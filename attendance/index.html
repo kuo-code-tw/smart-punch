@@ -23450,7 +23450,8 @@ const observer=new MutationObserver(mount);observer.observe(document.body,{child
 </script>
 <!-- PORT79 MOBILE PUNCH CLOUD ACK: persistent status view; read-only, preserves outbox -->
 <style>
-#p79MobilePunchSync{position:fixed;right:12px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9990;max-width:min(330px,calc(100vw - 24px));border:1px solid #a5b4fc;border-radius:13px;padding:10px 13px;background:#fff;color:#1e293b;box-shadow:0 7px 26px #0003;text-align:left;font-size:13px;font-weight:700}
+#p79MobilePunchSync{position:static;display:block;width:100%;max-width:none;border:1px solid #a5b4fc;border-radius:13px;padding:10px 13px;background:#fff;color:#1e293b;box-shadow:0 2px 8px #0001;text-align:left;font-size:13px;font-weight:700}
+#p79MobilePunchSync[hidden]{display:none!important}
 #p79MobilePunchSync small{display:block;font-weight:400;margin-top:3px}
 #p79MobilePunchSyncPanel{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:14px;background:#0f172a99}
 #p79MobilePunchSyncPanel.open{display:flex}
@@ -23463,6 +23464,10 @@ const observer=new MutationObserver(mount);observer.observe(document.body,{child
 'use strict';
 const key='p79_mobile_punch_last_cloud_ack_v1';
 const btn=document.getElementById('p79MobilePunchSync'),panel=document.getElementById('p79MobilePunchSyncPanel'),details=document.getElementById('p79MobilePunchSyncDetails');
+// Sync status belongs to employee punch panel, never overlay admin deletion/edit actions.
+const punchArea=document.getElementById('btnClockIn')?.parentElement?.parentElement;
+if(punchArea?.parentElement && btn) punchArea.insertAdjacentElement('afterend',btn);
+else if(btn) btn.hidden=true;
 const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=(k)=>{try{const a=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}};
 function ack(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
@@ -23485,7 +23490,8 @@ function draw(){
   }).join('');
   const reason=errors[0]||a?.error||'';
   btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):last)+'</small>';
-  const hasPunch=!!(document.getElementById('punchSuccessModal')||document.getElementById('homeClockInBtn'));
+  const employeePage=document.getElementById('viewEmployee');
+  const hasPunch=!!(employeePage && employeePage.contains(btn));
   btn.hidden=!hasPunch;
   details.innerHTML='<p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
     (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
