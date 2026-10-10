@@ -21921,6 +21921,9 @@ function p79AttendanceRetryDelay(payload, attempts) {
   if(String(payload?.action||'')==='deleteRecord'){
     return Math.min(3600000, Math.max(300000, 300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4))));
   }
+  if (['updateRecord','editRecord'].includes(String(payload?.action||''))) {
+    return Math.min(3600000,300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4)));
+  }
   return Math.min(MAX_BACKOFF,1000*Math.pow(2,Math.min(attempts,4)));
 }
 
@@ -22181,7 +22184,7 @@ async function drain(force=false){
       q=readQueue();
       if(!q.length)break;
       const now=Date.now();
-      const item=q.find(x=>force||Number(x.nextRetryAt||0)<=now);
+      const item=q.find(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now));
       if(!item)break;
 
       currentOpText=desc(item.payload);
@@ -22226,7 +22229,7 @@ async function drain(force=false){
         const serverData = err?.serverData || {};
         const rid = cur?.payload?.record?.id ?? cur?.payload?.id;
 
-        if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord'){
+        if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
           // V5.10.17：雲端判定為重複刷卡時不可一直重試，
           // 並把剛才 optimistic 加入的本機那一筆回滾。
           remove(cur.key);
@@ -22256,7 +22259,8 @@ async function drain(force=false){
         cur.attempts=attempts;
         cur.state='pending';
         cur.lastError=String(err?.message||err||'失敗');
-        cur.nextRetryAt=Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+        cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
         currentOpText='等待重試';
@@ -22316,7 +22320,7 @@ async function drainFast(force=true, concurrency=4){
       const nonRetryable=err?.retryable===false;
       const rid=cur?.payload?.record?.id ?? cur?.payload?.id;
 
-      if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord'){
+      if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
         remove(cur.key);
         if(rid!=null){
           const ridText=String(rid);
@@ -22333,7 +22337,8 @@ async function drainFast(force=true, concurrency=4){
       cur.attempts=attempts;
       cur.state='pending';
       cur.lastError=String(err?.message||err||'失敗');
-      cur.nextRetryAt=Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+      cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
       return {ok:false,item,error:err,retryable:true};
     }
@@ -22345,7 +22350,7 @@ async function drainFast(force=true, concurrency=4){
       if(!q.length)break;
 
       const now=Date.now();
-      const eligible=q.filter(x=>force||Number(x.nextRetryAt||0)<=now);
+      const eligible=q.filter(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now));
       if(!eligible.length)break;
 
       const group=[];
