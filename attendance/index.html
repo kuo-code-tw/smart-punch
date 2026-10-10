@@ -5467,6 +5467,8 @@ const now = new Date();
                 const tombEvent = String(item?.eventKey || '').trim();
 
                 if (id && tombId && id === tombId && now - savedAt <= ATTENDANCE_LOCAL_DELETE_ID_TTL_MS) return true;
+                // 兩筆都有不同 ID 時，不能只因事件鍵一致就連帶隱藏另一筆。
+                if (id && tombId && id !== tombId) return false;
                 if (eventKey && tombEvent && eventKey === tombEvent && now - savedAt <= ATTENDANCE_LOCAL_DELETE_EVENT_TTL_MS) return true;
                 return false;
             });
@@ -5481,10 +5483,10 @@ const now = new Date();
             const shouldKeep = item => {
                 if (!item) return true;
                 const itemId = String(item?.id ?? '').trim();
+                // 有 ID 的刪除只能刪同一 ID；相同時間／事件鍵可能是另一筆合法刷卡。
+                if (id) return itemId !== id;
                 const itemEvent = getAttendanceImportEventKey(item);
-                if (id && itemId === id) return false;
-                if (eventKey && itemEvent === eventKey) return false;
-                return true;
+                return !eventKey || itemEvent !== eventKey;
             };
 
             try {
@@ -14269,6 +14271,13 @@ function getManualPairRecordAnchor(record) {
         let p79LastManualRecoveryCheckAt = 0;
         // 只顯示重複候選原始打卡；人工核對後才允許刪除單筆，絕不自動刪。
         let p79DuplicateReviewRows = [];
+        let p79MainTableDuplicateRows = [];
+        function p79OpenMainTableDuplicateReview(index) {
+            const row = p79MainTableDuplicateRows[index];
+            if (!row) return;
+            p79DuplicateReviewRows = [row];
+            p79OpenDuplicateReview(0);
+        }
         function p79CloseDuplicateReview() {
             document.getElementById('p79DuplicateReviewModal')?.remove();
         }
@@ -14354,18 +14363,35 @@ function getManualPairRecordAnchor(record) {
             const r = row?.records?.[recordIndex];
             if (!r || !requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
             const id = String(r.id ?? '').trim();
-            if (!id || records.filter(x => String(x?.id ?? '').trim() === id).length !== 1) {
-                showToast('紀錄 ID 缺失或重複，為安全起見禁止從此處刪除', 'warning');
+            const matches=(Array.isArray(records)?records:[]).filter(x=>String(x?.id??'').trim()===id);
+            if (!id || matches.length !== 1 ||
+                String(matches[0]?.timeStr||'') !== String(r?.timeStr||'') ||
+                String(matches[0]?.status||'') !== String(r?.status||'')) {
+                showToast('原始紀錄已變動或 ID 不唯一，請重新整理後再核對', 'warning');
                 return;
             }
-            // 沿用原有確認與雲端 tombstone。取消刪除時不關閉核對視窗。
-            const reviewRowsBeforeDelete = p79DuplicateReviewRows.slice();
-            if (deleteRecord(id) !== true) return;
-            const refreshed = { ...row, records:row.records.filter(item => String(item?.id ?? '').trim() !== id) };
-            reviewRowsBeforeDelete[index] = refreshed;
-            // deleteRecord 會重畫主表並重設清單；先恢復原核對上下文，再原地刷新視窗。
-            p79DuplicateReviewRows = reviewRowsBeforeDelete;
-            p79OpenDuplicateReview(index);
+            const outbox=window.p79V5QueueInfoForId?.(id);
+            if(outbox){
+                showToast('這筆刪除／修改仍在待同步佇列，請先等待核對雲端結果','warning');
+                return;
+            }
+            if (!confirm('只刪除這一筆原始紀錄：'+String(r.timeStr||'')+' '+String(r.status||'')+
+                '\n紀錄 ID：'+id+'\n其他上班／下班打卡將保留。\n確認送出雲端刪除？')) return;
+            // 不先清空本機：等待 GAS 正式確認後，才以此 ID 移除並記錄 tombstone。
+            p79CloseDuplicateReview();
+            showToast('刪除請求已送出；雲端確認前保留原紀錄，避免整組變空白','warning');
+            Promise.resolve(postToCloud({action:'deleteRecord',id:id}))
+              .then(result=>{
+                if(result?.ok && !result?.queued){
+                    // V5 direct-ACK 也會執行確認移除，重複呼叫是安全的。
+                    p79ApplyConfirmedAttendanceDelete(id);
+                }else if(result?.queued){
+                    showToast('雲端尚未確認刪除，原紀錄保留並等待補傳','warning');
+                }else if(result?.error){
+                    showToast('刪除尚未完成：'+String(result.error),'warning');
+                }
+              })
+              .catch(err=>showToast('雲端刪除未確認，原始紀錄保留：'+String(err?.message||err),'warning'));
         }
 
         function renderAdminRecordsTable() {
@@ -14513,7 +14539,7 @@ function getManualPairRecordAnchor(record) {
             const allowAttendanceCreate = canPerformAdminAction(currentEmp, 'attendanceCreate');
             const allowAttendanceDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
 
-            p79DuplicateReviewRows = pageRows;
+            p79MainTableDuplicateRows = pageRows;
             tbody.innerHTML = pageRows.map((row, rowIndex) => {
                 // V5.10.3：顯示單位／職務時每列直接用考勤號查員工主檔。
                 // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
@@ -14536,7 +14562,7 @@ function getManualPairRecordAnchor(record) {
                 ).trim();
 
                 const statusBadge = String(row.attendanceStatus || '').includes('重複')
-                    ? `<button type="button" onclick="p79OpenDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對重複打卡">🔎 重複刷卡</button>`
+                    ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對重複打卡">🔎 重複刷卡</button>`
                     : getAttendanceStatusBadge(row.attendanceStatus);
                 const extraChecks = (Array.isArray(row.attendanceCheckLabels) ? row.attendanceCheckLabels : [])
                     .filter(label => label === '跨日班次' || label === '人工補卡')
@@ -14669,6 +14695,31 @@ function getManualPairRecordAnchor(record) {
             }
             return false;
         }
+
+        function p79ApplyConfirmedAttendanceDelete(id) {
+            const targetId=String(id??'').trim();
+            if (!targetId) return false;
+            const matching=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'').trim()===targetId);
+            if(matching.length>1){
+                console.warn('[PORT79] 雲端確認刪除後發現相同 ID 多筆，停止前端批次移除：',targetId);
+                return false;
+            }
+            try {
+                // 成功 ACK 才建立刪除保護；只能針對指定 ID，不能刪除同班其他刷卡。
+                purgeDeletedAttendanceRecordFromAllLocalCaches(matching[0]||{id:targetId});
+                records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'').trim()!==targetId);
+                removeAttendanceRecordsFromArchive([targetId]);
+                forgetRecentAttendanceMutation(targetId);
+                saveRecords();
+                renderAdminRecordsTable();
+                try{renderAdminLiveTable()}catch(e){}
+                return true;
+            }catch(err){
+                console.warn('[PORT79] 已收到刪除 ACK，但本機畫面刷新失敗：',err);
+                return false;
+            }
+        }
+        window.p79ApplyConfirmedAttendanceDelete=p79ApplyConfirmedAttendanceDelete;
 
         function ensure24HourTimePicker(prefix) {
             const hourSelect = document.getElementById(`${prefix}TimeHour`);
@@ -22225,6 +22276,9 @@ async function drain(force=false){
         }
 
         remove(item.key);
+        if(String(item?.payload?.action||'')==='deleteRecord'){
+            try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+        }
         if(String(item?.payload?.action||'')==='addRecord' &&
             String(item?.payload?.record?.source||'').toLowerCase().includes('employee')){
             try{window.p79ConfirmMobilePunchCloudRecord?.(item?.payload?.record?.id);}catch(e){}
@@ -22324,6 +22378,9 @@ async function drainFast(force=true, concurrency=4){
       }
 
       remove(item.key);
+      if(String(item?.payload?.action||'')==='deleteRecord'){
+        try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+      }
       syncBatchDone++;
       lastDoneAt=Date.now();
 
@@ -22687,6 +22744,9 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
         try{markRecentAttendanceMutationCloudConfirmed?.(recordId)}catch(e){}
       }
 
+      if(String(payload?.action||'')==='deleteRecord'){
+        try{window.p79ApplyConfirmedAttendanceDelete?.(recordId)}catch(e){}
+      }
       syncBatchDone++;
       lastDoneAt=Date.now();
       currentOpText='同步完成';
