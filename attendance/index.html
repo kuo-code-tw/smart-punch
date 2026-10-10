@@ -6111,8 +6111,11 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
             // 2. 該月份 incoming 為雲端快照主體。
             // 3. 再聯集目前記憶體中同月份資料，保留較新的 Delta / 本機剛寫入資料。
             // 4. 真正刪除仍由 Delta delete / 明確刪除流程處理，不靠月份快照推測刪除。
+            // 不讓本機已標記刪除的舊紀錄，再經由月份快照合併回畫面。
+            // 注意：不過濾雲端傳回的 incoming，避免將實際尚未刪除的雲端資料假裝刪除成功。
             const existingSameMonth = currentRecords.filter(
-                record => attendanceRecordMonthKey(record) === key
+                record => attendanceRecordMonthKey(record) === key &&
+                    !isLocallyDeletedAttendanceRecord(record)
             );
             const keepOtherMonths = currentRecords.filter(
                 record => attendanceRecordMonthKey(record) !== key
