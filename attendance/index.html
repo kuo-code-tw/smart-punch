@@ -4138,6 +4138,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             : (isManualAttendanceWrite
                                 ? 35000
                                 : (['updateRecord','editRecord','deleteRecord'].includes(action) ? 20000 : 20000)))));
+            const startedAt = Date.now();
             const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
             const timeoutId = controller ? setTimeout(() => controller.abort(), effectiveTimeout) : null;
             return fetch(getActiveGasUrl(), {
@@ -4155,6 +4156,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 }
             }).finally(() => {
                 if (timeoutId) clearTimeout(timeoutId);
+                const elapsedMs = Date.now() - startedAt;
+                if (elapsedMs > 3000) console.info('[PORT79 考勤雲端請求]',action,elapsedMs+'ms');
             });
         }
 
@@ -4363,7 +4366,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             if (!sysConfig || !sysConfig.gasUrl) {
                 if (successMsg) showToast(successMsg + " (未設定雲端 URL，僅存於本地)", "warning");
                 if (typeof onError === 'function') onError('未設定雲端 URL');
-                return;
+                return Promise.resolve({ok:false,error:'未設定雲端 URL'});
             }
 
             const payloadDescription = getCloudPayloadDescription(payload);
@@ -4402,7 +4405,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     // 讓本機也盡快取得正式雲端 revision；其他裝置則由狀態列 revision 自動偵測。
                     setTimeout(() => { try { checkAttendanceCloudRevision(); } catch (e) {} }, 700);
                 } else {
-                    const errorText = String(data.error || '');
+                    const errorText = String(data?.error || '雲端未回傳有效資料');
                     const retryable = data?.retryable === true ||
                         /正在同步|正在處理其他資料|自動重試|稍後.*重試/i.test(errorText);
 
@@ -4421,6 +4424,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
                     if (typeof onError === 'function') onError(errorText || '未知錯誤');
                 }
+                return data || {ok:false,error:'雲端未回傳有效資料'};
             })
             .catch(err => {
                 console.error('postToCloud 連線錯誤：', err);
@@ -4429,6 +4433,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 setCloudSyncStatus(pending > 0 ? `🟠 待同步 ${pending} 筆（自動重試中）` : '🔴 雲端連線失敗', pending > 0 ? 'loading' : 'error');
                 showToast(`雲端暫時無法連線，${pendingText}`, 'warning');
                 if (typeof onError === 'function') onError(pendingText);
+                return {ok:false,queued:pending>0,error:String(err?.message || err || pendingText)};
             })
             .finally(() => {
                 cloudDirectWriteBusy = Math.max(0, cloudDirectWriteBusy - 1);
@@ -7834,6 +7839,26 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }
         }
 
+        // 主快取立即保存；大型安全備份延後合併連續寫入，減少手機卡頓。
+        let p79AttendanceBackupTimer = null;
+        function p79FlushAttendanceSafetyBackup() {
+            if (p79AttendanceBackupTimer !== null) {
+                clearTimeout(p79AttendanceBackupTimer);
+                p79AttendanceBackupTimer = null;
+            }
+            return saveAttendanceSafetyBackup(records);
+        }
+        function p79ScheduleAttendanceSafetyBackup() {
+            if (p79AttendanceBackupTimer !== null) clearTimeout(p79AttendanceBackupTimer);
+            p79AttendanceBackupTimer = setTimeout(p79FlushAttendanceSafetyBackup, 450);
+        }
+        window.addEventListener('pagehide', () => {
+            if (p79AttendanceBackupTimer !== null) p79FlushAttendanceSafetyBackup();
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && p79AttendanceBackupTimer !== null) p79FlushAttendanceSafetyBackup();
+        });
+
         function saveRecords() {
             records = records.map(normalizeAttendanceRecordIdentifiers);
             const serialized = JSON.stringify(records);
@@ -7866,7 +7891,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }
 
             // 安全備份本身已有 try/catch；只有主快取成功時才再複製完整資料，避免容量不足時反覆失敗。
-            if (primarySaved) saveAttendanceSafetyBackup(records);
+            if (primarySaved) p79ScheduleAttendanceSafetyBackup();
             return primarySaved;
         }
         function saveLeaveRecords() {
@@ -10135,7 +10160,11 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 雲端無法確認時停止寫入，不刪除或覆蓋任何原始紀錄。
             if (statusText === '上班簽到' || statusText === '下班簽退') {
                 try {
-                    const cloudFresh = await p79MobileRefreshOfficial(true);
+                    // 已驗證的新鮮雲端資料（8秒內）避免無意義整月再拉取。
+                    const justVerified = p79MobileHasOfficial(currentEmp) &&
+                        Date.now()-p79MobileOfficial.verifiedAt >= 0 &&
+                        Date.now()-p79MobileOfficial.verifiedAt < 8000;
+                    const cloudFresh = justVerified || await p79MobileRefreshOfficial(true);
                     if (!cloudFresh) {
                         showToast('無法確認雲端最新上班紀錄，暫停打卡以避免重複；請稍後再試或通知管理員核對。', 'warning');
                         releasePunchGuard();
@@ -10366,19 +10395,11 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 完整簽到／簽退後清掉該工作日的本機確認顯示，但 records 與雲端完全保留。
             updateEmployeeDailyConfirmationAfterPunch(currentEmp, newRecord);
 
-            // 先把畫面與按鈕立即更新，員工不需要等 GAS 回應。
+            // 已同步寫入本機快取；成功視窗出現後立即開始非同步雲端寫入。
+            // 雲端請求不應等員工歷史班次重算與管理員下拉選單。
             openPunchSuccessModal(newRecord);
-            updateHomeClockInButtonState();
-            if (noteInput) noteInput.value = '';
-            renderEmpHistoryTable();
-            initDropdowns();
-
-            // 本機紀錄與成功畫面已完成，立即解除打卡操作鎖；
-            // 雲端寫入留在背景，不讓手機等 GAS 才能繼續操作。
             releasePunchGuard();
-
-            // 下一個 event loop 才開始送雲端，確保手機先畫出「已打卡完成」。
-            setTimeout(() => {
+            try {
                 postRealtimePunchToCloud(
                     newRecord,
                     `打卡成功！雲端已收到：${statusText}`,
@@ -10389,7 +10410,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     },
                     error => updatePunchSuccessCloudStatus(false, error)
                 );
-            }, 80);
+            } catch(error) {
+                updatePunchSuccessCloudStatus(false,error?.message || String(error));
+            }
+            updateHomeClockInButtonState();
+            if(noteInput) noteInput.value = '';
+            renderEmpHistoryTable();
+            if(isAdminLoggedIn) initDropdowns();
         }
 
         let empHistoryCurrentPage = 1;
