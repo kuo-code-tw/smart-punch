@@ -9649,6 +9649,24 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             finally{p79MobileOfficialPromise=null;}
         }
 
+        // On actual GAS acknowledgment the official snapshot must immediately adopt that record.
+        // Otherwise removing it from the outbox can temporarily revert the phone buttons.
+        window.p79MobileMarkAcceptedPunch=function(recordId) {
+            const key=String(recordId??'').trim();
+            if(!key || !p79MobileHasOfficial(currentEmp))return false;
+            const record=(Array.isArray(records)?records:[]).find(x=>String(x?.id??'')===key);
+            if(!record || !findEmployeeForAttendanceIdentity(record,[currentEmp]))return false;
+            p79MobileOfficial.rows=p79MobileOfficial.rows.filter(x=>String(x?.id??'')!==key);
+            p79MobileOfficial.rows.push(record);
+            p79MobileOfficial.verifiedAt=Date.now();
+            window.p79MobileLatestOfficialPunch={
+                empId:p79MobileOfficial.empId,recordId:key,timeStr:String(record.timeStr||''),
+                status:String(record.status||''),verifiedAt:Date.now()
+            };
+            try{updateHomeClockInButtonState();}catch(e){}
+            return true;
+        };
+
         function getEmployeePunchRecords(emp = currentEmp, channel = 'REGULAR') {
             if (!emp) return [];
             const local=Array.isArray(records)?records:[];
@@ -9656,8 +9674,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             let source=local;
             if(p79MobileHasOfficial(emp)){
                 // Preserve only not-yet-cloud-confirmed local punches and recent cross-month shifts.
+                const confirmedIds=new Set(p79MobileOfficial.rows.map(record=>String(record?.id??'')));
                 const pending=local.filter(record=>matched(record) &&
                     (window.p79V5PendingForId?.(record.id)===true ||
+                     (String(record?.source||'').toLowerCase().includes('employee') &&
+                      !confirmedIds.has(String(record?.id??'')) &&
+                      Date.now()-getAttendanceTimestamp(record)>=0 &&
+                      Date.now()-getAttendanceTimestamp(record)<=5*60000) ||
                      (attendanceRecordMonthKey(record)!==p79MobileOfficial.month &&
                       Date.now()-getAttendanceTimestamp(record)>=0 &&
                       Date.now()-getAttendanceTimestamp(record)<=36*3600000)));
@@ -10356,7 +10379,11 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 postRealtimePunchToCloud(
                     newRecord,
                     `打卡成功！雲端已收到：${statusText}`,
-                    () => { forgetRecentAttendanceMutation(newRecord.id); updatePunchSuccessCloudStatus(true); },
+                    () => {
+                        forgetRecentAttendanceMutation(newRecord.id);
+                        window.p79MobileMarkAcceptedPunch?.(newRecord.id);
+                        updatePunchSuccessCloudStatus(true);
+                    },
                     error => updatePunchSuccessCloudStatus(false, error)
                 );
             }, 80);
@@ -23653,6 +23680,7 @@ window.p79RecordMobilePunchAck=function(state,error,recordId){
   draw();
 };
 window.p79ConfirmMobilePunchCloudRecord=function(recordId){
+  try{window.p79MobileMarkAcceptedPunch?.(recordId);}catch(e){}
   const current=ack();
   if(current?.recordId && String(current.recordId)===String(recordId)){
     window.p79RecordMobilePunchAck('success','',recordId);
