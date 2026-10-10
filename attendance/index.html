@@ -14313,11 +14313,78 @@ function getManualPairRecordAnchor(record) {
                 <div class="text-sm font-bold mb-2">疑似重複班次：${list.length} 組｜整合多餘刷卡：${totalExtra} 筆</div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3">僅統計目前已載入、且你有權限查看的考勤資料；不是全年雲端全部重複筆數。這是班次整合候選，並非確認可刪資料。人工補卡與不同事件 ID 請逐筆核對。</p>
                 <div class="overflow-x-auto"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
-                <div class="flex justify-end mt-4"><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
+                <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">刪除重複考勤（系統優先）</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
             </div>`;
             modal.addEventListener('click',e=>{if(e.target===modal)p79CloseDuplicateReview();});
             document.body.appendChild(modal);
         }
+
+        // 批次安全整理：雲端確認後刪除，Excel 唯一紀錄升級為正式系統。
+        let p79BatchDuplicateBusy = false;
+        async function p79BatchCleanDuplicateAttendance() {
+            if (p79BatchDuplicateBusy || !requireAdminAction('attendanceDelete','批次整理重複考勤')) return;
+            const rows = p79GetDuplicateListRows();
+            const items = Array.isArray(records) ? records : [];
+            const tasks = [], keys = new Set(), skipped = new Set();
+            const source = r => String(r?.source || r?.dataSource || r?.['資料來源'] || '').toLowerCase();
+            const excel = r => source(r) === 'excel-import';
+            const manual = r => !!r?.manuallyEdited || /manual|補刷|補卡/.test(source(r));
+            const safe = r => !!String(r?.id??'').trim() &&
+                items.filter(x=>String(x?.id??'').trim()===String(r.id).trim()).length===1 &&
+                !window.p79V5QueueInfoForId?.(String(r.id).trim());
+            for (const row of rows) {
+                if (!Array.isArray(row.records)) continue;
+                for (const dir of ['IN','OUT']) {
+                    const group=row.records.filter(r=>getAttendanceRecordType(r)===dir&&!isLocallyDeletedAttendanceRecord(r));
+                    if (!group.length) continue;
+                    if (group.some(r=>manual(r)||!safe(r))) {skipped.add(row);continue;}
+                    const official=group.filter(r=>!excel(r));
+                    if (official.length>1 && new Set(official.map(r=>String(r.timeStr||''))).size>1) {
+                        skipped.add(row);continue;
+                    }
+                    const keep=official[0]||group.slice().sort((a,b)=>String(a.timeStr||'').localeCompare(String(b.timeStr||'')))[0];
+                    if (group.some(r=>r!==keep && String(r.timeStr||'')!==String(keep.timeStr||'') &&
+                        !(excel(r) && typeof p79ImportSideMatch==='function' && p79ImportSideMatch(r,keep)?.matched))) {
+                        skipped.add(row);continue;
+                    }
+                    if (excel(keep) && !keys.has('p'+keep.id)) {
+                        keys.add('p'+keep.id);tasks.push({mode:'promote',record:keep});
+                    }
+                    group.filter(r=>r!==keep).forEach(r=>{
+                        if (!keys.has('d'+r.id)) {keys.add('d'+r.id);tasks.push({mode:'delete',record:r});}
+                    });
+                }
+            }
+            const del=tasks.filter(t=>t.mode==='delete').length,pro=tasks.length-del;
+            if (!tasks.length){showToast('沒有可安全自動清除的重複刷卡；不同事件仍保留待核對','warning');return;}
+            if (!confirm('保留系統考勤優先？\n雲端刪除 '+del+' 筆\nExcel 改正式系統 '+pro+' 筆\n保留待核對 '+skipped.size+' 組\n確認後才執行，雲端未確認不會從畫面移除。')) return;
+            p79BatchDuplicateBusy=true;
+            let removed=0,converted=0,failed=0;
+            try {
+                for(const task of tasks) {
+                    const r=task.record,id=String(r.id).trim();
+                    if (items.filter(x=>String(x?.id??'').trim()===id).length!==1 ||
+                        window.p79V5QueueInfoForId?.(id)) {failed++;continue;}
+                    try {
+                        if(task.mode==='delete') {
+                            const result=await postToCloud({action:'deleteRecord',id});
+                            if(result?.ok&&!result?.queued&&p79ApplyConfirmedAttendanceDelete(id))removed++;
+                            else failed++;
+                        } else {
+                            const updated={...r,source:'system-confirmed',importConfirmedAt:new Date().toISOString(),importConfirmedFrom:String(r.importFile||'')};
+                            const result=await postToCloud({action:'updateRecord',record:updated,originalTimeStr:r.timeStr,originalPunchType:r.status});
+                            if(result?.ok&&!result?.queued) {
+                                Object.assign(r,updated);archiveAttendanceRecords([r]);saveRecords();converted++;
+                            } else failed++;
+                        }
+                    }catch(e){failed++;console.warn('[PORT79] 批次整理未完成',id,e);}
+                }
+                p79CloseDuplicateReview();
+                try{renderAdminRecordsTable()}catch(e){}
+                showToast('批次整理：刪除 '+removed+' 筆、Excel 轉系統 '+converted+' 筆、未完成 '+failed+' 筆、保留待核對 '+skipped.size+' 組',failed?'warning':'success');
+            } finally {p79BatchDuplicateBusy=false;}
+        }
+
         function p79OpenDuplicateReview(index) {
             const row = p79DuplicateReviewRows[index];
             if (!row || !Array.isArray(row.records)) return;
