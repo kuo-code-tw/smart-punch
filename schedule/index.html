@@ -2616,8 +2616,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 
     function setCurrentMonthDefault() {
       const picker = document.getElementById('month-picker');
-      const now = new Date();
-      picker.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      picker.value = scheduleTaipeiTodayKey().slice(0,7);
     }
 
     function loadDataFromLocalStorage() {
@@ -3440,9 +3439,9 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 
     function scheduleMonthBounds(monthKey){const [y,m]=String(monthKey||'').split('-').map(Number);if(!y||!m)return['',''];const last=new Date(y,m,0).getDate();return[`${y}-${String(m).padStart(2,'0')}-01`,`${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`];}
     function updateScheduleDateRangeSummary(){const a=document.getElementById('scheduleDateFrom')?.value||'',b=document.getElementById('scheduleDateTo')?.value||'',el=document.getElementById('scheduleDateRangeSummary');if(el)el.innerHTML=`<i class="fa-regular fa-calendar-check text-indigo-500 mr-1"></i>${!a&&!b?'日期範圍':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`}`;}
-    function setScheduleFullMonthRange(){const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7),[a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
+    function setScheduleFullMonthRange(){const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7),[a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
     async function onScheduleMonthPickerChange(){
-      const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7);
+      const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7);
       const [a,b]=scheduleMonthBounds(month);
       const from=document.getElementById('scheduleDateFrom'),to=document.getElementById('scheduleDateTo');
       if(from)from.value=a;if(to)to.value=b;
@@ -4969,7 +4968,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
   };
 
   function currentRangeMonth(){
-    return (document.getElementById('scheduleDateFrom')?.value||document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7)).slice(0,7);
+    return (document.getElementById('scheduleDateFrom')?.value||document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7)).slice(0,7);
   }
 
   window.renderScheduleRangeCalendar=function(){
@@ -4985,8 +4984,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     if(label)label.textContent=`${y}年${pad2(m)}月`;
     if(hint)hint.textContent=rangeDraftStart?`開始 ${prettyDate(rangeDraftStart)}，請點結束日期`:'先點開始日期，再點結束日期';
     if(!days)return;
-    const today=new Date();
-    const todayKey=`${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
+    const todayKey=scheduleTaipeiTodayKey();
     const html=[];
     for(let i=0;i<firstDow;i++)html.push('<span class="schedule-range-blank"></span>');
     for(let d=1;d<=lastDay;d++){
@@ -5081,7 +5079,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
   });
 })();
 </script>
-<script id="schedule-unified-date-range-init">window.addEventListener('load',()=>{try{const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7),[a,b]=scheduleMonthBounds(month),x=document.getElementById('scheduleDateFrom'),y=document.getElementById('scheduleDateTo');if(x&&!x.value)x.value=a;if(y&&!y.value)y.value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}catch(e){console.warn(e);}});</script>
+<script id="schedule-unified-date-range-init">window.addEventListener('load',()=>{try{const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7),[a,b]=scheduleMonthBounds(month),x=document.getElementById('scheduleDateFrom'),y=document.getElementById('scheduleDateTo');const today=scheduleTaipeiTodayKey();if(x&&!x.value)x.value=today.slice(0,7)===month?today:a;if(y&&!y.value)y.value=today.slice(0,7)===month?today:b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}catch(e){console.warn(e);}});</script>
 
 <script id="p79-unified-ui-script-v20260928-80">
 (function(){
