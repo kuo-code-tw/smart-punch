@@ -23737,5 +23737,89 @@ setInterval(draw,4000);draw();
 })();
 </script>
 <script src="./v6-engine.js?v=6.0.5"></script>
+<script id="p79-v14-cloud-ack-reconciliation">
+(function(){
+'use strict';
+// V14: 只核對新增考勤的雲端 ID 與核心內容；不碰管理員修改或刪除任務。
+// 舊版 POST 逾時時，伺服器可能已寫成功；避免把同一筆反覆寫入。
+const KEY='port79_attendance_v5_outbox';
+let running=false, last=0;
+function token(){
+  try{return String(sessionStorage.getItem('port79_user_token')||
+    sessionStorage.getItem('port79_admin_token')||
+    sessionStorage.getItem('port79_gc_superadmin_token')||'').trim()}catch(e){return ''}
+}
+function canonicalTime(v){
+  return String(v||'').trim().replace(/[.-]/g,'/').replace(/\s+/g,' ')
+    .replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{1,2})/,
+      (_,y,m,d,h,mi)=>[y,m.padStart(2,'0'),d.padStart(2,'0')].join('/')+' '+h.padStart(2,'0')+':'+mi.padStart(2,'0'));
+}
+function equalRecord(local,remote){
+  if(!local||!remote)return false;
+  if(String(local.id||'')!==String(remote.id||''))return false;
+  for(const key of ['empId','attNo','status']){
+    if(String(local[key]||'').trim()!==String(remote[key]||'').trim())return false;
+  }
+  if(canonicalTime(local.timeStr)!==canonicalTime(remote.timeStr))return false;
+  // 手動補卡需確認指定的同班配對錨點沒有遺失。
+  for(const key of ['manualPairClockInId','manualPairClockOutId']){
+    if(String(local[key]||'').trim()!==String(remote[key]||'').trim())return false;
+  }
+  return true;
+}
+async function reconcile(){
+  if(running||Date.now()-last<45000||navigator.onLine===false)return;
+  if(window.p79V5GetStatus?.().writing)return;
+  const tk=token();
+  if(!tk)return;
+  let queue;
+  try{queue=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){return}
+  if(!Array.isArray(queue)||!queue.length)return;
+  const pending=queue.filter(x=>!x.paused&&String(x?.payload?.action||'')==='addRecord'&&x?.payload?.record?.id);
+  if(!pending.length)return;
+  const ids=[...new Set(pending.map(x=>String(x.payload.record.id)))].slice(0,25);
+  const base=typeof getActiveGasUrl==='function'?getActiveGasUrl():'';
+  if(!base)return;
+  running=true;last=Date.now();
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),12000);
+  try{
+    const url=base+(base.includes('?')?'&':'?')+
+      'action=getAttendanceWriteStatus&ids='+encodeURIComponent(ids.join(','))+
+      '&token='+encodeURIComponent(tk);
+    const response=await fetch(url,{cache:'no-store',signal:ctrl.signal});
+    const data=await response.json();
+    if(!data?.ok||!data?.found)return;
+    if(window.p79V5GetStatus?.().writing)return;
+    const current=JSON.parse(localStorage.getItem(KEY)||'[]');
+    if(!Array.isArray(current))return;
+    const completed=[];
+    const keep=current.filter(entry=>{
+      if(entry?.paused||String(entry?.payload?.action||'')!=='addRecord')return true;
+      const record=entry?.payload?.record;
+      if(!record||!equalRecord(record,data.found[String(record.id)]))return true;
+      completed.push(String(record.id));return false;
+    });
+    if(!completed.length)return;
+    // 防止非本函式寫入佇列的競態：若資料已改變，留給下一輪核對。
+    if(window.p79V5GetStatus?.().writing)return;
+    if(JSON.stringify(current)!==localStorage.getItem(KEY))return;
+    localStorage.setItem(KEY,JSON.stringify(keep));
+    for(const id of completed){
+      try{markRecentAttendanceMutationCloudConfirmed?.(id)}catch(e){}
+      try{window.p79ConfirmMobilePunchCloudRecord?.(id)}catch(e){}
+    }
+    window.p79V5RefreshStatus?.();
+    console.info('[PORT79] 已核對雲端並結案新增考勤 '+completed.length+' 筆（未修改雲端資料）');
+  }catch(e){
+    console.info('[PORT79] 待同步核對暫不可用，原佇列完整保留',String(e?.message||e));
+  }finally{clearTimeout(timer);running=false}
+}
+window.p79V14ReconcilePunchAcks=reconcile;
+document.addEventListener('DOMContentLoaded',()=>setTimeout(reconcile,1800),{once:true});
+window.addEventListener('online',()=>setTimeout(reconcile,3000));
+setInterval(()=>{if(!document.hidden)reconcile()},60000);
+})();
+</script>
 </body>
 </html>
