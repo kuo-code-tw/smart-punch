@@ -21783,6 +21783,13 @@ const STATE_KEY='port79_attendance_v5_state';
 const ACTIVE_MS=1800;
 const IDLE_MS=4000;
 const MAX_BACKOFF=15000;
+// 刪除失敗不應每 15 秒重新佔用 GAS；保留資料並採漸進退避（5分鐘至1小時）。
+function p79AttendanceRetryDelay(payload, attempts) {
+  if(String(payload?.action||'')==='deleteRecord'){
+    return Math.min(3600000, Math.max(300000, 300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4))));
+  }
+  return Math.min(MAX_BACKOFF,1000*Math.pow(2,Math.min(attempts,4)));
+}
 
 const ATTENDANCE_WRITE_ACTIONS = new Set([
   'addRecord','updateRecord','editRecord','deleteRecord',
@@ -22082,7 +22089,7 @@ async function drain(force=false){
         const serverData = err?.serverData || {};
         const rid = cur?.payload?.record?.id ?? cur?.payload?.id;
 
-        if(nonRetryable){
+        if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord'){
           // V5.10.17：雲端判定為重複刷卡時不可一直重試，
           // 並把剛才 optimistic 加入的本機那一筆回滾。
           remove(cur.key);
@@ -22112,7 +22119,7 @@ async function drain(force=false){
         cur.attempts=attempts;
         cur.state='pending';
         cur.lastError=String(err?.message||err||'失敗');
-        cur.nextRetryAt=Date.now()+Math.min(MAX_BACKOFF,1000*Math.pow(2,Math.min(attempts,4)));
+        cur.nextRetryAt=Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
         currentOpText='等待重試';
@@ -22172,7 +22179,7 @@ async function drainFast(force=true, concurrency=4){
       const nonRetryable=err?.retryable===false;
       const rid=cur?.payload?.record?.id ?? cur?.payload?.id;
 
-      if(nonRetryable){
+      if(nonRetryable && String(cur?.payload?.action||'')!=='deleteRecord'){
         remove(cur.key);
         if(rid!=null){
           const ridText=String(rid);
@@ -22189,7 +22196,7 @@ async function drainFast(force=true, concurrency=4){
       cur.attempts=attempts;
       cur.state='pending';
       cur.lastError=String(err?.message||err||'失敗');
-      cur.nextRetryAt=Date.now()+Math.min(MAX_BACKOFF,1000*Math.pow(2,Math.min(attempts,4)));
+      cur.nextRetryAt=Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
       return {ok:false,item,error:err,retryable:true};
     }
