@@ -8204,92 +8204,91 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function requestLocationPermission(callback) {
-            if (!("geolocation" in navigator)) {
-                showToast("您的裝置不支援地理定位", "warning");
-                if (callback) callback(false, null);
+            // Never skip GPS or the original server-configured allowed radius.
+            const distanceEl=document.getElementById('distanceDisplay');
+            if(!navigator.geolocation || window.isSecureContext===false){
+                if(distanceEl)distanceEl.textContent='定位不可用';
+                showToast('目前瀏覽器無法使用安全 GPS 定位，請改用 HTTPS 網頁並開啟位置權限','warning');
+                callback?.(false,null);
                 return;
             }
-
-            const distanceEl = document.getElementById('distanceDisplay');
-            if (distanceEl) distanceEl.textContent = "快速定位中...";
-
-            let finished = false;
-            let lowPosition = null;
-
-            const evaluatePosition = (pos, source = 'high') => {
-                if (finished || !pos?.coords) return false;
-
-                const locations = getConfiguredPunchLocations();
-                const nearest = locations
-                    .map(location => ({
-                        ...location,
-                        distance: calculateDistance(
-                            pos.coords.latitude,
-                            pos.coords.longitude,
-                            location.lat,
-                            location.lng
-                        )
-                    }))
-                    .sort((a, b) => a.distance - b.distance)[0];
-
-                if (!nearest) {
-                    finished = true;
-                    if (distanceEl) distanceEl.textContent = "尚未設定打卡地點";
-                    showToast("請先由超級管理員設定 GPS 打卡地點", "warning");
-                    if (callback) callback(false, null, null);
-                    return true;
+            let finished=false;
+            let quickPosition=null;
+            let highStarted=false;
+            const watchdog=setTimeout(()=>fail('定位等待逾時，請重新點更新定位並檢查手機 GPS 訊號'),22000);
+            function finish(ok,distance,nearest,errorText){
+                if(finished)return;
+                finished=true;
+                clearTimeout(watchdog);
+                if(!ok){
+                    if(distanceEl)distanceEl.textContent=String(errorText||'無法取得定位');
+                    showToast(String(errorText||'無法取得定位，請開啟手機定位與瀏覽器位置權限'),'warning');
                 }
-
-                const accuracy = Number(pos.coords.accuracy || 9999);
-                document.getElementById('targetLocationName').textContent = nearest.name;
-                if (distanceEl) {
-                    distanceEl.textContent = `${nearest.distance.toFixed(1)} 公尺${Number.isFinite(accuracy) ? `｜±${Math.round(accuracy)}m` : ''}`;
+                callback?.(!!ok,distance??null,nearest??null);
+            }
+            function fail(text){finish(false,null,null,text);}
+            function evaluate(pos,source){
+                if(finished || !pos?.coords)return false;
+                const lat=Number(pos.coords.latitude),lng=Number(pos.coords.longitude);
+                const accuracy=Number(pos.coords.accuracy);
+                if(!Number.isFinite(lat)||!Number.isFinite(lng)||!Number.isFinite(accuracy))return false;
+                if(accuracy<=0 || accuracy>150){
+                    if(distanceEl)distanceEl.textContent='定位精度不足（±'+Math.round(accuracy)+'m）';
+                    return false;
                 }
-
-                // 快速低精度定位只有在精度足夠時才直接採用。
-                // 精度不足就補一次高精度，避免粗略基地台定位誤判打卡範圍。
-                if (source === 'low' && accuracy > 100) return false;
-
-                finished = true;
-                if (callback) callback(true, nearest.distance, nearest);
+                if(source==='quick' && accuracy>100)return false;
+                const locations=getConfiguredPunchLocations();
+                const nearest=locations.map(location=>({
+                    ...location,distance:calculateDistance(lat,lng,location.lat,location.lng)
+                })).sort((a,b)=>a.distance-b.distance)[0];
+                if(!nearest){fail('尚未設定打卡地點，請通知管理員設定正式 GPS 範圍');return true;}
+                const target=document.getElementById('targetLocationName');
+                if(target)target.textContent=nearest.name;
+                if(distanceEl)distanceEl.textContent=nearest.distance.toFixed(1)+' 公尺｜±'+Math.round(accuracy)+'m';
+                finish(true,nearest.distance,nearest);
                 return true;
-            };
-
-            const fail = () => {
-                if (finished) return;
-                finished = true;
-                if (distanceEl) distanceEl.textContent = "無法取得定位";
-                showToast("定位逾時，請確認已開啟手機定位與瀏覽器位置權限後再試", "warning");
-                if (callback) callback(false, null);
-            };
-
-            const requestHighAccuracy = () => {
-                if (finished) return;
-                if (distanceEl) distanceEl.textContent = "精確定位中...";
+            }
+            function messageFor(error){
+                const code=Number(error?.code||0);
+                if(code===1)return '定位權限被拒絕：請在手機與目前使用的瀏覽器開啟位置權限，再點更新定位';
+                if(code===2)return '手機目前無法取得 GPS 訊號：請開啟精確定位、移至較開闊位置後再試';
+                if(code===3)return '定位逾時：請確認手機 GPS 已開啟，點更新定位重試';
+                return '無法取得定位：請檢查手機 GPS 及瀏覽器位置權限後再試';
+            }
+            function high(){
+                if(finished || highStarted)return;
+                highStarted=true;
+                if(distanceEl)distanceEl.textContent='精確定位中…';
+                try{
+                    navigator.geolocation.getCurrentPosition(
+                        pos=>{
+                            if(evaluate(pos,'high'))return;
+                            if(quickPosition && evaluate(quickPosition,'fallback'))return;
+                            fail('GPS 精度不足，請開啟手機精確定位並移至較開闊位置後重試');
+                        },
+                        error=>{
+                            if(Number(error?.code)===1){fail(messageFor(error));return;}
+                            if(quickPosition && evaluate(quickPosition,'fallback'))return;
+                            fail(messageFor(error));
+                        },
+                        {enableHighAccuracy:true,timeout:11000,maximumAge:15000}
+                    );
+                }catch(error){fail('手機瀏覽器無法啟動 GPS 定位，請檢查位置權限');}
+            }
+            if(distanceEl)distanceEl.textContent='快速定位中…';
+            try{
                 navigator.geolocation.getCurrentPosition(
-                    pos => evaluatePosition(pos, 'high'),
-                    () => {
-                        // 若快速定位本身精度尚可，精確定位偶發失敗時仍可沿用，
-                        // 不再讓手機固定等滿 15 秒後整筆打卡失敗。
-                        if (lowPosition && Number(lowPosition.coords?.accuracy || 9999) <= 150) {
-                            evaluatePosition(lowPosition, 'high');
-                            return;
-                        }
-                        fail();
+                    pos=>{
+                        quickPosition=pos;
+                        if(!evaluate(pos,'quick'))high();
                     },
-                    { enableHighAccuracy: true, timeout: 6500, maximumAge: 10000 }
+                    error=>{
+                        if(Number(error?.code)===1){fail(messageFor(error));return;}
+                        high();
+                    },
+                    {enableHighAccuracy:false,timeout:4500,maximumAge:45000}
                 );
-            };
-
-            // 第一階段：先使用手機最近 60 秒內的位置或快速網路定位。
-            navigator.geolocation.getCurrentPosition(
-                pos => {
-                    lowPosition = pos;
-                    if (!evaluatePosition(pos, 'low')) requestHighAccuracy();
-                },
-                () => requestHighAccuracy(),
-                { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
-            );
+            }catch(error){fail('手機瀏覽器無法使用定位功能，請檢查位置權限');}
         }
 
         function normalizeLeaveEmployeeNo(value) {
@@ -9396,10 +9395,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             document.getElementById('punchSuccessStatus').textContent = record.status || '--';
             document.getElementById('punchSuccessTime').textContent = formatDateTime(record.timeStr);
             document.getElementById('punchSuccessLocation').textContent = formatAttendanceLocationDisplay(record.location) || '--';
-            window.p79RecordMobilePunchAck?.('pending');
+            window.p79RecordMobilePunchAck?.('pending','',record.id);
             const cloudStatus = document.getElementById('punchSuccessCloudStatus');
             cloudStatus.textContent = sysConfig.gasUrl
-                ? '✓ 已打卡完成（本機已保存）｜雲端背景上傳中…'
+                ? '⏳ 本機暫存完成｜等待雲端打卡確認…'
                 : '✓ 已打卡完成（本機已保存；尚未設定雲端）';
             cloudStatus.className = `mt-3 text-xs ${sysConfig.gasUrl ? 'text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400'}`;
             const modal = document.getElementById('punchSuccessModal');
@@ -9410,13 +9409,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         function updatePunchSuccessCloudStatus(success, message = '') {
             const status = document.getElementById('punchSuccessCloudStatus');
+            // Even after dismissing the modal, cloud ACK must be recorded for the employee.
+            window.p79RecordMobilePunchAck?.(success ? 'success' : 'failed', message);
             if (!status || document.getElementById('punchSuccessModal')?.classList.contains('hidden')) return;
             const msg = String(message || '');
             const queued = !success && (
                 msg.includes('待同步') ||
                 /登入\s*Token\s*已逾時|改由原打卡通道驗證/i.test(msg)
             );
-            window.p79RecordMobilePunchAck?.(success ? 'success' : 'failed', message);
             status.textContent = success
                 ? '✓ 已同步至雲端'
                 : (queued
@@ -9634,6 +9634,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 p79MobileOfficial.month=month;
                 p79MobileOfficial.rows=matched;
                 p79MobileOfficial.verifiedAt=Date.now();
+                const latest=[...matched].sort((a,b)=>getAttendanceTimestamp(b)-getAttendanceTimestamp(a))[0];
+                window.p79MobileLatestOfficialPunch={
+                    empId:empId,recordId:String(latest?.id??''),timeStr:String(latest?.timeStr||''),
+                    status:String(latest?.status||''),verifiedAt:Date.now()
+                };
+                if(latest?.id!=null)window.p79ConfirmMobilePunchCloudRecord?.(latest.id);
                 try{updateHomeClockInButtonState();}catch(e){}
                 return true;
             })();
@@ -10350,7 +10356,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 postRealtimePunchToCloud(
                     newRecord,
                     `打卡成功！雲端已收到：${statusText}`,
-                    () => { forgetRecentAttendanceMutation(newRecord.id); },
+                    () => { forgetRecentAttendanceMutation(newRecord.id); updatePunchSuccessCloudStatus(true); },
                     error => updatePunchSuccessCloudStatus(false, error)
                 );
             }, 80);
@@ -22169,6 +22175,10 @@ async function drain(force=false){
         }
 
         remove(item.key);
+        if(String(item?.payload?.action||'')==='addRecord' &&
+            String(item?.payload?.record?.source||'').toLowerCase().includes('employee')){
+            try{window.p79ConfirmMobilePunchCloudRecord?.(item?.payload?.record?.id);}catch(e){}
+        }
         syncBatchDone++;
         lastDoneAt=Date.now();
         currentOpText='同步完成';
@@ -23607,7 +23617,9 @@ function ack(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e)
 function draw(){
   const legacy=read('sp_cloud_outbox_v1'),fast=read('port79_attendance_v5_outbox'),pending=legacy.length+fast.length;
   const a=ack();
-  const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'尚無雲端確認紀錄';
+  const official=window.p79MobileLatestOfficialPunch;
+  const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'本機尚無最近打卡送出紀錄';
+  const officialText=official?.timeStr?'正式主表最近刷卡：'+official.timeStr+'｜'+official.status:'正式主表本人刷卡狀態仍在查詢';
   const errors=[...fast,...legacy].map(x=>x?.lastError||x?.error||'').filter(Boolean);
   const attendanceActions=new Set(['addRecord','persistEmployeePunch','queueEmployeePunch','updateRecord','editRecord','deleteRecord']);
   const punchItems=[...fast,...legacy].filter(x=>{const p=x?.payload||{};return ['addRecord','persistEmployeePunch','queueEmployeePunch'].includes(String(p.action||'')) && String(p.record?.source||p.record?.dataSource||'').toLowerCase().includes('employee')});
@@ -23622,19 +23634,36 @@ function draw(){
       (err?'<div style="color:#b91c1c;overflow-wrap:anywhere">原因：'+safe(err)+'</div>':'')+'</li>';
   }).join('');
   const reason=errors[0]||a?.error||'';
-  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):last)+'</small>';
+  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):(a?.state?last:officialText))+'</small>';
   const employeePage=document.getElementById('viewEmployee');
   const hasPunch=!!(employeePage && employeePage.contains(btn));
   btn.hidden=!hasPunch;
-  details.innerHTML='<p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
+  details.innerHTML='<p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:7px"><strong>正式雲端：</strong>'+safe(officialText)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
     (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
     (reason?'<p style="margin-top:10px;color:#b91c1c;overflow-wrap:anywhere"><strong>最近錯誤：</strong>'+safe(reason)+'</p>':'')+
     (pending?'<details style="margin-top:10px" open><summary style="font-weight:800;cursor:pointer">查看所有待同步明細（'+pending+'）</summary><ol style="margin-top:8px;list-style:decimal;padding-left:18px">'+describe([...fast,...legacy])+'</ol></details>':'')+
     '<p style="margin-top:10px;color:#92400e">待同步 0 筆不等於 Google Sheets 已寫入；只有收到雲端確認才顯示成功。請勿為了測試重新打卡。</p>';
 }
-window.p79RecordMobilePunchAck=function(state,error){
-  try{localStorage.setItem(key,JSON.stringify({state:String(state),error:String(error||''),time:Date.now()}))}catch(e){}
+window.p79RecordMobilePunchAck=function(state,error,recordId){
+  try{
+    const previous=ack();
+    const id=recordId==null?String(previous?.recordId||''):String(recordId);
+    localStorage.setItem(key,JSON.stringify({state:String(state),error:String(error||''),recordId:id,time:Date.now()}));
+  }catch(e){}
   draw();
+};
+window.p79ConfirmMobilePunchCloudRecord=function(recordId){
+  const current=ack();
+  if(current?.recordId && String(current.recordId)===String(recordId)){
+    window.p79RecordMobilePunchAck('success','',recordId);
+    const status=document.getElementById('punchSuccessCloudStatus');
+    if(status && !document.getElementById('punchSuccessModal')?.classList.contains('hidden')){
+      status.textContent='✓ 此筆打卡已由雲端確認';
+      status.className='mt-3 text-xs font-bold text-emerald-600';
+    }
+    return true;
+  }
+  return false;
 };
 btn.addEventListener('click',()=>{draw();panel.classList.add('open')});
 document.getElementById('p79MobilePunchSyncClose').addEventListener('click',()=>panel.classList.remove('open'));
