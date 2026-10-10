@@ -23425,7 +23425,7 @@ function show(){
    let error='尚無錯誤資訊';
    if(rawError){
      if(/signal is aborted without reason|aborterror|the operation was aborted/i.test(rawError))error='連線請求遭中止或逾時（系統會依佇列規則重試）';
-     else if(/每月自動歸檔失敗|安全停止|ID 無法核對/.test(rawError))error='雲端資料安全核對失敗，已停止相關刪除作業；請管理員核對原始紀錄（'+(rawError.match(/\d+\s*筆 ID/)?.[0]||'有未核對 ID')+'）';
+     else if(/每月自動歸檔失敗|安全停止|ID 無法核對/.test(rawError))error='雲端歸檔安全核對失敗；原始錯誤：'+rawError;
      else error=rawError;
    }
    const recordId=String(p.id??p.record?.id??entry?.recordId??'').trim();
