@@ -3777,10 +3777,11 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       document.getElementById('substitute-for-wrap').classList.toggle('hidden',document.getElementById('substitute-overtime-kind').value!=='substitute');
     }
     function p79IsUnavailableForSubstitute(emp, day) {
+      if(!emp)return true;
       const shift=String((monthlyScheduleData[emp.id]||{})[day]||'').trim();
-      if(['休','年','特','年假','特休','事','病','公','喪','離'].includes(shift))return true;
-      const approved=approvedLeaveRecordsOnDate(day);
-      return approved.some(l=>String(l.empId||'').trim().toUpperCase()===String(emp.id||'').trim().toUpperCase());
+      // 「休」是可安排休假加班的排休，不是正式請假；年假／特休／請假／離職仍不可安排。
+      if(['年','特','年假','特休','事','病','公','喪','離'].includes(shift))return true;
+      return !!approvedLeaveForEmployee(emp.id,day,emp.name);
     }
     function p79UpdateSubstituteTargetOptions() {
       const id=String(document.getElementById('substitute-worker-emp').value||'');
@@ -3806,8 +3807,10 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       const choices=employees.filter(e=>String(e.role||'').trim()===String(emp.role||'').trim())
         .sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.id).localeCompare(String(b.id)));
       const worker=document.getElementById('substitute-worker-emp');
-      worker.innerHTML='<option value="">— 請選擇加班／代班人員 —</option>'+choices.filter(e=>!fromAnnualLeave || (!p79IsUnavailableForSubstitute(e,dayStr) && String(e.id)!==String(empId))).map(e=>'<option value="'+scheduleEscapeHtml(e.id)+'">'+scheduleEscapeHtml(e.name)+'（'+scheduleEscapeHtml(e.id)+'）</option>').join('');
-      worker.value=fromAnnualLeave?'':String(empId);
+      // 第一位和第二位皆列出同職務完整名單；第一位在代替請假者時僅排除被代班者本人。
+      // 不因「休」或請假狀態隱藏姓名；實際不合格人選在儲存時明確阻擋。
+      worker.innerHTML='<option value="">— 請選擇加班／代班人員 —</option>'+choices.filter(e=>!fromAnnualLeave || String(e.id)!==String(empId)).map(e=>'<option value="'+scheduleEscapeHtml(e.id)+'">'+scheduleEscapeHtml(e.name)+'（'+scheduleEscapeHtml(e.id)+'）'+(p79IsUnavailableForSubstitute(e,dayStr)?'〔當日請假／不可安排〕':'')+'</option>').join('');
+      worker.value=fromAnnualLeave || p79IsUnavailableForSubstitute(emp,dayStr) ? '' : String(empId);
       document.getElementById('substitute-cover-emp-id').value=empId;
       document.getElementById('substitute-date-key').value=dayStr;
       document.getElementById('substitute-modal-subtitle').textContent=dayStr+'｜'+emp.role+'｜目前班別：'+((monthlyScheduleData[empId]||{})[dayStr]||'未排');
@@ -3819,7 +3822,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       p79ToggleSubstituteType();
       document.getElementById('substitute-note').value = String(existing.note || '');
       const hint = document.getElementById('substitute-leave-hint');
-      hint.textContent='選擇代班加班時，請指定第二位被代班人員；名單僅限相同職務單位。';
+      hint.textContent='第一位顯示同職務完整姓名（排休可安排加班，當日請假不可安排）；第二位為被代班人員，不可與第一位相同。';
       modal.classList.remove('hidden');
     }
 
@@ -3835,7 +3838,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       const forEmpId=kind==='substitute'?String(document.getElementById('substitute-for-emp').value||'').trim():'';
       const note=String(document.getElementById('substitute-note').value||'').trim();
       const worker=employees.find(e=>String(e.id)===empId);
-      if(worker && kind==='substitute' && p79IsUnavailableForSubstitute(worker,dayStr))return alert('此人當天已休假或請假，不能安排代班；請選擇其他人員');
+      if(worker && p79IsUnavailableForSubstitute(worker,dayStr))return alert('此人當天有核准請假、請假班別或已離職，不能安排加班／代班；一般排「休」仍可安排休假加班');
       const target=employees.find(e=>String(e.id)===forEmpId);
       if(!worker||!dayStr)return alert('請選擇加班人員');
       if(kind==='substitute'&&(!target||forEmpId===empId))return alert('代班加班必須選擇第二位被代班人員');
