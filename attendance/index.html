@@ -4351,7 +4351,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 return window.p79V5SubmitAttendanceWrite(
                     { action: 'addRecord', record },
                     successMsg,
-                    data => { try { onPersistSuccess?.(data); } catch (e) {} },
+                    data => { try { updatePunchSuccessCloudStatus(true); onPersistSuccess?.(data); } catch (e) {} },
                     onError
                 );
             }
@@ -9383,6 +9383,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             document.getElementById('punchSuccessStatus').textContent = record.status || '--';
             document.getElementById('punchSuccessTime').textContent = formatDateTime(record.timeStr);
             document.getElementById('punchSuccessLocation').textContent = formatAttendanceLocationDisplay(record.location) || '--';
+            window.p79RecordMobilePunchAck?.('pending');
             const cloudStatus = document.getElementById('punchSuccessCloudStatus');
             cloudStatus.textContent = sysConfig.gasUrl
                 ? '✓ 已打卡完成（本機已保存）｜雲端背景上傳中…'
@@ -9402,6 +9403,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 msg.includes('待同步') ||
                 /登入\s*Token\s*已逾時|改由原打卡通道驗證/i.test(msg)
             );
+            window.p79RecordMobilePunchAck?.(success ? 'success' : 'failed', message);
             status.textContent = success
                 ? '✓ 已同步至雲端'
                 : (queued
@@ -23444,6 +23446,48 @@ document.getElementById('p79OutboxInspectClose')?.addEventListener('click',()=>d
 document.getElementById('p79OutboxInspectPanel')?.addEventListener('click',e=>{if(e.target.id==='p79OutboxInspectPanel')e.target.classList.remove('p79-show')});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('p79OutboxInspectPanel')?.classList.remove('p79-show')});
 const observer=new MutationObserver(mount);observer.observe(document.body,{childList:true,subtree:true});mount();
+})();
+</script>
+<!-- PORT79 MOBILE PUNCH CLOUD ACK: persistent status view; read-only, preserves outbox -->
+<style>
+#p79MobilePunchSync{position:fixed;right:12px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9990;max-width:min(330px,calc(100vw - 24px));border:1px solid #a5b4fc;border-radius:13px;padding:10px 13px;background:#fff;color:#1e293b;box-shadow:0 7px 26px #0003;text-align:left;font-size:13px;font-weight:700}
+#p79MobilePunchSync small{display:block;font-weight:400;margin-top:3px}
+#p79MobilePunchSyncPanel{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:14px;background:#0f172a99}
+#p79MobilePunchSyncPanel.open{display:flex}
+#p79MobilePunchSyncCard{width:min(450px,100%);max-height:80vh;overflow:auto;background:white;color:#0f172a;border-radius:17px;padding:20px;font-size:14px}
+</style>
+<button id="p79MobilePunchSync" type="button" aria-label="檢視手機雲端打卡狀態" hidden>☁️ 雲端打卡狀態<small>尚未確認雲端寫入</small></button>
+<div id="p79MobilePunchSyncPanel" role="dialog" aria-modal="true" aria-label="雲端打卡狀態"><div id="p79MobilePunchSyncCard"><h3 style="font-size:18px;font-weight:800;margin-bottom:12px">雲端打卡狀態</h3><div id="p79MobilePunchSyncDetails"></div><p style="margin-top:12px;color:#64748b;font-size:12px">本畫面僅查詢本機資料，不會刪除、重打卡或清除待同步紀錄。請勿因未顯示成功而再刷一次上班卡。</p><button type="button" id="p79MobilePunchSyncClose" style="margin-top:14px;width:100%;padding:11px;border-radius:10px;background:#4338ca;color:white;font-weight:800">關閉</button></div></div>
+<script id="p79-mobile-punch-cloud-ack">
+(function(){
+'use strict';
+const key='p79_mobile_punch_last_cloud_ack_v1';
+const btn=document.getElementById('p79MobilePunchSync'),panel=document.getElementById('p79MobilePunchSyncPanel'),details=document.getElementById('p79MobilePunchSyncDetails');
+const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const read=(k)=>{try{const a=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}};
+function ack(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
+function draw(){
+  const legacy=read('sp_cloud_outbox_v1'),fast=read('port79_attendance_v5_outbox'),pending=legacy.length+fast.length;
+  const a=ack();
+  const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'尚無雲端確認紀錄';
+  const errors=[...fast,...legacy].map(x=>x?.lastError||x?.error||'').filter(Boolean);
+  const reason=errors[0]||a?.error||'';
+  btn.innerHTML='☁️ 雲端打卡狀態<small>'+safe(pending?('待同步 '+pending+' 筆｜'+last):last)+'</small>';
+  const hasPunch=!!(document.getElementById('punchSuccessModal')||document.getElementById('homeClockInBtn'));
+  btn.hidden=!hasPunch;
+  details.innerHTML='<p><strong>最近打卡：</strong>'+safe(last)+'</p><p style="margin-top:10px"><strong>本機待同步：</strong>'+pending+' 筆</p>'+
+    (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
+    (reason?'<p style="margin-top:10px;color:#b91c1c;overflow-wrap:anywhere"><strong>最近錯誤：</strong>'+safe(reason)+'</p>':'')+
+    '<p style="margin-top:10px;color:#92400e">待同步 0 筆不等於 Google Sheets 已寫入；只有收到雲端確認才顯示成功。</p>';
+}
+window.p79RecordMobilePunchAck=function(state,error){
+  try{localStorage.setItem(key,JSON.stringify({state:String(state),error:String(error||''),time:Date.now()}))}catch(e){}
+  draw();
+};
+btn.addEventListener('click',()=>{draw();panel.classList.add('open')});
+document.getElementById('p79MobilePunchSyncClose').addEventListener('click',()=>panel.classList.remove('open'));
+panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('open')});
+setInterval(draw,4000);draw();
 })();
 </script>
 <script src="./v6-engine.js?v=6.0.5"></script>
