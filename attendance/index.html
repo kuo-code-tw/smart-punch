@@ -2376,6 +2376,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
                 try {
+                    const readStartedAt = Date.now();
                     const response = await fetch(url, {
                         method: 'GET',
                         cache: 'no-store',
@@ -2383,6 +2384,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                         signal: controller?.signal
                     });
                     const data = await readGasResponseAsJson(response, label);
+                    if (Date.now() - readStartedAt > 2500) console.info('[PORT79 雲端讀取延遲]',label,(Date.now()-readStartedAt)+'ms');
                     const errorText = String(data?.error || data?.message || '');
                     const retryableResponse = data?.ok === false && (
                         data?.retryable === true ||
@@ -4936,7 +4938,7 @@ const now = new Date();
         let attendanceDeltaIdleRounds = 0;
         let attendanceDeltaResetBusy = false;
         const ATTENDANCE_DELTA_ACTIVE_MS = 1800;
-        const ATTENDANCE_DELTA_IDLE_MS = 1800;
+        const ATTENDANCE_DELTA_IDLE_MS = 5500;
         const ATTENDANCE_DELTA_HIDDEN_MS = 30000;
         window.p79AttendanceDeltaEnabled = true;
 
@@ -4971,7 +4973,7 @@ const now = new Date();
                         JSON.stringify(records.filter(isDurableLocalAttendanceRecord))
                     );
                 } catch (e) {}
-                try { saveAttendanceSafetyBackup(records); } catch (e) {}
+                try { p79ScheduleAttendanceSafetyBackup(); } catch (e) {}
             }, 1200);
         }
 
@@ -6240,7 +6242,11 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
         }
 
 
-        async function loadAttendanceMainDirectFromCloud(monthKey) {
+        // 同月份、同登入身分的主表請求合併；2秒內可重用已驗證的增量版本。
+        // 手機打卡的強制雲端核對使用獨立流程，不會讀取這份短期快取。
+        const p79DirectMonthReadCache = new Map();
+        const p79DirectMonthReadInflight = new Map();
+        async function loadAttendanceMainDirectFromCloud(monthKey, force = false) {
             const activeGasUrl = getActiveGasUrl();
             if (!isValidGasWebAppUrl(activeGasUrl) || navigator.onLine === false) return [];
             const key = String(monthKey || getRequestedAttendanceCloudMonth()).trim();
@@ -6250,27 +6256,53 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                 sessionStorage.getItem('port79_user_token') ||
                 ''
             ).trim();
-
-            const url = new URL(activeGasUrl);
-            url.searchParams.set('action', 'getAttendanceMainDirect');
-            url.searchParams.set('month', key);
-            url.searchParams.set('t', String(Date.now()));
-            if (token) url.searchParams.set('token', token);
-
+            const requestKey = activeGasUrl + '|month=' + key + '|token=' + token;
+            const seq = Number(attendanceDeltaLastSeq || 0);
+            const busy = cloudDirectWriteBusy > 0 ||
+                window.p79V5GetStatus?.()?.writing === true ||
+                Number(window.p79V5GetStatus?.()?.pending || 0) > 0;
+            const cached = p79DirectMonthReadCache.get(requestKey);
+            if (!force && !busy && cached &&
+                cached.seq === seq && Date.now() - cached.savedAt < 2000) {
+                return cached.rows.map(record => ({...record}));
+            }
+            if (!force && !busy && p79DirectMonthReadInflight.has(requestKey)) {
+                const rows = await p79DirectMonthReadInflight.get(requestKey);
+                return rows.map(record => ({...record}));
+            }
+            const task = (async () => {
+                const url = new URL(activeGasUrl);
+                url.searchParams.set('action', 'getAttendanceMainDirect');
+                url.searchParams.set('month', key);
+                url.searchParams.set('t', String(Date.now()));
+                if (token) url.searchParams.set('token', token);
+                try {
+                    const data = await fetchGasJsonWithRetry(url.toString(), '主考勤紀錄直接同步', 2, 15000);
+                    if (!data?.ok || !Array.isArray(data.records)) return [];
+                    const rows = data.records.map(normalizeAttendanceRecordIdentifiers);
+                    // 寫入中或讀取期間 cursor 改變時絕不保存舊快取。
+                    if (!force && !busy && seq === Number(attendanceDeltaLastSeq || 0) &&
+                        cloudDirectWriteBusy === 0 && rows.length) {
+                        if (p79DirectMonthReadCache.size > 5) p79DirectMonthReadCache.clear();
+                        p79DirectMonthReadCache.set(requestKey, {rows,seq,savedAt:Date.now()});
+                    }
+                    console.info(`[PORT79] 主考勤紀錄直接讀取 ${key}: raw=${data.rawRows||0}, parsed=${data.parsedRows||rows.length}`);
+                    return rows;
+                } catch (e) {
+                    console.warn('主考勤紀錄直接同步失敗',e);
+                    return [];
+                }
+            })();
+            if (!force && !busy) p79DirectMonthReadInflight.set(requestKey,task);
             try {
-                const data = await fetchGasJsonWithRetry(url.toString(), '主考勤紀錄直接同步', 2, 15000);
-                if (!data?.ok) return [];
-                const rows = Array.isArray(data.records)
-                    ? data.records.map(normalizeAttendanceRecordIdentifiers)
-                    : [];
-                console.info(`[PORT79] 主考勤紀錄直接讀取 ${key}: raw=${data.rawRows||0}, parsed=${data.parsedRows||rows.length}`);
-                return rows;
-            } catch (e) {
-                console.warn('主考勤紀錄直接同步失敗', e);
-                return [];
+                const rows = await task;
+                return rows.map(record => ({...record}));
+            } finally {
+                if (p79DirectMonthReadInflight.get(requestKey) === task) {
+                    p79DirectMonthReadInflight.delete(requestKey);
+                }
             }
         }
-
 
 
         // PORT79 2026-10-04 DUAL-CHANNEL-HISTORY-SUPPLEMENT
@@ -6528,7 +6560,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
                 const now = new Date();
                 const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
                 if (key === currentMonth) {
-                    const directRows = await loadAttendanceMainDirectFromCloud(key);
+                    const directRows = await loadAttendanceMainDirectFromCloud(key, showMessage);
                     if (directRows.length) {
                         incoming = mergeAttendanceRecordCollections(directRows, incoming);
                     }
@@ -6957,7 +6989,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     // 關鍵修正：
                     // Core API 就算「成功」只回 1 筆，也不能因此跳過主表直接讀取。
                     // 每一次快速同步都再直接讀主「考勤紀錄」，並與 Core 結果聯集。
-                    const directRows = await loadAttendanceMainDirectFromCloud(targetMonth);
+                    const directRows = await loadAttendanceMainDirectFromCloud(targetMonth, showMessage);
                     if (directRows.length) {
                         rawRemoteRecords = mergeAttendanceRecordCollections(directRows, rawRemoteRecords);
                     }
