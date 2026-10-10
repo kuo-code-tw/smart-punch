@@ -23383,11 +23383,20 @@ function show(){
   if(!q.length){html+='<p style="color:#16a34a">沒有待同步項目</p>';continue;}
   html+='<table><thead><tr><th>序號</th><th>操作種類</th><th>重試次數</th><th>狀態</th><th>最近錯誤</th></tr></thead><tbody>';
   q.forEach((entry,i)=>{
-   const p=entry?.payload||{};const action=p.action||entry?.action||entry?.type||'未標示';
+   const p=entry?.payload||{};const action=String(p.action||entry?.action||entry?.type||'未標示');
+   const names={logSession:'登入／登出紀錄',deleteRecord:'刪除考勤紀錄',addRecord:'新增考勤紀錄',updateRecord:'修改考勤紀錄',editRecord:'修改考勤紀錄',syncRecords:'同步考勤紀錄',persistEmployeePunch:'員工打卡寫入',queueEmployeePunch:'員工打卡補傳'};
    const attempts=entry?.attempts??entry?.retries??0;
-   const state=entry?.paused?'已暫停':(entry?.state||'待同步');
-   const error=entry?.lastError||entry?.error||'沒有錯誤資訊';
-   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(action)+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td></tr>';
+   const rawState=String(entry?.state||'pending').toLowerCase();
+   const state=entry?.paused?'已暫停，等待人工核對':({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
+   const rawError=String(entry?.lastError||entry?.error||'');
+   let error='尚無錯誤資訊';
+   if(rawError){
+     if(/signal is aborted without reason|aborterror|the operation was aborted/i.test(rawError))error='連線請求遭中止或逾時（系統會依佇列規則重試）';
+     else if(/每月自動歸檔失敗|安全停止|ID 無法核對/.test(rawError))error='雲端資料安全核對失敗，已停止相關刪除作業；請管理員核對原始紀錄（'+(rawError.match(/\\d+\\s*筆 ID/)?.[0]||'有未核對 ID')+'）';
+     else error=rawError;
+   }
+   const recordId=String(p.id??p.record?.id??entry?.recordId??'').trim();
+   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(names[action]||action)+(recordId?' <small style="color:#64748b">（紀錄ID '+safe(recordId)+'）</small>':'')+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td></tr>';
   });
   html+='</tbody></table>';
  }
