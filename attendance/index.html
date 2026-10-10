@@ -5290,26 +5290,39 @@ const now = new Date();
                 pending = Array.isArray(q) ? q.length : 0;
             } catch (e) {}
 
-            const isError = mode === 'error' || /失敗|錯誤/.test(stateText);
-            const needsAttention = isError || busy || pending > 0;
-            const compactLabel = isError
-                ? '同步異常'
-                : (pending > 0
-                    ? `待同步 ${pending}`
-                    : (busy
-                        ? (mode === 'read' ? '更新中' : '同步中')
-                        : '已同步'));
+            // V5 考勤與舊版非考勤分別有佇列，兩者都必須計入。
+            let v5Writing = false;
+            try {
+                const v5 = window.p79V5GetStatus?.();
+                pending += Math.max(0, Number(v5?.pending || 0));
+                v5Writing = v5?.writing === true;
+            } catch (ignore) {}
+            const staleRead = busy && mode === 'read' &&
+                Date.now() - Number(state.updatedAt || 0) >= 90000;
+            const isError = staleRead || mode === 'error' || /失敗|錯誤|逾時/.test(stateText);
+            const needsAttention = isError || busy || v5Writing || pending > 0;
+            const compactLabel = staleRead
+                ? '更新逾時'
+                : (isError
+                    ? '同步異常'
+                    : (pending > 0
+                        ? `待同步 ${pending}`
+                        : (busy || v5Writing
+                            ? (mode === 'read' ? '更新中' : '同步中')
+                            : '已同步')));
 
             compactDot.className = `h-2 w-2 rounded-full shadow-sm ${needsAttention ? 'bg-amber-400' : 'bg-emerald-400'}`;
             compactText.textContent = compactLabel;
             compact.className = `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black ${needsAttention
                 ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'}`;
-            compact.title = isError
-                ? '雲端同步異常；點此立即重試'
-                : (pending > 0
-                    ? `有 ${pending} 筆待同步；點此立即重試`
-                    : (busy ? '雲端作業進行中' : '考勤資料已同步'));
+            compact.title = staleRead
+                ? '雲端考勤讀取超過 90 秒未完成，請檢查連線並重新整理'
+                : (isError
+                    ? '雲端同步異常，詳情請查看雲端狀態及待同步明細'
+                    : (pending > 0
+                        ? `有 ${pending} 筆待同步；點此立即重試`
+                        : ((busy || v5Writing) ? '雲端作業進行中' : '考勤同步工作已完成')));
         }
 
         function setCloudSyncStatus(text, type = 'idle', explicitMode = '') {
@@ -21442,6 +21455,10 @@ window.p79AttendanceRecordCounts = function(){
       coreRows=normRows(data.core?.records).filter(r=>attendanceRecordMonthKey(r)===month);
     }
 
+    // 四條正式 API 全部失敗，不可誤當「0 筆＝成功」。
+    if (!Object.keys(data).length) {
+      throw new Error('正式考勤雲端來源全部讀取失敗，已保留本機資料');
+    }
     const rows=losslessMerge([rawRows,directRows,monthRows,coreRows]);
     return {
       rows,
@@ -21511,7 +21528,7 @@ window.p79AttendanceRecordCounts = function(){
         return true;
       }catch(e){
         console.warn('[PORT79 Attendance V2] 同步失敗，保留目前資料',e);
-        try{setCloudSyncStatus(`🟠 ${month} 同步暫時失敗｜已保留本機資料`,'loading');}catch(_){}
+        try{setCloudSyncStatus(`🟠 ${month} 同步暫時失敗｜已保留本機資料`,'error','error');}catch(_){}
         if(options.showMessage)try{showToast(`考勤同步暫時失敗：${e?.message||e}`,'warning');}catch(_){}
         return false;
       }finally{V2.busy.delete(month);}
@@ -22448,14 +22465,18 @@ function updateUi(){
     if(typeof setCloudSyncStatus==='function'){
       const opState = window.p79AttendanceOperationState || {};
       const readBusy = opState.busy === true && opState.mode === 'read';
-
-      // 正在讀取時，不讓 V5 寫入狀態計時器把「讀取中」覆蓋掉。
-      if(readBusy){
-        // 由目前 GET 流程自己更新讀取狀態。
+      const readTimedOut = readBusy && (Date.now() - Number(opState.updatedAt || 0) >= 90000);
+      // 讀取逾時不可永久佔住「更新中」，失敗也不能顯示假成功。
+      if(readTimedOut){
+        setCloudSyncStatus('雲端考勤讀取逾時，請重新整理後重試','error','error');
+      }else if(readBusy){
+        // 有效讀取中由 GET 更新狀態。
       }else if(writing){
         setCloudSyncStatus(`第 ${currentIndex}/${total} 筆｜${currentOpText}`,'loading','write');
       }else if(pending){
         setCloudSyncStatus(`等待寫入 ${pending} 筆｜下一筆：${nextDescription}`,'loading','write');
+      }else if(opState.mode === 'error'){
+        // 最近同步失敗時保留錯誤，直到新的 GET/POST 確實成功。
       }else if(latestAt){
         const prevMode=String(opState.mode||'');
         if(prevMode==='write'){
