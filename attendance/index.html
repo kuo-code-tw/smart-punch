@@ -23471,14 +23471,27 @@ function draw(){
   const a=ack();
   const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'尚無雲端確認紀錄';
   const errors=[...fast,...legacy].map(x=>x?.lastError||x?.error||'').filter(Boolean);
+  const attendanceActions=new Set(['addRecord','persistEmployeePunch','queueEmployeePunch','updateRecord','editRecord','deleteRecord']);
+  const punchItems=[...fast,...legacy].filter(x=>{const p=x?.payload||{};return ['addRecord','persistEmployeePunch','queueEmployeePunch'].includes(String(p.action||'')) && String(p.record?.source||p.record?.dataSource||'').toLowerCase().includes('employee')});
+  const describe=items=>items.map((item,i)=>{
+    const p=item?.payload||{},rec=p.record||{},act=String(p.action||'unknown');
+    const status=String(item?.state||'pending');
+    const err=String(item?.lastError||item?.error||'');
+    const id=String(p.id||rec.id||'');
+    return '<li style="margin:8px 0;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><strong>'+safe(act)+'</strong>｜'+safe(status)+'｜重試 '+safe(item?.attempts??item?.retries??0)+' 次'+
+      (rec.timeStr?'<div>原打卡時間：'+safe(rec.timeStr)+'</div>':'')+
+      (id?'<div style="font-size:11px;overflow-wrap:anywhere">紀錄 ID：'+safe(id)+'</div>':'')+
+      (err?'<div style="color:#b91c1c;overflow-wrap:anywhere">原因：'+safe(err)+'</div>':'')+'</li>';
+  }).join('');
   const reason=errors[0]||a?.error||'';
-  btn.innerHTML='☁️ 雲端打卡狀態<small>'+safe(pending?('待同步 '+pending+' 筆｜'+last):last)+'</small>';
+  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):last)+'</small>';
   const hasPunch=!!(document.getElementById('punchSuccessModal')||document.getElementById('homeClockInBtn'));
   btn.hidden=!hasPunch;
-  details.innerHTML='<p><strong>最近打卡：</strong>'+safe(last)+'</p><p style="margin-top:10px"><strong>本機待同步：</strong>'+pending+' 筆</p>'+
+  details.innerHTML='<p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
     (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
     (reason?'<p style="margin-top:10px;color:#b91c1c;overflow-wrap:anywhere"><strong>最近錯誤：</strong>'+safe(reason)+'</p>':'')+
-    '<p style="margin-top:10px;color:#92400e">待同步 0 筆不等於 Google Sheets 已寫入；只有收到雲端確認才顯示成功。</p>';
+    (pending?'<details style="margin-top:10px" open><summary style="font-weight:800;cursor:pointer">查看所有待同步明細（'+pending+'）</summary><ol style="margin-top:8px;list-style:decimal;padding-left:18px">'+describe([...fast,...legacy])+'</ol></details>':'')+
+    '<p style="margin-top:10px;color:#92400e">待同步 0 筆不等於 Google Sheets 已寫入；只有收到雲端確認才顯示成功。請勿為了測試重新打卡。</p>';
 }
 window.p79RecordMobilePunchAck=function(state,error){
   try{localStorage.setItem(key,JSON.stringify({state:String(state),error:String(error||''),time:Date.now()}))}catch(e){}
