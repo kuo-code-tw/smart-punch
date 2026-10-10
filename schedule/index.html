@@ -1178,8 +1178,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       return scheduleAccessLevel === 'manage';
     }
 
-    const SCHEDULE_LOCK_HEARTBEAT_MS = 30000; // 自己持有鎖：30秒續租
-    const SCHEDULE_LOCK_WATCH_OTHER_MS = 1000; // 別人編輯中：1秒確認是否已離開
+    const SCHEDULE_LOCK_HEARTBEAT_MS = 20000; // 自己持有鎖：30秒續租
+    const SCHEDULE_LOCK_WATCH_OTHER_MS = 4000; // 別人編輯中：1秒確認是否已離開
     const SCHEDULE_LOCK_FREE_POLL_MS = 4000; // 無人鎖定：4秒低頻確認
     const SCHEDULE_LOCK_HIDDEN_POLL_MS = 30000;
     const SCHEDULE_LOCK_FETCH_TIMEOUT_MS = 5000;
@@ -1192,6 +1192,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     let scheduleLockFirstFailureAt = 0;
     let scheduleLockLastSuccessAt = 0;
     let scheduleEditLockRefreshBusy = false;
+    let scheduleLockRequestEpoch = 0; // 忽略手動鎖定後才抵達的舊背景回應
+    let scheduleManualLockBusy = false;
     let scheduleEditLockState = { locked:false, mine:false, ownerName:'', ownerEmpId:'', expiresAt:0, startedAt:0, lastCheckedAt:0 };
 
     function getScheduleClientId() {
@@ -1365,6 +1367,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     function setScheduleEditLockState(data) {
+      if (!data || data.ok !== true) throw new Error(String(data?.error || '排班編輯鎖回傳異常'));
       const previousMine = !!scheduleEditLockState.mine;
       const previousLocked = !!scheduleEditLockState.locked;
       const previousOwnerEmpId = String(scheduleEditLockState.ownerEmpId || '');
@@ -1498,7 +1501,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 
     async function refreshOrAcquireScheduleEditLock() {
       // v9.1：避免定時心跳、手動重新整理、focus/online 同時進來造成重複請求與重繪。
-      if (scheduleEditLockRefreshBusy) return false;
+      if (scheduleEditLockRefreshBusy || scheduleManualLockBusy) return false;
+      const requestEpoch = scheduleLockRequestEpoch;
       scheduleEditLockRefreshBusy = true;
       try {
         if (canManageSchedule()) {
@@ -1506,15 +1510,18 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
           const data = scheduleEditLockState.mine
             ? await scheduleLockPost('scheduleHeartbeatEditLock')
             : await scheduleLockGet();
+          if (requestEpoch !== scheduleLockRequestEpoch || scheduleManualLockBusy) return false;
           scheduleLockLastError = ''; scheduleLockFailureCount=0; scheduleLockFirstFailureAt=0;
           setScheduleEditLockState(data);
         } else {
           const data = await scheduleLockGet();
+          if (requestEpoch !== scheduleLockRequestEpoch || scheduleManualLockBusy) return false;
           scheduleLockLastError = ''; scheduleLockFailureCount=0; scheduleLockFirstFailureAt=0;
           setScheduleEditLockState(data);
         }
         return true;
       } catch (e) {
+        if (requestEpoch !== scheduleLockRequestEpoch || scheduleManualLockBusy) return false;
         scheduleLockLastError = String(e?.message || e || '編輯鎖連線失敗');
         scheduleLockFailureCount += 1; if(!scheduleLockFirstFailureAt)scheduleLockFirstFailureAt=Date.now();
         console.warn('排班編輯鎖同步失敗：', e);
@@ -1575,6 +1582,9 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     async function manualAcquireScheduleEditLock(){
       if (!canManageSchedule()) { alert('只有管理員以上且具有排班管理權限才可鎖定編輯。'); return false; }
       if (scheduleEditLockState.mine) { window.p79UpdateScheduleLockTop?.(); return true; }
+      if (scheduleManualLockBusy) return false;
+      scheduleManualLockBusy = true;
+      ++scheduleLockRequestEpoch;
       try {
         scheduleLockLastError='';
         updateScheduleLockBadge();
@@ -1612,6 +1622,9 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 
         console.warn('鎖定編輯暫時失敗：', e);
         return false;
+      } finally {
+        scheduleManualLockBusy = false;
+        scheduleNextEditLockPoll(scheduleEditLockNextDelay());
       }
     }
     async function manualReleaseScheduleEditLock(){
@@ -1641,15 +1654,16 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 
       // V10.28：離頁同時送 beacon + keepalive。
       // GAS release 是冪等操作，多送一次不會破壞資料，卻能降低跨網域轉址時 beacon 單獨遺失的機率。
+      let sent=false;
       try {
         if (navigator.sendBeacon) {
           const body = new Blob([payload], { type:'text/plain;charset=UTF-8' });
-          navigator.sendBeacon(GAS_URL, body);
+          sent=!!navigator.sendBeacon(GAS_URL, body);
         }
       } catch (e) {}
 
       try {
-        fetch(GAS_URL, {
+        if(!sent)fetch(GAS_URL, {
           method:'POST',
           headers:{'Content-Type':'text/plain;charset=UTF-8'},
           body:payload,
@@ -1666,16 +1680,26 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     async function releaseScheduleEditLock(keepalive=false) {
-      if (!scheduleEditLockState.mine) return;
-      try { await scheduleLockPost('scheduleReleaseEditLock', keepalive); } catch(e) {
-        console.warn('釋放排班編輯鎖失敗，下一次同帳號登入會自動接管：', e);
+      if (!scheduleEditLockState.mine || scheduleManualLockBusy) return false;
+      scheduleManualLockBusy=true;
+      ++scheduleLockRequestEpoch;
+      try {
+        const result=await scheduleLockPost('scheduleReleaseEditLock',keepalive);
+        if (!result?.ok || result.released !== true) {
+          throw new Error(String(result?.error||'雲端尚未確認解鎖，已保留原鎖定狀態'));
+        }
+        scheduleLockLastError='';
+        setScheduleEditLockState({ok:true,locked:false,mine:false,ownerName:'',ownerEmpId:'',expiresAt:0,startedAt:0});
+        return true;
+      }catch(e){
+        scheduleLockLastError=String(e?.message||e);
+        updateScheduleLockBadge();
+        console.warn('排班解鎖未確認，保留編輯鎖狀態並稍後核對',e);
+        return false;
+      }finally{
+        scheduleManualLockBusy=false;
+        scheduleNextEditLockPoll(1000);
       }
-      scheduleLockLastError = '';
-      scheduleEditLockState.mine = false;
-      scheduleEditLockState.locked = false;
-      scheduleEditLockState.startedAt = 0;
-      scheduleEditLockState.lastCheckedAt = Date.now();
-      updateScheduleLockBadge();
     }
 
     function initScheduleTheme() {
@@ -2560,8 +2584,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       startScheduleFullAutoSync();
       startScheduleAttendanceStateAutoSync();
 
-      window.addEventListener('pagehide', () => {
-        releaseScheduleEditLockOnExit();
+      window.addEventListener('pagehide', (event) => {
+        if(!event.persisted) releaseScheduleEditLockOnExit();
       });
     };
 
