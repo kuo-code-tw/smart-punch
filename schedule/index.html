@@ -1150,12 +1150,14 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         const hash=String(location.hash||'').replace(/^#/,'');
         const params=new URLSearchParams(hash);
         const fromHash=String(params.get('gasurl')||'').trim();
-        if(/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/i.test(fromHash)){
-          sessionStorage.setItem('port79_gas_url',fromHash);
-          return fromHash;
+        if(fromHash === DEFAULT_GAS_URL){
+          sessionStorage.setItem('port79_gas_url',DEFAULT_GAS_URL);
+          return DEFAULT_GAS_URL;
         }
       }catch(e){}
-      return String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
+      // 正式專案只使用目前驗證通過的 GAS；舊帳號網址不再覆蓋排班編輯鎖。
+      try{sessionStorage.setItem('port79_gas_url',DEFAULT_GAS_URL)}catch(e){}
+      return DEFAULT_GAS_URL;
     }
 
     const GAS_URL = getScheduleGasUrl();
