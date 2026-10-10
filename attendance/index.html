@@ -9752,6 +9752,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const waitingForEmployeeMaster = !currentEmp && !!rememberedEmpId;
             const openShift = getOpenClockInShift(currentEmp);
             const openOvertime = getOpenOvertimeShift(currentEmp);
+            // 已簽退的班次不能再顯示可按的「下班簽退／重新核對上班卡」。
+            // 僅使用同一員工最近的正式刷卡狀態；跨日後不誤鎖新一天的按鈕。
+            const latestRegularPunch = getLatestEmployeePunchState(currentEmp, 'REGULAR');
+            const latestRegularTime = latestRegularPunch?.timestamp ? new Date(latestRegularPunch.timestamp) : null;
+            const nowDay = new Date();
+            const completedClockOutToday = !openShift &&
+                latestRegularPunch?.type === 'OUT' &&
+                latestRegularTime &&
+                latestRegularTime.getFullYear() === nowDay.getFullYear() &&
+                latestRegularTime.getMonth() === nowDay.getMonth() &&
+                latestRegularTime.getDate() === nowDay.getDate();
 
             function setButtonState(button, enabled, enabledText, disabledText, disabledTitle) {
                 if (!button) return;
@@ -9782,12 +9793,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 clockOutButton,
                 !!openShift,
                 '下班簽退',
-                '重新核對上班卡',
-                openShift ? '' : '尚未讀到有效上班紀錄，請重新核對雲端後再簽退'
+                completedClockOutToday ? '✓ 已完成下班簽退' : '重新核對上班卡',
+                completedClockOutToday ? '今天已完成下班簽退，請勿重複刷卡' : (openShift ? '' : '尚未讀到有效上班紀錄，請重新核對雲端後再簽退')
             );
-            // 沒讀到上班卡時提供安全的「重新核對」入口，而非永久停用下班鍵。
-            // 不直接送出 OUT；仍需找到實際原始 IN 後才可進入原有打卡驗證。
-            if (clockOutButton && !openShift && currentEmp) {
+            // 已完成簽退時保持灰色停用，不允許「重新核對」把按鈕重新啟用。
+            if (clockOutButton && completedClockOutToday) {
+                clockOutButton.disabled = true;
+                clockOutButton.setAttribute('aria-disabled', 'true');
+                clockOutButton.onclick = null;
+                clockOutButton.classList.remove('bg-rose-600','bg-red-600','hover:bg-rose-700','hover:bg-red-700');
+                clockOutButton.classList.add('bg-slate-400','cursor-not-allowed','opacity-70');
+            } else if (clockOutButton && !openShift && currentEmp) {
                 clockOutButton.disabled = false;
                 clockOutButton.setAttribute('aria-disabled', 'false');
                 clockOutButton.classList.remove('cursor-not-allowed','opacity-70');
