@@ -22169,6 +22169,21 @@ async function send(payload,timeout=25000){
   }
 }
 
+function p79PunchUploadPriority(item){
+  const action=String(item?.payload?.action||'');
+  // 新打卡優先於管理員修改與整批修復；僅調整待送出順序，不提前宣告成功。
+  if(['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(action))return 0;
+  if(['updateRecord','editRecord'].includes(action))return 2;
+  if(['syncRecords','repairAttendanceRecords'].includes(action))return 4;
+  return 3;
+}
+function p79OrderedReadyQueue(q,force,now){
+  return q.filter(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now))
+    .map((item,index)=>({item,index}))
+    .sort((a,b)=>p79PunchUploadPriority(a.item)-p79PunchUploadPriority(b.item)||a.index-b.index)
+    .map(x=>x.item);
+}
+
 async function drain(force=false){
   if(writing)return false;
   if(navigator.onLine===false){updateUi();return false}
@@ -22184,7 +22199,7 @@ async function drain(force=false){
       q=readQueue();
       if(!q.length)break;
       const now=Date.now();
-      const item=q.find(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now));
+      const item=p79OrderedReadyQueue(q,force,now)[0];
       if(!item)break;
 
       currentOpText=desc(item.payload);
@@ -22350,7 +22365,7 @@ async function drainFast(force=true, concurrency=4){
       if(!q.length)break;
 
       const now=Date.now();
-      const eligible=q.filter(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now));
+      const eligible=p79OrderedReadyQueue(q,force,now);
       if(!eligible.length)break;
 
       const group=[];
