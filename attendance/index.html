@@ -23302,6 +23302,60 @@ C.mountRange({startId:'manualLeaveStart',endId:'manualLeaveEnd',label:'請假日
 
 });
 </script>
+<!-- 考勤同步診斷：只讀取本機佇列，不清除、不重送任何紀錄 -->
+<style id="p79-outbox-inspector-css">
+#p79OutboxInspectBtn{margin-left:5px;padding:5px 9px;border:1px solid #fbbf24;border-radius:9px;background:#fffbeb;color:#92400e;font-size:11px;font-weight:800;cursor:pointer}
+#p79OutboxInspectPanel{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.58);padding:14px}
+#p79OutboxInspectPanel.p79-show{display:flex}
+#p79OutboxInspectCard{width:min(630px,100%);max-height:85vh;overflow:auto;background:white;color:#0f172a;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0004;font-size:13px}
+#p79OutboxInspectCard table{width:100%;border-collapse:collapse;word-break:break-word}
+#p79OutboxInspectCard td,#p79OutboxInspectCard th{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
+#p79OutboxInspectCard th{background:#f8fafc}
+</style>
+<div id="p79OutboxInspectPanel" role="dialog" aria-modal="true" aria-label="待同步明細">
+<div id="p79OutboxInspectCard">
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div>
+<p style="color:#64748b;margin:10px 0">僅顯示同步狀態，不會刪除或修改資料。若含個資，截圖前請遮住相關內容。</p>
+<div id="p79OutboxInspectBody"></div>
+</div></div>
+<script id="p79-outbox-inspector">
+(function(){
+'use strict';
+const keys=[['sp_cloud_outbox_v1','舊版雲端同步'],['port79_attendance_v5_outbox','新版考勤快速同步']];
+function safe(t){return String(t??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function entries(key){try{const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[]}catch(e){return null;}}
+function show(){
+ const root=document.getElementById('p79OutboxInspectPanel'),body=document.getElementById('p79OutboxInspectBody');if(!root||!body)return;
+ let html='';
+ for(const [key,label] of keys){
+  const q=entries(key);html+='<h3 style="font-weight:800;margin:16px 0 6px">'+safe(label)+'：'+(q===null?'無法讀取':q.length+' 筆')+'</h3>';
+  if(!q){html+='<p>資料格式異常，請勿清除。</p>';continue;}
+  if(!q.length){html+='<p style="color:#16a34a">沒有待同步項目</p>';continue;}
+  html+='<table><thead><tr><th>序號</th><th>操作種類</th><th>重試次數</th><th>狀態</th><th>最近錯誤</th></tr></thead><tbody>';
+  q.forEach((entry,i)=>{
+   const p=entry?.payload||{};const action=p.action||entry?.action||entry?.type||'未標示';
+   const attempts=entry?.attempts??entry?.retries??0;
+   const state=entry?.paused?'已暫停':(entry?.state||'待同步');
+   const error=entry?.lastError||entry?.error||'沒有錯誤資訊';
+   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(action)+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td></tr>';
+  });
+  html+='</tbody></table>';
+ }
+ body.innerHTML=html;root.classList.add('p79-show');
+}
+function mount(){
+ const status=document.getElementById('attendanceSyncCompactStatus');
+ if(status&&!document.getElementById('p79OutboxInspectBtn')){
+  const btn=document.createElement('button');btn.id='p79OutboxInspectBtn';btn.type='button';btn.textContent='查看明細';btn.title='檢查舊版與新版待同步佇列';
+  btn.addEventListener('click',show);status.insertAdjacentElement('afterend',btn);
+ }
+}
+document.getElementById('p79OutboxInspectClose')?.addEventListener('click',()=>document.getElementById('p79OutboxInspectPanel')?.classList.remove('p79-show'));
+document.getElementById('p79OutboxInspectPanel')?.addEventListener('click',e=>{if(e.target.id==='p79OutboxInspectPanel')e.target.classList.remove('p79-show')});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('p79OutboxInspectPanel')?.classList.remove('p79-show')});
+const observer=new MutationObserver(mount);observer.observe(document.body,{childList:true,subtree:true});mount();
+})();
+</script>
 <script src="./v6-engine.js?v=6.0.5"></script>
 </body>
 </html>
