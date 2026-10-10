@@ -20975,6 +20975,10 @@ function p79HasAdminSessionForDirectOpen(){
   return false;
 }
 
+// 讓較早定義的 onload 啟動流程也能存取相同的管理員 Session 驗證函式。
+// 不改動驗證條件、Token 或員工打卡入口的行為。
+window.p79HasAdminSessionForDirectOpen = p79HasAdminSessionForDirectOpen;
+
 function p79OpenAttendanceAdminDirect(){
   if(!p79HasAdminSessionForDirectOpen()){
     document.documentElement.classList.remove('p79-attendance-admin-prepaint');
