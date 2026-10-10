@@ -14429,6 +14429,42 @@ function getManualPairRecordAnchor(record) {
             }
         }
 
+        // V6 會將 HH:mm 正規化成 HH:mm:00，核對時不可以比較原始時間字串。
+        function p79ReviewedCanonicalTime(record) {
+            const raw=String(record?.timeStr||'').trim();
+            if(!raw)return '';
+            const fn=window.P79AttendanceV6?.normalizeTime;
+            if(typeof fn==='function')return fn(raw);
+            const normalized=raw.replace(/-/g,'/').replace(/T/g,' ').replace(/\\s+/g,' ').trim();
+            return /\\d{1,2}:\\d{2}$/.test(normalized)?normalized+':00':normalized;
+        }
+        function p79ReviewedRecordSource(record){
+            return String(record?.source||record?.dataSource||record?.['資料來源']||'').trim().toLowerCase();
+        }
+        function p79SameReviewedOriginal(snapshot,original){
+            if(!snapshot||!original||String(snapshot.id??'').trim()!==String(original.id??'').trim())return false;
+            if(p79ReviewedCanonicalTime(snapshot)!==p79ReviewedCanonicalTime(original))return false;
+            if(getAttendanceRecordType(snapshot)!==getAttendanceRecordType(original))return false;
+            if(getPunchChannel(snapshot.status)!==getPunchChannel(original.status))return false;
+            if(p79ReviewedRecordSource(snapshot)!==p79ReviewedRecordSource(original))return false;
+            const attA=normalizeAttendanceIdentityAttNo(snapshot.attNo);
+            const attB=normalizeAttendanceIdentityAttNo(original.attNo);
+            if(attA&&attB&&attA!==attB)return false;
+            const empA=String(snapshot.empId||'').trim().toUpperCase();
+            const empB=String(original.empId||'').trim().toUpperCase();
+            if(empA&&empB&&empA!==empB)return false;
+            return true;
+        }
+        // 自動清理最多比對同員工、同方向、同類型，且相差不超過15分鐘的刷卡。
+        function p79CanAutoCombineDuplicateSide(record,keep) {
+            if(!record||!keep)return false;
+            if(getAttendanceRecordType(record)!==getAttendanceRecordType(keep) ||
+                getPunchChannel(record.status)!==getPunchChannel(keep.status))return false;
+            if(!p79ImportIdentityMatches(record,keep))return false;
+            const a=getAttendanceTimestamp(record),b=getAttendanceTimestamp(keep);
+            return a>0&&b>0&&Math.abs(a-b)<=15*60*1000;
+        }
+
         async function p79BatchCleanDuplicateAttendance() {
             if(p79BatchDuplicateBusy) {
                 showToast('重複考勤仍在處理中，請勿重複送出','warning');
@@ -14443,8 +14479,11 @@ function getManualPairRecordAnchor(record) {
             const source=r=>String(r?.source||r?.dataSource||r?.['資料來源']||'').toLowerCase();
             const excel=r=>source(r)==='excel-import';
             const manual=r=>!!r?.manuallyEdited||/manual|補刷|補卡/.test(source(r));
+            const byId=new Map();
+            items.forEach(r=>{const id=String(r?.id??'').trim();if(id&&!byId.has(id))byId.set(id,r);});
             const safe=r=>!!String(r?.id??'').trim()&&idCounts.get(String(r.id).trim())===1 &&
-                !window.p79V5QueueInfoForId?.(String(r.id).trim());
+                !window.p79V5QueueInfoForId?.(String(r.id).trim()) &&
+                p79SameReviewedOriginal(r,byId.get(String(r.id).trim()));
             for(const row of rows) {
                 if(!Array.isArray(row.records))continue;
                 for(const dir of ['IN','OUT']) {
@@ -14452,22 +14491,22 @@ function getManualPairRecordAnchor(record) {
                     if(!group.length)continue;
                     if(group.some(r=>manual(r)||!safe(r))) {skipped.add(row);continue;}
                     const official=group.filter(r=>!excel(r));
-                    if(official.length>1&&new Set(official.map(r=>String(r.timeStr||''))).size>1) {
+                    if(official.length>1&&new Set(official.map(r=>p79ReviewedCanonicalTime(r))).size>1) {
                         skipped.add(row);continue;
                     }
-                    const keep=official[0]||group.slice().sort((x,y)=>String(x.timeStr||'').localeCompare(String(y.timeStr||'')))[0];
-                    if(group.some(r=>r!==keep&&String(r.timeStr||'')!==String(keep.timeStr||'')&&
-                        !(excel(r)&&typeof p79ImportSideMatch==='function'&&p79ImportSideMatch(r,keep)?.matched))) {
+                    const keep=official[0]||group.slice().sort((x,y)=>p79ReviewedCanonicalTime(x).localeCompare(p79ReviewedCanonicalTime(y)))[0];
+                    if(group.some(r=>r!==keep&&(!p79CanAutoCombineDuplicateSide(r,keep)||
+                        (!excel(r)&&p79ReviewedCanonicalTime(r)!==p79ReviewedCanonicalTime(keep))))) {
                         skipped.add(row);continue;
                     }
                     if(excel(keep)&&!keys.has('p'+keep.id)) {
                         keys.add('p'+keep.id);
-                        tasks.push({mode:'promote',record:keep,id:String(keep.id).trim(),time:keep.timeStr,status:keep.status});
+                        tasks.push({mode:'promote',record:keep,id:String(keep.id).trim()});
                     }
                     group.filter(r=>r!==keep).forEach(r=>{
                         if(!keys.has('d'+r.id)) {
                             keys.add('d'+r.id);
-                            tasks.push({mode:'delete',record:r,id:String(r.id).trim(),time:r.timeStr,status:r.status});
+                            tasks.push({mode:'delete',record:r,id:String(r.id).trim()});
                         }
                     });
                 }
@@ -14500,8 +14539,7 @@ function getManualPairRecordAnchor(record) {
                     const r=task.record,id=task.id;
                     try {
                         const matches=(Array.isArray(records)?records:[]).filter(x=>String(x?.id??'').trim()===id);
-                        if(matches.length!==1||String(matches[0].timeStr||'')!==String(task.time||'')||
-                            String(matches[0].status||'')!==String(task.status||'')||
+                        if(matches.length!==1||!p79SameReviewedOriginal(r,matches[0])||
                             window.p79V5QueueInfoForId?.(id)) {
                             markError('紀錄已變動或已有待同步工作，沒有執行刪除',false);
                             continue;
@@ -14515,11 +14553,12 @@ function getManualPairRecordAnchor(record) {
                                 } else markError('雲端已確認刪除，但本機更新失敗，請重新整理核對',false);
                             }else markError(result?.error||'雲端未確認刪除',true);
                         }else {
-                            const updated={...r,source:'system-confirmed',importConfirmedAt:new Date().toISOString(),importConfirmedFrom:String(r.importFile||'')};
-                            const result=await postToCloud({action:'updateRecord',record:updated,originalTimeStr:r.timeStr,originalPunchType:r.status});
+                            const original=matches[0];
+                            const updated={...original,source:'system-confirmed',importConfirmedAt:new Date().toISOString(),importConfirmedFrom:String(original.importFile||'')};
+                            const result=await postToCloud({action:'updateRecord',record:updated,originalTimeStr:original.timeStr,originalPunchType:original.status});
                             if(result?.ok&&!result?.queued) {
-                                Object.assign(r,updated);
-                                archiveAttendanceRecords([r]);
+                                Object.assign(original,updated);
+                                archiveAttendanceRecords([original]);
                                 saveRecords();
                                 stats.converted++;
                                 remoteFailures=0;
@@ -14555,19 +14594,36 @@ function getManualPairRecordAnchor(record) {
             const canDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
             const modal = document.createElement('div');
             modal.id = 'p79DuplicateReviewModal';
-            modal.className = 'fixed inset-0 z-[160] bg-slate-950/60 flex items-center justify-center p-4';
+            modal.className = 'fixed inset-0 bg-slate-950/60 flex items-center justify-center p-2 sm:p-4';
+            modal.style.zIndex='2147483000';
+            // 建立一次 ID 索引，避免每顯示一筆都再掃描所有員工考勤。
+            const idStats=new Map(),byId=new Map();
+            (Array.isArray(records)?records:[]).forEach(x=>{
+                const id=String(x?.id??'').trim();
+                if(!id)return;
+                idStats.set(id,(idStats.get(id)||0)+1);
+                if(!byId.has(id))byId.set(id,x);
+            });
+            const directionStats=new Map();
+            row.records.forEach(x=>{
+                const key=getAttendanceRecordType(x)+'|'+getPunchChannel(x?.status);
+                directionStats.set(key,(directionStats.get(key)||0)+1);
+            });
             const rowsHtml = row.records.map((r, i) => {
                 const id = String(r?.id ?? '').trim();
-                const sameIdCount = id ? records.filter(x => String(x?.id ?? '').trim() === id).length : 0;
-                const uniqueId = !!id && sameIdCount === 1;
+                const sameIdCount=idStats.get(id)||0;
+                const uniqueId=!!id&&sameIdCount===1;
+                const current=uniqueId?byId.get(id):null;
+                const unchanged=uniqueId&&p79SameReviewedOriginal(r,current);
                 const source = String(r?.source || r?.dataSource || r?.['資料來源'] || '');
                 const sourceLower = source.toLowerCase();
                 const edited = !!(r?.manuallyEdited || sourceLower.includes('manual') || source.includes('補刷') || source.includes('補卡'));
                 const sourceLabels = {'excel-import':'Excel 匯入','employee-punch':'員工刷卡','mobile-punch':'手機刷卡','local-punch':'本機刷卡','manual-admin':'管理員補刷','manual-punch':'人工補刷','sync-import':'雲端同步','system-confirmed':'系統確認'};
                 const sourceText = sourceLabels[sourceLower] || source || '來源未標示';
                 const direction = String(r?.status || '').trim();
-                const sameDirectionCount = row.records.filter(item => String(item?.status || '').trim() === direction).length;
-                const reviewText = edited ? '人工補刷（請核對）' : sameDirectionCount > 1 ? '同方向疑似重複' : '一般打卡';
+                const sameDirectionCount = directionStats.get(getAttendanceRecordType(r)+'|'+getPunchChannel(r.status))||0;
+                const warning = !id?'缺少紀錄 ID':sameIdCount>1?'ID 衝突（'+sameIdCount+' 筆）':!unchanged?'來源或時間已更新，需重新核對':'';
+                const reviewText = warning|| (edited ? '人工補刷（請核對）' : sameDirectionCount > 1 ? '同方向疑似重複' : '一般打卡');
                 const reviewClass = edited ? 'text-amber-700 dark:text-amber-300' : sameDirectionCount > 1 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-300';
                 return `<tr class="border-b border-slate-200 dark:border-slate-700">
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(String(r?.timeStr || ''))}</td>
@@ -14575,7 +14631,7 @@ function getManualPairRecordAnchor(record) {
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(sourceText)}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(reviewText)}</td>
                     <td class="px-3 py-2 text-center align-middle">
-                        ${canDelete && uniqueId ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">僅可保留</span>'}
+                        ${canDelete && uniqueId && unchanged && sameDirectionCount>1 ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">保留／待核對</span>'}
                     </td>
                 </tr>`;
             }).join('');
@@ -14594,16 +14650,20 @@ function getManualPairRecordAnchor(record) {
             if (!r || !requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
             const id = String(r.id ?? '').trim();
             const matches=(Array.isArray(records)?records:[]).filter(x=>String(x?.id??'').trim()===id);
-            if (!id || matches.length !== 1 ||
-                String(matches[0]?.timeStr||'') !== String(r?.timeStr||'') ||
-                String(matches[0]?.status||'') !== String(r?.status||'')) {
-                showToast('原始紀錄已變動或 ID 不唯一，請重新整理後再核對', 'warning');
+            if(!id){showToast('這筆紀錄沒有 ID，停止刪除，避免誤刪其他刷卡','warning');return;}
+            if(matches.length!==1){
+                showToast(matches.length>1?'同一 ID 對應 '+matches.length+' 筆資料，不能以 ID 單筆刪除；需後端精準核對':
+                    '這筆原始紀錄已不在目前資料，請重新開啟清單','warning');
+                return;
+            }
+            if(!p79SameReviewedOriginal(r,matches[0])){
+                showToast('刷卡來源、狀態或時間已更新，請重新開啟清單核對；不會刪除','warning');
                 return;
             }
             // 重複核對視窗不可刪到只剩零筆上班或下班，避免整班空白。
             const dir=getAttendanceRecordType(r);
             const otherSameSide=(Array.isArray(row.records)?row.records:[])
-                .filter(x=>String(x?.id??'').trim()!==id && getAttendanceRecordType(x)===dir);
+                .filter(x=>String(x?.id??'').trim()!==id && getAttendanceRecordType(x)===dir && getPunchChannel(x.status)===getPunchChannel(r.status));
             if(['IN','OUT'].includes(dir) && otherSameSide.length===0){
                 showToast('同班這個方向只剩最後一筆，為避免整班空白，請保留原始打卡','warning');
                 return;
