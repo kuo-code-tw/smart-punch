@@ -22658,7 +22658,42 @@ try{
   localStorage.removeItem('port79_cloud_outbox');
 }catch(e){}
 
+// PORT79 V5 已核實刪除請求一次性整理（2026-10-10）。
+// 以上 5 個 ID 已在 companytest.tw@gmail.com 所擁有的正式 GPS考勤資料庫
+// (ID 1QlixVO7V0tAdx64n1npQmWCFW8sNvsfdVh-vEtGpakE) 驗證：
+// 「考勤永久刪除保護索引」有 ID、「考勤紀錄」主表沒有 ID。
+// 只解除這 5 筆已完成的 deleteRecord 本機重試，不觸碰其他雲端/個人 Drive。
+// 歷史歸檔實體清除狀態仍須由後端維護，不以這段本機整理冒充已清除歷史歸檔。
+const PORT79_VERIFIED_DELETED_IDS_20261010 = new Set(["1791597999970","1791599671136","1791597605356","1791599649935","1791597922198"]);
+function p79PruneVerifiedDeletedRecordRetries20261010(){
+  if(writing)return 0;
+  try{
+    const raw=localStorage.getItem(OUTBOX_KEY);
+    if(!raw)return 0;
+    const queue=JSON.parse(raw);
+    if(!Array.isArray(queue))return 0;  // 格式異常時絕不覆寫
+    const keep=queue.filter(item=>{
+      const payload=item?.payload;
+      return !(String(payload?.action||'')==='deleteRecord' &&
+        PORT79_VERIFIED_DELETED_IDS_20261010.has(String(payload?.id??payload?.record?.id??'').trim()));
+    });
+    const removed=queue.length-keep.length;
+    if(!removed)return 0;
+    localStorage.setItem(OUTBOX_KEY,JSON.stringify(keep));
+    lastDoneAt=Date.now();
+    currentOpText='已核實刪除的舊請求已整理';
+    console.info('[PORT79] 已從本機同步佇列移除經正式永久刪除索引核對的請求：'+removed+' 筆');
+    updateUi();
+    return removed;
+  }catch(e){
+    console.warn('[PORT79] 已核實刪除佇列整理未完成，保留所有原始待同步資料',e);
+    return 0;
+  }
+}
+window.p79PruneVerifiedDeletedRecordRetries20261010=p79PruneVerifiedDeletedRecordRetries20261010;
+
 document.addEventListener('DOMContentLoaded',()=>{
+  p79PruneVerifiedDeletedRecordRetries20261010();
   updateUi();
   startDelta();
   drain(false);
