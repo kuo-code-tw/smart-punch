@@ -14251,12 +14251,22 @@ function getManualPairRecordAnchor(record) {
             }
 
             // 一天一頁：先找出目前篩選結果實際有資料的日期，最新日期排最前面。
-            recordsDatePageKeys = [...new Set(
-                dailyRows
-                    .map(row => attendanceRowDatePageKey(row, datePageMonth))
-                    .filter(Boolean)
-            )].sort((a, b) => String(b).localeCompare(String(a)));
+            const todayPageKey = getTodayAttendanceIso();
+            const showTodayPage = datePageMonth === todayPageKey.slice(0, 7)
+                && (!dateFrom || todayPageKey >= dateFrom)
+                && (!dateTo || todayPageKey <= dateTo);
+            const availableDatePages = dailyRows
+                .map(row => attendanceRowDatePageKey(row, datePageMonth))
+                .filter(Boolean);
+            // 今日即使尚未有打卡也要顯示頁籤，不能直接跳到昨天。
+            if (showTodayPage) availableDatePages.push(todayPageKey);
+            recordsDatePageKeys = [...new Set(availableDatePages)]
+                .sort((a, b) => String(b).localeCompare(String(a)));
 
+            // 首次進入考勤，優先顯示今天；使用者手動點其他日期後則保留選擇。
+            if (!recordsSelectedDateKey && showTodayPage) {
+                recordsCurrentPage = recordsDatePageKeys.indexOf(todayPageKey) + 1;
+            }
             // 以日期值而不是分頁序號定位；新增／刪除其他日期資料時序號可能改變。
             if (recordsSelectedDateKey && recordsDatePageKeys.includes(recordsSelectedDateKey)) {
                 recordsCurrentPage = recordsDatePageKeys.indexOf(recordsSelectedDateKey) + 1;
