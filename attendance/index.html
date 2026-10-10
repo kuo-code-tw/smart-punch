@@ -9980,6 +9980,40 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }
             }
 
+            // 2026-10-10：簽到/簽退前必須重新核對雲端當月資料。
+            // 尤其管理員刪除 OUT 之後，舊手機快取不能再讓 IN 被重複建立。
+            // 雲端無法確認時停止寫入，不刪除或覆蓋任何原始紀錄。
+            if (statusText === '上班簽到' || statusText === '下班簽退') {
+                try {
+                    const today = new Date();
+                    const monthKey = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+                    const cloudFresh = await loadAttendanceMonthFromCloud(monthKey, false);
+                    if (!cloudFresh) {
+                        showToast('無法確認雲端最新上班紀錄，暫停打卡以避免重複；請稍後再試或通知管理員核對。', 'warning');
+                        releasePunchGuard();
+                        return;
+                    }
+                    const open = getOpenClockInShift(currentEmp);
+                    if (statusText === '上班簽到' && open) {
+                        showToast('已經上班簽到，請使用「下班簽退」，不可重複簽到。', 'warning');
+                        updateHomeClockInButtonState();
+                        releasePunchGuard();
+                        return;
+                    }
+                    if (statusText === '下班簽退' && !open) {
+                        showToast('雲端尚未確認未完成的上班紀錄，請通知管理員核對；不會另外建立簽退。', 'warning');
+                        updateHomeClockInButtonState();
+                        releasePunchGuard();
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('打卡前雲端紀錄核對失敗', error);
+                    showToast('雲端紀錄核對失敗，為防重複打卡，請稍後重試。', 'warning');
+                    releasePunchGuard();
+                    return;
+                }
+            }
+
             // V5.10.17：真正打卡前先做本機狀態機防重複。
             const punchSequenceCheck = validateEmployeePunchSequence(statusText, currentEmp);
             if (!punchSequenceCheck.ok) {
