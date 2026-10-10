@@ -14370,6 +14370,14 @@ function getManualPairRecordAnchor(record) {
                 showToast('原始紀錄已變動或 ID 不唯一，請重新整理後再核對', 'warning');
                 return;
             }
+            // 重複核對視窗不可刪到只剩零筆上班或下班，避免整班空白。
+            const dir=getAttendanceRecordType(r);
+            const otherSameSide=(Array.isArray(row.records)?row.records:[])
+                .filter(x=>String(x?.id??'').trim()!==id && getAttendanceRecordType(x)===dir);
+            if(['IN','OUT'].includes(dir) && otherSameSide.length===0){
+                showToast('同班這個方向只剩最後一筆，為避免整班空白，請保留原始打卡','warning');
+                return;
+            }
             const outbox=window.p79V5QueueInfoForId?.(id);
             if(outbox){
                 showToast('這筆刪除／修改仍在待同步佇列，請先等待核對雲端結果','warning');
