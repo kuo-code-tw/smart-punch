@@ -2676,10 +2676,11 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             // 目前頁面若由首頁 SSO 明確帶入有效 URL，使用該 URL；
             // 否則一律使用程式內建正式部署，不再讓某支手機 localStorage 的舊部署蓋過正式來源。
             const fromHash = readGasUrlFromSsoHash();
-            if (fromHash) {
-                try { sessionStorage.setItem('port79_gas_url', fromHash); } catch (e) {}
-                return fromHash;
+            if (fromHash && fromHash === CANONICAL_GAS_URL) {
+                try { sessionStorage.setItem('port79_gas_url', CANONICAL_GAS_URL); } catch (e) {}
+                return CANONICAL_GAS_URL;
             }
+            // 舊帳號的 SSO hash 可能殘留舊部署。新帳號固定使用新正式 GAS，避免跨帳號寫入。
 
             try {
                 const sessionUrl = normalizeGasWebAppUrl(sessionStorage.getItem('port79_gas_url') || '');
@@ -8271,7 +8272,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             if(quickPosition && evaluate(quickPosition,'fallback'))return;
                             fail(messageFor(error));
                         },
-                        {enableHighAccuracy:true,timeout:11000,maximumAge:15000}
+                        {enableHighAccuracy:true,timeout:15000,maximumAge:0}
                     );
                 }catch(error){fail('手機瀏覽器無法啟動 GPS 定位，請檢查位置權限');}
             }
@@ -8286,7 +8287,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         if(Number(error?.code)===1){fail(messageFor(error));return;}
                         high();
                     },
-                    {enableHighAccuracy:false,timeout:4500,maximumAge:45000}
+                    {enableHighAccuracy:false,timeout:6000,maximumAge:10000}
                 );
             }catch(error){fail('手機瀏覽器無法使用定位功能，請檢查位置權限');}
         }
