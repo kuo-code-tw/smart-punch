@@ -4460,6 +4460,10 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 role: 'employee',
                 adminRole: 'employee',
                 rememberedDevice: true,
+                // 僅保留已確認與目前手機一致的裝置綁定，供雲端主檔暫時無法讀取時沿用。
+                deviceId: (String(emp.deviceId || baseSession?.deviceId || '').trim() &&
+                    isSamePhysicalDeviceId(String(emp.deviceId || baseSession?.deviceId || '').trim(), getDeviceId()))
+                    ? String(emp.deviceId || baseSession?.deviceId || '').trim() : '',
                 savedAt: new Date().toISOString()
             };
         }
@@ -4634,6 +4638,18 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             const role = String(session?.adminRole || session?.role || session?.actualAdminRole || 'employee').toLowerCase();
             const empId = String(session?.empId || sessionStorage.getItem('port79_home_emp_id') || '').trim().toUpperCase();
             if (!empId || role !== 'employee') return null;
+            // 不把首頁最小 Session 當成新的手機；優先沿用同一員工已驗證裝置。
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem(PORT79_PERSISTENT_EMPLOYEE_SESSION_KEY) || 'null'); } catch(e){}
+            if (String(saved?.empId || '').trim().toUpperCase() !== empId) saved = null;
+            const fromCache = (Array.isArray(employees) ? employees : []).find(e =>
+                String(e?.empId || '').trim().toUpperCase() === empId &&
+                String(e?.deviceId || '').trim() &&
+                isSamePhysicalDeviceId(String(e.deviceId).trim(), getDeviceId())
+            );
+            const trustedDevice = [session?.deviceId, fromCache?.deviceId, saved?.deviceId].find(id =>
+                String(id || '').trim() && isSamePhysicalDeviceId(String(id).trim(), getDeviceId())
+            ) || '';
             return {
                 attNo: String(session?.attNo || session?.attendanceNo || '').trim(),
                 empId,
@@ -4643,7 +4659,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 deptDetail: String(session?.jobTitle || session?.deptDetail || '').trim(),
                 adminRole: 'employee',
                 phone: String(session?.phone || session?.mobile || '').trim(),
-                deviceId: String(session?.deviceId || '').trim(),
+                deviceId: String(trustedDevice).trim(),
                 allowPunchWithoutDeviceBinding:
                     session?.allowPunchWithoutDeviceBinding === true ||
                     String(session?.allowPunchWithoutDeviceBinding || '').toLowerCase() === 'true' ||
