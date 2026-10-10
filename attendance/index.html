@@ -6275,6 +6275,8 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                 url.searchParams.set('action', 'getAttendanceMainDirect');
                 url.searchParams.set('month', key);
                 url.searchParams.set('t', String(Date.now()));
+                // GAS v15 支援 force=1：管理員手動刷新必須讀最新主表。
+                if (force) url.searchParams.set('force', '1');
                 if (token) url.searchParams.set('token', token);
                 try {
                     const data = await fetchGasJsonWithRetry(url.toString(), '主考勤紀錄直接同步', 2, 15000);
