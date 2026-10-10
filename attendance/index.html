@@ -9619,8 +9619,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const latest = getLatestEmployeePunchState(emp, channel);
             const now = Date.now();
 
-            // 同類型上一筆仍在 24 小時內：直接視為重複刷卡。
-            if (latest?.type === type && latest.timestamp && now - latest.timestamp <= P79_PUNCH_DUPLICATE_WINDOW_MS) {
+            // 防重複必須按「同一班次」判斷，不能把前一班次的 OUT 當作新班次已簽退。
+            // 如最新 OUT 時間比目前未結束的 IN 還新，代表資料矛盾，仍阻止寫入並請管理員核對。
+            const openRegularShift = channel === 'REGULAR' ? getOpenClockInShift(emp) : null;
+            const openRegularInTime = openRegularShift ? getAttendanceTimestamp(openRegularShift.clockIn) : 0;
+            const duplicateSameShift = !(channel === 'REGULAR' && type === 'OUT' &&
+                openRegularInTime > 0 && latest?.timestamp && latest.timestamp < openRegularInTime);
+            if (duplicateSameShift && latest?.type === type && latest.timestamp && now - latest.timestamp <= P79_PUNCH_DUPLICATE_WINDOW_MS) {
                 const action = type === 'IN' ? '上班簽到' : '下班簽退';
                 return {
                     ok:false,
