@@ -9587,16 +9587,86 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return '';
         }
 
+
+        // PORT79 2026-10-10 MOBILE FAST STATE: only read the official attendance main sheet.
+        // Never ask archived Drive folders to decide whether one employee may clock IN/OUT.
+        const p79MobileOfficial = {empId:'',month:'',rows:[],verifiedAt:0,lastAttempt:0};
+        let p79MobileOfficialPromise = null;
+        function p79MobileMonth() {
+            const now=new Date();
+            return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        }
+        function p79MobileHasOfficial(emp) {
+            return !!emp && !!p79MobileOfficial.verifiedAt &&
+                p79MobileOfficial.empId===String(emp.empId||'').trim().toUpperCase() &&
+                p79MobileOfficial.month===p79MobileMonth();
+        }
+        async function p79MobileRefreshOfficial(force=false) {
+            const employee=currentEmp;
+            const empId=String(employee?.empId||'').trim().toUpperCase();
+            if(!empId)return false;
+            if(p79MobileOfficialPromise)return p79MobileOfficialPromise;
+            if(!force && p79MobileHasOfficial(employee) && Date.now()-p79MobileOfficial.verifiedAt<45000)return true;
+            if(!force && Date.now()-p79MobileOfficial.lastAttempt<12000)return false;
+            p79MobileOfficial.lastAttempt=Date.now();
+            const task=(async()=>{
+                const gas=String(getActiveGasUrl()||'');
+                if(!gas.startsWith('https://script.google.com/macros/s/'))return false;
+                const month=p79MobileMonth();
+                const token=String(sessionStorage.getItem('port79_user_token')||
+                    sessionStorage.getItem('port79_admin_token')||
+                    sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
+                const url=gas+(gas.includes('?')?'&':'?')+
+                    'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+
+                    (token?'&token='+encodeURIComponent(token):'')+'&t='+Date.now();
+                const data=await fetchGasJsonWithRetry(url,'本人正式考勤快速核對',1,12000);
+                if(!data?.ok || !Array.isArray(data.records) || String(data.month||'')!==month)
+                    throw new Error(data?.error||'正式主表未回傳有效刷卡紀錄');
+                const matched=data.records.filter(record=>{
+                    const rid=String(record?.empId||'').trim().toUpperCase();
+                    if(rid)return rid===empId;
+                    const att=String(record?.attNo||'').trim();
+                    return !!att && att===String(employee.attNo||'').trim() &&
+                        String(record?.name||'').replace(/\s+/g,'')===String(employee.name||'').replace(/\s+/g,'');
+                });
+                if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId)return false;
+                p79MobileOfficial.empId=empId;
+                p79MobileOfficial.month=month;
+                p79MobileOfficial.rows=matched;
+                p79MobileOfficial.verifiedAt=Date.now();
+                try{updateHomeClockInButtonState();}catch(e){}
+                return true;
+            })();
+            p79MobileOfficialPromise=task;
+            try{return await task;}
+            catch(e){console.warn('手機正式主表狀態核對失敗：',e);return false;}
+            finally{p79MobileOfficialPromise=null;}
+        }
+
         function getEmployeePunchRecords(emp = currentEmp, channel = 'REGULAR') {
             if (!emp) return [];
-            return (Array.isArray(records) ? records : [])
-                .filter(record => {
-                    if (!findEmployeeForAttendanceIdentity(record, [emp])) return false;
-                    const status = String(record?.status || '').trim();
-                    if (!getPunchTypeFromStatus(status)) return false;
-                    return getPunchChannel(status) === channel;
-                })
-                .sort((a, b) => getAttendanceTimestamp(b) - getAttendanceTimestamp(a));
+            const local=Array.isArray(records)?records:[];
+            const matched=record=>!!findEmployeeForAttendanceIdentity(record,[emp]);
+            let source=local;
+            if(p79MobileHasOfficial(emp)){
+                // Preserve only not-yet-cloud-confirmed local punches and recent cross-month shifts.
+                const pending=local.filter(record=>matched(record) &&
+                    (window.p79V5PendingForId?.(record.id)===true ||
+                     (attendanceRecordMonthKey(record)!==p79MobileOfficial.month &&
+                      Date.now()-getAttendanceTimestamp(record)>=0 &&
+                      Date.now()-getAttendanceTimestamp(record)<=36*3600000)));
+                source=[...p79MobileOfficial.rows,...pending];
+            }
+            const seen=new Set();
+            return source.filter(record=>{
+                if(!matched(record))return false;
+                const status=String(record?.status||'').trim();
+                if(!getPunchTypeFromStatus(status)||getPunchChannel(status)!==channel)return false;
+                const key=String(record?.id??'')+'|'+getPunchTypeFromStatus(status);
+                if(seen.has(key))return false;
+                seen.add(key);
+                return true;
+            }).sort((a,b)=>getAttendanceTimestamp(b)-getAttendanceTimestamp(a));
         }
 
         function getLatestEmployeePunchState(emp = currentEmp, channel = 'REGULAR') {
@@ -9692,9 +9762,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function getOpenClockInShift(emp = currentEmp) {
             if (!emp) return null;
             const regularStatuses = new Set(['上班簽到', '下班簽退', '簽到', '簽退']);
-            const myRecords = records.filter(record =>
-                regularStatuses.has(String(record.status || '').trim()) &&
-                !!findEmployeeForAttendanceIdentity(record, [emp])
+            const myRecords = getEmployeePunchRecords(emp,'REGULAR').filter(record =>
+                regularStatuses.has(String(record.status || '').trim())
             );
             const openShift = buildDailyAttendanceRows(myRecords)
                 .filter(row => row.clockIn && !row.clockOut)
@@ -9728,8 +9797,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const btn = document.getElementById('btnClockOut');
             if (btn) { btn.disabled = true; btn.textContent = '正在核對上班卡…'; }
             try {
-                const month = getRequestedAttendanceCloudMonth();
-                const ok = await loadAttendanceMonthFromCloud(month, false);
+                const ok = await p79MobileRefreshOfficial(true);
                 updateHomeClockInButtonState();
                 if (!ok) {
                     showToast('雲端上班卡核對失敗，請確認網路，或通知管理員核對原始打卡', 'warning');
@@ -9773,6 +9841,11 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }
 
             const waitingForEmployeeMaster = !currentEmp && !!rememberedEmpId;
+            // Background-only refresh on entry: button state must reflect existing official IN/OUT.
+            if(currentEmp && !p79MobileHasOfficial(currentEmp) && !p79MobileOfficialPromise &&
+                Date.now()-p79MobileOfficial.lastAttempt>12000){
+                setTimeout(()=>p79MobileRefreshOfficial(false),600);
+            }
             const openShift = getOpenClockInShift(currentEmp);
             const openOvertime = getOpenOvertimeShift(currentEmp);
             // 已簽退的班次不能再顯示可按的「下班簽退／重新核對上班卡」。
@@ -9859,6 +9932,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             clockInButton.classList.toggle('bg-slate-400', locked);
             clockInButton.classList.toggle('dark:bg-slate-600', locked);
         }
+
+        window.addEventListener('pageshow',()=>setTimeout(()=>{if(currentEmp)p79MobileRefreshOfficial(false);},900));
+        document.addEventListener('visibilitychange',()=>{
+            if(!document.hidden && currentEmp)setTimeout(()=>p79MobileRefreshOfficial(false),500);
+        });
+        setInterval(()=>{if(!document.hidden && currentEmp)p79MobileRefreshOfficial(false);},60000);
 
         // 手機快速打卡：已綁定且本機裝置一致時，不再每次打卡前等待完整 getData。
         // 首次綁定仍交由 GAS setEmployeeDevice 驗證，避免兩支手機搶綁。
@@ -10024,9 +10103,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 雲端無法確認時停止寫入，不刪除或覆蓋任何原始紀錄。
             if (statusText === '上班簽到' || statusText === '下班簽退') {
                 try {
-                    const today = new Date();
-                    const monthKey = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
-                    const cloudFresh = await loadAttendanceMonthFromCloud(monthKey, false);
+                    const cloudFresh = await p79MobileRefreshOfficial(true);
                     if (!cloudFresh) {
                         showToast('無法確認雲端最新上班紀錄，暫停打卡以避免重複；請稍後再試或通知管理員核對。', 'warning');
                         releasePunchGuard();
