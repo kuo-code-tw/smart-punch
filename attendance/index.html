@@ -22791,11 +22791,8 @@ window.postRealtimePunchToCloud=function(record,successMsg,onPersistSuccess,onEr
   }
 };
 
-// legacy outbox no longer drives attendance writes.
-try{
-  localStorage.removeItem('port79_cloud_outbox_v1');
-  localStorage.removeItem('port79_cloud_outbox');
-}catch(e){}
+// 舊版佇列已不負責寫入，但仍保留內容供人工安全核對。
+// 不能在每次進入考勤頁時清除舊版待同步資料，以免未核對的補卡遺失。
 
 // PORT79 V5 已核實刪除請求一次性整理（2026-10-10）。
 // 以上 5 個 ID 已在 companytest.tw@gmail.com 所擁有的正式 GPS考勤資料庫
