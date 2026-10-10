@@ -14300,7 +14300,8 @@ function getManualPairRecordAnchor(record) {
             const totalExtra = list.reduce((n,row) => n + Number(row.duplicateRecordCount || 0),0);
             const modal = document.createElement('div');
             modal.id = 'p79DuplicateReviewModal';
-            modal.className = 'fixed inset-0 z-[160] bg-slate-950/60 flex items-center justify-center p-4';
+            modal.className = 'fixed inset-0 bg-slate-950/60 flex items-center justify-center p-2 sm:p-4';
+            modal.style.zIndex = '2147483000';
             const listHtml = list.map((row,index) => `<tr class="border-b border-slate-200 dark:border-slate-700">
                 <td class="px-3 py-2">${escapeHtml(String(row.dateKey || ''))}</td>
                 <td class="px-3 py-2">${escapeHtml(String(row.name || row.empId || ''))}</td>
@@ -14308,12 +14309,12 @@ function getManualPairRecordAnchor(record) {
                 <td class="px-3 py-2 text-center font-bold">${Number(row.duplicateRecordCount || 0)}</td>
                 <td class="px-3 py-2"><button type="button" onclick="p79OpenDuplicateReview(${index})" class="font-bold text-cyan-700 underline">查看原始紀錄</button></td>
             </tr>`).join('');
-            modal.innerHTML = `<div role="dialog" aria-modal="true" aria-label="疑似重複考勤清單" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl p-5 w-full max-w-4xl max-h-[85vh] overflow-auto">
+            modal.innerHTML = `<div role="dialog" aria-modal="true" aria-label="疑似重複考勤清單" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl p-3 sm:p-5 w-full max-w-4xl flex flex-col min-h-0" style="max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px)">
                 <div class="flex justify-between items-center mb-3"><h3 class="font-black text-base">🔎 疑似重複考勤清單</h3><button type="button" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
                 <div class="text-sm font-bold mb-2">疑似重複班次：${list.length} 組｜整合多餘刷卡：${totalExtra} 筆</div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3">僅統計目前已載入、且你有權限查看的考勤資料；不是全年雲端全部重複筆數。這是班次整合候選，並非確認可刪資料。人工補卡與不同事件 ID 請逐筆核對。</p>
-                <div class="overflow-x-auto"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
-                <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">刪除重複考勤（系統優先）</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
+                <div class="overflow-auto min-h-0 flex-1"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
+                <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">刪除重複考勤（系統優先）</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
             </div>`;
             modal.addEventListener('click',e=>{if(e.target===modal)p79CloseDuplicateReview();});
             document.body.appendChild(modal);
