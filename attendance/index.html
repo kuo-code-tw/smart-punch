@@ -14381,7 +14381,8 @@ function getManualPairRecordAnchor(record) {
             document.body.appendChild(modal);
         }
 
-        // 批次安全整理：雲端確認後刪除，Excel 唯一紀錄升級為正式系統。
+        // 批次安全整理：專用雲端直送，不經 postToCloud 的自動佇列，避免逾時後在背景偷偷重送刪除。
+        // 只有獲得 GAS 明確 ACK 才修改本地資料；結果不明立即停下核對。
         let p79BatchDuplicateBusy = false;
         // 工作執行期間不佔用考勤清單或其他管理介面。
         // 重複考勤批次只在雲端確認後更新本地，連續失敗就停止新請求。
@@ -14545,24 +14546,24 @@ function getManualPairRecordAnchor(record) {
                             continue;
                         }
                         if(task.mode==='delete') {
-                            const result=await postToCloud({action:'deleteRecord',id});
+                            const result=await sendCloudPayload({action:'deleteRecord',id});
                             if(result?.ok&&!result?.queued) {
                                 if(p79ApplyConfirmedAttendanceDelete(id,{skipRender:true})) {
                                     stats.removed++;
                                     remoteFailures=0;
                                 } else markError('雲端已確認刪除，但本機更新失敗，請重新整理核對',false);
-                            }else markError(result?.error||'雲端未確認刪除',true);
+                            }else markError('ID '+id+'：'+String(result?.error||'雲端沒有回傳刪除成功確認')+'；不自動重送，請先核對',true);
                         }else {
                             const original=matches[0];
                             const updated={...original,source:'system-confirmed',importConfirmedAt:new Date().toISOString(),importConfirmedFrom:String(original.importFile||'')};
-                            const result=await postToCloud({action:'updateRecord',record:updated,originalTimeStr:original.timeStr,originalPunchType:original.status});
+                            const result=await sendCloudPayload({action:'updateRecord',record:updated,originalTimeStr:original.timeStr,originalPunchType:original.status});
                             if(result?.ok&&!result?.queued) {
                                 Object.assign(original,updated);
                                 archiveAttendanceRecords([original]);
                                 saveRecords();
                                 stats.converted++;
                                 remoteFailures=0;
-                            }else markError(result?.error||'雲端未確認來源轉換',true);
+                            }else markError('ID '+id+'：'+String(result?.error||'雲端沒有回傳更新成功確認')+'；不自動重送，請先核對',true);
                         }
                     }catch(error) {
                         markError(error?.message||String(error),true);
@@ -14574,7 +14575,7 @@ function getManualPairRecordAnchor(record) {
                 }
             };
             try {
-                await Promise.all([worker(),worker()]);
+                await worker();
                 stats.finished=true;
                 p79ShowBatchDuplicateProgress(stats);
                 try{renderAdminRecordsTable();}catch(e){console.warn('整理結束後刷新失敗',e);}
@@ -14627,6 +14628,7 @@ function getManualPairRecordAnchor(record) {
                 const reviewClass = edited ? 'text-amber-700 dark:text-amber-300' : sameDirectionCount > 1 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-300';
                 return `<tr class="border-b border-slate-200 dark:border-slate-700">
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(String(r?.timeStr || ''))}</td>
+                    <td class="px-3 py-2 text-center align-middle break-all" title="${escapeHtml(id)}">${escapeHtml(id||'缺少 ID')}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(String(r?.status || ''))}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(sourceText)}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(reviewText)}</td>
@@ -14638,7 +14640,7 @@ function getManualPairRecordAnchor(record) {
             modal.innerHTML = `<div role="dialog" aria-modal="true" aria-label="重複刷卡原始紀錄核對" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl p-5 w-full max-w-4xl max-h-[85vh] overflow-auto">
                 <div class="relative flex items-center justify-center gap-2 mb-3"><h3 class="font-black text-base text-center">🔎 同班次重複刷卡核對</h3><button type="button" class="absolute right-0 top-0" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3 text-center">這些是系統合併顯示的原始紀錄，不代表每一筆都該刪。上班和下班通常各要保留一筆；人工補卡請特別核對。刪除會同步至雲端，且可能影響工時。</p>
-                <div class="overflow-x-auto"><table class="min-w-full text-xs text-center"><thead><tr class="border-b"><th class="px-3 py-2 text-center align-middle">打卡時間</th><th class="px-3 py-2 text-center align-middle">方向</th><th class="px-3 py-2 text-center align-middle">來源</th><th class="px-3 py-2 text-center align-middle">核對狀態</th><th class="px-3 py-2 text-center align-middle">操作</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+                <div class="overflow-x-auto"><table class="min-w-full text-xs text-center"><thead><tr class="border-b"><th class="px-3 py-2 text-center align-middle">打卡時間</th><th class="px-3 py-2 text-center align-middle">紀錄 ID</th><th class="px-3 py-2 text-center align-middle">方向</th><th class="px-3 py-2 text-center align-middle">來源</th><th class="px-3 py-2 text-center align-middle">核對狀態</th><th class="px-3 py-2 text-center align-middle">操作</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
                 <div class="flex justify-center mt-4"><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold">全部保留／關閉</button></div>
             </div>`;
             modal.addEventListener('click', e => { if(e.target === modal) p79CloseDuplicateReview(); });
