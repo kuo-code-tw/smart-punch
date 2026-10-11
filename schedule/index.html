@@ -1188,6 +1188,33 @@ html.dark #app-main-container .p79-roster-frozen-people .p79-fixed-person-row{ba
 html.dark #app-main-container .p79-roster-frozen-people .p79-fixed-person-row:nth-child(even){background:#0f172a}
 html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!important;color:#f1f5f9!important}
 </style>
+<style id="p79-schedule-diagnostic-embed-20261011">
+.p79-schedule-diagnostic-overlay{
+ display:none;position:fixed;inset:0;z-index:2147483640;
+ padding:10px;background:rgba(15,23,42,.7);
+ align-items:center;justify-content:center;
+}
+.p79-schedule-diagnostic-panel{
+ width:min(940px,100%);height:min(92vh,960px);background:#f5f7fb;
+ display:flex;flex-direction:column;border-radius:15px;overflow:hidden;
+ box-shadow:0 22px 55px #07111a55;
+}
+.p79-schedule-diagnostic-bar{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:10px;padding:10px 16px;background:#1e3a5f;color:white;font-size:14px;
+}
+.p79-schedule-diagnostic-bar button{
+ background:#f1f5f9;color:#1e293b;border:0;border-radius:9px;
+ padding:9px 13px;cursor:pointer;font-weight:800;
+}
+.p79-schedule-diagnostic-panel iframe{
+ width:100%;height:100%;border:0;flex:1;background:#f5f7fb;
+}
+@media(max-width:680px){
+ .p79-schedule-diagnostic-overlay{padding:0}
+ .p79-schedule-diagnostic-panel{width:100%;height:100dvh;border-radius:0}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -1221,7 +1248,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
             <button id="top-save-schedule-btn" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="schedule-top-action px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
               <i class="fa-solid fa-floppy-disk"></i> 儲存排班
             </button>
-            <button id="schedule-diag-btn" type="button" onclick="window.open('diagnostics.html','_blank')" class="schedule-top-action px-3 py-2 text-sm bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="新分頁開啟唯讀 GAS 連線診斷，不會修改班表">
+            <button id="schedule-diag-btn" type="button" onclick="openScheduleDiagnostics()" class="schedule-top-action px-3 py-2 text-sm bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="新分頁開啟唯讀 GAS 連線診斷，不會修改班表">
               <i class="fa-solid fa-stethoscope"></i> 連線診斷
             </button>
             <button id="schedule-import-btn" type="button" onclick="openScheduleImportPicker()" class="schedule-top-action px-3 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="匯入由本系統匯出的班表 Excel，或同欄位格式的 Excel">
@@ -1457,6 +1484,36 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     let scheduleLockRequestEpoch = 0; // 忽略手動鎖定後才抵達的舊背景回應
     let scheduleManualLockBusy = false;
     let scheduleEditLockState = { locked:false, mine:false, ownerName:'', ownerEmpId:'', expiresAt:0, startedAt:0, lastCheckedAt:0 };
+
+    // 診斷頁和排班頁共享相同的 top-level browsing context / sessionStorage。
+    // 不使用新分頁，也不將登入 Token 或 clientId 放進 URL。
+    function openScheduleDiagnostics(){
+      let overlay=document.getElementById('p79ScheduleDiagOverlay');
+      if(!overlay){
+        overlay=document.createElement('div');
+        overlay.id='p79ScheduleDiagOverlay';
+        overlay.className='p79-schedule-diagnostic-overlay';
+        overlay.setAttribute('role','dialog');
+        overlay.setAttribute('aria-modal','true');
+        overlay.setAttribute('aria-label','排班雲端連線診斷');
+        overlay.innerHTML=`
+          <div class="p79-schedule-diagnostic-panel">
+            <div class="p79-schedule-diagnostic-bar">
+              <strong><i class="fa-solid fa-stethoscope"></i> 排班雲端連線診斷（唯讀）</strong>
+              <button type="button" onclick="closeScheduleDiagnostics()" aria-label="關閉診斷視窗"><i class="fa-solid fa-xmark"></i> 返回排班</button>
+            </div>
+            <iframe title="排班雲端診斷工具" src="diagnostics.html?v=20261011.2" referrerpolicy="no-referrer"></iframe>
+          </div>`;
+        document.body.appendChild(overlay);
+      }
+      overlay.style.display='flex';
+    }
+    function closeScheduleDiagnostics(){
+      const overlay=document.getElementById('p79ScheduleDiagOverlay');
+      if(overlay)overlay.style.display='none';
+    }
+    window.openScheduleDiagnostics=openScheduleDiagnostics;
+    window.closeScheduleDiagnostics=closeScheduleDiagnostics;
 
     function getScheduleClientId() {
       let id = String(sessionStorage.getItem('port79_schedule_client_id') || '').trim();
