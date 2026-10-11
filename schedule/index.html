@@ -3872,11 +3872,20 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       return idx === -1 ? 999 : idx;
     }
 
+    // Group display/order is derived from names, never from cloud insertion order.
+    // Keep persisted availableGroups unchanged to avoid unnecessary GAS writes.
+    function sortedScheduleGroups() {
+      return [...new Set((availableGroups || []).filter(Boolean))].sort((a,b)=>{
+        if(a==='不分組')return b==='不分組'?0:-1;
+        if(b==='不分組')return 1;
+        if(a==='不輪班')return b==='不輪班'?0:1;
+        if(b==='不輪班')return -1;
+        return String(a).localeCompare(String(b),'zh-Hant',{numeric:true,sensitivity:'base'});
+      });
+    }
     function getGroupPriority(group) {
-      if (group === '不分組') return 0;
-      if (group === '不輪班') return 999;
-      const idx = availableGroups.indexOf(group);
-      return idx === -1 ? 500 : idx;
+      const index=sortedScheduleGroups().indexOf(group);
+      return index<0?500:index;
     }
 
     // v2026.09.30.8.9：恢復「人員上下移動」。
@@ -4365,7 +4374,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
     function getGroupOptionsHtml(selectedGroup) {
       let html = '';
-      availableGroups.forEach(g => {
+      sortedScheduleGroups().forEach(g => {
         html += `<option value="${g}" ${selectedGroup===g?'selected':''}>${g}</option>`;
       });
       return html;
@@ -4797,7 +4806,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         </button>
       `;
 
-      availableGroups.forEach(gKey => {
+      sortedScheduleGroups().forEach(gKey => {
         const count = groupCounts[gKey] || 0;
         const isActive = (activeGroupFilter === gKey);
         groupTabsHtml += `
