@@ -3723,8 +3723,14 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       return assignments.map(({kind,data:a})=>{
         const workerNames=(a.workerIds||[]).map(id=>employees.find(e=>String(e.id||'').toUpperCase()===String(id).toUpperCase())?.name||id).join('、');
         const leaveName=employees.find(e=>String(e.id||'').toUpperCase()===String(a.leaveEmpId||'').toUpperCase())?.name||a.leaveEmpId;
-        const title=kind==='leave'?'請假代班：'+workerNames:'代班 '+leaveName+'｜'+(a.mode==='two'?'兩人加班':'排休代班');
-        return '<span title="'+scheduleEscapeHtml(title)+'" class="inline-flex items-center px-1 py-0.5 rounded-md bg-cyan-100 text-cyan-900 font-black text-[9px]">'+(kind==='leave'?'👥已安排':'🔄代班')+'</span>';
+        const twoWorkers=a.mode==='two';
+        const hours=twoWorkers?4:8;
+        const title=kind==='leave'
+          ? '請假已安排：'+workerNames+'｜'+(twoWorkers?'兩位各代班4小時':'一位排休代班8小時')
+          : '代班 '+leaveName+'｜'+hours+'小時';
+        const label=kind==='leave'?'已排':('代'+hours);
+        const cls=kind==='leave'?'bg-rose-50 text-rose-700':'bg-cyan-100 text-cyan-900';
+        return '<span title="'+scheduleEscapeHtml(title)+'" aria-label="'+scheduleEscapeHtml(title)+'" class="inline-flex shrink-0 whitespace-nowrap items-center justify-center px-1 py-0.5 rounded '+cls+' font-black text-[9px] leading-none">'+label+'</span>';
       }).join('');
     }
 
