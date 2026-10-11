@@ -1101,6 +1101,22 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 html.dark #app-main-container #p79RosterScroll .p79-person-cell{background:#111827!important}
 html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-person-cell{background:#0f172a!important}
 </style>
+<style id="p79-schedule-save-protection-20261011">
+body.p79-schedule-saving #p79RosterScroll{background:#e2e8f0!important;cursor:wait}
+body.p79-schedule-saving #p79RosterScroll tbody{opacity:.48;filter:grayscale(.65)}
+body.p79-schedule-saving #p79RosterScroll select,body.p79-schedule-saving #p79RosterScroll button{pointer-events:none!important}
+body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #schedule-rule-toolbar{pointer-events:none!important;opacity:.6}
+#app-main-container .p79-month-schedule-table .p79-person-cell,#app-main-container .p79-month-schedule-table .p79-person-header{width:150px!important;min-width:150px!important;max-width:150px!important;padding:3px 4px!important;box-sizing:border-box!important}
+#app-main-container .p79-person-name-line{display:flex!important;align-items:center!important;gap:3px!important}
+#app-main-container .p79-person-name{max-width:none!important;flex:1 1 auto!important;font-size:15px!important}
+#app-main-container .p79-person-subline{display:flex!important;align-items:center!important;gap:3px!important;justify-content:space-between!important}
+#app-main-container .p79-person-controls{display:flex!important;gap:2px!important;flex:0 0 auto!important}
+#app-main-container .p79-mini-select{max-width:51px!important;width:51px!important;font-size:10px!important}
+#app-main-container .p79-drag-top{flex:0 0 29px!important;width:29px!important;height:29px!important;min-height:29px!important;font-size:16px!important}
+#app-main-container #p79RosterScroll .p79-person-cell{position:sticky!important;left:0!important;z-index:30!important;background:#fff!important}
+#app-main-container #p79RosterFixedHeader{isolation:isolate}
+#app-main-container #p79RosterFixedHeader .p79-person-header{position:relative!important;left:0!important;z-index:90!important;background:#e9eef5!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4133,16 +4149,22 @@ html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-per
         headTable.appendChild(originalHead);
         header.appendChild(headTable);
       }
+      const pinPersonHeader=()=>{
+        const first=header.querySelector('.p79-person-header');
+        if(first)first.style.transform='translateX('+main.scrollLeft+'px)';
+      };
       const syncSize=()=>{
         spacer.style.width=table.scrollWidth+'px';
         const headTable=header.querySelector('table');
         if(headTable)headTable.style.width=table.scrollWidth+'px';
         header.scrollLeft=main.scrollLeft;
+        pinPersonHeader();
         bar.scrollLeft=main.scrollLeft;
       };
       syncSize();
       main.addEventListener('scroll',()=>{
         header.scrollLeft=main.scrollLeft;
+        pinPersonHeader();
         if(Math.abs(bar.scrollLeft-main.scrollLeft)>1)bar.scrollLeft=main.scrollLeft;
       },{passive:true});
       bar.addEventListener('scroll',()=>{
@@ -4438,7 +4460,6 @@ html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-per
                 <div class="p79-person-name-line">
                   <span class="p79-person-name">${emp.name}</span>
                   ${scheduleAttendanceActiveBadge(emp.id)}
-                  ${getGroupBadgeHtml(emp.group)}
                   ${lockBadge}
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
                 </div>
@@ -4507,7 +4528,17 @@ html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-per
       applyScheduleAccessUi();
     }
 
+    let p79ManualScheduleSaveBusy=false;
+    function p79SetScheduleSaving(busy){
+      document.body.classList.toggle('p79-schedule-saving',!!busy);
+      const button=document.getElementById('top-save-schedule-btn');
+      if(button){button.disabled=!!busy;button.innerHTML=busy?'<i class="fa-solid fa-spinner fa-spin"></i> 儲存中…':'<i class="fa-solid fa-floppy-disk"></i> 儲存排班';}
+      const month=document.getElementById('month-picker');
+      if(month)month.disabled=!!busy;
+      document.querySelectorAll('#p79RosterScroll select,#p79RosterScroll button').forEach(el=>{if(busy)el.disabled=true;});
+    }
     async function saveCurrentTabSchedule() {
+      if(p79ManualScheduleSaveBusy)return;
       if (!canManageSchedule()) { requireScheduleEditLock(); return; }
       // 儲存前由 GAS 原子確認編輯權；不以可能延遲的本機狀態直接拒絕管理員。
       // 若其他帳號持鎖，必須拒絕寫入，不可強制接管。
@@ -4520,6 +4551,9 @@ html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-per
         }
       }
       if (!requireScheduleEditLock(false)) return;
+      p79ManualScheduleSaveBusy=true;
+      p79SetScheduleSaving(true);
+      try {
       // 儲存前立即續租，避免雲端寫入過程中使用即將到期的租約。
       try {
         const renewed=await scheduleLockPost('scheduleHeartbeatEditLock');
@@ -4561,6 +4595,11 @@ html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-per
       } else {
         port79ScheduleDirty = true;
         alert('❌ 排班雲端儲存失敗：\n' + (lastScheduleCloudError || '雲端沒有回傳詳細錯誤，請確認 Apps Script 已部署最新版。'));
+      }
+      } finally {
+        p79ManualScheduleSaveBusy=false;
+        p79SetScheduleSaving(false);
+        applyScheduleAccessUi();
       }
     }
 
