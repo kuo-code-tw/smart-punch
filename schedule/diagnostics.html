@@ -39,7 +39,7 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
   </div>
   <p id="sessionInfo">正在檢查本分頁的登入狀態……</p>
   <p id="v4Status" style="font-weight:800;color:#64748b">GAS V4 排班／考勤分離狀態：尚未檢查</p>
-  <div class="notice">如果顯示「缺少登入資訊」，請先登入排班系統，從排班頁面的「連線診斷」按鈕開啟此頁。請勿在此輸入密碼，也不要分享登入 Token。</div>
+  <div class="notice">你即使已經登入排班系統，若從聊天連結直接開新分頁，此頁也可能讀不到<b>另一個分頁</b>的登入狀態。正確方式：保持原排班頁不關閉，按上方「連線診斷」，會在同一頁的視窗中執行，不需要重新登入，也不會清除未存班表。請勿分享登入 Token。</div>
 </div>
 <div class="panel">
   <h2>測試結果</h2>
@@ -70,7 +70,16 @@ function authData(){
   let token="",clientId="";
   try {
     // Opened from schedule page: inherit the same session and client identity.
+    // Embedded diagnostics run inside the schedule tab: the iframe and parent share
+    // origin and top-level browsing context. Read the *live parent* session if present.
     const stores=[sessionStorage];
+    try{
+      if(window.parent!==window&&window.parent.location.origin===location.origin){
+        stores.unshift(window.parent.sessionStorage);
+        if(typeof window.parent.currentPort79SsoToken==='function')token=String(window.parent.currentPort79SsoToken()||"").trim();
+        if(typeof window.parent.getScheduleClientId==='function')clientId=String(window.parent.getScheduleClientId()||"").trim();
+      }
+    }catch(_){}
     try{if(window.opener&&window.opener.location.origin===location.origin)stores.push(window.opener.sessionStorage)}catch(_){}
     for(const store of stores){
       if(!token)for(const key of keynames){const v=String(store.getItem(key)||"").trim();if(v){token=v;break}}
@@ -83,7 +92,7 @@ function updateSessionInfo(){
   const auth=authData();
   const status=auth.token
     ? (auth.clientId?"已偵測到排班登入與目前編輯分頁識別碼，可檢查編輯鎖。":"已偵測到登入，但缺少排班分頁識別碼；先從排班頁的按鈕開啟診斷。")
-    : "沒有偵測到排班登入資訊；仍可測試 GAS 基本連線。";
+    : "此診斷頁未取得同分頁的排班登入資訊。若你已登入，請回到原班表，直接按排班頁上方「連線診斷」，不要從聊天視窗另外開一個分頁。";
   byId("sessionInfo").textContent=status;
   return auth;
 }
