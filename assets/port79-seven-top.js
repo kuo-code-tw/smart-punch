@@ -151,7 +151,7 @@ const MENU={
  ],
  workhours:[['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式']],
- schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
+ schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
  hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
  history:[]
@@ -227,6 +227,7 @@ async function runAction(sys,a){closeMenu();try{
  }
  if(sys==='schedule'){
   if(a==='schedule-lock')return window.p79ToggleScheduleLock?.();
+  if(a==='schedule-takeover')return window.p79ForceTakeoverScheduleEditLock?.();
   if(a==='schedule-save')return await window.saveCurrentTabSchedule?.();
   if(a==='schedule-mode')return window.p79OpenScheduleModeModal?.();
   if(a==='import')return window.openScheduleImportPicker?.();
@@ -255,7 +256,7 @@ function buildMenu(sys){
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
   ['資料管理',['attendance-import','attendance-export','import','export']],
-  ['系統設定',['schedule-lock','schedule-mode','org','reset-cloud']],
+  ['系統設定',['schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
@@ -272,7 +273,7 @@ function buildMenu(sys){
    menu.appendChild(b);
  }
  GROUPS.forEach(([heading,actions])=>{
-   const included=actions.filter(a=>items.has(a)||['data-cache','global-theme','logout-system'].includes(a));
+   const included=actions.filter(a=>(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['data-cache','global-theme','logout-system'].includes(a)));
    if(!included.length)return;
    const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
    included.forEach(a=>{
