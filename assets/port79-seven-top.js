@@ -84,21 +84,21 @@ else p79BootLogoutControls();
 })();
 
 const META={
- attendance:['🕒','考勤系統','員工打卡・考勤紀錄・即時動態'],
+ attendance:['🕒','考勤管理','員工打卡・考勤紀錄・即時動態'],
  workhours:['📊','加班管理','出勤統計・加班統計・月結工時'],
- leave:['📝','請假系統','請假申請・審核・特休資訊'],
- schedule:['📅','排班系統','人員班表・組別・今日出勤'],
- efficiency:['🚢','效率系統','船舶作業・效率統計・月報比對'],
- hr:['👥','人資系統','員工主檔・部門職稱・權限設定'],
- history:['🗄️','歷史資料','考勤・排班・船舶歷史查詢']
+ leave:['📝','請假管理','請假申請・審核・特休資訊'],
+ schedule:['📅','排班管理','人員班表・組別・今日出勤'],
+ efficiency:['🚢','效率管理','船舶作業・效率統計・月報比對'],
+ hr:['👥','人資管理','員工主檔・部門職稱・權限設定'],
+ history:['🗄️','歷史資料管理','考勤・排班・船舶歷史查詢']
 };
 const NAV=[
- ['attendance','🕒','考勤','../attendance/'],['workhours','📊','加班管理','../work-hours/'],
- ['leave','📝','請假','../leave/'],['schedule','📅','排班','../schedule/'],
- ['efficiency','🚢','效率','../aqc-efficiency/'],['hr','👥','人資','../hr/'],
- ['history','🗄️','歷史資料','../history-data/']
+ ['attendance','🕒','考勤管理','../attendance/'],['workhours','📊','加班管理','../work-hours/'],
+ ['leave','📝','請假管理','../leave/'],['schedule','📅','排班管理','../schedule/'],
+ ['efficiency','🚢','效率管理','../aqc-efficiency/'],['hr','👥','人資管理','../hr/'],
+ ['history','🗄️','歷史資料管理','../history-data/']
 ];
-const SYSTEMS=[['attendance','考勤'],['workhours','加班管理'],['leave','請假'],['schedule','排班'],['efficiency','效率'],['hr','人資'],['history','歷史資料']];
+const SYSTEMS=[['attendance','考勤管理'],['workhours','加班管理'],['leave','請假管理'],['schedule','排班管理'],['efficiency','效率管理'],['hr','人資管理'],['history','歷史資料管理']];
 let statusBusy=false,statusTimer=null,lastSignature='';
 
 function currentSystem(){
