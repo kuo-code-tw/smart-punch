@@ -2251,7 +2251,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.11.30';
+        const APP_VERSION='2026.10.11.31';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -19072,19 +19072,31 @@ function getManualPairRecordAnchor(record) {
         window.syncImportedAttendanceRecordsToCloud = syncImportedAttendanceRecordsToCloud;
 
         let p79FinalizeExcelAttendanceBusy = false;
-        async function p79ReadExcelFinalizationMonths(rows) {
+        async function p79ReadExcelFinalizationMonths(rows, preferMain = false) {
             const result = new Map();
             const months = [...new Set(rows.map(attendanceRecordMonthKey))];
             for (const month of months) {
                 if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('考勤月份無效');
                 const url = new URL(sysConfig.gasUrl);
-                url.searchParams.set('action', 'getAttendanceMonthRaw');
                 url.searchParams.set('month', month);
                 url.searchParams.set('token', getAttendanceEmployeeMasterToken());
                 url.searchParams.set('fresh', '1');
                 url.searchParams.set('t', String(Date.now()));
-                const data = await fetchGasJsonWithRetry(url.toString(), 'Excel 清理重新讀取', 1, 20000);
-                if (!data?.ok || !Array.isArray(data.records)) throw new Error(data?.error || '雲端考勤讀取失敗');
+                const read = async action => {
+                    url.searchParams.set('action', action);
+                    const data = await fetchGasJsonWithRetry(url.toString(), 'Excel 清理重新讀取', 1, 20000);
+                    if (!data?.ok || !Array.isArray(data.records)) throw new Error(data?.error || '雲端考勤讀取失敗');
+                    return data;
+                };
+                let data;
+                if (preferMain && month === getCurrentYearMonthValue()) {
+                    data = await read('getAttendanceMainDirect');
+                    const ids = new Set(data.records.map(row => String(row.id)));
+                    // 舊版誤存年度檔、或刪除後需核對其他來源時，仍完整讀取。
+                    if (rows.some(row => attendanceRecordMonthKey(row) === month && !ids.has(String(row.id)))) {
+                        data = await read('getAttendanceMonthRaw');
+                    }
+                } else data = await read('getAttendanceMonthRaw');
                 data.records.forEach(row => result.set(String(row.id), row));
             }
             return result;
@@ -19143,7 +19155,7 @@ function getManualPairRecordAnchor(record) {
                         job.written = result?.ok === true && result?.queued !== true;
                     } catch (_) { job.written = false; }
                 }
-                const after = await p79ReadExcelFinalizationMonths(excelRows);
+                const after = await p79ReadExcelFinalizationMonths(excelRows, true);
                 const deletedIds = [];
                 const promoted = [];
                 for (const job of jobs) {
