@@ -4072,6 +4072,33 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             return pending;
         }
 
+        // 手動拉取只讀目前月份，不觸發 outbox 寫入；雲端空回應時由原有同步引擎保護本機資料。
+        let p79ManualMonthPullBusy = false;
+        async function p79PullSelectedMonthFromCloud() {
+            if(p79ManualMonthPullBusy)return false;
+            const btn=document.getElementById('p79PullCloudMonthBtn');
+            const month=String(document.getElementById('filterMonthSelect')?.value||'').trim();
+            if(!/^\d{4}-\d{2}$/.test(month)){
+                showToast('請先選擇要拉取的考勤月份','warning');return false;
+            }
+            if(typeof loadAttendanceMonthFromCloud!=='function'){
+                showToast('雲端月份讀取功能尚未載入，請重新整理網頁','warning');return false;
+            }
+            p79ManualMonthPullBusy=true;
+            if(btn){btn.disabled=true;btn.textContent='⏳ 拉取中…';}
+            try{
+                const ok=await loadAttendanceMonthFromCloud(month,true);
+                if(ok!==true)showToast('雲端資料尚未成功讀回，本機資料已保留','warning');
+                return ok===true;
+            }catch(e){
+                showToast('雲端拉取失敗：'+String(e?.message||e),'warning');
+                return false;
+            }finally{
+                p79ManualMonthPullBusy=false;
+                if(btn){btn.disabled=false;btn.textContent='☁ 從雲端拉取';}
+            }
+        }
+
         async function retryCloudOutboxNow() {
             const queue = readCloudOutbox();
             if (!queue.length) {
@@ -14274,6 +14301,7 @@ function getManualPairRecordAnchor(record) {
                                 📅 ${String(selectedDate || '').replaceAll('-', '/')}｜當日班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天
                             </span>
                             <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="新增補打卡">＋ 新增補打卡</button>
+                            <button id="p79PullCloudMonthBtn" type="button" onclick="p79PullSelectedMonthFromCloud()" class="px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 disabled:opacity-50" title="只從雲端讀取目前選擇的月份，不會上傳或清除待同步資料">☁ 從雲端拉取</button>
                             <button id="attendanceSyncCompactStatus" type="button" onclick="retryCloudOutboxNow()"
                                     class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                                     title="考勤雲端同步狀態；有待同步資料時可點此立即重試">
