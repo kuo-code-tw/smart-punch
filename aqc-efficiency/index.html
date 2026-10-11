@@ -1570,7 +1570,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.11.30';
+const APP_VERSION='2026.10.12.32';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -2179,10 +2179,22 @@ function summaryRows(){
   // 逐作業時段去重，不再用「整個區間只要有一筆 WORKING REPORT 就整批排除舊資料」的規則。
   // 這樣混合新舊資料的月份不會漏人，也不會把同一時段重複加總。
   const base=canonicalOperationalRecords((records||[]).filter(recordMatches));
+  const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]);
+  ps.forEach((p,i)=>{
+    for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
+      if(!index.has(key))index.set(key,[]);
+      index.get(key).push(i);
+    }
+  });
+  // 每筆明細只分派一次；同時命中工號與姓名時仍只計一次，保留原始加總順序。
+  base.forEach(r=>{
+    const matches=new Set([...(byId.get(String(r.empId||''))||[]),...(byName.get(normalizePersonName(r.name))||[])]);
+    matches.forEach(i=>personRows[i].push(r));
+  });
 
-  let arr=ps.map(p=>{
+  let arr=ps.map((p,i)=>{
     const gid=personGroupId(p);
-    const rs=base.filter(r=>String(r.empId||'')===p.empId||samePersonName(r.name,p.name));
+    const rs=personRows[i];
     const totalHours=rs.reduce((s,r)=>s+effectiveHours(r),0);
     const containers=rs.reduce((s,r)=>{
       if(['working-report','gc-driver-efficiency'].includes(String(r.source||''))){
@@ -10212,7 +10224,7 @@ function canonicalOperationalRecords(list){
     const et=String(r?.endTime||'').slice(0,5);
     const directNo=String(r?.workingNo||r?.workNo||r?.workingNumber||'').trim();
     const directSerial=normalizeMonthlySerial(directNo);
-    const master=vesselMasterForRecord(r);
+    const master=directSerial?null:vesselMasterForRecord(r);
     // 5260151 / 0151 是同一月報序號；日期已在 key 內，因此用標準序號可安全去重。
     const vesselKey=directSerial?`SER:${directSerial}`:(master?.workingNo?`SER:${normalizeMonthlySerial(master.workingNo)}`:`SHIP:${monthlyShipNo(r?.shipName||r?.vessel||'')}`);
     const rawMoves=(num(r?.disc)+num(r?.load))||num(r?.containers);
