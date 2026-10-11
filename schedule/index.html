@@ -2561,28 +2561,29 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       return p79ScheduleLocalMutationVersion;
     }
 
-    function p79MarkScheduleCloudWriteConfirmed() {
-      port79ScheduleDirty = false;
+    function p79MarkScheduleCloudWriteConfirmed(snapshotVersion) {
+      // An older POST must never clear newer unsaved edits.
+      const latest=Number(snapshotVersion)===p79ScheduleLocalMutationVersion;
+      port79ScheduleDirty = !latest;
       port79ScheduleLastAutoSyncAt = Date.now();
       // GAS 寫入成功後，月份讀取/試算表索引可能短暫仍看見舊內容。
       // 12 秒內禁止自動 GET 把剛儲存的本機畫面洗回去。
       p79ScheduleProtectLocalUntil = Math.max(p79ScheduleProtectLocalUntil, Date.now() + 12000);
+      return latest;
     }
 
+    let p79ScheduleWriteTail=Promise.resolve();
     async function runScheduleCloudWrite(task) {
-      // 同一時間只允許一個排班寫入工作；若已有寫入，先等它完成再接下一個。
-      if (port79ScheduleWriteInFlight) {
-        try { await port79ScheduleWriteInFlight; } catch(ignore) {}
-      }
-      const p = (async () => {
-        try { return await task(); }
-        catch (e) { console.error('排班雲端寫入失敗：', e); return false; }
-      })();
-      port79ScheduleWriteInFlight = p;
+      // Promise chaining, not just waiting on the current writer, guarantees serial calls.
+      const run=()=>Promise.resolve().then(task).catch(e=>{
+        console.error('排班雲端寫入失敗：',e);
+        return false;
+      });
+      const p=p79ScheduleWriteTail.then(run,run);
+      p79ScheduleWriteTail=p.then(()=>{},()=>{});
+      port79ScheduleWriteInFlight=p;
       try { return await p; }
-      finally {
-        if (port79ScheduleWriteInFlight === p) port79ScheduleWriteInFlight = null;
-      }
+      finally { if(port79ScheduleWriteInFlight===p)port79ScheduleWriteInFlight=null; }
     }
 
     async function flushSchedulePendingWrites() {
@@ -2592,20 +2593,17 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         personnelSaveTimer = null;
         if (scheduleSaveTimer) { clearTimeout(scheduleSaveTimer); scheduleSaveTimer = null; }
         const ok = await runScheduleCloudWrite(() => saveScheduleEmployeesToCloud(false));
-        if (ok) port79ScheduleDirty = false;
-        return ok;
+        return !!ok && !port79ScheduleDirty;
       }
       if (scheduleSaveTimer) {
         clearTimeout(scheduleSaveTimer);
         scheduleSaveTimer = null;
         const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false));
-        if (ok) port79ScheduleDirty = false;
-        return ok;
+        return !!ok && !port79ScheduleDirty;
       }
       if (port79ScheduleWriteInFlight) {
         const ok = await port79ScheduleWriteInFlight;
-        if (ok) port79ScheduleDirty = false;
-        return !!ok;
+        return !!ok && !port79ScheduleDirty;
       }
       return !port79ScheduleDirty;
     }
@@ -3532,6 +3530,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     }
 
     async function saveScheduleMonthToCloud(showAlert = true) {
+      const snapshotVersion=p79ScheduleLocalMutationVersion;
       const yearMonth = document.getElementById('month-picker').value;
       const schedules = employees.map(emp => {
         const monthData = {};
@@ -3577,7 +3576,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           }
         }
         saveAllDataToLocalStorage();
-        p79MarkScheduleCloudWriteConfirmed();
+        p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         if (showAlert) alert(`☁️ ${result.message || '排班已同步 Google 雲端'}`);
         return true;
       } catch (err) {
@@ -3615,9 +3614,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         scheduleSaveTimer = null;
         flushScheduleLocalPersist();
         const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false));
-        if (ok && !personnelSaveTimer) {
-          p79MarkScheduleCloudWriteConfirmed();
-        }
+        // The POST confirms only the captured snapshot, not later edits.
       }, 3000);
     }
 
@@ -3632,9 +3629,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         personnelSaveTimer = null;
         flushScheduleLocalPersist();
         const ok = await runScheduleCloudWrite(() => saveScheduleEmployeesToCloud(false));
-        if (ok) {
-          p79MarkScheduleCloudWriteConfirmed();
-        }
+        // Never clear newer pending edits after this queued personnel save.
       }, 1500);
     }
 
@@ -4971,7 +4966,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false));
 
       if (ok) {
-        p79MarkScheduleCloudWriteConfirmed();
+        // The monthly write already confirmed its captured mutation version.
 
         // 儲存期間若又有新的編輯，不可誤把它標成已完成；交給下一次 autosave。
         if (p79ScheduleLocalMutationVersion !== saveVersion) {
