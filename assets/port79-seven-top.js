@@ -14,7 +14,7 @@ window.p79LogoutToSevenSystemHome=function(){
  location.replace('../?logout=1&t='+Date.now());
 };
 function p79IsReturnHome(el){
- const label=String(el.textContent||'').replace(/\\s+/g,'').trim();
+ const label=String(el.textContent||'').replace(/\s+/g,'').trim();
  return /返回首頁|回首頁|登出系統/.test(label) ||
         (el.dataset?.action==='home') ||
         (el.classList?.contains('home') && /首頁/.test(label));
