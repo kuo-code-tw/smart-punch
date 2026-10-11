@@ -1150,6 +1150,44 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
 #app-main-container #p79RosterScroll tbody tr[data-p79-drag-emp]{scroll-snap-align:start;scroll-snap-stop:normal}
 #app-main-container #p79RosterScroll tbody .p79-person-name{overflow:visible!important;text-overflow:clip!important;max-width:none!important}
 </style>
+<style id="p79-schedule-structural-frozen-people-20261011">
+/* Real frozen pane: employee controls never belong to the horizontal scrolling layer. */
+#app-main-container .p79-roster-header-shell{position:relative!important;isolation:isolate}
+#app-main-container .p79-roster-frozen-label{
+ position:absolute!important;left:0;top:0;bottom:0;z-index:90!important;
+ display:flex;align-items:center;padding:0 8px;box-sizing:border-box;
+ background:#e9eef5!important;color:#334155!important;font-size:12px;font-weight:700;
+ border-right:2px solid #94a3b8;pointer-events:none;
+}
+#app-main-container #p79RosterFixedHeader .p79-person-header{visibility:hidden!important;transform:none!important}
+#app-main-container .p79-roster-body-shell{position:relative!important;isolation:isolate}
+#app-main-container .p79-roster-frozen-people{
+ position:absolute!important;left:0!important;top:0!important;bottom:0!important;
+ overflow:hidden!important;z-index:90!important;background:#fff;
+ pointer-events:none;box-shadow:3px 0 5px #33415525;
+}
+#app-main-container .p79-roster-frozen-inner{position:relative!important;will-change:transform}
+#app-main-container .p79-roster-frozen-people .p79-fixed-person-row{
+ position:absolute!important;left:0!important;width:100%!important;min-width:0!important;
+ max-width:none!important;display:block!important;box-sizing:border-box!important;
+ padding:3px 4px!important;margin:0!important;pointer-events:auto!important;
+ background:#fff;border-right:2px solid #cbd5e1;overflow:hidden;
+}
+#app-main-container .p79-roster-frozen-people .p79-fixed-person-row:nth-child(even){background:#f1f5f9}
+#app-main-container .p79-roster-frozen-people .p79-fixed-person-row:hover{background:#eaf0ff}
+#app-main-container .p79-roster-body-shell.p79-has-frozen-people #p79RosterScroll tbody td.p79-person-cell,
+#app-main-container .p79-roster-body-shell.p79-has-frozen-people #p79RosterScroll tfoot tr>td:first-child{
+ visibility:hidden!important;pointer-events:none!important;
+}
+/* The cloned controls remain usable; underlying duplicates are invisible. */
+body.p79-schedule-saving #p79RosterPinnedPeople{opacity:.48;filter:grayscale(.65)}
+body.p79-schedule-saving #p79RosterPinnedPeople button,
+body.p79-schedule-saving #p79RosterPinnedPeople select{pointer-events:none!important}
+html.dark #app-main-container .p79-roster-frozen-people,
+html.dark #app-main-container .p79-roster-frozen-people .p79-fixed-person-row{background:#111827}
+html.dark #app-main-container .p79-roster-frozen-people .p79-fixed-person-row:nth-child(even){background:#0f172a}
+html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!important;color:#f1f5f9!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4172,45 +4210,80 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
     }
     window.toggleScheduleRoleRosterCollapsed = toggleScheduleRoleRosterCollapsed;
 
+    // Frozen people pane is a separate visual layer from the horizontal date scroller.
+    // This avoids sticky table-cell behavior inside a two-axis scrolling table.
     function p79ConnectRosterScroll(){
       const main=document.getElementById('p79RosterScroll');
       const bar=document.getElementById('p79RosterBottomScroll');
       const spacer=document.getElementById('p79RosterBottomWidth');
       const header=document.getElementById('p79RosterFixedHeader');
+      const fixed=document.getElementById('p79RosterPinnedPeople');
+      const fixedInner=document.getElementById('p79RosterPinnedInner');
+      const fixedLabel=document.getElementById('p79RosterFrozenHeaderLabel');
+      const shell=document.getElementById('p79RosterBodyShell');
       const table=main?.querySelector('table');
-      if(!main||!bar||!spacer||!header||!table)return;
+      if(!main||!bar||!spacer||!header||!table||!fixed||!fixedInner||!shell||!fixedLabel)return;
       const originalHead=table.querySelector('thead');
       if(originalHead){
         const headTable=table.cloneNode(false);
         headTable.removeAttribute('id');
         headTable.className=table.className;
         headTable.appendChild(originalHead);
-        header.appendChild(headTable);
+        header.replaceChildren(headTable);
       }
-       const pinPersonHeader=()=>{
-        const first=header.querySelector('.p79-person-header');
-        if(first)first.style.transform='translateX('+main.scrollLeft+'px)';
-      };
-      const syncSize=()=>{
+      const pairs=[];
+      const frozenRows=main.querySelectorAll('tbody tr[data-p79-drag-emp],tfoot tr');
+      const fragments=document.createDocumentFragment();
+      frozenRows.forEach(row=>{
+        const source=row.querySelector('td:first-child');
+        if(!source)return;
+        const clone=document.createElement('div');
+        clone.className='p79-fixed-person-row p79-person-cell';
+        if(row.dataset.p79DragEmp){
+          clone.dataset.p79DragEmp=row.dataset.p79DragEmp;
+          clone.classList.add('p79-draggable-employee');
+        }else{
+          clone.classList.add('p79-fixed-summary-row');
+          const background=getComputedStyle(source).backgroundColor;
+          clone.style.backgroundColor=background;
+        }
+        clone.innerHTML=source.innerHTML;
+        fragments.appendChild(clone);
+        pairs.push({row,source,clone});
+      });
+      fixedInner.replaceChildren(fragments);
+      const updateGeometry=()=>{
+        if(!main.isConnected)return;
+        const origin=main.getBoundingClientRect().top + main.clientTop;
+        const personWidth=Math.ceil(pairs[0]?.source.getBoundingClientRect().width || 216);
+        fixed.style.width=personWidth+'px';
+        fixedLabel.style.width=personWidth+'px';
+        pairs.forEach(item=>{
+          const rect=item.row.getBoundingClientRect();
+          const y=rect.top-origin+main.scrollTop;
+          item.clone.style.top=Math.round(y)+'px';
+          item.clone.style.height=Math.ceil(rect.height)+'px';
+        });
+        fixedInner.style.height=Math.ceil(table.getBoundingClientRect().height)+'px';
         spacer.style.width=table.scrollWidth+'px';
         const headTable=header.querySelector('table');
         if(headTable)headTable.style.width=table.scrollWidth+'px';
-        header.scrollLeft=main.scrollLeft;
-        pinPersonHeader();
-        bar.scrollLeft=main.scrollLeft;
+        syncViewport();
       };
-      syncSize();
-      main.addEventListener('scroll',()=>{
-        header.scrollLeft=main.scrollLeft;
-        pinPersonHeader();
-        pinPersonCells();
+      const syncViewport=()=>{
+        if(!main.isConnected)return;
+        if(header.scrollLeft!==main.scrollLeft)header.scrollLeft=main.scrollLeft;
         if(Math.abs(bar.scrollLeft-main.scrollLeft)>1)bar.scrollLeft=main.scrollLeft;
-      },{passive:true});
+        fixedInner.style.transform='translate3d(0,'+(-main.scrollTop)+'px,0)';
+      };
+      updateGeometry();
+      shell.classList.add('p79-has-frozen-people');
+      main.addEventListener('scroll',syncViewport,{passive:true});
       bar.addEventListener('scroll',()=>{
         if(Math.abs(main.scrollLeft-bar.scrollLeft)>1)main.scrollLeft=bar.scrollLeft;
       },{passive:true});
       if(typeof ResizeObserver!=='undefined'){
-        const observer=new ResizeObserver(syncSize);
+        const observer=new ResizeObserver(updateGeometry);
         observer.observe(main);
         observer.observe(table);
         main.p79ScrollObserver=observer;
@@ -4371,8 +4444,13 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
             </div>
           </div>
 
-          <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>
-          <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>\n          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
+          <div class="p79-roster-header-shell">
+            <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>
+            <div class="p79-roster-frozen-label" id="p79RosterFrozenHeaderLabel">姓名 / 狀態 / 組別</div>
+          </div>
+          <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>\n          <div class="p79-roster-body-shell" id="p79RosterBodyShell">
+            <div class="p79-roster-frozen-people" id="p79RosterPinnedPeople"><div class="p79-roster-frozen-inner" id="p79RosterPinnedInner"></div></div>
+            <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
             <table class="p79-month-schedule-table w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
@@ -4555,8 +4633,8 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
-
 
         </div>
       `;
@@ -4585,7 +4663,7 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
       if(button){button.disabled=!!busy;button.innerHTML=busy?'<i class="fa-solid fa-spinner fa-spin"></i> 儲存中…':'<i class="fa-solid fa-floppy-disk"></i> 儲存排班';}
       const month=document.getElementById('month-picker');
       if(month)month.disabled=!!busy;
-      document.querySelectorAll('#p79RosterScroll select,#p79RosterScroll button').forEach(el=>{if(busy)el.disabled=true;});
+      document.querySelectorAll('#p79RosterScroll select,#p79RosterScroll button,#p79RosterPinnedPeople select,#p79RosterPinnedPeople button').forEach(el=>{if(busy)el.disabled=true;});
     }
     async function saveCurrentTabSchedule() {
       if(p79ManualScheduleSaveBusy)return;
