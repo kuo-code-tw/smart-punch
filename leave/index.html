@@ -478,7 +478,7 @@ function renderAdmin(){
      <td><b>${esc(l.name||'')}</b><br><span class="note">${esc(l.empId||l.attNo||'')}</span></td>
      <td>${esc(l.dept||'')}</td>
      <td>${esc(leaveType)}</td>
-     <td>${esc(l.startTime||l.startDate||'')}<br>～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
+     <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td>${esc(l.reason||'')}</td>
      <td><div class="p79-leave-status-inline">${badge(l.status)}${coverDisplay}</div></td>
@@ -894,6 +894,7 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 .p79-leave-cover-names{font-size:11px;font-weight:750;color:#475569;white-space:nowrap}
 .p79-cover-again{margin-top:0!important;white-space:nowrap}
 @media(max-width:850px){.p79-leave-status-inline{min-width:170px}.p79-leave-cover-names{white-space:normal}}
+.p79-leave-date-inline{white-space:nowrap!important;min-width:max-content}
 #p79LeaveCoverModal[hidden],#p79LeaveCoverSecondWrap[hidden]{display:none!important}
 #p79LeaveCoverModal{position:fixed;inset:0;z-index:21000;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:16px}
 #p79LeaveCoverModal .cover-card{width:min(480px,100%);max-height:90vh;overflow:auto;border-radius:16px;background:var(--card,#fff);color:var(--text,#172033);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
