@@ -3984,10 +3984,13 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     function p79CoverageShift(empId,dayStr){
       const entry=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
       if(!entry)return '';
+      const current=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
+      // 已手動設定明確班別時，永遠以正式班表為準，不讓代班資訊覆蓋。
+      if(['早','中','晚'].includes(current))return '';
       const target=String(entry.data.leaveEmpId||'').trim().toUpperCase();
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
-      // 代班的班別以請假者原定早／中／晚班為準，不改動員工原始排休資料。
-      return ['早','中','晚'].includes(original)?original:'?';
+      // 原班別不明時不輸出「?」，改保留目前班表班別及獨立的代班標籤。
+      return ['早','中','晚'].includes(original)?original:'';
     }
     function p79LeaveCoverBadge(empId,dayStr){
       const assignments=p79LeaveCoverOnDay(empId,dayStr);
@@ -4547,9 +4550,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
-              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() && !coverageShift ? '' : 'disabled'}
+              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() ? '' : 'disabled'}
                 class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                ${shownShift==='?' ? `<option value="?" selected>?</option>` : ''}
                 <option value="早" ${shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${shownShift==='中'?'selected':''}>中</option>
                 <option value="晚" ${shownShift==='晚'?'selected':''}>晚</option>
