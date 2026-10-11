@@ -3728,9 +3728,9 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         const title=kind==='leave'
           ? '請假已安排：'+workerNames+'｜'+(twoWorkers?'兩位各代班4小時':'一位排休代班8小時')
           : '代班 '+leaveName+'｜'+hours+'小時';
-        const label=kind==='leave'?'已排':('代'+hours);
+        const label=kind==='leave'?'':('代'+hours);
         const cls=kind==='leave'?'bg-rose-50 text-rose-700':'bg-cyan-100 text-cyan-900';
-        return '<span title="'+scheduleEscapeHtml(title)+'" aria-label="'+scheduleEscapeHtml(title)+'" class="inline-flex shrink-0 whitespace-nowrap items-center justify-center px-1 py-0.5 rounded '+cls+' font-black text-[9px] leading-none">'+label+'</span>';
+        return kind==='leave' ? '' : '<span title="'+scheduleEscapeHtml(title)+'" aria-label="'+scheduleEscapeHtml(title)+'" class="inline-flex shrink-0 whitespace-nowrap items-center justify-center px-1 py-0.5 rounded '+cls+' font-black text-[9px] leading-none">'+label+'</span>';
       }).join('');
     }
 
@@ -4172,19 +4172,19 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
           const metaBadge = dayMeta
             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black text-[9px]" title="${scheduleEscapeHtml(dayMeta.note || '')}">${dayMeta.forEmpId ? '🔄代' : ''}${dayMeta.overtime ? '⭐加' : ''}</span>`
             : '';
-          const leaveBadge = ownApprovedLeave
-            ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 font-black text-[9px]" title="${scheduleEscapeHtml(ownApprovedLeave.leaveType || '請假')}已核准">📝假</span>`
-            : '';
+          const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
+          const approvedLeaveCode = ownApprovedLeave ? (/年|特/.test(String(ownApprovedLeave.leaveType||''))?'年':/事/.test(String(ownApprovedLeave.leaveType||''))?'事':/病/.test(String(ownApprovedLeave.leaveType||''))?'病':/公/.test(String(ownApprovedLeave.leaveType||''))?'公':/喪/.test(String(ownApprovedLeave.leaveType||''))?'喪':'假') : '';
           const leaveCoverBadge = p79LeaveCoverBadge(emp.id,dayStr);
-          const assignButton = canManageSchedule() && shiftVal !== '離'
+          const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
             ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition">${dayMeta ? '編輯代班' : '代班'}</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
-              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() ? '' : 'disabled'}
-                class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${shiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                <option value="早" ${shiftVal==='早'?'selected':''}>早</option>
+              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() && !ownApprovedLeave ? '' : 'disabled'}
+                class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' : shiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
+                ${approvedLeaveCode && !['年','事','病','公','喪'].includes(shiftVal) ? `<option value="${approvedLeaveCode}" selected>${approvedLeaveCode}</option>` : ''}
+                <option value="早" ${shiftVal==='早'&&!approvedLeaveCode?'selected':''}>早</option>
                 <option value="中" ${shiftVal==='中'?'selected':''}>中</option>
                 <option value="晚" ${shiftVal==='晚'?'selected':''}>晚</option>
                 <option value="休" ${shiftVal==='休'?'selected':''}>休</option>
