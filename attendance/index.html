@@ -14525,33 +14525,29 @@ function getManualPairRecordAnchor(record) {
                     const group=row.records.filter(r=>getAttendanceRecordType(r)===dir&&!isLocallyDeletedAttendanceRecord(r));
                     if(!group.length)continue;
                     if(group.some(r=>manual(r)||!safe(r))) {skipped.add(row);continue;}
-                    const official=group.filter(r=>!excel(r));
-                    if(official.length>1&&new Set(official.map(r=>p79ReviewedCanonicalTime(r))).size>1) {
+                    // 只以真實員工刷卡為保留基準；其餘來源一律不得自動刪除。
+                    // 必須恰好一筆員工刷卡，且候選全部為 Excel 匯入，避免誤刪手機打卡或人工補卡。
+                    const punched=group.filter(r=>source(r)==='employee-punch');
+                    if(punched.length!==1) {skipped.add(row);continue;}
+                    const keep=punched[0];
+                    const candidates=group.filter(r=>r!==keep);
+                    if(!candidates.length||candidates.some(r=>!excel(r)||!p79CanAutoCombineDuplicateSide(r,keep))) {
                         skipped.add(row);continue;
                     }
-                    const keep=official[0]||group.slice().sort((x,y)=>p79ReviewedCanonicalTime(x).localeCompare(p79ReviewedCanonicalTime(y)))[0];
-                    if(group.some(r=>r!==keep&&(!p79CanAutoCombineDuplicateSide(r,keep)||
-                        (!excel(r)&&p79ReviewedCanonicalTime(r)!==p79ReviewedCanonicalTime(keep))))) {
-                        skipped.add(row);continue;
-                    }
-                    if(excel(keep)&&!keys.has('p'+keep.id)) {
-                        keys.add('p'+keep.id);
-                        tasks.push({mode:'promote',record:keep,id:String(keep.id).trim()});
-                    }
-                    group.filter(r=>r!==keep).forEach(r=>{
-                        if(!keys.has('d'+r.id)) {
+                    candidates.forEach(r=>{
+                        if(!keys.has('d'+r.id)){
                             keys.add('d'+r.id);
                             tasks.push({mode:'delete',record:r,id:String(r.id).trim()});
                         }
                     });
                 }
             }
-            const del=tasks.filter(t=>t.mode==='delete').length,pro=tasks.length-del;
+            const del=tasks.length,pro=0;
             if(!tasks.length) {
                 showToast('沒有可安全清理的紀錄；若之前失敗，請先核對雲端待同步佇列','warning');
                 return false;
             }
-            if(!confirm('確認背景整理重複考勤？\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n雲端連續失敗將暫停，以免整批卡住。'))return false;
+            if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 Excel 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n雲端連續失敗將暫停，以免整批卡住。'))return false;
             p79BatchDuplicateBusy=true;
             p79BatchDuplicateProgressHidden=false;
             if(p79BatchDuplicateProgressHideTimer!==null) {
