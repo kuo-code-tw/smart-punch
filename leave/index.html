@@ -465,7 +465,7 @@ function renderAdmin(){
      <td>${esc(l.startTime||l.startDate||'')}<br>～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td>${esc(l.reason||'')}</td>
-     <td>${badge(l.status)}</td>
+     <td>${badge(l.status)}${String(l.status)==='已核准'&&leaveAccess==='manage'?'<br><button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover(\''+esc(l.id)+'\')">安排代班</button>':''}</td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span></td>
    </tr>`;
@@ -476,7 +476,58 @@ function renderAdminBalances(){
  const rows=employees.filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
  body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
 }
-async function setLeaveStatus(id,status){if(leaveAccess!=='manage')return;if(!confirm('確定將此請假設為「'+status+'」？'))return;try{await postCloud({action:'updateLeaveStatus',id,status});setStatus('✅ 請假狀態已更新','');await loadCloud();renderAdmin()}catch(e){setStatus('更新失敗：'+(e?.message||e),'error')}}
+
+function p79OpenLeaveCover(id){
+ const leave=leaveRecords.find(x=>String(x.id)===String(id));
+ if(!leave||leaveAccess!=='manage'||leave.status!=='已核准')return;
+ const modal=document.getElementById('p79LeaveCoverModal');
+ const target=employees.find(e=>sameEmployee(leave,e));
+ const role=String(target?.jobTitle||target?.role||'').trim();
+ const eligible=employees.filter(e=>leaveEmployeeIsActive(e)&&!sameEmployee(leave,e)&&String(e.jobTitle||e.role||'').trim()===role)
+  .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hant'));
+ const opt='<option value="">請選擇人員</option>'+eligible.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name)+'（'+esc(e.empId)+'）</option>').join('');
+ document.getElementById('p79LeaveCoverFirst').innerHTML=opt;
+ document.getElementById('p79LeaveCoverSecond').innerHTML=opt;
+ document.getElementById('p79LeaveCoverId').value=String(id);
+ document.getElementById('p79LeaveCoverSummary').textContent=(leave.name||leave.empId)+'｜'+(leave.leaveType||'請假')+'｜'+String(leave.startTime||leave.startDate||'')+' ～ '+String(leave.endTime||leave.endDate||'')+'｜同職務：'+(role||'未設定');
+ document.getElementById('p79LeaveCoverMode').value='two';
+ p79RefreshLeaveCoverMode();
+ const saved=(window.p79LeaveCoverAssignments||[]).find(x=>String(x.leaveId)===String(id));
+ if(saved){
+  document.getElementById('p79LeaveCoverMode').value=saved.mode;
+  p79RefreshLeaveCoverMode();
+  document.getElementById('p79LeaveCoverFirst').value=saved.workerIds?.[0]||'';
+  document.getElementById('p79LeaveCoverSecond').value=saved.workerIds?.[1]||'';
+ }
+ modal.hidden=false;
+}
+function p79RefreshLeaveCoverMode(){
+ document.getElementById('p79LeaveCoverSecondWrap').hidden=document.getElementById('p79LeaveCoverMode').value!=='two';
+}
+function p79CloseLeaveCover(){document.getElementById('p79LeaveCoverModal').hidden=true;}
+async function p79SaveLeaveCover(){
+ const btn=document.getElementById('p79LeaveCoverSave');
+ const mode=document.getElementById('p79LeaveCoverMode').value;
+ const first=document.getElementById('p79LeaveCoverFirst').value;
+ const second=document.getElementById('p79LeaveCoverSecond').value;
+ if(!first||(mode==='two'&&(!second||first===second)))return alert('請選擇正確的兩位不同人員，或一位排休代班人員');
+ btn.disabled=true;btn.textContent='雲端保存中…';
+ try{
+  await postCloud({action:'saveLeaveCoverAssignment',leaveId:document.getElementById('p79LeaveCoverId').value,mode,workerIds:mode==='two'?[first,second]:[first]});
+  p79CloseLeaveCover();setStatus('✅ 請假代班已儲存，排班管理可查看','success');await loadCloud();renderAdmin();
+ }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
+ finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
+}
+async function setLeaveStatus(id,status){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('確定將此請假設為「'+status+'」？'))return;
+ try{
+  await postCloud({action:'updateLeaveStatus',id,status});
+  setStatus('✅ 請假狀態已更新','');
+  await loadCloud();renderAdmin();
+  if(status==='已核准')p79OpenLeaveCover(id);
+ }catch(e){setStatus('更新失敗：'+(e?.message||e),'error')}
+}
 async function deleteLeave(id){if(leaveAccess!=='manage')return;if(!confirm('確定刪除此請假紀錄？'))return;try{await postCloud({action:'deleteLeaveRecord',id});setStatus('✅ 請假紀錄已刪除','');await loadCloud();renderAdmin()}catch(e){setStatus('刪除失敗：'+(e?.message||e),'error')}}
 function leaveBalanceNumber(v){
  const s=String(v??'').trim().replace(/,/g,'');
@@ -820,5 +871,28 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 });
 </script>
 <script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+
+<style id="p79-leave-cover-style">
+#p79LeaveCoverModal[hidden],#p79LeaveCoverSecondWrap[hidden]{display:none!important}
+#p79LeaveCoverModal{position:fixed;inset:0;z-index:21000;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+#p79LeaveCoverModal .cover-card{width:min(480px,100%);max-height:90vh;overflow:auto;border-radius:16px;background:var(--card,#fff);color:var(--text,#172033);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+#p79LeaveCoverModal label{display:block;margin:12px 0 5px;font-weight:800}
+#p79LeaveCoverModal select{width:100%;min-height:42px;border:1px solid var(--border,#cbd5e1);border-radius:9px;background:var(--card,#fff);color:inherit;padding:8px}
+#p79LeaveCoverModal .cover-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+#p79LeaveCoverModal button{padding:10px 14px;border-radius:9px;border:1px solid #cbd5e1;cursor:pointer}
+#p79LeaveCoverSave{background:#2563eb;color:white;border-color:#2563eb!important;font-weight:800}
+.p79-cover-again{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:6px;background:#dbeafe;color:#1d4ed8;font-size:11px}
+</style>
+<div id="p79LeaveCoverModal" role="dialog" aria-modal="true" aria-label="請假核准代班安排" hidden>
+<div class="cover-card"><h3 style="font-weight:900;font-size:19px">請假核准｜安排代班</h3>
+<p id="p79LeaveCoverSummary" style="margin-top:8px;font-size:12px"></p>
+<input type="hidden" id="p79LeaveCoverId">
+<label for="p79LeaveCoverMode">代班方式</label>
+<select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="two">兩位不同人員加班代班</option><option value="rest">一位原本排休的人員代班</option></select>
+<label for="p79LeaveCoverFirst">第一位代班人員</label><select id="p79LeaveCoverFirst"></select>
+<div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
+<p style="margin-top:10px;font-size:12px">僅可安排同職務、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
+<div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">稍後安排</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
+</div></div>
 </body>
 </html>
