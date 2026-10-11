@@ -1049,6 +1049,26 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
  #app-main-container .p79-roster-scroll{height:48vh!important;max-height:48vh!important}
 }
 </style>
+
+<style id="p79-compact-person-top-drag-scrollbar-20261011">
+/* 人員資訊：上行姓名+組別+排序把手，下行工號+職務+組別。 */
+#app-main-container .p79-month-schedule-table .p79-person-cell,
+#app-main-container .p79-month-schedule-table .p79-person-header{
+ width:194px!important;min-width:194px!important;max-width:194px!important;padding:4px 5px!important;
+}
+#app-main-container .p79-person-name-line{display:flex!important;align-items:center!important;gap:3px!important;min-width:0!important;white-space:nowrap!important}
+#app-main-container .p79-person-name{font-size:15px!important;line-height:20px!important;flex:0 1 auto!important;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#app-main-container .p79-drag-top{margin-left:auto!important;flex:0 0 19px!important;width:19px!important;height:19px!important;min-height:19px!important}
+#app-main-container .p79-person-subline{margin-top:1px!important;display:flex!important;align-items:center!important;gap:3px!important}
+#app-main-container .p79-person-controls{margin-left:auto!important;display:flex!important;gap:2px!important;flex:0 0 auto}
+#app-main-container .p79-mini-select{max-width:55px!important;height:20px!important;min-height:20px!important;font-size:9px!important}
+#app-main-container .p79-person-id{font-size:8px!important}
+#app-main-container .p79-roster-bottom-scroll{
+ position:relative!important;bottom:auto!important;z-index:50!important;
+ min-height:20px!important;height:20px!important;
+ border-top:0!important;border-bottom:1px solid #94a3b8!important;
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4258,7 +4278,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             </div>
           </div>
 
-          <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>\n          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
+          <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>
+          <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>\n          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
             <table class="p79-month-schedule-table w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
@@ -4387,12 +4408,12 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
                   ${scheduleAttendanceActiveBadge(emp.id)}
                   ${getGroupBadgeHtml(emp.group)}
                   ${lockBadge}
+                  <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
                 </div>
               </div>
               <div class="p79-person-subline">
                 <span class="p79-person-id">${emp.id}</span>
                 <div class="p79-person-controls">
-                  <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag" title="按住拖曳調整人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
                   <select onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="p79-mini-select p79-role-select" title="跨單位支援">
                     ${getRoleOptionsHtml(emp.role)}
                   </select>
@@ -4444,7 +4465,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
               </tfoot>
             </table>
           </div>
-          <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>
+
 
         </div>
       `;
