@@ -2,6 +2,51 @@
 'use strict';
 
 const GLOBAL_THEME_KEY='port79_global_theme_v1';
+// 所有子系統共用安全登出：返回首頁時強制回到帳號／密碼登入畫面。
+const PORT79_LOGOUT_SESSION_KEYS=[
+ 'port79_user_session','port79_user_token','port79_home_emp_id','port79_leave_emp_id',
+ 'admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name',
+ 'aqc_admin_active_tab','port79_admin_token','port79_gc_token',
+ 'port79_gc_superadmin_token','port79_sso_verified','p79_workhours_permission'
+];
+window.p79LogoutToSevenSystemHome=function(){
+ try{PORT79_LOGOUT_SESSION_KEYS.forEach(k=>sessionStorage.removeItem(k));}catch(e){}
+ location.replace('../?logout=1&t='+Date.now());
+};
+function p79IsReturnHome(el){
+ const label=String(el.textContent||'').replace(/\\s+/g,'').trim();
+ return /返回首頁|回首頁|登出系統/.test(label) ||
+        (el.dataset?.action==='home') ||
+        (el.classList?.contains('home') && /首頁/.test(label));
+}
+function p79NormalizeExitControls(root=document){
+ root.querySelectorAll?.('a,button').forEach(el=>{
+   if(!p79IsReturnHome(el))return;
+   if(/返回首頁|回首頁/.test(el.textContent||'')){
+     [...el.childNodes].forEach(n=>{if(n.nodeType===3)n.nodeValue=n.nodeValue.replace(/返回首頁|回首頁/g,'登出系統')});
+     if(!/登出系統/.test(el.textContent||''))el.textContent='↪ 登出系統';
+   }
+   el.title='登出系統並重新輸入帳號及密碼';
+   el.dataset.p79SystemLogout='1';
+ });
+}
+document.addEventListener('click',e=>{
+ const el=e.target?.closest?.('a,button');
+ if(!el || !(el.dataset?.p79SystemLogout==='1'||p79IsReturnHome(el)))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ window.p79LogoutToSevenSystemHome();
+},true);
+function p79BootLogoutControls(){
+ p79NormalizeExitControls();
+ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{
+   if(n.nodeType!==1)return;
+   if(n.matches?.('a,button'))p79NormalizeExitControls(n.parentElement||document);
+   else p79NormalizeExitControls(n);
+ }))).observe(document.documentElement,{childList:true,subtree:true});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',p79BootLogoutControls,{once:true});
+else p79BootLogoutControls();
+
 const META={
  attendance:['🕒','考勤系統','員工打卡・考勤紀錄・即時動態'],
  workhours:['📊','加班管理','出勤統計・加班統計・月結工時'],
