@@ -1928,6 +1928,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     let monthlyScheduleMeta = {};
     // 由 GAS 安全排班端點一起取得，僅用來提示已核准請假與代班來源。
     let leaveRecords = [];
+    let leaveCoverAssignments = [];
     // 今日已有上班打卡且尚未下班簽退的人員工號。
     let todayAttendanceActiveEmpIds = new Set();
     // v2026.10.07：保留目前選取的單位，避免雲端重繪／重新 render 後縮回「請先選擇上方單位」。
@@ -2930,6 +2931,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         if (staleAgainstLocalEdit) {
           // 非排班附屬狀態仍可安全更新。
           leaveRecords = Array.isArray(data.leaveRecords) ? data.leaveRecords : leaveRecords;
+          leaveCoverAssignments = Array.isArray(data.leaveCoverAssignments) ? data.leaveCoverAssignments : leaveCoverAssignments;
           // 亮燈由獨立即時端點管理；全量排班快照不可覆寫較新的狀態。
           cloudLoaded = true;
           console.info('[PORT79 SCHEDULE V10.15] 忽略過期雲端班表快照', {
@@ -2962,6 +2964,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         else if (!employeeMasterBase.length) employeeMasterBase = employees.map(cloneScheduleEmployee);
 
         leaveRecords = Array.isArray(data.leaveRecords) ? data.leaveRecords : [];
+        leaveCoverAssignments = Array.isArray(data.leaveCoverAssignments) ? data.leaveCoverAssignments : [];
         // 不使用排班快照的空值清除出勤中狀態；由即時考勤端點更新。
         monthlyScheduleData = {};
         monthlyScheduleMeta = {};
@@ -3710,6 +3713,26 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         : '';
     }
 
+    function p79LeaveCoverOnDay(empId, dayStr){
+      const id=String(empId||'').trim().toUpperCase();
+      const list=[];
+      (leaveCoverAssignments||[]).forEach(a=>{
+        if(dayStr < a.startDate || dayStr > a.endDate)return;
+        if(String(a.leaveEmpId||'').trim().toUpperCase()===id)list.push({kind:'leave',data:a});
+        if((a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id))list.push({kind:'worker',data:a});
+      });
+      return list;
+    }
+    function p79LeaveCoverBadge(empId,dayStr){
+      const assignments=p79LeaveCoverOnDay(empId,dayStr);
+      return assignments.map(({kind,data:a})=>{
+        const workerNames=(a.workerIds||[]).map(id=>employees.find(e=>String(e.id||'').toUpperCase()===String(id).toUpperCase())?.name||id).join('、');
+        const leaveName=employees.find(e=>String(e.id||'').toUpperCase()===String(a.leaveEmpId||'').toUpperCase())?.name||a.leaveEmpId;
+        const title=kind==='leave'?'請假代班：'+workerNames:'代班 '+leaveName+'｜'+(a.mode==='two'?'兩人加班':'排休代班');
+        return '<span title="'+scheduleEscapeHtml(title)+'" class="inline-flex items-center px-1 py-0.5 rounded-md bg-cyan-100 text-cyan-900 font-black text-[9px]">'+(kind==='leave'?'👥已安排':'🔄代班')+'</span>';
+      }).join('');
+    }
+
     function approvedLeaveRecordsOnDate(dayStr) {
       return (leaveRecords || []).filter(item => {
         if (String(item?.status || '') !== '已核准') return false;
@@ -4151,6 +4174,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
           const leaveBadge = ownApprovedLeave
             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 font-black text-[9px]" title="${scheduleEscapeHtml(ownApprovedLeave.leaveType || '請假')}已核准">📝假</span>`
             : '';
+          const leaveCoverBadge = p79LeaveCoverBadge(emp.id,dayStr);
           const assignButton = canManageSchedule() && shiftVal !== '離'
             ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition">${dayMeta ? '編輯代班' : '代班'}</button>`
             : '';
@@ -4170,7 +4194,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
                 <option value="喪" ${shiftVal==='喪'?'selected':''}>喪假</option>
                 <option value="離" ${shiftVal==='離'?'selected':''}>離職</option>
               </select>
-              <div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${leaveBadge}${metaBadge}</div>
+              <div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${leaveBadge}${metaBadge}${leaveCoverBadge}</div>
               ${assignButton}
             </td>
           `;
