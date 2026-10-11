@@ -1016,6 +1016,39 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 #app-main-container .p79-roster-scroll .p79-month-schedule-table thead th.p79-person-header{z-index:45!important;left:0!important}
 #app-main-container .p79-roster-bottom-scroll{position:sticky;bottom:0;z-index:40;display:block!important}
 </style>
+<style id="p79-roster-detached-header-20261011">
+/* 真正分離日期列和人員滾動區，不再依賴 table sticky 的跨瀏覽器行為。 */
+#app-main-container .p79-roster-fixed-header{
+ overflow:hidden!important;position:relative!important;z-index:55!important;
+ background:#e9eef5;box-shadow:0 2px 4px #64748b50;flex:none;
+}
+#app-main-container .p79-roster-fixed-header table{
+ width:max-content!important;table-layout:fixed!important;
+ border-collapse:separate!important;border-spacing:0!important;margin:0!important;
+}
+#app-main-container .p79-roster-fixed-header thead th{
+ position:static!important;top:auto!important;
+ background:#e9eef5!important;height:43px!important;
+}
+#app-main-container .p79-roster-scroll{
+ height:min(62vh,630px)!important;max-height:min(62vh,630px)!important;
+ min-height:180px!important;overflow:auto!important;
+ overscroll-behavior:auto!important;scrollbar-width:auto;
+}
+#app-main-container .p79-roster-scroll .p79-month-schedule-table{
+ margin:0!important;border-collapse:separate!important;border-spacing:0!important;
+}
+#app-main-container .p79-roster-bottom-scroll{
+ display:block!important;position:relative!important;bottom:auto!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-head,
+#app-main-container .p79-month-schedule-table .p79-day-cell{
+ width:60px!important;min-width:60px!important;max-width:60px!important;
+}
+@media(max-height:650px){
+ #app-main-container .p79-roster-scroll{height:48vh!important;max-height:48vh!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4037,13 +4070,38 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       const main=document.getElementById('p79RosterScroll');
       const bar=document.getElementById('p79RosterBottomScroll');
       const spacer=document.getElementById('p79RosterBottomWidth');
-      if(!main||!bar||!spacer)return;
-      const syncSize=()=>{spacer.style.width=main.scrollWidth+'px';bar.scrollLeft=main.scrollLeft;};
+      const header=document.getElementById('p79RosterFixedHeader');
+      const table=main?.querySelector('table');
+      if(!main||!bar||!spacer||!header||!table)return;
+      const originalHead=table.querySelector('thead');
+      if(originalHead){
+        const headTable=table.cloneNode(false);
+        headTable.removeAttribute('id');
+        headTable.className=table.className;
+        headTable.appendChild(originalHead);
+        header.appendChild(headTable);
+      }
+      const syncSize=()=>{
+        spacer.style.width=table.scrollWidth+'px';
+        const headTable=header.querySelector('table');
+        if(headTable)headTable.style.width=table.scrollWidth+'px';
+        header.scrollLeft=main.scrollLeft;
+        bar.scrollLeft=main.scrollLeft;
+      };
       syncSize();
-      let busy=false;
-      main.addEventListener('scroll',()=>{if(!busy){busy=true;bar.scrollLeft=main.scrollLeft;busy=false}},{passive:true});
-      bar.addEventListener('scroll',()=>{if(!busy){busy=true;main.scrollLeft=bar.scrollLeft;busy=false}},{passive:true});
-      if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(syncSize);observer.observe(main);observer.observe(main.querySelector('table'));main.p79ScrollObserver=observer}
+      main.addEventListener('scroll',()=>{
+        header.scrollLeft=main.scrollLeft;
+        if(Math.abs(bar.scrollLeft-main.scrollLeft)>1)bar.scrollLeft=main.scrollLeft;
+      },{passive:true});
+      bar.addEventListener('scroll',()=>{
+        if(Math.abs(main.scrollLeft-bar.scrollLeft)>1)main.scrollLeft=bar.scrollLeft;
+      },{passive:true});
+      if(typeof ResizeObserver!=='undefined'){
+        const observer=new ResizeObserver(syncSize);
+        observer.observe(main);
+        observer.observe(table);
+        main.p79ScrollObserver=observer;
+      }
     }
     function renderRoleScheduleView() {
       // 沒有選單位時不建立大型排班 DOM，避免頁面一進來就渲染全部人員。
@@ -4200,7 +4258,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             </div>
           </div>
 
-          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
+          <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>\n          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
             <table class="p79-month-schedule-table w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
