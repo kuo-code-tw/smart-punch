@@ -151,7 +151,7 @@ const MENU={
  ],
  workhours:[['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式']],
- schedule:[['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
+ schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
  hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
  history:[]
@@ -255,7 +255,7 @@ function buildMenu(sys){
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
   ['資料管理',['attendance-import','attendance-export','import','export']],
-  ['系統設定',['schedule-mode','org','reset-cloud']],
+  ['系統設定',['schedule-lock','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
@@ -279,7 +279,7 @@ function buildMenu(sys){
      if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
      else if(a==='global-theme')addAction(a,'🌙 全系統顯示模式','common theme');
      else if(a==='logout-system')addAction(a,'↪ 登出系統','danger');
-     else {const [,label,cls]=items.get(a);addAction(a,label,cls)}
+     else {const [,label,cls]=items.get(a);addAction(a,sys==='schedule'&&a==='schedule-lock'?scheduleLockMenuLabel():label,cls)}
    });
  });
  updateThemeMenuLabel();
