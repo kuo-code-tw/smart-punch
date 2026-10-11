@@ -510,7 +510,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="../assets/port79-data-cache.js?v=20261008-fast-v2"></script>
+<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 
 <style id="p79-work-hours-page-css">
@@ -2086,7 +2086,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.03.16.60';
+        const APP_VERSION='2026.10.11.30';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -9224,7 +9224,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             if (tab === 'records') { initDropdowns(); renderAdminRecordsTable(); }
             if (tab === 'live') renderAdminLiveTable();
-            if (tab === 'overtime') { initOvertimeFilters(); renderOvertimeStats(); }
+            if (tab === 'overtime') renderOvertimeStats();
             if (tab === 'leave') { renderLeaveBalanceImportSummary(); initLeaveBalanceFilters(); initLeaveFilters(); renderAdminLeaveTable(); }
             if (tab === 'stats') { initAttendanceStatsFilters(); renderAttendanceStatsTable(); }
             if (tab === 'employees') { initEmployeeFilters(); applyEmployeeListAccessUI(); renderAdminEmployeeTable(); }
@@ -12129,6 +12129,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return `${hours} 小時${remainder ? ` ${remainder} 分` : ''}`;
         }
 
+        let p79OvertimeCalculationCache = null;
         function buildOvertimeStatisticsRows() {
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
@@ -12140,6 +12141,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
             });
 
+            const signature = JSON.stringify([sourceRecords, visibleEmployees]);
+            if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             const rows = buildDailyAttendanceRows(sourceRecords)
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
@@ -12166,14 +12169,20 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 })
                 .filter(Boolean);
 
-            return rows.sort((a, b) => b.sortTime - a.sortTime);
+            rows.sort((a, b) => b.sortTime - a.sortTime);
+            p79OvertimeCalculationCache = {signature, rows};
+            return rows;
         }
 
         function replaceOvertimeOptions(element, allLabel, values, labelMap = null) {
             if (!element) return;
             const previous = element.value || 'ALL';
             const uniqueValues = [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))];
-            element.innerHTML = `<option value="ALL">${allLabel}</option>` + uniqueValues.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(labelMap?.get(value) || value)}</option>`).join('');
+            const html = `<option value="ALL">${allLabel}</option>` + uniqueValues.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(labelMap?.get(value) || value)}</option>`).join('');
+            if (element.dataset.p79OptionsHtml !== html) {
+                element.innerHTML = html;
+                element.dataset.p79OptionsHtml = html;
+            }
             element.value = uniqueValues.includes(previous) ? previous : 'ALL';
         }
 
@@ -14408,3 +14417,4 @@ C.mountMonth({inputId:'attendanceStatsMonth'});
 </script>
 </body>
 </html>
+

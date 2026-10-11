@@ -23,6 +23,15 @@ jobs:
     steps:
       - name: Checkout current main
         uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify attendance synchronization
+        run: |
+          node tests/seven-cache-queue.cjs
+          node tests/attendance-core-boot.cjs
+          node tests/attendance-import-overtime.cjs
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
@@ -32,3 +41,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+

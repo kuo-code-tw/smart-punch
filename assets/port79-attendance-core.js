@@ -1,0 +1,996 @@
+(function(){
+'use strict';
+
+/*
+  PORT79 Attendance V5 Clean Core
+  核心原則：
+  1. 畫面立即改（optimistic）
+  2. 所有雲端寫入只走一條序列佇列
+  3. Delta 只做增量，不做整月覆蓋
+  4. 待同步本機修改永遠優先於雲端舊快照
+  5. 狀態明確：待同步→同步中→已同步/失敗
+*/
+
+const OUTBOX_KEY='port79_attendance_v5_outbox';
+const STATE_KEY='port79_attendance_v5_state';
+const ACTIVE_MS=30000;
+const IDLE_MS=60000;
+const MAX_BACKOFF=15000;
+// 刪除失敗不應每 15 秒重新佔用 GAS；保留資料並採漸進退避（5分鐘至1小時）。
+function p79AttendanceRetryDelay(payload, attempts) {
+  if(String(payload?.action||'')==='deleteRecord'){
+    return Math.min(3600000, Math.max(300000, 300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4))));
+  }
+  if (['updateRecord','editRecord'].includes(String(payload?.action||''))) {
+    return Math.min(3600000,300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4)));
+  }
+  if(['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(String(payload?.action||''))) {
+    // 新打卡重試採 8→16→30 秒，避免過去最多 120 秒的等待；每次仍只走一條寫入佇列。
+    return Math.min(30000,8000*Math.pow(2,Math.min(Math.max(0,attempts-1),2)));
+  }
+  return Math.min(120000,15000*Math.pow(2,Math.min(Math.max(0,attempts-1),3)));
+}
+
+const ATTENDANCE_WRITE_ACTIONS = new Set([
+  'addRecord','updateRecord','editRecord','deleteRecord',
+  'queueEmployeePunch','persistEmployeePunch',
+  'syncRecords','repairAttendanceRecords'
+]);
+function isV5AttendanceWrite(payload){
+  return ATTENDANCE_WRITE_ACTIONS.has(String(payload?.action||''));
+}
+
+
+let writing=false;
+let deltaBusy=false;
+let deltaTimer=null;
+let deltaResetRepairBusy=false;
+// V5.11：每次頁面生命週期從 0 開始追最新 Delta，避免舊 sessionStorage 游標高於雲端最新序號後永遠收不到事件。
+let lastSeq=0;
+try{sessionStorage.setItem('port79_attendance_v5_delta_seq','0')}catch(e){}
+let lastDoneAt=0;
+let currentOpText='準備同步';
+let activeSyncRecordId='';
+let syncBatchTotal=0;
+let syncBatchDone=0;
+let syncBatchStartedAt=0;
+let lastStatusUiSignature='';
+const rejectedPunchById=new Map();
+
+function token(){
+  return String(
+    sessionStorage.getItem('port79_user_token') ||
+    sessionStorage.getItem('port79_admin_token') ||
+    sessionStorage.getItem('port79_gc_superadmin_token') ||
+    ''
+  ).trim();
+}
+function gasUrl(){
+  try{return typeof getActiveGasUrl==='function'?getActiveGasUrl():String(sysConfig?.gasUrl||'')}catch(e){return ''}
+}
+function readQueue(){
+  try{
+    const a=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');
+    return Array.isArray(a)?a:[];
+  }catch(e){return []}
+}
+function saveQueue(q){
+  try{localStorage.setItem(OUTBOX_KEY,JSON.stringify(q.slice(-500)))}catch(e){}
+  updateUi();
+}
+function opKey(payload){
+  const a=String(payload?.action||'');
+  const id=String(payload?.record?.id ?? payload?.id ?? '');
+  return `${a}:${id||JSON.stringify(payload||{})}`;
+}
+function desc(payload){
+  try{
+    if(typeof getCloudPayloadDescription==='function')return getCloudPayloadDescription(payload)
+  }catch(e){}
+  const a=String(payload?.action||'');
+  const n=String(payload?.record?.name||'');
+  if(a==='updateRecord'||a==='editRecord')return `修改考勤 ${n}`;
+  if(a==='addRecord')return `新增考勤 ${n}`;
+  if(a==='deleteRecord')return `刪除考勤`;
+  return a||'考勤資料';
+}
+function enqueue(payload){
+  const q=readQueue();
+  const key=opKey(payload);
+  const item={
+    key,payload,
+    createdAt:Date.now(),
+    attempts:0,
+    nextRetryAt:0,
+    state:'pending'
+  };
+  const i=q.findIndex(x=>x.key===key);
+  if(i>=0) q[i]=item; else q.push(item);
+  saveQueue(q);
+  return q.length;
+}
+function samePayload(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function remove(key,payload){
+  const q=readQueue(),next=q.filter(x=>x.key!==key||(payload&&!samePayload(x.payload,payload)));
+  if(next.length===q.length)return false;
+  saveQueue(next);return true;
+}
+function pendingForId(id){
+  const s=String(id??'');
+  return readQueue().some(x=>String(x?.payload?.record?.id ?? x?.payload?.id ?? '')===s);
+}
+
+function payloadRecordId(payload){
+  return String(payload?.record?.id ?? payload?.id ?? '');
+}
+
+function queueInfoForId(id){
+  const wanted=String(id??'');
+  if(!wanted)return null;
+
+  const q=readQueue();
+  const idx=q.findIndex(x=>payloadRecordId(x?.payload)===wanted);
+  if(idx>=0){
+    const item=q[idx];
+    return {
+      index:idx+1,
+      total:q.length,
+      state:String(item?.state||'pending'),
+      description:desc(item?.payload),
+      lastError:String(item?.lastError||'')
+    };
+  }
+
+  if(writing && activeSyncRecordId===wanted){
+    const total=Math.max(1,syncBatchTotal||1);
+    const index=Math.min(total,Math.max(1,syncBatchDone+1));
+    return {
+      index,
+      total,
+      state:'syncing',
+      description:currentOpText,
+      lastError:''
+    };
+  }
+  return null;
+}
+
+function normalizeCompareValue(value){
+  const text=String(value==null?'':value).replace('T',' ').trim();
+  const m=text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if(!m)return text;
+  return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+' '+m[4].padStart(2,'0')+':'+m[5].padStart(2,'0')+':'+String(m[6]||'0').padStart(2,'0');
+}
+
+function cloudRecordConfirmsItem(item, cloudRecord){
+  const payload=item?.payload||{};
+  const action=String(payload.action||'');
+  if(action==='deleteRecord')return false;
+
+  const local=payload.record||{};
+  const localId=payloadRecordId(payload);
+  const cloudId=String(cloudRecord?.id??'');
+  if(!localId||localId!==cloudId)return false;
+
+  // 新增/落盤只要同 ID 已由雲端讀回即可確認。
+  if(action==='addRecord'||action==='persistEmployeePunch'||action==='queueEmployeePunch'){
+    return true;
+  }
+
+  // 修改則至少要確認時間與狀態已是本機要求的值。
+  if(action==='updateRecord'||action==='editRecord'){
+    const fields=['timeStr','status'];
+    for(const key of fields){
+      const wanted=normalizeCompareValue(local?.[key]);
+      if(wanted && normalizeCompareValue(cloudRecord?.[key])!==wanted)return false;
+    }
+
+    const localEditedAt=Date.parse(String(local?.manuallyEditedAt||''))||0;
+    const cloudEditedAt=Date.parse(String(cloudRecord?.manuallyEditedAt||''))||0;
+    if(localEditedAt && cloudEditedAt && cloudEditedAt<localEditedAt)return false;
+    return true;
+  }
+
+  return false;
+}
+
+function confirmCloudRecord(cloudRecord){
+  const id=String(cloudRecord?.id??'');
+  if(!id)return false;
+
+  const q=readQueue();
+  let removed=0;
+  const keep=[];
+  q.forEach(item=>{
+    if(payloadRecordId(item?.payload)!==id){
+      keep.push(item);
+      return;
+    }
+    if(cloudRecordConfirmsItem(item,cloudRecord)){
+      removed++;
+    }else{
+      keep.push(item);
+    }
+  });
+
+  if(!removed)return false;
+
+  saveQueue(keep);
+  try{markRecentAttendanceMutationCloudConfirmed?.(id)}catch(e){}
+  lastDoneAt=Date.now();
+  currentOpText='同步完成';
+  updateUi();
+  return true;
+}
+
+function confirmCloudDelete(id){
+  const wanted=String(id??'');
+  if(!wanted)return false;
+
+  const q=readQueue();
+  let removed=0;
+  const keep=[];
+  q.forEach(item=>{
+    const same=payloadRecordId(item?.payload)===wanted;
+    const isDelete=String(item?.payload?.action||'')==='deleteRecord';
+    if(same&&isDelete)removed++;
+    else keep.push(item);
+  });
+
+  if(!removed)return false;
+  saveQueue(keep);
+  lastDoneAt=Date.now();
+  currentOpText='同步完成';
+  updateUi();
+  return true;
+}
+
+async function send(payload,timeout=25000){
+  const url=gasUrl();
+  if(!url) throw new Error('未設定 GAS URL');
+  const body={...payload};
+  const tk=token();
+  if(tk&&!body.token)body.token=tk;
+
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeout);
+  try{
+    const r=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(body),
+      cache:'no-store',
+      signal:ctrl.signal
+    });
+    const text=await r.text();
+    let data=null;
+    try{data=JSON.parse(text)}catch(e){throw new Error('GAS 回傳不是 JSON')}
+    if(!data?.ok){
+      const err=new Error(String(data?.error||'雲端寫入失敗'));
+      err.retryable=data?.retryable!==false;
+      err.serverData=data;
+      err.duplicatePunch=data?.duplicatePunch===true;
+      throw err;
+    }
+    return data;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function p79PunchUploadPriority(item){
+  const action=String(item?.payload?.action||'');
+  // 新打卡優先於管理員修改與整批修復；僅調整待送出順序，不提前宣告成功。
+  if(['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(action))return 0;
+  if(['updateRecord','editRecord'].includes(action))return 2;
+  if(['syncRecords','repairAttendanceRecords'].includes(action))return 4;
+  return 3;
+}
+function p79OrderedReadyQueue(q,force,now){
+  return q.filter(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now))
+    .map((item,index)=>({item,index}))
+    .sort((a,b)=>p79PunchUploadPriority(a.item)-p79PunchUploadPriority(b.item)||a.index-b.index)
+    .map(x=>x.item);
+}
+
+async function drain(force=false){
+  if(writing)return false;
+  if(navigator.onLine===false){updateUi();return false}
+  let q=readQueue();
+  if(!q.length){updateUi();return true}
+
+  writing=true;
+  syncBatchTotal=Math.max(1,q.length);
+  syncBatchDone=0;
+  syncBatchStartedAt=Date.now();
+  try{
+    while(true){
+      q=readQueue();
+      if(!q.length)break;
+      const now=Date.now();
+      const item=p79OrderedReadyQueue(q,force,now)[0];
+      if(!item)break;
+
+      currentOpText=desc(item.payload);
+      activeSyncRecordId=payloadRecordId(item.payload);
+      item.state='syncing';
+      saveQueue(q.map(x=>x.key===item.key?item:x));
+      updateUi();
+
+      try{
+        const data=await send(item.payload,30000);
+        // 寫入 ACK 不能跳過其他人尚未讀取的 Delta；游標只由讀取結果推進。
+
+        const rid=item?.payload?.record?.id ?? item?.payload?.id;
+        const latestConfirmed=remove(item.key,item.payload);
+        if(rid!=null&&latestConfirmed){
+          try{markRecentAttendanceMutationCloudConfirmed?.(rid)}catch(e){}
+        }
+        if(String(item?.payload?.action||'')==='deleteRecord'){
+            try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+        }
+        if(String(item?.payload?.action||'')==='addRecord' &&
+            String(item?.payload?.record?.source||'').toLowerCase().includes('employee')){
+            try{window.p79ConfirmMobilePunchCloudRecord?.(item?.payload?.record?.id);}catch(e){}
+        }
+        syncBatchDone++;
+        lastDoneAt=Date.now();
+        currentOpText='同步完成';
+        activeSyncRecordId='';
+
+        try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+
+        if(typeof item.payload?._v5Success==='function'){
+          try{item.payload._v5Success(data)}catch(e){}
+        }
+      }catch(err){
+        q=readQueue();
+        const cur=q.find(x=>x.key===item.key);
+        if(!cur||!samePayload(cur.payload,item.payload))continue;
+
+        const nonRetryable = err?.retryable === false;
+        const serverData = err?.serverData || {};
+        const rid = cur?.payload?.record?.id ?? cur?.payload?.id;
+
+        if(nonRetryable && err?.duplicatePunch===true && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
+          // V5.10.17：雲端判定為重複刷卡時不可一直重試，
+          // 並把剛才 optimistic 加入的本機那一筆回滾。
+          remove(cur.key,cur.payload);
+          if(rid!=null){
+            const ridText=String(rid);
+            rejectedPunchById.set(ridText, String(err?.message||'重複刷卡已阻擋'));
+            records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'')!==ridText);
+            try{removeAttendanceRecordsFromArchive?.([ridText])}catch(e){}
+            try{forgetRecentAttendanceMutation?.(ridText)}catch(e){}
+            try{
+              if(typeof window.p79ScheduleAttendancePersist==='function')window.p79ScheduleAttendancePersist();
+              else saveRecords?.();
+            }catch(e){}
+          }
+          try{updateHomeClockInButtonState?.()}catch(e){}
+          try{renderEmpHistoryTable?.()}catch(e){}
+          try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+          try{showToast(String(err?.message||'重複刷卡已阻擋'),'warning')}catch(e){}
+          syncBatchDone++;
+          activeSyncRecordId='';
+          currentOpText='重複刷卡已阻擋';
+          updateUi();
+          continue;
+        }
+
+        const attempts=Number(cur.attempts||0)+1;
+        cur.attempts=attempts;
+        cur.state='pending';
+        cur.lastError=String(err?.message||err||'失敗');
+        cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+        saveQueue(q.map(x=>x.key===cur.key?cur:x));
+        activeSyncRecordId='';
+        currentOpText='等待重試';
+        updateUi();
+        break;
+      }
+    }
+  }finally{
+    writing=false;
+    if(lastDoneAt)scheduleDelta(100);
+    activeSyncRecordId='';
+    updateUi();
+  }
+  return !readQueue().length;
+}
+
+// V6.0.12：管理員手動按「快速同步」時使用。
+// 同一 record id 絕不並行；不同 record id 最多 4 筆同時送。
+async function drainFast(force=true, concurrency=4){
+  if(writing)return false;
+  if(navigator.onLine===false){updateUi();return false}
+
+  let q=readQueue();
+  if(!q.length){updateUi();return true}
+
+  writing=true;
+  syncBatchTotal=Math.max(1,q.length);
+  syncBatchDone=0;
+  syncBatchStartedAt=Date.now();
+
+  const processOne=async(item)=>{
+    try{
+      const data=await send(item.payload,30000);
+
+      // 保留未讀 Delta，讓其他人的同時修改仍可同步。
+
+      const rid=item?.payload?.record?.id ?? item?.payload?.id;
+      const latestConfirmed=remove(item.key,item.payload);
+      if(rid!=null&&latestConfirmed){
+        try{markRecentAttendanceMutationCloudConfirmed?.(rid)}catch(e){}
+      }
+      if(String(item?.payload?.action||'')==='deleteRecord'){
+        try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+      }
+      syncBatchDone++;
+      lastDoneAt=Date.now();
+
+      if(typeof item.payload?._v5Success==='function'){
+        try{item.payload._v5Success(data)}catch(e){}
+      }
+      return {ok:true,item};
+    }catch(err){
+      const current=readQueue();
+      const cur=current.find(x=>x.key===item.key);
+      if(!cur||!samePayload(cur.payload,item.payload))return {ok:false,item,error:err,removed:true};
+
+      const nonRetryable=err?.retryable===false;
+      const rid=cur?.payload?.record?.id ?? cur?.payload?.id;
+
+      if(nonRetryable && err?.duplicatePunch===true && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
+        remove(cur.key,cur.payload);
+        if(rid!=null){
+          const ridText=String(rid);
+          rejectedPunchById.set(ridText,String(err?.message||'重複刷卡已阻擋'));
+          records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'')!==ridText);
+          try{removeAttendanceRecordsFromArchive?.([ridText])}catch(e){}
+          try{forgetRecentAttendanceMutation?.(ridText)}catch(e){}
+        }
+        syncBatchDone++;
+        return {ok:false,item,error:err,nonRetryable:true};
+      }
+
+      const attempts=Number(cur.attempts||0)+1;
+      cur.attempts=attempts;
+      cur.state='pending';
+      cur.lastError=String(err?.message||err||'失敗');
+      cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+      saveQueue(current.map(x=>x.key===cur.key?cur:x));
+      return {ok:false,item,error:err,retryable:true};
+    }
+  };
+
+  try{
+    while(true){
+      q=readQueue();
+      if(!q.length)break;
+
+      const now=Date.now();
+      const eligible=p79OrderedReadyQueue(q,force,now);
+      if(!eligible.length)break;
+
+      const group=[];
+      const usedIds=new Set();
+      let hasBulk=false;
+
+      for(const item of eligible){
+        if(group.length>=Math.max(1,Number(concurrency)||4))break;
+
+        const action=String(item?.payload?.action||'');
+        const rid=payloadRecordId(item?.payload);
+        const bulk=action==='syncRecords'||action==='repairAttendanceRecords';
+
+        if(bulk){
+          if(group.length===0){
+            group.push(item);
+            hasBulk=true;
+          }
+          break;
+        }
+
+        if(hasBulk)break;
+        const identity=rid||item.key;
+        if(usedIds.has(identity))continue;
+        usedIds.add(identity);
+        group.push(item);
+      }
+
+      if(!group.length)break;
+
+      currentOpText=group.length>1
+        ? '快速同步 '+group.length+' 筆'
+        : desc(group[0]?.payload);
+      activeSyncRecordId=group.length===1?payloadRecordId(group[0]?.payload):'';
+      updateUi();
+
+      const results=await Promise.all(group.map(processOne));
+      if(results.some(r=>r?.retryable===true))break;
+
+      await new Promise(resolve=>setTimeout(resolve,0));
+    }
+  }finally{
+    writing=false;
+    if(lastDoneAt)scheduleDelta(100);
+    activeSyncRecordId='';
+    currentOpText=readQueue().length?'等待重試':'同步完成';
+    try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+    updateUi();
+  }
+
+  return !readQueue().length;
+}
+
+function mergeDeltaEvent(event){
+  const kind=String(event?.kind||'').toLowerCase();
+  if(kind==='reset') return false;
+  if(kind==='delete'){
+    const id=String(event?.id??'');
+    if(!id)return false;
+    confirmCloudDelete(id);
+    if(pendingForId(id))return false;
+    records=records.filter(r=>String(r?.id??'')!==id);
+    try{forgetRecentAttendanceMutation?.(id)}catch(e){}
+    return true;
+  }
+  const rec=event?.record;
+  if(!rec)return false;
+  const id=String(rec?.id??'');
+  if(id){
+    confirmCloudRecord(rec);
+    if(pendingForId(id))return false;
+  }
+
+  const nr=typeof normalizeAttendanceRecordIdentifiers==='function'
+    ? normalizeAttendanceRecordIdentifiers(rec)
+    : rec;
+
+  // V6.0.14：本機已刪除的事件，在雲端 delete 尚未完全傳播前可能仍出現在 Delta。
+  // tombstone 存在時直接忽略 stale upsert，禁止復活。
+  if(typeof isLocallyDeletedAttendanceRecord==='function' && isLocallyDeletedAttendanceRecord(nr)){
+    return false;
+  }
+
+  // V5.10.35：舊雲端資料可能讓上班與下班共用同一 id。
+  // V5 Delta 只能覆蓋「同 id + 同 IN/OUT 類型」的紀錄，避免 OUT 被 IN 吃掉。
+  const nrType=typeof getAttendanceRecordType==='function'?getAttendanceRecordType(nr):'';
+  const idx=records.findIndex(r=>{
+    if(String(r?.id??'')!==String(nr?.id??''))return false;
+    if(typeof getAttendanceRecordType!=='function')return true;
+    return getAttendanceRecordType(r)===nrType;
+  });
+  if(idx>=0)records[idx]={...records[idx],...nr};
+  else records.unshift(nr);
+  return true;
+}
+
+async function pollDelta(force=false){
+  if(deltaBusy||writing)return false;
+  if(navigator.onLine===false)return false;
+  if(document.hidden&&!force)return false;
+  const url=gasUrl();
+  if(!url)return false;
+
+  deltaBusy=true;
+  let changed=false;
+  try{
+    const tk=token();
+    let u=url+(url.includes('?')?'&':'?')+
+      'action=getAttendanceDelta&since='+encodeURIComponent(String(lastSeq||0))+
+      '&limit=100&tail=30&t='+Date.now();
+    if(tk)u+='&token='+encodeURIComponent(tk);
+
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),6000);
+    try{
+      const r=await fetch(u,{cache:'no-store',signal:ctrl.signal});
+      const data=await r.json();
+      if(!data?.ok)throw new Error(data?.error||'Delta 失敗');
+
+      // V5.11：Delta reset/cursor 回退必須立即做權威月份修復。
+      const latestSeq=Math.max(0,Number(data.latestSeq??data.deltaSeq??0)||0);
+      const resetRequired=data.resetRequired===true || (lastSeq>0 && latestSeq>0 && latestSeq<lastSeq);
+      if(resetRequired){
+        lastSeq=0;
+        try{sessionStorage.setItem('port79_attendance_v5_delta_seq','0')}catch(e){}
+        if(!deltaResetRepairBusy){
+          deltaResetRepairBusy=true;
+          setTimeout(async()=>{
+            try{
+              if(typeof window.p79AttendanceForceRepair==='function') await window.p79AttendanceForceRepair();
+              else if(typeof loadAttendanceCoreSyncData==='function') await loadAttendanceCoreSyncData(false);
+            }catch(e){
+              console.warn('[PORT79 V5.11] Delta reset 權威修復失敗',e);
+            }finally{
+              deltaResetRepairBusy=false;
+            }
+          },0);
+        }
+      }
+
+      const events=Array.isArray(data.events)?data.events:[];
+      for(const ev of events) changed=mergeDeltaEvent(ev)||changed;
+
+      const seq=Math.max(0,Number(data.deltaSeq??data.latestSeq??0)||0);
+      if(seq>0){
+        lastSeq=Math.max(lastSeq,seq);
+        sessionStorage.setItem('port79_attendance_v5_delta_seq',String(lastSeq));
+      }
+
+      if(changed){
+        try{saveRecords?.()}catch(e){}
+        try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+      }
+    }finally{clearTimeout(timer)}
+  }catch(e){
+    // Delta 失敗只留待下一輪，不整月重抓，不洗畫面。
+  }finally{
+    deltaBusy=false;
+  }
+  return changed;
+}
+function scheduleDelta(ms){
+  clearTimeout(deltaTimer);
+  deltaTimer=setTimeout(async()=>{
+    const changed=await pollDelta(false);
+    scheduleDelta(changed?ACTIVE_MS:IDLE_MS);
+  },ms);
+}
+function startDelta(){
+  if(deltaTimer)return true;
+  scheduleDelta(500);
+  return true;
+}
+
+function ensurePanel(){
+  let el=document.getElementById('p79AttendanceV5Status');
+  if(el)return el;
+  el=document.createElement('div');
+  el.id='p79AttendanceV5Status';
+  el.className='mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black';
+  const sync=document.getElementById('cloudSyncStatus');
+  if(sync?.parentElement)sync.parentElement.appendChild(el);
+  else document.body.prepend(el);
+  return el;
+}
+function p79LatestCloudActivityAt(){
+  let readAt=0;
+  try{
+    readAt=Number(typeof lastCloudLoadSuccessAt!=='undefined'?lastCloudLoadSuccessAt:0)||0;
+  }catch(e){}
+  return Math.max(Number(lastDoneAt||0),readAt);
+}
+
+function updateUi(){
+  const el=ensurePanel();
+  const q=readQueue();
+  const pending=q.length;
+  const latestAt=p79LatestCloudActivityAt();
+  const latestText=latestAt
+    ? new Date(latestAt).toLocaleTimeString('zh-TW',{hour12:false})
+    : '--';
+
+  const total=Math.max(
+    1,
+    Number(syncBatchTotal||0),
+    Number(syncBatchDone||0)+pending+(writing?1:0)
+  );
+  const currentIndex=Math.min(total,Math.max(1,Number(syncBatchDone||0)+1));
+  const nextDescription=pending?desc(q[0]?.payload):'';
+
+  const mainState = writing
+    ? `✍️ 寫入中 ${currentIndex}/${total}｜${currentOpText}`
+    : (pending
+        ? `🟠 等待寫入 ${pending} 筆｜下一筆：${nextDescription}`
+        : (latestAt
+            ? `✅ 已同步｜${latestText}`
+            : '● 待命｜尚未完成首次雲端作業'));
+
+  const html=`
+    <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">⚡ V5 即時核心</span>
+    <span class="rounded-full border ${pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700'} px-2 py-1">${pending?`📤 同步佇列 ${pending} 筆`:'📤 同步佇列已清空'}</span>
+    <span class="rounded-full border ${writing?'border-indigo-200 bg-indigo-50 text-indigo-700':(pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700')} px-2 py-1">${mainState}</span>
+    <span class="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-sky-700">📡 即時同步 ${deltaBusy?'讀取中':`監聽正常｜Seq ${lastSeq}`}</span>`;
+
+  const signature=[pending,writing,currentOpText,activeSyncRecordId,syncBatchTotal,syncBatchDone,deltaBusy,lastSeq,latestAt].join('|');
+  if(signature!==lastStatusUiSignature){
+    el.innerHTML=html;
+    lastStatusUiSignature=signature;
+  }
+
+  // 頁首狀態也顯示真實進度，不再只寫「待命」。
+  try{
+    if(typeof setCloudSyncStatus==='function'){
+      const opState = window.p79AttendanceOperationState || {};
+      const readBusy = opState.busy === true && opState.mode === 'read';
+      const readTimedOut = readBusy && (Date.now() - Number(opState.updatedAt || 0) >= 90000);
+      // 讀取逾時不可永久佔住「更新中」，失敗也不能顯示假成功。
+      if(readTimedOut){
+        setCloudSyncStatus('雲端考勤讀取逾時，請重新整理後重試','error','error');
+      }else if(readBusy){
+        // 有效讀取中由 GET 更新狀態。
+      }else if(writing){
+        setCloudSyncStatus(`第 ${currentIndex}/${total} 筆｜${currentOpText}`,'loading','write');
+      }else if(pending){
+        setCloudSyncStatus(`等待寫入 ${pending} 筆｜下一筆：${nextDescription}`,'loading','write');
+      }else if(opState.mode === 'error'){
+        // 最近同步失敗時保留錯誤，直到新的 GET/POST 確實成功。
+      }else if(latestAt){
+        const prevMode=String(opState.mode||'');
+        if(prevMode==='write'){
+          setCloudSyncStatus(`雲端考勤已寫入｜${latestText}`,'success','write');
+        }else{
+          setCloudSyncStatus(`雲端考勤已更新｜${latestText}`,'success','read');
+        }
+      }else{
+        setCloudSyncStatus('目前沒有讀取或寫入','idle','idle');
+      }
+    }
+  }catch(e){}
+}
+
+// ---- replace legacy sync API with V5 ----
+window.p79V5Enqueue=enqueue;
+window.p79V5Drain=drain;
+window.p79V5DrainFast=drainFast;
+window.p79V5StartDelta=startDelta;
+window.p79V5PollDelta=pollDelta;
+window.p79V5PendingForId=pendingForId;
+window.p79V5QueueInfoForId=queueInfoForId;
+window.p79V5ConfirmCloudRecord=confirmCloudRecord;
+window.p79V5ConfirmCloudDelete=confirmCloudDelete;
+window.p79V5RefreshStatus=updateUi;
+window.p79V5GetStatus=()=>({
+  writing,
+  pending:readQueue().length,
+  currentOpText,
+  activeSyncRecordId,
+  syncBatchTotal,
+  syncBatchDone,
+  deltaBusy,
+  lastSeq,
+  lastDoneAt,
+  cloudActivityAt:p79LatestCloudActivityAt()
+});
+
+
+async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
+  const recordId = payload?.record?.id ?? payload?.id;
+
+  // 非考勤寫入交還舊系統；V5 只接管考勤。
+  if(!isV5AttendanceWrite(payload)){
+    if(typeof window.p79LegacyPostToCloud==='function'){
+      return window.p79LegacyPostToCloud(payload,successMsg,onSuccess,onError);
+    }
+    return {ok:false,error:'非考勤寫入未由 V5 處理'};
+  }
+
+  // 沒有其他 writer 時直接送 GAS。
+  if(!writing && navigator.onLine !== false&&
+      !p79OrderedReadyQueue(readQueue(),false,Date.now()).some(x=>p79PunchUploadPriority(x)<p79PunchUploadPriority({payload}))){
+    enqueue(payload);
+    writing=true;
+    syncBatchTotal=Math.max(1,readQueue().length);
+    syncBatchDone=0;
+    syncBatchStartedAt=Date.now();
+    activeSyncRecordId=recordId!=null?String(recordId):'';
+    currentOpText=desc(payload);
+    updateUi();
+
+    try{
+      const data=await send(payload,30000);
+      const latestConfirmed=remove(opKey(payload),payload);
+      // 保留未讀 Delta，讓其他人的同時修改仍可同步。
+
+      if(recordId!=null&&latestConfirmed){
+        try{markRecentAttendanceMutationCloudConfirmed?.(recordId)}catch(e){}
+      }
+
+      if(String(payload?.action||'')==='deleteRecord'){
+        try{window.p79ApplyConfirmedAttendanceDelete?.(recordId)}catch(e){}
+      }
+      syncBatchDone++;
+      lastDoneAt=Date.now();
+      currentOpText='同步完成';
+      activeSyncRecordId='';
+
+      try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+      try{renderAdminRecordsTable?.()}catch(e){}
+      try{renderAdminLiveTable?.()}catch(e){}
+
+      if(successMsg)try{showToast(successMsg,'success')}catch(e){}
+      if(typeof onSuccess==='function')try{onSuccess(data)}catch(e){}
+
+      // 直送完成後再補傳之前失敗的考勤。
+      setTimeout(()=>drain(false),0);
+      return data;
+    }catch(err){
+      const reason=String(err?.message||err||'雲端寫入失敗');
+      const current=readQueue().find(x=>x.key===opKey(payload));
+      if(current&&!samePayload(current.payload,payload))return {ok:false,queued:true,error:reason};
+
+      if(err?.retryable===false && err?.duplicatePunch===true){
+        remove(opKey(payload),payload);
+        const rid=recordId!=null?String(recordId):'';
+        if(rid){
+          rejectedPunchById.set(rid, reason);
+          records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'')!==rid);
+          try{removeAttendanceRecordsFromArchive?.([rid])}catch(e){}
+          try{forgetRecentAttendanceMutation?.(rid)}catch(e){}
+          try{
+            if(typeof window.p79ScheduleAttendancePersist==='function')window.p79ScheduleAttendancePersist();
+            else saveRecords?.();
+          }catch(e){}
+        }
+        try{updateHomeClockInButtonState?.()}catch(e){}
+        try{renderEmpHistoryTable?.()}catch(e){}
+        try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+        currentOpText='重複刷卡已阻擋';
+        updateUi();
+        if(typeof onError==='function'){
+          try{onError(reason)}catch(e){}
+        }else{
+          try{showToast(reason,'warning')}catch(e){}
+        }
+        return {ok:false,queued:false,duplicatePunch:err?.duplicatePunch===true,error:reason};
+      }
+
+      // 直送前已持久化；失敗時不能用舊 payload 覆蓋使用者後續修改。
+      currentOpText='等待自動重試';
+      updateUi();
+
+      if(typeof onError==='function'){
+        try{onError(reason)}catch(e){}
+      }else{
+        try{showToast('雲端暫時未完成，這筆考勤已保留並會自動重試','warning')}catch(e){}
+      }
+      return {ok:false,queued:true,error:reason};
+    }finally{
+      writing=false;
+      if(lastDoneAt)scheduleDelta(100);
+      activeSyncRecordId='';
+      updateUi();
+    }
+  }
+
+  // 已有另一筆考勤寫入中，才排入唯一 V5 outbox。
+  enqueue(payload);
+  if(!writing)setTimeout(()=>drain(false),0);
+  currentOpText='等待前一筆完成';
+  updateUi();
+  return {ok:true,queued:true};
+}
+
+window.p79V5SubmitAttendanceWrite=submitAttendanceWrite;
+
+window.postToCloud=async function(payload,successMsg,onSuccess,onError){
+  return submitAttendanceWrite(payload,successMsg,onSuccess,onError);
+};
+
+window.flushCloudOutbox=function(force=false){return drain(force)};
+window.startAttendanceRevisionWatch=function(){return startDelta()};
+window.checkAttendanceCloudRevision=async function(){return false};
+window.pollAttendanceDelta=pollDelta;
+window.startAttendanceDeltaWatch=startDelta;
+
+// 一般員工手機打卡也統一進 V5 單一寫入通道。
+
+
+// 舊版佇列已不負責寫入，但仍保留內容供人工安全核對。
+// 不能在每次進入考勤頁時清除舊版待同步資料，以免未核對的補卡遺失。
+
+// PORT79 V5 已核實刪除請求一次性整理（2026-10-10）。
+// 以上 5 個 ID 已在 companytest.tw@gmail.com 所擁有的正式 GPS考勤資料庫
+// (ID 1QlixVO7V0tAdx64n1npQmWCFW8sNvsfdVh-vEtGpakE) 驗證：
+// 「考勤永久刪除保護索引」有 ID、「考勤紀錄」主表沒有 ID。
+// 只解除這 5 筆已完成的 deleteRecord 本機重試，不觸碰其他雲端/個人 Drive。
+// 歷史歸檔實體清除狀態仍須由後端維護，不以這段本機整理冒充已清除歷史歸檔。
+const PORT79_VERIFIED_DELETED_IDS_20261010 = new Set(["1791597999970","1791599671136","1791597605356","1791599649935","1791597922198"]);
+function p79PruneVerifiedDeletedRecordRetries20261010(){
+  if(writing)return 0;
+  try{
+    const raw=localStorage.getItem(OUTBOX_KEY);
+    if(!raw)return 0;
+    const queue=JSON.parse(raw);
+    if(!Array.isArray(queue))return 0;  // 格式異常時絕不覆寫
+    const keep=queue.filter(item=>{
+      const payload=item?.payload;
+      return !(String(payload?.action||'')==='deleteRecord' &&
+        PORT79_VERIFIED_DELETED_IDS_20261010.has(String(payload?.id??payload?.record?.id??'').trim()));
+    });
+    const removed=queue.length-keep.length;
+    if(!removed)return 0;
+    localStorage.setItem(OUTBOX_KEY,JSON.stringify(keep));
+    lastDoneAt=Date.now();
+    currentOpText='已核實刪除的舊請求已整理';
+    console.info('[PORT79] 已從本機同步佇列移除經正式永久刪除索引核對的請求：'+removed+' 筆');
+    updateUi();
+    return removed;
+  }catch(e){
+    console.warn('[PORT79] 已核實刪除佇列整理未完成，保留所有原始待同步資料',e);
+    return 0;
+  }
+}
+window.p79PruneVerifiedDeletedRecordRetries20261010=p79PruneVerifiedDeletedRecordRetries20261010;
+
+function p79ShortenOldPunchRetryWait(){
+  // 只修正舊版留下的過長 nextRetryAt；保留所有 payload/ID/attempts，不重送 paused 項目。
+  const q=readQueue(), now=Date.now();
+  let updated=false;
+  for(const item of q){
+    const action=String(item?.payload?.action||'');
+    if(item?.paused || !['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(action))continue;
+    if(Number(item.nextRetryAt||0)>now+30000){item.nextRetryAt=now+30000;updated=true;}
+  }
+  if(updated)saveQueue(q);
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  p79PruneVerifiedDeletedRecordRetries20261010();
+  p79ShortenOldPunchRetryWait();
+  updateUi();
+  startDelta();
+  drain(false);
+  setInterval(()=>{if(document.visibilityState==='visible')updateUi();},3000);
+},{once:true});
+window.addEventListener('online',()=>{drain(true);pollDelta(true)});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){drain(false);pollDelta(true)}
+});
+setInterval(()=>{if(!writing)drain(false)},5000);
+
+
+// ----- V5.4 HARD BRIDGE -----
+// 保留非考勤舊 API；任何考勤寫入若繞過 postToCloud，仍會被攔回 V5。
+if(!window.p79LegacyPerformCloudRequest && typeof window.performCloudRequest==='function'){
+  window.p79LegacyPerformCloudRequest=window.performCloudRequest;
+}
+if(!window.p79LegacyEnqueueCloudOperation && typeof window.enqueueCloudOperation==='function'){
+  window.p79LegacyEnqueueCloudOperation=window.enqueueCloudOperation;
+}
+if(!window.p79LegacyFlushCloudOutbox && typeof window.flushCloudOutbox==='function'){
+  window.p79LegacyFlushCloudOutbox=window.flushCloudOutbox;
+}
+
+window.performCloudRequest=async function(payload,timeoutMs=0){
+  if(isV5AttendanceWrite(payload)){
+    return submitAttendanceWrite(payload,'',null,null);
+  }
+  if(typeof window.p79LegacyPerformCloudRequest==='function'){
+    return window.p79LegacyPerformCloudRequest(payload,timeoutMs);
+  }
+  return {ok:false,error:'無可用雲端 API'};
+};
+
+window.enqueueCloudOperation=function(payload,scheduleRetry=true){
+  if(isV5AttendanceWrite(payload)){
+    enqueue(payload);
+    if(scheduleRetry) setTimeout(()=>drain(false),0);
+    return true;
+  }
+  if(typeof window.p79LegacyEnqueueCloudOperation==='function'){
+    return window.p79LegacyEnqueueCloudOperation(payload,scheduleRetry);
+  }
+  return false;
+};
+
+window.flushCloudOutbox=function(force=false){
+  // 考勤只跑 V5 outbox。舊 outbox 不再負責考勤。
+  return drain(force);
+};
+
+window.postRealtimePunchToCloud=function(record,successMsg,onPersistSuccess,onError){
+  return submitAttendanceWrite(
+    {action:'addRecord',record},
+    successMsg,
+    data=>{try{onPersistSuccess?.(data)}catch(e){}},
+    onError
+  );
+};
+
+})();

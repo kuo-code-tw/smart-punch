@@ -1570,7 +1570,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.09.27.1-HR-SOURCE-DUAL-AUDIT';
+const APP_VERSION='2026.10.11.30';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -6464,7 +6464,7 @@ function recordFormValue(){
 function updateFormulaPreview(){const c=calc(recordFormValue());document.getElementById('formulaPreview').innerHTML=`實作時數 <b>${c.actualHours.toFixed(2)}</b>｜扣除 <b>${c.deductHours.toFixed(2)}</b>｜統計 <b>${c.statHours.toFixed(2)}</b><br>效率(未扣) <b>${c.effRaw.toFixed(2)}</b>｜效率(扣除) <b>${c.effDeduct.toFixed(2)}</b>`}
 async function saveRecord(){if(!requireSuperAdminAccess())return;const r=recordFormValue();if(!r.empId||!r.workDate||!r.startTime||!r.endTime)return toast('請完整選擇人員、日期、開始與結束時間');const i=records.findIndex(x=>x.id===r.id);i>=0?records[i]=r:records.push(r);let a=assignments.find(x=>x.empId===r.empId);if(a)a.groupId=r.groupId;else assignments.push({empId:r.empId,name:r.name,groupId:r.groupId});saveLocal();renderAll();document.getElementById('recordDialog').close();await postCloud('gcUpsertRecord',{record:r});await postCloud('gcAssignEmployee',{assignment:{empId:r.empId,name:r.name,groupId:r.groupId}})}
 async function deleteRecord(id){if(!requireSuperAdminAccess())return;if(!confirm('確定刪除這筆 AQC 作業紀錄？'))return;records=records.filter(x=>x.id!==id);saveLocal();renderAll();await postCloud('gcDeleteRecord',{id})}
-const PORT79_BUILD_VERSION='20260927.7.13';
+const PORT79_BUILD_VERSION='20261011.30';
 const GC_SESSION_TOKEN_KEY='port79_gc_superadmin_token';
 const GC_LEGACY_TOKEN_KEY='port79_gc_token';
 let efficiencyAccessLevel='none';
@@ -13786,7 +13786,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 
 
-<script src="../assets/port79-data-cache.js?v=20261008-fast-v2"></script>
+<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
 <script src="../assets/port79-calendar-range.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
@@ -13873,3 +13873,4 @@ body[data-p79-system="efficiency"] #excelLiveBar{
 }
 </style>
 </body></html>
+

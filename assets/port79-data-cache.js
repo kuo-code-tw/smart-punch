@@ -25,6 +25,7 @@ const SYSTEM_LABELS={attendance:'考勤',workhours:'工時統計',leave:'請假'
 const memoryCache=new Map();
 const inflightReads=new Map();
 let dbPromise=null;
+let mutationGeneration=0;
 
 function currentSystem(){
  const p=location.pathname.toLowerCase();
@@ -90,18 +91,21 @@ function urlInfo(urlLike){
 function actionKey(urlLike){
  const {u,action}=urlInfo(urlLike);
  if(!u||!READ_ACTIONS.has(action))return null;
- const parts=[action];
- ['month','year','scope','type','includeEmployees'].forEach(k=>{const v=u.searchParams.get(k);if(v)parts.push(k+'='+v)});
- return viewerKey()+'|api|'+parts.join('|');
+ const params=new URLSearchParams(u.searchParams);
+ ['token','userToken','gcToken','adminToken','t','_','ts','fresh'].forEach(k=>params.delete(k));
+ params.sort();
+ return viewerKey()+'|api|'+u.origin+u.pathname+'?'+params;
 }
 function systemKey(sys){return viewerKey()+'|system|'+sys}
 function mutationStamp(){
  try{return Number(sessionStorage.getItem('port79_cache_mutated_at')||0)}catch(e){return 0}
 }
 function markMutation(){
- const now=Date.now();
+ const now=Math.max(Date.now(),mutationStamp()+1);
+ mutationGeneration++;
  try{sessionStorage.setItem('port79_cache_mutated_at',String(now))}catch(e){}
  memoryCache.clear();
+ inflightReads.clear();
 }
 function cacheFreshTtl(action,urlLike){
  const {u}=urlInfo(urlLike);
@@ -148,9 +152,9 @@ async function restoreSystemSnapshot(sys,options={}){
  }
  return row;
 }
-async function storeApi(url,data,sys=''){
+async function storeApi(url,data,sys='',savedAt=Date.now()){
  const key=actionKey(url);
- const row={key,kind:'api',system:sys||currentSystem(),savedAt:Date.now(),size:safeSize(data),data};
+ const row={key,kind:'api',system:sys||currentSystem(),savedAt,size:safeSize(data),data};
  if(key)await put(row);
  if(sys)await put({key:systemKey(sys),kind:'system',system:sys,savedAt:Date.now(),size:safeSize(data),data});
 }
@@ -162,15 +166,16 @@ const nativeFetch=window.fetch.bind(window);
 function coalescedNetwork(key,input,init,url){
  let p=inflightReads.get(key);
  if(!p){
+  const generation=mutationGeneration,startedAt=Date.now();
   p=nativeFetch(input,init).then(async r=>{
    try{
     if(r.ok){
       const d=await r.clone().json();
-      if(d&&d.ok!==false)await storeApi(url,d);
+      if(d&&d.ok!==false&&generation===mutationGeneration&&key===actionKey(url))await storeApi(url,d,'',startedAt);
     }
    }catch(e){}
    return r;
-  }).finally(()=>inflightReads.delete(key));
+  }).finally(()=>{if(inflightReads.get(key)===p)inflightReads.delete(key)});
   inflightReads.set(key,p);
  }
  return p.then(r=>r.clone());
@@ -178,18 +183,25 @@ function coalescedNetwork(key,input,init,url){
 
 window.fetch=async function(input,init){
  const method=String(init?.method||'GET').toUpperCase();
- const url=typeof input==='string'?input:input?.url;
+ let url=typeof input==='string'?input:input?.url;
+ const info=urlInfo(url);
+ // 舊版 GET 也必須帶登入權杖；限定 Apps Script，不傳送到其他來源。
+ if(method==='GET'&&info.u?.origin==='https://script.google.com'&&info.u.pathname.startsWith('/macros/s/')&&!['token','userToken','gcToken','adminToken'].some(k=>String(info.u.searchParams.get(k)||'').trim())){
+  const tk=token();if(tk){info.u.searchParams.set('token',tk);url=info.u.toString();input=typeof input==='string'?url:new Request(url,input);}
+ }
 
  if(method!=='GET'){
    const action=requestAction(input,init);
+   const mutation=isMutationAction(action);
+   if(mutation)markMutation();
    const r=await nativeFetch(input,init);
-   if(r.ok&&isMutationAction(action))markMutation();
+   if(r.ok&&mutation)markMutation();
    return r;
  }
 
  // 排班正式讀取帶有月版本與逾時控制；不可共用跨請求的 inflight fetch/快取。
  // 先讓排班專用完整 GET 經由原生 fetch，避免共用請求的 abort/response 影響正式讀取。
- if(urlInfo(url).action==='getScheduleDataSecure')return nativeFetch(input,init);
+ if(['getScheduleDataSecure','getAttendanceMainDirect'].includes(info.action)||info.u?.searchParams.get('fresh')==='1')return nativeFetch(input,init);
  const key=actionKey(url);
  if(!key)return nativeFetch(input,init);
 
@@ -382,3 +394,4 @@ async function openCenter(){const b=ensureModal();b.classList.add('open');await 
 
 window.Port79DataCache={openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
+
