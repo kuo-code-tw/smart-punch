@@ -206,13 +206,14 @@ body[data-p79-system="leave"]>header{display:none!important}
 .leave-admin-table .leave-remain.zero{color:#e11d48}
 .leave-admin-table .leave-remain.na{color:#94a3b8}
 </style>
-<link rel="stylesheet" href="../assets/port79-seven-top.css?v=202610071307">
+<link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
+<style id="p79-leave-one-header-20261011">#p79LeaveTop{display:none!important}body[data-p79-system="leave"]>header{display:none!important}</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body data-p79-system="leave">
 <header>
   <div class="header-inner">
-    <div><div class="title">📝 請假系統</div><div class="sub">版本 2026.09.27.7.13｜一般員工可申請法定／公司公告假別</div></div>
+    <div><div class="title">📝 請假管理</div><div class="sub">版本 2026.09.27.7.13｜一般員工可申請法定／公司公告假別</div></div>
     <div class="top-actions"><button class="btn btn-home" onclick="location.href='../'">🏠 返回首頁</button><button id="themeBtn" class="btn btn-home">🌙 暗色</button></div>
   </div>
 </header>
@@ -800,9 +801,8 @@ async function poll(){
  }catch(e){}finally{if(to)clearTimeout(to);busy=false}
 }
 function start(){
- mount();
- poll();
- timer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000);
+ // 七大系統共用頂部已取代此舊版重複導覽與雲端輪詢。
+ return;
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
@@ -819,6 +819,6 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 
 });
 </script>
-<script src="../assets/port79-seven-top.js?v=202610071307"></script>
+<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
 </body>
 </html>
