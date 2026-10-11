@@ -1130,6 +1130,15 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
 #app-main-container .p79-person-cell .p79-drag-top{margin-left:auto!important;flex:0 0 30px!important;width:30px!important;height:45px!important;min-height:45px!important;position:absolute!important;right:1px!important;top:50%!important;transform:translateY(-50%)!important}
 #app-main-container #p79RosterFixedHeader .p79-person-header{z-index:90!important}
 </style>
+<style id="p79-roster-scroll-restoration-20261011">
+#app-main-container .p79-month-schedule-table .p79-person-cell,#app-main-container .p79-month-schedule-table .p79-person-header{width:216px!important;min-width:216px!important;max-width:216px!important}
+#app-main-container .p79-person-name-line{padding-right:36px!important;overflow:visible!important}
+#app-main-container .p79-person-name{max-width:none!important;overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important;flex:0 0 auto!important;font-size:15px!important}
+#app-main-container .p79-person-name-line>.p79-person-id{font-size:8px!important}
+#app-main-container #p79RosterScroll .p79-person-cell{position:sticky!important;left:0!important;z-index:85!important;will-change:transform}
+#app-main-container #p79RosterScroll{overflow-anchor:none!important}
+#app-main-container .p79-person-controls{padding-right:35px!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -3773,8 +3782,13 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         `;
       }
 
+      const oldScroll=document.getElementById('p79RosterScroll');
+      const previousTop=oldScroll?.scrollTop || 0;
+      const previousLeft=oldScroll?.scrollLeft || 0;
       container.innerHTML = html;
       p79ConnectRosterScroll();
+      const newScroll=document.getElementById('p79RosterScroll');
+      if(newScroll){newScroll.scrollTop=previousTop;newScroll.scrollLeft=previousLeft;newScroll.dispatchEvent(new Event('scroll'));}
       applyScheduleAccessUi();
 
       const summaryBadge = document.getElementById('overall-summary-badge');
@@ -4162,6 +4176,13 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         headTable.appendChild(originalHead);
         header.appendChild(headTable);
       }
+      const pinPersonCells=()=>{
+        const parentLeft=main.getBoundingClientRect().left;
+        for(const cell of main.querySelectorAll('tbody .p79-person-cell, tfoot .sticky-col-left')){
+          const offset=parentLeft-cell.getBoundingClientRect().left;
+          cell.style.transform=Math.abs(offset)>0.5?'translateX('+offset+'px)':'';
+        }
+      };
       const pinPersonHeader=()=>{
         const first=header.querySelector('.p79-person-header');
         if(first)first.style.transform='translateX('+main.scrollLeft+'px)';
@@ -4172,16 +4193,36 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         if(headTable)headTable.style.width=table.scrollWidth+'px';
         header.scrollLeft=main.scrollLeft;
         pinPersonHeader();
+        pinPersonCells();
         bar.scrollLeft=main.scrollLeft;
       };
       syncSize();
       main.addEventListener('scroll',()=>{
         header.scrollLeft=main.scrollLeft;
         pinPersonHeader();
+        pinPersonCells();
         if(Math.abs(bar.scrollLeft-main.scrollLeft)>1)bar.scrollLeft=main.scrollLeft;
       },{passive:true});
       bar.addEventListener('scroll',()=>{
         if(Math.abs(main.scrollLeft-bar.scrollLeft)>1)main.scrollLeft=bar.scrollLeft;
+      },{passive:true});
+      let rosterWheelSnapTimer=null;
+      main.addEventListener('wheel',e=>{
+        if(Math.abs(e.deltaY)<Math.abs(e.deltaX) || e.ctrlKey)return;
+        clearTimeout(rosterWheelSnapTimer);
+        rosterWheelSnapTimer=setTimeout(()=>{
+          if(!main.isConnected)return;
+          const rows=[...main.querySelectorAll('tbody tr[data-p79-drag-emp]')];
+          if(!rows.length)return;
+          const top=main.scrollTop;
+          let closest=rows[0].offsetTop;
+          let distance=Infinity;
+          for(const row of rows){
+            const d=Math.abs(row.offsetTop-top);
+            if(d<distance){closest=row.offsetTop;distance=d;}
+          }
+          main.scrollTo({top:closest,behavior:'smooth'});
+        },130);
       },{passive:true});
       if(typeof ResizeObserver!=='undefined'){
         const observer=new ResizeObserver(syncSize);
