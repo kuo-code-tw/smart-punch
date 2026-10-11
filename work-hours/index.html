@@ -14016,23 +14016,40 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
     }
   }
 
-  let queued=false, pending=[];
+  // Avoid traversing entire large attendance tables multiple times per animation frame.
+  const pending=new Set();
+  let scheduled=false;
   function flush(){
-    queued=false;
-    const list=pending.splice(0);
-    list.forEach(cleanNode);
+    scheduled=false;
+    let count=0;
+    for(const node of pending){
+      pending.delete(node);
+      if(node.isConnected)cleanNode(node);
+      if(++count>=35)break;
+    }
+    if(pending.size)requestFlush();
+  }
+  function requestFlush(){
+    if(scheduled)return;
+    scheduled=true;
+    if(document.visibilityState==='hidden'){setTimeout(flush,500);return;}
+    requestAnimationFrame(flush);
   }
   function queue(node){
-    if(node) pending.push(node);
-    if(!queued){ queued=true; requestAnimationFrame(flush); }
+    if(!node)return;
+    if(node.nodeType!==1&&node.nodeType!==3)return;
+    if(node.nodeType===1&&node.closest?.('script,style,textarea,input,[contenteditable="true"]'))return;
+    pending.add(node);
+    requestFlush();
   }
   function start(){
-    cleanNode(document.body);
+    // Initial page content is handled in small batches; no synchronous full-body scan.
+    Array.from(document.body.children).forEach(queue);
     const obs=new MutationObserver(muts=>{
-      muts.forEach(m=>{
-        if(m.type==='characterData') queue(m.target);
-        else m.addedNodes && m.addedNodes.forEach(queue);
-      });
+      for(const m of muts){
+        if(m.type==='characterData')queue(m.target);
+        else for(const node of m.addedNodes)queue(node);
+      }
     });
     obs.observe(document.body,{subtree:true,childList:true,characterData:true});
   }
