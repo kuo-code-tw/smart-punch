@@ -311,3 +311,50 @@ body[data-p79-system="hr"] main,
 body[data-p79-system="history"] main{
   box-sizing:border-box!important;
 }
+
+
+/* PORT79 2026-10-11: 七大系統統一介面規格。 */
+#p79SevenTop .top-row{
+ grid-template-columns:minmax(195px,1fr) minmax(0,auto) minmax(125px,1fr);
+ min-height:62px;gap:10px;padding:7px 14px;
+}
+#p79SevenTop .logo{width:40px;height:40px;font-size:20px;border-radius:11px}
+#p79SevenTop .brand-name{font-size:17px}
+#p79SevenNav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:4px;width:min(100%,790px);min-width:0}
+#p79SevenNav a{min-width:0;width:100%;min-height:36px;padding:7px 6px;text-align:center;font-size:12px;white-space:nowrap}
+#p79SevenMenuButton{min-height:36px;min-width:112px;padding:7px 12px;font-size:12px}
+#p79SevenStatus{min-height:28px;padding:3px 9px;gap:4px;font-size:10px}
+#p79SevenStatus .sys{min-height:21px;padding:2px 6px;border-radius:7px}
+#p79SevenMenuWrap>.p79-seven-standard-menu{width:270px;max-height:min(75vh,580px)}
+#p79SevenStandardMenu .menu-title{
+ margin:8px 4px 3px;padding:5px 8px;border-radius:7px;
+ font-size:11px;font-weight:900;color:#475569;background:#f1f5f9;
+}
+#p79SevenStandardMenu button[data-action]{
+ display:block;width:100%;min-height:34px;padding:7px 10px;
+ margin:1px 0;text-align:left;border:0;border-radius:8px;
+ font-size:12px;font-weight:750;line-height:1.3;
+}
+#p79SevenStandardMenu button[data-action="logout-system"]{
+ color:#b91c1c!important;background:#fff1f2!important;margin-top:3px;
+}
+/* 只對七大系統既有的日期、篩選及操作控制項統一字體和高度，不改其行為。 */
+body[data-p79-system] :is(.filters,.toolbar,.filter-bar,.action-bar) :is(button,select,input:not([type="checkbox"]):not([type="radio"])),
+body[data-p79-system] :is(#recordDateRangePicker,#leaveFilterDateRangePicker,#scheduleRangeControl) :is(button,select,input){
+ box-sizing:border-box;min-height:32px;border-radius:8px;font-size:12px;line-height:1.25;
+}
+body[data-p79-system] :is(.filters,.toolbar,.filter-bar,.action-bar){gap:6px}
+body[data-p79-system] :is(main,#viewAdmin,#app-main-container) :is(table) th{
+ font-size:12px;font-weight:800;
+}
+@media(max-width:1350px){
+ #p79SevenTop .top-row{grid-template-columns:minmax(170px,1fr) minmax(0,auto) minmax(108px,1fr);gap:6px;padding-inline:9px}
+ #p79SevenNav a{font-size:11px;padding-inline:4px}
+}
+@media(max-width:1150px){
+ #p79SevenTop .top-row{grid-template-columns:1fr;gap:5px;padding:7px 10px}
+ #p79SevenTop .brand{justify-content:center}
+ #p79SevenTop .action{justify-content:center}
+ #p79SevenNav{width:100%;max-width:100%;grid-template-columns:repeat(7,minmax(86px,1fr));overflow-x:auto;justify-content:start}
+ #p79SevenStatus{justify-content:flex-start}
+}
