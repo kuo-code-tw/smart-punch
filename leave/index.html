@@ -336,6 +336,7 @@ async function loadCloud(show=false){
    if(!d?.ok)throw new Error(d?.error||'雲端讀取失敗');
    employees=Array.isArray(d.employees)?d.employees:[];
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
+   window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
    populateDepartments();renderAll();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
   }catch(e){
    last=e;
