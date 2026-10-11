@@ -4273,7 +4273,31 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     async function saveCurrentTabSchedule() {
-      if (!requireScheduleEditLock()) return;
+      if (!canManageSchedule()) { requireScheduleEditLock(); return; }
+      // 儲存前由 GAS 原子確認編輯權；不以可能延遲的本機狀態直接拒絕管理員。
+      // 若其他帳號持鎖，必須拒絕寫入，不可強制接管。
+      if (!scheduleEditLockState.mine) {
+        const acquired = await manualAcquireScheduleEditLock();
+        if (!acquired) {
+          const owner=scheduleEditLockState.locked ? '目前由 '+scheduleLockOwnerLabel()+' 編輯' : '雲端尚未確認編輯權';
+          alert('❌ 排班尚未儲存：'+owner+'。請稍候再按儲存，勿重新整理以免丟失未儲存的變更。');
+          return;
+        }
+      }
+      if (!requireScheduleEditLock(false)) return;
+      // 儲存前立即續租，避免雲端寫入過程中使用即將到期的租約。
+      try {
+        const renewed=await scheduleLockPost('scheduleHeartbeatEditLock');
+        setScheduleEditLockState(renewed);
+        if (!scheduleEditLockState.mine) {
+          alert('❌ 編輯權已轉移給其他管理員，班表未儲存。請重新取得編輯權。');
+          return;
+        }
+      } catch(e) {
+        // 不在無法確認擁有權時嘗試寫入，避免誤覆蓋；保留畫面內容。
+        alert('❌ 無法確認排班編輯權，班表尚未儲存；請稍後重試。');
+        return;
+      }
       const tabName = (activeRoleTab === 'ALL') ? '全部人員' : activeRoleTab + '單位';
       lastScheduleCloudError = '';
 
