@@ -2346,6 +2346,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     let p79ScheduleAttendanceStateTimer = null;
     let p79ScheduleAttendanceStateBusy = false;
     let p79ScheduleAttendanceHasSynced = false;
+    let p79ScheduleAttendanceAuthExpired = false;
     function setScheduleAttendanceLiveStatus(mode, message) {
       const el = document.getElementById('todayAttendanceLiveStatus');
       if (!el) return;
@@ -2368,10 +2369,10 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     async function refreshScheduleAttendanceState(showError=false) {
-      if (p79ScheduleAttendanceStateBusy) return false;
+      if (p79ScheduleAttendanceStateBusy || p79ScheduleAttendanceAuthExpired) return false;
       if (!isGasUrlConfigured()) { setScheduleAttendanceLiveStatus('error', '考勤燈號未同步：未設定正式 GAS'); return false; }
       const token = currentPort79SsoToken();
-      if (!token) { setScheduleAttendanceLiveStatus('error', '考勤燈號未同步：登入驗證遺失'); return false; }
+      if (!token) { p79ScheduleAttendanceAuthExpired=true; setScheduleAttendanceLiveStatus('error', '考勤燈號暫停同步：登入驗證遺失，請重新登入'); return false; }
       p79ScheduleAttendanceStateBusy = true;
       if (!p79ScheduleAttendanceHasSynced) setScheduleAttendanceLiveStatus('loading', '考勤燈號：向正式雲端讀取中…');
       try {
@@ -2384,7 +2385,15 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         try { res = await fetch(url, {cache:'no-store', redirect:'follow', signal:controller.signal}); }
         finally { clearTimeout(timer); }
         const data = await res.json();
-        if (!data?.ok) throw new Error(data?.error || '今日考勤狀態讀取失敗');
+        if (!data?.ok) {
+          const err=String(data?.error || '今日考勤狀態讀取失敗');
+          if (/登入驗證.*(?:逾時|過期|失效|無效)|登入.*(?:逾時|過期)|token.*(?:expired|invalid)|session.*expired|請重新登入/i.test(err)) {
+            p79ScheduleAttendanceAuthExpired=true;
+            setScheduleAttendanceLiveStatus('error','考勤燈號已暫停同步：登入已過期，請返回首頁重新登入');
+            return false;
+          }
+          throw new Error(err);
+        }
         if (!Array.isArray(data.activeEmpIds)) throw new Error('雲端未提供即時出勤名單（請確認 GAS 已更新）');
         if (data.today && data.today !== scheduleTaipeiTodayKey()) throw new Error('雲端回傳的出勤日期不是今日');
 
@@ -2419,20 +2428,20 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       if (p79ScheduleAttendanceStateTimer) clearTimeout(p79ScheduleAttendanceStateTimer);
       p79ScheduleAttendanceStateTimer = setTimeout(async () => {
         await refreshScheduleAttendanceState(false);
-        scheduleNextAttendanceStatePoll(document.visibilityState === 'visible' ? 5000 : 30000);
+        if (!p79ScheduleAttendanceAuthExpired) scheduleNextAttendanceStatePoll(document.visibilityState === 'visible' ? 15000 : 60000);
       }, Math.max(1000, Number(delayMs) || 5000));
     }
 
     function startScheduleAttendanceStateAutoSync() {
       refreshScheduleAttendanceState(false);
-      scheduleNextAttendanceStatePoll(3000);
+      scheduleNextAttendanceStatePoll(15000);
 
       window.addEventListener('focus', () => {
-        setTimeout(() => refreshScheduleAttendanceState(false), 150);
+        if (!p79ScheduleAttendanceAuthExpired) setTimeout(() => refreshScheduleAttendanceState(false), 150);
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-          setTimeout(() => refreshScheduleAttendanceState(false), 150);
+          if (!p79ScheduleAttendanceAuthExpired) setTimeout(() => refreshScheduleAttendanceState(false), 150);
         }
       });
     }
