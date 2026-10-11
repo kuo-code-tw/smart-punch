@@ -252,12 +252,36 @@ function buildMenu(sys){
  const accountTitle=document.createElement('div');accountTitle.className='menu-title';accountTitle.textContent='登入資訊';menu.appendChild(accountTitle);
  const accountInfo=document.createElement('div');accountInfo.className='p79-seven-account-info';accountInfo.textContent='👤 '+account.name+'｜'+account.role;menu.appendChild(accountInfo);
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
- const title=document.createElement('div');title.className='menu-title';title.textContent='系統功能';menu.appendChild(title);
- (MENU[sys]||[]).forEach(([a,label,cls])=>{const b=document.createElement('button');b.type='button';b.dataset.action=a;b.textContent=(sys==='schedule'&&a==='schedule-lock')?scheduleLockMenuLabel():label;if(cls)b.classList.add(cls);b.addEventListener('click',()=>runAction(sys,a));menu.appendChild(b)});
- const sep=document.createElement('div');sep.className='sep';menu.appendChild(sep);
- const ct=document.createElement('div');ct.className='menu-title';ct.textContent='七大系統共用';menu.appendChild(ct);
- const cache=document.createElement('button');cache.type='button';cache.dataset.action='data-cache';cache.className='cache common';cache.textContent='☁️ 資料快取中心';cache.addEventListener('click',()=>runAction(sys,'data-cache'));menu.appendChild(cache);
- const theme=document.createElement('button');theme.type='button';theme.dataset.action='global-theme';theme.className='theme common';theme.addEventListener('click',()=>runAction(sys,'global-theme'));menu.appendChild(theme);
+ // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
+ const GROUPS=[
+  ['資料管理',['attendance-import','attendance-export','import','export']],
+  ['系統設定',['schedule-mode','org','reset-cloud']],
+  ['權限管理',['permissions','leave-edit']],
+  ['紀錄查詢',['logs','attendance-compare','compare']],
+  ['進階工具',['clearDeleted','data-cache']],
+  ['顯示設定',['year','global-theme']],
+  ['登出系統',['logout-system']]
+ ];
+ const items=new Map((MENU[sys]||[]).map(entry=>[entry[0],entry]));
+ function addAction(a,label,cls){
+   const b=document.createElement('button');
+   b.type='button';b.dataset.action=a;b.textContent=label;
+   if(cls)b.classList.add(cls);
+   if(a==='logout-system')b.classList.add('danger');
+   b.addEventListener('click',()=>a==='logout-system'?window.p79LogoutToSevenSystemHome():runAction(sys,a));
+   menu.appendChild(b);
+ }
+ GROUPS.forEach(([heading,actions])=>{
+   const included=actions.filter(a=>items.has(a)||['data-cache','global-theme','logout-system'].includes(a));
+   if(!included.length)return;
+   const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
+   included.forEach(a=>{
+     if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
+     else if(a==='global-theme')addAction(a,'🌙 全系統顯示模式','common theme');
+     else if(a==='logout-system')addAction(a,'↪ 登出系統','danger');
+     else {const [,label,cls]=items.get(a);addAction(a,label,cls)}
+   });
+ });
  updateThemeMenuLabel();
  return menu;
 }
