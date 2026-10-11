@@ -889,11 +889,11 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <p id="p79LeaveCoverSummary" style="margin-top:8px;font-size:12px"></p>
 <input type="hidden" id="p79LeaveCoverId">
 <label for="p79LeaveCoverMode">代班方式</label>
-<select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="two">兩位不同人員加班代班</option><option value="rest">一位原本排休的人員代班</option></select>
+<select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="two">兩位不同人員加班代班</option><option value="rest">排休人員代班</option></select>
 <label for="p79LeaveCoverFirst">第一位代班人員</label><select id="p79LeaveCoverFirst"></select>
 <div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
 <p style="margin-top:10px;font-size:12px">僅可安排同職務、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
-<div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">稍後安排</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
+<div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
 </body>
 </html>
