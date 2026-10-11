@@ -1570,7 +1570,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.12.33';
+const APP_VERSION='2026.10.12.35';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -1987,6 +1987,12 @@ function switchTab(name,btn){if(name==='groups')ensureEmployeeDataForGroups();
   tabBtn?.classList.add('active');
   renderEfficiencyTabFast(name);
 }
+function dashboardSelectableMonths(year,loadedMonths=[]){
+  const y=String(year||'').trim();
+  if(!/^\d{4}$/.test(y))return [];
+  const calendar=Array.from({length:12},(_,i)=>`${y}-${String(i+1).padStart(2,'0')}`);
+  return [...new Set([...calendar,...loadedMonths])].filter(m=>new RegExp('^'+y+'-(0[1-9]|1[0-2])$').test(String(m))).sort().reverse();
+}
 function populateSelects(){
   populatePort79YearFilters();
   const monthFilter=document.getElementById('filterMonth');
@@ -1995,8 +2001,7 @@ function populateSelects(){
     const currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const initialized=monthFilter.dataset.p79MonthInitialized==='1';
     const prevMonth=initialized?monthFilter.value:currentMonth;
-    const months=[...new Set([currentMonth,...availableMonthsFromRecords()])]
-      .filter(m=>String(m).startsWith(getPort79Year()+'-')).sort().reverse();
+    const months=dashboardSelectableMonths(getPort79Year(),availableMonthsFromRecords());
     monthFilter.innerHTML='<option value="">全部月份</option>'+months.map(m=>`<option value="${esc(m)}">${esc(m.replace('-','年'))}月</option>`).join('');
     if([...monthFilter.options].some(o=>o.value===prevMonth))monthFilter.value=prevMonth;
     else monthFilter.value='';
