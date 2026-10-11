@@ -972,6 +972,16 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
   height:90px!important;vertical-align:top!important;
 }
 </style>
+<style id="p79-schedule-sticky-head-scrollbar-20261011">
+/* 只讓班表內垂直／水平捲動，日期表頭始終可見；底部常駐水平操作條。 */
+#app-main-container .p79-roster-scroll{position:relative;max-height:min(72vh,850px);overflow:auto!important;overscroll-behavior:contain;scrollbar-width:auto;scrollbar-color:#64748b #e2e8f0}
+#app-main-container .p79-roster-scroll thead th{position:sticky!important;top:0!important;z-index:24!important;background:#e9eef5!important;box-shadow:0 2px 2px #94a3b844}
+#app-main-container .p79-roster-scroll thead th.p79-person-header{z-index:32!important}
+#app-main-container .p79-roster-bottom-scroll{height:19px;overflow-x:auto;overflow-y:hidden;background:#edf2f7;border-top:1px solid #cbd5e1;scrollbar-width:auto;scrollbar-color:#64748b #e2e8f0}
+#app-main-container .p79-roster-bottom-scroll>div{height:1px}
+#app-main-container .p79-roster-bottom-scroll::-webkit-scrollbar,#app-main-container .p79-roster-scroll::-webkit-scrollbar{height:15px;width:10px}
+#app-main-container .p79-roster-bottom-scroll::-webkit-scrollbar-thumb,#app-main-container .p79-roster-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:12px;border:3px solid #e2e8f0}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -3616,6 +3626,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       }
 
       container.innerHTML = html;
+      p79ConnectRosterScroll();
       applyScheduleAccessUi();
 
       const summaryBadge = document.getElementById('overall-summary-badge');
@@ -3988,6 +3999,18 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
     window.toggleScheduleRoleRosterCollapsed = toggleScheduleRoleRosterCollapsed;
 
+    function p79ConnectRosterScroll(){
+      const main=document.getElementById('p79RosterScroll');
+      const bar=document.getElementById('p79RosterBottomScroll');
+      const spacer=document.getElementById('p79RosterBottomWidth');
+      if(!main||!bar||!spacer)return;
+      const syncSize=()=>{spacer.style.width=main.scrollWidth+'px';bar.scrollLeft=main.scrollLeft;};
+      syncSize();
+      let busy=false;
+      main.addEventListener('scroll',()=>{if(!busy){busy=true;bar.scrollLeft=main.scrollLeft;busy=false}},{passive:true});
+      bar.addEventListener('scroll',()=>{if(!busy){busy=true;main.scrollLeft=bar.scrollLeft;busy=false}},{passive:true});
+      if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(syncSize);observer.observe(main);observer.observe(main.querySelector('table'));main.p79ScrollObserver=observer}
+    }
     function renderRoleScheduleView() {
       // 沒有選單位時不建立大型排班 DOM，避免頁面一進來就渲染全部人員。
       if (!activeRoleTab) {
@@ -4143,7 +4166,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             </div>
           </div>
 
-          <div class="overflow-x-auto custom-scrollbar">
+          <div class="p79-roster-scroll custom-scrollbar" id="p79RosterScroll">
             <table class="p79-month-schedule-table w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
@@ -4329,6 +4352,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
               </tfoot>
             </table>
           </div>
+          <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>
 
           <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
             <button onclick="saveCurrentTabSchedule()" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center gap-2">
