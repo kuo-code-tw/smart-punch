@@ -47,6 +47,42 @@ function p79BootLogoutControls(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',p79BootLogoutControls,{once:true});
 else p79BootLogoutControls();
 
+
+/* Attendance anomaly legend: compact, aligned 3+2 grid inside its existing filter row. */
+(function(){
+ const words=['已整合','缺少簽到','缺少簽退','上班分鐘','下班分鐘'];
+ function adjust(){
+  if(currentSystem()!=='attendance')return;
+  const nodes=[...document.querySelectorAll('span')];
+  const header=nodes.find(x=>x.textContent?.includes('異常顏色') && x.children.length===0);
+  if(!header)return;
+  const host=header.parentElement;
+  if(!host || host.dataset.p79AlignedLegend==='1')return;
+  const tags=words.map(w=>[...host.querySelectorAll('span')].find(x=>x!==header && !x.children.length && x.textContent?.includes(w)));
+  if(tags.some(x=>!x))return;
+  const grid=document.createElement('div');
+  grid.className='p79-anomaly-legend-grid';
+  tags[0].before(grid);
+  tags.forEach(t=>grid.appendChild(t));
+  host.dataset.p79AlignedLegend='1';
+  host.classList.add('p79-anomaly-legend-host');
+  header.classList.add('p79-anomaly-legend-title');
+ }
+ const style=document.createElement('style');
+ style.id='p79-anomaly-legend-aligned-v1';
+ style.textContent=`
+ .p79-anomaly-legend-host{display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:6px!important;min-width:0!important;padding:4px 7px!important}
+ .p79-anomaly-legend-title{flex:none!important;font-size:10px!important;white-space:nowrap!important}
+ .p79-anomaly-legend-grid{display:grid!important;grid-template-columns:repeat(3,max-content);grid-template-rows:repeat(2,20px);gap:3px 5px;align-items:stretch;max-width:100%;min-width:0}
+ .p79-anomaly-legend-grid>span{display:inline-flex!important;justify-content:center!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:20px!important;min-height:20px!important;padding:0 5px!important;margin:0!important;font-size:10px!important;line-height:1.1!important;white-space:nowrap!important;border-radius:5px!important}
+ @media(max-width:760px){.p79-anomaly-legend-host{flex-wrap:wrap!important}.p79-anomaly-legend-grid{grid-template-columns:repeat(3,max-content)}.p79-anomaly-legend-grid>span{font-size:9px!important;padding:0 3px!important}}
+ `;
+ document.head.appendChild(style);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',adjust,{once:true});else adjust();
+ const obs=new MutationObserver(()=>{if(!document.querySelector('.p79-anomaly-legend-host'))adjust()});
+ obs.observe(document.documentElement,{childList:true,subtree:true});
+})();
+
 const META={
  attendance:['🕒','考勤系統','員工打卡・考勤紀錄・即時動態'],
  workhours:['📊','加班管理','出勤統計・加班統計・月結工時'],
