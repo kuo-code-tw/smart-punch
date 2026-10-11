@@ -1570,7 +1570,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.12.32';
+const APP_VERSION='2026.10.12.33';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -6352,18 +6352,8 @@ function renderAll(){
   // 因此更新後先自動重新解析既有紀錄，不一定要再匯入 Excel。
   repairBundleRecordsFromRemarks();
 
-  populatePort79YearFilters();
   populateSelects();
-  renderDashboard();
-  renderGroups();
-  renderPeople();
-  renderRecords();
-  if(!document.getElementById('view-workload')?.classList.contains('hidden')){populatePersonStatPeople();renderPersonStats();}
-  renderWeeklyEfficiency();
-  if(personalAuditReference){
-    buildPersonalEfficiencyAudit();
-    renderPersonalEfficiencyAudit();
-  }
+  renderEfficiencyTabFast();
 
 }
 function repairBlankVesselNames(){
@@ -6747,7 +6737,23 @@ async function vesselRevisionIsCurrent(timeoutMs=7000){
   return !!remoteRevision && remoteRevision===localRevision;
 }
 
-async function apiPost(action,payload={}){const url=getGasUrl();if(!url)throw Error('未設定 GAS URL');const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,gcToken,...payload})});const text=await r.text();let j;try{j=JSON.parse(text)}catch{throw Error('GAS 未回 JSON')};if(!j.ok)throw Error(j.error||'雲端錯誤');return j}
+const GC_WRITE_TIMEOUT_MS=30000;
+async function apiPost(action,payload={}){
+  const url=getGasUrl();if(!url)throw Error('未設定 GAS URL');
+  const controller=new AbortController();let timer;
+  const request=(async()=>{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},signal:controller.signal,body:JSON.stringify({action,gcToken,...payload})});
+    const text=await r.text();let j;
+    try{j=JSON.parse(text)}catch{throw Error('GAS 未回 JSON')}
+    if(!r.ok || !j.ok)throw Error(j.error||'雲端錯誤');return j;
+  })();
+  try{
+    return await Promise.race([request,new Promise((_,reject)=>{
+      timer=setTimeout(()=>{reject(Error('雲端寫入逾時，資料保留等待補傳'));controller.abort();},GC_WRITE_TIMEOUT_MS);
+    })]);
+  }finally{clearTimeout(timer)}
+}
+
 function readQueue(){try{return JSON.parse(localStorage.getItem(STORE.queue)||'[]')}catch{return[]}}
 function saveQueue(q){localStorage.setItem(STORE.queue,JSON.stringify(q))}
 function recordIdentityKey(r){
@@ -7289,8 +7295,16 @@ async function onMonthlyCompareMonthChange(){
   rebuildMonthlyComparison();
 }
 
+function gcLocalSyncState(){return JSON.stringify({groups,assignments,records,shipMasters});}
 async function buildSafeGcSyncPayload(payload={}){
   const localPayload={...payload};
+  const beforeState=gcLocalSyncState();
+  const matchesCurrent=JSON.stringify({
+    groups:Array.isArray(localPayload.groups)?localPayload.groups:groups,
+    assignments:Array.isArray(localPayload.assignments)?localPayload.assignments:assignments,
+    records:Array.isArray(localPayload.records)?localPayload.records:records,
+    shipMasters:Array.isArray(localPayload.shipMasters)?localPayload.shipMasters:shipMasters
+  })===beforeState;
   delete localPayload.__destructiveSync;
 
   try{
@@ -7360,16 +7374,16 @@ async function buildSafeGcSyncPayload(payload={}){
       delete out.manualOverrides;
       return out;
     });
-    shipMasters=canonicalShipMasters(mergedMasters);
+    const sendingMasters=canonicalShipMasters(mergedMasters);
 
     // 作業明細：雲端先作基底，再套用本機較完整的新資料，且保留雙方不存在的紀錄。
-    records=mergeCloudRecordsWithLocal(
+    const sendingRecords=mergeCloudRecordsWithLocal(
       remoteRecords,
       Array.isArray(localPayload.records)?localPayload.records:(records||[])
     );
 
     // 人員分組不允許雲端空 groupId 洗掉本機已分組資料。
-    assignments=mergeAssignmentsKeepLocal(
+    const sendingAssignments=mergeAssignmentsKeepLocal(
       Array.isArray(localPayload.assignments)?localPayload.assignments:(assignments||[]),
       remoteAssignments
     );
@@ -7380,18 +7394,22 @@ async function buildSafeGcSyncPayload(payload={}){
     (Array.isArray(localPayload.groups)?localPayload.groups:(groups||[])).forEach(g=>{
       if(g?.id) groupMap.set(String(g.id),g);
     });
-    groups=[...groupMap.values()];
+    const sendingGroups=[...groupMap.values()];
 
-    saveLocal();
+    // 舊快照補傳或等待雲端期間的新編輯，不能被前置合併改回舊的畫面資料。
+    if(matchesCurrent && gcLocalSyncState()===beforeState){
+      groups=sendingGroups;assignments=sendingAssignments;records=sendingRecords;shipMasters=sendingMasters;
+      invalidateWorkloadIndex();saveLocal();
+    }
 
     console.info('[GC safe sync]',{
       remoteMasters:remoteMasters.length,
       remoteRecords:remoteRecords.length,
-      sendingMasters:shipMasters.length,
-      sendingRecords:records.length
+      sendingMasters:sendingMasters.length,
+      sendingRecords:sendingRecords.length
     });
 
-    return {groups,assignments,records,shipMasters};
+    return {groups:sendingGroups,assignments:sendingAssignments,records:sendingRecords,shipMasters:sendingMasters};
   }catch(e){
     console.error('同步前讀取雲端資料失敗，為避免覆蓋舊資料，本次只保留本機並等待安全補傳',e);
     const err=new Error('Excel 已保留在本機；目前無法確認雲端完整資料，因此暫不覆蓋雲端。系統已保留資料，稍後可再按「雲端同步」補傳。');
@@ -7401,59 +7419,66 @@ async function buildSafeGcSyncPayload(payload={}){
   }
 }
 
+let gcQueueFlushPromise=null;
 async function postCloud(action,payload){
- if(!requireSuperAdminAccess()) return
- let sendPayload=payload||{};
- try{
-   // 刪除船舶時才允許真正整批覆寫；其他新增/修改先與雲端合併。
-   if(action==='gcSyncAll' && !sendPayload.__destructiveSync){
-     sendPayload=await buildSafeGcSyncPayload(sendPayload);
-   }else if(action==='gcSyncAll' && sendPayload.__destructiveSync){
-     sendPayload={...sendPayload};
-     delete sendPayload.__destructiveSync;
-   }
-   cloudStatus('資料同步中',false);
-   const j=await apiPost(action,sendPayload);
-   if(j.revision)localStorage.setItem(STORE.rev,String(j.revision));
-   cloudStatus(`雲端已同步｜主檔 ${(shipMasters||[]).length}｜明細 ${(records||[]).length}`);
-   return j;
- }catch(e){
-   if(e?.safeSyncBlocked){
-     // Excel/本機資料已完成，不再把整次操作宣告為「匯入失敗」。
-     // 把原始 gcSyncAll payload 以 safeMerge 標記排隊；補傳時仍必須重新讀雲端並安全合併。
-     let q=readQueue();
-     q.push({id:uid('Q'),action,payload:payload||{},safeMerge:true,at:Date.now()});
-     saveQueue(q);
-     cloudStatus(`本機已保存｜待安全補傳 ${q.length} 筆`,false);
-     toast(e.message);
-     return {ok:true,pendingCloudSync:true,localSaved:true};
-   }
-   let q=readQueue();q.push({id:uid('Q'),action,payload:sendPayload,at:Date.now()});saveQueue(q);cloudStatus(`待補傳 ${q.length} 筆`,false);toast(`已保留本機資料，等待補傳：${action}`)
- }
+  if(!requireSuperAdminAccess())return {ok:false};
+  // 先保存獨立快照；後續編輯不能改到正在上傳或等待補傳的內容。
+  const snapshot=JSON.parse(JSON.stringify(payload||{}));
+  const q=readQueue(),last=q[q.length-1];
+  let item=last;
+  if(!last || last.action!==action || JSON.stringify(last.payload)!==JSON.stringify(snapshot)){
+    item={id:uid('Q'),action,payload:snapshot,at:Date.now()};
+    if(action==='gcSyncAll'&&!snapshot.__destructiveSync)item.safeMerge=true;
+    q.push(item);saveQueue(q);
+  }
+  setEfficiencySaveState(true,'本機已保存，等待雲端確認');
+  await flushQueue();
+  const pending=readQueue();
+  if(pending.some(x=>JSON.stringify(x)===JSON.stringify(item))){
+    cloudStatus(`本機已保存｜待補傳 ${pending.length} 筆`,false);
+    toast('本機已保存，雲端尚未完成，請稍後同步');
+    return {ok:false,pendingCloudSync:true,localSaved:true};
+  }
+  return {ok:true};
+}
+async function postCloudConfirmed(action,payload){
+  const result=await postCloud(action,payload);
+  if(!result?.ok || result.pendingCloudSync || readQueue().length){
+    throw Error('本機已保留，雲端尚未完成；請稍後同步');
+  }
+  return result;
 }
 async function flushQueue(){
-  if(cloudBusy||!requireSuperAdminAccess())return;
-  let q=readQueue();
-  if(!q.length)return;
+  if(gcQueueFlushPromise)return gcQueueFlushPromise;
+  if(!readQueue().length)return {ok:true};
+  if(cloudBusy||!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0};
   cloudBusy=true;
-  const left=[];
-  for(const item of q){
+  gcQueueFlushPromise=(async()=>{
     try{
-      let queuedPayload=item.payload||{};
-      // 安全同步被暫停的 gcSyncAll，重送前一定重新讀雲端再合併。
-      // 絕對不可直接 apiPost 原始整包 payload，避免舊船資料被覆蓋。
-      if(item.action==='gcSyncAll' && item.safeMerge===true){
-        queuedPayload=await buildSafeGcSyncPayload(queuedPayload);
+      while(readQueue().length){
+        const item=readQueue()[0];
+        try{
+          let payload=item.payload||{};
+          // 所有整批補傳每次都重新讀雲端合併，包含舊版本留下的佇列。
+          if(item.action==='gcSyncAll'&&!payload.__destructiveSync)payload=await buildSafeGcSyncPayload(payload);
+          else if(item.action==='gcSyncAll'){payload={...payload};delete payload.__destructiveSync;}
+          const result=await apiPost(item.action,payload);
+          // 只移除本次已確認的快照，保留上傳期間加入或修改的其他項目。
+          const signature=JSON.stringify(item);
+          const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===signature);
+          if(index>=0){live.splice(index,1);saveQueue(live)}
+          if(result.revision)localStorage.setItem(STORE.rev,String(result.revision));
+        }catch(e){
+          console.warn('待補傳仍未完成，保留佇列',item?.action,e);
+          break; // 舊修改未確認前，不能讓新修改越過它再被舊重試覆蓋。
+        }
       }
-      await apiPost(item.action,queuedPayload);
-    }catch(e){
-      console.warn('待補傳仍未完成，保留佇列',item?.action,e);
-      left.push(item);
-    }
-  }
-  saveQueue(left);
-  cloudBusy=false;
-  cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'雲端已同步',!left.length);
+      const left=readQueue();
+      cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'雲端已同步',!left.length);
+      return {ok:!left.length,pendingCloudSync:!!left.length};
+    }finally{cloudBusy=false}
+  })();
+  try{return await gcQueueFlushPromise}finally{gcQueueFlushPromise=null}
 }
 
 function normalizeCloudEmployee(e){
@@ -7645,7 +7670,7 @@ async function restoreVesselFromHistoryFallback(){
   return {shipMasters:masters,records:rows,months:loaded};
 }
 
-async function restoreVesselDataFromCloud(showMessage=true){
+async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=false){
   if(!requireEfficiencyAccess())return false;
 
   try{
@@ -7841,6 +7866,7 @@ async function restoreVesselDataFromCloud(showMessage=true){
     if(showMessage){
       toast(`雲端暫時無法讀取，已保留本機資料：${e?.message||e}`);
     }
+    if(requireCloudSuccess)throw e;
     return (shipMasters||[]).length>0 || (records||[]).length>0;
   }
 }
@@ -7897,8 +7923,10 @@ async function manualCloudSync(){
     // 單一「同步雲端」現在同時做兩件事：
     // 1. 先把本機待上傳修改補傳。
     // 2. 再把 Google 雲端最新船舶/作業/人員資料安全合併回來。
-    await flushQueue();
-    await restoreVesselDataFromCloud(false);
+    const upload=await flushQueue();
+    if(!upload?.ok || readQueue().length)throw Error('仍有本機修改等待補傳，尚未完成同步');
+    await restoreVesselDataFromCloud(false,true);
+    if(readQueue().length)throw Error('同步期間有新修改等待補傳');
 
     cloudStatus('雲端已同步');
     setEfficiencySaveState(false,'本機與雲端資料已完成同步');
@@ -10004,7 +10032,8 @@ async function importExcel(file) {
     }
 
     setExcelImportStage('同步船舶主檔與人員明細到雲端',88);
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    const upload=await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    if(!upload?.ok){setExcelImportStage('本機已保存，等待雲端補傳',96);return;}
 
     // 最後一份才更新本次船舶主檔；讀回驗證改成背景，不阻塞匯入完成。
     try{
@@ -10999,7 +11028,7 @@ async function createShipFromMonthlyActual(serial){
   saveLocal();
 
   try{
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     toast(`已依月報建立 ${workingNo} ${vessel}`);
   }catch(e){
     toast(`本機已建立，但雲端同步失敗：${e?.message||e}`);
@@ -11686,7 +11715,7 @@ async function applyMonthlyCorrection(serial,field){
 
   // 到這裡若兩邊已一致，卡片已從差異清單移除；雲端同步在後面進行。
   try{
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     shipMasters=canonicalShipMasters(shipMasters);
     saveLocal();
     rebuildMonthlyComparison();
@@ -11741,7 +11770,7 @@ async function applyAllMonthlyActual(serial){
   switchTab('compare',document.querySelector('[data-tab="compare"]'));
 
   try{
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     shipMasters=canonicalShipMasters(shipMasters);
     saveLocal();
     rebuildMonthlyComparison();
@@ -11997,7 +12026,7 @@ async function applyMonthlyQuickCorrection(serial,field){
   rebuildMonthlyComparison();
 
   try{
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     setEfficiencySaveState(false,'月報比對修正已同步雲端');
     rebuildMonthlyComparison();
 
@@ -12020,6 +12049,7 @@ async function applyMonthlyQuickCorrection(serial,field){
 let efficiencyHasUnsavedChanges=false;
 
 function setEfficiencySaveState(unsaved,message=''){
+  if(readQueue().length){unsaved=true;message='本機已保存，仍有資料等待雲端補傳';}
   efficiencyHasUnsavedChanges=!!unsaved;
   const btn=document.getElementById('efficiencySaveBtn');
   if(btn){
@@ -12038,7 +12068,7 @@ async function saveEfficiencyChangesToCloud(){
   if(btn){btn.disabled=true;btn.textContent='儲存中...';}
   try{
     saveLocal();
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     forceFullSystemConsistencyRefresh();
     setEfficiencySaveState(false,'已同步至 Google 雲端');
     toast('✅ 效率系統變更已儲存到雲端，已重新核對全部狀態');
@@ -12080,7 +12110,7 @@ async function saveDashboardShipNote(workingNo,value){
   saveLocal();
   setEfficiencySaveState(true,'備註正在同步雲端');
   try{
-    await postCloud('gcUpsertShipMaster',{shipMaster:master,records:[]});
+    await postCloudConfirmed('gcUpsertShipMaster',{shipMaster:master,records:[]});
     setEfficiencySaveState(false,'備註已儲存到雲端');
     toast(`備註已儲存：${workingNo}`);
   }catch(e){
@@ -12268,7 +12298,7 @@ async function saveShipMasterEdit(){
   setEfficiencySaveState(true,'船舶修改正在同步雲端');
 
   try{
-    await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
     // 雲端完成後再用最新人工修正值重算一次，確保首頁舊警告立刻消失。
     forceFullSystemConsistencyRefresh();
     setEfficiencySaveState(false,'船舶修改已儲存到雲端');
