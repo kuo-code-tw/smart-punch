@@ -1570,7 +1570,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.12.35';
+const APP_VERSION='2026.10.12.36';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -1964,12 +1964,19 @@ function activeEfficiencyTabName(){return document.querySelector('.tab.active')?
 function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
-  if(name==='compare'){populateSelects();renderMonthlyComparePage();return;}
+  if(name==='compare'){
+    populateSelects();
+    const month=document.getElementById('monthlyCompareMonth')?.value||'';
+    if(!monthlyCompareRebuilding && !monthlyCompareRows.length && monthlyActualRows.some(r=>String(r.month||'')===month))rebuildMonthlyComparison();
+    else renderMonthlyComparePage();
+    return;
+  }
   if(name==='groups'){populateSelects();renderGroups();renderPeople();return;}
   if(name==='records'){populateSelects();renderRecords();return;}
   if(name==='personstats'){
     populateSelects();
     if(personalAuditReference){buildPersonalEfficiencyAudit();renderPersonalEfficiencyAudit();}
+    if(personalAuditReference&&dualAuditWorkingReference){buildDualSourceSystemAudit();renderDualSourceSystemAudit();}
     return;
   }
   if(name==='workload'){
@@ -5530,11 +5537,12 @@ function savePersonalAuditCache(){
     console.warn('個人效率比對快取儲存失敗',e);
   }
 }
-function restorePersonalAuditCache(){
+function restorePersonalAuditCache(deferRender=false){
   try{
     const raw=JSON.parse(localStorage.getItem(PERSONAL_AUDIT_CACHE_KEY)||'null');
     if(raw && Array.isArray(raw.summary) && Array.isArray(raw.details)){
       personalAuditReference=raw;
+      if(deferRender)return;
       buildPersonalEfficiencyAudit();
       renderPersonalEfficiencyAudit();
     }
@@ -7819,8 +7827,8 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
 
     invalidateWorkloadIndex();
     renderVesselSummary();
+    restoreMonthlyCompareCache(true);
     renderEfficiencyTabFast();
-    restoreMonthlyCompareCache();
     updateEmployeeDataState(employeeSource);
 
     // 最新人資名單改成背景補抓，不阻塞「船舶作業資料」的顯示。
@@ -7864,8 +7872,8 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     saveLocal();
     invalidateWorkloadIndex();
     renderVesselSummary();
+    restoreMonthlyCompareCache(true);
     renderEfficiencyTabFast();
-    restoreMonthlyCompareCache();
 
     cloudStatus('使用本機資料',false);
     if(showMessage){
@@ -10894,7 +10902,7 @@ function saveMonthlyCompareCache(fileName=''){
   }
 }
 
-function restoreMonthlyCompareCache(){
+function restoreMonthlyCompareCache(deferRender=false){
   try{
     const raw=localStorage.getItem(MONTHLY_COMPARE_CACHE_KEY);
     const arr=raw?JSON.parse(raw):[];
@@ -10912,6 +10920,10 @@ function restoreMonthlyCompareCache(){
       sel.value=cachedMonth;
     }
 
+    if(deferRender){
+      monthlyCompareMap=new Map();monthlyCompareStatusMap=new Map();monthlyCompareRows=[];
+      return;
+    }
     if(monthlyActualRows.length && sel?.value){
       rebuildMonthlyComparison();
       renderDashboard();
@@ -13369,12 +13381,10 @@ async function initGcPage(){
   if(psm)psm.value=document.getElementById('filterMonth')?.value||'';
   repairBundleRecordsFromRemarks();
   invalidateWorkloadIndex();
-  renderEfficiencyTabFast('dashboard');
-  restoreMonthlyCompareCache();
-  restorePersonalAuditCache();
+  restoreMonthlyCompareCache(true);
+  restorePersonalAuditCache(true);
   restoreDualAuditWorkingCache();
-  if(personalAuditReference&&dualAuditWorkingReference)buildDualSourceSystemAudit();
-  renderDualSourceSystemAudit();
+  renderEfficiencyTabFast('dashboard');
 
   // 啟動後立即從 GAS 找回完整船舶主檔 / 作業明細。
   // 不論本機 localStorage 是否因換版本、換路徑而空掉，都能自動恢復。
@@ -13395,19 +13405,7 @@ async function initGcPage(){
     }
 
     if(restored){
-      renderVesselSummary();
-      renderEfficiencyTabFast();
-      if(monthlyActualRows?.length && document.getElementById('monthlyCompareMonth')?.value){
-        rebuildMonthlyComparison();
-      }
-      if(personalAuditReference){
-        buildPersonalEfficiencyAudit();
-        renderPersonalEfficiencyAudit();
-      }
-      if(personalAuditReference&&dualAuditWorkingReference){
-        buildDualSourceSystemAudit();
-        renderDualSourceSystemAudit();
-      }
+      // restoreVesselDataFromCloud 已刷新目前頁籤，版本相同時則沿用首次顯示。
       cloudStatus(`已自動拉取最新資料｜主檔 ${(shipMasters||[]).length}｜明細 ${(records||[]).length}`);
     }else{
       cloudStatus('雲端暫時無法讀取｜先使用本機資料，背景會自動重試',false);
