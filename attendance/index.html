@@ -4969,9 +4969,9 @@ const now = new Date();
         let attendanceDeltaPollBusy = false;
         let attendanceDeltaIdleRounds = 0;
         let attendanceDeltaResetBusy = false;
-        const ATTENDANCE_DELTA_ACTIVE_MS = 1800;
-        const ATTENDANCE_DELTA_IDLE_MS = 5500;
-        const ATTENDANCE_DELTA_HIDDEN_MS = 30000;
+        const ATTENDANCE_DELTA_ACTIVE_MS = 30000;
+        const ATTENDANCE_DELTA_IDLE_MS = 60000;
+        const ATTENDANCE_DELTA_HIDDEN_MS = 120000;
         window.p79AttendanceDeltaEnabled = true;
 
         function adoptAttendanceDeltaCursor(payload) {
@@ -6418,7 +6418,7 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
         let p79CurrentMonthReconcileBusy = false;
         let p79CurrentMonthReconcileTimer = null;
         let p79CurrentMonthReconcileLastAt = 0;
-        const P79_CURRENT_MONTH_RECONCILE_MS = 30000;
+        const P79_CURRENT_MONTH_RECONCILE_MS = 60 * 60 * 1000;
 
         async function p79ReconcileCurrentAttendanceMonth(options = {}) {
             if (p79CurrentMonthReconcileBusy) return false;
@@ -6522,7 +6522,7 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                 p79ReconcileCurrentAttendanceMonth({ force: true });
             }, 1800);
 
-            // Delta 持續負責即時；每 30 秒只對目前月份做一次安全核對。
+            // 每 60 分鐘核對目前月份；即時資料由寫入通道處理。
             p79CurrentMonthReconcileTimer = setInterval(() => {
                 if (document.visibilityState !== 'visible') return;
                 p79ReconcileCurrentAttendanceMonth({ force: false });
@@ -21725,8 +21725,8 @@ window.p79AttendanceRecordCounts = function(){
     lastSourceCounts:{},
     reconcileTimer:null,
     startupDone:false,
-    minBackgroundGapMs:15000,
-    reconcileMs:30000
+    minBackgroundGapMs:60 * 60 * 1000,
+    reconcileMs:60 * 60 * 1000
   };
 
   function monthNow(){
@@ -22110,11 +22110,11 @@ window.p79AttendanceRecordCounts = function(){
     return true;
   }; window.p79HandleAttendanceCloudRevision=handleAttendanceRevisionFromCloudStatus;}catch(e){}
 
-  // 原本 30 秒補漏改成 60 秒單一管線；不再啟動另一套資料邏輯。
+  // 完整月份自動補漏改為每 60 分鐘；不再啟動高頻整月拉取。
   try{p79StartCurrentMonthAttendanceReconcile=function(){
     try{clearInterval(p79CurrentMonthReconcileTimer);}catch(e){}
     try{if(V2.reconcileTimer)clearInterval(V2.reconcileTimer);}catch(e){}
-    setTimeout(()=>reconcile({force:true}),2200);
+    // 開頁由既有啟動流程處理；避免額外再拉取一次。
     V2.reconcileTimer=setInterval(()=>{
       if(document.visibilityState==='visible')reconcile({force:false});
     },V2.reconcileMs);
@@ -22149,7 +22149,7 @@ window.p79AttendanceRecordCounts = function(){
       deltaActiveMs:1800,
       deltaIdleMs:4000,
       fullReconcileMs:30000,
-      minBackgroundGapMs:15000,
+      minBackgroundGapMs:60 * 60 * 1000,
       mutationPersist:'idle/debounced',
       mutationRender:'single-RAF/no-cloud-success-rerender',
       records:Array.isArray(records)?records.length:0,
@@ -22287,8 +22287,8 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 const OUTBOX_KEY='port79_attendance_v5_outbox';
 const STATE_KEY='port79_attendance_v5_state';
-const ACTIVE_MS=1800;
-const IDLE_MS=4000;
+const ACTIVE_MS=30000;
+const IDLE_MS=60000;
 const MAX_BACKOFF=15000;
 // 刪除失敗不應每 15 秒重新佔用 GAS；保留資料並採漸進退避（5分鐘至1小時）。
 function p79AttendanceRetryDelay(payload, attempts) {
