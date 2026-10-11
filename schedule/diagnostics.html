@@ -44,9 +44,10 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
   <h2>測試結果</h2>
   <div id="tests">
     <div class="test"><div><div class="testname">① GAS 基本連線</div><div class="details">ping：確認 Web App 能回應 JSON</div></div><span id="status-ping" class="status idle">尚未測試</span></div>
-    <div class="test"><div><div class="testname">② 排班編輯鎖查詢</div><div class="details">scheduleGetEditLock：確認是否讀得到鎖、是否仍屬於目前分頁</div></div><span id="status-lock" class="status idle">尚未測試</span></div>
-    <div class="test"><div><div class="testname">③ 排班雲端版本查詢</div><div class="details">getScheduleSyncMeta：不讀整張表，檢查後端回應時間</div></div><span id="status-meta" class="status idle">尚未測試</span></div>
-    <div class="test"><div><div class="testname">④ 完整班表讀取（選用）</div><div class="details">getScheduleDataSecure：比較是否只有大型資料讀取特別慢</div></div><span id="status-full" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">② GAS 正在執行的工作</div><div class="details">getCloudActivity：查看目前是否有其他系統的讀取／寫入工作</div></div><span id="status-activity" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">③ 排班編輯鎖查詢</div><div class="details">scheduleGetEditLock：確認是否讀得到鎖、是否仍屬於目前分頁</div></div><span id="status-lock" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">④ 排班雲端版本查詢</div><div class="details">getScheduleSyncMeta：不讀整張表，檢查後端回應時間</div></div><span id="status-meta" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">⑤ 完整班表讀取（選用）</div><div class="details">getScheduleDataSecure：比較是否只有大型資料讀取特別慢</div></div><span id="status-full" class="status idle">尚未測試</span></div>
   </div>
 </div>
 <div class="panel">
@@ -60,7 +61,7 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
 (function(){
 "use strict";
 const GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
-const fields={ping:"GAS 基本連線",lock:"排班編輯鎖查詢",meta:"排班雲端版本查詢",full:"完整班表讀取"};
+const fields={ping:"GAS 基本連線",activity:"GAS 工作狀態",lock:"排班編輯鎖查詢",meta:"排班雲端版本查詢",full:"完整班表讀取"};
 const state={date:"",results:[],apiVersion:""};
 const byId=id=>document.getElementById(id);
 const keynames=["port79_gc_superadmin_token","port79_admin_token","port79_gc_token"];
@@ -105,7 +106,7 @@ function saveReport(){
 }
 async function probe(key,action,auth,timeoutMs){
  const label=fields[key];
- if(action!=="ping"&&!auth.token){
+ if(action!=="ping"&&action!=="getCloudActivity"&&!auth.token){
    setStatus(key,"未登入，略過","slow");
    state.results.push({label,result:"略過",ms:0,detail:"缺少本分頁登入資訊"});saveReport();return;
  }
@@ -121,7 +122,7 @@ async function probe(key,action,auth,timeoutMs){
    const u=new URL(GAS_URL);
    u.searchParams.set("action",action);
    u.searchParams.set("_",Date.now().toString());
-   if(action!=="ping")u.searchParams.set("gcToken",auth.token);
+   if(action!=="ping"&&action!=="getCloudActivity")u.searchParams.set("gcToken",auth.token);
    if(key==="lock")u.searchParams.set("scheduleClientId",auth.clientId);
    const response=await fetch(u.toString(),{method:"GET",cache:"no-store",redirect:"follow",signal:controller.signal});
    const raw=await response.text();
@@ -132,6 +133,12 @@ async function probe(key,action,auth,timeoutMs){
    let detail="回應成功";
    if(key==="ping"&&data.version)state.apiVersion=String(data.version).slice(0,40);
    if(key==="meta"&&data.apiVersion)state.apiVersion=String(data.apiVersion).slice(0,40);
+   if(key==="activity"){
+     const active=Number(data.activeCount||0);
+     const systems=data.systems||{};
+     let writes=0;for(const item of Object.values(systems))writes+=Number(item?.writeCount||0);
+     detail="目前回報 "+active+" 項短工作，其中寫入 "+writes+" 項（不代表 ScriptLock 一定空閒）";
+   }
    if(key==="lock")detail=data.mine?"目前分頁持有編輯權":data.locked?"有編輯者，但不是此分頁":"目前沒有編輯者";
    if(key==="full")detail="完整資料已讀取（未顯示班表內容）";
    const level=ms>8000?"slow":"ok";
@@ -154,11 +161,12 @@ function toggleBusy(value){busy=value;byId("run").disabled=value;byId("full").di
 async function runQuick(){
  if(busy)return;
  toggleBusy(true);state.date=new Date().toLocaleString("zh-TW");state.results=[];state.apiVersion="";
- for(const key of ["ping","lock","meta"])setStatus(key,"等待測試","idle");
+ for(const key of ["ping","activity","lock","meta"])setStatus(key,"等待測試","idle");
  saveReport();
  const auth=updateSessionInfo();
  try{
   await probe("ping","ping",auth,12000);
+  await probe("activity","getCloudActivity",auth,12000);
   await probe("lock","scheduleGetEditLock",auth,12000);
   await probe("meta","getScheduleSyncMeta",auth,12000);
  }finally{toggleBusy(false)}
