@@ -1214,7 +1214,10 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     function isScheduleSuperAdmin() {
-      return String(currentScheduleSession()?.adminRole || sessionStorage.getItem('aqc_admin_role') || '').toLowerCase() === 'superadmin';
+      let main={};try{main=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')||{}}catch(e){}
+      const session=currentScheduleSession();
+      return [main.adminRole,main.role,session.adminRole,session.role,sessionStorage.getItem('aqc_admin_role')]
+        .some(v=>String(v||'').trim().toLowerCase()==='superadmin');
     }
 
     function scheduleCanEditNow() {
@@ -1493,6 +1496,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         const data = await scheduleLockPost('scheduleForceAcquireEditLock');
         scheduleLockLastError = '';
         setScheduleEditLockState(data);
+        if(!scheduleEditLockState.mine)throw new Error(data?.error||'雲端尚未確認編輯權接管成功');
         await loadScheduleCloudWithRetry('manual', 2);
         renderTodaySchedulePanel();
         alert(`✅ 已踢除 ${previous}，目前排班編輯權已由你接管。`);
@@ -1500,6 +1504,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         alert('❌ 踢除／接管失敗：\n' + (e?.message || e));
       }
     }
+
+    window.p79ForceTakeoverScheduleEditLock=forceTakeoverScheduleEditLock;
 
     async function refreshOrAcquireScheduleEditLock() {
       // v9.1：避免定時心跳、手動重新整理、focus/online 同時進來造成重複請求與重繪。
