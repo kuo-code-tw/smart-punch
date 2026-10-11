@@ -1181,11 +1181,11 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
     }
 
     const SCHEDULE_LOCK_HEARTBEAT_MS = 20000; // 自己持有鎖：30秒續租
-    const SCHEDULE_LOCK_WATCH_OTHER_MS = 4000; // 別人編輯中：1秒確認是否已離開
-    const SCHEDULE_LOCK_FREE_POLL_MS = 4000; // 無人鎖定：4秒低頻確認
+    const SCHEDULE_LOCK_WATCH_OTHER_MS = 2000; // 別人編輯中：1秒確認是否已離開
+    const SCHEDULE_LOCK_FREE_POLL_MS = 2000; // 無人鎖定：4秒低頻確認
     const SCHEDULE_LOCK_HIDDEN_POLL_MS = 30000;
     const SCHEDULE_LOCK_FETCH_TIMEOUT_MS = 5000;
-    const SCHEDULE_LOCK_ACQUIRE_TIMEOUT_MS = 15000;
+    const SCHEDULE_LOCK_ACQUIRE_TIMEOUT_MS = 8000;
     const SCHEDULE_LOCK_BACKGROUND_TIMEOUT_MS = 5000;
     const SCHEDULE_LOCK_INITIAL_RETRIES = 0;
     let scheduleEditLockTimer = null;
@@ -1591,19 +1591,8 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
         scheduleLockLastError='';
         updateScheduleLockBadge();
 
-        // V10.28：使用者按下「鎖定編輯」時，先直接向雲端確認一次。
-        // 不相信畫面上可能還殘留上一位編輯者的舊狀態。
-        if (scheduleEditLockState.locked) {
-          try {
-            const fresh = await scheduleLockGet();
-            setScheduleEditLockState(fresh);
-          } catch (verifyErr) {
-            console.debug('鎖定前即時確認暫時失敗，仍直接嘗試取得鎖：', verifyErr);
-          }
-        }
-
-        if (scheduleEditLockState.mine) return true;
-
+        // 點擊直接由 GAS 原子取得編輯鎖，回傳持有人就是最新結果；
+        // 不額外 GET 一次，以免慢網路下兩個請求串行等待。
         const data = await scheduleLockPost('scheduleAcquireEditLock');
         scheduleLockLastError='';scheduleLockFailureCount=0;scheduleLockFirstFailureAt=0;
         setScheduleEditLockState(data);
