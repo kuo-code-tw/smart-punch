@@ -1881,9 +1881,14 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 選擇員工姓名</label>
-                    <select id="addModalEmpSelect" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold">
+                    <select id="addModalEmpSelect" onchange="p79AddModalEmployeeChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold">
                     </select>
                 </div>
+            </div>
+
+            <div class="mt-2">
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 選擇職務</label>
+                <select id="addModalJobSelect" onchange="p79AddModalJobChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -15679,34 +15684,38 @@ function getManualPairRecordAnchor(record) {
         }
 
 
-        function initAddModalDropdownsFast(preferredEmployee = null) {
-            const deptSelect = document.getElementById('addModalDeptSelect');
-            const empSelect = document.getElementById('addModalEmpSelect');
-            if (!deptSelect || !empSelect) return;
-
+        const p79AddStrokeSorter = new Intl.Collator('zh-Hant-TW-u-co-stroke', {numeric:true});
+        function p79AddJob(e){return String(e?.jobTitle||e?.deptDetail||'').trim()||'未設定職務';}
+        function p79AddEmployeesSorted(list){return list.slice().sort((a,b)=>p79AddStrokeSorter.compare(String(a?.name||''),String(b?.name||''))||String(a?.empId||'').localeCompare(String(b?.empId||'')));}
+        function p79AddRefreshEmployeeOptions(preferred=''){
+            const dept=document.getElementById('addModalDeptSelect')?.value||'';
+            const job=document.getElementById('addModalJobSelect')?.value||'';
+            const select=document.getElementById('addModalEmpSelect');if(!select)return;
+            const previous=preferred||select.value;
+            const list=p79AddEmployeesSorted(getAdminAttendanceEmployees().filter(e=>String(e?.dept||'一般')===dept&&(!job||p79AddJob(e)===job)));
+            select.innerHTML=list.map(e=>{const id=attendanceEmployeeOptionValue(e);return id?'<option value="'+escapeHtml(id)+'">'+escapeHtml(attendanceEmployeeDisplayLabel(e))+'</option>':'';}).join('');
+            if(previous&&list.some(e=>attendanceEmployeeOptionValue(e)===previous))select.value=previous;
+        }
+        function p79AddRefreshJobs(preferred=''){
+            const dept=document.getElementById('addModalDeptSelect')?.value||'';
+            const select=document.getElementById('addModalJobSelect');if(!select)return;
+            const current=preferred||select.value;
+            const jobs=[...new Set(getAdminAttendanceEmployees().filter(e=>String(e?.dept||'一般')===dept).map(p79AddJob))].sort(p79AddStrokeSorter.compare);
+            select.innerHTML='<option value="">全部職務</option>'+jobs.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+            if(jobs.includes(current))select.value=current;
+        }
+        function p79AddModalJobChanged(){p79AddRefreshEmployeeOptions();}
+        function p79AddModalEmployeeChanged(){}
+        function initAddModalDropdownsFast(preferredEmployee=null){
+            const select=document.getElementById('addModalDeptSelect');if(!select)return;
             repairAttendanceNamesInMemory();
-            const visible = sortEmployeesById(getAdminAttendanceEmployees());
-            const depts = Array.from(new Set(
-                visible.map(e => String(e?.dept || '一般').trim() || '一般')
-            )).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
-
-            const preferredDept = String(preferredEmployee?.dept || deptSelect.value || depts[0] || '一般');
-            deptSelect.innerHTML = depts.map(d =>
-                `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`
-            ).join('');
-            if (depts.includes(preferredDept)) deptSelect.value = preferredDept;
-
-            const selectedDept = deptSelect.value || preferredDept;
-            const filtered = visible.filter(e => String(e?.dept || '一般') === selectedDept);
-            empSelect.innerHTML = filtered.map(e => {
-                const value = attendanceEmployeeOptionValue(e);
-                return value ? `<option value="${escapeHtml(value)}">${escapeHtml(attendanceEmployeeDisplayLabel(e))}</option>` : '';
-            }).join('');
-
-            const preferredId = attendanceEmployeeOptionValue(preferredEmployee);
-            if (preferredId && filtered.some(e => attendanceEmployeeOptionValue(e) === preferredId)) {
-                empSelect.value = preferredId;
-            }
+            const list=getAdminAttendanceEmployees();
+            const depts=[...new Set(list.map(e=>String(e?.dept||'一般').trim()||'一般'))].sort(p79AddStrokeSorter.compare);
+            const desired=String(preferredEmployee?.dept||select.value||depts[0]||'一般');
+            select.innerHTML=depts.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+            if(depts.includes(desired))select.value=desired;
+            p79AddRefreshJobs(preferredEmployee?p79AddJob(preferredEmployee):'');
+            p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(preferredEmployee));
         }
 
         function p79ResolveManualPairTargetExact(targetId, targetTimeStr, expectedType, rowAttNo, rowName, dateKey) {
@@ -15979,24 +15988,7 @@ function getManualPairRecordAnchor(record) {
             pendingManualPairTargetName = '';
         }
 
-        function onAddModalDeptChange() {
-            const deptSelect = document.getElementById('addModalDeptSelect');
-            const empSelect = document.getElementById('addModalEmpSelect');
-            if (!deptSelect || !empSelect) return;
-            const previous = empSelect.value;
-            const dept = deptSelect.value;
-
-            const filtered = sortEmployeesById(
-                getAdminAttendanceEmployees().filter(e => (e.dept || '一般') === dept)
-            );
-            empSelect.innerHTML = filtered.map(e => {
-                const value = attendanceEmployeeOptionValue(e);
-                return value ? `<option value="${escapeHtml(value)}">${escapeHtml(attendanceEmployeeDisplayLabel(e))}</option>` : '';
-            }).join('');
-            if (previous && filtered.some(e => attendanceEmployeeOptionValue(e) === previous)) {
-                empSelect.value = previous;
-            }
-        }
+        function onAddModalDeptChange(){p79AddRefreshJobs();p79AddRefreshEmployeeOptions();}
 
         function selectAddModalStatus(status) {
             document.getElementById('addModalStatusInput').value = status;
