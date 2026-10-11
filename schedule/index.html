@@ -1849,7 +1849,11 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         const me = currentScheduleSession();
         const who = String(me.name || scheduleEditLockState.ownerName || me.empId || '目前帳號');
         el.className = 'px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-xs font-black text-emerald-700 dark:text-emerald-300';
-        el.innerHTML = `<i class="fa-solid fa-pen-to-square mr-1"></i> ${scheduleEscapeHtml(who)} 正在編輯｜其他人已禁止修改`;
+        const lastVerified=Number(scheduleEditLockState.lastCheckedAt||0);
+        const checkedText=lastVerified
+          ? new Date(lastVerified).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+          : '未確認';
+        el.innerHTML = `<i class="fa-solid fa-pen-to-square mr-1"></i> ${scheduleEscapeHtml(who)} 正在編輯（雲端上次確認 ${checkedText}）`;
       } else if (scheduleEditLockState.locked) {
         el.className = 'px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-xs font-black text-rose-700 dark:text-rose-300 flex items-center gap-2 flex-wrap';
         const kick = isScheduleSuperAdmin()
@@ -4963,6 +4967,17 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       flushScheduleLocalPersist();
 
       const saveVersion = p79ScheduleLocalMutationVersion;
+      // If autosave is already writing this same or a newer snapshot, wait once.
+      // Only skip the manual POST if cloud success and no local edits remain pending.
+      if (port79ScheduleWriteInFlight) {
+        const previousOk=await port79ScheduleWriteInFlight.catch(()=>false);
+        if (previousOk && !port79ScheduleDirty &&
+            p79ScheduleLocalMutationVersion === saveVersion &&
+            !personnelSaveTimer) {
+          alert('✅ 儲存完畢：背景自動儲存已完成，沒有需要重複寫入的班表修改。');
+          return;
+        }
+      }
       const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false));
 
       if (ok) {
@@ -4974,9 +4989,14 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           queueScheduleCloudSave();
         }
 
-        // 不重新拉雲端、不重建預設班表；保持使用者剛儲存的畫面。
+        // Do not claim the *latest* edits have been saved if another mutation
+        // was made after the payload snapshot was captured.
         try { renderTodaySchedulePanel(); } catch (e) {}
-        alert(`✅ 儲存完畢\n\n【${tabName}】目前月份班表已成功儲存至 Google 雲端。`);
+        if (port79ScheduleDirty) {
+          alert('⚠️ 前一筆班表已寫入，但仍有較新的修改等待同步；請保持本頁開啟。');
+        } else {
+          alert(`✅ 儲存完畢\n\n【${tabName}】目前月份班表已成功儲存至 Google 雲端。`);
+        }
       } else {
         port79ScheduleDirty = true;
         alert('❌ 排班雲端儲存失敗：\n' + (lastScheduleCloudError || '雲端沒有回傳詳細錯誤，請確認 Apps Script 已部署最新版。'));
