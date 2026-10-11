@@ -2251,7 +2251,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.11.31';
+        const APP_VERSION='2026.10.12.34';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14420,11 +14420,36 @@ function getManualPairRecordAnchor(record) {
             document.body.appendChild(modal);
         }
 
+        function p79DuplicateRequestError(error) {
+            const text=String(error?.message||error||'雲端尚未確認');
+            return /aborted|aborterror|逾時/i.test(text)
+                ? '刪除請求逾時或中止，結果尚未確認；不自動重送' : text;
+        }
+        // 此端點只能證明讀取時仍存在；找不到 ID 不等於已確認刪除。
+        async function p79ReadDuplicateDeleteStatus(id) {
+            const token=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
+            const base=getActiveGasUrl();
+            if(!token||!base)return '無法核對，請重新讀取雲端考勤';
+            const controller=new AbortController();
+            const timer=setTimeout(()=>controller.abort(),12000);
+            try {
+                const response=await fetch(base+(base.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token),{cache:'no-store',signal:controller.signal});
+                if(!response.ok)throw new Error('HTTP '+response.status);
+                const data=await response.json();
+                if(!data?.ok||!data.found||typeof data.found!=='object')throw new Error('核對回覆不完整');
+                const found=data.found[String(id)];
+                return found&&String(found.id)===String(id)
+                    ? '只讀核對：此 ID 仍存在，已暫停剩餘刪除'
+                    : '只讀核對：未找到此 ID，仍不能確認刪除完成；請重新讀取核對';
+            }catch(error){return '雲端核對未完成，剩餘刪除已暫停';}
+            finally{clearTimeout(timer);}
+        }
+
         // 批次安全整理：專用雲端直送，不經 postToCloud 的自動佇列，避免逾時後在背景偷偷重送刪除。
         // 只有獲得 GAS 明確 ACK 才修改本地資料；結果不明立即停下核對。
         let p79BatchDuplicateBusy = false;
         // 工作執行期間不佔用考勤清單或其他管理介面。
-        // 重複考勤批次只在雲端確認後更新本地，連續失敗就停止新請求。
+        // 重複考勤批次只在雲端確認後更新本地，任何未確認回覆立即停止新請求。
         let p79BatchDuplicateProgressHidden = false;
         let p79BatchDuplicateProgressHideTimer = null;
         function p79ShowBatchDuplicateProgress(info) {
@@ -14461,7 +14486,7 @@ function getManualPairRecordAnchor(record) {
                 p79BatchDuplicateProgressHidden=true;
                 el.remove();
             });
-            if(finished && p79BatchDuplicateProgressHideTimer===null) {
+            if(finished && !failed && p79BatchDuplicateProgressHideTimer===null) {
                 p79BatchDuplicateProgressHideTimer=setTimeout(()=>{
                     document.getElementById('p79BatchDuplicateProgress')?.remove();
                     p79BatchDuplicateProgressHideTimer=null;
@@ -14552,7 +14577,7 @@ function getManualPairRecordAnchor(record) {
                 showToast('沒有可安全清理的紀錄；若之前失敗，請先核對雲端待同步佇列','warning');
                 return false;
             }
-            if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 Excel 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n雲端連續失敗將暫停，以免整批卡住。'))return false;
+            if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 Excel 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n任何未確認回覆會立即暫停並只讀核對，不會自動重送刪除。'))return false;
             p79BatchDuplicateBusy=true;
             p79BatchDuplicateProgressHidden=false;
             if(p79BatchDuplicateProgressHideTimer!==null) {
@@ -14562,12 +14587,12 @@ function getManualPairRecordAnchor(record) {
             p79CloseDuplicateReview();
             const stats={done:0,total:tasks.length,removed:0,converted:0,failed:0,finished:false,aborted:false,lastError:''};
             p79ShowBatchDuplicateProgress(stats);
-            let nextIndex=0, remoteFailures=0;
+            let nextIndex=0;
             const markError=(reason,server)=>{
                 stats.failed++;
                 const msg=String(reason||'雲端尚未確認').trim();
                 if(!stats.lastError)stats.lastError=msg;
-                if(server && ++remoteFailures>=2)stats.aborted=true;
+                if(server)stats.aborted=true;
             };
             const worker=async()=>{
                 while(!stats.aborted&&nextIndex<tasks.length) {
@@ -14581,17 +14606,17 @@ function getManualPairRecordAnchor(record) {
                             continue;
                         }
                         if(task.mode==='delete') {
-                            const result=await sendCloudPayload({action:'deleteRecord',id});
+                            const result=await performCloudRequest({action:'deleteRecord',id},60000);
                             if(result?.ok&&!result?.queued) {
                                 if(p79ApplyConfirmedAttendanceDelete(id,{skipRender:true})) {
                                     stats.removed++;
-                                    remoteFailures=0;
+
                                 } else markError('雲端已確認刪除，但本機更新失敗，請重新整理核對',false);
                             }else markError('ID '+id+'：'+String(result?.error||'雲端沒有回傳刪除成功確認')+'；不自動重送，請先核對',true);
                         }else {
                             const original=matches[0];
                             const updated={...original,source:'system-confirmed',importConfirmedAt:new Date().toISOString(),importConfirmedFrom:String(original.importFile||'')};
-                            const result=await sendCloudPayload({action:'updateRecord',record:updated,originalTimeStr:original.timeStr,originalPunchType:original.status});
+                            const result=await performCloudRequest({action:'updateRecord',record:updated,originalTimeStr:original.timeStr,originalPunchType:original.status},60000);
                             if(result?.ok&&!result?.queued) {
                                 Object.assign(original,updated);
                                 archiveAttendanceRecords([original]);
@@ -14611,11 +14636,15 @@ function getManualPairRecordAnchor(record) {
             };
             try {
                 await worker();
+                if(stats.aborted && nextIndex>0) {
+                    const id=tasks[nextIndex-1].id;
+                    stats.lastError=p79DuplicateRequestError(stats.lastError)+'；'+await p79ReadDuplicateDeleteStatus(id);
+                }
                 stats.finished=true;
                 p79ShowBatchDuplicateProgress(stats);
                 try{renderAdminRecordsTable();}catch(e){console.warn('整理結束後刷新失敗',e);}
                 if(stats.aborted) {
-                    showToast('雲端連續失敗，已停止批次；已嘗試 '+stats.done+'/'+stats.total+' 筆。原因：'+stats.lastError,'warning');
+                    showToast('雲端未確認，已立即停止批次；已嘗試 '+stats.done+'/'+stats.total+' 筆。原因：'+stats.lastError,'warning');
                 }else {
                     showToast('重複考勤：已刪 '+stats.removed+' 筆、Excel轉系統 '+stats.converted+' 筆、未完成 '+stats.failed+' 筆',stats.failed?'warning':'success');
                 }
