@@ -14909,7 +14909,11 @@ function getManualPairRecordAnchor(record) {
                 const manualIdentity = encodeURIComponent(String(row.attNo || row.name || row.empId || ''));
                 const manualAttNo = encodeURIComponent(String(row.attNo ?? ''));
                 const manualName = encodeURIComponent(String(row.name || ''));
-                const manualDate = encodeURIComponent(String(row.dateKey || ''));
+                // 補卡預設日期以畫面本列實際已打卡事件為準，不使用可能從舊班次沿用的 row.dateKey。
+                // 缺下班以現有上班日為準；缺上班以現有下班日為準；跨日仍可在視窗手動改日期。
+                const manualAnchorTime = row.clockIn?.timeStr || row.clockOut?.timeStr || '';
+                const manualAnchorDate = String(getAttendanceDateKey(manualAnchorTime) || '').trim();
+                const manualDate = encodeURIComponent(manualAnchorDate || String(row.dateKey || ''));
                 const manualClockInId = encodeURIComponent(String(row.clockIn?.id ?? ''));
                 const manualClockOutId = encodeURIComponent(String(row.clockOut?.id ?? ''));
                 const manualClockInTime = encodeURIComponent(String(row.clockIn?.timeStr ?? ''));
@@ -15968,7 +15972,11 @@ function getManualPairRecordAnchor(record) {
                 return;
             }
 
-            const normalizedPairDate = normalizeImportedAttendanceTime(`${dateKey} 00:00`);
+            // 已核對到目標事件後，直接用事件本身的日期；沒有事件才使用傳入的班次日期。
+            const clickedEventDate = String(getAttendanceDateKey(targetTimeStr) || '').trim();
+            const initialDate = /^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(clickedEventDate)
+                ? clickedEventDate : dateKey;
+            const normalizedPairDate = normalizeImportedAttendanceTime(`${initialDate} 00:00`);
             const normalizedDateMatch = String(normalizedPairDate || '').match(/^(\d{4})\/(\d{2})\/(\d{2})/);
             if (normalizedDateMatch) {
                 document.getElementById('addModalDateInput').value =
