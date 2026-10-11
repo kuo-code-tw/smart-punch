@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>79號碼頭｜排班雲端連線診斷</title>
+<style>
+:root{font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;color:#172033;background:#f2f5fa}
+*{box-sizing:border-box}body{margin:0;padding:22px 14px}main{max-width:850px;margin:auto}
+h1{font-size:25px;margin:0 0 9px}h2{font-size:17px;margin:0 0 10px}
+p{line-height:1.65;color:#536174;margin:8px 0}
+small{color:#69778d}.panel{background:#fff;border:1px solid #dce4ee;border-radius:15px;padding:18px;margin:15px 0;box-shadow:0 3px 13px #2534510c}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:15px 0}
+button,a.action{border:0;background:#116bba;color:#fff;padding:11px 15px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
+button.secondary,a.action.secondary{background:#eef3f8;color:#34455c;border:1px solid #d9e1ed}
+button:disabled{opacity:.45;cursor:wait}
+.test{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #e8eef5;padding:14px 0}
+.test:first-child{border-top:none}
+.testname{font-weight:700;font-size:14px}.details{font-size:12px;color:#67768d;margin-top:4px}
+.status{font-size:13px;font-weight:800;white-space:nowrap}
+.ok{color:#087a5f}.slow{color:#a16207}.bad{color:#b42318}.idle{color:#64748b}
+.notice{background:#fff9eb;border:1px solid #fae0a3;padding:12px;border-radius:10px;color:#7f5515;font-size:13px;line-height:1.7}
+#report{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;background:#f8fafc;padding:12px;border-radius:9px;max-height:300px;overflow:auto}
+footer{color:#66758a;font-size:12px;padding:14px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>排班雲端連線診斷</h1>
+<p>一次測出 GAS 連線、排班編輯權讀取和排班版本查詢各花幾秒。全部使用 <b>GET 唯讀請求</b>，不會新增、重排、修改或儲存任何班別。</p>
+<div class="panel">
+  <h2>快速測試</h2>
+  <div class="actions">
+    <button id="run" type="button">開始快速診斷（約 5～30 秒）</button>
+    <button id="full" type="button" class="secondary">另外測試完整班表讀取</button>
+    <button id="copy" type="button" class="secondary">複製診斷結果</button>
+    <a class="action secondary" href="./">返回排班系統</a>
+  </div>
+  <p id="sessionInfo">正在檢查本分頁的登入狀態……</p>
+  <div class="notice">如果顯示「缺少登入資訊」，請先登入排班系統，從排班頁面的「連線診斷」按鈕開啟此頁。請勿在此輸入密碼，也不要分享登入 Token。</div>
+</div>
+<div class="panel">
+  <h2>測試結果</h2>
+  <div id="tests">
+    <div class="test"><div><div class="testname">① GAS 基本連線</div><div class="details">ping：確認 Web App 能回應 JSON</div></div><span id="status-ping" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">② 排班編輯鎖查詢</div><div class="details">scheduleGetEditLock：確認是否讀得到鎖、是否仍屬於目前分頁</div></div><span id="status-lock" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">③ 排班雲端版本查詢</div><div class="details">getScheduleSyncMeta：不讀整張表，檢查後端回應時間</div></div><span id="status-meta" class="status idle">尚未測試</span></div>
+    <div class="test"><div><div class="testname">④ 完整班表讀取（選用）</div><div class="details">getScheduleDataSecure：比較是否只有大型資料讀取特別慢</div></div><span id="status-full" class="status idle">尚未測試</span></div>
+  </div>
+</div>
+<div class="panel">
+<h2>可複製的診斷報告</h2>
+<p>只包含耗時、結果、API 版本及錯誤類型。<b>不包含登入 Token、員工名冊、班表或 GAS 網址。</b></p>
+<div id="report">尚未執行診斷</div>
+</div>
+<footer>本工具不執行 POST，因此不能證明正式「儲存排班」一定成功；它用來快速定位連線、身份驗證、編輯鎖讀取或大型資料讀取的瓶頸。</footer>
+</main>
+<script>
+(function(){
+"use strict";
+const GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
+const fields={ping:"GAS 基本連線",lock:"排班編輯鎖查詢",meta:"排班雲端版本查詢",full:"完整班表讀取"};
+const state={date:"",results:[],apiVersion:""};
+const byId=id=>document.getElementById(id);
+const keynames=["port79_gc_superadmin_token","port79_admin_token","port79_gc_token"];
+function authData(){
+  let token="",clientId="";
+  try {
+    // Opened from schedule page: inherit the same session and client identity.
+    const stores=[sessionStorage];
+    try{if(window.opener&&window.opener.location.origin===location.origin)stores.push(window.opener.sessionStorage)}catch(_){}
+    for(const store of stores){
+      if(!token)for(const key of keynames){const v=String(store.getItem(key)||"").trim();if(v){token=v;break}}
+      if(!clientId)clientId=String(store.getItem("port79_schedule_client_id")||"").trim();
+    }
+  }catch(_){}
+  return {token,clientId};
+}
+function updateSessionInfo(){
+  const auth=authData();
+  const status=auth.token
+    ? (auth.clientId?"已偵測到排班登入與目前編輯分頁識別碼，可檢查編輯鎖。":"已偵測到登入，但缺少排班分頁識別碼；先從排班頁的按鈕開啟診斷。")
+    : "沒有偵測到排班登入資訊；仍可測試 GAS 基本連線。";
+  byId("sessionInfo").textContent=status;
+  return auth;
+}
+function setStatus(key,text,level){
+  const el=byId("status-"+key);
+  el.textContent=text;
+  el.className="status "+level;
+}
+function errorCategory(message,status){
+  const msg=String(message||"");
+  if(status===401||status===403||/權限|token|session|登入|授權|permission|unauthor/i.test(msg))return "登入或權限問題";
+  if(/忙碌|正在處理|鎖|lock|retry|稍後/i.test(msg))return "雲端忙碌或編輯鎖問題";
+  if(/html|google/i.test(msg))return "GAS 回傳網頁而非 JSON";
+  return "GAS 回報失敗";
+}
+function saveReport(){
+ const lines=["排班雲端診斷｜只讀測試", "執行時間："+state.date,"API 版本："+(state.apiVersion||"尚未取得")];
+ for(const r of state.results)lines.push(r.label+"："+r.result+"｜"+r.ms+" ms｜"+r.detail);
+ lines.push("此診斷未進行排班寫入，不表示存檔成功。");
+ byId("report").textContent=lines.join("\n");
+}
+async function probe(key,action,auth,timeoutMs){
+ const label=fields[key];
+ if(action!=="ping"&&!auth.token){
+   setStatus(key,"未登入，略過","slow");
+   state.results.push({label,result:"略過",ms:0,detail:"缺少本分頁登入資訊"});saveReport();return;
+ }
+ if(key==="lock"&&!auth.clientId){
+   setStatus(key,"缺少編輯分頁識別碼","slow");
+   state.results.push({label,result:"略過",ms:0,detail:"請由排班頁開啟此診斷頁"});saveReport();return;
+ }
+ setStatus(key,"測試中…","idle");
+ const start=performance.now();
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{
+   const u=new URL(GAS_URL);
+   u.searchParams.set("action",action);
+   u.searchParams.set("_",Date.now().toString());
+   if(action!=="ping")u.searchParams.set("gcToken",auth.token);
+   if(key==="lock")u.searchParams.set("scheduleClientId",auth.clientId);
+   const response=await fetch(u.toString(),{method:"GET",cache:"no-store",redirect:"follow",signal:controller.signal});
+   const raw=await response.text();
+   let data;
+   try{data=JSON.parse(raw)}catch(_){throw new Error("INVALID_JSON")}
+   if(!response.ok||!data||data.ok!==true)throw new Error("BACKEND:"+errorCategory(data?.error||data?.message,response.status));
+   const ms=Math.round(performance.now()-start);
+   let detail="回應成功";
+   if(key==="ping"&&data.version)state.apiVersion=String(data.version).slice(0,40);
+   if(key==="meta"&&data.apiVersion)state.apiVersion=String(data.apiVersion).slice(0,40);
+   if(key==="lock")detail=data.mine?"目前分頁持有編輯權":data.locked?"有編輯者，但不是此分頁":"目前沒有編輯者";
+   if(key==="full")detail="完整資料已讀取（未顯示班表內容）";
+   const level=ms>8000?"slow":"ok";
+   const result=ms>8000?"回應很慢":"成功";
+   setStatus(key,result+" · "+ms+" ms",level);
+   state.results.push({label,result,ms,detail});
+ }catch(e){
+   const ms=Math.round(performance.now()-start);
+   const error=String(e?.message||"");
+   const detail=e?.name==="AbortError"?"連線逾時（超過 "+timeoutMs/1000+" 秒）":
+      error==="INVALID_JSON"?"不是 JSON：可能部署或網路導向異常":
+      error.startsWith("BACKEND:")?error.slice(8):
+      "網路、CORS 或連線異常";
+   setStatus(key,"失敗 · "+ms+" ms","bad");
+   state.results.push({label,result:"失敗",ms,detail});
+ }finally{clearTimeout(timer);saveReport();}
+}
+let busy=false;
+function toggleBusy(value){busy=value;byId("run").disabled=value;byId("full").disabled=value;}
+async function runQuick(){
+ if(busy)return;
+ toggleBusy(true);state.date=new Date().toLocaleString("zh-TW");state.results=[];state.apiVersion="";
+ for(const key of ["ping","lock","meta"])setStatus(key,"等待測試","idle");
+ saveReport();
+ const auth=updateSessionInfo();
+ try{
+  await probe("ping","ping",auth,12000);
+  await probe("lock","scheduleGetEditLock",auth,12000);
+  await probe("meta","getScheduleSyncMeta",auth,12000);
+ }finally{toggleBusy(false)}
+}
+async function runFull(){
+ if(busy)return;
+ toggleBusy(true);
+ if(!state.date)state.date=new Date().toLocaleString("zh-TW");
+ const auth=updateSessionInfo();
+ try{await probe("full","getScheduleDataSecure",auth,25000)}finally{toggleBusy(false)}
+}
+byId("run").addEventListener("click",runQuick);
+byId("full").addEventListener("click",runFull);
+byId("copy").addEventListener("click",async()=>{
+ const report=byId("report").textContent;
+ try{await navigator.clipboard.writeText(report);byId("copy").textContent="已複製診斷結果"}
+ catch(_){byId("copy").textContent="無法自動複製，請選取下方文字";}
+ setTimeout(()=>byId("copy").textContent="複製診斷結果",1800);
+});
+updateSessionInfo();
+})();
+</script>
+</body>
+</html>
