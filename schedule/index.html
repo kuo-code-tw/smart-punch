@@ -1117,6 +1117,19 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
 #app-main-container #p79RosterFixedHeader{isolation:isolate}
 #app-main-container #p79RosterFixedHeader .p79-person-header{position:relative!important;left:0!important;z-index:90!important;background:#e9eef5!important}
 </style>
+<style id="p79-roster-layout-final-20261011">
+#app-main-container .p79-month-schedule-table .p79-person-cell,#app-main-container .p79-month-schedule-table .p79-person-header{width:176px!important;min-width:176px!important;max-width:176px!important}
+#app-main-container .p79-person-cell{position:sticky!important;left:0!important;z-index:80!important;isolation:isolate!important}
+#app-main-container #p79RosterScroll .p79-person-cell{position:sticky!important;left:0!important;z-index:80!important;background:#fff!important}
+#app-main-container .p79-person-name-line{position:relative!important;display:flex!important;align-items:center!important;gap:4px!important;min-width:0!important;padding-right:34px!important}
+#app-main-container .p79-person-name{flex:0 1 auto!important;max-width:76px!important;font-size:15px!important}
+#app-main-container .p79-person-name-line>.p79-person-id{font-size:8px!important;flex:0 0 auto!important;letter-spacing:-.4px!important}
+#app-main-container .p79-person-subline{justify-content:flex-start!important;margin-top:4px!important;padding-right:34px!important}
+#app-main-container .p79-person-controls{margin-left:0!important;gap:4px!important}
+#app-main-container .p79-mini-select{max-width:57px!important;width:57px!important;font-size:11px!important;height:25px!important}
+#app-main-container .p79-person-cell .p79-drag-top{margin-left:auto!important;flex:0 0 30px!important;width:30px!important;height:45px!important;min-height:45px!important;position:absolute!important;right:1px!important;top:50%!important;transform:translateY(-50%)!important}
+#app-main-container #p79RosterFixedHeader .p79-person-header{z-index:90!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4444,8 +4457,8 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
                 <option value="喪" ${shownShift==='喪'?'selected':''}>喪</option>
                 <option value="離" ${!approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
-              <div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${leaveBadge}${metaBadge}${leaveCoverBadge}</div>
-              ${assignButton}
+              ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
+              ${coverHours ? '' : assignButton}
             </td>
           `;
         }
@@ -4458,14 +4471,13 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
             <td class="p79-person-cell sticky-col-left border-r bg-white">
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
-                  <span class="p79-person-name">${emp.name}</span>
+                  <span class="p79-person-name">${emp.name}</span><span class="p79-person-id">${emp.id}</span>
                   ${scheduleAttendanceActiveBadge(emp.id)}
                   ${lockBadge}
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
                 </div>
               </div>
               <div class="p79-person-subline">
-                <span class="p79-person-id">${emp.id}</span>
                 <div class="p79-person-controls">
                   <select onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="p79-mini-select p79-role-select" title="跨單位支援">
                     ${getRoleOptionsHtml(emp.role)}
