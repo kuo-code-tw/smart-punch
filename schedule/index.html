@@ -1207,9 +1207,25 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
  background:#f1f5f9;color:#1e293b;border:0;border-radius:9px;
  padding:9px 13px;cursor:pointer;font-weight:800;
 }
-.p79-schedule-diagnostic-panel iframe{
- width:100%;height:100%;border:0;flex:1;background:#f5f7fb;
-}
+.p79diag-content{padding:16px;overflow:auto;flex:1;background:#fff;color:#263347}
+.p79diag-content>p{font-size:13px;line-height:1.7;margin:7px 0 13px}
+.p79diag-session{border-radius:9px;background:#eff6ff;padding:10px 12px;font-size:13px!important}
+.p79diag-session[data-kind="bad"]{background:#fff1f2;color:#9f1239}
+.p79diag-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.p79diag-actions button{border:0;border-radius:9px;background:#1463ad;color:#fff;padding:9px 12px;font-weight:700;cursor:pointer}
+.p79diag-actions button:nth-child(2){background:#44546b}
+.p79diag-actions button:nth-child(3){background:#047857}
+.p79diag-actions button:disabled{opacity:.45;cursor:wait}
+.p79diag-results{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px}
+.p79diag-row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e2e8f0;padding:13px 11px;font-size:13px}
+.p79diag-row:last-child{border:0}
+.p79diag-row b{white-space:nowrap;color:#64748b;text-align:right}
+.p79diag-row b[data-kind="ok"]{color:#047857}
+.p79diag-row b[data-kind="slow"]{color:#a16207}
+.p79diag-row b[data-kind="bad"]{color:#b42318}
+.p79diag-content h3{margin:12px 0 5px;font-size:15px}
+#p79DiagReport{white-space:pre-wrap;word-break:break-word;background:#f1f5f9;border-radius:8px;padding:10px;font-size:12px;line-height:1.7}
+
 @media(max-width:680px){
  .p79-schedule-diagnostic-overlay{padding:0}
  .p79-schedule-diagnostic-panel{width:100%;height:100dvh;border-radius:0}
@@ -1485,8 +1501,157 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     let scheduleManualLockBusy = false;
     let scheduleEditLockState = { locked:false, mine:false, ownerName:'', ownerEmpId:'', expiresAt:0, startedAt:0, lastCheckedAt:0 };
 
-    // 診斷頁和排班頁共享相同的 top-level browsing context / sessionStorage。
-    // 不使用新分頁，也不將登入 Token 或 clientId 放進 URL。
+    // 內建診斷：不開新分頁、不使用 iframe，也不傳送或記錄登入 Token。
+    // 直接使用排班頁目前 GAS_URL / SSO Token / clientId 進行純 GET 唯讀查詢。
+    let p79ScheduleDiagBusy=false;
+    let p79ScheduleDiagResults=[];
+    let p79ScheduleDiagVersion='';
+    let p79ScheduleDiagV4=null;
+    const P79_DIAG_TESTS=[
+      {id:'ping',label:'① GAS 基本連線',action:'ping',timeout:12000},
+      {id:'activity',label:'② GAS 執行工作',action:'getCloudActivity',timeout:12000},
+      {id:'lock',label:'③ 排班編輯鎖',action:'scheduleGetEditLock',timeout:12000,requiresAuth:true},
+      {id:'meta',label:'④ 排班版本',action:'getScheduleSyncMeta',timeout:12000,requiresAuth:true},
+      {id:'full',label:'⑤ 完整班表讀取（選用）',action:'getScheduleDataSecure',timeout:25000,requiresAuth:true}
+    ];
+    function p79DiagSession(){
+      let token='';
+      try{token=currentPort79SsoToken()}catch(e){}
+      let clientId='';
+      try{clientId=getScheduleClientId()}catch(e){}
+      return {token,clientId,canManage:canManageSchedule(),localLock:!!scheduleEditLockState.mine};
+    }
+    function p79DiagStatus(testId,msg,kind=''){
+      const el=document.getElementById('p79DiagStatus-'+testId);
+      if(el){el.textContent=msg;el.dataset.kind=kind}
+    }
+    function p79DiagClassify(error,status){
+      const message=String(error||'').slice(0,300);
+      if(status===401||status===403||/Token|權限|登入|驗證|無效|過期|授權|session|permission/i.test(message))return '登入憑證過期或權限驗證失敗';
+      if(/月歸檔|救回|ID 無法核對|資料安全|資料核對/i.test(message))return '考勤歸檔安全檢查阻擋';
+      if(/雲端目前正在處理|忙碌|正在處理|編輯鎖|lock|重試/i.test(message))return '雲端忙碌或鎖定衝突';
+      if(/JSON|HTML|Google 網頁/i.test(message))return 'GAS 回應格式異常';
+      return 'GAS 回傳失敗';
+    }
+    function p79DiagReport(){
+      const version=p79ScheduleDiagVersion||'尚未取得';
+      const isolation=p79ScheduleDiagV4===true?'已確認 V4':p79ScheduleDiagV4===false?'線上版本未標記 V4':'尚未確認';
+      const lines=['排班診斷報告（僅 GET，不儲存資料）',
+        '時間：'+new Date().toLocaleString('zh-TW'),
+        'GAS 版本：'+version,'排班／考勤歸檔分離：'+isolation];
+      for(const r of p79ScheduleDiagResults)lines.push(r.label+'｜'+r.status+'｜'+r.ms+' ms｜'+r.detail);
+      lines.push('本報告不包含登入 Token、工號或完整班表；唯讀檢查不能證明寫入成功。');
+      const el=document.getElementById('p79DiagReport');
+      if(el)el.textContent=lines.join('\n');
+    }
+    function p79DiagUpdateSession(){
+      const s=p79DiagSession();
+      const el=document.getElementById('p79DiagSessionInfo');
+      if(el){
+        el.textContent=s.token
+          ? '本排班頁已有 SSO 登入憑證；本頁編輯分頁 ID：'+(s.clientId?'已建立':'不存在')+
+            '；目前本機編輯鎖：'+(s.localLock?'由本頁持有':'尚未確認持有')
+          : '本排班頁本身找不到 SSO 登入憑證（不是診斷頁讀取錯誤）。請先備份未儲存的班表，再檢查登入狀態。';
+        el.dataset.kind=s.token?'ok':'bad';
+      }
+      return s;
+    }
+    async function p79DiagProbe(test){
+      const auth=p79DiagSession();
+      if(test.requiresAuth&&!auth.token){
+        p79DiagStatus(test.id,'缺少本頁 SSO Token，略過','bad');
+        p79ScheduleDiagResults.push({label:test.label,status:'略過',ms:0,detail:'排班頁本身沒有登入憑證'});
+        p79DiagReport();return;
+      }
+      if(test.id==='lock'&&!auth.clientId){
+        p79DiagStatus(test.id,'缺少編輯分頁 ID','bad');
+        p79ScheduleDiagResults.push({label:test.label,status:'略過',ms:0,detail:'排班編輯分頁 ID 不存在'});
+        p79DiagReport();return;
+      }
+      p79DiagStatus(test.id,'測試中…');
+      const started=performance.now();
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),test.timeout);
+      try{
+        const url=new URL(GAS_URL);
+        url.searchParams.set('action',test.action);
+        url.searchParams.set('_',String(Date.now()));
+        if(test.requiresAuth)url.searchParams.set('gcToken',auth.token);
+        if(test.id==='lock')url.searchParams.set('scheduleClientId',auth.clientId);
+        if(test.id==='meta'||test.id==='full'){
+          const month=document.getElementById('month-picker')?.value||'';
+          if(month)url.searchParams.set('month',month);
+        }
+        const res=await fetch(url.toString(),{method:'GET',cache:'no-store',redirect:'follow',signal:controller.signal});
+        const raw=await res.text();
+        let data;
+        try{data=JSON.parse(raw)}catch(e){throw new Error('INVALID_JSON')}
+        if(!res.ok||data?.ok!==true)throw new Error('SERVER:'+p79DiagClassify(data?.error||data?.message,res.status));
+        const ms=Math.round(performance.now()-started);
+        let detail='回應成功';
+        if(test.id==='ping'){
+          p79ScheduleDiagVersion=String(data.version||'').slice(0,60);
+          p79ScheduleDiagV4=data.scheduleSaveRolloverIsolation===true;
+          detail=p79ScheduleDiagV4?'GAS V4 排班／考勤已分離':'線上版本未回報 V4 標記';
+        }
+        if(test.id==='activity'){
+          detail='GAS 回報工作狀態成功（不代表其他資料鎖未被占用）';
+        }
+        if(test.id==='lock'){
+          detail=data.mine?'雲端確認目前分頁持有編輯鎖':data.locked?'編輯鎖由其他分頁持有':'目前無人持有編輯鎖';
+        }
+        if(test.id==='meta'){
+          if(data.apiVersion)p79ScheduleDiagVersion=String(data.apiVersion).slice(0,60);
+          detail='排班版本讀取成功';
+        }
+        if(test.id==='full')detail='完整班表回應成功，內容未顯示';
+        const status=ms>8000?'回應偏慢':'成功';
+        p79DiagStatus(test.id,status+' · '+ms+' ms',ms>8000?'slow':'ok');
+        p79ScheduleDiagResults.push({label:test.label,status,ms,detail});
+      }catch(e){
+        const ms=Math.round(performance.now()-started);
+        const detail=e?.name==='AbortError'?'逾時超過 '+test.timeout/1000+' 秒':
+          e?.message==='INVALID_JSON'?'不是有效 JSON':
+          String(e?.message||'').startsWith('SERVER:')?String(e.message).slice(7):
+          '瀏覽器連線或 CORS 失敗';
+        p79DiagStatus(test.id,'失敗 · '+ms+' ms','bad');
+        p79ScheduleDiagResults.push({label:test.label,status:'失敗',ms,detail});
+      }finally{clearTimeout(timer);p79DiagReport();}
+    }
+    async function p79RunScheduleDiag(full=false){
+      if(p79ScheduleDiagBusy)return;
+      p79ScheduleDiagBusy=true;
+      for(const id of ['p79DiagQuickBtn','p79DiagFullBtn']){
+        const b=document.getElementById(id);
+        if(b)b.disabled=true;
+      }
+      p79DiagUpdateSession();
+      if(!full){
+        p79ScheduleDiagResults=[];p79ScheduleDiagVersion='';p79ScheduleDiagV4=null;
+        for(const t of P79_DIAG_TESTS)p79DiagStatus(t.id,t.id==='full'?'未測試':'等待測試');
+      }
+      p79DiagReport();
+      try{
+        const tests=full?P79_DIAG_TESTS.filter(t=>t.id==='full'):P79_DIAG_TESTS.filter(t=>t.id!=='full');
+        for(const t of tests)await p79DiagProbe(t);
+      }finally{
+        p79ScheduleDiagBusy=false;
+        for(const id of ['p79DiagQuickBtn','p79DiagFullBtn']){
+          const b=document.getElementById(id);
+          if(b)b.disabled=false;
+        }
+      }
+    }
+    async function p79CopyScheduleDiag(){
+      const txt=document.getElementById('p79DiagReport')?.textContent||'';
+      const button=document.getElementById('p79DiagCopyBtn');
+      try{
+        await navigator.clipboard.writeText(txt);
+        if(button)button.textContent='已複製，請貼給 ChatGPT';
+      }catch(e){
+        if(button)button.textContent='請手動選取下方報告複製';
+      }
+    }
     function openScheduleDiagnostics(){
       let overlay=document.getElementById('p79ScheduleDiagOverlay');
       if(!overlay){
@@ -1499,14 +1664,28 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         overlay.innerHTML=`
           <div class="p79-schedule-diagnostic-panel">
             <div class="p79-schedule-diagnostic-bar">
-              <strong><i class="fa-solid fa-stethoscope"></i> 排班雲端連線診斷（唯讀）</strong>
-              <button type="button" onclick="closeScheduleDiagnostics()" aria-label="關閉診斷視窗"><i class="fa-solid fa-xmark"></i> 返回排班</button>
+              <strong><i class="fa-solid fa-stethoscope"></i> 排班雲端連線診斷（本頁唯讀）</strong>
+              <button type="button" onclick="closeScheduleDiagnostics()" aria-label="關閉診斷視窗">返回班表 ✕</button>
             </div>
-            <iframe title="排班雲端診斷工具" src="diagnostics.html?v=20261011.3" referrerpolicy="no-referrer"></iframe>
+            <div class="p79diag-content">
+              <p>直接使用目前排班頁的登入憑證與 GAS 設定，不開分頁、不修改班表。</p>
+              <p id="p79DiagSessionInfo" class="p79diag-session"></p>
+              <div class="p79diag-actions">
+                <button id="p79DiagQuickBtn" type="button" onclick="p79RunScheduleDiag()">開始快速診斷</button>
+                <button id="p79DiagFullBtn" type="button" onclick="p79RunScheduleDiag(true)">加測完整班表讀取</button>
+                <button id="p79DiagCopyBtn" type="button" onclick="p79CopyScheduleDiag()">複製診斷報告</button>
+              </div>
+              <div class="p79diag-results">`+P79_DIAG_TESTS.map(t=>`<div class="p79diag-row"><span>${t.label}</span><b id="p79DiagStatus-${t.id}">尚未測試</b></div>`).join('')+`</div>
+              <h3>診斷報告（不包含登入憑證）</h3>
+              <pre id="p79DiagReport"></pre>
+              <p>所有測試均使用 GET 唯讀方式，不能確認正式存檔是否成功。</p>
+            </div>
           </div>`;
         document.body.appendChild(overlay);
       }
       overlay.style.display='flex';
+      p79DiagUpdateSession();
+      p79DiagReport();
     }
     function closeScheduleDiagnostics(){
       const overlay=document.getElementById('p79ScheduleDiagOverlay');
@@ -1514,25 +1693,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     }
     window.openScheduleDiagnostics=openScheduleDiagnostics;
     window.closeScheduleDiagnostics=closeScheduleDiagnostics;
-
-    // The diagnostic iframe requests the current tab's credentials via same-origin
-    // postMessage. Validate BOTH origin and the exact expected iframe source.
-    // Do not place credentials in URL, HTML attributes, reports or console output.
-    window.addEventListener('message',event=>{
-      if(event.origin!==location.origin || event.data?.type!=='PORT79_DIAG_AUTH_REQUEST')return;
-      const frame=document.querySelector('#p79ScheduleDiagOverlay iframe');
-      if(!frame || event.source!==frame.contentWindow)return;
-      const nonce=String(event.data?.nonce||'');
-      if(!/^[A-Za-z0-9_-]{8,100}$/.test(nonce))return;
-      try{
-        event.source.postMessage({
-          type:'PORT79_DIAG_AUTH_RESPONSE',
-          nonce,
-          token:currentPort79SsoToken(),
-          clientId:getScheduleClientId()
-        },location.origin);
-      }catch(e){console.warn('排班診斷無法與內嵌視窗交換登入狀態');}
-    });
+    window.p79RunScheduleDiag=p79RunScheduleDiag;
+    window.p79CopyScheduleDiag=p79CopyScheduleDiag;
 
     function getScheduleClientId() {
       let id = String(sessionStorage.getItem('port79_schedule_client_id') || '').trim();
