@@ -38,6 +38,7 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
     <a class="action secondary" href="./">返回排班系統</a>
   </div>
   <p id="sessionInfo">正在檢查本分頁的登入狀態……</p>
+  <p id="v4Status" style="font-weight:800;color:#64748b">GAS V4 排班／考勤分離狀態：尚未檢查</p>
   <div class="notice">如果顯示「缺少登入資訊」，請先登入排班系統，從排班頁面的「連線診斷」按鈕開啟此頁。請勿在此輸入密碼，也不要分享登入 Token。</div>
 </div>
 <div class="panel">
@@ -62,7 +63,7 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
 "use strict";
 const GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 const fields={ping:"GAS 基本連線",activity:"GAS 工作狀態",lock:"排班編輯鎖查詢",meta:"排班雲端版本查詢",full:"完整班表讀取"};
-const state={date:"",results:[],apiVersion:""};
+const state={date:"",results:[],apiVersion:"",v4:null};
 const byId=id=>document.getElementById(id);
 const keynames=["port79_gc_superadmin_token","port79_admin_token","port79_gc_token"];
 function authData(){
@@ -99,7 +100,7 @@ function errorCategory(message,status){
   return "GAS 回報失敗";
 }
 function saveReport(){
- const lines=["排班雲端診斷｜只讀測試", "執行時間："+state.date,"API 版本："+(state.apiVersion||"尚未取得")];
+ const lines=["排班雲端診斷｜只讀測試", "執行時間："+state.date,"API 版本："+(state.apiVersion||"尚未取得"),"GAS V4 排班／考勤歸檔分離："+(state.v4===true?"已確認部署":state.v4===false?"尚未部署（目前為舊版）":"未確認")];
  for(const r of state.results)lines.push(r.label+"："+r.result+"｜"+r.ms+" ms｜"+r.detail);
  lines.push("此診斷未進行排班寫入，不表示存檔成功。");
  byId("report").textContent=lines.join("\n");
@@ -131,7 +132,13 @@ async function probe(key,action,auth,timeoutMs){
    if(!response.ok||!data||data.ok!==true)throw new Error("BACKEND:"+errorCategory(data?.error||data?.message,response.status));
    const ms=Math.round(performance.now()-start);
    let detail="回應成功";
-   if(key==="ping"&&data.version)state.apiVersion=String(data.version).slice(0,40);
+   if(key==="ping"){
+     if(data.version)state.apiVersion=String(data.version).slice(0,80);
+     state.v4=data.scheduleSaveRolloverIsolation===true;
+     const v4=byId("v4Status");
+     v4.textContent=state.v4?"GAS V4 排班／考勤分離：已確認部署":"GAS V4 排班／考勤分離：尚未部署，目前線上仍是舊版";
+     v4.style.color=state.v4?"#087a5f":"#b42318";
+   }
    if(key==="meta"&&data.apiVersion)state.apiVersion=String(data.apiVersion).slice(0,40);
    if(key==="activity"){
      const active=Number(data.activeCount||0);
@@ -160,7 +167,7 @@ let busy=false;
 function toggleBusy(value){busy=value;byId("run").disabled=value;byId("full").disabled=value;}
 async function runQuick(){
  if(busy)return;
- toggleBusy(true);state.date=new Date().toLocaleString("zh-TW");state.results=[];state.apiVersion="";
+ toggleBusy(true);state.date=new Date().toLocaleString("zh-TW");state.results=[];state.apiVersion="";state.v4=null;byId("v4Status").textContent="GAS V4 排班／考勤分離狀態：正在檢查";
  for(const key of ["ping","activity","lock","meta"])setStatus(key,"等待測試","idle");
  saveReport();
  const auth=updateSessionInfo();
