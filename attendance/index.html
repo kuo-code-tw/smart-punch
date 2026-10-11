@@ -15700,7 +15700,12 @@ function getManualPairRecordAnchor(record) {
             const hh = String(now.getHours()).padStart(2, '0');
             const min = String(now.getMinutes()).padStart(2, '0');
 
-            document.getElementById('addModalDateInput').value = `${yyyy}-${mm}-${dd}`;
+            // 從日期導覽區開啟補卡時，優先採用目前顯示的考勤日期，而非舊視窗殘留日期。
+            const activeDay=String(recordsSelectedDateKey||'').trim();
+            const pageDay=String((Array.isArray(recordsDatePageKeys)?recordsDatePageKeys:[])[Math.max(0,Number(recordsCurrentPage||1)-1)]||'').trim();
+            const chosenDay=/^\d{4}-\d{2}-\d{2}$/.test(activeDay)?activeDay:
+                (/^\d{4}-\d{2}-\d{2}$/.test(pageDay)?pageDay:`${yyyy}-${mm}-${dd}`);
+            document.getElementById('addModalDateInput').value = chosenDay;
             set24HourTime('addModal', `${hh}:${min}`);
             document.getElementById('addModalNoteInput').value = "管理員手動補卡";
 
