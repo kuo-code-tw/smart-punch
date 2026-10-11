@@ -627,6 +627,9 @@ async function importLeaveBalanceFile(file) {
    }
    if(headerRow<0)throw new Error('找不到員工工號與年假剩餘欄位；請確認檔案內有「工號／員編」及「未休／可休／剩餘年假」其中一種欄位');
 
+   // Uploaded workbook has no as-of column; use its explicit filename month (202609).
+   const sourceMonthMatch=String(file.name||'').match(/(20\d{2})[-_.]?(0[1-9]|1[0-2])(?:月|[^0-9]|$)/);
+   const fileAsOf=sourceMonthMatch?sourceMonthMatch[1]+'/'+sourceMonthMatch[2]:'';
    const balances=[];
    for(let r=headerRow+1;r<rows.length;r++){
      const row=rows[r]||[];
@@ -637,7 +640,8 @@ async function importLeaveBalanceFile(file) {
      if(!empId)continue;
      const sourceName=String(leaveBalanceCell(row,map,['姓名','員工姓名','人員姓名','name'],[/姓名/,/name/])||'').trim();
      const sourceDept=String(leaveBalanceCell(row,map,['部門','單位','department','dept'],[/部門/,/單位/,/department/,/dept/])||'').trim();
-     const asOf=String(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/])||'').trim();
+     const asOf=String(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/])||'').trim()||fileAsOf;
+     if(!asOf)throw new Error('Excel 沒有基準月份欄位，檔名也沒有 YYYYMM 月份，已停止匯入以免沿用舊月份');
      const carryOver=leaveBalanceNumber(leaveBalanceCell(row,map,['遞延','遞延天數','去年遞延','去年未休','carryover'],[/遞延/,/去年.*未休/,/carryover/]));
      const annual=leaveBalanceNumber(leaveBalanceCell(row,map,['今年年假','年假','年假天數','本年度年假','本年年假','特休','特休天數','annual'],[/今年.*年假/,/本年.*年假/,/^年假/,/^特休/,/annual/]));
      const used=leaveBalanceNumber(leaveBalanceCell(row,map,['已休','已休天數','已使用','使用天數','used'],[/已休/,/已使用/,/使用.*天數/,/used/]));
@@ -650,7 +654,7 @@ async function importLeaveBalanceFile(file) {
      balances.push({empId,leaveBalance:{asOf,carryOver,annual,used,remaining,sourceName,sourceDept,importedAt:new Date().toISOString(),source:'leave-system-import'}});
    }
    if(!balances.length)throw new Error('沒有讀到可匯入的員工資料');
-   if(!confirm('將匯入 '+balances.length+' 人的可休天數，確定繼續？'))return;
+   if(!confirm('確認匯入基準月份：'+balances[0].leaveBalance.asOf+'\n將匯入 '+balances.length+' 人的可休天數，確定繼續？'))return;
 
    setStatus('☁️ 正在更新可休天數…','info');
    const d=await postCloud({action:'updateLeaveBalances',balances});
