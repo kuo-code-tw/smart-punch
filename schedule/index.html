@@ -931,6 +931,47 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 </style>
 
 <link rel="stylesheet" href="../assets/port79-calendar-range.css">
+
+<style id="p79-schedule-readable-cells-20261011">
+/* 日期欄改寬，讓班別與代班工時清楚顯示；維持全月橫向捲動。 */
+#app-main-container .p79-month-schedule-table{
+  width:max-content!important;
+  min-width:2140px!important;
+  table-layout:fixed!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-head,
+#app-main-container .p79-month-schedule-table .p79-day-cell{
+  box-sizing:border-box!important;
+  width:60px!important;min-width:60px!important;max-width:60px!important;
+  padding:5px 4px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-head>div:first-child{
+  font-size:13px!important;line-height:17px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-head>div:last-child{
+  font-size:10px!important;line-height:13px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-shift-select{
+  height:34px!important;min-height:34px!important;
+  padding:0 3px!important;font-size:14px!important;
+  font-weight:850!important;line-height:32px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-cell .mt-1{
+  margin-top:5px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-cell .mt-1 span{
+  font-size:11px!important;min-height:19px;line-height:15px!important;
+  white-space:nowrap!important;padding:2px 3px!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-cell button{
+  min-height:23px!important;padding:2px 3px!important;
+  font-size:10px!important;line-height:18px!important;
+  white-space:nowrap!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-cell{
+  height:90px!important;vertical-align:top!important;
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -3724,7 +3765,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
       const target=String(entry.data.leaveEmpId||'').trim().toUpperCase();
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
       // 代班的班別以請假者原定早／中／晚班為準，不改動員工原始排休資料。
-      return ['早','中','晚'].includes(original)?original:'代';
+      return ['早','中','晚'].includes(original)?original:'?';
     }
     function p79LeaveCoverBadge(empId,dayStr){
       const assignments=p79LeaveCoverOnDay(empId,dayStr);
@@ -4189,7 +4230,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             shownShift==='早'?'bg-emerald-100 text-emerald-800 font-black':
             shownShift==='中'?'bg-amber-100 text-amber-800 font-black':
             shownShift==='晚'?'bg-purple-100 text-purple-800 font-black':
-            shownShift==='代'?'bg-cyan-100 text-cyan-900 font-black':shiftStyle;
+            shownShift==='?'?'bg-cyan-100 text-cyan-900 font-black':shiftStyle;
           const leaveCoverBadge = p79LeaveCoverBadge(emp.id,dayStr);
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
             ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition">${dayMeta ? '編輯代班' : '代班'}</button>`
@@ -4199,7 +4240,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() && !coverageShift ? '' : 'disabled'}
                 class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                ${shownShift==='代' ? `<option value="代" selected>代</option>` : ''}
+                ${shownShift==='?' ? `<option value="?" selected>?</option>` : ''}
                 <option value="早" ${shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${shownShift==='中'?'selected':''}>中</option>
                 <option value="晚" ${shownShift==='晚'?'selected':''}>晚</option>
