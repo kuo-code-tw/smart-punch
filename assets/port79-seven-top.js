@@ -64,16 +64,16 @@ applyGlobalTheme(savedGlobalTheme(),{save:false});
 
 const MENU={
  attendance:[
-  ['records','📋 考勤管理'],['settings','⚙️ 系統設定'],['clearDeleted','🗑️ 清空已刪除考勤'],
+  ['clearDeleted','🗑️ 清空已刪除考勤'],
   ['attendance-import','考勤匯入'],['attendance-export','考勤匯出'],['attendance-compare','Excel 比對'],
-  ['save-cloud','💾 儲存雲端','cloud-save'],['read-cloud','☁️ 讀取雲端'],['employee','👤 我的打卡'],['year','📆 年份顯示']
+  ['year','📆 年份顯示']
  ],
- workhours:[['stats','📊 出勤統計'],['read-cloud','☁️ 讀取雲端'],['year','📆 年份顯示']],
+ workhours:[['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式']],
- schedule:[['schedule-lock','🔒 編輯鎖定：確認中…'],['schedule-save','💾 儲存排班'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
- efficiency:[['save-cloud','💾 儲存雲端','cloud-save'],['import','📥 匯入'],['compare','🔎 比對月報'],['export','📤 匯出'],['year','📆 年份顯示']],
- hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['add','＋ 新增人員'],['year','📆 年份顯示']],
- history:[['history-load','🗄️ 讀取目前月份']]
+ schedule:[['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
+ efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
+ hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
+ history:[]
 };
 function scheduleLockMenuState(){
  if(currentSystem()!=='schedule')return null;
