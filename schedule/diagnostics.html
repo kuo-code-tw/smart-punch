@@ -39,7 +39,7 @@ footer{color:#66758a;font-size:12px;padding:14px 0}
   </div>
   <p id="sessionInfo">正在檢查本分頁的登入狀態……</p>
   <p id="v4Status" style="font-weight:800;color:#64748b">GAS V4 排班／考勤分離狀態：尚未檢查</p>
-  <div class="notice">你即使已經登入排班系統，若從聊天連結直接開新分頁，此頁也可能讀不到<b>另一個分頁</b>的登入狀態。正確方式：保持原排班頁不關閉，按上方「連線診斷」，會在同一頁的視窗中執行，不需要重新登入，也不會清除未存班表。請勿分享登入 Token。</div>
+  <div class="notice" id="authNotice">若你已登入排班系統，但此頁沒有取得登入資訊：請從原排班頁上方按「連線診斷」，使用班表內的視窗測試。這與帳號是否登出不同。不要關閉仍有未儲存資料的班表，也不要分享登入 Token。</div>
 </div>
 <div class="panel">
   <h2>測試結果</h2>
@@ -66,6 +66,44 @@ const fields={ping:"GAS 基本連線",activity:"GAS 工作狀態",lock:"排班�
 const state={date:"",results:[],apiVersion:"",v4:null};
 const byId=id=>document.getElementById(id);
 const keynames=["port79_gc_superadmin_token","port79_admin_token","port79_gc_token"];
+let bridgedAuth=null;
+let bridgeRequest=null;
+function requestParentAuth(){
+  if(window.parent===window)return Promise.resolve(authData());
+  if(bridgeRequest)return bridgeRequest;
+  bridgeRequest=new Promise(resolve=>{
+    const nonce="diag-"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+    let resolved=false,timeout;
+    const finish=auth=>{
+      if(resolved)return;
+      resolved=true;
+      clearTimeout(timeout);
+      window.removeEventListener("message",onMessage);
+      bridgeRequest=null;
+      if(auth?.token)bridgedAuth=auth;
+      resolve(authData());
+    };
+    const onMessage=event=>{
+      if(event.origin!==location.origin || event.source!==window.parent)return;
+      const msg=event.data;
+      if(!msg || msg.type!=="PORT79_DIAG_AUTH_RESPONSE" || msg.nonce!==nonce)return;
+      finish({token:String(msg.token||"").trim(),clientId:String(msg.clientId||"").trim()});
+    };
+    window.addEventListener("message",onMessage);
+    timeout=setTimeout(()=>finish(null),1800);
+    try{window.parent.postMessage({type:"PORT79_DIAG_AUTH_REQUEST",nonce},location.origin)}
+    catch(_){finish(null)}
+  });
+  return bridgeRequest;
+}
+async function ensureAuthData(){
+  let auth=authData();
+  if((!auth.token||!auth.clientId)&&window.parent!==window){
+    auth=await requestParentAuth();
+  }
+  updateSessionInfo(auth);
+  return auth;
+}
 function authData(){
   let token="",clientId="";
   try {
@@ -86,14 +124,19 @@ function authData(){
       if(!clientId)clientId=String(store.getItem("port79_schedule_client_id")||"").trim();
     }
   }catch(_){}
+  if(!token&&bridgedAuth?.token)token=bridgedAuth.token;
+  if(!clientId&&bridgedAuth?.clientId)clientId=bridgedAuth.clientId;
   return {token,clientId};
 }
-function updateSessionInfo(){
-  const auth=authData();
+function updateSessionInfo(auth=authData()){
+  const embedded=window.parent!==window;
   const status=auth.token
     ? (auth.clientId?"已偵測到排班登入與目前編輯分頁識別碼，可檢查編輯鎖。":"已偵測到登入，但缺少排班分頁識別碼；先從排班頁的按鈕開啟診斷。")
-    : "此診斷頁未取得同分頁的排班登入資訊。若你已登入，請回到原班表，直接按排班頁上方「連線診斷」，不要從聊天視窗另外開一個分頁。";
+    : embedded
+      ? "診斷視窗沒有取得驗證資訊；請檢查是否為已更新的排班系統版本。"
+      : "目前是獨立測試分頁，無法自動取得其他分頁的登入資訊；請從原排班頁開啟內嵌診斷視窗。";
   byId("sessionInfo").textContent=status;
+  byId("authNotice").style.display=auth.token?"none":"block";
   return auth;
 }
 function setStatus(key,text,level){
@@ -117,8 +160,8 @@ function saveReport(){
 async function probe(key,action,auth,timeoutMs){
  const label=fields[key];
  if(action!=="ping"&&action!=="getCloudActivity"&&!auth.token){
-   setStatus(key,"未登入，略過","slow");
-   state.results.push({label,result:"略過",ms:0,detail:"缺少本分頁登入資訊"});saveReport();return;
+   setStatus(key,"無法取得驗證資訊，略過","slow");
+   state.results.push({label,result:"略過",ms:0,detail:"診斷工具未取得當前排班登入資訊，不能推斷帳號已登出"});saveReport();return;
  }
  if(key==="lock"&&!auth.clientId){
    setStatus(key,"缺少編輯分頁識別碼","slow");
@@ -179,7 +222,7 @@ async function runQuick(){
  toggleBusy(true);state.date=new Date().toLocaleString("zh-TW");state.results=[];state.apiVersion="";state.v4=null;byId("v4Status").textContent="GAS V4 排班／考勤分離狀態：正在檢查";
  for(const key of ["ping","activity","lock","meta"])setStatus(key,"等待測試","idle");
  saveReport();
- const auth=updateSessionInfo();
+ const auth=await ensureAuthData();
  try{
   await probe("ping","ping",auth,12000);
   await probe("activity","getCloudActivity",auth,12000);
@@ -191,7 +234,7 @@ async function runFull(){
  if(busy)return;
  toggleBusy(true);
  if(!state.date)state.date=new Date().toLocaleString("zh-TW");
- const auth=updateSessionInfo();
+ const auth=await ensureAuthData();
  try{await probe("full","getScheduleDataSecure",auth,25000)}finally{toggleBusy(false)}
 }
 byId("run").addEventListener("click",runQuick);
@@ -203,6 +246,7 @@ byId("copy").addEventListener("click",async()=>{
  setTimeout(()=>byId("copy").textContent="複製診斷結果",1800);
 });
 updateSessionInfo();
+if(window.parent!==window)ensureAuthData().catch(()=>{});
 })();
 </script>
 </body>
