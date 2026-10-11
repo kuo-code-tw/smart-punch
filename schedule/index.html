@@ -1069,6 +1069,38 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
  border-top:0!important;border-bottom:1px solid #94a3b8!important;
 }
 </style>
+
+<style id="p79-roster-fixed-compact-names-20261011">
+/* 姓名欄與日期表頭同時固定；縮小未使用的留白，不影響人員拖曳。 */
+#app-main-container .p79-month-schedule-table .p79-person-cell,
+#app-main-container .p79-month-schedule-table .p79-person-header{
+ width:176px!important;min-width:176px!important;max-width:176px!important;
+ box-sizing:border-box!important;padding:3px 4px!important;
+}
+#app-main-container #p79RosterScroll .p79-person-cell{
+ position:sticky!important;left:0!important;z-index:26!important;
+ background:#fff!important;box-shadow:2px 0 4px #33415522;
+}
+#app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-person-cell{background:#f1f5f9!important}
+#app-main-container #p79RosterScroll tbody tr:hover .p79-person-cell{background:#eaf0ff!important}
+#app-main-container #p79RosterFixedHeader .p79-person-header{
+ position:sticky!important;left:0!important;z-index:65!important;
+ background:#e9eef5!important;box-shadow:2px 0 4px #33415530;
+}
+#app-main-container .p79-person-name{font-size:15px!important;max-width:82px!important}
+#app-main-container .p79-person-name-line{gap:2px!important}
+#app-main-container .p79-person-controls{gap:1px!important}
+#app-main-container .p79-mini-select{max-width:50px!important;padding:0 1px!important}
+#app-main-container .p79-person-id{font-size:8px!important;letter-spacing:-.3px!important}
+@media(max-width:750px){
+ #app-main-container .p79-month-schedule-table .p79-person-cell,
+ #app-main-container .p79-month-schedule-table .p79-person-header{
+  width:176px!important;min-width:176px!important;max-width:176px!important;
+ }
+}
+html.dark #app-main-container #p79RosterScroll .p79-person-cell{background:#111827!important}
+html.dark #app-main-container #p79RosterScroll tbody tr:nth-child(even) .p79-person-cell{background:#0f172a!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
