@@ -1129,7 +1129,7 @@ async function manageLogin(){
     showSession(session);
     Promise.resolve().then(()=>p79RememberVerifiedEmployee(normalized)).catch(e=>console.warn('管理登入快取更新未完成：',e));
   }
-  catch(e){$('status').className='status error';$('status').textContent='管理登入失敗：'+(e?.message||e)}
+  catch(e){$('status').className='status error';const detail=String(e?.message||e);$('status').textContent=/Failed to fetch|NetworkError|Load failed|網路連線失敗/i.test(detail)?'管理登入暫時無法連線到驗證伺服器，請檢查網路後再試；這不代表密碼錯誤或沒有管理權限。':'管理登入失敗：'+detail}
   finally{if(slowTimer)clearTimeout(slowTimer);if(verySlowTimer)clearTimeout(verySlowTimer);loginBusy=false;$('punchLoginBtn').disabled=false;$('manageLoginBtn').disabled=false;$('punchLoginBtn').textContent='🕒 進入打卡';$('manageLoginBtn').textContent='🛡️ 管理員登入'}
 }
 $('punchLoginBtn').onclick=punchLogin;$('manageLoginBtn').onclick=manageLogin;$('account').oninput=()=>{if(port79DeploymentUpdating)return;passwordTouched=false;identityWarmPromise=null;identityWarmAccount='';$('password').value='';$('password').disabled=true;$('password').placeholder='正在判斷身分...';scheduleIdentityLookup()};$('account').onblur=()=>{if($('account').value.trim()&&!passwordTouched)autoDetectLoginIdentity()};$('account').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();autoDetectLoginIdentity().then(()=>{if(!$('password').disabled)$('password').focus();else punchLogin()})}};$('password').oninput=()=>{passwordTouched=true};$('password').onkeydown=e=>{if(e.key==='Enter')manageLogin()};$('logoutBtn').onclick=clearSession;
