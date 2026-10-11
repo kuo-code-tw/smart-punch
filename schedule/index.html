@@ -4232,8 +4232,10 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
             shownShift==='晚'?'bg-purple-100 text-purple-800 font-black':
             shownShift==='?'?'bg-cyan-100 text-cyan-900 font-black':shiftStyle;
           const leaveCoverBadge = p79LeaveCoverBadge(emp.id,dayStr);
+          const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
+          const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition">${dayMeta ? '編輯代班' : '代班'}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '代'+coverHours : (dayMeta ? '編輯代班' : '代班')}</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
