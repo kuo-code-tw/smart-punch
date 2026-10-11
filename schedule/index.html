@@ -1285,6 +1285,27 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
   padding-bottom:2px!important;
 }
 </style>
+<style id="p79-today-schedule-inline-summary-20261011">
+/* 當日統計與考勤同步合併同一橫排；資料更新仍沿用原本兩個 id。 */
+#todaySchedulePanel .p79-today-inline-status{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ flex-wrap:wrap;column-gap:12px;row-gap:2px;
+ margin-top:2px!important;min-width:0;
+ font-size:10px;line-height:1.2;
+}
+#todaySchedulePanel .p79-today-inline-status #todayScheduleSummary,
+#todaySchedulePanel .p79-today-inline-status #todayAttendanceLiveStatus{
+ display:inline-block!important;flex:0 0 auto;margin:0!important;
+ padding:0!important;line-height:1.2!important;white-space:nowrap;
+}
+@media(max-width:740px){
+ #todaySchedulePanel .p79-today-inline-status{column-gap:6px;row-gap:2px}
+ #todaySchedulePanel .p79-today-inline-status #todayScheduleSummary,
+ #todaySchedulePanel .p79-today-inline-status #todayAttendanceLiveStatus{
+   white-space:normal;flex:0 1 auto;
+ }
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -1424,8 +1445,10 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div class="today-panel-title font-black text-slate-800 dark:text-slate-100"><i class="fa-solid fa-user-clock text-indigo-600 mr-1"></i> 今日排班出勤人員 <span id="todayScheduleDate" class="text-xs text-slate-500 ml-1"></span></div>
-          <div id="todayScheduleSummary" class="text-[10px] text-slate-500 mt-0.5">載入中...</div>
-          <div id="todayAttendanceLiveStatus" class="text-[10px] text-amber-700 mt-0.5" aria-live="polite">考勤燈號：等待同步</div>
+          <div class="p79-today-inline-status">
+            <div id="todayScheduleSummary" class="text-[10px] text-slate-500">載入中...</div>
+            <div id="todayAttendanceLiveStatus" class="text-[10px] text-amber-700" aria-live="polite">考勤燈號：等待同步</div>
+          </div>
           <div id="todayScheduleLeaveSummary" class="hidden"></div>
         </div>
         <button type="button" onclick="toggleTodayScheduleDetail()" class="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-black">
