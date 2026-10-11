@@ -296,7 +296,7 @@ body[data-p79-system="leave"]>header{display:none!important}
     <div class="card" style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div><h2 style="margin-bottom:5px">🏖️ 員工年假剩餘天數</h2><div class="note">直接讀取考勤系統每月匯入到「人資主檔」的年假資料，不另外建立第二份資料。</div></div>
-        <div class="field" style="margin:0;min-width:220px"><label>搜尋工號／姓名／部門</label><input id="balanceKeyword" oninput="renderAdminBalances()" placeholder="輸入關鍵字"></div>
+        <div class="p79-balance-actions"><button type="button" class="btn btn-main" onclick="openLeaveBalanceImport()">📥 匯入可休天數</button><button type="button" class="btn btn-sec" onclick="exportLeaveBalanceXlsx()">📤 匯出可休天數</button></div><div class="field" style="margin:0;min-width:220px"><label>搜尋工號／姓名／部門</label><input id="balanceKeyword" oninput="renderAdminBalances()" placeholder="輸入關鍵字"></div>
       </div>
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"><tr><td colspan="8">正在載入...</td></tr></tbody></table></div>
     </div>
@@ -573,6 +573,24 @@ function leaveBalanceCell(row,map,names,patterns=[]){
  const idx=leaveBalanceHeaderIndex(map,names,patterns);
  return idx==null?'':row[idx];
 }
+async function exportLeaveBalanceXlsx(){
+ if(leaveAccess!=='manage')return alert('僅管理員可匯出');
+ try{
+  await window.p79EnsureXlsx();
+  const data=employees.filter(e=>e.empId&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining)));
+  if(!data.length)throw Error('尚無可匯出資料');
+  const rows=[['部門','員工編號','員工姓名','遞延天數','今年年假天數','已休年假天數','未休年假天數']];
+  data.forEach(e=>{const b=e.leaveBalance;rows.push([b.sourceDept||e.dept||'',String(e.empId),b.sourceName||e.name||'',Number(b.carryOver)||0,Number(b.annual)||0,Number(b.used)||0,Number(b.remaining)||0])});
+  const sheet=XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols']=[{wch:26},{wch:18},{wch:17},{wch:15},{wch:18},{wch:18},{wch:18}];
+  for(let i=2;i<=rows.length;i++){const cell=sheet['B'+i];if(cell){cell.t='s';cell.v=String(rows[i-1][1]);cell.z='@'}}
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'工作表1');
+  const month=(String(data[0].leaveBalance.asOf||'').replace(/\D/g,'').slice(0,6)||new Date().toISOString().slice(0,7).replace('-',''));
+  XLSX.writeFile(book,month+'月止可休天數統計表.xlsx');
+  setStatus('已匯出 '+data.length+' 人可休天數','');
+ }catch(e){setStatus('匯出失敗：'+(e?.message||e),'error')}
+}
+window.exportLeaveBalanceXlsx=exportLeaveBalanceXlsx;
 function openLeaveBalanceImport(){
  if(leaveAccess!=='manage'){
    alert('只有請假系統管理權限可以匯入可休天數');
