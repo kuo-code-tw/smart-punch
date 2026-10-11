@@ -1699,7 +1699,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const isManualAcquire = action==='scheduleAcquireEditLock' || action==='scheduleForceAcquireEditLock';
       const timeoutMs = isManualAcquire
         ? SCHEDULE_LOCK_ACQUIRE_TIMEOUT_MS
-        : SCHEDULE_LOCK_BACKGROUND_TIMEOUT_MS;
+        : action==='scheduleHeartbeatEditLock' ? 12000 : SCHEDULE_LOCK_BACKGROUND_TIMEOUT_MS;
 
       const send = async () => {
         const res = await scheduleLockFetch(
@@ -4684,17 +4684,33 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       p79ManualScheduleSaveBusy=true;
       p79SetScheduleSaving(true);
       try {
-      // 儲存前立即續租，避免雲端寫入過程中使用即將到期的租約。
+      // 儲存前續租；GAS 5 秒短逾時不代表編輯鎖已失效。
+      // 心跳失敗時先查同一 clientId 的雲端持有人，只能在確定 mine=true 時繼續寫入。
       try {
-        const renewed=await scheduleLockPost('scheduleHeartbeatEditLock');
-        setScheduleEditLockState(renewed);
-        if (!scheduleEditLockState.mine) {
+        let verified;
+        try {
+          verified=await scheduleLockPost('scheduleHeartbeatEditLock');
+        } catch(heartbeatError) {
+          if(!scheduleLockIsTransientNetworkError(heartbeatError) && !scheduleLockIsQuotaError(heartbeatError))throw heartbeatError;
+          console.warn('排班續租未取得回應，改查雲端編輯權：',heartbeatError);
+          await new Promise(resolve=>setTimeout(resolve,650));
+          verified=await scheduleLockGet();
+          if(!verified?.mine && !verified?.acquired) {
+            // 只有伺服器已回覆持有人不是自己才拒絕，不擅自接管。
+            setScheduleEditLockState(verified);
+            alert('❌ 雲端確認目前不是你的編輯權，班表未儲存；請重新鎖定編輯。');
+            return;
+          }
+        }
+        setScheduleEditLockState(verified);
+        if(!scheduleEditLockState.mine){
           alert('❌ 編輯權已轉移給其他管理員，班表未儲存。請重新取得編輯權。');
           return;
         }
-      } catch(e) {
-        // 不在無法確認擁有權時嘗試寫入，避免誤覆蓋；保留畫面內容。
-        alert('❌ 無法確認排班編輯權，班表尚未儲存；請稍後重試。');
+      }catch(e){
+        // 不能確定編輯權就停止，保留已編輯的畫面內容。
+        console.warn('儲存前排班編輯權確認失敗：',e);
+        alert('❌ 雲端編輯權確認暫時逾時，班表尚未儲存。請保持頁面開啟並稍後再按儲存。\n'+String(e?.message||e||''));
         return;
       }
       const tabName = (activeRoleTab === 'ALL') ? '全部人員' : activeRoleTab + '單位';
