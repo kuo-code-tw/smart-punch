@@ -658,8 +658,24 @@ async function importLeaveBalanceFile(file) {
 
    setStatus('☁️ 正在更新可休天數…','info');
    const d=await postCloud({action:'updateLeaveBalances',balances});
-   setStatus('✅ '+(d?.message||('可休天數已更新 '+(d?.updated||balances.length)+' 人')),'');
+   // 不以 POST ok 當成匯入成功：重新讀取正式雲端員工主檔後逐人核對基準月份及餘額。
    await loadCloud(true);
+   const latest=new Map(employees.map(e=>[String(e.empId||'').trim().toUpperCase(),e]));
+   const mismatches=[];
+   const num=v=>Math.round((Number(v)||0)*10)/10;
+   for(const row of balances){
+     const actual=latest.get(String(row.empId).trim().toUpperCase())?.leaveBalance;
+     if(!actual || String(actual.asOf||'').replace(/[-.]/g,'/')!==String(row.leaveBalance.asOf||'').replace(/[-.]/g,'/') ||
+        num(actual.remaining)!==num(row.leaveBalance.remaining)){
+       mismatches.push(row.empId);
+     }
+   }
+   if(mismatches.length){
+     setStatus('⚠️ 雲端讀回核對未通過：'+mismatches.length+' 人的基準月份或剩餘天數與 Excel 不一致，未確認匯入成功。','error');
+     alert('匯入已送出，但雲端讀回不一致：'+mismatches.length+' 人。\n請不要連續重複匯入，先核對雲端資料。');
+     return;
+   }
+   setStatus('✅ 已重新讀回 Google 雲端並核對 '+balances.length+' 人的基準月份與剩餘天數','');
  }catch(e){
    console.error(e);
    setStatus('匯入可休天數失敗：'+(e?.message||e),'error');
