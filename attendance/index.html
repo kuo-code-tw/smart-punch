@@ -14622,7 +14622,6 @@ function getManualPairRecordAnchor(record) {
                                 archiveAttendanceRecords([original]);
                                 saveRecords();
                                 stats.converted++;
-                                remoteFailures=0;
                             }else markError('ID '+id+'：'+String(result?.error||'雲端沒有回傳更新成功確認')+'；不自動重送，請先核對',true);
                         }
                     }catch(error) {
