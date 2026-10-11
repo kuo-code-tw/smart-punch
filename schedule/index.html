@@ -1139,6 +1139,17 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
 #app-main-container #p79RosterScroll{overflow-anchor:none!important}
 #app-main-container .p79-person-controls{padding-right:35px!important}
 </style>
+<style id="p79-roster-jump-and-fixed-col-20261011">
+/* Use native sticky positioning only: transforming sticky cells caused cumulative horizontal drift. */
+#app-main-container #p79RosterScroll .p79-person-cell,
+#app-main-container #p79RosterScroll tfoot .sticky-col-left{
+ position:sticky!important;left:0!important;transform:none!important;
+ z-index:80!important;background:#fff!important;
+}
+#app-main-container #p79RosterScroll{scroll-behavior:auto!important;overflow-anchor:none!important;scroll-snap-type:y proximity}
+#app-main-container #p79RosterScroll tbody tr[data-p79-drag-emp]{scroll-snap-align:start;scroll-snap-stop:normal}
+#app-main-container #p79RosterScroll tbody .p79-person-name{overflow:visible!important;text-overflow:clip!important;max-width:none!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4176,14 +4187,7 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         headTable.appendChild(originalHead);
         header.appendChild(headTable);
       }
-      const pinPersonCells=()=>{
-        const parentLeft=main.getBoundingClientRect().left;
-        for(const cell of main.querySelectorAll('tbody .p79-person-cell, tfoot .sticky-col-left')){
-          const offset=parentLeft-cell.getBoundingClientRect().left;
-          cell.style.transform=Math.abs(offset)>0.5?'translateX('+offset+'px)':'';
-        }
-      };
-      const pinPersonHeader=()=>{
+       const pinPersonHeader=()=>{
         const first=header.querySelector('.p79-person-header');
         if(first)first.style.transform='translateX('+main.scrollLeft+'px)';
       };
@@ -4193,7 +4197,6 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         if(headTable)headTable.style.width=table.scrollWidth+'px';
         header.scrollLeft=main.scrollLeft;
         pinPersonHeader();
-        pinPersonCells();
         bar.scrollLeft=main.scrollLeft;
       };
       syncSize();
@@ -4205,24 +4208,6 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
       },{passive:true});
       bar.addEventListener('scroll',()=>{
         if(Math.abs(main.scrollLeft-bar.scrollLeft)>1)main.scrollLeft=bar.scrollLeft;
-      },{passive:true});
-      let rosterWheelSnapTimer=null;
-      main.addEventListener('wheel',e=>{
-        if(Math.abs(e.deltaY)<Math.abs(e.deltaX) || e.ctrlKey)return;
-        clearTimeout(rosterWheelSnapTimer);
-        rosterWheelSnapTimer=setTimeout(()=>{
-          if(!main.isConnected)return;
-          const rows=[...main.querySelectorAll('tbody tr[data-p79-drag-emp]')];
-          if(!rows.length)return;
-          const top=main.scrollTop;
-          let closest=rows[0].offsetTop;
-          let distance=Infinity;
-          for(const row of rows){
-            const d=Math.abs(row.offsetTop-top);
-            if(d<distance){closest=row.offsetTop;distance=d;}
-          }
-          main.scrollTo({top:closest,behavior:'smooth'});
-        },130);
       },{passive:true});
       if(typeof ResizeObserver!=='undefined'){
         const observer=new ResizeObserver(syncSize);
@@ -4576,8 +4561,20 @@ body.p79-schedule-saving #main-role-tabs-container,body.p79-schedule-saving #sch
         </div>
       `;
 
+      // Keep viewport coordinates on every asynchronous redraw (edits, cloud refresh and status updates).
+      const oldRoster=document.getElementById('p79RosterScroll');
+      const savedScrollTop=oldRoster?oldRoster.scrollTop:0;
+      const savedScrollLeft=oldRoster?oldRoster.scrollLeft:0;
+      const savedPageY=window.scrollY;
       container.innerHTML = html;
       p79ConnectRosterScroll();
+      const newRoster=document.getElementById('p79RosterScroll');
+      if(newRoster){
+        newRoster.scrollTop=savedScrollTop;
+        newRoster.scrollLeft=savedScrollLeft;
+        newRoster.dispatchEvent(new Event('scroll'));
+      }
+      if(Math.abs(window.scrollY-savedPageY)>2)window.scrollTo({top:savedPageY,behavior:'instant'});
       applyScheduleAccessUi();
     }
 
