@@ -311,10 +311,10 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <div id="deployStatusSub" class="deploy-status-sub">GitHub Pages 正在部署最新版本，更新期間暫停登入，完成後會自動恢復。</div>
         <div id="deployStatusMeta" class="deploy-status-meta"></div>
       </div>
-      <div id="status" class="status">輸入員工編號後，系統會自動判斷一般員工或管理員。</div>
+      <div id="status" class="status" role="status" aria-live="polite">輸入員工編號後，系統會自動判斷一般員工或管理員。</div>
       <div class="employee-login-note">🔎 輸入工號或考勤號後，系統會自動查詢人資主檔。<br>🕒 一般員工：不開放密碼欄，只能刷卡或請假。<br>🛡️ 管理員／超級管理員：自動開放管理密碼欄。</div>
       <div class="field"><label for="account">員工編號</label><input id="account" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="請輸入員工編號／考勤號"></div>
-      <div class="field" id="adminPasswordField"><label for="password">管理員密碼</label><input id="password" type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="先輸入員工編號，管理員才會開放密碼" disabled><div class="login-action-help">一般員工無法輸入管理密碼；管理員／超級管理員會在輸入編號後自動開啟密碼欄。</div></div>
+      <div class="field" id="adminPasswordField"><label for="password">管理員密碼</label><input id="password" type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="先輸入員工編號，管理員才會開放密碼" disabled><button type="button" id="p79TogglePassword" class="p79-password-toggle" aria-label="顯示密碼" aria-pressed="false">👁 顯示</button><div class="login-action-help">一般員工無法輸入管理密碼；管理員／超級管理員會在輸入編號後自動開啟密碼欄。</div></div>
       <div id="p79LoginKeypad" class="p79-login-keypad" aria-label="登入數字盤" hidden>
         <div class="p79-keypad-title"><span id="p79KeypadTargetLabel">員工編號</span><small>請用數字盤輸入，不會叫出系統鍵盤</small></div>
         <div class="p79-keypad-grid">
@@ -325,7 +325,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         </div>
         <button type="button" id="p79KeypadConfirm" class="p79-keypad-confirm">確認</button>
       </div>
-      <div class="login-action-grid"><button id="punchLoginBtn" class="go punch-go" type="button">🕒 進入打卡</button><button id="manageLoginBtn" class="manage-go" type="button">🛡️ 管理登入</button></div><div class="login-action-help">「進入打卡」永遠不使用密碼；「管理登入」才會驗證管理密碼。</div>
+      <label class="p79-remember-id"><input type="checkbox" id="p79RememberId" checked> 記住我的員工編號（不儲存密碼）</label><div class="login-action-grid"><button id="punchLoginBtn" class="go punch-go" type="button">🕒 進入打卡</button><button id="manageLoginBtn" class="manage-go" type="button">🛡️ 管理登入</button></div><div class="login-action-help">「進入打卡」永遠不使用密碼；「管理登入」才會驗證管理密碼。</div>
       <div id="cloudProbe" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">☁️ 雲端待命｜登入與本機資料優先</div>
     </div>
 
@@ -1362,6 +1362,48 @@ window.addEventListener('online',()=>setTimeout(probeGasConnection,1200));
     mo.observe(password,{attributes:true,attributeFilter:['disabled']});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+
+<style id="p79-home-stable-login-20261011">
+#loginBox #status{box-sizing:border-box!important;height:78px!important;min-height:78px!important;max-height:78px!important;margin-bottom:12px!important;overflow:auto!important;overflow-wrap:anywhere!important;scrollbar-width:thin}
+#loginBox #adminPasswordField{position:relative}
+#loginBox #password{padding-right:97px!important}
+#loginBox #p79TogglePassword{position:absolute;right:7px;top:29px;height:36px;min-width:75px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--input);color:var(--text);font-size:12px;font-weight:800;cursor:pointer}
+#loginBox #p79TogglePassword:disabled{opacity:.6;cursor:not-allowed}
+#loginBox .p79-remember-id{display:flex;align-items:center;gap:8px;margin:2px 0 12px;font-size:12px;color:var(--muted);font-weight:700}
+#loginBox .p79-remember-id input{width:16px;height:16px;flex:none;margin:0}
+#loginBox .login-action-grid button{min-height:48px}
+@media(max-width:520px){#loginBox #status{height:94px!important;min-height:94px!important;max-height:94px!important}}
+</style>
+<script id="p79-home-login-ux-20261011">
+(function(){
+'use strict';
+const KEY='p79_remember_employee_id';
+function boot(){
+ const account=document.getElementById('account'),password=document.getElementById('password'),toggle=document.getElementById('p79TogglePassword'),check=document.getElementById('p79RememberId');
+ if(!account||!password||!toggle||!check)return;
+ let old='';try{old=localStorage.getItem(KEY)||''}catch(e){}
+ check.checked=!!old;
+ // 保留首頁登出時清空工號的安全行為，僅在首次開啟尚無輸入時提供記憶工號。
+ if(old&&!account.value&&!new URLSearchParams(location.search).has('logout')){
+   account.value=old;account.dispatchEvent(new Event('input',{bubbles:true}));
+ }
+ function save(){try{if(check.checked&&account.value.trim())localStorage.setItem(KEY,account.value.trim());else if(!check.checked)localStorage.removeItem(KEY)}catch(e){}}
+ check.addEventListener('change',save);
+ account.addEventListener('change',save);
+ account.addEventListener('blur',save);
+ toggle.addEventListener('click',()=>{
+   const visible=password.type==='password';password.type=visible?'text':'password';
+   toggle.textContent=visible?'🙈 隱藏':'👁 顯示';
+   toggle.setAttribute('aria-label',visible?'隱藏密碼':'顯示密碼');
+   toggle.setAttribute('aria-pressed',String(visible));
+ });
+ // 密碼永不持久化，且不改動登入驗證流程。
+ const loginButton=document.getElementById('manageLoginBtn');
+ loginButton?.addEventListener('click',save,true);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script>
 </body>
