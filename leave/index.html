@@ -459,6 +459,21 @@ function renderAdmin(){
    const remainClass=remain==null?'na':Number(remain)<=0?'zero':'';
    const remainText=remain==null?'--':fmtDay(remain)+' 天';
    const leaveType=/特休|年假/.test(String(l.leaveType||''))?'年假':String(l.leaveType||'');
+   const cover=(window.p79LeaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(l.id));
+   const workerIds=Array.isArray(cover?.workerIds)?cover.workerIds.filter(Boolean):[];
+   const workerNames=workerIds.map(id=>{
+     const e=employees.find(x=>String(x.empId||'').trim().toUpperCase()===String(id).trim().toUpperCase());
+     return e?.name||String(id);
+   });
+   const coverText=workerNames.length
+     ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
+     : '尚未安排代班';
+   const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
+     ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>`
+     : '';
+   const coverDisplay=String(l.status)==='已核准'
+     ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
+     : '';
    return `<tr>
      <td><b>${esc(l.name||'')}</b><br><span class="note">${esc(l.empId||l.attNo||'')}</span></td>
      <td>${esc(l.dept||'')}</td>
@@ -466,7 +481,7 @@ function renderAdmin(){
      <td>${esc(l.startTime||l.startDate||'')}<br>～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td>${esc(l.reason||'')}</td>
-     <td>${badge(l.status)}${String(l.status)==='已核准'&&leaveAccess==='manage'?'<br><button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover(\''+esc(l.id)+'\')">安排代班</button>':''}</td>
+     <td><div class="p79-leave-status-inline">${badge(l.status)}${coverDisplay}</div></td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span></td>
    </tr>`;
@@ -874,6 +889,11 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
 
 <style id="p79-leave-cover-style">
+.p79-leave-status-inline{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:210px}
+.p79-leave-cover-inline{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.p79-leave-cover-names{font-size:11px;font-weight:750;color:#475569;white-space:nowrap}
+.p79-cover-again{margin-top:0!important;white-space:nowrap}
+@media(max-width:850px){.p79-leave-status-inline{min-width:170px}.p79-leave-cover-names{white-space:normal}}
 #p79LeaveCoverModal[hidden],#p79LeaveCoverSecondWrap[hidden]{display:none!important}
 #p79LeaveCoverModal{position:fixed;inset:0;z-index:21000;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:16px}
 #p79LeaveCoverModal .cover-card{width:min(480px,100%);max-height:90vh;overflow:auto;border-radius:16px;background:var(--card,#fff);color:var(--text,#172033);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
