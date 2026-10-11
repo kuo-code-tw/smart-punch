@@ -1231,6 +1231,60 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
  .p79-schedule-diagnostic-panel{width:100%;height:100dvh;border-radius:0}
 }
 </style>
+
+<style id="p79-roster-person-centered-compact-20261011">
+/* 僅縮緊月份班表的人員列，保留原本資料、拖曳與凍結欄的控制邏輯。 */
+/* 日期格以 70px 為最小高度；有代班／狀態標籤時，表格仍可依內容自動增高。 */
+#app-main-container .p79-month-schedule-table tbody .p79-day-cell{
+  height:70px!important;
+  padding-top:3px!important;
+  padding-bottom:3px!important;
+}
+#app-main-container .p79-month-schedule-table tbody .p79-person-cell{
+  vertical-align:middle!important;
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+/* 取消以姓名列當作拖曳鈕的定位基準，讓鈕改依整個人員格居中。 */
+#app-main-container .p79-person-name-line{
+  position:static!important;
+  justify-content:center!important;
+  min-height:20px!important;
+  padding-right:36px!important;
+}
+#app-main-container .p79-person-subline{
+  justify-content:center!important;
+  padding-right:36px!important;
+  margin-top:1px!important;
+}
+#app-main-container .p79-person-controls{
+  margin-left:0!important;
+  margin-right:0!important;
+  padding-right:0!important;
+  justify-content:center!important;
+  gap:4px!important;
+}
+#app-main-container .p79-person-controls .p79-mini-select{
+  text-align:center!important;
+  text-align-last:center!important;
+  min-height:23px!important;
+  height:23px!important;
+}
+#app-main-container .p79-person-cell .p79-drag-top{
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  height:34px!important;
+  min-height:34px!important;
+}
+/* 目前固定姓名欄是獨立複製的 DIV；必須一起垂直置中。 */
+#app-main-container .p79-roster-frozen-people .p79-fixed-person-row.p79-draggable-employee{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
