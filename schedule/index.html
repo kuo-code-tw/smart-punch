@@ -2967,20 +2967,29 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if (token) { payload.gcToken = token; payload.token = token; }
 
       const send = async () => {
-        const res = await scheduleLockFetch(
-          GAS_URL,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/plain;charset=UTF-8',
-              'Accept': 'application/json'
+        // 寫入不是「編輯鎖心跳」：超時必須當成結果未確認，不能無條件重送完整月份。
+        const isScheduleSave= ['syncSchedules','saveSchedules','saveScheduleMonth'].includes(action);
+        let res;
+        try {
+          res = await scheduleLockFetch(
+            GAS_URL,
+            {
+              method:'POST',
+              headers:{'Content-Type':'text/plain;charset=UTF-8','Accept':'application/json'},
+              body:JSON.stringify(payload),
+              redirect:'follow',
+              cache:'no-store'
             },
-            body: JSON.stringify(payload),
-            redirect: 'follow',
-            cache: 'no-store'
-          },
-          20000
-        );
+            isScheduleSave ? 35000 : 20000
+          );
+        }catch(e){
+          if(isScheduleSave && e?.code==='SCHEDULE_LOCK_TIMEOUT'){
+            const unknown=new Error('排班寫入等待逾時，雲端可能仍在處理。不要重新整理或連續重複存檔，稍後再核對。');
+            unknown.code='SCHEDULE_SAVE_RESULT_UNKNOWN';
+            throw unknown;
+          }
+          throw e;
+        }
         const text = await res.text();
 
         if (scheduleCloudLooksLikeGoogleHtml(text)) {
@@ -3009,8 +3018,10 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       try {
         return await send();
       } catch (err) {
-        // Google 偶發回傳中介 HTML 時只重試一次，避免使用者整份班表被誤判成 Excel 格式錯誤。
-        if (err?.code === 'GAS_HTML_RESPONSE' || err?.code === 'SCHEDULE_LOCK_TIMEOUT') {
+        // 整月寫入超時/回傳 HTML 可能已在伺服器執行，禁止不明結果盲目重送。
+        // 非資料寫入操作才保留既有的一次網路重試。
+        if (!scheduleWriteActions.includes(action) &&
+            (err?.code === 'GAS_HTML_RESPONSE' || err?.code === 'SCHEDULE_LOCK_TIMEOUT')) {
           await new Promise(resolve => setTimeout(resolve, 900));
           try { return await send(); } catch (retryErr) { throw retryErr; }
         }
