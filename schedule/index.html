@@ -1306,6 +1306,33 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
  }
 }
 </style>
+<style id="p79-today-one-row-title-stats-20261011">
+/* 標題、日期、排班統計及出勤燈號同列；不是只合併原先的兩行副標。 */
+#todaySchedulePanel .p79-today-heading-inline{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ flex-wrap:wrap!important;gap:4px 12px!important;min-width:0;flex:1 1 auto;
+}
+#todaySchedulePanel .p79-today-heading-inline>.today-panel-title{
+ flex:0 0 auto!important;margin:0!important;white-space:nowrap!important;
+}
+#todaySchedulePanel .p79-today-heading-inline>.p79-today-inline-status{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ flex:0 1 auto!important;flex-wrap:wrap!important;gap:2px 10px!important;
+ min-width:0!important;margin:0!important;
+}
+#todaySchedulePanel .today-schedule-card>div:first-child{
+ align-items:center!important;gap:3px 8px!important;
+}
+#todaySchedulePanel #todayScheduleSummary,
+#todaySchedulePanel #todayAttendanceLiveStatus{
+ margin:0!important;line-height:1.2!important;
+}
+#todaySchedulePanel #todayScheduleCounts{margin-top:4px!important}
+@media(max-width:800px){
+ #todaySchedulePanel .p79-today-heading-inline{gap:2px 6px!important}
+ #todaySchedulePanel .p79-today-heading-inline>.p79-today-inline-status{gap:2px 6px!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -1443,7 +1470,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
   <section id="todaySchedulePanel" class="no-print">
     <div class="today-schedule-card p-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div class="p79-today-heading-inline">
           <div class="today-panel-title font-black text-slate-800 dark:text-slate-100"><i class="fa-solid fa-user-clock text-indigo-600 mr-1"></i> 今日排班出勤人員 <span id="todayScheduleDate" class="text-xs text-slate-500 ml-1"></span></div>
           <div class="p79-today-inline-status">
             <div id="todayScheduleSummary" class="text-[10px] text-slate-500">載入中...</div>
