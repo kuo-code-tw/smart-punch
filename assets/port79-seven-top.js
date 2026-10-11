@@ -266,7 +266,7 @@ function buildMenu(sys){
  function addAction(a,label,cls){
    const b=document.createElement('button');
    b.type='button';b.dataset.action=a;b.textContent=label;
-   if(cls)b.classList.add(cls);
+   if(cls)String(cls).split(/\s+/).filter(Boolean).forEach(c=>b.classList.add(c));
    if(a==='logout-system')b.classList.add('danger');
    b.addEventListener('click',()=>a==='logout-system'?window.p79LogoutToSevenSystemHome():runAction(sys,a));
    menu.appendChild(b);
