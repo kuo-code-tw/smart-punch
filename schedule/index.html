@@ -1221,6 +1221,9 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
             <button id="top-save-schedule-btn" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="schedule-top-action px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
               <i class="fa-solid fa-floppy-disk"></i> 儲存排班
             </button>
+            <button id="schedule-diag-btn" type="button" onclick="window.open('diagnostics.html','_blank')" class="schedule-top-action px-3 py-2 text-sm bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="新分頁開啟唯讀 GAS 連線診斷，不會修改班表">
+              <i class="fa-solid fa-stethoscope"></i> 連線診斷
+            </button>
             <button id="schedule-import-btn" type="button" onclick="openScheduleImportPicker()" class="schedule-top-action px-3 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="匯入由本系統匯出的班表 Excel，或同欄位格式的 Excel">
               <i class="fa-solid fa-file-import"></i> 匯入班表
             </button>
