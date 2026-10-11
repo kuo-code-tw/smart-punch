@@ -358,3 +358,15 @@ body[data-p79-system] :is(main,#viewAdmin,#app-main-container) :is(table) th{
  #p79SevenNav{width:100%;max-width:100%;grid-template-columns:repeat(7,minmax(86px,1fr));overflow-x:auto;justify-content:start}
  #p79SevenStatus{justify-content:flex-start}
 }
+
+/* 2026-10-11 七大管理系統：僅保留一組共用頂部／導覽／雲端狀態列。 */
+body[data-p79-system] #p79LeaveTop,
+body[data-p79-system] #p79HrShellV103,
+body[data-p79-system] #p79UnifiedShell,
+body[data-p79-system] #p79UnifiedShellV102,
+body[data-p79-system] #p79UnifiedShellV103{display:none!important}
+#p79SevenTop{display:block!important}
+#p79SevenNav{width:min(100%,950px)}
+#p79SevenNav a{font-size:11px;min-height:36px}
+#p79SevenTop .brand-name{min-width:0}
+@media(max-width:1150px){#p79SevenNav{width:100%;grid-template-columns:repeat(7,minmax(100px,1fr))}}
