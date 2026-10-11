@@ -1175,7 +1175,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                         </button>
                         <button type="button" id="btnAttendanceDuplicateList" onclick="p79OpenDuplicateList()" class="px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-cyan-700" title="統計目前已載入資料的疑似重複班次，不會自動刪除">🔎 重複清單 <span id="p79DuplicateListCount"></span></button>
                         <button type="button" id="btnAttendanceExport" onclick="openExportRecordsModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出 Excel</button>
-                        <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700">＋ 新增補打卡</button>
+                        
                     </div>
                 </div>
 
@@ -14273,6 +14273,7 @@ function getManualPairRecordAnchor(record) {
                             <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">
                                 📅 ${String(selectedDate || '').replaceAll('-', '/')}｜當日班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天
                             </span>
+                            <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="新增補打卡">＋ 新增補打卡</button>
                             <button id="attendanceSyncCompactStatus" type="button" onclick="retryCloudOutboxNow()"
                                     class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                                     title="考勤雲端同步狀態；有待同步資料時可點此立即重試">
