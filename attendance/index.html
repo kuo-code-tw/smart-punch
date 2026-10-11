@@ -1141,7 +1141,20 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
             <!-- 分頁 1：考勤紀錄管理與修改 -->
             <div id="adminContentRecords" class="space-y-4">
-                <div class="flex flex-wrap justify-between items-center gap-3 mb-2">
+                <div class="flex flex-col gap-0.5 mb-2">
+                    <div class="flex flex-col gap-0.5 text-[9px] sm:text-[10px] leading-tight text-slate-600 dark:text-slate-300" aria-label="異常顏色圖例">
+                        <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                            <span class="font-bold whitespace-nowrap">💡 異常顏色：</span>
+                            <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
+                            <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300">缺卡｜缺少簽到</span>
+                            <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300">缺卡｜缺少簽退</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                            <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 dark:border-amber-800 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300">時間提醒｜上班分鐘 01–30</span>
+                            <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 dark:border-violet-800 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300">時間提醒｜下班分鐘不在 45–60</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-between items-center gap-2">
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="flex items-center gap-2 min-w-0">
                             <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">📅 年月篩選：</label>
@@ -1179,13 +1192,6 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 text-[11px] bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/80 text-slate-600 dark:text-slate-300">
-                    <span class="font-bold text-slate-700 dark:text-slate-200">💡 異常顏色圖例：</span>
-                    <span class="inline-flex items-center rounded-lg border border-cyan-300 dark:border-cyan-800 bg-cyan-100 dark:bg-cyan-950 px-2 py-1 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
-                    <span class="inline-flex items-center rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950 px-2 py-1 font-bold text-rose-800 dark:text-rose-300">缺卡異常｜缺少簽到</span>
-                    <span class="inline-flex items-center rounded-lg border border-orange-300 dark:border-orange-800 bg-orange-100 dark:bg-orange-950 px-2 py-1 font-bold text-orange-800 dark:text-orange-300">缺卡異常｜缺少簽退</span>
-                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">時間提醒｜上班分鐘 01–30</span>
-                    <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">時間提醒｜下班分鐘不在 45–60</span>
                 </div>
 
                 <div class="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 mb-4">
