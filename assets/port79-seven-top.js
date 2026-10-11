@@ -150,7 +150,7 @@ const MENU={
   ['year','📆 年份顯示']
  ],
  workhours:[['year','📆 年份顯示']],
- leave:[['leave-edit','✎ 編輯／審核模式']],
+ leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
  hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
@@ -220,6 +220,8 @@ async function runAction(sys,a){closeMenu();try{
   if(a==='read-cloud')return await window.manualCloudRefresh?.();
  }
  if(sys==='leave'){
+  if(a==='balance-import')return window.openLeaveBalanceImport?.();
+  if(a==='balance-export')return window.exportLeaveBalanceXlsx?.();
   if(a==='leave-edit'){
     if(typeof window.p79ToggleUnifiedEditMode==='function')return window.p79ToggleUnifiedEditMode();
     const admin=document.getElementById('adminMode');if(admin){admin.scrollIntoView({behavior:'smooth',block:'start'});return}
@@ -255,7 +257,7 @@ function buildMenu(sys){
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
-  ['資料管理',['attendance-import','attendance-export','import','export']],
+  ['資料管理',['attendance-import','attendance-export','balance-import','balance-export','import','export']],
   ['系統設定',['schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['logs','attendance-compare','compare']],
