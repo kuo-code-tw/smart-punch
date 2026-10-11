@@ -1502,7 +1502,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
               <strong><i class="fa-solid fa-stethoscope"></i> 排班雲端連線診斷（唯讀）</strong>
               <button type="button" onclick="closeScheduleDiagnostics()" aria-label="關閉診斷視窗"><i class="fa-solid fa-xmark"></i> 返回排班</button>
             </div>
-            <iframe title="排班雲端診斷工具" src="diagnostics.html?v=20261011.2" referrerpolicy="no-referrer"></iframe>
+            <iframe title="排班雲端診斷工具" src="diagnostics.html?v=20261011.3" referrerpolicy="no-referrer"></iframe>
           </div>`;
         document.body.appendChild(overlay);
       }
@@ -1514,6 +1514,25 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     }
     window.openScheduleDiagnostics=openScheduleDiagnostics;
     window.closeScheduleDiagnostics=closeScheduleDiagnostics;
+
+    // The diagnostic iframe requests the current tab's credentials via same-origin
+    // postMessage. Validate BOTH origin and the exact expected iframe source.
+    // Do not place credentials in URL, HTML attributes, reports or console output.
+    window.addEventListener('message',event=>{
+      if(event.origin!==location.origin || event.data?.type!=='PORT79_DIAG_AUTH_REQUEST')return;
+      const frame=document.querySelector('#p79ScheduleDiagOverlay iframe');
+      if(!frame || event.source!==frame.contentWindow)return;
+      const nonce=String(event.data?.nonce||'');
+      if(!/^[A-Za-z0-9_-]{8,100}$/.test(nonce))return;
+      try{
+        event.source.postMessage({
+          type:'PORT79_DIAG_AUTH_RESPONSE',
+          nonce,
+          token:currentPort79SsoToken(),
+          clientId:getScheduleClientId()
+        },location.origin);
+      }catch(e){console.warn('排班診斷無法與內嵌視窗交換登入狀態');}
+    });
 
     function getScheduleClientId() {
       let id = String(sessionStorage.getItem('port79_schedule_client_id') || '').trim();
