@@ -370,3 +370,37 @@ body[data-p79-system] #p79UnifiedShellV103{display:none!important}
 #p79SevenNav a{font-size:11px;min-height:36px}
 #p79SevenTop .brand-name{min-width:0}
 @media(max-width:1150px){#p79SevenNav{width:100%;grid-template-columns:repeat(7,minmax(100px,1fr))}}
+
+/* 2026-10-11 七大管理系統：放大共用導覽模塊並維持固定排序。 */
+#p79SevenTop .top-row{
+  min-height:76px!important;
+  grid-template-columns:minmax(190px,1fr) minmax(0,auto) minmax(132px,1fr)!important;
+  gap:10px!important;padding:10px 14px!important;
+}
+#p79SevenNav{
+  width:max-content!important;
+  max-width:min(100%,1180px)!important;
+  grid-template-columns:repeat(7,max-content)!important;
+  gap:7px!important;padding:6px!important;
+  border-radius:15px!important;
+}
+#p79SevenNav a{
+  min-height:48px!important;
+  min-width:115px!important;
+  width:auto!important;
+  padding:11px 13px!important;
+  font-size:15px!important;
+  line-height:1.2!important;
+  gap:7px!important;
+  border-radius:11px!important;
+  font-weight:900!important;
+}
+#p79SevenNav a :is(i,svg){font-size:16px!important;width:17px;height:17px}
+@media(max-width:1500px){
+  #p79SevenTop .top-row{grid-template-columns:1fr!important;justify-items:center!important;gap:6px!important}
+  #p79SevenTop .brand,#p79SevenTop .action{justify-self:center!important}
+  #p79SevenNav{max-width:100%!important;overflow-x:auto!important;justify-content:flex-start!important}
+}
+@media(max-width:850px){
+  #p79SevenNav a{min-height:45px!important;min-width:106px!important;font-size:14px!important;padding:9px 11px!important}
+}
