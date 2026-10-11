@@ -982,6 +982,30 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 #app-main-container .p79-roster-bottom-scroll::-webkit-scrollbar,#app-main-container .p79-roster-scroll::-webkit-scrollbar{height:15px;width:10px}
 #app-main-container .p79-roster-bottom-scroll::-webkit-scrollbar-thumb,#app-main-container .p79-roster-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:12px;border:3px solid #e2e8f0}
 </style>
+
+<style id="p79-schedule-compact-personnel-20261011">
+/* 員工欄縮緊並突出姓名，保留完整工號、職務與組別操作。 */
+#app-main-container .p79-month-schedule-table .p79-person-header,
+#app-main-container .p79-month-schedule-table .p79-person-cell{
+  width:210px!important;min-width:210px!important;max-width:210px!important;
+  padding:5px 6px!important;vertical-align:middle!important;
+}
+#app-main-container .p79-person-name{font-size:16px!important;line-height:21px!important;font-weight:950!important}
+#app-main-container .p79-person-name-line{gap:4px!important;min-height:22px;overflow:visible}
+#app-main-container .p79-person-subline{margin-top:2px!important;gap:3px!important}
+#app-main-container .p79-person-id{font-size:9px!important}
+#app-main-container .p79-person-controls{gap:2px!important}
+#app-main-container .p79-mini-drag{width:20px!important;height:20px!important;min-height:20px!important}
+#app-main-container .p79-mini-select{height:21px!important;min-height:21px!important;font-size:9px!important;max-width:57px!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell{height:84px!important;padding:3px 4px!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell .mt-1{margin-top:2px!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell button{min-height:20px!important;line-height:16px!important;padding:1px 2px!important}
+@media(max-width:750px){
+ #app-main-container .p79-month-schedule-table .p79-person-header,
+ #app-main-container .p79-month-schedule-table .p79-person-cell{width:202px!important;min-width:202px!important;max-width:202px!important}
+ #app-main-container .p79-person-name{font-size:15px!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
