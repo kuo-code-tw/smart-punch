@@ -3305,7 +3305,27 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         return { empId: emp.id, name: emp.name, role: emp.role, group: emp.group, month: yearMonth, schedule: monthData };
       });
       try {
-        const result = await cloudPost({ action: 'syncSchedules', month: yearMonth, schedules });
+        // 限定對可重試的 GAS 忙碌錯誤重試。完整月份快照固定不變，
+        // 絕不對編輯權不足、資料格式錯誤或不明原因做盲目重送。
+        const snapshot={ action:'syncSchedules', month:yearMonth, schedules, expectedEmployeeCount:schedules.length };
+        let result;
+        for(let attempt=0;attempt<3;attempt++){
+          try{
+            result=await cloudPost(snapshot);
+            break;
+          }catch(error){
+            const message=String(error?.message||error||'');
+            const temporaryBusy=/雲端目前正在處理其他資料|雲端忙碌|雲端正忙|稍後自動重試|尚未完成儲存|排班雲端忙碌/.test(message);
+            if(!temporaryBusy || attempt>=2)throw error;
+            // 再確認仍持有同一編輯鎖，不可利用重試覆蓋其他管理員的變更。
+            if(!scheduleEditLockState.mine)throw error;
+            await new Promise(resolve=>setTimeout(resolve,[1700,3200][attempt]));
+            const ownership=await scheduleLockGet();
+            setScheduleEditLockState(ownership);
+            if(!scheduleEditLockState.mine)throw new Error('排班編輯權已轉移，已停止自動重試，尚未儲存');
+            console.warn('排班雲端忙碌，等待後重試存檔',attempt+2);
+          }
+        }
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed();
         if (showAlert) alert(`☁️ ${result.message || '排班已同步 Google 雲端'}`);
