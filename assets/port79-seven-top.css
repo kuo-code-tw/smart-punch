@@ -396,7 +396,7 @@ body[data-p79-system] #p79UnifiedShellV103{display:none!important}
   font-weight:900!important;
 }
 #p79SevenNav a :is(i,svg){font-size:16px!important;width:17px;height:17px}
-@media(max-width:1500px){
+@media(max-width:1180px){
   #p79SevenTop .top-row{grid-template-columns:1fr!important;justify-items:center!important;gap:6px!important}
   #p79SevenTop .brand,#p79SevenTop .action{justify-self:center!important}
   #p79SevenNav{max-width:100%!important;overflow-x:auto!important;justify-content:flex-start!important}
