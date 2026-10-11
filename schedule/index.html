@@ -1592,7 +1592,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         if(test.id==='ping'){
           p79ScheduleDiagVersion=String(data.version||'').slice(0,60);
           p79ScheduleDiagV4=data.scheduleSaveRolloverIsolation===true;
-          detail=p79ScheduleDiagV4?'GAS V4 排班／考勤已分離':'線上版本未回報 V4 標記';
+          detail=p79ScheduleDiagV4?'GAS 排班／考勤已分離':'線上版本未回報排班／考勤分離標記';
+          detail+='；寫入回條查詢 '+(Number(data.scheduleSaveReceiptVersion||0)>=1?'已部署':'尚未部署');
         }
         if(test.id==='activity'){
           detail='GAS 回報工作狀態成功（不代表其他資料鎖未被占用）';
@@ -3533,6 +3534,42 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       }
     }
 
+    function p79CreateScheduleSaveRequestId(){
+      let random='';
+      try{random=crypto.randomUUID();}
+      catch(e){random=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);}
+      return 'SCHSAVE-'+random;
+    }
+
+    // Only a matching V5 server receipt counts as confirmation after an ambiguous timeout.
+    // This is read-only and NEVER resubmits the original whole-month POST.
+    async function p79ConfirmScheduleSaveReceipt(requestId,yearMonth){
+      const token=currentPort79SsoToken();
+      const clientId=getScheduleClientId();
+      if(!token||!clientId||!requestId)return null;
+      for(let attempt=0;attempt<3;attempt++){
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),8000);
+        try{
+          const u=new URL(GAS_URL);
+          u.searchParams.set('action','scheduleGetSaveReceipt');
+          u.searchParams.set('gcToken',token);
+          u.searchParams.set('scheduleClientId',clientId);
+          u.searchParams.set('saveRequestId',requestId);
+          u.searchParams.set('_',String(Date.now()));
+          const response=await fetch(u.toString(),{method:'GET',cache:'no-store',redirect:'follow',signal:controller.signal});
+          const data=await response.json();
+          if(!response.ok||data?.ok!==true)return null; // Old GAS does not expose this endpoint.
+          if(data.found && data.completed && data.saveRequestId===requestId &&
+             data.month===yearMonth)return data;
+        }catch(e){
+          console.warn('查詢排班存檔回條暫時失敗：',String(e?.name||'連線異常'));
+        }finally{clearTimeout(timeout);}
+        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,[1500,3000][attempt]));
+      }
+      return null;
+    }
+
     async function saveScheduleMonthToCloud(showAlert = true) {
       const snapshotVersion=p79ScheduleLocalMutationVersion;
       const yearMonth = document.getElementById('month-picker').value;
@@ -3562,13 +3599,31 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       try {
         // 限定對可重試的 GAS 忙碌錯誤重試。完整月份快照固定不變，
         // 絕不對編輯權不足、資料格式錯誤或不明原因做盲目重送。
-        const snapshot={ action:'syncSchedules', month:yearMonth, schedules, expectedEmployeeCount:schedules.length };
+        const snapshot={
+          action:'syncSchedules',month:yearMonth,schedules,
+          expectedEmployeeCount:schedules.length,
+          saveRequestId:p79CreateScheduleSaveRequestId()
+        };
         let result;
         for(let attempt=0;attempt<3;attempt++){
           try{
             result=await cloudPost(snapshot);
             break;
           }catch(error){
+            // POST may already have committed when a network timeout/HTML response happens.
+            // Query its V5 receipt instead of blindly sending the entire month again.
+            if(['SCHEDULE_SAVE_RESULT_UNKNOWN','GAS_HTML_RESPONSE','GAS_INVALID_JSON'].includes(error?.code) ||
+               scheduleLockIsTransientNetworkError(error)){
+              const receipt=await p79ConfirmScheduleSaveReceipt(snapshot.saveRequestId,yearMonth);
+              if(receipt){
+                result={ok:true,receiptConfirmed:true,recoveredAfterTimeout:true,
+                  message:'已向 GAS 查到這筆排班的成功存檔回條'};
+                break;
+              }
+              const unknown=new Error('存檔請求已發出，但雲端結果尚未確認。請保留目前畫面；如果 GAS V5 尚未部署，需先更新後端才能查詢存檔回條。');
+              unknown.code='SCHEDULE_SAVE_RESULT_UNKNOWN';
+              throw unknown;
+            }
             const message=String(error?.message||error||'');
             const temporaryBusy=/雲端目前正在處理其他資料|雲端忙碌|雲端正忙|稍後自動重試|尚未完成儲存|排班雲端忙碌/.test(message);
             if(!temporaryBusy || attempt>=2)throw error;
