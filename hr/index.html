@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-Hant" data-theme="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261012.51"></script>
+<script src="../assets/port79-overtime-report.js?v=20261012.52"></script>
 <!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
 <!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜hr -->
@@ -431,10 +431,10 @@ function p79AvailableJobScopes(){
   const unique=[...new Set(values.map(x=>String(x||'').trim()).filter(Boolean))];
   return unique.sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
 }
-const SCOPE_OPTIONS=[['self','僅本人'],['unit','本單位'],['department','本部門'],['assigned','指定範圍'],['all','全部人員']];
+const SCOPE_OPTIONS=[['self','僅本人'],['unit','本單位'],['department','本部門'],['assigned','指定職稱（逐項勾選）'],['all','全部人員']];
 function fineDefaults(e,k){const role=String(e?.adminRole||'employee').toLowerCase(),p=normalizePerms(e||{}),raw=e?.finePermissions?.[k]||{},out={};(FINE_CATALOG[k]||[]).forEach(([key])=>{let v=false;if(role==='superadmin')v=true;else if(role==='employee')v=(k==='attendance'&&key==='punch')||(k==='leave'&&key==='apply');else if(p[k]==='manage')v=!(k==='hr'&&(key==='permissions.manage'||key==='audit.clear'));else if(p[k]==='view')v=/\.view$/.test(key)||key==='own.view'||key==='punch'||key==='apply';if(Object.prototype.hasOwnProperty.call(raw,key)&&role!=='employee'&&role!=='superadmin')v=!!raw[key];out[key]=v});return out}
 function dataScopes(e){const role=String(e?.adminRole||'employee').toLowerCase(),raw=e?.dataScope||{},out={};SYS.forEach(k=>out[k]=role==='superadmin'?'all':role==='employee'?'self':(raw[k]||'department'));return out}
-function canHr(action){return String(session?.adminRole||'').toLowerCase()==='superadmin'||session?.finePermissions?.hr?.[action]===true}
+function canHr(action){return String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||session?.finePermissions?.hr?.[action]===true}
 
 const PERMISSION_CAPS={
   attendance:{
@@ -443,7 +443,7 @@ const PERMISSION_CAPS={
   },
   workhours:{
     view:{see:['查看出勤統計','查看加班統計'],edit:['不可匯出統計']},
-    manage:{see:['查看全部出勤統計','查看全部加班統計'],edit:['匯出出勤統計','匯出加班統計']}
+    manage:{see:['查看全部出勤統計','查看全部加班統計'],edit:['匯出出勤統計','匯出加班統計','申報加班','管理加班選項']}
   },
   leave:{
     view:{see:['查看請假紀錄','查看請假狀態','查看特休資訊'],edit:['不可審核、修改或刪除請假']},
@@ -609,7 +609,7 @@ function p79ApplyHrSession(s){
   if(!s||typeof s!=='object')return false;
   session=s;
   const p=s.systemPermissions||{};
-  hrAccess=String(s.adminRole||s.role||'').toLowerCase()==='superadmin'?'manage':level(p.hr||s.employeeListAccess);
+  hrAccess=String(s.adminRole||s.role||s.actualAdminRole||'').toLowerCase()==='superadmin'?'manage':level(p.hr||s.employeeListAccess);
   if(hrAccess==='none')return false;
   $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
   if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
@@ -953,21 +953,31 @@ function render(){
   $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>e.dept).filter(Boolean)).size;
   $('stHrManagers').textContent=ps.filter(p=>p.hr==='manage').length;
 }
-function p79ToggleJobScopes(k){const el=document.getElementById('scope_jobs_'+k);if(el)el.style.display=document.getElementById('scope_'+k)?.value==='assigned'?'grid':'none';}
+function p79ToggleJobScopes(k){const el=document.getElementById('scope_jobs_'+k);if(el)el.style.display=document.getElementById('scope_'+k)?.value==='assigned'?'flex':'none';}
+function p79UpdateOvertimeManagementDisplay(){
+  const allowed=$('adminRole').value==='superadmin'||($('adminRole').value!=='employee'&&$('perm_workhours')?.value==='manage');
+  document.querySelectorAll('[data-overtime-management-display]').forEach(cb=>cb.checked=allowed);
+}
 function buildPermGrid(e){
-  const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=String(session?.adminRole||'')==='superadmin'||canHr('permissions.manage');
-  const scopes=dataScopes(e||{});
-  const selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
-  const availableJobs=p79AvailableJobScopes();
-  $('permGrid').innerHTML=SYS.map(k=>{
+  const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=canHr('permissions.manage');
+  const scopes=dataScopes(e||{}),selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
+  // 指定職稱與目前雲端實際接受的範圍一致。
+  const availableJobs=['AQC','ARMG','領班','指揮手'];
+  const cards=SYS.map(k=>{
     const f=fineDefaults({...e,adminRole:role},k);
-    const actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
-    const scopeOpts=SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('');
-    return `<div class="permitem"><b>${LABEL[k]}</b><select id="perm_${k}" ${superRole||employeeRole||!canGrant?'disabled':''}><option value="none">無後台權限</option><option value="view">查看後台</option><option value="manage">管理後台</option></select><div class="perm-actions-grid">${actions}</div><label class="perm-scope"><span>資料範圍</span><select id="scope_${k}" onchange="p79ToggleJobScopes(\'${k}\')" ${superRole||employeeRole||!canGrant?'disabled':''}>${scopeOpts}</select></label><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'grid':'none'};grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:3px 5px;margin-top:4px">${availableJobs.map(job=>`<label style="display:flex;justify-content:center;align-items:center;gap:5px;padding:4px 3px;font-size:12px;text-align:center;white-space:nowrap;line-height:1.2"><input type="checkbox" data-job-scope="${k}" value="${esc(job)}" ${Array.isArray(selectedJobs[k])?selectedJobs[k].includes(job)?'checked':'':'checked'} ${superRole||employeeRole||!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div>`;
+    let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
+    if(k==='workhours')actions+=['申報加班','管理加班選項'].map(label=>`<label class="perm-action" title="依工時統計的管理後台權限啟用"><input type="checkbox" data-overtime-management-display disabled ${superRole||(!employeeRole&&p.workhours==='manage')?'checked':''}><span>${label}</span></label>`).join('')+'<p class="muted" style="grid-column:1/-1">申報與選項管理依上方「管理後台」啟用。</p>';
+    return `<div class="permitem"><b>${LABEL[k]}</b><select id="perm_${k}" ${k==='workhours'?'onchange="p79UpdateOvertimeManagementDisplay()"':''} ${superRole||employeeRole||!canGrant?'disabled':''}><option value="none">無後台權限</option><option value="view">查看後台</option><option value="manage">管理後台</option></select><div class="perm-actions-grid">${actions}</div></div>`;
   }).join('');
-  SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];if(superRole)$('scope_'+k).value='all';if(employeeRole)$('scope_'+k).value='self'});
-  const pwd=$('password');
-  if(pwd){pwd.disabled=employeeRole||!canGrant; if(employeeRole)pwd.value='';}
+  let ranges;
+  if(superRole||employeeRole){
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍</b><p>${superRole?'超級管理員：全部系統固定可查看全部人員。':'一般員工：僅本人資料。'}</p>${SYS.map(k=>`<input type="hidden" id="scope_${k}" value="${superRole?'all':'self'}">`).join('')}</div>`;
+  }else{
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、領班、指揮手。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${job}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].includes(job)?'checked':''} ${!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div></div>`).join('')}</div>`;
+  }
+  $('permGrid').innerHTML=cards+ranges;
+  SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];});
+  const pwd=$('password');if(pwd){pwd.disabled=employeeRole||!canGrant;if(employeeRole)pwd.value='';}
 }
 function onRoleChange(){buildPermGrid(editing||{adminRole:$('adminRole').value})}
 function onEmploymentStatusChange(){
@@ -1357,7 +1367,7 @@ C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',c
 });
 </script>
 <script>
-window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>hrAccess==='manage'};
+window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||hrAccess==='manage'};
 </script>
 </body></html>
 
