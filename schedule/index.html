@@ -2476,7 +2476,18 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
     let availableGroups = ['不分組', '不輪班'];
 
-    const NATIONAL_HOLIDAYS = Object.fromEntries(Array.from({length:12},(_,i)=>'2026-'+String(i+1).padStart(2,'0')).flatMap(month=>p79RestQuota(month).slots.filter(s=>s.category==='國').map(s=>[s.sourceDate,s.holidayName])));
+    const NATIONAL_HOLIDAYS = {
+      "2027-01-01": "開國紀念日",
+      "2027-02-06": "農曆除夕",
+      "2027-02-07": "農曆春節",
+      "2027-02-28": "和平紀念日",
+      "2027-04-04": "兒童節/清明節",
+      "2027-05-01": "勞動節",
+      "2027-06-08": "端午節",
+      "2027-09-15": "中秋節",
+      "2027-10-10": "國慶日",
+      ...Object.fromEntries(Array.from({length:12},(_,i)=>'2026-'+String(i+1).padStart(2,'0')).flatMap(month=>p79RestQuota(month).slots.filter(s=>s.category==='國').map(s=>[s.sourceDate,s.holidayName])))
+    };
 
     const COLOR_PALETTE = [
       { bg: 'bg-blue-150', text: 'text-blue-800', border: 'border-blue-300' },
