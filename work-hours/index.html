@@ -20,6 +20,7 @@
 <!-- PORT79 2026-10-03 CROSS-MONTH-PAIR-GUARD：忽略時間倒流的舊人工配對，9/30 晚班可正常配 10/1 早班下班。 -->
 <!-- PORT79 2026-10-03 ATTENDANCE-NO-RETRY-LOOP：停止 focus/前景強制重送；updateRecord 失敗2次自動暫停。 -->
 <!-- PORT79 2026-10-03 FAST-EDIT-DELTA：單筆修改12秒逾時＋後端精準單列更新；員工打卡 delta 維持約1.8秒即時同步。 -->
+<!-- PORT79 2026-10-12：加班管理共享啟動同步、低頻背景輪詢與人工配對索引。 -->
 <!-- PORT79 2026-10-03：修正補卡被舊雲端快照洗掉＋一般員工 port79_user_token 未帶入員工主檔快速讀取。 -->
 <!-- PORT79 2026.10.03.16.60：根因修正：跨月完整班次月份歸屬改回上班簽到日；9/30上班＋10/1下班顯示於9/30 -->
 <!-- PORT79 2026.10.03：Token逾時時自動改走 addRecord 原打卡通道 -->
@@ -10230,6 +10231,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             // 若人工補卡保存了明確 target time，但 target 已被舊版誤刪，僅在顯示層補一個 deterministic target。
             const additions = [];
+            const pairingIds = new Set(list.map(r=>String(r?.id??'')));
+            let targetsByType = null;
+            const ensureTargetIndex=()=>{
+            if(targetsByType)return targetsByType;
+            targetsByType=new Map();
+            list.forEach(record=>{
+                const type=getAttendanceRecordType(record);
+                if(!targetsByType.has(type))targetsByType.set(type,{ids:new Set(),keys:new Set(),times:new Set()});
+                const index=targetsByType.get(type);
+                index.ids.add(String(record.id??'').trim());
+                const stableKey=getAttendanceStablePairKey(record);if(stableKey)index.keys.add(stableKey);
+                index.times.add(normalizeImportedAttendanceTime(record.timeStr));
+            });
+            return targetsByType;
+            };
             list.slice().forEach(record => {
                 const type = getAttendanceRecordType(record);
                 const direction = type === 'OUT' ? 'OUT_TO_IN' : (type === 'IN' ? 'IN_TO_OUT' : '');
@@ -10239,11 +10255,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const targetTime = direction === 'OUT_TO_IN' ? getManualPairClockInTimeStr(record) : getManualPairClockOutTimeStr(record);
                 if (!normalizeImportedAttendanceTime(targetTime)) return;
                 const targetType = direction === 'OUT_TO_IN' ? 'IN' : 'OUT';
-                const exists = list.some(candidate => getAttendanceRecordType(candidate) === targetType && attendancePairRecordMatches(candidate,targetId,targetKey,targetTime));
+                const index=ensureTargetIndex().get(targetType);
+                const exists = !!index && (!!targetId&&index.ids.has(String(targetId).trim()) || !!targetKey&&index.keys.has(String(targetKey).trim()) || !!normalizeImportedAttendanceTime(targetTime)&&index.times.has(normalizeImportedAttendanceTime(targetTime)));
                 if (exists) return;
                 const recovered = makeRecoveredManualPairRecord(record,targetType);
-                if (recovered && !list.some(r => String(r?.id ?? '') === String(recovered.id)) && !additions.some(r => String(r?.id ?? '') === String(recovered.id))) {
+                if (recovered && !pairingIds.has(String(recovered.id))) {
                     recovered.viewRecoveredPair = true;
+                    pairingIds.add(String(recovered.id));
                     additions.push(recovered);
                 }
             });
