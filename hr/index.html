@@ -407,7 +407,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </script>
 
 <script>
-const APP_VERSION='2026.10.11.30';
+const APP_VERSION='2026.10.12.47';
 const DEFAULT_GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 let employees=[],session=null,token='',hrAccess='none',editing=null;
@@ -489,12 +489,25 @@ function legacyAttendanceOrgSettings(){
   }
 }
 function mergeLegacyOrgSettings(base){
-  const legacy=legacyAttendanceOrgSettings();
-  return normalizeOrgSettings({
-    departments:[...(base?.departments||[]),...legacy.departments],
-    jobTitles:[...(base?.jobTitles||[]),...legacy.jobTitles],
-    units:[...(base?.units||[])]
-  });
+  // 舊考勤選項不可覆蓋人資管理員已儲存的清單。
+  return normalizeOrgSettings(base);
+}
+let p79CanonicalOrgOptions=null;
+const P79_HR_ORG_OPTIONS_KEY='hrOrgOptionsV1';
+function p79OrgOptionsCacheKey(){return 'p79_hr_org_options_v1:'+GAS_URL+':'+String(session?.empId||'');}
+function p79RememberOrgOptions(settings){
+  p79CanonicalOrgOptions=normalizeOrgSettings(settings);
+  try{localStorage.setItem(p79OrgOptionsCacheKey(),JSON.stringify(p79CanonicalOrgOptions));}catch(ignore){}
+}
+async function p79ReadCanonicalOrgOptions(){
+  const d=await apiGet('getData',45000);
+  if(!d.config||typeof d.config!=='object')throw new Error('組織設定來源不完整');
+  if(Object.prototype.hasOwnProperty.call(d.config,P79_HR_ORG_OPTIONS_KEY)){
+    const settings=d.config[P79_HR_ORG_OPTIONS_KEY];
+    if(!settings||!['departments','jobTitles','units'].every(k=>Array.isArray(settings[k])))throw new Error('組織選項格式不完整');
+    p79RememberOrgOptions(settings);
+  }else{p79CanonicalOrgOptions=null;}
+  return d.config;
 }
 async function migrateLegacyAttendanceOrgSettings(){
   // 舊版曾把考勤 localStorage 的部門／職稱自動回填到人資設定。
@@ -643,7 +656,7 @@ function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
     .filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN')
     .map(e=>({...e,phone:normalizePhone(e.phone)}));
   hrAccess=d.hrAccess||hrAccess;
-  orgSettings=mergeLegacyOrgSettings(normalizeOrgSettings(d.orgSettings||{}));
+  orgSettings=normalizeOrgSettings(p79CanonicalOrgOptions||d.orgSettings||{});
   populateFilters();
   render();
   migrateLegacyAttendanceOrgSettings();
@@ -656,6 +669,7 @@ function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
 
 async function p79TryLoadHrCache(){
   try{
+    try{const cached=JSON.parse(localStorage.getItem(p79OrgOptionsCacheKey())||'null');if(cached&&['departments','jobTitles','units'].every(k=>Array.isArray(cached[k])))p79CanonicalOrgOptions=normalizeOrgSettings(cached);}catch(ignore){}
     const snap=await window.Port79DataCache?.getSystemSnapshot?.('hr');
     const d=snap?.data;
     if(!d?.ok||!Array.isArray(d.employees)||!d.employees.length)return false;
@@ -700,6 +714,7 @@ async function loadEmployees(show){
         d=await apiGet('hrGetEmployees',45000);
       }
 
+      await p79ReadCanonicalOrgOptions();
       p79ApplyHrEmployeesPayload(d,show,'cloud');
       return true;
     }catch(e){
@@ -805,8 +820,15 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
   if(hrAccess!=='manage')return;
   try{
     $('saveOrgBtn').disabled=true;
-    const d=await apiPost({action:'hrSaveOrgSettings',settings:orgDraft});
-    orgSettings=normalizeOrgSettings(d.orgSettings||orgDraft);
+    const draft=normalizeOrgSettings(orgDraft);
+    const currentConfig=await p79ReadCanonicalOrgOptions();
+    const config={...currentConfig,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
+    if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+    await apiPost({action:'hrSaveOrgSettings',settings:draft});
+    await apiPost({action:'saveConfig',config});
+    await p79ReadCanonicalOrgOptions();
+    if(JSON.stringify(p79CanonicalOrgOptions)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
+    orgSettings=draft;
     populateFilters();orgDialog.close();
     $('status').textContent='✅ 部門／職稱／單位已儲存到雲端，七大系統人資主檔可共用';
   }catch(e){alert('組織設定儲存失敗：'+(e.message||e))}
@@ -1260,6 +1282,8 @@ function mount(){
         
         
         
+        <button type="button" id="p79HrAddPersonMenu" onclick="window.p79HrMenuAction('add')">＋ 新增人員</button>
+        <button type="button" onclick="window.p79HrMenuAction('org')">⚙️ 部門／職稱／單位</button>
         <button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>
         <button type="button" onclick="window.p79HrMenuAction('cleanupDevices')">🧹 清除免綁員工殘留裝置</button>
         <div class="p79v103-menu-sep"></div>
@@ -1333,4 +1357,5 @@ C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',c
 window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>hrAccess==='manage'};
 </script>
 </body></html>
+
 
