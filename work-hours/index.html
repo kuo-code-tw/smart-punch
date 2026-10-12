@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
+<script src="../assets/port79-overtime-report.js?v=20261012.46"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -1172,6 +1173,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
                     </div>
@@ -11174,8 +11176,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const end = getAttendanceTimestamp(row.clockOut);
             const totalMinutes = Math.floor((end - start) / 60000);
             const employee=findEmployeeForAttendanceIdentity(row,employees);
-            const meta=employee?employeeScheduleMetaMap(employee)[normalizeScheduleDateKey(row.dateKey)]:null;
-            return p79RestActualOvertimeMinutes(totalMinutes,meta);
+            const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(row.dateKey),employee?employeeScheduleMetaMap(employee):{});
+            const meta=matchedReport.meta,reported=matchedReport.minutes;
+            return reported===null?p79RestActualOvertimeMinutes(totalMinutes,meta):reported;
         }
 
         function attendanceRowOvertimeText(row) {
@@ -12157,8 +12160,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
                     const employee = findEmployeeForAttendanceIdentity(session, visibleEmployees);
                     if (!employee) return null;
-                    const restMeta=restMetaByEmp.get(String(employee.empId))?.[normalizeScheduleDateKey(session.dateKey)];
-                    const overtimeMinutes = p79RestActualOvertimeMinutes(totalMinutes,restMeta);
+                    const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId)));
+                    const restMeta=matchedReport.meta;
+                    const reportMinutes=matchedReport.minutes;
+                    const overtimeMinutes = reportMinutes===null?p79RestActualOvertimeMinutes(totalMinutes,restMeta):reportMinutes;
                     if(!overtimeMinutes)return null;
                     const monthKey = String(session.dateKey || '').slice(0, 7);
                     return {
@@ -12170,6 +12175,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         monthKey,
                         totalMinutes,
                         overtimeMinutes,
+                        overtimeReport:restMeta?.overtimeReport||null,
                         overDailyLimit: totalMinutes > 720
                     };
                 })
@@ -12295,7 +12301,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td class="px-3 py-3 font-bold whitespace-nowrap">${formatDurationMinutes(row.totalMinutes)}</td>
-                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}</td>
+                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-slate-500">${escapeHtml(row.overtimeReport.code)}｜申報換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件、且已完整簽到簽退的加班班次</td></tr>';
 
@@ -14421,7 +14427,11 @@ C.mountMonth({inputId:'attendanceStatsMonth'});
 
 });
 </script>
+<script>
+window.p79OvertimeContext={gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:()=>isAdminLoggedIn&&(isVerifiedSuperAdminSession()||(Object.prototype.hasOwnProperty.call(currentEmp?.systemPermissions||{},'workhours')?currentEmp.systemPermissions.workhours==='manage':canPerformAdminAction(currentEmp,'attendanceEdit')))};
+</script>
 </body>
 </html>
+
 
 

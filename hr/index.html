@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-Hant" data-theme="light">
 <head>
+<script src="../assets/port79-overtime-report.js?v=20261012.46"></script>
 <!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
 <!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜hr -->
@@ -1259,6 +1260,7 @@ function mount(){
         
         
         
+        <button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>
         <button type="button" onclick="window.p79HrMenuAction('cleanupDevices')">🧹 清除免綁員工殘留裝置</button>
         <div class="p79v103-menu-sep"></div>
         <button type="button" onclick="window.p79HrMenuAction('theme')">◐ 深淺色</button>
@@ -1327,4 +1329,8 @@ C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',c
 
 });
 </script>
+<script>
+window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>hrAccess==='manage'};
+</script>
 </body></html>
+

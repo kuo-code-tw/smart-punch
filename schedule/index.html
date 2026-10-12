@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<script src="../assets/port79-overtime-report.js?v=20261012.46"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
 <!-- PORT79 Schedule V10.29 SINGLE-SAVE：移除排班功能選單重複的「儲存雲端」入口；月班表儲存按鈕統一名稱為「儲存排班」，實際仍寫入 Google 雲端。 -->
 <!-- PORT79 Schedule V10.28 INSTANT-LOCK-SAVE：他人鎖定改1秒確認；點鎖定時先即時查雲端再取得；離頁 beacon+keepalive 雙送釋放；「儲存雲端」統一真正儲存，成功明確顯示「儲存完畢」；手動讀雲端失敗改非阻斷提示。 -->
@@ -3734,6 +3735,10 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         }
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
+        try{
+          const draft=JSON.parse(sessionStorage.getItem(P79Overtime.KEY)||'null');
+          if(draft&&schedules.some(row=>Object.values(row.schedule.__meta||{}).some(m=>m?.overtimeReport?.id===draft.id))){sessionStorage.removeItem(P79Overtime.KEY);document.getElementById('p79ReportBanner')?.remove();}
+        }catch(ignore){}
         if (showAlert) alert(`☁️ ${result.message || '排班已同步 Google 雲端'}`);
         return true;
       } catch (err) {
@@ -4537,6 +4542,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(choices.some(x=>String(x.id)===prev))target.value=prev;
     }
     function openSubstituteAssignment(empId, dayStr, fromAnnualLeave=false) {
+      p79PendingOvertimeReport=null;
       if (!requireScheduleEditLock()) return;
       if (!canManageSchedule()) { alert('此帳號只有排班查看權限。'); return; }
       ensureSubstituteModal();
@@ -4570,6 +4576,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
     function closeSubstituteAssignment() {
       document.getElementById('substitute-assignment-modal')?.classList.add('hidden');
+      p79PendingOvertimeReport=null;
     }
 
     function p79LoadSubstituteOvertimeFields() {
@@ -4593,11 +4600,13 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(!['rest','extended'].includes(overtimeType))throw new Error('請選擇有效的加班類型');
       if(overtimeType==='extended'&&(!normal||shift!==original))throw new Error('延時加班必須保留當日正常班別');
       if(overtimeType==='rest'&&!['休',''].includes(original))throw new Error('請假當日不能安排加班');
+      if(old.overtimeReport&&(old.overtimeStart!==start||old.overtimeEnd!==end||old.overtimeType!==overtimeType)&&!p79PendingOvertimeReport){old={...old};delete old.overtimeReport;}
       return {...old,...details,type:kind==='substitute'?'substitute':'overtime',overtime:true,
         overtimeType,overtimeOriginalShift:original,overtimeAssignedShift:shift,
         overtimeStart:start,overtimeEnd:end};
     }
 
+    let p79PendingOvertimeReport=null;
     function saveSubstituteAssignment() {
       if (!requireScheduleEditLock()||!canManageSchedule())return;
       const empId=String(document.getElementById('substitute-worker-emp').value||'').trim();
@@ -4611,10 +4620,22 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(!worker||!dayStr)return alert('請選擇加班人員');
       if(kind==='substitute'&&(!target||forEmpId===empId))return alert('代班加班必須選擇第二位被代班人員');
       if(target&&String(target.role||'').trim()!==String(worker.role||'').trim())return alert('只能選擇相同單位（職務）的人員代班');
-      const old=monthlyScheduleMeta[empId]?.[dayStr]||{};
+      let old=monthlyScheduleMeta[empId]?.[dayStr]||{};
+      const reportDraft=p79PendingOvertimeReport?.empId===empId&&p79PendingOvertimeReport?.date===dayStr?p79PendingOvertimeReport:null;
+      if(p79PendingOvertimeReport&&!reportDraft)return alert('申報人員或日期已改變，請取消後重新申報');
       const shift=String(document.getElementById('substitute-overtime-shift').value||'');
       let meta;
       try {
+        if(reportDraft){
+          const rule=reportDraft.rule;
+          if(kind!==(rule.category==='延'?'extended':'rest')||document.getElementById('substitute-overtime-start').value!==P79Overtime.time(rule.overtimeStart)||document.getElementById('substitute-overtime-end').value!==P79Overtime.time(rule.overtimeEnd))throw new Error('套用的申報類型或時段已修改，請回加班管理重新選擇規則');
+          if(kind==='rest'&&['早','中','晚'].includes(monthlyScheduleData[empId]?.[dayStr])){
+            if(!old.restQuotaOvertime||!['休','國','例'].includes(rule.category)||old.restCategory!==rule.category)throw new Error('工作日申報未休加班前，請先自動配對例／休／國，並選擇該日相同假別');
+            old={...old,reportOriginalShift:monthlyScheduleData[empId][dayStr],overtimeOriginalShift:'休'};
+          }
+          old={...old,overtimeReport:{...rule,id:reportDraft.id,reportedAt:new Date().toISOString()},reportOriginalShift:old.reportOriginalShift??monthlyScheduleData[empId]?.[dayStr]};
+          if(kind==='rest'&&(['休','國','例'].includes(rule.category)||old.restCategory)){old.restCategory=['休','國','例'].includes(rule.category)?rule.category:old.restCategory;old.restQuotaOvertime=true;old.restAllocationSource='manual';}
+        }
         meta=p79BuildScheduleOvertimeMeta(old,kind,String((monthlyScheduleData[empId]||{})[dayStr]||''),shift,
           String(document.getElementById('substitute-overtime-start').value||''),
           String(document.getElementById('substitute-overtime-end').value||''),
@@ -4624,6 +4645,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(!monthlyScheduleData[empId])monthlyScheduleData[empId]={};
       monthlyScheduleMeta[empId][dayStr]=meta;
       monthlyScheduleData[empId][dayStr]=shift;
+      if(reportDraft){p79PendingOvertimeReport=null;const banner=document.getElementById('p79ReportBanner');if(banner)banner.textContent='申報已加入班表，正在等待雲端儲存確認。';}
       queueScheduleCloudSave();
       closeSubstituteAssignment();
       renderRoleScheduleView();renderTodaySchedulePanel();
@@ -4635,8 +4657,12 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const dayStr = String(document.getElementById('substitute-date-key')?.value || '').trim();
       const meta=monthlyScheduleMeta[empId]?.[dayStr];
       if(meta?.overtimeAssignedShift && monthlyScheduleData[empId]?.[dayStr]===meta.overtimeAssignedShift && meta.overtimeOriginalShift!==undefined)
-        monthlyScheduleData[empId][dayStr]=meta.overtimeOriginalShift;
-      if (monthlyScheduleMeta[empId] && monthlyScheduleMeta[empId][dayStr]) delete monthlyScheduleMeta[empId][dayStr];
+        monthlyScheduleData[empId][dayStr]=meta.reportOriginalShift??meta.overtimeOriginalShift;
+      if (monthlyScheduleMeta[empId] && monthlyScheduleMeta[empId][dayStr]) {
+        const kept={};if(meta?.overtimeReport)for(const k of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])if(meta[k]!==undefined)kept[k]=meta[k];
+        if(kept.restCategory)kept.restQuotaOvertime=['早','中','晚'].includes(monthlyScheduleData[empId]?.[dayStr]);
+        if(Object.keys(kept).length)monthlyScheduleMeta[empId][dayStr]=kept;else delete monthlyScheduleMeta[empId][dayStr];
+      }
       queueScheduleCloudSave();
       closeSubstituteAssignment();
       renderRoleScheduleView();
@@ -5018,7 +5044,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '代'+coverHours : (dayMeta ? '編輯代班' : '代班')}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '代'+coverHours : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(dayMeta.overtimeReport.code) : (dayMeta ? '編輯代班' : '代班'))}</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
@@ -6545,11 +6571,51 @@ body[data-p79-system="schedule"] #app-main-container{
 })();
 </script>
 
+<script>
+window.p79OpenReportDraft=async function(){
+ try{
+  const raw=sessionStorage.getItem(P79Overtime.KEY);if(!raw)return;
+  const draft=JSON.parse(raw);
+  if(draft.gasUrl!==GAS_URL||Date.now()-draft.createdAt>86400000)throw new Error('待確認申報來源或日期已失效，請回加班管理重新申報');
+  if(!canManageSchedule())throw new Error('申報帶入班表需要排班管理權限');
+  if(port79ScheduleDirty||port79ScheduleWriteInFlight)throw new Error('請先完成目前班表儲存，再開啟申報');
+  if(!scheduleEditLockState.mine&&!await manualAcquireScheduleEditLock())throw new Error('尚未取得排班編輯鎖，請稍後重試');
+  document.getElementById('month-picker').value=draft.date.slice(0,7);
+  if(!await loadCloudData(false))throw new Error('雲端班表尚未載入，未帶入申報');
+  if(!monthlyScheduleData[draft.empId]?.[draft.date])throw new Error('該員工當日尚未排班，請先排班');
+  const rule=draft.rule;
+  P79Overtime.validate([[rule.category,rule.code,rule.declaredHours,rule.convertedHours??'',rule.normalStart,rule.normalEnd,rule.overtimeStart,rule.overtimeEnd,rule.position]]);
+  const current=monthlyScheduleData[draft.empId][draft.date];
+  if(rule.category==='延'){
+    const normalHour=Number(rule.normalStart.slice(0,2))%24,expected=normalHour<8?'晚':normalHour<16?'早':'中';
+    if(current!==expected)throw new Error('此代碼的正常班時段與當日班別不符，請重新選擇代碼');
+  }
+  openSubstituteAssignment(draft.empId,draft.date);
+  if(!document.getElementById('substitute-assignment-modal')||document.getElementById('substitute-assignment-modal').classList.contains('hidden'))throw new Error('無法開啟代班設定，請確認人員與權限');
+  p79PendingOvertimeReport=draft;
+  document.getElementById('substitute-overtime-kind').value=rule.category==='延'?'extended':'rest';
+  const h=Number((rule.category==='延'?rule.normalStart:rule.overtimeStart).slice(0,2))%24;
+  document.getElementById('substitute-overtime-shift').value=rule.category==='延'?current:(h<8?'晚':h<16?'早':'中');
+  document.getElementById('substitute-overtime-start').value=P79Overtime.time(rule.overtimeStart);
+  document.getElementById('substitute-overtime-end').value=P79Overtime.time(rule.overtimeEnd);
+  document.getElementById('substitute-note').value=draft.note||'';
+  document.getElementById('substitute-modal-subtitle').textContent=draft.date+'｜'+rule.code+'｜加班 '+rule.overtimeStart+'-'+rule.overtimeEnd+(rule.category==='延'?'｜正常 '+rule.normalStart+'-'+rule.normalEnd:'')+'｜換算 '+(rule.convertedHours===null?'未設定':rule.convertedHours+'小時');
+  p79ToggleSubstituteType();
+ }catch(e){alert('尚未帶入申報：'+e.message)}
+};
+document.addEventListener('DOMContentLoaded',()=>{
+ if(!sessionStorage.getItem(P79Overtime.KEY))return;
+ const banner=document.createElement('div');banner.id='p79ReportBanner';banner.style.cssText='padding:12px;margin:8px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;font-weight:700;color:#0c4a6e';
+ banner.innerHTML='有一筆從加班管理帶入的待確認申報。 <button type="button" onclick="p79OpenReportDraft()" style="padding:6px 12px;background:#0369a1;color:white;border-radius:6px">開啟申報並確認</button>';
+ document.body.prepend(banner);
+});
+</script>
 </body>
 </html>
 
 <style id="p79-schedule-v10-14-2-cloudsync">
 body[data-p79-system="schedule"] #schedule-cloud-sync-btn{display:inline-flex!important}
 </style>
+
 
 
