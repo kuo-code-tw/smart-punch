@@ -2251,7 +2251,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.39';
+        const APP_VERSION='2026.10.12.40';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12024,6 +12024,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(a>b)[a,b]=[b,a];
             }
 
+            recordsSingleDateRequested = false;
+            recordsSelectedDateKey = '';
             start.value=a;
             end.value=b;
             start.dataset.p79DateInitialized='1';
@@ -12168,6 +12170,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function onAttendanceMonthFilterChange() {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
+            recordsSingleDateRequested = false;
+            recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(monthSelect.value, false);
             resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
             renderAttendanceMonthTabs([...monthSelect.options].map(option=>option.value), monthSelect.value || 'ALL');
@@ -12186,6 +12190,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
             monthSelect.value = month;
+            recordsSingleDateRequested = false;
+            recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(month, false);
             resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
             renderAttendanceMonthTabs([...monthSelect.options].map(option=>option.value), month);
@@ -14275,6 +14281,8 @@ function getManualPairRecordAnchor(record) {
         let recordsPaginationSignature = '';
         let recordsDatePageKeys = [];
         let recordsSelectedDateKey = ''; // 修改、補卡、刪除或雲端同步後保持正在查看的日期
+        let recordsSingleDateRequested = false;
+        let recordsRangeViewRequested = false;
 
         function attendanceRowDatePageKey(row, monthFilter = 'ALL') {
             const accounting = String(
@@ -14305,6 +14313,8 @@ function getManualPairRecordAnchor(record) {
         }
 
         function goToRecordsPage(page) {
+            recordsSingleDateRequested = true;
+            recordsRangeViewRequested = false;
             recordsCurrentPage = Math.max(1, Number(page) || 1);
             recordsSelectedDateKey = recordsDatePageKeys[recordsCurrentPage - 1] || '';
             renderAdminRecordsTable();
@@ -14316,6 +14326,26 @@ function getManualPairRecordAnchor(record) {
             const index = recordsDatePageKeys.indexOf(key);
             if (index < 0) return;
             goToRecordsPage(index + 1);
+        }
+
+        function showRecordsDateRange() {
+            recordsSingleDateRequested = false;
+            recordsRangeViewRequested = true;
+            recordsSelectedDateKey = '';
+            renderAdminRecordsTable();
+        }
+
+        function p79UseRecordsRangeView(dateFrom, dateTo, monthFilter, singleDateRequested, forceRange = false) {
+            if (singleDateRequested) return false;
+            if (forceRange) return true;
+            if (dateFrom || dateTo) return dateFrom !== dateTo;
+            return /^\d{4}-\d{2}$/.test(String(monthFilter || ''));
+        }
+
+        function p79SelectRecordsViewRows(rows, selectedDateKey, monthFilter) {
+            return selectedDateKey
+                ? rows.filter(row => attendanceRowDatePageKey(row, monthFilter) === selectedDateKey)
+                : rows;
         }
 
         function renderRecordsPagination(dateKeys, selectedDate, dayRows, rawPunchCount = null) {
@@ -14331,8 +14361,8 @@ function getManualPairRecordAnchor(record) {
             box.classList.remove('hidden');
             const selectedIndex = Math.max(0, keys.indexOf(selectedDate));
             // keys 是最新→最舊；前一天＝較舊，後一天＝較新。
-            const previousDisabled = selectedIndex >= keys.length - 1;
-            const nextDisabled = selectedIndex <= 0;
+            const previousDisabled = !selectedDate || selectedIndex >= keys.length - 1;
+            const nextDisabled = !selectedDate || selectedIndex <= 0;
             const rowCount = Array.isArray(dayRows) ? dayRows.length : 0;
 
             const dateButtons = keys.map((dateKey, index) => {
@@ -14350,7 +14380,7 @@ function getManualPairRecordAnchor(record) {
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">
-                                📅 ${String(selectedDate || '').replaceAll('-', '/')}｜當日班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天
+                                📅 ${selectedDate ? String(selectedDate).replaceAll('-', '/') : '整段期間'}｜${selectedDate ? '當日' : '期間'}班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天
                             </span>
                             <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="新增補打卡">＋ 新增補打卡</button>
                             <button id="p79PullCloudMonthBtn" type="button" onclick="p79PullSelectedMonthFromCloud()" class="px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 disabled:opacity-50" title="只從雲端讀取目前選擇的月份，不會上傳或清除待同步資料">☁ 從雲端拉取</button>
@@ -14374,7 +14404,7 @@ function getManualPairRecordAnchor(record) {
                                 class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed">後一天 ›</button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">${dateButtons}</div>
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">${keys.length > 1 ? `<button type="button" onclick="showRecordsDateRange()" class="shrink-0 px-3 py-1.5 rounded-lg border text-xs font-black ${!selectedDate ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'}">顯示整段期間</button>` : ''}${dateButtons}</div>
                 </div>`;
             refreshAttendanceSyncCompactStatus();
         }
@@ -14905,6 +14935,9 @@ function getManualPairRecordAnchor(record) {
             if (paginationSignature !== recordsPaginationSignature) {
                 recordsPaginationSignature = paginationSignature;
                 recordsCurrentPage = 1;
+                recordsSingleDateRequested = false;
+                recordsRangeViewRequested = false;
+                recordsSelectedDateKey = '';
             }
 
             // 一天一頁：先找出目前篩選結果實際有資料的日期，最新日期排最前面。
@@ -14930,11 +14963,10 @@ function getManualPairRecordAnchor(record) {
             }
             const totalDatePages = Math.max(1, recordsDatePageKeys.length);
             recordsCurrentPage = Math.min(Math.max(1, recordsCurrentPage), totalDatePages);
-            const selectedDateKey = recordsDatePageKeys[recordsCurrentPage - 1] || '';
+            const rangeView = p79UseRecordsRangeView(dateFrom, dateTo, monthFilter, recordsSingleDateRequested, recordsRangeViewRequested);
+            const selectedDateKey = rangeView ? '' : (recordsDatePageKeys[recordsCurrentPage - 1] || '');
             recordsSelectedDateKey = selectedDateKey;
-            const pageRows = selectedDateKey
-                ? dailyRows.filter(row => attendanceRowDatePageKey(row, monthFilter) === selectedDateKey)
-                : dailyRows;
+            const pageRows = p79SelectRecordsViewRows(dailyRows, selectedDateKey, monthFilter);
 
             const rawEventKeys = new Set();
             pageRows.forEach(row => {
@@ -14956,8 +14988,8 @@ function getManualPairRecordAnchor(record) {
             if (countEl) {
                 countEl.textContent = selectedDateKey
                     ? `(日期 ${selectedDateKey.replaceAll('-', '/')}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆｜共 ${recordsDatePageKeys.length} 天)`
-                    : `(班次 ${dailyRows.length} 列)`;
-                countEl.title = '一天一頁：同一天所有班次一次顯示；原始打卡＝上班/下班各自一筆';
+                    : `(期間 ${dateFrom || '不限'} ～ ${dateTo || '不限'}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆)`;
+                countEl.title = rangeView ? '顯示選定期間全部符合的班次；點日期可查看單日' : '顯示選定日期的全部班次';
             }
             renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount);
 
