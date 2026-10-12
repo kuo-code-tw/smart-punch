@@ -2086,7 +2086,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.11.30';
+        const APP_VERSION='2026.10.12.42';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -5188,6 +5188,7 @@ const now = new Date();
         }
 
         function clearConfirmedRecentAttendanceMutations(remoteRecords, requestStartedAt = 0) {
+            const now = Date.now();
             const remote = Array.isArray(remoteRecords) ? remoteRecords : [];
             const byId = new Map(remote.map(r => [String(r?.id ?? ''), r]));
             const pendingIds = new Set(readCloudOutbox()
