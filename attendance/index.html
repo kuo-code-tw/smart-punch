@@ -1976,6 +1976,12 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 <button type="button" onclick="closeExportRecordsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
             </div>
 
+            <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
+                <label for="exportAttendanceMonth" class="block text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-2">匯出年／月份</label>
+                <input type="month" id="exportAttendanceMonth" required class="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm">
+                <p class="text-[11px] text-slate-500 mt-2">只匯出所選月份的原始打卡紀錄，以每筆打卡的實際日期為準。</p>
+            </div>
+
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="selectAllExportFields(true)" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-xl text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50">☑️ 全部選取</button>
@@ -2251,7 +2257,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.41';
+        const APP_VERSION='2026.10.12.44';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -20891,6 +20897,9 @@ function getManualPairRecordAnchor(record) {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             const companyFilter = document.getElementById('exportCompanyFilter');
             if (companyFilter) companyFilter.value = 'ALL';
+            const selectedMonth=document.getElementById('filterMonthSelect')?.value||'';
+            document.getElementById('exportAttendanceMonth').value=/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)
+                ? selectedMonth : getTodayAttendanceIso().slice(0,7);
             document.getElementById('exportRecordsModal').classList.remove('hidden');
             updateExportFieldCount();
         }
@@ -20918,6 +20927,11 @@ function getManualPairRecordAnchor(record) {
             document.getElementById('exportFieldCount').textContent = `已選 ${checkedCount} 個欄位`;
         }
 
+        function p79AttendanceExportMatchesMonth(record,month) {
+            if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month||'')))return false;
+            return getAttendanceDateKey(record?.timeStr||'').replaceAll('/','-').slice(0,7)===month;
+        }
+
         function exportSelectedRecordsExcel() {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             const checkboxes = document.querySelectorAll('.export-field-checkbox');
@@ -20934,7 +20948,13 @@ function getManualPairRecordAnchor(record) {
             }
 
             const companyFilter = document.getElementById('exportCompanyFilter')?.value || 'ALL';
+            const exportMonth=document.getElementById('exportAttendanceMonth')?.value||'';
+            if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(exportMonth)){
+                showToast('請選擇有效的匯出年／月份', 'warning');
+                return;
+            }
             const visibleRecords = records
+                .filter(record=>p79AttendanceExportMatchesMonth(record,exportMonth))
                 .filter(canCurrentAdminViewDataRow)
                 .filter(record => {
                     if (companyFilter === 'ALL') return true;
@@ -20947,7 +20967,7 @@ function getManualPairRecordAnchor(record) {
                     return company === companyFilter;
                 });
             if (visibleRecords.length === 0) {
-                showToast(companyFilter === 'ALL' ? "目前無考勤紀錄可供匯出" : `目前沒有 ${companyFilter} 工號的考勤紀錄`, "warning");
+                showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
             if (!ensureExcelLibrary()) return;
@@ -20974,9 +20994,9 @@ function getManualPairRecordAnchor(record) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
-            XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${companySuffix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
-            showToast("考勤紀錄 Excel 匯出成功！", "success");
+            showToast(`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`, "success");
         }
 
         // 首頁預設日期若已經是同一天，載入後立即顯示 1 天，而不是舊制的 8 小時。
