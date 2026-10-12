@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261012.49"></script>
+<script src="../assets/port79-overtime-report.js?v=20261012.51"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -1173,6 +1173,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
                         <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
@@ -4486,8 +4487,8 @@ const now = new Date();
         let attendanceDeltaPollBusy = false;
         let attendanceDeltaIdleRounds = 0;
         let attendanceDeltaResetBusy = false;
-        const ATTENDANCE_DELTA_ACTIVE_MS = 5000;
-        const ATTENDANCE_DELTA_IDLE_MS = 15000;
+        const ATTENDANCE_DELTA_ACTIVE_MS = 30000;
+        const ATTENDANCE_DELTA_IDLE_MS = 60000;
         const ATTENDANCE_DELTA_HIDDEN_MS = 60000;
         window.p79AttendanceDeltaEnabled = true;
 
@@ -4649,6 +4650,7 @@ const now = new Date();
 
         async function pollAttendanceDelta(force = false) {
             if (attendanceDeltaPollBusy) return false;
+            if (!p79AttendanceSyncAuthenticated()) { scheduleAttendanceDeltaPoll(60000); return false; }
             if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                 scheduleAttendanceDeltaPoll(ATTENDANCE_DELTA_HIDDEN_MS); return false;
             }
@@ -5823,21 +5825,26 @@ function p79IsMobileOrTabletForAttendanceSync() {
         }
         window.p79PreloadAttendanceEmployeeMaster = preloadAttendanceEmployeeMaster;
 
-        async function p79StartupAttendanceCurrentMonthSync(showMessage = false) {
-            // 員工主檔與本月考勤平行讀取；單位／職稱不再被考勤資料拖住。
-            const masterPromise = preloadAttendanceEmployeeMaster(false, true);
-            const corePromise = loadAttendanceCoreSyncData(showMessage);
-            const results = await Promise.allSettled([masterPromise, corePromise]);
-            const coreOk = results[1]?.status === 'fulfilled' && results[1]?.value === true;
-
-            // 不論 Core 成功與否，都再做一次月份直接驗證。
-            // 之前就是因為 Core 成功回 1 筆，流程提早 return，主表很多筆永遠沒有機會載入。
-            const monthOk = await loadAttendanceMonthFromCloud(
-                getRequestedAttendanceCloudMonth(),
-                showMessage && !coreOk
-            );
-
-            return coreOk || monthOk;
+        let p79StartupSyncFlight = null;
+        function p79AttendanceSyncAuthenticated() {
+            return !!String(sessionStorage.getItem('port79_user_token') || sessionStorage.getItem('port79_admin_token') || sessionStorage.getItem('port79_gc_superadmin_token') || '').trim();
+        }
+        function p79StartupAttendanceCurrentMonthSync(showMessage = false) {
+            if (!p79AttendanceSyncAuthenticated()) return Promise.resolve(false);
+            const month = getRequestedAttendanceCloudMonth();
+            if (p79StartupSyncFlight?.month === month) return p79StartupSyncFlight.promise;
+            // 月份改變也先等前一份同步結束，避免同時覆寫畫面。
+            if (p79StartupSyncFlight) return p79StartupSyncFlight.promise.catch(()=>false).then(()=>p79StartupAttendanceCurrentMonthSync(showMessage));
+            const flight = {month, promise:null};
+            p79StartupSyncFlight = flight;
+            flight.promise = (async()=>{
+                const results = await Promise.allSettled([preloadAttendanceEmployeeMaster(false,true), loadAttendanceCoreSyncData(showMessage)]);
+                const coreOk = results[1]?.status === 'fulfilled' && results[1]?.value === true;
+                // 保留月份主表驗證；兩個啟動入口共用一次完整同步。
+                const monthOk = await loadAttendanceMonthFromCloud(month, showMessage && !coreOk);
+                return coreOk || monthOk;
+            })().finally(()=>{if(p79StartupSyncFlight===flight)p79StartupSyncFlight=null;});
+            return flight.promise;
         }
         window.p79StartupAttendanceCurrentMonthSync = p79StartupAttendanceCurrentMonthSync;
 
@@ -8894,7 +8901,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const startIndex = (empHistoryCurrentPage - 1) * EMP_HISTORY_PAGE_SIZE;
             const pageRows = myRecords.slice(startIndex, startIndex + EMP_HISTORY_PAGE_SIZE);
 
-            tbody.innerHTML = pageRows.length ? pageRows.map(r => {
+            const overtimeRowsHtml = pageRows.length ? pageRows.map(r => {
                 const type = getAttendanceRecordType(r);
                 const rawStatus = String(r.status || '');
                 let confirmText = '已完成打卡';
@@ -12160,6 +12167,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
             const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp]]);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
+            // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
+            const employeeById = new Map(), employeeByAtt = new Map(), employeeByName = new Map();
+            const addUnique = (map,key,employee)=>{if(key)map.set(key,map.has(key)?null:employee);};
+            visibleEmployees.forEach(employee=>{
+                const id=String(employee.empId||'').trim().toUpperCase();
+                if(id&&!employeeById.has(id))employeeById.set(id,employee);
+                addUnique(employeeByAtt,normalizeAttendanceStatsAttNo(employee.attNo),employee);
+                addUnique(employeeByName,normalizeEmployeeLookupName(employee.name),employee);
+            });
+            const indexedEmployee = session => employeeById.get(String(session.empId||'').trim().toUpperCase()) || employeeByAtt.get(normalizeAttendanceStatsAttNo(session.attNo)) || employeeByName.get(normalizeEmployeeLookupName(session.name)) || null;
             const rows = buildDailyAttendanceRows(sourceRecords)
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
@@ -12168,7 +12185,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const totalMinutes = Math.floor((end - start) / 60000);
                     // 每日延長時間 30 分鐘以內不列入加班；須超過 30 分鐘才計入。
                     if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
-                    const employee = findEmployeeForAttendanceIdentity(session, visibleEmployees);
+                    const employee = indexedEmployee(session);
                     if (!employee) return null;
                     const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId).trim().toUpperCase()));
                     const restMeta=matchedReport.meta;
@@ -12315,6 +12332,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件、且已完整簽到簽退的加班班次</td></tr>';
 
+            if(tbody.p79OvertimeRowsHtml!==overtimeRowsHtml){tbody.innerHTML=overtimeRowsHtml;tbody.p79OvertimeRowsHtml=overtimeRowsHtml;}
             const pagination = document.getElementById('overtimePagination');
             if (pagination) pagination.innerHTML = `<span class="text-[11px] text-slate-500 dark:text-slate-400">共 ${rows.length} 筆｜第 ${overtimeCurrentPage} / ${totalPages} 頁｜每頁 50 筆</span><div class="flex gap-2"><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage - 1})" ${overtimeCurrentPage <= 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">上一頁</button><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage + 1})" ${overtimeCurrentPage >= totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">下一頁</button></div>`;
         }
@@ -13981,7 +13999,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
 
     if(typeof oldOnload==='function') await oldOnload.call(this,ev);
 
-    if(online){
+    if(online && p79AttendanceSyncAuthenticated()){
       let cloudOk = false;
       try{
         // oldOnload 已經啟動 getData；若仍在進行，loadCloudData 會共用同一個 Promise，不會多打一份完整請求。
@@ -14001,6 +14019,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   window.addEventListener('online',()=>{
     setTimeout(()=>{
       try{
+        if(!p79AttendanceSyncAuthenticated())return;
         if(typeof p79IsMobileOrTabletForAttendanceSync==='function' && p79IsMobileOrTabletForAttendanceSync()){
           Promise.resolve(typeof pollAttendanceDelta==='function' ? pollAttendanceDelta(true) : false)
             .finally(()=>flushCloudOutbox(false));
@@ -14016,7 +14035,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   // 手機從背景切回前景時，若距離上次完整雲端讀取已超過 12 秒，直接強制對齊一次。
   // revision 狀態列仍會做快速偵測；這裡只處理 iOS 長時間凍結計時器的情況。
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState!=='visible')return;
+    if(document.visibilityState!=='visible'||!p79AttendanceSyncAuthenticated())return;
     if(typeof navigator!=='undefined'&&navigator.onLine===false)return;
 
     // 手機/平板從背景回來只補 attendance delta，不再立刻重抓整個月份。
@@ -14027,7 +14046,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
 
     // 電腦/筆電維持原本行為，不更動。
     const age=Date.now()-Number(typeof lastCloudLoadSuccessAt!=='undefined'?lastCloudLoadSuccessAt:0);
-    if(age<12000)return;
+    if(age<60000)return;
     setTimeout(()=>{try{loadAttendanceCoreSyncData(false).then(ok=>ok||loadAttendanceMonthFromCloud(getRequestedAttendanceCloudMonth(),false))}catch(e){}},250);
   });
 
@@ -14372,7 +14391,7 @@ document.addEventListener('click',function(e){
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+<script src="../assets/port79-seven-top.js?v=20261012.51"></script>
 
 <script id="p79-workhours-menu-compact-v20261004">
 (function(){
