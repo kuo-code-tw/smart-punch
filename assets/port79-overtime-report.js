@@ -78,6 +78,11 @@
    const d=await res.json();if(d?.ok!==true)throw Error(d?.error||'雲端未確認成功');return d;
   }finally{clearTimeout(timer)}
  }
+ function reportRules(){
+  const config=global.p79OvertimeContext?.config?.();
+  if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
+  return defaults();
+ }
  async function loadRules(){const d=await rpc('getData');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:normalizeStored(d.config[CONFIG])};}
  function dialog(title,content){
   document.getElementById('p79OvertimeDialog')?.remove();
@@ -116,7 +121,7 @@
   if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
-   const {rows}=await loadRules(),people=global.p79OvertimeContext.employees();
+   const rows=reportRules(),people=global.p79OvertimeContext.employees();
    el.insertAdjacentHTML('beforeend','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>員工<select id="p79OtEmp" style="'+inputStyle+'">'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.empId+' '+e.name)+'</option>').join('')+'</select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"><option value="rest">休息日／代加班／國定假日</option><option value="extended">平日延長加班</option></select></label><label>套用代碼<select id="p79OtCode" style="'+inputStyle+'"></select></label></div><div id="p79OtPreview" style="padding:14px;background:#f0f9ff;border-radius:10px"></div><label style="display:block;margin:12px 0">備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label><p style="font-size:13px;color:#64748b">下一步帶入班表「代」，確認日期、人員及時段後按儲存。未完成班表儲存前，申報尚未送出。同一人同一天再次申報會更新該日的代班設定。</p><button id="p79OtStage" type="button" style="margin-top:12px;background:#0369a1;color:white;padding:10px 18px;border-radius:8px">帶入班表確認</button>');
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
    const kind=el.querySelector('#p79OtKind'),select=el.querySelector('#p79OtCode');
@@ -133,5 +138,5 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
