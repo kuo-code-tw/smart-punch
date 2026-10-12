@@ -910,6 +910,25 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
   body.port79-employee-only #viewEmployee .p-6{padding:14px 12px!important}
 }
 </style>
+<style id="attendance-export-viewport-fix">
+/* Keep export controls inside the viewport, above the shared navigation. */
+#exportRecordsModal{z-index:130000;padding:12px;overflow:hidden;box-sizing:border-box}
+#exportRecordsModal .attendance-export-dialog{display:flex;flex-direction:column;width:100%;max-width:672px;min-height:0;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);padding:0;overflow:hidden}
+#exportRecordsModal .attendance-export-header{flex:0 0 auto;margin:0;padding:16px 18px;gap:12px}
+#exportRecordsModal .attendance-export-header>button{flex-shrink:0;min-width:36px;min-height:36px}
+#exportRecordsModal .attendance-export-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+#exportRecordsModal .attendance-export-body>div{flex-shrink:0;padding-top:12px;padding-bottom:12px}
+#exportRecordsModal #exportFieldList{gap:8px}
+#exportRecordsModal #exportFieldList>label{min-height:44px;padding:10px 12px}
+#exportRecordsModal .attendance-export-footer{flex:0 0 auto;margin:0;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px}
+#exportRecordsModal .attendance-export-footer>button{margin:0;min-height:40px}
+@media(max-width:480px){
+ #exportRecordsModal{padding:8px}
+ #exportRecordsModal .attendance-export-dialog{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}
+ #exportRecordsModal .attendance-export-header,#exportRecordsModal .attendance-export-body,#exportRecordsModal .attendance-export-footer{padding-left:12px;padding-right:12px}
+ #exportRecordsModal .attendance-export-body>div:has(#exportFieldCount)>div{flex-wrap:wrap}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="port79-employee-only bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="attendance">
@@ -1967,15 +1986,16 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
     <!-- 彈出式考勤紀錄 Excel 欄位選擇 Modal -->
     <div id="exportRecordsModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-2xl max-w-2xl w-full space-y-5 border border-slate-100 dark:border-slate-700">
-            <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
+        <div class="attendance-export-dialog bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-100 dark:border-slate-700" role="dialog" aria-modal="true" aria-labelledby="attendanceExportTitle">
+            <div class="attendance-export-header flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
                 <div>
-                    <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">📥 匯出考勤</h3>
+                    <h3 id="attendanceExportTitle" class="text-base font-bold text-slate-800 dark:text-slate-100">📥 匯出考勤</h3>
                     <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">請點選要匯出的欄位，可自行選擇欄位順序。</p>
                 </div>
-                <button type="button" onclick="closeExportRecordsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
+                <button type="button" onclick="closeExportRecordsModal()" aria-label="關閉匯出考勤視窗" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
             </div>
 
+            <div class="attendance-export-body">
             <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
                 <label for="exportAttendanceMonth" class="block text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-2">匯出年／月份</label>
                 <input type="month" id="exportAttendanceMonth" required class="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm">
@@ -2041,7 +2061,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 </div>
             </div>
 
-            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            </div>
+            <div class="attendance-export-footer flex justify-end border-t border-slate-100 dark:border-slate-700">
                 <button type="button" onclick="closeExportRecordsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">取消</button>
                 <button type="button" onclick="exportSelectedRecordsExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700">📥 確認匯出 Excel</button>
             </div>
