@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261012.48"></script>
+<script src="../assets/port79-overtime-report.js?v=20261012.49"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -4554,7 +4554,6 @@ const now = new Date();
                 } else if (tab === 'live') {
                     try { renderAdminLiveTable(); } catch (e) {}
                 } else if (tab === 'overtime') {
-                    try { initOvertimeFilters(); } catch (e) {}
                     try { renderOvertimeStats(); } catch (e) {}
                 } else if (tab === 'stats') {
                     try { initAttendanceStatsFilters(); } catch (e) {}
@@ -12147,9 +12146,20 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
             });
 
-            const signature = JSON.stringify([sourceRecords, visibleEmployees, schedules]);
+            // 一次掃描可見員工的加班 metadata；不逐位重掃全部月份班表。
+            const restMetaByEmp=new Map(visibleEmployees.map(emp=>[String(emp.empId).trim().toUpperCase(),{}]));
+            (schedules||[]).forEach(row=>{
+                const map=restMetaByEmp.get(String(row?.empId||'').trim().toUpperCase());if(!map)return;
+                const source=row?.schedule?.__meta||{};
+                Object.entries(source).forEach(([date,value])=>{
+                    if(!value||typeof value!=='object')return;
+                    const key=normalizeScheduleDateKey(date);if(!key)return;
+                    if(value.restQuotaOvertime||value.overtimeReport)map[key]={restQuotaOvertime:value.restQuotaOvertime,restCategory:value.restCategory,overtimeReport:value.overtimeReport};
+                    else delete map[key];
+                });
+            });
+            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp]]);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
-            const restMetaByEmp=new Map(visibleEmployees.map(emp=>[String(emp.empId),employeeScheduleMetaMap(emp)]));
             const rows = buildDailyAttendanceRows(sourceRecords)
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
@@ -12160,7 +12170,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
                     const employee = findEmployeeForAttendanceIdentity(session, visibleEmployees);
                     if (!employee) return null;
-                    const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId)));
+                    const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId).trim().toUpperCase()));
                     const restMeta=matchedReport.meta;
                     const reportMinutes=matchedReport.minutes;
                     const overtimeMinutes = reportMinutes===null?p79RestActualOvertimeMinutes(totalMinutes,restMeta):reportMinutes;
@@ -14432,6 +14442,7 @@ window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),emp
 </script>
 </body>
 </html>
+
 
 
 
