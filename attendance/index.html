@@ -2251,7 +2251,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.40';
+        const APP_VERSION='2026.10.12.41';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14283,6 +14283,9 @@ function getManualPairRecordAnchor(record) {
         let recordsSelectedDateKey = ''; // 修改、補卡、刪除或雲端同步後保持正在查看的日期
         let recordsSingleDateRequested = false;
         let recordsRangeViewRequested = false;
+        let recordsRowPage = 1;
+        let recordsRowPageSignature = '';
+        let recordsRowPageTotal = 1;
 
         function attendanceRowDatePageKey(row, monthFilter = 'ALL') {
             const accounting = String(
@@ -14348,7 +14351,23 @@ function getManualPairRecordAnchor(record) {
                 : rows;
         }
 
-        function renderRecordsPagination(dateKeys, selectedDate, dayRows, rawPunchCount = null) {
+        function p79BoundRecordsRows(rows, page = 1) {
+            const pageSize = 50;
+            const total = rows.length;
+            const pages = Math.max(1, Math.ceil(total / pageSize));
+            const current = Math.min(pages, Math.max(1, Math.floor(Number(page) || 1)));
+            const offset = (current - 1) * pageSize;
+            return {rows:rows.slice(offset, offset + pageSize), page:current, pages,
+                total, start:total ? offset + 1 : 0, end:Math.min(total, offset + pageSize)};
+        }
+
+        function goToRecordsRowPage(page) {
+            recordsRowPage = Math.min(recordsRowPageTotal, Math.max(1, Number(page) || 1));
+            renderAdminRecordsTable();
+            document.getElementById('adminRecordsTableContainer')?.scrollTo({top:0,behavior:'smooth'});
+        }
+
+        function renderRecordsPagination(dateKeys, selectedDate, dayRows, rawPunchCount = null, rowPageInfo = null) {
             const box = document.getElementById('recordsPagination');
             if (!box) return;
             const keys = Array.isArray(dateKeys) ? dateKeys : [];
@@ -14375,6 +14394,13 @@ function getManualPairRecordAnchor(record) {
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-800'}">${label}</button>`;
             }).join('');
 
+            const rowPager = rowPageInfo && rowPageInfo.pages > 1 ? `
+                <div class="flex flex-wrap items-center justify-end gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <span>顯示 ${rowPageInfo.start}–${rowPageInfo.end}／共 ${rowPageInfo.total} 列｜每頁 50 筆</span>
+                    <button type="button" onclick="goToRecordsRowPage(${rowPageInfo.page-1})" ${rowPageInfo.page<=1?'disabled':''} class="px-3 py-1.5 rounded-lg border disabled:opacity-40">上一頁</button>
+                    <span>第 ${rowPageInfo.page}／${rowPageInfo.pages} 頁</span>
+                    <button type="button" onclick="goToRecordsRowPage(${rowPageInfo.page+1})" ${rowPageInfo.page>=rowPageInfo.pages?'disabled':''} class="px-3 py-1.5 rounded-lg border disabled:opacity-40">下一頁</button>
+                </div>` : '';
             box.innerHTML = `
                 <div class="w-full flex flex-col gap-2">
                     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -14405,6 +14431,7 @@ function getManualPairRecordAnchor(record) {
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">${keys.length > 1 ? `<button type="button" onclick="showRecordsDateRange()" class="shrink-0 px-3 py-1.5 rounded-lg border text-xs font-black ${!selectedDate ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'}">顯示整段期間</button>` : ''}${dateButtons}</div>
+                    ${rowPager}
                 </div>`;
             refreshAttendanceSyncCompactStatus();
         }
@@ -14991,7 +15018,16 @@ function getManualPairRecordAnchor(record) {
                     : `(期間 ${dateFrom || '不限'} ～ ${dateTo || '不限'}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆)`;
                 countEl.title = rangeView ? '顯示選定期間全部符合的班次；點日期可查看單日' : '顯示選定日期的全部班次';
             }
-            renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount);
+            const rowPageSignature = paginationSignature + '|' + selectedDateKey;
+            if (recordsRowPageSignature !== rowPageSignature) {
+                recordsRowPageSignature = rowPageSignature;
+                recordsRowPage = 1;
+            }
+            const rowPageInfo = p79BoundRecordsRows(pageRows, recordsRowPage);
+            recordsRowPage = rowPageInfo.page;
+            recordsRowPageTotal = rowPageInfo.pages;
+            const renderRows = rowPageInfo.rows;
+            renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount, rowPageInfo);
 
             if (dailyRows.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="11" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
@@ -15002,8 +15038,8 @@ function getManualPairRecordAnchor(record) {
             const allowAttendanceCreate = canPerformAdminAction(currentEmp, 'attendanceCreate');
             const allowAttendanceDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
 
-            p79MainTableDuplicateRows = pageRows;
-            tbody.innerHTML = pageRows.map((row, rowIndex) => {
+            p79MainTableDuplicateRows = renderRows;
+            tbody.innerHTML = renderRows.map((row, rowIndex) => {
                 // V5.10.3：顯示單位／職務時每列直接用考勤號查員工主檔。
                 // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
                 const displayEmp = findEmployeeForAttendanceDisplay(row, visibleEmployees)
