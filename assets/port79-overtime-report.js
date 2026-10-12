@@ -97,11 +97,35 @@
  async function loadRules(){const d=await rpc('getData');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:normalizeStored(d.config[CONFIG])};}
  function dialog(title,content,id='p79OvertimeDialog'){
   const previous=document.getElementById(id);previous?.p79Cleanup?.();previous?.remove();
-  const el=document.createElement('dialog');el.id=id;el.style.cssText='width:min(1200px,96vw);max-height:90vh;padding:20px;border:1px solid #cbd5e1;border-radius:16px;color:#0f172a;background:white;';
-  el.innerHTML='<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2 style="font-size:20px;font-weight:900">'+esc(title)+'</h2><button type="button" id="p79OtClose">✕ 關閉</button></div>'+content;
+  const el=document.createElement('dialog');el.id=id;el.className='p79-overtime-dialog';el.style.cssText='box-sizing:border-box;width:min(1200px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:20px;border:1px solid #cbd5e1;border-radius:16px;color:#0f172a;background:white;overflow:auto;text-align:center;';
+  el.innerHTML=`<style>
+   .p79-overtime-dialog,.p79-overtime-dialog *{box-sizing:border-box!important}
+   .p79-overtime-dialog[open]{display:flex;flex-direction:column;gap:10px}
+   .p79-overtime-dialog>div,.p79-overtime-dialog>p{min-width:0;max-width:100%;flex-shrink:0}
+   .p79-overtime-dialog p,.p79-overtime-dialog h2,.p79-overtime-dialog label,.p79-overtime-dialog th,.p79-overtime-dialog td{text-align:center!important}
+   .p79-overtime-dialog input,.p79-overtime-dialog select{min-width:0!important;max-width:100%!important;text-align:center!important}
+   .p79-overtime-dialog label{min-width:0}
+   .p79-ot-dialog-header{position:relative;display:flex;align-items:center;justify-content:center;min-height:36px;padding:0 90px}
+   .p79-ot-dialog-header h2{margin:0;font-size:20px;font-weight:900}
+   .p79-ot-dialog-header button{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+   .p79-overtime-dialog button{max-width:100%;white-space:normal;text-align:center}
+   .p79-ot-new-type-controls,.p79-ot-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+   .p79-ot-actions{position:sticky;bottom:0;z-index:4;margin-top:6px;padding:10px 0;background:white}
+   #p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 auto;min-height:120px;max-height:55vh;width:100%;overflow:auto;overscroll-behavior:contain;border:1px solid #e2e8f0;border-radius:8px}
+   #p79OvertimeOptionsDialog table{width:100%!important;min-width:1000px!important;max-width:none!important;table-layout:fixed;border-collapse:collapse}
+   #p79OvertimeOptionsDialog th{position:sticky;top:0;z-index:2;white-space:normal!important;overflow-wrap:anywhere;vertical-align:middle;padding:8px 4px!important}
+   #p79OvertimeOptionsDialog td{padding:6px 4px!important;vertical-align:middle;overflow:hidden}
+   #p79OvertimeOptionsDialog th:first-child{width:6%}
+   #p79OvertimeOptionsDialog th:nth-child(2){width:11%}
+   #p79OvertimeOptionsDialog th:nth-child(9){width:7%}
+   #p79OvertimeOptionsDialog th:nth-child(10){width:13%}
+   #p79OvertimeOptionsDialog th:last-child{width:6%}
+   #p79OvertimeOptionsDialog td input,#p79OvertimeOptionsDialog td select{width:100%!important;padding:7px 3px!important}
+   @media(max-width:600px){.p79-overtime-dialog{padding:12px!important;width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 20px)!important}.p79-ot-dialog-header{padding:0 65px}.p79-ot-dialog-header h2{font-size:17px}.p79-ot-new-type-controls input,.p79-ot-new-type-controls select{width:100%!important}.p79-ot-actions button{padding:8px!important}}
+  </style><div class="p79-ot-dialog-header"><h2>`+esc(title)+'</h2><button type="button" id="p79OtClose">✕ 關閉</button></div>'+content;
   document.body.appendChild(el);el.querySelector('#p79OtClose').onclick=()=>el.close();el.showModal();return el;
  }
- const inputStyle='width:100%;min-width:68px;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
+ const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
  function editorRow(row){return '<tr>'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
@@ -109,8 +133,8 @@
   try{
    const loaded=global.p79OvertimeContext?.config?.()?{config:global.p79OvertimeContext.config(),rows:reportRules()}:await loadRules();
    const rows=loaded.rows;let loadedRows=JSON.stringify(rows),customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[])),loadedTypes=JSON.stringify(customTypes);
-   el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div style="max-height:58vh;overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(editorRow).join('')+'</tbody></table></div><div style="display:flex;gap:10px;margin-top:16px"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出CSV</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
-   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType">新增類型</button></div><p style="font-size:12px;color:#475569">先新增類型，再新增該類型的出勤時段，最後按下方儲存。</p></div>');
+   el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(editorRow).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出CSV</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
+   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div class="p79-ot-new-type-controls" style="margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType">新增類型</button></div><p style="font-size:12px;color:#475569">先新增類型，再新增該類型的出勤時段，最後按下方儲存。</p></div>');
    el.querySelector('#p79AddType').onclick=()=>{
     const name=el.querySelector('#p79NewTypeName').value.trim(),category=el.querySelector('#p79NewTypeCategory').value;
     if(!name)return el.querySelector('#p79OtStatus').textContent='請填加班類型名稱';
