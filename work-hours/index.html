@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261012.51"></script>
+<script src="../assets/port79-overtime-report.js?v=20261012.52"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -565,6 +565,7 @@ window.p79CheckWorkHoursPermission=async function(){
     const res=await fetch(gas+(gas.includes('?')?'&':'?')+'action=getSessionMeta&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store'});
     const data=await res.json();
     if(!data?.ok)return true;
+    if(String(data.adminRole||data.role||data.actualAdminRole||'').toLowerCase()==='superadmin')return true;
     const level=String(data.systemPermissions?.workhours||'none').toLowerCase();
     if(level!=='view'&&level!=='manage'){
       alert('此帳號沒有「工時統計」查看權限');
@@ -2969,10 +2970,10 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             try {
                 const candidates = [
                     String(sessionStorage.getItem('aqc_admin_role') || '').trim().toLowerCase(),
-                    (()=>{ try { return String(JSON.parse(sessionStorage.getItem('admin_session') || 'null')?.adminRole || '').trim().toLowerCase(); } catch(e){ return ''; } })(),
-                    (()=>{ try { return String(JSON.parse(sessionStorage.getItem('port79_user_session') || 'null')?.adminRole || '').trim().toLowerCase(); } catch(e){ return ''; } })()
+                    (()=>{ try { return (()=>{const a=JSON.parse(sessionStorage.getItem('admin_session')||'null');return String(a?.adminRole||a?.role||a?.actualAdminRole||'').trim().toLowerCase()})(); } catch(e){ return ''; } })(),
+                    (()=>{ try { return (()=>{const a=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');return String(a?.adminRole||a?.role||a?.actualAdminRole||'').trim().toLowerCase()})(); } catch(e){ return ''; } })()
                 ];
-                return candidates.find(r => r === 'superadmin' || r === 'admin') || '';
+                return candidates.includes('superadmin')?'superadmin':candidates.includes('admin')?'admin':'';
             } catch(e) { return ''; }
         }
 
@@ -2990,7 +2991,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
         function isVerifiedSuperAdminSession() {
             try {
-                return hasAuthoritativeAdminSession() && getAuthoritativeAdminSessionRole() === 'superadmin';
+                return hasValidHomepageAdminSession() && getAuthoritativeAdminSessionRole() === 'superadmin';
             } catch (e) {
                 return false;
             }
@@ -8967,7 +8968,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const role=[String(sessionStorage.getItem('aqc_admin_role')||'').toLowerCase(),String(a?.adminRole||a?.role||'').toLowerCase(),String(u?.adminRole||u?.role||u?.actualAdminRole||'').toLowerCase()].find(r=>r==='admin'||r==='superadmin')||'';
             const empId=String(sessionStorage.getItem('aqc_admin_id')||a?.empId||u?.empId||'').trim();
             const token=String(sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||sessionStorage.getItem('port79_user_token')||'').trim();
-            const loggedIn=sessionStorage.getItem('aqc_admin_logged_in')==='1'||!!a||(['admin','superadmin'].includes(String(u?.adminRole||u?.role||'').toLowerCase()));
+            const loggedIn=sessionStorage.getItem('aqc_admin_logged_in')==='1'||!!a||(['admin','superadmin'].includes(String(u?.adminRole||u?.role||u?.actualAdminRole||'').toLowerCase()));
             return loggedIn&&!!empId&&['admin','superadmin'].includes(role)&&!!token;
         }
 
@@ -14475,7 +14476,15 @@ C.mountMonth({inputId:'attendanceStatsMonth'});
 });
 </script>
 <script>
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:()=>isAdminLoggedIn&&(isVerifiedSuperAdminSession()||(Object.prototype.hasOwnProperty.call(currentEmp?.systemPermissions||{},'workhours')?currentEmp.systemPermissions.workhours==='manage':canPerformAdminAction(currentEmp,'attendanceEdit')))};
+function p79CanManageOvertime(){
+  // 首頁已驗證的超級管理員不依賴考勤頁尚未完成的還原旗標。
+  if(isVerifiedSuperAdminSession())return true;
+  if(!isAdminLoggedIn || !hasValidHomepageAdminSession())return false;
+  return Object.prototype.hasOwnProperty.call(currentEmp?.systemPermissions||{},'workhours')
+    ? currentEmp.systemPermissions.workhours==='manage'
+    : canPerformAdminAction(currentEmp,'attendanceEdit');
+}
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanManageOvertime,canEditRules:p79CanManageOvertime};
 </script>
 </body>
 </html>
