@@ -150,11 +150,11 @@ const MENU={
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
- workhours:[['year','📆 年份顯示']],
+ workhours:[['overtime-options','⚙️ 加班選項管理'],['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
- hr:[['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
+ hr:[['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
  history:[]
 };
 function scheduleLockMenuState(){
@@ -198,6 +198,7 @@ function closeMenu(){document.getElementById('p79SevenStandardMenu')?.classList.
 function toggleMenu(e){e?.stopPropagation();refreshScheduleLockMenu();document.getElementById('p79SevenStandardMenu')?.classList.toggle('open')}
 
 async function runAction(sys,a){closeMenu();try{
+ if(a==='overtime-options')return await window.P79Overtime?.openRules?.();
  if(a==='global-theme')return toggleGlobalTheme();
  if(a==='data-cache')return window.Port79DataCache?.openCenter?.();
  if(a==='year'){
@@ -258,8 +259,8 @@ function buildMenu(sys){
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
-  ['資料管理',['attendance-import','attendance-export','balance-import','balance-export','import','export']],
-  ['系統設定',['settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
+  ['資料管理',['add','attendance-import','attendance-export','balance-import','balance-export','import','export']],
+  ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
@@ -428,4 +429,5 @@ async function poll(){if(statusBusy||document.visibilityState==='hidden')return;
 function start(){mount();syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,20),{once:true});else setTimeout(start,20);
 })();
+
 
