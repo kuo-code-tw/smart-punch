@@ -2251,7 +2251,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.34';
+        const APP_VERSION='2026.10.12.37';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -9689,7 +9689,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         // PORT79 2026-10-10 MOBILE FAST STATE: only read the official attendance main sheet.
         // Never ask archived Drive folders to decide whether one employee may clock IN/OUT.
-        const p79MobileOfficial = {empId:'',month:'',rows:[],verifiedAt:0,lastAttempt:0};
+        const p79MobileOfficial = {empId:'',month:'',rows:[],verifiedAt:0,lastAttempt:0,lastError:''};
         let p79MobileOfficialPromise = null;
         function p79MobileMonth() {
             const now=new Date();
@@ -9699,6 +9699,38 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return !!emp && !!p79MobileOfficial.verifiedAt &&
                 p79MobileOfficial.empId===String(emp.empId||'').trim().toUpperCase() &&
                 p79MobileOfficial.month===p79MobileMonth();
+        }
+        function p79MobileAuthExpired(error) {
+            return /登入驗證(?:資料不存在|已逾時|資料失效)|登入 Token 已逾時/.test(String(error || ''));
+        }
+        async function p79MobileRenewPunchSession(employee) {
+            const empId=String(employee?.empId||'').trim().toUpperCase();
+            const session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
+            // Reuse the existing passwordless punch login only; never renew management access.
+            if(!empId || !session || String(session.empId||'').trim().toUpperCase()!==empId ||
+                String(session.adminRole||'').toLowerCase()!=='employee')
+                throw new Error('登入驗證已逾時，請回首頁重新登入');
+            const gas=String(getActiveGasUrl()||'');
+            const url=gas+(gas.includes('?')?'&':'?')+'action=verifyUser&loginMode=punch&empId='+
+                encodeURIComponent(empId)+'&t='+Date.now();
+            const data=await fetchGasJsonWithRetry(url,'員工打卡登入更新',1,20000);
+            const token=String(data?.userToken||'').trim();
+            if(!data?.ok)throw new Error(data?.error||'員工打卡登入更新失敗');
+            if(!token || String(data.empId||'').trim().toUpperCase()!==empId ||
+                data.punchOnly!==true || String(data.adminRole||'').toLowerCase()!=='employee')
+                throw new Error('員工打卡登入回覆身分不符，請回首頁重新登入');
+            const current=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
+            if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId ||
+                String(current?.empId||'').trim().toUpperCase()!==empId ||
+                String(current?.adminRole||'').toLowerCase()!=='employee')
+                throw new Error('登入身分已變更，請重新核對');
+            sessionStorage.setItem('port79_user_token',token);
+            sessionStorage.setItem('port79_user_session',JSON.stringify({...current,
+                systemPermissions:data.systemPermissions||current.systemPermissions,
+                finePermissions:data.finePermissions||{},dataScope:data.dataScope||{},
+                punchOnly:true,localCache:false,pendingCloudVerification:false,
+                loginAt:new Date().toISOString()}));
+            return token;
         }
         async function p79MobileRefreshOfficial(force=false) {
             const employee=currentEmp;
@@ -9712,13 +9744,20 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const gas=String(getActiveGasUrl()||'');
                 if(!gas.startsWith('https://script.google.com/macros/s/'))return false;
                 const month=p79MobileMonth();
-                const token=String(sessionStorage.getItem('port79_user_token')||
+                let token=String(sessionStorage.getItem('port79_user_token')||
                     sessionStorage.getItem('port79_admin_token')||
                     sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
-                const url=gas+(gas.includes('?')?'&':'?')+
+                let renewed=false;
+                if(!token){token=await p79MobileRenewPunchSession(employee);renewed=true;}
+                const read=()=>fetchGasJsonWithRetry(gas+(gas.includes('?')?'&':'?')+
                     'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+
-                    (token?'&token='+encodeURIComponent(token):'')+'&t='+Date.now();
-                const data=await fetchGasJsonWithRetry(url,'本人正式考勤快速核對',1,12000);
+                    '&token='+encodeURIComponent(token)+'&t='+Date.now(),
+                    '本人正式考勤快速核對',1,45000);
+                let data=await read();
+                if(data?.ok===false && p79MobileAuthExpired(data.error) && !renewed){
+                    token=await p79MobileRenewPunchSession(employee);
+                    data=await read();
+                }
                 if(!data?.ok || !Array.isArray(data.records) || String(data.month||'')!==month)
                     throw new Error(data?.error||'正式主表未回傳有效刷卡紀錄');
                 const matched=data.records.filter(record=>{
@@ -9733,6 +9772,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 p79MobileOfficial.month=month;
                 p79MobileOfficial.rows=matched;
                 p79MobileOfficial.verifiedAt=Date.now();
+                p79MobileOfficial.lastError='';
+                window.p79MobileOfficialReadError='';
                 const latest=[...matched].sort((a,b)=>getAttendanceTimestamp(b)-getAttendanceTimestamp(a))[0];
                 window.p79MobileLatestOfficialPunch={
                     empId:empId,recordId:String(latest?.id??''),timeStr:String(latest?.timeStr||''),
@@ -9744,7 +9785,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             })();
             p79MobileOfficialPromise=task;
             try{return await task;}
-            catch(e){console.warn('手機正式主表狀態核對失敗：',e);return false;}
+            catch(e){
+                const detail=/AbortError|aborted|逾時/i.test(String(e?.name||'')+' '+String(e?.message||''))
+                    ? '雲端考勤核對逾時，請稍後重新核對' : String(e?.message||e);
+                p79MobileOfficial.lastError=detail;
+                window.p79MobileOfficialReadError=detail;
+                console.warn('手機正式主表狀態核對失敗：',e);return false;
+            }
             finally{p79MobileOfficialPromise=null;}
         }
 
@@ -9928,7 +9975,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const ok = await p79MobileRefreshOfficial(true);
                 updateHomeClockInButtonState();
                 if (!ok) {
-                    showToast('雲端上班卡核對失敗，請確認網路，或通知管理員核對原始打卡', 'warning');
+                    showToast('雲端上班卡核對失敗：'+(p79MobileOfficial.lastError||'請確認網路後重試'), 'warning');
                     return;
                 }
                 if (getOpenClockInShift(currentEmp)) {
@@ -10185,7 +10232,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function handlePunch(statusText) {
             // 防止手機連點造成重複打卡；超過 15 秒自動解除，避免定位/網路例外把按鈕永久鎖死。
             const nowGuard = Date.now();
-            if (p79PunchInProgress && nowGuard - p79PunchGuardStartedAt < 15000) {
+            if (p79PunchInProgress && (p79MobileOfficialPromise || nowGuard - p79PunchGuardStartedAt < 15000)) {
                 showToast('打卡正在處理中，請稍候…', 'warning');
                 return;
             }
@@ -10237,7 +10284,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         Date.now()-p79MobileOfficial.verifiedAt < 8000;
                     const cloudFresh = justVerified || await p79MobileRefreshOfficial(true);
                     if (!cloudFresh) {
-                        showToast('無法確認雲端最新上班紀錄，暫停打卡以避免重複；請稍後再試或通知管理員核對。', 'warning');
+                        showToast('打卡前雲端核對未完成：'+(p79MobileOfficial.lastError||'請稍後重新核對')+'。原始打卡與待傳紀錄保留。', 'warning');
                         releasePunchGuard();
                         return;
                     }
@@ -23146,8 +23193,9 @@ function draw(){
       (id?'<div style="font-size:11px;overflow-wrap:anywhere">紀錄 ID：'+safe(id)+'</div>':'')+
       (err?'<div style="color:#b91c1c;overflow-wrap:anywhere">原因：'+safe(err)+'</div>':'')+'</li>';
   }).join('');
-  const reason=errors[0]||a?.error||'';
-  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):(a?.state?last:officialText))+'</small>';
+  const readError=String(window.p79MobileOfficialReadError||'');
+  const reason=readError||errors[0]||a?.error||'';
+  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
   const employeePage=document.getElementById('viewEmployee');
   const hasPunch=!!(employeePage && employeePage.contains(btn));
   btn.hidden=!hasPunch;
