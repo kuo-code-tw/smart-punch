@@ -83,6 +83,12 @@
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
   return defaults();
  }
+ function filterReportEmployees(people,department='',jobTitle=''){
+  const dept=e=>String(e.dept||'一般'),title=e=>String(e.jobTitle||e.deptDetail||'未設定');
+  const unique=xs=>[...new Set(xs)].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
+  const scoped=people.filter(e=>!department||dept(e)===department);
+  return {departments:unique(people.map(dept)),jobTitles:unique(scoped.map(title)),employees:scoped.filter(e=>!jobTitle||title(e)===jobTitle)};
+ }
  async function loadRules(){const d=await rpc('getData');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:normalizeStored(d.config[CONFIG])};}
  function dialog(title,content){
   document.getElementById('p79OvertimeDialog')?.remove();
@@ -122,8 +128,19 @@
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    const rows=reportRules(),people=global.p79OvertimeContext.employees();
-   el.insertAdjacentHTML('beforeend','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>員工<select id="p79OtEmp" style="'+inputStyle+'">'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.empId+' '+e.name)+'</option>').join('')+'</select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"><option value="rest">休息日／代加班／國定假日</option><option value="extended">平日延長加班</option></select></label><label>套用代碼<select id="p79OtCode" style="'+inputStyle+'"></select></label></div><div id="p79OtPreview" style="padding:14px;background:#f0f9ff;border-radius:10px"></div><label style="display:block;margin:12px 0">備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label><p style="font-size:13px;color:#64748b">下一步帶入班表「代」，確認日期、人員及時段後按儲存。未完成班表儲存前，申報尚未送出。同一人同一天再次申報會更新該日的代班設定。</p><button id="p79OtStage" type="button" style="margin-top:12px;background:#0369a1;color:white;padding:10px 18px;border-radius:8px">帶入班表確認</button>');
+   el.insertAdjacentHTML('beforeend','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>部門<select id="p79OtDept" style="'+inputStyle+'"></select></label><label>職稱<select id="p79OtTitle" style="'+inputStyle+'"></select></label><label>員工<select id="p79OtEmp" style="'+inputStyle+'">'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.empId+' '+e.name)+'</option>').join('')+'</select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"><option value="rest">休息日／代加班／國定假日</option><option value="extended">平日延長加班</option></select></label><label>套用代碼<select id="p79OtCode" style="'+inputStyle+'"></select></label></div><div id="p79OtPreview" style="padding:14px;background:#f0f9ff;border-radius:10px"></div><label style="display:block;margin:12px 0">備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label><p style="font-size:13px;color:#64748b">下一步帶入班表「代」，確認日期、人員及時段後按儲存。未完成班表儲存前，申報尚未送出。同一人同一天再次申報會更新該日的代班設定。</p><button id="p79OtStage" type="button" style="margin-top:12px;background:#0369a1;color:white;padding:10px 18px;border-radius:8px">帶入班表確認</button>');
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+   const deptSelect=el.querySelector('#p79OtDept'),titleSelect=el.querySelector('#p79OtTitle'),empSelect=el.querySelector('#p79OtEmp');
+   const fillSelect=(select,label,values)=>{const previous=select.value;select.innerHTML='<option value="">全部'+label+'</option>'+values.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');select.value=values.includes(previous)?previous:'';};
+   fillSelect(deptSelect,'部門',filterReportEmployees(people).departments);
+   const filterPeople=()=>{
+    const options=filterReportEmployees(people,deptSelect.value);
+    fillSelect(titleSelect,'職稱',options.jobTitles);
+    const matches=filterReportEmployees(people,deptSelect.value,titleSelect.value).employees,previous=empSelect.value;
+    empSelect.innerHTML=matches.length?matches.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.empId+' '+e.name)+'</option>').join(''):'<option value="">沒有符合條件的人員</option>';
+    if(matches.some(e=>String(e.empId)===previous))empSelect.value=previous;
+   };
+   deptSelect.onchange=filterPeople;titleSelect.onchange=filterPeople;filterPeople();
    const kind=el.querySelector('#p79OtKind'),select=el.querySelector('#p79OtCode');
    const refresh=()=>{select.innerHTML=rows.map((r,i)=>({r,i})).filter(({r})=>(r[0]==='延')===(kind.value==='extended')).map(({r,i})=>'<option value="'+i+'">'+esc(r[1])+'</option>').join('');preview()};
    function preview(){const r=rows[Number(select.value)];el.querySelector('#p79OtPreview').textContent=r?'加班 '+r[6]+'-'+r[7]+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):'尚未設定這類加班規則';}
@@ -138,5 +155,6 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,filterReportEmployees,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
+
