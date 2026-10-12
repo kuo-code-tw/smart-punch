@@ -147,6 +147,7 @@ const MENU={
  attendance:[
   ['clearDeleted','🗑️ 清空已刪除考勤'],
   ['attendance-import','考勤匯入'],['attendance-export','考勤匯出'],['attendance-compare','Excel 比對'],
+  ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
  workhours:[['year','📆 年份顯示']],
@@ -258,7 +259,7 @@ function buildMenu(sys){
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
   ['資料管理',['attendance-import','attendance-export','balance-import','balance-export','import','export']],
-  ['系統設定',['schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
+  ['系統設定',['settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
