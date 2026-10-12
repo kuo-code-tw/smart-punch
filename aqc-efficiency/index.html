@@ -8100,7 +8100,8 @@ function scanWorkbookBundleEvidence(book){
       seen.add(key);
 
       const parsed=parseBundleRemark(s);
-      if(parsed.deduct>0){
+      // A parsed 1BN/1FL is valid evidence with zero deduction, not a parse failure.
+      if(parsed.items.length>0){
         result.hits.push({
           row:ri+1,col:ci+1,text:s,
           deduct:num(parsed.deduct),bn:num(parsed.bn),fl:num(parsed.fl)
@@ -8325,7 +8326,7 @@ function effectiveBundleRecord(r){
     };
   }
 
-  if(parsed.deduct>0){
+  if(parsed.items.length>0){
     const adjusted=applyBundleDeductionToWorkingReport(rawDisc,rawLoad,remark);
     return {
       detected:true,
