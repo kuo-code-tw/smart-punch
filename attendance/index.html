@@ -2278,7 +2278,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.44';
+        const APP_VERSION='2026.10.12.50';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -8178,50 +8178,63 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             refreshJobTitleControls();
         }
 
-        function saveSystemSettings() {
-            if (!requireAdminAction('settingsManage', '修改系統與定位設定')) return;
-            sysConfig.companyName = document.getElementById('cfgCompanyName').value.trim() || defaultConfig.companyName;
-            sysConfig.locationName = document.getElementById('cfgLocationName').value.trim() || "79號碼頭";
-            sysConfig.lat = parseFloat(document.getElementById('cfgLat').value) || 22.557128;
-            sysConfig.lng = parseFloat(document.getElementById('cfgLng').value) || 120.337712;
-            sysConfig.radius = parseInt(document.getElementById('cfgRadius').value) || 100;
-
-            const gasUrlInput = normalizeGasWebAppUrl(
-                document.getElementById('cfgGasUrl')?.value || ''
-            );
-            if (!isValidGasWebAppUrl(gasUrlInput)) {
-                showToast('Google Apps Script Web App URL 格式不正確', 'warning');
-                return;
-            }
-            sysConfig.gasUrl = gasUrlInput;
-            sessionStorage.setItem('port79_gas_url', gasUrlInput);
-
-            const extraLocations = [];
-            for (let number = 1; number <= 5; number++) {
-                const name = document.getElementById(`cfgExtraLocationName${number}`)?.value.trim() || '';
-                const latText = document.getElementById(`cfgExtraLocationLat${number}`)?.value.trim() || '';
-                const lngText = document.getElementById(`cfgExtraLocationLng${number}`)?.value.trim() || '';
-                const radiusText = document.getElementById(`cfgExtraLocationRadius${number}`)?.value.trim() || '';
-                const hasAnyValue = !!(name || latText || lngText);
-                if (hasAnyValue && (!name || !latText || !lngText || !Number.isFinite(Number(latText)) || !Number.isFinite(Number(lngText)))) {
-                    showToast(`額外地點 ${number} 資料不完整，請填寫地點名稱、緯度與經度`, 'warning');
-                    return;
+        let p79SystemSettingsSaveBusy=false;
+        function p79SettingsSaveFeedback(message,error=false){
+            const button=document.getElementById('btnSaveSystemSettings');
+            let status=document.getElementById('p79SystemSettingsSaveStatus');
+            if(!status&&button){status=document.createElement('span');status.id='p79SystemSettingsSaveStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.style.cssText='display:inline-block;margin-right:12px;font-size:13px;font-weight:700;white-space:normal;';button.parentElement.insertBefore(status,button);}
+            if(status){status.textContent=message;status.style.color=error?'#b91c1c':'#0369a1';}
+        }
+        async function saveSystemSettings() {
+            if(p79SystemSettingsSaveBusy)return;
+            if (!requireAdminAction('settingsManage', '修改系統與定位設定')) {p79SettingsSaveFeedback('❌ 此帳號沒有修改系統設定權限',true);return {ok:false};}
+            const button=document.getElementById('btnSaveSystemSettings'),originalButton=button?.innerHTML;
+            const value=(id,fallback='')=>{const input=document.getElementById(id);return input?String(input.value??'').trim():String(fallback??'');};
+            try{
+                const draft=JSON.parse(JSON.stringify(sysConfig));
+                draft.companyName=value('cfgCompanyName',draft.companyName)||defaultConfig.companyName;
+                draft.locationName=value('cfgLocationName',draft.locationName)||'79號碼頭';
+                const latText=value('cfgLat',draft.lat),lngText=value('cfgLng',draft.lng),radiusText=value('cfgRadius',draft.radius);
+                if(!latText||!lngText||!Number.isFinite(Number(latText))||Math.abs(Number(latText))>90||!Number.isFinite(Number(lngText))||Math.abs(Number(lngText))>180)throw new Error('主要地點緯度／經度無效');
+                if(!(Number(radiusText)>0))throw new Error('主要地點允許半徑必須大於0');
+                draft.lat=Number(latText);draft.lng=Number(lngText);draft.radius=Number(radiusText);
+                draft.gasUrl=normalizeGasWebAppUrl(value('cfgGasUrl',getActiveGasUrl())||getActiveGasUrl());
+                if(!isValidGasWebAppUrl(draft.gasUrl))throw new Error('Google Apps Script Web App URL 格式不正確');
+                const extras=[];
+                for(let number=1;number<=5;number++){
+                    const existing=normalizeExtraLocations(draft.extraLocations)[number-1];
+                    const name=value(`cfgExtraLocationName${number}`,existing.name),lat=value(`cfgExtraLocationLat${number}`,existing.lat),lng=value(`cfgExtraLocationLng${number}`,existing.lng),radius=value(`cfgExtraLocationRadius${number}`,existing.radius);
+                    const enabled=!!(name||lat||lng);
+                    if(enabled&&(!name||!lat||!lng||!Number.isFinite(Number(lat))||Math.abs(Number(lat))>90||!Number.isFinite(Number(lng))||Math.abs(Number(lng))>180))throw new Error(`額外地點 ${number} 請填完整的名稱、有效緯度及經度`);
+                    if(enabled&&!(Number(radius)>0))throw new Error(`額外地點 ${number} 允許半徑必須大於0`);
+                    extras.push({name,lat:enabled?Number(lat):null,lng:enabled?Number(lng):null,radius:Number(radius)>0?Number(radius):100});
                 }
-                extraLocations.push({
-                    name,
-                    lat: hasAnyValue ? Number(latText) : null,
-                    lng: hasAnyValue ? Number(lngText) : null,
-                    radius: Math.max(1, Number(radiusText) || 100)
-                });
+                draft.extraLocations=normalizeExtraLocations(extras);
+                const adminInput=document.getElementById('cfgAdminIds');
+                if(adminInput)draft.adminIds=normalizeAdminIds(String(adminInput.value||'').split(','));
+                if(new TextEncoder().encode(JSON.stringify(draft)).length>8800)throw new Error('系統設定超過雲端容量，尚未送出；請先縮小或移除公司LOGO圖片');
+                p79SystemSettingsSaveBusy=true;
+                if(button){button.disabled=true;button.textContent='儲存中…';}
+                p79SettingsSaveFeedback('☁️ 正在儲存定位設定，等待雲端確認…');
+                const previous=sysConfig;
+                sysConfig=draft;
+                try{saveConfig();}catch(error){sysConfig=previous;throw new Error('本機無法保留設定：'+(error.message||error)+'。欄位已保留，尚未送出雲端');}
+                const result=await postToCloud({action:'syncConfig',config:draft},'');
+                if(result?.ok!==true||result.localOnly)throw new Error(result?.error||'雲端尚未確認儲存；請保留欄位並重試');
+                if(result.config&&JSON.stringify(normalizeExtraLocations(result.config.extraLocations))!==JSON.stringify(draft.extraLocations))throw new Error('雲端回覆的定位設定不一致，尚未確認儲存');
+                applySysConfigUI();
+                p79SettingsSaveFeedback('✅ 定位與系統設定已由雲端確認儲存');
+                showToast('定位與系統設定已儲存','success');
+                return result;
+            }catch(error){
+                const message=String(error?.message||error||'未知錯誤');
+                p79SettingsSaveFeedback('❌ 尚未確認儲存：'+message,true);
+                showToast('設定尚未確認儲存：'+message,'warning');
+                return {ok:false,error:message};
+            }finally{
+                p79SystemSettingsSaveBusy=false;
+                if(button){button.disabled=false;button.innerHTML=originalButton;}
             }
-            sysConfig.extraLocations = normalizeExtraLocations(extraLocations);
-
-            const adminStr = document.getElementById('cfgAdminIds').value;
-            sysConfig.adminIds = normalizeAdminIds(adminStr.split(','));
-
-            saveConfig();
-            applySysConfigUI();
-            postToCloud({ action: 'syncConfig', config: sysConfig }, '系統設定已儲存並同步至所有裝置');
         }
 
         function normalizeEmployeeLookupName(value) {
@@ -23450,3 +23463,4 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 </script>
 </body>
 </html>
+
