@@ -72,7 +72,7 @@
   return best||{meta:direct,date,minutes:direct?.overtimeReport?overtimeMinutes(start,end,date,direct):null};
  }
  function auth(){
-  const token=sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'';
+  const token=sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'';
   const url=global.p79OvertimeContext?.gasUrl?.();if(!url||!token)throw Error('請先登入管理員');return {url,token};
  }
  async function rpc(action,payload){
