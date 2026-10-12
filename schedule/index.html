@@ -48,7 +48,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.11.30';
+    const APP_VERSION='2026.10.12.43';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -815,7 +815,7 @@ html.dark #todayScheduleLeaveSummary .today-leave-title{color:#fdba74}
 }
 </style>
 
-<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
+<script src="../assets/port79-data-cache.js?v=20261012.43"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 <link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
 
@@ -2321,7 +2321,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       initScheduleTheme();
     }
 
-    const PORT79_BUILD_VERSION='20261011.30';
+    const PORT79_BUILD_VERSION='20261012.43';
 
     function readPort79SsoTokenFromHash() {
       try {
@@ -3701,6 +3701,14 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         return { empId: emp.id, name: emp.name, role: emp.role, group: emp.group, month: yearMonth, schedule: monthData };
       });
       try {
+        schedules.forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
+          if(!meta.overtimeType)return;
+          try {
+            p79BuildScheduleOvertimeMeta(meta,meta.type==='substitute'?'substitute':meta.overtimeType,
+              String(row.schedule[date]||''),String(row.schedule[date]||''),
+              String(meta.overtimeStart||''),String(meta.overtimeEnd||''),{});
+          }catch(error){throw new Error(`${row.name}（${row.empId}）${date}：${error.message}。請開啟該日「代班／加班設定」補齊後再儲存。`);}
+        }));
         // 限定對可重試的 GAS 忙碌錯誤重試。完整月份快照固定不變，
         // 絕不對編輯權不足、資料格式錯誤或不明原因做盲目重送。
         const snapshot={
@@ -4498,16 +4506,18 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       wrap.id = 'substitute-assignment-modal';
       wrap.className = 'hidden fixed inset-0 z-[200] bg-slate-950/55 backdrop-blur-sm p-4 flex items-center justify-center';
       wrap.innerHTML = `
-        <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-slate-200">
           <div class="px-5 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center justify-between gap-3">
             <div><div class="text-lg font-black">🔄 代班／加班設定</div><div id="substitute-modal-subtitle" class="text-xs text-indigo-100 mt-1"></div></div>
             <button type="button" onclick="closeSubstituteAssignment()" class="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 font-black">✕</button>
           </div>
           <div class="p-5 space-y-4">
             <input type="hidden" id="substitute-cover-emp-id"><input type="hidden" id="substitute-date-key">
-            <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班人員（第一位）</span><select id="substitute-worker-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold" onchange="p79UpdateSubstituteTargetOptions()"></select></label><label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班類型</span><select id="substitute-overtime-kind" onchange="p79ToggleSubstituteType()" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"><option value="rest">休假加班</option><option value="substitute">代班加班</option></select></label>
+            <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班人員（第一位）</span><select id="substitute-worker-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold" onchange="p79UpdateSubstituteTargetOptions()"></select></label><label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班類型</span><select id="substitute-overtime-kind" onchange="p79ToggleSubstituteType()" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"><option value="rest">休假加班</option><option value="extended">延時加班</option><option value="substitute">代班加班</option></select></label>
             <label id="substitute-for-wrap" class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">被代班人員（第二位）</span><select id="substitute-for-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"></select></label>
-            
+            <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班班別</span><select id="substitute-overtime-shift" class="w-full rounded-xl border border-slate-300 px-3 py-2"><option value="">請選擇班別</option><option value="早">早班</option><option value="中">中班</option><option value="晚">晚班</option></select></label>
+            <div class="grid grid-cols-2 gap-3"><label>加班開始<input type="time" id="substitute-overtime-start" class="block w-full rounded-xl border border-slate-300 px-3 py-2"></label><label>加班結束<input type="time" id="substitute-overtime-end" class="block w-full rounded-xl border border-slate-300 px-3 py-2"></label></div>
+            <div class="text-xs text-slate-500">結束早於開始表示跨日；請填實際安排的加班時間。</div>
             <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">備註</span><textarea id="substitute-note" rows="3" placeholder="例：王大明請假，由李大明代早班" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm resize-none"></textarea></label>
             <div id="substitute-leave-hint" class="text-xs leading-5 text-slate-500"></div>
             <div class="grid grid-cols-3 gap-2 pt-1"><button type="button" onclick="clearSubstituteAssignment()" class="py-3 rounded-xl bg-rose-50 text-rose-700 font-black border border-rose-200">清除</button><button type="button" onclick="closeSubstituteAssignment()" class="py-3 rounded-xl bg-slate-100 text-slate-700 font-black">取消</button><button type="button" onclick="saveSubstituteAssignment()" class="py-3 rounded-xl bg-indigo-600 text-white font-black shadow">儲存</button></div>
@@ -4536,6 +4546,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const day=String(document.getElementById('substitute-date-key')?.value||'');
       const choices=employees.filter(x=>x.id!==id&&String(x.role||'').trim()===String(e.role||'').trim())
         .sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.id).localeCompare(String(b.id)));
+      p79LoadSubstituteOvertimeFields();
       target.innerHTML='<option value="">— 請選擇第二位人員 —</option>'+choices.map(x=>'<option value="'+scheduleEscapeHtml(x.id)+'">'+scheduleEscapeHtml(x.name)+'（'+scheduleEscapeHtml(x.id)+'）</option>').join('');
       if(choices.some(x=>String(x.id)===prev))target.value=prev;
     }
@@ -4559,7 +4570,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       document.getElementById('substitute-date-key').value=dayStr;
       document.getElementById('substitute-modal-subtitle').textContent=dayStr+'｜'+emp.role+'｜目前班別：'+((monthlyScheduleData[empId]||{})[dayStr]||'未排');
       if(worker.value)p79UpdateSubstituteTargetOptions();else document.getElementById('substitute-for-emp').innerHTML='<option value="">— 請先選擇可代班人員 —</option>';
-      document.getElementById('substitute-overtime-kind').value=fromAnnualLeave?'substitute':((existing.forEmpId||existing.overtimeType==='substitute')?'substitute':'rest');
+      document.getElementById('substitute-overtime-kind').value=fromAnnualLeave?'substitute':((existing.forEmpId||existing.type==='substitute')?'substitute':(existing.overtimeType==='extended'?'extended':'rest'));
+      p79LoadSubstituteOvertimeFields();
       const select=document.getElementById('substitute-for-emp');
       if([...select.options].some(x=>x.value===String(existing.forEmpId||'')))select.value=String(existing.forEmpId);
       if(fromAnnualLeave && [...select.options].some(x=>x.value===String(empId)))select.value=String(empId);
@@ -4572,6 +4584,32 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
     function closeSubstituteAssignment() {
       document.getElementById('substitute-assignment-modal')?.classList.add('hidden');
+    }
+
+    function p79LoadSubstituteOvertimeFields() {
+      const id=String(document.getElementById('substitute-worker-emp').value||'');
+      const day=String(document.getElementById('substitute-date-key').value||'');
+      const meta=getScheduleDayMeta(id,day)||{};
+      const shift=String((monthlyScheduleData[id]||{})[day]||'');
+      document.getElementById('substitute-overtime-shift').value=['早','中','晚'].includes(shift)?shift:'';
+      document.getElementById('substitute-overtime-start').value=meta.overtimeStart||'';
+      document.getElementById('substitute-overtime-end').value=meta.overtimeEnd||'';
+    }
+
+    function p79BuildScheduleOvertimeMeta(old,kind,currentShift,shift,start,end,details) {
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)||start===end)
+        throw new Error('請填有效且不同的加班開始、結束時間');
+      if(!['早','中','晚'].includes(shift))throw new Error('請選擇加班班別');
+      const original=old.overtimeOriginalShift===undefined?currentShift:String(old.overtimeOriginalShift);
+      const normal=['早','中','晚'].includes(original);
+      if(kind==='rest'&&normal)throw new Error('當日已有正常班別，請選擇延時加班或代班加班');
+      const overtimeType=kind==='substitute'?(normal?'extended':'rest'):kind;
+      if(!['rest','extended'].includes(overtimeType))throw new Error('請選擇有效的加班類型');
+      if(overtimeType==='extended'&&(!normal||shift!==original))throw new Error('延時加班必須保留當日正常班別');
+      if(overtimeType==='rest'&&!['休',''].includes(original))throw new Error('請假當日不能安排加班');
+      return {...old,...details,type:kind==='substitute'?'substitute':'overtime',overtime:true,
+        overtimeType,overtimeOriginalShift:original,overtimeAssignedShift:shift,
+        overtimeStart:start,overtimeEnd:end};
     }
 
     function saveSubstituteAssignment() {
@@ -4587,11 +4625,19 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(!worker||!dayStr)return alert('請選擇加班人員');
       if(kind==='substitute'&&(!target||forEmpId===empId))return alert('代班加班必須選擇第二位被代班人員');
       if(target&&String(target.role||'').trim()!==String(worker.role||'').trim())return alert('只能選擇相同單位（職務）的人員代班');
+      const old=monthlyScheduleMeta[empId]?.[dayStr]||{};
+      const shift=String(document.getElementById('substitute-overtime-shift').value||'');
+      let meta;
+      try {
+        meta=p79BuildScheduleOvertimeMeta(old,kind,String((monthlyScheduleData[empId]||{})[dayStr]||''),shift,
+          String(document.getElementById('substitute-overtime-start').value||''),
+          String(document.getElementById('substitute-overtime-end').value||''),
+          {forEmpId,forName:target?.name||'',note,assignedAt:new Date().toISOString()});
+      }catch(error){return alert(error.message);}
       if(!monthlyScheduleMeta[empId])monthlyScheduleMeta[empId]={};
-      const old=monthlyScheduleMeta[empId][dayStr]||{};
-      monthlyScheduleMeta[empId][dayStr]={...old,type:kind==='substitute'?'substitute':'overtime',
-        forEmpId,forName:target?.name||'',overtime:true,
-        overtimeType:kind==='rest'?'rest':'substitute',note,assignedAt:new Date().toISOString()};
+      if(!monthlyScheduleData[empId])monthlyScheduleData[empId]={};
+      monthlyScheduleMeta[empId][dayStr]=meta;
+      monthlyScheduleData[empId][dayStr]=shift;
       queueScheduleCloudSave();
       closeSubstituteAssignment();
       renderRoleScheduleView();renderTodaySchedulePanel();
@@ -4599,8 +4645,11 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
     function clearSubstituteAssignment() {
       if (!requireScheduleEditLock()) return;
-      const empId = String(document.getElementById('substitute-cover-emp-id')?.value || '').trim().toUpperCase();
+      const empId = String(document.getElementById('substitute-worker-emp')?.value || document.getElementById('substitute-cover-emp-id')?.value || '').trim().toUpperCase();
       const dayStr = String(document.getElementById('substitute-date-key')?.value || '').trim();
+      const meta=monthlyScheduleMeta[empId]?.[dayStr];
+      if(meta?.overtimeAssignedShift && monthlyScheduleData[empId]?.[dayStr]===meta.overtimeAssignedShift && meta.overtimeOriginalShift!==undefined)
+        monthlyScheduleData[empId][dayStr]=meta.overtimeOriginalShift;
       if (monthlyScheduleMeta[empId] && monthlyScheduleMeta[empId][dayStr]) delete monthlyScheduleMeta[empId][dayStr];
       queueScheduleCloudSave();
       closeSubstituteAssignment();
