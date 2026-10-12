@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
+<script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -1168,7 +1169,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 <div class="flex flex-wrap justify-between items-center gap-3">
                     <div>
                         <h3 class="font-bold text-slate-800 dark:text-slate-200 text-sm">每日加班人員統計</h3>
-                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">完整班次超過 8 小時後，延長時間須超過 30 分鐘才列為「估算加班」；跨日班次歸入上班日期。</p>
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
@@ -11172,8 +11173,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const start = getAttendanceTimestamp(row.clockIn);
             const end = getAttendanceTimestamp(row.clockOut);
             const totalMinutes = Math.floor((end - start) / 60000);
-            if (!Number.isFinite(totalMinutes) || totalMinutes <= 480 + MIN_OVERTIME_MINUTES) return 0;
-            return Math.max(0, totalMinutes - 480);
+            const employee=findEmployeeForAttendanceIdentity(row,employees);
+            const meta=employee?employeeScheduleMetaMap(employee)[normalizeScheduleDateKey(row.dateKey)]:null;
+            return p79RestActualOvertimeMinutes(totalMinutes,meta);
         }
 
         function attendanceRowOvertimeText(row) {
@@ -12142,8 +12144,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
             });
 
-            const signature = JSON.stringify([sourceRecords, visibleEmployees]);
+            const signature = JSON.stringify([sourceRecords, visibleEmployees, schedules]);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
+            const restMetaByEmp=new Map(visibleEmployees.map(emp=>[String(emp.empId),employeeScheduleMetaMap(emp)]));
             const rows = buildDailyAttendanceRows(sourceRecords)
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
@@ -12151,10 +12154,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const end = getAttendanceTimestamp(session.clockOut);
                     const totalMinutes = Math.floor((end - start) / 60000);
                     // 每日延長時間 30 分鐘以內不列入加班；須超過 30 分鐘才計入。
-                    if (!Number.isFinite(totalMinutes) || totalMinutes <= 480 + MIN_OVERTIME_MINUTES) return null;
+                    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
                     const employee = findEmployeeForAttendanceIdentity(session, visibleEmployees);
                     if (!employee) return null;
-                    const overtimeMinutes = totalMinutes - 480;
+                    const restMeta=restMetaByEmp.get(String(employee.empId))?.[normalizeScheduleDateKey(session.dateKey)];
+                    const overtimeMinutes = p79RestActualOvertimeMinutes(totalMinutes,restMeta);
+                    if(!overtimeMinutes)return null;
                     const monthKey = String(session.dateKey || '').slice(0, 7);
                     return {
                         ...session,
@@ -14418,4 +14423,5 @@ C.mountMonth({inputId:'attendanceStatsMonth'});
 </script>
 </body>
 </html>
+
 
