@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.90"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.92"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -14608,12 +14608,11 @@ async function p79OpenLeaveOvertimeHandoff(){
     const entry=handoff.entries[0],date=entry.date,token=currentPort79SsoToken();
     const data=await fetchGasJsonWithRetry(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+date.slice(0,7)+'&_='+Date.now(),'請假代班時段',1,12000);
     if(!data.ok)throw Error(data.error||'班表尚未讀取完成');
-    const byEmp=new Map([[String(entry.empId).trim().toUpperCase(),{}]]);
-    p79MergeWorkOvertimeSnapshot({ready:true,token,rows:data.schedules||[],covers:data.leaveCoverAssignments||[]},byEmp);
-    const meta=byEmp.get(String(entry.empId).trim().toUpperCase())?.[date];
-    if(!meta?.overtimeReport)throw Error('該日代班安排已變更，請先核對請假及班表');
-    await P79Overtime.openReport({...entry,code:meta.overtimeReport.code,category:'代',leaveHandoffId:handoff.id});
-    if(status)status.textContent='請選擇出勤時段與加班明細，再送出申報。';
+    const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
+    let optionsWarning='';
+    try{const loaded=await P79Overtime.loadRules();Object.assign(sysConfig,loaded.config);saveConfig();}catch(error){optionsWarning='最新選項讀取未完成，請核對現有選項或按更新雲端時段選項。';}
+    await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id});
+    if(status)status.textContent=optionsWarning||'請選擇出勤時段與加班明細，再送出申報。';
   }catch(error){const message='請假與代班已儲存，申報時段尚未帶入：'+(error.message||error);if(status)status.textContent=message;alert(message);}
   finally{p79LeaveHandoffBusy=false;}
 }
