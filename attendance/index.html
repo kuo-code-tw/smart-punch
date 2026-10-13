@@ -2903,6 +2903,30 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             return [primary, ...extras].filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
         }
 
+        function findAllowedPunchLocation(lat,lng) {
+            const candidates=getConfiguredPunchLocations().map(location=>({...location,distance:calculateDistance(lat,lng,location.lat,location.lng)})).filter(location=>Number.isFinite(location.distance)).sort((a,b)=>a.distance-b.distance);
+            // 優先使用任何涵蓋目前位置的地點；最近的地點不一定有足夠大的允許半徑。
+            return candidates.find(location=>location.distance<=location.radius)||candidates[0]||null;
+        }
+        let p79LocationConfigReadPromise=null;
+        async function refreshPunchLocationConfig() {
+            if(p79LocationConfigReadPromise)return p79LocationConfigReadPromise;
+            p79LocationConfigReadPromise=(async()=>{
+                const url=getActiveGasUrl(),token=currentPort79SsoToken();
+                if(!url||!token)throw Error('登入驗證資料不存在，無法核對最新定位設定');
+                const data=await fetchGasJsonWithRetry(url+(url.includes('?')?'&':'?')+'action=getData&token='+encodeURIComponent(token)+'&gcToken='+encodeURIComponent(token)+'&t='+Date.now(),'定位設定同步',1,15000);
+                if(data?.ok!==true||!data.config||!Object.prototype.hasOwnProperty.call(data.config,'lat')||!Object.prototype.hasOwnProperty.call(data.config,'lng'))throw Error(data?.error||'雲端未回傳完整定位設定');
+                const config=data.config,lat=Number(config.lat),lng=Number(config.lng),radius=Number(config.radius);
+                if(!Number.isFinite(lat)||Math.abs(lat)>90||!Number.isFinite(lng)||Math.abs(lng)>180||!(radius>0))throw Error('雲端主要定位設定無效');
+                const extras=normalizeExtraLocations(config.extraLocations);
+                if(extras.some(location=>location.name&&(!Number.isFinite(location.lat)||Math.abs(location.lat)>90||!Number.isFinite(location.lng)||Math.abs(location.lng)>180)))throw Error('雲端額外定位設定無效');
+                Object.assign(sysConfig,{locationName:String(config.locationName||sysConfig.locationName),lat,lng,radius,extraLocations:extras});
+                try{saveConfig();}catch(error){console.warn('最新定位已載入，本機快取未更新',error);}
+                return true;
+            })().finally(()=>{p79LocationConfigReadPromise=null;});
+            return p79LocationConfigReadPromise;
+        }
+
         function formatAttendanceLocationDisplay(value) {
             const raw = String(value || '').trim();
             if (!raw || raw === PRIMARY_IN_RANGE_LOCATION_LABEL) return raw;
@@ -8376,10 +8400,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     return false;
                 }
                 if(source==='quick' && accuracy>100)return false;
-                const locations=getConfiguredPunchLocations();
-                const nearest=locations.map(location=>({
-                    ...location,distance:calculateDistance(lat,lng,location.lat,location.lng)
-                })).sort((a,b)=>a.distance-b.distance)[0];
+                const nearest=findAllowedPunchLocation(lat,lng);
                 if(!nearest){fail('尚未設定打卡地點，請通知管理員設定正式 GPS 範圍');return true;}
                 const target=document.getElementById('targetLocationName');
                 if(target)target.textContent=nearest.name;
@@ -10492,18 +10513,25 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return;
             }
 
-            requestLocationPermission((success, distance, nearestLocation) => {
-                if (!success) { releasePunchGuard(); return; }
-                if (distance <= nearestLocation.radius) {
-                    const locationLabel = nearestLocation.primary
-                        ? PRIMARY_IN_RANGE_LOCATION_LABEL
-                        : nearestLocation.name;
-                    execPunch(statusText, locationLabel);
-                } else {
-                    releasePunchGuard();
-                    showToast(`超出打卡範圍！距離 ${nearestLocation.name} ${distance.toFixed(1)} 公尺 (限制 ${nearestLocation.radius}m)`, "warning");
+            const completeLocationCheck=async(success,distance,location,cloudChecked=false)=>{
+                if(!success||!location){releasePunchGuard();return;}
+                if(distance<=location.radius){
+                    execPunch(statusText,location.primary?PRIMARY_IN_RANGE_LOCATION_LABEL:location.name);
+                    return;
                 }
-            });
+                if(!cloudChecked){
+                    showToast('正在核對最新打卡地點設定…','info');
+                    try{
+                        await refreshPunchLocationConfig();
+                        // 取得新的 GPS，避免用等待雲端前的位置完成打卡。
+                        requestLocationPermission((ok,nextDistance,nextLocation)=>completeLocationCheck(ok,nextDistance,nextLocation,true));
+                    }catch(error){releasePunchGuard();showToast('無法核對最新定位設定：'+(error.message||error)+'，請稍後再試','warning');}
+                    return;
+                }
+                releasePunchGuard();
+                showToast(`超出所有已設定打卡地點範圍！距離 ${location.name} ${distance.toFixed(1)} 公尺（此地點限制 ${location.radius}m）`,'warning');
+            };
+            requestLocationPermission((success,distance,location)=>completeLocationCheck(success,distance,location));
         }
 
         function releasePunchGuard() {
