@@ -477,7 +477,7 @@ function renderAdmin(){
      ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
      : '尚未安排代班';
    const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
-     ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>`
+     ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>${workerIds.length?`<button type="button" class="p79-cover-again" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">加班明細</button>`:''}`
      : '';
    const coverDisplay=String(l.status)==='已核准'
      ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
@@ -502,6 +502,25 @@ function renderAdminBalances(){
  body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
 }
 
+let p79SavedCoverReportBusy=false;
+async function p79ReportSavedLeaveCover(id){
+ if(p79SavedCoverReportBusy||leaveAccess!=='manage')return;
+ p79SavedCoverReportBusy=true;
+ try{
+  setStatus('正在帶入已安排代班的加班明細…','info');
+  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  if(!fresh?.ok)throw new Error(fresh?.error||'雲端讀取失敗');
+  const leave=(fresh.leaveRecords||[]).find(l=>String(l.id)===String(id));
+  const covers=(fresh.leaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(id));
+  if(!leave||leave.status!=='已核准'||!covers.length)throw new Error('此筆請假目前沒有已儲存的代班安排，請重新整理核對');
+  const entries=[],seen=new Set();
+  for(const cover of covers){const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);if(!start||!end||start>end)throw new Error('代班日期無效，請先核對');for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const worker of cover.workerIds||[]){const empId=String(worker),key=empId+'|'+date;if(seen.has(key))continue;seen.add(key);const person=(fresh.employees||[]).find(e=>String(e.empId)===empId);entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId)});if(entries.length>124)throw new Error('申報日期超出單次範圍，請分次安排');}}}
+  if(!entries.length)throw new Error('找不到可申報的代班人員');
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:String(id),createdAt:Date.now(),entries}));
+  location.href='../work-hours/?leaveReport=1#overtime';
+ }catch(error){setStatus('加班明細未開啟：'+String(error.message||error),'error');}
+ finally{p79SavedCoverReportBusy=false;}
+}
 function p79OpenLeaveCover(id){
  const leave=leaveRecords.find(x=>String(x.id)===String(id));
  if(!leave||leaveAccess!=='manage'||leave.status!=='已核准')return;
