@@ -2150,7 +2150,17 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             return /quota|quota has been exceeded|too many times|service invoked too many times|rate limit|resource exhausted|429|配額|呼叫次數.*過多/i.test(String(value || ''));
         }
 
+        function p79AuthenticateCloudReadUrl(value){
+            try{
+                const base=new URL(getActiveGasUrl()),target=new URL(String(value));
+                if(target.origin!==base.origin||target.pathname!==base.pathname)return value;
+                if(target.searchParams.has('token')||target.searchParams.has('gcToken')||target.searchParams.has('userToken'))return value;
+                const token=currentPort79SsoToken();if(token)target.searchParams.set('gcToken',token);
+                return target.toString();
+            }catch(ignore){return value;}
+        }
         async function fetchGasJsonWithRetry(url, label = 'GAS', attempts = 3, timeoutMs = 20000) {
+            url=p79AuthenticateCloudReadUrl(url);
             let lastError = null;
             const totalAttempts = Math.max(1, Number(attempts) || 1);
 
