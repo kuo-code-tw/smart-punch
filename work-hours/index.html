@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.96"></script>
+<script src="../assets/port79-overtime-report.js?v=20261014.97"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -1181,7 +1181,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="p79ExportOvertimeComparison(false)" class="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">匯出Excel</button><button type="button" onclick="p79ExportOvertimeComparison(true)" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">列印比對</button><button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
+                        <button type="button" id="p79ReloadOvertimeButton" onclick="p79ReloadOvertimeMonth(this)" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">重新讀取加班</button><button type="button" onclick="p79ExportOvertimeComparison(false)" class="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">匯出Excel</button><button type="button" onclick="p79ExportOvertimeComparison(true)" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">列印比對</button><button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
                         <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
@@ -12173,7 +12173,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function p79LoadWorkOvertimeMonths(sourceRecords){
             const token=currentPort79SsoToken();if(!token)return;
             const selectedMonth=document.getElementById('overtimeMonthFilter')?.value;
-            const months=[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].filter(month=>!selectedMonth||selectedMonth==='ALL'||month===selectedMonth).sort().reverse();
+            const months=[...new Set([...(selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[]),...sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m))])].filter(month=>!selectedMonth||selectedMonth==='ALL'||month===selectedMonth).sort().reverse();
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
@@ -12369,7 +12369,8 @@ async function p79ExportOvertimeComparison(printMode){
             const now = new Date();
             const currentMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
             const desired = firstLoad ? currentMonth : (selectedBefore || currentMonth);
-            const choices = [...new Set([...months, currentMonth, ...(desired!=='ALL'?[desired]:[])])].sort().reverse();
+            const recentMonths=Array.from({length:12},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')});
+            const choices = [...new Set([...recentMonths,...months, currentMonth, ...(desired!=='ALL'?[desired]:[])])].sort().reverse();
             replaceOvertimeOptions(monthEl, '全部月份', choices);
             monthEl.value = desired;
             monthEl.dataset.p79MonthInitialized = '1';
@@ -12383,10 +12384,23 @@ async function p79ExportOvertimeComparison(printMode){
             replaceOvertimeOptions(employeeEl, '全部姓名', [...nameMap.keys()], nameMap);
         }
 
-        function onOvertimeMonthChange() {
+        async function p79ReloadOvertimeMonth(button){
+            if(!hasValidHomepageAdminSession())return;
+            const selected=document.getElementById('overtimeMonthFilter')?.value;
+            const month=selected&&selected!=='ALL'?selected:getCurrentYearMonthValue();
+            if(button?.disabled)return;if(button){button.disabled=true;button.textContent='讀取中…';}
+            try{
+                const ok=await loadAttendanceMonthFromCloud(month,false);if(ok===false)throw Error('出勤讀取未完成，已保留原資料');
+                const old=p79WorkOvertimeMonths.get(month);if(old)old.at=0;
+                p79LoadWorkOvertimeMonths(records);await p79WorkOvertimeLoadQueue;p79OvertimeCalculationCache=null;renderOvertimeStats();
+            }catch(error){showToast('加班讀取失敗：'+error.message,'warning');}
+            finally{if(button){button.disabled=false;button.textContent='重新讀取加班';}}
+        }
+        async function onOvertimeMonthChange() {
             ['overtimeDeptFilter','overtimeJobTitleFilter','overtimeEmployeeFilter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 'ALL'; });
             overtimeCurrentPage = 1;
             renderOvertimeStats();
+            await p79ReloadOvertimeMonth(document.getElementById('p79ReloadOvertimeButton'));
         }
 
         function onOvertimeDeptChange() {
@@ -14608,7 +14622,32 @@ function p79CanReportOvertime(){
   const fine=currentEmp?.finePermissions?.workhours||{};
   return Object.prototype.hasOwnProperty.call(fine,'overtime.report') ? fine['overtime.report']===true : p79CanManageOvertime();
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+async function p79SaveWorkOvertimeDraft(draft){
+ const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
+ const month=draft.date.slice(0,7),url=getActiveGasUrl();
+ const read=async action=>{
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+  try{const response=await fetch(url+'?action='+action+'&month='+month+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});const data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'出勤或班表讀取失敗');return data}finally{clearTimeout(timer)}
+ };
+ const [cloud,attendance]=await Promise.all([read('getScheduleDataSecure'),read('getAttendanceMonthData')]);
+ const employeeId=String(draft.empId).trim().toUpperCase();
+ const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
+ const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
+ if(!pairs.length)throw Error('當日沒有包含所選時段的完整出勤，未生成加班');
+ if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
+ const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',attendanceInId:pairs[0].row.clockIn.id,attendanceOutId:pairs[0].row.clockOut.id};
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+ try{
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
+  if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
+  p79WorkOvertimeMonths.set(month,{token,ready:true,pending:false,at:0,rows:cloud.schedules||[],covers:cloud.leaveCoverAssignments||[]});
+  const savedRow=p79WorkOvertimeMonths.get(month).rows.find(row=>String(row.empId).trim().toUpperCase()===employeeId);
+  if(savedRow){savedRow.schedule.__meta=savedRow.schedule.__meta||{};savedRow.schedule.__meta[draft.date]={...(savedRow.schedule.__meta[draft.date]||{}),overtimeReport:result.report,forEmpId:draft.forEmpId||''};}
+  p79OvertimeCalculationCache=null;renderOvertimeStats();return result;
+ }finally{clearTimeout(timer)}
+}
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 let p79LeaveHandoffBusy=false;
 async function p79OpenLeaveOvertimeHandoff(){
   if(p79LeaveHandoffBusy)return;

@@ -320,12 +320,24 @@
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
-   el.querySelector('#p79OtStage').onclick=()=>{
+   el.querySelector('#p79OtStage').onclick=async()=>{
     try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
      const draft={id:crypto.randomUUID(),empId,date,rule:report(rows[Number(select.value)]),...reportPair(rows[Number(select.value)][0],empId,forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
-     sessionStorage.setItem(KEY,JSON.stringify(draft));location.href='../schedule/?overtimeReport=1';
+     try{const pending=JSON.parse(sessionStorage.getItem(KEY)||'null');
+      if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
+     }catch(ignore){}
+     sessionStorage.setItem(KEY,JSON.stringify(draft));
+     if(typeof global.p79OvertimeContext?.saveReport==='function'){
+      const button=el.querySelector('#p79OtStage');button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
+      try{
+       const result=await global.p79OvertimeContext.saveReport(draft);
+       if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
+       sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent='✅ 加班申報已儲存，已更新加班管理。';
+       global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));
+      }finally{button.disabled=false}
+     }else location.href='../schedule/?overtimeReport=1';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
