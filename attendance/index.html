@@ -14539,8 +14539,63 @@ function getManualPairRecordAnchor(record) {
             return Math.max(0, totalMinutes - 480);
         }
 
+        const p79AttendanceOvertimeMonths = new Map();
+        function p79AttendanceOvertimeDate(row) {
+            return getAttendanceDateKey(row?.accountingDateKey || row?.dateKey || row?.clockIn?.timeStr || row?.clockOut?.timeStr).replace(/\//g,'-');
+        }
+        function p79LoadAttendanceOvertimeMonth(month) {
+            if(!/^\d{4}-\d{2}$/.test(month))return;
+            const token=getAttendanceEmployeeMasterToken();
+            if(!token)return;
+            const old=p79AttendanceOvertimeMonths.get(month);
+            if(old?.token===token && (old.pending || Date.now()-old.at<60000))return;
+            const state={token,at:Date.now(),pending:true,rows:[],covers:[]};
+            p79AttendanceOvertimeMonths.set(month,state);
+            const controller=new AbortController();
+            const timer=setTimeout(()=>controller.abort(),12000);
+            fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',signal:controller.signal})
+              .then(r=>r.json()).then(data=>{
+                if(!data.ok)throw new Error(data.error||'班表讀取失敗');
+                if(p79AttendanceOvertimeMonths.get(month)!==state || getAttendanceEmployeeMasterToken()!==token)return;
+                state.rows=Array.isArray(data.schedules)?data.schedules:[];
+                state.covers=Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[];
+                state.ready=true;state.pending=false;
+                renderAdminRecordsTable();
+              }).catch(()=>{state.pending=false;}).finally(()=>clearTimeout(timer));
+        }
+        function p79AttendanceReportedOvertime(row,state) {
+            const date=p79AttendanceOvertimeDate(row), id=String(row?.empId||'').trim().toUpperCase();
+            const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
+            const meta=roster.__meta?.[date]||{};
+            const cover=state.covers.find(a=>date>=a.startDate && date<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
+            const substitute=!!cover || !!meta.forEmpId || meta.type==='substitute';
+            if(!substitute && !meta.overtime && !meta.restQuotaOvertime && !meta.overtimeReport)return null;
+            const ranges={早:['08:00','16:00'],中:['16:00','00:00'],晚:['00:00','08:00']};
+            const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
+            const shift=ranges[roster[date]]?roster[date]:target[date];
+            let times=meta.overtimeStart && meta.overtimeEnd?[meta.overtimeStart,meta.overtimeEnd]:ranges[shift];
+            if(cover?.mode==='two' && !meta.overtimeStart && times){
+                const index=cover.workerIds.findIndex(x=>String(x).trim().toUpperCase()===id);
+                const halves={早:[['08:00','12:00'],['12:00','16:00']],中:[['16:00','20:00'],['20:00','00:00']],晚:[['00:00','04:00'],['04:00','08:00']]};
+                times=halves[shift]?.[index===1?1:0];
+            }
+            const category=substitute?'代':meta.overtimeReport?.category || (meta.restQuotaOvertime?meta.restCategory:'加');
+            if(!times)return {label:category+'班',minutes:null};
+            const minutes=t=>{const m=String(t).match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):NaN;};
+            const start=minutes(times[0]),end=minutes(times[1]);
+            if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null};
+            const compact=(t,isEnd)=>t==='00:00'?(isEnd?'24':'24'):String(t).replace(/:00$/,'');
+            return {label:category+compact(times[0],false)+'-'+compact(times[1],true),minutes:(end-start+1440)%1440};
+        }
         function attendanceRowOvertimeText(row) {
-            return formatDurationMinutes(attendanceRowOvertimeMinutes(row));
+            const actual=attendanceRowOvertimeMinutes(row);
+            const month=p79AttendanceOvertimeDate(row).slice(0,7);
+            p79LoadAttendanceOvertimeMonth(month);
+            const state=p79AttendanceOvertimeMonths.get(month);
+            const planned=state?.ready && state.token===getAttendanceEmployeeMasterToken()?p79AttendanceReportedOvertime(row,state):null;
+            if(!planned)return formatDurationMinutes(actual);
+            const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            return `<div class="text-cyan-700 dark:text-cyan-300">${label}</div>${planned.minutes!==null?`<div class="text-xs">申報 ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
         }
 
         let p79LastManualRecoveryCheckAt = 0;
