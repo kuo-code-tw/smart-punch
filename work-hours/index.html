@@ -5804,6 +5804,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
             .then(data => {
                 if (!data?.ok || !Array.isArray(data.employees)) throw new Error(data?.error || '員工主檔快速讀取失敗');
                 employees = mergeCloudEmployees(data.employees.map(normalizeEmployeeIdentifiers));
+                if(currentEmp){const fresh=employees.find(e=>String(e.empId||'').trim().toUpperCase()===String(currentEmp.empId||'').trim().toUpperCase());if(fresh)currentEmp=fresh;}
                 ensureBuiltinAdminAccount();
                 migrateLegacyDepartments();
                 syncDepartmentsFromEmployees();
@@ -14553,12 +14554,14 @@ function p79CanManageOvertime(){
     : canPerformAdminAction(currentEmp,'attendanceEdit');
 }
 function p79CanReportOvertime(){
-  if(!p79CanManageOvertime())return false;
   if(isVerifiedSuperAdminSession())return true;
+  if(!hasValidHomepageAdminSession() || !currentEmp)return false;
+  const level=currentEmp.systemPermissions?.workhours;
+  if(level!==undefined && !['view','manage'].includes(level))return false;
   const fine=currentEmp?.finePermissions?.workhours||{};
-  return !Object.prototype.hasOwnProperty.call(fine,'overtime.report') || fine['overtime.report']===true;
+  return Object.prototype.hasOwnProperty.call(fine,'overtime.report') ? fine['overtime.report']===true : p79CanManageOvertime();
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 </script>
 </body>
 </html>
