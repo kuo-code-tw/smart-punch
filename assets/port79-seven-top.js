@@ -154,7 +154,7 @@ const MENU={
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
- hr:[['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
+ hr:[['import','📥 匯入人員'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
  history:[]
 };
 function scheduleLockMenuState(){
@@ -245,6 +245,7 @@ async function runAction(sys,a){closeMenu();try{
   if(a==='export')return window.openExportDialog?.();
  }
  if(sys==='hr'){
+  if(a==='import')return window.P79HrImport?.open();
   if(a==='permissions')return window.openPermissionOverview?.();if(a==='logs')return await window.openSessionLogs?.();
   if(a==='org')return window.openOrgSettings?.();if(a==='export')return window.exportEmployees?.();if(a==='add')return window.openEditor?.();
  }
