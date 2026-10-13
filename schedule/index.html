@@ -1343,6 +1343,16 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 #app-main-container .p79-month-schedule-table .p79-rest-break{background:#dbeafe!important;color:#1e40af!important}
 #app-main-container .p79-month-schedule-table .p79-rest-national{background:#dcfce7!important;color:#166534!important}
 </style>
+
+<style id="p79-substitute-modal-viewport-fix">
+#substitute-assignment-modal{z-index:100100!important;padding:16px!important;overflow:auto;overscroll-behavior:contain}
+#substitute-assignment-modal>div{max-height:calc(100vh - 32px)!important;max-height:calc(100dvh - 32px)!important;display:flex;flex-direction:column;overflow:hidden!important}
+#substitute-assignment-modal>div>div:first-child{flex:none;position:relative;z-index:2}
+#substitute-assignment-modal>div>div:last-child{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#substitute-assignment-modal>div>div:last-child>div:last-child{position:sticky;bottom:-20px;z-index:2;background:#fff;padding-top:12px;padding-bottom:12px;box-shadow:0 -6px 14px #0f172a0c}
+html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{background:#111827}
+@media(max-width:600px){#substitute-assignment-modal{padding:8px!important}#substitute-assignment-modal>div{max-height:calc(100vh - 16px)!important;max-height:calc(100dvh - 16px)!important}}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4505,7 +4515,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if (document.getElementById('substitute-assignment-modal')) return;
       const wrap = document.createElement('div');
       wrap.id = 'substitute-assignment-modal';
-      wrap.className = 'hidden fixed inset-0 z-[200] bg-slate-950/55 backdrop-blur-sm p-4 flex items-center justify-center';
+      wrap.className = 'hidden fixed inset-0 bg-slate-950/55 backdrop-blur-sm p-4 flex items-center justify-center';
       wrap.innerHTML = `
         <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-slate-200">
           <div class="px-5 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center justify-between gap-3">
