@@ -4459,28 +4459,34 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       // 原班別不明時不輸出「?」，改保留目前班表班別及獨立的代班標籤。
       return ['早','中','晚'].includes(original)?original:'';
     }
+    function p79CompactOvertimeCode(value){
+      const code=String(value||'').trim(),match=code.match(/^([代休國例延])(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?$/);
+      if(!match)return '';
+      const hour=(h,m)=>{const n=Number(h),minutes=Number(m||0);if(n>24||minutes>59||(n===24&&minutes))return null;return String(Math.round(n+minutes/60)).padStart(2,'0');};
+      const start=hour(match[2],match[3]),end=hour(match[4],match[5]);return start!==null&&end!==null?match[1]+start+'-'+end:'';
+    }
     function p79SubstituteShiftLabel(empId,dayStr,meta){
-      const reportCode=String(meta?.overtimeReport?.code||'').trim();
+      const saved=typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[empId]?.[dayStr]:null;
+      meta={...(saved||{}),...(meta&&typeof meta==='object'?meta:{})};
+      const reportCode=p79CompactOvertimeCode(meta.overtimeReport?.code);
       if(reportCode)return reportCode;
-      const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
-      if(!cover && !meta?.forEmpId && meta?.type!=='substitute')return '';
-      const ranges={早:'08-16',中:'16-24',晚:'24-08'};
-      if(meta?.overtimeStart && meta?.overtimeEnd){
-        const compact=t=>String(t).replace(/:00$/,'');
-        const end=meta.overtimeEnd==='00:00'?'24':compact(meta.overtimeEnd);
-        return '代'+compact(meta.overtimeStart)+'-'+end;
-      }
       const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
-      const target=cover?.data?.leaveEmpId || meta?.forEmpId;
+      const ownCode=p79CompactOvertimeCode(own);if(ownCode)return ownCode;
+      const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
+      if(!cover&&!meta.overtime&&!meta.overtimeReport&&meta.type!=='substitute')return '';
+      const ranges={早:'08-16',中:'16-24',晚:'24-08'};
+      const substitute=!!cover||!!meta.forEmpId||meta.type==='substitute'||meta.overtimeReport?.category==='代';
+      const prefix=substitute?'代':['休','國','例'].includes(meta.overtimeReport?.category)?meta.overtimeReport.category:['休','國','例'].includes(meta.restCategory)?meta.restCategory:meta.overtimeType==='extended'?'延':'休';
+      if(meta.overtimeStart&&meta.overtimeEnd){const compact=p79CompactOvertimeCode(prefix+meta.overtimeStart+'-'+(meta.overtimeEnd==='00:00'?'24':meta.overtimeEnd));if(compact)return compact;}
+      const target=cover?.data?.leaveEmpId||meta.forEmpId;
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
-      const shift=[meta?.reportOriginalShift,meta?.overtimeOriginalShift,own,original].map(v=>String(v||'').trim()).find(v=>ranges[v])||'';
-      if(!shift)return '代班';
+      const shift=[meta.reportOriginalShift,meta.overtimeOriginalShift,meta.overtimeAssignedShift,own,original].map(v=>String(v||'').trim()).find(v=>ranges[v])||'';
+      if(!shift)return '';
       if(cover?.data?.mode==='two'){
         const index=(cover.data.workerIds||[]).findIndex(id=>String(id).toUpperCase()===String(empId).toUpperCase());
-        const halves={早:['08-12','12-16'],中:['16-20','20-24'],晚:['24-04','04-08']};
-        return '代'+halves[shift][index===1?1:0];
+        const halves={早:['08-12','12-16'],中:['16-20','20-24'],晚:['24-04','04-08']};return '代'+halves[shift][index===1?1:0];
       }
-      return '代'+ranges[shift];
+      return prefix+ranges[shift];
     }
     function p79LeaveCoverBadge(empId,dayStr){
       const assignments=p79LeaveCoverOnDay(empId,dayStr);
