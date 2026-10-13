@@ -1043,9 +1043,12 @@ function openEditor(id=''){
   if(String(session?.adminRole||'')!=='superadmin')$('adminRole').disabled=true;else $('adminRole').disabled=false;
   buildPermGrid(editing||{adminRole:'employee',systemPermissions:{attendance:'view',workhours:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none',history:'none'}});
   onEmploymentStatusChange();
+  window.Port79CalendarRange?.syncAll?.();
   editor.showModal();
 }
+let p79HrSaveRevision=0;
 async function saveCurrent(){
+  if($('saveBtn').disabled)return;
   if(editing&&!canHr('people.edit'))return alert('沒有修改人員權限');
   if(!editing&&!canHr('people.create'))return alert('沒有新增人員權限');
   const empId=$('empId').value.trim().toUpperCase(),name=$('name').value.trim();
@@ -1068,13 +1071,29 @@ async function saveCurrent(){
     terminationReason:st==='resigned'?$('terminationReason').value.trim():''
   };
   if(st==='resigned'&&!employee.terminationDate){alert('離職狀態請填寫離職日期');return}
+  const button=$('saveBtn'),originalLabel=button.textContent,originalEmpId=$('origEmpId').value||empId;
   try{
-    $('saveBtn').disabled=true;$('status').textContent='☁️ 正在儲存人資資料...';
-    await apiPost({action:'hrUpsertEmployee',originalEmpId:$('origEmpId').value||empId,employee});
-    editor.close();await loadEmployees(false);
-    $('status').textContent='✅ 人資資料已儲存｜七大系統會依在職狀態套用人員資格'
+    button.disabled=true;button.textContent='儲存中…';$('status').textContent='☁️ 正在儲存這位員工，等待雲端確認…';
+    const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
+    if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
+    const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
+    const saved={...(index>=0?employees[index]:{}),...employee,...(result.employee||{})};
+    if(index>=0)employees.splice(index,1,saved);else employees.push(saved);
+    populateFilters();render();editor.close();
+    $('status').textContent='✅ 雲端已確認儲存｜正在背景更新人員清單…';
+    const revision=++p79HrSaveRevision;
+    // 只讀人資主檔；不再等完整 getData 與組織設定才結束儲存。
+    Promise.resolve(p79HrLoadPromise).catch(()=>{}).then(()=>apiGet('hrGetEmployees',20000)).then(data=>{
+      if(revision!==p79HrSaveRevision)return;
+      const cloudEmployee=(data.employees||[]).find(item=>String(item.empId).toUpperCase()===empId);
+      const normalizeDate=v=>String(v||'').slice(0,10).replace(/\//g,'-');
+      const textMatches=['name','dept','unit'].every(key=>String(cloudEmployee?.[key]||'').trim()===String(employee[key]||'').trim());
+      if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
+      p79ApplyHrEmployeesPayload(data,false,'cloud');
+      $('status').textContent='✅ 人資資料已儲存，雲端人員清單已更新';
+    }).catch(error=>{if(revision===p79HrSaveRevision)$('status').textContent='✅ 員工已儲存｜清單背景更新未完成，可稍後重新同步';console.warn('已儲存人員的背景同步失敗',error);});
   }catch(e){alert('儲存失敗：'+(e.message||e))}
-  finally{$('saveBtn').disabled=false}
+  finally{button.disabled=false;button.textContent=originalLabel||'儲存'}
 }
 async function resignCurrent(){if(!canHr('employment.edit'))return alert('沒有變更在職狀態權限');
   if(!editing)return;
@@ -1379,7 +1398,7 @@ document.addEventListener('click',function(e){
 </script>
 
 
-<script src="../assets/port79-calendar-range.js"></script>
+<script src="../assets/port79-calendar-range.js?v=20261013.59"></script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
 
