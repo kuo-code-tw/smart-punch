@@ -3,8 +3,9 @@
  const KEY='port79_overtime_report_draft_v1',CONFIG='overtimeConversionRowsV1';
  const types=['休','國','例','代','延'];
  const TYPECONFIG='overtimeReportTypesV1';
- const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'代班加班',延:'平日延長加班'};
- const isBuiltinType=name=>Object.values(typeLabel).includes(name);
+ const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'};
+ const canonicalType=name=>name==='代班加班'?'休假代班加班':name;
+ const isBuiltinType=name=>Object.values(typeLabel).includes(canonicalType(name));
  // 舊表格切換假別後可能保留原來的預設名稱；預設類型一律依假別辨識。
  const ruleType=r=>r[9]&&!isBuiltinType(r[9])?r[9]:typeLabel[r[0]];
  function typeOptions(config={},rows=[]){const map=new Map(types.map(c=>[typeLabel[c],c]));for(const r of config[TYPECONFIG]||[]){if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');const name=String(r[0]).trim();if(!isBuiltinType(name))map.set(name,r[1]);}for(const r of rows){const name=ruleType(r);if(r[9]&&!isBuiltinType(name))map.set(name,r[0]);}return [...map].map(([name,category])=>({name,category}));}
@@ -87,7 +88,7 @@
    const d=await res.json();if(d?.ok!==true)throw Error(d?.error||'雲端未確認成功');return d;
   })(),deadline]);}finally{clearTimeout(timer)}
  }
- function matchesReportType(row,type){if(!isBuiltinType(type))return ruleType(row)===type;const category=types.find(c=>typeLabel[c]===type);return row[0]===category||(category==='代'&&String(row[1]).startsWith('代'));}
+ function matchesReportType(row,type){type=canonicalType(type);if(!isBuiltinType(type))return ruleType(row)===type;const category=types.find(c=>typeLabel[c]===type);return row[0]===category||(category==='代'&&String(row[1]).startsWith('代'));}
  function reportRules(){
   const config=global.p79OvertimeContext?.config?.();
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
@@ -241,9 +242,10 @@
  function reportPair(category,empId,forEmpId,people){
   if(category!=='代')return {forEmpId:'',forName:''};
   const target=people.find(e=>String(e.empId)===String(forEmpId));
-  if(!target||String(forEmpId)===String(empId))throw Error('代班加班請選擇另一位請假人員');
+  if(!target||String(forEmpId)===String(empId))throw Error('休假代班加班請選擇另一位請假人員');
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
+ function showReportLoading(){const el=dialog('申報加班','<p id="p79OtStatus">正在同時核對代班安排與加班選項…</p>');el.onclose=()=>el.remove();return el;}
  async function openReport(prefill={}){
   if(!global.p79OvertimeContext?.canReport?.() && global.p79OvertimeContext?.refreshAccess)await global.p79OvertimeContext.refreshAccess();
   if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
@@ -303,6 +305,6 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
