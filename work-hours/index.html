@@ -1195,7 +1195,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <span id="overtimeFilterResultCount" class="text-[10px] text-slate-400 dark:text-slate-500"></span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option><option value="ALL">全部加班紀錄</option></select></div>
+                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
@@ -12272,7 +12272,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId).trim().toUpperCase()));
                     const restMeta=matchedReport.meta;
                     const reportMinutes=matchedReport.minutes;
-                    const overtimeMinutes = reportMinutes===null?p79RestActualOvertimeMinutes(totalMinutes,restMeta):reportMinutes;
+                    // 自動未休假配對不是申報；未有申報或代班時，只計打卡超過8小時且超過30分的部分。
+                    const overtimeMinutes = reportMinutes===null?(totalMinutes>480+MIN_OVERTIME_MINUTES?totalMinutes-480:0):reportMinutes;
                     if(!overtimeMinutes)return null;
                     const monthKey = String(session.dateKey || '').slice(0, 7);
                     return {
@@ -12380,7 +12381,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const dept = document.getElementById('overtimeDeptFilter')?.value || 'ALL';
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
-            const source = document.getElementById('overtimeSourceFilter')?.value || 'arranged';
+            const source = document.getElementById('overtimeSourceFilter')?.value || 'ALL';
             let rows = allOvertimeRows.filter(row =>
                 (source==='ALL' || (source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
                 (month === 'ALL' || String(row.monthKey||'').replace(/\//g,'-') === month) &&
