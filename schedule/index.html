@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.69"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.70"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
 <!-- PORT79 Schedule V10.29 SINGLE-SAVE：移除排班功能選單重複的「儲存雲端」入口；月班表儲存按鈕統一名稱為「儲存排班」，實際仍寫入 Google 雲端。 -->
 <!-- PORT79 Schedule V10.28 INSTANT-LOCK-SAVE：他人鎖定改1秒確認；點鎖定時先即時查雲端再取得；離頁 beacon+keepalive 雙送釋放；「儲存雲端」統一真正儲存，成功明確顯示「儲存完畢」；手動讀雲端失敗改非阻斷提示。 -->
@@ -3554,6 +3554,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           .map(emp => ({
             id: String(emp.empId || '').trim().toUpperCase(),
             name: emp.name || '',
+            dept: String(emp.dept || '').trim(),
             role: emp.jobTitle || emp.deptDetail || emp.role || emp.dept || 'AQC',
             group: emp.group || '不分組',
             lockType: emp.lockType || 'ROTATION',
@@ -4513,8 +4514,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           </div>
           <div class="p-5 space-y-4">
             <input type="hidden" id="substitute-cover-emp-id"><input type="hidden" id="substitute-date-key">
-            <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班人員（第一位）</span><select id="substitute-worker-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold" onchange="p79UpdateSubstituteTargetOptions()"></select></label><label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班類型</span><select id="substitute-overtime-kind" onchange="p79ToggleSubstituteType()" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"><option value="rest">休假加班</option><option value="extended">延時加班</option><option value="substitute">代班加班</option></select></label>
-            <label id="substitute-for-wrap" class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">被代班人員（第二位）</span><select id="substitute-for-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"></select></label>
+            <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">代班人員</span><select id="substitute-worker-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold" onchange="p79UpdateSubstituteTargetOptions()"></select></label><label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班類型</span><select id="substitute-overtime-kind" onchange="p79ToggleSubstituteType()" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"><option value="rest">休假加班</option><option value="extended">延時加班</option><option value="substitute">代班加班</option></select></label>
+            <label id="substitute-for-wrap" class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">請假人員</span><select id="substitute-for-emp" class="w-full rounded-xl border border-slate-300 px-3 py-3 bg-white text-sm font-bold"></select></label>
             <label class="block"><span class="block text-xs font-black text-slate-600 mb-1.5">加班班別</span><select id="substitute-overtime-shift" class="w-full rounded-xl border border-slate-300 px-3 py-2"><option value="">請選擇班別</option><option value="早">早班</option><option value="中">中班</option><option value="晚">晚班</option></select></label>
             <div class="grid grid-cols-2 gap-3"><label>加班開始<input type="time" id="substitute-overtime-start" class="block w-full rounded-xl border border-slate-300 px-3 py-2"></label><label>加班結束<input type="time" id="substitute-overtime-end" class="block w-full rounded-xl border border-slate-300 px-3 py-2"></label></div>
             <div class="text-xs text-slate-500">結束早於開始表示跨日；請填實際安排的加班時間。</div>
@@ -4544,10 +4545,10 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const target=document.getElementById('substitute-for-emp'),prev=target.value;
       const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
       const day=String(document.getElementById('substitute-date-key')?.value||'');
-      const choices=employees.filter(x=>x.id!==id&&String(x.role||'').trim()===String(e.role||'').trim())
+      const choices=employees.filter(x=>x.id!==id&&String(e.dept||'').trim()&&String(x.dept||'').trim()===String(e.dept||'').trim())
         .sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.id).localeCompare(String(b.id)));
       p79LoadSubstituteOvertimeFields();
-      target.innerHTML='<option value="">— 請選擇第二位人員 —</option>'+choices.map(x=>'<option value="'+scheduleEscapeHtml(x.id)+'">'+scheduleEscapeHtml(x.name)+'（'+scheduleEscapeHtml(x.id)+'）</option>').join('');
+      target.innerHTML='<option value="">— 請選擇請假人員 —</option>'+choices.map(x=>'<option value="'+scheduleEscapeHtml(x.id)+'">'+scheduleEscapeHtml(x.name)+'（'+scheduleEscapeHtml(x.id)+'）</option>').join('');
       if(choices.some(x=>String(x.id)===prev))target.value=prev;
     }
     function openSubstituteAssignment(empId, dayStr, fromAnnualLeave=false) {
@@ -4560,7 +4561,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const modal = document.getElementById('substitute-assignment-modal');
       const existing = getScheduleDayMeta(empId, dayStr) || {};
       const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
-      const choices=employees.filter(e=>String(e.role||'').trim()===String(emp.role||'').trim())
+      const choices=employees.filter(e=>String(emp.dept||'').trim()&&String(e.dept||'').trim()===String(emp.dept||'').trim())
         .sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.id).localeCompare(String(b.id)));
       const worker=document.getElementById('substitute-worker-emp');
       // 第一位和第二位皆列出同職務完整名單；第一位在代替請假者時僅排除被代班者本人。
@@ -4579,7 +4580,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       p79ToggleSubstituteType();
       document.getElementById('substitute-note').value = String(existing.note || '');
       const hint = document.getElementById('substitute-leave-hint');
-      hint.textContent='第一位顯示同職務完整姓名（排休可安排加班，當日請假不可安排）；第二位為被代班人員，不可與第一位相同。';
+      hint.textContent='請假人員與代班人員需為同部門，姓名依筆畫排序；只有一位人員加班代班。';
       modal.classList.remove('hidden');
     }
 
@@ -4627,8 +4628,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if(worker && p79IsUnavailableForSubstitute(worker,dayStr))return alert('此人當天有核准請假、請假班別或已離職，不能安排加班／代班；一般排「休」仍可安排休假加班');
       const target=employees.find(e=>String(e.id)===forEmpId);
       if(!worker||!dayStr)return alert('請選擇加班人員');
-      if(kind==='substitute'&&(!target||forEmpId===empId))return alert('代班加班必須選擇第二位被代班人員');
-      if(target&&String(target.role||'').trim()!==String(worker.role||'').trim())return alert('只能選擇相同單位（職務）的人員代班');
+      if(kind==='substitute'&&(!target||forEmpId===empId))return alert('請先選擇請假人員；只需要一位代班人員');
+      if(target&&(!String(target.dept||'').trim()||String(target.dept||'').trim()!==String(worker.dept||'').trim()))return alert('只能選擇與請假人員同部門的代班人員');
       let old=monthlyScheduleMeta[empId]?.[dayStr]||{};
       const reportDraft=p79PendingOvertimeReport?.empId===empId&&p79PendingOvertimeReport?.date===dayStr?p79PendingOvertimeReport:null;
       if(p79PendingOvertimeReport&&!reportDraft)return alert('申報人員或日期已改變，請取消後重新申報');
