@@ -532,10 +532,16 @@ async function p79SaveLeaveCover(){
  if(mode==='two'&&(!second||first===second))return alert('請選擇兩位不同的代班人員');
  btn.disabled=true;btn.textContent='雲端保存中…';
  try{
-  await postCloud({action:'saveLeaveCoverAssignment',leaveId:document.getElementById('p79LeaveCoverId').value,mode,workerIds:mode==='two'?[first,second]:[first]});
+  const requestedId=document.getElementById('p79LeaveCoverId').value;
+  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+  const requestedLeave=fresh.leaveRecords.find(l=>String(l.id)===String(requestedId));
+  if(!requestedLeave||String(requestedLeave.status)!=='已核准')throw new Error('請假單不存在或尚未核准，請重新整理');
+  const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:requestedId,empId:requestedLeave.empId,leaveType:requestedLeave.leaveType,startDate:normalizeLeaveFilterDate(requestedLeave.startTime||requestedLeave.startDate),endDate:normalizeLeaveFilterDate(requestedLeave.endTime||requestedLeave.endDate||requestedLeave.startTime||requestedLeave.startDate),mode,workerIds:mode==='two'?[first,second]:[first]});
+  if(!plan.covered)await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode,workerIds:mode==='two'?[first,second]:[first]});
   p79CloseLeaveCover();
   if(mode!=='rest'){
-   const leaveId=document.getElementById('p79LeaveCoverId').value,leave=leaveRecords.find(l=>String(l.id)===String(leaveId));
+   const leaveId=plan.leaveId,leave=fresh.leaveRecords.find(l=>String(l.id)===String(leaveId));
    const start=normalizeLeaveFilterDate(leave?.startTime||leave?.startDate),end=normalizeLeaveFilterDate(leave?.endTime||leave?.endDate||leave?.startTime||leave?.startDate);
    if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
    const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
