@@ -563,8 +563,10 @@ body[data-p79-system="schedule"] .badge,body[data-p79-system="schedule"] [class*
 #app-main-container .p79-day-cell button{
   min-height:18px!important;padding:0 1px!important;font-size:8px!important;line-height:16px!important;
 }
-#app-main-container .p79-month-schedule-table th:nth-last-child(-n+4),
-#app-main-container .p79-month-schedule-table tbody td:nth-last-child(-n+4){
+#app-main-container .p79-month-schedule-table .p79-rest-example,
+#app-main-container .p79-month-schedule-table .p79-rest-break,
+#app-main-container .p79-month-schedule-table .p79-rest-national,
+#app-main-container .p79-month-schedule-table .p79-attendance-total{
   width:64px!important;min-width:64px!important;max-width:64px!important;
 }
 html.dark .p79-person-name{color:#f1f5f9}
@@ -4964,6 +4966,9 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
                   <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名 / 狀態 / 組別</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日">例</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日">休</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日">國</th>
       `;
 
       const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -4986,19 +4991,11 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       }
 
       html += `
-                  <th class="py-2 px-2 text-center border-b w-14 bg-slate-200">出勤</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日">例</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日">休</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日">國</th>
+                  <th class="p79-attendance-total py-2 px-2 text-center border-b w-14 bg-slate-200">出勤</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
       `;
-
-      const dailyEarlyCount = new Array(totalDays + 1).fill(0);
-      const dailyMidCount = new Array(totalDays + 1).fill(0);
-      const dailyNightCount = new Array(totalDays + 1).fill(0);
-      const dailyOffCount = new Array(totalDays + 1).fill(0);
 
       roleEmps.forEach(emp => {
         const automaticRestMeta = p79AutomaticRestMetadata(emp.id, yearMonth);
@@ -5015,10 +5012,6 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           const coverageShift = p79CoverageShift(emp.id,dayStr);
           const displayShift = coverageShift || shiftVal;
 
-          if(shiftVal === '早') dailyEarlyCount[d]++;
-          else if(shiftVal === '中') dailyMidCount[d]++;
-          else if(shiftVal === '晚') dailyNightCount[d]++;
-          else dailyOffCount[d]++;
 
           if(shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '離') {
             offDays++;
@@ -5113,45 +5106,15 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
                 </div>
               </div>
             </td>
-            ${cellsHtml}
-            <td class="py-1 text-center font-bold text-emerald-700 bg-emerald-50/50 border-r text-xs">${workDays}天</td>
             ${restCategoryCells}
+            ${cellsHtml}
+            <td class="p79-attendance-total py-1 text-center font-bold text-emerald-700 bg-emerald-50/50 border-r text-xs">${workDays}天</td>
           </tr>
         `;
       });
 
-      let earlyRow = '', midRow = '', nightRow = '', offRow = '';
-      for(const d of visibleDays) {
-        earlyRow += `<td class="text-center font-bold text-emerald-800 bg-emerald-50 border-r">${dailyEarlyCount[d]}</td>`;
-        midRow += `<td class="text-center font-bold text-amber-800 bg-amber-50 border-r">${dailyMidCount[d]}</td>`;
-        nightRow += `<td class="text-center font-bold text-purple-800 bg-purple-50 border-r">${dailyNightCount[d]}</td>`;
-        offRow += `<td class="text-center font-bold text-slate-600 bg-slate-100 border-r">${dailyOffCount[d]}</td>`;
-      }
-
       html += `
               </tbody>
-              <tfoot class="border-t-2 border-slate-300 font-bold text-xs">
-                <tr>
-                  <td class="py-1.5 px-3 sticky-col-left bg-emerald-100 border-r text-emerald-900">☀️ 早班在勤人數</td>
-                  ${earlyRow}
-                  <td colspan="4" class="bg-emerald-100"></td>
-                </tr>
-                <tr>
-                  <td class="py-1.5 px-3 sticky-col-left bg-amber-100 border-r text-amber-900">⛅ 中班在勤人數</td>
-                  ${midRow}
-                  <td colspan="4" class="bg-amber-100"></td>
-                </tr>
-                <tr>
-                  <td class="py-1.5 px-3 sticky-col-left bg-purple-100 border-r text-purple-900">🌙 晚班在勤人數</td>
-                  ${nightRow}
-                  <td colspan="4" class="bg-purple-100"></td>
-                </tr>
-                <tr>
-                  <td class="py-1.5 px-3 sticky-col-left bg-slate-200 border-r text-slate-800">💤 輪休人數</td>
-                  ${offRow}
-                  <td colspan="4" class="bg-slate-200"></td>
-                </tr>
-              </tfoot>
             </table>
             </div>
           </div>
