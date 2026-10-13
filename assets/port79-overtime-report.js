@@ -220,6 +220,7 @@
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
  async function openReport(prefill={}){
+  if(!global.p79OvertimeContext?.canReport?.() && global.p79OvertimeContext?.refreshAccess)await global.p79OvertimeContext.refreshAccess();
   if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
