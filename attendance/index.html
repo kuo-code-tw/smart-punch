@@ -12092,8 +12092,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(a>b)[a,b]=[b,a];
             }
 
-            recordsSingleDateRequested = false;
-            recordsSelectedDateKey = '';
+            recordsSingleDateRequested = a === b;
+            recordsRangeViewRequested = a !== b;
+            recordsSelectedDateKey = a === b ? a : '';
             start.value=a;
             end.value=b;
             start.dataset.p79DateInitialized='1';
@@ -12238,7 +12239,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function onAttendanceMonthFilterChange() {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
-            recordsSingleDateRequested = false;
+            recordsSingleDateRequested = true;
+            recordsRangeViewRequested = false;
             recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(monthSelect.value, false);
             resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
@@ -12258,7 +12260,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
             monthSelect.value = month;
-            recordsSingleDateRequested = false;
+            recordsSingleDateRequested = true;
+            recordsRangeViewRequested = false;
             recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(month, false);
             resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
@@ -14349,7 +14352,7 @@ function getManualPairRecordAnchor(record) {
         let recordsPaginationSignature = '';
         let recordsDatePageKeys = [];
         let recordsSelectedDateKey = ''; // 修改、補卡、刪除或雲端同步後保持正在查看的日期
-        let recordsSingleDateRequested = false;
+        let recordsSingleDateRequested = true;
         let recordsRangeViewRequested = false;
         let recordsRowPage = 1;
         let recordsRowPageSignature = '';
@@ -15028,12 +15031,13 @@ function getManualPairRecordAnchor(record) {
 
             const paginationSignature = [deptFilter, jobTitleFilter, nameFilter, statusFilter, monthFilter, dateFrom, dateTo, currentEmp?.empId || ''].join('|');
             if (paginationSignature !== recordsPaginationSignature) {
-                const firstRecordsView = !recordsPaginationSignature;
                 recordsPaginationSignature = paginationSignature;
                 recordsCurrentPage = 1;
-                recordsSingleDateRequested = firstRecordsView;
-                recordsRangeViewRequested = false;
-                recordsSelectedDateKey = firstRecordsView ? getTodayAttendanceIso() : '';
+                // 雲端更新、人員選單重建及登入身分載入都可能改變 signature。
+                // 日期模式只由使用者切換，更新資料不能自動退回整段期間。
+                recordsSingleDateRequested = !recordsRangeViewRequested;
+                recordsSelectedDateKey = recordsSingleDateRequested
+                    ? (recordsSelectedDateKey || getTodayAttendanceIso()) : '';
             }
 
             // 一天一頁：先找出目前篩選結果實際有資料的日期，最新日期排最前面。
