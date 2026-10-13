@@ -27,7 +27,7 @@
   return rows.map((r,i)=>{
    if(!Array.isArray(r)||![9,10].includes(r.length))throw Error('第'+(i+1)+'列格式錯誤');
    const v=r.map(x=>String(x??'').trim()),code=v[1];
-   if(!types.includes(v[0])||!/^.{1,12}?\d{2}(?::\d{2})?-\d{2}(?::\d{2})?$/.test(code))throw Error('第'+(i+1)+'列類型或代碼有誤');
+   if(!types.includes(v[0])||!/^(?:[^0-9]{1,12})?\d{2}(?::\d{2})?-\d{2}(?::\d{2})?$/.test(code))throw Error('第'+(i+1)+'列類型或代碼有誤');
    const key=ruleType(v)+'|'+code;if(seen.has(key))throw Error('同一加班類型的出勤時段重複：'+code);seen.add(key);
    if(!(Number(v[2])>0&&Number(v[2])<=24)||v[3]!==''&&!(Number.isFinite(Number(v[3]))&&Number(v[3])>=0&&Number(v[3])<=100))throw Error(code+' 時數無效');
    if(!Number.isFinite(span(v[6],v[7])))throw Error(code+' 加班起迄時間無效');
@@ -41,6 +41,20 @@
    if(v.length===10&&(!v[9]||isBuiltinType(v[9])))v.pop();
    return v;
   });
+ }
+ const excelHeaders=['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱'];
+ const positionLabels={full:'全段',after:'班後',before:'班前'};
+ function excelRows(rows){return [excelHeaders,...validate(rows).map(r=>[typeLabel[r[0]],...r.slice(1,8),positionLabels[r[8]],ruleType(r)])];}
+ function parseExcelRows(rows){
+  if(!Array.isArray(rows)||!rows.length||excelHeaders.some((h,i)=>String(rows[0][i]||'').trim()!==h))throw Error('匯入欄位不符，請先匯出Excel範本');
+  const categories=Object.fromEntries(types.map(c=>[typeLabel[c],c])),positions=Object.fromEntries(Object.entries(positionLabels).map(([a,b])=>[b,a]));
+  return validate(rows.slice(1).filter(r=>r.some(v=>String(v??'').trim())).map(r=>[categories[String(r[0]).trim()]||r[0],...Array.from({length:7},(_,i)=>r[i+1]??''),positions[String(r[8]).trim()]||r[8],r[9]||'']));
+ }
+ async function ensureExcel(){
+  if(global.XLSX)return global.XLSX;
+  const loader=global.p79EnsureXlsx||global.p79LoadXlsxLibrary;
+  if(!loader)throw Error('Excel元件尚未就緒，請重新整理');
+  await loader();if(!global.XLSX)throw Error('Excel元件載入失敗');return global.XLSX;
  }
  function normalizeStored(value){return value===undefined?defaults():validate(value);}
  function report(row){
@@ -174,7 +188,7 @@
    const cached=global.p79OvertimeContext?.config?.();
    let rows=reportRules();
    let loadedRows='',customTypes=JSON.parse(JSON.stringify(cached?.[TYPECONFIG]||[])),loadedTypes='',cloudReady=false,reading=false;
-   el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(editorRow).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出CSV</button><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
+   el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(editorRow).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出Excel</button><button id="p79OtImport" type="button">匯入Excel</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div class="p79-ot-new-type-controls" style="margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType">新增類型</button></div><p style="font-size:12px;color:#475569">先新增類型，再新增該類型的出勤時段，最後按下方儲存。</p></div>');
    el.querySelector('#p79AddType').onclick=()=>{
     const name=el.querySelector('#p79NewTypeName').value.trim(),category=el.querySelector('#p79NewTypeCategory').value;
@@ -197,7 +211,18 @@
      validate([...getRows(),row]);body.insertAdjacentHTML('beforeend',editorRow(row));form.close();el.querySelector('#p79OtStatus').textContent='已加入「'+chosen.name+'／'+code+'」，請按儲存。';
     }catch(error){form.querySelector('#p79PeriodMessage').textContent=error.message}};
    };
-   el.querySelector('#p79OtExport').onclick=()=>{const rows=getRows(),csv='\uFEFF'+[['類型','代碼','申報時數','換算時數','正常起','正常迄','加班起','加班迄','位置'],...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download='加班換算表.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+   el.querySelector('#p79OtExport').onclick=async()=>{try{
+    const x=await ensureExcel(),wb=x.utils.book_new();x.utils.book_append_sheet(wb,x.utils.aoa_to_sheet(excelRows(getRows())),'加班選項');x.writeFile(wb,'加班換算表.xlsx');
+   }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}};
+   el.querySelector('#p79OtImport').onclick=()=>{if(cloudReady)el.querySelector('#p79OtImportFile').click()};
+   el.querySelector('#p79OtImportFile').onchange=async event=>{try{
+    if(!cloudReady)throw Error('請先確認雲端資料');const file=event.target.files?.[0];if(!file)return;
+    const x=await ensureExcel(),wb=x.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets['加班選項']||wb.Sheets[wb.SheetNames[0]];
+    const imported=parseExcelRows(x.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false}));
+    if(!imported.length)throw Error('Excel沒有加班選項，未覆蓋原表');
+    rows=imported;customTypes=typeOptions({},rows).filter(t=>!isBuiltinType(t.name)).map(t=>[t.name,t.category]);body.innerHTML=rows.map(editorRow).join('');
+    el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
+   }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}finally{event.target.value=''}};
    el.querySelector('#p79OtSave').onclick=async()=>{
     const b=el.querySelector('#p79OtSave');if(b.disabled||!cloudReady)return;b.disabled=true;
     try{
@@ -205,7 +230,7 @@
      if(JSON.stringify(fresh.rows)!==loadedRows&&JSON.stringify(fresh.rows)!==JSON.stringify(draft))throw Error('換算表已由其他人修改，請關閉後重新載入再編輯');
      if(JSON.stringify(fresh.config[TYPECONFIG]||[])!==loadedTypes&&JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes))throw Error('加班類型已被其他人修改，請重新載入');
      const config={...fresh.config,[CONFIG]:draft,[TYPECONFIG]:customTypes};
-     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，尚未儲存；請匯出CSV保留，再改用獨立試算表分頁');
+     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，尚未儲存；請匯出Excel保留，再改用獨立試算表分頁');
      if(!Object.prototype.hasOwnProperty.call(fresh.config,CONFIG)||!Object.prototype.hasOwnProperty.call(fresh.config,TYPECONFIG)||JSON.stringify(fresh.rows)!==JSON.stringify(draft)||JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes))await rpc('saveConfig',{config});const check=await loadRules();
      if(!Object.prototype.hasOwnProperty.call(check.config,CONFIG)||!Object.prototype.hasOwnProperty.call(check.config,TYPECONFIG)||JSON.stringify(check.rows)!==JSON.stringify(draft))throw Error('雲端尚未保存這份加班選項，未確認儲存成功；請保留視窗再試');
      loadedRows=JSON.stringify(check.rows);loadedTypes=JSON.stringify(check.config[TYPECONFIG]||[]);if(loadedTypes!==JSON.stringify(customTypes))throw Error('加班類型讀回不一致');
@@ -214,7 +239,7 @@
    };
    const setReady=ready=>{
     cloudReady=ready;
-    ['p79OtAdd','p79AddType','p79OtSave'].forEach(id=>el.querySelector('#'+id).disabled=!ready);
+    ['p79OtAdd','p79AddType','p79OtSave','p79OtImport'].forEach(id=>el.querySelector('#'+id).disabled=!ready);
     body.querySelectorAll('input,select,button').forEach(input=>input.disabled=!ready);
    };
    const reload=async()=>{
@@ -305,6 +330,6 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 

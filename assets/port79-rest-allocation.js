@@ -49,9 +49,13 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[]) {
   const unresolved=[];
   const overtimePriority={'國':0,'休':1,'例':2};
   remaining.sort((a,b)=>overtimePriority[a.category]-overtimePriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
-  // 未休額度固定從月底最近的可用工作日往前補，不再靠近原假日日期。
-  workers.sort((a,b)=>b.localeCompare(a));
-  for(const slot of remaining) {const date=workers.find(d=>!used.has(d));if(date)assign(date,slot,true);else unresolved.push(slot);}
+  // Spread reminders across the final eight days, beginning one week before month end.
+  const finalWeek=workers.filter(d=>Number(d.slice(8))>=quota.days-7).sort();
+  const older=workers.filter(d=>Number(d.slice(8))<quota.days-7).sort().reverse();
+  const count=Math.min(remaining.length,finalWeek.length),selected=[];
+  for(let i=0;i<count;i++)selected.push(finalWeek[count===1?0:Math.round(i*(finalWeek.length-1)/(count-1))]);
+  const candidates=[...selected,...older,...finalWeek.filter(d=>!selected.includes(d))];
+  for(const slot of remaining) {const date=candidates.find(d=>!used.has(d));if(date)assign(date,slot,true);else unresolved.push(slot);}
   const assigned=dates.map(d=>result[d]).filter(x=>x?.restCategory);
   return {meta:result,quota:quota.counts,off:assigned.filter(x=>!x.restQuotaOvertime).length,
     overtime:assigned.filter(x=>x.restQuotaOvertime).length,unresolved};

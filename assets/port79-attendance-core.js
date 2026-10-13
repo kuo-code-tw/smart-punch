@@ -869,6 +869,10 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
 
 window.p79V5SubmitAttendanceWrite=submitAttendanceWrite;
 
+// Preserve the original non-attendance writer before replacing the global entry point.
+if(!window.p79LegacyPostToCloud && typeof window.postToCloud==='function'){
+  window.p79LegacyPostToCloud=window.postToCloud;
+}
 window.postToCloud=async function(payload,successMsg,onSuccess,onError){
   return submitAttendanceWrite(payload,successMsg,onSuccess,onError);
 };

@@ -281,7 +281,7 @@ body[data-p79-system="leave"]>header{display:none!important}
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
-        <div class="actions"><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
+        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出Excel</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
         <div class="field"><label>搜尋姓名／工號</label><input id="filterKeyword" oninput="renderAdmin()" placeholder="關鍵字"></div>
@@ -307,6 +307,7 @@ const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuM
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
 const $=id=>document.getElementById(id);
+let p79LeaveComparisonRows=[];
 let employees=[], leaveRecords=[], currentEmployee=null, adminSession=null, adminToken='', leaveAccess='none', currentMode='employee';
 function leaveEmploymentStatus(e){const s=String(e?.employmentStatus||'active').toLowerCase();if(['resigned','離職','terminated','inactive'].includes(s))return'resigned';if(['leave','留職停薪','留停','loa'].includes(s))return'leave';return'active'}
 function leaveEmployeeIsActive(e){return leaveEmploymentStatus(e)==='active'}
@@ -391,7 +392,7 @@ async function restoreAdmin(){
    const role=String(d.adminRole||'').toLowerCase();if(!['admin','superadmin'].includes(role))throw new Error('沒有管理員權限');
    const p=perms({systemPermissions:d.systemPermissions},role);leaveAccess=p.leave;
    if(leaveAccess==='none')throw new Error('此帳號沒有請假系統權限');
-   adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p};
+   adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p,finePermissions:d.finePermissions||{}};
    try{history.replaceState(null,'',location.pathname+location.search)}catch{}
    $('tabAdmin').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
    switchMode('admin');return true;
@@ -444,6 +445,24 @@ function populateDepartments(){const sel=$('filterDept');const cur=sel.value;con
 function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
 function updateLeaveAdminDateRange(){let a=$('leaveAdminDateFrom')?.value||'',b=$('leaveAdminDateTo')?.value||'';if(a&&b&&a>b){$('leaveAdminDateTo').value=a;b=a;}const span=$('leaveAdminDateRangeSummary')?.querySelector('span');if(span)span.textContent=!a&&!b?'全部日期':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`;}
 function clearLeaveAdminDateRange(){if($('leaveAdminDateFrom'))$('leaveAdminDateFrom').value='';if($('leaveAdminDateTo'))$('leaveAdminDateTo').value='';updateLeaveAdminDateRange();renderAdmin()}
+
+async function p79ComparisonOutput(title,rows,printMode){
+ if(printMode){
+  const popup=window.open('','_blank');if(!popup)throw Error('請允許列印視窗');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+escape(title)+'</title><style>body{font:12px sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:6px;text-align:center}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style><h2>'+escape(title)+'</h2><table>'+rows.map((r,i)=>'<tr>'+r.map(v=>'<'+(i?'td':'th')+'>'+escape(v)+'</'+(i?'td':'th')+'>').join('')+'</tr>').join('')+'</table></html>');popup.document.close();popup.focus();popup.print();return;
+ }
+ await window.p79EnsureXlsx();if(!window.XLSX)throw Error('Excel元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
+}
+async function p79ExportLeaveComparison(printMode){
+ if(!adminSession||leaveAccess==='none')return;
+ if(adminSession.adminRole!=='superadmin'&&adminSession.finePermissions?.leave?.['records.export']===false)return alert('沒有匯出權限');renderAdmin();
+ const rows=[['請假人員','部門','假別','開始日期','結束日期','天數','事由','狀態','代班人員'],...p79LeaveComparisonRows.map(l=>{
+ const covers=(window.p79LeaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(l.id));
+ const ids=[...new Set(covers.flatMap(c=>c.workerIds||[]))];
+ return [l.name||l.empId,l.dept||'',l.leaveType||'',l.startTime||l.startDate||'',l.endTime||l.endDate||'',l.days??l.dayCount??'',l.reason||'',l.status||'',ids.map(id=>employees.find(e=>String(e.empId)===String(id))?.name||id).join('、')];})];
+ try{await p79ComparisonOutput('請假比對表',rows,printMode)}catch(e){alert(e.message)}
+}
 function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
@@ -455,6 +474,7 @@ function renderAdmin(){
    const rangeOk=(!dateFrom&&!dateTo)||!!ls&&!!le&&(!dateFrom||le>=dateFrom)&&(!dateTo||ls<=dateTo);
    return rangeOk&&(!kw||[l.name,l.empId,l.attNo].some(v=>String(v||'').toLowerCase().includes(kw)))&&(!dept||String(l.dept||'')===dept)&&(!status||String(l.status||'')===status);
  });
+ p79LeaveComparisonRows=rows;
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
  for(const cover of window.p79LeaveCoverAssignments||[])if(!coverIndex.has(String(cover.leaveId)))coverIndex.set(String(cover.leaveId),cover);

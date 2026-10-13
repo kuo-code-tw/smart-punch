@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.95"></script>
-<script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.96"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -1181,17 +1181,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
+                        <button type="button" onclick="p79ExportOvertimeComparison(false)" class="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">匯出Excel</button><button type="button" onclick="p79ExportOvertimeComparison(true)" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">列印比對</button><button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
                         <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
                     </div>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px]">
-                    <span class="font-bold text-slate-600 dark:text-slate-300">💡 時間提醒：</span>
-                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">上班分鐘 01–30</span>
-                    <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不在 45–60</span>
                 </div>
 
                 <div class="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3">
@@ -1200,13 +1194,19 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <span class="text-xs font-bold text-slate-700 dark:text-slate-200">加班統計篩選</span>
                         <span id="overtimeFilterResultCount" class="text-[10px] text-slate-400 dark:text-slate-500"></span>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 姓名</label><select id="overtimeEmployeeFilter" onchange="onOvertimeEmployeeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
+                    <div class="flex flex-nowrap gap-2 overflow-x-auto">
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 姓名</label><select id="overtimeEmployeeFilter" onchange="onOvertimeEmployeeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
                     </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px]">
+                    <span class="font-bold text-slate-600 dark:text-slate-300">💡 時間提醒：</span>
+                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">上班分鐘 01–30</span>
+                    <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不在 45–60</span>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -12172,11 +12172,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         let p79WorkOvertimeLoadQueue=Promise.resolve();
         function p79LoadWorkOvertimeMonths(sourceRecords){
             const token=currentPort79SsoToken();if(!token)return;
-            const months=[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+            const selectedMonth=document.getElementById('overtimeMonthFilter')?.value;
+            const months=[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].filter(month=>!selectedMonth||selectedMonth==='ALL'||month===selectedMonth).sort().reverse();
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
-                if(previous?.token===token&&(previous.pending||Date.now()-previous.at<60000))return;
-                const state={token,at:Date.now(),pending:true,rows:[],covers:[]};p79WorkOvertimeMonths.set(month,state);
+                if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
+                const state={...(previous?.token===token?previous:{}),token,at:Date.now(),pending:true,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[]};p79WorkOvertimeMonths.set(month,state);
                 p79WorkOvertimeLoadQueue=p79WorkOvertimeLoadQueue.then(async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
@@ -12223,7 +12224,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 });
             });
         }
-        let p79WorkOvertimeDisplayedRows=[];
+        let p79WorkOvertimeDisplayedRows=[],p79WorkOvertimeFilteredRows=[];
         function p79CanDeleteOvertime(){return p79CanManageOvertime()&&(isVerifiedSuperAdminSession()||currentEmp?.systemPermissions?.schedule==='manage');}
         async function p79DeleteWorkOvertimeRow(index,button){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanDeleteOvertime())return;
@@ -12247,6 +12248,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }catch(error){alert('刪除未確認：'+(error.message||error)+'。請重新整理核對後再操作。');}
             finally{if(acquired)try{await rpc('scheduleReleaseEditLock');}catch(ignore){}button.disabled=false;button.textContent='刪除加班';}
         }
+
+async function p79ComparisonOutput(title,rows,printMode){
+ if(printMode){
+  const popup=window.open('','_blank');if(!popup)throw Error('請允許列印視窗');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+escape(title)+'</title><style>body{font:12px sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:6px;text-align:center}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style><h2>'+escape(title)+'</h2><table>'+rows.map((r,i)=>'<tr>'+r.map(v=>'<'+(i?'td':'th')+'>'+escape(v)+'</'+(i?'td':'th')+'>').join('')+'</tr>').join('')+'</table></html>');popup.document.close();popup.focus();popup.print();return;
+ }
+ await window.p79EnsureXlsx();if(!window.XLSX)throw Error('Excel元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
+}
+async function p79ExportOvertimeComparison(printMode){
+ const fine=currentEmp?.finePermissions?.workhours||{};
+ if(!isVerifiedSuperAdminSession()&&!(Object.prototype.hasOwnProperty.call(fine,'overtime.export')?fine['overtime.export']===true:canPerformAdminAction(currentEmp,'attendanceExport')))return alert('沒有匯出權限');
+ renderOvertimeStats();const rows=[['上班日期','姓名','部門','職稱','上班時間','下班時間','出勤時數','出勤時段','加班時數','申報時數','換算時數'],...p79WorkOvertimeFilteredRows.map(r=>[r.rosterDate||r.dateKey,r.name,r.dept,r.jobTitle,r.clockIn?.timeStr||'',r.clockOut?.timeStr||'',r.totalMinutes/60,r.overtimeReport?.code||'',r.overtimeMinutes/60,r.overtimeReport?.declaredHours??'',r.overtimeReport?.convertedHours??''])];
+ try{await p79ComparisonOutput('加班比對表',rows,printMode)}catch(e){alert(e.message)}
+}
         function p79ReportWorkOvertimeRow(index){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
             P79Overtime.openReport({empId:row.empId,date:row.rosterDate||normalizeScheduleDateKey(row.dateKey),forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||'',category:row.overtimeReport?.category||'延'});
@@ -12420,6 +12436,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle) &&
                 (employeeId === 'ALL' || String(row.empId) === employeeId)
             );
+            p79WorkOvertimeFilteredRows=rows;
             const uniqueEmployees = new Set(rows.map(row => String(row.empId || row.attNo || row.name))).size;
             const totalOvertimeMinutes = rows.reduce((total, row) => total + row.overtimeMinutes, 0);
             const over12Count = rows.filter(row => row.overDailyLimit).length;
