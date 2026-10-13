@@ -14622,7 +14622,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
   const banner=document.createElement('div');banner.style.cssText='padding:10px;margin:10px;background:#ecfeff;color:#155e75;border:1px solid #67e8f9;border-radius:10px;text-align:center';
   const button=document.createElement('button');button.textContent='接續請假代班的加班申報';button.onclick=p79OpenLeaveOvertimeHandoff;banner.appendChild(button);const status=document.createElement('div');status.id='p79LeaveHandoffStatus';status.textContent='代班已儲存，正在準備加班明細…';banner.appendChild(status);document.body.prepend(banner);
-  window.addEventListener('load',()=>{void p79OpenLeaveOvertimeHandoff();},{once:true});
+  void p79OpenLeaveOvertimeHandoff();
 });
 </script>
 </body>
