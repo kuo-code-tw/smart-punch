@@ -115,6 +115,16 @@
    #p79OvertimeOptionsDialog table{width:100%!important;min-width:1000px!important;max-width:none!important;table-layout:fixed;border-collapse:collapse}
    #p79OvertimeOptionsDialog th{position:sticky;top:0;z-index:2;white-space:normal!important;overflow-wrap:anywhere;vertical-align:middle;padding:8px 4px!important}
    #p79OvertimeOptionsDialog td{padding:6px 4px!important;vertical-align:middle;overflow:hidden}
+   #p79OvertimeOptionsDialog [data-ot-category="休"]{--ot-row:#dbeafe;--ot-field:#eff6ff;--ot-ink:#1e40af}
+   #p79OvertimeOptionsDialog [data-ot-category="國"]{--ot-row:#dcfce7;--ot-field:#f0fdf4;--ot-ink:#166534}
+   #p79OvertimeOptionsDialog [data-ot-category="例"]{--ot-row:#ede9fe;--ot-field:#f5f3ff;--ot-ink:#5b21b6}
+   #p79OvertimeOptionsDialog [data-ot-category="代"]{--ot-row:#fef3c7;--ot-field:#fffbeb;--ot-ink:#92400e}
+   #p79OvertimeOptionsDialog [data-ot-category="延"]{--ot-row:#ffe4e6;--ot-field:#fff1f2;--ot-ink:#9f1239}
+   #p79OvertimeOptionsDialog tr[data-ot-category] td{background:var(--ot-row)!important;color:var(--ot-ink)!important}
+   #p79OvertimeOptionsDialog tr[data-ot-category] td:first-child{border-left:4px solid var(--ot-ink)}
+   #p79OvertimeOptionsDialog tr[data-ot-category] input,#p79OvertimeOptionsDialog tr[data-ot-category] select{background:var(--ot-field)!important;color:var(--ot-ink)!important}
+   #p79OvertimeOptionsDialog .p79-ot-color-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:8px}
+   #p79OvertimeOptionsDialog .p79-ot-color-legend span{background:var(--ot-row);color:var(--ot-ink);border:1px solid var(--ot-ink);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700}
    #p79OvertimeOptionsDialog th:first-child{width:6%}
    #p79OvertimeOptionsDialog th:nth-child(2){width:11%}
    #p79OvertimeOptionsDialog th:nth-child(9){width:7%}
@@ -126,7 +136,7 @@
   document.body.appendChild(el);el.querySelector('#p79OtClose').onclick=()=>el.close();el.showModal();return el;
  }
  const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
- function editorRow(row){return '<tr>'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
+ function editorRow(row){return '<tr data-ot-category="'+esc(row[0])+'">'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
   const el=dialog('加班選項管理','<p id="p79OtStatus">正在讀取已儲存的選項…</p>','p79OvertimeOptionsDialog');
@@ -141,7 +151,9 @@
     if(typeOptions({[TYPECONFIG]:customTypes},rows).some(x=>x.name===name))return el.querySelector('#p79OtStatus').textContent='此類型已存在';
     customTypes.push([name,category]);el.querySelector('#p79NewTypeName').value='';el.querySelector('#p79OtStatus').textContent='已新增「'+name+'」，請新增出勤時段後儲存。';
    };
+   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div class="p79-ot-color-legend" aria-label="假別顏色說明">'+types.map(c=>'<span data-ot-category="'+c+'">'+esc(typeLabel[c])+'</span>').join('')+'</div>');
    const body=el.querySelector('#p79OtRuleRows'),getRows=()=>[...body.rows].map(tr=>[...tr.querySelectorAll('[data-col]')].map(i=>i.value));
+   body.addEventListener('change',e=>{if(e.target.matches('select[data-col="0"]'))e.target.closest('tr').dataset.otCategory=e.target.value;});
    body.addEventListener('click',e=>{if(e.target.closest('.p79OtDelete'))e.target.closest('tr').remove()});
    el.querySelector('#p79OtStatus').textContent='已載入雲端規則；修改後按儲存。';
    el.querySelector('#p79OtAdd').onclick=()=>{
