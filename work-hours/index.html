@@ -1195,6 +1195,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <span id="overtimeFilterResultCount" class="text-[10px] text-slate-400 dark:text-slate-500"></span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option><option value="ALL">全部加班紀錄</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
@@ -12379,7 +12380,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const dept = document.getElementById('overtimeDeptFilter')?.value || 'ALL';
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
+            const source = document.getElementById('overtimeSourceFilter')?.value || 'arranged';
             let rows = allOvertimeRows.filter(row =>
+                (source==='ALL' || (source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
                 (month === 'ALL' || String(row.monthKey||'').replace(/\//g,'-') === month) &&
                 (dept === 'ALL' || row.dept === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle) &&
@@ -12413,7 +12416,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     <td class="px-3 py-3 font-bold whitespace-nowrap">${formatDurationMinutes(row.totalMinutes)}</td>
                     <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-cyan-800 dark:text-cyan-200">${escapeHtml(row.overtimeReport.code)}｜${row.coverCandidate?'待申報':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</div><div class="text-xs text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="mt-1 px-2 py-1 rounded bg-cyan-100 text-cyan-900 text-xs font-bold">申報加班</button>`:''}</td>
                 </tr>`;
-            }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件、且已完整簽到簽退的加班班次</td></tr>';
+            }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
             if(tbody.p79OvertimeRowsHtml!==overtimeRowsHtml){tbody.innerHTML=overtimeRowsHtml;tbody.p79OvertimeRowsHtml=overtimeRowsHtml;}
             const pagination = document.getElementById('overtimePagination');
