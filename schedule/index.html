@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.70"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.90"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
 <!-- PORT79 Schedule V10.29 SINGLE-SAVE：移除排班功能選單重複的「儲存雲端」入口；月班表儲存按鈕統一名稱為「儲存排班」，實際仍寫入 Google 雲端。 -->
 <!-- PORT79 Schedule V10.28 INSTANT-LOCK-SAVE：他人鎖定改1秒確認；點鎖定時先即時查雲端再取得；離頁 beacon+keepalive 雙送釋放；「儲存雲端」統一真正儲存，成功明確顯示「儲存完畢」；手動讀雲端失敗改非阻斷提示。 -->
@@ -3768,7 +3768,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         try{
           const draft=JSON.parse(sessionStorage.getItem(P79Overtime.KEY)||'null');
-          if(draft&&schedules.some(row=>Object.values(row.schedule.__meta||{}).some(m=>m?.overtimeReport?.id===draft.id))){sessionStorage.removeItem(P79Overtime.KEY);document.getElementById('p79ReportBanner')?.remove();}
+          if(draft&&schedules.some(row=>Object.values(row.schedule.__meta||{}).some(m=>m?.overtimeReport?.id===draft.id))){sessionStorage.removeItem(P79Overtime.KEY);document.getElementById('p79ReportBanner')?.remove();if(draft.leaveHandoffId){const handoff=JSON.parse(sessionStorage.getItem('port79_leave_overtime_handoff_v1')||'null');if(handoff?.id===draft.leaveHandoffId){handoff.entries=(handoff.entries||[]).filter(e=>!(String(e.empId)===String(draft.empId)&&e.date===draft.date));if(handoff.entries.length)sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify(handoff));else sessionStorage.removeItem('port79_leave_overtime_handoff_v1');setTimeout(()=>{location.href='../work-hours/?leaveReport=1#overtime'},0);}}}
         }catch(ignore){}
         if (showAlert) alert(`☁️ ${result.message || '排班已同步 Google 雲端'}`);
         return true;
