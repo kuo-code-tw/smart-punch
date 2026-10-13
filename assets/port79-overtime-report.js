@@ -100,6 +100,18 @@
   return {departments:unique(people.map(dept)),jobTitles:unique(scoped.map(title)),employees:scoped.filter(e=>!jobTitle||title(e)===jobTitle)};
  }
  async function loadRules(){const d=await rpc('getOvertimeConfig');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:validate(normalizeStored(d.config[CONFIG]))};}
+ function resolveLeaveCoverReport(data,handoff,entry){
+  const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
+  const cover=(data.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(handoff.id)&&key(c.leaveEmpId)===key(entry.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry.empId))&&String(c.startDate)<=date&&String(c.endDate)>=date);
+  if(!cover)throw Error('此筆請假在該日的代班已取消或更換人員，請重新整理請假管理核對');
+  const roster=new Map((data.schedules||[]).map(r=>[key(r.empId),r.schedule||{}])),own=roster.get(key(entry.empId))||{},target=roster.get(key(cover.leaveEmpId))||{};
+  const meta=own.__meta?.[date]||{};
+  if(meta.overtimeReport?.category==='代'&&key(meta.forEmpId)===key(cover.leaveEmpId)&&meta.overtimeReport.code)return {code:meta.overtimeReport.code,requirePeriodSelection:false};
+  const shift=map=>{const value=map[date]??map[date.slice(-2)]??map[String(Number(date.slice(-2)))];if(['早','中','晚'].includes(value))return value;const m=map.__meta?.[date]||{};return [m.reportOriginalShift,m.overtimeOriginalShift,m.leaveOriginalShift].find(v=>['早','中','晚'].includes(v));};
+  const name=shift(own)||shift(target),ranges={早:['08','16'],中:['16','24'],晚:['24','08']};let times=ranges[name];
+  if(times&&cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[name][cover.workerIds.findIndex(id=>key(id)===key(entry.empId))===1?1:0];}
+  return {code:times?'代'+times.join('-'):'',requirePeriodSelection:!times};
+ }
  function dialog(title,content,id='p79OvertimeDialog'){
   const previous=document.getElementById(id);previous?.p79Cleanup?.();previous?.remove();
   const el=document.createElement('dialog');el.id=id;el.className='p79-overtime-dialog';el.style.cssText='box-sizing:border-box;width:min('+(id==='p79OvertimeOptionsDialog'?'1100':'680')+'px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:20px;border:1px solid #cbd5e1;border-radius:16px;color:#0f172a;background:white;overflow:auto;text-align:center;';
@@ -263,7 +275,7 @@
     const categoryMatch=match>=0?match:rows.findIndex(r=>r[0]===prefill.category);
     if(categoryMatch>=0){kind.value=ruleType(rows[categoryMatch]);refresh();}
     if(match>=0){select.value=String(match);preview();}
-    else if(prefill.code){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent='班表時段 '+prefill.code+' 尚無相符選項，請新增或選擇正確時段。';}
+    else if(prefill.code||prefill.requirePeriodSelection){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent=prefill.code?'班表時段 '+prefill.code+' 尚無相符選項，請新增或選擇正確時段。':'代班已確認；班表無法推算時段，請自行選擇正確出勤時段。';}
     refreshPairPeople();empSelect.value=String(prefill.empId);preview();
    }
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
@@ -273,7 +285,7 @@
     const code=previous?.[1]||prefill.code,category=previous?.[0]||prefill.category;
     const index=rows.findIndex(r=>r[1]===code&&r[0]===category);
     if(index>=0){if(!matches(rows[index])){kind.value=ruleType(rows[index]);refresh();}select.value=String(index);preview();}
-    else if(code){select.selectedIndex=-1;select.value='';preview();}
+    else if(code||prefill.requirePeriodSelection){select.selectedIndex=-1;select.value='';preview();}
    }
    const optionsSaved=()=>{if(el.isConnected)applyReportRows(reportRules());};
    el.insertAdjacentHTML('beforeend','<button id="p79OtReloadOptions" type="button">更新雲端時段選項</button>');
@@ -291,6 +303,6 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,report,interval,overtimeMinutes,matchReport,reportRules,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
