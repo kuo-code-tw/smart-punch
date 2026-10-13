@@ -1021,7 +1021,10 @@ async function saveAdminCreateLeave(){
   leaveSaved=true;
   $('adminCreateLeaveMessage').textContent='請假已儲存，正在安排代班…';
   await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId]});
-  $('adminCreateLeaveDialog').close();setStatus('✅ '+employee.name+' 請假已核准｜'+[worker,second].filter(Boolean).map(e=>e.name).join('、')+' 加班代班已安排','');await loadCloud();renderAdmin();
+  $('adminCreateLeaveDialog').close();
+  const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of [worker,second].filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
+  location.href='../work-hours/?leaveReport=1#overtime';
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
 }
