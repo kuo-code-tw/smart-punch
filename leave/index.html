@@ -322,12 +322,16 @@ async function jsonFetch(url,opt={},timeout=25000){
  catch(e){if(timed||String(e?.name)==='AbortError'||/abort/i.test(String(e?.message||e)))throw new Error('雲端回應逾時，請再試一次');throw e}
  finally{if(t)clearTimeout(t)}
 }
+function leaveRequestToken(){
+ if(adminSession)return String(adminToken||'').trim();
+ return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
+}
 async function loadCloud(show=false){
  let last;
  for(let i=0;i<3;i++){
   try{
    if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
-   const userToken=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||adminToken||'').trim();
+   const userToken=leaveRequestToken();
    const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
    if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
    if(!d?.ok)throw new Error(d?.error||'雲端讀取失敗');
@@ -355,7 +359,7 @@ async function loadCloud(show=false){
 
  // 再用較輕的人資端點先把員工與年假/可休天數載入；請假紀錄稍後可按重新整理補抓。
  try{
-   const userToken=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||adminToken||'').trim();
+   const userToken=leaveRequestToken();
    const hr=await jsonFetch(GAS_URL+'?action=hrGetEmployees&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
    if(hr?.ok && Array.isArray(hr.employees)){
      employees=hr.employees;
@@ -368,7 +372,7 @@ async function loadCloud(show=false){
  setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
 }
 async function postCloud(payload){
- const userToken=String(sessionStorage.getItem('port79_user_token')||adminToken||sessionStorage.getItem('port79_admin_token')||'').trim();
+ const userToken=leaveRequestToken();
  if(userToken){payload.token=userToken;if(adminToken)payload.gcToken=adminToken}
  const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'},25000);
  if(!d?.ok)throw new Error(d?.error||d?.message||'雲端操作失敗');return d;
@@ -973,15 +977,17 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <script>
 let adminCreateLeaveId='',adminCreateLeaveBusy=false;
 function filterAdminCreateLeavePeople(){
- const keyword=String($('adminCreateLeaveKeyword').value||'').trim().toLowerCase(),dept=$('adminCreateLeaveDept').value,sel=$('adminCreateLeaveEmployee'),previous=sel.value;
- const people=employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&(!dept||String(e.dept||'')===dept)&&(!keyword||[e.name,e.empId,e.attNo].some(v=>String(v||'').toLowerCase().includes(keyword))));
- sel.innerHTML='<option value="">請選擇請假人員</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
+ const keyword=String($('adminCreateLeaveKeyword').value||'').trim().toLowerCase(),dept=String($('adminCreateLeaveDept').value||'').trim(),sel=$('adminCreateLeaveEmployee'),previous=sel.value;
+ const people=employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&(!dept||String(e.dept||'').trim()===dept)&&(!keyword||[e.name,e.empId,e.attNo].some(v=>String(v||'').toLowerCase().includes(keyword))));
+ sel.innerHTML='<option value="">'+(people.length?'請選擇請假人員（'+people.length+'人）':'沒有符合條件的人員')+'</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
  if(people.some(e=>String(e.empId)===previous))sel.value=previous;
 }
-function openAdminCreateLeave(){
+async function openAdminCreateLeave(){
+ if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
+ if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)))await loadCloud(true);
  adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveKeyword').value='';$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
- $('adminCreateLeaveDept').innerHTML='<option value="">全部部門</option>'+[...new Set(employees.map(e=>String(e.dept||'')).filter(Boolean))].sort().map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
+ $('adminCreateLeaveDept').innerHTML='<option value="">全部部門</option>'+[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort().map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
  updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();$('adminCreateLeaveDialog').showModal();
