@@ -15028,11 +15028,12 @@ function getManualPairRecordAnchor(record) {
 
             const paginationSignature = [deptFilter, jobTitleFilter, nameFilter, statusFilter, monthFilter, dateFrom, dateTo, currentEmp?.empId || ''].join('|');
             if (paginationSignature !== recordsPaginationSignature) {
+                const firstRecordsView = !recordsPaginationSignature;
                 recordsPaginationSignature = paginationSignature;
                 recordsCurrentPage = 1;
-                recordsSingleDateRequested = false;
+                recordsSingleDateRequested = firstRecordsView;
                 recordsRangeViewRequested = false;
-                recordsSelectedDateKey = '';
+                recordsSelectedDateKey = firstRecordsView ? getTodayAttendanceIso() : '';
             }
 
             // 一天一頁：先找出目前篩選結果實際有資料的日期，最新日期排最前面。
