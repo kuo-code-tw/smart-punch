@@ -659,17 +659,25 @@ async function exportLeaveBalanceXlsx(){
  }catch(e){setStatus('匯出失敗：'+(e?.message||e),'error')}
 }
 window.exportLeaveBalanceXlsx=exportLeaveBalanceXlsx;
+let leaveBalanceImportMonth='';
 function openLeaveBalanceImport(){
- if(leaveAccess!=='manage'){
-   alert('只有請假系統管理權限可以匯入可休天數');
-   return;
- }
- const input=$('leaveBalanceImportFile');
- if(!input)return alert('找不到匯入元件');
- input.value='';
- input.click();
+ if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
+ let dialog=$('leaveBalanceMonthDialog');
+ if(!dialog){dialog=document.createElement('dialog');dialog.id='leaveBalanceMonthDialog';dialog.style.cssText='width:360px;max-width:calc(100vw - 32px);height:fit-content;min-height:0;padding:20px;border:1px solid #cbd5e1;border-radius:14px;text-align:center';dialog.innerHTML='<h3>匯入未休假天數</h3><label style="display:block;margin:14px 0">本次基準月份<input id="leaveBalanceImportMonth" type="month" style="display:block;width:100%;padding:10px;margin-top:6px"></label><p class="note">以這裡選擇的月份為準，不沿用 Excel 的舊月份。</p><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button type="button" onclick="document.getElementById(\'leaveBalanceMonthDialog\').close()">取消</button><button type="button" class="btn btn-pri" onclick="confirmLeaveBalanceImportMonth()">選擇匯入檔案</button></div>';document.body.appendChild(dialog);}
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());const lastMonth=new Date(today.slice(0,7)+'-01T12:00:00Z');lastMonth.setUTCMonth(lastMonth.getUTCMonth()-1);
+ $('leaveBalanceImportMonth').value=lastMonth.toISOString().slice(0,7);leaveBalanceImportMonth='';dialog.showModal();
+}
+function confirmLeaveBalanceImportMonth(){
+ const month=String($('leaveBalanceImportMonth').value||'');
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return alert('請選擇本次匯入的基準月份');
+ const input=$('leaveBalanceImportFile');if(!input)return alert('找不到匯入元件');
+ leaveBalanceImportMonth=month.replace('-','/');$('leaveBalanceMonthDialog').close();input.value='';input.click();
+}
+function normalizeLeaveBalanceMonth(value){
+ const text=String(value||'').trim();const m=text.match(/^(\d{3,4})[年\/.-]?(\d{1,2})(?:月|$|[-\/]\d{1,2})/);if(!m)return '';const year=Number(m[1])+(m[1].length===3?1911:0),month=Number(m[2]);return month>=1&&month<=12?year+'/'+String(month).padStart(2,'0'):'';
 }
 async function importLeaveBalanceFile(file) {
+ const selectedImportMonth=leaveBalanceImportMonth;leaveBalanceImportMonth='';
   await window.p79EnsureXlsx();
  if(!file)return;
  if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
@@ -711,7 +719,7 @@ async function importLeaveBalanceFile(file) {
      if(!empId)continue;
      const sourceName=String(leaveBalanceCell(row,map,['姓名','員工姓名','人員姓名','name'],[/姓名/,/name/])||'').trim();
      const sourceDept=String(leaveBalanceCell(row,map,['部門','單位','department','dept'],[/部門/,/單位/,/department/,/dept/])||'').trim();
-     const asOf=String(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/])||'').trim()||fileAsOf;
+     const asOf=selectedImportMonth||normalizeLeaveBalanceMonth(fileAsOf)||normalizeLeaveBalanceMonth(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/]));
      if(!asOf)throw new Error('Excel 沒有基準月份欄位，檔名也沒有 YYYYMM 月份，已停止匯入以免沿用舊月份');
      const carryOver=leaveBalanceNumber(leaveBalanceCell(row,map,['遞延','遞延天數','去年遞延','去年未休','carryover'],[/遞延/,/去年.*未休/,/carryover/]));
      const annual=leaveBalanceNumber(leaveBalanceCell(row,map,['今年年假','年假','年假天數','本年度年假','本年年假','特休','特休天數','annual'],[/今年.*年假/,/本年.*年假/,/^年假/,/^特休/,/annual/]));
@@ -727,7 +735,7 @@ async function importLeaveBalanceFile(file) {
    if(!balances.length)throw new Error('沒有讀到可匯入的員工資料');
    if(!confirm('確認匯入基準月份：'+balances[0].leaveBalance.asOf+'\n將匯入 '+balances.length+' 人的可休天數，確定繼續？'))return;
 
-   setStatus('☁️ 正在更新可休天數…','info');
+   setStatus('☁️ 正在更新 '+(selectedImportMonth||fileAsOf||balances[0]?.leaveBalance?.asOf||'')+' 未休假天數…','info');
    const d=await postCloud({action:'updateLeaveBalances',balances});
    // 不以 POST ok 當成匯入成功：重新讀取正式雲端員工主檔後逐人核對基準月份及餘額。
    await loadCloud(true);
