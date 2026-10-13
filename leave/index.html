@@ -962,8 +962,8 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 
 <dialog id="adminCreateLeaveDialog" style="width:min(560px,94vw);max-height:90vh;overflow:auto;border:1px solid #cbd5e1;border-radius:18px;padding:20px">
  <div style="display:flex;justify-content:space-between;align-items:center"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
- <div class="field"><label>搜尋姓名／工號</label><input id="adminCreateLeaveKeyword" placeholder="輸入姓名或工號" oninput="filterAdminCreateLeavePeople()"></div>
  <div class="field"><label>部門</label><select id="adminCreateLeaveDept" onchange="filterAdminCreateLeavePeople()"></select></div>
+ <div class="field"><label>職稱</label><select id="adminCreateLeaveJobTitle" onchange="filterAdminCreateLeavePeople()"></select></div>
  <div class="field"><label>請假人員</label><select id="adminCreateLeaveEmployee"></select></div>
  <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
  <div class="field"><label>開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
@@ -977,16 +977,21 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <script>
 let adminCreateLeaveId='',adminCreateLeaveBusy=false;
 function filterAdminCreateLeavePeople(){
- const keyword=String($('adminCreateLeaveKeyword').value||'').trim().toLowerCase(),dept=String($('adminCreateLeaveDept').value||'').trim(),sel=$('adminCreateLeaveEmployee'),previous=sel.value;
- const people=employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&(!dept||String(e.dept||'').trim()===dept)&&(!keyword||[e.name,e.empId,e.attNo].some(v=>String(v||'').toLowerCase().includes(keyword))));
- sel.innerHTML='<option value="">'+(people.length?'請選擇請假人員（'+people.length+'人）':'沒有符合條件的人員')+'</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
+ const dept=String($('adminCreateLeaveDept').value||'').trim(),sel=$('adminCreateLeaveEmployee'),previous=sel.value,titleSelect=$('adminCreateLeaveJobTitle'),previousTitle=titleSelect.value;
+ const jobTitle=e=>String(e.jobTitle||e.deptDetail||'').trim();
+ const departmentPeople=employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&(!dept||String(e.dept||'').trim()===dept));
+ const titles=[...new Set(departmentPeople.map(jobTitle).filter(Boolean))].sort();
+ titleSelect.innerHTML='<option value="">全部職稱</option>'+titles.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');
+ titleSelect.value=titles.includes(previousTitle)?previousTitle:'';
+ const people=departmentPeople.filter(e=>!titleSelect.value||jobTitle(e)===titleSelect.value);
+ sel.innerHTML='<option value="">'+(people.length?'請選擇請假人員（'+people.length+'人）':'沒有符合條件的人員')+'</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(jobTitle(e)?'｜'+jobTitle(e):''))+'</option>').join('');
  if(people.some(e=>String(e.empId)===previous))sel.value=previous;
 }
 async function openAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
  if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)))await loadCloud(true);
- adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveKeyword').value='';$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveJobTitle').innerHTML='<option value="">全部職稱</option>';$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
  $('adminCreateLeaveDept').innerHTML='<option value="">全部部門</option>'+[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort().map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
