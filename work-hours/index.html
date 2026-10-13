@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.68"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.90"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -14591,7 +14591,31 @@ function p79CanReportOvertime(){
   const fine=currentEmp?.finePermissions?.workhours||{};
   return Object.prototype.hasOwnProperty.call(fine,'overtime.report') ? fine['overtime.report']===true : p79CanManageOvertime();
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+async function p79OpenLeaveOvertimeHandoff(){
+  const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
+  let handoff;try{handoff=JSON.parse(raw);}catch(ignore){return;}
+  if(Date.now()-handoff.createdAt>86400000||!Array.isArray(handoff.entries)||!handoff.entries.length)return;
+  await preloadAttendanceEmployeeMaster(false,true);
+  if(!p79CanReportOvertime())return;
+  const entry=handoff.entries[0],date=entry.date,token=currentPort79SsoToken();
+  try{
+    const data=await fetchGasJsonWithRetry(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+date.slice(0,7)+'&_='+Date.now(),'請假代班時段',1,12000);
+    if(!data.ok)throw Error(data.error||'班表尚未讀取完成');
+    const byEmp=new Map([[String(entry.empId).trim().toUpperCase(),{}]]);
+    p79MergeWorkOvertimeSnapshot({ready:true,token,rows:data.schedules||[],covers:data.leaveCoverAssignments||[]},byEmp);
+    const meta=byEmp.get(String(entry.empId).trim().toUpperCase())?.[date];
+    if(!meta?.overtimeReport)throw Error('該日代班安排已變更，請先核對請假及班表');
+    await P79Overtime.openReport({...entry,code:meta.overtimeReport.code,category:'代',leaveHandoffId:handoff.id});
+  }catch(error){alert('請假與代班已儲存，申報時段尚未帶入：'+(error.message||error));}
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!new URLSearchParams(location.search).has('leaveReport'))return;
+  const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
+  const banner=document.createElement('div');banner.style.cssText='padding:10px;margin:10px;background:#ecfeff;color:#155e75;border:1px solid #67e8f9;border-radius:10px;text-align:center';
+  const button=document.createElement('button');button.textContent='接續請假代班的加班申報';button.onclick=p79OpenLeaveOvertimeHandoff;banner.appendChild(button);document.body.prepend(banner);
+  window.addEventListener('load',()=>{void p79OpenLeaveOvertimeHandoff();},{once:true});
+});
 </script>
 </body>
 </html>
