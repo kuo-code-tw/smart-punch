@@ -4448,6 +4448,27 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
       // 原班別不明時不輸出「?」，改保留目前班表班別及獨立的代班標籤。
       return ['早','中','晚'].includes(original)?original:'';
     }
+    function p79SubstituteShiftLabel(empId,dayStr,meta){
+      const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
+      if(!cover && !meta?.forEmpId && meta?.type!=='substitute')return '';
+      const ranges={早:'08-16',中:'16-24',晚:'24-08'};
+      if(meta?.overtimeStart && meta?.overtimeEnd){
+        const compact=t=>String(t).replace(/:00$/,'');
+        const end=meta.overtimeEnd==='00:00'?'24':compact(meta.overtimeEnd);
+        return '代'+compact(meta.overtimeStart)+'-'+end;
+      }
+      const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
+      const target=cover?.data?.leaveEmpId || meta?.forEmpId;
+      const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
+      const shift=ranges[own]?own:ranges[original]?original:'';
+      if(!shift)return '代班';
+      if(cover?.data?.mode==='two'){
+        const index=(cover.data.workerIds||[]).findIndex(id=>String(id).toUpperCase()===String(empId).toUpperCase());
+        const halves={早:['08-12','12-16'],中:['16-20','20-24'],晚:['24-04','04-08']};
+        return '代'+halves[shift][index===1?1:0];
+      }
+      return '代'+ranges[shift];
+    }
     function p79LeaveCoverBadge(empId,dayStr){
       const assignments=p79LeaveCoverOnDay(empId,dayStr);
       return assignments.map(({kind,data:a})=>{
@@ -5023,6 +5044,7 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
           const ownApprovedLeave = approvedLeaveForEmployee(emp.id, dayStr);
           const coverageShift = p79CoverageShift(emp.id,dayStr);
           const displayShift = coverageShift || shiftVal;
+          const substituteLabel = ownApprovedLeave ? '' : p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
 
 
           if(shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '離') {
@@ -5044,7 +5066,7 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
 
           const subRec = (shiftVal === '事' || shiftVal === '病' || shiftVal === '喪' || shiftVal === '特') ? getSubstituteRecommendation(emp.role, emp.id, dayStr) : '';
 
-          const metaBadge = dayMeta && (dayMeta.forEmpId || dayMeta.overtime || dayMeta.restQuotaOvertime)
+          const metaBadge = !substituteLabel && dayMeta && (dayMeta.forEmpId || dayMeta.overtime || dayMeta.restQuotaOvertime)
             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black text-[9px]" title="${scheduleEscapeHtml(dayMeta.note || '')}">${dayMeta.forEmpId ? '🔄代' : ''}${dayMeta.overtime ? '⭐加' : ''}${dayMeta.restQuotaOvertime ? dayMeta.restCategory+'加' : ''}</span>`
             : '';
           const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
@@ -5058,7 +5080,7 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
             shownShift==='中'?'bg-amber-100 text-amber-800 font-black':
             shownShift==='晚'?'bg-purple-100 text-purple-800 font-black':
             shownShift==='?'?'bg-cyan-100 text-cyan-900 font-black':shiftStyle;
-          const leaveCoverBadge = p79LeaveCoverBadge(emp.id,dayStr);
+          const leaveCoverBadge = substituteLabel ? '' : p79LeaveCoverBadge(emp.id,dayStr);
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
@@ -5069,21 +5091,22 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() ? '' : 'disabled'}
                 class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                <option value="早" ${shownShift==='早'?'selected':''}>早</option>
-                <option value="中" ${shownShift==='中'?'selected':''}>中</option>
-                <option value="晚" ${shownShift==='晚'?'selected':''}>晚</option>
-                <option value="休" ${shownShift==='休'?'selected':''}>休</option>
-                <option value="例" ${shownShift==='例'?'selected':''}>例</option>
-                <option value="國" ${shownShift==='國'?'selected':''}>國</option>
-                <option value="年" ${shownShift==='年'?'selected':''}>年</option>
-                <option value="事" ${shownShift==='事'?'selected':''}>事</option>
-                <option value="病" ${shownShift==='病'?'selected':''}>病</option>
-                <option value="公" ${shownShift==='公'?'selected':''}>公</option>
-                <option value="喪" ${shownShift==='喪'?'selected':''}>喪</option>
-                <option value="離" ${!approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
+                ${substituteLabel ? `<option value="${scheduleEscapeHtml(shiftVal)}" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
+                <option value="早" ${!substituteLabel && shownShift==='早'?'selected':''}>早</option>
+                <option value="中" ${!substituteLabel && shownShift==='中'?'selected':''}>中</option>
+                <option value="晚" ${!substituteLabel && shownShift==='晚'?'selected':''}>晚</option>
+                <option value="休" ${!substituteLabel && shownShift==='休'?'selected':''}>休</option>
+                <option value="例" ${!substituteLabel && shownShift==='例'?'selected':''}>例</option>
+                <option value="國" ${!substituteLabel && shownShift==='國'?'selected':''}>國</option>
+                <option value="年" ${!substituteLabel && shownShift==='年'?'selected':''}>年</option>
+                <option value="事" ${!substituteLabel && shownShift==='事'?'selected':''}>事</option>
+                <option value="病" ${!substituteLabel && shownShift==='病'?'selected':''}>病</option>
+                <option value="公" ${!substituteLabel && shownShift==='公'?'selected':''}>公</option>
+                <option value="喪" ${!substituteLabel && shownShift==='喪'?'selected':''}>喪</option>
+                <option value="離" ${!substituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
-              ${coverHours ? '' : assignButton}
+              ${substituteLabel || coverHours ? '' : assignButton}
             </td>
           `;
         }
