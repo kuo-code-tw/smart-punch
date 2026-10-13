@@ -4477,11 +4477,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const ranges={早:'08-16',中:'16-24',晚:'24-08'};
       const substitute=!!cover||!!meta.forEmpId||meta.type==='substitute'||meta.overtimeReport?.category==='代';
       const prefix=substitute?'代':['休','國','例'].includes(meta.overtimeReport?.category)?meta.overtimeReport.category:['休','國','例'].includes(meta.restCategory)?meta.restCategory:meta.overtimeType==='extended'?'延':'休';
-      if(meta.overtimeStart&&meta.overtimeEnd){const compact=p79CompactOvertimeCode(prefix+meta.overtimeStart+'-'+(meta.overtimeEnd==='00:00'?'24':meta.overtimeEnd));if(compact)return compact;}
+      const start=meta.overtimeReport?.overtimeStart||meta.overtimeStart,end=meta.overtimeReport?.overtimeEnd||meta.overtimeEnd;
+      if(start&&end){const compact=p79CompactOvertimeCode(prefix+start+'-'+(end==='00:00'?'24':end));if(compact)return compact;}
       const target=cover?.data?.leaveEmpId||meta.forEmpId;
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
       const shift=[meta.reportOriginalShift,meta.overtimeOriginalShift,meta.overtimeAssignedShift,own,original].map(v=>String(v||'').trim()).find(v=>ranges[v])||'';
-      if(!shift)return '';
+      if(!shift)return own==='代班'?'代班':'';
       if(cover?.data?.mode==='two'){
         const index=(cover.data.workerIds||[]).findIndex(id=>String(id).toUpperCase()===String(empId).toUpperCase());
         const halves={早:['08-12','12-16'],中:['16-20','20-24'],晚:['24-04','04-08']};return '代'+halves[shift][index===1?1:0];
