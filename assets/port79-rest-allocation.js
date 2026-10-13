@@ -42,9 +42,13 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[]) {
       restHolidayName:slot.holidayName||'',restQuotaOvertime:overtime,restAllocationSource:'auto-v1'};
   };
   // Fill actual days off before assigning any shortfall to an existing work day.
+  const offPriority={'例':0,'休':1,'國':2};
+  slots.sort((a,b)=>offPriority[a.category]-offPriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
   for(const slot of slots) {const date=nearest(available,slot.sourceDate);if(date)assign(date,slot,false);else remaining.push(slot);}
   const workers=dates.filter(d=>['早','中','晚'].includes(schedule[d])&&!excluded.has(d)&&!result[d]?.overtime&&!result[d]?.forEmpId&&!result[d]?.restCategory);
   const unresolved=[];
+  const overtimePriority={'國':0,'休':1,'例':2};
+  remaining.sort((a,b)=>overtimePriority[a.category]-overtimePriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
   for(const slot of remaining) {const date=nearest(workers,slot.sourceDate);if(date)assign(date,slot,true);else unresolved.push(slot);}
   const assigned=dates.map(d=>result[d]).filter(x=>x?.restCategory);
   return {meta:result,quota:quota.counts,off:assigned.filter(x=>!x.restQuotaOvertime).length,
