@@ -219,7 +219,7 @@
   if(!target||String(forEmpId)===String(empId))throw Error('代班加班請選擇另一位請假人員');
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
- async function openReport(){
+ async function openReport(prefill={}){
   if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
@@ -241,6 +241,16 @@
    function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];refreshPairPeople();el.querySelector('#p79OtForWrap').style.display=r?.[0]==='代'?'block':'none';el.querySelector('#p79OtPreview').textContent=r&&ruleType(r)===kind.value?'加班 '+r[6]+'-'+r[7]+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):'尚未設定這類加班規則';if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
    const refreshTypes=()=>{const previous=kind.value,options=typeOptions(global.p79OvertimeContext?.config?.()||{},rows);kind.innerHTML=options.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    kind.onchange=refresh;select.onchange=preview;forSelect.onchange=preview;empSelect.onchange=preview;refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
+   if(prefill.empId){
+    el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
+    if(prefill.forEmpId)forSelect.value=String(prefill.forEmpId);
+    const match=rows.findIndex(r=>r[1]===prefill.code&&r[0]===prefill.category);
+    const categoryMatch=match>=0?match:rows.findIndex(r=>r[0]===prefill.category);
+    if(categoryMatch>=0){kind.value=ruleType(rows[categoryMatch]);refresh();}
+    if(match>=0){select.value=String(match);preview();}
+    else el.querySelector('#p79OtStatus').textContent='班表出勤時段：'+(prefill.code||'')+'，請選擇相符的出勤時段；沒有時可新增加班選項。';
+    refreshPairPeople();empSelect.value=String(prefill.empId);preview();
+   }
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;
    const optionsSaved=()=>{if(el.isConnected){rows=reportRules();refreshTypes();}};
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
