@@ -485,7 +485,7 @@ body[data-p79-system="schedule"] .badge,body[data-p79-system="schedule"] [class*
 #app-main-container{max-width:none!important;width:100%!important;padding-left:4px!important;padding-right:4px!important}
 #app-main-container .p79-month-schedule-table{
   width:100%!important;
-  min-width:1660px!important;
+  min-width:1790px!important;
   table-layout:fixed!important;
 }
 #app-main-container .p79-person-header,
@@ -563,15 +563,15 @@ body[data-p79-system="schedule"] .badge,body[data-p79-system="schedule"] [class*
 #app-main-container .p79-day-cell button{
   min-height:18px!important;padding:0 1px!important;font-size:8px!important;line-height:16px!important;
 }
-#app-main-container .p79-month-schedule-table th:nth-last-child(-n+3),
-#app-main-container .p79-month-schedule-table td:nth-last-child(-n+3){
-  width:55px!important;min-width:55px!important;max-width:55px!important;
+#app-main-container .p79-month-schedule-table th:nth-last-child(-n+4),
+#app-main-container .p79-month-schedule-table tbody td:nth-last-child(-n+4){
+  width:64px!important;min-width:64px!important;max-width:64px!important;
 }
 html.dark .p79-person-name{color:#f1f5f9}
 html.dark .p79-attendance-active-badge{background:#052e2b;color:#a7f3d0;border-color:#059669}
 
 @media(max-width:1700px){
-  #app-main-container .p79-month-schedule-table{min-width:1585px!important}
+  #app-main-container .p79-month-schedule-table{min-width:1710px!important}
   #app-main-container .p79-person-header,
   #app-main-container .p79-person-cell{width:210px!important;min-width:210px!important;max-width:210px!important}
   #app-main-container .p79-day-head,
@@ -579,7 +579,7 @@ html.dark .p79-attendance-active-badge{background:#052e2b;color:#a7f3d0;border-c
 }
 @media(max-width:1350px){
   /* 小螢幕仍保留完整 1～31 日，不砍日期；改用水平捲動 */
-  #app-main-container .p79-month-schedule-table{min-width:1540px!important}
+  #app-main-container .p79-month-schedule-table{min-width:1710px!important}
 }
 </style>
 
@@ -4981,8 +4981,9 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
       html += `
                   <th class="py-2 px-2 text-center border-b w-14 bg-slate-200">出勤</th>
-                  <th class="py-2 px-2 text-center border-b w-14 bg-slate-200">例休</th>
-                  <th class="py-2 px-2 text-center border-b w-16 bg-slate-200">總工時</th>
+                  <th class="py-2 px-2 text-center border-b bg-purple-100 text-purple-800" style="min-width:64px">例</th>
+                  <th class="py-2 px-2 text-center border-b bg-blue-100 text-blue-800" style="min-width:64px">休</th>
+                  <th class="py-2 px-2 text-center border-b bg-green-100 text-green-800" style="min-width:64px">國</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -5076,11 +5077,12 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           `;
         }
 
-        const totalHours = workDays * 8;
         const restStats={'例':0,'休':0,'國':0}, restOvertimeStats={'例':0,'休':0,'國':0};
         for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
-        const restSummary='例'+restStats['例']+'／休'+restStats['休']+'／國'+restStats['國'];
-        const restOT=Object.values(restOvertimeStats).reduce((a,b)=>a+b,0);
+        const restCategoryCells = ['例','休','國'].map(category => {
+          const color=category==='例'?'bg-purple-50 text-purple-800':category==='休'?'bg-blue-50 text-blue-800':'bg-green-50 text-green-800';
+          return `<td class="py-1 px-2 text-center font-bold border-r text-xs ${color}" style="min-width:64px"><div class="whitespace-nowrap">${restStats[category]}天</div>${restOvertimeStats[category] ? `<div class="text-[10px] whitespace-nowrap mt-1">未休加班</div><div class="text-[10px] whitespace-nowrap">${restOvertimeStats[category]}天</div>` : ''}</td>`;
+        }).join('');
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
         html += `
@@ -5107,8 +5109,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
             </td>
             ${cellsHtml}
             <td class="py-1 text-center font-bold text-emerald-700 bg-emerald-50/50 border-r text-xs">${workDays}天</td>
-            <td class="py-1 text-center font-bold text-slate-500 bg-slate-50 border-r text-xs">${offDays}天<div class="text-[9px] whitespace-nowrap">${restSummary}</div>${restOT ? `<div class="text-[9px] text-sky-700">未休加班 ${restOT}天</div>` : ''}</td>
-            <td class="py-1 text-center font-bold text-indigo-700 bg-indigo-50/50 text-xs">${totalHours}h</td>
+            ${restCategoryCells}
           </tr>
         `;
       });
@@ -5127,22 +5128,22 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
                 <tr>
                   <td class="py-1.5 px-3 sticky-col-left bg-emerald-100 border-r text-emerald-900">☀️ 早班在勤人數</td>
                   ${earlyRow}
-                  <td colspan="3" class="bg-emerald-100"></td>
+                  <td colspan="4" class="bg-emerald-100"></td>
                 </tr>
                 <tr>
                   <td class="py-1.5 px-3 sticky-col-left bg-amber-100 border-r text-amber-900">⛅ 中班在勤人數</td>
                   ${midRow}
-                  <td colspan="3" class="bg-amber-100"></td>
+                  <td colspan="4" class="bg-amber-100"></td>
                 </tr>
                 <tr>
                   <td class="py-1.5 px-3 sticky-col-left bg-purple-100 border-r text-purple-900">🌙 晚班在勤人數</td>
                   ${nightRow}
-                  <td colspan="3" class="bg-purple-100"></td>
+                  <td colspan="4" class="bg-purple-100"></td>
                 </tr>
                 <tr>
                   <td class="py-1.5 px-3 sticky-col-left bg-slate-200 border-r text-slate-800">💤 輪休人數</td>
                   ${offRow}
-                  <td colspan="3" class="bg-slate-200"></td>
+                  <td colspan="4" class="bg-slate-200"></td>
                 </tr>
               </tfoot>
             </table>
