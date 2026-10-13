@@ -122,7 +122,7 @@
    .p79-overtime-dialog p,.p79-overtime-dialog h2,.p79-overtime-dialog label,.p79-overtime-dialog th,.p79-overtime-dialog td{text-align:center!important}
    .p79-overtime-dialog input,.p79-overtime-dialog select{min-width:0!important;max-width:100%!important;text-align:center!important}
    .p79-overtime-dialog label{min-width:0}
-   #p79OvertimeDialog{width:min(680px,calc(100vw - 32px))!important;padding:18px!important;height:auto!important}
+   #p79OvertimeDialog{width:min(680px,calc(100vw - 32px))!important;padding:14px!important;height:fit-content!important;min-height:0!important;max-height:calc(100dvh - 28px)!important;margin:auto!important;gap:6px!important}
    #p79OvertimeDialog .p79-report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0}
    #p79OvertimeDialog .p79-report-grid label{display:flex;flex-direction:column;gap:5px;font-size:14px;font-weight:700}
    #p79OvertimeDialog select,#p79OvertimeDialog input{font-size:14px!important;padding:8px!important}
@@ -250,7 +250,7 @@
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    let rows=reportRules();const people=global.p79OvertimeContext.employees();
-   el.insertAdjacentHTML('beforeend','<div class="p79-report-grid"><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"></select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label id="p79OtForWrap">請假人員<select id="p79OtForEmp" style="'+inputStyle+'"></select></label><label>代班／加班人員<select id="p79OtEmp" style="'+inputStyle+'"></select></label><label style="grid-column:1/-1">出勤時段<select id="p79OtCode" style="'+inputStyle+'"></select></label></div><div id="p79OtPreview" style="padding:10px;border-radius:8px"></div><label>備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label><p style="font-size:12px;color:#64748b;margin:4px 0">帶入班表確認並儲存後完成申報；同一人同一天再次申報會更新該日設定。</p><button id="p79OtStage" type="button" style="background:#0369a1;color:white;padding:9px 16px;border-radius:8px">帶入班表確認</button>');
+   el.insertAdjacentHTML('beforeend','<div class="p79-report-grid"><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"></select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label id="p79OtForWrap">請假人員<select id="p79OtForEmp" style="'+inputStyle+'"></select></label><label>代班／加班人員<select id="p79OtEmp" style="'+inputStyle+'"></select></label><label>出勤時段<select id="p79OtCode" style="'+inputStyle+'"></select></label><label>備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label></div><div id="p79OtPreview" style="padding:8px;border-radius:8px"></div><p style="font-size:12px;color:#64748b;margin:4px 0">帶入班表確認並儲存後完成申報；同一人同一天再次申報會更新該日設定。</p><button id="p79OtStage" type="button" style="background:#0369a1;color:white;padding:9px 16px;border-radius:8px">帶入班表確認</button>');
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
    const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
