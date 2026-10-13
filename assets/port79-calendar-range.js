@@ -204,6 +204,20 @@ function mountRange(opts){
   return api;
 }
 
+function installMonthJump(pop,getView,render){
+  const heading=pop.querySelector('.p79-ucr-month');
+  heading.style.cssText='display:flex;justify-content:center;align-items:center;gap:6px;min-width:0';
+  const year=document.createElement('select'),month=document.createElement('select');
+  year.className='p79-ucr-year-select';year.setAttribute('aria-label','直接選擇年份');
+  month.className='p79-ucr-month-select';month.setAttribute('aria-label','直接選擇月份');
+  [year,month].forEach(el=>el.style.cssText='width:auto;min-width:0;max-width:100%;padding:6px 3px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:var(--panel,#fff);color:inherit');
+  month.innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1} 月</option>`).join('');
+  heading.replaceChildren(year,month);
+  function sync(){const view=getView(),current=new Date().getFullYear(),first=Math.min(1900,view.y),last=Math.max(current+10,view.y);if(year.dataset.range!==first+':'+last){year.innerHTML=Array.from({length:last-first+1},(_,i)=>{const y=first+i;return `<option value="${y}">${y>=1912?'民國 '+(y-1911)+'（'+y+'）':'西元 '+y}</option>`}).join('');year.dataset.range=first+':'+last;}year.value=String(view.y);month.value=String(view.m);}
+  year.onchange=()=>{getView().y=Number(year.value);render();};month.onchange=()=>{getView().m=Number(month.value);render();};
+  return sync;
+}
+
 function mountSingle(opts){
   const input=document.getElementById(opts.inputId);
   if(!input||input.dataset.p79CalendarMounted==='1')return null;
@@ -226,8 +240,9 @@ function mountSingle(opts){
   let view=monthOf(input.value||todayIso());
 
   function sync(){trigger.querySelector('.p79-ucr-trigger-text').textContent=input.value?fmt(input.value):(opts.emptyText||'選擇日期')}
+  const syncMonthJump=installMonthJump(pop,()=>view,render);
   function render(){
-    pop.querySelector('.p79-ucr-month').textContent=`${view.y} 年 ${view.m} 月`;
+    syncMonthJump();
     const grid=pop.querySelector('.p79-ucr-grid');grid.innerHTML='';
     const first=new Date(view.y,view.m-1,1).getDay(),total=daysInMonth(view.y,view.m);
     for(let i=0;i<first;i++){const x=document.createElement('button');x.type='button';x.className='p79-ucr-day p79-empty';grid.appendChild(x)}
@@ -238,7 +253,7 @@ function mountSingle(opts){
       b.onclick=()=>{input.value=val;sync();emit(input);close()};grid.appendChild(b);
     }
   }
-  function open(){closeOthers(api);view=monthOf(input.value||todayIso());render();pop.hidden=false}
+  function open(){closeOthers(api);sync();view=monthOf(input.value||todayIso());render();pop.hidden=false}
   function close(){pop.hidden=true}
   trigger.onclick=()=>pop.hidden?open():close();
   pop.querySelector('.p79-prev').onclick=()=>{view.m--;if(view.m<1){view.m=12;view.y--}render()};
@@ -274,5 +289,6 @@ function mountMonth(opts){
   input.addEventListener('change',sync);sync();return {sync};
 }
 
-global.Port79CalendarRange={mountRange,mountSingle,mountMonth};
+global.Port79CalendarRange={mountRange,mountSingle,mountMonth,syncAll:()=>instances.forEach(api=>api.sync?.())};
 })(window);
+
