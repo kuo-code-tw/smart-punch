@@ -3412,6 +3412,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return {
         id: String(emp?.id || '').trim().toUpperCase(),
         name: String(emp?.name || ''),
+        dept: String(emp?.dept || '').trim(),
         role: String(emp?.role || 'AQC'),
         group: String(emp?.group || '不分組'),
         lockType: String(emp?.lockType || 'ROTATION'),
@@ -5931,9 +5932,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const rawShift = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
           const category=monthlyScheduleMeta[emp.id]?.[dayStr];
-          row[String(d)] = category?.restQuotaOvertime ? rawShift+'（'+category.restCategory+'加）' : (rawShift==='休'&&category?.restCategory) ? category.restCategory : ['特','特休','特別休假','年假'].includes(String(rawShift).trim())
+          const substituteLabel=approvedLeaveForEmployee(emp.id,dayStr)?'':p79SubstituteShiftLabel(emp.id,dayStr,category);
+          row[String(d)] = substituteLabel || (category?.restQuotaOvertime ? rawShift+'（'+category.restCategory+'加）' : (rawShift==='休'&&category?.restCategory) ? category.restCategory : ['特','特休','特別休假','年假'].includes(String(rawShift).trim())
             ? '年'
-            : (String(rawShift).trim() === '離' ? '離職' : rawShift);
+            : (String(rawShift).trim() === '離' ? '離職' : rawShift));
         }
 
         exportRows.push(row);
