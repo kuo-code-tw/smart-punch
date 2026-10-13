@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-Hant" data-theme="light">
 <head>
+<script src="../assets/port79-hr-import.js?v=20261013.58"></script>
 <script src="../assets/port79-overtime-report.js?v=20261013.57"></script>
 <!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
 <!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
@@ -200,6 +201,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   </div>
   <section class="card">
     <div style="display:flex;gap:7px;flex-wrap:wrap;padding:12px 12px 0">
+      <button class="btn" id="p79HrImportToolbar" type="button" onclick="P79HrImport.open()">📥 匯入人員</button>
       <button class="btn primary" id="p79HrAddPersonToolbar" type="button" onclick="openEditor()">＋ 新增人員</button>
       <button class="btn" onclick="setStatusView('active')">👥 在職人員</button>
       <button class="btn" onclick="setStatusView('resigned')">🚪 離職人員</button>
@@ -1355,7 +1357,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261012.51"></script>
+<script src="../assets/port79-seven-top.js?v=20261013.58"></script>
 
 <script id="p79-logout-home-v20261004">
 (function(){
@@ -1388,6 +1390,7 @@ C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',c
 });
 </script>
 <script>
+window.p79HrImportContext={canCreate:()=>canHr('people.create'),canEdit:()=>canHr('people.edit'),ensureXlsx:()=>window.p79EnsureXlsx(),upsert:employee=>apiPost({action:'hrUpsertEmployee',originalEmpId:employee.empId,employee}),readEmployees:async()=>{const d=await apiGet('hrGetEmployees',30000);if(!Array.isArray(d.employees))throw new Error('雲端人員資料不完整，停止匯入');p79ApplyHrEmployeesPayload(d,false,'cloud');return d.employees;}};
 window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||hrAccess==='manage'};
 </script>
 </body></html>
