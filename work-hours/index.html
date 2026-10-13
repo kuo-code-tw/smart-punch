@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261014.97"></script>
+<script src="../assets/port79-overtime-report.js?v=20261014.98"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -12265,7 +12265,9 @@ async function p79ExportOvertimeComparison(printMode){
 }
         function p79ReportWorkOvertimeRow(index){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
-            P79Overtime.openReport({empId:row.empId,date:row.rosterDate||normalizeScheduleDateKey(row.dateKey),forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||'',category:row.overtimeReport?.category||'延'});
+            const date=row.rosterDate||normalizeScheduleDateKey(row.dateKey),category=row.overtimeReport?.category||'延';
+            const inferred=row.overtimeReport?null:P79Overtime.inferRule(p79DirectAttendanceTimestamp(row.clockIn),p79DirectAttendanceTimestamp(row.clockOut),date,P79Overtime.reportRules(),category);
+            P79Overtime.openReport({empId:row.empId,date,forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||inferred?.[1]||'',category,requirePeriodSelection:!row.overtimeReport&&!inferred});
         }
         let p79OvertimeCalculationCache = null;
         function buildOvertimeStatisticsRows() {

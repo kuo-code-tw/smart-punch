@@ -75,6 +75,25 @@
   const[a,b]=interval(date,r.overtimeStart,r.overtimeEnd,offset);
   return Math.max(0,Math.floor((Math.min(end,b)-Math.max(start,a))/60000));
  }
+ function inferRule(start,end,date,rows,category){
+  const candidates=[];
+  validate(rows).forEach((row,index)=>{
+   if(category&&row[0]!==category)return;
+   try{
+    let ot=interval(date,row[6],row[7]),a=ot[0],b=ot[1];
+    if(row[0]==='延'){
+     const normal=interval(date,row[4],row[5]);
+     const offset=row[8]==='after'?normal[1]-ot[0]:normal[0]-ot[1];
+     if(offset%86400000)return;ot=ot.map(t=>t+offset);
+     a=row[8]==='after'?normal[0]:ot[0];b=row[8]==='after'?ot[1]:normal[1];
+    }
+    if(Math.abs(start-a)>45*60000||Math.abs(end-b)>45*60000)return;
+    const minutes=Math.max(0,Math.floor((Math.min(end,ot[1])-Math.max(start,ot[0]))/60000));
+    if(minutes)candidates.push({row,index,minutes,distance:Math.abs(start-a)+Math.abs(end-b)});
+   }catch(ignore){}
+  });
+  candidates.sort((a,b)=>a.distance-b.distance||a.index-b.index);return candidates[0]?.row||null;
+ }
  function matchReport(start,end,date,map){
   const direct=map?.[date]||null,base=Date.parse(date+'T00:00:00+08:00');
   if(!Number.isFinite(base))return {meta:direct,date,minutes:null};
@@ -342,6 +361,6 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
