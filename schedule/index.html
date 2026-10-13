@@ -1353,6 +1353,16 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{background:#111827}
 @media(max-width:600px){#substitute-assignment-modal{padding:8px!important}#substitute-assignment-modal>div{max-height:calc(100vh - 16px)!important;max-height:calc(100dvh - 16px)!important}}
 </style>
+<style id="p79-substitute-time-fit">
+#app-main-container .p79-month-schedule-table .p79-shift-select.p79-substitute-time{
+  box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;
+  font-size:10px!important;font-weight:900!important;letter-spacing:-.35px!important;padding:0!important;
+  text-align:center!important;text-align-last:center!important;opacity:1!important;
+  background:#cffafe!important;color:#164e63!important;border:1px solid #0891b2!important;
+}
+#app-main-container .p79-month-schedule-table .p79-shift-select.p79-substitute-time-long{font-size:8px!important;letter-spacing:-.45px!important}
+html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-substitute-time{background:#164e63!important;color:#ecfeff!important;border-color:#22d3ee!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -5090,7 +5100,8 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
           cellsHtml += `
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() ? '' : 'disabled'}
-                class="clean-shift-select p79-shift-select w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
+                title="${scheduleEscapeHtml(substituteLabel || shownShift)}"
+                class="clean-shift-select p79-shift-select ${substituteLabel ? 'p79-substitute-time'+(substituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${substituteLabel ? `<option value="${scheduleEscapeHtml(shiftVal)}" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
                 <option value="早" ${!substituteLabel && shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${!substituteLabel && shownShift==='中'?'selected':''}>中</option>
