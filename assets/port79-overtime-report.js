@@ -4,8 +4,10 @@
  const types=['休','國','例','代','延'];
  const TYPECONFIG='overtimeReportTypesV1';
  const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'代班加班',延:'平日延長加班'};
- function typeOptions(config={},rows=[]){const map=new Map(types.map(c=>[typeLabel[c],c]));for(const r of config[TYPECONFIG]||[]){if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');map.set(String(r[0]).trim(),r[1]);}for(const r of rows)if(r[9])map.set(r[9],r[0]);return [...map].map(([name,category])=>({name,category}));}
- const ruleType=r=>r[9]||typeLabel[r[0]];
+ const isBuiltinType=name=>Object.values(typeLabel).includes(name);
+ // 舊表格切換假別後可能保留原來的預設名稱；預設類型一律依假別辨識。
+ const ruleType=r=>r[9]&&!isBuiltinType(r[9])?r[9]:typeLabel[r[0]];
+ function typeOptions(config={},rows=[]){const map=new Map(types.map(c=>[typeLabel[c],c]));for(const r of config[TYPECONFIG]||[]){if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');const name=String(r[0]).trim();if(!isBuiltinType(name))map.set(name,r[1]);}for(const r of rows){const name=ruleType(r);if(r[9]&&!isBuiltinType(name))map.set(name,r[0]);}return [...map].map(([name,category])=>({name,category}));}
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const hour=x=>{const m=String(x).match(/^(\d{2})(?::(\d{2}))?$/);if(!m)return NaN;const h=Number(m[1]),n=Number(m[2]||0);return h<=24&&n<60&&(h!==24||n===0)?h*60+n:NaN};
  const span=(a,b)=>{const x=hour(a),y=hour(b);return Number.isFinite(x)&&Number.isFinite(y)&&x%1440!==y%1440?(y-x+1440)%1440:NaN};
@@ -25,7 +27,7 @@
    if(!Array.isArray(r)||![9,10].includes(r.length))throw Error('第'+(i+1)+'列格式錯誤');
    const v=r.map(x=>String(x??'').trim()),code=v[1];
    if(!types.includes(v[0])||!/^.{1,12}?\d{2}(?::\d{2})?-\d{2}(?::\d{2})?$/.test(code))throw Error('第'+(i+1)+'列類型或代碼有誤');
-   const key=(v[9]||typeLabel[v[0]])+'|'+code;if(seen.has(key))throw Error('同一加班類型的出勤時段重複：'+code);seen.add(key);
+   const key=ruleType(v)+'|'+code;if(seen.has(key))throw Error('同一加班類型的出勤時段重複：'+code);seen.add(key);
    if(!(Number(v[2])>0&&Number(v[2])<=24)||v[3]!==''&&!(Number.isFinite(Number(v[3]))&&Number(v[3])>=0&&Number(v[3])<=100))throw Error(code+' 時數無效');
    if(!Number.isFinite(span(v[6],v[7])))throw Error(code+' 加班起迄時間無效');
    if(v[0]==='延'){
@@ -35,7 +37,7 @@
    const label=code.match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);
    if(v[0]!=='延'&&(hour(label[1])%1440!==hour(v[6])%1440||hour(label[2])%1440!==hour(v[7])%1440))throw Error(code+' 代碼時段與加班時段不一致');
    if(v[0]==='延'&&v[8]==='before'&&(hour(label[1])%1440!==hour(v[6])%1440||hour(label[2])%1440!==hour(v[5])%1440))throw Error(code+' 班前加班代碼須包含完整出勤時段');
-   if(v.length===10&&(!v[9]||v[9]===typeLabel[v[0]]))v.pop();
+   if(v.length===10&&(!v[9]||isBuiltinType(v[9])))v.pop();
    return v;
   });
  }
@@ -153,7 +155,7 @@
    };
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div class="p79-ot-color-legend" aria-label="假別顏色說明">'+types.map(c=>'<span data-ot-category="'+c+'">'+esc(typeLabel[c])+'</span>').join('')+'</div>');
    const body=el.querySelector('#p79OtRuleRows'),getRows=()=>[...body.rows].map(tr=>[...tr.querySelectorAll('[data-col]')].map(i=>i.value));
-   body.addEventListener('change',e=>{if(e.target.matches('select[data-col="0"]'))e.target.closest('tr').dataset.otCategory=e.target.value;});
+   body.addEventListener('change',e=>{if(e.target.matches('select[data-col="0"]')){const row=e.target.closest('tr');row.dataset.otCategory=e.target.value;const name=row.querySelector('[data-col="9"]');if(name&&(!name.value.trim()||isBuiltinType(name.value.trim())))name.value=typeLabel[e.target.value];}});
    body.addEventListener('click',e=>{if(e.target.closest('.p79OtDelete'))e.target.closest('tr').remove()});
    el.querySelector('#p79OtStatus').textContent='已載入雲端規則；修改後按儲存。';
    el.querySelector('#p79OtAdd').onclick=()=>{
