@@ -421,7 +421,7 @@ const SYS=['attendance','workhours','leave','schedule','efficiency','hr','histor
 const LABEL={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
 const FINE_CATALOG={
  attendance:[['punch','刷卡'],['records.view','查看考勤紀錄'],['realtime.view','查看即時考勤'],['records.create','新增/補登'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['exceptions.manage','異常處理']],
- workhours:[['attendance.view','查看出勤統計'],['overtime.view','查看加班統計'],['attendance.export','匯出出勤統計'],['overtime.export','匯出加班統計']],
+ workhours:[['attendance.view','查看出勤統計'],['overtime.view','查看加班統計'],['attendance.export','匯出出勤統計'],['overtime.export','匯出加班統計'],['overtime.report','申報加班']],
  leave:[['apply','提出請假'],['own.view','查看自己的申請'],['records.view','查看請假紀錄'],['approve','核准'],['reject','退回'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['balance.view','查看假別餘額'],['balance.edit','修改假別餘額']],
  schedule:[['own.view','查看自己的班表'],['records.view','查看班表'],['records.create','新增排班'],['records.edit','修改排班'],['records.delete','刪除排班'],['records.export','匯出'],['import','匯入'],['support.manage','調任/支援']],
  efficiency:[['records.view','查看效率資料'],['monthly.view','查看月報'],['records.create','新增'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['import','匯入'],['monthly.edit','修改月報'],['sync','同步']],
@@ -989,7 +989,7 @@ function buildPermGrid(e){
   const cards=SYS.map(k=>{
     const f=fineDefaults({...e,adminRole:role},k);
     let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
-    if(k==='workhours')actions+=['申報加班','管理加班選項'].map(label=>`<label class="perm-action" title="依工時統計的管理後台權限啟用"><input type="checkbox" data-overtime-management-display disabled ${superRole||(!employeeRole&&p.workhours==='manage')?'checked':''}><span>${label}</span></label>`).join('')+'<p class="muted" style="grid-column:1/-1">申報與選項管理依上方「管理後台」啟用。</p>';
+    if(k==='workhours')actions+=['管理加班選項'].map(label=>`<label class="perm-action" title="依工時統計的管理後台權限啟用"><input type="checkbox" data-overtime-management-display disabled ${superRole||(!employeeRole&&p.workhours==='manage')?'checked':''}><span>${label}</span></label>`).join('')+'<p class="muted" style="grid-column:1/-1">勾選「申報加班」後，具有工時統計管理後台權限的管理員即可申報。加班選項管理依上方「管理後台」啟用。</p>';
     return `<div class="permitem"><b>${LABEL[k]}</b><select id="perm_${k}" ${k==='workhours'?'onchange="p79UpdateOvertimeManagementDisplay()"':''} ${superRole||employeeRole||!canGrant?'disabled':''}><option value="none">無後台權限</option><option value="view">查看後台</option><option value="manage">管理後台</option></select><div class="perm-actions-grid">${actions}</div></div>`;
   }).join('');
   let ranges;
