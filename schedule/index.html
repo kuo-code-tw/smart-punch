@@ -3662,6 +3662,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
     }
 
     async function saveScheduleMonthToCloud(showAlert = true) {
+      if (scheduleEditLockState.mine) p79ApplyAutomaticRestMetadata();
       const snapshotVersion=p79ScheduleLocalMutationVersion;
       const yearMonth = document.getElementById('month-picker').value;
       const schedules = employees.map(emp => {
@@ -4993,6 +4994,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       const dailyOffCount = new Array(totalDays + 1).fill(0);
 
       roleEmps.forEach(emp => {
+        const automaticRestMeta = p79AutomaticRestMetadata(emp.id, yearMonth);
         let workDays = 0;
         let offDays = 0;
 
@@ -5000,7 +5002,8 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         for(const d of visibleDays) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const shiftVal = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
-          const dayMeta = getScheduleDayMeta(emp.id, dayStr);
+          const dayMeta = automaticRestMeta[dayStr] || null;
+          const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
           const ownApprovedLeave = approvedLeaveForEmployee(emp.id, dayStr);
           const coverageShift = p79CoverageShift(emp.id,dayStr);
           const displayShift = coverageShift || shiftVal;
@@ -5029,13 +5032,16 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
           const subRec = (shiftVal === '事' || shiftVal === '病' || shiftVal === '喪' || shiftVal === '特') ? getSubstituteRecommendation(emp.role, emp.id, dayStr) : '';
 
-          const metaBadge = dayMeta
+          const metaBadge = dayMeta && (dayMeta.forEmpId || dayMeta.overtime || dayMeta.restQuotaOvertime)
             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black text-[9px]" title="${scheduleEscapeHtml(dayMeta.note || '')}">${dayMeta.forEmpId ? '🔄代' : ''}${dayMeta.overtime ? '⭐加' : ''}${dayMeta.restQuotaOvertime ? dayMeta.restCategory+'加' : ''}</span>`
             : '';
           const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
           const approvedLeaveCode = ownApprovedLeave ? (/年|特/.test(String(ownApprovedLeave.leaveType||''))?'年':/事/.test(String(ownApprovedLeave.leaveType||''))?'事':/病/.test(String(ownApprovedLeave.leaveType||''))?'病':/公/.test(String(ownApprovedLeave.leaveType||''))?'公':/喪/.test(String(ownApprovedLeave.leaveType||''))?'喪':'假') : '';
           const shownShift = approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
           const shownShiftStyle = ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
+            shownShift==='例'?'bg-purple-100 text-purple-800 font-black':
+            shownShift==='休'?'bg-blue-100 text-blue-800 font-black':
+            shownShift==='國'?'bg-green-100 text-green-800 font-black':
             shownShift==='早'?'bg-emerald-100 text-emerald-800 font-black':
             shownShift==='中'?'bg-amber-100 text-amber-800 font-black':
             shownShift==='晚'?'bg-purple-100 text-purple-800 font-black':
@@ -5044,7 +5050,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${dayMeta ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '代'+coverHours : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(dayMeta.overtimeReport.code) : (dayMeta ? '編輯代班' : '代班'))}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '代'+coverHours : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(dayMeta.overtimeReport.code) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
@@ -5072,7 +5078,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
         const totalHours = workDays * 8;
         const restStats={'例':0,'休':0,'國':0}, restOvertimeStats={'例':0,'休':0,'國':0};
-        for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=monthlyScheduleMeta[emp.id]?.[date];if(m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
+        for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
         const restSummary='例'+restStats['例']+'／休'+restStats['休']+'／國'+restStats['國'];
         const restOT=Object.values(restOvertimeStats).reduce((a,b)=>a+b,0);
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
@@ -5186,6 +5192,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         }
       }
       if (!requireScheduleEditLock(false)) return;
+      p79ApplyAutomaticRestMetadata();
       p79ManualScheduleSaveBusy=true;
       p79SetScheduleSaving(true);
       try {
@@ -5460,6 +5467,29 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
       if (dayStr === scheduleTaipeiTodayKey()) {
         try { renderTodaySchedulePanel(); } catch (e) {}
       }
+    }
+
+    function p79AutomaticRestMetadata(empId, month) {
+      const existing=monthlyScheduleMeta[empId]||{};
+      try {
+        const quota=p79RestQuota(month);
+        const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))
+          .filter(d=>approvedLeaveForEmployee(empId,d)||p79LeaveCoverOnDay(empId,d).length);
+        return p79AllocateRestMonth(monthlyScheduleData[empId]||{},existing,month,excluded).meta;
+      } catch (error) { return existing; }
+    }
+
+    function p79ApplyAutomaticRestMetadata() {
+      const month=document.getElementById('month-picker').value;
+      let changed=false;
+      for (const emp of employees) {
+        const meta=p79AutomaticRestMetadata(emp.id,month);
+        if (JSON.stringify(meta)!==JSON.stringify(monthlyScheduleMeta[emp.id]||{})) {
+          monthlyScheduleMeta[emp.id]=meta;changed=true;
+        }
+      }
+      if (changed) p79MarkScheduleLocalMutation();
+      return changed;
     }
 
     function p79AutoAllocateRest() {
