@@ -1335,6 +1335,12 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
  #todaySchedulePanel .p79-today-heading-inline>.p79-today-inline-status{gap:2px 6px!important}
 }
 </style>
+
+<style id="p79-rest-category-summary-colors">
+#app-main-container .p79-month-schedule-table .p79-rest-example{background:#f3e8ff!important;color:#6b21a8!important}
+#app-main-container .p79-month-schedule-table .p79-rest-break{background:#dbeafe!important;color:#1e40af!important}
+#app-main-container .p79-month-schedule-table .p79-rest-national{background:#dcfce7!important;color:#166534!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -4981,9 +4987,9 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 
       html += `
                   <th class="py-2 px-2 text-center border-b w-14 bg-slate-200">出勤</th>
-                  <th class="py-2 px-2 text-center border-b bg-purple-100 text-purple-800" style="min-width:64px">例</th>
-                  <th class="py-2 px-2 text-center border-b bg-blue-100 text-blue-800" style="min-width:64px">休</th>
-                  <th class="py-2 px-2 text-center border-b bg-green-100 text-green-800" style="min-width:64px">國</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日">例</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日">休</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日">國</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -5080,7 +5086,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
         const restStats={'例':0,'休':0,'國':0}, restOvertimeStats={'例':0,'休':0,'國':0};
         for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
         const restCategoryCells = ['例','休','國'].map(category => {
-          const color=category==='例'?'bg-purple-50 text-purple-800':category==='休'?'bg-blue-50 text-blue-800':'bg-green-50 text-green-800';
+          const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
           return `<td class="py-1 px-2 text-center font-bold border-r text-xs ${color}" style="min-width:64px"><div class="whitespace-nowrap">${restStats[category]}天</div>${restOvertimeStats[category] ? `<div class="text-[10px] whitespace-nowrap mt-1">未休加班</div><div class="text-[10px] whitespace-nowrap">${restOvertimeStats[category]}天</div>` : ''}</td>`;
         }).join('');
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
