@@ -4460,6 +4460,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return ['早','中','晚'].includes(original)?original:'';
     }
     function p79SubstituteShiftLabel(empId,dayStr,meta){
+      const reportCode=String(meta?.overtimeReport?.code||'').trim();
+      if(reportCode)return reportCode;
       const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
       if(!cover && !meta?.forEmpId && meta?.type!=='substitute')return '';
       const ranges={早:'08-16',中:'16-24',晚:'24-08'};
@@ -4471,7 +4473,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
       const target=cover?.data?.leaveEmpId || meta?.forEmpId;
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
-      const shift=ranges[own]?own:ranges[original]?original:'';
+      const shift=[meta?.reportOriginalShift,meta?.overtimeOriginalShift,own,original].map(v=>String(v||'').trim()).find(v=>ranges[v])||'';
       if(!shift)return '代班';
       if(cover?.data?.mode==='two'){
         const index=(cover.data.workerIds||[]).findIndex(id=>String(id).toUpperCase()===String(empId).toUpperCase());
