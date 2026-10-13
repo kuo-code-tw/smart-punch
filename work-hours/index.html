@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.70"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.68"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -12160,6 +12160,66 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return `${hours} 小時${remainder ? ` ${remainder} 分` : ''}`;
         }
 
+        const p79WorkOvertimeMonths=new Map();
+        let p79WorkOvertimeLoadQueue=Promise.resolve();
+        function p79LoadWorkOvertimeMonths(sourceRecords){
+            const token=currentPort79SsoToken();if(!token)return;
+            const months=[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+            months.forEach(month=>{
+                const previous=p79WorkOvertimeMonths.get(month);
+                if(previous?.token===token&&(previous.pending||Date.now()-previous.at<60000))return;
+                const state={token,at:Date.now(),pending:true,rows:[],covers:[]};p79WorkOvertimeMonths.set(month,state);
+                p79WorkOvertimeLoadQueue=p79WorkOvertimeLoadQueue.then(async()=>{
+                    if(currentPort79SsoToken()!==token){state.pending=false;return;}
+                    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
+                    try{
+                        const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
+                        const data=await response.json();if(!data.ok)throw Error(data.error||'班表讀取失敗');
+                        if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
+                        state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.ready=true;state.pending=false;state.at=Date.now();
+                        p79OvertimeCalculationCache=null;renderOvertimeStats();
+                    }catch(e){state.pending=false;state.at=Date.now();}finally{clearTimeout(timer);}
+                });
+            });
+        }
+        function p79MergeWorkOvertimeSnapshot(state,metaByEmp){
+            if(!state.ready||state.token!==currentPort79SsoToken())return;
+            const roster=new Map(state.rows.map(r=>[String(r.empId||'').trim().toUpperCase(),r.schedule||{}]));
+            const ranges={早:['08','16'],中:['16','24'],晚:['24','08']};
+            state.rows.forEach(r=>{
+                const id=String(r.empId||'').trim().toUpperCase(),map=metaByEmp.get(id);if(!map)return;
+                const schedule=r.schedule||{};
+                Object.entries(schedule.__meta||{}).forEach(([date,m])=>{
+                    if(!m||typeof m!=='object')return;
+                    if(m.overtimeReport||m.restQuotaOvertime)map[date]={...m};
+                    else if(m.overtime&&m.overtimeStart&&m.overtimeEnd){
+                        const category=m.forEmpId||m.type==='substitute'?'代':m.overtimeType==='extended'?'延':'休';
+                        const a=P79Overtime.time(m.overtimeStart).replace(':00',''),b=m.overtimeEnd==='00:00'?'24':P79Overtime.time(m.overtimeEnd).replace(':00','');
+                        const normal=ranges[schedule[date]]||['08','16'];
+                        const minute=t=>{const parts=String(t).split(':');return Number(parts[0])*60+Number(parts[1]||0);};
+                        map[date]={...m,overtimeReport:{category,code:category+a+'-'+b,declaredHours:((minute(b)-minute(a)+1440)%1440)/60,convertedHours:null,normalStart:normal[0],normalEnd:normal[1],overtimeStart:a,overtimeEnd:b,position:'standalone'},forEmpId:m.forEmpId,coverCandidate:true};
+                    }else delete map[date];
+                });
+            });
+            state.covers.forEach(cover=>{
+                const target=roster.get(String(cover.leaveEmpId||'').trim().toUpperCase())||{};
+                (cover.workerIds||[]).forEach((worker,index)=>{
+                    const id=String(worker).trim().toUpperCase(),map=metaByEmp.get(id),own=roster.get(id)||{};if(!map)return;
+                    const dates=new Set([...Object.keys(own),...Object.keys(target)]);
+                    dates.forEach(date=>{
+                        if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate||map[date]?.overtimeReport)return;
+                        const shift=ranges[own[date]]?own[date]:target[date];let times=ranges[shift];if(!times)return;
+                        if(cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[shift][index===1?1:0];}
+                        map[date]={forEmpId:cover.leaveEmpId,coverCandidate:true,overtimeReport:{category:'代',code:'代'+times.join('-'),declaredHours:cover.mode==='two'?4:8,convertedHours:null,normalStart:times[0],normalEnd:times[1],overtimeStart:times[0],overtimeEnd:times[1],position:'standalone'}};
+                    });
+                });
+            });
+        }
+        let p79WorkOvertimeDisplayedRows=[];
+        function p79ReportWorkOvertimeRow(index){
+            const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
+            P79Overtime.openReport({empId:row.empId,date:row.rosterDate||normalizeScheduleDateKey(row.dateKey),forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||'',category:row.overtimeReport?.category||'延'});
+        }
         let p79OvertimeCalculationCache = null;
         function buildOvertimeStatisticsRows() {
             const visibleEmployees = p79WorkhoursEligibleEmployees();
@@ -12172,6 +12232,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
             });
 
+            p79LoadWorkOvertimeMonths(sourceRecords);
             // 一次掃描可見員工的加班 metadata；不逐位重掃全部月份班表。
             const restMetaByEmp=new Map(visibleEmployees.map(emp=>[String(emp.empId).trim().toUpperCase(),{}]));
             (schedules||[]).forEach(row=>{
@@ -12184,6 +12245,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     else delete map[key];
                 });
             });
+            p79WorkOvertimeMonths.forEach(state=>p79MergeWorkOvertimeSnapshot(state,restMetaByEmp));
             const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp]]);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
@@ -12222,6 +12284,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         totalMinutes,
                         overtimeMinutes,
                         overtimeReport:restMeta?.overtimeReport||null,
+                        rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,
                         overDailyLimit: totalMinutes > 720
                     };
                 })
@@ -12336,7 +12399,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const startIndex = (overtimeCurrentPage - 1) * OVERTIME_PAGE_SIZE;
             const pageRows = rows.slice(startIndex, startIndex + OVERTIME_PAGE_SIZE);
             const allowAttendanceEdit = canPerformAdminAction(currentEmp, 'attendanceEdit');
-            tbody.innerHTML = pageRows.length ? pageRows.map(row => {
+            p79WorkOvertimeDisplayedRows=pageRows;
+            const overtimeRowsHtml = pageRows.length ? pageRows.map((row,rowIndex) => {
                 const clockInCell = formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
                 const clockOutCell = formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${row.overDailyLimit ? 'bg-rose-50/60 dark:bg-rose-950/10' : ''}">
@@ -12347,7 +12411,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td class="px-3 py-3 font-bold whitespace-nowrap">${formatDurationMinutes(row.totalMinutes)}</td>
-                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-slate-500">${escapeHtml(row.overtimeReport.code)}｜申報換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}</td>
+                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-cyan-800 dark:text-cyan-200">${escapeHtml(row.overtimeReport.code)}｜${row.coverCandidate?'待申報':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</div><div class="text-xs text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="mt-1 px-2 py-1 rounded bg-cyan-100 text-cyan-900 text-xs font-bold">申報加班</button>`:''}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件、且已完整簽到簽退的加班班次</td></tr>';
 
