@@ -547,14 +547,14 @@ async function p79SaveLeaveCover(){
   const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:requestedId,empId:requestedLeave.empId,leaveType:requestedLeave.leaveType,startDate:normalizeLeaveFilterDate(requestedLeave.startTime||requestedLeave.startDate),endDate:normalizeLeaveFilterDate(requestedLeave.endTime||requestedLeave.endDate||requestedLeave.startTime||requestedLeave.startDate),mode,workerIds:mode==='two'?[first,second]:[first]});
   if(!plan.covered)await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode,workerIds:mode==='two'?[first,second]:[first]});
   p79CloseLeaveCover();
-  if(mode!=='rest'){
+  {
    const leaveId=plan.leaveId,leave=fresh.leaveRecords.find(l=>String(l.id)===String(leaveId));
    const start=normalizeLeaveFilterDate(leave?.startTime||leave?.startDate),end=normalizeLeaveFilterDate(leave?.endTime||leave?.endDate||leave?.startTime||leave?.startDate);
    if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
    const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
    sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:leaveId,createdAt:Date.now(),entries}));
    location.href='../work-hours/?leaveReport=1#overtime';
-  }else{setStatus('✅ 排休代班已儲存，排班管理可查看','success');await loadCloud();renderAdmin();}
+  }
  }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
  finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
 }
