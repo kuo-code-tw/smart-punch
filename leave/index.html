@@ -294,10 +294,10 @@ body[data-p79-system="leave"]>header{display:none!important}
       <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>部門</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <div><h2 style="margin-bottom:5px">🏖️ 員工年假剩餘天數</h2></div>
-      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"><tr><td colspan="8">正在載入...</td></tr></tbody></table></div>
-    </div>
+    <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
+      <summary style="cursor:pointer;font-size:18px;font-weight:700;padding:6px 0">🏖️ 員工年假剩餘天數 <span class="note">（點選展開／收合）</span></summary>
+      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
+    </details>
   </section>
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
@@ -456,17 +456,21 @@ function renderAdmin(){
    return rangeOk&&(!kw||[l.name,l.empId,l.attNo].some(v=>String(v||'').toLowerCase().includes(kw)))&&(!dept||String(l.dept||'')===dept)&&(!status||String(l.status||'')===status);
  });
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
+ const balanceCache=new Map(),coverIndex=new Map();
+ for(const cover of window.p79LeaveCoverAssignments||[])if(!coverIndex.has(String(cover.leaveId)))coverIndex.set(String(cover.leaveId),cover);
+ const peopleIndex=new Map(employees.map(e=>[String(e.empId||'').trim().toUpperCase(),e]));
  $('adminLeaveBody').innerHTML=rows.length?rows.map(l=>{
    const emp=employees.find(e=>sameEmployee(l,e));
-   const info=emp?leaveBalanceInfo(emp):{effectiveRemaining:null};
+   const key=String(emp?.empId||'');if(emp&&!balanceCache.has(key))balanceCache.set(key,leaveBalanceInfo(emp));
+   const info=emp?balanceCache.get(key):{effectiveRemaining:null};
    const remain=info.effectiveRemaining;
    const remainClass=remain==null?'na':Number(remain)<=0?'zero':'';
    const remainText=remain==null?'--':fmtDay(remain)+' 天';
    const leaveType=/特休|年假/.test(String(l.leaveType||''))?'年假':String(l.leaveType||'');
-   const cover=(window.p79LeaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(l.id));
+   const cover=coverIndex.get(String(l.id));
    const workerIds=Array.isArray(cover?.workerIds)?cover.workerIds.filter(Boolean):[];
    const workerNames=workerIds.map(id=>{
-     const e=employees.find(x=>String(x.empId||'').trim().toUpperCase()===String(id).trim().toUpperCase());
+     const e=peopleIndex.get(String(id).trim().toUpperCase());
      return e?.name||String(id);
    });
    const coverText=workerNames.length
@@ -492,6 +496,7 @@ function renderAdmin(){
  }).join(''):'<tr><td colspan="9">沒有符合資料</td></tr>';
 }
 function renderAdminBalances(){
+ if(!$('adminBalancePanel')?.open)return;
  const body=$('adminBalanceBody');if(!body)return;const kw=String($('balanceKeyword')?.value||'').trim().toLowerCase();
  const rows=employees.filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
  body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
