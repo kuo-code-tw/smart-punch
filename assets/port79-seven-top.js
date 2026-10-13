@@ -93,8 +93,8 @@ const META={
  history:['🗄️','歷史資料管理','考勤・排班・船舶歷史查詢']
 };
 const NAV=[
- ['workhours','📊','加班管理','../work-hours/'],['attendance','🕒','考勤管理','../attendance/'],
- ['leave','📝','請假管理','../leave/'],['schedule','📅','排班管理','../schedule/'],
+ ['attendance','🕒','考勤管理','../attendance/'],['leave','📝','請假管理','../leave/'],
+ ['workhours','📊','加班管理','../work-hours/'],['schedule','📅','排班管理','../schedule/'],
  ['efficiency','🚢','效率管理','../aqc-efficiency/'],['hr','👥','人資管理','../hr/'],
  ['history','🗄️','歷史資料管理','../history-data/']
 ];
