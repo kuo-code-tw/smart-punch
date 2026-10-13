@@ -281,7 +281,7 @@ body[data-p79-system="leave"]>header{display:none!important}
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
-        <button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button>
+        <div class="actions"><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
         <div class="field"><label>搜尋姓名／工號</label><input id="filterKeyword" oninput="renderAdmin()" placeholder="關鍵字"></div>
@@ -441,6 +441,7 @@ function updateLeaveAdminDateRange(){let a=$('leaveAdminDateFrom')?.value||'',b=
 function clearLeaveAdminDateRange(){if($('leaveAdminDateFrom'))$('leaveAdminDateFrom').value='';if($('leaveAdminDateTo'))$('leaveAdminDateTo').value='';updateLeaveAdminDateRange();renderAdmin()}
 function renderAdmin(){
  if(!adminSession)return;
+ $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
  const kw=$('filterKeyword').value.trim().toLowerCase(),dept=$('filterDept').value,status=$('filterStatus').value;
  const dateFrom=$('leaveAdminDateFrom')?.value||'',dateTo=$('leaveAdminDateTo')?.value||'';
  let rows=leaveRecords.filter(l=>{
@@ -954,6 +955,52 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <p style="margin-top:10px;font-size:12px">僅可安排同職務、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
+
+<dialog id="adminCreateLeaveDialog" style="width:min(560px,94vw);max-height:90vh;overflow:auto;border:1px solid #cbd5e1;border-radius:18px;padding:20px">
+ <div style="display:flex;justify-content:space-between;align-items:center"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
+ <div class="field"><label>搜尋姓名／工號</label><input id="adminCreateLeaveKeyword" placeholder="輸入姓名或工號" oninput="filterAdminCreateLeavePeople()"></div>
+ <div class="field"><label>部門</label><select id="adminCreateLeaveDept" onchange="filterAdminCreateLeavePeople()"></select></div>
+ <div class="field"><label>請假人員</label><select id="adminCreateLeaveEmployee"></select></div>
+ <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
+ <div class="field"><label>開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+ <div class="field"><label>結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+ <div class="field"><label>請假天數</label><input id="adminCreateLeaveDays" readonly></div>
+ <div class="field"><label>事由／備註</label><textarea id="adminCreateLeaveReason"></textarea></div>
+ <p class="note">新增後列為待審核，可回到管理員請假審核表核准及安排代班。</p>
+ <p id="adminCreateLeaveMessage" role="status"></p>
+ <button id="adminCreateLeaveSave" class="btn btn-pri" type="button" style="width:100%" onclick="saveAdminCreateLeave()">儲存請假</button>
+</dialog>
+<script>
+let adminCreateLeaveId='',adminCreateLeaveBusy=false;
+function filterAdminCreateLeavePeople(){
+ const keyword=String($('adminCreateLeaveKeyword').value||'').trim().toLowerCase(),dept=$('adminCreateLeaveDept').value,sel=$('adminCreateLeaveEmployee'),previous=sel.value;
+ const people=employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&(!dept||String(e.dept||'')===dept)&&(!keyword||[e.name,e.empId,e.attNo].some(v=>String(v||'').toLowerCase().includes(keyword))));
+ sel.innerHTML='<option value="">請選擇請假人員</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
+ if(people.some(e=>String(e.empId)===previous))sel.value=previous;
+}
+function openAdminCreateLeave(){
+ if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
+ adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveKeyword').value='';$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ $('adminCreateLeaveDept').innerHTML='<option value="">全部部門</option>'+[...new Set(employees.map(e=>String(e.dept||'')).filter(Boolean))].sort().map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
+ $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
+ updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();$('adminCreateLeaveDialog').showModal();
+}
+function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';}
+async function saveAdminCreateLeave(){
+ if(adminCreateLeaveBusy)return;
+ if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
+ const employee=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value));updateAdminCreateLeaveDays();const days=Number($('adminCreateLeaveDays').value);
+ if(!employee||!leaveEmployeeIsActive(employee)||!days){$('adminCreateLeaveMessage').textContent='請選擇請假人員及有效日期範圍';return;}
+ const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
+ try{
+  await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,days,reason:$('adminCreateLeaveReason').value.trim(),status:'待審核',source:'manual-admin'}});
+  $('adminCreateLeaveDialog').close();setStatus('✅ 已新增 '+employee.name+' 的請假，等待審核','');await loadCloud();renderAdmin();
+ }catch(error){$('adminCreateLeaveMessage').textContent='儲存未確認：'+String(error.message||error);}
+ finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假';}
+}
+</script>
 </body>
 </html>
+
 
