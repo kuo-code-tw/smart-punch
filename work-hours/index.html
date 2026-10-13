@@ -14484,7 +14484,13 @@ function p79CanManageOvertime(){
     ? currentEmp.systemPermissions.workhours==='manage'
     : canPerformAdminAction(currentEmp,'attendanceEdit');
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanManageOvertime,canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+function p79CanReportOvertime(){
+  if(!p79CanManageOvertime())return false;
+  if(isVerifiedSuperAdminSession())return true;
+  const fine=currentEmp?.finePermissions?.workhours||{};
+  return !Object.prototype.hasOwnProperty.call(fine,'overtime.report') || fine['overtime.report']===true;
+}
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 </script>
 </body>
 </html>
