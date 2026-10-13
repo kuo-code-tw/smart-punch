@@ -12211,7 +12211,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate||map[date]?.overtimeReport)return;
                         const shift=ranges[own[date]]?own[date]:target[date];let times=ranges[shift];if(!times)return;
                         if(cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[shift][index===1?1:0];}
-                        map[date]={forEmpId:cover.leaveEmpId,coverCandidate:true,overtimeReport:{category:'代',code:'代'+times.join('-'),declaredHours:cover.mode==='two'?4:8,convertedHours:null,normalStart:times[0],normalEnd:times[1],overtimeStart:times[0],overtimeEnd:times[1],position:'standalone'}};
+                        map[date]={forEmpId:cover.leaveEmpId,coverCandidate:true,coverAlreadyArranged:true,overtimeReport:{category:'代',code:'代'+times.join('-'),declaredHours:cover.mode==='two'?4:8,convertedHours:null,normalStart:times[0],normalEnd:times[1],overtimeStart:times[0],overtimeEnd:times[1],position:'standalone'}};
                     });
                 });
             });
@@ -12286,7 +12286,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         totalMinutes,
                         overtimeMinutes,
                         overtimeReport:restMeta?.overtimeReport||null,
-                        rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,
+                        rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,coverAlreadyArranged:!!restMeta?.coverAlreadyArranged,
                         overDailyLimit: totalMinutes > 720
                     };
                 })
@@ -12415,7 +12415,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td class="px-3 py-3 font-bold whitespace-nowrap">${formatDurationMinutes(row.totalMinutes)}</td>
-                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-cyan-800 dark:text-cyan-200">${escapeHtml(row.overtimeReport.code)}｜${row.coverCandidate?'待申報':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</div><div class="text-xs text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="mt-1 px-2 py-1 rounded bg-cyan-100 text-cyan-900 text-xs font-bold">申報加班</button>`:''}</td>
+                    <td class="px-3 py-3 font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${formatDurationMinutes(row.overtimeMinutes)}${row.overtimeReport ? `<div class="text-xs text-cyan-800 dark:text-cyan-200">${escapeHtml(row.overtimeReport.code)}｜${row.coverAlreadyArranged?'已安排代班（請假管理）':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</div><div class="text-xs text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</div>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="mt-1 px-2 py-1 rounded bg-cyan-100 text-cyan-900 text-xs font-bold">${row.coverAlreadyArranged?'設定加班換算':'申報加班'}</button>`:''}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
