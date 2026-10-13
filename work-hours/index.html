@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261013.93"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.94"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261012.44"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -14600,20 +14600,27 @@ async function p79OpenLeaveOvertimeHandoff(){
   if(Date.now()-handoff.createdAt>86400000||!Array.isArray(handoff.entries)||!handoff.entries.length)return;
   p79LeaveHandoffBusy=true;
   const status=document.getElementById('p79LeaveHandoffStatus');if(status)status.textContent='正在開啟加班明細選項…';
+  const loading=P79Overtime.showReportLoading();
   try{
     restoreAdminSession();
-    await preloadAttendanceEmployeeMaster(false,true);
+    const entry=handoff.entries[0],date=entry.date,token=currentPort79SsoToken();
+    const results=await Promise.allSettled([
+      preloadAttendanceEmployeeMaster(false,false),
+      fetchGasJsonWithRetry(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+date.slice(0,7)+'&_='+Date.now(),'請假代班時段',1,12000),
+      P79Overtime.loadRules()
+    ]);
+    if(!loading.isConnected)return;
     if(!currentEmp)restoreAdminSession();
     if(!p79CanReportOvertime())throw Error('管理員身分尚未完成驗證，或此帳號未開放申報加班，請確認登入後按接續申報');
-    const entry=handoff.entries[0],date=entry.date,token=currentPort79SsoToken();
-    const data=await fetchGasJsonWithRetry(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+date.slice(0,7)+'&_='+Date.now(),'請假代班時段',1,12000);
-    if(!data.ok)throw Error(data.error||'班表尚未讀取完成');
+    if(results[0].status==='rejected')console.warn('員工資料更新未完成，使用已驗證的登入資料');
+    if(results[1].status==='rejected')throw results[1].reason;
+    const data=results[1].value;if(!data.ok)throw Error(data.error||'班表尚未讀取完成');
     const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
     let optionsWarning='';
-    try{const loaded=await P79Overtime.loadRules();Object.assign(sysConfig,loaded.config);saveConfig();}catch(error){optionsWarning='最新選項讀取未完成，請核對現有選項或按更新雲端時段選項。';}
+    if(results[2].status==='fulfilled'){Object.assign(sysConfig,results[2].value.config);saveConfig();}else optionsWarning='最新選項讀取未完成，請核對現有選項或按更新雲端時段選項。';
     await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id});
     if(status)status.textContent=optionsWarning||'請選擇出勤時段與加班明細，再送出申報。';
-  }catch(error){const message='請假與代班已儲存，申報時段尚未帶入：'+(error.message||error);if(status)status.textContent=message;alert(message);}
+  }catch(error){const message='請假與代班已儲存，申報時段尚未帶入：'+(error.message||error);if(status)status.textContent=message;if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent=message;}
   finally{p79LeaveHandoffBusy=false;}
 }
 document.addEventListener('DOMContentLoaded',()=>{
