@@ -821,21 +821,42 @@ function removeOrgItem(kind,value){
 }
 async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修改組織設定權限');
   if(hrAccess!=='manage')return;
+  if($('saveOrgBtn').disabled)return;
+  const originalLabel=$('saveOrgBtn').textContent;
   try{
     $('saveOrgBtn').disabled=true;
+    $('saveOrgBtn').textContent='正在儲存…';
     const draft=normalizeOrgSettings(orgDraft);
     const currentConfig=await p79ReadCanonicalOrgOptions();
     const config={...currentConfig,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
-    await apiPost({action:'hrSaveOrgSettings',settings:draft});
-    await apiPost({action:'saveConfig',config});
+    await p79RetryOrgSave(()=>({action:'hrSaveOrgSettings',settings:draft}));
+    await p79RetryOrgSave(async()=>{
+      // 等候資料鎖期間可能有其他設定更新，每次重試都重新合併最新設定。
+      const latest=await p79ReadCanonicalOrgOptions();
+      const merged={...latest,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
+      if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+      return {action:'saveConfig',config:merged};
+    });
     await p79ReadCanonicalOrgOptions();
     if(JSON.stringify(p79CanonicalOrgOptions)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
     orgSettings=draft;
     populateFilters();orgDialog.close();
     $('status').textContent='✅ 部門／職稱／單位已儲存到雲端，七大系統人資主檔可共用';
   }catch(e){alert('組織設定儲存失敗：'+(e.message||e))}
-  finally{$('saveOrgBtn').disabled=false}
+  finally{$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
+}
+async function p79RetryOrgSave(makePayload){
+  for(let attempt=0;attempt<4;attempt++){
+    try{return await apiPost(await makePayload())}
+    catch(error){
+      // 只重試明確尚未取得資料鎖的回應；網路逾時與驗證失敗不自動重送。
+      if(!/雲端目前正在處理其他資料/.test(String(error?.message||error)))throw error;
+      if(attempt===3)throw new Error('雲端仍忙碌，已重試3次；你的修改仍保留，請稍後再按儲存');
+      $('saveOrgBtn').textContent=`雲端忙碌，自動重試 ${attempt+1}/3…`;
+      await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt)));
+    }
+  }
 }
 function openMasterPicker(kind,targetId){
   pickerKind=kind;pickerTarget=targetId;
