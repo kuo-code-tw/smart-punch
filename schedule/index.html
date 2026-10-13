@@ -4653,6 +4653,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if(overtimeType==='extended'&&(!normal||shift!==original))throw new Error('延時加班必須保留當日正常班別');
       if(overtimeType==='rest'&&!['休',''].includes(original))throw new Error('請假當日不能安排加班');
       if(old.overtimeReport&&(old.overtimeStart!==start||old.overtimeEnd!==end||old.overtimeType!==overtimeType)&&!p79PendingOvertimeReport){old={...old};delete old.overtimeReport;}
+      old={...old};delete old.overtimeExcluded;delete old.overtimeDeletedAt;
       return {...old,...details,type:kind==='substitute'?'substitute':'overtime',overtime:true,
         overtimeType,overtimeOriginalShift:original,overtimeAssignedShift:shift,
         overtimeStart:start,overtimeEnd:end};
