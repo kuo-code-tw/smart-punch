@@ -289,6 +289,7 @@ body[data-p79-system="leave"]>header{display:none!important}
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
         <div class="field" style="position:relative"><label>日期範圍</label><details id="leaveAdminDateRangePicker" style="position:relative"><summary id="leaveAdminDateRangeSummary" class="btn btn-sec" style="list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:38px">📅 <span>全部日期</span></summary><div style="position:absolute;right:0;top:calc(100% + 8px);z-index:80;min-width:340px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 18px 45px rgba(15,23,42,.18)"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="field"><label>開始日期</label><input id="leaveAdminDateFrom" type="date" onchange="updateLeaveAdminDateRange();renderAdmin()"></div><div class="field"><label>結束日期</label><input id="leaveAdminDateTo" type="date" onchange="updateLeaveAdminDateRange();renderAdmin()"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px"><button type="button" class="btn btn-sec" onclick="clearLeaveAdminDateRange()">清除日期</button><button type="button" class="btn btn-main" onclick="document.getElementById('leaveAdminDateRangePicker').removeAttribute('open')">完成</button></div></div></details></div>
       </div>
+      <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button>
       <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
       <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>部門</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
@@ -444,6 +445,7 @@ function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,
 function updateLeaveAdminDateRange(){let a=$('leaveAdminDateFrom')?.value||'',b=$('leaveAdminDateTo')?.value||'';if(a&&b&&a>b){$('leaveAdminDateTo').value=a;b=a;}const span=$('leaveAdminDateRangeSummary')?.querySelector('span');if(span)span.textContent=!a&&!b?'全部日期':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`;}
 function clearLeaveAdminDateRange(){if($('leaveAdminDateFrom'))$('leaveAdminDateFrom').value='';if($('leaveAdminDateTo'))$('leaveAdminDateTo').value='';updateLeaveAdminDateRange();renderAdmin()}
 function renderAdmin(){
+ if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
  $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
  const kw=$('filterKeyword').value.trim().toLowerCase(),dept=$('filterDept').value,status=$('filterStatus').value;
@@ -533,7 +535,7 @@ async function p79SaveLeaveCover(){
  btn.disabled=true;btn.textContent='雲端保存中…';
  try{
   const requestedId=document.getElementById('p79LeaveCoverId').value;
-  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  const fresh=await p79ReadCurrentLeaveCoverState();
   if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
   const requestedLeave=fresh.leaveRecords.find(l=>String(l.id)===String(requestedId));
   if(!requestedLeave||String(requestedLeave.status)!=='已核准')throw new Error('請假單不存在或尚未核准，請重新整理');
@@ -561,7 +563,32 @@ async function setLeaveStatus(id,status){
   if(status==='已核准')p79OpenLeaveCover(id);
  }catch(e){setStatus('更新失敗：'+(e?.message||e),'error')}
 }
-async function deleteLeave(id){if(leaveAccess!=='manage')return;if(!confirm('確定刪除此請假紀錄？'))return;try{await postCloud({action:'deleteLeaveRecord',id});setStatus('✅ 請假紀錄已刪除','');await loadCloud();renderAdmin()}catch(e){setStatus('刪除失敗：'+(e?.message||e),'error')}}
+async function deleteLeave(id){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('確定刪除此請假紀錄？對應的一位／兩位代班安排與代班加班會一起移除，班表恢復原班別。'))return;
+ try{
+  const result=await postCloud({action:'deleteLeaveRecord',id});
+  if(!result.linkedDelete)throw new Error('請假已刪除，但後端尚未完成連動刪除更新；代班殘留需清除，請勿直接重新安排');
+  p79ClearDeletedLeaveDraft(id);
+  setStatus('✅ 請假、對應代班與代班加班已一併刪除','success');await loadCloud();renderAdmin();
+ }catch(e){setStatus('連動刪除未確認：'+(e?.message||e),'error')}
+}
+function p79ClearDeletedLeaveDraft(id){
+ try{const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');if(String(handoff?.id)===String(id))sessionStorage.removeItem(key);const draftKey='port79_overtime_report_draft_v1',draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(String(draft?.leaveHandoffId)===String(id))sessionStorage.removeItem(draftKey);}catch(ignore){}
+}
+async function p79CleanupDeletedLeaveCovers(){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('清除請假單已不存在的代班安排及相關代班加班？仍存在的請假安排會保留。'))return;
+ try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
+}
+async function p79ReadCurrentLeaveCoverState(){
+ const read=()=>jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+ let fresh=await read();
+ if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+ const ids=new Set(fresh.leaveRecords.map(l=>String(l.id)));
+ if(fresh.leaveCoverAssignments.some(c=>!ids.has(String(c.leaveId)))){await postCloud({action:'cleanupOrphanLeaveCovers'});fresh=await read();if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'清除後無法確認雲端資料，請重試');}
+ return fresh;
+}
 function leaveBalanceNumber(v){
  const s=String(v??'').trim().replace(/,/g,'');
  if(!s)return 0;
@@ -1042,7 +1069,7 @@ async function saveAdminCreateLeave(){
  const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
  try{
   $('adminCreateLeaveMessage').textContent='正在確認雲端請假與代班安排…';
-  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  const fresh=await p79ReadCurrentLeaveCoverState();
   if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
   const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:adminCreateLeaveId,empId:employee.empId,leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId]});
   adminCreateLeaveId=plan.leaveId;
