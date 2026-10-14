@@ -1242,9 +1242,10 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                         </div>
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📊 狀態</label>
-                            <select id="recordStatusFilter" onchange="onRecordDataScopeChange()" class="w-full px-2 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                            <select id="recordStatusFilter" onchange="onRecordStatusFilterChange()" class="w-full px-2 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                                 <option value="ALL">全部狀態</option>
                                 <option value="ABNORMAL">異常</option>
+                                <option value="PENDING">待簽退（未超過24小時）</option>
                                 <option value="NORMAL">正常</option>
                             </select>
                         </div>
@@ -6289,13 +6290,14 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                         + (activeGasUrl.includes('?') ? '&' : '?')
                         + 'action=getAttendanceMonthData'
                         + '&month=' + encodeURIComponent(monthKey)
+                        + '&token=' + encodeURIComponent(getAttendanceEmployeeMasterToken())
                         + '&t=' + Date.now();
 
                     const data = await fetchGasJsonWithRetry(
                         url,
                         `跨月考勤同步 ${monthKey}`,
                         2,
-                        15000
+                        45000
                     );
 
                     if (!data?.ok) {
@@ -6637,10 +6639,10 @@ function p79IsMobileOrTabletForAttendanceSync() {
             const activeGasUrl = getActiveGasUrl();
             if (!isValidGasWebAppUrl(activeGasUrl) || navigator.onLine === false) return false;
             const key = String(monthKey || getRequestedAttendanceCloudMonth()).trim();
-            const url = activeGasUrl + (activeGasUrl.includes('?') ? '&' : '?') + 'action=getAttendanceMonthData&month=' + encodeURIComponent(key) + '&t=' + Date.now();
+            const url = activeGasUrl + (activeGasUrl.includes('?') ? '&' : '?') + 'action=getAttendanceMonthData&month=' + encodeURIComponent(key) + '&token=' + encodeURIComponent(getAttendanceEmployeeMasterToken()) + '&t=' + Date.now();
             try {
                 const mobileSync = p79IsMobileOrTabletForAttendanceSync();
-                const monthTimeoutMs = mobileSync ? 30000 : 15000;
+                const monthTimeoutMs = 45000;
                 const data = await fetchGasJsonWithRetry(url, '月份考勤同步', 2, monthTimeoutMs);
                 if (!data?.ok) throw new Error(data?.error || '月份考勤同步失敗');
                 let incoming = (Array.isArray(data.records) ? data.records : []).map(normalizeAttendanceRecordIdentifiers);
@@ -12151,7 +12153,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             );
             const statusFilter = document.getElementById('recordStatusFilter')?.value || 'ALL';
 
-            let rows = buildDailyAttendanceRows(records.filter(canCurrentAdminViewDataRow));
+            const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
+            let rows = build(records.filter(canCurrentAdminViewDataRow));
 
             if (dateFrom || dateTo) {
                 rows = rows.filter(row =>
@@ -12161,8 +12164,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 rows = rows.filter(row => attendanceRowVisibleForMonth(row, monthFilter));
             }
 
-            if (statusFilter === 'NORMAL') rows = rows.filter(row => row.attendanceStatus === '正常');
-            if (statusFilter === 'ABNORMAL') rows = rows.filter(row => row.attendanceStatus !== '正常');
+            rows = p79FilterAttendanceStatus(rows,statusFilter);
             return sortAttendanceRowsActiveFirst(rows);
         }
 
@@ -14330,7 +14332,38 @@ function getManualPairRecordAnchor(record) {
             return removeRecords.size;
         }
 
+        function p79AttendanceRowAssessment(row,now=Date.now()){
+            const input=!!row?.clockIn,output=!!row?.clockOut;
+            const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
+            if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
+            if(input&&output){
+                if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||b-a>24*3600000)return {kind:'ABNORMAL',status:'班次時間異常'};
+                const edited=r=>r?.manuallyEdited===true||String(r?.manuallyEdited||'').toLowerCase()==='true';
+                const minute=r=>{const m=String(r?.timeStr||'').match(/(?:\s|T)\d{1,2}:(\d{2})(?::\d{2})?$/);return m?Number(m[1]):null;};
+                const inMinute=minute(row.clockIn),outMinute=minute(row.clockOut);
+                const timeChecks=[];
+                if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班分鐘01–30');
+                if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<45)timeChecks.push('下班分鐘未在45–60');
+                if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
+                return {kind:'NORMAL',status:'正常'};
+            }
+            // 沒有排定下班時間時，只將尚未超過配對上限的單側簽到列為待確認，不宣稱正常。
+            if(input&&!output&&Number.isFinite(a)&&now>=a&&now-a<24*3600000)return {kind:'PENDING',status:'待簽退'};
+            return {kind:'ABNORMAL',status:input?'缺少簽退':output?'缺少簽到':'缺少上下班'};
+        }
+        function p79FilterAttendanceStatus(rows,filter,now=Date.now()){
+            return rows.map(row=>{const result=p79AttendanceRowAssessment(row,now);return {...row,attendanceStatus:result.status,attendanceAssessment:result.kind,attendanceAssessmentReasons:result.reasons||[]};})
+                .filter(row=>!filter||filter==='ALL'||row.attendanceAssessment===filter);
+        }
+        function onRecordStatusFilterChange(){
+            if(document.getElementById('recordStatusFilter')?.value==='ABNORMAL'){
+                recordsSingleDateRequested=false;recordsRangeViewRequested=true;recordsSelectedDateKey='';recordsCurrentPage=1;
+            }
+            onRecordDataScopeChange();
+        }
         function getAttendanceStatusBadge(status) {
+            if (status === '待簽退') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-sky-100 text-sky-800 font-bold" title="只有簽到，尚未超過24小時；待核對下班，不代表已完成正常班次">待簽退</span>';
+            if (/班次配對異常|班次時間異常|缺少上下班|時間需核對/.test(String(status)))return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">'+escapeHtml(status)+'</span>';
             if (status === '正常') {
                 return `<span class="px-2.5 py-1 rounded-lg text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">正常</span>`;
             }
@@ -15077,11 +15110,10 @@ function getManualPairRecordAnchor(record) {
             const datePageMonth = /^\d{4}-\d{2}$/.test(String(monthFilter))
                 ? String(monthFilter)
                 : currentDatePageMonth;
-            dailyRows = dailyRows.filter(row =>
+            if(monthFilter!=='ALL')dailyRows = dailyRows.filter(row =>
                 attendanceRowDatePageKey(row, datePageMonth).startsWith(datePageMonth + '-')
             );
-            if (statusFilter === 'NORMAL') dailyRows = dailyRows.filter(row => row.attendanceStatus === '正常');
-            if (statusFilter === 'ABNORMAL') dailyRows = dailyRows.filter(row => row.attendanceStatus !== '正常');
+            dailyRows = p79FilterAttendanceStatus(dailyRows,statusFilter);
             sortAttendanceRowsActiveFirst(dailyRows);
 
             const paginationSignature = [deptFilter, jobTitleFilter, nameFilter, statusFilter, monthFilter, dateFrom, dateTo, currentEmp?.empId || ''].join('|');
@@ -15188,8 +15220,8 @@ function getManualPairRecordAnchor(record) {
                     ''
                 ).trim();
 
-                const statusBadge = String(row.attendanceStatus || '').includes('重複')
-                    ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對重複打卡">🔎 重複刷卡</button>`
+                const statusBadge = (Number(row.duplicateRecordCount)>0||String(row.attendanceStatus || '').includes('重複'))
+                    ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對已整合的重複打卡">🔎 重複刷卡已整合</button>${getAttendanceStatusBadge(row.attendanceStatus)}`
                     : getAttendanceStatusBadge(row.attendanceStatus);
                 const extraChecks = (Array.isArray(row.attendanceCheckLabels) ? row.attendanceCheckLabels : [])
                     .filter(label => label === '跨日班次' || label === '人工補卡')
@@ -15234,7 +15266,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}${row.attendanceAssessmentReasons?.length?`<div class="text-[10px] text-amber-800">${escapeHtml(row.attendanceAssessmentReasons.join('／'))}</div>`:''}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
                             ${row.noteText ? `<span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.noteText))}">備註：${escapeHtml(String(row.noteText).length > 14 ? String(row.noteText).slice(0,14)+'…' : String(row.noteText))}</span>` : ''}
                             <span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.locationText || ''))}">${escapeHtml(String(row.locationText || '--'))}</span>
