@@ -293,6 +293,7 @@
  async function openReport(prefill={}){
   if(!global.p79OvertimeContext?.canReport?.() && global.p79OvertimeContext?.refreshAccess)await global.p79OvertimeContext.refreshAccess();
   if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
+  if(!global.p79OvertimeContext.employees().length&&global.p79OvertimeContext.refreshAccess)await global.p79OvertimeContext.refreshAccess();
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    let rows=reportRules();const people=global.p79OvertimeContext.employees();
