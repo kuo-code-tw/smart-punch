@@ -14648,7 +14648,7 @@ async function p79SaveWorkOvertimeDraft(draft){
   for(let attempt=1;attempt<=2;attempt++){
    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
    try{
-    const response=await fetch(url+'?action='+action+'&month='+month+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
+    const response=await fetch(url+'?action='+action+'&month='+month+'&empId='+encodeURIComponent(draft.empId)+'&date='+encodeURIComponent(draft.date)+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
     const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
    }catch(error){
     const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
@@ -14657,7 +14657,7 @@ async function p79SaveWorkOvertimeDraft(draft){
    }finally{clearTimeout(timer)}
   }
  };
- const [cloud,attendance]=await Promise.all([read('getScheduleDataSecure','班表核對'),read('getAttendanceMonthData','出勤核對')]);
+ const cloud=await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
  const employeeId=String(draft.empId).trim().toUpperCase();
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
