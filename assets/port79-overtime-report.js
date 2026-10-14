@@ -289,6 +289,16 @@
   if(!target||String(forEmpId)===String(empId))throw Error('休假代班加班請選擇另一位請假人員');
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
+ function advanceLeaveHandoff(draft){
+  if(!draft.leaveHandoffId)return null;
+  const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');
+  if(!handoff||String(handoff.id)!==String(draft.leaveHandoffId)||!Array.isArray(handoff.entries))return null;
+  const index=handoff.entries.findIndex(e=>String(e.empId)===String(draft.empId)&&e.date===draft.date&&String(e.forEmpId||'')===String(draft.forEmpId||''));
+  if(index<0)return null;
+  handoff.entries.splice(index,1);
+  if(handoff.entries.length)sessionStorage.setItem(key,JSON.stringify(handoff));else sessionStorage.removeItem(key);
+  return {remaining:handoff.entries.length};
+ }
  function showReportLoading(){const el=dialog('申報加班','<p id="p79OtStatus">正在同時核對代班安排與加班選項…</p>');el.onclose=()=>el.remove();return el;}
  async function openReport(prefill={}){
   const loading=showReportLoading();
@@ -355,18 +365,28 @@
      }catch(ignore){}
      sessionStorage.setItem(KEY,JSON.stringify(draft));
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
-      const button=el.querySelector('#p79OtStage');button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
+      const button=el.querySelector('#p79OtStage');if(button.disabled)return;let completed=false;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
       try{
        const result=await global.p79OvertimeContext.saveReport(draft);
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
        sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent='✅ 加班申報已儲存，已更新加班管理。';
        global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));
-      }finally{button.disabled=false}
+       if(draft.leaveHandoffId&&typeof global.p79OpenLeaveOvertimeHandoff==='function'){
+        completed=true;
+        try{
+         const progress=advanceLeaveHandoff(draft);
+         if(progress&&progress.remaining){el.close();await global.p79OpenLeaveOvertimeHandoff();}
+         else if(progress){el.querySelector('#p79OtStatus').textContent='✅ 本次請假代班的加班申報已全部完成。';button.textContent='全部申報完成';}
+         else el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；待申報清單已變更，請按接續申報核對剩餘項目。';
+        }catch(error){el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；接續申報未完成：'+error.message+'。請按接續申報核對剩餘項目。';}
+       }
+
+      }finally{button.disabled=completed}
      }else location.href='../schedule/?overtimeReport=1';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
