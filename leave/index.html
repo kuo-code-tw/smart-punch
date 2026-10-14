@@ -551,6 +551,7 @@ async function p79ReportSavedLeaveCover(id){
   for(const cover of covers){const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);if(!start||!end||start>end)throw new Error('代班日期無效，請先核對');for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const worker of cover.workerIds||[]){const empId=String(worker),key=empId+'|'+date;if(seen.has(key))continue;seen.add(key);const person=(fresh.employees||[]).find(e=>String(e.empId)===empId);entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId)});if(entries.length>124)throw new Error('申報日期超出單次範圍，請分次安排');}}}
   if(!entries.length)throw new Error('找不到可申報的代班人員');
   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:String(id),createdAt:Date.now(),entries}));
+  void loadCloud(false,true);
   await p79OpenLeaveOvertimeHandoff();
  }catch(error){setStatus('加班明細未開啟：'+String(error.message||error),'error');}
  finally{p79SavedCoverReportBusy=false;}
@@ -619,7 +620,8 @@ async function p79SaveLeaveCover(){
    if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
    const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
    sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:leaveId,createdAt:Date.now(),entries}));
-   await p79OpenLeaveOvertimeHandoff();
+   void loadCloud(false,true);
+  await p79OpenLeaveOvertimeHandoff();
   }
  }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
  finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
@@ -1210,6 +1212,7 @@ async function saveAdminCreateLeave(){
   $('adminCreateLeaveDialog').close();
   const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of [worker,second].filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
+  void loadCloud(false,true);
   await p79OpenLeaveOvertimeHandoff();
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
@@ -1254,7 +1257,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
-  void loadCloud(false,true);return result;
+  return result;
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
 
