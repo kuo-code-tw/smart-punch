@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261014.102"></script>
+<script src="../assets/port79-overtime-report.js?v=20261014.110"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -5828,9 +5828,10 @@ function p79IsMobileOrTabletForAttendanceSync() {
                 syncAdminIdsFromEmployeeRoles();
                 try { localStorage.setItem('sp_employees_v5', JSON.stringify(employees)); } catch (e) {}
                 initDropdowns();
-                if (!document.getElementById('viewAdmin')?.classList.contains('hidden')) {
-                    renderAdminRecordsTable();
-                    renderAdminLiveTable();
+                if(document.body.dataset.p79System==='workhours'){
+                    if(typeof renderOvertimeStats==='function')renderOvertimeStats();
+                }else if (!document.getElementById('viewAdmin')?.classList.contains('hidden')) {
+                    renderAdminRecordsTable();renderAdminLiveTable();
                 }
                 if (showMessage) showToast(`員工主檔已更新 ${employees.length} 人`, 'success');
                 return true;
@@ -14490,12 +14491,15 @@ function p79ShowWorkHoursImmediately(){
 async function activateWorkHours(){
   // 權限確認完成後才初始化預設加班統計。
   p79ShowWorkHoursImmediately();
+  const peopleReady=typeof preloadAttendanceEmployeeMaster==='function'&&hasValidHomepageAdminSession()
+    ? preloadAttendanceEmployeeMaster(false,false):Promise.resolve(false);
   try{
     if(typeof window.p79CheckWorkHoursPermission==='function'){
       const allowed=await window.p79CheckWorkHoursPermission();
       if(!allowed)return;
     }
-    // 考勤同步延後至第一次點選統計功能，不阻塞空白首頁。
+    await peopleReady;
+    // 先載入已驗證範圍內的人員；出勤統計沿用既有獨立同步。
   }catch(e){console.error('工時統計初始化失敗',e)}
 }
 
