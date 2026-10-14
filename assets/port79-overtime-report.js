@@ -291,9 +291,12 @@
  }
  function showReportLoading(){const el=dialog('申報加班','<p id="p79OtStatus">正在同時核對代班安排與加班選項…</p>');el.onclose=()=>el.remove();return el;}
  async function openReport(prefill={}){
-  if(!global.p79OvertimeContext?.canReport?.() && global.p79OvertimeContext?.refreshAccess)await global.p79OvertimeContext.refreshAccess();
-  if(!global.p79OvertimeContext?.canReport?.())return alert('沒有申報加班權限');
-  if(!global.p79OvertimeContext.employees().length&&global.p79OvertimeContext.refreshAccess)await global.p79OvertimeContext.refreshAccess();
+  const loading=showReportLoading();
+  try{
+   if((!global.p79OvertimeContext?.canReport?.()||!global.p79OvertimeContext?.employees?.().length)&&global.p79OvertimeContext?.refreshAccess)await global.p79OvertimeContext.refreshAccess();
+   if(loading.isConnected===false)return;
+   if(!global.p79OvertimeContext?.canReport?.()){loading.remove?.();return alert('沒有申報加班權限');}
+  }catch(error){loading.querySelector('#p79OtStatus').textContent='人員載入失敗：'+error.message;return;}
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    let rows=reportRules();const people=global.p79OvertimeContext.employees();
@@ -301,7 +304,8 @@
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
    const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
-   const sorted=()=>[...people].sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));
+   const sortedPeople=[...people].sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));
+   const sorted=()=>sortedPeople;
    forSelect.innerHTML='<option value="">請選擇請假人員</option>'+sorted().map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
    function refreshPairPeople(){
     const rule=select.selectedIndex<0?null:rows[Number(select.value)],target=people.find(e=>String(e.empId)===String(forSelect.value)),previous=empSelect.value;
