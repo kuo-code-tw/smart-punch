@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
-<script src="../assets/port79-overtime-report.js?v=20261014.101"></script>
+<script src="../assets/port79-overtime-report.js?v=20261014.102"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -14693,7 +14693,7 @@ async function p79OpenLeaveOvertimeHandoff(){
     const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
     let optionsWarning='';
     if(results[2].status==='fulfilled'){Object.assign(sysConfig,results[2].value.config);saveConfig();}else optionsWarning='最新選項讀取未完成，請核對現有選項或按更新雲端時段選項。';
-    await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id});
+    await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id,allowedEmpIds:handoff.entries.filter(x=>x.date===entry.date&&String(x.forEmpId||'')===String(entry.forEmpId||'')).map(x=>x.empId)});
     if(status)status.textContent=optionsWarning||'請選擇出勤時段與加班明細，再送出申報。';
   }catch(error){const message='請假與代班已儲存，申報時段尚未帶入：'+(error.message||error);if(status)status.textContent=message;if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent=message;}
   finally{p79LeaveHandoffBusy=false;}
