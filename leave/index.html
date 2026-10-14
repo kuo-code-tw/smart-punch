@@ -1057,8 +1057,8 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <dialog id="adminCreateLeaveDialog" style="width:min(560px,94vw);max-height:90vh;overflow:auto;border:1px solid #cbd5e1;border-radius:18px;padding:20px">
  <div style="display:flex;justify-content:space-between;align-items:center"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0">
-  <div class="field"><label>請假人員</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div>
-  <div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+  <div><div class="field"><label for="adminCreateLeaveJob">請假人員職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div><div class="field"><label for="adminCreateLeaveEmployee">請假人員</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div></div>
+  <div><div class="field"><label for="adminCreateLeaveWorkerJob">代班人員職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
  </div>
  <p id="adminCreateLeaveDepartment" class="note"></p>
  <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
@@ -1073,24 +1073,44 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <script>
 let adminCreateLeaveId='',adminCreateLeaveBusy=false;
 function leavePeopleStrokeOrder(list){const collator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});return [...list].sort((a,b)=>collator.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));}
+function leavePersonJob(e){return String(e.jobTitle||e.deptDetail||'').trim()||'未設定職稱';}
+function leaveCreatePeople(){return leavePeopleStrokeOrder(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)));}
+function leavePersonOption(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）｜'+leavePersonJob(e))+'</option>';}
+function leaveFillJobFilter(select,people){
+ const previous=select.value,titles=[...new Set(people.map(leavePersonJob))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+ select.innerHTML='<option value="">全部職稱</option>'+titles.map(title=>'<option value="'+esc(title)+'">'+esc(title)+'</option>').join('');
+ if(titles.includes(previous))select.value=previous;
+}
+function filterAdminCreateLeaveApplicants(){
+ const select=$('adminCreateLeaveEmployee'),previous=select.value,job=$('adminCreateLeaveJob').value;
+ const people=leaveCreatePeople().filter(e=>!job||leavePersonJob(e)===job);
+ select.innerHTML='<option value="">請選擇請假人員</option>'+people.map(leavePersonOption).join('');
+ if(people.some(e=>String(e.empId)===previous))select.value=previous;
+ filterAdminCreateLeavePeople();
+}
 function filterAdminCreateLeavePeople(){
  const target=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value)),worker=$('adminCreateLeaveWorker'),previous=worker.value,dept=String(target?.dept||'').trim();
- const choices=leavePeopleStrokeOrder(employees.filter(e=>e.empId&&String(e.empId)!==String(target?.empId)&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&dept&&String(e.dept||'').trim()===dept));
- worker.innerHTML='<option value="">'+(!target?'先選左邊請假人員':choices.length?'請選擇代班人員':'同部門沒有可代班人員')+'</option>'+choices.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）')+'</option>').join('');
+ const available=leaveCreatePeople().filter(e=>String(e.empId)!==String(target?.empId)&&dept&&String(e.dept||'').trim()===dept);
+ const job=$('adminCreateLeaveWorkerJob');leaveFillJobFilter(job,available);job.disabled=!target;
+ const choices=available.filter(e=>!job.value||leavePersonJob(e)===job.value);
+ worker.innerHTML='<option value="">'+(!target?'先選左邊請假人員':choices.length?'請選擇代班人員':'此職稱沒有可代班人員')+'</option>'+choices.map(leavePersonOption).join('');
  if(choices.some(e=>String(e.empId)===previous))worker.value=previous;
+ worker.disabled=!target;
  const second=$('adminCreateLeaveWorkerSecond'),previousSecond=second.value;
  const otherChoices=choices.filter(e=>String(e.empId)!==String(worker.value));
- second.innerHTML='<option value="">不選第二位（一位代8小時）</option>'+otherChoices.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）')+'</option>').join('');
+ second.innerHTML='<option value="">不選第二位（一位代8小時）</option>'+otherChoices.map(leavePersonOption).join('');
  if(otherChoices.some(e=>String(e.empId)===previousSecond))second.value=previousSecond;
- $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側只列同部門人員':'';
+ second.disabled=!target;
+ $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側依職稱篩選同部門人員':'';
 }
 async function openAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
  if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)))await loadCloud(true);
  adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
- const people=leavePeopleStrokeOrder(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)));
- $('adminCreateLeaveEmployee').innerHTML='<option value="">請選擇請假人員</option>'+people.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
+ $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';
+ $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
+ leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
  updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();$('adminCreateLeaveDialog').showModal();
