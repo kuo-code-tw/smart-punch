@@ -238,6 +238,24 @@ body[data-p79-system="leave"] #adminBalancePanel>summary{font-size:16px!importan
 @media(max-width:600px){body[data-p79-system="leave"]>main{padding:10px!important}body[data-p79-system="leave"] #adminMode>.card{padding:12px!important}body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{font-size:16px!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{font-size:14px!important;padding:9px!important}body[data-p79-system="leave"] #adminMode .actions{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveAdminDateRangePicker>div{min-width:0!important;width:min(340px,calc(100vw - 66px))}}
 </style>
 
+<style id="p79-leave-type-colors-20261014">
+.p79-leave-type{display:inline-flex;align-items:center;justify-content:center;max-width:100%;padding:5px 10px;border:1px solid;border-radius:8px;font-size:14px!important;font-weight:800;line-height:1.5;white-space:nowrap}
+.p79-leave-type-annual{background:#dcfce7;color:#14532d;border-color:#86efac}
+.p79-leave-type-personal{background:#ffedd5;color:#7c2d12;border-color:#fdba74}
+.p79-leave-type-sick{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd}
+.p79-leave-type-injury{background:#fee2e2;color:#7f1d1d;border-color:#fca5a5}
+.p79-leave-type-marriage{background:#fce7f3;color:#831843;border-color:#f9a8d4}
+.p79-leave-type-bereavement{background:#e2e8f0;color:#1e293b;border-color:#94a3b8}
+.p79-leave-type-official{background:#ccfbf1;color:#134e4a;border-color:#5eead4}
+.p79-leave-type-maternity{background:#f3e8ff;color:#581c87;border-color:#d8b4fe}
+.p79-leave-type-prenatal{background:#fae8ff;color:#701a75;border-color:#f0abfc}
+.p79-leave-type-paternity{background:#e0e7ff;color:#312e81;border-color:#a5b4fc}
+.p79-leave-type-pregnancy{background:#ede9fe;color:#4c1d95;border-color:#c4b5fd}
+.p79-leave-type-family{background:#fef3c7;color:#78350f;border-color:#fcd34d}
+.p79-leave-type-menstrual{background:#ffe4e6;color:#881337;border-color:#fda4af}
+.p79-leave-type-other{background:#ecfccb;color:#365314;border-color:#bef264}
+body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!important;min-height:36px!important;padding:7px 9px!important;border:0;border-radius:8px;white-space:nowrap}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body data-p79-system="leave">
@@ -472,6 +490,11 @@ function showEmployee(){
 }
 function sameEmployee(l,e){return String(l.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase() || (String(l.attNo||'').trim()&&String(l.attNo||'').trim()===String(e.attNo||'').trim())}
 function badge(s){const c=s==='已核准'?'approved':s==='已駁回'?'rejected':'pending';return `<span class="badge ${c}">${esc(s||'待審核')}</span>`}
+function leaveTypeBadge(value){
+ const name=String(value||'未設定假別');
+ const kinds={'年假':'annual','特休':'annual','特別休假':'annual','事假':'personal','普通傷病假':'sick','病假':'sick','公傷病假':'injury','婚假':'marriage','喪假':'bereavement','公假':'official','產假':'maternity','產檢假':'prenatal','陪產檢及陪產假':'paternity','安胎休養請假':'pregnancy','家庭照顧假':'family','生理假':'menstrual','其他公司公告假別':'other'};
+ return '<span class="p79-leave-type p79-leave-type-'+(kinds[name]||'other')+'">'+esc(name)+'</span>';
+}
 function renderMy(){
  const body=$('myLeaveBody');if(body)body.innerHTML='<tr><td colspan="5">一般員工不開放請假紀錄查閱</td></tr>';
 }
@@ -547,7 +570,7 @@ function renderAdmin(){
    return `<tr>
      <td><b>${esc(l.name||'')}</b><br><span class="note">${esc(l.empId||l.attNo||'')}</span></td>
      <td>${esc(l.dept||'')}</td>
-     <td>${esc(leaveType)}</td>
+     <td>${leaveTypeBadge(leaveType)}</td>
      <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td>${esc(l.reason||'')}</td>
