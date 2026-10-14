@@ -546,24 +546,37 @@ function p79OpenLeaveCover(id){
  if(!leave||leaveAccess!=='manage'||leave.status!=='已核准')return;
  const modal=document.getElementById('p79LeaveCoverModal');
  const target=employees.find(e=>sameEmployee(leave,e));
- const role=String(target?.jobTitle||target?.role||'').trim();
- const eligible=employees.filter(e=>leaveEmployeeIsActive(e)&&!sameEmployee(leave,e)&&String(e.dept||'').trim()===String(target?.dept||'').trim())
-  .sort((a,b)=>new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare(String(a.name||''),String(b.name||'')));
- const opt='<option value="">請選擇人員</option>'+eligible.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name)+'（'+esc(e.empId)+'）</option>').join('');
- document.getElementById('p79LeaveCoverFirst').innerHTML=opt;
- document.getElementById('p79LeaveCoverSecond').innerHTML=opt;
  document.getElementById('p79LeaveCoverId').value=String(id);
  document.getElementById('p79LeaveCoverSummary').textContent=(leave.name||leave.empId)+'｜'+(leave.leaveType||'請假')+'｜'+String(leave.startTime||leave.startDate||'')+' ～ '+String(leave.endTime||leave.endDate||'')+'｜同部門：'+(target?.dept||'未設定');
  document.getElementById('p79LeaveCoverMode').value='one';
+ document.getElementById('p79LeaveCoverJob').value='';
+ document.getElementById('p79LeaveCoverFirst').value='';
+ document.getElementById('p79LeaveCoverSecond').value='';
+ p79FilterLeaveCoverPeople();
  p79RefreshLeaveCoverMode();
  const saved=(window.p79LeaveCoverAssignments||[]).find(x=>String(x.leaveId)===String(id));
  if(saved){
   document.getElementById('p79LeaveCoverMode').value=saved.mode==='two'?'two':saved.mode==='rest'?'rest':'one';
   p79RefreshLeaveCoverMode();
   document.getElementById('p79LeaveCoverFirst').value=saved.workerIds?.[0]||'';
+  p79FilterLeaveCoverPeople();
   document.getElementById('p79LeaveCoverSecond').value=saved.workerIds?.[1]||'';
  }
  modal.hidden=false;
+}
+function p79FilterLeaveCoverPeople(){
+ const leave=leaveRecords.find(x=>String(x.id)===String($('p79LeaveCoverId').value));
+ const target=employees.find(e=>sameEmployee(leave||{},e)),dept=String(target?.dept||'').trim();
+ const eligible=leaveCreatePeople().filter(e=>dept&&!sameEmployee(leave,e)&&String(e.dept||'').trim()===dept);
+ const job=$('p79LeaveCoverJob');leaveFillJobFilter(job,eligible);
+ const choices=eligible.filter(e=>!job.value||leavePersonJob(e)===job.value);
+ const first=$('p79LeaveCoverFirst'),second=$('p79LeaveCoverSecond'),firstId=first.value,secondId=second.value;
+ const prompt='<option value="">'+(choices.length?'請選擇人員':'此職稱沒有可代班人員')+'</option>';
+ first.innerHTML=prompt+choices.map(leavePersonOption).join('');
+ if(choices.some(e=>String(e.empId)===firstId))first.value=firstId;
+ const others=choices.filter(e=>String(e.empId)!==String(first.value));
+ second.innerHTML=prompt+others.map(leavePersonOption).join('');
+ if(others.some(e=>String(e.empId)===secondId))second.value=secondId;
 }
 function p79RefreshLeaveCoverMode(){
  document.getElementById('p79LeaveCoverSecondWrap').hidden=document.getElementById('p79LeaveCoverMode').value!=='two';
@@ -1048,7 +1061,8 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <input type="hidden" id="p79LeaveCoverId">
 <label for="p79LeaveCoverMode">代班方式</label>
 <select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="one">一位代班8小時</option><option value="two">兩位各代班4小時</option><option value="rest">排休人員代班</option></select>
-<label for="p79LeaveCoverFirst">代班人員</label><select id="p79LeaveCoverFirst"></select>
+<label for="p79LeaveCoverJob">代班人員職稱</label><select id="p79LeaveCoverJob" onchange="p79FilterLeaveCoverPeople()"></select>
+<label for="p79LeaveCoverFirst">代班人員</label><select id="p79LeaveCoverFirst" onchange="p79FilterLeaveCoverPeople()"></select>
 <div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
