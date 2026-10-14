@@ -14644,11 +14644,20 @@ function p79DirectAttendanceTimestamp(record){
 async function p79SaveWorkOvertimeDraft(draft){
  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
  const month=draft.date.slice(0,7),url=getActiveGasUrl();
- const read=async action=>{
-  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
-  try{const response=await fetch(url+'?action='+action+'&month='+month+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});const data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'出勤或班表讀取失敗');return data}finally{clearTimeout(timer)}
+ const read=async (action,label)=>{
+  for(let attempt=1;attempt<=2;attempt++){
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);
+   try{
+    const response=await fetch(url+'?action='+action+'&month='+month+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
+    const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
+   }catch(error){
+    const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
+    if(!transport)throw error;
+    if(attempt===2)throw Error(label+'連線失敗或逾時，尚未送出加班；已保留內容，請再次按儲存。');
+   }finally{clearTimeout(timer)}
+  }
  };
- const [cloud,attendance]=await Promise.all([read('getScheduleDataSecure'),read('getAttendanceMonthData')]);
+ const [cloud,attendance]=await Promise.all([read('getScheduleDataSecure','班表核對'),read('getAttendanceMonthData','出勤核對')]);
  const employeeId=String(draft.empId).trim().toUpperCase();
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
@@ -14664,7 +14673,7 @@ async function p79SaveWorkOvertimeDraft(draft){
   const savedRow=p79WorkOvertimeMonths.get(month).rows.find(row=>String(row.empId).trim().toUpperCase()===employeeId);
   if(savedRow){savedRow.schedule.__meta=savedRow.schedule.__meta||{};savedRow.schedule.__meta[draft.date]={...(savedRow.schedule.__meta[draft.date]||{}),overtimeReport:result.report,forEmpId:draft.forEmpId||''};}
   p79OvertimeCalculationCache=null;renderOvertimeStats();return result;
- }finally{clearTimeout(timer)}
+ }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
 window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 let p79LeaveHandoffBusy=false;
