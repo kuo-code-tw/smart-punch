@@ -273,16 +273,35 @@
     return t ? t.slice(0,10) : '';
   }
   function suppressReplacedSyntheticRecoveries(records){
-    const list=Array.isArray(records)?records:[];
-    const realKeys=new Set();
+    const list=Array.isArray(records)?records:[],realKeys=new Set(),byId=new Map(),manualReal=[];
     list.forEach(r=>{
-      if(isSyntheticManualPairRecovery(r)) return;
+      const id=s(r.id);if(id){if(!byId.has(id))byId.set(id,[]);byId.get(id).push(r);}
+      if(isSyntheticManualPairRecovery(r))return;
       realKeys.add([r.__identity,r.__type,calendarDateKey(r)].join('|'));
+      if(isManual(r))manualReal.push(r);
     });
     return list.filter(r=>{
-      if(!isSyntheticManualPairRecovery(r)) return true;
+      if(!isSyntheticManualPairRecovery(r))return true;
       const key=[r.__identity,r.__type,calendarDateKey(r)].join('|');
-      return !realKeys.has(key);
+      if(realKeys.has(key))return false;
+      // Only retire a stale synthetic side when its exact old counterpart and
+      // a genuine manual correction both explicitly select the same replacement.
+      // A same-day alternative alone is not evidence that a real punch is obsolete.
+      const oldTargets=[explicitTargetId(r),legacyTargetId(r)].filter(Boolean);
+      for(const real of manualReal){
+        if(real.__identity!==r.__identity||real.__type===r.__type||!validPair(r,real))continue;
+        const targets=[explicitTargetId(real),legacyTargetId(real)].filter(Boolean);
+        for(const targetId of targets){
+          if(targetId===s(r.id))continue;
+          const replacements=(byId.get(targetId)||[]).filter(t=>t.__identity===r.__identity&&t.__type===r.__type&&calendarDateKey(t)===calendarDateKey(r)&&validPair(t,real));
+          if(!replacements.length)continue;
+          for(const oldId of oldTargets){
+            const chained=(byId.get(oldId)||[]).some(old=>old.__identity===r.__identity&&old.__type===real.__type&&calendarDateKey(old)===calendarDateKey(real)&&validPair(r,old)&&[explicitTargetId(old),legacyTargetId(old)].includes(targetId));
+            if(chained)return false;
+          }
+        }
+      }
+      return true;
     });
   }
   function buildShifts(rawRecords){
@@ -405,3 +424,4 @@
   return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
+
