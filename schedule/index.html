@@ -4465,20 +4465,31 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const hour=(h,m)=>{const n=Number(h),minutes=Number(m||0);if(n>24||minutes>59||(n===24&&minutes))return null;return String(Math.round(n+minutes/60)).padStart(2,'0');};
       const start=hour(match[2],match[3]),end=hour(match[4],match[5]);return start!==null&&end!==null?(match[1]||'')+start+'-'+end:'';
     }
+    function p79OvertimePeriodLabel(report){
+ const code=String(report?.code||'').trim();
+ const extended=report?.category==='延'||['before','after'].includes(report?.position);
+ if(!extended)return code;
+ const start=String(report.overtimeStart||'').trim(),end=String(report.overtimeEnd||'').trim();
+ const part=value=>{const m=value.match(/^(\d{1,2})(?::(\d{2}))?$/);if(!m||Number(m[1])>24||Number(m[2]||0)>59||(Number(m[1])===24&&Number(m[2]||0)))return '';return m[1].padStart(2,'0')+(m[2]&&m[2]!=='00'?':'+m[2]:'');};
+ if(part(start)&&part(end))return part(start)+'-'+(part(end)==='00'?'24':part(end));
+ const bare=code.replace(/^[代延]/,'');
+ return ({'08-20':'16-20','20-08':'20-24'})[bare]||bare;
+}
+
     function p79SubstituteShiftLabel(empId,dayStr,meta){
       const saved=typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[empId]?.[dayStr]:null;
       meta={...(saved||{}),...(meta&&typeof meta==='object'?meta:{})};
       const reportCode=p79CompactOvertimeCode(meta.overtimeReport?.code);
-      if(reportCode)return meta.overtimeReport?.category==='延'?reportCode.replace(/^[代延]/,''):reportCode;
+      if(reportCode)return p79OvertimePeriodLabel({...meta.overtimeReport,code:reportCode});
       const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
-      const ownCode=p79CompactOvertimeCode(own);if(ownCode)return ownCode;
+      const ownCode=p79CompactOvertimeCode(own);if(ownCode)return p79OvertimePeriodLabel({category:meta.overtimeReport?.category||(meta.overtimeType==='extended'||(!meta.restCategory&&/^(08-20|20-08)$/.test(ownCode))?'延':''),code:ownCode,overtimeStart:meta.overtimeReport?.overtimeStart||meta.overtimeStart,overtimeEnd:meta.overtimeReport?.overtimeEnd||meta.overtimeEnd});
       const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
       if(!cover&&!meta.overtime&&!meta.overtimeReport&&meta.type!=='substitute')return '';
       const ranges={早:'08-16',中:'16-24',晚:'24-08'};
       const substitute=!!cover||!!meta.forEmpId||meta.type==='substitute'||meta.overtimeReport?.category==='代';
       const prefix=substitute?'代':['休','國','例'].includes(meta.overtimeReport?.category)?meta.overtimeReport.category:['休','國','例'].includes(meta.restCategory)?meta.restCategory:meta.overtimeType==='extended'?'延':'休';
       const start=meta.overtimeReport?.overtimeStart||meta.overtimeStart,end=meta.overtimeReport?.overtimeEnd||meta.overtimeEnd;
-      if(start&&end){const compact=p79CompactOvertimeCode(prefix+start+'-'+(end==='00:00'?'24':end));if(compact)return compact;}
+      if(start&&end){const compact=p79CompactOvertimeCode(prefix+start+'-'+(end==='00:00'?'24':end));if(compact)return meta.overtimeType==='extended'?p79OvertimePeriodLabel({category:'延',code:compact,overtimeStart:start,overtimeEnd:end}):compact;}
       const target=cover?.data?.leaveEmpId||meta.forEmpId;
       const original=String(monthlyScheduleData?.[target]?.[dayStr]||'').trim();
       const shift=[meta.reportOriginalShift,meta.overtimeOriginalShift,meta.overtimeAssignedShift,own,original].map(v=>String(v||'').trim()).find(v=>ranges[v])||'';
@@ -5107,7 +5118,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(dayMeta.overtimeReport.code) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
