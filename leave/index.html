@@ -296,7 +296,7 @@ body[data-p79-system="leave"]>header{display:none!important}
 
     <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
       <summary style="cursor:pointer;font-size:18px;font-weight:700;padding:6px 0">🏖️ 員工年假剩餘天數 <span class="note">（點選展開／收合）</span></summary>
-      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
+      <p id="adminBalanceMonthSummary" class="note" role="status"></p><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
     </details>
   </section>
 </main>
@@ -424,6 +424,15 @@ function leaveBalanceInfo(emp){
  const importedRemaining=Number(b.remaining)||0;
  return{entitled:(Number(b.carryOver)||0)+(Number(b.annual)||0),used:(Number(b.used)||0)+newlyApproved,effectiveRemaining:Math.max(0,Math.round((importedRemaining-newlyApproved)*10)/10),newlyApproved,asOf:String(b.asOf||'')};
 }
+function leaveBalanceExplanation(emp,info=leaveBalanceInfo(emp)){
+ if(info.effectiveRemaining==null)return '尚無匯入餘額';
+ return '匯入 '+fmtDay(emp.leaveBalance.remaining)+' 天 − 另核准 '+fmtDay(info.newlyApproved)+' 天 ＝ '+fmtDay(info.effectiveRemaining)+' 天';
+}
+function leaveBalanceMonthSummary(people){
+ const counts=new Map();for(const e of people){const month=normalizeLeaveBalanceMonth(e.leaveBalance?.asOf);if(month)counts.set(month,(counts.get(month)||0)+1);}
+ const months=[...counts.keys()].sort(),latest=months.at(-1)||'';
+ return {latest,text:months.length?months.map(m=>m+'：'+counts.get(m)+' 人').join('｜')+(months.length>1?'。較早月份的人員尚未更新至 '+latest+'。':''):'尚無有效基準月份'};
+}
 function fmtDay(n){return Number.isFinite(Number(n))?Number(n).toFixed(1):'--'}
 function showEmployee(){
  if(!currentEmployee)return;$('employeeLoginCard').classList.add('hidden');$('employeeProfileCard').classList.remove('hidden');$('empName').textContent=currentEmployee.name||currentEmployee.empId;$('empMeta').textContent=`工號 ${currentEmployee.empId||'--'}｜考勤號 ${currentEmployee.attNo||'--'}｜${currentEmployee.dept||'未設定部門'}`;
@@ -512,7 +521,7 @@ function renderAdmin(){
      <td>${esc(l.reason||'')}</td>
      <td><div class="p79-leave-status-inline">${badge(l.status)}${coverDisplay}</div></td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
-     <td><span class="leave-remain ${remainClass}">${remainText}</span></td>
+     <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
  }).join(''):'<tr><td colspan="9">沒有符合資料</td></tr>';
 }
@@ -520,7 +529,9 @@ function renderAdminBalances(){
  if(!$('adminBalancePanel')?.open)return;
  const body=$('adminBalanceBody');if(!body)return;const kw=String($('balanceKeyword')?.value||'').trim().toLowerCase();
  const rows=employees.filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
- body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
+ const summary=leaveBalanceMonthSummary(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))));
+ if($('adminBalanceMonthSummary'))$('adminBalanceMonthSummary').textContent=summary.text;
+ body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}${summary.latest&&normalizeLeaveBalanceMonth(b.asOf)<summary.latest?'<div class="note" style="color:#b45309;font-weight:700">待更新</div>':''}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b><div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(e,info))}</div></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
 }
 
 let p79SavedCoverReportBusy=false;
