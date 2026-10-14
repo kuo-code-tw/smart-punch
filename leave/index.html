@@ -218,15 +218,14 @@ body[data-p79-system="leave"]>header{display:none!important}
   </div>
 </header>
 <main>
+  <div id="p79LeaveHandoffBanner" class="status info" hidden><span id="p79LeaveHandoffStatus"></span> <button type="button" class="btn" onclick="p79OpenLeaveOvertimeHandoff()">接續代班加班申報</button></div>
   <div id="globalStatus" class="status info">正在連線雲端...</div>
 
   <div id="leaveStickyTabs" class="tabs">
     <button id="tabEmployee" class="tab active" onclick="switchMode('employee')">👷 員工請假</button>
-    <button id="tabOvertime" class="tab hidden" onclick="p79OpenUnifiedOvertime(false)">📊 加班申報／明細</button>
     <button id="tabAdmin" class="tab hidden" onclick="switchMode('admin')">🛡️ 管理／審核</button>
   </div>
 
-  <section id="p79UnifiedOvertime" hidden><p id="p79UnifiedOvertimeStatus" role="status">正在載入加班管理…</p><iframe id="p79UnifiedOvertimeFrame" title="加班申報與明細" style="width:100%;height:calc(100dvh - 240px);min-height:520px;border:0;border-radius:12px" ></iframe></section>
   <section id="employeeMode">
     <div class="grid">
       <div>
@@ -396,10 +395,10 @@ async function restoreAdmin(){
    const role=String(d.adminRole||'').toLowerCase();if(!['admin','superadmin'].includes(role))throw new Error('沒有管理員權限');
    const p=perms({systemPermissions:d.systemPermissions},role);leaveAccess=p.leave;
    if(leaveAccess==='none')throw new Error('此帳號沒有請假系統權限');
-   adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p,finePermissions:d.finePermissions||{}};
+   adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p,finePermissions:d.finePermissions||{},overtimePermissions:d.systemPermissions||{}};
    try{history.replaceState(null,'',location.pathname+location.search)}catch{}
-   $('tabAdmin').classList.remove('hidden');$('tabOvertime').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
-   switchMode('admin');return true;
+   $('tabAdmin').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
+   switchMode('admin');p79UpdateLeaveHandoffBanner();return true;
   }catch(e){
    last=e;console.warn('管理員 SSO 第 '+(i+1)+' 次驗證失敗',e);
    if(i===0)await new Promise(r=>setTimeout(r,900));
@@ -409,7 +408,7 @@ async function restoreAdmin(){
  setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
  return false;
 }
-function switchMode(m){p79CloseUnifiedOvertime();currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
+function switchMode(m){currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
 function employeeLogin(){
  const raw=$('empLoginInput').value.trim(),digits=raw.replace(/\D/g,'');if(!raw){setStatus('請輸入考勤號、工號或電話','warn');return}
  const matches=employees.filter(e=>leaveEmployeeIsActive(e)&&(String(e.empId||'').trim().toUpperCase()===raw.toUpperCase()||String(e.attNo??'').trim()===raw|| (digits&&String(e.phone||'').replace(/\D/g,'')===digits)));
@@ -552,7 +551,7 @@ async function p79ReportSavedLeaveCover(id){
   for(const cover of covers){const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);if(!start||!end||start>end)throw new Error('代班日期無效，請先核對');for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const worker of cover.workerIds||[]){const empId=String(worker),key=empId+'|'+date;if(seen.has(key))continue;seen.add(key);const person=(fresh.employees||[]).find(e=>String(e.empId)===empId);entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId)});if(entries.length>124)throw new Error('申報日期超出單次範圍，請分次安排');}}}
   if(!entries.length)throw new Error('找不到可申報的代班人員');
   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:String(id),createdAt:Date.now(),entries}));
-  p79OpenUnifiedOvertime(true);
+  await p79OpenLeaveOvertimeHandoff();
  }catch(error){setStatus('加班明細未開啟：'+String(error.message||error),'error');}
  finally{p79SavedCoverReportBusy=false;}
 }
@@ -620,7 +619,7 @@ async function p79SaveLeaveCover(){
    if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
    const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
    sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:leaveId,createdAt:Date.now(),entries}));
-   p79OpenUnifiedOvertime(true);
+   await p79OpenLeaveOvertimeHandoff();
   }
  }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
  finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
@@ -1211,54 +1210,108 @@ async function saveAdminCreateLeave(){
   $('adminCreateLeaveDialog').close();
   const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of [worker,second].filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
-  p79OpenUnifiedOvertime(true);
+  await p79OpenLeaveOvertimeHandoff();
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
 }
 </script>
 
-<style>
-body.p79-unified-overtime main > :not(#leaveStickyTabs):not(#globalStatus):not(#p79UnifiedOvertime){display:none!important}
-#p79UnifiedOvertime[hidden]{display:none!important}
-#leaveStickyTabs{flex-wrap:wrap}
-</style>
+<script src="../attendance/v6-engine.js?v=20261014.109"></script>
+<script src="../assets/port79-overtime-report.js?v=20261014.112"></script>
 <script>
-let p79UnifiedOvertimeLoaded=false,p79UnifiedLeaveDirty=false;
-function p79CloseUnifiedOvertime(){
- document.body.classList.remove('p79-unified-overtime');
- document.getElementById('p79UnifiedOvertime').hidden=true;
- document.getElementById('tabOvertime').classList.remove('active');
- if(p79UnifiedLeaveDirty){p79UnifiedLeaveDirty=false;loadCloud(false,true);}
+function p79DirectAttendanceTimestamp(record){
+ const raw=String(record?.timeStr||'').trim();
+ if(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw))return Date.parse(raw);
+ const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+ if(m)return Date.parse(m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+'T'+m[4].padStart(2,'0')+':'+m[5]+':'+(m[6]||'00')+'+08:00');
+ const normalized=P79AttendanceV6.normalizeTime(raw);return /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(normalized)?Date.parse(normalized.replace(/\//g,'-').replace(' ','T')+'+08:00'):NaN;
 }
-function p79OpenUnifiedOvertime(fromLeave=false){
- // The child app independently validates the current session and overtime permissions.
- if(!adminSession)return;
- document.body.classList.add('p79-unified-overtime');
- document.getElementById('p79UnifiedOvertime').hidden=false;
- document.querySelectorAll('#leaveStickyTabs .tab').forEach(b=>b.classList.toggle('active',b.id==='tabOvertime'));
- const frame=document.getElementById('p79UnifiedOvertimeFrame');
- if(!p79UnifiedOvertimeLoaded||fromLeave){
-  document.getElementById('p79UnifiedOvertimeStatus').textContent='正在載入加班管理…';
-  frame.onload=()=>{
+async function p79SaveWorkOvertimeDraft(draft){
+ const token=leaveRequestToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
+ const month=draft.date.slice(0,7),url=GAS_URL;
+ const read=async (action,label)=>{
+  for(let attempt=1;attempt<=2;attempt++){
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
    try{
-    const doc=frame.contentDocument;
-    const style=doc.createElement('style');style.textContent='#p79SevenTop{display:none!important}';doc.head.appendChild(style);
-    frame.contentWindow.addEventListener('p79-overtime-report-saved',()=>{p79UnifiedLeaveDirty=true;});
-    document.getElementById('p79UnifiedOvertimeStatus').textContent='請假與加班共同作業｜上方可切回請假審核';
-   }catch(error){document.getElementById('p79UnifiedOvertimeStatus').textContent='加班頁尚未完成載入，請稍後再試';}
-  };
-  frame.src='../work-hours/?embeddedLeave=1'+(fromLeave?'&leaveReport=1#overtime':'');
-  p79UnifiedOvertimeLoaded=true;
- }
- if(fromLeave)p79UnifiedLeaveDirty=true;
+    const response=await fetch(url+'?action='+action+'&month='+month+'&empId='+encodeURIComponent(draft.empId)+'&date='+encodeURIComponent(draft.date)+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
+    const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
+   }catch(error){
+    const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
+    if(!transport)throw error;
+    if(attempt===2)throw Error(label+'連線失敗或逾時，尚未送出加班；已保留內容，請再次按儲存。');
+   }finally{clearTimeout(timer)}
+  }
+ };
+ const cloud=await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ const employeeId=String(draft.empId).trim().toUpperCase();
+ const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
+ const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
+ if(!pairs.length)throw Error('當日沒有包含所選時段的完整出勤，未生成加班');
+ if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
+ const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',attendanceInId:pairs[0].row.clockIn.id,attendanceOutId:pairs[0].row.clockOut.id};
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+ try{
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
+  if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
+  void loadCloud(false,true);return result;
+ }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
-document.addEventListener('click',event=>{
- const link=event.target.closest('a');if(!link||!adminSession)return;
- const url=new URL(link.href,location.href);
- if(url.origin===location.origin&&url.pathname.endsWith('/work-hours/')){event.preventDefault();p79OpenUnifiedOvertime(false);}
-});
+
+let p79LeaveOvertimeConfig={},p79LeaveHandoffBusy=false;
+function p79CanReportOvertime(){
+ if(!adminSession)return false;
+ if(adminSession.adminRole==='superadmin')return true;
+ const permissions=adminSession.overtimePermissions||{},access=permissions.workhours??permissions.attendance??'none';
+ if(!['view','manage'].includes(access))return false;
+ const fine=adminSession.finePermissions?.workhours||{};
+ return Object.prototype.hasOwnProperty.call(fine,'overtime.report')?fine['overtime.report']===true:access==='manage';
+}
+function p79UpdateLeaveHandoffBanner(){
+ const banner=$('p79LeaveHandoffBanner');if(!banner)return;
+ let handoff;try{handoff=JSON.parse(sessionStorage.getItem('port79_leave_overtime_handoff_v1')||'null');}catch(ignore){}
+ const count=handoff?.entries?.length||0;
+ banner.hidden=!adminSession||!count||Date.now()-handoff.createdAt>86400000;
+ if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對，可接續申報。';
+}
+async function p79OpenLeaveOvertimeHandoff(){
+ if(p79LeaveHandoffBusy)return;
+ p79UpdateLeaveHandoffBanner();
+ const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
+ let handoff;try{handoff=JSON.parse(raw);}catch(ignore){return;}
+ if(Date.now()-handoff.createdAt>86400000||!Array.isArray(handoff.entries)||!handoff.entries.length)return;
+ p79LeaveHandoffBusy=true;
+ const loading=P79Overtime.showReportLoading();
+ try{
+  if(!p79CanReportOvertime())throw Error('請假與代班已儲存；此帳號沒有申報加班權限，請由有權限的管理員接續。');
+  const entry=handoff.entries[0],token=leaveRequestToken();
+  const [data,options]=await Promise.all([
+   jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+entry.date.slice(0,7)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000),
+   P79Overtime.loadRules()
+  ]);
+  if(!loading.isConnected)return;
+  if(!data?.ok)throw Error(data?.error||'無法核對代班班表');
+  p79LeaveOvertimeConfig=options.config;
+  const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
+  await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id,allowedEmpIds:handoff.entries.filter(e=>e.date===entry.date&&String(e.forEmpId||'')===String(entry.forEmpId||'')).map(e=>e.empId)});
+  $('p79LeaveHandoffStatus').textContent='尚有 '+handoff.entries.length+' 筆｜目前：'+entry.date+' '+(entry.name||entry.empId)+'，儲存成功後接續下一筆。';
+ }catch(error){
+  if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
+  setStatus('加班明細尚未完成：'+error.message,'warn');
+ }finally{p79LeaveHandoffBusy=false;}
+}
+window.p79OvertimeContext={
+ config:()=>p79LeaveOvertimeConfig,gasUrl:()=>GAS_URL,token:()=>leaveRequestToken(),
+ employees:()=>employees.filter(leaveEmployeeIsActive),canReport:p79CanReportOvertime,
+ saveReport:p79SaveWorkOvertimeDraft,refreshAccess:async()=>{await restoreAdmin();if(adminSession&&!employees.length)await loadCloud(false,true);return !!adminSession;},
+ canEditRules:()=>adminSession?.adminRole==='superadmin',persistConfig:()=>{}
+};
+window.addEventListener('p79-overtime-report-saved',()=>setTimeout(p79UpdateLeaveHandoffBanner,0));
+window.addEventListener('load',()=>{setTimeout(p79UpdateLeaveHandoffBanner,0);});
+
 </script>
 </body>
 </html>
+
 
 
