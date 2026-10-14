@@ -328,13 +328,14 @@ function leaveRequestToken(){
  if(adminSession)return String(adminToken||'').trim();
  return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
 }
-async function loadCloud(show=false,requireFresh=false){
+async function loadCloud(show=false,requireFresh=false,identityReady=null){
  let last;
  for(let i=0;i<3;i++){
   try{
    if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
    const userToken=leaveRequestToken();
    const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   if(identityReady)await identityReady;
    if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
    if(!d?.ok)throw new Error(d?.error||'雲端讀取失敗');
    employees=Array.isArray(d.employees)?d.employees:[];
@@ -834,7 +835,9 @@ document.getElementById('leaveBalanceImportFile')?.addEventListener('change',e=>
 function renderAll(){if(currentEmployee){const fresh=employees.find(e=>String(e.empId||'').toUpperCase()===String(currentEmployee.empId||'').toUpperCase());if(fresh)currentEmployee=fresh;showEmployee()}else renderMy();if(adminSession){renderAdmin();renderAdminBalances()}}
 
 (async function init(){
- const sso=await restoreAdmin();await loadCloud();
+ const identityReady=restoreAdmin();
+ const dataReady=loadCloud(false,false,identityReady);
+ const sso=await identityReady;await dataReady;
  if(!sso){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
  const today=new Date().toISOString().slice(0,10);$('leaveStart').value=today;$('leaveEnd').value=today;updateDays();
 })();
@@ -1155,14 +1158,19 @@ function filterAdminCreateLeavePeople(){
 async function openAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
- if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)))await loadCloud(true);
+ const dialog=$('adminCreateLeaveDialog');if(!dialog.open)dialog.showModal();
+ if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e))){
+  $('adminCreateLeaveMessage').textContent='正在載入人員，請稍候…';$('adminCreateLeaveSave').disabled=true;
+  try{await loadCloud(true,true);}catch(error){$('adminCreateLeaveMessage').textContent='人員載入失敗：'+(error.message||error);return;}finally{$('adminCreateLeaveSave').disabled=false;}
+  if(!dialog.open)return;
+ }
  adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
  $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';
  $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
  leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
- updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();$('adminCreateLeaveDialog').showModal();
+ updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();
 }
 function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';}
 function p79PlanLeaveCoverRequest(records,covers,request){
