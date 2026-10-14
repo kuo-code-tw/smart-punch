@@ -3343,7 +3343,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
               redirect:'follow',
               cache:'no-store'
             },
-            isScheduleSave ? 35000 : 20000
+            isScheduleSave ? 35000 : action==='deleteOvertimeAssignment'?45000:20000
           );
         }catch(e){
           if(isScheduleSave && e?.code==='SCHEDULE_LOCK_TIMEOUT'){
@@ -5126,7 +5126,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml(substituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${substituteLabel ? 'p79-substitute-time'+(substituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                ${substituteLabel ? `<option value="${scheduleEscapeHtml(shiftVal)}" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
+                ${substituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
                 <option value="早" ${!substituteLabel && shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${!substituteLabel && shownShift==='中'?'selected':''}>中</option>
                 <option value="晚" ${!substituteLabel && shownShift==='晚'?'selected':''}>晚</option>
@@ -5485,7 +5485,51 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       else alert("❌ 雲端儲存失敗，請稍後再試；若持續失敗請確認 Apps Script 已部署最新版。");
     }
 
-    function updateDailyShift(empId, dayStr, val) {
+    let p79OvertimeShiftEditBusy=false;
+    async function updateDailyShift(empId,dayStr,val){
+      if(val==='__overtime__')return;
+      if(p79OvertimeShiftEditBusy){renderRoleScheduleView();return;}
+      if(!requireScheduleEditLock())return;
+      const meta=monthlyScheduleMeta[empId]?.[dayStr]||{};
+      const cover=p79LeaveCoverOnDay(empId,dayStr).find(c=>c.kind==='worker');
+      if(!meta.overtimeReport&&!meta.overtime&&!meta.forEmpId&&meta.type!=='substitute'&&!cover){p79SetDailyShift(empId,dayStr,val);return;}
+      const person=employees.find(e=>String(e.id)===String(empId));
+      if(!confirm('將 '+(person?.name||empId)+' '+dayStr+' 改為「'+val+'」？此操作會取消當日加班及對應代班；同一安排若有兩位代班人員，兩位當日安排都會取消。請假與打卡紀錄保留。')){renderRoleScheduleView();return;}
+      p79OvertimeShiftEditBusy=true;
+      let cancelled=false;
+      try{
+        if(!await flushSchedulePendingWrites())throw Error('尚有班表修改未儲存，請先完成儲存');
+        const ok=await runScheduleCloudWrite(async()=>{
+          const month=dayStr.slice(0,7),token=currentPort79SsoToken();
+          const read=async()=>{
+            const response=await scheduleLockFetch(GAS_URL+'?action=getScheduleDataSecure&month='+month+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+            const data=await response.json();if(!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'無法確認正式班表');return data;
+          };
+          const before=await read();
+          if(!before.overtimeLinkedDelete||!before.revision)throw Error('雲端尚未提供取消加班功能');
+          const deleted=await cloudPost({action:'deleteOvertimeAssignment',empId,date:dayStr,expectedRevision:before.revision,scheduleClientId:getScheduleClientId()});
+          cancelled=true;
+          const after=await read(),affected=new Set(deleted.affectedEmployeeIds||[empId]);
+          for(const id of affected){
+            const row=after.schedules.find(r=>String(r.empId)===String(id));
+            if(!row||row.schedule?.__meta?.[dayStr]?.overtimeReport)throw Error('取消後的班表讀回未通過，請重新整理核對');
+            if(!monthlyScheduleData[id])monthlyScheduleData[id]={};
+            if(!monthlyScheduleMeta[id])monthlyScheduleMeta[id]={};
+            if(row.schedule[dayStr]!==undefined)monthlyScheduleData[id][dayStr]=row.schedule[dayStr];
+            monthlyScheduleMeta[id][dayStr]={...(row.schedule.__meta?.[dayStr]||{})};
+          }
+          leaveCoverAssignments=after.leaveCoverAssignments||[];
+          p79SetDailyShift(empId,dayStr,val);
+          clearTimeout(scheduleSaveTimer);scheduleSaveTimer=null;
+          const saved=await saveScheduleMonthToCloud(false);
+          if(!saved)throw Error('新班別尚未確認儲存，請保留畫面並按儲存班表');
+          return true;
+        });
+        if(!ok)throw Error(cancelled?'當日加班已取消，新班別尚未確認儲存，請核對儲存狀態':'未確認變更，請核對權限與雲端連線');
+      }catch(error){alert((cancelled?'加班已取消；':'尚未確認取消加班：')+(error.message||error));}
+      finally{p79OvertimeShiftEditBusy=false;renderRoleScheduleView();try{renderTodaySchedulePanel();}catch(ignore){}}
+    }
+    function p79SetDailyShift(empId, dayStr, val) {
       if (!requireScheduleEditLock()) return;
       if(!monthlyScheduleData[empId]) monthlyScheduleData[empId] = {};
       const previousShift=String(monthlyScheduleData[empId][dayStr]||'');
