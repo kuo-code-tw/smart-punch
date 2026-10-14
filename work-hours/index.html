@@ -2190,7 +2190,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
                     return data;
                 } catch (error) {
-                    lastError = error;
+                    lastError = controller?.signal.aborted ? new Error(label+'等候雲端超過 '+Math.round(timeoutMs/1000)+' 秒，請稍後重試') : error;
                     const quotaHit = isGoogleQuotaError(error?.message || error);
                     if (quotaHit) {
                         try { error.quotaExceeded = true; } catch (ignore) {}
@@ -5711,7 +5711,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
             const url = activeGasUrl + (activeGasUrl.includes('?') ? '&' : '?') + 'action=getAttendanceMonthData&month=' + encodeURIComponent(key) + '&t=' + Date.now();
             try {
                 const mobileSync = p79IsMobileOrTabletForAttendanceSync();
-                const monthTimeoutMs = mobileSync ? 30000 : 15000;
+                const monthTimeoutMs = 45000;
                 const data = await fetchGasJsonWithRetry(url, '月份考勤同步', 2, monthTimeoutMs);
                 if (!data?.ok) throw new Error(data?.error || '月份考勤同步失敗');
                 let incoming = (Array.isArray(data.records) ? data.records : []).map(normalizeAttendanceRecordIdentifiers);
@@ -14646,7 +14646,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  const month=draft.date.slice(0,7),url=getActiveGasUrl();
  const read=async (action,label)=>{
   for(let attempt=1;attempt<=2;attempt++){
-   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
    try{
     const response=await fetch(url+'?action='+action+'&month='+month+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
     const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
