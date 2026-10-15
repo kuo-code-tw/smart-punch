@@ -2280,7 +2280,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.51';
+        const APP_VERSION='2026.10.15.52';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -10134,12 +10134,15 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return;
             }
 
+            const openId=String(openShift?.clockIn?.id??'');
+            const cloudConfirmedIn=!!openId&&p79MobileHasOfficial(currentEmp)&&p79MobileOfficial.rows.some(row=>String(row?.id??'')===openId);
+            // Keep duplicate prevention, but do not call a local-only punch cloud-confirmed.
             // 一般打卡狀態機：IN → OUT → IN。
             setButtonState(
                 clockInButton,
                 !openShift,
                 '上班簽到',
-                '✓ 已完成上班簽到',
+                cloudConfirmedIn?'✓ 已完成上班簽到':'上班已暫存｜待雲端確認',
                 openShift ? `已於 ${formatDateTime(openShift.clockIn.timeStr)} 完成上班簽到，請使用下班簽退` : ''
             );
             setButtonState(
@@ -22686,7 +22689,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261013.96"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.52"></script>
 
 
 
@@ -23459,14 +23462,14 @@ const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const read=(k)=>{try{const a=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}};
 function ack(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
 function draw(){
-  const legacy=read('sp_cloud_outbox_v1'),fast=read('port79_attendance_v5_outbox'),pending=legacy.length+fast.length;
+  const legacy=read('sp_cloud_outbox_v1'),fast=window.p79V5ReadPendingQueue?.()||read('port79_attendance_v5_outbox'),pending=legacy.length+fast.length;
   const a=ack();
   const official=window.p79MobileLatestOfficialPunch;
   const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'本機尚無最近打卡送出紀錄';
   const officialText=official?.timeStr?'正式主表最近刷卡：'+official.timeStr+'｜'+official.status:'正式主表本人刷卡狀態仍在查詢';
   const errors=[...fast,...legacy].map(x=>x?.lastError||x?.error||'').filter(Boolean);
   const attendanceActions=new Set(['addRecord','persistEmployeePunch','queueEmployeePunch','updateRecord','editRecord','deleteRecord']);
-  const punchItems=[...fast,...legacy].filter(x=>{const p=x?.payload||{};return ['addRecord','persistEmployeePunch','queueEmployeePunch'].includes(String(p.action||'')) && String(p.record?.source||p.record?.dataSource||'').toLowerCase().includes('employee')});
+  const punchItems=[...fast,...legacy].filter(x=>{const p=x?.payload||{};return ['persistEmployeePunch','queueEmployeePunch'].includes(String(p.action||'')) || (String(p.action||'')==='addRecord' && String(p.record?.source||p.record?.dataSource||'').toLowerCase().includes('employee'))});
   const describe=items=>items.map((item,i)=>{
     const p=item?.payload||{},rec=p.record||{},act=String(p.action||'unknown');
     const status=String(item?.state||'pending');
@@ -23479,7 +23482,7 @@ function draw(){
   }).join('');
   const readError=String(window.p79MobileOfficialReadError||'');
   const reason=readError||errors[0]||a?.error||'';
-  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆'):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
+  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆｜'+officialText):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
   const employeePage=document.getElementById('viewEmployee');
   const hasPunch=!!(employeePage && employeePage.contains(btn));
   btn.hidden=!hasPunch;
