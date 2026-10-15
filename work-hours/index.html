@@ -2101,7 +2101,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.67';
+        const APP_VERSION='2026.10.15.68';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -11716,8 +11716,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if (currentEmp && !isAdminLoggedIn) renderEmpHistoryTable();
 
                 showToast(
-                    localSaved ? '考勤修改已套用，正在同步雲端…' : '考勤修改已套用；本機容量不足，正在直接同步雲端…',
-                    localSaved ? 'success' : 'warning'
+                    localSaved ? '修改已暫存，尚未收到雲端確認，正在同步…' : '本機容量不足，尚未收到雲端確認，正在直接同步…',
+                    'warning'
                 );
 
                 postToCloud({
@@ -14788,6 +14788,7 @@ window.p79MonthlyRestContext={
 };
 </script>
 
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.68"></script>
 </body>
 </html>
 
