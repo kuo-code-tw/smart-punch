@@ -3242,6 +3242,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         'openSubstituteAssignment','saveSubstituteAssignment','clearSubstituteAssignment'
       ];
       document.querySelectorAll('[data-schedule-edit="1"]').forEach(el => {
+        if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請先在請假管理完成連動刪除，再修改班別';return;}
         el.disabled = !editable;
         el.title = editable ? '' : disabledTitle;
         el.classList.toggle('opacity-40', !editable);
@@ -3265,7 +3266,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         const code = String(el.getAttribute('onchange') || '');
         const editChange = ['updateDailyShift','updateEmpRoleAndResort','updateEmpGroupAndResort','updateEmpLockType'].some(p => code.includes(p));
         if (editChange) {
-          el.disabled = !editable;
+          if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請先在請假管理完成連動刪除，再修改班別';return;}
+        el.disabled = !editable;
           el.title = editable ? '' : disabledTitle;
         }
       });
@@ -5196,7 +5198,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
-              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
+              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml(substituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${substituteLabel ? 'p79-substitute-time'+(substituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${substituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
@@ -6373,7 +6375,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     if(st&&st.textContent!==wantedStatus)st.textContent=wantedStatus;
     document.querySelectorAll('[data-p79-mutation="1"]').forEach(el=>{
       if(view){if(!el.disabled){el.dataset.p79ModeDisabled='1';el.disabled=true}}
-      else if(el.dataset.p79ModeDisabled==='1'){el.disabled=false;delete el.dataset.p79ModeDisabled}
+      else if(el.dataset.p79ModeDisabled==='1'){el.disabled=el.dataset.p79LeaveLocked==='1';delete el.dataset.p79ModeDisabled}
     });
   }
   window.p79ToggleUnifiedEditMode=function(){const next=readMode()==='edit'?'view':'edit';try{localStorage.setItem('port79_unified_edit_mode_v1',next)}catch(e){}applyMode(next)};
