@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head>
+<!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
 <!-- PORT79 V6.0.21 MOBILE-PUNCH-FAST：員工手機打卡減少等待；GPS先快速定位、必要時才補高精度；員工主檔打卡入口只做單次雲端讀取；XLSX管理套件不再於員工打卡頁下載。 -->
 <!-- PORT79 V6.0.20 SYNC-IN-DATE-HEADER：精簡同步狀態移入日期切換白色區塊最上排，與日期摘要同行；移除獨立狀態列與說明文字。 -->
 <!-- PORT79 V6.0.19 COMPACT-SYNC-DOTS：考勤時間同步狀態改為時間上方綠/黃小圓點；完整同步狀態集中顯示於表格上方，避免每列膠囊標籤拉高頁面。 -->
@@ -8407,6 +8408,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const target=document.getElementById('targetLocationName');
                 if(target)target.textContent=nearest.name;
                 if(distanceEl)distanceEl.textContent=nearest.distance.toFixed(1)+' 公尺｜±'+Math.round(accuracy)+'m';
+                // A coarse/cached outside fix cannot decide rejection before precise GPS.
+                if(source==='quick'&&nearest.distance>nearest.radius)return false;
+                // Do not replace a failed/fresh precise fix with an old outside location.
+                if(source==='fallback'&&nearest.distance>nearest.radius)return false;
                 finish(true,nearest.distance,nearest);
                 return true;
             }
@@ -10491,7 +10496,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }
 
             pendingFirstPunchStatus = statusText;
-            const deviceReady = await verifyAndBindCurrentDevice();
+            let deviceReady=false;
+            try{deviceReady=await verifyAndBindCurrentDevice();}
+            catch(error){releasePunchGuard();showToast('裝置驗證未完成：'+String(error?.message||error)+'。請保留目前頁面，稍後重試。','warning');return;}
             if (!deviceReady) {
                 releasePunchGuard();
                 return;
