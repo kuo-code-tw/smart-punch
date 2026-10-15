@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.15.60';
+    const APP_VERSION='2026.10.15.62';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -1372,7 +1372,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-person-cell .p79-drag-top{right:2px!important;width:22px!important;min-width:22px!important}
 #app-main-container .p79-person-controls{padding-right:24px!important;gap:4px!important}
 </style>
-<script src="../attendance/v6-engine.js?v=20261015.57"></script>
+<script src="../attendance/v6-engine.js?v=20261015.62"></script>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -2972,8 +2972,13 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     let p79ScheduleAttendanceStateTimer = null;
     let p79ScheduleAttendanceStateBusy = false;
     let p79ScheduleAttendanceHasSynced = false;
+    let p79ScheduleAttendanceLastSyncedAt = 0;
     let p79ScheduleAttendanceAuthExpired = false;
     function setScheduleAttendanceLiveStatus(mode, message) {
+      if(mode==='error'&&p79ScheduleAttendanceHasSynced){
+        p79ScheduleAttendanceHasSynced=false;
+        try{renderTodaySchedulePanel();renderRoleScheduleView();}catch(ignore){}
+      }
       const el = document.getElementById('todayAttendanceLiveStatus');
       if (!el) return;
       el.textContent = String(message || '');
@@ -3006,11 +3011,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           '?action=getScheduleAttendanceState&gcToken=' + encodeURIComponent(token) +
           '&t=' + Date.now();
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 12000);
-        let res;
-        try { res = await fetch(url, {cache:'no-store', redirect:'follow', signal:controller.signal}); }
-        finally { clearTimeout(timer); }
-        const data = await res.json();
+        const timer = setTimeout(() => controller.abort(), 25000);
+        let res,data;
+        try { res = await fetch(url, {cache:'no-store', redirect:'follow', signal:controller.signal});
+          if(!res.ok)throw Error('HTTP '+res.status);
+          data=await res.json();
+        } finally { clearTimeout(timer); }
         if (!data?.ok) {
           const err=String(data?.error || '今日考勤狀態讀取失敗');
           if (/登入驗證.*(?:逾時|過期|失效|無效)|登入.*(?:逾時|過期)|token.*(?:expired|invalid)|session.*expired|請重新登入/i.test(err)) {
@@ -3031,12 +3037,14 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
         const before = [...todayAttendanceActiveEmpIds].sort().join('|');
         const after = [...nextSet].sort().join('|');
+        const wasSynced=p79ScheduleAttendanceHasSynced;
         todayAttendanceActiveEmpIds = nextSet;
         p79ScheduleAttendanceHasSynced = true;
+        p79ScheduleAttendanceLastSyncedAt = Date.now();
         const syncedAt = new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
         setScheduleAttendanceLiveStatus('ok', '考勤燈號已同步 ' + syncedAt + '｜目前出勤中 ' + nextSet.size + ' 人');
 
-        if (before !== after) {
+        if (before !== after || !wasSynced) {
           renderTodaySchedulePanel();
           try { renderRoleScheduleView(); } catch(ignore) {}
         }
@@ -4462,7 +4470,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     function isScheduleEmployeeClockedIn(empId) {
-      return todayAttendanceActiveEmpIds.has(String(empId || '').trim().toUpperCase());
+      return p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000&&todayAttendanceActiveEmpIds.has(String(empId || '').trim().toUpperCase());
     }
 
     function scheduleAttendanceActiveBadge(empId) {
