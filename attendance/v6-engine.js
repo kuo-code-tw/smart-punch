@@ -5,8 +5,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
   const MAX_SHIFT_MS=24*60*60*1000;
-  // V6.0.4：同一員工同一側 15 分鐘內的多刷，視為同一次班次的重複刷卡候選。
-  // 僅用於班次顯示/配對，不直接刪除原始 Google Sheet 資料。
+  // V6.0.10: Preserve distinct shifts and unpaired punches.
   const NEAR_DUPLICATE_SIDE_MS=15*60*1000;
 
   function s(v){return String(v==null?'':v).trim();}
@@ -200,6 +199,8 @@
           if(!base.clockIn||!base.clockOut)return;
           const inDiff=Math.abs(base.clockIn.__ts-session.clockIn.__ts);
           const outDiff=Math.abs(base.clockOut.__ts-session.clockOut.__ts);
+          // Two completed, non-overlapping shifts are separate work, even minutes apart.
+          if(Math.max(base.clockIn.__ts,session.clockIn.__ts)>=Math.min(base.clockOut.__ts,session.clockOut.__ts))return;
           if(inDiff<=NEAR_DUPLICATE_SIDE_MS&&outDiff<=NEAR_DUPLICATE_SIDE_MS){
             const score=inDiff+outDiff;
             if(score<bestScore){bestScore=score;bestIndex=index;}
@@ -221,6 +222,11 @@
           const base=mergedSession(cluster,'near-duplicate-side');
           const target=side==='IN'?base.clockIn:base.clockOut;
           if(!target)return;
+          if(side==='IN'&&sideRec.__ts>=base.clockOut.__ts)return;
+          if(side==='OUT'&&sideRec.__ts<=base.clockIn.__ts)return;
+          const anchored=[explicitTargetId(sideRec),legacyTargetId(sideRec)].filter(Boolean);
+          const opposite=side==='IN'?base.clockOut:base.clockIn;
+          if(!anchored.length||!anchored.includes(s(opposite?.id)))return;
           const diff=Math.abs(target.__ts-sideRec.__ts);
           if(diff<=NEAR_DUPLICATE_SIDE_MS&&diff<bestDiff){bestDiff=diff;bestIndex=index;}
         });
@@ -235,7 +241,7 @@
         ));
       });
 
-      // ③ 沒有完整班次可吸附的同側孤兒，也以 15 分鐘為一群，避免連續多刷顯示很多列。
+      // ③ Without a confirmed counterpart, different timestamps remain distinct.
       const bySide={IN:[],OUT:[]};
       remainingOrphans.forEach(session=>{
         const side=session.clockIn?'IN':(session.clockOut?'OUT':'');
@@ -247,27 +253,7 @@
           const ar=(side==='IN'?a.clockIn:a.clockOut),br=(side==='IN'?b.clockIn:b.clockOut);
           return (ar&&ar.__ts||0)-(br&&br.__ts||0);
         });
-        let cluster=[];
-        let anchorTs=NaN;
-        const flush=()=>{
-          if(!cluster.length)return;
-          result.push(mergedSession(
-            cluster,
-            cluster.length>1?'near-duplicate-orphan-merged':(cluster[0].v6PairReason||'orphan')
-          ));
-          cluster=[];anchorTs=NaN;
-        };
-        sorted.forEach(session=>{
-          const r=side==='IN'?session.clockIn:session.clockOut;
-          const t=r&&r.__ts;
-          if(!cluster.length){cluster=[session];anchorTs=t;return;}
-          if(Number.isFinite(t)&&Number.isFinite(anchorTs)&&Math.abs(t-anchorTs)<=NEAR_DUPLICATE_SIDE_MS){
-            cluster.push(session);
-          }else{
-            flush();cluster=[session];anchorTs=t;
-          }
-        });
-        flush();
+        result.push(...sorted);
       });
     });
 
@@ -433,8 +419,8 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.9-WORK-DATE';
-    console.info('[PORT79] Attendance V6.0.9 work-date rule installed');
+    window.p79AttendanceEngineVersion='V6.0.10-DISTINCT-SHIFTS';
+    console.info('[PORT79] Attendance V6.0.10 distinct-shift preservation installed');
     return true;
   }
   return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
