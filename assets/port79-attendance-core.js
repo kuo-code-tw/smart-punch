@@ -121,10 +121,32 @@ function enqueue(payload){
   return q.length;
 }
 function samePayload(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function p79ClearMatchingLegacyEdit(payload){
+ if(!['updateRecord','editRecord'].includes(String(payload?.action||'')))return;
+ try{
+  const raw=localStorage.getItem('sp_cloud_outbox_v1');if(!raw)return;
+  const q=JSON.parse(raw);if(!Array.isArray(q))return;
+  const keep=q.filter(item=>{
+   const old=item?.payload;if(!['updateRecord','editRecord'].includes(String(old?.action||'')))return true;
+   if(!cloudRecordConfirmsItem({payload:old},payload.record))return true;
+   for(const field of ['empId','attNo','note'])if(normalizeCompareValue(old.record?.[field])!==normalizeCompareValue(payload.record?.[field]))return true;
+   return false;
+  });
+  if(keep.length!==q.length)localStorage.setItem('sp_cloud_outbox_v1',JSON.stringify(keep));
+ }catch(e){console.warn('舊版考勤待傳核對未完成，原內容保留',e);}
+}
+function p79NotifyAttendanceWrite(payload){
+ p79ClearMatchingLegacyEdit(payload);
+ try{localStorage.setItem('port79_attendance_sync_notice_v1',JSON.stringify({id:payloadRecordId(payload),action:payload.action,at:Date.now()}));}catch(e){}
+}
+window.addEventListener('storage',event=>{
+ if(event.key===OUTBOX_KEY){updateUi();return;}
+ if(event.key==='port79_attendance_sync_notice_v1')scheduleDelta(100);
+});
 function remove(key,payload){
   const q=readQueue(),next=q.filter(x=>x.key!==key||(payload&&!samePayload(x.payload,payload)));
   if(next.length===q.length)return false;
-  saveQueue(next);return true;
+  saveQueue(next);if(payload)p79NotifyAttendanceWrite(payload);return true;
 }
 function pendingForId(id){
   const s=String(id??'');
@@ -209,6 +231,7 @@ function cloudRecordConfirmsItem(item, cloudRecord){
 }
 
 function confirmCloudRecord(cloudRecord){
+  p79ClearMatchingLegacyEdit({action:'updateRecord',record:cloudRecord});
   const id=String(cloudRecord?.id??'');
   if(!id)return false;
 
@@ -346,7 +369,7 @@ async function drain(force=false){
       updateUi();
 
       try{
-        const data=await send(item.payload,30000);
+        const data=await send(item.payload,45000);
         // 寫入 ACK 不能跳過其他人尚未讀取的 Delta；游標只由讀取結果推進。
 
         const rid=item?.payload?.record?.id ?? item?.payload?.id;
@@ -445,7 +468,7 @@ async function drainFast(force=true, concurrency=4){
 
   const processOne=async(item)=>{
     try{
-      const data=await send(item.payload,30000);
+      const data=await send(item.payload,45000);
 
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
@@ -817,7 +840,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     updateUi();
 
     try{
-      const data=await send(payload,30000);
+      const data=await send(payload,45000);
       const latestConfirmed=remove(opKey(payload),payload);
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
