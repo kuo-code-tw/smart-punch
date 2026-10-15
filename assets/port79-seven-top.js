@@ -150,7 +150,7 @@ const MENU={
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
- workhours:[['overtime-application','📄 加班申報表'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
+ workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
@@ -219,10 +219,11 @@ async function runAction(sys,a){closeMenu();try{
  if(sys==='workhours'){
   if(a==='overtime-reload')return await window.p79ReloadOvertimeMonth?.(document.getElementById('p79ReloadOvertimeButton'));
   if(a==='overtime-export')return await window.p79ExportOvertimeComparison?.(false);
+  if(a==='overtime-summary')return window.P79OvertimeApplication?.open({summary:true});
   if(a==='overtime-application')return window.P79OvertimeApplication?.open();
   if(a==='overtime-print')return await window.p79ExportOvertimeComparison?.(true);
   if(a==='overtime-policy')return window.openOvertimePolicyModal?.();
-  if(a==='stats'){location.hash='stats';return window.switchAdminTab?.('stats')}
+  if(a==='stats'){document.body.dataset.p79WorkhoursUserOpened='1';location.hash='stats';return window.switchAdminTab?.('stats')}
   if(a==='overtime'){location.hash='overtime';return window.switchAdminTab?.('overtime')}
   if(a==='read-cloud')return await window.manualCloudRefresh?.();
  }
@@ -268,7 +269,7 @@ function buildMenu(sys){
   ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','import','export']],
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
-  ['紀錄查詢',['overtime-application','overtime-print','overtime-policy','logs','attendance-compare','compare']],
+  ['紀錄查詢',['stats','overtime-summary','overtime-application','overtime-print','overtime-policy','logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
   ['顯示設定',['year','global-theme']],
   ['登出系統',['logout-system']]
