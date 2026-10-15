@@ -911,6 +911,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
   body.port79-employee-only #viewEmployee .p-6{padding:14px 12px!important}
 }
 </style>
+<style id="p79-punch-disabled-20261015">body #viewEmployee #btnClockIn:disabled,body #viewEmployee #btnClockOut:disabled{background:#94a3b8!important;background-image:none!important;color:#fff!important;cursor:not-allowed!important;box-shadow:none!important;opacity:1!important;}</style>
 <style id="attendance-export-viewport-fix">
 /* Keep export controls inside the viewport, above the shared navigation. */
 #exportRecordsModal{z-index:130000;padding:12px;overflow:hidden;box-sizing:border-box}
@@ -2280,7 +2281,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.53';
+        const APP_VERSION='2026.10.15.54';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -9895,6 +9896,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return true;
         };
 
+        const p79ImmediatePunchRecords = new Map();
         function getEmployeePunchRecords(emp = currentEmp, channel = 'REGULAR') {
             if (!emp) return [];
             const local=Array.isArray(records)?records:[];
@@ -9914,6 +9916,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                       Date.now()-getAttendanceTimestamp(record)<=36*3600000)));
                 source=[...p79MobileOfficial.rows,...pending];
             }
+            // Keep immediate and queued punches when cloud refresh replaces local records.
+            const queued=(window.p79V5ReadPendingQueue?.()||[]).map(item=>item?.payload?.record).filter(Boolean);
+            const immediate=[...p79ImmediatePunchRecords.values()].filter(record=>{
+                const age=Date.now()-getAttendanceTimestamp(record);
+                if(p79MobileHasOfficial(emp) && p79MobileOfficial.rows.some(row=>String(row?.id??'')===String(record?.id??''))){
+                    p79ImmediatePunchRecords.delete(String(record.id));return false;
+                }
+                return age>=0 && age<=24*3600000;
+            });
+            source=[...immediate,...queued,...source];
             const seen=new Set();
             return source.filter(record=>{
                 if(!matched(record))return false;
@@ -10597,6 +10609,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             };
 
             records.unshift(newRecord);
+            p79ImmediatePunchRecords.set(String(newRecord.id),newRecord);
+            updateHomeClockInButtonState();
             saveRecords();
             // 首頁打卡先存入本機保護備份；即使雲端暫時失敗或更新 HTML，也不會遺失。
             archiveAttendanceRecords([newRecord]);
