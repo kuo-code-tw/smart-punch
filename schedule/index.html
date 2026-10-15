@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.15.62';
+    const APP_VERSION='2026.10.15.63';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -2514,6 +2514,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     const ALL_ROLE_ORDER = ['領班', '指揮手', 'AQC', 'ARMG', 'F/L', '課長', '主任', '副理'];
 
     let availableGroups = ['不分組', '不輪班'];
+    let scheduleRoleGroupOptions = {};
 
     const NATIONAL_HOLIDAYS = {
       "2027-01-01": "開國紀念日",
@@ -2923,9 +2924,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         const leaveBadge=isLeave
           ? `<span class="today-leave-pill ${scheduleLeavePillClass(x.leaveLabel)}">${scheduleEscapeHtml(x.leaveLabel)}</span>`
           : '';
-        const activeBadge=(!isLeave && isScheduleEmployeeClockedIn(x.emp?.id))
-          ? '<span class="today-attendance-active"><span class="today-attendance-active-dot"></span>出勤中</span>'
-          : '';
+        const activeBadge=isLeave?'':scheduleDutyBadge(x.shift,x.emp?.id);
 
         return `<div class="today-person-row" title="${scheduleEscapeHtml(x.emp?.name||'')}｜${scheduleEscapeHtml(x.emp?.role||'')}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}">
           <div class="today-person-name">
@@ -3000,6 +2999,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     async function refreshScheduleAttendanceState(showError=false) {
+      p79RefreshScheduleDutyPeriod();
       if (p79ScheduleAttendanceStateBusy || p79ScheduleAttendanceAuthExpired) return false;
       if (!isGasUrlConfigured()) { setScheduleAttendanceLiveStatus('error', '考勤燈號未同步：未設定正式 GAS'); return false; }
       const token = currentPort79SsoToken();
@@ -3042,7 +3042,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         p79ScheduleAttendanceHasSynced = true;
         p79ScheduleAttendanceLastSyncedAt = Date.now();
         const syncedAt = new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-        setScheduleAttendanceLiveStatus('ok', '考勤燈號已同步 ' + syncedAt + '｜目前出勤中 ' + nextSet.size + ' 人');
+        setScheduleAttendanceLiveStatus('ok', '考勤燈號已同步 ' + syncedAt + '｜已簽到未簽退 ' + nextSet.size + ' 人');
 
         if (before !== after || !wasSynced) {
           renderTodaySchedulePanel();
@@ -3258,6 +3258,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       });
       document.querySelectorAll('button[onclick]').forEach(btn => {
         const code = String(btn.getAttribute('onclick') || '');
+        if(code.includes('promptAddNewGroup')||code.includes('promptDeleteGroup')){
+          btn.disabled=!manage||lockedByOther;btn.title=btn.disabled?disabledTitle:'管理此單位組別；需要時自動取得編輯鎖';
+          btn.classList.toggle('opacity-40',btn.disabled);btn.classList.toggle('cursor-not-allowed',btn.disabled);return;
+        }
         if (mutationPatterns.some(p => code.includes(p))) {
           btn.disabled = !editable;
           btn.title = editable ? '' : disabledTitle;
@@ -3635,6 +3639,7 @@ function p79EmployeeDateEligible(emp,date) {
         monthlyScheduleData = {};
         monthlyScheduleMeta = {};
         schedulePersonnelOverrides = {};
+        scheduleRoleGroupOptions = {};
 
         (data.schedules || []).forEach(row => {
           const empId = String(row.empId || '').trim().toUpperCase();
@@ -3645,6 +3650,11 @@ function p79EmployeeDateEligible(emp,date) {
           const personnel = schedule.__personnel && typeof schedule.__personnel === 'object'
             ? Object.assign({}, schedule.__personnel)
             : {};
+          const groupRole=String(personnel.role||row.role||'');
+          if(month&&groupRole&&Array.isArray(personnel.groupOptions)){
+            if(!scheduleRoleGroupOptions[month])scheduleRoleGroupOptions[month]={};
+            scheduleRoleGroupOptions[month][groupRole]=personnel.groupOptions.filter(g=>typeof g==='string'&&g.trim());
+          }
           if (month) {
             if (!schedulePersonnelOverrides[month]) schedulePersonnelOverrides[month] = {};
             schedulePersonnelOverrides[month][empId] = {
@@ -3750,6 +3760,7 @@ function p79EmployeeDateEligible(emp,date) {
         monthData.__personnel = {
           role: emp.role || 'AQC',
           group: emp.group || '不分組',
+          groupOptions:scheduleRoleGroupList(emp.role,yearMonth).filter(g=>g!=='不分組'),
           lockType: emp.lockType || 'ROTATION',
           order: scheduleOrderNumber(emp.order)
         };
@@ -3940,16 +3951,35 @@ function p79EmployeeDateEligible(emp,date) {
       return idx === -1 ? 999 : idx;
     }
 
-    // Group display/order is derived from names, never from cloud insertion order.
-    // Keep persisted availableGroups unchanged to avoid unnecessary GAS writes.
-    function sortedScheduleGroups() {
-      return [...new Set((availableGroups || []).filter(Boolean))].sort((a,b)=>{
-        if(a==='不分組')return b==='不分組'?0:-1;
-        if(b==='不分組')return 1;
-        if(a==='不輪班')return b==='不輪班'?0:1;
-        if(b==='不輪班')return -1;
-        return String(a).localeCompare(String(b),'zh-Hant',{numeric:true,sensitivity:'base'});
-      });
+    function scheduleRoleGroupList(role=activeRoleTab,month=currentScheduleMonthKey()) {
+      const all=!role||role==='ALL'||role==='EMP_MGMT';
+      const configured=scheduleRoleGroupOptions[month]||{};
+      const groups=all?Object.values(configured).flat():configured[role];
+      const assigned=employees.filter(e=>all||e.role===role).map(e=>e.group).filter(Boolean);
+      return [...new Set(['不分組',...assigned,...(Array.isArray(groups)?groups:[])])].filter(Boolean).sort((a,b)=>a==='不分組'?-1:b==='不分組'?1:String(a).localeCompare(String(b),'zh-Hant',{numeric:true}));
+    }
+    function sortedScheduleGroups(role=activeRoleTab) {return scheduleRoleGroupList(role);}
+    function p79RoleGroupTarget(){
+      const role=activeRoleTab==='EMP_MGMT'?mgmtRoleFilter:activeRoleTab;
+      if(!role||role==='ALL'||role==='EMP_MGMT'){alert('請先選擇要管理組別的單位');return '';}
+      return role;
+    }
+    async function p79EnsureGroupEdit(){
+      if(!canManageSchedule()){alert('沒有排班管理權限');return false;}
+      if(!scheduleCanEditNow()&&!await manualAcquireScheduleEditLock())return false;
+      return requireScheduleEditLock();
+    }
+    async function p79CommitRoleGroups(role,groups,removed=[]){
+      if(!await flushSchedulePendingWrites())return false;
+      const wasDirty=port79ScheduleDirty,month=currentScheduleMonthKey(),before=JSON.parse(JSON.stringify(scheduleRoleGroupOptions)),members=employees.filter(e=>e.role===role&&removed.includes(e.group)).map(e=>({emp:e,group:e.group}));
+      if(!scheduleRoleGroupOptions[month])scheduleRoleGroupOptions[month]={};
+      scheduleRoleGroupOptions[month][role]=groups.filter(g=>g!=='不分組');
+      members.forEach(x=>{x.emp.group='不分組';savePersonnelOverrideForCurrentMonth(x.emp);});
+      p79MarkScheduleLocalMutation();activeGroupFilter='ALL';buildRoleTabsAndRender();
+      const ok=await runScheduleCloudWrite(()=>saveScheduleMonthToCloud(false));
+      if(!ok){port79ScheduleDirty=wasDirty;scheduleRoleGroupOptions=before;members.forEach(x=>{x.emp.group=x.group;savePersonnelOverrideForCurrentMonth(x.emp);});buildRoleTabsAndRender();return false;}
+      groups.forEach(g=>{if(!availableGroups.includes(g))availableGroups.push(g);});
+      return true;
     }
     function getGroupPriority(group) {
       const index=sortedScheduleGroups().indexOf(group);
@@ -4097,70 +4127,24 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     async function promptAddNewGroup() {
-      if (!requireScheduleEditLock()) return;
-      const groupName = prompt("請輸入您要新增的組別名稱（例：甲組、A組）：");
-      if (!(groupName && groupName.trim())) return;
-
-      const cleanName = groupName.trim();
-      if (availableGroups.includes(cleanName)) {
-        alert("該組別名稱已存在！");
-        return;
-      }
-
-      const before = [...availableGroups];
-      const nonShiftIdx = availableGroups.indexOf('不輪班');
-      if(nonShiftIdx >= 0) availableGroups.splice(nonShiftIdx, 0, cleanName);
-      else availableGroups.push(cleanName);
-      buildRoleTabsAndRender();
-
-      // 組別是獨立主檔：必須先確認 Google 雲端真的寫入成功，才顯示「新增成功」。
-      const ok = await saveScheduleGroupsImmediate();
-      if (!ok) {
-        availableGroups = before;
-        buildRoleTabsAndRender();
-        alert(`❌ 新增組別【${cleanName}】失敗。\n\nGoogle 雲端尚未成功保存，所以系統已還原，避免畫面顯示成功但重新同步後又消失。`);
-        return;
-      }
-      alert(`✅ 組別【${cleanName}】已儲存到 Google 雲端。`);
+      const role=p79RoleGroupTarget();if(!role||!await p79EnsureGroupEdit())return;
+      const name=String(prompt('新增【'+role+'】的組別名稱：')||'').trim();if(!name)return;
+      if(name.length>30||/[<>"'\\]/.test(name)){alert('組別名稱請使用30字以內的中英文或數字');return;}
+      const groups=scheduleRoleGroupList(role);
+      if(groups.includes(name)){alert('此單位已有該組別');return;}
+      if(!await p79CommitRoleGroups(role,[...groups,name]))return alert('尚未確認組別儲存成功；已保留原設定，請重試。');
+      alert('已新增【'+role+'／'+name+'】');
     }
-
     async function promptDeleteGroup() {
-      if (!requireScheduleEditLock()) return;
-      const deletableGroups = availableGroups.filter(g => g !== '不分組' && g !== '不輪班');
-      if (deletableGroups.length === 0) {
-        alert("目前沒有可以刪除的自訂組別！");
-        return;
-      }
-
-      const selectedGroup = prompt(`請輸入欲刪除的組別名稱：\n現有自訂組別：[ ${deletableGroups.join(' , ')} ]`);
-      if (!(selectedGroup && selectedGroup.trim())) return;
-
-      const cleanName = selectedGroup.trim();
-      if (!availableGroups.includes(cleanName)) {
-        alert(`找不到名稱為【${cleanName}】的組別！`);
-        return;
-      }
-
-      const currentMembers = employees.filter(e => e.group === cleanName);
-      if (currentMembers.length > 0) {
-        alert(`⚠️ 無法刪除【${cleanName}】！該組別目前還有 ${currentMembers.length} 位同仁，請先將其轉移至其他組別。`);
-        return;
-      }
-      if (!confirm(`確定要刪除組別【${cleanName}】嗎？`)) return;
-
-      const before = [...availableGroups];
-      availableGroups = availableGroups.filter(g => g !== cleanName);
-      if (activeGroupFilter === cleanName) activeGroupFilter = 'ALL';
-      buildRoleTabsAndRender();
-
-      const ok = await saveScheduleGroupsImmediate();
-      if (!ok) {
-        availableGroups = before;
-        buildRoleTabsAndRender();
-        alert(`❌ 刪除組別【${cleanName}】失敗。\n\nGoogle 雲端沒有成功保存，系統已還原原本組別。`);
-        return;
-      }
-      alert(`🗑️ 組別【${cleanName}】已從 Google 雲端刪除。`);
+      const role=p79RoleGroupTarget();if(!role||!await p79EnsureGroupEdit())return;
+      const groups=scheduleRoleGroupList(role).filter(g=>g!=='不分組');
+      if(!groups.length)return alert('此單位沒有使用組別；需要時可按新增組別。');
+      const name=String(prompt('刪除【'+role+'】組別：'+groups.join('、')+'；輸入「全部」可取消此單位全部組別。')||'').trim();if(!name)return;
+      const removed=name==='全部'?groups:[name];if(removed.some(g=>!groups.includes(g)))return alert('此單位沒有該組別');
+      const count=employees.filter(e=>e.role===role&&removed.includes(e.group)).length;
+      if(!confirm('取消【'+role+'】的 '+removed.join('、')+'？'+(count?' '+count+' 位人員改為不分組；人員與班表保留。':'')))return;
+      if(!await p79CommitRoleGroups(role,groups.filter(g=>!removed.includes(g)),removed))return alert('尚未確認刪除儲存成功；已保留原設定，請重試。');
+      alert('已取消【'+role+'】的所選組別；其他單位不受影響。');
     }
 
     function quickAssignEmpToGroup(groupName) {
@@ -4389,6 +4373,7 @@ function p79EmployeeDateEligible(emp,date) {
       const next = String(roleName || '').trim();
       if (!next) return;
 
+      if(next===activeRoleTab&&next!=='EMP_MGMT'){toggleScheduleRoleRosterCollapsed();return;}
       activeRoleTab = next;
       activeGroupFilter = 'ALL';
       try { sessionStorage.setItem('port79_schedule_active_role_tab', activeRoleTab); } catch (e) {}
@@ -4443,9 +4428,9 @@ function p79EmployeeDateEligible(emp,date) {
       }
     }
 
-    function getGroupOptionsHtml(selectedGroup) {
+    function getGroupOptionsHtml(selectedGroup,role=activeRoleTab) {
       let html = '';
-      sortedScheduleGroups().forEach(g => {
+      [...new Set([...sortedScheduleGroups(role),selectedGroup].filter(Boolean))].forEach(g => {
         html += `<option value="${g}" ${selectedGroup===g?'selected':''}>${g}</option>`;
       });
       return html;
@@ -4469,14 +4454,28 @@ function p79EmployeeDateEligible(emp,date) {
       return m ? `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}` : '';
     }
 
+    function scheduleTaipeiDutyShift(now=new Date()) {
+      const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
+      return hour<8?'晚':hour<16?'早':'中';
+    }
+    function scheduleDutyBadge(shift,empId){
+      const duty=shift===scheduleTaipeiDutyShift(),punched=isScheduleEmployeeClockedIn(empId);
+      if(duty)return '<span class="today-attendance-active" title="依今日排班及台北時間顯示當班；實際出勤仍依打卡紀錄"><span class="today-attendance-active-dot"></span>當班</span>'+(punched?' <span class="today-person-badge bg-sky-100 text-sky-800">已簽到</span>':'');
+      return punched?'<span class="today-person-badge bg-amber-100 text-amber-800" title="雲端有簽到但尚未讀到簽退，請核對打卡紀錄">待確認簽退</span>':'';
+    }
+    let p79ScheduleRenderedDutyShift='';
+    function p79RefreshScheduleDutyPeriod(){
+      const next=scheduleTaipeiDutyShift();if(next===p79ScheduleRenderedDutyShift)return;
+      p79ScheduleRenderedDutyShift=next;renderTodaySchedulePanel();try{renderRoleScheduleView();}catch(ignore){}
+    }
     function isScheduleEmployeeClockedIn(empId) {
       return p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000&&todayAttendanceActiveEmpIds.has(String(empId || '').trim().toUpperCase());
     }
 
     function scheduleAttendanceActiveBadge(empId) {
-      return isScheduleEmployeeClockedIn(empId)
-        ? '<span class="p79-attendance-active-badge" title="今日已上班簽到，尚未下班簽退"><span class="p79-attendance-dot"></span>出勤中</span>'
-        : '';
+      const date=scheduleTaipeiTodayKey(),shift=monthlyScheduleData?.[empId]?.[date]||'';
+      if(approvedLeaveForEmployee(empId,date))return '';
+      return scheduleDutyBadge(shift,empId);
     }
 
     function p79LeaveCoverOnDay(empId, dayStr){
@@ -5024,7 +5023,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         </button>
       `;
 
-      sortedScheduleGroups().forEach(gKey => {
+      sortedScheduleGroups().filter(g=>g!=='不分組'||sortedScheduleGroups().length>1).forEach(gKey => {
         const count = groupCounts[gKey] || 0;
         const isActive = (activeGroupFilter === gKey);
         groupTabsHtml += `
@@ -5252,8 +5251,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   <select onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="p79-mini-select p79-role-select" title="跨單位支援">
                     ${getRoleOptionsHtml(emp.role)}
                   </select>
-                  <select onchange="updateEmpGroupAndResort('${emp.id}', this.value)" class="p79-mini-select p79-group-select" title="組別">
-                    ${getGroupOptionsHtml(emp.group)}
+                  <select onchange="updateEmpGroupAndResort('${emp.id}', this.value)" class="p79-mini-select p79-group-select" title="組別" style="${sortedScheduleGroups(emp.role).length>1?'':'display:none!important'}">
+                    ${getGroupOptionsHtml(emp.group,emp.role)}
                   </select>
                 </div>
               </div>
@@ -5454,7 +5453,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td class="py-3 px-4 flex items-center gap-2">
               ${getGroupBadgeHtml(emp.group)}
               <select onchange="updateEmpGroupAndResort('${emp.id}', this.value)" class="px-2 py-1 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50/50">
-                ${getGroupOptionsHtml(emp.group)}
+                ${getGroupOptionsHtml(emp.group,emp.role)}
               </select>
             </td>
             <td class="py-3 px-4">
