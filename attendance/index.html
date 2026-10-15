@@ -1279,6 +1279,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             <tr>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">考勤號</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">姓名</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap" title="班次計算與日期篩選的歸屬日">工作日</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">部門</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">單位</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">職務</th>
@@ -2281,7 +2282,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.59';
+        const APP_VERSION='2026.10.15.61';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -15100,6 +15101,13 @@ function getManualPairRecordAnchor(record) {
               .catch(err=>showToast('雲端刪除未確認，原始紀錄保留：'+String(err?.message||err),'warning'));
         }
 
+        function p79AttendanceWorkDateCell(row) {
+            const key=String(row?.accountingDateKey||row?.dateKey||'').replaceAll('/','-');
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(key))return '--';
+            const actual=String(row?.actualDateKey||getAttendanceDateKey(row?.clockIn?.timeStr||row?.clockOut?.timeStr||'')).replaceAll('/','-');
+            const adjusted=!!row?.clockIn&&!!row?.clockOut&&actual&&key!==actual;
+            return '<span class="block font-bold '+(adjusted?'text-blue-800 dark:text-blue-200':'text-slate-700 dark:text-slate-200')+'">'+escapeHtml(key.replaceAll('-','/'))+'</span>'+(adjusted?'<span class="inline-flex rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200" title="依完整班次歸屬前一工作日；簽到與簽退欄保留實際打卡時間">凌晨歸前日</span>':'');
+        }
         function renderAdminRecordsTable() {
             const tbody = document.getElementById('adminRecordsTableBody');
 
@@ -15249,7 +15257,7 @@ function getManualPairRecordAnchor(record) {
             renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount, rowPageInfo);
 
             if (dailyRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
                 return;
             }
 
@@ -15319,6 +15327,7 @@ function getManualPairRecordAnchor(record) {
                         data-p79-out-time="${escapeHtml(String(normalizeImportedAttendanceTime(row.clockOut?.timeStr || '')))}">
                         <td class="px-2 py-3 text-center font-mono font-bold whitespace-nowrap">${row.attNo ?? ''}</td>
                         <td class="px-2 py-3 text-center font-semibold whitespace-nowrap">${row.name || ''}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${p79AttendanceWorkDateCell(row)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayDept}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
