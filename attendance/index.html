@@ -2281,7 +2281,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.55';
+        const APP_VERSION='2026.10.15.56';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -11895,7 +11895,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function attendanceRowMatchesDateRange(row, dateFrom = '', dateTo = '') {
-            const dates = attendanceRowDateCandidates(row);
+            const accounting=normalizeRecordFilterDate(row?.accountingDateKey||row?.dateKey||'');
+            const dates = accounting?[accounting]:attendanceRowDateCandidates(row);
             if (!dates.length) return false;
             return dates.some(d =>
                 (!dateFrom || d >= dateFrom) &&
@@ -11906,7 +11907,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         // v2026.10.03.16.60：班次月份一律以上班簽到日歸屬。
         // 例：09/30 23:35 -> 10/01 07:48，整班必須顯示在 2026-09 / 09-30。
         function attendanceRowAccountingMonthKey(row) {
-            const source = row?.clockIn?.timeStr || row?.dateKey || row?.clockOut?.timeStr || '';
+            const source = row?.accountingMonthKey || row?.accountingDateKey || row?.dateKey || row?.clockIn?.timeStr || row?.clockOut?.timeStr || '';
             const m = String(source).match(/^(\d{4})[\/-](\d{1,2})/);
             return m ? `${m[1]}-${String(m[2]).padStart(2,'0')}` : '';
         }
@@ -17177,7 +17178,7 @@ function getManualPairRecordAnchor(record) {
             // 以完整班次統計，而不是逐筆原始刷卡統計。
             // 班次所屬月份以「上班簽到日」為準，因此 9/30 23:35 至 10/1 07:48 只計入 9 月 30 日。
             buildDailyAttendanceRows(visibleRecords).forEach(session => {
-                const dateMatch = String(session.dateKey || '').match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+                const dateMatch = String(session.accountingDateKey || session.dateKey || '').match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/);
                 if (!dateMatch || Number(dateMatch[1]) !== year || Number(dateMatch[2]) !== month) return;
                 const emp = findEmployeeForAttendanceIdentity(session, visibleEmployees);
                 if (!emp) return;
@@ -21134,7 +21135,38 @@ function getManualPairRecordAnchor(record) {
             return getAttendanceDateKey(record?.timeStr||'').replaceAll('/','-').slice(0,7)===month;
         }
 
-        function exportSelectedRecordsExcel() {
+        function p79AttendanceLeaveReportCode(value) {
+            const text=String(value||'').trim();
+            const codes={'特休假':'年','特別休假':'年','特休':'年','年假':'年','事假':'事','病假':'病','公假':'公','喪假':'喪','婚假':'婚','產假':'產','產檢假':'檢','陪產檢及陪產假':'陪','陪產假':'陪','家庭照顧假':'顧','生理假':'經','安胎休養假':'安','公傷病假':'傷','職災傷病假':'傷','訂婚假':'訂','離職':'離','resigned':'離','terminated':'離'};
+            return codes[text]||text;
+        }
+        function p79BuildAttendanceDayReport(month,people,source) {
+            const output=[['工作日','考勤號','工號','姓名','部門','職稱','班表／假別','上班簽到時間','下班簽退時間']];
+            const sessions=window.P79AttendanceV6.buildShifts(source),byDay=new Map();
+            sessions.forEach(session=>{
+                const day=String(session.accountingDateKey||session.dateKey||'').replaceAll('/','-');
+                if(day.slice(0,7)!==month)return;
+                const emp=findEmployeeForAttendanceIdentity(session,people);if(!emp)return;
+                const key=String(emp.empId)+'|'+day;if(!byDay.has(key))byDay.set(key,[]);byDay.get(key).push(session);
+            });
+            const [year,number]=month.split('-').map(Number),count=new Date(year,number,0).getDate();
+            people.forEach(emp=>{
+                const planned=employeeScheduleMap(emp),metadata=employeeScheduleMetaMap(emp);
+                for(let day=1;day<=count;day++){
+                    const date=month+'-'+String(day).padStart(2,'0'),raw=String(planned[date]||'');
+                    const approved=approvedLeaveOnDate(emp.empId,date),meta=metadata[date]||{};
+                    let label=approved.length?[...new Set(approved.map(x=>p79AttendanceLeaveReportCode(x.leaveType||x.type||x.category||'請假')))].join('／'):p79AttendanceLeaveReportCode(raw);
+                    if(!approved.length&&['早','中','晚','休'].includes(raw))label=meta.overtimeReport?.code||((raw==='休'&&meta.restCategory)?meta.restCategory:raw);
+                    const last=normalizeScheduleDateKey(emp.lastWorkDate||emp.terminationDate||'');
+                    if(!approved.length&&['resigned','離職','terminated'].includes(String(emp.employmentStatus||'').toLowerCase())&&last&&date>last)label='離';
+                    const shifts=byDay.get(String(emp.empId)+'|'+date)||[];
+                    if(!shifts.length&&!label)continue;
+                    (shifts.length?shifts:[null]).forEach(shift=>output.push([date,emp.attNo??'',emp.empId,emp.name||'',emp.dept||'',emp.jobTitle||emp.deptDetail||'',label,shift?.clockIn?.timeStr||'',shift?.clockOut?.timeStr||'']));
+                }
+            });
+            return output;
+        }
+        async function exportSelectedRecordsExcel() {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             const checkboxes = document.querySelectorAll('.export-field-checkbox');
             let selectedFields = [];
@@ -21155,6 +21187,15 @@ function getManualPairRecordAnchor(record) {
                 showToast('請選擇有效的匯出年／月份', 'warning');
                 return;
             }
+            if(getActiveGasUrl()){
+                const loaded=await loadCloudData(false,true);
+                if(!loaded){showToast('雲端假別與班表尚未讀取完成，請稍後再匯出，避免漏資料','warning');return;}
+                if(!await loadAttendanceMonthFromCloud(exportMonth,false)){showToast('所選月份考勤未讀取完成，請稍後再匯出','warning');return;}
+            }
+            if(!window.P79AttendanceV6?.buildShifts){showToast('班次計算元件尚未載入，請稍後再試','warning');return;}
+            const reportPeople=getAdminAttendanceEmployees().filter(emp=>String(emp.empId||'')!=='ADMIN'&&(companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter)));
+            const reportSource=records.filter(canCurrentAdminViewDataRow);
+            const dailyReport=p79BuildAttendanceDayReport(exportMonth,reportPeople,reportSource);
             const visibleRecords = records
                 .filter(record=>p79AttendanceExportMatchesMonth(record,exportMonth))
                 .filter(canCurrentAdminViewDataRow)
@@ -21168,7 +21209,7 @@ function getManualPairRecordAnchor(record) {
                     const company = recordEmpId.match(/^([A-Z]+)/)?.[1] || '';
                     return company === companyFilter;
                 });
-            if (visibleRecords.length === 0) {
+            if (visibleRecords.length === 0 && dailyReport.length<=1) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
@@ -21194,6 +21235,9 @@ function getManualPairRecordAnchor(record) {
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
             worksheet['!cols'] = selectedFields.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, time: 22, status: 14, location: 28, note: 28 })[field.key] || 16 }));
             const workbook = XLSX.utils.book_new();
+            const dailySheet=XLSX.utils.aoa_to_sheet(dailyReport);
+            dailySheet['!cols']=[12,10,16,14,16,14,18,24,24].map(wch=>({wch}));
+            XLSX.utils.book_append_sheet(workbook,dailySheet,'班次與假別');
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
@@ -23601,7 +23645,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261014.109"></script>
+<script src="./v6-engine.js?v=20261015.56"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';
