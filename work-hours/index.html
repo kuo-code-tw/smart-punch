@@ -2,7 +2,7 @@
 <html lang="zh-TW" class="light">
 <head>
 <script src="../assets/port79-overtime-report.js?v=20261014.111"></script>
-<script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -2099,7 +2099,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.57';
+        const APP_VERSION='2026.10.15.58';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12327,7 +12327,7 @@ async function p79ExportOvertimeComparison(printMode){
                     // 每日延長時間 30 分鐘以內不列入加班；須超過 30 分鐘才計入。
                     if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
                     const employee = indexedEmployee(session);
-                    if (!employee) return null;
+                    if (!employee||!p79EmployeeDateEligible(employee,session.accountingDateKey||session.dateKey)) return null;
                     const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId).trim().toUpperCase()));
                     const restMeta=matchedReport.meta;
                     if(restMeta?.overtimeExcluded)return null;
@@ -12633,6 +12633,21 @@ function p79OvertimePeriodLabel(report){
             return Number.isFinite(numeric) ? String(Math.trunc(numeric)) : raw.toUpperCase();
         }
 
+
+function p79EmploymentStartDate(emp) {
+  const raw=String(emp?.reportingDate||emp?.startDate||'').trim();
+  const m=raw.match(/^(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(!m)return '';
+  let y=Number(m[1]);if(y<1911)y+=1911;
+  const month=Number(m[2]),day=Number(m[3]),check=new Date(y,month-1,day);
+  if(check.getFullYear()!==y||check.getMonth()!==month-1||check.getDate()!==day)return '';
+  return String(y).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+}
+function p79EmployeeDateEligible(emp,date) {
+  const start=p79EmploymentStartDate(emp);
+  return !start||String(date||'').replaceAll('/','-').slice(0,10)>=start;
+}
+
         function buildAttendanceDayMapByShift(visibleEmployees, year, month) {
             const attendanceDays = new Map(visibleEmployees.map(emp => [String(emp.empId || ''), new Set()]));
             const visibleRecords = records.filter(canCurrentAdminViewDataRow);
@@ -12643,7 +12658,7 @@ function p79OvertimePeriodLabel(report){
                 const dateMatch = String(session.accountingDateKey || session.dateKey || '').match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/);
                 if (!dateMatch || Number(dateMatch[1]) !== year || Number(dateMatch[2]) !== month) return;
                 const emp = findEmployeeForAttendanceIdentity(session, visibleEmployees);
-                if (!emp) return;
+                if (!emp||!p79EmployeeDateEligible(emp,String(session.accountingDateKey||session.dateKey||''))) return;
                 attendanceDays.get(String(emp.empId || ''))?.add(Number(dateMatch[3]));
             });
             return attendanceDays;
