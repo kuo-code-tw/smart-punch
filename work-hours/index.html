@@ -766,6 +766,24 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px}
 #adminContentOvertime .p79-overtime-inline button{min-height:28px!important;padding:2px 6px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
 </style>
+<style id="p79-attendance-balanced-columns-v69">
+#adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:1440px!important;table-layout:fixed!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td){padding:10px 8px!important;text-align:center!important;vertical-align:middle!important;box-sizing:border-box!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(1){width:6%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(2){width:7%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(3){width:8%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:9%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:9%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:7%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:12%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:12%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:7%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:8%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:10%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:5%!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
@@ -2101,7 +2119,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.68';
+        const APP_VERSION='2026.10.15.69';
 
         function readPort79SsoTokenFromHash() {
             try {
