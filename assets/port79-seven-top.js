@@ -150,7 +150,7 @@ const MENU={
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
- workhours:[['overtime-options','⚙️ 加班選項管理'],['year','📆 年份顯示']],
+ workhours:[['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
@@ -217,6 +217,10 @@ async function runAction(sys,a){closeMenu();try{
   if(a==='employee')return window.switchView?.('employee');
  }
  if(sys==='workhours'){
+  if(a==='overtime-reload')return await window.p79ReloadOvertimeMonth?.(document.getElementById('p79ReloadOvertimeButton'));
+  if(a==='overtime-export')return await window.p79ExportOvertimeComparison?.(false);
+  if(a==='overtime-print')return await window.p79ExportOvertimeComparison?.(true);
+  if(a==='overtime-policy')return window.openOvertimePolicyModal?.();
   if(a==='stats'){location.hash='stats';return window.switchAdminTab?.('stats')}
   if(a==='overtime'){location.hash='overtime';return window.switchAdminTab?.('overtime')}
   if(a==='read-cloud')return await window.manualCloudRefresh?.();
@@ -260,10 +264,10 @@ function buildMenu(sys){
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
-  ['資料管理',['add','attendance-import','attendance-export','balance-import','balance-export','import','export']],
+  ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','import','export']],
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
-  ['紀錄查詢',['logs','attendance-compare','compare']],
+  ['紀錄查詢',['overtime-print','overtime-policy','logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
   ['顯示設定',['year','global-theme']],
   ['登出系統',['logout-system']]
@@ -272,6 +276,7 @@ function buildMenu(sys){
  function addAction(a,label,cls){
    const b=document.createElement('button');
    b.type='button';b.dataset.action=a;b.textContent=label;
+   if(sys==='workhours'&&a==='overtime-reload')b.id='p79ReloadOvertimeButton';
    if(cls)String(cls).split(/\s+/).filter(Boolean).forEach(c=>b.classList.add(c));
    if(a==='logout-system')b.classList.add('danger');
    b.addEventListener('click',()=>a==='logout-system'?window.p79LogoutToSevenSystemHome():runAction(sys,a));
