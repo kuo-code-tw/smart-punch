@@ -68,15 +68,26 @@ function token(){
 function gasUrl(){
   try{return typeof getActiveGasUrl==='function'?getActiveGasUrl():String(sysConfig?.gasUrl||'')}catch(e){return ''}
 }
+const EMERGENCY_OUTBOX_KEY=OUTBOX_KEY+'_emergency';
+let queueOverlay=null,queueStorage='local';
 function readQueue(){
-  try{
-    const a=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');
-    return Array.isArray(a)?a:[];
-  }catch(e){return []}
+  if(queueOverlay)return queueOverlay.slice();
+  try{const raw=sessionStorage.getItem(EMERGENCY_OUTBOX_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a)){queueStorage='session';return a;}}}catch(e){}
+  try{const a=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}
 }
 function saveQueue(q){
-  try{localStorage.setItem(OUTBOX_KEY,JSON.stringify(q.slice(-500)))}catch(e){}
+  // Never truncate or silently discard unconfirmed punches when storage is full.
+  queueOverlay=q.slice();
+  const raw=JSON.stringify(q);
+  try{
+    localStorage.setItem(OUTBOX_KEY,raw);queueStorage='local';queueOverlay=null;
+    try{sessionStorage.removeItem(EMERGENCY_OUTBOX_KEY)}catch(e){}
+  }catch(error){
+    try{sessionStorage.setItem(EMERGENCY_OUTBOX_KEY,raw);queueStorage='session';queueOverlay=null;}
+    catch(backupError){queueStorage='memory';console.error('考勤待傳資料只能暫留目前頁面，請勿關閉，正在持續重試雲端',backupError);}
+  }
   updateUi();
+  return queueStorage!=='memory';
 }
 function opKey(payload){
   const a=String(payload?.action||'');
@@ -172,8 +183,11 @@ function cloudRecordConfirmsItem(item, cloudRecord){
   const cloudId=String(cloudRecord?.id??'');
   if(!localId||localId!==cloudId)return false;
 
-  // 新增/落盤只要同 ID 已由雲端讀回即可確認。
+  // New punches must match the saved identity, time and IN/OUT status as well as ID.
   if(action==='addRecord'||action==='persistEmployeePunch'||action==='queueEmployeePunch'){
+    for(const field of ['empId','attNo','timeStr','status']){
+      if(local[field]!=null&&String(local[field]).trim()!==''&&normalizeCompareValue(local[field])!==normalizeCompareValue(cloudRecord?.[field]))return false;
+    }
     return true;
   }
 
@@ -271,6 +285,18 @@ async function send(payload,timeout=25000){
       err.serverData=data;
       err.duplicatePunch=data?.duplicatePunch===true;
       throw err;
+    }
+    const action=String(payload?.action||'');
+    const employeePunch=['queueEmployeePunch','persistEmployeePunch'].includes(action)||
+      (action==='addRecord'&&String(payload?.record?.source||'').toLowerCase().includes('employee'));
+    if(employeePunch){
+      const id=payloadRecordId(payload);
+      if(String(data.id||'')!==id)throw new Error('雲端回覆紀錄 ID 不符，尚未確認正式打卡');
+      const check=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(tk),{cache:'no-store',signal:ctrl.signal});
+      const verified=await check.json();
+      if(!check.ok||verified?.ok!==true||!cloudRecordConfirmsItem({payload},verified?.found?.[id])){
+        throw new Error('雲端正式主表尚未核對到同一筆打卡，原始時間與待傳紀錄保留');
+      }
     }
     return data;
   }finally{
@@ -684,6 +710,7 @@ function updateUi(){
   const currentIndex=Math.min(total,Math.max(1,Number(syncBatchDone||0)+1));
   const nextDescription=pending?desc(q[0]?.payload):'';
 
+  const storageWarning=queueStorage==='memory'?'⚠ 儲存空間不足：待傳資料僅留目前頁面，請勿關閉':queueStorage==='session'?'⚠ 已使用分頁備援保留待傳資料，請等待雲端確認':'';
   const mainState = writing
     ? `✍️ 寫入中 ${currentIndex}/${total}｜${currentOpText}`
     : (pending
@@ -693,6 +720,7 @@ function updateUi(){
             : '● 待命｜尚未完成首次雲端作業'));
 
   const html=`
+    ${storageWarning?'<strong class="text-red-700">'+storageWarning+'</strong>':''}
     <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">⚡ V5 即時核心</span>
     <span class="rounded-full border ${pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700'} px-2 py-1">${pending?`📤 同步佇列 ${pending} 筆`:'📤 同步佇列已清空'}</span>
     <span class="rounded-full border ${writing?'border-indigo-200 bg-indigo-50 text-indigo-700':(pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700')} px-2 py-1">${mainState}</span>
@@ -746,7 +774,9 @@ window.p79V5QueueInfoForId=queueInfoForId;
 window.p79V5ConfirmCloudRecord=confirmCloudRecord;
 window.p79V5ConfirmCloudDelete=confirmCloudDelete;
 window.p79V5RefreshStatus=updateUi;
+window.p79V5ReadPendingQueue=()=>readQueue();
 window.p79V5GetStatus=()=>({
+  queueStorage,
   writing,
   pending:readQueue().length,
   currentOpText,
@@ -998,3 +1028,4 @@ window.postRealtimePunchToCloud=function(record,successMsg,onPersistSuccess,onEr
 };
 
 })();
+
