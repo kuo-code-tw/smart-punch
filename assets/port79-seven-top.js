@@ -219,7 +219,7 @@ async function runAction(sys,a){closeMenu();try{
  if(sys==='workhours'){
   if(a==='overtime-reload')return await window.p79ReloadOvertimeMonth?.(document.getElementById('p79ReloadOvertimeButton'));
   if(a==='overtime-export')return await window.p79ExportOvertimeComparison?.(false);
-  if(a==='overtime-summary')return window.P79OvertimeApplication?.open({summary:true});
+  if(a==='overtime-summary')return window.P79OvertimeMonthlyMatrix?.open();
   if(a==='overtime-application')return window.P79OvertimeApplication?.open();
   if(a==='overtime-print')return await window.p79ExportOvertimeComparison?.(true);
   if(a==='overtime-policy')return window.openOvertimePolicyModal?.();
