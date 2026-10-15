@@ -1182,10 +1182,10 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button type="button" id="p79ReloadOvertimeButton" onclick="p79ReloadOvertimeMonth(this)" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">重新讀取加班</button><button type="button" onclick="p79ExportOvertimeComparison(false)" class="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">匯出Excel</button><button type="button" onclick="p79ExportOvertimeComparison(true)" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">列印比對</button><button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
+                        
                         <button type="button" onclick="P79MonthlyRest.open()" class="px-3 py-1.5 bg-indigo-700 text-white rounded-xl text-xs font-semibold">每月未休假加班</button>
                         <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
-                        <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
+                        
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
                     </div>
                 </div>
@@ -2101,7 +2101,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.66';
+        const APP_VERSION='2026.10.15.67';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14592,7 +14592,7 @@ document.addEventListener('click',function(e){
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261012.51"></script>
+<script src="../assets/port79-seven-top.js?v=20261015.67"></script>
 
 <script id="p79-workhours-menu-compact-v20261004">
 (function(){
