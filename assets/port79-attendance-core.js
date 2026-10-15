@@ -292,6 +292,8 @@ async function send(payload,timeout=25000){
     if(employeePunch){
       const id=payloadRecordId(payload);
       if(String(data.id||'')!==id)throw new Error('雲端回覆紀錄 ID 不符，尚未確認正式打卡');
+      // V49 flushes the official row and original journal before issuing this receipt.
+      if(data.punchWriteConfirmed===true && (data.fastLane===true || data.persisted===true))return data;
       const check=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(tk),{cache:'no-store',signal:ctrl.signal});
       const verified=await check.json();
       if(!check.ok||verified?.ok!==true||!cloudRecordConfirmsItem({payload},verified?.found?.[id])){
@@ -385,6 +387,7 @@ async function drain(force=false){
           if(rid!=null){
             const ridText=String(rid);
             rejectedPunchById.set(ridText, String(err?.message||'重複刷卡已阻擋'));
+            try{window.p79HandleRejectedPunch?.(ridText,String(err?.message||''));}catch(e){}
             records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'')!==ridText);
             try{removeAttendanceRecordsFromArchive?.([ridText])}catch(e){}
             try{forgetRecentAttendanceMutation?.(ridText)}catch(e){}
@@ -850,6 +853,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
         const rid=recordId!=null?String(recordId):'';
         if(rid){
           rejectedPunchById.set(rid, reason);
+          try{window.p79HandleRejectedPunch?.(rid,reason);}catch(e){}
           records=(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'')!==rid);
           try{removeAttendanceRecordsFromArchive?.([rid])}catch(e){}
           try{forgetRecentAttendanceMutation?.(rid)}catch(e){}
