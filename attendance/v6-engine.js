@@ -77,17 +77,10 @@
   function accountingDateForSession(inRec,outRec){
     const base=inRec||outRec;
     const calendar=normalizeTime(base&&base.timeStr).slice(0,10).replace(/\//g,'-');
-    // A completed dawn call-out belongs to the previous night when most of its
-    // actual working time falls before 08:00. Early arrival for a normal day
-    // shift remains on its calendar day. Never alter either punch timestamp.
-    if(!inRec||!outRec)return calendar;
-    const start=ts(inRec),end=ts(outRec),day=new Date(start);
-    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||end-start>MAX_SHIFT_MS||day.getHours()>=8)return calendar;
-    const cutoff=new Date(day.getFullYear(),day.getMonth(),day.getDate(),8).getTime();
-    const night=Math.max(0,Math.min(end,cutoff)-start),after=Math.max(0,end-Math.max(start,cutoff));
-    if(night<=after)return calendar;
-    day.setDate(day.getDate()-1);
-    return [day.getFullYear(),String(day.getMonth()+1).padStart(2,'0'),String(day.getDate()).padStart(2,'0')].join('-');
+    // Work date follows the actual clock-in calendar date, including dawn
+    // call-outs. A shift that crosses midnight stays on its clock-in date.
+    // Preserve both original timestamps and never infer a previous day by hour.
+    return calendar;
   }
   function pairSession(inRec,outRec,reason,allRecords){
     const rawList=Array.isArray(allRecords)?allRecords:[inRec,outRec];
@@ -419,8 +412,8 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.10-DISTINCT-SHIFTS';
-    console.info('[PORT79] Attendance V6.0.10 distinct-shift preservation installed');
+    window.p79AttendanceEngineVersion='V6.0.11-CALENDAR-WORKDATE';
+    console.info('[PORT79] Attendance V6.0.11 calendar work-date installed');
     return true;
   }
   return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
