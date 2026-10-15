@@ -4651,7 +4651,11 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
         function markFirstPunchVerifiedLocally(emp) {
             if (!emp) return;
-            try { localStorage.setItem(getFirstPunchVerificationKey(emp), '1'); } catch (e) {}
+            try {
+                const key=getFirstPunchVerificationKey(emp);localStorage.setItem(key,'1');
+                const phone=normalizeVerificationPhone(emp.phone||'');
+                if(phone)localStorage.setItem(key+'_phone',phone);else localStorage.removeItem(key+'_phone');
+            } catch (e) {}
         }
 
         function findSingleEmployeeByCurrentDeviceBinding() {
@@ -9412,6 +9416,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function isFirstPunchVerified(emp) {
             if (!emp) return false;
             if (normalizeAdminRole(emp.adminRole, emp) === 'superadmin') return true;
+
+            // HR device exemption does not require a persistent device binding.
+            // Keep the first phone check; clearing/changing the master phone invalidates this proof.
+            if(emp.allowPunchWithoutDeviceBinding===true){
+                try{
+                    const key=getFirstPunchVerificationKey(emp),phone=normalizeVerificationPhone(emp.phone||'');
+                    if(!phone){localStorage.removeItem(key);localStorage.removeItem(key+'_phone');return false;}
+                    return localStorage.getItem(key)==='1'&&localStorage.getItem(key+'_phone')===phone;
+                }catch(error){return false;}
+            }
 
             const savedDeviceId = String(emp.deviceId || '').trim();
 
