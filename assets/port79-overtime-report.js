@@ -142,9 +142,16 @@
   const meta=own.__meta?.[date]||{};
   if(meta.overtimeReport?.category==='代'&&key(meta.forEmpId)===key(cover.leaveEmpId)&&meta.overtimeReport.code)return {code:meta.overtimeReport.code,requirePeriodSelection:false};
   const shift=map=>{const value=map[date]??map[date.slice(-2)]??map[String(Number(date.slice(-2)))];if(['早','中','晚'].includes(value))return value;const m=map.__meta?.[date]||{};return [m.reportOriginalShift,m.overtimeOriginalShift,m.leaveOriginalShift].find(v=>['早','中','晚'].includes(v));};
-  const name=shift(own)||shift(target),ranges={早:['08','16'],中:['16','24'],晚:['24','08']};let times=ranges[name];
-  if(times&&cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[name][cover.workerIds.findIndex(id=>key(id)===key(entry.empId))===1?1:0];}
-  return {code:times?'代'+times.join('-'):'',requirePeriodSelection:!times};
+  const name=shift(target)||shift(own),ranges={早:['08','16'],中:['16','24'],晚:['24','08']};let times=ranges[name];
+  if(times&&cover.mode==='two'){
+   const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]},ownTimes=ranges[shift(own)];
+   if(ownTimes){
+    const adjacent=halves[name].filter(t=>hour(t[1])%1440===hour(ownTimes[0])%1440||hour(t[0])%1440===hour(ownTimes[1])%1440);
+    if(adjacent.length!==1)return {code:'',requirePeriodSelection:true,periodHint:'請假班為'+name+'班 '+ranges[name].join('-')+'；此員正常班為'+shift(own)+'班 '+ownTimes.join('-')+'，沒有可直接相接的半班，請核對代班安排。'};
+    times=adjacent[0];
+   }else times=halves[name][cover.workerIds.findIndex(id=>key(id)===key(entry.empId))===1?1:0];
+  }
+  return {code:times?'代'+times.join('-'):'',requirePeriodSelection:!times,periodHint:times?'請假班為'+name+'班 '+ranges[name].join('-')+'；本筆代班時段 '+times.join('-')+'，請選擇符合的已設定規則。':''};
  }
  function dialog(title,content,id='p79OvertimeDialog'){
   const previous=document.getElementById(id);previous?.p79Cleanup?.();previous?.remove();
@@ -339,7 +346,7 @@
     const categoryMatch=match>=0?match:rows.findIndex(r=>r[0]===prefill.category);
     if(categoryMatch>=0){kind.value=ruleType(rows[categoryMatch]);refresh();}
     if(match>=0){select.value=String(match);preview();}
-    else if(prefill.code||prefill.requirePeriodSelection){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent=prefill.code?'班表時段 '+prefill.code+' 尚無相符選項，請新增或選擇正確時段。':'代班已確認；班表無法推算時段，請自行選擇正確出勤時段。';}
+    else if(prefill.code||prefill.requirePeriodSelection){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent=prefill.periodHint|| (prefill.code?'班表時段 '+prefill.code+' 尚無相符選項，請新增或選擇正確時段。':'代班已確認；班表無法推算時段，請自行選擇正確出勤時段。');}
     refreshPairPeople();empSelect.value=String(prefill.empId);preview();
    }
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
@@ -362,7 +369,7 @@
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
    el.querySelector('#p79OtStage').onclick=async()=>{
-    try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');if(normalMismatch(rows[Number(select.value)]))throw Error('此出勤時段的正常班與該員班表不同，請選擇符合的時段或在加班選項管理設定正確正常班');
+    try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');if(normalMismatch(rows[Number(select.value)]))throw Error('該員當日原班為「'+prefill.normalShifts?.[el.querySelector('#p79OtEmp').value]+'班」，所選時段需正常班 '+rows[Number(select.value)][4]+'-'+rows[Number(select.value)][5]+'，請核對班表與加班時段');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
      const draft={id:crypto.randomUUID(),empId,date,rule:report(rows[Number(select.value)]),...reportPair(prefill.leaveHandoffId?'代':rows[Number(select.value)][0],empId,forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
