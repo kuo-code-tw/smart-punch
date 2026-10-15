@@ -173,6 +173,15 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 <link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
 <link rel="stylesheet" href="../assets/port79-calendar-range.css">
 <style id="p79-hr-hide-floating-year">#port79CalendarModeBox{display:none!important}</style>
+<style id="hr-editor-v58">
+#editor{width:min(1040px,calc(100vw - 24px));max-height:92dvh;overflow:auto;scroll-behavior:auto;overflow-anchor:none}
+#editor .modalhead{position:sticky;top:0;z-index:5;background:var(--panel,#fff);align-items:center;gap:12px}
+.hr-editor-top-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;flex-shrink:0}
+#editor .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#editor .grid>*{min-width:0}#editor .employment-box,#editor .field.wide{grid-column:1/-1}
+@media(max-width:760px){#editor .grid{grid-template-columns:repeat(2,minmax(0,1fr))}#editor .modalhead{flex-wrap:wrap}.hr-editor-top-actions{width:100%}}
+@media(max-width:480px){#editor .grid{grid-template-columns:1fr}}
+</style>
 </head>
 <!-- v2026.09.28.8.1：人員異動紀錄可安全清除＋GAS 舊網址自動回退；保留目前人員主檔與既有修正結果。 -->
 <body data-p79-system="hr">
@@ -309,7 +318,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   <input id="pickerSearch" placeholder="搜尋..." oninput="renderMasterPicker()">
   <div id="pickerResults" class="picker-results"></div>
 </div></dialog>
-<dialog id="editor"><form method="dialog" onsubmit="return false"><div class="modal"><div class="modalhead"><div><b id="modalTitle">新增員工</b><div class="muted">所有七大系統都會讀取這一份人資主檔；不會搬移或重建既有 Google Sheet。</div></div><button class="btn" onclick="editor.close()">關閉</button></div>
+<dialog id="editor"><form method="dialog" onsubmit="return false"><div class="modal"><div class="modalhead"><div><b id="modalTitle">新增員工</b><div class="muted">所有七大系統都會讀取這一份人資主檔；不會搬移或重建既有 Google Sheet。</div></div><div class="hr-editor-top-actions"><button type="button" class="btn danger" id="resignTopBtn" onclick="resignCurrent()">🚪 辦理離職</button><button type="button" class="btn primary" id="saveTopBtn" onclick="saveCurrent()">💾 儲存</button><button type="button" class="btn" onclick="editor.close()">關閉</button></div></div>
 <div class="grid">
   <input id="origEmpId" type="hidden">
   <div class="field"><label>考勤號碼</label><input id="attNo" inputmode="numeric"></div><div class="field"><label>工號 *</label><input id="empId" required></div><div class="field"><label>姓名 *</label><input id="name" required></div>
@@ -332,7 +341,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <label>電話</label><input id="phone" inputmode="tel" autocomplete="tel" placeholder="例如 0972933252">
     <div class="help-text">台灣手機若 Google Sheet 把開頭 0 吃掉，系統會自動補回。</div>
   </div>
-  <div class="field"><label>到職日</label><input id="startDate" type="date"></div><div class="field"><label>生日</label><input id="birthday" type="date"></div><div class="field"><label>特休剩餘天數</label><input id="leaveRemaining" type="number" step="0.5" min="0"></div>
+  <div class="field"><label>到職日</label><input id="startDate" type="date"></div><div class="field"><label for="reportingDate">報到日期（統計起算）</label><input id="reportingDate" type="date"><div class="help-text">從此日起計算考勤、排班與例休國；未填則沿用到職日。</div></div><div class="field"><label>生日</label><input id="birthday" type="date"></div><div class="field"><label>特休剩餘天數</label><input id="leaveRemaining" type="number" step="0.5" min="0"></div>
   <div class="employment-box">
     <div class="title">🚪 在職／離職管理</div>
     <div class="grid">
@@ -345,7 +354,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   <div class="field"><label>後台角色</label><select id="adminRole" onchange="onRoleChange()"><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select></div><div class="field"><label>管理員登入密碼</label><input id="password" type="password" placeholder="一般員工不可設定密碼；管理員留空＝維持原密碼"><div class="muted">只有管理員／超級管理員可設定；一般員工此欄鎖定。</div></div><div class="field"><label>裝置綁定</label><input id="deviceState" disabled></div>
   <div class="field wide"><label>系統權限（含工時統計與歷史資料；超級管理員固定全部管理）</label><div class="permgrid" id="permGrid"></div></div>
 </div>
-<div class="footer"><div class="muted" id="editHint">離職不會刪除歷史資料；考勤、請假、排班、效率紀錄都會保留。</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn danger" id="resignBtn" onclick="resignCurrent()">🚪 辦理離職</button><button class="btn" id="restoreBtn" onclick="restoreCurrent()">↩ 恢復在職／重新到職</button><button class="btn" id="unbindBtn" onclick="unbindCurrent()">解除裝置</button><button class="btn primary" id="saveBtn" onclick="saveCurrent()">💾 儲存</button></div></div>
+<div class="footer"><div class="muted" id="editHint">離職不會刪除歷史資料；考勤、請假、排班、效率紀錄都會保留。</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn danger" id="resignBtn" onclick="resignCurrent()">🚪 辦理離職</button><button class="btn" id="restoreBtn" onclick="restoreCurrent()">↩ 恢復在職／重新到職</button><button class="btn" id="unbindBtn" onclick="unbindCurrent()">解除裝置</button><button type="button" class="btn" id="cancelEditBtn" onclick="editor.close()">取消</button><button class="btn primary" id="saveBtn" onclick="saveCurrent()">💾 儲存</button></div></div>
 </div></form></dialog>
 
 <div id="port79CalendarModeBox" aria-label="年份顯示方式">
@@ -410,7 +419,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </script>
 
 <script>
-const APP_VERSION='2026.10.12.47';
+const APP_VERSION='2026.10.15.58';
 const DEFAULT_GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 let employees=[],session=null,token='',hrAccess='none',editing=null;
@@ -950,7 +959,7 @@ function render(){
       <td>${i+1}</td><td><span class="empstatus ${employmentClass(stt)}">${employmentLabel(stt)}</span></td>
       <td>${esc(e.attNo||'')}</td><td><b>${esc(e.empId)}</b></td><td><b>${esc(e.name)}</b></td>
       <td>${esc(e.dept||'')}</td><td>${esc(e.unit||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
-      <td>${esc(e.startDate||'')}</td><td>${stt==='resigned'?esc(e.terminationDate||'—'):'—'}</td><td>${esc(e.birthday||'')}</td>
+      <td>${esc(e.startDate||'')}${e.reportingDate?`<div class="muted">報到 ${esc(e.reportingDate)}</div>`:''}</td><td>${stt==='resigned'?esc(e.terminationDate||'—'):'—'}</td><td>${esc(e.birthday||'')}</td>
       <td><b>${lb.remaining==null?'—':esc(lb.remaining)+' 天'}</b></td>
       <td>${e.deviceBound?'<span class="pill">已綁定</span>':'—'}</td>
       <td>
@@ -1028,6 +1037,7 @@ function openEditor(id=''){
   $('jobTitle').value=editing?.jobTitle||editing?.deptDetail||'';
   $('phone').value=normalizePhone(editing?.phone||'');
   $('startDate').value=String(editing?.startDate||'').slice(0,10).replace(/\//g,'-');
+  $('reportingDate').value=String(editing?.reportingDate||'').slice(0,10).replace(/\//g,'-');
   $('birthday').value=String(editing?.birthday||'').slice(0,10).replace(/\//g,'-');
   $('leaveRemaining').value=editing?.leaveBalance?.remaining??'';
   $('employmentStatus').value=normalizeEmploymentStatus(editing?.employmentStatus);
@@ -1044,7 +1054,14 @@ function openEditor(id=''){
   buildPermGrid(editing||{adminRole:'employee',systemPermissions:{attendance:'view',workhours:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none',history:'none'}});
   onEmploymentStatusChange();
   window.Port79CalendarRange?.syncAll?.();
+  $('resignTopBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
   editor.showModal();
+  const resetEditorTop=()=>{
+    editor.scrollTop=0;
+    editor.querySelectorAll('form,.modal').forEach(el=>el.scrollTop=0);
+    $('attNo').focus({preventScroll:true});
+  };
+  resetEditorTop();requestAnimationFrame(resetEditorTop);
 }
 let p79HrSaveRevision=0;
 async function saveCurrent(){
@@ -1062,7 +1079,7 @@ async function saveCurrent(){
     ...old,
     attNo:$('attNo').value.trim(),empId,name,dept:$('dept').value.trim(),unit:$('unit').value.trim(),
     jobTitle:$('jobTitle').value.trim(),deptDetail:$('jobTitle').value.trim(),
-    phone:normalizePhone($('phone').value),startDate:$('startDate').value,birthday:$('birthday').value,
+    phone:normalizePhone($('phone').value),startDate:$('startDate').value,reportingDate:$('reportingDate').value,birthday:$('birthday').value,
     password:role==='employee'?'':$('password').value,adminRole:role,systemPermissions:p,finePermissions,dataScope,dataScopeJobs,employeeListAccess:p.hr,
     leaveBalance:Object.keys(lb).length?lb:null,
     employmentStatus:st,
@@ -1073,7 +1090,7 @@ async function saveCurrent(){
   if(st==='resigned'&&!employee.terminationDate){alert('離職狀態請填寫離職日期');return}
   const button=$('saveBtn'),originalLabel=button.textContent,originalEmpId=$('origEmpId').value||empId;
   try{
-    button.disabled=true;button.textContent='儲存中…';$('status').textContent='☁️ 正在儲存這位員工，等待雲端確認…';
+    $('saveTopBtn').disabled=true;button.disabled=true;button.textContent='儲存中…';$('status').textContent='☁️ 正在儲存這位員工，等待雲端確認…';
     const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
     if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
     const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
@@ -1088,12 +1105,12 @@ async function saveCurrent(){
       const cloudEmployee=(data.employees||[]).find(item=>String(item.empId).toUpperCase()===empId);
       const normalizeDate=v=>String(v||'').slice(0,10).replace(/\//g,'-');
       const textMatches=['name','dept','unit'].every(key=>String(cloudEmployee?.[key]||'').trim()===String(employee[key]||'').trim());
-      if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
+      if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.reportingDate)!==employee.reportingDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
       p79ApplyHrEmployeesPayload(data,false,'cloud');
       $('status').textContent='✅ 人資資料已儲存，雲端人員清單已更新';
     }).catch(error=>{if(revision===p79HrSaveRevision)$('status').textContent='✅ 員工已儲存｜清單背景更新未完成，可稍後重新同步';console.warn('已儲存人員的背景同步失敗',error);});
   }catch(e){alert('儲存失敗：'+(e.message||e))}
-  finally{button.disabled=false;button.textContent=originalLabel||'儲存'}
+  finally{$('saveTopBtn').disabled=false;button.disabled=false;button.textContent=originalLabel||'儲存'}
 }
 async function resignCurrent(){if(!canHr('employment.edit'))return alert('沒有變更在職狀態權限');
   if(!editing)return;
@@ -1259,7 +1276,7 @@ async function clearSessionLogs(){
 }
 
 async function exportEmployees() {
-  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
 init();
 </script>
 
@@ -1404,7 +1421,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 const C=window.Port79CalendarRange;if(!C)return;
 C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',compatSummaryId:'hrDateRangeSummary',allowClear:true,emptyText:'全部日期'});
-['startDate','birthday','terminationDate','lastWorkDate'].forEach(id=>C.mountSingle({inputId:id}));
+['startDate','reportingDate','birthday','terminationDate','lastWorkDate'].forEach(id=>C.mountSingle({inputId:id}));
 
 });
 </script>
