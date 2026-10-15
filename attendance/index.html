@@ -325,7 +325,7 @@ window.p79LoadXlsxLibrary = function(){
     s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     s.defer=true;
     s.onload=()=>resolve(window.XLSX);
-    s.onerror=()=>reject(new Error('XLSX 載入失敗'));
+    s.onerror=()=>{window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入失敗，請檢查網路後重試'));};
     document.head.appendChild(s);
   });
   return window.p79XlsxLoadPromise;
@@ -7145,6 +7145,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         window.p79AttendanceCoreSync = loadAttendanceCoreSyncData;
 
+        function p79CloudReadCache(write) {
+            try {write();return true;} catch(error) {
+                if(error?.name!=='QuotaExceededError'&&error?.name!=='NS_ERROR_DOM_QUOTA_REACHED'&&error?.code!==22&&error?.code!==1014)throw error;
+                console.warn('本機快取空間不足；已讀取的雲端資料仍可檢視與匯出');
+                return false;
+            }
+        }
+        function p79CacheCloudValue(key,value) {
+            return p79CloudReadCache(()=>localStorage.setItem(key,value));
+        }
         function loadCloudData(showMessage = false, force = false) {
             // 不再只依賴 sysConfig.gasUrl。
             // SSO/session/localStorage 都沒有值時，仍使用程式內建 CANONICAL_GAS_URL。
@@ -7224,8 +7234,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     syncJobTitlesFromEmployees();
                     applyBuiltinLeaveBalances();
                     syncAdminIdsFromEmployeeRoles();
-                    localStorage.setItem('sp_employees_v5', JSON.stringify(employees));
-                    saveConfig();
+                    p79CacheCloudValue('sp_employees_v5', JSON.stringify(employees));
+                    p79CloudReadCache(()=>saveConfig());
                     updated = true;
                 }
 
@@ -7255,7 +7265,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         records = mergeAttendanceRecordCollections(localBeforeCloud, recovered);
 
                         if (records.length) {
-                            localStorage.setItem('sp_records_v5', JSON.stringify(records));
+                            p79CacheCloudValue('sp_records_v5', JSON.stringify(records));
                             saveAttendanceSafetyBackup(records);
 
                             setCloudSyncStatus(
@@ -7293,8 +7303,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         // 所有顯示去重交給 buildDailyAttendanceRows 的純函式；真正資料收斂只在 add/edit/sync 寫入時執行。
                         sessionStorage.removeItem('sp_duplicate_cleanup_notice_v1');
 
-                        localStorage.setItem('sp_records_v5', JSON.stringify(records));
-                        localStorage.setItem(
+                        p79CacheCloudValue('sp_records_v5', JSON.stringify(records));
+                        p79CacheCloudValue(
                             ATTENDANCE_IMPORT_ARCHIVE_KEY,
                             JSON.stringify(records.filter(isDurableLocalAttendanceRecord))
                         );
@@ -7306,7 +7316,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if (Array.isArray(data.leaveRecords)) {
                     leaveRecords = sanitizeLeaveRecords(cloudState.leaveRecords)
                         .map(normalizeAttendanceRecordIdentifiers);
-                    localStorage.setItem('sp_leave_records_v5', JSON.stringify(leaveRecords));
+                    p79CacheCloudValue('sp_leave_records_v5', JSON.stringify(leaveRecords));
                     updated = true;
                 }
 
@@ -7318,13 +7328,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             month: String(row.month || '').trim(),
                             schedule: row.schedule && typeof row.schedule === 'object' ? row.schedule : {}
                         }));
-                    localStorage.setItem('sp_schedules_v1', JSON.stringify(schedules));
+                    p79CacheCloudValue('sp_schedules_v1', JSON.stringify(schedules));
                     updated = true;
                 }
 
                 if (Array.isArray(data.sessionLogs)) {
                     sessionLogs = cloudState.sessionLogs;
-                    localStorage.setItem('sp_session_logs_v1', JSON.stringify(sessionLogs));
+                    p79CacheCloudValue('sp_session_logs_v1', JSON.stringify(sessionLogs));
                     updated = true;
                 }
 
@@ -7336,13 +7346,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     sysConfig.departments = normalizeDepartments(sysConfig.departments);
                     sysConfig.jobTitles = normalizeJobTitles(sysConfig.jobTitles);
                     sysConfig.extraLocations = normalizeExtraLocations(sysConfig.extraLocations);
-                    saveConfig();
+                    p79CloudReadCache(()=>saveConfig());
                     applySysConfigUI();
                     updated = true;
                 }
 
                 migrateLegacyDepartments();
-                initializeLeaveBalanceBaselines(true);
+                p79CloudReadCache(()=>initializeLeaveBalanceBaselines(true));
 
                 if (updated) {
                     initDropdowns();
@@ -21184,6 +21194,18 @@ function p79EmployeeDateEligible(emp,date) {
         }
         async function exportSelectedRecordsExcel() {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
+            const modal=document.getElementById('exportRecordsModal');
+            const button=modal?.querySelector('button[onclick="exportSelectedRecordsExcel()"]');
+            if(button?.disabled)return;
+            let progress=document.getElementById('p79AttendanceExportProgress');
+            if(!progress&&modal){progress=document.createElement('p');progress.id='p79AttendanceExportProgress';progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');progress.style.cssText='padding:10px 16px;color:#1d4ed8;background:#eff6ff;white-space:normal';button?.parentElement?.insertBefore(progress,button);}
+            const originalLabel=button?.textContent;
+            const update=message=>{if(progress)progress.textContent=message;if(button)button.textContent='匯出處理中…';};
+            if(button)button.disabled=true;
+            try {
+            update('正在準備 Excel 元件，請稍候…');
+            await window.p79LoadXlsxLibrary();
+            if(!window.XLSX?.utils)throw Error('Excel 元件未成功載入，請再試一次');
             const checkboxes = document.querySelectorAll('.export-field-checkbox');
             let selectedFields = [];
             checkboxes.forEach(cb => {
@@ -21204,11 +21226,14 @@ function p79EmployeeDateEligible(emp,date) {
                 return;
             }
             if(getActiveGasUrl()){
-                const loaded=await loadCloudData(false,true);
-                if(!loaded){showToast('雲端假別與班表尚未讀取完成，請稍後再匯出，避免漏資料','warning');return;}
-                if(!await loadAttendanceMonthFromCloud(exportMonth,false)){showToast('所選月份考勤未讀取完成，請稍後再匯出','warning');return;}
+                update('正在核對雲端假別與班表，請稍候…');
+                const loaded=await loadCloudData(false,false);
+                if(!loaded)throw Error('雲端假別與班表尚未讀取完成，請稍後再匯出，避免漏資料');
+                update('正在讀取 '+exportMonth+' 考勤與跨月班次，請稍候…');
+                if(!await loadAttendanceMonthFromCloud(exportMonth,false))throw Error('所選月份考勤未讀取完成，請稍後再匯出');
             }
-            if(!window.P79AttendanceV6?.buildShifts){showToast('班次計算元件尚未載入，請稍後再試','warning');return;}
+            if(!window.P79AttendanceV6?.buildShifts)throw Error('班次計算元件尚未載入，請稍後再試');
+            update('正在整理班次、假別與選取欄位…');
             const reportPeople=getAdminAttendanceEmployees().filter(emp=>String(emp.empId||'')!=='ADMIN'&&(companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter)));
             const reportSource=records.filter(canCurrentAdminViewDataRow);
             const dailyReport=p79BuildAttendanceDayReport(exportMonth,reportPeople,reportSource);
@@ -21229,7 +21254,7 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
-            if (!ensureExcelLibrary()) return;
+            if (!ensureExcelLibrary()) throw Error('Excel 元件尚未就緒');
             const sheetRows = [selectedFields.map(f => f.label)];
             visibleRecords.forEach(r => {
                 const currentEmployee = findEmployeeForAttendanceIdentity(r, getAttendanceIdentityEmployeePool());
@@ -21259,6 +21284,14 @@ function p79EmployeeDateEligible(emp,date) {
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
             showToast(`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`, "success");
+            } catch(error) {
+                const message='匯出失敗：'+(error?.message||String(error));
+                if(progress)progress.textContent=message;
+                showToast(message,'error');
+                console.error('考勤 Excel 匯出失敗',error);
+            } finally {
+                if(button){button.disabled=false;button.textContent=originalLabel;}
+            }
         }
 
         // 首頁預設日期若已經是同一天，載入後立即顯示 1 天，而不是舊制的 8 小時。
