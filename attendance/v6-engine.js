@@ -75,14 +75,30 @@
     records.forEach(r=>{const k=eventKey(r); if(!k){loose.push(r);return;} map.set(k,prefer(r,map.get(k)));});
     return [...map.values(),...loose].sort((a,b)=>(a.__ts||0)-(b.__ts||0)||(a.__index||0)-(b.__index||0));
   }
+  function accountingDateForSession(inRec,outRec){
+    const base=inRec||outRec;
+    const calendar=normalizeTime(base&&base.timeStr).slice(0,10).replace(/\//g,'-');
+    // A completed dawn call-out belongs to the previous night when most of its
+    // actual working time falls before 08:00. Early arrival for a normal day
+    // shift remains on its calendar day. Never alter either punch timestamp.
+    if(!inRec||!outRec)return calendar;
+    const start=ts(inRec),end=ts(outRec),day=new Date(start);
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||end-start>MAX_SHIFT_MS||day.getHours()>=8)return calendar;
+    const cutoff=new Date(day.getFullYear(),day.getMonth(),day.getDate(),8).getTime();
+    const night=Math.max(0,Math.min(end,cutoff)-start),after=Math.max(0,end-Math.max(start,cutoff));
+    if(night<=after)return calendar;
+    day.setDate(day.getDate()-1);
+    return [day.getFullYear(),String(day.getMonth()+1).padStart(2,'0'),String(day.getDate()).padStart(2,'0')].join('-');
+  }
   function pairSession(inRec,outRec,reason,allRecords){
     const rawList=Array.isArray(allRecords)?allRecords:[inRec,outRec];
     const seen=new Set();
     const list=rawList.filter(Boolean).filter(r=>{if(seen.has(r))return false;seen.add(r);return true;});
     const base=inRec||outRec||list[0]||{};
     const baseTime=(inRec&&inRec.timeStr)||(outRec&&outRec.timeStr)||'';
-    const date=baseTime.slice(0,10).replace(/\//g,'-');
-    const month=baseTime.slice(0,7).replace('/','-');
+    const actualDateKey=baseTime.slice(0,10).replace(/\//g,'-');
+    const date=accountingDateForSession(inRec,outRec);
+    const month=date.slice(0,7);
     const selectedCount=(inRec?1:0)+(outRec?1:0);
     const duplicateCount=Math.max(0,list.length-selectedCount);
     // V6.0.7：讓管理介面可直接讀取系統判斷標籤，不更動原有狀態及配對結果。
@@ -108,7 +124,7 @@
       attNo:base.attNo,empId:base.empId,name:base.name,dept:base.dept||'一般',unit:base.unit||'',jobTitle:base.jobTitle||'',
       clockIn:inRec||null,clockOut:outRec||null,records:list,
       key:`${identity(base)}|${inRec?inRec.timeStr:''}|${outRec?outRec.timeStr:''}`,
-      dateKey:date,accountingDateKey:date,accountingMonthKey:month,
+      dateKey:date,accountingDateKey:date,accountingMonthKey:month,actualDateKey,workDateAdjusted:date!==actualDateKey,
       attendanceStatus:inRec&&outRec
         ? (duplicateCount>0?'已整合｜同班次重複刷卡':'正常')
         : (inRec?'缺少簽退':'缺少簽到'),
@@ -417,11 +433,11 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.8';
-    console.info('[PORT79] Attendance V6.0.8 manual-badge fix installed');
+    window.p79AttendanceEngineVersion='V6.0.9-WORK-DATE';
+    console.info('[PORT79] Attendance V6.0.9 work-date rule installed');
     return true;
   }
-  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,buildShifts,install};
+  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
 
