@@ -24,7 +24,7 @@
 <!-- PORT79 2026-10-04 SCHEDULE-COLOR-RESTORE：恢復原班別顏色＋放大字體/格子＋交錯列辨識。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
-<script src="../assets/port79-rest-allocation.js?v=20261013.96"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
 <script id="p79-default-light-v20261001">
 (function(){
   try{
@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.15.56';
+    const APP_VERSION='2026.10.15.58';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -1362,6 +1362,15 @@ html.dark #substitute-assignment-modal>div>div:last-child>div:last-child{backgro
 }
 #app-main-container .p79-month-schedule-table .p79-shift-select.p79-substitute-time-long{font-size:8px!important;letter-spacing:-.45px!important}
 html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-substitute-time{background:#164e63!important;color:#ecfeff!important;border-color:#22d3ee!important}
+</style>
+<style id="p79-person-fit-v58">
+#app-main-container .p79-person-name-line{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:2px 4px!important;padding:0 25px 0 0!important;min-width:0!important;overflow:hidden!important}
+#app-main-container .p79-person-name-line .p79-person-name{grid-column:1!important;font-size:14px!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+#app-main-container .p79-person-name-line .p79-person-id{grid-column:2!important;max-width:75px!important;overflow:hidden!important;font-size:8px!important}
+#app-main-container .p79-person-name-line>span:not(.p79-person-name):not(.p79-person-id){grid-row:2!important;font-size:9px!important;min-width:0!important;white-space:nowrap!important}
+#app-main-container .p79-person-main,#app-main-container .p79-fixed-person-row{min-width:0!important;box-sizing:border-box!important;overflow:hidden!important}
+#app-main-container .p79-person-cell .p79-drag-top{right:2px!important;width:22px!important;min-width:22px!important}
+#app-main-container .p79-person-controls{padding-right:24px!important;gap:4px!important}
 </style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
@@ -3398,7 +3407,23 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if(['leave','留職停薪','留停','loa'].includes(s))return 'leave';
       return 'active';
     }
+
+function p79EmploymentStartDate(emp) {
+  const raw=String(emp?.reportingDate||emp?.startDate||'').trim();
+  const m=raw.match(/^(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(!m)return '';
+  let y=Number(m[1]);if(y<1911)y+=1911;
+  const month=Number(m[2]),day=Number(m[3]),check=new Date(y,month-1,day);
+  if(check.getFullYear()!==y||check.getMonth()!==month-1||check.getDate()!==day)return '';
+  return String(y).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+}
+function p79EmployeeDateEligible(emp,date) {
+  const start=p79EmploymentStartDate(emp);
+  return !start||String(date||'').replaceAll('/','-').slice(0,10)>=start;
+}
+
     function scheduleEmployeeEligibleForMonth(emp, yearMonth) {
+      const start=p79EmploymentStartDate(emp);if(start&&String(yearMonth||'').slice(0,7)<start.slice(0,7))return false;
       const status=normalizeScheduleEmploymentStatus(emp?.employmentStatus);
       if(status==='active')return true;
       if(status==='leave')return false;
@@ -3418,6 +3443,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         lockType: String(emp?.lockType || 'ROTATION'),
         order: scheduleOrderNumber(emp?.order),
         employmentStatus: normalizeScheduleEmploymentStatus(emp?.employmentStatus),
+        startDate:String(emp?.startDate||''),reportingDate:String(emp?.reportingDate||''),
         terminationDate: String(emp?.terminationDate||''),
         lastWorkDate: String(emp?.lastWorkDate||'')
       };
@@ -3581,6 +3607,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             lockType: emp.lockType || 'ROTATION',
             order: scheduleOrderNumber(emp.order),
             employmentStatus: emp.employmentStatus || 'active',
+            startDate:emp.startDate||'',reportingDate:emp.reportingDate||'',
             terminationDate: emp.terminationDate || '',
             lastWorkDate: emp.lastWorkDate || '',
             attendanceNo: String(emp.attendanceNo || emp.attNo || emp.attendanceId || '').trim().toUpperCase(),
@@ -4138,6 +4165,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     function calculateShiftForDay(emp, empIndexInRole, dayNum, dayOfWeek) {
+      const date=currentScheduleMonthKey()+'-'+String(dayNum).padStart(2,'0');
+      if(!p79EmployeeDateEligible(emp,date))return '';
       if (emp.lockType === 'FIXED_LOCKED') {
         return (dayOfWeek === 0 || dayOfWeek === 6) ? '休' : '早';
       }
@@ -5072,6 +5101,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         let cellsHtml = '';
         for(const d of visibleDays) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
+          if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
           const shiftVal = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
           const dayMeta = automaticRestMeta[dayStr] || null;
           const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
@@ -5147,7 +5177,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         }
 
         const restStats={'例':0,'休':0,'國':0}, restOvertimeStats={'例':0,'休':0,'國':0};
-        for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
+        for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(p79EmployeeDateEligible(emp,date)&&m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
         const restCategoryCells = ['例','休','國'].map(category => {
           const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
           return `<td class="py-1 px-2 text-center font-bold border-r text-xs ${color}" style="min-width:64px"><div class="whitespace-nowrap">${restStats[category]}天</div>${restOvertimeStats[category] ? `<div class="text-[10px] whitespace-nowrap mt-1">未休加班</div><div class="text-[10px] whitespace-nowrap">${restOvertimeStats[category]}天</div>` : ''}</td>`;
@@ -5559,7 +5589,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         const quota=p79RestQuota(month);
         const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))
           .filter(d=>approvedLeaveForEmployee(empId,d)||p79LeaveCoverOnDay(empId,d).length);
-        return p79AllocateRestMonth(monthlyScheduleData[empId]||{},existing,month,excluded).meta;
+        return p79AllocateRestMonth(monthlyScheduleData[empId]||{},existing,month,excluded,p79EmploymentStartDate(employees.find(e=>e.id===empId))).meta;
       } catch (error) { return existing; }
     }
 
@@ -5587,7 +5617,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         try {
           const quota=p79RestQuota(month);
           const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>approvedLeaveForEmployee(emp.id,d)||p79LeaveCoverOnDay(emp.id,d).length);
-          results.push({emp,result:p79AllocateRestMonth(schedule,monthlyScheduleMeta[emp.id]||{},month,excluded)});
+          results.push({emp,result:p79AllocateRestMonth(schedule,monthlyScheduleMeta[emp.id]||{},month,excluded,p79EmploymentStartDate(emp))});
         } catch(error) {errors.push(emp.name+'：'+error.message);}
       }
       if(errors.length){alert('未進行配對：\n'+errors.join('\n'));return;}
@@ -5966,6 +5996,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return codes[text]||text;
     }
     function p79ScheduleExportDay(emp,dayStr) {
+      if(!p79EmployeeDateEligible(emp,dayStr))return '';
       const approved=approvedLeaveForEmployee(emp.id,dayStr,emp.name);
       if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
       const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
