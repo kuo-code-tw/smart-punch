@@ -2099,7 +2099,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.12.42';
+        const APP_VERSION='2026.10.15.56';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12640,7 +12640,7 @@ function p79OvertimePeriodLabel(report){
             // 以完整班次統計，而不是逐筆原始刷卡統計。
             // 班次所屬月份以「上班簽到日」為準，因此 9/30 23:35 至 10/1 07:48 只計入 9 月 30 日。
             buildDailyAttendanceRows(visibleRecords).forEach(session => {
-                const dateMatch = String(session.dateKey || '').match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+                const dateMatch = String(session.accountingDateKey || session.dateKey || '').match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/);
                 if (!dateMatch || Number(dateMatch[1]) !== year || Number(dateMatch[2]) !== month) return;
                 const emp = findEmployeeForAttendanceIdentity(session, visibleEmployees);
                 if (!emp) return;
@@ -12745,7 +12745,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 const allRowMap = new Map(baseEmployees.map(emp => [String(emp.empId || ''), { emp, days: new Set(), totalDays: 0 }]));
                 const visibleRecords = records.filter(canCurrentAdminViewDataRow);
                 buildDailyAttendanceRows(visibleRecords).forEach(session => {
-                    const dateMatch = String(session.dateKey || '').match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+                    const dateMatch = String(session.accountingDateKey || session.dateKey || '').match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/);
                     if (!dateMatch || Number(dateMatch[1]) !== year || Number(dateMatch[2]) !== month) return;
                     const emp = findEmployeeForAttendanceIdentity(session, baseEmployees);
                     if (!emp) return;
@@ -14730,6 +14730,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
+<script src="../attendance/v6-engine.js?v=20261015.56"></script>
 </body>
 </html>
 
