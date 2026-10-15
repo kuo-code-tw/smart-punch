@@ -27,7 +27,8 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    const planned=report.planned===true&&date>=today();
    if(mode==='actual'&&planned){issues.push(emp.name+' '+date+' 為預排資料，請切換預排申請表');continue;}
    if(mode==='planned'&&!planned)continue;
-   const category=['休','例','國'].includes(report.category)?report.category:'延';
+   const substitute=report.category==='代'||['休假代班加班','代班加班'].includes(report.typeName);
+   const category=substitute?'休':['休','例','國'].includes(report.category)?report.category:'延';
    const spans=['','','',''];spans[{休:0,延:1,例:2,國:3}[category]]=period(report);
    const actual=periodHours(report);
    const converted=report.convertedHours===null||report.convertedHours===undefined||report.convertedHours===''?null:Number(report.convertedHours);
