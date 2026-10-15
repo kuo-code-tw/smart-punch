@@ -2119,7 +2119,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.69';
+        const APP_VERSION='2026.10.15.70';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14610,7 +14610,7 @@ document.addEventListener('click',function(e){
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261015.67"></script>
+<script src="../assets/port79-seven-top.js?v=20261015.70"></script>
 
 <script id="p79-workhours-menu-compact-v20261004">
 (function(){
@@ -14781,19 +14781,25 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
 
 <script>
+function p79CanExportOvertimeApplication(){
+ if(!hasValidHomepageAdminSession()||!currentEmp)return false;
+ const fine=currentEmp.finePermissions?.workhours||{};
+ return isVerifiedSuperAdminSession()||(Object.prototype.hasOwnProperty.call(fine,'overtime.export')?fine['overtime.export']===true:canPerformAdminAction(currentEmp,'attendanceExport'));
+}
 window.p79MonthlyRestContext={
  canReport:p79CanReportOvertime,employees:()=>p79WorkhoursEligibleEmployees(),employmentStart:p79EmploymentStartDate,
  month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:'';},
  saveReport:p79SaveWorkOvertimeDraft,
- snapshot:async function(month,rosterOnly=false){
-  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
+ snapshot:async function(month,rosterOnly=false,reportView=false){
+  const token=currentPort79SsoToken();if(!token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('沒有操作權限');
   const read=async action=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',month);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
    const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');return data;
   }finally{clearTimeout(timer)}};
-  const [roster,attendance]=await Promise.all([read('getScheduleDataSecure'),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw')]);
+  const [roster,attendance,boundary]=await Promise.all([read('getScheduleDataSecure'),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw'),reportView?read('getAttendanceMonthData'):Promise.resolve({records:[]})]);
+  const attendanceRows=(attendance.records||[]).concat((boundary.records||[]).filter(r=>!normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).startsWith(month+'-')));
   const employees=p79WorkhoursEligibleEmployees(),allowed=new Set(employees.map(e=>String(e.empId).trim().toUpperCase()));
-  const pairs=buildDailyAttendanceRows(attendance.records||[]).filter(r=>r.clockIn&&r.clockOut).map(row=>{
+  const pairs=buildDailyAttendanceRows(attendanceRows).filter(r=>r.clockIn&&r.clockOut).map(row=>{
    const employee=employees.find(e=>String(e.empId).toUpperCase()===String(row.empId||row.clockIn.empId).toUpperCase())||employees.find(e=>normalizeAttendanceStatsAttNo(e.attNo)===normalizeAttendanceStatsAttNo(row.clockIn.attNo));
    return {empId:employee?.empId||'',date:normalizeScheduleDateKey(getAttendanceDateKey(row.clockIn.timeStr)),start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)};
   }).filter(p=>allowed.has(String(p.empId).toUpperCase())&&p.date.startsWith(month+'-')&&p.end>p.start);
@@ -14806,6 +14812,10 @@ window.p79MonthlyRestContext={
 };
 </script>
 
+<script>
+window.p79OvertimeApplicationContext={canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,false,true)};
+</script>
+<script src="../assets/port79-overtime-application.js?v=20261015.70"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.68"></script>
 </body>
 </html>
