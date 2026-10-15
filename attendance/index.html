@@ -2100,8 +2100,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
     <!-- 打卡完成確認 -->
     <div id="punchSuccessModal" class="fixed inset-0 z-[140] hidden items-center justify-center bg-slate-950/65 backdrop-blur-sm p-4" onclick="if(event.target===this) closePunchSuccessModal()">
         <div class="modal-content w-full max-w-sm rounded-3xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 shadow-2xl p-6 text-center">
-            <div class="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-3xl mb-4">✓</div>
-            <h2 class="text-xl font-black text-slate-900 dark:text-white">打卡完成</h2>
+            <div id="p79PunchResultIcon" class="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-3xl mb-4">✓</div>
+            <h2 id="p79PunchResultTitle" class="text-xl font-black text-slate-900 dark:text-white">打卡確認中</h2>
             <p id="punchSuccessEmployee" class="mt-2 font-bold text-slate-700 dark:text-slate-200"></p>
             <div class="mt-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 text-left space-y-2 text-sm">
                 <div class="flex justify-between gap-3"><span class="text-slate-500">打卡項目</span><strong id="punchSuccessStatus"></strong></div>
@@ -2281,7 +2281,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.54';
+        const APP_VERSION='2026.10.15.55';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -9572,7 +9572,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
         }
 
+        function p79SetPunchResultHeading(title,icon){
+            const heading=document.getElementById('p79PunchResultTitle'),symbol=document.getElementById('p79PunchResultIcon');
+            if(heading)heading.textContent=title;if(symbol)symbol.textContent=icon;
+        }
         function openPunchSuccessModal(record) {
+            p79SetPunchResultHeading('打卡確認中','⏳');
             document.getElementById('punchSuccessEmployee').textContent = `${record.name || '未命名'}（${record.empId || '--'}）`;
             document.getElementById('punchSuccessStatus').textContent = record.status || '--';
             document.getElementById('punchSuccessTime').textContent = formatDateTime(record.timeStr);
@@ -9595,6 +9600,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             window.p79RecordMobilePunchAck?.(success ? 'success' : 'failed', message);
             if (!status || document.getElementById('punchSuccessModal')?.classList.contains('hidden')) return;
             const msg = String(message || '');
+            p79SetPunchResultHeading(success?'打卡完成':(/重複刷卡/.test(msg)?'重複打卡已阻擋':'尚未完成雲端確認'),success?'✓':'⚠');
             const queued = !success && (
                 msg.includes('待同步') ||
                 /登入\s*Token\s*已逾時|改由原打卡通道驗證/i.test(msg)
@@ -9603,7 +9609,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 ? '✓ 已同步至雲端'
                 : (queued
                     ? '⏳ 已儲存在本機，系統正在自動補傳雲端'
-                    : `⚠ 已儲存在本機，雲端同步失敗${msg ? `：${msg}` : ''}`);
+                    : `⚠ 雲端尚未確認此筆打卡${msg ? `：${msg}` : ''}`);
             status.className = `mt-3 text-xs font-bold ${success
                 ? 'text-emerald-600 dark:text-emerald-300'
                 : (queued ? 'text-amber-600 dark:text-amber-300' : 'text-rose-600 dark:text-rose-300')}`;
@@ -9897,6 +9903,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         };
 
         const p79ImmediatePunchRecords = new Map();
+        window.p79HandleRejectedPunch=function(id,reason){
+            p79ImmediatePunchRecords.delete(String(id));
+            updatePunchSuccessCloudStatus(false,reason);
+        };
         function getEmployeePunchRecords(emp = currentEmp, channel = 'REGULAR') {
             if (!emp) return [];
             const local=Array.isArray(records)?records:[];
@@ -22703,7 +22713,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.52"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.55"></script>
 
 
 
