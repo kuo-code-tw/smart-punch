@@ -616,7 +616,7 @@ async function pollDelta(force=false){
     if(tk)u+='&token='+encodeURIComponent(tk);
 
     const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),6000);
+    const timer=setTimeout(()=>ctrl.abort(),25000);
     try{
       const r=await fetch(u,{cache:'no-store',signal:ctrl.signal});
       const data=await r.json();
