@@ -325,11 +325,11 @@
     if(matches.some(e=>String(e.empId)===previous))empSelect.value=previous;
    }
    const kind=el.querySelector('#p79OtKind'),select=el.querySelector('#p79OtCode');
-   const matches=r=>matchesReportType(r,kind.value);
+   const matches=r=>{if(!matchesReportType(r,kind.value))return false;const normal=el.querySelector('#p79OtDate').value===prefill.date?prefill.normalShifts?.[empSelect.value]:'';return r[0]!=='延'||!['早','中','晚'].includes(normal)||({'08':'早','16':'中','24':'晚','00':'晚'})[String(r[4]).slice(0,2)]===normal;};
    const refresh=()=>{const previous=select.value;select.innerHTML=rows.map((r,i)=>({r,i})).filter(({r})=>matches(r)).map(({r,i})=>'<option data-ot-category="'+r[0]+'" value="'+i+'">'+esc(r[1]+(ruleType(r)!==kind.value?'｜'+ruleType(r):''))+'</option>').join('');if(previous!==''&&rows[Number(previous)]&&matches(rows[Number(previous)]))select.value=previous;preview()};
    function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=!!prefill.leaveHandoffId||r?.[0]!=='代';empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display='flex';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'加班 '+r[6]+'-'+r[7]+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):'尚未設定這類加班規則';if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
    const refreshTypes=()=>{const previous=kind.value,options=typeOptions(global.p79OvertimeContext?.config?.()||{},rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
-   kind.onchange=refresh;select.onchange=preview;forSelect.onchange=preview;empSelect.onchange=preview;refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
+   kind.onchange=refresh;select.onchange=preview;forSelect.onchange=preview;empSelect.onchange=refresh;el.querySelector('#p79OtDate').onchange=refresh;refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
    if(prefill.empId||prefill.forEmpId){
     el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
     if(prefill.forEmpId)forSelect.value=String(prefill.forEmpId);
@@ -359,7 +359,7 @@
     try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
-     const draft={id:crypto.randomUUID(),empId,date,rule:report(rows[Number(select.value)]),...reportPair(rows[Number(select.value)][0],empId,forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:rows[Number(select.value)][0]==='代'?(prefill.leaveHandoffId||''):''};
+     const draft={id:crypto.randomUUID(),empId,date,rule:report(rows[Number(select.value)]),...reportPair(prefill.leaveHandoffId?'代':rows[Number(select.value)][0],empId,forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
      try{const pending=JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}
@@ -369,7 +369,7 @@
       try{
        const result=await global.p79OvertimeContext.saveReport(draft);
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
-       sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent='✅ 加班申報已儲存，已更新加班管理。';
+       sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent=result.report?.planned?'✅ 預排加班已儲存；待實際出勤完成後核算，不會先填入打卡時間。':'✅ 加班申報已儲存，已更新加班管理。';
        global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));
        if(draft.leaveHandoffId&&typeof global.p79OpenLeaveOvertimeHandoff==='function'){
         completed=true;
@@ -382,11 +382,12 @@
        }
 
       }finally{button.disabled=completed}
-     }else location.href='../schedule/?overtimeReport=1';
+     }else throw Error('申報儲存模組尚未載入；內容已保留，請重新整理後接續申報。');
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
  global.P79Overtime={advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
+
 
