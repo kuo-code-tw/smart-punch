@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.12.44';
+    const APP_VERSION='2026.10.15.56';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -5960,6 +5960,20 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       }
     }
 
+    function p79ScheduleLeaveExportCode(value) {
+      const text=String(value||'').trim();
+      const codes={'特休假':'年','特別休假':'年','特休':'年','年假':'年','事假':'事','病假':'病','公假':'公','喪假':'喪','婚假':'婚','產假':'產','產檢假':'檢','陪產檢及陪產假':'陪','陪產假':'陪','家庭照顧假':'顧','生理假':'經','安胎休養假':'安','公傷病假':'傷','職災傷病假':'傷','訂婚假':'訂','離職':'離','resigned':'離','terminated':'離'};
+      return codes[text]||text;
+    }
+    function p79ScheduleExportDay(emp,dayStr) {
+      const approved=approvedLeaveForEmployee(emp.id,dayStr,emp.name);
+      if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
+      const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
+      const meta=monthlyScheduleMeta[emp.id]?.[dayStr];
+      const compact=p79ScheduleLeaveExportCode(raw);
+      if(compact!==String(raw).trim()||['年','事','病','公','喪','婚','產','檢','陪','顧','經','安','傷','訂','假','離'].includes(compact))return compact;
+      return p79SubstituteShiftLabel(emp.id,dayStr,meta)||(meta?.restQuotaOvertime?raw+'（'+meta.restCategory+'加）':raw==='休'&&meta?.restCategory?meta.restCategory:raw);
+    }
     function exportScheduleToExcel() {
       const yearMonth = document.getElementById('month-picker').value;
       const [year, month] = yearMonth.split('-').map(Number);
@@ -5997,12 +6011,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
         for (let d = 1; d <= totalDays; d++) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-          const rawShift = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
-          const category=monthlyScheduleMeta[emp.id]?.[dayStr];
-          const substituteLabel=approvedLeaveForEmployee(emp.id,dayStr)?'':p79SubstituteShiftLabel(emp.id,dayStr,category);
-          row[String(d)] = substituteLabel || (category?.restQuotaOvertime ? rawShift+'（'+category.restCategory+'加）' : (rawShift==='休'&&category?.restCategory) ? category.restCategory : ['特','特休','特別休假','年假'].includes(String(rawShift).trim())
-            ? '年'
-            : (String(rawShift).trim() === '離' ? '離職' : rawShift));
+          row[String(d)] = p79ScheduleExportDay(emp,dayStr);
         }
 
         exportRows.push(row);
