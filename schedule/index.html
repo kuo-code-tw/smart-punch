@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.15.63';
+    const APP_VERSION='2026.10.15.64';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -1371,6 +1371,18 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-person-main,#app-main-container .p79-fixed-person-row{min-width:0!important;box-sizing:border-box!important;overflow:hidden!important}
 #app-main-container .p79-person-cell .p79-drag-top{right:2px!important;width:22px!important;min-width:22px!important}
 #app-main-container .p79-person-controls{padding-right:24px!important;gap:4px!important}
+</style>
+<style id="p79-person-compact-v64">
+#app-main-container .p79-month-schedule-table .p79-person-cell,
+#app-main-container .p79-month-schedule-table .p79-person-header{width:168px!important;min-width:168px!important;max-width:168px!important}
+#app-main-container .p79-month-schedule-table tbody .p79-day-cell{height:54px!important;padding-top:2px!important;padding-bottom:2px!important}
+#app-main-container .p79-person-name-line{display:flex!important;align-items:center!important;justify-content:center!important;flex-wrap:wrap!important;gap:2px 4px!important;padding:0 24px 0 0!important;min-height:20px!important;overflow:visible!important}
+#app-main-container .p79-person-name-line .p79-person-name{flex:0 0 auto!important;font-size:14px!important;max-width:none!important}
+#app-main-container .p79-person-name-line>span:not(.p79-person-name){font-size:9px!important;line-height:16px!important;white-space:nowrap!important}
+#app-main-container .p79-person-subline{padding-right:24px!important;margin-top:1px!important;justify-content:center!important}
+#app-main-container .p79-person-controls{padding-right:0!important;gap:3px!important}
+#app-main-container .p79-person-controls .p79-mini-select{width:57px!important;max-width:57px!important;height:22px!important;min-height:22px!important}
+#app-main-container .p79-person-cell .p79-drag-top{width:22px!important;min-width:22px!important;height:30px!important;min-height:30px!important;right:1px!important}
 </style>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
 </head>
@@ -4912,7 +4924,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const updateGeometry=()=>{
         if(!main.isConnected)return;
         const origin=main.getBoundingClientRect().top + main.clientTop;
-        const personWidth=Math.ceil(pairs[0]?.source.getBoundingClientRect().width || 216);
+        const personWidth=Math.ceil(pairs[0]?.source.getBoundingClientRect().width || 168);
         fixed.style.width=personWidth+'px';
         fixedLabel.style.width=personWidth+'px';
         pairs.forEach(item=>{
@@ -5240,7 +5252,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td class="p79-person-cell sticky-col-left border-r bg-white">
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
-                  <span class="p79-person-name">${emp.name}</span><span class="p79-person-id">${emp.id}</span>
+                  <span class="p79-person-name">${emp.name}</span>
                   ${scheduleAttendanceActiveBadge(emp.id)}
                   ${lockBadge}
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
