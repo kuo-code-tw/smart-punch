@@ -3,6 +3,7 @@
 <head>
 <script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261015.66"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -1182,6 +1183,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" id="p79ReloadOvertimeButton" onclick="p79ReloadOvertimeMonth(this)" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">重新讀取加班</button><button type="button" onclick="p79ExportOvertimeComparison(false)" class="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">匯出Excel</button><button type="button" onclick="p79ExportOvertimeComparison(true)" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">列印比對</button><button type="button" onclick="P79Overtime.openRules()" class="px-3 py-1.5 bg-slate-700 text-white rounded-xl text-xs font-semibold">⚙️ 加班選項管理</button>
+                        <button type="button" onclick="P79MonthlyRest.open()" class="px-3 py-1.5 bg-indigo-700 text-white rounded-xl text-xs font-semibold">每月未休假加班</button>
                         <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
                         <button type="button" onclick="openOvertimePolicyModal()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold shadow">📖 勞基法規則說明</button>
                         <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
@@ -2099,7 +2101,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.62';
+        const APP_VERSION='2026.10.15.66';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14704,6 +14706,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
+ if(draft.preventReplace&&((previous&&previous.id!==draft.id)||(!previous&&(dayMeta.overtime||dayMeta.forEmpId||dayMeta.coverAssignmentId))))throw Error('此日期已有加班或代班安排，未覆蓋原資料；請重新讀取核對');
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
@@ -14758,6 +14761,33 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
+
+<script>
+window.p79MonthlyRestContext={
+ canReport:p79CanReportOvertime,employees:()=>p79WorkhoursEligibleEmployees(),employmentStart:p79EmploymentStartDate,
+ month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:'';},
+ saveReport:p79SaveWorkOvertimeDraft,
+ snapshot:async function(month,rosterOnly=false){
+  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
+  const read=async action=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{
+   const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',month);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
+   const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');return data;
+  }finally{clearTimeout(timer)}};
+  const [roster,attendance]=await Promise.all([read('getScheduleDataSecure'),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw')]);
+  const employees=p79WorkhoursEligibleEmployees(),allowed=new Set(employees.map(e=>String(e.empId).trim().toUpperCase()));
+  const pairs=buildDailyAttendanceRows(attendance.records||[]).filter(r=>r.clockIn&&r.clockOut).map(row=>{
+   const employee=employees.find(e=>String(e.empId).toUpperCase()===String(row.empId||row.clockIn.empId).toUpperCase())||employees.find(e=>normalizeAttendanceStatsAttNo(e.attNo)===normalizeAttendanceStatsAttNo(row.clockIn.attNo));
+   return {empId:employee?.empId||'',date:normalizeScheduleDateKey(getAttendanceDateKey(row.clockIn.timeStr)),start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)};
+  }).filter(p=>allowed.has(String(p.empId).toUpperCase())&&p.date.startsWith(month+'-')&&p.end>p.start);
+  const leaveDates=[];for(const leave of roster.leaveRecords||[]){if(leave.status!=='已核准')continue;const emp=employees.find(e=>leaveBelongsToEmployee(leave,e));if(!emp)continue;
+   const first=toDateInputValue(leave.startTime||leave.startDate),last=toDateInputValue(leave.endTime||leave.endDate||leave.startTime||leave.startDate);if(!first||!last)continue;
+   const days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();for(let d=1;d<=days;d++){const date=month+'-'+String(d).padStart(2,'0');if(date>=first&&date<=last)leaveDates.push(String(emp.empId).toUpperCase()+'|'+date);}
+  }
+  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,leaveDates};
+ }
+};
+</script>
+
 </body>
 </html>
 
