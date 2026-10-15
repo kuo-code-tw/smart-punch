@@ -2280,7 +2280,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.52';
+        const APP_VERSION='2026.10.15.53';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -23516,6 +23516,61 @@ window.p79ConfirmMobilePunchCloudRecord=function(recordId){
   }
   return false;
 };
+
+// Safe mobile refresh: reuse original queued writes; never reload or clear storage.
+const refresh=document.createElement('button');
+refresh.id='p79MobilePunchRefresh';refresh.type='button';
+refresh.textContent='↻ 重新整理／檢查同步';
+refresh.style.cssText='width:100%;margin:8px 0;padding:12px;border:1px solid #0891b2;border-radius:12px;background:#ecfeff;color:#155e75;font-weight:800';
+btn.insertAdjacentElement('afterend',refresh);
+const result=document.createElement('p');result.id='p79MobilePunchRefreshResult';
+result.setAttribute('role','status');result.setAttribute('aria-live','polite');
+result.style.cssText='font-size:13px;color:#155e75;margin:6px 0;overflow-wrap:anywhere';
+refresh.insertAdjacentElement('afterend',result);
+let refreshBusy=false;
+async function refreshPunch(){
+ if(refreshBusy)return;
+ panel.classList.add('open');draw();
+ if(typeof p79PunchInProgress!=='undefined' && p79PunchInProgress){
+  result.textContent='打卡正在送出，請稍候完成再檢查。';return;
+ }
+ if(navigator.onLine===false){
+  result.textContent='目前離線，請恢復網路後再檢查；待傳紀錄保留。';return;
+ }
+ if(window.p79V5GetStatus?.().writing){
+  result.textContent='原有打卡正在同步，請保留頁面，稍後再檢查。';return;
+ }
+ refreshBusy=true;refresh.disabled=true;retry.disabled=true;
+ refresh.textContent='正在同步及核對雲端…';result.textContent='正在使用原始紀錄重試，不會新增打卡，請保留目前頁面。';
+ try{
+  if(typeof window.p79V5Drain!=='function')throw Error('同步元件尚未載入，請稍後重試');
+  await window.p79V5Drain(true);
+  const ok=await p79MobileRefreshOfficial(true);
+  if(typeof updateHomeClockInButtonState==='function')updateHomeClockInButtonState();
+  draw();
+  const pending=(window.p79V5ReadPendingQueue?.()||[]).length+read('sp_cloud_outbox_v1').length;
+  const message=!ok?'雲端核對尚未完成，請保留頁面並查看同步明細。':
+   pending?'已更新雲端查詢，仍有 '+pending+' 筆待同步，尚未全部完成。':
+   '雲端查詢已更新，本機目前沒有待同步紀錄；請核對明細中的正式刷卡時間。';
+  result.textContent=message;dialogResult.textContent=message;
+ }catch(error){
+  const message='檢查未完成：'+String(error?.message||error)+'。待傳紀錄保留，請勿清除網站資料。';
+  result.textContent=message;dialogResult.textContent=message;
+ }finally{
+  refreshBusy=false;refresh.disabled=false;retry.disabled=false;
+  refresh.textContent='↻ 重新整理／檢查同步';draw();
+ }
+}
+const retry=document.createElement('button');retry.type='button';retry.textContent='↻ 重新整理／檢查同步';
+retry.style.cssText=refresh.style.cssText;
+const dialogResult=document.createElement('p');dialogResult.setAttribute('role','status');
+dialogResult.style.cssText=result.style.cssText;
+details.insertAdjacentElement('afterend',retry);retry.insertAdjacentElement('afterend',dialogResult);
+refresh.addEventListener('click',refreshPunch);retry.addEventListener('click',refreshPunch);
+const visibility=new MutationObserver(()=>{refresh.hidden=btn.hidden;result.hidden=btn.hidden;});
+visibility.observe(btn,{attributes:true,attributeFilter:['hidden']});
+refresh.hidden=btn.hidden;result.hidden=btn.hidden;
+
 btn.addEventListener('click',()=>{draw();panel.classList.add('open')});
 document.getElementById('p79MobilePunchSyncClose').addEventListener('click',()=>panel.classList.remove('open'));
 panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('open')});
