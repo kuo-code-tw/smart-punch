@@ -23464,6 +23464,8 @@ function ack(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e)
 function draw(){
   const legacy=read('sp_cloud_outbox_v1'),fast=window.p79V5ReadPendingQueue?.()||read('port79_attendance_v5_outbox'),pending=legacy.length+fast.length;
   const a=ack();
+  const storageMode=window.p79V5GetStatus?.().queueStorage;
+  const storageWarning=storageMode==='memory'?'儲存空間不足，待傳僅留目前頁面，請勿關閉':storageMode==='session'?'待傳已存分頁備援，請等待正式雲端確認':'';
   const official=window.p79MobileLatestOfficialPunch;
   const last=a?.state==='success'?'雲端已確認寫入':a?.state==='failed'?'雲端尚未完成':a?.state==='pending'?'本機已保存，尚待雲端確認':'本機尚無最近打卡送出紀錄';
   const officialText=official?.timeStr?'正式主表最近刷卡：'+official.timeStr+'｜'+official.status:'正式主表本人刷卡狀態仍在查詢';
@@ -23482,11 +23484,11 @@ function draw(){
   }).join('');
   const readError=String(window.p79MobileOfficialReadError||'');
   const reason=readError||errors[0]||a?.error||'';
-  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆｜'+officialText):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
+  btn.innerHTML='☁️ 雲端同步明細<small>'+safe(storageWarning?storageWarning+'｜':'')+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆｜'+officialText):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
   const employeePage=document.getElementById('viewEmployee');
   const hasPunch=!!(employeePage && employeePage.contains(btn));
   btn.hidden=!hasPunch;
-  details.innerHTML='<p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:7px"><strong>正式雲端：</strong>'+safe(officialText)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
+  details.innerHTML=(storageWarning?'<p style="color:#b91c1c;font-weight:800">'+safe(storageWarning)+'</p>':'')+'<p>版本：'+safe(typeof APP_VERSION!=='undefined'?APP_VERSION:'--')+'</p><p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:7px"><strong>正式雲端：</strong>'+safe(officialText)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
     (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
     (reason?'<p style="margin-top:10px;color:#b91c1c;overflow-wrap:anywhere"><strong>最近錯誤：</strong>'+safe(reason)+'</p>':'')+
     (pending?'<details style="margin-top:10px" open><summary style="font-weight:800;cursor:pointer">查看所有待同步明細（'+pending+'）</summary><ol style="margin-top:8px;list-style:decimal;padding-left:18px">'+describe([...fast,...legacy])+'</ol></details>':'')+
