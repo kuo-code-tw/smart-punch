@@ -23,6 +23,57 @@ const READ_ACTIONS=new Set([
 ]);
 const SYSTEM_LABELS={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
 const memoryCache=new Map();
+// Explicit management opt-in; punch-only sessions keep their current cache behavior.
+const MANAGEMENT_MEMORY_MAX_ENTRIES=12;
+const MANAGEMENT_MEMORY_MAX_PAYLOAD_BYTES=8*1024*1024;
+const memoryWeights=new Map();
+let memoryPayloadBytes=0;
+function boundedManagementMemory(){
+ if(window.P79ManagementTestMode!==true&&window.P79ManagementOptimizationMode!==true)return false;
+ try{
+  const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
+  return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase());
+ }catch(_){return false;}
+}
+function forgetMemory(key){
+ memoryCache.delete(key);
+ if(memoryWeights.has(key)){memoryPayloadBytes-=memoryWeights.get(key);memoryWeights.delete(key);}
+}
+function memoryPayloadSize(row){
+ const size=Number(row?.size);
+ // Snapshot producers already measure serialized payload size; reuse it instead of serializing each hit.
+ return Number.isFinite(size)&&size>=0?size:safeSize(row?.data??row);
+}
+function trimManagementMemory(){
+ // Account for snapshots admitted before the management session became available.
+ for(const [key,row] of memoryCache)if(!memoryWeights.has(key)){
+  const size=memoryPayloadSize(row);memoryWeights.set(key,size);memoryPayloadBytes+=size;
+ }
+ while(memoryCache.size>MANAGEMENT_MEMORY_MAX_ENTRIES||memoryPayloadBytes>MANAGEMENT_MEMORY_MAX_PAYLOAD_BYTES){
+  forgetMemory(memoryCache.keys().next().value);
+ }
+}
+function rememberMemory(row){
+ if(!row?.key)return;
+ const bounded=boundedManagementMemory();
+ forgetMemory(row.key);
+ if(bounded){
+  const size=memoryPayloadSize(row);
+  // Large snapshots still persist in IndexedDB and are returned to their caller.
+  if(size>MANAGEMENT_MEMORY_MAX_PAYLOAD_BYTES){trimManagementMemory();return;}
+  memoryWeights.set(row.key,size);memoryPayloadBytes+=size;
+ }
+ memoryCache.set(row.key,row);
+ if(bounded)trimManagementMemory();
+}
+function recallMemory(key){
+ const bounded=boundedManagementMemory();if(bounded)trimManagementMemory();
+ const row=memoryCache.get(key);
+ if(row&&bounded){memoryCache.delete(key);memoryCache.set(key,row);}
+ return row;
+}
+function clearMemory(){memoryCache.clear();memoryWeights.clear();memoryPayloadBytes=0;}
+window.addEventListener?.('pagehide',()=>{if(boundedManagementMemory())clearMemory();});
 const inflightReads=new Map();
 let dbPromise=null;
 let mutationGeneration=0;
@@ -61,21 +112,37 @@ function openDb(){
  return dbPromise;
 }
 async function put(row){
- if(row?.key)memoryCache.set(row.key,row);
+ rememberMemory(row);
  const db=await openDb();
  return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(row);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)});
 }
 async function get(key){
- if(memoryCache.has(key))return memoryCache.get(key);
+ const cached=recallMemory(key);if(cached)return cached;
  const db=await openDb();
- return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>{const row=r.result||null;if(row)memoryCache.set(key,row);resolve(row)};r.onerror=()=>reject(r.error)});
+ return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>{const row=r.result||null;if(row)rememberMemory(row);resolve(row)};r.onerror=()=>reject(r.error)});
 }
 async function all(){
  const db=await openDb();
  return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)});
 }
+async function managementSystemMetadata(){
+ const db=await openDb(),viewer=viewerKey();
+ return new Promise((resolve,reject)=>{
+  const rows=[],tx=db.transaction(STORE,'readonly'),store=tx.objectStore(STORE);
+  tx.oncomplete=()=>resolve(rows);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('快取清單讀取中止'));
+  // The management summary needs seven current-viewer headers, not every historical payload.
+  Object.keys(SYSTEM_LABELS).forEach(system=>{
+   const request=store.get(viewer+'|system|'+system);
+   request.onsuccess=()=>{
+    const r=request.result;if(!r)return;
+    rows.push({key:r.key,kind:r.kind,system:r.system,savedAt:r.savedAt,size:r.size});
+   };
+   request.onerror=()=>reject(request.error);
+  });
+ });
+}
 async function clear(){
- memoryCache.clear();
+ clearMemory();
  const db=await openDb();
  return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).clear();tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)});
 }
@@ -104,7 +171,7 @@ function markMutation(){
  const now=Math.max(Date.now(),mutationStamp()+1);
  mutationGeneration++;
  try{sessionStorage.setItem('port79_cache_mutated_at',String(now))}catch(e){}
- memoryCache.clear();
+ clearMemory();
  inflightReads.clear();
 }
 function cacheFreshTtl(action,urlLike){
@@ -388,7 +455,7 @@ function ensureModal(){
 }
 function setProgress(t){const e=document.getElementById('p79CacheProgress');if(e)e.textContent=t}
 async function refreshModal(){
- const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=await all();const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
+ const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=boundedManagementMemory()?await managementSystemMetadata():await all();const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 

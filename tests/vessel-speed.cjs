@@ -1,8 +1,8 @@
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict'),{performance}=require('perf_hooks');
 const root=path.resolve(__dirname,'..'),after=fs.readFileSync(path.join(root,'aqc-efficiency/index.html'),'utf8');
+// Fixed parent of the original optimization; optional HTML override remains supported.
 const baseline=process.argv[2];
-assert(baseline,'Pass the pre-change vessel HTML path');
-const before=fs.readFileSync(baseline,'utf8');
+const before=baseline?fs.readFileSync(baseline,'utf8'):require('child_process').execFileSync('git',['show','083fd1ffeba4e30c2db7289cf38f48665b23ae39:aqc-efficiency/index.html'],{cwd:root,encoding:'utf8',maxBuffer:5*1024*1024});
 function fn(src,name){const start=src.indexOf('function '+name+'(');assert(start>=0,name);const end=src.indexOf('\n}',start);assert(end>start,name);return src.slice(start,end+2)}
 function context(src){
   const c={console,shipMasters:[],records:[],roster:[],month:'',year:'2026',range:null,lookupCalls:0,

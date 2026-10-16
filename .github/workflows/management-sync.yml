@@ -1,0 +1,33 @@
+name: Verify management synchronization
+on:
+  pull_request:
+    paths:
+      - 'integration-test/**'
+      - 'assets/port79-attendance-core.js'
+      - 'assets/port79-data-cache.js'
+      - 'assets/port79-management-link.js'
+      - 'hr/**'
+      - 'attendance/**'
+      - 'leave/**'
+      - 'schedule/**'
+      - 'work-hours/**'
+      - 'aqc-efficiency/**'
+      - 'history-data/**'
+      - 'tests/**'
+      - '.github/workflows/management-sync.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          for test_file in tests/*.cjs; do
+            node "$test_file" || exit 1
+          done
