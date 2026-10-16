@@ -880,10 +880,10 @@ body[data-p79-system="efficiency"] main{
     <div class="card p-4 dual-audit-card">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div class="text-xs font-black text-cyan-700">兩份原始 Excel ＋ 雲端系統 三方交叉檢查</div>
-          <h2 class="text-xl font-black mt-1">🧭 雙檔系統差異比對</h2>
+          <div class="text-xs font-black text-cyan-700">個人效率表與 WORKING SHEET 正確性核對</div>
+          <h2 class="text-xl font-black mt-1">🧭 雙檔差異比對</h2>
           <div class="text-sm text-slate-500 mt-1">
-            先放「AQC 個人效率表」，再放同一艘船的「WORKING SHEET」。差異會自動排最前面，點「查看差異」可直接看到是哪個欄位、哪一份檔案或系統有問題。
+            先放「AQC 個人效率表」，再放同一艘船的「WORKING SHEET」。差異會自動排最前面，點「查看差異」可直接看到是哪個欄位、兩份檔案之間的差異。
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -911,21 +911,17 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
         <div class="rounded-xl border bg-rose-50 p-3 text-center">
           <div class="text-[10px] text-rose-700">差異項目</div>
           <div id="dualIssueCount" class="text-xl font-black text-rose-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-orange-50 p-3 text-center">
-          <div class="text-[10px] text-orange-700">系統問題</div>
-          <div id="dualSystemIssueCount" class="text-xl font-black text-orange-700">0</div>
         </div>
         <div class="rounded-xl border bg-amber-50 p-3 text-center">
           <div class="text-[10px] text-amber-700">來源檔差異</div>
           <div id="dualSourceIssueCount" class="text-xl font-black text-amber-700">0</div>
         </div>
         <div class="rounded-xl border bg-emerald-50 p-3 text-center">
-          <div class="text-[10px] text-emerald-700">一致人員/總計</div>
+          <div class="text-[10px] text-emerald-700">一致人員</div>
           <div id="dualOkCount" class="text-xl font-black text-emerald-700">0</div>
         </div>
         <div class="rounded-xl border bg-indigo-50 p-3 text-center">
@@ -939,7 +935,6 @@ body[data-p79-system="efficiency"] main{
           <label class="block text-xs font-bold mb-1">顯示</label>
           <select id="dualAuditFilter" class="border rounded-xl px-3 py-2 bg-white text-sm" onchange="renderDualSourceSystemAudit()">
             <option value="issues">差異優先 / 只看差異</option>
-            <option value="system">只看系統問題</option>
             <option value="source">只看來源檔問題</option>
             <option value="ok">只看一致</option>
             <option value="all">全部（差異仍排前面）</option>
@@ -953,16 +948,16 @@ body[data-p79-system="efficiency"] main{
       </div>
 
       <div class="overflow-auto max-h-[54vh] rounded-2xl border mt-3">
-        <table class="tbl w-full min-w-[1500px] text-center">
+        <table class="tbl w-full min-w-[1100px] text-center">
           <thead>
             <tr>
               <th>狀態</th><th>人員 / 項目</th><th>AQC</th>
-              <th>個人效率表</th><th>WORKING SHEET</th><th>系統</th>
+              <th>個人效率表</th><th>WORKING SHEET</th>
               <th>差異欄位</th><th>判定</th><th>查看</th>
             </tr>
           </thead>
           <tbody id="dualAuditBody">
-            <tr><td colspan="9" class="p-5 text-slate-400">請依序放入兩份 Excel</td></tr>
+            <tr><td colspan="8" class="p-5 text-slate-400">請依序放入兩份 Excel</td></tr>
           </tbody>
         </table>
       </div>
@@ -1223,7 +1218,7 @@ body[data-p79-system="efficiency"] main{
   <div class="p-5 space-y-4">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <div class="text-xs font-black text-cyan-700">三方差異定位</div>
+        <div class="text-xs font-black text-cyan-700">雙檔差異定位</div>
         <h3 id="dualDetailTitle" class="text-xl font-black">—</h3>
         <div id="dualDetailMeta" class="text-xs text-slate-500 mt-1"></div><div class="text-[10px] text-slate-400 mt-1">可拖曳視窗右下角放大 / 縮小</div>
       </div>
@@ -1233,9 +1228,9 @@ body[data-p79-system="efficiency"] main{
     <div id="dualDetailVerdict" class="rounded-2xl border p-3"></div>
 
     <div class="overflow-auto rounded-2xl border max-h-[62vh]">
-      <table class="tbl w-full min-w-[980px] text-center">
+      <table class="tbl w-full min-w-[760px] text-center">
         <thead>
-          <tr><th>欄位</th><th>個人效率表</th><th>WORKING SHEET</th><th>系統</th><th>判定</th></tr>
+          <tr><th>欄位</th><th>個人效率表</th><th>WORKING SHEET</th><th>判定</th></tr>
         </thead>
         <tbody id="dualDetailBody"></tbody>
       </table>
@@ -1583,7 +1578,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.86';
+const APP_VERSION='2026.10.16.87';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -4222,21 +4217,11 @@ function dualAuditFmt(field,v){
 }
 
 function dualAuditFieldVerdict(field,p,w,s){
-  const hasP=!(p==null||p==='');
-  const hasW=!(w==null||w==='');
-  const hasS=!(s==null||s==='');
-  const pw=hasP&&hasW&&dualAuditValueEqual(field,p,w);
-  const ws=hasW&&hasS&&dualAuditValueEqual(field,w,s);
-  const ps=hasP&&hasS&&dualAuditValueEqual(field,p,s);
-
-  if(hasP&&hasW&&hasS&&pw&&ws)return {ok:true,type:'ok',text:'三方一致'};
-  if(!hasS&&(hasP||hasW))return {ok:false,type:'system',text:'系統缺少 / 未對到'};
-  if(!hasP&&hasW&&hasS&&ws)return {ok:false,type:'personal',text:'個人效率表缺少'};
-  if(!hasW&&hasP&&hasS&&ps)return {ok:false,type:'working',text:'WORKING SHEET缺少'};
-  if(hasW&&hasS&&ws&&(!hasP||!pw))return {ok:false,type:'personal',text:'個人效率表與原始船舶檔不同'};
-  if(hasP&&hasW&&pw&&(!hasS||!ws))return {ok:false,type:'system',text:'兩份來源一致，系統不同'};
-  if(hasP&&hasS&&ps&&(!hasW||!pw))return {ok:false,type:'working',text:'個人效率表與系統一致，船舶檔不同'};
-  return {ok:false,type:'mixed',text:'三方數值不一致，需查看明細'};
+  const hasP=!(p==null||p===''),hasW=!(w==null||w==='');
+  if(!hasP&&!hasW)return {ok:true,type:'ok',text:'兩份皆未提供'};
+  if(!hasP)return {ok:false,type:'personal',text:'個人效率表缺少'};
+  if(!hasW)return {ok:false,type:'working',text:'WORKING SHEET缺少'};
+  return dualAuditValueEqual(field,p,w)?{ok:true,type:'ok',text:'兩份來源一致'}:{ok:false,type:'working',text:'兩份來源數值不同'};
 }
 
 function buildDualPersonResult(p,w,s,meta={}){
@@ -4251,8 +4236,7 @@ function buildDualPersonResult(p,w,s,meta={}){
 
     let verdict;
     if(field==='bundleDeduct'){
-      const ok=(wv==null&&sv==null)||dualAuditValueEqual(field,wv||0,sv||0);
-      verdict=ok?{ok:true,type:'ok',text:'WORKING / 系統一致'}:{ok:false,type:'system',text:'系統 Bundle 與 WORKING 不一致'};
+      verdict={ok:true,type:'ok',text:'WORKING SHEET參考值（個人表無此欄）'};
     }else{
       verdict=dualAuditFieldVerdict(field,pv,wv,sv);
     }
@@ -4320,17 +4304,7 @@ function buildDualSourceSystemAudit(){
 
   const workingGroups=dualAuditGroupRecords(wr.records||[],wr.summary||{});
 
-  // 系統端必須跟「個人效率比對」使用同一套正式來源整理規則，
-  // 禁止三方比對又直接讀 raw records，否則舊孤兒/重複來源會再次被累加。
-  const systemRecords=personalAuditSystemRecords(personalAuditReference.month||'').filter(r=>{
-    const s=monthlySerialFromWorkingNo(personalAuditRecordSerial(r)||r.workingNo||'');
-    if(s===serial)return true;
-    const ship=personalAuditRecordShip(r)||monthlyShipNo(r.shipName||r.vessel||'');
-    return ship===vessel && String(r.workDate||'').startsWith(personalAuditReference.month||'');
-  });
-  const systemGroups=dualAuditGroupRecords(systemRecords,wr.summary||{});
-
-  const usedW=new Set(),usedS=new Set();
+  const usedW=new Set();
   const pairs=[];
 
   personalGroups.forEach(p=>{
@@ -4343,25 +4317,8 @@ function buildDualSourceSystemAudit(){
   });
 
   pairs.forEach(pair=>{
-    const target=pair.w||pair.p;
-    const match=dualAuditFindGroup(target,systemGroups,usedS);
-    if(match.group)usedS.add(match.group.key);
-    dualAuditResults.push(buildDualPersonResult(pair.p,pair.w,match.group,{
-      sourceMatchMode:pair.sourceMatchMode,
-      systemMatchMode:match.mode
-    }));
+    dualAuditResults.push(buildDualPersonResult(pair.p,pair.w,null,{sourceMatchMode:pair.sourceMatchMode}));
   });
-
-  systemGroups.forEach(s=>{
-    if(usedS.has(s.key))return;
-    dualAuditResults.push(buildDualPersonResult(null,null,s,{systemOnly:true}));
-  });
-
-  const systemJob=(vesselJobRows()||[]).find(x=>
-    String(x.workingNo||'')===String(wr.summary?.workingNo||'') ||
-    (monthlySerialFromWorkingNo(x.workingNo)===serial && monthlyShipNo(x.vessel)===vessel)
-  )||null;
-  dualAuditResults.push(buildDualShipResult(wr,personalGroups,systemJob));
 
   dualAuditResults.sort((a,b)=>{
     const rank=x=>x.ok?9:(x.category==='system'?0:1);
@@ -4405,7 +4362,7 @@ function renderDualSourceSystemAudit(){
   const put=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
   if(!personalAuditReference||!dualAuditWorkingReference){
     put('dualIssueCount',0);put('dualSystemIssueCount',0);put('dualSourceIssueCount',0);put('dualOkCount',0);put('dualShipLabel','—');
-    body.innerHTML='<tr><td colspan="9" class="p-5 text-slate-400">請依序放入兩份 Excel；兩份都載入後會自動比對目前系統資料。</td></tr>';
+    body.innerHTML='<tr><td colspan="8" class="p-5 text-slate-400">請依序放入兩份 Excel；兩份都載入後會自動核對檔案內容。</td></tr>';
     return;
   }
 
@@ -4451,12 +4408,11 @@ function renderDualSourceSystemAudit(){
       <td>${esc(x.aqc||'—')}</td>
       <td>${x.kind==='ship'?'<span class="text-xs">整月表合計</span>':dualAuditGroupSummary(x.p)}</td>
       <td>${x.kind==='ship'?'<span class="text-xs">船舶原始總計</span>':dualAuditGroupSummary(x.w)}</td>
-      <td>${x.kind==='ship'?'<span class="text-xs">系統船舶總計</span>':dualAuditGroupSummary(x.s)}</td>
       <td>${fields}</td>
       <td class="font-black ${x.ok?'text-emerald-600':x.category==='system'?'text-rose-600':'text-amber-700'}">${esc(x.categoryText)}</td>
       <td><button type="button" onclick="event.stopPropagation();openDualAuditDetail(${globalIndex})" class="text-indigo-700 font-black hover:underline">${x.ok?'查看':'查看差異 →'}</button></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="9" class="p-5 text-slate-400">目前篩選條件沒有資料</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="p-5 text-slate-400">目前篩選條件沒有資料</td></tr>';
 }
 
 function openDualAuditDetail(index){
@@ -4468,18 +4424,15 @@ function openDualAuditDetail(index){
   const body=document.getElementById('dualDetailBody');
   if(title)title.textContent=x.name;
   if(meta)meta.textContent=x.kind==='ship'
-    ? `整船三方總計｜NO.${dualAuditWorkingReference?.summary?.workingNo||'—'}`
+    ? `整船雙檔總計｜NO.${dualAuditWorkingReference?.summary?.workingNo||'—'}`
     : `AQC ${x.aqc||'—'}｜差異 ${x.issueCount} 項`;
   if(verdict){
     if(x.ok){
       verdict.className='rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 font-black';
-      verdict.textContent='✓ 這一筆三方比對一致。';
-    }else if(x.category==='system'){
-      verdict.className='rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-800 font-black';
-      verdict.textContent='⚠ 優先檢查系統：兩份來源檔與系統之間有差異，下面會標明是哪個欄位。';
+      verdict.textContent='✓ 這一筆個人效率表與 WORKING SHEET 一致。';
     }else{
       verdict.className='rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-900 font-black';
-      verdict.textContent='⚠ 來源 Excel 之間有差異：先修正來源檔的錯字/日期/船名，再判斷是否需要改系統。';
+      verdict.textContent='⚠ 來源 Excel 之間有差異：請核對下方標出的姓名、日期、船名或數值。';
     }
   }
   if(body){
@@ -4488,7 +4441,6 @@ function openDualAuditDetail(index){
       <td class="font-black">${esc(r.label)}</td>
       <td>${esc(String(dualAuditFmt(r.field,r.personal)))}</td>
       <td>${esc(String(dualAuditFmt(r.field,r.working)))}</td>
-      <td>${esc(String(dualAuditFmt(r.field,r.system)))}</td>
       <td class="font-black ${r.ok?'text-emerald-600':r.type==='system'||r.type==='mixed'?'text-rose-600':'text-amber-700'}">${esc(r.text)}</td>
     </tr>`).join('');
   }
@@ -4509,7 +4461,6 @@ async function importDualWorkingExcel(file) {
   const state=document.getElementById('dualWorkingFileState');
   if(state){state.className='rounded-xl border bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700';state.textContent='② 正在解析 WORKING SHEET / WORKING REPORT...'}
   try{
-    try{await flushQueue();await autoRestoreVesselCloud('dual-file-audit',2)}catch(e){console.warn('雙檔比對前同步失敗，先使用目前資料',e)}
     const buf=await file.arrayBuffer();
     const book=XLSX.read(buf,{type:'array',cellDates:true});
     const summary=parseWorkingSheetSummary(book);
