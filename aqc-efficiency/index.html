@@ -1582,7 +1582,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.93';
+const APP_VERSION='2026.10.16.94';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -4835,44 +4835,26 @@ function parsePersonalAuditCombinedSheet(book,year,month){
 
 function auditPersonalWorkbookInternalConsistency(details,combinedRows,onPersonIssue){
   const issues=[];
-  const detailMap=new Map();
-  const combinedMap=new Map();
-
-  (details||[]).forEach(x=>{
-    const k=personalAuditRowSignature(x);
-    detailMap.set(k,(detailMap.get(k)||0)+1);
+  // 同一人、序號、船、日期與 AQC 合計核對，允許來源將連續作業拆成不同列。
+  const personal=personalAuditGroupReferenceRows(details||[]);
+  const combined=personalAuditGroupReferenceRows(combinedRows||[]);
+  const remaining=new Map(combined.map(g=>[g.key,g]));
+  const report=(row,text)=>{
+    const message=`個人效率檔內部檢查（不影響雙檔比對）：${text}：${row.name||'—'}｜${row.serial||'—'}｜船 ${row.ship||'—'}｜${row.date||row.dateRaw||'—'}｜${(row.intervals||[]).join('、')}｜櫃 ${personalAuditRound(row.containers,0)}｜H/C ${personalAuditRound(row.hatches,0)}`;
+    issues.push(message);if(onPersonIssue)onPersonIssue(row,message);
+  };
+  personal.forEach(p=>{
+    const c=remaining.get(p.key);
+    if(!c){report(p,'「總表」未找到同組作業');return;}
+    remaining.delete(p.key);
+    const differences=[];
+    if(!personalAuditIntervalsEquivalent(p.intervals,c.intervals))differences.push('作業時段');
+    if(!personalAuditNear(p.containers,c.containers,0.01))differences.push('櫃數');
+    if(!personalAuditNear(p.hatches,c.hatches,0.01))differences.push('H/C');
+    if(!personalAuditNear(p.hours,c.hours,0.03))differences.push('時數');
+    if(differences.length)report(p,`個人分頁與「總表」${differences.join('、')}不同`);
   });
-  (combinedRows||[]).forEach(x=>{
-    const k=personalAuditRowSignature(x);
-    combinedMap.set(k,(combinedMap.get(k)||0)+1);
-  });
-
-  detailMap.forEach((count,key)=>{
-    const have=combinedMap.get(key)||0;
-    if(count<=have)return;
-    const sample=(details||[]).find(x=>personalAuditRowSignature(x)===key);
-    const miss=count-have;
-    for(let i=0;i<miss;i++){
-      const message=
-        `個人效率表檔案內部差異（非系統缺資料）：「總表」未找到完全相同的個人分頁作業：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}｜${sample?.start||'—'}-${sample?.end||'—'}｜櫃 ${personalAuditRound(sample?.containers,0)}｜H/C ${personalAuditRound(sample?.hatches,0)}`;
-      issues.push(message);
-      if(onPersonIssue)onPersonIssue(sample,message);
-    }
-  });
-
-  combinedMap.forEach((count,key)=>{
-    const have=detailMap.get(key)||0;
-    if(count<=have)return;
-    const sample=(combinedRows||[]).find(x=>personalAuditRowSignature(x)===key);
-    const extra=count-have;
-    for(let i=0;i<extra;i++){
-      const message=
-        `個人效率表檔案內部差異（非系統缺資料）：「總表」有一筆未找到完全相同的個人分頁作業：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}`;
-      issues.push(message);
-      if(onPersonIssue)onPersonIssue(sample,message);
-    }
-  });
-
+  remaining.forEach(c=>report(c,'個人分頁未找到同組作業'));
   return issues;
 }
 
@@ -4886,6 +4868,7 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
 
   const details=[];
   const personIssues={};
+  const internalPersonIssues={};
   const summaryNames=new Set(summary.map(x=>x.normName));
 
   summary.forEach(s=>{
@@ -4935,7 +4918,7 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
   sourceIssues.push(...(combined.issues||[]));
   auditPersonalWorkbookInternalConsistency(details,combined.rows,(row,message)=>{
     const key=normalizePersonName(row?.name);
-    (personIssues[key] ||= []).push(message);
+    (internalPersonIssues[key] ||= []).push(message);
   });
 
   return {
@@ -4947,7 +4930,7 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
     details,
     combinedDetailCount:combined.rows.length,
     sourceIssues,
-    personIssues
+    personIssues,internalPersonIssues
   };
 }
 // v2026.09.27.7.15：個人效率核對不可用「當月只要有一筆 WORKING REPORT，
@@ -5777,11 +5760,10 @@ function openPersonalAuditDetail(normName){
     }).join('');
   }
 
-  const allSource=[
-    ...(personalAuditReference?.sourceIssues||[]),
-    ...(x.sourceIssues||[]),
-    ...(x.summaryIssues||[])
-  ];
+  const isInternalMessage=v=>/個人效率.*檔.*內部|「總表」漏掉個人工作表作業|「總表」有一筆找不到對應個人工作表/.test(String(v));
+  const rawSource=[...(personalAuditReference?.sourceIssues||[]),...(x.sourceIssues||[]),...(x.summaryIssues||[])];
+  const allSource=rawSource.filter(v=>!isInternalMessage(v));
+  const internalSource=[...(personalAuditReference?.internalPersonIssues?.[normName]||[]),...rawSource.filter(v=>isInternalMessage(v)&&String(v).includes(x.name))];
   if(sourceBox){
     if(allSource.length){
       sourceBox.className='rounded-2xl border border-amber-200 bg-amber-50 p-3';
@@ -5792,6 +5774,9 @@ function openPersonalAuditDetail(normName){
     }
   }
 
+  if(sourceBox&&internalSource.length){
+    sourceBox.innerHTML+=`<details class="mt-2 border-t pt-2"><summary class="cursor-pointer text-slate-600">個人效率檔內部檢查 ${internalSource.length} 項（不影響雙檔比對）</summary><ul class="list-disc pl-5 text-xs mt-2">${internalSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></details>`;
+  }
   if(body){
     body.innerHTML=x.groupResults.map(g=>{
       const rr=g.ref,ss=g.sys;
