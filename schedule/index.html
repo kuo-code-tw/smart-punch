@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.16.120';
+    const APP_VERSION='2026.10.16.121';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -4936,7 +4936,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
     // Frozen people pane is a separate visual layer from the horizontal date scroller.
     // This avoids sticky table-cell behavior inside a two-axis scrolling table.
+    let p79RosterScrollCleanup=null;
+    function p79DisposeRosterScroll(){
+      if(p79RosterScrollCleanup){const cleanup=p79RosterScrollCleanup;p79RosterScrollCleanup=null;cleanup();}
+    }
     function p79ConnectRosterScroll(){
+      p79DisposeRosterScroll();
       const main=document.getElementById('p79RosterScroll');
       const bar=document.getElementById('p79RosterBottomScroll');
       const spacer=document.getElementById('p79RosterBottomWidth');
@@ -5003,17 +5008,27 @@ async function p79SaveScheduleOvertimeDraft(draft){
       updateGeometry();
       shell.classList.add('p79-has-frozen-people');
       main.addEventListener('scroll',syncViewport,{passive:true});
-      bar.addEventListener('scroll',()=>{
+      const syncFromBar=()=>{
         if(Math.abs(main.scrollLeft-bar.scrollLeft)>1)main.scrollLeft=bar.scrollLeft;
-      },{passive:true});
+      };
+      bar.addEventListener('scroll',syncFromBar,{passive:true});
+      let observer=null;
       if(typeof ResizeObserver!=='undefined'){
-        const observer=new ResizeObserver(updateGeometry);
+        observer=new ResizeObserver(updateGeometry);
         observer.observe(main);
         observer.observe(table);
         main.p79ScrollObserver=observer;
       }
+      p79RosterScrollCleanup=()=>{
+        observer?.disconnect();
+        main.removeEventListener('scroll',syncViewport);
+        bar.removeEventListener('scroll',syncFromBar);
+        delete main.p79ScrollObserver;
+        pairs.length=0;
+      };
     }
     function renderRoleScheduleView() {
+      p79DisposeRosterScroll();
       // 沒有選單位時不建立大型排班 DOM，避免頁面一進來就渲染全部人員。
       if (!activeRoleTab) {
         const container = document.getElementById('app-main-container');
@@ -5456,6 +5471,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
 
     function renderEmployeeManagementView() {
+      p79DisposeRosterScroll();
       const container = document.getElementById('app-main-container');
 
       const roleCounts = {};
