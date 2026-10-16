@@ -269,10 +269,11 @@ async function readFresh(action,params={}){
  const originIdentity=context.identity(),revision=viewRevision,scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
  const url=new URL(raw,location.href);if(url.origin!=='https://script.google.com'||!url.pathname.startsWith('/macros/s/'))throw Error('雲端來源不正確');
  url.searchParams.set('action',action);url.searchParams.set('token',tk);url.searchParams.set('gcToken',tk);url.searchParams.set('_',Date.now());Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
- const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);activeReads.add(ctl);
+ const readTimeoutMs=['historyGetMonthData','gcGetData'].includes(action)?25000:12000;
+ const startedAt=Date.now(),ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),readTimeoutMs);activeReads.add(ctl);
  try{const response=await fetch(url.toString(),{method:'GET',cache:'no-store',signal:ctl.signal});const data=await response.json();
   if(!response.ok||data?.ok!==true||data.retryable)throw Error(data?.error||'雲端未確認讀取');
-  if(stopped||suspended||revision!==viewRevision||context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('頁面、登入、權限或範圍已變更');return data;
+  if(stopped||suspended||revision!==viewRevision||context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('頁面、登入、權限或範圍已變更');if(g.P79ManagementTestMode)console.info('[management-read]',JSON.stringify({action,elapsedMs:Date.now()-startedAt}));return data;
  }finally{clearTimeout(timeout);activeReads.delete(ctl);}
 }
 function ensureBar(){
@@ -297,7 +298,7 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.3';}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.4';}
 }
 const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
