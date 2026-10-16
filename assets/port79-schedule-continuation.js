@@ -33,10 +33,16 @@ function buildPlan(input){
     return {index,value};}).filter(x=>x.value);
    if(known.length<Math.min(4,cycle.length)){summary.reason='正常班資料不足，無法判定輪班位置';continue;}
    const candidates=cycle.map((_,phase)=>({phase,score:known.reduce((n,k)=>n+(cycle[(k.index+phase)%cycle.length]===k.value?1:0),0)})),max=Math.max(...candidates.map(c=>c.score));
-   phases=candidates.filter(c=>c.score===max).map(c=>c.phase);
+   // A good whole-month score cannot override the actual end of the source month.
+   const tail=known.filter(k=>k.index>=sourceDays.length-7);
+   phases=candidates.filter(c=>c.score===max&&tail.every(k=>cycle[(k.index+c.phase)%cycle.length]===k.value)).map(c=>c.phase);
+   if(!tail.length||!phases.length){summary.reason='月底班別與輪班規則不一致，無法安全接續；請先確認月底順序';continue;}
    const sequences=new Set(phases.map(phase=>targetDays.map((_,i)=>cycle[(sourceDays.length+i+phase)%cycle.length]).join('|')));
    if(max/known.length<0.8||sequences.size!==1){summary.reason='班表與目前輪班規則不一致或位置不明，請人工確認';continue;}
   }
+  const lastActual=canonical(original[sourceDays[sourceDays.length-1]]),firstExisting=canonical(byId.get(emp)?.schedule?.[targetDays[0]]);
+  const firstPlanned=fixedWeekend?([0,6].includes(new Date(targetDays[0]+'T12:00:00Z').getUTCDay())?'休':'早'):cycle[(sourceDays.length+phases[0])%cycle.length];
+  if(lastActual==='晚'&&(firstExisting||firstPlanned)==='早'){summary.reason='跨月晚班接早班，請人工確認；未新增任何班別';continue;}
   let to=byId.get(emp);if(!to){to={empId:emp,name:person.name||from.name,role:from.role,group:from.group,month:targetMonth,schedule:{}};rows.push(to);byId.set(emp,to);}
   const roster=to.schedule||(to.schedule={}),priorMeta=roster.__meta||{},created=[];
   for(let i=0;i<targetDays.length;i++){
@@ -82,6 +88,6 @@ async function save(){if(busy||!draft?.plan.changes.length)return;const ctx=glob
  if(d.plan.changes.some(c=>index.get(c.empId)?.[c.date]!==c.shift))throw Error('雲端尚未讀回完整延續結果，請保留視窗再核對');
  d.uncertain=false;q('scStatus').textContent='已核對並儲存 '+d.targetMonth+' 班表，共新增 '+d.plan.changes.length+' 格。';q('scSave').textContent='已儲存';draft=null;await ctx.afterSave(d.targetMonth);dialog.close();
  }catch(e){if(e.confirmedRejected)d.uncertain=false;q('scStatus').textContent='尚未確認完成：'+e.message;}finally{setBusy(false);}}
-function open(){const ctx=global.P79ScheduleContinuationContext;if(!ctx?.canManage())return alert('沒有排班管理權限');ui();draft=null;dialog.querySelector('#scSource').value=ctx.month();dialog.querySelector('#scTarget').value=nextMonth(ctx.month());dialog.querySelector('#scRows').textContent='';dialog.querySelector('#scStatus').textContent='請確認目前輪班規則，再產生預覽。';dialog.querySelector('#scSave').textContent='確認延續並儲存';setBusy(false);dialog.showModal();}
+function open(sourceMonth){const ctx=global.P79ScheduleContinuationContext;if(!ctx?.canManage())return alert('沒有排班管理權限');ui();draft=null;const month=typeof sourceMonth==='string'?sourceMonth:ctx.month();dialog.querySelector('#scSource').value=month;dialog.querySelector('#scTarget').value=nextMonth(month);dialog.querySelector('#scRows').textContent='';dialog.querySelector('#scStatus').textContent='請確認目前輪班規則，再產生預覽。';dialog.querySelector('#scSave').textContent='確認延續並儲存';setBusy(false);dialog.showModal();}
 global.P79ScheduleContinuation={buildPlan,nextMonth,cycleFor,open};
 })(typeof window==='undefined'?globalThis:window);
