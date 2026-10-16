@@ -1,0 +1,24 @@
+name: Verify management synchronization
+on:
+  pull_request:
+    paths:
+      - 'integration-test/**'
+      - 'assets/port79-attendance-core.js'
+      - 'assets/port79-data-cache.js'
+      - 'tests/**'
+      - '.github/workflows/management-sync.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node tests/management-link.cjs
+          node tests/seven-cache-queue.cjs
+          node tests/attendance-core-boot.cjs
+          node tests/attendance-import-overtime.cjs
