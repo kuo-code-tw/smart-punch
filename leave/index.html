@@ -258,9 +258,25 @@ body[data-p79-system="leave"] #adminBalancePanel>summary{font-size:16px!importan
 .p79-leave-type-other{background:#ecfccb;color:#365314;border-color:#bef264}
 body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!important;min-height:36px!important;padding:7px 9px!important;border:0;border-radius:8px;white-space:nowrap}
 </style>
+<script>document.documentElement.classList.add('p79-leave-simple');</script>
+<style id="p79-employee-leave-simple-v107">
+html.p79-leave-simple #p79LeaveTop,html.p79-leave-simple #p79SevenTop,html.p79-leave-simple body>header,html.p79-leave-simple #leaveStickyTabs,html.p79-leave-simple #port79CalendarModeBox,html.p79-leave-simple #p79SevenStandardMenu,html.p79-leave-simple #p79LeaveHandoffBanner,html.p79-leave-simple #employeeLoginCard,html.p79-leave-simple #employeeLeaveHistory{display:none!important}
+#employeeLeaveSimpleHeader{display:none}
+html.p79-leave-simple #employeeLeaveSimpleHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);padding:14px 16px;border-bottom:1px solid var(--border)}
+html.p79-leave-simple #employeeLeaveSimpleHeader strong{font-size:20px}
+html.p79-leave-simple main{max-width:620px!important;width:100%!important;margin:0 auto!important;padding:14px!important}
+html.p79-leave-simple #employeeMode .grid{display:block!important}
+html.p79-leave-simple #employeeProfileCard{padding:16px}
+html.p79-leave-simple #employeeMode .balance{gap:6px}
+html.p79-leave-simple #globalStatus{font-size:14px;margin-bottom:10px}
+html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
+#employeeLeaveReauth{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;line-height:1.6}
+#employeeLeaveReauth[hidden]{display:none!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body data-p79-system="leave">
+<div id="employeeLeaveSimpleHeader"><strong>請假申請</strong><button type="button" class="btn btn-sec" onclick="location.href='../attendance/'">返回打卡</button></div>
 <header>
   <div class="header-inner">
     <div><div class="title">📝 請假管理</div><div class="sub">版本 2026.09.27.7.13｜一般員工可申請法定／公司公告假別</div></div>
@@ -277,6 +293,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
   </div>
 
   <section id="employeeMode">
+    <div id="employeeLeaveReauth" hidden><b>請重新登入後申請請假</b><p>目前登入已失效，尚未送出請假申請。</p><a class="btn btn-pri" href="../?logout=1">重新登入</a></div>
     <div class="grid">
       <div>
         <div id="employeeLoginCard" class="card">
@@ -321,7 +338,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
         </div>
       </div>
 
-      <div class="card">
+      <div id="employeeLeaveHistory" class="card">
         <h2>我的請假紀錄</h2>
         <div class="table-wrap"><table><thead><tr><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th></tr></thead><tbody id="myLeaveBody"><tr><td colspan="5">請先確認員工身分</td></tr></tbody></table></div>
       </div>
@@ -353,7 +370,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.106';
+const APP_VERSION='2026.10.16.107';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -366,7 +383,17 @@ function leaveEmployeeIsActive(e){return leaveEmploymentStatus(e)==='active'}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
 function level(v,f='none'){v=String(v??'').toLowerCase();return ['none','view','manage'].includes(v)?v:f}
 function perms(emp,role){role=String(role||emp?.adminRole||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',leave:'manage',schedule:'manage',efficiency:'manage'};const raw=emp?.systemPermissions&&typeof emp.systemPermissions==='object'?emp.systemPermissions:{};const def=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none'}:{attendance:'view',leave:'view',schedule:'view',efficiency:'none'};return{attendance:level(raw.attendance,def.attendance),leave:level(raw.leave,def.leave),schedule:level(raw.schedule,def.schedule),efficiency:level(raw.efficiency,def.efficiency)}}
-function setStatus(msg,type='info'){const b=$('globalStatus');b.className='status '+type;b.textContent=msg}
+function p79LeaveAuthError(message){return /登入驗證資料不存在|登入.*(?:失效|過期)|Token.*(?:失效|過期|無效)|請重新登入|尚未登入/i.test(String(message||''))}
+function p79EmployeeLeaveReauth(){
+ if(adminSession)return;
+ currentEmployee=null;$('employeeProfileCard').classList.add('hidden');$('employeeLeaveReauth').hidden=false;
+ $('globalStatus').className='status warn';$('globalStatus').textContent='登入已失效，請重新登入後再申請。';
+}
+function setStatus(msg,type='info'){
+ const b=$('globalStatus');b.className='status '+type;
+ if(!adminSession&&p79LeaveAuthError(msg)){p79EmployeeLeaveReauth();return;}
+ b.textContent=msg;
+}
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('leave_theme',t);$('themeBtn').textContent=t==='dark'?'☀️ 淺色':'🌙 暗色'};setTheme(localStorage.getItem('leave_theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));$('themeBtn').onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
 
 async function jsonFetch(url,opt={},timeout=25000){
@@ -385,13 +412,15 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
   try{
    if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
    const userToken=leaveRequestToken();
+   if(!userToken&&!adminSession){p79EmployeeLeaveReauth();return false;}
    const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
    if(identityReady)await identityReady;
    if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
-   if(!d?.ok)throw new Error(d?.error||'雲端讀取失敗');
+   if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
    employees=Array.isArray(d.employees)?d.employees:[];
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
+   if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
    populateDepartments();renderAll();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
   }catch(e){
    last=e;
@@ -458,7 +487,7 @@ async function restoreAdmin(){
  setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
  return false;
 }
-function switchMode(m){currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
+function switchMode(m){if(m==='admin'&&!adminSession)return;document.documentElement.classList.toggle('p79-leave-simple',m!=='admin');currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
 function employeeLogin(){
  const raw=$('empLoginInput').value.trim(),digits=raw.replace(/\D/g,'');if(!raw){setStatus('請輸入考勤號、工號或電話','warn');return}
  const matches=employees.filter(e=>leaveEmployeeIsActive(e)&&(String(e.empId||'').trim().toUpperCase()===raw.toUpperCase()||String(e.attNo??'').trim()===raw|| (digits&&String(e.phone||'').replace(/\D/g,'')===digits)));
@@ -897,7 +926,7 @@ function renderAll(){if(currentEmployee){const fresh=employees.find(e=>String(e.
  const identityReady=restoreAdmin();
  const dataReady=loadCloud(false,false,identityReady);
  const sso=await identityReady;await dataReady;
- if(!sso){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
+ if(!sso&&$('employeeLeaveReauth').hidden){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
  const today=new Date().toISOString().slice(0,10);$('leaveStart').value=today;$('leaveEnd').value=today;updateDays();
 })();
 </script>
