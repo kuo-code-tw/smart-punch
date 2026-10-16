@@ -1,0 +1,17 @@
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync(path.join(__dirname,'../schedule/index.html'),'utf8');
+assert.match(html,/<input type="month" id="month-picker" value=""/);
+assert(!html.includes('id="month-picker" value="2026-09"'));
+const todayFn=html.match(/function scheduleTaipeiTodayKey\(\) \{[\s\S]*?\n    \}/)?.[0];
+const defaultFn=html.match(/function setCurrentMonthDefault\(\) \{[\s\S]*?\n    \}/)?.[0];
+assert(todayFn,'Taipei date helper must exist');
+assert(defaultFn,'Current-month initializer must exist');
+assert.match(todayFn,/timeZone:\s*'Asia\/Taipei'/);
+const input={value:''};
+const context={Intl,Date,document:{getElementById(id){assert.equal(id,'month-picker');return input}}};
+vm.createContext(context);
+vm.runInContext(todayFn+'\n'+defaultFn+'\nsetCurrentMonthDefault();',context);
+const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+const expected=parts.find(x=>x.type==='year').value+'-'+parts.find(x=>x.type==='month').value;
+assert.equal(input.value,expected);
+console.log('PASS schedule month defaults to the current Asia/Taipei month without a stale static month');
