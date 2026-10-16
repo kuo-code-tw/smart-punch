@@ -225,9 +225,11 @@ body[data-p79-system="leave"] #adminMode .table-wrap{max-width:100%;overflow-x:a
 body[data-p79-system="leave"] .leave-admin-table{width:100%!important;min-width:1240px!important;font-size:14px!important;table-layout:auto}
 body[data-p79-system="leave"] .leave-admin-table th{font-size:14px!important;font-weight:800!important;padding:12px 10px!important;white-space:nowrap}
 body[data-p79-system="leave"] .leave-admin-table td{font-size:14px!important;padding:12px 10px!important;line-height:1.6;text-align:center!important;vertical-align:middle!important}
+body[data-p79-system="leave"] .leave-admin-table th:nth-child(7),body[data-p79-system="leave"] .leave-admin-table td:nth-child(7){text-align:left!important}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-status-inline>.badge,body[data-p79-system="leave"] .leave-admin-table .p79-cover-again{flex-shrink:0}
 body[data-p79-system="leave"] .leave-admin-table td:nth-child(6){max-width:220px;white-space:normal!important;overflow-wrap:anywhere}
-body[data-p79-system="leave"] .leave-admin-table .p79-leave-status-inline{justify-content:center;gap:8px;min-width:260px}
-body[data-p79-system="leave"] .leave-admin-table .p79-leave-cover-inline{justify-content:center;gap:8px}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-status-inline{justify-content:flex-start;gap:8px;min-width:260px;width:100%;text-align:left}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-cover-inline{justify-content:flex-start;gap:8px;min-width:0}
 body[data-p79-system="leave"] .leave-admin-table .p79-leave-cover-names{font-size:13px!important;line-height:1.5;white-space:normal!important}
 body[data-p79-system="leave"] .leave-admin-table .p79-cover-again{font-size:14px!important;min-height:38px;padding:8px 10px!important;border-radius:8px}
 body[data-p79-system="leave"] .leave-admin-table .actions{gap:6px!important;flex-wrap:nowrap!important}
@@ -351,7 +353,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.91';
+const APP_VERSION='2026.10.16.92';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
