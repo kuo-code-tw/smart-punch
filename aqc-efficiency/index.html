@@ -718,7 +718,6 @@ body[data-p79-system="efficiency"] main{
               <th class="cursor-pointer select-none" onclick="setDashboardSort('gphHC')">GPH(含H/C) <span data-sort-mark="gphHC"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vph')">VPH <span data-sort-mark="vph"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vphHC')">VPH(含H/C) <span data-sort-mark="vphHC"></span></th>
-              <th class="min-w-[180px]">備註</th>
             </tr>
             <tr class="bg-slate-50/95">
               <th><button type="button" onclick="clearDashboardColumnFilters()" class="text-xs font-black text-slate-600 hover:text-indigo-700">清除</button></th>
@@ -740,7 +739,6 @@ body[data-p79-system="efficiency"] main{
                   <option value="">全部效率</option>
                 </select>
               </th>
-              <th></th>
               <th></th>
               <th></th>
               <th></th>
@@ -1582,7 +1580,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.97';
+const APP_VERSION='2026.10.16.99';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -3459,9 +3457,8 @@ function renderDashboard(){
       ${dashboardChangeCell(x,'gphHC',num(x.gphHC).toFixed(2))}
       ${dashboardChangeCell(x,'vph',num(x.vph).toFixed(2),'font-bold')}
       ${dashboardChangeCell(x,'vphHC',num(x.vphHC).toFixed(2))}
-      <td class="text-left text-xs text-slate-600"><input class="dashboard-note-input" value="${esc(x.note||'')}" placeholder="輸入備註" onclick="event.stopPropagation()" onchange="saveDashboardShipNote('${esc(x.workingNo)}',this.value)"></td>
     </tr>`;
-  }).join('')||'<tr><td colspan="19" class="text-center text-slate-400">尚無船舶資料，請匯入含 WORKING SHEET + WORKING REPORT 的 Excel</td></tr>';
+  }).join('')||'<tr><td colspan="18" class="text-center text-slate-400">尚無船舶資料，請匯入含 WORKING SHEET + WORKING REPORT 的 Excel</td></tr>';
 
   renderSummaryPagination(jobs.length,totalPages);
 
@@ -13923,6 +13920,27 @@ body[data-p79-system="efficiency"] #excelLiveProgressCard{
 body[data-p79-system="efficiency"] #excelLiveBar{
   min-height:9px!important;
 }
+</style>
+<style id="p79-dashboard-column-widths-v99">
+body[data-p79-system="efficiency"] #summaryDashboardTable{min-width:1580px!important;width:100%!important;table-layout:fixed!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1){width:7.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(2){width:5.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(3){width:5.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(4){width:6.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(5){width:6.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(6){width:10.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(7){width:8.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(8){width:4.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(9){width:5.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(10){width:4.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(11){width:6.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(12){width:7.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(13){width:4.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(14){width:5.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(15){width:4.5%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(16){width:5.5%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(17){width:4.0%!important;min-width:0!important}
+body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 </style>
 </body></html>
 
