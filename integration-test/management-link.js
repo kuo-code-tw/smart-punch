@@ -214,7 +214,7 @@ g.P79ManagementContext={system:'workhours',identity:()=>currentPort79SsoToken()+
 scope:()=>({month:document.getElementById('overtimeMonthFilter')?.value||getRequestedAttendanceCloudMonth()}),
 readFresh:async read=>{const selected=document.getElementById('overtimeMonthFilter')?.value||getRequestedAttendanceCloudMonth();if(!/^\d{4}-\d{2}$/.test(selected))throw Error('請先選擇單一月份再同步');const [core,roster]=await Promise.all([read('getAttendanceCoreData',{month:selected}),read('getScheduleDataSecure',{month:selected})]);if(!Array.isArray(core.employees)||!Array.isArray(core.records)||!Array.isArray(roster.schedules)||!Array.isArray(roster.leaveCoverAssignments))throw Error('加班資料不完整');return {ok:true,confirmedFresh:true,core,roster,month:selected,at:Date.now()};},
 applySnapshot:async s=>{employees=mergeCloudEmployees(s.core.employees.map(normalizeEmployeeIdentifiers));if(currentEmp){const mine=employees.find(e=>String(e.empId).toUpperCase()===String(currentEmp.empId).toUpperCase());if(mine)currentEmp={...currentEmp,...mine};}leaveRecords=Array.isArray(s.core.leaveRecords)?s.core.leaveRecords:leaveRecords;
-const rows=s.core.records.map(normalizeAttendanceRecordIdentifiers);if(rows.length)replaceAttendanceMonthInMemory(s.month,mergeRecentAttendanceMutationsIntoRemote(rows,s.at));
+// Core replies may be partial. Keep attendance records under the existing dedicated sync owner; never replace a month from this management refresh.
 schedules=(schedules||[]).filter(r=>normalizeScheduleMonthKey(r.month)!==s.month).concat(s.roster.schedules);
 p79WorkOvertimeMonths.set(s.month,{token:currentPort79SsoToken(),at:Date.now(),pending:false,ready:true,rows:s.roster.schedules,covers:s.roster.leaveCoverAssignments,revision:s.roster.revision,canDelete:s.roster.overtimeLinkedDelete===true});p79OvertimeCalculationCache=null;initDropdowns();renderOvertimeStats();return true;}}
 ;
@@ -232,11 +232,40 @@ applySnapshot:async snapshot=>{p79CanonicalOrgOptions=null;p79ApplyHrEmployeesPa
 ;
 })(window);
 },"history":function(){(function(g){'use strict';
-g.P79ManagementContext={system:'history',identity:()=>token()+'|'+$('month').value+'|'+type,gas:()=>gas(),token:()=>token(),canRead:()=>!!token()&&!!session(),hasPendingChanges:()=>!!document.querySelector('.history-import-preview:not([hidden])'),scope:()=>({month:$('month').value,type}),
+g.P79ManagementContext={system:'history',identity:()=>token()+'|'+$('month').value+'|'+type,gas:()=>gas(),token:()=>token(),canRead:()=>!!token()&&!!session(),hasPendingChanges:()=>!!document.querySelector('#historyImportPreview:not([hidden])'),scope:()=>({month:$('month').value,type}),
 readFresh:async read=>{const month=$('month').value,kind=type;if(!/^\d{4}-\d{2}$/.test(month))throw Error('月份不正確');const d=await read('historyGetMonthData',{month,type:kind});const key=kind==='schedule'?'schedules':kind==='vessel'?'shipMasters':'records';if(!Array.isArray(d[key]))throw Error('歷史資料不完整');return {ok:true,confirmedFresh:true,data:d,month,kind};},
-applySnapshot:async s=>{historyLoaded={type:s.kind,month:s.month,rows:s.data[s.kind==='schedule'?'schedules':s.kind==='vessel'?'shipMasters':'records']};$('historyExportExcel').disabled=false;pills([s.month,historyLoaded.rows.length+' 筆',s.data.sourceLabel||'Google Drive']);const rows=historyLoaded.rows;const cols=s.kind==='schedule'?[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||''},...Array.from({length:31},(_,i)=>({label:String(i+1),get:r=>r.schedule?.[i+1]??r.schedule?.[s.month+'-'+String(i+1).padStart(2,'0')]??''}))]:s.kind==='attendance'?[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||''}]:[{label:'船名',get:r=>r.vessel||r.shipName||''},{label:'工作號',get:r=>r.workingNo||''}];table(cols,rows);setStatus(s.month+' 跨系統更新已讀回核對');return true;}}
+applySnapshot:async s=>{const render=s.kind==='schedule'?p79ConnectionloadSchedule:s.kind==='attendance'?p79ConnectionloadAttendance:p79ConnectionloadVessel;await render(s.month,s.data);setStatus(s.month+' 跨系統更新已讀回核對');return true;}}
 ;
 })(window);
+async function p79ConnectionloadAttendance(month,provided){const d=provided,rows=Array.isArray(d.records)?d.records:[];historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
+async function p79ConnectionloadSchedule(month,provided){const d=provided,rows=Array.isArray(d.schedules)?d.schedules:[];historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);const cols=[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'組別',get:r=>r.group||r.schedule?.__personnel?.group||''},{label:'職務',get:r=>r.role||r.schedule?.__personnel?.role||''}];for(let i=1;i<=31;i++)cols.push({label:String(i),get:r=>r.schedule?.[i]??r.schedule?.[String(i)]??''});table(cols,rows)}
+async function p79ConnectionloadVessel(month,provided){
+  const d=provided,masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
+  pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
+  const rows=masters.length?masters:records;historyLoaded={type:'vessel',month,rows};$('historyExportExcel').disabled=false;
+  const n=v=>{const x=Number(v);return Number.isFinite(x)?x:''};
+  const voyage=r=>String(r.voyageE||r.voyageI||r.voyage||r.tfcCodeE||r.tfcCodeI||'').trim();
+  const dateOrTime=(r,a,b,c,d)=>r[a]||r[b]||r[c]||r[d]||'';
+  table([
+    {label:'船名',get:r=>r.vesselName||r.shipName||r.vessel||r.name||''},
+    {label:'航次',get:voyage},
+    {label:'WORKING NO',get:r=>r.workingNo||r.WORKING_NO||''},
+    {label:'開始',get:r=>dateOrTime(r,'firstDate','startDate','startTime','beginTime')},
+    {label:'結束',get:r=>dateOrTime(r,'lastDate','endDate','endTime','finishTime')},
+    {label:'卸船櫃數',get:r=>n(r.disc)},
+    {label:'裝船櫃數',get:r=>n(r.load)},
+    {label:'請款櫃數',get:r=>n(r.totalContainers??r.ttlCtnr??r.TTLCtnr??r.containerCount)},
+    {label:'艙蓋 H/C',get:r=>n(r.hatches??r.sheetHatches)},
+    {label:'翻艙 SHIFT',get:r=>n(r.shiftMoves??r.sheetShiftMoves)},
+    {label:'總 Moves',get:r=>n(r.totalMoves??r.sheetTotalMoves)},
+    {label:'AQC台數',get:r=>n(r.aqcCount??r.sheetAqcCount)},
+    {label:'GPH',get:r=>n(r.gph??r.shipGph)},
+    {label:'GPH含H/C',get:r=>n(r.gphHC??r.shipGphHC)},
+    {label:'VPH',get:r=>n(r.vph??r.shipVph)},
+    {label:'VPH含H/C',get:r=>n(r.vphHC??r.shipVphHC)},
+    {label:'碼頭',get:r=>r.wharf||''}
+  ],rows)
+}
 }};if(registers[sys])registers[sys]();})();
 (function(g){
 'use strict';
@@ -283,7 +312,7 @@ function boot(){
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
- binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
+ binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
 }
 const resume=()=>{if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
