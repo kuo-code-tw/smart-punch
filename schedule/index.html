@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.16.115';
+    const APP_VERSION='2026.10.16.116';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -1506,6 +1506,28 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       </div>
     </header>
 
+    <section id="p79ScheduleQuickBar" aria-label="排班常用操作">
+      <div class="p79-quick-month">
+        <button type="button" onclick="p79QuickScheduleMonth(-1)" aria-label="上個月">‹ 上月</button>
+        <div id="p79QuickMonthHost"></div>
+        <button type="button" onclick="p79QuickScheduleMonth(1)" aria-label="下個月">下月 ›</button>
+        <button type="button" onclick="p79QuickScheduleMonth(0)">本月</button>
+      </div>
+      <div class="p79-quick-actions">
+        <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
+        <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
+        <button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button>
+        <button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button>
+      </div>
+      <details class="p79-quick-guide"><summary>怎麼操作？</summary><div>
+        <p><b>改班別：</b>先取得上方編輯權，再選擇職稱／組別，點日期格內的班別選單修改。</p>
+        <p><b>報加班：</b>點當日格子的「代班／加班」按鈕，選擇出勤時段；已有加班則點時段查看。</p>
+        <p><b>下月排班：</b>點「延續到下個月」，先看預覽，再確認儲存。已有排班與請假會保留。</p>
+        <p><b>不能修改：</b>已連動請假或代班的日期，請先在請假管理完成刪除；他人編輯時須先取得編輯權。</p>
+        <p><b>完成修改：</b>按「儲存排班」並確認成功訊息；儲存失敗時保留畫面，稍後重試。</p>
+      </div></details>
+      <span id="p79QuickMonthStatus" role="status" aria-live="polite"></span>
+    </section>
     <!-- 圖片二：說明與全部職稱頁籤固定在上方，不會隨班表往下捲走 -->
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
       <div id="schedule-legend-row" class="max-w-[1920px] mx-auto bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
@@ -6850,6 +6872,35 @@ window.P79ScheduleContinuationContext={
 };
 </script>
 <script src="../assets/port79-schedule-continuation.js?v=20261016.115"></script>
+
+<style id="p79-schedule-usability">
+#p79ScheduleQuickBar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;margin:0 auto;max-width:1920px;background:#f8fafc;color:#1e293b;border-bottom:1px solid #cbd5e1}
+#p79ScheduleQuickBar .p79-quick-month,#p79ScheduleQuickBar .p79-quick-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+#p79ScheduleQuickBar button{padding:8px 12px;min-height:38px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#334155;font-size:14px;font-weight:700;cursor:pointer}
+#p79ScheduleQuickBar button:hover{background:#e0e7ff;border-color:#818cf8}#p79ScheduleQuickBar button:focus-visible{outline:3px solid #6366f1;outline-offset:2px}
+#p79ScheduleQuickBar button.primary{background:#2563eb;color:white;border-color:#2563eb}#p79ScheduleQuickBar button:disabled{opacity:.55;cursor:wait}
+#p79QuickMonthHost #scheduleRangeControl{padding:6px!important;min-height:38px}#p79QuickMonthHost input{font-size:15px!important}
+#p79ScheduleQuickBar .p79-quick-guide{margin-left:auto;font-size:14px}#p79ScheduleQuickBar summary{cursor:pointer;font-weight:700;padding:8px}
+#p79ScheduleQuickBar .p79-quick-guide[open]{width:100%;order:3;margin:0}#p79ScheduleQuickBar .p79-quick-guide p{margin:6px 0;line-height:1.6}
+#p79QuickMonthStatus{font-size:13px;color:#b91c1c} .dark #p79ScheduleQuickBar{background:#0f172a;color:#e2e8f0;border-color:#475569}.dark #p79ScheduleQuickBar button{background:#1e293b;color:#f1f5f9;border-color:#64748b}.dark #p79ScheduleQuickBar button.primary{background:#2563eb}.dark #p79QuickMonthStatus{color:#fda4af}
+@media(max-width:700px){#p79ScheduleQuickBar{padding:8px;gap:8px}#p79ScheduleQuickBar .p79-quick-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#p79ScheduleQuickBar .p79-quick-guide{margin-left:0}}
+@media print{#p79ScheduleQuickBar{display:none!important}}
+</style>
+<script id="p79-schedule-usability-script">
+let p79QuickMonthBusy=false;
+async function p79QuickScheduleMonth(step){
+ if(p79QuickMonthBusy)return;
+ const picker=document.getElementById('month-picker'),status=document.getElementById('p79QuickMonthStatus');
+ const old=picker.value,base=/^\d{4}-\d{2}$/.test(old)?old:scheduleTaipeiTodayKey().slice(0,7),parts=base.split('-').map(Number);
+ const date=new Date(parts[0],parts[1]-1+step,1,12),next=step===0?scheduleTaipeiTodayKey().slice(0,7):date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+ if(next===old)return;p79QuickMonthBusy=true;const buttons=[...document.querySelectorAll('.p79-quick-month button')];buttons.forEach(b=>b.disabled=true);picker.disabled=true;status.textContent='正在確認修改並切換月份…';
+ try{if(!await flushSchedulePendingWrites())throw Error('尚有未儲存修改，請先儲存排班再切換月份');picker.value=next;await onScheduleMonthPickerChange();status.textContent='';}
+ catch(e){status.textContent=e.message||'月份切換未完成，請重新讀取';}
+ finally{p79QuickMonthBusy=false;buttons.forEach(b=>b.disabled=false);picker.disabled=false;}
+}
+document.addEventListener('DOMContentLoaded',()=>{const control=document.getElementById('scheduleRangeControl'),host=document.getElementById('p79QuickMonthHost');if(control&&host)host.appendChild(control);});
+</script>
+
 </body>
 </html>
 
