@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="light">
+<head><base href="/smart-punch/history-data/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
+<!-- PORT79 2026-10-06 統一單月月曆日期選擇｜history-data -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="//script.google.com">
+<link rel="dns-prefetch" href="//script.googleusercontent.com">
+<title>79號碼頭雲端智慧系統｜歷史資料中心</title>
+<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
+<style>
+:root{--bg:#f5f7fb;--panel:#fff;--text:#0f172a;--muted:#64748b;--line:#dbe3ee;--nav:#07162a;--blue:#2563eb;--green:#059669;--orange:#d97706;--shadow:0 12px 32px rgba(15,23,42,.08)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans TC",system-ui,-apple-system,sans-serif}.top{background:linear-gradient(135deg,#07162a,#102b4b);color:#fff;padding:14px 18px;box-shadow:0 8px 24px rgba(2,6,23,.18)}.topin{max-width:1600px;margin:auto;display:flex;gap:14px;align-items:center;justify-content:space-between}.brand{display:flex;gap:12px;align-items:center}.logo{width:46px;height:46px;border-radius:15px;background:rgba(255,255,255,.12);display:grid;place-items:center;font-size:24px}.title{font-size:20px;font-weight:900}.sub{font-size:11px;color:#cbd5e1;margin-top:3px}.nav{display:flex;gap:5px;overflow:auto}.nav a{color:#cbd5e1;text-decoration:none;padding:8px 10px;border-radius:10px;white-space:nowrap;font-size:12px;font-weight:800}.nav a.active,.nav a:hover{background:rgba(255,255,255,.12);color:#fff}.wrap{max-width:1600px;margin:18px auto;padding:0 14px}.hero{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.hero h1{font-size:24px;margin:0 0 6px}.hero p{margin:0;color:var(--muted);font-size:13px}.picker{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.picker input,.picker button{min-height:42px;border-radius:11px;border:1px solid var(--line);font:inherit}.picker input{padding:8px 12px;background:#fff}.picker button{padding:8px 15px;background:#0f172a;color:#fff;border:0;font-weight:900;cursor:pointer}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.tab{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:16px;text-align:center;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,.05)}.tab strong{font-size:16px}.tab small{display:block;color:var(--muted);margin-top:5px}.tab.active{outline:3px solid rgba(37,99,235,.16);border-color:#93c5fd}.tab[disabled]{opacity:.45;cursor:not-allowed}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}.panelhead{display:flex;justify-content:center;gap:18px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);text-align:center;flex-wrap:wrap}.panelhead>div:first-child{flex:1;min-width:260px}.stats{justify-content:center}.status{font-size:12px;color:var(--muted)}.stats{display:flex;gap:8px;flex-wrap:wrap}.pill{padding:5px 9px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:11px;font-weight:800}.tablewrap{overflow:auto;max-height:68vh}.empty{padding:50px 20px;text-align:center;color:var(--muted)}table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap}th,td{padding:9px 10px;border-bottom:1px solid #eef2f7;text-align:center;vertical-align:middle}th{position:sticky;top:0;background:#f8fafc;z-index:2;font-size:11px;color:#475569}.note{margin-top:12px;color:var(--muted);font-size:11px;text-align:center}.cache{font-size:11px;color:#0f766e;font-weight:800}@media(max-width:850px){.topin{display:block}.nav{margin-top:10px}.hero{grid-template-columns:1fr}.tabs{grid-template-columns:1fr}.picker{width:100%}.picker input,.picker button{flex:1}.title{font-size:17px}}
+
+.progressbox{display:none;padding:12px 16px;border-bottom:1px solid var(--line);background:#f8fafc;text-align:center}
+.progressbox.show{display:block}.progressline{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:7px;font-size:12px;font-weight:800;color:#334155}.progressbar{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden;box-shadow:inset 0 1px 2px rgba(15,23,42,.08)}.progressfill{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,#0ea5e9,#2563eb,#7c3aed);transition:width .35s ease}.progressdetail{margin-top:6px;font-size:11px;color:#64748b}.num{font-variant-numeric:tabular-nums}
+</style>
+<style>
+.history-excel-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:1600px;margin:12px auto;padding:0 14px}
+.history-excel-bar button{border:0;border-radius:10px;padding:10px 13px;font-size:12px;font-weight:800;background:#334155;color:white;cursor:pointer}
+.history-excel-bar button:first-child{background:#047857}
+.history-excel-bar button:nth-child(2){background:#4338ca}
+.history-excel-bar button:disabled{opacity:.45;cursor:not-allowed}
+#historyExcelMessage{color:#64748b;font-size:12px}
+.history-import-preview{max-width:1572px;margin:0 auto 14px;padding:14px;background:white;border:1px solid #cbd5e1;border-radius:14px}
+.history-import-preview[hidden]{display:none}
+.history-import-preview strong{display:block;margin-bottom:7px}
+.history-import-preview p{font-size:12px;color:#475569}
+.history-import-preview button{background:#334155;color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer}
+</style>
+<link rel="stylesheet" href="../assets/port79-calendar-range.css">
+<style>
+/* 歷史月份切換：清楚標示可操作箭頭，避免原本淺灰底白箭頭看不見。 */
+body[data-p79-system="history"] .picker .p79-umnav{
+  border-color:#c7d2fe;background:#ffffff;
+}
+body[data-p79-system="history"] .picker .p79-umnav button{
+  background:#4338ca;color:#ffffff;border:1px solid #3730a3;
+  opacity:1;box-shadow:0 2px 5px rgba(55,48,163,.18);
+  font-size:24px;font-weight:900;line-height:1;
+}
+body[data-p79-system="history"] .picker .p79-umnav button:hover{
+  background:#312e81;color:#ffffff;box-shadow:0 0 0 3px #c7d2fe;
+}
+body[data-p79-system="history"] .picker .p79-umnav button:focus-visible{
+  outline:3px solid #f59e0b;outline-offset:2px;
+}
+body[data-p79-system="history"] .picker .p79-umnav-label{
+  color:#0f172a;font-weight:900;
+}
+</style>
+<link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
+</head>
+<body data-p79-system="history">
+<header class="top"><div class="topin"><div class="brand"><div class="logo">🗄️</div><div><div class="title">歷史資料中心</div><div class="sub">考勤歷史・排班歷史・船舶歷史｜已讀月份會保存在本機</div></div></div><nav class="nav"><a href="../attendance/">🕒 考勤</a><a href="../work-hours/">📊 工時統計</a><a href="../leave/">📝 請假</a><a href="../schedule/">📅 排班</a><a href="../aqc-efficiency/">🚢 效率</a><a href="../hr/">👥 人資</a><a class="active" href="./">🗄️ 歷史資料</a><a href="../">⌂ 首頁</a></nav></div></header>
+<main class="wrap">
+<section class="hero"><div><h1>歷史資料集中查詢</h1><p>歷史資料直接從 Google Drive 的「79號碼頭－出勤資料／排班資料／船舶資料」年度試算表讀取；第一次讀取後會保存本機快取。</p></div><div class="picker"><input id="month" type="month"><button id="loadBtn" type="button">讀取月份</button></div></section>
+<div class="history-excel-bar">
+<button type="button" id="historyExportExcel" disabled>📥 匯出當月 Excel</button>
+<button type="button" id="historyExcelTemplate">📄 Excel 格式範本</button>
+<button type="button" id="historyImportExcel">📤 匯入 Excel 核對</button>
+<input type="file" id="historyExcelFile" accept=".xlsx,.xls" hidden>
+<span id="historyExcelMessage" aria-live="polite">先讀取月份，再匯出或比對</span>
+</div>
+<div id="historyImportPreview" class="history-import-preview" hidden></div>
+<div class="tabs"><button class="tab active" data-type="attendance"><strong>🕒 考勤歷史</strong><small>依月份讀取完整考勤紀錄</small></button><button class="tab" data-type="schedule"><strong>📅 排班歷史</strong><small>依月份查看人員班表</small></button><button class="tab" data-type="vessel"><strong>🚢 船舶歷史</strong><small>依月份讀取船舶主檔與作業明細</small></button></div>
+<section class="panel"><div class="panelhead"><div><strong id="panelTitle">考勤歷史</strong><div id="status" class="status">選擇月份後按「讀取月份」</div></div><div class="stats" id="stats"></div></div><div id="progressBox" class="progressbox"><div class="progressline"><span id="progressText">準備讀取…</span><span id="progressPct" class="num">0%</span></div><div class="progressbar"><div id="progressFill" class="progressfill"></div></div><div id="progressDetail" class="progressdetail">等待開始</div></div><div class="tablewrap" id="result"><div class="empty">尚未讀取資料</div></div></section>
+<div class="note"><span class="cache">● 共用快取啟用</span>｜GitHub 資料夾：<b>history-data/</b>｜歷史月份只需下載一次，後續切換直接使用本機保存資料。</div>
+</main>
+<script>
+(function(){
+'use strict';
+const GAS_DEFAULT='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
+const $=id=>document.getElementById(id);let type='attendance';
+let historyLoaded=null;
+let historyXlsxPromise=null;
+function historyXlsx(){
+  if(window.XLSX)return Promise.resolve(window.XLSX);
+  if(historyXlsxPromise)return historyXlsxPromise;
+  historyXlsxPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('Excel 套件載入失敗'));
+    script.onerror=()=>reject(new Error('Excel 套件下載失敗，請確認網路'));
+    document.head.appendChild(script);
+  }).catch(err=>{historyXlsxPromise=null;throw err});
+  return historyXlsxPromise;
+}
+function historyExcelColumns(kind){
+  if(kind==='attendance')return [
+    ['timeStr','日期/時間'],['empId','工號'],['name','姓名'],['dept','部門'],
+    ['status','狀態']];
+  if(kind==='schedule')return [['empId','工號'],['name','姓名'],['group','組別'],['role','職務'],
+    ...Array.from({length:31},(_,i)=>['d'+(i+1),String(i+1)])];
+  return [['vesselName','船名'],['voyage','航次'],['workingNo','WORKING NO'],['firstDate','開始'],
+    ['lastDate','結束'],['disc','卸船櫃數'],['load','裝船櫃數'],['totalMoves','總 Moves']];
+}
+function historyNormalizeExcelRow(r,kind){
+  if(kind==='attendance')return {
+    timeStr:recordTime(r),empId:r.empId||r.employeeId||'',
+    name:r.name||r.employeeName||'',dept:r.dept||r.department||'',
+    status:r.status||r.type||r.action||'',location:r.location||r.place||r.address||'',
+    note:r.note||r.remark||'',attNo:r.attNo||'',id:r.id||'',source:r.source||''};
+  if(kind==='schedule'){const v={empId:r.empId||'',name:r.name||r.employeeName||'',group:r.group||'',role:r.role||''};
+    for(let i=1;i<=31;i++)v['d'+i]=r.schedule?.[i]??r.schedule?.[String(i)]??'';return v}
+  return r;
+}
+function historyWorkbookRows(kind,items){
+  const cols=historyExcelColumns(kind);
+  return [cols.map(c=>c[1]),...(items||[]).map(r=>{
+    const v=historyNormalizeExcelRow(r,kind);
+    return cols.map(([k])=>v[k]??'');
+  })];
+}
+function historySaveExcel(items,kind,month,suffix){
+  return historyXlsx().then(XLSX=>{
+    const ws=XLSX.utils.aoa_to_sheet(historyWorkbookRows(kind,items));
+    ws['!cols']=historyExcelColumns(kind).map(()=>({wch:18}));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'歷史資料');
+    XLSX.writeFile(wb,'PORT79_'+({attendance:'考勤歷史',schedule:'排班歷史',vessel:'船舶歷史'}[kind])+'_'+month+suffix+'.xlsx');
+  });
+}
+function historyExcelKey(r){return [String(r.id||'').trim(),String(r.empId||'').trim().toUpperCase(),String(r.timeStr||'').trim(),String(r.status||'').trim()].join('|')}
+function historyPreviewImport(items,kind,month){
+  const box=$('historyImportPreview');const existing=historyLoaded?.type===kind&&historyLoaded?.month===month?historyLoaded.rows:[];
+  const keys=new Set(existing.map(r=>historyExcelKey(historyNormalizeExcelRow(r,kind))));
+  const unique=new Set();let repeated=0,invalid=0,wrongMonth=0;const candidates=[];
+  for(const item of items){
+    const row=historyNormalizeExcelRow(item,kind),key=historyExcelKey(row);
+    if(kind==='attendance'){
+      if(!row.empId||!row.timeStr||!row.status){invalid++;continue}
+      const ym=String(row.timeStr).replaceAll('/','-').slice(0,7);
+      if(ym!==month){wrongMonth++;continue}
+    }
+    if(unique.has(key)||keys.has(key)){repeated++;continue}
+    unique.add(key);candidates.push(row);
+  }
+  box.hidden=false;
+  box.innerHTML='<strong>Excel 匯入核對｜'+esc(month)+'</strong>'+
+    '<p>來源 '+items.length+' 筆｜重複 '+repeated+' 筆｜欄位不完整 '+invalid+' 筆｜非本月份 '+wrongMonth+' 筆｜待確認 '+candidates.length+' 筆</p>'+
+    '<p><b>安全保護：</b>這裡只預覽與比對，不會寫入 Google Drive，也不會刪除或覆蓋歷史原始紀錄。正式匯入須先部署具權限驗證的 GAS 寫入 API。</p>'+
+    '<button type="button" id="historyClosePreview">關閉預覽</button>';
+  $('historyClosePreview').onclick=()=>{box.hidden=true};
+}
+
+function session(){
+  let active=null,admin=null;
+  try{active=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(e){}
+  try{admin=JSON.parse(sessionStorage.getItem('admin_session')||'null')}catch(e){}
+  const role=String(admin?.adminRole||admin?.role||'').toLowerCase();
+  const token=String(sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim();
+  // 僅在同一工號且已有管理員登入權杖時，修復被打卡頁覆蓋的共用 Session。
+  if(admin&&token&&['admin','superadmin'].includes(role)&&
+     String(admin.empId||'').trim().toUpperCase()===String(active?.empId||'').trim().toUpperCase()){
+    if(!['admin','superadmin'].includes(String(active?.adminRole||active?.role||'').toLowerCase())){
+      try{sessionStorage.setItem('port79_user_session',JSON.stringify(admin))}catch(e){}
+      return admin;
+    }
+  }
+  return active||admin;
+}
+function perms(){const s=session(),r=String(s?.adminRole||s?.role||'').toLowerCase(),p=s?.systemPermissions||{},f=s?.finePermissions?.history||{};if(r==='superadmin')return{level:'manage',attendance:true,schedule:true,vessel:true};const level=String(p.history||'none');return{level,attendance:!!f['attendance.view'],schedule:!!f['schedule.view'],vessel:!!f['vessel.view']}}
+function token(){return String(sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_token')||sessionStorage.getItem('port79_user_token')||'').trim()}
+function gas(){return String(sessionStorage.getItem('port79_gas_url')||GAS_DEFAULT).trim()}
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(v){if(v==null)return '';if(typeof v==='object')return JSON.stringify(v);return String(v)}
+async function api(action,params={}){const u=new URL(gas()),tk=token();u.searchParams.set('action',action);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,String(v)));if(tk){u.searchParams.set('token',tk);u.searchParams.set('gcToken',tk)}u.searchParams.set('_',Date.now());const r=await fetch(u.toString(),{cache:'no-store',redirect:'follow'}),j=await r.json();if(!j?.ok)throw new Error(j?.error||'雲端讀取失敗');return j}
+function currentMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+function setStatus(s){$('status').textContent=s}
+function pills(items){$('stats').innerHTML=items.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}
+let progressTimer=null,progressValue=0,progressStartedAt=0;
+function progressPhase(p){if(p<18)return['建立雲端連線…','正在連接 Google Apps Script'];if(p<40)return['尋找年度檔案…','正在定位 Google Drive 年度試算表'];if(p<68)return['讀取月份資料…','正在讀取月份分頁與船舶／人員明細'];if(p<90)return['整理資料…','正在解析欄位、合併摘要與明細'];return['完成前檢查…','正在準備顯示資料']}
+function paintProgress(p,text,detail){progressValue=Math.max(0,Math.min(100,Math.round(p)));$('progressBox').classList.add('show');$('progressFill').style.width=progressValue+'%';$('progressPct').textContent=progressValue+'%';const phase=progressPhase(progressValue);$('progressText').textContent=text||phase[0];$('progressDetail').textContent=detail||phase[1]}
+function startProgress(month){if(progressTimer)clearInterval(progressTimer);progressValue=5;progressStartedAt=Date.now();paintProgress(progressValue,'開始讀取 '+month,'準備向 Google Drive 讀取資料');progressTimer=setInterval(()=>{const elapsed=Date.now()-progressStartedAt;let target=8+Math.min(82,Math.floor(elapsed/260));if(target>90)target=90;if(target>progressValue)paintProgress(target)},260)}
+function finishProgress(ok,detail){if(progressTimer){clearInterval(progressTimer);progressTimer=null}paintProgress(ok?100:progressValue,ok?'讀取完成':'讀取失敗',detail||'');if(ok)setTimeout(()=>{$('progressBox').classList.remove('show')},1400)}
+function table(cols,rows){if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+function recordTime(r){const v=r.timeStr??r.datetime??r.dateTime??r.timestamp??r.time??r.fullTime??r.attendanceTime??r.clockTime??r['完整考勤時間']??r['考勤時間']??'';if(v instanceof Date)return v.toLocaleString('zh-TW',{hour12:false});return v}
+async function loadAttendance(month){const d=await api('historyGetMonthData',{type:'attendance',month}),rows=Array.isArray(d.records)?d.records:[];historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
+async function loadSchedule(month){const d=await api('historyGetMonthData',{type:'schedule',month}),rows=Array.isArray(d.schedules)?d.schedules:[];historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);const cols=[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'組別',get:r=>r.group||r.schedule?.__personnel?.group||''},{label:'職務',get:r=>r.role||r.schedule?.__personnel?.role||''}];for(let i=1;i<=31;i++)cols.push({label:String(i),get:r=>r.schedule?.[i]??r.schedule?.[String(i)]??''});table(cols,rows)}
+async function loadVessel(month){
+  const d=await api('historyGetMonthData',{type:'vessel',month}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
+  pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
+  const rows=masters.length?masters:records;historyLoaded={type:'vessel',month,rows};$('historyExportExcel').disabled=false;
+  const n=v=>{const x=Number(v);return Number.isFinite(x)?x:''};
+  const voyage=r=>String(r.voyageE||r.voyageI||r.voyage||r.tfcCodeE||r.tfcCodeI||'').trim();
+  const dateOrTime=(r,a,b,c,d)=>r[a]||r[b]||r[c]||r[d]||'';
+  table([
+    {label:'船名',get:r=>r.vesselName||r.shipName||r.vessel||r.name||''},
+    {label:'航次',get:voyage},
+    {label:'WORKING NO',get:r=>r.workingNo||r.WORKING_NO||''},
+    {label:'開始',get:r=>dateOrTime(r,'firstDate','startDate','startTime','beginTime')},
+    {label:'結束',get:r=>dateOrTime(r,'lastDate','endDate','endTime','finishTime')},
+    {label:'卸船櫃數',get:r=>n(r.disc)},
+    {label:'裝船櫃數',get:r=>n(r.load)},
+    {label:'請款櫃數',get:r=>n(r.totalContainers??r.ttlCtnr??r.TTLCtnr??r.containerCount)},
+    {label:'艙蓋 H/C',get:r=>n(r.hatches??r.sheetHatches)},
+    {label:'翻艙 SHIFT',get:r=>n(r.shiftMoves??r.sheetShiftMoves)},
+    {label:'總 Moves',get:r=>n(r.totalMoves??r.sheetTotalMoves)},
+    {label:'AQC台數',get:r=>n(r.aqcCount??r.sheetAqcCount)},
+    {label:'GPH',get:r=>n(r.gph??r.shipGph)},
+    {label:'GPH含H/C',get:r=>n(r.gphHC??r.shipGphHC)},
+    {label:'VPH',get:r=>n(r.vph??r.shipVph)},
+    {label:'VPH含H/C',get:r=>n(r.vphHC??r.shipVphHC)},
+    {label:'碼頭',get:r=>r.wharf||''}
+  ],rows)
+}
+async function load(){historyLoaded=null;$('historyExportExcel').disabled=true;$('historyImportPreview').hidden=true;const m=$('month').value;if(!/^\d{4}-\d{2}$/.test(m))return;setStatus(`讀取 ${m} 中…`);$('loadBtn').disabled=true;startProgress(m);try{if(type==='attendance')await loadAttendance(m);else if(type==='schedule')await loadSchedule(m);else await loadVessel(m);setStatus(`${m} 已完成；下次同月份會優先使用本機保存資料`);finishProgress(true,`${m} 資料已整理完成`)}catch(e){setStatus(`讀取失敗：${e.message||e}`);$('result').innerHTML=`<div class="empty">${esc(e.message||e)}</div>`;finishProgress(false,e.message||String(e))}finally{$('loadBtn').disabled=false}}
+function applyPerms(){const p=perms();document.querySelectorAll('.tab').forEach(b=>{b.disabled=p.level==='none'||!p[b.dataset.type]});const first=[...document.querySelectorAll('.tab')].find(b=>!b.disabled);if(!first){$('loadBtn').disabled=true;const current=session();const punchMode=!!current?.punchOnly;setStatus(punchMode?'目前是「員工打卡模式」，即使帳號為最高管理員也不能查詢歷史資料；請返回首頁使用「管理員登入」並輸入密碼。':'目前登入狀態沒有「歷史資料」查詢權限；請返回首頁確認使用管理員登入，或由權限管理員開啟歷史資料權限。');$('result').innerHTML='<div class="empty">'+(punchMode?'目前使用打卡模式，需先通過管理員驗證。':'請確認管理員登入狀態及歷史資料權限。')+'<div style="margin-top:16px"><a href="../" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#0f172a;color:white;text-decoration:none;font-weight:800">返回首頁・管理員登入</a></div></div>';return}if(document.querySelector('.tab.active')?.disabled){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));first.classList.add('active');type=first.dataset.type}}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{if(b.disabled)return;document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');type=b.dataset.type;$('panelTitle').textContent=type==='attendance'?'考勤歷史':type==='schedule'?'排班歷史':'船舶歷史';historyLoaded=null;$('historyExportExcel').disabled=true;$('historyImportPreview').hidden=true;$('result').innerHTML='<div class="empty">按「讀取月份」查看資料</div>';pills([]);setStatus('已切換資料類型')}));
+$('historyExportExcel').addEventListener('click',async()=>{
+  if(!historyLoaded||historyLoaded.type!==type||historyLoaded.month!==$('month').value)return;
+  try{await historySaveExcel(historyLoaded.rows,type,historyLoaded.month,'');$('historyExcelMessage').textContent='當月 Excel 已匯出'}
+  catch(e){$('historyExcelMessage').textContent='匯出失敗：'+e.message}
+});
+$('historyExcelTemplate').addEventListener('click',async()=>{
+  try{await historySaveExcel([],type,$('month').value||currentMonth(),'_空白格式');$('historyExcelMessage').textContent='範本已匯出'}
+  catch(e){$('historyExcelMessage').textContent='範本失敗：'+e.message}
+});
+$('historyImportExcel').addEventListener('click',()=>{$('historyExcelFile').value='';$('historyExcelFile').click()});
+$('historyExcelFile').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  if(!historyLoaded||historyLoaded.type!==type||historyLoaded.month!==$('month').value){
+    $('historyExcelMessage').textContent='請先讀取要核對的歷史月份';return;
+  }
+  try{
+    const XLSX=await historyXlsx(),wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+    if(data.length>20000)throw new Error('單次最多核對 20,000 筆');
+    const cols=historyExcelColumns(type);
+    const mapped=data.map(row=>{const item={};for(const [key,label] of cols)item[key]=row[label]??'';return item});
+    historyPreviewImport(mapped,type,historyLoaded.month);
+    $('historyExcelMessage').textContent='已完成匯入預覽，尚未寫入雲端';
+  }catch(err){$('historyExcelMessage').textContent='匯入核對失敗：'+err.message}
+});
+$('loadBtn').addEventListener('click',load);$('month').value=currentMonth();applyPerms();
+})();
+</script>
+
+<script src="../assets/port79-calendar-range.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+
+const C=window.Port79CalendarRange;if(!C)return;
+C.mountMonth({inputId:'month'});
+
+});
+</script>
+<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script>(function(global){
+'use strict';
+// Draft: management-only invalidation. It never writes domain records or submits punch requests.
+const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
+const ACTIONS={
+ hrUpsertEmployee:['people','permissions'],hrDeleteEmployee:['people','permissions','schedule'],hrSetEmploymentStatus:['people','schedule'],hrSaveOrgSettings:['organization','people'],
+ addLeave:['leave'],addLeaveRecord:['leave'],updateLeaveStatus:['leave','cover','schedule','overtime'],
+ deleteLeaveRecord:['leave','cover','schedule','overtime'],saveLeaveCoverAssignment:['leave','cover','schedule','overtime'],cleanupOrphanLeaveCovers:['cover','schedule','overtime'],
+ updateLeaveBalances:['leave'],syncSchedules:['schedule','overtime'],saveScheduleEmployee:['people','schedule'],saveScheduleGroups:['organization','schedule'],
+ saveOvertimeReportDirect:['overtime','schedule'],deleteOvertimeAssignment:['overtime','schedule'],
+ gcUpsertShipMaster:['efficiency','history'],gcDeleteShipMaster:['efficiency','history'],gcUpsertRecord:['efficiency','history'],gcDeleteRecord:['efficiency','history'],gcSyncAll:['efficiency','history'],gcUpsertGroup:['efficiency'],gcDeleteGroup:['efficiency'],gcAssignEmployee:['efficiency'],
+ updateRecord:['attendance','overtime'],deleteRecord:['attendance','overtime']
+};
+const DEPENDENCIES={attendance:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],hr:['people','organization','permissions'],leave:['people','organization','permissions','leave','cover','schedule','overtime'],schedule:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],workhours:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],efficiency:['people','organization','permissions','efficiency'],history:['history','attendance','schedule','efficiency']};
+function topicsFor(action){return (ACTIONS[action]||[]).slice();}
+function validEvent(e){return !!e&&e.v===1&&typeof e.id==='string'&&e.id.length<150&&Number.isFinite(e.at)&&Array.isArray(e.topics)&&e.topics.length<=TOPICS.length&&e.topics.every(t=>TOPICS.includes(t));}
+function create(options){
+ const {system,isManager,refresh,isEditing,notify=()=>{},clock=Date.now}=options;
+ const dependencies=DEPENDENCIES[system]||[];let pending=new Set(),seen=new Set(),running=null,disposed=false,generation=0;
+ function status(){return {pending:[...pending],running:!!running,generation};}
+ function receive(event){
+  if(disposed||!isManager()||!validEvent(event)||seen.has(event.id))return false;
+  seen.add(event.id);if(seen.size>128)seen.delete(seen.values().next().value);
+  const relevant=event.topics.filter(t=>dependencies.includes(t));if(!relevant.length)return false;
+  relevant.forEach(t=>pending.add(t));generation++;notify(status());return true;
+ }
+ async function synchronize(){
+  if(disposed||!isManager())return {ok:false,reason:'permission'};
+  if(running)return running;
+  if(isEditing())return {ok:false,reason:'editing'};
+  if(!pending.size)return {ok:true,unchanged:true};
+  const captured=generation;
+  running=Promise.resolve().then(async()=>{try{
+   const result=await refresh([...pending]);
+   if(disposed||!isManager())return {ok:false,reason:'permission'};
+   if(result!==true)return {ok:false,reason:'unconfirmed'};
+   if(generation===captured)pending.clear();
+   return {ok:true,pending:pending.size>0};
+  }catch(error){return {ok:false,reason:'read-failed'};}finally{running=null;if(!disposed)notify(status());}});
+  return running;
+ }
+ function acknowledge(action,response){
+  const topics=topicsFor(action);if(!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
+  return {v:1,id:options.makeId(),at:clock(),topics};
+ }
+ return {receive,synchronize,acknowledge,status,dispose(){disposed=true;pending.clear();seen.clear();}};
+}
+function attach(options){
+ if(!options.isManager())return {dispose(){}};
+ const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;
+ const handle=e=>{if(!engine.receive(e))return;try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){};};
+ const publish=event=>{if(!event)return;handle(event);try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};};
+ const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
+ global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));
+ function requestAction(input,init){
+  const method=String(init?.method||(typeof input==='object'?input.method:'GET')||'GET').toUpperCase();if(method==='GET')return '';
+  try{const url=new URL(typeof input==='string'?input:input.url,global.location.href);if(url.origin!==options.gasOrigin||url.pathname!==options.gasPath)return '';return JSON.parse(init?.body||'{}').action||'';}catch(_){return '';}
+ }
+ async function wrapped(input,init){
+  const action=options.isManager()?requestAction(input,init):'',response=await priorFetch.call(global,input,init);
+  if(topicsFor(action).length&&response.ok){
+   // Only an explicit domain ACK is a revision. HTTP 200/timeout is never a success.
+   void response.clone().json().then(body=>publish(engine.acknowledge(action,body))).catch(()=>{});
+  }
+  return response;
+ }
+ global.fetch=wrapped;
+ const onFocus=()=>{if(options.isManager()&&options.autoRefreshSafe?.())void engine.synchronize();};
+ global.addEventListener('focus',onFocus);listeners.push(()=>global.removeEventListener('focus',onFocus));
+ // No polling: receiver adapters decide when a form is safe to reload.
+ return {engine,publish,dispose(){listeners.forEach(f=>f());engine.dispose();if(global.fetch===wrapped)global.fetch=priorFetch;}};
+}
+global.P79ManagementSync={topicsFor,validEvent,create,attach,dependencies:DEPENDENCIES};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){
+'use strict';
+function makeAdapter(system,context){
+ if(!context||typeof context.canRead!=='function'||typeof context.readFresh!=='function'||typeof context.hasPendingChanges!=='function')throw Error('Incomplete management adapter: '+system);
+ let generation=0,disposed=false,reading=null;
+ return {
+  system,
+  isManager:()=>!disposed&&context.canRead()===true,
+  isEditing:()=>context.hasPendingChanges()!==false||context.isFormOpen?.()===true,
+  async refresh(topics){
+   if(disposed||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+   if(reading)return reading;
+   const epoch=++generation,identity=context.identity();
+   reading=Promise.resolve().then(async()=>{
+    const snapshot=await context.readFresh(topics);
+    if(disposed||epoch!==generation||context.identity()!==identity||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+    if(snapshot?.ok!==true||snapshot.fromCache===true||snapshot.confirmedFresh!==true)return false;
+    // Applying is a local display operation; adapters never submit domain writes.
+    await context.applySnapshot(snapshot,topics);
+    return true;
+   }).finally(()=>{reading=null;});return reading;
+  },
+  dispose(){disposed=true;generation++;}
+ };
+}
+g.P79ManagementAdapterFactory={makeAdapter};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){'use strict';
+g.P79ManagementContext={system:'history',identity:()=>token()+'|'+$('month').value+'|'+type,gas:()=>gas(),token:()=>token(),canRead:()=>!!token()&&!!session(),hasPendingChanges:()=>!!document.querySelector('.history-import-preview:not([hidden])'),scope:()=>({month:$('month').value,type}),
+readFresh:async read=>{const month=$('month').value,kind=type;if(!/^\d{4}-\d{2}$/.test(month))throw Error('月份不正確');const d=await read('historyGetMonthData',{month,type:kind});const key=kind==='schedule'?'schedules':kind==='vessel'?'shipMasters':'records';if(!Array.isArray(d[key]))throw Error('歷史資料不完整');return {ok:true,confirmedFresh:true,data:d,month,kind};},
+applySnapshot:async s=>{historyLoaded={type:s.kind,month:s.month,rows:s.data[s.kind==='schedule'?'schedules':s.kind==='vessel'?'shipMasters':'records']};$('historyExportExcel').disabled=false;pills([s.month,historyLoaded.rows.length+' 筆',s.data.sourceLabel||'Google Drive']);const rows=historyLoaded.rows;const cols=s.kind==='schedule'?[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||''},...Array.from({length:31},(_,i)=>({label:String(i+1),get:r=>r.schedule?.[i+1]??r.schedule?.[s.month+'-'+String(i+1).padStart(2,'0')]??''}))]:s.kind==='attendance'?[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||''}]:[{label:'船名',get:r=>r.vessel||r.shipName||''},{label:'工作號',get:r=>r.workingNo||''}];table(cols,rows);setStatus(s.month+' 跨系統更新已讀回核對');return true;}}
+;
+})(window);
+
+(function(g){
+'use strict';
+if(g.P79ManagementPageBridge)return;
+const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
+if(!context||!api||!factory)return;
+let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null;
+const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
+function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return ['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
+function openForm(){
+ const el=document.activeElement;if(el&&el.matches?.('input,textarea,[contenteditable="true"]'))return true;
+ return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
+}
+function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
+function readScope(){return JSON.stringify(context.scope?.()||{});}
+async function readFresh(action,params={}){
+ const originIdentity=context.identity(),scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
+ const url=new URL(raw,location.href);if(url.origin!=='https://script.google.com'||!url.pathname.startsWith('/macros/s/'))throw Error('雲端來源不正確');
+ url.searchParams.set('action',action);url.searchParams.set('token',tk);url.searchParams.set('gcToken',tk);url.searchParams.set('_',Date.now());Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+ const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);
+ try{const response=await fetch(url.toString(),{method:'GET',cache:'no-store',signal:ctl.signal});const data=await response.json();
+  if(!response.ok||data?.ok!==true||data.retryable)throw Error(data?.error||'雲端未確認讀取');
+  if(context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('登入、權限或範圍已變更');return data;
+ }finally{clearTimeout(timeout);}
+}
+function ensureBar(){
+ if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
+ bar.style.cssText='display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 16px;background:#eff6ff;color:#1e3a8a;border-bottom:1px solid #93c5fd;font:700 13px system-ui;flex-wrap:wrap';
+ const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);
+ const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
+}
+function notify(state){
+ pendingState=state;if(!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜正在編輯，保留內容並延後套用':'｜準備同步');b.querySelector('button').disabled=state.running;
+ if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
+}
+async function synchronize(){
+ clearTimeout(timer);timer=null;if(stopped||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
+ const result=await binding.engine.synchronize();
+ if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認｜保留目前資料，可按更新重試';}
+}
+function boot(){
+ if(stopped||binding||!roleAllowed())return;
+ if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
+ const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope(),readFresh:()=>context.readFresh(readFresh)});
+ const backend=new URL(context.gas(),location.href);
+ binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};
+}
+const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
+g.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);clearTimeout(bootTimer);binding?.dispose();document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);},{once:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})(window);
+</script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';api.binding.publish({v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']});document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body></html>
+
+
