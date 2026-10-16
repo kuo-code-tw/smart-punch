@@ -1,6 +1,21 @@
 (function(global){
 'use strict';
 // Draft: management-only invalidation. It never writes domain records or submits punch requests.
+// The original efficiency verifier labels every {ok:false} as an auth rejection.
+// Keep the server's exact lock-contention response as a failed read in the isolated candidate.
+if(global.P79ManagementTestMode===true&&typeof global.verifyGcSsoToken==='function'){
+ const verify=global.verifyGcSsoToken;
+ global.verifyGcSsoToken=async function(...args){
+  try{return await verify.apply(this,args);}
+  catch(error){
+   if(error?.ssoAuthRejected===true&&String(error.message||'').trim()==='雲端正在同步管理員資料，請稍後重試 SSO 驗證'){
+    const unavailable=new Error('雲端正在同步管理員資料，請稍後重試 SSO 驗證');
+    unavailable.ssoAuthRejected=false;unavailable.retryable=true;throw unavailable;
+   }
+   throw error;
+  }
+ };
+}
 const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
 const ACTIONS={
  hrUpsertEmployee:['people','permissions'],hrDeleteEmployee:['people','permissions','schedule'],hrSetEmploymentStatus:['people','schedule'],hrSaveOrgSettings:['organization','people'],
@@ -40,19 +55,19 @@ function create(options){
   return running;
  }
  function acknowledge(action,response){
-  const topics=topicsFor(action);if(!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
+  const topics=topicsFor(action);if(disposed||!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
   return {v:1,id:options.makeId(),at:clock(),topics};
  }
  return {receive,synchronize,acknowledge,status,dispose(){disposed=true;pending.clear();seen.clear();}};
 }
 function attach(options){
  if(!options.isManager())return {dispose(){}};
- const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;
+ const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;let disposed=false;
  const invalidate=()=>{try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){}};
  const handle=e=>{if(engine.receive(e))invalidate();};
  let channel=null;try{if(typeof global.BroadcastChannel==='function')channel=new global.BroadcastChannel(KEY);}catch(_){}
  if(channel)channel.onmessage=e=>handle(e.data);
- const publish=event=>{if(!event)return;if(options.receiveOwn===true)handle(event);else invalidate();try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};try{channel?.postMessage(event);}catch(_){};};
+ const publish=event=>{if(disposed||!event)return;if(options.receiveOwn===true)handle(event);else invalidate();try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};try{channel?.postMessage(event);}catch(_){};};
  const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
  global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));listeners.push(()=>channel?.close());
  function requestAction(input,init){
@@ -71,7 +86,7 @@ function attach(options){
  const onFocus=()=>{if(options.isManager()&&options.autoRefreshSafe?.())void engine.synchronize();};
  global.addEventListener('focus',onFocus);listeners.push(()=>global.removeEventListener('focus',onFocus));
  // No polling: receiver adapters decide when a form is safe to reload.
- return {engine,publish,dispose(){listeners.forEach(f=>f());engine.dispose();if(global.fetch===wrapped)global.fetch=priorFetch;}};
+ return {engine,publish,dispose(){if(disposed)return;disposed=true;listeners.forEach(f=>f());engine.dispose();if(global.fetch===wrapped)global.fetch=priorFetch;}};
 }
 global.P79ManagementSync={topicsFor,validEvent,create,attach,dependencies:DEPENDENCIES};
 })(typeof window==='undefined'?globalThis:window);
@@ -237,7 +252,8 @@ applySnapshot:async snapshot=>{p79CanonicalOrgOptions=null;p79ApplyHrEmployeesPa
 if(g.P79ManagementPageBridge)return;
 const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
 if(!context||!api||!factory)return;
-let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
+let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
+const activeReads=new Set();
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
 function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
@@ -247,14 +263,15 @@ function openForm(){
 function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
 function readScope(){return JSON.stringify(context.scope?.()||{});}
 async function readFresh(action,params={}){
- const originIdentity=context.identity(),scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
+ if(stopped||suspended)throw Error('頁面已離開');
+ const originIdentity=context.identity(),revision=viewRevision,scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
  const url=new URL(raw,location.href);if(url.origin!=='https://script.google.com'||!url.pathname.startsWith('/macros/s/'))throw Error('雲端來源不正確');
  url.searchParams.set('action',action);url.searchParams.set('token',tk);url.searchParams.set('gcToken',tk);url.searchParams.set('_',Date.now());Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
- const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);
+ const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);activeReads.add(ctl);
  try{const response=await fetch(url.toString(),{method:'GET',cache:'no-store',signal:ctl.signal});const data=await response.json();
   if(!response.ok||data?.ok!==true||data.retryable)throw Error(data?.error||'雲端未確認讀取');
-  if(context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('登入、權限或範圍已變更');return data;
- }finally{clearTimeout(timeout);}
+  if(stopped||suspended||revision!==viewRevision||context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('頁面、登入、權限或範圍已變更');return data;
+ }finally{clearTimeout(timeout);activeReads.delete(ctl);}
 }
 function ensureBar(){
  if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
@@ -263,25 +280,33 @@ function ensureBar(){
  const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
 }
 function notify(state){
- pendingState=state;if(!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
+ pendingState=state;if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
  const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜正在編輯，保留內容並延後套用':'｜準備同步');b.querySelector('button').disabled=state.running;
  if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
 }
 async function synchronize(){
- clearTimeout(timer);timer=null;if(stopped||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
+ clearTimeout(timer);timer=null;if(stopped||suspended||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
  const result=await binding.engine.synchronize();
- if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
+ if(!stopped&&!suspended&&result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
 }
 function boot(){
- if(stopped||binding||!roleAllowed())return;
+ if(stopped||suspended||binding||!roleAllowed())return;
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.2';}
 }
-const resume=()=>{if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
-g.addEventListener('pagehide',event=>{clearTimeout(timer);clearTimeout(bootTimer);if(event.persisted)return;stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();document.removeEventListener('input',changed,true);document.removeEventListener('change',changed,true);document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);});g.addEventListener('pageshow',event=>{if(event.persisted)resume();});
+function pagehide(event){
+ suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);timer=null;bootTimer=null;
+ activeReads.forEach(ctl=>ctl.abort());activeReads.clear();
+ if(event.persisted)return;
+ stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();
+ document.removeEventListener('input',changed,true);document.removeEventListener('change',changed,true);document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);g.removeEventListener('pagehide',pagehide);g.removeEventListener('pageshow',pageshow);
+}
+function pageshow(event){if(event.persisted&&!stopped){suspended=false;resume();}}
+g.addEventListener('pagehide',pagehide);g.addEventListener('pageshow',pageshow);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })(window);
