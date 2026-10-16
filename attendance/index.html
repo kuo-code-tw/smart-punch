@@ -2282,7 +2282,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.83';
+        const APP_VERSION='2026.10.16.103';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -11211,12 +11211,33 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return false;
         }
 
+        function p79ExplicitBackendTabAccess(tab){
+            const module=['overtime','stats'].includes(tab)?'workhours':['records','live'].includes(tab)?'attendance':'';
+            if(!module)return null;
+            let principal=currentEmp;
+            if(!Object.prototype.hasOwnProperty.call(principal?.systemPermissions||{},module)){
+                for(const key of ['port79_user_session','admin_session']){
+                    try{const cached=JSON.parse(sessionStorage.getItem(key)||'null');
+                        const id=String(currentEmp?.empId||'').trim().toUpperCase();
+                        if(cached&&(!id||String(cached.empId||'').trim().toUpperCase()===id)&&Object.prototype.hasOwnProperty.call(cached.systemPermissions||{},module)){principal=cached;break;}
+                    }catch(e){}
+                }
+            }
+            if(!Object.prototype.hasOwnProperty.call(principal?.systemPermissions||{},module))return null;
+            if(!['view','manage'].includes(principal.systemPermissions[module]))return false;
+            const action={overtime:'overtime.view',stats:'attendance.view',records:'records.view',live:'realtime.view'}[tab];
+            const fine=principal.finePermissions?.[module]||{};
+            return Object.prototype.hasOwnProperty.call(fine,action)?fine[action]===true:true;
+        }
+
         function canOpenAdminTab(tab) {
             if (tab === 'leave') return false; // 請假已獨立到 ../leave/
-            if (!isAdminLoggedIn) return false;
+            if (!isAdminLoggedIn && !hasValidHomepageAdminSession()) return false;
 
             const sessionRole = getAuthoritativeAdminSessionRole();
             if (sessionRole === 'superadmin' || isCurrentViewerSuperAdmin()) return true;
+            const explicitAccess=p79ExplicitBackendTabAccess(tab);
+            if(explicitAccess!==null)return explicitAccess;
 
             // v10.5：只要首頁已驗證為 admin，即使 currentEmp / 權限欄位尚未同步，
             // 考勤基本後台仍一定可以開，避免所有 tab 都被隱藏造成整頁黑畫面。
