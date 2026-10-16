@@ -763,7 +763,8 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 <style id="p79-overtime-compact-inline">
 #adminContentOvertime table:has(#overtimeTableBody){width:100%!important;min-width:100%!important;table-layout:auto!important}
 #adminContentOvertime table:has(#overtimeTableBody) th,#adminContentOvertime table:has(#overtimeTableBody) td{padding:5px 9px!important;font-size:14px!important;line-height:24px!important;white-space:nowrap!important;text-align:center!important}
-#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px}
+#adminContentOvertime table:has(#overtimeTableBody) th:last-child,#adminContentOvertime table:has(#overtimeTableBody) td:last-child{text-align:left!important}
+#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:6px;white-space:nowrap;font-size:14px}
 #adminContentOvertime .p79-overtime-inline button{min-height:28px!important;padding:2px 6px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
 </style>
 <style id="p79-attendance-balanced-columns-v69">
@@ -2119,7 +2120,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.82';
+        const APP_VERSION='2026.10.16.95';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12529,7 +12530,7 @@ function p79OvertimePeriodLabel(report){
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}</td>
-                    <td class="px-3 py-3"><div class="p79-overtime-inline"><span class="font-black text-indigo-700 dark:text-indigo-300">${row.planned?'預排／待核對':formatDurationMinutes(row.overtimeMinutes)}</span>${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td class="px-3 py-3"><div class="p79-overtime-inline">${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
