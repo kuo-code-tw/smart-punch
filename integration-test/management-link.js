@@ -52,7 +52,7 @@ function create(options){
    if(generation===captured)pending.clear();
    return {ok:true,pending:pending.size>0};
   }catch(error){return {ok:false,reason:'read-failed',errorType:['AbortError','ReferenceError','TypeError'].includes(error?.name)?error.name:'ReadError'};}finally{running=null;if(!disposed)notify(status());}});
-  return running;
+  notify(status());return running;
  }
  function acknowledge(action,response){
   const topics=topicsFor(action);if(disposed||!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
@@ -303,7 +303,7 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:topics=>context.readFresh(readFresh,topics)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.7';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.8';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
 const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();scheduleReadIdleResume();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
