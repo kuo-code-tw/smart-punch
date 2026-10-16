@@ -351,7 +351,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.15.60';
+const APP_VERSION='2026.10.16.84';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -617,7 +617,7 @@ function p79OpenLeaveCover(id){
  document.getElementById('p79LeaveCoverId').value=String(id);
  document.getElementById('p79LeaveCoverSummary').textContent=(leave.name||leave.empId)+'｜'+(leave.leaveType||'請假')+'｜'+String(leave.startTime||leave.startDate||'')+' ～ '+String(leave.endTime||leave.endDate||'')+'｜同部門：'+(target?.dept||'未設定');
  document.getElementById('p79LeaveCoverMode').value='one';
- document.getElementById('p79LeaveCoverJob').value='';
+ document.getElementById('p79LeaveCoverJob').value='';document.getElementById('p79LeaveCoverSecondJob').value='';
  document.getElementById('p79LeaveCoverFirst').value='';
  document.getElementById('p79LeaveCoverSecond').value='';
  p79FilterLeaveCoverPeople();
@@ -642,7 +642,8 @@ function p79FilterLeaveCoverPeople(){
  const prompt='<option value="">'+(choices.length?'請選擇人員':'此職稱沒有可代班人員')+'</option>';
  first.innerHTML=prompt+choices.map(leavePersonOption).join('');
  if(choices.some(e=>String(e.empId)===firstId))first.value=firstId;
- const others=choices.filter(e=>String(e.empId)!==String(first.value));
+ const secondJob=$('p79LeaveCoverSecondJob');leaveFillJobFilter(secondJob,eligible);
+ const others=eligible.filter(e=>(!secondJob.value||leavePersonJob(e)===secondJob.value)&&String(e.empId)!==String(first.value));
  second.innerHTML=prompt+others.map(leavePersonOption).join('');
  if(others.some(e=>String(e.empId)===secondId))second.value=secondId;
 }
@@ -1155,9 +1156,9 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <input type="hidden" id="p79LeaveCoverId">
 <label for="p79LeaveCoverMode">代班方式</label>
 <select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="one">一位代班8小時</option><option value="two">兩位各代班4小時</option><option value="rest">排休人員代班</option></select>
-<label for="p79LeaveCoverJob">代班人員職稱</label><select id="p79LeaveCoverJob" onchange="p79FilterLeaveCoverPeople()"></select>
+<label for="p79LeaveCoverJob">第一位代班人員職稱</label><select id="p79LeaveCoverJob" onchange="p79FilterLeaveCoverPeople()"></select>
 <label for="p79LeaveCoverFirst">代班人員</label><select id="p79LeaveCoverFirst" onchange="p79FilterLeaveCoverPeople()"></select>
-<div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
+<div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecondJob">第二位代班人員職稱</label><select id="p79LeaveCoverSecondJob" onchange="p79FilterLeaveCoverPeople()"></select><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
@@ -1166,7 +1167,7 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
  <div style="display:flex;justify-content:space-between;align-items:center"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0">
   <div><div class="field"><label for="adminCreateLeaveJob">請假人員職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div><div class="field"><label for="adminCreateLeaveEmployee">請假人員</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div></div>
-  <div><div class="field"><label for="adminCreateLeaveWorkerJob">代班人員職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+  <div><div class="field"><label for="adminCreateLeaveWorkerJob">第一位代班人員職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecondJob">第二位代班人員職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
  </div>
  <p id="adminCreateLeaveDepartment" class="note"></p>
  <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
@@ -1205,7 +1206,8 @@ function filterAdminCreateLeavePeople(){
  if(choices.some(e=>String(e.empId)===previous))worker.value=previous;
  worker.disabled=!target;
  const second=$('adminCreateLeaveWorkerSecond'),previousSecond=second.value;
- const otherChoices=choices.filter(e=>String(e.empId)!==String(worker.value));
+ const secondJob=$('adminCreateLeaveWorkerSecondJob');leaveFillJobFilter(secondJob,available);secondJob.disabled=!target;
+ const otherChoices=available.filter(e=>(!secondJob.value||leavePersonJob(e)===secondJob.value)&&String(e.empId)!==String(worker.value));
  second.innerHTML='<option value="">不選第二位（一位代8小時）</option>'+otherChoices.map(leavePersonOption).join('');
  if(otherChoices.some(e=>String(e.empId)===previousSecond))second.value=previousSecond;
  second.disabled=!target;
@@ -1221,7 +1223,7 @@ async function openAdminCreateLeave(){
   if(!dialog.open)return;
  }
  adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
- $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';
+ $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';$('adminCreateLeaveWorkerSecondJob').value='';
  $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
  leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
