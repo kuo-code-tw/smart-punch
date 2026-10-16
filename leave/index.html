@@ -351,7 +351,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.85';
+const APP_VERSION='2026.10.16.91';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -1163,23 +1163,55 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
 
-<dialog id="adminCreateLeaveDialog" style="width:min(560px,94vw);max-height:90vh;overflow:auto;border:1px solid #cbd5e1;border-radius:18px;padding:20px">
- <div style="display:flex;justify-content:space-between;align-items:center"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
- <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0">
-  <div><div class="field"><label for="adminCreateLeaveJob">請假人員職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div><div class="field"><label for="adminCreateLeaveEmployee">請假人員</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div></div>
-  <div><div class="field"><label for="adminCreateLeaveWorkerJob">第一位代班人員職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecondJob">第二位代班人員職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+<style id="p79-leave-create-layout-v91">
+#adminCreateLeaveDialog{width:min(740px,calc(100vw - 24px))!important;max-height:90dvh!important;overflow:hidden!important;padding:0!important;border-radius:14px!important}
+#adminCreateLeaveDialog .p79-create-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #dbe3ee}
+#adminCreateLeaveDialog h2{font-size:18px;margin:0}
+#adminCreateLeaveDialog .p79-create-body{padding:12px 14px;max-height:calc(90dvh - 126px);overflow:auto;display:grid;gap:10px}
+#adminCreateLeaveDialog .p79-create-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#adminCreateLeaveDialog .p79-create-dates{display:grid;grid-template-columns:1fr 1fr 90px;gap:10px}
+#adminCreateLeaveDialog .field{margin:0!important;min-width:0}
+#adminCreateLeaveDialog label{font-size:13px!important;line-height:1.3;margin:0 0 4px!important}
+#adminCreateLeaveDialog select,#adminCreateLeaveDialog input:not([type=checkbox]){width:100%;min-height:35px!important;height:35px!important;padding:5px 8px!important;font-size:14px!important;box-sizing:border-box;min-width:0}
+#adminCreateLeaveDialog textarea{width:100%;height:54px;min-height:54px;padding:6px 8px!important;font-size:14px!important;box-sizing:border-box}
+#adminCreateLeaveDialog .p79-create-person{padding:9px;border:1px solid #dbe3ee;border-radius:9px;background:#f8fafc;display:grid;gap:8px}
+#adminCreateLeaveDialog .p79-create-person>b{font-size:13px;color:#334155}
+#adminCreateLeaveDialog .p79-create-daily-toggle{display:flex!important;align-items:center;justify-content:flex-start;gap:7px!important;margin:0!important}
+#adminCreateLeaveDialog #adminCreateLeaveDaily{width:16px!important;height:16px!important;min-height:16px!important;min-width:16px!important;flex:0 0 16px;margin:0!important;padding:0!important;appearance:auto}
+#adminCreateLeaveDialog .note{margin:0!important;font-size:12px!important;line-height:1.4}
+#adminCreateLeaveDialog .p79-create-actions{padding:9px 14px;display:flex;gap:8px;border-top:1px solid #dbe3ee;background:#fff}
+#adminCreateLeaveDialog .p79-create-actions button{padding:7px 12px!important;min-height:36px!important;font-size:14px!important}
+#adminCreateLeaveDialog #adminCreateLeaveSave{flex:1}
+@media(max-width:480px){#adminCreateLeaveDialog .p79-create-dates{grid-template-columns:1fr 1fr}#adminCreateLeaveDialog .p79-create-dates>.field:last-child{grid-column:1/-1}#adminCreateLeaveDialog .p79-create-body{padding:10px;gap:8px}#adminCreateLeaveDialog .p79-create-two{gap:8px}}
+</style>
+<dialog id="adminCreateLeaveDialog">
+ <div class="p79-create-heading"><h2>新增請假與代班安排</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
+ <div class="p79-create-body">
+  <div class="p79-create-two">
+   <div class="field"><label for="adminCreateLeaveOvertimeType">加班類型</label><select id="adminCreateLeaveOvertimeType"><option value="">依班表自動判斷</option></select></div>
+   <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
+  </div>
+  <div class="p79-create-dates">
+   <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+   <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+   <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
+  </div>
+  <div class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
+   <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
+   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div>
+  </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
+  <div class="p79-create-two">
+   <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div></div>
+   <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+  </div>
+  <label class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
+  <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
+  <p class="note">一位代8小時；兩位各代4小時。加班類型會帶入後續申報，出勤時段可逐筆選擇。</p>
+  <p id="adminCreateLeaveMessage" role="status"></p>
  </div>
- <label style="display:flex;align-items:center;gap:8px"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
- <p id="adminCreateLeaveDepartment" class="note"></p>
- <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
- <div class="field"><label>開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
- <div class="field"><label>結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays()"></div>
- <div class="field"><label>請假天數</label><input id="adminCreateLeaveDays" readonly></div>
- <div class="field"><label>事由／備註</label><textarea id="adminCreateLeaveReason"></textarea></div>
- <p class="note">儲存後直接核准請假並安排代班。一位代8小時；選兩位則各代4小時。兩位均限同部門，第二位不可與第一位重複。</p>
- <p id="adminCreateLeaveMessage" role="status"></p>
- <button id="adminCreateLeaveSave" class="btn btn-pri" type="button" style="width:100%" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button>
+ <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
+
 <script>
 let p79CreateDailyPlan=new Map();
 function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
@@ -1242,6 +1274,13 @@ function filterAdminCreateLeavePeople(){
  p79RenderDailyCreateCover();
  $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側依職稱篩選同部門人員':'';
 }
+function p79PopulateCreateOvertimeTypes(){
+ const select=$('adminCreateLeaveOvertimeType');if(!select)return;
+ const previous=select.value||'',module=window.P79Overtime;
+ const options=module?module.typeOptions(window.p79OvertimeContext?.config?.()||{},module.reportRules()):[];
+ select.innerHTML='<option value="">依班表自動判斷</option>'+options.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
+ if(previous){if(!options.some(x=>x.name===previous))select.innerHTML+='<option value="'+esc(previous)+'">'+esc(previous)+'（待核對）</option>';select.value=previous;}
+}
 async function openAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
@@ -1251,13 +1290,14 @@ async function openAdminCreateLeave(){
   try{await loadCloud(true,true);}catch(error){$('adminCreateLeaveMessage').textContent='人員載入失敗：'+(error.message||error);return;}finally{$('adminCreateLeaveSave').disabled=false;}
   if(!dialog.open)return;
  }
- p79CreateDailyPlan=new Map();$('adminCreateLeaveDaily').checked=false;adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ p79CreateDailyPlan=new Map();$('adminCreateLeaveDaily').checked=false;$('adminCreateLeaveOvertimeType').value='';p79PopulateCreateOvertimeTypes();adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
  $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';$('adminCreateLeaveWorkerSecondJob').value='';
  $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
  leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
  updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();
+ if(window.P79Overtime&&p79CanReportOvertime())void P79Overtime.loadRules().then(loaded=>{if(!dialog.open)return;p79LeaveOvertimeConfig=loaded.config;p79PopulateCreateOvertimeTypes();}).catch(()=>{});
 }
 function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';if(typeof p79RenderDailyCreateCover==='function')p79RenderDailyCreateCover();}
 function p79PlanLeaveCoverRequest(records,covers,request){
@@ -1297,7 +1337,7 @@ async function saveAdminCreateLeave(){
   if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});if(dailyAssignments&&saved.dailyAssignmentsSaved!==true)throw Error('雲端尚未支援逐日代班，請更新 GAS 後重試');p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;}
   $('adminCreateLeaveDialog').close();
   const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of (dailyAssignments?dailyAssignments.find(p=>p.date===date).workerIds.map(id=>employees.find(e=>String(e.empId)===String(id))):[worker,second]).filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
-  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries,preferredType:$('adminCreateLeaveOvertimeType')?.value||''}));
   await p79OpenLeaveOvertimeHandoff();
   void loadCloud(false,true);
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
@@ -1306,7 +1346,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261016.85"></script>
+<script src="../assets/port79-overtime-report.js?v=20261016.91"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1383,7 +1423,7 @@ async function p79OpenLeaveOvertimeHandoff(){
   p79LeaveHandoffContext={...data,leaveId:handoff.id,at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
   const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
-  await P79Overtime.openReport({...entry,...period,category:'代',leaveHandoffId:handoff.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[entry.date]?.reportOriginalShift??row.schedule?.__meta?.[entry.date]?.overtimeOriginalShift??row.schedule?.[entry.date]])),allowedEmpIds:handoff.entries.filter(e=>e.date===entry.date&&String(e.forEmpId||'')===String(entry.forEmpId||'')).map(e=>e.empId)});
+  await P79Overtime.openReport({...entry,...period,preferredType:entry.preferredType||handoff.preferredType||'',category:'代',leaveHandoffId:handoff.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[entry.date]?.reportOriginalShift??row.schedule?.__meta?.[entry.date]?.overtimeOriginalShift??row.schedule?.[entry.date]])),allowedEmpIds:handoff.entries.filter(e=>e.date===entry.date&&String(e.forEmpId||'')===String(entry.forEmpId||'')).map(e=>e.empId)});
   $('p79LeaveHandoffStatus').textContent='尚有 '+handoff.entries.length+' 筆｜目前：'+entry.date+' '+(entry.name||entry.empId)+'，儲存成功後接續下一筆。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
