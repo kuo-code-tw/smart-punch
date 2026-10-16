@@ -787,6 +787,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:6px;white-space:normal;font-size:14px;width:100%;min-width:0;flex-wrap:wrap}
 #adminContentOvertime .p79-overtime-inline button:first-of-type{margin-left:auto!important}
 #adminContentOvertime .p79-overtime-inline button{min-height:28px!important;padding:2px 6px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
+@media(min-width:851px){
+#overtimeTableBody>tr{height:64px!important}
+#adminContentOvertime table:has(#overtimeTableBody) #overtimeTableBody>tr>td{vertical-align:middle!important}
+#adminContentOvertime .p79-overtime-inline{min-height:54px;align-content:center}
+}
 #adminContentOvertime .p79-overtime-inline>span{min-width:0;white-space:normal;overflow-wrap:anywhere}
 #adminContentOvertime .p79-overtime-inline button{flex:0 0 auto;white-space:nowrap}
 @media(max-width:850px){
@@ -2152,7 +2157,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.105';
+        const APP_VERSION='2026.10.16.110';
 
         function readPort79SsoTokenFromHash() {
             try {
