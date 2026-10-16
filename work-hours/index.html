@@ -761,10 +761,20 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
 <link rel="stylesheet" href="../assets/port79-calendar-range.css">
 <style id="p79-overtime-compact-inline">
-#adminContentOvertime table:has(#overtimeTableBody){width:100%!important;min-width:100%!important;table-layout:auto!important}
+#adminContentOvertime table:has(#overtimeTableBody){width:100%!important;min-width:1680px!important;table-layout:fixed!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(1){width:8%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(2){width:7%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(3){width:8%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(4){width:7%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(5){width:14%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(6){width:14%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(7){width:9%!important}
+#adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(8){width:33%!important}
+
 #adminContentOvertime table:has(#overtimeTableBody) th,#adminContentOvertime table:has(#overtimeTableBody) td{padding:5px 9px!important;font-size:14px!important;line-height:24px!important;white-space:nowrap!important;text-align:center!important}
 #adminContentOvertime table:has(#overtimeTableBody) th:last-child,#adminContentOvertime table:has(#overtimeTableBody) td:last-child{text-align:left!important}
-#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:6px;white-space:nowrap;font-size:14px}
+#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:8px;white-space:nowrap;font-size:14px;width:100%}
+#adminContentOvertime .p79-overtime-inline button:first-of-type{margin-left:auto!important}
 #adminContentOvertime .p79-overtime-inline button{min-height:28px!important;padding:2px 6px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
 </style>
 <style id="p79-attendance-balanced-columns-v69">
@@ -2120,7 +2130,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.95';
+        const APP_VERSION='2026.10.16.98';
 
         function readPort79SsoTokenFromHash() {
             try {
