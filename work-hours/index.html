@@ -2158,7 +2158,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.113';
+        const APP_VERSION='2026.10.16.114';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12263,7 +12263,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         let p79WorkOvertimeLoadQueue=Promise.resolve();
         function p79LoadWorkOvertimeMonths(sourceRecords){
             const token=currentPort79SsoToken();if(!token)return;
-            const selectedMonth=document.getElementById('overtimeMonthFilter')?.value;
+            const monthFilter=document.getElementById('overtimeMonthFilter');
+            const selectedMonth=monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());
             const months=[...new Set([...(selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[]),...sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m))])].filter(month=>!selectedMonth||selectedMonth==='ALL'||month===selectedMonth).sort().reverse();
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
@@ -12365,8 +12366,14 @@ async function p79ExportOvertimeComparison(printMode){
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
             const visibleAttendanceNumbers = new Set(visibleEmployees.map(emp => normalizeAttendanceStatsAttNo(emp.attNo)).filter(Boolean));
+            // 先建立一次權限索引，避免每筆出勤都搜尋所有員工。
+            const rowVisibility=new Map();
+            employees.forEach(employee=>{const id=String(employee.empId||'').trim().toUpperCase();if(!rowVisibility.has(id))rowVisibility.set(id,canCurrentAdminViewEmployee(employee));});
+            const hiddenAdminIds=new Set(normalizeAdminIds(sysConfig.adminIds));
+            const unrestricted=!isAdminLoggedIn||isCurrentViewerSuperAdmin();
             const sourceRecords = records.filter(record => {
-                if (!canCurrentAdminViewDataRow(record)) return false;
+                const rowId=String(record.empId||'').trim().toUpperCase();
+                if(!unrestricted&&!(rowVisibility.has(rowId)?rowVisibility.get(rowId):!hiddenAdminIds.has(rowId)))return false;
                 const empId = String(record.empId || '').trim().toUpperCase();
                 const attNo = normalizeAttendanceStatsAttNo(record.attNo);
                 return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
