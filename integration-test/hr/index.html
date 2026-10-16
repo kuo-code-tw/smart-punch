@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="light">
+<head><base href="/smart-punch/hr/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
+<script src="../assets/port79-hr-import.js?v=20261013.58"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.96"></script>
+<!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
+<!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
+<!-- PORT79 2026-10-06 統一單月月曆日期選擇｜hr -->
+<!-- PORT79 V5.10.1：人資手機綁定改為勾選框；勾選=需綁定，取消=免綁打卡。 -->
+<!-- PORT79 V5.10：人資新增「免綁打卡」欄，可個別允許員工不綁手機先打卡。 -->
+<!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
+<!-- PORT79 2026-10-04 HR-V103-CLEAN：移除舊 v8 統一介面與 MutationObserver，改用單一 v10.14.5 功能選單。 -->
+<!-- PORT79 2026-10-04 HR-NONBLOCKING-AUTH：權限驗證限時＋本機已驗證 Session 備援，避免頁面卡住。 -->
+<!-- PORT79 2026-10-04 SEVEN-SYSTEM-UNIFIED：七大系統放大導覽＋七大即時雲端狀態列。 -->
+<!-- PORT79 2026-10-04 HR-WORKHOURS-PERMISSION：新增工時統計獨立權限，並保留歷史資料權限。 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="//script.google.com">
+<link rel="dns-prefetch" href="//script.googleusercontent.com">
+<title>人資管理系統｜79號碼頭雲端智慧系統</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
+<style>:root{--bg:#f8fafc;--panel:#fff;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--teal:#0f766e;--teal2:#14b8a6;--danger:#dc2626;--shadow:0 10px 30px rgba(15,23,42,.08)} html[data-theme="dark"]{--bg:#0f172a;--panel:#111827;--text:#e5e7eb;--muted:#94a3b8;--border:#334155;--teal:#2dd4bf;--teal2:#14b8a6;--shadow:0 10px 30px rgba(0,0,0,.28)} *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}button,input,select{font:inherit}button{cursor:pointer}.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}.topin{max-width:1600px;margin:auto;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px;min-width:0}.logo{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:#ccfbf1;font-size:22px}html[data-theme="dark"] .logo{background:#134e4a}h1{font-size:18px;margin:0}.sub{font-size:10px;color:var(--muted);margin-top:2px}.actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;padding:8px 11px;font-size:12px;font-weight:800}.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}.btn.danger{background:#fee2e2;border-color:#fecaca;color:#b91c1c}html[data-theme="dark"] .btn.danger{background:#451a1a;border-color:#7f1d1d;color:#fecaca}.wrap{max-width:1600px;margin:auto;padding:14px}.banner{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--panel);font-size:12px;font-weight:750;color:var(--muted)}.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:12px 0}.stat{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:var(--shadow)}.stat .k{font-size:10px;color:var(--muted)}.stat .v{font-size:24px;font-weight:950;margin-top:3px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}.filters{display:grid;grid-template-columns:2fr repeat(4,1fr) auto;gap:8px;padding:12px;border-bottom:1px solid var(--border)}input,select{width:100%;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;padding:9px 10px;font-size:12px;outline:none}.tablewrap{overflow:auto;max-height:calc(100vh - 310px)}table{width:100%;border-collapse:collapse;min-width:1450px;font-size:11px}th,td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}th{position:sticky;top:0;background:var(--panel);z-index:2;font-size:10px;color:var(--muted)}tr:hover td{background:color-mix(in srgb,var(--teal2) 5%,transparent)}.pill{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900;background:#e2e8f0;color:#334155}html[data-theme="dark"] .pill{background:#334155;color:#e2e8f0}.perm{font-size:9px;white-space:nowrap}.perm.manage{color:#047857;font-weight:900}.perm.view{color:#2563eb;font-weight:900}.perm.none{color:#94a3b8}dialog{border:0;border-radius:18px;padding:0;width:min(920px,calc(100vw - 24px));background:var(--panel);color:var(--text);box-shadow:0 24px 70px rgba(15,23,42,.3)}dialog::backdrop{background:rgba(15,23,42,.58);backdrop-filter:blur(2px)}.modal{padding:18px;max-height:90vh;overflow:auto}.modalhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.field label{display:block;font-size:10px;font-weight:900;color:var(--muted);margin:0 0 4px 2px}.wide{grid-column:1/-1}.permgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.permitem{border:1px solid var(--border);border-radius:12px;padding:9px}.permitem b{display:block;font-size:10px;margin-bottom:5px}.footer{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--border);margin-top:14px;padding-top:12px}.muted{color:var(--muted);font-size:10px}.hidden{display:none!important}@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr 1fr}.filters .wide-search{grid-column:1/-1}.grid{grid-template-columns:1fr 1fr}.permgrid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.topin{align-items:flex-start}.brand h1{font-size:16px}.actions .txt{display:none}.wrap{padding:8px}.stats{gap:6px}.stat{padding:9px}.stat .v{font-size:20px}.filters{grid-template-columns:1fr}.filters .wide-search{grid-column:auto}.grid{grid-template-columns:1fr}.permgrid{grid-template-columns:1fr}.tablewrap{max-height:none}} .empstatus{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:4px 8px;border-radius:999px;font-size:9px;font-weight:950} .empstatus.active{background:#dcfce7;color:#166534}.empstatus.resigned{background:#fee2e2;color:#991b1b}.empstatus.leave{background:#fef3c7;color:#92400e} html[data-theme="dark"] .empstatus.active{background:#14532d;color:#bbf7d0} html[data-theme="dark"] .empstatus.resigned{background:#7f1d1d;color:#fecaca} html[data-theme="dark"] .empstatus.leave{background:#78350f;color:#fde68a} .row-resigned td{opacity:.72}.row-leave td{background:color-mix(in srgb,#f59e0b 4%,transparent)} .employment-box{grid-column:1/-1;border:1px solid var(--border);border-radius:14px;padding:12px;background:color-mix(in srgb,var(--panel) 96%,#f8fafc)} .employment-box .title{font-size:11px;font-weight:950;margin-bottom:9px} .permgrid{align-items:stretch} .permitem{min-width:0!important;display:flex;flex-direction:column;gap:8px;padding:12px} .permitem>b{font-size:13px;margin:0} .perm-actions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;align-items:start} .perm-action{display:grid!important;grid-template-columns:20px minmax(0,1fr);align-items:center;column-gap:7px;min-height:28px;margin:0!important;font-size:12px!important;line-height:1.25} .perm-action input[type="checkbox"]{width:18px!important;height:18px!important;min-height:0!important;margin:0!important;padding:0!important;justify-self:start;accent-color:var(--teal)} .perm-scope{display:grid!important;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:8px;margin-top:auto!important;font-size:12px!important} .perm-scope select{min-width:0} @media(max-width:760px){.perm-actions-grid{grid-template-columns:1fr}.perm-scope{grid-template-columns:1fr}}</style>
+
+<style id="port79-calendar-mode-style">#port79CalendarModeBox{position:fixed;right:10px;bottom:10px;z-index:99998;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.94);border:1px solid rgba(148,163,184,.55);box-shadow:0 6px 20px rgba(15,23,42,.14);backdrop-filter:blur(8px);font:700 11px/1.2 system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#475569} #port79CalendarModeBox select{border:0;background:transparent;color:inherit;font:800 11px/1.2 inherit;outline:none;cursor:pointer;padding:2px 3px} html.dark #port79CalendarModeBox,html[data-theme="dark"] #port79CalendarModeBox{background:rgba(15,23,42,.94);border-color:#475569;color:#e2e8f0} @media(max-width:640px){#port79CalendarModeBox{right:6px;bottom:6px;padding:5px 6px;font-size:10px}#port79CalendarModeBox select{font-size:10px}}</style>
+
+<style id="hr-v20260927-4">body{font-size:14px} .wrap{max-width:1900px;padding:16px} .topin{max-width:1900px;padding:12px 16px} h1{font-size:21px} .sub{font-size:12px} .btn{font-size:13px;padding:10px 13px} .banner{font-size:13px;padding:12px 14px} .filters{grid-template-columns:2fr repeat(5,minmax(150px,1fr)) auto;gap:10px;padding:14px} input,select{font-size:14px;padding:11px 12px;min-height:43px} table{min-width:2150px;font-size:13px} th{font-size:12px;padding:12px 10px;white-space:nowrap} td{padding:12px 10px;white-space:nowrap} table th:nth-child(4),table td:nth-child(4){min-width:125px} table th:nth-child(5),table td:nth-child(5){min-width:105px} table th:nth-child(6),table td:nth-child(6){min-width:145px} table th:nth-child(7),table td:nth-child(7){min-width:120px} table th:nth-child(8),table td:nth-child(8){min-width:130px} table th:nth-child(9),table td:nth-child(9){min-width:125px} table th:nth-child(10),table td:nth-child(10),table th:nth-child(11),table td:nth-child(11),table th:nth-child(12),table td:nth-child(12){min-width:110px} table th:nth-child(15),table td:nth-child(15),table th:nth-child(16),table td:nth-child(16),table th:nth-child(17),table td:nth-child(17),table th:nth-child(18),table td:nth-child(18),table th:nth-child(19),table td:nth-child(19){min-width:78px} .perm{font-size:11px} .permclick{border:0;background:transparent;cursor:pointer;padding:7px 9px;border-radius:9px;font-weight:950;font-size:12px;white-space:nowrap} .permclick.manage{color:#10b981;background:rgba(16,185,129,.10)} .permclick.view{color:#3b82f6;background:rgba(59,130,246,.10)} .permclick.none{color:#94a3b8;background:rgba(148,163,184,.08)} .permclick:hover{outline:1px solid currentColor;transform:translateY(-1px)} .thlink{border:0;background:transparent;color:inherit;font:inherit;font-weight:900;cursor:pointer;padding:3px 4px;border-radius:6px} .thlink:hover{color:var(--teal)} dialog.wide-dialog{width:min(1180px,calc(100vw - 22px))} dialog.org-dialog{width:min(980px,calc(100vw - 28px))} .orggrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px} .orgbox{border:1px solid var(--border);border-radius:14px;padding:12px;min-height:320px} .orgbox h3{margin:0 0 8px;font-size:15px} .orglist{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto;margin-top:10px} .orgitem{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:9px;padding:7px 9px;font-size:13px} .small-danger{border:0;background:transparent;color:#ef4444;font-weight:900;cursor:pointer} .field label{font-size:12px} .field-picker-label{display:flex!important;align-items:center;justify-content:space-between;gap:8px} .picker-btn{border:0;background:rgba(20,184,166,.10);color:var(--teal);border-radius:7px;padding:3px 7px;font-size:10px;font-weight:900} .perm-cap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0} .perm-cap-card{border:1px solid var(--border);border-radius:12px;padding:10px} .perm-cap-card b{font-size:12px} .perm-cap-card ul{margin:7px 0 0;padding-left:18px;font-size:11px;line-height:1.8} .permission-summary{padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:color-mix(in srgb,var(--panel) 94%,#e0f2fe)} .picker-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:50vh;overflow:auto;margin-top:10px} .picker-option{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;padding:10px;text-align:left;font-weight:850;cursor:pointer} .picker-option:hover{border-color:var(--teal);background:color-mix(in srgb,var(--teal2) 8%,var(--panel))} .help-text{font-size:10px;color:var(--muted);margin-top:4px} input[type="checkbox"]{width:auto!important;min-width:16px;height:16px;flex:0 0 auto;padding:0;margin:0;accent-color:var(--teal)} .permitem label{line-height:1.45;align-items:flex-start!important}.permitem{min-width:0}.permitem select{margin-top:4px} @media(max-width:1000px){.filters{grid-template-columns:1fr 1fr} .orggrid{grid-template-columns:1fr} .perm-cap-grid{grid-template-columns:1fr} .picker-results{grid-template-columns:1fr 1fr}} @media(max-width:600px){table{font-size:12px} th{font-size:11px} td{padding:10px 8px} .picker-results{grid-template-columns:1fr}}</style>
+<link rel="stylesheet" href="../assets/port79-ui.css?v=20260927711">
+<style id="hr-v20260927-711-permission-layout-fix">
+/* v7.11：權限卡片版面保護。即使共用 CSS 曾被瀏覽器快取，也不可把權限文字壓成直排。 */
+body[data-p79-system="hr"] .permitem{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;column-gap:0!important;align-items:stretch!important;min-width:0!important}
+body[data-p79-system="hr"] .permitem>select{grid-column:auto!important;width:100%!important}
+body[data-p79-system="hr"] .perm-actions-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px 14px!important;align-items:start!important}
+body[data-p79-system="hr"] .perm-action{display:grid!important;grid-template-columns:20px minmax(0,1fr)!important;align-items:center!important;column-gap:7px!important;min-height:28px!important}
+body[data-p79-system="hr"] .perm-action span{writing-mode:horizontal-tb!important;word-break:keep-all!important;overflow-wrap:normal!important;white-space:normal!important}
+body[data-p79-system="hr"] .perm-scope{display:grid!important;grid-template-columns:72px minmax(0,1fr)!important;align-items:center!important;gap:8px!important}
+@media(max-width:760px){body[data-p79-system="hr"] .perm-actions-grid{grid-template-columns:1fr!important}body[data-p79-system="hr"] .perm-scope{grid-template-columns:1fr!important}}
+</style>
+
+<style id="p79-unified-ui-v20260928-80">
+:root{
+  --p79-navy:#0f1f38;--p79-navy2:#132846;--p79-blue:#2563eb;--p79-cyan:#0891b2;
+  --p79-green:#059669;--p79-violet:#7c3aed;--p79-rose:#e11d48;--p79-amber:#d97706;
+  --p79-bg:#f3f7fb;--p79-panel:#ffffff;--p79-line:#dbe4ee;--p79-text:#172033;--p79-muted:#64748b;
+  --p79-radius:16px;--p79-shadow:0 7px 24px rgba(15,31,56,.08);
+}
+html{background:var(--p79-bg)!important}
+body{background:var(--p79-bg)!important;color:var(--p79-text);font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif!important;font-size:14px!important}
+#p79UnifiedShell{position:sticky;top:0;z-index:9997;background:var(--p79-navy);color:#fff;box-shadow:0 8px 22px rgba(15,31,56,.2);border-bottom:1px solid rgba(255,255,255,.08)}
+#p79UnifiedShell *{box-sizing:border-box}
+.p79u-top{max-width:1920px;margin:0 auto;min-height:64px;padding:8px 16px;display:grid;grid-template-columns:minmax(250px,1fr) auto minmax(360px,1fr);align-items:center;gap:12px}
+.p79u-brand{display:flex;align-items:center;gap:10px;min-width:0}.p79u-logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#1d4ed8,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.p79u-title{font-size:20px;font-weight:900;line-height:1.1;white-space:nowrap}.p79u-sub{font-size:11px;color:#b7c6d9;margin-top:3px;white-space:nowrap}
+.p79u-nav{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:13px;padding:4px;overflow-x:auto;scrollbar-width:none}.p79u-nav::-webkit-scrollbar{display:none}.p79u-nav a{display:flex;align-items:center;gap:5px;color:#dce8f6;text-decoration:none!important;padding:8px 11px;border-radius:9px;font-size:13px;font-weight:800;white-space:nowrap}.p79u-nav a:hover{background:rgba(255,255,255,.09)}.p79u-nav a.active{background:#fff;color:#16375e;box-shadow:0 3px 10px rgba(0,0,0,.16)}
+.p79u-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:none}.p79u-actions::-webkit-scrollbar{display:none}.p79u-btn{min-height:38px;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:7px 11px;background:rgba(255,255,255,.08);color:#fff;font-size:13px;font-weight:850;white-space:nowrap;cursor:pointer}.p79u-btn:hover{background:rgba(255,255,255,.15)}.p79u-btn.primary{background:#0e7490;border-color:#0891b2}.p79u-btn.edit{background:#6d28d9;border-color:#8b5cf6}.p79u-btn.view{background:#475569;border-color:#64748b}.p79u-btn.home{background:#1e293b}.p79u-mode-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;margin-right:5px}.p79u-view-mode .p79u-mode-dot{background:#fbbf24}
+#p79UnifiedContext{max-width:1920px;margin:0 auto;padding:0 16px 8px}.p79u-context-inner{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:7px;color:#cbd5e1;font-size:12px}.p79u-context-status{display:flex;align-items:center;gap:8px;min-width:0}.p79u-context-status span{white-space:nowrap}.p79u-context-hint{color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 統一內容與卡片 */
+body>main,.wrap,#app-main-container{max-width:1920px!important;margin-left:auto!important;margin-right:auto!important}
+.card,.stat,.metric,.bg-white,.dark\:bg-slate-800{border-radius:var(--p79-radius)}
+section.card,.card,.stats .stat{box-shadow:0 3px 14px rgba(15,31,56,.045)}
+input,select,textarea,button,summary{font-family:inherit!important}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{min-height:42px!important;border-radius:10px!important;font-size:14px!important}
+button,.btn{font-size:13.5px!important;border-radius:10px!important}
+label{font-size:12px!important;font-weight:750!important}
+table{font-size:13.5px!important} th{font-size:12.5px!important;font-weight:850!important;background:#edf3f9!important;color:#334155!important;white-space:nowrap} td{font-size:13.5px!important}.dark th,html.dark th{background:#17243a!important;color:#dbeafe!important}
+/* 統一篩選區 */
+.filters,.toolbar,#schedule-rule-toolbar,#schedule-legend-row,#attendanceAdminTabsBar,#efficiencyMainTabs{background:var(--p79-panel)!important;border:1px solid var(--p79-line)!important;border-radius:14px!important;box-shadow:0 2px 10px rgba(15,31,56,.04)!important;padding:10px!important;gap:8px!important}
+.filters,.toolbar{align-items:end!important}
+.filters input,.filters select,.toolbar input,.toolbar select,.filters summary,.toolbar summary{min-height:42px!important;background:#fff!important;border:1px solid #cbd5e1!important;color:#1e293b!important}
+html.dark .filters,html.dark .toolbar,html.dark #schedule-rule-toolbar,html.dark #schedule-legend-row,html.dark #attendanceAdminTabsBar,html.dark #efficiencyMainTabs{background:#111c2e!important;border-color:#334155!important}
+html.dark .filters input,html.dark .filters select,html.dark .toolbar input,html.dark .toolbar select,html.dark .filters summary,html.dark .toolbar summary{background:#0f172a!important;color:#e2e8f0!important;border-color:#475569!important}
+/* 常見統計卡 */
+.stats,.grid.grid-cols-2.lg\:grid-cols-4,.grid.grid-cols-2.lg\:grid-cols-5{gap:10px!important}.stat,.metric{border:1px solid var(--p79-line)!important}.stat .v,.metric b{font-size:24px!important}
+/* 原系統頂部去重，保留功能列 */
+body[data-p79-system="attendance"]>header .attendance-header-brand{display:none!important}
+body[data-p79-system="attendance"]>header .attendance-header-inner{display:block!important;min-height:0!important;padding:6px 12px!important}
+body[data-p79-system="attendance"]>header .attendance-header-tools{justify-content:flex-start!important}
+body[data-p79-system="attendance"]>header button[onclick*="location.href='../'"]{display:none!important}
+body[data-p79-system="attendance"]>header button[onclick*="toggleDarkMode"]{display:none!important}
+body[data-p79-system="leave"]>header{display:none!important}
+body[data-p79-system="hr"] header.top .brand{display:none!important}
+body[data-p79-system="hr"] header.top .topin{justify-content:flex-end!important;min-height:54px!important}
+body[data-p79-system="hr"] header.top .actions>#themeBtn,body[data-p79-system="hr"] header.top .actions>button[onclick*="location.href='../'"],body[data-p79-system="hr"] header.top .actions>button[onclick*="loadEmployees(true)"]{display:none!important}
+body[data-p79-system="schedule"] #schedule-title-block{display:none!important}
+body[data-p79-system="schedule"] .schedule-action-left{display:none!important}
+body[data-p79-system="schedule"] #schedule-refresh-btn,body[data-p79-system="schedule"] #schedule-theme-toggle{display:none!important}
+body[data-p79-system="schedule"] #schedule-control-shell{position:relative!important;top:auto!important;z-index:40!important}
+body[data-p79-system="efficiency"] #efficiencyHeader{position:relative!important;top:auto!important;background:#fff!important;color:#0f172a!important;box-shadow:none!important;border-bottom:1px solid var(--p79-line)!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:first-child>div:first-child{display:none!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child button,body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child a{display:none!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner{padding-top:8px!important;padding-bottom:8px!important}
+body[data-p79-system="efficiency"] #cloudState{background:#e0f2fe!important;color:#075985!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child span:nth-child(2){background:#fef3c7!important;color:#92400e!important}
+/* 統一頁籤 */
+.tabs,.p79-tab-row,#main-role-tabs-container{gap:5px!important}.tab,.tabs button,#attendanceAdminTabsBar button,#efficiencyMainTabs button,#main-role-tabs-container button{min-height:38px!important;padding:7px 12px!important;border-radius:9px!important;font-size:13px!important;font-weight:800!important}
+/* 查看模式 */
+body.p79-view-mode [data-p79-mode-disabled="1"]{opacity:.45!important;filter:grayscale(.4);cursor:not-allowed!important}
+body.p79-view-mode .p79-edit-only-note{display:block!important}.p79-edit-only-note{display:none}
+@media(max-width:1100px){.p79u-top{grid-template-columns:1fr auto;grid-template-areas:"brand actions" "nav nav"}.p79u-brand{grid-area:brand}.p79u-nav{grid-area:nav;justify-content:flex-start}.p79u-actions{grid-area:actions}.p79u-title{font-size:18px}}
+@media(max-width:700px){body{font-size:14px!important}.p79u-top{display:flex;flex-direction:column;align-items:stretch;padding:7px 8px;gap:6px}.p79u-brand{order:1}.p79u-actions{order:2;justify-content:flex-start}.p79u-nav{order:3}.p79u-logo{width:36px;height:36px}.p79u-title{font-size:17px}.p79u-sub{font-size:10px}.p79u-btn{font-size:12px!important;min-height:36px;padding:6px 9px}#p79UnifiedContext{padding:0 8px 6px}.p79u-context-inner{display:block}.p79u-context-hint{margin-top:3px}input:not([type="checkbox"]):not([type="radio"]),select,textarea{font-size:16px!important}table{font-size:13px!important}td{font-size:13px!important}.filters,.toolbar{display:grid!important;grid-template-columns:1fr!important}.filters>* ,.toolbar>*{min-width:0!important;width:100%!important}}
+</style>
+
+<style id="p79-hr-unified-polish">body[data-p79-system="hr"] main.wrap{padding-top:12px!important}body[data-p79-system="hr"] header.top{position:relative!important;top:auto!important;background:#fff!important;border-bottom:1px solid var(--p79-line)!important;box-shadow:none!important}body[data-p79-system="hr"] .stats{grid-template-columns:repeat(6,minmax(120px,1fr))!important}body[data-p79-system="hr"] .filters{display:grid!important;grid-template-columns:minmax(240px,2fr) repeat(5,minmax(140px,1fr)) minmax(190px,1.2fr) auto!important}body[data-p79-system="hr"] section.card{border:1px solid var(--p79-line)!important;box-shadow:var(--p79-shadow)!important}@media(max-width:1300px){body[data-p79-system="hr"] .filters{grid-template-columns:repeat(4,minmax(150px,1fr))!important}body[data-p79-system="hr"] .stats{grid-template-columns:repeat(3,1fr)!important}}@media(max-width:700px){body[data-p79-system="hr"] .stats{grid-template-columns:repeat(2,1fr)!important}}</style>
+
+
+
+
+<style id="p79-hr-v103-clean-style">
+#p79HrShellV103{
+  position:sticky;top:0;z-index:9999;
+  background:linear-gradient(90deg,#10233f,#112843 60%,#10233f);
+  color:#f8fafc;border-bottom:1px solid rgba(148,163,184,.2);
+  box-shadow:0 4px 18px rgba(2,6,23,.16);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+}
+#p79HrShellV103 *{box-sizing:border-box}
+#p79HrShellV103 .p79v103-row{
+  min-height:76px;max-width:1920px;margin:auto;padding:8px 12px;
+  display:grid;grid-template-columns:minmax(250px,1fr) auto minmax(150px,.55fr);
+  align-items:center;gap:14px;
+}
+#p79HrShellV103 .p79v103-brand{display:flex;align-items:center;gap:11px;min-width:0}
+#p79HrShellV103 .p79v103-logo{
+  width:46px;height:46px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+  background:linear-gradient(145deg,#0e7490,#1d4ed8);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)
+}
+#p79HrShellV103 .p79v103-title{font-size:19px;font-weight:900}
+#p79HrShellV103 .p79v103-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+#p79HrShellV103 .p79v103-nav{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none}
+#p79HrShellV103 .p79v103-nav::-webkit-scrollbar{display:none}
+#p79HrShellV103 .p79v103-nav a{
+  min-height:46px;padding:11px 17px;border-radius:12px;
+  color:#dbeafe;text-decoration:none;font-size:15px;font-weight:900;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap
+}
+#p79HrShellV103 .p79v103-nav a.active{background:#fff;color:#172033;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+#p79HrShellV103 .p79v103-actions{display:flex;justify-content:flex-end}
+#p79HrShellV103 .p79v103-menu-wrap{position:relative}
+#p79HrShellV103 .p79v103-btn{
+  min-height:42px;padding:9px 14px;border:1px solid rgba(148,163,184,.3);
+  border-radius:11px;background:#1e3a5f;color:#fff;font-weight:900;cursor:pointer
+}
+#p79HrShellV103 .p79v103-menu{
+  display:none;position:absolute;right:0;top:calc(100% + 8px);width:250px;
+  padding:8px;background:#fff;color:#172033;border:1px solid #dbe3ec;
+  border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.25);z-index:10020
+}
+#p79HrShellV103 .p79v103-menu.open{display:block}
+#p79HrShellV103 .p79v103-menu button{
+  width:100%;border:0;background:transparent;padding:10px 11px;border-radius:9px;
+  text-align:left;font-size:13px;font-weight:800;cursor:pointer;color:#334155
+}
+#p79HrShellV103 .p79v103-menu button:hover{background:#f1f5f9}
+#p79HrShellV103 .p79v103-menu .danger{color:#be123c}
+#p79HrShellV103 .p79v103-menu-sep{height:1px;background:#e2e8f0;margin:5px 0}
+#p79HrShellV103 .p79v103-status{
+  max-width:1920px;margin:auto;padding:5px 12px 7px;
+  font-size:11px;color:#cbd5e1;border-top:1px solid rgba(148,163,184,.15)
+}
+body[data-p79-system="hr"]>header.top{display:none!important}
+@media(max-width:1000px){
+ #p79HrShellV103 .p79v103-row{grid-template-columns:1fr;gap:8px}
+ #p79HrShellV103 .p79v103-brand{justify-content:center}
+ #p79HrShellV103 .p79v103-nav{width:100%}
+ #p79HrShellV103 .p79v103-actions{justify-content:center}
+}
+</style>
+
+<link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
+<link rel="stylesheet" href="../assets/port79-calendar-range.css">
+<style id="p79-hr-hide-floating-year">#port79CalendarModeBox{display:none!important}</style>
+<style id="hr-editor-v58">
+#editor{width:min(1040px,calc(100vw - 24px));max-height:92dvh;overflow:auto;scroll-behavior:auto;overflow-anchor:none}
+#editor .modalhead{position:sticky;top:0;z-index:5;background:var(--panel,#fff);align-items:center;gap:12px}
+.hr-editor-top-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;flex-shrink:0}
+#editor .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#editor .grid>*{min-width:0}#editor .employment-box,#editor .field.wide{grid-column:1/-1}
+@media(max-width:760px){#editor .grid{grid-template-columns:repeat(2,minmax(0,1fr))}#editor .modalhead{flex-wrap:wrap}.hr-editor-top-actions{width:100%}}
+@media(max-width:480px){#editor .grid{grid-template-columns:1fr}}
+</style>
+</head>
+<!-- v2026.09.28.8.1：人員異動紀錄可安全清除＋GAS 舊網址自動回退；保留目前人員主檔與既有修正結果。 -->
+<body data-p79-system="hr">
+<header class="top"><div class="topin">
+  <div class="brand"><div class="logo">👥</div><div><h1>人資管理系統</h1><div class="sub">79號碼頭雲端智慧系統｜唯一人員主檔｜版本 2026.09.28.8.1</div></div></div>
+  <div class="actions">
+    <button class="btn" onclick="location.href='../'">🏠 <span class="txt">返回首頁</span></button>
+    <button class="btn" id="themeBtn">🌙 <span class="txt">暗色</span></button>
+    <button class="btn" onclick="loadEmployees(true)">↻ <span class="txt">重新同步</span></button>
+    <button class="btn" onclick="openPermissionOverview()">🔐 <span class="txt">權限總覽</span></button>
+    <button class="btn" id="sessionLogBtn" onclick="openSessionLogs()">🧾 <span class="txt">登入紀錄</span></button>
+    <button class="btn" id="orgSettingsBtn" onclick="openOrgSettings()">⚙️ <span class="txt">部門／職稱／單位</span></button>
+    <button class="btn" onclick="exportEmployees()">📥 <span class="txt">匯出</span></button>
+    <button class="btn primary" id="addBtn" onclick="openEditor()">＋ 新增員工</button>
+  </div>
+</div></header>
+<main class="wrap">
+  <div id="status" class="banner">正在驗證人資系統權限...</div>
+  <div class="stats">
+    <div class="stat"><div class="k">在職人員</div><div class="v" id="stActive">0</div></div>
+    <div class="stat"><div class="k">離職人員</div><div class="v" id="stResigned">0</div></div>
+    <div class="stat"><div class="k">留職停薪</div><div class="v" id="stLeave">0</div></div>
+    <div class="stat"><div class="k">管理員／超級管理員</div><div class="v" id="stAdmins">0</div></div>
+    <div class="stat"><div class="k">部門數</div><div class="v" id="stDepts">0</div></div>
+    <div class="stat"><div class="k">可管理人資</div><div class="v" id="stHrManagers">0</div></div>
+  </div>
+  <section class="card">
+    <div style="display:flex;gap:7px;flex-wrap:wrap;padding:12px 12px 0">
+      <button class="btn" id="p79HrImportToolbar" type="button" onclick="P79HrImport.open()">📥 匯入人員</button>
+      <button class="btn primary" id="p79HrAddPersonToolbar" type="button" onclick="openEditor()">＋ 新增人員</button>
+      <button class="btn" onclick="setStatusView('active')">👥 在職人員</button>
+      <button class="btn" onclick="setStatusView('resigned')">🚪 離職人員</button>
+      <button class="btn" onclick="setStatusView('leave')">⏸️ 留職停薪</button>
+      <button class="btn" onclick="setStatusView('')">📋 全部人員</button>
+      <button class="btn" onclick="openEmploymentHistory()">🔄 異動紀錄</button>
+    </div>
+    <div class="filters">
+      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、部門、單位、職稱、電話、離職原因" oninput="render()">
+      <select id="fStatus" onchange="render()"><option value="active">在職人員</option><option value="">全部狀態</option><option value="resigned">離職人員</option><option value="leave">留職停薪</option></select>
+      <select id="fDept" onchange="render()"><option value="">全部部門</option></select>
+      <select id="fUnit" onchange="render()"><option value="">全部單位</option></select>
+      <select id="fJob" onchange="render()"><option value="">全部職稱</option></select>
+      <select id="fRole" onchange="render()"><option value="">全部角色</option><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select>
+      <details id="hrDateRangePicker" style="position:relative">
+        <summary id="hrDateRangeSummary" class="btn" style="list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:190px">📅 到職日期範圍 <span style="font-size:11px;color:var(--muted)">全部日期</span></summary>
+        <div style="position:absolute;right:0;top:calc(100% + 8px);z-index:80;min-width:340px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:var(--shadow)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="field"><label>開始日期</label><input id="hrDateFrom" type="date" onchange="updateHrDateRangeSummary();render()"></div><div class="field"><label>結束日期</label><input id="hrDateTo" type="date" onchange="updateHrDateRangeSummary();render()"></div></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px"><button class="btn" type="button" onclick="clearHrDateRange()">清除日期</button><button class="btn primary" type="button" onclick="document.getElementById('hrDateRangePicker').removeAttribute('open')">完成</button></div>
+        </div>
+      </details>
+      <button class="btn" onclick="resetFilters()">清除</button>
+    </div>
+    <div class="tablewrap"><table><thead><tr>
+      <th>編輯</th><th>#</th><th>狀態</th><th>考勤號</th><th>工號</th><th>姓名</th>
+      <th><button class="thlink" onclick="focusFilter('fDept')">部門 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fUnit')">單位 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fJob')">職稱 🔎</button></th>
+      <th>電話</th><th>到職日</th><th>離職日</th><th>生日</th><th>特休剩餘</th><th>裝置</th><th>綁定打卡 ☑</th><th>角色</th>
+      <th><button class="thlink" onclick="openPermissionOverview('attendance')">考勤 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('workhours')">工時統計 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('leave')">請假 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('schedule')">排班 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('efficiency')">效率 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('hr')">人資 🔎</button></th>
+      <th><button class="thlink" onclick="openPermissionOverview('history')">歷史資料 🔎</button></th>
+    </tr></thead><tbody id="body"></tbody></table></div>
+  </section>
+</main>
+<dialog id="historyDialog"><div class="modal">
+  <div class="modalhead">
+    <div><b>🔄 人員異動紀錄</b><div class="muted">包含部門／單位／職稱調動，以及在職／離職／留停狀態變更。清除紀錄只會刪除歷程，不會變更目前已修正完成的人員資料。</div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn danger hidden" id="clearEmployeeHistoryBtn" onclick="clearEmployeeHistory()">🗑 清除異動紀錄</button>
+      <button class="btn" onclick="historyDialog.close()">關閉</button>
+    </div>
+  </div>
+  <div class="tablewrap" style="max-height:65vh"><table style="min-width:1050px"><thead><tr><th>時間</th><th>工號</th><th>姓名</th><th>類型</th><th>異動前</th><th>異動後</th><th>原因／備註</th><th>操作人</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+</div></dialog>
+
+<dialog id="sessionLogDialog" class="wide-dialog"><div class="modal">
+  <div class="modalhead">
+    <div><b>🧾 登入／登出紀錄</b><div class="muted">查看管理員與員工的登入、登出紀錄。清除只會刪除這張紀錄表內容，不會刪除人員、考勤、請假、排班或效率資料。</div></div>
+    <button class="btn" onclick="sessionLogDialog.close()">關閉</button>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <div class="muted" id="sessionLogCount">共 0 筆</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="loadSessionLogs()">↻ 重新整理</button>
+      <button class="btn danger hidden" id="clearSessionLogsBtn" onclick="clearSessionLogs()">🗑 清除登入／登出紀錄</button>
+    </div>
+  </div>
+  <div class="tablewrap" style="max-height:62vh"><table style="min-width:920px"><thead><tr><th>時間</th><th>工號</th><th>姓名</th><th>角色</th><th>動作</th><th>裝置</th></tr></thead><tbody id="sessionLogBody"></tbody></table></div>
+</div></dialog>
+
+<dialog id="permissionDialog" class="wide-dialog"><div class="modal">
+  <div class="modalhead">
+    <div><b>🔐 七大系統權限明細</b><div class="muted">點主表的「管理／查看／無」也會開到這裡；可依系統、權限、人員篩選。</div></div>
+    <button class="btn" onclick="permissionDialog.close()">關閉</button>
+  </div>
+  <div class="filters" style="border:0;padding:0 0 10px;grid-template-columns:1fr 1fr 2fr auto">
+    <select id="permSystemFilter" onchange="renderPermissionOverview()">
+      <option value="">全部系統</option><option value="attendance">考勤</option><option value="leave">請假</option><option value="schedule">排班</option><option value="efficiency">效率</option><option value="hr">人資</option>
+    </select>
+    <select id="permLevelFilter" onchange="renderPermissionOverview()">
+      <option value="">全部權限</option><option value="manage">管理</option><option value="view">查看</option><option value="none">無權限</option>
+    </select>
+    <input id="permSearch" placeholder="搜尋工號、姓名、部門、單位、職稱" oninput="renderPermissionOverview()">
+    <button class="btn" onclick="document.getElementById('permSearch').value='';document.getElementById('permLevelFilter').value='';renderPermissionOverview()">清除</button>
+  </div>
+  <div id="permissionCapabilities" class="permission-summary"></div>
+  <div class="tablewrap" style="max-height:58vh;margin-top:10px">
+    <table style="min-width:1250px">
+      <thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>單位</th><th>職稱</th><th>系統</th><th>權限</th><th>可以查看</th><th>可以修改／執行</th><th>操作</th></tr></thead>
+      <tbody id="permissionBody"></tbody>
+    </table>
+  </div>
+</div></dialog>
+
+<dialog id="orgDialog" class="org-dialog"><div class="modal">
+  <div class="modalhead">
+    <div><b>⚙️ 部門／職稱／單位管理</b><div class="muted">這裡是七大系統唯一的部門／單位／職稱來源；移除並儲存後，不會再從舊考勤或既有人員資料自動補回。</div></div>
+    <button class="btn" onclick="orgDialog.close()">關閉</button>
+  </div>
+  <div class="orggrid">
+    <div class="orgbox"><h3>🏢 部門</h3><div style="display:flex;gap:6px"><input id="newDepartment" placeholder="新增部門"><button class="btn primary" onclick="addOrgItem('departments','newDepartment')">新增</button></div><div id="departmentList" class="orglist"></div></div>
+    <div class="orgbox"><h3>🧭 單位</h3><div style="display:flex;gap:6px"><input id="newUnit" placeholder="新增單位"><button class="btn primary" onclick="addOrgItem('units','newUnit')">新增</button></div><div id="unitList" class="orglist"></div></div>
+    <div class="orgbox"><h3>🎖️ 職稱</h3><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
+  </div>
+  <div class="footer"><div class="muted">刪除選項只會移除「選單選項」，不會刪掉既有人員歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
+</div></dialog>
+
+<dialog id="masterPickerDialog"><div class="modal">
+  <div class="modalhead"><div><b id="pickerTitle">選擇</b><div class="muted">輸入文字即可篩選，點一下就帶入員工資料欄位。</div></div><button class="btn" onclick="masterPickerDialog.close()">關閉</button></div>
+  <input id="pickerSearch" placeholder="搜尋..." oninput="renderMasterPicker()">
+  <div id="pickerResults" class="picker-results"></div>
+</div></dialog>
+<dialog id="editor"><form method="dialog" onsubmit="return false"><div class="modal"><div class="modalhead"><div><b id="modalTitle">新增員工</b><div class="muted">所有七大系統都會讀取這一份人資主檔；不會搬移或重建既有 Google Sheet。</div></div><div class="hr-editor-top-actions"><button type="button" class="btn danger" id="resignTopBtn" onclick="resignCurrent()">🚪 辦理離職</button><button type="button" class="btn primary" id="saveTopBtn" onclick="saveCurrent()">💾 儲存</button><button type="button" class="btn" onclick="editor.close()">關閉</button></div></div>
+<div class="grid">
+  <input id="origEmpId" type="hidden">
+  <div class="field"><label>考勤號碼</label><input id="attNo" inputmode="numeric"></div><div class="field"><label>工號 *</label><input id="empId" required></div><div class="field"><label>姓名 *</label><input id="name" required></div>
+  <div class="field">
+    <label class="field-picker-label">部門 <button type="button" class="picker-btn" onclick="openMasterPicker('departments','dept')">點選／篩選</button></label>
+    <input id="dept" list="deptOptions" autocomplete="off" placeholder="可輸入文字篩選部門">
+    <datalist id="deptOptions"></datalist>
+  </div>
+  <div class="field">
+    <label class="field-picker-label">單位 <button type="button" class="picker-btn" onclick="openMasterPicker('units','unit')">點選／篩選</button></label>
+    <input id="unit" list="unitOptions" autocomplete="off" placeholder="可輸入文字篩選單位">
+    <datalist id="unitOptions"></datalist>
+  </div>
+  <div class="field">
+    <label class="field-picker-label">職稱 <button type="button" class="picker-btn" onclick="openMasterPicker('jobTitles','jobTitle')">點選／篩選</button></label>
+    <input id="jobTitle" list="jobTitleOptions" autocomplete="off" placeholder="可輸入文字篩選職稱">
+    <datalist id="jobTitleOptions"></datalist>
+  </div>
+  <div class="field">
+    <label>電話</label><input id="phone" inputmode="tel" autocomplete="tel" placeholder="例如 0972933252">
+    <div class="help-text">台灣手機若 Google Sheet 把開頭 0 吃掉，系統會自動補回。</div>
+  </div>
+  <div class="field"><label>到職日</label><input id="startDate" type="date"></div><div class="field"><label for="reportingDate">報到日期（統計起算）</label><input id="reportingDate" type="date"><div class="help-text">從此日起計算考勤、排班與例休國；未填則沿用到職日。</div></div><div class="field"><label>生日</label><input id="birthday" type="date"></div><div class="field"><label>特休剩餘天數</label><input id="leaveRemaining" type="number" step="0.5" min="0"></div>
+  <div class="employment-box">
+    <div class="title">🚪 在職／離職管理</div>
+    <div class="grid">
+      <div class="field"><label>在職狀態</label><select id="employmentStatus" onchange="onEmploymentStatusChange()"><option value="active">在職</option><option value="leave">留職停薪</option><option value="resigned">離職</option></select></div>
+      <div class="field"><label>離職日期</label><input id="terminationDate" type="date"></div>
+      <div class="field"><label>最後工作日</label><input id="lastWorkDate" type="date"></div>
+      <div class="field wide"><label>離職原因／備註</label><input id="terminationReason" placeholder="例如：自願離職、退休、契約期滿（可留空）"></div>
+    </div>
+  </div>
+  <div class="field"><label>後台角色</label><select id="adminRole" onchange="onRoleChange()"><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select></div><div class="field"><label>管理員登入密碼</label><input id="password" type="password" placeholder="一般員工不可設定密碼；管理員留空＝維持原密碼"><div class="muted">只有管理員／超級管理員可設定；一般員工此欄鎖定。</div></div><div class="field"><label>裝置綁定</label><input id="deviceState" disabled></div>
+  <div class="field wide"><label>系統權限（含工時統計與歷史資料；超級管理員固定全部管理）</label><div class="permgrid" id="permGrid"></div></div>
+</div>
+<div class="footer"><div class="muted" id="editHint">離職不會刪除歷史資料；考勤、請假、排班、效率紀錄都會保留。</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn danger" id="resignBtn" onclick="resignCurrent()">🚪 辦理離職</button><button class="btn" id="restoreBtn" onclick="restoreCurrent()">↩ 恢復在職／重新到職</button><button class="btn" id="unbindBtn" onclick="unbindCurrent()">解除裝置</button><button type="button" class="btn" id="cancelEditBtn" onclick="editor.close()">取消</button><button class="btn primary" id="saveBtn" onclick="saveCurrent()">💾 儲存</button></div></div>
+</div></form></dialog>
+
+<div id="port79CalendarModeBox" aria-label="年份顯示方式">
+  <span>年份</span>
+  <select id="port79CalendarModeSelect" title="切換西元年／民國年">
+    <option value="gregorian">西元</option>
+    <option value="roc">民國</option>
+  </select>
+</div>
+<script id="port79-calendar-mode-script">
+(function(){
+  const KEY='port79_year_mode';
+  const mode=localStorage.getItem(KEY)==='roc'?'roc':'gregorian';
+  const sel=document.getElementById('port79CalendarModeSelect');
+  if(sel){
+    sel.value=mode;
+    sel.addEventListener('change',()=>{
+      localStorage.setItem(KEY,sel.value==='roc'?'roc':'gregorian');
+      location.reload();
+    });
+  }
+  if(mode!=='roc')return;
+  const skip=new Set(['SCRIPT','STYLE','NOSCRIPT','TEXTAREA','INPUT']);
+  const cv=(s)=>{
+    s=String(s||'');
+    s=s.replace(/民國\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,(m,y,mo,d)=>`${Number(y)}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})(?:[\/-])(\d{1,2})(?:[\/-])(\d{1,2})\b/g,(m,y,mo,d)=>`${Number(y)}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/g,(m,y,mo)=>`${Number(y)}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})(?:[\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,mo)=>`${Number(y)}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})\s*年/g,(m,y)=>`${Number(y)}年`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,(m,y,mo,d)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})(?:[\/-])(\d{1,2})(?:[\/-])(\d{1,2})\b/g,(m,y,mo,d)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年\s*(\d{1,2})\s*月/g,(m,y,mo)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})(?:[\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,mo)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年/g,(m,y)=>`${Number(y)-1911}年`);
+    return s;
+  };
+  let busy=false;
+  function scan(root){
+    if(!root||busy)return;
+    busy=true;
+    try{
+      const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+      const nodes=[]; let n;
+      while(n=walker.nextNode())nodes.push(n);
+      nodes.forEach(node=>{
+        const p=node.parentElement;
+        if(!p||skip.has(p.tagName)||p.closest('#port79CalendarModeBox'))return;
+        const old=node.nodeValue||'';
+        const next=cv(old);
+        if(next!==old)node.nodeValue=next;
+      });
+    }finally{busy=false}
+  }
+  scan(document.body);
+  const mo=new MutationObserver(ms=>{
+    if(busy)return;
+    ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1||n.nodeType===3)scan(n.nodeType===1?n:n.parentElement)}));
+  });
+  mo.observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+<script>
+const APP_VERSION='2026.10.16.101';
+const DEFAULT_GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
+let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
+let employees=[],session=null,token='',hrAccess='none',editing=null;
+let orgSettings={departments:[],jobTitles:[],units:[]};
+let orgDraft={departments:[],jobTitles:[],units:[]};
+let pickerKind='',pickerTarget='';
+const SYS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
+const LABEL={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
+const FINE_CATALOG={
+ attendance:[['punch','刷卡'],['records.view','查看考勤紀錄'],['realtime.view','查看即時考勤'],['records.create','新增/補登'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['exceptions.manage','異常處理']],
+ workhours:[['attendance.view','查看出勤統計'],['overtime.view','查看加班統計'],['attendance.export','匯出出勤統計'],['overtime.export','匯出加班統計'],['overtime.report','申報加班']],
+ leave:[['apply','提出請假'],['own.view','查看自己的申請'],['records.view','查看請假紀錄'],['approve','核准'],['reject','退回'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['balance.view','查看假別餘額'],['balance.edit','修改假別餘額']],
+ schedule:[['own.view','查看自己的班表'],['records.view','查看班表'],['records.create','新增排班'],['records.edit','修改排班'],['records.delete','刪除排班'],['records.export','匯出'],['import','匯入'],['support.manage','調任/支援']],
+ efficiency:[['records.view','查看效率資料'],['monthly.view','查看月報'],['records.create','新增'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['import','匯入'],['monthly.edit','修改月報'],['sync','同步']],
+ hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人員'],['employment.edit','在職/離職/留停'],['org.view','查看部門/單位/職稱'],['org.manage','管理部門/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
+ history:[['attendance.view','查看考勤歷史'],['schedule.view','查看排班歷史'],['vessel.view','查看船舶歷史']]
+};
+function p79AvailableJobScopes(){
+  const values=[...(orgSettings.jobTitles||[]),...employees.map(e=>e.jobTitle||e.deptDetail||'')];
+  const unique=[...new Set(values.map(x=>String(x||'').trim()).filter(Boolean))];
+  return unique.sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
+}
+const SCOPE_OPTIONS=[['self','僅本人'],['unit','本單位'],['department','本部門'],['assigned','指定職稱（逐項勾選）'],['all','全部人員']];
+function fineDefaults(e,k){const role=String(e?.adminRole||'employee').toLowerCase(),p=normalizePerms(e||{}),raw=e?.finePermissions?.[k]||{},out={};(FINE_CATALOG[k]||[]).forEach(([key])=>{let v=false;if(role==='superadmin')v=true;else if(role==='employee')v=(k==='attendance'&&key==='punch')||(k==='leave'&&key==='apply');else if(p[k]==='manage')v=!(k==='hr'&&(key==='permissions.manage'||key==='audit.clear'));else if(p[k]==='view')v=/\.view$/.test(key)||key==='own.view'||key==='punch'||key==='apply';if(Object.prototype.hasOwnProperty.call(raw,key)&&role!=='employee'&&role!=='superadmin')v=!!raw[key];out[key]=v});return out}
+function dataScopes(e){const role=String(e?.adminRole||'employee').toLowerCase(),raw=e?.dataScope||{},out={};SYS.forEach(k=>out[k]=role==='superadmin'?'all':role==='employee'?'self':(raw[k]||'department'));return out}
+function canHr(action){return String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||session?.finePermissions?.hr?.[action]===true}
+
+const PERMISSION_CAPS={
+  attendance:{
+    view:{see:['查看考勤紀錄','查看人員打卡狀態','查看歷史考勤'],edit:['不可修改考勤資料']},
+    manage:{see:['查看全部考勤紀錄','查看即時考勤','查看歷史資料'],edit:['新增／修正考勤紀錄','刪除考勤紀錄','執行考勤管理功能']}
+  },
+  workhours:{
+    view:{see:['查看出勤統計','查看加班統計'],edit:['不可匯出統計']},
+    manage:{see:['查看全部出勤統計','查看全部加班統計'],edit:['匯出出勤統計','匯出加班統計','申報加班','管理加班選項']}
+  },
+  leave:{
+    view:{see:['查看請假紀錄','查看請假狀態','查看特休資訊'],edit:['不可審核、修改或刪除請假']},
+    manage:{see:['查看全部請假與特休資料'],edit:['審核請假','修改請假','刪除請假紀錄','管理請假資料']}
+  },
+  schedule:{
+    view:{see:['查看班表','查看歷史排班'],edit:['不可變更或儲存班表']},
+    manage:{see:['查看全部班表與排班資料'],edit:['編輯班表','儲存排班','調任／支援設定','排班管理']}
+  },
+  efficiency:{
+    view:{see:['查看船舶效率','查看個人效率','查看月報與作業明細'],edit:['不可匯入、修改、刪除效率資料']},
+    manage:{see:['查看全部效率、船舶、月報、作業明細'],edit:['匯入船舶資料','修改／刪除作業資料','同步效率資料','執行月報比對']}
+  },
+  hr:{
+    view:{see:['查看人資主檔','查看離職／異動紀錄','查看系統權限'],edit:['不可新增或修改人員']},
+    manage:{see:['查看全部人資資料與權限'],edit:['新增／修改人員','辦理離職／復職','管理部門／職稱／單位','管理一般人員資料']}
+  },
+  history:{
+    view:{see:['依細項權限查看考勤／排班／船舶歷史'],edit:['不可修改歷史資料']},
+    manage:{see:['依細項權限查看歷史資料'],edit:['歷史中心目前以查看為主']}
+  }
+};
+function uniqSorted(arr){return [...new Set((arr||[]).map(v=>String(v||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}))}
+function normalizeOrgSettings(raw){
+  raw=raw&&typeof raw==='object'?raw:{};
+  return{
+    departments:uniqSorted(raw.departments),
+    jobTitles:uniqSorted(raw.jobTitles),
+    units:uniqSorted(raw.units)
+  };
+}
+
+function legacyAttendanceOrgSettings(){
+  try{
+    const cfg=JSON.parse(localStorage.getItem('sp_config_v5')||'null');
+    if(!cfg||typeof cfg!=='object')return{departments:[],jobTitles:[],units:[]};
+    return{
+      departments:uniqSorted(cfg.departments||[]),
+      jobTitles:uniqSorted(cfg.jobTitles||[]),
+      units:[]
+    };
+  }catch(e){
+    return{departments:[],jobTitles:[],units:[]};
+  }
+}
+function mergeLegacyOrgSettings(base){
+  // 舊考勤選項不可覆蓋人資管理員已儲存的清單。
+  return normalizeOrgSettings(base);
+}
+let p79CanonicalOrgOptions=null;
+const P79_HR_ORG_OPTIONS_KEY='hrOrgOptionsV1';
+function p79OrgOptionsCacheKey(){return 'p79_hr_org_options_v1:'+GAS_URL+':'+String(session?.empId||'');}
+function p79RememberOrgOptions(settings){
+  p79CanonicalOrgOptions=normalizeOrgSettings(settings);
+  try{localStorage.setItem(p79OrgOptionsCacheKey(),JSON.stringify(p79CanonicalOrgOptions));}catch(ignore){}
+}
+async function p79ReadCanonicalOrgOptions(){
+  const d=await apiGet('getData',45000);
+  if(!d.config||typeof d.config!=='object')throw new Error('組織設定來源不完整');
+  if(Object.prototype.hasOwnProperty.call(d.config,P79_HR_ORG_OPTIONS_KEY)){
+    const settings=d.config[P79_HR_ORG_OPTIONS_KEY];
+    if(!settings||!['departments','jobTitles','units'].every(k=>Array.isArray(settings[k])))throw new Error('組織選項格式不完整');
+    p79RememberOrgOptions(settings);
+  }else{p79CanonicalOrgOptions=null;}
+  return d.config;
+}
+async function migrateLegacyAttendanceOrgSettings(){
+  // 舊版曾把考勤 localStorage 的部門／職稱自動回填到人資設定。
+  // 現在停用自動回填，避免管理員刪除後又被舊資料重新加回。
+  return;
+}
+
+function mergedOrgValues(kind){
+  // 人資組織設定是唯一選單來源。
+  // 既有人員仍可保留舊值，但不再把舊值自動回灌成可選項目。
+  return uniqSorted(orgSettings[kind]||[]);
+}
+function normalizePhone(v){
+  let s=String(v??'').trim();
+  const digits=s.replace(/\D/g,'');
+  if(digits.length===9&&digits.startsWith('9'))return '0'+digits;
+  if(digits.length===10&&digits.startsWith('0'))return digits;
+  return s;
+}
+function focusFilter(id){const el=$(id);if(el){el.focus();try{el.showPicker?.()}catch(e){}}}
+function systemPermissionDetails(key,level){
+  if(level==='none')return{see:['不可進入此系統管理功能'],edit:['不可修改']};
+  return PERMISSION_CAPS[key]?.[level]||{see:['—'],edit:['—']};
+}
+
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const level=v=>['none','view','manage'].includes(String(v||'').toLowerCase())?String(v).toLowerCase():'none';
+function roleLabel(v){return v==='superadmin'?'超級管理員':v==='admin'?'管理員':'一般員工'}
+function permLabel(v){return v==='manage'?'管理':v==='view'?'查看':'無'}
+function normalizeEmploymentStatus(v){
+  const s=String(v||'').trim().toLowerCase();
+  if(['resigned','離職','terminated','inactive'].includes(s))return 'resigned';
+  if(['leave','留職停薪','留停','loa'].includes(s))return 'leave';
+  return 'active';
+}
+function employmentLabel(v){v=normalizeEmploymentStatus(v);return v==='resigned'?'離職':v==='leave'?'留職停薪':'在職'}
+function employmentClass(v){return normalizeEmploymentStatus(v)}
+function todayYmd(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+
+function theme(){const d=document.documentElement.getAttribute('data-theme')==='dark';$('themeBtn').innerHTML=d?'☀️ <span class="txt">亮色</span>':'🌙 <span class="txt">暗色</span>'}
+(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('port79_theme')||'light');theme();$('themeBtn').onclick=()=>{const n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('port79_theme',n);theme()}})();
+function normalizeGasUrl(v){return String(v||'').trim().replace(/\s+/g,'').replace(/\/+$/,'')}
+function validGasUrl(v){return /^https:\/\/script\.google\.com\/macros\/s\/[^/?#]+\/exec(?:[?#].*)?$/i.test(normalizeGasUrl(v))}
+function readHash(){try{const p=new URLSearchParams(String(location.hash||'').replace(/^#/,''));const g=normalizeGasUrl(p.get('gasurl')||'');if(validGasUrl(g)){GAS_URL=g;sessionStorage.setItem('port79_gas_url',g)}const t=p.get('port79sso');if(t)sessionStorage.setItem('port79_user_token',t);history.replaceState(null,'',location.pathname+location.search);return t||''}catch{return''}}
+function getToken(){return String(readHash()||sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim()}
+async function jfetch(url,opt={},ms=16000){
+  const fetchOnce=async targetUrl=>{
+    const c=new AbortController(),tm=setTimeout(()=>c.abort(),ms);
+    try{
+      const r=await fetch(targetUrl,{...opt,signal:c.signal,redirect:'follow',cache:'no-store'});
+      const s=await r.text();
+      return {r,s,targetUrl};
+    }finally{clearTimeout(tm)}
+  };
+  const isHtml=s=>/^<!doctype|^<html/i.test(String(s||'').trim());
+  const oldGas=normalizeGasUrl(GAS_URL);
+  let result=await fetchOnce(url);
+
+  // 某些舊分頁會在 sessionStorage 留下過期 GAS URL。
+  // 若舊 URL 回 Google HTML，自動切回本版內建正式 /exec 再重試一次。
+  if(isHtml(result.s)){
+    const canonical=normalizeGasUrl(DEFAULT_GAS_URL);
+    if(oldGas&&canonical&&oldGas!==canonical&&String(url).startsWith(oldGas)){
+      GAS_URL=canonical;
+      sessionStorage.setItem('port79_gas_url',canonical);
+      result=await fetchOnce(canonical+String(url).slice(oldGas.length));
+    }
+  }
+
+  if(isHtml(result.s)){
+    throw new Error('GAS 回傳 Google 網頁而不是 JSON。請到 Apps Script「管理部署作業」→ 編輯目前 Web App → 選「新版本」→ 部署；執行身分選「我」，存取權限選「任何人」。');
+  }
+
+  let d;
+  try{d=JSON.parse(result.s)}
+  catch{throw new Error('GAS 回傳內容不是 JSON，請確認 Web App /exec 網址與部署版本。')}
+
+  if(!d.ok){
+    let msg=d.error||'雲端操作失敗';
+    if(/未知操作\s*:\s*\[(hrSaveOrgSettings|hrUpsertEmployee|hrClearEmployeeHistory)\]/i.test(msg)){
+      msg='目前人資網頁已更新，但 Google Apps Script 尚未部署到同一版本。請將 v2026.09.28.7.42 的 Code.gs 覆蓋後，在「管理部署作業」建立新版本並部署。';
+    }
+    throw new Error(msg);
+  }
+  return d;
+}
+async function apiGet(action,ms=16000){return jfetch(GAS_URL+'?action='+encodeURIComponent(action)+'&token='+encodeURIComponent(token)+'&t='+Date.now(),{},ms)}
+async function apiPost(payload){return jfetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token,userToken:token})})}
+function normalizePerms(e){const r=String(e.adminRole||'employee').toLowerCase();if(r==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage',history:'manage'};const p=e.systemPermissions&&typeof e.systemPermissions==='object'?e.systemPermissions:{};return{attendance:level(p.attendance||'view'),workhours:level(Object.prototype.hasOwnProperty.call(p,'workhours')?p.workhours:p.attendance),leave:level(p.leave||(r==='employee'?'view':'none')),schedule:level(p.schedule),efficiency:level(p.efficiency),hr:level(p.hr||e.employeeListAccess),history:level(p.history)}}
+let p79HrInitStarted=false;
+function p79CachedHrSession(){
+  try{
+    return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
+  }catch(e){return null}
+}
+function p79ApplyHrSession(s){
+  if(!s||typeof s!=='object')return false;
+  session=s;
+  const p=s.systemPermissions||{};
+  hrAccess=String(s.adminRole||s.role||s.actualAdminRole||'').toLowerCase()==='superadmin'?'manage':level(p.hr||s.employeeListAccess);
+  if(hrAccess==='none')return false;
+  $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
+  if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
+  $('orgSettingsBtn')?.classList.toggle('hidden',!canHr('org.view'));
+  $('sessionLogBtn')?.classList.toggle('hidden',!canHr('audit.view'));
+  return true;
+}
+async function init(){
+  if(p79HrInitStarted)return;
+  p79HrInitStarted=true;
+  token=getToken();
+  if(!token){location.replace('../');return}
+
+  const cached=p79CachedHrSession();
+  const cachedOk=p79ApplyHrSession(cached);
+  if(cachedOk)$('status').textContent='☁️ 已取得登入權限｜正在確認雲端人資權限…';
+
+  let cloudOk=false;
+  try{
+    // 權限確認最多等 7 秒；不要讓整個人資頁面一直停在驗證狀態。
+    const d=await apiGet('getSessionMeta',7000);
+    if(!p79ApplyHrSession(d))throw new Error('此帳號沒有「人資管理系統」查看權限');
+    cloudOk=true;
+  }catch(e){
+    if(!cachedOk){
+      $('status').textContent='❌ '+(e?.name==='AbortError'?'人資權限驗證逾時，請稍後再試':(e.message||e));
+      setTimeout(()=>location.replace('../'),1800);
+      return;
+    }
+    console.warn('人資雲端權限確認暫時失敗，沿用已驗證登入權限：',e);
+    $('status').textContent='🟡 雲端權限確認較慢｜先使用目前已驗證權限讀取人資資料';
+  }
+
+  // 讓瀏覽器先完成第一幀，避免權限驗證與人資主檔大表同一時間搶主執行緒。
+  await new Promise(r=>setTimeout(r,60));
+  await loadEmployees(false);
+  if(cloudOk&&$('status')?.textContent?.startsWith('🟡')){
+    $('status').textContent='✅ 人資權限已確認';
+  }
+}
+let p79HrLoadPromise=null;
+
+function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
+  if(!d||!Array.isArray(d.employees))throw new Error('人資主檔回傳格式不完整');
+  employees=(d.employees||[])
+    .filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN')
+    .map(e=>({...e,phone:normalizePhone(e.phone)}));
+  hrAccess=d.hrAccess||hrAccess;
+  orgSettings=normalizeOrgSettings(p79CanonicalOrgOptions||d.orgSettings||{});
+  populateFilters();
+  render();
+  migrateLegacyAttendanceOrgSettings();
+  $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
+  if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
+  $('orgSettingsBtn')?.classList.toggle('hidden',hrAccess!=='manage');
+  const sourceText=source==='cache'?'最近快取':'雲端';
+  $('status').textContent=`✅ 人資主檔已載入｜${employees.length} 人｜來源：${sourceText}｜目前權限：${permLabel(hrAccess)}${show?'｜已重新整理':''}`;
+  return true;
+}
+
+async function p79TryLoadHrCache(){
+  try{
+    try{const cached=JSON.parse(localStorage.getItem(p79OrgOptionsCacheKey())||'null');if(cached&&['departments','jobTitles','units'].every(k=>Array.isArray(cached[k])))p79CanonicalOrgOptions=normalizeOrgSettings(cached);}catch(ignore){}
+    const snap=await window.Port79DataCache?.getSystemSnapshot?.('hr');
+    const d=snap?.data;
+    if(!d?.ok||!Array.isArray(d.employees)||!d.employees.length)return false;
+    p79ApplyHrEmployeesPayload(d,false,'cache');
+    return true;
+  }catch(e){
+    console.warn('人資快取讀取失敗，改走雲端：',e);
+    return false;
+  }
+}
+
+async function p79FetchHrEmployeesCloud(){
+  // 優先走共用資料快取模組：成功時會同時更新 IndexedDB 快取。
+  if(window.Port79DataCache?.downloadSystem){
+    return await window.Port79DataCache.downloadSystem('hr');
+  }
+  return await apiGet('hrGetEmployees',30000);
+}
+
+async function loadEmployees(show){
+  if(p79HrLoadPromise)return p79HrLoadPromise;
+  p79HrLoadPromise=(async()=>{
+    let cacheShown=false;
+    try{
+      cacheShown=await p79TryLoadHrCache();
+      $('status').textContent=cacheShown
+        ? '☁️ 已先顯示最近人資資料｜正在同步最新雲端主檔...'
+        : '☁️ 正在同步人資主檔...';
+
+      let d;
+      try{
+        d=await p79FetchHrEmployeesCloud();
+      }catch(firstError){
+        const isTimeout=firstError?.name==='AbortError'||/abort|逾時|timeout/i.test(String(firstError?.message||firstError));
+        if(!isTimeout)throw firstError;
+
+        $('status').textContent=cacheShown
+          ? '🟡 雲端回應較慢｜目前先顯示最近資料，正在自動重試最新主檔...'
+          : '🟡 雲端回應較慢｜正在自動重試人資主檔，請稍候...';
+
+        await new Promise(r=>setTimeout(r,700));
+        d=await apiGet('hrGetEmployees',45000);
+      }
+
+      await p79ReadCanonicalOrgOptions();
+      p79ApplyHrEmployeesPayload(d,show,'cloud');
+      return true;
+    }catch(e){
+      if(cacheShown){
+        $('status').textContent='🟡 雲端最新人資主檔暫時未同步完成｜目前顯示最近一次可用資料，可稍後再按重新同步';
+        console.warn('人資雲端同步失敗，保留最近快取：',e);
+        return true;
+      }
+      $('status').textContent='❌ '+((e?.name==='AbortError'||/abort|逾時|timeout/i.test(String(e?.message||e)))
+        ?'人資雲端回應逾時；系統已自動重試仍未完成，請稍後再按重新同步'
+        :(e.message||e));
+      return false;
+    }finally{
+      p79HrLoadPromise=null;
+    }
+  })();
+  return p79HrLoadPromise;
+}
+function populateFilters(){
+  const fill=(id,label,vals)=>{
+    const el=$(id),cur=el?.value||'';
+    if(!el)return;
+    el.innerHTML=`<option value="">全部${label}</option>`+uniqSorted(vals).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if([...el.options].some(o=>o.value===cur))el.value=cur;
+  };
+  fill('fDept','部門',mergedOrgValues('departments'));
+  fill('fUnit','單位',mergedOrgValues('units'));
+  fill('fJob','職稱',mergedOrgValues('jobTitles'));
+  const dl=(id,vals)=>{const el=$(id);if(el)el.innerHTML=uniqSorted(vals).map(v=>`<option value="${esc(v)}"></option>`).join('')};
+  dl('deptOptions',mergedOrgValues('departments'));
+  dl('unitOptions',mergedOrgValues('units'));
+  dl('jobTitleOptions',mergedOrgValues('jobTitles'));
+}
+function updateHrDateRangeSummary(){const a=$('hrDateFrom')?.value||'',b=$('hrDateTo')?.value||'';if(a&&b&&a>b)$('hrDateTo').value=a;const aa=$('hrDateFrom')?.value||'',bb=$('hrDateTo')?.value||'',el=$('hrDateRangeSummary');if(el){const t=!aa&&!bb?'全部日期':aa&&bb?`${aa} ～ ${bb}`:aa?`${aa} 起`:`至 ${bb}`;el.innerHTML=`📅 到職日期範圍 <span style="font-size:11px;color:var(--muted)">${esc(t)}</span>`;}}
+function clearHrDateRange(){if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
+function resetFilters(){$('q').value='';$('fStatus').value='active';$('fDept').value='';$('fUnit').value='';$('fJob').value='';$('fRole').value='';if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
+function setStatusView(status){$('fStatus').value=status;render()}
+function openEmploymentHistory(){
+  const clearBtn=$('clearEmployeeHistoryBtn');
+  if(clearBtn)clearBtn.classList.toggle('hidden',!canHr('audit.clear'));
+  const rows=[];
+  employees.forEach(e=>{
+    (Array.isArray(e.transferHistory)?e.transferHistory:[]).forEach(h=>{
+      rows.push({
+        at:h.changedAt||'',empId:e.empId||'',name:e.name||'',type:'部門／單位／職稱調動',
+        from:`${h.fromDept||'—'} / ${h.fromUnit||'—'} / ${h.fromJobTitle||'—'}`,
+        to:`${h.toDept||'—'} / ${h.toUnit||'—'} / ${h.toJobTitle||'—'}`,
+        reason:'',by:h.changedBy||''
+      });
+    });
+    (Array.isArray(e.employmentHistory)?e.employmentHistory:[]).forEach(h=>{
+      rows.push({
+        at:h.changedAt||'',empId:e.empId||'',name:e.name||'',type:'在職狀態',
+        from:employmentLabel(h.fromStatus),to:employmentLabel(h.toStatus),
+        reason:h.reason||'',by:h.changedBy||''
+      });
+    });
+  });
+  rows.sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  $('historyBody').innerHTML=rows.map(x=>`<tr><td>${esc(String(x.at||'').replace('T',' ').slice(0,19))}</td><td>${esc(x.empId)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.type)}</td><td>${esc(x.from)}</td><td>${esc(x.to)}</td><td>${esc(x.reason||'')}</td><td>${esc(x.by||'')}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">目前沒有異動紀錄</td></tr>';
+  historyDialog.showModal();
+}
+
+async function clearEmployeeHistory(){
+  if(!canHr('audit.clear'))return alert('只有被授予「清除登入/登出與人員異動紀錄」權限的人員可以執行');
+  if(!confirm('確定清除全部人員異動紀錄？\n\n只會清除「調動歷程」與「在職狀態異動歷程」。\n目前已修正完成的人員資料、部門、單位、職稱、在職狀態、考勤、請假、排班與效率資料都不會被變更。'))return;
+  try{
+    const d=await apiPost({action:'hrClearEmployeeHistory'});
+    await loadEmployees(false);
+    alert(`已清除 ${Number(d.cleared||0)} 筆人員異動紀錄；目前人員資料保持不變`);
+    openEmploymentHistory();
+  }catch(e){alert('清除人員異動紀錄失敗：'+(e.message||e))}
+}
+
+function openOrgSettings(){if(!canHr('org.view'))return alert('沒有查看組織設定權限');
+  if(hrAccess!=='manage')return;
+  orgDraft={
+    departments:uniqSorted(orgSettings.departments).slice(),
+    jobTitles:uniqSorted(orgSettings.jobTitles).slice(),
+    units:uniqSorted(orgSettings.units).slice()
+  };
+  renderOrgSettings();
+  orgDialog.showModal();
+}
+function renderOrgSettings(){
+  const draw=(kind,id)=>{
+    const el=$(id);if(!el)return;
+    el.innerHTML=(orgDraft[kind]||[]).map(v=>`<div class="orgitem"><span>${esc(v)}</span><button class="small-danger" onclick="removeOrgItem('${kind}',${JSON.stringify(v).replace(/"/g,'&quot;')})">移除</button></div>`).join('')||'<div class="muted">尚未建立</div>';
+  };
+  draw('departments','departmentList');draw('units','unitList');draw('jobTitles','jobTitleList');
+}
+function addOrgItem(kind,inputId){
+  const input=$(inputId),v=String(input?.value||'').trim();
+  if(!v)return;
+  orgDraft[kind]=uniqSorted([...(orgDraft[kind]||[]),v]);
+  input.value='';renderOrgSettings();
+}
+function removeOrgItem(kind,value){
+  orgDraft[kind]=(orgDraft[kind]||[]).filter(v=>v!==value);
+  renderOrgSettings();
+}
+async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修改組織設定權限');
+  if(hrAccess!=='manage')return;
+  if($('saveOrgBtn').disabled)return;
+  const originalLabel=$('saveOrgBtn').textContent;
+  try{
+    $('saveOrgBtn').disabled=true;
+    $('saveOrgBtn').textContent='正在儲存…';
+    const draft=normalizeOrgSettings(orgDraft);
+    const currentConfig=await p79ReadCanonicalOrgOptions();
+    const config={...currentConfig,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
+    if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+    await p79RetryOrgSave(()=>({action:'hrSaveOrgSettings',settings:draft}));
+    await p79RetryOrgSave(async()=>{
+      // 等候資料鎖期間可能有其他設定更新，每次重試都重新合併最新設定。
+      const latest=await p79ReadCanonicalOrgOptions();
+      const merged={...latest,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
+      if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+      return {action:'saveConfig',config:merged};
+    });
+    await p79ReadCanonicalOrgOptions();
+    if(JSON.stringify(p79CanonicalOrgOptions)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
+    orgSettings=draft;
+    populateFilters();orgDialog.close();
+    $('status').textContent='✅ 部門／職稱／單位已儲存到雲端，七大系統人資主檔可共用';
+  }catch(e){alert('組織設定儲存失敗：'+(e.message||e))}
+  finally{$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
+}
+async function p79RetryOrgSave(makePayload){
+  for(let attempt=0;attempt<4;attempt++){
+    try{return await apiPost(await makePayload())}
+    catch(error){
+      // 只重試明確尚未取得資料鎖的回應；網路逾時與驗證失敗不自動重送。
+      if(!/雲端目前正在處理其他資料/.test(String(error?.message||error)))throw error;
+      if(attempt===3)throw new Error('雲端仍忙碌，已重試3次；你的修改仍保留，請稍後再按儲存');
+      $('saveOrgBtn').textContent=`雲端忙碌，自動重試 ${attempt+1}/3…`;
+      await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt)));
+    }
+  }
+}
+function openMasterPicker(kind,targetId){
+  pickerKind=kind;pickerTarget=targetId;
+  const label=kind==='departments'?'部門':kind==='units'?'單位':'職稱';
+  $('pickerTitle').textContent='選擇'+label;
+  $('pickerSearch').value='';
+  renderMasterPicker();
+  masterPickerDialog.showModal();
+}
+function renderMasterPicker(){
+  const q=$('pickerSearch').value.trim().toLowerCase();
+  const vals=mergedOrgValues(pickerKind).filter(v=>!q||v.toLowerCase().includes(q));
+  $('pickerResults').innerHTML=vals.map(v=>`<button type="button" class="picker-option" onclick="chooseMasterValue(${JSON.stringify(v).replace(/"/g,'&quot;')})">${esc(v)}</button>`).join('')||'<div class="muted">沒有符合的選項，可先到「部門／職稱／單位」新增。</div>';
+}
+function chooseMasterValue(value){
+  const el=$(pickerTarget);if(el)el.value=value;
+  masterPickerDialog.close();
+}
+function openPermissionOverview(system='',level='',empId=''){if(!canHr('permissions.view'))return alert('沒有查看權限設定的權限');
+  $('permSystemFilter').value=system||'';
+  $('permLevelFilter').value=level||'';
+  const emp=empId?employees.find(e=>String(e.empId)===String(empId)):null;
+  $('permSearch').value=emp?(emp.name||emp.empId):'';
+  renderPermissionOverview();
+  permissionDialog.showModal();
+}
+function openPermissionDetail(empId,system){
+  const emp=employees.find(e=>String(e.empId)===String(empId));
+  if(!emp)return;
+  const level=normalizePerms(emp)[system]||'none';
+  openPermissionOverview(system,level,empId);
+}
+function renderPermissionOverview(){
+  const sys=$('permSystemFilter').value,lev=$('permLevelFilter').value,q=$('permSearch').value.trim().toLowerCase();
+  const systems=sys?[sys]:SYS.slice();
+  if(sys){
+    const levels=lev?[lev]:['manage','view','none'];
+    $('permissionCapabilities').innerHTML=`<b>${LABEL[sys]}權限說明</b><div class="perm-cap-grid">`+levels.map(level=>{
+      const d=systemPermissionDetails(sys,level);
+      return`<div class="perm-cap-card"><b class="perm ${level}">${permLabel(level)}</b><ul><li><b>可查看：</b>${d.see.map(esc).join('、')}</li><li><b>可修改／執行：</b>${d.edit.map(esc).join('、')}</li></ul></div>`
+    }).join('')+'</div>';
+  }else{
+    $('permissionCapabilities').innerHTML='<b>全部系統權限總覽</b>｜選擇上方「系統」後，會列出該系統管理／查看／無權限的細項。';
+  }
+  const rows=[];
+  employees.forEach(e=>{
+    const p=normalizePerms(e);
+    systems.forEach(k=>{
+      const level=p[k]||'none';
+      const hay=`${e.empId||''} ${e.name||''} ${e.dept||''} ${e.unit||''} ${e.jobTitle||e.deptDetail||''}`.toLowerCase();
+      if(lev&&level!==lev)return;
+      if(q&&!hay.includes(q))return;
+      const d=systemPermissionDetails(k,level);
+      rows.push({e,k,level,d});
+    });
+  });
+  rows.sort((a,b)=>{
+    const rank={manage:0,view:1,none:2};
+    return (rank[a.level]-rank[b.level])||String(a.e.name||'').localeCompare(String(b.e.name||''),'zh-Hant');
+  });
+  $('permissionBody').innerHTML=rows.map(({e,k,level,d})=>`<tr>
+    <td><b>${esc(e.empId||'')}</b></td><td><b>${esc(e.name||'')}</b></td><td>${esc(e.dept||'')}</td><td>${esc(e.unit||'')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td>
+    <td>${LABEL[k]}</td><td><span class="perm ${level}">${permLabel(level)}</span></td>
+    <td style="white-space:normal;min-width:250px;text-align:left">${d.see.map(x=>'• '+esc(x)).join('<br>')}</td>
+    <td style="white-space:normal;min-width:280px;text-align:left">${d.edit.map(x=>'• '+esc(x)).join('<br>')}</td>
+    <td>${hrAccess==='manage'?`<button class="btn" onclick="permissionDialog.close();openEditor('${esc(e.empId)}')">編輯此人</button>`:'查看'}</td>
+  </tr>`).join('')||'<tr><td colspan="24" class="muted">沒有符合條件的人員</td></tr>';
+}
+
+function render(){
+  const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,d=$('fDept').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
+  const dateFrom=$('hrDateFrom')?.value||'',dateTo=$('hrDateTo')?.value||'';
+  let list=employees.filter(e=>{
+    const empStatus=normalizeEmploymentStatus(e.employmentStatus);
+    const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${e.dept||''} ${e.unit||''} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
+    const empStart=String(e.startDate||'').slice(0,10).replace(/\//g,'-');
+    const dateOk=(!dateFrom&&!dateTo)||!!empStart&&(!dateFrom||empStart>=dateFrom)&&(!dateTo||empStart<=dateTo);
+    return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!d||e.dept===d)&&(!u||String(e.unit||'')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
+  });
+  list.sort((a,b)=>{
+    const sa=normalizeEmploymentStatus(a.employmentStatus),sb=normalizeEmploymentStatus(b.employmentStatus),rank={active:0,leave:1,resigned:2};
+    return(rank[sa]-rank[sb])||String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true});
+  });
+  $('body').innerHTML=list.map((e,i)=>{
+    const p=normalizePerms(e),lb=e.leaveBalance||{},can=hrAccess==='manage',stt=normalizeEmploymentStatus(e.employmentStatus);
+    const rowClass=stt==='resigned'?'row-resigned':stt==='leave'?'row-leave':'';
+    return`<tr class="${rowClass}">
+      <td>${can?`<button class="btn" onclick="openEditor('${esc(e.empId)}')">編輯</button>`:'<span class="muted">查看</span>'}</td>
+      <td>${i+1}</td><td><span class="empstatus ${employmentClass(stt)}">${employmentLabel(stt)}</span></td>
+      <td>${esc(e.attNo||'')}</td><td><b>${esc(e.empId)}</b></td><td><b>${esc(e.name)}</b></td>
+      <td>${esc(e.dept||'')}</td><td>${esc(e.unit||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
+      <td>${esc(e.startDate||'')}${e.reportingDate?`<div class="muted">報到 ${esc(e.reportingDate)}</div>`:''}</td><td>${stt==='resigned'?esc(e.terminationDate||'—'):'—'}</td><td>${esc(e.birthday||'')}</td>
+      <td><b>${lb.remaining==null?'—':esc(lb.remaining)+' 天'}</b></td>
+      <td>${e.deviceBound?'<span class="pill">已綁定</span>':'—'}</td>
+      <td>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-weight:700;cursor:${canHr('device.unbind')?'pointer':'default'};white-space:nowrap"
+               title="${e.allowPunchWithoutDeviceBinding?'目前未要求手機綁定；打勾後恢復需綁定':'目前需要手機綁定；取消打勾即可免綁打卡'}">
+          <input type="checkbox"
+                 ${e.allowPunchWithoutDeviceBinding?'':'checked'}
+                 ${canHr('device.unbind')?'':'disabled'}
+                 onchange="setPunchBindingRequired('${esc(e.empId)}',this.checked,this)"
+                 style="width:18px;height:18px;accent-color:#16a34a;cursor:${canHr('device.unbind')?'pointer':'default'}">
+          <span>${e.allowPunchWithoutDeviceBinding?'免綁':'需綁'}</span>
+        </label>
+      </td>
+      <td><span class="pill">${roleLabel(String(e.adminRole||'employee'))}</span></td>
+      ${SYS.map(k=>`<td><button type="button" class="permclick ${p[k]}" onclick="openPermissionDetail('${esc(e.empId)}','${k}')" title="點擊查看${LABEL[k]}權限細項">${permLabel(p[k])}</button></td>`).join('')}
+    </tr>`;
+  }).join('')||'<tr><td colspan="24" class="muted">沒有符合條件的人員</td></tr>';
+  const ps=employees.map(normalizePerms);
+  $('stActive').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='active').length;
+  $('stResigned').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='resigned').length;
+  $('stLeave').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='leave').length;
+  $('stAdmins').textContent=employees.filter(e=>['admin','superadmin'].includes(String(e.adminRole))).length;
+  $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>e.dept).filter(Boolean)).size;
+  $('stHrManagers').textContent=ps.filter(p=>p.hr==='manage').length;
+}
+function p79ToggleJobScopes(k){const el=document.getElementById('scope_jobs_'+k);if(el)el.style.display=document.getElementById('scope_'+k)?.value==='assigned'?'flex':'none';}
+function p79UpdateOvertimeManagementDisplay(){
+  const allowed=$('adminRole').value==='superadmin'||($('adminRole').value!=='employee'&&$('perm_workhours')?.value==='manage');
+  document.querySelectorAll('[data-overtime-management-display]').forEach(cb=>cb.checked=allowed);
+}
+function buildPermGrid(e){
+  const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=canHr('permissions.manage');
+  const scopes=dataScopes(e||{}),selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
+  // 指定職稱與目前雲端實際接受的範圍一致。
+  const availableJobs=['AQC','ARMG','領班','指揮手'];
+  const cards=SYS.map(k=>{
+    const f=fineDefaults({...e,adminRole:role},k);
+    let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
+    if(k==='workhours')actions+=['管理加班選項'].map(label=>`<label class="perm-action" title="依工時統計的管理後台權限啟用"><input type="checkbox" data-overtime-management-display disabled ${superRole||(!employeeRole&&p.workhours==='manage')?'checked':''}><span>${label}</span></label>`).join('')+'<p class="muted" style="grid-column:1/-1">勾選「申報加班」後，具有工時統計管理後台權限的管理員即可申報。加班選項管理依上方「管理後台」啟用。</p>';
+    return `<div class="permitem"><b>${LABEL[k]}</b><select id="perm_${k}" ${k==='workhours'?'onchange="p79UpdateOvertimeManagementDisplay()"':''} ${superRole||employeeRole||!canGrant?'disabled':''}><option value="none">無後台權限</option><option value="view">查看後台</option><option value="manage">管理後台</option></select><div class="perm-actions-grid">${actions}</div></div>`;
+  }).join('');
+  let ranges;
+  if(superRole||employeeRole){
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍</b><p>${superRole?'超級管理員：全部系統固定可查看全部人員。':'一般員工：僅本人資料。'}</p>${SYS.map(k=>`<input type="hidden" id="scope_${k}" value="${superRole?'all':'self'}">`).join('')}</div>`;
+  }else{
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、領班、指揮手。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${job}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].includes(job)?'checked':''} ${!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div></div>`).join('')}</div>`;
+  }
+  $('permGrid').innerHTML=cards+ranges;
+  SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];});
+  const pwd=$('password');if(pwd){pwd.disabled=employeeRole||!canGrant;if(employeeRole)pwd.value='';}
+}
+function onRoleChange(){buildPermGrid(editing||{adminRole:$('adminRole').value})}
+function onEmploymentStatusChange(){
+  const st=normalizeEmploymentStatus($('employmentStatus').value);
+  const resigned=st==='resigned';
+  $('terminationDate').disabled=!resigned;
+  $('lastWorkDate').disabled=!resigned;
+  $('terminationReason').disabled=!resigned;
+  if(resigned){
+    if(!$('terminationDate').value)$('terminationDate').value=todayYmd();
+    if(!$('lastWorkDate').value)$('lastWorkDate').value=$('terminationDate').value||todayYmd();
+  }
+}
+function openEditor(id=''){
+  if(id&&!canHr('people.edit'))return alert('沒有修改人員權限');
+  if(!id&&!canHr('people.create'))return alert('沒有新增人員權限');
+  editing=id?employees.find(e=>String(e.empId)===String(id)):null;
+  $('modalTitle').textContent=editing?'編輯員工':'新增員工';
+  $('origEmpId').value=editing?.empId||'';
+  $('attNo').value=editing?.attNo||'';
+  $('empId').value=editing?.empId||'';
+  $('name').value=editing?.name||'';
+  $('dept').value=editing?.dept||'';
+  $('unit').value=editing?.unit||'';
+  $('jobTitle').value=editing?.jobTitle||editing?.deptDetail||'';
+  $('phone').value=normalizePhone(editing?.phone||'');
+  $('startDate').value=String(editing?.startDate||'').slice(0,10).replace(/\//g,'-');
+  $('reportingDate').value=String(editing?.reportingDate||'').slice(0,10).replace(/\//g,'-');
+  $('birthday').value=String(editing?.birthday||'').slice(0,10).replace(/\//g,'-');
+  $('leaveRemaining').value=editing?.leaveBalance?.remaining??'';
+  $('employmentStatus').value=normalizeEmploymentStatus(editing?.employmentStatus);
+  $('terminationDate').value=String(editing?.terminationDate||'').slice(0,10).replace(/\//g,'-');
+  $('lastWorkDate').value=String(editing?.lastWorkDate||'').slice(0,10).replace(/\//g,'-');
+  $('terminationReason').value=editing?.terminationReason||'';
+  $('adminRole').value=editing?.adminRole||'employee';
+  $('password').value='';
+  $('deviceState').value=editing?.deviceBound?'已綁定':'未綁定';
+  $('resignBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
+  $('restoreBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='active');
+  $('unbindBtn').classList.toggle('hidden',!editing?.deviceBound);
+  if(String(session?.adminRole||'')!=='superadmin')$('adminRole').disabled=true;else $('adminRole').disabled=false;
+  buildPermGrid(editing||{adminRole:'employee',systemPermissions:{attendance:'view',workhours:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none',history:'none'}});
+  onEmploymentStatusChange();
+  window.Port79CalendarRange?.syncAll?.();
+  $('resignTopBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
+  editor.showModal();
+  const resetEditorTop=()=>{
+    editor.scrollTop=0;
+    editor.querySelectorAll('form,.modal').forEach(el=>el.scrollTop=0);
+    $('attNo').focus({preventScroll:true});
+  };
+  resetEditorTop();requestAnimationFrame(resetEditorTop);
+}
+let p79HrSaveRevision=0;
+async function saveCurrent(){
+  if($('saveBtn').disabled)return;
+  if(editing&&!canHr('people.edit'))return alert('沒有修改人員權限');
+  if(!editing&&!canHr('people.create'))return alert('沒有新增人員權限');
+  const empId=$('empId').value.trim().toUpperCase(),name=$('name').value.trim();
+  if(!empId||!name){alert('工號與姓名不可空白');return}
+  const role=$('adminRole').value,p={},finePermissions={},dataScope={},dataScopeJobs={};SYS.forEach(k=>{p[k]=role==='superadmin'?'manage':role==='employee'?'none':$('perm_'+k).value;finePermissions[k]={};document.querySelectorAll(`[data-fine="${k}"]`).forEach(cb=>finePermissions[k][cb.dataset.action]=!!cb.checked);if(role==='employee'){Object.keys(finePermissions[k]).forEach(a=>finePermissions[k][a]=false);if(k==='attendance')finePermissions[k].punch=true;if(k==='leave')finePermissions[k].apply=true}dataScope[k]=role==='superadmin'?'all':role==='employee'?'self':$('scope_'+k).value;dataScopeJobs[k]=dataScope[k]==='assigned'?[...document.querySelectorAll('[data-job-scope="'+k+'"]:checked')].map(el=>el.value):[]});
+  if(SYS.some(k=>dataScope[k]==='assigned'&&!dataScopeJobs[k].length))return alert('指定範圍至少需要選一個職稱');
+  const old=editing||{},lb=old.leaveBalance&&typeof old.leaveBalance==='object'?{...old.leaveBalance}:{};
+  if($('leaveRemaining').value!=='')lb.remaining=Number($('leaveRemaining').value);
+  const st=normalizeEmploymentStatus($('employmentStatus').value);
+  const employee={
+    ...old,
+    attNo:$('attNo').value.trim(),empId,name,dept:$('dept').value.trim(),unit:$('unit').value.trim(),
+    jobTitle:$('jobTitle').value.trim(),deptDetail:$('jobTitle').value.trim(),
+    phone:normalizePhone($('phone').value),startDate:$('startDate').value,reportingDate:$('reportingDate').value,birthday:$('birthday').value,
+    password:role==='employee'?'':$('password').value,adminRole:role,systemPermissions:p,finePermissions,dataScope,dataScopeJobs,employeeListAccess:p.hr,
+    leaveBalance:Object.keys(lb).length?lb:null,
+    employmentStatus:st,
+    terminationDate:st==='resigned'?$('terminationDate').value:'',
+    lastWorkDate:st==='resigned'?$('lastWorkDate').value:'',
+    terminationReason:st==='resigned'?$('terminationReason').value.trim():''
+  };
+  if(st==='resigned'&&!employee.terminationDate){alert('離職狀態請填寫離職日期');return}
+  const button=$('saveBtn'),originalLabel=button.textContent,originalEmpId=$('origEmpId').value||empId;
+  try{
+    $('saveTopBtn').disabled=true;button.disabled=true;button.textContent='儲存中…';$('status').textContent='☁️ 正在儲存這位員工，等待雲端確認…';
+    const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
+    if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
+    if(result.employee&&SYS.some(k=>normalizePerms(result.employee)[k]!==p[k]))throw new Error('雲端回覆的後台權限與設定不一致，請保留視窗並重新核對');
+    const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
+    const saved={...(index>=0?employees[index]:{}),...employee,...(result.employee||{})};
+    if(index>=0)employees.splice(index,1,saved);else employees.push(saved);
+    populateFilters();render();editor.close();
+    $('status').textContent='✅ 雲端已確認儲存｜正在背景更新人員清單…';
+    const revision=++p79HrSaveRevision;
+    // 只讀人資主檔；不再等完整 getData 與組織設定才結束儲存。
+    Promise.resolve(p79HrLoadPromise).catch(()=>{}).then(()=>apiGet('hrGetEmployees',20000)).then(data=>{
+      if(revision!==p79HrSaveRevision)return;
+      const cloudEmployee=(data.employees||[]).find(item=>String(item.empId).toUpperCase()===empId);
+      const normalizeDate=v=>String(v||'').slice(0,10).replace(/\//g,'-');
+      const textMatches=['name','dept','unit'].every(key=>String(cloudEmployee?.[key]||'').trim()===String(employee[key]||'').trim());
+      if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.reportingDate)!==employee.reportingDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
+      if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k])){ $('status').textContent='⚠️ 雲端讀回的後台權限與設定不一致，尚未確認權限儲存成功，請重新開啟該人員核對';return; }
+      p79ApplyHrEmployeesPayload(data,false,'cloud');
+      $('status').textContent='✅ 人資資料已儲存，雲端人員清單已更新';
+    }).catch(error=>{if(revision===p79HrSaveRevision)$('status').textContent='✅ 員工已儲存｜清單背景更新未完成，可稍後重新同步';console.warn('已儲存人員的背景同步失敗',error);});
+  }catch(e){alert('儲存失敗：'+(e.message||e))}
+  finally{$('saveTopBtn').disabled=false;button.disabled=false;button.textContent=originalLabel||'儲存'}
+}
+async function resignCurrent(){if(!canHr('employment.edit'))return alert('沒有變更在職狀態權限');
+  if(!editing)return;
+  if(normalizeEmploymentStatus(editing.employmentStatus)==='resigned')return;
+  const date=$('terminationDate').value||todayYmd();
+  const last=$('lastWorkDate').value||date;
+  const reason=$('terminationReason').value.trim();
+  if(!confirm(`確定辦理 ${editing.name}（${editing.empId}）離職？\n\n離職日期：${date}\n最後工作日：${last}\n\n歷史考勤、請假、排班、效率資料都會保留；登入與新打卡會停止。`))return;
+  try{
+    await apiPost({action:'hrSetEmploymentStatus',empId:editing.empId,employmentStatus:'resigned',terminationDate:date,lastWorkDate:last,terminationReason:reason});
+    editor.close();await loadEmployees(false);$('status').textContent=`✅ ${editing.name} 已辦理離職，歷史資料完整保留`
+  }catch(e){alert('辦理離職失敗：'+(e.message||e))}
+}
+async function restoreCurrent(){
+  if(!editing)return;
+  if(!confirm(`確定將 ${editing.name}（${editing.empId}）恢復為在職？\n\n原本的離職紀錄會保留在任職歷程中。`))return;
+  try{
+    await apiPost({action:'hrSetEmploymentStatus',empId:editing.empId,employmentStatus:'active'});
+    editor.close();await loadEmployees(false);$('status').textContent=`✅ ${editing.name} 已恢復在職`
+  }catch(e){alert('恢復在職失敗：'+(e.message||e))}
+}
+async function deleteCurrent(){alert('人資主檔不再使用刪除員工；請改用「辦理離職」。')}
+
+async function setPunchBindingRequired(empId, required, checkbox){
+  if(!canHr('device.unbind')){
+    if(checkbox) checkbox.checked=!required;
+    return alert('沒有裝置管理權限');
+  }
+  const emp=employees.find(e=>String(e.empId||'')===String(empId||''));
+  if(!emp){
+    if(checkbox) checkbox.checked=!required;
+    return alert('找不到員工');
+  }
+
+  // required=true => 必須綁定
+  // required=false => 免綁打卡
+  const enableBypass = !required;
+  const wording = required
+    ? '需要手機綁定才能打卡'
+    : '不用綁定手機也可以打卡';
+
+  if(!confirm(`確定將 ${emp.name}（${emp.empId}）設定為：\n\n${wording}？`)){
+    if(checkbox) checkbox.checked=!required;
+    return;
+  }
+
+  try{
+    if(checkbox) checkbox.disabled=true;
+    $('status').textContent=required
+      ? '☁️ 正在恢復手機綁定限制...'
+      : '☁️ 正在開啟免綁手機打卡...';
+
+    await apiPost({
+      action:'hrSetPunchDeviceBypass',
+      empId:emp.empId,
+      enabled:enableBypass    });
+
+    // V5.10.2：取消「綁定打卡」時，真正清除雲端 deviceId。
+    // hrSetPunchDeviceBypass 只代表允許免綁打卡，本身不會移除舊裝置資料。
+    if(enableBypass && (emp.deviceBound || String(emp.deviceId || '').trim())){
+      await apiPost({
+        action:'hrUnbindEmployeeDevice',
+        empId:emp.empId
+      });
+    }
+
+    await loadEmployees(false);
+
+    $('status').textContent=required
+      ? `✅ ${emp.name} 已設定為「需綁定手機」`
+      : `✅ ${emp.name} 已設定為「免綁手機可打卡」`;
+  }catch(e){
+    if(checkbox){
+      checkbox.disabled=false;
+      checkbox.checked=!required;
+    }
+    alert('更新手機綁定設定失敗：'+(e.message||e));
+  }
+}
+
+// 保留舊函式名稱相容其他地方可能呼叫。
+async function togglePunchDeviceBypass(empId, enabled){
+  return setPunchBindingRequired(empId, !enabled, null);
+}
+
+async function unbindCurrent(){if(!canHr('device.unbind'))return alert('沒有解除裝置權限');if(!editing||!confirm(`解除 ${editing.name} 的打卡裝置綁定？`))return;try{await apiPost({action:'hrUnbindEmployeeDevice',empId:editing.empId});editor.close();await loadEmployees(false)}catch(e){alert('解除失敗：'+(e.message||e))}}
+
+async function p79HrCleanupBypassDeviceBindings(){
+  if(!canHr('device.unbind'))return alert('沒有解除裝置權限');
+  const targets=(Array.isArray(employees)?employees:[]).filter(emp=>
+    emp &&
+    emp.allowPunchWithoutDeviceBinding===true &&
+    (emp.deviceBound===true || String(emp.deviceId||'').trim())
+  );
+
+  if(!targets.length){
+    alert('目前沒有「免綁打卡」但雲端仍殘留裝置的員工。');
+    return true;
+  }
+
+  const preview=targets.slice(0,12).map(emp=>`${emp.empId||''} ${emp.name||''}`).join('\n');
+  const more=targets.length>12 ? `\n…另外 ${targets.length-12} 人` : '';
+  if(!confirm(
+    `確定清除這些免綁員工的雲端裝置綁定嗎？\n\n共 ${targets.length} 人\n\n${preview}${more}\n\n只會清除 deviceId，不會刪除員工資料、考勤或權限。`
+  )) return false;
+
+  let ok=0, failed=0;
+  $('status').textContent=`☁️ 正在清除殘留裝置 0/${targets.length}...`;
+
+  for(let i=0;i<targets.length;i++){
+    const emp=targets[i];
+    try{
+      await apiPost({action:'hrUnbindEmployeeDevice',empId:emp.empId});
+      ok++;
+    }catch(e){
+      failed++;
+      console.warn('清除殘留裝置失敗',emp.empId,e);
+    }
+    $('status').textContent=`☁️ 正在清除殘留裝置 ${i+1}/${targets.length}...`;
+  }
+
+  await loadEmployees(false);
+  $('status').textContent=failed
+    ? `🟠 殘留裝置清理完成｜成功 ${ok}｜失敗 ${failed}`
+    : `✅ 殘留裝置已全部清除｜${ok} 人`;
+
+  if(failed)alert(`清理完成：成功 ${ok} 人，失敗 ${failed} 人。可再按一次重新清理失敗項目。`);
+  else alert(`已清除 ${ok} 位免綁員工的雲端裝置殘留。`);
+  return failed===0;
+}
+window.p79HrCleanupBypassDeviceBindings=p79HrCleanupBypassDeviceBindings;
+
+async function openSessionLogs(){
+  if(!canHr('audit.view'))return alert('沒有查看登入紀錄權限');
+  $('clearSessionLogsBtn').classList.toggle('hidden',!canHr('audit.clear'));
+  sessionLogDialog.showModal();
+  await loadSessionLogs();
+}
+async function loadSessionLogs(){
+  if(!canHr('audit.view'))return;
+  const body=$('sessionLogBody');
+  body.innerHTML='<tr><td colspan="6">載入中...</td></tr>';
+  try{
+    const d=await apiGet('hrGetSessionLogs');
+    const rows=Array.isArray(d.sessionLogs)?d.sessionLogs:[];
+    $('sessionLogCount').textContent=`共 ${rows.length} 筆`;
+    if(!rows.length){body.innerHTML='<tr><td colspan="6">目前沒有登入／登出紀錄</td></tr>';return}
+    body.innerHTML=rows.slice().reverse().map(x=>{
+      const action=String(x.action||'').toLowerCase();
+      const actionLabel=action==='login'?'登入':action==='logout'?'登出':(x.action||'—');
+      return `<tr><td>${esc(x.time||'')}</td><td>${esc(x.empId||'')}</td><td>${esc(x.name||'')}</td><td>${esc(roleLabel(String(x.role||'employee')))}</td><td>${esc(actionLabel)}</td><td>${esc(x.deviceId||'')}</td></tr>`
+    }).join('');
+  }catch(e){body.innerHTML=`<tr><td colspan="6">讀取失敗：${esc(e.message||e)}</td></tr>`}
+}
+async function clearSessionLogs(){
+  if(!canHr('audit.clear'))return alert('只有被授予「清除登入/登出紀錄」權限的人員可以執行');
+  if(!confirm('確定清除全部登入／登出紀錄？\n\n這不會刪除人員、考勤、請假、排班或效率資料。'))return;
+  try{
+    const d=await apiPost({action:'hrClearSessionLogs'});
+    alert(`已清除 ${Number(d.cleared||0)} 筆登入／登出紀錄`);
+    await loadSessionLogs();
+  }catch(e){alert('清除失敗：'+(e.message||e))}
+}
+
+async function exportEmployees() {
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+init();
+</script>
+
+
+
+<script id="p79-global-logout-to-seven-home-v20261004">
+(function(){
+'use strict';
+const P79_LOGOUT_KEYS=[
+  'admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name',
+  'aqc_admin_active_tab','port79_admin_token','port79_user_token','port79_gc_token',
+  'port79_gc_superadmin_token','port79_sso_verified','p79_workhours_permission'
+];
+window.p79LogoutToSevenSystemHome=function(){
+  try{
+    P79_LOGOUT_KEYS.forEach(k=>{
+      try{sessionStorage.removeItem(k)}catch(e){}
+      try{localStorage.removeItem(k)}catch(e){}
+    });
+  }catch(e){}
+  // 保留 GAS URL / UI 主題，不清除使用者系統設定；只登出身分。
+  location.replace('../?logout=1&t='+Date.now());
+};
+document.addEventListener('click',function(e){
+  const btn=e.target?.closest?.('button,a');
+  if(!btn)return;
+  const txt=String(btn.textContent||'').replace(/\s+/g,'').trim();
+  // 只攔真正登出鈕；不攔「登入／登出紀錄」「清除登入登出紀錄」等管理按鈕。
+  if(!/^(↪)?登出(後台)?$/.test(txt))return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  window.p79LogoutToSevenSystemHome();
+},true);
+})();
+</script>
+
+
+<script id="p79-hr-v103-clean-script">
+(function(){
+'use strict';
+const nav=[
+ ['attendance','🕒','考勤','../attendance/'],
+ ['workhours','📊','工時統計','../work-hours/'],
+ ['leave','📝','請假','../leave/'],
+ ['schedule','📅','排班','../schedule/'],
+ ['efficiency','🚢','效率','../aqc-efficiency/'],
+ ['hr','👥','人資','../hr/'],
+ ['history','🗄️','歷史資料','../history-data/']
+];
+function roleText(){
+  try{
+    const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
+    const r=String(s?.adminRole||s?.role||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
+    return r==='superadmin'?'超級管理員':r==='admin'?'管理員':'一般員工';
+  }catch(e){return '登入使用者'}
+}
+function mount(){
+  document.body.dataset.p79System='hr';
+  document.getElementById('p79HrShellV103')?.remove();
+  document.getElementById('p79UnifiedShell')?.remove();
+  document.getElementById('p79UnifiedShellV102')?.remove();
+  document.getElementById('p79UnifiedShellV103')?.remove();
+
+  const el=document.createElement('div');
+  el.id='p79HrShellV103';
+  el.innerHTML=`<div class="p79v103-row">
+    <div class="p79v103-brand"><div class="p79v103-logo">👥</div><div><div class="p79v103-title">人資系統</div><div class="p79v103-sub">79號碼頭雲端智慧系統｜功能選單版 v10.14.5</div></div></div>
+    <nav class="p79v103-nav">${nav.map(n=>`<a class="${n[0]==='hr'?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav>
+    <div class="p79v103-actions"><div class="p79v103-menu-wrap">
+      <button class="p79v103-btn" type="button" onclick="window.p79HrToggleMenu(event)">☰ 功能選單</button>
+      <div id="p79HrSystemMenu" class="p79v103-menu">
+        
+        
+        
+        
+        
+        
+        <button type="button" id="p79HrAddPersonMenu" onclick="window.p79HrMenuAction('add')">＋ 新增人員</button>
+        <button type="button" onclick="window.p79HrMenuAction('org')">⚙️ 部門／職稱／單位</button>
+        <button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>
+        <button type="button" onclick="window.p79HrMenuAction('cleanupDevices')">🧹 清除免綁員工殘留裝置</button>
+        <div class="p79v103-menu-sep"></div>
+        <button type="button" onclick="window.p79HrMenuAction('theme')">◐ 深淺色</button>
+        <button type="button" onclick="window.p79HrMenuAction('home')">⌂ 返回首頁</button>
+        <button class="danger" type="button" onclick="window.p79HrMenuAction('logout')">↪ 登出</button>
+      </div>
+    </div></div>
+  </div><div class="p79v103-status">● ${roleText()}｜員工主檔・部門職稱・權限設定</div>`;
+  document.body.insertBefore(el,document.body.firstChild);
+}
+window.p79HrToggleMenu=function(e){e?.stopPropagation();document.getElementById('p79HrSystemMenu')?.classList.toggle('open')};
+window.p79HrCloseMenu=function(){document.getElementById('p79HrSystemMenu')?.classList.remove('open')};
+window.p79HrMenuAction=async function(action){
+  window.p79HrCloseMenu();
+  try{
+    if(action==='refresh')return await window.loadEmployees?.(true);
+    if(action==='permissions')return window.openPermissionOverview?.();
+    if(action==='logs')return await window.openSessionLogs?.();
+    if(action==='org')return window.openOrgSettings?.();
+    if(action==='export')return window.exportEmployees?.();
+    if(action==='add')return window.openEditor?.();
+    if(action==='cleanupDevices')return await window.p79HrCleanupBypassDeviceBindings?.();
+    if(action==='theme')return document.getElementById('themeBtn')?.click();
+    if(action==='home'){location.href='../';return}
+    if(action==='logout'){
+      if(typeof window.p79LogoutToSevenSystemHome==='function')return window.p79LogoutToSevenSystemHome();
+      location.replace('../?logout=1&t='+Date.now());return;
+    }
+  }catch(e){console.error('人資功能選單執行失敗',e);alert('功能執行失敗：'+(e?.message||e))}
+};
+document.addEventListener('click',e=>{if(!e.target?.closest?.('.p79v103-menu-wrap'))window.p79HrCloseMenu()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')window.p79HrCloseMenu()});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
+})();
+</script>
+
+<script src="../assets/port79-seven-top.js?v=20261013.58"></script>
+
+<script id="p79-logout-home-v20261004">
+(function(){
+window.p79LogoutToSevenSystemHome=function(){
+  try{
+    ['admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name','aqc_admin_active_tab',
+     'port79_admin_token','port79_user_token','port79_gc_token','port79_gc_superadmin_token','port79_sso_verified',
+     'p79_workhours_permission'].forEach(k=>{try{sessionStorage.removeItem(k)}catch(e){}});
+  }catch(e){}
+  location.replace('../?logout=1&t='+Date.now());
+};
+document.addEventListener('click',function(e){
+  const b=e.target?.closest?.('button,a'); if(!b)return;
+  const txt=String(b.textContent||'').replace(/\s+/g,'').trim();
+  if(!/^(↪)?登出(後台)?$/.test(txt))return;
+  e.preventDefault();e.stopImmediatePropagation();window.p79LogoutToSevenSystemHome();
+},true);
+})();
+</script>
+
+
+<script src="../assets/port79-calendar-range.js?v=20261013.59"></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+
+const C=window.Port79CalendarRange;if(!C)return;
+C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',compatSummaryId:'hrDateRangeSummary',allowClear:true,emptyText:'全部日期'});
+['startDate','reportingDate','birthday','terminationDate','lastWorkDate'].forEach(id=>C.mountSingle({inputId:id}));
+
+});
+</script>
+<script>
+window.p79HrImportContext={canCreate:()=>canHr('people.create'),canEdit:()=>canHr('people.edit'),ensureXlsx:()=>window.p79EnsureXlsx(),upsert:employee=>apiPost({action:'hrUpsertEmployee',originalEmpId:employee.empId,employee}),readEmployees:async()=>{const d=await apiGet('hrGetEmployees',30000);if(!Array.isArray(d.employees))throw new Error('雲端人員資料不完整，停止匯入');p79ApplyHrEmployeesPayload(d,false,'cloud');return d.employees;}};
+window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||hrAccess==='manage'};
+</script>
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script>(function(global){
+'use strict';
+// Draft: management-only invalidation. It never writes domain records or submits punch requests.
+const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
+const ACTIONS={
+ hrUpsertEmployee:['people','permissions'],hrDeleteEmployee:['people','permissions','schedule'],hrSetEmploymentStatus:['people','schedule'],hrSaveOrgSettings:['organization','people'],
+ addLeave:['leave'],addLeaveRecord:['leave'],updateLeaveStatus:['leave','cover','schedule','overtime'],
+ deleteLeaveRecord:['leave','cover','schedule','overtime'],saveLeaveCoverAssignment:['leave','cover','schedule','overtime'],cleanupOrphanLeaveCovers:['cover','schedule','overtime'],
+ updateLeaveBalances:['leave'],syncSchedules:['schedule','overtime'],saveScheduleEmployee:['people','schedule'],saveScheduleGroups:['organization','schedule'],
+ saveOvertimeReportDirect:['overtime','schedule'],deleteOvertimeAssignment:['overtime','schedule'],
+ gcUpsertShipMaster:['efficiency','history'],gcDeleteShipMaster:['efficiency','history'],gcUpsertRecord:['efficiency','history'],gcDeleteRecord:['efficiency','history'],gcSyncAll:['efficiency','history'],gcUpsertGroup:['efficiency'],gcDeleteGroup:['efficiency'],gcAssignEmployee:['efficiency'],
+ updateRecord:['attendance','overtime'],deleteRecord:['attendance','overtime']
+};
+const DEPENDENCIES={attendance:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],hr:['people','organization','permissions'],leave:['people','organization','permissions','leave','cover','schedule','overtime'],schedule:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],workhours:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],efficiency:['people','organization','permissions','efficiency'],history:['history','attendance','schedule','efficiency']};
+function topicsFor(action){return (ACTIONS[action]||[]).slice();}
+function validEvent(e){return !!e&&e.v===1&&typeof e.id==='string'&&e.id.length<150&&Number.isFinite(e.at)&&Array.isArray(e.topics)&&e.topics.length<=TOPICS.length&&e.topics.every(t=>TOPICS.includes(t));}
+function create(options){
+ const {system,isManager,refresh,isEditing,notify=()=>{},clock=Date.now}=options;
+ const dependencies=DEPENDENCIES[system]||[];let pending=new Set(),seen=new Set(),running=null,disposed=false,generation=0;
+ function status(){return {pending:[...pending],running:!!running,generation};}
+ function receive(event){
+  if(disposed||!isManager()||!validEvent(event)||seen.has(event.id))return false;
+  seen.add(event.id);if(seen.size>128)seen.delete(seen.values().next().value);
+  const relevant=event.topics.filter(t=>dependencies.includes(t));if(!relevant.length)return false;
+  relevant.forEach(t=>pending.add(t));generation++;notify(status());return true;
+ }
+ async function synchronize(){
+  if(disposed||!isManager())return {ok:false,reason:'permission'};
+  if(running)return running;
+  if(isEditing())return {ok:false,reason:'editing'};
+  if(!pending.size)return {ok:true,unchanged:true};
+  const captured=generation;
+  running=Promise.resolve().then(async()=>{try{
+   const result=await refresh([...pending]);
+   if(disposed||!isManager())return {ok:false,reason:'permission'};
+   if(result!==true)return {ok:false,reason:'unconfirmed'};
+   if(generation===captured)pending.clear();
+   return {ok:true,pending:pending.size>0};
+  }catch(error){return {ok:false,reason:'read-failed'};}finally{running=null;if(!disposed)notify(status());}});
+  return running;
+ }
+ function acknowledge(action,response){
+  const topics=topicsFor(action);if(!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
+  return {v:1,id:options.makeId(),at:clock(),topics};
+ }
+ return {receive,synchronize,acknowledge,status,dispose(){disposed=true;pending.clear();seen.clear();}};
+}
+function attach(options){
+ if(!options.isManager())return {dispose(){}};
+ const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;
+ const handle=e=>{if(!engine.receive(e))return;try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){};};
+ const publish=event=>{if(!event)return;handle(event);try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};};
+ const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
+ global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));
+ function requestAction(input,init){
+  const method=String(init?.method||(typeof input==='object'?input.method:'GET')||'GET').toUpperCase();if(method==='GET')return '';
+  try{const url=new URL(typeof input==='string'?input:input.url,global.location.href);if(url.origin!==options.gasOrigin||url.pathname!==options.gasPath)return '';return JSON.parse(init?.body||'{}').action||'';}catch(_){return '';}
+ }
+ async function wrapped(input,init){
+  const action=options.isManager()?requestAction(input,init):'',response=await priorFetch.call(global,input,init);
+  if(topicsFor(action).length&&response.ok){
+   // Only an explicit domain ACK is a revision. HTTP 200/timeout is never a success.
+   void response.clone().json().then(body=>publish(engine.acknowledge(action,body))).catch(()=>{});
+  }
+  return response;
+ }
+ global.fetch=wrapped;
+ const onFocus=()=>{if(options.isManager()&&options.autoRefreshSafe?.())void engine.synchronize();};
+ global.addEventListener('focus',onFocus);listeners.push(()=>global.removeEventListener('focus',onFocus));
+ // No polling: receiver adapters decide when a form is safe to reload.
+ return {engine,publish,dispose(){listeners.forEach(f=>f());engine.dispose();if(global.fetch===wrapped)global.fetch=priorFetch;}};
+}
+global.P79ManagementSync={topicsFor,validEvent,create,attach,dependencies:DEPENDENCIES};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){
+'use strict';
+function makeAdapter(system,context){
+ if(!context||typeof context.canRead!=='function'||typeof context.readFresh!=='function'||typeof context.hasPendingChanges!=='function')throw Error('Incomplete management adapter: '+system);
+ let generation=0,disposed=false,reading=null;
+ return {
+  system,
+  isManager:()=>!disposed&&context.canRead()===true,
+  isEditing:()=>context.hasPendingChanges()!==false||context.isFormOpen?.()===true,
+  async refresh(topics){
+   if(disposed||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+   if(reading)return reading;
+   const epoch=++generation,identity=context.identity();
+   reading=Promise.resolve().then(async()=>{
+    const snapshot=await context.readFresh(topics);
+    if(disposed||epoch!==generation||context.identity()!==identity||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+    if(snapshot?.ok!==true||snapshot.fromCache===true||snapshot.confirmedFresh!==true)return false;
+    // Applying is a local display operation; adapters never submit domain writes.
+    await context.applySnapshot(snapshot,topics);
+    return true;
+   }).finally(()=>{reading=null;});return reading;
+  },
+  dispose(){disposed=true;generation++;}
+ };
+}
+g.P79ManagementAdapterFactory={makeAdapter};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){'use strict';
+g.P79ManagementContext={system:'hr',identity:()=>token,gas:()=>GAS_URL,token:()=>token,canRead:()=>!!session&&!!token&&hrAccess!=='none',hasPendingChanges:()=>false,scope:()=>({}),
+readFresh:async read=>{const d=await read('hrGetEmployees');if(!Array.isArray(d.employees))throw Error('人資資料不完整');return {ok:true,confirmedFresh:true,data:d};},
+applySnapshot:async snapshot=>{p79CanonicalOrgOptions=null;p79ApplyHrEmployeesPayload(snapshot.data,false,'cloud');return true;}}
+;
+})(window);
+
+(function(g){
+'use strict';
+if(g.P79ManagementPageBridge)return;
+const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
+if(!context||!api||!factory)return;
+let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null;
+const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
+function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return ['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
+function openForm(){
+ const el=document.activeElement;if(el&&el.matches?.('input,textarea,[contenteditable="true"]'))return true;
+ return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
+}
+function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
+function readScope(){return JSON.stringify(context.scope?.()||{});}
+async function readFresh(action,params={}){
+ const originIdentity=context.identity(),scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
+ const url=new URL(raw,location.href);if(url.origin!=='https://script.google.com'||!url.pathname.startsWith('/macros/s/'))throw Error('雲端來源不正確');
+ url.searchParams.set('action',action);url.searchParams.set('token',tk);url.searchParams.set('gcToken',tk);url.searchParams.set('_',Date.now());Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+ const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);
+ try{const response=await fetch(url.toString(),{method:'GET',cache:'no-store',signal:ctl.signal});const data=await response.json();
+  if(!response.ok||data?.ok!==true||data.retryable)throw Error(data?.error||'雲端未確認讀取');
+  if(context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('登入、權限或範圍已變更');return data;
+ }finally{clearTimeout(timeout);}
+}
+function ensureBar(){
+ if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
+ bar.style.cssText='display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 16px;background:#eff6ff;color:#1e3a8a;border-bottom:1px solid #93c5fd;font:700 13px system-ui;flex-wrap:wrap';
+ const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);
+ const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
+}
+function notify(state){
+ pendingState=state;if(!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜正在編輯，保留內容並延後套用':'｜準備同步');b.querySelector('button').disabled=state.running;
+ if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
+}
+async function synchronize(){
+ clearTimeout(timer);timer=null;if(stopped||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
+ const result=await binding.engine.synchronize();
+ if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認｜保留目前資料，可按更新重試';}
+}
+function boot(){
+ if(stopped||binding||!roleAllowed())return;
+ if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
+ const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope(),readFresh:()=>context.readFresh(readFresh)});
+ const backend=new URL(context.gas(),location.href);
+ binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};
+}
+const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
+g.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);clearTimeout(bootTimer);binding?.dispose();document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);},{once:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})(window);
+</script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';api.binding.publish({v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']});document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body></html>
+
+
