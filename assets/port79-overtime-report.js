@@ -378,7 +378,7 @@
      }catch(ignore){}
      sessionStorage.setItem(KEY,JSON.stringify(draft));
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
-      const button=el.querySelector('#p79OtStage');if(button.disabled)return;let completed=false;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
+      const button=el.querySelector('#p79OtStage');if(button.disabled)return;let completed=false,closeReady=false;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
       try{
        const result=await global.p79OvertimeContext.saveReport(draft);
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
@@ -389,12 +389,12 @@
         try{
          const progress=advanceLeaveHandoff(draft);
          if(progress&&progress.remaining){el.close();await global.p79OpenLeaveOvertimeHandoff();}
-         else if(progress){el.querySelector('#p79OtStatus').textContent='✅ 本次請假代班的加班申報已全部完成。';button.textContent='全部申報完成';}
+         else if(progress){el.querySelector('#p79OtStatus').textContent='✅ 本次請假代班的加班申報已全部完成。';button.textContent='全部申報完成，關閉';closeReady=true;button.onclick=()=>el.close();}
          else el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；待申報清單已變更，請按接續申報核對剩餘項目。';
         }catch(error){el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；接續申報未完成：'+error.message+'。請按接續申報核對剩餘項目。';}
        }
 
-      }finally{button.disabled=completed}
+      }finally{button.disabled=completed&&!closeReady}
      }else throw Error('申報儲存模組尚未載入；內容已保留，請重新整理後接續申報。');
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
    };
