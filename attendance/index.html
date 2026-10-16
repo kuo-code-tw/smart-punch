@@ -2282,7 +2282,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.103';
+        const APP_VERSION='2026.10.16.109';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -15355,7 +15355,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}${row.attendanceAssessmentReasons?.length?`<div class="text-[10px] text-amber-800">${escapeHtml(row.attendanceAssessmentReasons.join('／'))}</div>`:''}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
                             ${row.noteText ? `<span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.noteText))}">備註：${escapeHtml(String(row.noteText).length > 14 ? String(row.noteText).slice(0,14)+'…' : String(row.noteText))}</span>` : ''}
                             <span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.locationText || ''))}">${escapeHtml(String(row.locationText || '--'))}</span>
