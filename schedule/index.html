@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.16.119';
+    const APP_VERSION='2026.10.16.120';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -2809,7 +2809,20 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return ok;
     }
 
-    async function loadScheduleCloudWithRetry(reason='auto', retryCount=3) {
+    let p79ScheduleReadTask=null;
+    async function loadScheduleCloudWithRetry(reason='auto',retryCount=3){
+      const month=currentScheduleMonthKey();
+      while(p79ScheduleReadTask){
+        const task=p79ScheduleReadTask;
+        if(task.month===month)return task.promise;
+        await task.promise.catch(()=>false);
+        if(currentScheduleMonthKey()!==month)return false;
+      }
+      const promise=loadScheduleCloudWithRetryOnce(reason,reason==='month'?1:retryCount);
+      const task={month,promise};p79ScheduleReadTask=task;
+      try{return await promise;}finally{if(p79ScheduleReadTask===task)p79ScheduleReadTask=null;}
+    }
+    async function loadScheduleCloudWithRetryOnce(reason='auto', retryCount=3) {
       if (!isGasUrlConfigured()) return false;
       if (port79ScheduleAutoSyncBusy) return false;
 
@@ -2826,7 +2839,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if (!['login','manual','manual-cloud-sync','month'].includes(reason) && now < p79ScheduleProtectLocalUntil) {
         return true;
       }
-      if (!['login','manual'].includes(reason) && now - port79ScheduleLastAutoSyncAt < 8000) return true;
+      if (!['login','manual','month'].includes(reason) && now - port79ScheduleLastAutoSyncAt < 8000) return true;
 
       port79ScheduleAutoSyncBusy = true;
       try {
@@ -3607,6 +3620,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     async function loadCloudData(showAlert = false) {
+      const requestMonth=currentScheduleMonthKey();
       const requestMutationVersion = p79ScheduleLocalMutationVersion;
       const requestStartedAt = Date.now();
 
@@ -3620,16 +3634,17 @@ function p79EmployeeDateEligible(emp,date) {
         // port79ScheduleAutoSyncBusy 永久卡住；失敗交由背景重試，不阻擋進頁。
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
-        let res;
+        let data;
         try {
-          res = await fetch(
-            GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&month=' + encodeURIComponent(currentScheduleMonthKey()) + '&_=' + Date.now(),
+          const res = await fetch(
+            GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&month=' + encodeURIComponent(requestMonth) + '&_=' + Date.now(),
             { redirect:'follow', cache:'no-store', signal:controller?.signal }
           );
+          data=await res.json();
         } finally {
           if (timer) clearTimeout(timer);
         }
-        const data = await res.json();
+        if(requestMonth!==currentScheduleMonthKey())return false;
         if (!data.ok) throw new Error(data.error || '讀取失敗');
 
         // V10.15：這份 GET 若是在使用者修改前發出、修改後才回來，就是過期快照。
@@ -4291,9 +4306,14 @@ function p79EmployeeDateEligible(emp,date) {
       if(from)from.value=a;if(to)to.value=b;
       try{applySchedulePersonnelOverrides(month)}catch(e){}
       try{initDefaultScheduleData(month)}catch(e){}
-      try{await loadScheduleCloudWithRetry('month',2)}catch(e){console.warn('月份切換雲端載入失敗',e)}
-      buildRoleTabsAndRender();
-      renderTodaySchedulePanel();
+      const status=document.getElementById('p79QuickMonthStatus');
+      if(status)status.textContent='正在讀取 '+month+' 班表…';
+      try{
+        const ok=await loadScheduleCloudWithRetry('month',1);
+        if(currentScheduleMonthKey()!==month)return;
+        if(status)status.textContent=ok?'':month+' 雲端讀取未完成，請按重新讀取；目前內容尚未確認';
+        if(!ok){buildRoleTabsAndRender();renderTodaySchedulePanel();}
+      }catch(e){if(status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
     }
     async function onScheduleDateRangeChange(side){const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');let a=aEl?.value||'',b=bEl?.value||'';if(a){const month=a.slice(0,7),oldMonth=document.getElementById('month-picker').value;if(month!==oldMonth){document.getElementById('month-picker').value=month;applySchedulePersonnelOverrides(month);initDefaultScheduleData(month);}const [,last]=scheduleMonthBounds(month);if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;}if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;}updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
 
@@ -6876,7 +6896,7 @@ async function p79QuickScheduleMonth(step){
  const old=picker.value,base=/^\d{4}-\d{2}$/.test(old)?old:scheduleTaipeiTodayKey().slice(0,7),parts=base.split('-').map(Number);
  const date=new Date(parts[0],parts[1]-1+step,1,12),next=step===0?scheduleTaipeiTodayKey().slice(0,7):date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
  if(next===old)return;p79QuickMonthBusy=true;const buttons=[...document.querySelectorAll('.p79-quick-month button')];buttons.forEach(b=>b.disabled=true);picker.disabled=true;status.textContent='正在確認修改並切換月份…';
- try{if(!await flushSchedulePendingWrites())throw Error('尚有未儲存修改，請先儲存排班再切換月份');picker.value=next;await onScheduleMonthPickerChange();status.textContent='';}
+ try{if(!await flushSchedulePendingWrites())throw Error('尚有未儲存修改，請先儲存排班再切換月份');picker.value=next;await onScheduleMonthPickerChange();}
  catch(e){status.textContent=e.message||'月份切換未完成，請重新讀取';}
  finally{p79QuickMonthBusy=false;buttons.forEach(b=>b.disabled=false);picker.disabled=false;}
 }
