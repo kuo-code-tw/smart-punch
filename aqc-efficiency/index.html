@@ -1582,7 +1582,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.94';
+const APP_VERSION='2026.10.16.96';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -4549,21 +4549,20 @@ function personalAuditHeaderIndex(row,names){
   }
   return -1;
 }
-function parsePersonalAuditMonth(book){
+function parsePersonalAuditMonth(book,fileName=''){
   const preferred=book.Sheets['AQC-個人效率表'] || book.Sheets[book.SheetNames[0]];
   const rows=preferred?XLSX.utils.sheet_to_json(preferred,{header:1,raw:false,defval:''}):[];
   const text=rows.slice(0,8).flat().map(x=>String(x||'')).join(' ');
-  const m=text.match(/(\d{2,4})\s*年\s*0?(\d{1,2})\s*月/);
-  if(!m)return {year:'',month:'',label:''};
-
-  let year=Number(m[1]);
-  if(year<1911)year+=1911;
+  const filename=String(fileName||'').normalize('NFKC');
+  // 支援 115 79W 10-AQC、115 79W 09-AQC、115年10月及 2026-10 等明確年月。
+  const fileMatch=filename.match(/(?:^|[^0-9])(20\d{2}|\d{3})\s*(?:年\s*|[-_. ]+)(?:79\s*W\s*[-_. ]*)?(0?[1-9]|1[0-2])(?=月|[^0-9]|$)/i);
+  const titleMatch=text.match(/(\d{2,4})\s*年\s*0?(\d{1,2})\s*月/);
+  const valid=m=>m&&Number(m[2])>=1&&Number(m[2])<=12;
+  const m=valid(fileMatch)?fileMatch:(valid(titleMatch)?titleMatch:null);
+  if(!m)return {year:'',month:'',label:'',source:''};
+  let year=Number(m[1]);if(year<1911)year+=1911;
   const month=String(Number(m[2])).padStart(2,'0');
-  return {
-    year:String(year),
-    month:`${year}-${month}`,
-    label:`${year}-${month}`
-  };
+  return {year:String(year),month:`${year}-${month}`,label:`${year}-${month}`,source:m===fileMatch?'檔名':'工作表標題'};
 }
 function parsePersonalAuditDate(v,year,month){
   if(v instanceof Date && !Number.isNaN(v.getTime())){
@@ -4859,7 +4858,7 @@ function auditPersonalWorkbookInternalConsistency(details,combinedRows,onPersonI
 }
 
 function parsePersonalEfficiencyWorkbook(book,fileName=''){
-  const ym=parsePersonalAuditMonth(book);
+  const ym=parsePersonalAuditMonth(book,fileName);
   const sourceIssues=[];
   if(!ym.month)sourceIssues.push('無法從「AQC-個人效率表」標題辨識年份/月分');
 
@@ -4926,6 +4925,7 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
     importedAt:new Date().toISOString(),
     year:ym.year,
     month:ym.month,
+    monthSource:ym.source,
     summary,
     details,
     combinedDetailCount:combined.rows.length,
@@ -5621,7 +5621,7 @@ function renderPersonalEfficiencyAudit(){
     const sourceCount=topSource+personSource;
     state.className=`mt-3 rounded-xl border px-3 py-2 text-xs font-bold ${sourceCount?'bg-amber-50 text-amber-800 border-amber-200':'bg-emerald-50 text-emerald-800 border-emerald-200'}`;
     state.innerHTML=
-      `已載入：<b>${esc(ref.fileName||'個人效率表')}</b> ｜ 比對月份：<b>${esc(ref.month||'—')}</b> ｜ Excel ${ref.summary.length} 人 / 個人表 ${ref.details.length} 筆 / 總表 ${ref.combinedDetailCount??'—'} 筆`+
+      `已載入：<b>${esc(ref.fileName||'個人效率表')}</b> ｜ 比對月份：<b>${esc(ref.month||'—')}</b>${ref.monthSource?'（依'+esc(ref.monthSource)+'）':''} ｜ Excel ${ref.summary.length} 人 / 個人表 ${ref.details.length} 筆 / 總表 ${ref.combinedDetailCount??'—'} 筆`+
       (sourceCount?` ｜ ⚠ 來源檔問題 ${sourceCount} 項`:' ｜ ✓ 來源檔基本結構正常');
   }
 
