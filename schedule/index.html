@@ -5210,7 +5210,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black text-[9px]" title="${scheduleEscapeHtml(dayMeta.note || '')}">${dayMeta.forEmpId ? '🔄代' : ''}${dayMeta.overtime ? '⭐加' : ''}${dayMeta.restQuotaOvertime ? dayMeta.restCategory+'加' : ''}</span>`
             : '';
           const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
-          const approvedLeaveCode = ownApprovedLeave ? (/年|特/.test(String(ownApprovedLeave.leaveType||''))?'年':/事/.test(String(ownApprovedLeave.leaveType||''))?'事':/病/.test(String(ownApprovedLeave.leaveType||''))?'病':/公/.test(String(ownApprovedLeave.leaveType||''))?'公':/喪/.test(String(ownApprovedLeave.leaveType||''))?'喪':'假') : '';
+          const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
           const shownShift = approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
           const shownShiftStyle = ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
@@ -6071,8 +6071,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
     function p79ScheduleLeaveExportCode(value) {
       const text=String(value||'').trim();
-      const codes={'特休假':'年','特別休假':'年','特休':'年','年假':'年','事假':'事','病假':'病','公假':'公','喪假':'喪','婚假':'婚','產假':'產','產檢假':'檢','陪產檢及陪產假':'陪','陪產假':'陪','家庭照顧假':'顧','生理假':'經','安胎休養假':'安','公傷病假':'傷','職災傷病假':'傷','訂婚假':'訂','離職':'離','resigned':'離','terminated':'離'};
-      return codes[text]||text;
+      const codes={'特休假':'年','特別休假':'年','特休':'年','年假':'年','事假':'事','病假':'病','普通傷病假':'病','普通傷病':'病','公假':'公','喪假':'喪','婚假':'婚','產假':'產','產檢假':'檢','陪產檢及陪產假':'陪','陪產假':'陪','家庭照顧假':'顧','生理假':'經','安胎休養假':'安','公傷病假':'傷','職災傷病假':'傷','訂婚假':'訂','離職':'離','resigned':'離','terminated':'離'};
+      if(codes[text])return codes[text];
+      if(/病/.test(text))return '病';
+      if(/假/.test(text))return /特|年/.test(text)?'年':/事/.test(text)?'事':/喪/.test(text)?'喪':/公/.test(text)?'公':Array.from(text)[0]||'假';
+      return text;
     }
     function p79ScheduleExportDay(emp,dayStr) {
       if(!p79EmployeeDateEligible(emp,dayStr))return '';
