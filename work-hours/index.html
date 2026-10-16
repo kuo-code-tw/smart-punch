@@ -573,6 +573,17 @@ window.p79CheckWorkHoursPermission=async function(){
       location.href='../';
       return false;
     }
+    // 用雲端驗證回覆更新同一位登入者，不沿用舊員工快取中的權限。
+    const authFields=['adminRole','systemPermissions','finePermissions','dataScope','dataScopeJobs'];
+    const verifiedId=String(data.empId||'').trim().toUpperCase();
+    for(const key of ['port79_user_session','admin_session']){
+      try{const saved=JSON.parse(sessionStorage.getItem(key)||'null');
+        if(saved&&String(saved.empId||'').trim().toUpperCase()===verifiedId){authFields.forEach(k=>{if(Object.prototype.hasOwnProperty.call(data,k))saved[k]=data[k]});sessionStorage.setItem(key,JSON.stringify(saved));}
+      }catch(e){}
+    }
+    if(typeof currentEmp!=='undefined'&&currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===verifiedId){
+      authFields.forEach(k=>{if(Object.prototype.hasOwnProperty.call(data,k))currentEmp[k]=data[k]});
+    }
     sessionStorage.setItem('p79_workhours_permission',level);
     return true;
   }catch(e){console.warn('工時統計權限檢查失敗，交由既有登入流程處理',e);return true}
@@ -2130,7 +2141,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.102';
+        const APP_VERSION='2026.10.16.104';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -9286,7 +9297,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 !document.body.dataset.p79WorkhoursUserOpened &&
                 (tab === 'stats' || tab === 'overtime')) return;
             if (!p79IsAbsoluteSuperAdmin() && !canOpenAdminTab(tab)) {
-                showToast('此管理員沒有這個項目的監看權限', 'warning');
+                showToast(tab==='stats'?'尚未開放「查看出勤統計」，請至人資權限勾選該項目':tab==='overtime'?'尚未開放「查看加班統計」，請至人資權限勾選該項目':'尚未開放此功能的查看權限，請核對人資細項權限', 'warning');
                 return;
             }
             applyAdminPermissionVisibility();
@@ -14550,7 +14561,13 @@ function p79ShowWorkHoursImmediately(){
     document.getElementById('p79WorkhoursLauncher')?.remove();
     document.body.dataset.p79WorkhoursUserOpened='1';
     const requested=(location.hash||'').replace('#','').toLowerCase();
-    const wanted=requested==='stats'?'stats':'overtime';
+    const preferred=requested==='stats'?'stats':'overtime';
+    const wanted=canOpenAdminTab(preferred)?preferred:['overtime','stats'].find(canOpenAdminTab);
+    if(!wanted){
+      document.getElementById('adminContentOvertime')?.classList.add('hidden');
+      document.getElementById('adminContentStats')?.classList.add('hidden');
+      return;
+    }
     document.getElementById('adminContentOvertime')?.classList.toggle('hidden',wanted!=='overtime');
     document.getElementById('adminContentStats')?.classList.toggle('hidden',wanted!=='stats');
     if(document.body.dataset.p79WorkhoursActiveTab!==wanted){
@@ -14569,11 +14586,14 @@ async function activateWorkHours(){
   const peopleReady=typeof preloadAttendanceEmployeeMaster==='function'&&hasValidHomepageAdminSession()
     ? preloadAttendanceEmployeeMaster(false,false):Promise.resolve(false);
   try{
+    await peopleReady;
     if(typeof window.p79CheckWorkHoursPermission==='function'){
       const allowed=await window.p79CheckWorkHoursPermission();
       if(!allowed)return;
     }
-    await peopleReady;
+    // 雲端主檔載入後套用驗證回覆，重新選擇允許的預設頁籤。
+    document.body.dataset.p79WorkhoursActiveTab='';
+    p79ShowWorkHoursImmediately();
     // 先載入已驗證範圍內的人員；出勤統計沿用既有獨立同步。
   }catch(e){console.error('工時統計初始化失敗',e)}
 }
