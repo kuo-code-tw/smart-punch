@@ -1,6 +1,21 @@
 (function(global){
 'use strict';
 // Draft: management-only invalidation. It never writes domain records or submits punch requests.
+// The original efficiency verifier labels every {ok:false} as an auth rejection.
+// Keep the server's exact lock-contention response as a failed read in the isolated candidate.
+if(global.P79ManagementTestMode===true&&typeof global.verifyGcSsoToken==='function'){
+ const verify=global.verifyGcSsoToken;
+ global.verifyGcSsoToken=async function(...args){
+  try{return await verify.apply(this,args);}
+  catch(error){
+   if(error?.ssoAuthRejected===true&&String(error.message||'').trim()==='雲端正在同步管理員資料，請稍後重試 SSO 驗證'){
+    const unavailable=new Error('雲端正在同步管理員資料，請稍後重試 SSO 驗證');
+    unavailable.ssoAuthRejected=false;unavailable.retryable=true;throw unavailable;
+   }
+   throw error;
+  }
+ };
+}
 const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
 const ACTIONS={
  hrUpsertEmployee:['people','permissions'],hrDeleteEmployee:['people','permissions','schedule'],hrSetEmploymentStatus:['people','schedule'],hrSaveOrgSettings:['organization','people'],
@@ -280,7 +295,7 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.1';}
 }
 const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
