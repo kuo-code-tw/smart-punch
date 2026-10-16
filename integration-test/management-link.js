@@ -1,9 +1,9 @@
 (function(global){
 'use strict';
-// Draft: management-only invalidation. It never writes domain records or submits punch requests.
+// Management-only invalidation. It never writes domain records or submits punch requests.
 // The original efficiency verifier labels every {ok:false} as an auth rejection.
-// Keep the server's exact lock-contention response as a failed read in the isolated candidate.
-if(global.P79ManagementTestMode===true&&typeof global.verifyGcSsoToken==='function'){
+// Keep the server's exact lock-contention response as a failed read, with no authorization grant.
+if((global.P79ManagementTestMode===true||global.P79ManagementOptimizationMode===true)&&typeof global.verifyGcSsoToken==='function'){
  const verify=global.verifyGcSsoToken;
  global.verifyGcSsoToken=async function(...args){
   try{return await verify.apply(this,args);}
@@ -236,6 +236,7 @@ p79WorkOvertimeMonths.set(s.month,{token:currentPort79SsoToken(),at:Date.now(),p
 })(window);
 },"efficiency":function(){(function(g){'use strict';
 g.P79ManagementContext={system:'efficiency',identity:()=>loadGcSession()+'|'+JSON.stringify(efficiencyCloudScopeParams()),gas:()=>getGasUrl(),token:()=>loadGcSession(),canRead:()=>requireEfficiencyAccess(),hasPendingChanges:()=>readQueue().length>0||!!cloudBusy||!!port79ShipAutoSyncBusy,
+isReadBusy:()=>!!cloudBusy||!!port79ShipAutoSyncBusy,
 pendingReason:()=>{const count=readQueue().length;return count?'有 '+count+' 筆待傳資料，保留內容並延後更新':(cloudBusy||port79ShipAutoSyncBusy)?'原頁雲端同步中，保留內容並延後更新':'';},
 scope:()=>efficiencyCloudScopeParams(),readFresh:async(read,topics=['efficiency','people'])=>{const needData=topics.includes('efficiency'),needPeople=topics.some(t=>['people','organization','permissions'].includes(t));if(!needData&&!needPeople)throw Error('沒有對應效率管理更新');const [d,p]=await Promise.all([needData?read('gcGetData',efficiencyCloudScopeParams()):null,needPeople?read('gcGetEmployees'):null]);if((needData&&(!Array.isArray(d?.records)||!Array.isArray(d?.shipMasters)))||(needPeople&&!Array.isArray(p?.employees)))throw Error('效率資料不完整');return {ok:true,confirmedFresh:true,data:d,people:p?p.employees:null};},
 applySnapshot:async s=>{const d=s.data;if(s.people!==null)systemEmployees=s.people.map(normalizeCloudEmployee).filter(Boolean);if(d){if(Array.isArray(d.groups))groups=d.groups;if(Array.isArray(d.assignments))assignments=mergeAssignmentsKeepLocal(assignments,d.assignments);if(d.shipMasters.length)shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,d.shipMasters.map(sanitizeShipMasterMetrics)));if(d.records.length)records=mergeCloudRecordsWithLocal(d.records,records);}invalidateWorkloadIndex();populateSelects();renderVesselSummary();renderEfficiencyTabFast();if(s.people!==null)updateEmployeeDataState('人資員工主檔');return true;}}
@@ -256,7 +257,7 @@ if(!context||!api||!factory)return;
 let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
 const activeReads=new Set();
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
-function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
+function roleAllowed(){if(g.P79ManagementTestMode!==true&&g.P79ManagementOptimizationMode!==true)return false;try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
  const el=document.activeElement;if(el&&el.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
  return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
@@ -282,13 +283,17 @@ function ensureBar(){
  const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);
  const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
 }
+function scheduleReadIdleResume(){
+ if(stopped||suspended||!pendingState?.pending.length||document.visibilityState!=='visible'||context.isReadBusy?.()!==true)return;
+ clearTimeout(timer);timer=setTimeout(()=>{timer=null;if(stopped||suspended||document.visibilityState!=='visible')return;if(context.isReadBusy?.()===true)scheduleReadIdleResume();else resume();},1000);
+}
 function notify(state){
  pendingState=state;if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
  const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():'｜準備同步');b.querySelector('button').disabled=state.running;
- if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
+ if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}else if(state.pending.length&&!state.running)scheduleReadIdleResume();
 }
 async function synchronize(){
- clearTimeout(timer);timer=null;if(stopped||suspended||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
+ clearTimeout(timer);timer=null;if(stopped||suspended||!binding||!roleAllowed()||document.visibilityState!=='visible')return;if(editing()){scheduleReadIdleResume();return;}
  const result=await binding.engine.synchronize();
  if(!stopped&&!suspended&&result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?editingMessage():'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
 }
@@ -298,9 +303,9 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:topics=>context.readFresh(readFresh,topics)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.5';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.7';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
-const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();scheduleReadIdleResume();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
 function pagehide(event){
  suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);timer=null;bootTimer=null;
