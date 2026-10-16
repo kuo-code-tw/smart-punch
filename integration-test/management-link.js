@@ -48,10 +48,11 @@ function create(options){
 function attach(options){
  if(!options.isManager())return {dispose(){}};
  const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;
- const handle=e=>{if(!engine.receive(e))return;try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){};};
+ const invalidate=()=>{try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){}};
+ const handle=e=>{if(engine.receive(e))invalidate();};
  let channel=null;try{if(typeof global.BroadcastChannel==='function')channel=new global.BroadcastChannel(KEY);}catch(_){}
  if(channel)channel.onmessage=e=>handle(e.data);
- const publish=event=>{if(!event)return;handle(event);try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};try{channel?.postMessage(event);}catch(_){};};
+ const publish=event=>{if(!event)return;if(options.receiveOwn===true)handle(event);else invalidate();try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};try{channel?.postMessage(event);}catch(_){};};
  const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
  global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));listeners.push(()=>channel?.close());
  function requestAction(input,init){
@@ -78,7 +79,7 @@ global.P79ManagementSync={topicsFor,validEvent,create,attach,dependencies:DEPEND
 (function(g){
 'use strict';
 function makeAdapter(system,context){
- if(!context||typeof context.canRead!=='function'||typeof context.readFresh!=='function'||typeof context.hasPendingChanges!=='function')throw Error('Incomplete management adapter: '+system);
+ if(!context||typeof context.canRead!=='function'||typeof context.readFresh!=='function'||typeof context.hasPendingChanges!=='function'||typeof context.identity!=='function'||typeof context.applySnapshot!=='function')throw Error('Incomplete management adapter: '+system);
  let generation=0,disposed=false,reading=null;
  return {
   system,
@@ -93,8 +94,8 @@ function makeAdapter(system,context){
     if(disposed||epoch!==generation||context.identity()!==identity||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
     if(snapshot?.ok!==true||snapshot.fromCache===true||snapshot.confirmedFresh!==true)return false;
     // Applying is a local display operation; adapters never submit domain writes.
-    await context.applySnapshot(snapshot,topics);
-    return true;
+    const applied=await context.applySnapshot(snapshot,topics);
+    return applied===true;
    }).finally(()=>{reading=null;});return reading;
   },
   dispose(){disposed=true;generation++;}
@@ -285,7 +286,7 @@ function boot(){
  binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
 }
-const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+const resume=()=>{if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
 g.addEventListener('pagehide',event=>{clearTimeout(timer);clearTimeout(bootTimer);if(event.persisted)return;stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();document.removeEventListener('input',changed,true);document.removeEventListener('change',changed,true);document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);});g.addEventListener('pageshow',event=>{if(event.persisted)resume();});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
