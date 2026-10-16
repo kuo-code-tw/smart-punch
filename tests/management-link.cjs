@@ -5,18 +5,18 @@ const bridge=source.slice(source.indexOf("(function(g){\n'use strict';\nif(g.P79
 const tick=()=>new Promise(r=>setImmediate(r));
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve}};
 const storage=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,String(v))}};
-function setup(page=false){
+function setup(page=false,sessionOptions={}){
  const events=new Map(),docEvents=new Map(),timers=new Map(),channels=[],requests=[];let serial=0;
  const listen=(map,k,f)=>{if(!map.has(k))map.set(k,new Set());map.get(k).add(f)};
  const elements=new Map();const node=()=>({style:{},dataset:{},children:[],setAttribute(){},appendChild(n){this.children.push(n)},querySelector(selector){return selector==='button'?this.children[1]:this.children[0]}});
- const c={console,URL,Request,Response,AbortController,Date,Promise,Set,Map,JSON,Math,sessionStorage:storage(),localStorage:storage(),location:{href:'https://test.invalid/smart-punch/integration-test/hr/'},
+ const c={P79ManagementTestMode:true,console,URL,Request,Response,AbortController,Date,Promise,Set,Map,JSON,Math,sessionStorage:storage(),localStorage:storage(),location:{href:'https://test.invalid/smart-punch/integration-test/hr/'},
  setTimeout:(f,ms)=>{timers.set(++serial,{f,ms});return serial},clearTimeout:i=>timers.delete(i),
  addEventListener:(k,f)=>listen(events,k,f),removeEventListener:(k,f)=>events.get(k)?.delete(f),
  document:{readyState:'complete',visibilityState:'visible',activeElement:null,addEventListener:(k,f)=>listen(docEvents,k,f),removeEventListener:(k,f)=>docEvents.get(k)?.delete(f),querySelectorAll:()=>[],getElementById:id=>elements.get(id),createElement:node,body:{prepend(n){elements.set(n.id,n)}}},
  getComputedStyle:()=>({visibility:'visible'}),
  BroadcastChannel:class{constructor(){channels.push(this)}postMessage(e){assert(!this.closed);this.sent=(this.sent||[]).concat(e)}close(){this.closed=true}},
  fetch:async(input,init)=>{requests.push({input,init});return new Response(JSON.stringify({ok:true}),{status:200})}};
- c.window=c;c.sessionStorage.setItem('admin_session',JSON.stringify({role:'admin'}));
+ c.window=c;c.sessionStorage.setItem('admin_session',JSON.stringify({role:'admin'}));if(sessionOptions.user)c.sessionStorage.setItem('port79_user_session',JSON.stringify(sessionOptions.user));if(sessionOptions.production){c.P79ManagementTestMode=false;c.P79ManagementOptimizationMode=true;}if(sessionOptions.disabled){c.P79ManagementTestMode=false;c.P79ManagementOptimizationMode=false;}
  vm.createContext(c);vm.runInContext(core,c);
  const emit=(k,event={})=>{for(const f of [...(events.get(k)||[])])f(event)};
  const runTimers=async()=>{const current=[...timers];for(const [id,t] of current){if(!timers.delete(id))continue;if(t.ms===500)t.f();}await tick()};
@@ -28,6 +28,7 @@ const event=(id='one',topics=['people'])=>({v:1,id,at:Date.now(),topics});
 let passed=0,failed=0;
 async function test(name,f){try{await f();passed++;console.log('PASS '+name)}catch(e){failed++;console.error('FAIL '+name+': '+e.message)}}
 (async()=>{
+await test('production opt-in is limited to managers and excludes active punch-only or employee sessions',async()=>{for(const user of [{role:'admin',punchOnly:true},{role:'employee',punchOnly:false}]){const x=setup(true,{production:true,user});assert.equal(x.c.P79ManagementPageBridge,undefined);assert.equal(x.channels.length,0);assert.equal(x.requests.length,0)}const disabled=setup(true,{disabled:true});assert.equal(disabled.c.P79ManagementPageBridge,undefined);const manager=setup(true,{production:true,user:{role:'admin',punchOnly:false}});assert(manager.c.P79ManagementPageBridge);manager.emit('pagehide',{persisted:false})});
 await test('duplicate and unrelated notifications do not trigger reads',async()=>{const {c}=setup();let reads=0;const e=c.P79ManagementSync.create({system:'hr',isManager:()=>true,isEditing:()=>false,refresh:async()=>{reads++;return true}});assert(!e.receive(event('none',['history'])));assert(e.receive(event()));assert(!e.receive(event()));await e.synchronize();await e.synchronize();assert.equal(reads,1)});
 await test('editing defers refresh; an explicit confirmed apply clears pending',async()=>{const {c}=setup();let editing=true,reads=0;const e=c.P79ManagementSync.create({system:'schedule',isManager:()=>true,isEditing:()=>editing,refresh:async()=>{reads++;return true}});e.receive(event());assert.equal((await e.synchronize()).reason,'editing');assert.equal(reads,0);editing=false;await e.synchronize();assert.equal(reads,1);assert.equal(e.status().pending.length,0)});
 await test('new notification during read survives old completion',async()=>{const {c}=setup(),d=deferred();const e=c.P79ManagementSync.create({system:'hr',isManager:()=>true,isEditing:()=>false,refresh:()=>d.promise});e.receive(event());const a=e.synchronize(),b=e.synchronize();await tick();e.receive(event('two'));d.resolve(true);await Promise.all([a,b]);assert.equal(e.status().pending.length,1)});

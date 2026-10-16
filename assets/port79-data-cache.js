@@ -23,13 +23,13 @@ const READ_ACTIONS=new Set([
 ]);
 const SYSTEM_LABELS={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
 const memoryCache=new Map();
-// Opt-in management experiment. Production and punch-only pages keep their current cache behavior.
+// Explicit management opt-in; punch-only sessions keep their current cache behavior.
 const MANAGEMENT_MEMORY_MAX_ENTRIES=12;
 const MANAGEMENT_MEMORY_MAX_PAYLOAD_BYTES=8*1024*1024;
 const memoryWeights=new Map();
 let memoryPayloadBytes=0;
 function boundedManagementMemory(){
- if(window.P79ManagementTestMode!==true)return false;
+ if(window.P79ManagementTestMode!==true&&window.P79ManagementOptimizationMode!==true)return false;
  try{
   const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
   return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase());
