@@ -242,11 +242,11 @@ applySnapshot:async s=>{historyLoaded={type:s.kind,month:s.month,rows:s.data[s.k
 if(g.P79ManagementPageBridge)return;
 const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
 if(!context||!api||!factory)return;
-let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null;
+let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
 function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return ['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
- const el=document.activeElement;if(el&&el.matches?.('input,textarea,[contenteditable="true"]'))return true;
+ const el=document.activeElement;if(el&&el.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
  return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
 }
 function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
@@ -280,13 +280,13 @@ async function synchronize(){
 function boot(){
  if(stopped||binding||!roleAllowed())return;
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
- const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope(),readFresh:()=>context.readFresh(readFresh)});
+ const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
 }
 const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
-document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
-g.addEventListener('pagehide',event=>{clearTimeout(timer);clearTimeout(bootTimer);if(event.persisted)return;stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);});g.addEventListener('pageshow',event=>{if(event.persisted)resume();});
+const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
+g.addEventListener('pagehide',event=>{clearTimeout(timer);clearTimeout(bootTimer);if(event.persisted)return;stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();document.removeEventListener('input',changed,true);document.removeEventListener('change',changed,true);document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);});g.addEventListener('pageshow',event=>{if(event.persisted)resume();});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })(window);
