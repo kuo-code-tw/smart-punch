@@ -36,7 +36,7 @@ function create(options){
    if(result!==true)return {ok:false,reason:'unconfirmed'};
    if(generation===captured)pending.clear();
    return {ok:true,pending:pending.size>0};
-  }catch(error){return {ok:false,reason:'read-failed'};}finally{running=null;if(!disposed)notify(status());}});
+  }catch(error){return {ok:false,reason:'read-failed',errorType:['AbortError','ReferenceError','TypeError'].includes(error?.name)?error.name:'ReadError'};}finally{running=null;if(!disposed)notify(status());}});
   return running;
  }
  function acknowledge(action,response){
@@ -305,7 +305,7 @@ function notify(state){
 async function synchronize(){
  clearTimeout(timer);timer=null;if(stopped||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
  const result=await binding.engine.synchronize();
- if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認｜保留目前資料，可按更新重試';}
+ if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
 }
 function boot(){
  if(stopped||binding||!roleAllowed())return;
