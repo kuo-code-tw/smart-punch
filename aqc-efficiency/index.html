@@ -1578,7 +1578,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.87';
+const APP_VERSION='2026.10.16.88';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -6731,8 +6731,56 @@ async function apiPost(action,payload={}){
   }finally{clearTimeout(timer)}
 }
 
-function readQueue(){try{return JSON.parse(localStorage.getItem(STORE.queue)||'[]')}catch{return[]}}
-function saveQueue(q){localStorage.setItem(STORE.queue,JSON.stringify(q))}
+let p79EfficiencyDbPromise=null,gcQueueReady=false,gcQueueReadyPromise=null,gcQueueMemory=null,gcQueueStorageMode='local',gcQueueStorageWrites=Promise.resolve();
+function p79EfficiencyWriteOptional(key,value){
+ try{localStorage.setItem(key,value);return true;}catch(error){console.warn('效率系統本機快取未寫入，保留本頁資料與雲端儲存流程',key,error);return false;}
+}
+function p79EfficiencyOpenDb(){
+ if(p79EfficiencyDbPromise)return p79EfficiencyDbPromise;
+ p79EfficiencyDbPromise=new Promise((resolve,reject)=>{
+  if(typeof indexedDB==='undefined')return reject(Error('瀏覽器資料庫不可用'));
+  const req=indexedDB.open('port79_efficiency_durable_v1',1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('state'))req.result.createObjectStore('state');};
+  req.onerror=()=>reject(req.error||Error('瀏覽器資料庫開啟失敗'));req.onblocked=()=>reject(Error('瀏覽器資料庫被其他分頁占用'));
+  req.onsuccess=()=>resolve(req.result);
+ });return p79EfficiencyDbPromise;
+}
+async function p79EfficiencyDbReadQueue(legacy){const db=await p79EfficiencyOpenDb();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite'),store=tx.objectStore('state'),req=store.get('pending-queue');let value;req.onsuccess=()=>{value=req.result;if(value===undefined&&Array.isArray(legacy)){value=legacy;store.put(value,'pending-queue');}};req.onerror=()=>reject(req.error);tx.oncomplete=()=>resolve(value);tx.onabort=()=>reject(tx.error||Error('讀取待同步資料失敗'));tx.onerror=()=>reject(tx.error||Error('讀取待同步資料失敗'));});}
+async function p79EfficiencyDbWriteQueue(queue){const db=await p79EfficiencyOpenDb();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(queue,'pending-queue');tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error||Error('待同步資料尚未儲存'));tx.onabort=()=>reject(tx.error||Error('待同步資料尚未儲存'));});}
+async function ensureGcQueueReady(){
+ if(gcQueueReady)return;
+ if(gcQueueReadyPromise)return gcQueueReadyPromise;
+ gcQueueReadyPromise=(async()=>{
+  let legacy=[];try{const value=JSON.parse(localStorage.getItem(STORE.queue)||'[]');if(Array.isArray(value))legacy=value;}catch(error){throw Error('原待同步資料無法讀取，請保留此頁並先匯出備份');}
+  let stored;
+  try{stored=await p79EfficiencyDbReadQueue(legacy);}
+  catch(error){
+   if(typeof indexedDB!=='undefined'||localStorage.getItem('gc_queue_storage_v2')==='indexeddb')throw Error('待同步資料庫暫時無法讀取，請保留此頁後重試');
+   gcQueueStorageMode='local';gcQueueMemory=legacy;gcQueueReady=true;return;
+  }
+  if(stored!==undefined&&!Array.isArray(stored))throw Error('待同步資料格式有誤，請保留原資料');
+  gcQueueStorageMode='indexeddb';gcQueueMemory=stored===undefined?legacy:stored;gcQueueReady=true;
+  // Remove the legacy duplicate only after its durable transaction succeeds.
+  try{localStorage.removeItem(STORE.queue);localStorage.setItem('gc_queue_storage_v2','indexeddb');}catch(ignore){}
+ })();try{return await gcQueueReadyPromise;}finally{gcQueueReadyPromise=null;}
+}
+function readQueue(){
+ if(gcQueueMemory!==null)return JSON.parse(JSON.stringify(gcQueueMemory));
+ try{const q=JSON.parse(localStorage.getItem(STORE.queue)||'[]');return Array.isArray(q)?q:[];}catch{return[];}
+}
+function saveQueue(q){
+ if(!gcQueueReady)return Promise.reject(Error('待同步資料尚未載入，請重試'));
+ const snapshot=JSON.parse(JSON.stringify(q)),previous=gcQueueMemory;
+ if(gcQueueStorageMode==='local'){
+  try{localStorage.setItem(STORE.queue,JSON.stringify(snapshot));gcQueueMemory=snapshot;return Promise.resolve(true);}
+  catch(error){return Promise.reject(Error('本機空間不足，尚未保存待同步資料；請保留此頁與原始 Excel，勿關閉或重新整理'));}
+ }
+ gcQueueMemory=snapshot;
+ const operation=gcQueueStorageWrites.catch(()=>{}).then(()=>p79EfficiencyDbWriteQueue(snapshot));
+ gcQueueStorageWrites=operation;
+ return operation.catch(error=>{if(gcQueueMemory===snapshot)gcQueueMemory=previous;throw Error('待同步資料尚未保存，請保留此頁與原始 Excel：'+(error.message||error));});
+}
+
 function recordIdentityKey(r){
   const id=String(r?.id||'').trim();
   if(id)return `ID:${id}`;
@@ -7233,7 +7281,7 @@ function mergeEfficiencyCloudData(d){
   if(Array.isArray(d?.availableMonths)){
     try{localStorage.setItem('port79_gc_drive_months_v1',JSON.stringify(d.availableMonths));}catch(e){}
   }
-  if(d?.revision)localStorage.setItem(STORE.rev,String(d.revision));
+  if(d?.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
 }
 
 async function loadEfficiencyCloudScope(params,showStatus=false){
@@ -7401,12 +7449,13 @@ async function postCloud(action,payload){
   if(!requireSuperAdminAccess())return {ok:false};
   // 先保存獨立快照；後續編輯不能改到正在上傳或等待補傳的內容。
   const snapshot=JSON.parse(JSON.stringify(payload||{}));
+  await ensureGcQueueReady();
   const q=readQueue(),last=q[q.length-1];
   let item=last;
   if(!last || last.action!==action || JSON.stringify(last.payload)!==JSON.stringify(snapshot)){
     item={id:uid('Q'),action,payload:snapshot,at:Date.now()};
     if(action==='gcSyncAll'&&!snapshot.__destructiveSync)item.safeMerge=true;
-    q.push(item);saveQueue(q);
+    q.push(item);await saveQueue(q);
   }
   setEfficiencySaveState(true,'本機已保存，等待雲端確認');
   await flushQueue();
@@ -7426,6 +7475,7 @@ async function postCloudConfirmed(action,payload){
   return result;
 }
 async function flushQueue(){
+  await ensureGcQueueReady();
   if(gcQueueFlushPromise)return gcQueueFlushPromise;
   if(!readQueue().length)return {ok:true};
   if(cloudBusy||!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0};
@@ -7443,8 +7493,8 @@ async function flushQueue(){
           // 只移除本次已確認的快照，保留上傳期間加入或修改的其他項目。
           const signature=JSON.stringify(item);
           const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===signature);
-          if(index>=0){live.splice(index,1);saveQueue(live)}
-          if(result.revision)localStorage.setItem(STORE.rev,String(result.revision));
+          if(index>=0){live.splice(index,1);await saveQueue(live)}
+          if(result.revision)p79EfficiencyWriteOptional(STORE.rev,String(result.revision));
         }catch(e){
           console.warn('待補傳仍未完成，保留佇列',item?.action,e);
           break; // 舊修改未確認前，不能讓新修改越過它再被舊重試覆蓋。
@@ -7753,7 +7803,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
       employeeSource='系統同步員工主檔';
     }
 
-    if(d?.revision)localStorage.setItem(STORE.rev,String(d.revision));
+    if(d?.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
 
     shipMasters=canonicalShipMasters(shipMasters||[]);
     saveLocal();
@@ -7785,7 +7835,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
         [...shipMasters].sort(compareWorkingNoDesc)[0]
       )||lastVesselSummary;
       if(lastVesselSummary){
-        localStorage.setItem('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
+        p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
       }
     }
 
@@ -7866,7 +7916,7 @@ async function syncFromCloud(force=false){
      employeeSource='系統同步員工主檔';
    }
 
-   if(d.revision)localStorage.setItem(STORE.rev,String(d.revision));
+   if(d.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
    saveLocal();
    invalidateWorkloadIndex();
    renderEfficiencyTabFast();
@@ -9992,10 +10042,10 @@ async function importExcel(file) {
     shipMasters.push(master);
     shipMasters=canonicalShipMasters(shipMasters);
     [...new Set(imported.map(r=>r.name))].forEach(name=>{const p=people().find(x=>samePersonName(x.name,name)),id=p?.empId||`NAME:${name}`;if(!assignments.some(a=>a.empId===id))assignments.push({empId:id,name,groupId:p?personGroupId(p):''})});
-    lastVesselSummary=summary;localStorage.setItem('ship_stats_last_vessel_summary',JSON.stringify(summary));
+    lastVesselSummary=summary;p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(summary));
     setExcelImportStage('寫入本機資料',78);
     saveLocal();
-    localStorage.setItem('gc_last_full_working_report_backup',JSON.stringify({
+    p79EfficiencyWriteOptional('gc_last_full_working_report_backup',JSON.stringify({
       at:Date.now(),workingNo:summary.workingNo,vessel:summary.vessel,records:imported,master
     }));
     // 批次匯入期間先不重算整份月報，全部檔案完成後統一重算一次。
@@ -10051,8 +10101,8 @@ async function importExcel(file) {
     const workDate=String(prompt('已偵測到 GC司機效率格式。\n此檔案沒有日期欄，請輸入作業日期 YYYY-MM-DD：',localStorage.getItem('ship_stats_last_import_date')||today)||'').trim();
     if(!/^\d{4}-\d{2}-\d{2}$/.test(workDate))return toast('匯入取消：請輸入正確日期 YYYY-MM-DD');
     const vesselLabel=String(prompt('請輸入船名／航次（可留空）：',localStorage.getItem('ship_stats_last_vessel')||'')||'').trim();
-    localStorage.setItem('ship_stats_last_import_date',workDate);
-    localStorage.setItem('ship_stats_last_vessel',vesselLabel);
+    p79EfficiencyWriteOptional('ship_stats_last_import_date',workDate);
+    p79EfficiencyWriteOptional('ship_stats_last_vessel',vesselLabel);
     setExcelImportStage('解析 GC司機效率明細',45);
     imported=parseGcDriverEfficiencyWorkbook(book,workDate,vesselLabel);
     if(!imported.length){lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'沒有讀到 AQC 人員明細',records:0,workingNo:''};return toast('沒有讀到可匯入的 AQC 人員明細，請確認人資主檔的部門/單位含 AQC');}
@@ -10093,7 +10143,7 @@ async function importExcel(file) {
   }else{
     setExcelImportStage(`本檔完成｜等待其餘 ${excelImportQueue.length} 份`,96);
   }
- }catch(e){console.error(e);toast(`匯入失敗：${e.message}`)}
+ }catch(e){lastExcelImportResult={ok:false,file:String(file?.name||''),reason:String(e?.message||e),records:0,workingNo:''};console.error(e);toast(`匯入失敗：${e.message}`)}
 }
 
 let activeVesselKey={workingNo:'',vessel:''};
@@ -12273,7 +12323,7 @@ async function saveShipMasterEdit(){
 
   if(lastVesselSummary&&String(lastVesselSummary.workingNo||'').trim()===oldNo){
     lastVesselSummary=shipMasterToSummary(updated);
-    localStorage.setItem('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
+    p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
   }
 
   forceFullSystemConsistencyRefresh();
