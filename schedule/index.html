@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.16.117';
+    const APP_VERSION='2026.10.16.119';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -5135,7 +5135,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   </button>
                   <button onclick="p79AutoAllocateRest()" class="px-4 py-2.5 text-xs bg-sky-700 text-white font-bold rounded-xl">自動配對例／休／國</button>
                   <button onclick="autoScheduleCurrentTab()" class="px-4 py-2.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> 執行【${activeRoleTab === 'ALL' ? '全部人員' : activeRoleTab + '單位'}】智慧錯開排班
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 接續上月班表（先預覽）
                   </button>
                 </div>
               </div>
@@ -5729,30 +5729,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
 
     function autoScheduleCurrentTab() {
-      if (!requireScheduleEditLock()) return;
-      const yearMonth = document.getElementById('month-picker').value;
-      const [year, month] = yearMonth.split('-').map(Number);
-      const totalDays = getDaysInMonth(year, month);
-
-      MAIN_ROLES.forEach(roleName => {
-        const roleEmps = sortScheduleEmployeesForRole(employees.filter(e => e.role === roleName));
-        roleEmps.forEach((emp, idx) => {
-          if (emp.lockType === 'FIXED_LOCKED') return;
-          if(!monthlyScheduleData[emp.id]) monthlyScheduleData[emp.id] = {};
-          for(let d = 1; d <= totalDays; d++) {
-            const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-            const dateObj = new Date(year, month - 1, d);
-            if (monthlyScheduleData[emp.id][dayStr] === '離') continue;
-            if(approvedLeaveForEmployee(emp.id,dayStr)||p79LeaveCoverOnDay(emp.id,dayStr).length)continue;
-            monthlyScheduleData[emp.id][dayStr] = calculateShiftForDay(emp, idx, d, dateObj.getDay());
-          }
-        });
-      });
-
-      saveAllDataToLocalStorage();
-      queueScheduleCloudSave();
-      renderRoleScheduleView();
-      alert(`✨ 已完成智慧錯開排班，正在同步 Google 雲端！`);
+      if(!canManageSchedule())return alert('沒有排班管理權限');
+      const month=currentScheduleMonthKey(),[year,m]=month.split('-').map(Number);
+      const previous=new Date(Date.UTC(year,m-2,1)).toISOString().slice(0,7);
+      if(!window.P79ScheduleContinuation)return alert('排班模組尚未載入，請重新整理後再試');
+      // Continue the formal previous-month roster; never restart day 1 or overwrite all staff.
+      window.P79ScheduleContinuation.open(previous);
     }
 
     function openAddModal() {
@@ -6871,7 +6853,7 @@ window.P79ScheduleContinuationContext={
   const loaded=await loadCloudData(false);if(loaded){buildRoleTabsAndRender();renderTodaySchedulePanel();}else alert('下個月班表已儲存並核對，畫面尚未重新載入，請按重新整理。');}
 };
 </script>
-<script src="../assets/port79-schedule-continuation.js?v=20261016.115"></script>
+<script src="../assets/port79-schedule-continuation.js?v=20261016.119"></script>
 
 <style id="p79-schedule-usability">
 #p79ScheduleQuickBar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;margin:0 auto;max-width:1920px;background:#f8fafc;color:#1e293b;border-bottom:1px solid #cbd5e1}
