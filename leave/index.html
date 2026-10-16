@@ -351,7 +351,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.84';
+const APP_VERSION='2026.10.16.85';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -542,7 +542,7 @@ function renderAdmin(){
  p79LeaveComparisonRows=rows;
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
- for(const cover of window.p79LeaveCoverAssignments||[])if(!coverIndex.has(String(cover.leaveId)))coverIndex.set(String(cover.leaveId),cover);
+ for(const cover of window.p79LeaveCoverAssignments||[]){const key=String(cover.leaveId),prior=coverIndex.get(key);coverIndex.set(key,prior?{...prior,workerIds:[...new Set([...(prior.workerIds||[]),...(cover.workerIds||[])])]}:cover);}
  const peopleIndex=new Map(employees.map(e=>[String(e.empId||'').trim().toUpperCase(),e]));
  $('adminLeaveBody').innerHTML=rows.length?rows.map(l=>{
    const emp=employees.find(e=>sameEmployee(l,e));
@@ -1169,6 +1169,7 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
   <div><div class="field"><label for="adminCreateLeaveJob">請假人員職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div><div class="field"><label for="adminCreateLeaveEmployee">請假人員</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div></div>
   <div><div class="field"><label for="adminCreateLeaveWorkerJob">第一位代班人員職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第一位代班人員</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecondJob">第二位代班人員職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label>第二位代班人員（選填）</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
  </div>
+ <label style="display:flex;align-items:center;gap:8px"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
  <p id="adminCreateLeaveDepartment" class="note"></p>
  <div class="field"><label>假別</label><select id="adminCreateLeaveType"></select></div>
  <div class="field"><label>開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
@@ -1180,6 +1181,33 @@ C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',en
  <button id="adminCreateLeaveSave" class="btn btn-pri" type="button" style="width:100%" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button>
 </dialog>
 <script>
+let p79CreateDailyPlan=new Map();
+function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
+function p79RenderDailyCreateCover(){
+ const box=$('adminCreateLeaveDailyRows');if(!box)return;box.hidden=!$('adminCreateLeaveDaily').checked;if(box.hidden)return;
+ const target=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value)),dept=String(target?.dept||'').trim();
+ const available=leaveCreatePeople().filter(e=>String(e.empId)!==String(target?.empId)&&dept&&String(e.dept||'').trim()===dept);
+ const options=(people,selected,prompt)=>'<option value="">'+prompt+'</option>'+people.map(e=>'<option value="'+esc(e.empId)+'"'+(String(e.empId)===selected?' selected':'')+'>'+esc(e.name+'｜'+leavePersonJob(e))+'</option>').join('');
+ const jobs=(selected)=>'<option value="">全部職稱</option>'+[...new Set(available.map(leavePersonJob))].map(j=>'<option value="'+esc(j)+'"'+(j===selected?' selected':'')+'>'+esc(j)+'</option>').join('');
+ box.innerHTML=p79DailyCreateDates().map(date=>{let row=p79CreateDailyPlan.get(date);if(!row){row={first:$('adminCreateLeaveWorker').value,second:$('adminCreateLeaveWorkerSecond').value,firstJob:$('adminCreateLeaveWorkerJob').value,secondJob:$('adminCreateLeaveWorkerSecondJob').value};p79CreateDailyPlan.set(date,row);}
+  const chosen=available.filter(e=>!row.firstJob||leavePersonJob(e)===row.firstJob),others=available.filter(e=>String(e.empId)!==row.first&&(!row.secondJob||leavePersonJob(e)===row.secondJob));
+  if(!chosen.some(e=>String(e.empId)===row.first))row.first='';if(!others.some(e=>String(e.empId)===row.second))row.second='';
+  return '<div style="padding:10px;border:1px solid #cbd5e1;border-radius:10px;margin:8px 0"><b>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+['first','second'].map((key,i)=>'<div><label>第'+(i+1)+'位職稱</label><select data-date="'+date+'" data-field="'+key+'Job">'+jobs(row[key+'Job'])+'</select><label>第'+(i+1)+'位代班人員'+(i?'（選填）':'')+'</label><select data-date="'+date+'" data-field="'+key+'">'+options(i?others:chosen,row[key],i?'不選第二位':'請選擇人員')+'</select></div>').join('')+'</div><small>'+ (row.second?'兩位各代4小時':'一位代8小時')+'</small></div>';
+ }).join('')||'<p>請先選擇有效日期，最多62天。</p>';
+ box.querySelectorAll('select[data-date]').forEach(select=>{select.onchange=()=>{const row=p79CreateDailyPlan.get(select.dataset.date);row[select.dataset.field]=select.value;p79RenderDailyCreateCover();};});
+}
+function p79CollectDailyCreateCover(employee){
+ const dates=p79DailyCreateDates();if(!dates.length)throw Error('請選擇有效日期，最多62天');
+ return dates.map(date=>{const row=p79CreateDailyPlan.get(date)||{},ids=[row.first,row.second].filter(Boolean);if(!row.first||new Set(ids).size!==ids.length)throw Error(date+' 請選擇一位或兩位不同的代班人員');for(const id of ids){const e=employees.find(e=>String(e.empId)===String(id));if(!e||!leaveEmployeeIsActive(e)||String(e.empId)===String(employee.empId)||!employee.dept||String(e.dept||'').trim()!==String(employee.dept||'').trim())throw Error(date+' 請選擇同部門、在職的代班人員');}return {date,mode:ids.length===2?'two':'one',workerIds:ids};});
+}
+function p79PlanDailyCoverRequest(records,covers,request){
+ const plan=request.dailyAssignments,existing=records.filter(l=>String(l.status)==='已核准'&&String(l.empId)===String(request.empId)&&String(l.leaveType)===String(request.leaveType)&&normalizeLeaveFilterDate(l.startTime||l.startDate)===request.startDate&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===request.endDate);
+ const covered=l=>plan.every(p=>covers.some(c=>String(c.leaveId)===String(l.id)&&c.startDate<=p.date&&c.endDate>=p.date&&c.mode===p.mode&&JSON.stringify((c.workerIds||[]).map(String))===JSON.stringify(p.workerIds.map(String))));
+ const chosen=existing.find(covered)||existing.find(l=>String(l.id)===String(request.id))||existing[0],id=String(chosen?.id||request.id);
+ for(const p of plan)if(covers.some(c=>String(c.leaveId)!==id&&c.startDate<=p.date&&c.endDate>=p.date&&(c.workerIds||[]).some(worker=>p.workerIds.map(String).includes(String(worker)))))throw Error(p.date+' 代班人員已有其他安排');
+ return {leaveId:id,existing:!!chosen,covered:!!chosen&&covered(chosen)};
+}
+
 let adminCreateLeaveId='',adminCreateLeaveBusy=false;
 function leavePeopleStrokeOrder(list){const collator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});return [...list].sort((a,b)=>collator.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));}
 function leavePersonJob(e){return String(e.jobTitle||e.deptDetail||'').trim()||'未設定職稱';}
@@ -1211,6 +1239,7 @@ function filterAdminCreateLeavePeople(){
  second.innerHTML='<option value="">不選第二位（一位代8小時）</option>'+otherChoices.map(leavePersonOption).join('');
  if(otherChoices.some(e=>String(e.empId)===previousSecond))second.value=previousSecond;
  second.disabled=!target;
+ p79RenderDailyCreateCover();
  $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側依職稱篩選同部門人員':'';
 }
 async function openAdminCreateLeave(){
@@ -1222,7 +1251,7 @@ async function openAdminCreateLeave(){
   try{await loadCloud(true,true);}catch(error){$('adminCreateLeaveMessage').textContent='人員載入失敗：'+(error.message||error);return;}finally{$('adminCreateLeaveSave').disabled=false;}
   if(!dialog.open)return;
  }
- adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ p79CreateDailyPlan=new Map();$('adminCreateLeaveDaily').checked=false;adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
  $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';$('adminCreateLeaveWorkerSecondJob').value='';
  $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
  leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
@@ -1230,8 +1259,9 @@ async function openAdminCreateLeave(){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
  updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();
 }
-function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';}
+function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';if(typeof p79RenderDailyCreateCover==='function')p79RenderDailyCreateCover();}
 function p79PlanLeaveCoverRequest(records,covers,request){
+ if(request.dailyAssignments)return p79PlanDailyCoverRequest(records,covers,request);
  const start=request.startDate,end=request.endDate,ids=request.workerIds.map(String);
  const exact=records.filter(l=>String(l.status)==='已核准'&&String(l.empId)===String(request.empId)&&String(l.leaveType)===String(request.leaveType)&&normalizeLeaveFilterDate(l.startTime||l.startDate)===start&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===end);
  const sameWorkers=c=>String(c.mode)===request.mode&&JSON.stringify((c.workerIds||[]).map(String))===JSON.stringify(ids);
@@ -1245,8 +1275,9 @@ async function saveAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
  const employee=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value));updateAdminCreateLeaveDays();const days=Number($('adminCreateLeaveDays').value);
- const worker=employees.find(e=>String(e.empId)===String($('adminCreateLeaveWorker').value));
- const secondId=String($('adminCreateLeaveWorkerSecond').value||'');
+ let dailyAssignments;try{if($('adminCreateLeaveDaily')?.checked)dailyAssignments=p79CollectDailyCreateCover(employee);}catch(error){$('adminCreateLeaveMessage').textContent=error.message;return;}
+ const worker=employees.find(e=>String(e.empId)===String(dailyAssignments?.[0]?.workerIds[0]||$('adminCreateLeaveWorker').value));
+ const secondId=String(dailyAssignments?dailyAssignments[0].workerIds[1]||'':$('adminCreateLeaveWorkerSecond').value||'');
  const second=employees.find(e=>String(e.empId)===secondId);
  if(secondId&&(!second||!leaveEmployeeIsActive(second)||second.empId===employee?.empId||second.empId===worker?.empId||String(second.dept||'').trim()!==String(employee?.dept||'').trim())){$('adminCreateLeaveMessage').textContent='第二位需為同部門、不同的代班人員';return;}
  if(!worker||!leaveEmployeeIsActive(worker)||worker.empId===employee?.empId||!String(employee?.dept||'').trim()||String(worker.dept||'').trim()!==String(employee?.dept||'').trim()){$('adminCreateLeaveMessage').textContent='請選擇同部門的代班人員';return;}
@@ -1258,14 +1289,14 @@ async function saveAdminCreateLeave(){
   $('adminCreateLeaveMessage').textContent='正在確認雲端請假與代班安排…';
   const fresh=await p79ReadCurrentLeaveCoverState();
   if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
-  const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:adminCreateLeaveId,empId:employee.empId,leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId]});
+  const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:adminCreateLeaveId,empId:employee.empId,leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});
   adminCreateLeaveId=plan.leaveId;
   if(!plan.existing)await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
   leaveSaved=true;
   $('adminCreateLeaveMessage').textContent='請假已儲存，正在安排代班…';
-  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId]});p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;}
+  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});if(dailyAssignments&&saved.dailyAssignmentsSaved!==true)throw Error('雲端尚未支援逐日代班，請更新 GAS 後重試');p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;}
   $('adminCreateLeaveDialog').close();
-  const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of [worker,second].filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
+  const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of (dailyAssignments?dailyAssignments.find(p=>p.date===date).workerIds.map(id=>employees.find(e=>String(e.empId)===String(id))):[worker,second]).filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
   await p79OpenLeaveOvertimeHandoff();
   void loadCloud(false,true);
@@ -1275,7 +1306,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
+<script src="../assets/port79-overtime-report.js?v=20261016.85"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
