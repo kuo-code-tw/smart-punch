@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.16.116';
+    const APP_VERSION='2026.10.16.117';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -1532,12 +1532,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
       <div id="schedule-legend-row" class="max-w-[1920px] mx-auto bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
         <div id="schedule-legend-left">
-          <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別與假別說明：</span></div>
+          <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
           <div class="flex flex-wrap justify-start items-center gap-2 font-semibold">
-            <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b>：早班</span>
-            <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b>：中班</span>
-            <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b>：晚班</span>
-            <span class="px-2 py-1 rounded-md bg-slate-200 text-slate-600 border border-slate-300"><b>休</b>：例休</span>
+            <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
+            <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
+            <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
+            <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
             <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
@@ -5116,11 +5116,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       let html = `
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
-          <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+          <div class="p79-roster-action-heading p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
             <div class="w-full">
               <div class="flex flex-wrap justify-between items-center gap-2">
                 <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <i class="fa-solid fa-layer-group text-teal-600"></i> ${titleLabel}
+                  <i class="fa-solid fa-layer-group text-teal-600"></i> ${year}年${month}月｜${titleLabel}
                   <span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">${roleEmps.length} 人</span>
                 </h2>
 
@@ -5250,7 +5250,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
-            <td class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
+            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${substituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml(substituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${substituteLabel ? 'p79-substitute-time'+(substituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
@@ -6801,7 +6801,7 @@ body[data-p79-system="schedule"] #app-main-container{
 <script id="p79-schedule-v20261007-compact-month-filter-script">
 (function(){
   function mountMonthFilter(){
-    const toolbar=document.getElementById('schedule-rule-toolbar');
+    const toolbar=document.getElementById('p79QuickMonthHost')||document.getElementById('schedule-rule-toolbar');
     const control=document.getElementById('scheduleRangeControl');
     const picker=document.getElementById('month-picker');
     if(!toolbar||!control||!picker)return;
@@ -6900,6 +6900,56 @@ async function p79QuickScheduleMonth(step){
 }
 document.addEventListener('DOMContentLoaded',()=>{const control=document.getElementById('scheduleRangeControl'),host=document.getElementById('p79QuickMonthHost');if(control&&host)host.appendChild(control);});
 </script>
+
+
+<style id="p79-schedule-reference-layout">
+/* Schedule only: keep shared navigation and all editing/synchronization behavior. */
+body[data-p79-system="schedule"]{background:#f4f7fb!important;color:#142b49}
+body[data-p79-system="schedule"] #p79SevenTop{background:#112e50!important;border:0!important;color:#fff!important}
+body[data-p79-system="schedule"] #p79SevenTop .top-row{padding:14px 20px!important;gap:16px!important}
+body[data-p79-system="schedule"] #p79SevenTop .brand-name{font-size:21px!important;color:white!important}
+body[data-p79-system="schedule"] #p79SevenTop .brand-sub{color:#cbd5e1!important}
+body[data-p79-system="schedule"] #p79SevenNav{gap:5px!important}
+body[data-p79-system="schedule"] #p79SevenNav a{padding:10px 12px!important;border-radius:7px!important;font-size:15px!important;color:#e2e8f0!important}
+body[data-p79-system="schedule"] #p79SevenNav a.active{background:#2563eb!important;color:#fff!important}
+#p79ScheduleQuickBar{max-width:none!important;padding:12px 20px!important;background:#fff!important;gap:12px!important;border-bottom:0!important}
+#p79ScheduleQuickBar button{min-height:42px!important;border-radius:7px!important;padding:9px 14px!important;font-size:15px!important}
+#p79ScheduleQuickBar .p79-quick-month{gap:7px!important}
+#p79QuickMonthHost #scheduleRangeControl{border-radius:7px!important;border-color:#cbd5e1!important;background:#fff!important}
+#p79QuickMonthHost #month-picker{width:142px!important;min-width:125px!important;font-size:16px!important;color:#142b49!important}
+#scheduleActiveEditorBanner{margin:4px 20px 10px!important;border-radius:7px!important;padding:9px 12px!important;min-height:0!important}
+#schedule-legend-row{box-shadow:none!important;border:0!important;background:transparent!important;padding:6px 0!important;gap:12px!important}
+#schedule-legend-left{gap:10px!important}#schedule-legend-left span{font-size:14px!important}#schedule-legend-left b{font-size:16px!important}
+#main-role-tabs-container{gap:6px!important}#main-role-tabs-container button{font-size:14px!important;padding:8px 13px!important;border-radius:7px!important}
+#app-main-container{padding-left:20px!important;padding-right:20px!important}
+.p79-roster-action-heading{padding:12px 14px!important;background:#f8fafc!important}
+.p79-roster-action-heading h2{font-size:20px!important;color:#142b49!important}
+.p79-roster-action-heading button{border-radius:7px!important;font-size:13px!important;padding:8px 11px!important}
+#app-main-container .p79-month-schedule-table th{background:#edf2f7!important;color:#243b56!important;font-size:14px!important;border-color:#d5dfeb!important}
+#app-main-container .p79-month-schedule-table td{border-color:#d5dfeb!important}
+#app-main-container .p79-day-cell{vertical-align:middle!important;padding:3px!important}
+#app-main-container .p79-day-cell[data-display-shift="早"]{background:#c3f0ce!important}
+#app-main-container .p79-day-cell[data-display-shift="中"]{background:#ffebb0!important}
+#app-main-container .p79-day-cell[data-display-shift="晚"]{background:#dfd0fb!important}
+#app-main-container .p79-day-cell:is([data-display-shift="例"],[data-display-shift="休"],[data-display-shift="國"]){background:#ffdbdf!important}
+#app-main-container .p79-day-cell[data-display-overtime="1"]{background:#d1e7fc!important}
+#app-main-container .p79-day-cell .p79-shift-select{background:transparent!important;min-height:28px!important;font-size:14px!important;line-height:1.4!important;font-weight:800!important;color:#183b62!important}
+#app-main-container .p79-day-cell[data-display-shift="早"] .p79-shift-select{color:#166534!important}
+#app-main-container .p79-day-cell[data-display-shift="中"] .p79-shift-select{color:#92400e!important}
+#app-main-container .p79-day-cell[data-display-shift="晚"] .p79-shift-select{color:#5b21b6!important}
+#app-main-container .p79-day-cell:is([data-display-shift="例"],[data-display-shift="休"],[data-display-shift="國"]) .p79-shift-select{color:#b91c1c!important;font-weight:900!important}
+#app-main-container .p79-person-name{font-size:15px!important;color:#142b49!important}
+#app-main-container .p79-month-schedule-table :is(.p79-rest-example,.p79-rest-break,.p79-rest-national){background:#f4f7fc!important;color:#b91c1c!important;font-size:13px!important}
+#app-main-container .p79-day-head>div:first-child{font-size:14px!important}#app-main-container .p79-day-head>div:nth-child(2){font-size:12px!important}
+html.dark body[data-p79-system="schedule"]{background:#0b1425!important;color:#e2e8f0}
+html.dark #p79ScheduleQuickBar,html.dark #p79QuickMonthHost #scheduleRangeControl{background:#111e33!important}
+html.dark #p79QuickMonthHost #month-picker{color:#e2e8f0!important}
+html.dark .p79-roster-action-heading{background:#172337!important}html.dark .p79-roster-action-heading h2,html.dark #app-main-container .p79-person-name{color:#e2e8f0!important}
+html.dark #app-main-container .p79-month-schedule-table :is(th,.p79-rest-example,.p79-rest-break,.p79-rest-national){background:#1e293b!important;color:#fda4af!important;border-color:#475569!important}
+html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
+@media(max-width:850px){#p79ScheduleQuickBar{padding:9px!important}#app-main-container{padding-left:8px!important;padding-right:8px!important}#scheduleActiveEditorBanner{margin-inline:8px!important}body[data-p79-system="schedule"] #p79SevenTop .top-row{padding:10px!important}#p79ScheduleQuickBar button{font-size:14px!important;padding:8px!important}}
+@media print{#app-main-container .p79-day-cell{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
 
 </body>
 </html>
