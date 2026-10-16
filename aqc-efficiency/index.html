@@ -511,6 +511,26 @@ body[data-p79-system="efficiency"] main{
 #efficiencyMainTabs #efficiencySharedYear{min-width:105px!important;max-width:125px;min-height:34px!important;padding:5px 8px!important;font-size:14px!important;border-width:1px;border-color:#cbd5e1;border-radius:8px}
 @media(max-width:640px){#efficiencyMainTabs{gap:6px!important}#efficiencyMainTabs>.p79-efficiency-tab-year{gap:4px;font-size:11px}#efficiencyMainTabs #efficiencySharedYear{min-width:88px!important;max-width:100px;font-size:13px!important}}
 </style>
+<style id="p79-efficiency-compact-vessel-v90">
+#view-dashboard #p79EfficiencyCumulative{padding:7px 10px!important;margin-top:8px!important}
+#view-dashboard #p79EfficiencyCumulative #cumulativeTitle{font-size:14px!important;margin-bottom:4px!important}
+#view-dashboard #p79EfficiencyCumulative>.grid{gap:6px!important}
+#view-dashboard #p79EfficiencyCumulative>.grid>div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 8px;padding:5px 8px!important;text-align:left}
+#view-dashboard #p79EfficiencyCumulative>.grid>div>.text-xs{font-size:12px!important;line-height:1.25!important}
+#view-dashboard #p79EfficiencyCumulative>.grid>div>.text-2xl{font-size:18px!important;line-height:1.2!important;margin:0!important}
+#view-dashboard #p79EfficiencyCumulative [id$="Sub"]{grid-column:1/-1;margin:0!important;font-size:11px!important}
+#view-dashboard #p79EfficiencyCumulative [id$="Sub"]:empty{display:none!important}
+#view-dashboard #vesselSummaryCard{padding:8px 10px!important;border-radius:12px!important;margin-top:8px!important}
+#view-dashboard #vesselSummaryCard>div:first-child{margin-bottom:5px!important;gap:6px!important}
+#view-dashboard #vesselSummaryCard>div:first-child>div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px}
+#view-dashboard #vesselSummaryCard #vsVessel{font-size:18px!important;line-height:1.25!important}
+#view-dashboard #vesselSummaryCard>.grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px!important}
+#view-dashboard #vesselSummaryCard>.grid>div{padding:4px 6px!important;border-radius:7px!important;min-height:0!important}
+#view-dashboard #vesselSummaryCard>.grid>div>.text-xs{font-size:11px!important;line-height:1.25!important}
+#view-dashboard #vesselSummaryCard>.grid>div>.font-black{font-size:14px!important;line-height:1.25!important;margin-top:2px}
+@media(min-width:1100px){#view-dashboard #vesselSummaryCard>.grid{grid-template-columns:repeat(9,minmax(0,1fr))!important}}
+@media(max-width:640px){#view-dashboard #p79EfficiencyCumulative>.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-dashboard #p79EfficiencyCumulative>.grid>div{padding:5px 6px!important;gap:2px 4px}#view-dashboard #p79EfficiencyCumulative>.grid>div>.text-2xl{font-size:17px!important}}
+</style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -1562,7 +1582,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.89';
+const APP_VERSION='2026.10.16.90';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
