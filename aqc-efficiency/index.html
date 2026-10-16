@@ -1582,7 +1582,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.90';
+const APP_VERSION='2026.10.16.93';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -4751,7 +4751,7 @@ function personalAuditRowSignature(x){
     normalizePersonName(x?.name),
     normalizeMonthlySerial(x?.serial),
     monthlyShipNo(x?.ship),
-    String(x?.dateRaw||x?.date||'').trim(),
+    String(x?.date||x?.dateRaw||'').trim(),
     String(x?.start||''),
     String(x?.end||''),
     personalAuditRound(x?.containers,2),
@@ -4833,7 +4833,7 @@ function parsePersonalAuditCombinedSheet(book,year,month){
   return {rows,issues};
 }
 
-function auditPersonalWorkbookInternalConsistency(details,combinedRows){
+function auditPersonalWorkbookInternalConsistency(details,combinedRows,onPersonIssue){
   const issues=[];
   const detailMap=new Map();
   const combinedMap=new Map();
@@ -4853,9 +4853,10 @@ function auditPersonalWorkbookInternalConsistency(details,combinedRows){
     const sample=(details||[]).find(x=>personalAuditRowSignature(x)===key);
     const miss=count-have;
     for(let i=0;i<miss;i++){
-      issues.push(
-        `「總表」漏掉個人工作表作業：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}｜${sample?.start||'—'}-${sample?.end||'—'}｜櫃 ${personalAuditRound(sample?.containers,0)}｜H/C ${personalAuditRound(sample?.hatches,0)}`
-      );
+      const message=
+        `個人效率表檔案內部差異（非系統缺資料）：「總表」未找到完全相同的個人分頁作業：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}｜${sample?.start||'—'}-${sample?.end||'—'}｜櫃 ${personalAuditRound(sample?.containers,0)}｜H/C ${personalAuditRound(sample?.hatches,0)}`;
+      issues.push(message);
+      if(onPersonIssue)onPersonIssue(sample,message);
     }
   });
 
@@ -4865,9 +4866,10 @@ function auditPersonalWorkbookInternalConsistency(details,combinedRows){
     const sample=(combinedRows||[]).find(x=>personalAuditRowSignature(x)===key);
     const extra=count-have;
     for(let i=0;i<extra;i++){
-      issues.push(
-        `「總表」有一筆找不到對應個人工作表：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}`
-      );
+      const message=
+        `個人效率表檔案內部差異（非系統缺資料）：「總表」有一筆未找到完全相同的個人分頁作業：${sample?.name||'—'}｜${sample?.serial||'—'}｜船 ${sample?.ship||'—'}｜${sample?.dateRaw||'—'}`;
+      issues.push(message);
+      if(onPersonIssue)onPersonIssue(sample,message);
     }
   });
 
@@ -4928,10 +4930,13 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
   });
 
   // 再拿「總表」與每一個人的工作表逐筆交叉檢查。
-  // 這份 115/09 檔案實際有一筆續列在個人工作表存在，但「總表」漏掉。
+  // 此項只檢查個人效率檔內部兩種分頁；按人員歸屬，不能當成 WORKING REPORT 或系統缺資料。
   const combined=parsePersonalAuditCombinedSheet(book,ym.year,ym.month);
   sourceIssues.push(...(combined.issues||[]));
-  sourceIssues.push(...auditPersonalWorkbookInternalConsistency(details,combined.rows));
+  auditPersonalWorkbookInternalConsistency(details,combined.rows,(row,message)=>{
+    const key=normalizePersonName(row?.name);
+    (personIssues[key] ||= []).push(message);
+  });
 
   return {
     fileName,
@@ -5780,7 +5785,7 @@ function openPersonalAuditDetail(normName){
   if(sourceBox){
     if(allSource.length){
       sourceBox.className='rounded-2xl border border-amber-200 bg-amber-50 p-3';
-      sourceBox.innerHTML=`<div class="font-black text-amber-800 mb-1">⚠ 檢查重點</div><ul class="list-disc pl-5 text-xs font-bold text-amber-800 space-y-1">${allSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul><div class="mt-2 text-[11px] text-rose-700 font-black">下方表格已用紅框直接標出錯誤欄位，方便你比對。</div>`;
+      sourceBox.innerHTML=`<div class="font-black text-amber-800 mb-1">⚠ 檢查重點</div><div class="text-xs mb-2">個人效率檔：${esc(personalAuditReference?.fileName||'未命名')}。檔案內部差異與下方系統比對分開判斷；不代表 WORKING REPORT 沒有該筆。</div><ul class="list-disc pl-5 text-xs font-bold text-amber-800 space-y-1">${allSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul><div class="mt-2 text-[11px] text-rose-700 font-black">下方表格已用紅框直接標出錯誤欄位，方便你比對。</div>`;
     }else{
       sourceBox.className='rounded-2xl border border-emerald-200 bg-emerald-50 p-3';
       sourceBox.innerHTML='<div class="font-black text-emerald-700">✓ 總表數字與來源 Excel 結構沒有發現問題</div>';
