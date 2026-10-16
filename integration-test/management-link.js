@@ -295,7 +295,7 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.1';}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.2';}
 }
 const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);

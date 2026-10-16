@@ -18,6 +18,8 @@ for (const type of ['click','auxclick']) {
 }
 for (const system of systems) {
   const html=fs.readFileSync(path.join(__dirname,'../integration-test',system,'index.html'),'utf8');
+  assert(html.includes('/smart-punch/integration-test/data-cache.js?v=20261017.2'));
   assert(html.includes('<head><script src="/smart-punch/integration-test/stage-navigation.js?v=20261017.2"></script>'));
 }
+assert.equal(fs.readFileSync(path.join(__dirname,'../integration-test/data-cache.js'),'utf8'),fs.readFileSync(path.join(__dirname,'../assets/port79-data-cache.js'),'utf8'));
 console.log('PASS seven-system isolated navigation, modifier/middle-click paths, query/hash retention and external-link boundaries');
