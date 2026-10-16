@@ -236,6 +236,7 @@ p79WorkOvertimeMonths.set(s.month,{token:currentPort79SsoToken(),at:Date.now(),p
 })(window);
 },"efficiency":function(){(function(g){'use strict';
 g.P79ManagementContext={system:'efficiency',identity:()=>loadGcSession()+'|'+JSON.stringify(efficiencyCloudScopeParams()),gas:()=>getGasUrl(),token:()=>loadGcSession(),canRead:()=>requireEfficiencyAccess(),hasPendingChanges:()=>readQueue().length>0||!!cloudBusy||!!port79ShipAutoSyncBusy,
+pendingReason:()=>{const count=readQueue().length;return count?'有 '+count+' 筆待傳資料，保留內容並延後更新':(cloudBusy||port79ShipAutoSyncBusy)?'原頁雲端同步中，保留內容並延後更新':'';},
 scope:()=>efficiencyCloudScopeParams(),readFresh:async read=>{const [d,p]=await Promise.all([read('gcGetData',efficiencyCloudScopeParams()),read('gcGetEmployees')]);if(!Array.isArray(d.records)||!Array.isArray(d.shipMasters)||!Array.isArray(p.employees))throw Error('效率資料不完整');return {ok:true,confirmedFresh:true,data:d,people:p.employees};},
 applySnapshot:async s=>{const d=s.data;systemEmployees=s.people.map(normalizeCloudEmployee).filter(Boolean);if(Array.isArray(d.groups))groups=d.groups;if(Array.isArray(d.assignments))assignments=mergeAssignmentsKeepLocal(assignments,d.assignments);if(d.shipMasters.length)shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,d.shipMasters.map(sanitizeShipMasterMetrics)));if(d.records.length)records=mergeCloudRecordsWithLocal(d.records,records);invalidateWorkloadIndex();populateSelects();renderVesselSummary();renderEfficiencyTabFast();updateEmployeeDataState('人資員工主檔');return true;}}
 ;
@@ -261,6 +262,7 @@ function openForm(){
  return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
 }
 function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
+function editingMessage(){try{return context.pendingReason?.()||'正在編輯，保留內容並延後更新'}catch(_){return '正在編輯，保留內容並延後更新'}}
 function readScope(){return JSON.stringify(context.scope?.()||{});}
 async function readFresh(action,params={}){
  if(stopped||suspended)throw Error('頁面已離開');
@@ -281,13 +283,13 @@ function ensureBar(){
 }
 function notify(state){
  pendingState=state;if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
- const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜正在編輯，保留內容並延後套用':'｜準備同步');b.querySelector('button').disabled=state.running;
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():'｜準備同步');b.querySelector('button').disabled=state.running;
  if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
 }
 async function synchronize(){
  clearTimeout(timer);timer=null;if(stopped||suspended||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
  const result=await binding.engine.synchronize();
- if(!stopped&&!suspended&&result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
+ if(!stopped&&!suspended&&result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?editingMessage():'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
 }
 function boot(){
  if(stopped||suspended||binding||!roleAllowed())return;
@@ -295,9 +297,9 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.2';}
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.3';}
 }
-const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent='正在編輯，保留內容並延後更新';return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
 function pagehide(event){
  suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);timer=null;bootTimer=null;
