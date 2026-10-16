@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head><base href="/smart-punch/leave/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
+<!-- PORT79 2026-10-06 統一單月月曆日期選擇｜leave -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="//script.google.com">
+<link rel="dns-prefetch" href="//script.googleusercontent.com">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<title>79號碼頭雲端智慧系統｜請假系統</title>
+<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
+<style>*{box-sizing:border-box}:root{--bg:#f1f5f9;--card:#fff;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--pri:#059669;--pri2:#0d9488;--danger:#e11d48;--warn:#d97706;--input:#fff} html[data-theme="dark"]{color-scheme:dark;--bg:#020617;--card:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155;--input:#111827} body{margin:0;background:var(--bg);color:var(--text);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;min-height:100vh} header{position:sticky;top:0;z-index:20;background:linear-gradient(135deg,#064e3b,#0f766e);color:white;padding:16px 18px;box-shadow:0 8px 24px #0002} .header-inner{max-width:1150px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}.title{font-weight:900;font-size:20px}.sub{font-size:11px;opacity:.8;margin-top:3px} .btn{border:0;border-radius:11px;padding:10px 13px;font-weight:800;cursor:pointer}.btn-home{background:#ffffff20;color:white;border:1px solid #ffffff35}.btn-pri{background:var(--pri);color:white}.btn-sec{background:#475569;color:white}.btn-danger{background:var(--danger);color:white}.btn-warn{background:var(--warn);color:white}.btn:disabled{opacity:.45;cursor:not-allowed} main{max-width:1150px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:360px 1fr;gap:16px}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 8px 25px #0f172a0c}.card h2{margin:0 0 14px;font-size:16px} label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin:0 0 5px}.field{margin-bottom:12px}input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--input);color:var(--text);font:inherit;font-size:14px;outline:none}textarea{resize:vertical;min-height:78px} .status{padding:11px 12px;border-radius:11px;font-size:12px;line-height:1.5;margin-bottom:12px;background:#ecfdf5;border:1px solid #a7f3d0;color:#047857}.status.error{background:#fff1f2;border-color:#fecdd3;color:#be123c}.status.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}.status.info{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8} html[data-theme="dark"] .status{background:#052e24;border-color:#047857;color:#a7f3d0}html[data-theme="dark"] .status.error{background:#3f0d18;border-color:#9f1239;color:#fecdd3}html[data-theme="dark"] .status.warn{background:#422006;border-color:#a16207;color:#fde68a}html[data-theme="dark"] .status.info{background:#172554;border-color:#1d4ed8;color:#bfdbfe} .hidden{display:none!important}.balance{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.metric{padding:10px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;text-align:center}.metric b{display:block;font-size:20px;color:#047857}.metric span{font-size:10px;color:#64748b} .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:12px}.toolbar .field{margin:0;min-width:130px;flex:1}.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:900}.pending{background:#fef3c7;color:#92400e}.approved{background:#dcfce7;color:#166534}.rejected{background:#ffe4e6;color:#9f1239} .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:13px}table{width:100%;border-collapse:collapse;min-width:760px;font-size:12px}th,td{padding:10px 9px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{background:#f8fafc;color:#475569;position:sticky;top:0}html[data-theme="dark"] th{background:#111827;color:#cbd5e1}.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{padding:6px 8px;font-size:10px;border:0;border-radius:8px;font-weight:800;cursor:pointer} .emp-card{padding:12px;border-radius:13px;background:linear-gradient(135deg,#064e3b,#0f766e);color:white;margin-bottom:12px}.emp-card .name{font-size:18px;font-weight:900}.emp-card .meta{font-size:11px;opacity:.82;margin-top:4px} .tabs{display:flex;gap:8px;margin-bottom:12px}.tab{flex:1;border:1px solid var(--border);background:var(--card);color:var(--text);padding:10px;border-radius:10px;font-weight:800;cursor:pointer}.tab.active{background:#059669;color:white;border-color:#059669} .note{font-size:11px;color:var(--muted);line-height:1.6}.top-actions{display:flex;gap:8px} @media(max-width:820px){.grid{grid-template-columns:1fr}.header-inner{align-items:flex-start}.title{font-size:18px}.top-actions{flex-direction:column}.balance{grid-template-columns:1fr 1fr 1fr}main{padding:12px}.card{padding:15px}}</style>
+
+<style id="port79-leave-ui-polish-v20260925-4">body{background:radial-gradient(circle at 8% 0%,rgba(16,185,129,.10),transparent 27%),radial-gradient(circle at 92% 8%,rgba(14,165,233,.08),transparent 24%),var(--bg);-webkit-font-smoothing:antialiased} header{background:linear-gradient(135deg,#064e3b 0%,#047857 52%,#0f766e 100%);box-shadow:0 10px 30px rgba(6,78,59,.20);backdrop-filter:blur(12px)} .header-inner{min-height:60px}.title{font-size:21px;letter-spacing:.02em}.sub{font-size:11px;line-height:1.55;opacity:.88} .btn{border-radius:12px;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}.btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.02)}.btn:active:not(:disabled){transform:scale(.985)} .btn-pri{background:linear-gradient(135deg,#059669,#0d9488);box-shadow:0 9px 20px rgba(5,150,105,.20)} main{padding-top:22px;padding-bottom:max(24px,env(safe-area-inset-bottom))} .card{border-radius:20px;border-color:color-mix(in srgb,var(--border) 90%,#10b981);box-shadow:0 12px 32px rgba(15,23,42,.065);transition:transform .16s ease,box-shadow .16s ease}.card:hover{box-shadow:0 16px 38px rgba(15,23,42,.085)} .card h2{font-size:17px;letter-spacing:.01em} input,select,textarea{min-height:46px;border-radius:12px;transition:border-color .15s ease,box-shadow .15s ease}textarea{min-height:92px} input:focus,select:focus,textarea:focus{border-color:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.11)} .tabs{padding:5px;background:color-mix(in srgb,var(--card) 88%,#e2e8f0);border:1px solid var(--border);border-radius:15px;box-shadow:0 5px 18px rgba(15,23,42,.04)} .tab{border:0;border-radius:11px;background:transparent}.tab.active{background:linear-gradient(135deg,#059669,#0f766e);box-shadow:0 7px 18px rgba(5,150,105,.18)} .balance{gap:10px}.metric{padding:13px 8px;border-radius:15px}.metric:nth-child(1){background:linear-gradient(135deg,#eff6ff,#e0f2fe);border-color:#bae6fd}.metric:nth-child(1) b{color:#0369a1}.metric:nth-child(2){background:linear-gradient(135deg,#fff7ed,#fef3c7);border-color:#fde68a}.metric:nth-child(2) b{color:#b45309}.metric:nth-child(3){background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#a7f3d0}.metric:nth-child(3) b{color:#047857}.metric b{font-size:23px} .emp-card{border-radius:16px;background:linear-gradient(135deg,#065f46,#0f766e 65%,#0891b2);box-shadow:0 12px 26px rgba(6,95,70,.18)} .status{border-radius:13px}.table-wrap{border-radius:15px;box-shadow:0 6px 20px rgba(15,23,42,.035)} th{font-weight:900;letter-spacing:.01em}tbody tr{transition:background .13s ease}tbody tr:hover td{background:rgba(16,185,129,.055)} @media(max-width:820px){header{padding:13px 12px}.header-inner{gap:8px}.top-actions{width:auto}.btn-home{padding:9px 10px}.balance{gap:7px}.metric{padding:10px 5px}.metric b{font-size:20px}.card{border-radius:17px}}</style>
+
+<style id="port79-unified-ux-v20260926-5">:root{--leave-header-h:60px} html{scroll-behavior:smooth} body{font-size:13px} header{padding:8px 14px!important} .header-inner{max-width:1500px!important;min-height:46px!important} .title{font-size:17px!important}.sub{font-size:9.5px!important;margin-top:1px!important}.top-actions{flex-direction:row!important}.btn{padding:7px 10px!important;border-radius:9px!important;font-size:11px} main{max-width:1500px!important;padding:12px 14px 22px!important}.grid{grid-template-columns:320px minmax(0,1fr)!important;gap:12px!important}.card{padding:14px!important;border-radius:15px!important}.card h2{font-size:14px!important;margin-bottom:10px!important} input,select,textarea{min-height:38px!important;padding:8px 10px!important;font-size:12px!important;border-radius:9px!important}.field{margin-bottom:9px!important} #leaveStickyTabs{position:sticky;top:var(--leave-header-h);z-index:19;margin:0 -2px 10px!important;padding:4px!important;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(12px)} #leaveStickyTabs .tab{padding:7px 10px!important;font-size:11px!important;white-space:nowrap} .balance{gap:6px!important}.metric{padding:8px 5px!important}.metric b{font-size:18px!important} .toolbar{gap:6px!important}.toolbar .field{min-width:115px!important}table{font-size:11px!important}th,td{padding:7px 7px!important} html[data-theme="dark"] .metric:nth-child(1){background:#0c4a6e!important;border-color:#0369a1!important}html[data-theme="dark"] .metric:nth-child(1) b{color:#bae6fd!important} html[data-theme="dark"] .metric:nth-child(2){background:#78350f!important;border-color:#b45309!important}html[data-theme="dark"] .metric:nth-child(2) b{color:#fde68a!important} html[data-theme="dark"] .metric:nth-child(3){background:#064e3b!important;border-color:#047857!important}html[data-theme="dark"] .metric:nth-child(3) b{color:#a7f3d0!important} html[data-theme="dark"] .metric span{color:#cbd5e1!important} html[data-theme="dark"] .pending{background:#78350f!important;color:#fde68a!important}html[data-theme="dark"] .approved{background:#064e3b!important;color:#a7f3d0!important}html[data-theme="dark"] .rejected{background:#881337!important;color:#fecdd3!important} html[data-theme="dark"] tbody tr:hover td{background:rgba(16,185,129,.10)!important} @media(max-width:820px){.grid{grid-template-columns:1fr!important}.header-inner{align-items:center!important}.sub{max-width:60vw}.top-actions{width:auto!important}.btn-home{padding:7px 8px!important}main{padding:10px!important}}</style>
+
+<style id="port79-mobile-ux-v20260926-8">.port79-mobile-top{position:fixed;right:12px;bottom:calc(14px+env(safe-area-inset-bottom));z-index:80;width:42px;height:42px;border:0;border-radius:50%;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.88);color:#fff;box-shadow:0 8px 24px rgba(15,23,42,.28);font-size:18px;font-weight:900;backdrop-filter:blur(10px)} @media(max-width:900px){.port79-mobile-top.show{display:flex}} html{scroll-padding-top:calc(var(--leave-header-h)+50px)} body{overscroll-behavior-y:contain;padding-bottom:env(safe-area-inset-bottom)} button,a,input,select,textarea{touch-action:manipulation} .table-wrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain} @media(max-width:820px){header{padding:7px 9px!important} .header-inner{min-height:38px!important;align-items:center!important;gap:6px!important} .title{font-size:14px!important;line-height:1.05!important} .sub{font-size:8.5px!important;line-height:1.2!important;max-width:58vw!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top-actions{display:flex!important;flex-direction:row!important;gap:4px!important;flex:0 0 auto} .top-actions .btn{min-height:31px!important;padding:5px 7px!important;font-size:9px!important;border-radius:8px!important} main{padding:7px!important} #globalStatus{padding:8px 9px!important;margin-bottom:7px!important;font-size:10px!important} #leaveStickyTabs{top:var(--leave-header-h)!important;margin:0 -7px 8px!important;padding:4px 7px!important;border-radius:0!important;overflow-x:auto!important;display:flex!important;gap:4px!important;box-shadow:0 5px 12px rgba(15,23,42,.08)} #leaveStickyTabs .tab{flex:0 0 auto!important;min-width:112px;min-height:34px!important;padding:5px 9px!important;font-size:10px!important} .grid{grid-template-columns:1fr!important;gap:8px!important} .card{padding:10px!important;border-radius:13px!important} .card h2{font-size:12.5px!important;margin-bottom:8px!important} .field{margin-bottom:7px!important} label{font-size:9.5px!important;margin-bottom:3px!important} input,select,textarea{font-size:16px!important;min-height:40px!important;padding:7px 9px!important;border-radius:9px!important} textarea{min-height:70px!important} .btn{min-height:38px!important;padding:7px 9px!important;font-size:10px!important} .emp-card{padding:9px!important;margin-bottom:8px!important} .emp-card .name{font-size:15px!important}.emp-card .meta{font-size:9px!important} .balance{gap:5px!important;margin:8px 0!important} .metric{padding:7px 4px!important;border-radius:10px!important} .metric b{font-size:16px!important}.metric span{font-size:8.5px!important} .status{font-size:9.5px!important;padding:8px!important;margin-bottom:8px!important} .toolbar{display:grid!important;grid-template-columns:1fr 1fr!important;gap:6px!important} .toolbar .field{min-width:0!important;width:100%!important} .toolbar .field:first-child{grid-column:1 / -1} .table-wrap{border-radius:10px!important;max-width:100vw} table{font-size:10px!important;min-width:690px!important} th,td{padding:6px 6px!important;white-space:nowrap} th{top:0!important} .actions{flex-wrap:nowrap!important} .actions button{min-height:30px!important;padding:5px 6px!important;font-size:9px!important} .note{font-size:9px!important}} @media(max-width:430px){.sub{max-width:52vw!important} .balance{grid-template-columns:repeat(3,minmax(0,1fr))!important} .toolbar{grid-template-columns:1fr!important} .toolbar .field:first-child{grid-column:auto}}</style>
+
+<style id="port79-calendar-mode-style">#port79CalendarModeBox{display:none!important;position:fixed;right:10px;bottom:10px;z-index:99998;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.94);border:1px solid rgba(148,163,184,.55);box-shadow:0 6px 20px rgba(15,23,42,.14);backdrop-filter:blur(8px);font:700 11px/1.2 system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#475569} #port79CalendarModeBox select{border:0;background:transparent;color:inherit;font:800 11px/1.2 inherit;outline:none;cursor:pointer;padding:2px 3px} html.dark #port79CalendarModeBox,html[data-theme="dark"] #port79CalendarModeBox{background:rgba(15,23,42,.94);border-color:#475569;color:#e2e8f0} @media(max-width:640px){#port79CalendarModeBox{right:6px;bottom:6px;padding:5px 6px;font-size:10px}#port79CalendarModeBox select{font-size:10px}}</style>
+
+<style id="port79-leave-annual-only-v20260927-73">#employeeMode .grid>.card,#employeeMode .balance,#employeeMode #balanceAsOf,#employeeMode #changeEmployeeBtn{display:none !important;} #employeeMode .grid{grid-template-columns:minmax(0,680px) !important;justify-content:center !important;}</style>
+<link rel="stylesheet" href="../assets/port79-ui.css?v=20260927711">
+
+<style id="p79-unified-ui-v20260928-80">
+:root{
+  --p79-navy:#0f1f38;--p79-navy2:#132846;--p79-blue:#2563eb;--p79-cyan:#0891b2;
+  --p79-green:#059669;--p79-violet:#7c3aed;--p79-rose:#e11d48;--p79-amber:#d97706;
+  --p79-bg:#f3f7fb;--p79-panel:#ffffff;--p79-line:#dbe4ee;--p79-text:#172033;--p79-muted:#64748b;
+  --p79-radius:16px;--p79-shadow:0 7px 24px rgba(15,31,56,.08);
+}
+html{background:var(--p79-bg)!important}
+body{background:var(--p79-bg)!important;color:var(--p79-text);font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif!important;font-size:14px!important}
+#p79UnifiedShell{position:sticky;top:0;z-index:9997;background:var(--p79-navy);color:#fff;box-shadow:0 8px 22px rgba(15,31,56,.2);border-bottom:1px solid rgba(255,255,255,.08)}
+#p79UnifiedShell *{box-sizing:border-box}
+.p79u-top{max-width:1920px;margin:0 auto;min-height:64px;padding:8px 16px;display:grid;grid-template-columns:minmax(250px,1fr) auto minmax(360px,1fr);align-items:center;gap:12px}
+.p79u-brand{display:flex;align-items:center;gap:10px;min-width:0}.p79u-logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#1d4ed8,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.p79u-title{font-size:20px;font-weight:900;line-height:1.1;white-space:nowrap}.p79u-sub{font-size:11px;color:#b7c6d9;margin-top:3px;white-space:nowrap}
+.p79u-nav{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:13px;padding:4px;overflow-x:auto;scrollbar-width:none}.p79u-nav::-webkit-scrollbar{display:none}.p79u-nav a{display:flex;align-items:center;gap:5px;color:#dce8f6;text-decoration:none!important;padding:8px 11px;border-radius:9px;font-size:13px;font-weight:800;white-space:nowrap}.p79u-nav a:hover{background:rgba(255,255,255,.09)}.p79u-nav a.active{background:#fff;color:#16375e;box-shadow:0 3px 10px rgba(0,0,0,.16)}
+.p79u-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:none}.p79u-actions::-webkit-scrollbar{display:none}.p79u-btn{min-height:38px;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:7px 11px;background:rgba(255,255,255,.08);color:#fff;font-size:13px;font-weight:850;white-space:nowrap;cursor:pointer}.p79u-btn:hover{background:rgba(255,255,255,.15)}.p79u-btn.primary{background:#0e7490;border-color:#0891b2}.p79u-btn.edit{background:#6d28d9;border-color:#8b5cf6}.p79u-btn.view{background:#475569;border-color:#64748b}.p79u-btn.home{background:#1e293b}.p79u-mode-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;margin-right:5px}.p79u-view-mode .p79u-mode-dot{background:#fbbf24}
+#p79UnifiedContext{max-width:1920px;margin:0 auto;padding:0 16px 8px}.p79u-context-inner{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:7px;color:#cbd5e1;font-size:12px}.p79u-context-status{display:flex;align-items:center;gap:8px;min-width:0}.p79u-context-status span{white-space:nowrap}.p79u-context-hint{color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 統一內容與卡片 */
+body>main,.wrap,#app-main-container{max-width:1920px!important;margin-left:auto!important;margin-right:auto!important}
+.card,.stat,.metric,.bg-white,.dark\:bg-slate-800{border-radius:var(--p79-radius)}
+section.card,.card,.stats .stat{box-shadow:0 3px 14px rgba(15,31,56,.045)}
+input,select,textarea,button,summary{font-family:inherit!important}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{min-height:42px!important;border-radius:10px!important;font-size:14px!important}
+button,.btn{font-size:13.5px!important;border-radius:10px!important}
+label{font-size:12px!important;font-weight:750!important}
+table{font-size:13.5px!important} th{font-size:12.5px!important;font-weight:850!important;background:#edf3f9!important;color:#334155!important;white-space:nowrap} td{font-size:13.5px!important}.dark th,html.dark th{background:#17243a!important;color:#dbeafe!important}
+/* 統一篩選區 */
+.filters,.toolbar,#schedule-rule-toolbar,#schedule-legend-row,#attendanceAdminTabsBar,#efficiencyMainTabs{background:var(--p79-panel)!important;border:1px solid var(--p79-line)!important;border-radius:14px!important;box-shadow:0 2px 10px rgba(15,31,56,.04)!important;padding:10px!important;gap:8px!important}
+.filters,.toolbar{align-items:end!important}
+.filters input,.filters select,.toolbar input,.toolbar select,.filters summary,.toolbar summary{min-height:42px!important;background:#fff!important;border:1px solid #cbd5e1!important;color:#1e293b!important}
+html.dark .filters,html.dark .toolbar,html.dark #schedule-rule-toolbar,html.dark #schedule-legend-row,html.dark #attendanceAdminTabsBar,html.dark #efficiencyMainTabs{background:#111c2e!important;border-color:#334155!important}
+html.dark .filters input,html.dark .filters select,html.dark .toolbar input,html.dark .toolbar select,html.dark .filters summary,html.dark .toolbar summary{background:#0f172a!important;color:#e2e8f0!important;border-color:#475569!important}
+/* 常見統計卡 */
+.stats,.grid.grid-cols-2.lg\:grid-cols-4,.grid.grid-cols-2.lg\:grid-cols-5{gap:10px!important}.stat,.metric{border:1px solid var(--p79-line)!important}.stat .v,.metric b{font-size:24px!important}
+/* 原系統頂部去重，保留功能列 */
+body[data-p79-system="attendance"]>header .attendance-header-brand{display:none!important}
+body[data-p79-system="attendance"]>header .attendance-header-inner{display:block!important;min-height:0!important;padding:6px 12px!important}
+body[data-p79-system="attendance"]>header .attendance-header-tools{justify-content:flex-start!important}
+body[data-p79-system="attendance"]>header button[onclick*="location.href='../'"]{display:none!important}
+body[data-p79-system="attendance"]>header button[onclick*="toggleDarkMode"]{display:none!important}
+body[data-p79-system="leave"]>header{display:none!important}
+body[data-p79-system="hr"] header.top .brand{display:none!important}
+body[data-p79-system="hr"] header.top .topin{justify-content:flex-end!important;min-height:54px!important}
+body[data-p79-system="hr"] header.top .actions>#themeBtn,body[data-p79-system="hr"] header.top .actions>button[onclick*="location.href='../'"],body[data-p79-system="hr"] header.top .actions>button[onclick*="loadEmployees(true)"]{display:none!important}
+body[data-p79-system="schedule"] #schedule-title-block{display:none!important}
+body[data-p79-system="schedule"] .schedule-action-left{display:none!important}
+body[data-p79-system="schedule"] #schedule-refresh-btn,body[data-p79-system="schedule"] #schedule-theme-toggle{display:none!important}
+body[data-p79-system="schedule"] #schedule-control-shell{position:relative!important;top:auto!important;z-index:40!important}
+body[data-p79-system="efficiency"] #efficiencyHeader{position:relative!important;top:auto!important;background:#fff!important;color:#0f172a!important;box-shadow:none!important;border-bottom:1px solid var(--p79-line)!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:first-child>div:first-child{display:none!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child button,body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child a{display:none!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner{padding-top:8px!important;padding-bottom:8px!important}
+body[data-p79-system="efficiency"] #cloudState{background:#e0f2fe!important;color:#075985!important}
+body[data-p79-system="efficiency"] #efficiencyHeaderInner>div:last-child span:nth-child(2){background:#fef3c7!important;color:#92400e!important}
+/* 統一頁籤 */
+.tabs,.p79-tab-row,#main-role-tabs-container{gap:5px!important}.tab,.tabs button,#attendanceAdminTabsBar button,#efficiencyMainTabs button,#main-role-tabs-container button{min-height:38px!important;padding:7px 12px!important;border-radius:9px!important;font-size:13px!important;font-weight:800!important}
+/* 查看模式 */
+body.p79-view-mode [data-p79-mode-disabled="1"]{opacity:.45!important;filter:grayscale(.4);cursor:not-allowed!important}
+body.p79-view-mode .p79-edit-only-note{display:block!important}.p79-edit-only-note{display:none}
+@media(max-width:1100px){.p79u-top{grid-template-columns:1fr auto;grid-template-areas:"brand actions" "nav nav"}.p79u-brand{grid-area:brand}.p79u-nav{grid-area:nav;justify-content:flex-start}.p79u-actions{grid-area:actions}.p79u-title{font-size:18px}}
+@media(max-width:700px){body{font-size:14px!important}.p79u-top{display:flex;flex-direction:column;align-items:stretch;padding:7px 8px;gap:6px}.p79u-brand{order:1}.p79u-actions{order:2;justify-content:flex-start}.p79u-nav{order:3}.p79u-logo{width:36px;height:36px}.p79u-title{font-size:17px}.p79u-sub{font-size:10px}.p79u-btn{font-size:12px!important;min-height:36px;padding:6px 9px}#p79UnifiedContext{padding:0 8px 6px}.p79u-context-inner{display:block}.p79u-context-hint{margin-top:3px}input:not([type="checkbox"]):not([type="radio"]),select,textarea{font-size:16px!important}table{font-size:13px!important}td{font-size:13px!important}.filters,.toolbar{display:grid!important;grid-template-columns:1fr!important}.filters>* ,.toolbar>*{min-width:0!important;width:100%!important}}
+</style>
+
+<style id="p79-leave-unified-polish">body[data-p79-system="leave"] main{padding-top:12px!important}body[data-p79-system="leave"] .tabs{position:relative!important;top:auto!important;margin-bottom:10px!important}body[data-p79-system="leave"] .toolbar{display:grid!important;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(150px,1fr))!important}body[data-p79-system="leave"] .card{border:1px solid var(--p79-line)!important;box-shadow:var(--p79-shadow)!important}@media(max-width:900px){body[data-p79-system="leave"] .toolbar{grid-template-columns:1fr!important}}</style>
+
+<style id="p79-leave-v103-stable-top-style">
+:root{
+  --p79-leave-top-bg:#102844;
+  --p79-leave-top-bg2:#16304f;
+  --p79-leave-top-text:#e5edf7;
+  --p79-leave-top-muted:#9fb0c3;
+}
+#p79LeaveTop{
+  position:sticky;top:0;z-index:11000;
+  background:linear-gradient(90deg,var(--p79-leave-top-bg),var(--p79-leave-top-bg2) 55%,var(--p79-leave-top-bg));
+  color:var(--p79-leave-top-text);
+  border-bottom:1px solid rgba(148,163,184,.18);
+  box-shadow:0 3px 14px rgba(2,6,23,.16);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+}
+#p79LeaveTop *{box-sizing:border-box}
+#p79LeaveTop .top-row{
+  min-height:70px;
+  display:grid;
+  grid-template-columns:minmax(235px,1fr) auto minmax(235px,1fr);
+  align-items:center;gap:16px;padding:8px 16px;
+}
+#p79LeaveTop .brand{display:flex;align-items:center;gap:11px;min-width:0}
+#p79LeaveTop .logo{
+  width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;font-size:23px;background:linear-gradient(145deg,#0e7490,#2563eb);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 4px 13px rgba(2,6,23,.2)
+}
+#p79LeaveTop .brand-name{font-size:19px;line-height:1.1;font-weight:950;white-space:nowrap}
+#p79LeaveTop .brand-sub{margin-top:3px;color:var(--p79-leave-top-muted);font-size:10px;font-weight:700;white-space:nowrap}
+#p79LeaveNav{
+  display:flex;justify-content:center;align-items:center;gap:5px;padding:4px;
+  border:1px solid rgba(148,163,184,.17);border-radius:14px;background:rgba(30,58,95,.42);
+  overflow-x:auto;scrollbar-width:none
+}
+#p79LeaveNav::-webkit-scrollbar{display:none}
+#p79LeaveNav a{
+  min-height:36px;padding:8px 11px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+  gap:5px;flex:0 0 auto;text-decoration:none;color:#dbe7f5;font-size:13px;font-weight:900;white-space:nowrap
+}
+#p79LeaveNav a:hover{background:rgba(255,255,255,.07)}
+#p79LeaveNav a.active{background:#fff;color:#1e293b;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+#p79LeaveTop .action{display:flex;justify-content:flex-end;align-items:center}
+#p79LeaveMenuWrap{position:relative}
+#p79LeaveMenuButton{
+  min-height:38px;padding:8px 14px;border:1px solid rgba(148,163,184,.28);border-radius:11px;
+  background:#0e7490;color:#fff;font-size:13px;font-weight:900;cursor:pointer
+}
+#p79LeaveMenu{
+  display:none;position:absolute;right:0;top:calc(100% + 8px);width:250px;max-height:70vh;overflow:auto;
+  padding:8px;background:#fff;color:#172033;border:1px solid #dbe3ec;border-radius:14px;
+  box-shadow:0 18px 50px rgba(15,23,42,.28);z-index:12000
+}
+#p79LeaveMenu.open{display:block}
+#p79LeaveMenu button{
+  width:100%;border:0;background:transparent;color:#334155;text-align:left;padding:10px 11px;border-radius:9px;
+  font-size:13px;font-weight:850;cursor:pointer
+}
+#p79LeaveMenu button:hover{background:#f1f5f9}
+#p79LeaveMenu .danger{color:#be123c}
+#p79LeaveMenu .sep{height:1px;background:#e2e8f0;margin:5px 0}
+#p79LeaveStatus{
+  min-height:31px;display:flex;align-items:center;justify-content:center;gap:6px;padding:5px 10px 6px;
+  border-top:1px solid rgba(148,163,184,.12);overflow-x:auto;scrollbar-width:none;white-space:nowrap;
+  font-size:10px;font-weight:800
+}
+#p79LeaveStatus::-webkit-scrollbar{display:none}
+#p79LeaveStatus .cloud-title{color:#dbe7f5}
+#p79LeaveStatus .sys{
+  display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;padding:3px 7px;border-radius:8px;
+  border:1px solid rgba(148,163,184,.24);background:rgba(15,23,42,.25)
+}
+#p79LeaveStatus .sys b{color:#f8fafc}
+#p79LeaveStatus .sys[data-state="idle"] span{color:#86efac}
+#p79LeaveStatus .sys[data-state="busy"] span{color:#bfdbfe}
+#p79LeaveStatus .sys[data-state="done"] span{color:#bbf7d0}
+#p79LeaveStatus .sys[data-state="error"] span{color:#fecaca}
+
+/* hide original leave top header; keep business content only */
+body[data-p79-system="leave"]>header{display:none!important}
+
+@media(max-width:1150px){
+  #p79LeaveTop .top-row{grid-template-columns:1fr;gap:7px;padding:8px 10px}
+  #p79LeaveTop .brand{justify-content:center}
+  #p79LeaveTop .action{justify-content:center}
+  #p79LeaveNav{justify-content:flex-start;width:100%}
+  #p79LeaveStatus{justify-content:flex-start}
+}
+</style>
+
+<link rel="stylesheet" href="../assets/port79-calendar-range.css">
+
+<style id="p79-leave-admin-center-v20261007">
+.leave-admin-table th,
+.leave-admin-table td{
+  text-align:center!important;
+  vertical-align:middle!important;
+}
+.leave-admin-table td:first-child,
+.leave-admin-table th:first-child{
+  text-align:center!important;
+}
+.leave-admin-table .actions{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  flex-wrap:wrap!important;
+}
+.leave-admin-table .leave-remain{
+  font-weight:900;
+  color:#059669;
+  white-space:nowrap;
+}
+.leave-admin-table .leave-remain.zero{color:#e11d48}
+.leave-admin-table .leave-remain.na{color:#94a3b8}
+</style>
+<link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261011-unified-management">
+<style id="p79-leave-one-header-20261011">#p79LeaveTop{display:none!important}body[data-p79-system="leave"]>header{display:none!important}</style>
+<style>.p79-balance-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.p79-balance-actions button{white-space:nowrap}</style><style id="p79-leave-page-layout-20261014-113">
+body[data-p79-system="leave"]>main{width:100%!important;max-width:none!important;margin:0!important;padding:16px 18px!important}
+body[data-p79-system="leave"] #adminMode{min-width:0}
+body[data-p79-system="leave"] #adminMode>.card{padding:16px!important}
+body[data-p79-system="leave"] #leaveStickyTabs{display:flex!important;gap:8px!important;padding:5px!important;width:100%;margin:0 0 12px!important}
+body[data-p79-system="leave"] #leaveStickyTabs .tab{flex:1 1 0!important;min-width:0!important;min-height:40px!important;font-size:15px!important;padding:9px 14px!important}
+body[data-p79-system="leave"] #adminMode h2{font-size:19px!important;line-height:1.4!important;margin:0 0 5px!important}
+body[data-p79-system="leave"] #adminMode .note,body[data-p79-system="leave"] #adminMode label{font-size:13px!important;line-height:1.5}
+body[data-p79-system="leave"] #adminMode .btn{font-size:14px!important;line-height:1.4;min-height:40px!important;padding:9px 12px!important}
+body[data-p79-system="leave"] #adminMode>.card>.toolbar{display:grid!important;grid-template-columns:minmax(220px,1.5fr) repeat(3,minmax(150px,1fr))!important;align-items:end;gap:12px!important;margin:12px 0!important;padding:12px!important}
+body[data-p79-system="leave"] #adminMode .toolbar .field{min-width:0!important;width:auto!important;margin:0!important}
+body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{width:100%!important;min-height:42px!important;font-size:14px!important;padding:9px 12px!important}
+body[data-p79-system="leave"] #p79CleanupDeletedLeaveButton{margin:0 0 10px!important}
+body[data-p79-system="leave"] #adminMode .table-wrap{max-width:100%;overflow-x:auto}
+body[data-p79-system="leave"] .leave-admin-table{width:100%!important;min-width:1240px!important;font-size:14px!important;table-layout:auto}
+body[data-p79-system="leave"] .leave-admin-table th{font-size:14px!important;font-weight:800!important;padding:12px 10px!important;white-space:nowrap}
+body[data-p79-system="leave"] .leave-admin-table td{font-size:14px!important;padding:12px 10px!important;line-height:1.6;text-align:center!important;vertical-align:middle!important}
+body[data-p79-system="leave"] .leave-admin-table th:nth-child(7),body[data-p79-system="leave"] .leave-admin-table td:nth-child(7){text-align:left!important}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-status-inline>.badge,body[data-p79-system="leave"] .leave-admin-table .p79-cover-again{flex-shrink:0}
+body[data-p79-system="leave"] .leave-admin-table td:nth-child(6){max-width:220px;white-space:normal!important;overflow-wrap:anywhere}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-status-inline{justify-content:flex-start;gap:8px;min-width:260px;width:100%;text-align:left}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-cover-inline{justify-content:flex-start;gap:8px;min-width:0}
+body[data-p79-system="leave"] .leave-admin-table .p79-leave-cover-names{font-size:13px!important;line-height:1.5;white-space:normal!important}
+body[data-p79-system="leave"] .leave-admin-table .p79-cover-again{font-size:14px!important;min-height:38px;padding:8px 10px!important;border-radius:8px}
+body[data-p79-system="leave"] .leave-admin-table .actions{gap:6px!important;flex-wrap:nowrap!important}
+body[data-p79-system="leave"] .leave-admin-table .actions .btn{font-size:13px!important;min-height:36px!important;padding:7px 9px!important}
+body[data-p79-system="leave"] .leave-admin-table .leave-remain{font-size:16px!important;font-weight:800}
+body[data-p79-system="leave"] #adminBalancePanel>summary{font-size:16px!important;padding:4px 0}
+@media(max-width:1050px){body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important}body[data-p79-system="leave"] #adminMode .toolbar .field:first-child{grid-column:auto!important}}
+@media(max-width:600px){body[data-p79-system="leave"]>main{padding:10px!important}body[data-p79-system="leave"] #adminMode>.card{padding:12px!important}body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{font-size:16px!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{font-size:14px!important;padding:9px!important}body[data-p79-system="leave"] #adminMode .actions{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveAdminDateRangePicker>div{min-width:0!important;width:min(340px,calc(100vw - 66px))}}
+</style>
+
+<style id="p79-leave-type-colors-20261014">
+.p79-leave-type{display:inline-flex;align-items:center;justify-content:center;max-width:100%;padding:5px 10px;border:1px solid;border-radius:8px;font-size:14px!important;font-weight:800;line-height:1.5;white-space:nowrap}
+.p79-leave-type-annual{background:#dcfce7;color:#14532d;border-color:#86efac}
+.p79-leave-type-personal{background:#ffedd5;color:#7c2d12;border-color:#fdba74}
+.p79-leave-type-sick{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd}
+.p79-leave-type-injury{background:#fee2e2;color:#7f1d1d;border-color:#fca5a5}
+.p79-leave-type-marriage{background:#fce7f3;color:#831843;border-color:#f9a8d4}
+.p79-leave-type-bereavement{background:#e2e8f0;color:#1e293b;border-color:#94a3b8}
+.p79-leave-type-official{background:#ccfbf1;color:#134e4a;border-color:#5eead4}
+.p79-leave-type-maternity{background:#f3e8ff;color:#581c87;border-color:#d8b4fe}
+.p79-leave-type-prenatal{background:#fae8ff;color:#701a75;border-color:#f0abfc}
+.p79-leave-type-paternity{background:#e0e7ff;color:#312e81;border-color:#a5b4fc}
+.p79-leave-type-pregnancy{background:#ede9fe;color:#4c1d95;border-color:#c4b5fd}
+.p79-leave-type-family{background:#fef3c7;color:#78350f;border-color:#fcd34d}
+.p79-leave-type-menstrual{background:#ffe4e6;color:#881337;border-color:#fda4af}
+.p79-leave-type-other{background:#ecfccb;color:#365314;border-color:#bef264}
+body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!important;min-height:36px!important;padding:7px 9px!important;border:0;border-radius:8px;white-space:nowrap}
+</style>
+<script>document.documentElement.classList.add('p79-leave-simple');</script>
+<style id="p79-employee-leave-simple-v107">
+html.p79-leave-simple #p79LeaveTop,html.p79-leave-simple #p79SevenTop,html.p79-leave-simple body>header,html.p79-leave-simple #leaveStickyTabs,html.p79-leave-simple #port79CalendarModeBox,html.p79-leave-simple #p79SevenStandardMenu,html.p79-leave-simple #p79LeaveHandoffBanner,html.p79-leave-simple #employeeLoginCard,html.p79-leave-simple #employeeLeaveHistory{display:none!important}
+#employeeLeaveSimpleHeader{display:none}
+html.p79-leave-simple #employeeLeaveSimpleHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);padding:14px 16px;border-bottom:1px solid var(--border)}
+html.p79-leave-simple #employeeLeaveSimpleHeader strong{font-size:20px}
+html.p79-leave-simple main{max-width:620px!important;width:100%!important;margin:0 auto!important;padding:14px!important}
+html.p79-leave-simple #employeeMode .grid{display:block!important}
+html.p79-leave-simple #employeeProfileCard{padding:16px}
+html.p79-leave-simple #employeeMode .balance{gap:6px}
+html.p79-leave-simple #globalStatus{font-size:14px;margin-bottom:10px}
+html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
+#employeeLeaveReauth{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;line-height:1.6}
+#employeeLeaveReauth[hidden]{display:none!important}
+</style>
+</head>
+<!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
+<body data-p79-system="leave">
+<div id="employeeLeaveSimpleHeader"><strong>請假申請</strong><button type="button" class="btn btn-sec" onclick="location.href='../attendance/'">返回打卡</button></div>
+<header>
+  <div class="header-inner">
+    <div><div class="title">📝 請假管理</div><div class="sub">版本 2026.09.27.7.13｜一般員工可申請法定／公司公告假別</div></div>
+    <div class="top-actions"><button class="btn btn-home" onclick="location.href='../'">🏠 返回首頁</button><button id="themeBtn" class="btn btn-home">🌙 暗色</button></div>
+  </div>
+</header>
+<main>
+  <div id="p79LeaveHandoffBanner" class="status info" hidden><span id="p79LeaveHandoffStatus"></span> <button type="button" class="btn" onclick="p79OpenLeaveOvertimeHandoff()">接續代班加班申報</button></div>
+  <div id="globalStatus" class="status info">正在連線雲端...</div>
+
+  <div id="leaveStickyTabs" class="tabs">
+    <button id="tabEmployee" class="tab active" onclick="switchMode('employee')">👷 員工請假</button>
+    <button id="tabAdmin" class="tab hidden" onclick="switchMode('admin')">🛡️ 管理／審核</button>
+  </div>
+
+  <section id="employeeMode">
+    <div id="employeeLeaveReauth" hidden><b>請重新登入後申請請假</b><p>目前登入已失效，尚未送出請假申請。</p><a class="btn btn-pri" href="../?logout=1">重新登入</a></div>
+    <div class="grid">
+      <div>
+        <div id="employeeLoginCard" class="card">
+          <h2>員工身分</h2>
+          <div class="field"><label>考勤號／工號／電話</label><input id="empLoginInput" placeholder="輸入後按確認"></div>
+          <button class="btn btn-pri" style="width:100%" onclick="employeeLogin()">確認員工身分</button>
+          <p class="note">與考勤系統使用同一份「人資主檔」。這裡不另外建立人員資料。</p>
+        </div>
+
+        <div id="employeeProfileCard" class="card hidden">
+          <div class="emp-card"><div id="empName" class="name">--</div><div id="empMeta" class="meta">--</div></div>
+          <div class="balance">
+            <div class="metric"><b id="balanceEntitled">--</b><span>可休合計</span></div>
+            <div class="metric"><b id="balanceUsed">--</b><span>已休</span></div>
+            <div class="metric"><b id="balanceRemaining">--</b><span>目前未休</span></div>
+          </div>
+          <div id="balanceAsOf" class="status info" style="margin-top:0">年假基準：尚無匯入資料</div>
+          <div class="field"><label>假別</label>
+            <select id="leaveType">
+              <option value="特休假">年假</option>
+              <option value="事假">事假</option>
+              <option value="普通傷病假">普通傷病假</option>
+              <option value="公傷病假">公傷病假</option>
+              <option value="婚假">婚假</option>
+              <option value="喪假">喪假</option>
+              <option value="公假">公假</option>
+              <option value="產假">產假</option>
+              <option value="產檢假">產檢假</option>
+              <option value="陪產檢及陪產假">陪產檢及陪產假</option>
+              <option value="安胎休養請假">安胎休養請假</option>
+              <option value="家庭照顧假">家庭照顧假</option>
+              <option value="生理假">生理假</option>
+              <option value="其他公司公告假別">其他公司公告假別</option>
+            </select>
+          </div>
+          <div class="field"><label>開始日期</label><input id="leaveStart" type="date" onchange="updateDays()"></div>
+          <div class="field"><label>結束日期</label><input id="leaveEnd" type="date" onchange="updateDays()"></div>
+          <div class="field"><label>請假天數</label><input id="leaveDays" value="1" readonly></div>
+          <div class="field"><label>事由／備註</label><textarea id="leaveReason" placeholder="請輸入請假事由"></textarea></div>
+          <button id="submitLeaveBtn" class="btn btn-pri" style="width:100%" onclick="submitLeave()">📤 送出請假申請</button>
+          <button id="changeEmployeeBtn" class="btn btn-sec" style="width:100%;margin-top:8px" onclick="logoutEmployee()">更換員工</button>
+        </div>
+      </div>
+
+      <div id="employeeLeaveHistory" class="card">
+        <h2>我的請假紀錄</h2>
+        <div class="table-wrap"><table><thead><tr><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th></tr></thead><tbody id="myLeaveBody"><tr><td colspan="5">請先確認員工身分</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="adminMode" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
+        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出Excel</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
+      </div>
+      <div class="toolbar">
+        <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
+        <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
+        <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
+      </div>
+      <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button>
+      <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
+      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>部門</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
+    </div>
+
+    <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
+      <summary style="cursor:pointer;font-size:18px;font-weight:700;padding:6px 0">🏖️ 員工年假剩餘天數 <span class="note">（點選展開／收合）</span></summary>
+      <p id="adminBalanceMonthSummary" class="note" role="status"></p><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
+    </details>
+  </section>
+</main>
+<input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+<script>
+const APP_VERSION='2026.10.16.112';
+const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
+let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
+window.GAS_URL=GAS_URL;
+const $=id=>document.getElementById(id);
+let p79LeaveComparisonRows=[];
+let employees=[], leaveRecords=[], currentEmployee=null, adminSession=null, adminToken='', leaveAccess='none', currentMode='employee';
+function leaveEmploymentStatus(e){const s=String(e?.employmentStatus||'active').toLowerCase();if(['resigned','離職','terminated','inactive'].includes(s))return'resigned';if(['leave','留職停薪','留停','loa'].includes(s))return'leave';return'active'}
+function leaveEmployeeIsActive(e){return leaveEmploymentStatus(e)==='active'}
+
+function esc(v){return String(v??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
+function level(v,f='none'){v=String(v??'').toLowerCase();return ['none','view','manage'].includes(v)?v:f}
+function perms(emp,role){role=String(role||emp?.adminRole||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',leave:'manage',schedule:'manage',efficiency:'manage'};const raw=emp?.systemPermissions&&typeof emp.systemPermissions==='object'?emp.systemPermissions:{};const def=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none'}:{attendance:'view',leave:'view',schedule:'view',efficiency:'none'};return{attendance:level(raw.attendance,def.attendance),leave:level(raw.leave,def.leave),schedule:level(raw.schedule,def.schedule),efficiency:level(raw.efficiency,def.efficiency)}}
+function p79LeaveAuthError(message){return /登入驗證資料不存在|登入.*(?:失效|過期)|Token.*(?:失效|過期|無效)|請重新登入|尚未登入/i.test(String(message||''))}
+function p79EmployeeLeaveReauth(){
+ if(adminSession)return;
+ currentEmployee=null;$('employeeProfileCard').classList.add('hidden');$('employeeLeaveReauth').hidden=false;
+ $('globalStatus').className='status warn';$('globalStatus').textContent='登入已失效，請重新登入後再申請。';
+}
+function setStatus(msg,type='info'){
+ const b=$('globalStatus');b.className='status '+type;
+ if(!adminSession&&p79LeaveAuthError(msg)){p79EmployeeLeaveReauth();return;}
+ b.textContent=msg;
+}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('leave_theme',t);$('themeBtn').textContent=t==='dark'?'☀️ 淺色':'🌙 暗色'};setTheme(localStorage.getItem('leave_theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));$('themeBtn').onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+
+async function jsonFetch(url,opt={},timeout=25000){
+ const c=typeof AbortController!=='undefined'?new AbortController():null;let timed=false;const t=c?setTimeout(()=>{timed=true;try{c.abort()}catch{}},timeout):null;
+ try{const r=await fetch(url,{...opt,signal:c?.signal});const raw=await r.text();if(!r.ok)throw new Error('HTTP '+r.status);if(/^<!doctype|<html/i.test(raw.trim()))throw new Error('GAS 回傳網頁而不是 JSON');return JSON.parse(raw)}
+ catch(e){if(timed||String(e?.name)==='AbortError'||/abort/i.test(String(e?.message||e)))throw new Error('雲端回應逾時，請再試一次');throw e}
+ finally{if(t)clearTimeout(t)}
+}
+function leaveRequestToken(){
+ if(adminSession||adminToken)return String(adminToken||'').trim();
+ return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
+}
+async function loadCloud(show=false,requireFresh=false,identityReady=null){
+ let last;
+ for(let i=0;i<3;i++){
+  try{
+   if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
+   const userToken=leaveRequestToken();
+   if(!userToken&&!adminSession){p79EmployeeLeaveReauth();return false;}
+   const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   if(identityReady)await identityReady;
+   if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
+   if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
+   employees=Array.isArray(d.employees)?d.employees:[];
+   leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
+   window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
+   if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
+   populateDepartments();renderAll();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
+  }catch(e){
+   last=e;
+   if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
+  }
+ }
+ if(requireFresh)throw last||new Error('無法讀回最新雲端資料，尚未確認匯入成功');
+ // getLeaveData 太慢時，先用最近一次本機快取，避免整頁變空白。
+ try{
+   const snap=await window.Port79DataCache?.getSystemSnapshot?.('leave');
+   const d=snap?.data;
+   if(d?.ok && Array.isArray(d.employees)){
+     employees=d.employees;
+     if(adminSession&&Array.isArray(d.leaveRecords))leaveRecords=d.leaveRecords;
+     populateDepartments();renderAll();
+     setStatus('☁️ 雲端較慢｜已先顯示最近一次請假資料','warn');
+     return true;
+   }
+ }catch(e){console.warn('請假快取備援失敗',e)}
+
+ // 再用較輕的人資端點先把員工與年假/可休天數載入；請假紀錄稍後可按重新整理補抓。
+ try{
+   const userToken=leaveRequestToken();
+   const hr=await jsonFetch(GAS_URL+'?action=hrGetEmployees&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+   if(hr?.ok && Array.isArray(hr.employees)){
+     employees=hr.employees;
+     populateDepartments();renderAll();
+     setStatus('☁️ 請假紀錄雲端較慢｜已先載入人員與年假資料，可按「重新整理」再抓請假紀錄','warn');
+     return true;
+   }
+ }catch(e){console.warn('人資備援讀取失敗',e)}
+
+ setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
+}
+async function postCloud(payload){
+ const userToken=leaveRequestToken();
+ if(userToken){payload.token=userToken;if(adminToken)payload.gcToken=adminToken}
+ const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'},['updateLeaveBalances','saveLeaveCoverAssignment'].includes(payload.action)?45000:25000);
+ if(!d?.ok)throw new Error(d?.error||d?.message||'雲端操作失敗');return d;
+}
+function readHash(){try{const p=new URLSearchParams(String(location.hash||'').replace(/^#/,''));const gas=p.get('gasurl');if(gas)sessionStorage.setItem('port79_gas_url',gas);return String(p.get('port79sso')||'')}catch{return''}}
+function storedToken(){return String(readHash()||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim()}
+async function restoreAdmin(){
+ adminToken=storedToken();if(!adminToken)return false;
+ let last;
+ for(let i=0;i<2;i++){
+  try{
+   setStatus(i===0?'🔐 正在驗證管理員身分…':'🔐 雲端較慢，正在重新驗證管理員身分…','info');
+   const d=await jsonFetch(GAS_URL+'?action=gcGetSyncMeta&gcToken='+encodeURIComponent(adminToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+   if(!d?.ok)throw new Error(d?.error||'SSO 驗證失敗');
+   const role=String(d.adminRole||'').toLowerCase();if(!['admin','superadmin'].includes(role))throw new Error('沒有管理員權限');
+   const p=perms({systemPermissions:d.systemPermissions},role);leaveAccess=p.leave;
+   if(leaveAccess==='none')throw new Error('此帳號沒有請假系統權限');
+   adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p,finePermissions:d.finePermissions||{},overtimePermissions:d.systemPermissions||{}};
+   try{history.replaceState(null,'',location.pathname+location.search)}catch{}
+   $('tabAdmin').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
+   switchMode('admin');p79UpdateLeaveHandoffBanner();return true;
+  }catch(e){
+   last=e;console.warn('管理員 SSO 第 '+(i+1)+' 次驗證失敗',e);
+   if(i===0)await new Promise(r=>setTimeout(r,900));
+  }
+ }
+ adminSession=null;
+ setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
+ return false;
+}
+function switchMode(m){if(m==='admin'&&!adminSession)return;document.documentElement.classList.toggle('p79-leave-simple',m!=='admin');currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
+function employeeLogin(){
+ const raw=$('empLoginInput').value.trim(),digits=raw.replace(/\D/g,'');if(!raw){setStatus('請輸入考勤號、工號或電話','warn');return}
+ const matches=employees.filter(e=>leaveEmployeeIsActive(e)&&(String(e.empId||'').trim().toUpperCase()===raw.toUpperCase()||String(e.attNo??'').trim()===raw|| (digits&&String(e.phone||'').replace(/\D/g,'')===digits)));
+ if(matches.length!==1){setStatus(matches.length>1?'找到多筆人員，請改用完整工號':'找不到員工，請確認人資主檔','error');return}
+ const e=matches[0];
+ currentEmployee=e;sessionStorage.setItem('port79_leave_emp_id',String(e.empId||''));showEmployee();setStatus('✅ 已確認 '+(e.name||e.empId),'')
+}
+function logoutEmployee(){currentEmployee=null;sessionStorage.removeItem('port79_leave_emp_id');$('employeeLoginCard').classList.remove('hidden');$('employeeProfileCard').classList.add('hidden');renderMy()}
+function isSpecialLeave(l){return /特休|年假/.test(String(l?.leaveType||''))}
+function leaveDays(l){const n=Number(l?.days??l?.hours??0);return Number.isFinite(n)?n:0}
+function leaveBalanceInfo(emp){
+ const b=emp?.leaveBalance;if(!b||!Number.isFinite(Number(b.remaining)))return{entitled:null,used:null,effectiveRemaining:null,newlyApproved:0,asOf:''};
+ const baseline=new Set(Array.isArray(b.baselineApprovedLeaveIds)?b.baselineApprovedLeaveIds.map(String):[]);
+ const newlyApproved=leaveRecords.filter(l=>sameEmployee(l,emp)&&isSpecialLeave(l)&&String(l.status||'')==='已核准'&&!baseline.has(String(l.id||''))).reduce((sum,l)=>sum+leaveDays(l),0);
+ const importedRemaining=Number(b.remaining)||0;
+ return{entitled:(Number(b.carryOver)||0)+(Number(b.annual)||0),used:(Number(b.used)||0)+newlyApproved,effectiveRemaining:Math.max(0,Math.round((importedRemaining-newlyApproved)*10)/10),newlyApproved,asOf:String(b.asOf||'')};
+}
+function leaveBalanceExplanation(emp,info=leaveBalanceInfo(emp)){
+ if(info.effectiveRemaining==null)return '尚無匯入餘額';
+ return '匯入 '+fmtDay(emp.leaveBalance.remaining)+' 天 − 另核准 '+fmtDay(info.newlyApproved)+' 天 ＝ '+fmtDay(info.effectiveRemaining)+' 天';
+}
+function leaveBalanceMonthSummary(people){
+ const counts=new Map();for(const e of people){const month=normalizeLeaveBalanceMonth(e.leaveBalance?.asOf);if(month)counts.set(month,(counts.get(month)||0)+1);}
+ const months=[...counts.keys()].sort(),latest=months.at(-1)||'';
+ return {latest,text:months.length?months.map(m=>m+'：'+counts.get(m)+' 人').join('｜')+(months.length>1?'。較早月份的人員尚未更新至 '+latest+'。':''):'尚無有效基準月份'};
+}
+function fmtDay(n){return Number.isFinite(Number(n))?Number(n).toFixed(1):'--'}
+function showEmployee(){
+ if(!currentEmployee)return;$('employeeLoginCard').classList.add('hidden');$('employeeProfileCard').classList.remove('hidden');$('empName').textContent=currentEmployee.name||currentEmployee.empId;$('empMeta').textContent=`工號 ${currentEmployee.empId||'--'}｜考勤號 ${currentEmployee.attNo||'--'}｜${currentEmployee.dept||'未設定部門'}`;
+ const info=leaveBalanceInfo(currentEmployee);$('balanceEntitled').textContent=fmtDay(info.entitled);$('balanceUsed').textContent=fmtDay(info.used);$('balanceRemaining').textContent=fmtDay(info.effectiveRemaining);$('balanceAsOf').textContent=info.effectiveRemaining==null?'年假基準：尚無每月匯入資料':`年假基準：${info.asOf||'最近一次匯入'}${info.newlyApproved>0?`｜匯入後另核准 ${fmtDay(info.newlyApproved)} 天，已自動扣除`:''}`;renderMy()
+}
+function sameEmployee(l,e){return String(l.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase() || (String(l.attNo||'').trim()&&String(l.attNo||'').trim()===String(e.attNo||'').trim())}
+function badge(s){const c=s==='已核准'?'approved':s==='已駁回'?'rejected':'pending';return `<span class="badge ${c}">${esc(s||'待審核')}</span>`}
+function leaveTypeBadge(value){
+ const name=String(value||'未設定假別');
+ const kinds={'特休假':'annual','年假':'annual','特休':'annual','特別休假':'annual','事假':'personal','普通傷病假':'sick','病假':'sick','公傷病假':'injury','婚假':'marriage','喪假':'bereavement','公假':'official','產假':'maternity','產檢假':'prenatal','陪產檢及陪產假':'paternity','安胎休養請假':'pregnancy','家庭照顧假':'family','生理假':'menstrual','其他公司公告假別':'other'};
+ return '<span class="p79-leave-type p79-leave-type-'+(kinds[name]||'other')+'">'+esc(name)+'</span>';
+}
+function renderMy(){
+ const body=$('myLeaveBody');if(body)body.innerHTML='<tr><td colspan="5">一般員工不開放請假紀錄查閱</td></tr>';
+}
+function updateDays(){const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){$('leaveDays').value='';return}const a=new Date(s+'T00:00:00'),b=new Date(e+'T00:00:00');const d=Math.floor((b-a)/86400000)+1;$('leaveDays').value=d>0?d:''}
+async function submitLeave(){
+ if(!currentEmployee)return;const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){setStatus('請選擇開始與結束日期','warn');return}updateDays();const days=Number($('leaveDays').value);if(!days){setStatus('結束日期不可早於開始日期','error');return}
+ const btn=$('submitLeaveBtn');btn.disabled=true;btn.textContent='上傳中...';
+ try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';await loadCloud()}
+ catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
+ finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
+}
+function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=ds.includes(cur)?cur:'';populateLeaveAdminJobs()}
+function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
+function p79LeaveJobForRecord(record){
+ const id=String(record.empId||'').trim().toUpperCase(),attNo=String(record.attNo||'').trim();
+ const employee=employees.find(e=>id&&String(e.empId||'').trim().toUpperCase()===id)||employees.find(e=>attNo&&String(e.attNo||'').trim()===attNo);
+ return String(employee?.jobTitle||employee?.deptDetail||record.jobTitle||record.deptDetail||'').trim();
+}
+function populateLeaveAdminJobs(){
+ const select=$('filterJob');if(!select)return;const dept=$('filterDept').value,current=select.value;
+ const jobs=[...new Set([...employees.filter(e=>!dept||String(e.dept||'')===dept).map(e=>String(e.jobTitle||e.deptDetail||'').trim()),...leaveRecords.filter(l=>!dept||String(l.dept||'')===dept).map(p79LeaveJobForRecord)].filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
+ select.innerHTML='<option value="">全部職稱</option>'+jobs.map(job=>`<option value="${esc(job)}">${esc(job)}</option>`).join('');select.value=jobs.includes(current)?current:'';
+}
+
+async function p79ComparisonOutput(title,rows,printMode){
+ if(printMode){
+  const popup=window.open('','_blank');if(!popup)throw Error('請允許列印視窗');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+escape(title)+'</title><style>body{font:12px sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:6px;text-align:center}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style><h2>'+escape(title)+'</h2><table>'+rows.map((r,i)=>'<tr>'+r.map(v=>'<'+(i?'td':'th')+'>'+escape(v)+'</'+(i?'td':'th')+'>').join('')+'</tr>').join('')+'</table></html>');popup.document.close();popup.focus();popup.print();return;
+ }
+ await window.p79EnsureXlsx();if(!window.XLSX)throw Error('Excel元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
+}
+async function p79ExportLeaveComparison(printMode){
+ if(!adminSession||leaveAccess==='none')return;
+ if(adminSession.adminRole!=='superadmin'&&adminSession.finePermissions?.leave?.['records.export']===false)return alert('沒有匯出權限');renderAdmin();
+ const rows=[['請假人員','部門','假別','開始日期','結束日期','天數','事由','狀態','代班人員'],...p79LeaveComparisonRows.map(l=>{
+ const covers=(window.p79LeaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(l.id));
+ const ids=[...new Set(covers.flatMap(c=>c.workerIds||[]))];
+ return [l.name||l.empId,l.dept||'',l.leaveType||'',l.startTime||l.startDate||'',l.endTime||l.endDate||'',l.days??l.dayCount??'',l.reason||'',l.status||'',ids.map(id=>employees.find(e=>String(e.empId)===String(id))?.name||id).join('、')];})];
+ try{await p79ComparisonOutput('請假比對表',rows,printMode)}catch(e){alert(e.message)}
+}
+function renderAdmin(){
+ if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
+ if(!adminSession)return;
+ $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
+ const dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
+ let rows=leaveRecords.filter(l=>(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'')===status));
+ p79LeaveComparisonRows=rows;
+ rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
+ const balanceCache=new Map(),coverIndex=new Map();
+ for(const cover of window.p79LeaveCoverAssignments||[]){const key=String(cover.leaveId),prior=coverIndex.get(key);coverIndex.set(key,prior?{...prior,workerIds:[...new Set([...(prior.workerIds||[]),...(cover.workerIds||[])])]}:cover);}
+ const peopleIndex=new Map(employees.map(e=>[String(e.empId||'').trim().toUpperCase(),e]));
+ $('adminLeaveBody').innerHTML=rows.length?rows.map(l=>{
+   const emp=employees.find(e=>sameEmployee(l,e));
+   const key=String(emp?.empId||'');if(emp&&!balanceCache.has(key))balanceCache.set(key,leaveBalanceInfo(emp));
+   const info=emp?balanceCache.get(key):{effectiveRemaining:null};
+   const remain=info.effectiveRemaining;
+   const remainClass=remain==null?'na':Number(remain)<=0?'zero':'';
+   const remainText=remain==null?'--':fmtDay(remain)+' 天';
+   const leaveType=/特休|年假/.test(String(l.leaveType||''))?'年假':String(l.leaveType||'');
+   const cover=coverIndex.get(String(l.id));
+   const workerIds=Array.isArray(cover?.workerIds)?cover.workerIds.filter(Boolean):[];
+   const workerNames=workerIds.map(id=>{
+     const e=peopleIndex.get(String(id).trim().toUpperCase());
+     return e?.name||String(id);
+   });
+   const coverText=workerNames.length
+     ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
+     : l.source==='manual-admin-no-cover'?'無須代班人員':'尚未安排代班';
+   const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
+     ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>${workerIds.length?`<button type="button" class="p79-cover-again" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">加班明細</button>`:''}`
+     : '';
+   const coverDisplay=String(l.status)==='已核准'
+     ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
+     : '';
+   return `<tr>
+     <td><b>${esc(l.name||'')}</b><br><span class="note">${esc(l.empId||l.attNo||'')}</span></td>
+     <td>${esc(l.dept||'')}</td>
+     <td>${leaveTypeBadge(leaveType)}</td>
+     <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
+     <td>${esc(l.days??l.hours??'')}</td>
+     <td>${esc(l.reason||'')}</td>
+     <td><div class="p79-leave-status-inline">${badge(l.status)}${coverDisplay}</div></td>
+     <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
+     <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
+   </tr>`;
+ }).join(''):'<tr><td colspan="9">沒有符合資料</td></tr>';
+}
+function renderAdminBalances(){
+ if(!$('adminBalancePanel')?.open)return;
+ const body=$('adminBalanceBody');if(!body)return;const kw=String($('balanceKeyword')?.value||'').trim().toLowerCase();
+ const rows=employees.filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
+ const summary=leaveBalanceMonthSummary(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))));
+ if($('adminBalanceMonthSummary'))$('adminBalanceMonthSummary').textContent=summary.text;
+ body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}${summary.latest&&normalizeLeaveBalanceMonth(b.asOf)<summary.latest?'<div class="note" style="color:#b45309;font-weight:700">待更新</div>':''}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b><div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(e,info))}</div></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
+}
+
+let p79SavedCoverReportBusy=false;
+async function p79ReportSavedLeaveCover(id){
+ if(p79SavedCoverReportBusy||leaveAccess!=='manage')return;
+ p79SavedCoverReportBusy=true;
+ try{
+  setStatus('正在帶入已安排代班的加班明細…','info');
+  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  if(!fresh?.ok)throw new Error(fresh?.error||'雲端讀取失敗');
+  const leave=(fresh.leaveRecords||[]).find(l=>String(l.id)===String(id));
+  const covers=(fresh.leaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(id));
+  if(!leave||leave.status!=='已核准'||!covers.length)throw new Error('此筆請假目前沒有已儲存的代班安排，請重新整理核對');
+  const entries=[],seen=new Set();
+  for(const cover of covers){const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);if(!start||!end||start>end)throw new Error('代班日期無效，請先核對');for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const worker of cover.workerIds||[]){const empId=String(worker),key=empId+'|'+date;if(seen.has(key))continue;seen.add(key);const person=(fresh.employees||[]).find(e=>String(e.empId)===empId);entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId)});if(entries.length>124)throw new Error('申報日期超出單次範圍，請分次安排');}}}
+  if(!entries.length)throw new Error('找不到可申報的代班人員');
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:String(id),createdAt:Date.now(),entries}));
+  await p79OpenLeaveOvertimeHandoff();
+  void loadCloud(false,true);
+ }catch(error){setStatus('加班明細未開啟：'+String(error.message||error),'error');}
+ finally{p79SavedCoverReportBusy=false;}
+}
+function p79OpenLeaveCover(id){
+ const leave=leaveRecords.find(x=>String(x.id)===String(id));
+ if(!leave||leaveAccess!=='manage'||leave.status!=='已核准')return;
+ const modal=document.getElementById('p79LeaveCoverModal');
+ const target=employees.find(e=>sameEmployee(leave,e));
+ document.getElementById('p79LeaveCoverId').value=String(id);
+ document.getElementById('p79LeaveCoverSummary').textContent=(leave.name||leave.empId)+'｜'+(leave.leaveType||'請假')+'｜'+String(leave.startTime||leave.startDate||'')+' ～ '+String(leave.endTime||leave.endDate||'')+'｜同部門：'+(target?.dept||'未設定');
+ document.getElementById('p79LeaveCoverMode').value='one';
+ document.getElementById('p79LeaveCoverJob').value='';document.getElementById('p79LeaveCoverSecondJob').value='';
+ document.getElementById('p79LeaveCoverFirst').value='';
+ document.getElementById('p79LeaveCoverSecond').value='';
+ p79FilterLeaveCoverPeople();
+ p79RefreshLeaveCoverMode();
+ const saved=(window.p79LeaveCoverAssignments||[]).find(x=>String(x.leaveId)===String(id));
+ if(saved){
+  document.getElementById('p79LeaveCoverMode').value=saved.mode==='two'?'two':saved.mode==='rest'?'rest':'one';
+  p79RefreshLeaveCoverMode();
+  document.getElementById('p79LeaveCoverFirst').value=saved.workerIds?.[0]||'';
+  p79FilterLeaveCoverPeople();
+  document.getElementById('p79LeaveCoverSecond').value=saved.workerIds?.[1]||'';
+ }
+ modal.hidden=false;
+}
+function p79FilterLeaveCoverPeople(){
+ const leave=leaveRecords.find(x=>String(x.id)===String($('p79LeaveCoverId').value));
+ const target=employees.find(e=>sameEmployee(leave||{},e)),dept=String(target?.dept||'').trim();
+ const eligible=leaveCreatePeople().filter(e=>dept&&!sameEmployee(leave,e)&&String(e.dept||'').trim()===dept);
+ const job=$('p79LeaveCoverJob');leaveFillJobFilter(job,eligible);
+ const choices=eligible.filter(e=>!job.value||leavePersonJob(e)===job.value);
+ const first=$('p79LeaveCoverFirst'),second=$('p79LeaveCoverSecond'),firstId=first.value,secondId=second.value;
+ const prompt='<option value="">'+(choices.length?'請選擇人員':'此職稱沒有可代班人員')+'</option>';
+ first.innerHTML=prompt+choices.map(leavePersonOption).join('');
+ if(choices.some(e=>String(e.empId)===firstId))first.value=firstId;
+ const secondJob=$('p79LeaveCoverSecondJob');leaveFillJobFilter(secondJob,eligible);
+ const others=eligible.filter(e=>(!secondJob.value||leavePersonJob(e)===secondJob.value)&&String(e.empId)!==String(first.value));
+ second.innerHTML=prompt+others.map(leavePersonOption).join('');
+ if(others.some(e=>String(e.empId)===secondId))second.value=secondId;
+}
+function p79RefreshLeaveCoverMode(){
+ document.getElementById('p79LeaveCoverSecondWrap').hidden=document.getElementById('p79LeaveCoverMode').value!=='two';
+}
+function p79CloseLeaveCover(){document.getElementById('p79LeaveCoverModal').hidden=true;}
+async function p79SaveLeaveCover(){
+ const btn=document.getElementById('p79LeaveCoverSave');
+ const mode=document.getElementById('p79LeaveCoverMode').value;
+ const first=document.getElementById('p79LeaveCoverFirst').value;
+ const second=document.getElementById('p79LeaveCoverSecond').value;
+ if(!first)return alert('請選擇代班人員');
+ if(mode==='two'&&(!second||first===second))return alert('請選擇兩位不同的代班人員');
+ btn.disabled=true;btn.textContent='雲端保存中…';
+ try{
+  const requestedId=document.getElementById('p79LeaveCoverId').value;
+  const fresh=await p79ReadCurrentLeaveCoverState();
+  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+  const requestedLeave=fresh.leaveRecords.find(l=>String(l.id)===String(requestedId));
+  if(!requestedLeave||String(requestedLeave.status)!=='已核准')throw new Error('請假單不存在或尚未核准，請重新整理');
+  const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:requestedId,empId:requestedLeave.empId,leaveType:requestedLeave.leaveType,startDate:normalizeLeaveFilterDate(requestedLeave.startTime||requestedLeave.startDate),endDate:normalizeLeaveFilterDate(requestedLeave.endTime||requestedLeave.endDate||requestedLeave.startTime||requestedLeave.startDate),mode,workerIds:mode==='two'?[first,second]:[first]});
+  if(!plan.covered)await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode,workerIds:mode==='two'?[first,second]:[first]});
+  p79CloseLeaveCover();
+  {
+   const leaveId=plan.leaveId,leave=fresh.leaveRecords.find(l=>String(l.id)===String(leaveId));
+   const start=normalizeLeaveFilterDate(leave?.startTime||leave?.startDate),end=normalizeLeaveFilterDate(leave?.endTime||leave?.endDate||leave?.startTime||leave?.startDate);
+   if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
+   const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
+   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:leaveId,createdAt:Date.now(),entries}));
+   await p79OpenLeaveOvertimeHandoff();
+  void loadCloud(false,true);
+  }
+ }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
+ finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
+}
+async function setLeaveStatus(id,status){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('確定將此請假設為「'+status+'」？'))return;
+ try{
+  await postCloud({action:'updateLeaveStatus',id,status});
+  setStatus('✅ 請假狀態已更新','');
+  await loadCloud();renderAdmin();
+  if(status==='已核准')p79OpenLeaveCover(id);
+ }catch(e){setStatus('更新失敗：'+(e?.message||e),'error')}
+}
+async function deleteLeave(id){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('確定刪除此請假紀錄？對應的一位／兩位代班安排與代班加班會一起移除，班表恢復原班別。'))return;
+ try{
+  const result=await postCloud({action:'deleteLeaveRecord',id});
+  if(!result.linkedDelete)throw new Error('請假已刪除，但後端尚未完成連動刪除更新；代班殘留需清除，請勿直接重新安排');
+  p79ClearDeletedLeaveDraft(id);
+  setStatus('✅ 請假、對應代班與代班加班已一併刪除','success');await loadCloud();renderAdmin();
+ }catch(e){setStatus('連動刪除未確認：'+(e?.message||e),'error')}
+}
+function p79ClearDeletedLeaveDraft(id){
+ try{const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');if(String(handoff?.id)===String(id))sessionStorage.removeItem(key);const draftKey='port79_overtime_report_draft_v1',draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(String(draft?.leaveHandoffId)===String(id))sessionStorage.removeItem(draftKey);}catch(ignore){}
+}
+async function p79CleanupDeletedLeaveCovers(){
+ if(leaveAccess!=='manage')return;
+ if(!confirm('清除請假單已不存在的代班安排及相關代班加班？仍存在的請假安排會保留。'))return;
+ try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
+}
+async function p79ReadCurrentLeaveCoverState(){
+ const read=()=>jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+ let fresh=await read();
+ if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+ const ids=new Set(fresh.leaveRecords.map(l=>String(l.id)));
+ if(fresh.leaveCoverAssignments.some(c=>!ids.has(String(c.leaveId)))){await postCloud({action:'cleanupOrphanLeaveCovers'});fresh=await read();if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'清除後無法確認雲端資料，請重試');}
+ return fresh;
+}
+function leaveBalanceNumber(v){
+ const s=String(v??'').trim().replace(/,/g,'');
+ if(!s)return 0;
+ const n=Number(s.replace(/天$/,'').trim());
+ return Number.isFinite(n)?Math.round(n*10)/10:0;
+}
+function normalizeLeaveBalanceHeader(v){
+ return String(v??'')
+   .trim()
+   .replace(/[\s　]+/g,'')
+   .replace(/[()（）【】\[\]：:／/\\_-]/g,'')
+   .toLowerCase();
+}
+function leaveBalanceHeaderIndex(map,names,patterns=[]){
+ for(const name of names){
+   const key=normalizeLeaveBalanceHeader(name);
+   if(map[key]!=null)return map[key];
+ }
+ const entries=Object.entries(map);
+ for(const [key,idx] of entries){
+   if(patterns.some(re=>re.test(key)))return idx;
+ }
+ return null;
+}
+function leaveBalanceCell(row,map,names,patterns=[]){
+ const idx=leaveBalanceHeaderIndex(map,names,patterns);
+ return idx==null?'':row[idx];
+}
+async function exportLeaveBalanceXlsx(){
+ if(leaveAccess!=='manage')return alert('僅管理員可匯出');
+ try{
+  await window.p79EnsureXlsx();
+  const data=employees.filter(e=>e.empId&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining)));
+  if(!data.length)throw Error('尚無可匯出資料');
+  const rows=[['部門','員工編號','員工姓名','遞延天數','今年年假天數','已休年假天數','未休年假天數']];
+  data.forEach(e=>{const b=e.leaveBalance;rows.push([b.sourceDept||e.dept||'',String(e.empId),b.sourceName||e.name||'',Number(b.carryOver)||0,Number(b.annual)||0,Number(b.used)||0,Number(b.remaining)||0])});
+  const sheet=XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols']=[{wch:26},{wch:18},{wch:17},{wch:15},{wch:18},{wch:18},{wch:18}];
+  for(let i=2;i<=rows.length;i++){const cell=sheet['B'+i];if(cell){cell.t='s';cell.v=String(rows[i-1][1]);cell.z='@'}}
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'工作表1');
+  const month=(String(data[0].leaveBalance.asOf||'').replace(/\D/g,'').slice(0,6)||new Date().toISOString().slice(0,7).replace('-',''));
+  XLSX.writeFile(book,month+'月止可休天數統計表.xlsx');
+  setStatus('已匯出 '+data.length+' 人可休天數','');
+ }catch(e){setStatus('匯出失敗：'+(e?.message||e),'error')}
+}
+window.exportLeaveBalanceXlsx=exportLeaveBalanceXlsx;
+let leaveBalanceImportMonth='';
+function openLeaveBalanceImport(){
+ if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
+ let dialog=$('leaveBalanceMonthDialog');
+ if(!dialog){dialog=document.createElement('dialog');dialog.id='leaveBalanceMonthDialog';dialog.style.cssText='width:360px;max-width:calc(100vw - 32px);height:fit-content;min-height:0;padding:20px;border:1px solid #cbd5e1;border-radius:14px;text-align:center';dialog.innerHTML='<h3>匯入未休假天數</h3><label style="display:block;margin:14px 0">本次基準月份<input id="leaveBalanceImportMonth" type="month" style="display:block;width:100%;padding:10px;margin-top:6px"></label><p class="note">以這裡選擇的月份為準，不沿用 Excel 的舊月份。</p><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button type="button" onclick="document.getElementById(\'leaveBalanceMonthDialog\').close()">取消</button><button type="button" class="btn btn-pri" onclick="confirmLeaveBalanceImportMonth()">選擇匯入檔案</button></div>';document.body.appendChild(dialog);}
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());const lastMonth=new Date(today.slice(0,7)+'-01T12:00:00Z');lastMonth.setUTCMonth(lastMonth.getUTCMonth()-1);
+ $('leaveBalanceImportMonth').value=lastMonth.toISOString().slice(0,7);leaveBalanceImportMonth='';dialog.showModal();
+}
+function confirmLeaveBalanceImportMonth(){
+ const month=String($('leaveBalanceImportMonth').value||'');
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return alert('請選擇本次匯入的基準月份');
+ const input=$('leaveBalanceImportFile');if(!input)return alert('找不到匯入元件');
+ leaveBalanceImportMonth=month.replace('-','/');$('leaveBalanceMonthDialog').close();input.value='';input.click();
+}
+function normalizeLeaveBalanceMonth(value){
+ const text=String(value||'').trim();const m=text.match(/^(\d{3,4})[年\/.-]?(\d{1,2})(?:月|$|[-\/]\d{1,2})/);if(!m)return '';const year=Number(m[1])+(m[1].length===3?1911:0),month=Number(m[2]);return month>=1&&month<=12?year+'/'+String(month).padStart(2,'0'):'';
+}
+function p79PlanLeaveBalanceImport(rows,people){
+ const id=v=>String(v||'').trim().toUpperCase(),name=v=>String(v||'').replace(/[\s　]+/g,'');
+ const matched=[],skipped=[],seen=new Set();
+ for(const row of rows){
+  const source=id(row.empId),sourceName=name(row.leaveBalance?.sourceName);
+  let choices=people.filter(e=>id(e.empId)===source);
+  if(!choices.length)choices=people.filter(e=>e.attNo&&id(e.attNo)===source);
+  if(!choices.length&&sourceName)choices=people.filter(e=>name(e.name)===sourceName);
+  if(choices.length>1)throw new Error('人員配對不唯一：'+(row.leaveBalance.sourceName||source));
+  const person=choices[0];
+  if(!person){skipped.push((row.leaveBalance.sourceName||source)+'（'+source+'）');continue;}
+  if(sourceName&&sourceName!==name(person.name))throw new Error('工號與姓名不一致：'+source);
+  const masterId=id(person.empId);if(!masterId||masterId==='ADMIN')throw new Error('無效人員：'+source);
+  if(seen.has(masterId))throw new Error('檔案重複配對同一人員：'+person.name);seen.add(masterId);
+  matched.push({...row,empId:masterId});
+ }
+ if(!matched.length)throw new Error('檔案沒有可配對的主檔人員，未寫入任何資料');
+ return {matched,skipped};
+}
+async function importLeaveBalanceFile(file) {
+ const selectedImportMonth=leaveBalanceImportMonth;leaveBalanceImportMonth='';
+  await window.p79EnsureXlsx();
+ if(!file)return;
+ if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
+ if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入，請重新整理後再試');
+ try{
+   setStatus('📥 正在讀取可休天數檔案…','info');
+   const buf=await file.arrayBuffer();
+   const wb=XLSX.read(buf,{type:'array',cellDates:false});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+   if(!rows.length)throw new Error('匯入檔沒有資料');
+
+   let headerRow=-1,map={};
+   for(let r=0;r<Math.min(rows.length,20);r++){
+     const next={};
+     (rows[r]||[]).forEach((v,i)=>{const k=normalizeLeaveBalanceHeader(v);if(k)next[k]=i});
+     const empIdx=leaveBalanceHeaderIndex(next,
+       ['工號','員工編號','員工工號','員編','人員編號','人員工號','empid','employeeid','employee no','employee number'],
+       [/工號/,/員編/,/員工.*編號/,/employee.*id/,/employee.*no/]
+     );
+     const remainIdx=leaveBalanceHeaderIndex(next,
+       ['目前未休','未休','未休天數','剩餘','剩餘天數','可休','可休天數','年假剩餘','年假剩餘天數','剩餘年假','特休剩餘','remaining','balance'],
+       [/未休/,/可休/,/剩餘.*年假/,/年假.*剩餘/,/剩餘.*天數/,/remaining/,/balance/]
+     );
+     if(empIdx!=null&&remainIdx!=null){headerRow=r;map=next;break}
+   }
+   if(headerRow<0)throw new Error('找不到員工工號與年假剩餘欄位；請確認檔案內有「工號／員編」及「未休／可休／剩餘年假」其中一種欄位');
+
+   // Uploaded workbook has no as-of column; use its explicit filename month (202609).
+   const sourceMonthMatch=String(file.name||'').match(/(20\d{2})[-_.]?(0[1-9]|1[0-2])(?:月|[^0-9]|$)/);
+   const fileAsOf=sourceMonthMatch?sourceMonthMatch[1]+'/'+sourceMonthMatch[2]:'';
+   let balances=[];
+   for(let r=headerRow+1;r<rows.length;r++){
+     const row=rows[r]||[];
+     const empId=String(leaveBalanceCell(row,map,
+       ['工號','員工編號','員工工號','員編','人員編號','人員工號','empid','employeeid','employee no','employee number'],
+       [/工號/,/員編/,/員工.*編號/,/employee.*id/,/employee.*no/]
+     )||'').trim().toUpperCase();
+     if(!empId)continue;
+     const sourceName=String(leaveBalanceCell(row,map,['姓名','員工姓名','人員姓名','name'],[/姓名/,/name/])||'').trim();
+     const sourceDept=String(leaveBalanceCell(row,map,['部門','單位','department','dept'],[/部門/,/單位/,/department/,/dept/])||'').trim();
+     const asOf=selectedImportMonth||normalizeLeaveBalanceMonth(fileAsOf)||normalizeLeaveBalanceMonth(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/]));
+     if(!asOf)throw new Error('Excel 沒有基準月份欄位，檔名也沒有 YYYYMM 月份，已停止匯入以免沿用舊月份');
+     const carryOver=leaveBalanceNumber(leaveBalanceCell(row,map,['遞延','遞延天數','去年遞延','去年未休','carryover'],[/遞延/,/去年.*未休/,/carryover/]));
+     const annual=leaveBalanceNumber(leaveBalanceCell(row,map,['今年年假','年假','年假天數','本年度年假','本年年假','特休','特休天數','annual'],[/今年.*年假/,/本年.*年假/,/^年假/,/^特休/,/annual/]));
+     const used=leaveBalanceNumber(leaveBalanceCell(row,map,['已休','已休天數','已使用','使用天數','used'],[/已休/,/已使用/,/使用.*天數/,/used/]));
+     let remainingRaw=leaveBalanceCell(row,map,
+       ['目前未休','未休','未休天數','剩餘','剩餘天數','可休','可休天數','年假剩餘','年假剩餘天數','剩餘年假','特休剩餘','remaining','balance'],
+       [/未休/,/可休/,/剩餘.*年假/,/年假.*剩餘/,/剩餘.*天數/,/remaining/,/balance/]
+     );
+     let remaining=leaveBalanceNumber(remainingRaw);
+     if(String(remainingRaw??'').trim()==='' && (carryOver||annual||used))remaining=Math.max(0,Math.round((carryOver+annual-used)*10)/10);
+     balances.push({empId,leaveBalance:{asOf,carryOver,annual,used,remaining,sourceName,sourceDept,importedAt:new Date().toISOString(),source:'leave-system-import'}});
+   }
+   if(!balances.length)throw new Error('沒有讀到可匯入的員工資料');
+   if(!employees.length)await loadCloud(true,true);
+   const plan=p79PlanLeaveBalanceImport(balances,employees);balances=plan.matched;
+   const skippedNote=plan.skipped.length?'\n另有 '+plan.skipped.length+' 人不在目前主檔，本次不匯入：\n'+plan.skipped.join('、'):'';
+   if(!confirm('確認匯入基準月份：'+balances[0].leaveBalance.asOf+'\n將更新 '+balances.length+' 人的可休天數。'+skippedNote+'\n確定繼續？'))return;
+
+   setStatus('☁️ 正在更新 '+(selectedImportMonth||fileAsOf||balances[0]?.leaveBalance?.asOf||'')+' 未休假天數…','info');
+   const d=await postCloud({action:'updateLeaveBalances',balances});
+   // 不以 POST ok 當成匯入成功：重新讀取正式雲端員工主檔後逐人核對基準月份及餘額。
+   await loadCloud(true,true);
+   const latest=new Map(employees.map(e=>[String(e.empId||'').trim().toUpperCase(),e]));
+   const mismatches=[];
+   const num=v=>Math.round((Number(v)||0)*10)/10;
+   for(const row of balances){
+     const actual=latest.get(String(row.empId).trim().toUpperCase())?.leaveBalance;
+     if(!actual || String(actual.asOf||'').replace(/[-.]/g,'/')!==String(row.leaveBalance.asOf||'').replace(/[-.]/g,'/') ||
+        num(actual.remaining)!==num(row.leaveBalance.remaining)){
+       mismatches.push(row.empId);
+     }
+   }
+   if(mismatches.length){
+     setStatus('⚠️ 雲端讀回核對未通過：'+mismatches.length+' 人的基準月份或剩餘天數與 Excel 不一致，未確認匯入成功。','error');
+     alert('匯入已送出，但雲端讀回不一致：'+mismatches.length+' 人。\n請不要連續重複匯入，先核對雲端資料。');
+     return;
+   }
+   const success='✅ 已重新讀回 Google 雲端並核對 '+balances.length+' 人，基準月份 '+balances[0].leaveBalance.asOf+'，剩餘天數一致。'+(plan.skipped.length?' 未匯入 '+plan.skipped.length+' 位非主檔人員。':'');
+   setStatus(success,'');alert(success);
+ }catch(e){
+   console.error(e);
+   const failure='匯入尚未確認成功：'+(e?.message||e);setStatus(failure,'error');alert(failure);
+ }
+}
+window.openLeaveBalanceImport=openLeaveBalanceImport;
+document.getElementById('leaveBalanceImportFile')?.addEventListener('change',e=>importLeaveBalanceFile(e.target.files?.[0]));
+
+function renderAll(){if(currentEmployee){const fresh=employees.find(e=>String(e.empId||'').toUpperCase()===String(currentEmployee.empId||'').toUpperCase());if(fresh)currentEmployee=fresh;showEmployee()}else renderMy();if(adminSession){renderAdmin();renderAdminBalances()}}
+
+(async function init(){
+ const identityReady=restoreAdmin();
+ const dataReady=loadCloud(false,false,identityReady);
+ const sso=await identityReady;await dataReady;
+ if(!sso&&$('employeeLeaveReauth').hidden){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
+ const today=new Date().toISOString().slice(0,10);$('leaveStart').value=today;$('leaveEnd').value=today;updateDays();
+})();
+</script>
+
+<script id="port79-unified-sticky-leave">
+(()=>{const h=document.querySelector('body>header');if(!h)return;const sync=()=>document.documentElement.style.setProperty('--leave-header-h',Math.ceil(h.getBoundingClientRect().height)+'px');sync();window.addEventListener('resize',sync,{passive:true});if(window.ResizeObserver)new ResizeObserver(sync).observe(h);})();
+</script>
+<button id="port79MobileTop" class="port79-mobile-top" type="button" aria-label="回到頁面最上方" title="回到頂端">↑</button>
+
+<script id="port79-mobile-top-helper">
+(()=>{const b=document.getElementById('port79MobileTop');if(!b)return;
+const sync=()=>b.classList.toggle('show',window.scrollY>420);
+b.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+window.addEventListener('scroll',sync,{passive:true});sync();})();
+</script>
+
+<div id="port79CalendarModeBox" aria-label="年份顯示方式">
+  <span>年份</span>
+  <select id="port79CalendarModeSelect" title="切換西元年／民國年">
+    <option value="gregorian">西元</option>
+    <option value="roc">民國</option>
+  </select>
+</div>
+<script id="port79-calendar-mode-script">
+(function(){
+  const KEY='port79_year_mode';
+  const mode=localStorage.getItem(KEY)==='roc'?'roc':'gregorian';
+  const sel=document.getElementById('port79CalendarModeSelect');
+  if(sel){
+    sel.value=mode;
+    sel.addEventListener('change',()=>{
+      localStorage.setItem(KEY,sel.value==='roc'?'roc':'gregorian');
+      location.reload();
+    });
+  }
+  if(mode!=='roc')return;
+  const skip=new Set(['SCRIPT','STYLE','NOSCRIPT','TEXTAREA','INPUT']);
+  const cv=(s)=>{
+    s=String(s||'');
+    s=s.replace(/民國\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,(m,y,mo,d)=>`${Number(y)}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})(?:[\/-])(\d{1,2})(?:[\/-])(\d{1,2})\b/g,(m,y,mo,d)=>`${Number(y)}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/g,(m,y,mo)=>`${Number(y)}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})(?:[\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,mo)=>`${Number(y)}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/民國\s*(\d{1,3})\s*年/g,(m,y)=>`${Number(y)}年`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,(m,y,mo,d)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})(?:[\/-])(\d{1,2})(?:[\/-])(\d{1,2})\b/g,(m,y,mo,d)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}/${String(d).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年\s*(\d{1,2})\s*月/g,(m,y,mo)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})(?:[\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,mo)=>`${Number(y)-1911}/${String(mo).padStart(2,'0')}`);
+    s=s.replace(/\b((?:19|20)\d{2})\s*年/g,(m,y)=>`${Number(y)-1911}年`);
+    return s;
+  };
+  let busy=false;
+  function scan(root){
+    if(!root||busy)return;
+    busy=true;
+    try{
+      const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+      const nodes=[]; let n;
+      while(n=walker.nextNode())nodes.push(n);
+      nodes.forEach(node=>{
+        const p=node.parentElement;
+        if(!p||skip.has(p.tagName)||p.closest('#port79CalendarModeBox'))return;
+        const old=node.nodeValue||'';
+        const next=cv(old);
+        if(next!==old)node.nodeValue=next;
+      });
+    }finally{busy=false}
+  }
+  scan(document.body);
+  const mo=new MutationObserver(ms=>{
+    if(busy)return;
+    ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1||n.nodeType===3)scan(n.nodeType===1?n:n.parentElement)}));
+  });
+  mo.observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+
+
+
+
+<script id="p79-leave-v103-stable-top-script">
+(function(){
+'use strict';
+const NAV=[
+ ['attendance','🕒','考勤','../attendance/'],
+ ['workhours','📊','工時統計','../work-hours/'],
+ ['leave','📝','請假','../leave/'],
+ ['schedule','📅','排班','../schedule/'],
+ ['efficiency','🚢','效率','../aqc-efficiency/'],
+ ['hr','👥','人資','../hr/'],
+ ['history','🗄️','歷史資料','../history-data/']
+];
+const SYSTEMS=[
+ ['attendance','考勤'],['workhours','工時統計'],['leave','請假'],
+ ['schedule','排班'],['efficiency','效率'],['hr','人資'],['history','歷史資料']
+];
+let timer=null,busy=false,lastSig='';
+
+function roleText(){
+ try{
+  const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
+  const r=String(s?.adminRole||s?.role||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
+  return r==='superadmin'?'超級管理員':r==='admin'?'管理員':'一般員工';
+ }catch(e){return '登入使用者'}
+}
+function gasUrl(){
+ try{if(typeof GAS_URL!=='undefined'&&GAS_URL)return String(GAS_URL)}catch(e){}
+ try{if(window.GAS_URL)return String(window.GAS_URL)}catch(e){}
+ try{
+  for(const k of ['port79_gas_url','gasUrl','GAS_URL']){
+   const v=sessionStorage.getItem(k)||localStorage.getItem(k);
+   if(v&&/script\.google\.com/i.test(v))return v;
+  }
+ }catch(e){}
+ return '';
+}
+function logoutHome(){
+ try{
+  ['admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name',
+   'port79_admin_token','port79_user_token','port79_gc_token','port79_gc_superadmin_token','port79_sso_verified']
+  .forEach(k=>{try{sessionStorage.removeItem(k)}catch(e){}});
+ }catch(e){}
+ location.replace('../?logout=1&t='+Date.now());
+}
+function mount(){
+ if(document.getElementById('p79LeaveTop'))return;
+ const root=document.createElement('div');
+ root.id='p79LeaveTop';
+ root.innerHTML=`
+ <div class="top-row">
+  <div class="brand">
+   <div class="logo">📝</div>
+   <div><div class="brand-name">請假系統</div><div class="brand-sub">79號碼頭雲端智慧系統｜${roleText()}｜請假申請・審核・年假資訊</div></div>
+  </div>
+  <nav id="p79LeaveNav">${NAV.map(n=>`<a class="${n[0]==='leave'?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav>
+  <div class="action">
+   <div id="p79LeaveMenuWrap">
+    <button id="p79LeaveMenuButton" type="button">☰ 功能選單</button>
+    <div id="p79LeaveMenu">
+      <button type="button" data-action="import-balance">📥 匯入可休天數</button>
+       <button type="button" data-action="export-balance">📤 匯出可休天數</button>
+      <button type="button" data-action="year">📆 年份顯示：<span id="p79LeaveYearLabel">西元</span></button>
+      <div class="sep"></div>
+      <button type="button" class="danger" data-action="logout">↪ 登出</button>
+    </div>
+   </div>
+  </div>
+ </div>
+ <div id="p79LeaveStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><b>${l}</b><span>● 待命</span></span>`).join('')}</div>`;
+ document.body.insertBefore(root,document.body.firstChild);
+ const yearLabel=document.getElementById('p79LeaveYearLabel');if(yearLabel)yearLabel.textContent=localStorage.getItem('port79_year_mode')==='roc'?'民國':'西元';
+
+ const menu=document.getElementById('p79LeaveMenu');
+ document.getElementById('p79LeaveMenuButton')?.addEventListener('click',e=>{e.stopPropagation();menu?.classList.toggle('open')});
+ document.addEventListener('click',e=>{if(!e.target?.closest?.('#p79LeaveMenuWrap'))menu?.classList.remove('open')});
+ menu?.addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  menu.classList.remove('open');
+  const action=btn.dataset.action;
+  try{
+   if(action==='refresh'){
+    if(typeof window.loadCloud==='function') await window.loadCloud(true); else location.reload();
+   }else if(action==='import-balance'){
+    if(typeof window.openLeaveBalanceImport==='function') window.openLeaveBalanceImport();
+   }else if(action==='export-balance'){
+    if(typeof window.exportLeaveBalanceXlsx==='function')await window.exportLeaveBalanceXlsx();
+   }else if(action==='theme'){
+    document.getElementById('themeBtn')?.click();
+   }else if(action==='year'){
+    const key='port79_year_mode';
+    const next=localStorage.getItem(key)==='roc'?'gregorian':'roc';
+    localStorage.setItem(key,next);
+    location.reload();
+   }else if(action==='home'){
+    location.href='../';
+   }else if(action==='logout'){
+    logoutHome();
+   }
+  }catch(err){console.error('請假功能選單執行失敗',err)}
+ });
+}
+function render(data){
+ const systems={...(data?.systems||{})};
+ if(!systems.workhours&&systems.attendance)systems.workhours=systems.attendance;
+ const sig=SYSTEMS.map(([k])=>{
+  const s=systems[k]||{},a=Array.isArray(s.active)?s.active:[],j=a[0]||{},last=s.lastCompleted||{};
+  return [k,a.length,j.operation,j.action,last.ok,last.action,Math.floor(Number(last.ageMs||0)/10000)].join(':');
+ }).join('|');
+ if(sig===lastSig)return;
+ lastSig=sig;
+ SYSTEMS.forEach(([k])=>{
+  const el=document.querySelector(`#p79LeaveStatus [data-sys="${k}"]`);if(!el)return;
+  const span=el.querySelector('span'),s=systems[k]||{},a=Array.isArray(s.active)?s.active:[];
+  let state='idle',txt='● 待命';
+  if(a.length){
+   const j=a.find(x=>x.operation==='write')||a.find(x=>x.operation==='read')||a[0]||{};
+   state='busy';txt=(j.operation==='write'?'✍️ ':'↙ ')+(j.operationLabel||'讀取')+'中｜'+(j.label||j.action||'雲端資料');
+  }else if(s.lastCompleted&&Number(s.lastCompleted.ageMs||0)<15000){
+   state=s.lastCompleted.ok===false?'error':'done';
+   txt=(state==='done'?'✓ ':'! ')+(s.lastCompleted.operationLabel||'讀取')+'完成';
+  }
+  el.dataset.state=state;
+  if(span.textContent!==txt)span.textContent=txt;
+ });
+}
+async function poll(){
+ if(busy||document.visibilityState==='hidden')return;
+ const url=gasUrl();if(!url)return;
+ busy=true;let ctrl,to;
+ try{
+  ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);
+  const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});
+  const d=await r.json();if(d?.ok)render(d);
+ }catch(e){}finally{if(to)clearTimeout(to);busy=false}
+}
+function start(){
+ // 七大系統共用頂部已取代此舊版重複導覽與雲端輪詢。
+ return;
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
+</script>
+
+
+<script src="../assets/port79-calendar-range.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+
+const C=window.Port79CalendarRange;if(!C)return;
+C.mountRange({startId:'leaveStart',endId:'leaveEnd',label:'請假日期',allowClear:false});
+
+});
+</script>
+<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+
+<style id="p79-leave-cover-style">
+.p79-leave-status-inline{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:210px}
+.p79-leave-cover-inline{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.p79-leave-cover-names{font-size:11px;font-weight:750;color:#475569;white-space:nowrap}
+.p79-cover-again{margin-top:0!important;white-space:nowrap}
+@media(max-width:850px){.p79-leave-status-inline{min-width:170px}.p79-leave-cover-names{white-space:normal}}
+.p79-leave-date-inline{white-space:nowrap!important;min-width:max-content}
+#p79LeaveCoverModal[hidden],#p79LeaveCoverSecondWrap[hidden]{display:none!important}
+#p79LeaveCoverModal{position:fixed;inset:0;z-index:21000;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+#p79LeaveCoverModal .cover-card{width:min(480px,100%);max-height:90vh;overflow:auto;border-radius:16px;background:var(--card,#fff);color:var(--text,#172033);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+#p79LeaveCoverModal label{display:block;margin:12px 0 5px;font-weight:800}
+#p79LeaveCoverModal select{width:100%;min-height:42px;border:1px solid var(--border,#cbd5e1);border-radius:9px;background:var(--card,#fff);color:inherit;padding:8px}
+#p79LeaveCoverModal .cover-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+#p79LeaveCoverModal button{padding:10px 14px;border-radius:9px;border:1px solid #cbd5e1;cursor:pointer}
+#p79LeaveCoverSave{background:#2563eb;color:white;border-color:#2563eb!important;font-weight:800}
+.p79-cover-again{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:6px;background:#dbeafe;color:#1d4ed8;font-size:11px}
+</style>
+<div id="p79LeaveCoverModal" role="dialog" aria-modal="true" aria-label="請假核准代班安排" hidden>
+<div class="cover-card"><h3 style="font-weight:900;font-size:19px">請假核准｜安排代班</h3>
+<p id="p79LeaveCoverSummary" style="margin-top:8px;font-size:12px"></p>
+<input type="hidden" id="p79LeaveCoverId">
+<label for="p79LeaveCoverMode">代班方式</label>
+<select id="p79LeaveCoverMode" onchange="p79RefreshLeaveCoverMode()"><option value="one">一位代班8小時</option><option value="two">兩位各代班4小時</option><option value="rest">排休人員代班</option></select>
+<label for="p79LeaveCoverJob">第一位代班人員職稱</label><select id="p79LeaveCoverJob" onchange="p79FilterLeaveCoverPeople()"></select>
+<label for="p79LeaveCoverFirst">代班人員</label><select id="p79LeaveCoverFirst" onchange="p79FilterLeaveCoverPeople()"></select>
+<div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecondJob">第二位代班人員職稱</label><select id="p79LeaveCoverSecondJob" onchange="p79FilterLeaveCoverPeople()"></select><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond"></select></div>
+<p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
+<div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
+</div></div>
+
+<style id="p79-leave-create-layout-v91">
+#adminCreateLeaveDialog [hidden]{display:none!important}
+#adminCreateLeaveDialog{width:min(740px,calc(100vw - 24px))!important;max-height:90dvh!important;overflow:hidden!important;padding:0!important;border-radius:14px!important}
+#adminCreateLeaveDialog .p79-create-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #dbe3ee}
+#adminCreateLeaveDialog h2{font-size:18px;margin:0}
+#adminCreateLeaveDialog .p79-create-body{padding:12px 14px;max-height:calc(90dvh - 126px);overflow:auto;display:grid;gap:10px}
+#adminCreateLeaveDialog .p79-create-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#adminCreateLeaveDialog .p79-create-dates{display:grid;grid-template-columns:1fr 1fr 90px;gap:10px}
+#adminCreateLeaveDialog .field{margin:0!important;min-width:0}
+#adminCreateLeaveDialog label{font-size:13px!important;line-height:1.3;margin:0 0 4px!important}
+#adminCreateLeaveDialog select,#adminCreateLeaveDialog input:not([type=checkbox]){width:100%;min-height:35px!important;height:35px!important;padding:5px 8px!important;font-size:14px!important;box-sizing:border-box;min-width:0}
+#adminCreateLeaveDialog textarea{width:100%;height:54px;min-height:54px;padding:6px 8px!important;font-size:14px!important;box-sizing:border-box}
+#adminCreateLeaveDialog .p79-create-person{padding:9px;border:1px solid #dbe3ee;border-radius:9px;background:#f8fafc;display:grid;gap:8px}
+#adminCreateLeaveDialog .p79-create-person>b{font-size:13px;color:#334155}
+#adminCreateLeaveDialog .p79-create-daily-toggle{display:flex!important;align-items:center;justify-content:flex-start;gap:7px!important;margin:0!important}
+#adminCreateLeaveDialog #adminCreateLeaveDaily{width:16px!important;height:16px!important;min-height:16px!important;min-width:16px!important;flex:0 0 16px;margin:0!important;padding:0!important;appearance:auto}
+#adminCreateLeaveDialog .note{margin:0!important;font-size:12px!important;line-height:1.4}
+#adminCreateLeaveDialog .p79-create-actions{padding:9px 14px;display:flex;gap:8px;border-top:1px solid #dbe3ee;background:#fff}
+#adminCreateLeaveDialog .p79-create-actions button{padding:7px 12px!important;min-height:36px!important;font-size:14px!important}
+#adminCreateLeaveDialog #adminCreateLeaveSave{flex:1}
+@media(max-width:480px){#adminCreateLeaveDialog .p79-create-dates{grid-template-columns:1fr 1fr}#adminCreateLeaveDialog .p79-create-dates>.field:last-child{grid-column:1/-1}#adminCreateLeaveDialog .p79-create-body{padding:10px;gap:8px}#adminCreateLeaveDialog .p79-create-two{gap:8px}}
+</style>
+<dialog id="adminCreateLeaveDialog">
+ <div class="p79-create-heading"><h2>新增請假與代班安排</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
+ <div class="p79-create-body">
+  <div class="p79-create-two">
+   <div class="field"><label for="adminCreateLeaveOvertimeType">加班類型</label><select id="adminCreateLeaveOvertimeType"><option value="">依班表自動判斷</option></select></div>
+   <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
+  </div>
+  <div class="p79-create-dates">
+   <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+   <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+   <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
+  </div>
+  <div class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
+   <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
+   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div>
+  </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
+  <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" style="width:16px;height:16px;min-height:16px" onchange="p79ToggleCreateNoCover()">無須代班人員</label>
+  <div id="adminCreateLeaveWorkers" class="p79-create-two">
+   <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div></div>
+   <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+  </div>
+  <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
+  <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
+  <p class="note">一位代8小時；兩位各代4小時。加班類型會帶入後續申報，出勤時段可逐筆選擇。</p>
+  <p id="adminCreateLeaveMessage" role="status"></p>
+ </div>
+ <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
+</dialog>
+
+<script>
+let p79CreateDailyPlan=new Map();
+function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
+function p79RenderDailyCreateCover(){
+ const box=$('adminCreateLeaveDailyRows');if(!box)return;box.hidden=!$('adminCreateLeaveDaily').checked;if(box.hidden)return;
+ const target=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value)),dept=String(target?.dept||'').trim();
+ const available=leaveCreatePeople().filter(e=>String(e.empId)!==String(target?.empId)&&dept&&String(e.dept||'').trim()===dept);
+ const options=(people,selected,prompt)=>'<option value="">'+prompt+'</option>'+people.map(e=>'<option value="'+esc(e.empId)+'"'+(String(e.empId)===selected?' selected':'')+'>'+esc(e.name+'｜'+leavePersonJob(e))+'</option>').join('');
+ const jobs=(selected)=>'<option value="">全部職稱</option>'+[...new Set(available.map(leavePersonJob))].map(j=>'<option value="'+esc(j)+'"'+(j===selected?' selected':'')+'>'+esc(j)+'</option>').join('');
+ box.innerHTML=p79DailyCreateDates().map(date=>{let row=p79CreateDailyPlan.get(date);if(!row){row={first:$('adminCreateLeaveWorker').value,second:$('adminCreateLeaveWorkerSecond').value,firstJob:$('adminCreateLeaveWorkerJob').value,secondJob:$('adminCreateLeaveWorkerSecondJob').value};p79CreateDailyPlan.set(date,row);}
+  const chosen=available.filter(e=>!row.firstJob||leavePersonJob(e)===row.firstJob),others=available.filter(e=>String(e.empId)!==row.first&&(!row.secondJob||leavePersonJob(e)===row.secondJob));
+  if(!chosen.some(e=>String(e.empId)===row.first))row.first='';if(!others.some(e=>String(e.empId)===row.second))row.second='';
+  return '<div style="padding:10px;border:1px solid #cbd5e1;border-radius:10px;margin:8px 0"><b>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+['first','second'].map((key,i)=>'<div><label>第'+(i+1)+'位職稱</label><select data-date="'+date+'" data-field="'+key+'Job">'+jobs(row[key+'Job'])+'</select><label>第'+(i+1)+'位代班人員'+(i?'（選填）':'')+'</label><select data-date="'+date+'" data-field="'+key+'">'+options(i?others:chosen,row[key],i?'不選第二位':'請選擇人員')+'</select></div>').join('')+'</div><small>'+ (row.second?'兩位各代4小時':'一位代8小時')+'</small></div>';
+ }).join('')||'<p>請先選擇有效日期，最多62天。</p>';
+ box.querySelectorAll('select[data-date]').forEach(select=>{select.onchange=()=>{const row=p79CreateDailyPlan.get(select.dataset.date);row[select.dataset.field]=select.value;p79RenderDailyCreateCover();};});
+}
+function p79CollectDailyCreateCover(employee){
+ const dates=p79DailyCreateDates();if(!dates.length)throw Error('請選擇有效日期，最多62天');
+ return dates.map(date=>{const row=p79CreateDailyPlan.get(date)||{},ids=[row.first,row.second].filter(Boolean);if(!row.first||new Set(ids).size!==ids.length)throw Error(date+' 請選擇一位或兩位不同的代班人員');for(const id of ids){const e=employees.find(e=>String(e.empId)===String(id));if(!e||!leaveEmployeeIsActive(e)||String(e.empId)===String(employee.empId)||!employee.dept||String(e.dept||'').trim()!==String(employee.dept||'').trim())throw Error(date+' 請選擇同部門、在職的代班人員');}return {date,mode:ids.length===2?'two':'one',workerIds:ids};});
+}
+function p79PlanDailyCoverRequest(records,covers,request){
+ const plan=request.dailyAssignments,existing=records.filter(l=>String(l.status)==='已核准'&&String(l.empId)===String(request.empId)&&String(l.leaveType)===String(request.leaveType)&&normalizeLeaveFilterDate(l.startTime||l.startDate)===request.startDate&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===request.endDate);
+ const covered=l=>plan.every(p=>covers.some(c=>String(c.leaveId)===String(l.id)&&c.startDate<=p.date&&c.endDate>=p.date&&c.mode===p.mode&&JSON.stringify((c.workerIds||[]).map(String))===JSON.stringify(p.workerIds.map(String))));
+ const chosen=existing.find(covered)||existing.find(l=>String(l.id)===String(request.id))||existing[0],id=String(chosen?.id||request.id);
+ for(const p of plan)if(covers.some(c=>String(c.leaveId)!==id&&c.startDate<=p.date&&c.endDate>=p.date&&(c.workerIds||[]).some(worker=>p.workerIds.map(String).includes(String(worker)))))throw Error(p.date+' 代班人員已有其他安排');
+ return {leaveId:id,existing:!!chosen,covered:!!chosen&&covered(chosen)};
+}
+
+let adminCreateLeaveId='',adminCreateLeaveBusy=false;
+function leavePeopleStrokeOrder(list){const collator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});return [...list].sort((a,b)=>collator.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));}
+function leavePersonJob(e){return String(e.jobTitle||e.deptDetail||'').trim()||'未設定職稱';}
+function leaveCreatePeople(){return leavePeopleStrokeOrder(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)));}
+function leavePersonOption(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）｜'+leavePersonJob(e))+'</option>';}
+function leaveFillJobFilter(select,people){
+ const previous=select.value,titles=[...new Set(people.map(leavePersonJob))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+ select.innerHTML='<option value="">全部職稱</option>'+titles.map(title=>'<option value="'+esc(title)+'">'+esc(title)+'</option>').join('');
+ if(titles.includes(previous))select.value=previous;
+}
+function filterAdminCreateLeaveApplicants(){
+ const select=$('adminCreateLeaveEmployee'),previous=select.value,job=$('adminCreateLeaveJob').value;
+ const people=leaveCreatePeople().filter(e=>!job||leavePersonJob(e)===job);
+ select.innerHTML='<option value="">請選擇請假人員</option>'+people.map(leavePersonOption).join('');
+ if(people.some(e=>String(e.empId)===previous))select.value=previous;
+ filterAdminCreateLeavePeople();
+}
+function filterAdminCreateLeavePeople(){
+ const target=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value)),worker=$('adminCreateLeaveWorker'),previous=worker.value,dept=String(target?.dept||'').trim();
+ const available=leaveCreatePeople().filter(e=>String(e.empId)!==String(target?.empId)&&dept&&String(e.dept||'').trim()===dept);
+ const job=$('adminCreateLeaveWorkerJob');leaveFillJobFilter(job,available);job.disabled=!target;
+ const choices=available.filter(e=>!job.value||leavePersonJob(e)===job.value);
+ worker.innerHTML='<option value="">'+(!target?'先選左邊請假人員':choices.length?'請選擇代班人員':'此職稱沒有可代班人員')+'</option>'+choices.map(leavePersonOption).join('');
+ if(choices.some(e=>String(e.empId)===previous))worker.value=previous;
+ worker.disabled=!target;
+ const second=$('adminCreateLeaveWorkerSecond'),previousSecond=second.value;
+ const secondJob=$('adminCreateLeaveWorkerSecondJob');leaveFillJobFilter(secondJob,available);secondJob.disabled=!target;
+ const otherChoices=available.filter(e=>(!secondJob.value||leavePersonJob(e)===secondJob.value)&&String(e.empId)!==String(worker.value));
+ second.innerHTML='<option value="">不選第二位（一位代8小時）</option>'+otherChoices.map(leavePersonOption).join('');
+ if(otherChoices.some(e=>String(e.empId)===previousSecond))second.value=previousSecond;
+ second.disabled=!target;
+ p79RenderDailyCreateCover();
+ $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側依職稱篩選同部門人員':'';
+}
+function p79PopulateCreateOvertimeTypes(){
+ const select=$('adminCreateLeaveOvertimeType');if(!select)return;
+ const previous=select.value||'',module=window.P79Overtime;
+ const options=module?module.typeOptions(window.p79OvertimeContext?.config?.()||{},module.reportRules()):[];
+ select.innerHTML='<option value="">依班表自動判斷</option>'+options.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
+ if(previous){if(!options.some(x=>x.name===previous))select.innerHTML+='<option value="'+esc(previous)+'">'+esc(previous)+'（待核對）</option>';select.value=previous;}
+}
+async function openAdminCreateLeave(){
+ if(adminCreateLeaveBusy)return;
+ if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
+ const dialog=$('adminCreateLeaveDialog');if(!dialog.open)dialog.showModal();
+ if(!employees.some(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e))){
+  $('adminCreateLeaveMessage').textContent='正在載入人員，請稍候…';$('adminCreateLeaveSave').disabled=true;
+  try{await loadCloud(true,true);}catch(error){$('adminCreateLeaveMessage').textContent='人員載入失敗：'+(error.message||error);return;}finally{$('adminCreateLeaveSave').disabled=false;}
+  if(!dialog.open)return;
+ }
+ p79CreateDailyPlan=new Map();$('adminCreateLeaveNoCover').checked=false;p79ToggleCreateNoCover();$('adminCreateLeaveDaily').checked=false;$('adminCreateLeaveOvertimeType').value='';p79PopulateCreateOvertimeTypes();adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';$('adminCreateLeaveWorkerSecondJob').value='';
+ $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
+ leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
+ $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
+ updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();
+ if(window.P79Overtime&&p79CanReportOvertime())void P79Overtime.loadRules().then(loaded=>{if(!dialog.open)return;p79LeaveOvertimeConfig=loaded.config;p79PopulateCreateOvertimeTypes();}).catch(()=>{});
+}
+function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';if(typeof p79RenderDailyCreateCover==='function')p79RenderDailyCreateCover();}
+function p79PlanLeaveCoverRequest(records,covers,request){
+ if(request.dailyAssignments)return p79PlanDailyCoverRequest(records,covers,request);
+ const start=request.startDate,end=request.endDate,ids=request.workerIds.map(String);
+ const exact=records.filter(l=>String(l.status)==='已核准'&&String(l.empId)===String(request.empId)&&String(l.leaveType)===String(request.leaveType)&&normalizeLeaveFilterDate(l.startTime||l.startDate)===start&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===end);
+ const sameWorkers=c=>String(c.mode)===request.mode&&JSON.stringify((c.workerIds||[]).map(String))===JSON.stringify(ids);
+ const covered=l=>{const parts=covers.filter(c=>String(c.leaveId)===String(l.id)&&sameWorkers(c));for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);if(!parts.some(c=>normalizeLeaveFilterDate(c.startDate)<=date&&normalizeLeaveFilterDate(c.endDate)>=date))return false;}return true;};
+ const existing=exact.find(covered)||exact.find(l=>String(l.id)===String(request.id))||exact[0];
+ const conflict=covers.find(c=>String(c.leaveId)!==String(existing?.id||request.id)&&(c.workerIds||[]).some(id=>ids.includes(String(id)))&&normalizeLeaveFilterDate(c.startDate)<=end&&normalizeLeaveFilterDate(c.endDate)>=start);
+ if(conflict){const leave=records.find(l=>String(l.id)===String(conflict.leaveId));throw new Error('代班人員已有安排：'+String(leave?.name||conflict.leaveEmpId||'其他請假人員')+'（'+normalizeLeaveFilterDate(conflict.startDate)+' ～ '+normalizeLeaveFilterDate(conflict.endDate)+'）。請先修改原代班安排或選擇其他人員。');}
+ return {leaveId:String(existing?.id||request.id),existing:!!existing,covered:!!existing&&covered(existing)};
+}
+function p79ToggleCreateNoCover(){
+ const noCover=!!$('adminCreateLeaveNoCover')?.checked;
+ $('adminCreateLeaveWorkers').hidden=noCover;
+ $('adminCreateLeaveDailyToggle').hidden=noCover;
+ $('adminCreateLeaveDailyRows').hidden=noCover||!$('adminCreateLeaveDaily').checked;
+ $('adminCreateLeaveOvertimeType').disabled=noCover;
+ $('adminCreateLeaveSave').textContent=noCover?'儲存請假':'儲存請假並安排代班';
+}
+async function p79SaveCreateLeaveWithoutCover(employee,days){
+ const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
+ try{
+  $('adminCreateLeaveMessage').textContent='正在確認並儲存請假（無須代班）…';
+  const fresh=await p79ReadCurrentLeaveCoverState();
+  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw Error(fresh?.error||'無法核對雲端請假資料');
+  const start=$('adminCreateLeaveStart').value,end=$('adminCreateLeaveEnd').value,type=$('adminCreateLeaveType').value;
+  const existing=fresh.leaveRecords.find(l=>String(l.status)==='已核准'&&String(l.empId)===String(employee.empId)&&String(l.leaveType)===type&&normalizeLeaveFilterDate(l.startTime||l.startDate)===start&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===end);
+  if(existing){
+   if(fresh.leaveCoverAssignments.some(c=>String(c.leaveId)===String(existing.id)))throw Error('已有相同請假且已安排代班，請由原請假紀錄修改，避免留下代班資料');
+   if(String(existing.id)!==String(adminCreateLeaveId)&&existing.source!=='manual-admin-no-cover')throw Error('已有相同請假紀錄，請由原紀錄處理，避免重複新增');
+   adminCreateLeaveId=String(existing.id);
+  }else{
+   await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:type,startDate:start,endDate:end,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin-no-cover'}});
+  }
+  $('adminCreateLeaveDialog').close();setStatus('✅ 請假已儲存｜無須代班人員');void loadCloud(false,true);
+ }catch(error){$('adminCreateLeaveMessage').textContent='儲存未確認：'+String(error.message||error);}
+ finally{adminCreateLeaveBusy=false;button.disabled=false;p79ToggleCreateNoCover();}
+}
+async function saveAdminCreateLeave(){
+ if(adminCreateLeaveBusy)return;
+ if(!adminSession||leaveAccess!=='manage')return alert('沒有新增請假管理權限');
+ const employee=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value));updateAdminCreateLeaveDays();const days=Number($('adminCreateLeaveDays').value);
+ if(!employee||!leaveEmployeeIsActive(employee)||!days){$('adminCreateLeaveMessage').textContent='請選擇請假人員及有效日期範圍';return;}
+ if($('adminCreateLeaveNoCover')?.checked)return p79SaveCreateLeaveWithoutCover(employee,days);
+ let dailyAssignments;try{if($('adminCreateLeaveDaily')?.checked)dailyAssignments=p79CollectDailyCreateCover(employee);}catch(error){$('adminCreateLeaveMessage').textContent=error.message;return;}
+ const worker=employees.find(e=>String(e.empId)===String(dailyAssignments?.[0]?.workerIds[0]||$('adminCreateLeaveWorker').value));
+ const secondId=String(dailyAssignments?dailyAssignments[0].workerIds[1]||'':$('adminCreateLeaveWorkerSecond').value||'');
+ const second=employees.find(e=>String(e.empId)===secondId);
+ if(secondId&&(!second||!leaveEmployeeIsActive(second)||second.empId===employee?.empId||second.empId===worker?.empId||String(second.dept||'').trim()!==String(employee?.dept||'').trim())){$('adminCreateLeaveMessage').textContent='第二位需為同部門、不同的代班人員';return;}
+ if(!worker||!leaveEmployeeIsActive(worker)||worker.empId===employee?.empId||!String(employee?.dept||'').trim()||String(worker.dept||'').trim()!==String(employee?.dept||'').trim()){$('adminCreateLeaveMessage').textContent='請選擇同部門的代班人員';return;}
+ if(days>62){$('adminCreateLeaveMessage').textContent='一次代班最多62天，請分次安排';return;}
+ if(!employee||!leaveEmployeeIsActive(employee)||!days){$('adminCreateLeaveMessage').textContent='請選擇請假人員及有效日期範圍';return;}
+ let leaveSaved=false;
+ const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
+ try{
+  $('adminCreateLeaveMessage').textContent='正在確認雲端請假與代班安排…';
+  const fresh=await p79ReadCurrentLeaveCoverState();
+  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+  const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:adminCreateLeaveId,empId:employee.empId,leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});
+  adminCreateLeaveId=plan.leaveId;
+  if(!plan.existing)await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
+  leaveSaved=true;
+  $('adminCreateLeaveMessage').textContent='請假已儲存，正在安排代班…';
+  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});if(dailyAssignments&&saved.dailyAssignmentsSaved!==true)throw Error('雲端尚未支援逐日代班，請更新 GAS 後重試');p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;}
+  $('adminCreateLeaveDialog').close();
+  const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of (dailyAssignments?dailyAssignments.find(p=>p.date===date).workerIds.map(id=>employees.find(e=>String(e.empId)===String(id))):[worker,second]).filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries,preferredType:$('adminCreateLeaveOvertimeType')?.value||''}));
+  await p79OpenLeaveOvertimeHandoff();
+  void loadCloud(false,true);
+ }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
+ finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
+}
+</script>
+
+<script src="../attendance/v6-engine.js?v=20261014.109"></script>
+<script src="../assets/port79-overtime-report.js?v=20261016.91"></script>
+<script>
+function p79DirectAttendanceTimestamp(record){
+ const raw=String(record?.timeStr||'').trim();
+ if(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw))return Date.parse(raw);
+ const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+ if(m)return Date.parse(m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+'T'+m[4].padStart(2,'0')+':'+m[5]+':'+(m[6]||'00')+'+08:00');
+ const normalized=P79AttendanceV6.normalizeTime(raw);return /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(normalized)?Date.parse(normalized.replace(/\//g,'-').replace(' ','T')+'+08:00'):NaN;
+}
+async function p79SaveWorkOvertimeDraft(draft){
+ const token=leaveRequestToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
+ const month=draft.date.slice(0,7),url=GAS_URL;
+ const read=async (action,label)=>{
+  for(let attempt=1;attempt<=2;attempt++){
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+   try{
+    const response=await fetch(url+'?action='+action+'&month='+month+'&empId='+encodeURIComponent(draft.empId)+'&date='+encodeURIComponent(draft.date)+'&leaveHandoffId='+encodeURIComponent(draft.leaveHandoffId||'')+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
+    const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
+   }catch(error){
+    const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
+    if(!transport)throw error;
+    if(attempt===2)throw Error(label+'連線失敗或逾時，尚未送出加班；已保留內容，請再次按儲存。');
+   }finally{clearTimeout(timer)}
+  }
+ };
+ const cloud=await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ const employeeId=String(draft.empId).trim().toUpperCase();
+ const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
+ const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()),planned=!pairs.length&&draft.date>=today;
+ if(!pairs.length&&!planned)throw Error('過去日期須有包含所選時段的完整出勤；未生成實際加班');
+ if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
+ if(!planned&&['休','國'].includes(draft.rule.category)){const cutoff=P79Overtime.interval(draft.date,draft.rule.overtimeStart,draft.rule.overtimeEnd)[1]-15*60000;if(pairs[0].end<cutoff)throw Error('國定假日／休息日加班須於所選時段結束前15分鐘起簽退（例如08–16須15:45起），尚未符合申報條件');}
+ const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+ const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+ try{
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
+  if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
+  return result;
+ }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
+}
+
+let p79LeaveOvertimeConfig={},p79LeaveHandoffBusy=false,p79LeaveHandoffContext=null;
+function p79CanReportOvertime(){
+ if(!adminSession)return false;
+ if(adminSession.adminRole==='superadmin')return true;
+ const permissions=adminSession.overtimePermissions||{},access=permissions.workhours??permissions.attendance??'none';
+ if(!['view','manage'].includes(access))return false;
+ const fine=adminSession.finePermissions?.workhours||{};
+ return Object.prototype.hasOwnProperty.call(fine,'overtime.report')?fine['overtime.report']===true:access==='manage';
+}
+function p79UpdateLeaveHandoffBanner(){
+ const banner=$('p79LeaveHandoffBanner');if(!banner)return;
+ let handoff;try{handoff=JSON.parse(sessionStorage.getItem('port79_leave_overtime_handoff_v1')||'null');}catch(ignore){}
+ const count=handoff?.entries?.length||0;
+ banner.hidden=!adminSession||!count||Date.now()-handoff.createdAt>86400000;
+ if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對，可接續申報。';
+}
+async function p79OpenLeaveOvertimeHandoff(){
+ if(p79LeaveHandoffBusy)return;
+ p79UpdateLeaveHandoffBanner();
+ const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
+ let handoff;try{handoff=JSON.parse(raw);}catch(ignore){return;}
+ if(Date.now()-handoff.createdAt>86400000||!Array.isArray(handoff.entries)||!handoff.entries.length)return;
+ p79LeaveHandoffBusy=true;
+ const loading=P79Overtime.showReportLoading();
+ try{
+  if(!p79CanReportOvertime())throw Error('請假與代班已儲存；此帳號沒有申報加班權限，請由有權限的管理員接續。');
+  const entry=handoff.entries[0],token=leaveRequestToken();
+  const cached=p79LeaveHandoffContext,canUse=cached&&String(cached.leaveId)===String(handoff.id)&&cached.month===entry.date.slice(0,7)&&Date.now()-cached.at<60000&&(cached.schedules||[]).some(row=>String(row.empId)===String(entry.empId));
+  const data=canUse?cached:await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(entry.empId)+'&date='+encodeURIComponent(entry.date)+'&leaveHandoffId='+encodeURIComponent(handoff.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+  if(!loading.isConnected)return;
+  if(!data?.ok)throw Error(data?.error||'無法核對代班班表');
+  p79LeaveHandoffContext={...data,leaveId:handoff.id,at:Date.now()};
+  p79LeaveOvertimeConfig=data.config||{};
+  const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
+  await P79Overtime.openReport({...entry,...period,preferredType:entry.preferredType||handoff.preferredType||'',category:'代',leaveHandoffId:handoff.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[entry.date]?.reportOriginalShift??row.schedule?.__meta?.[entry.date]?.overtimeOriginalShift??row.schedule?.[entry.date]])),allowedEmpIds:handoff.entries.filter(e=>e.date===entry.date&&String(e.forEmpId||'')===String(entry.forEmpId||'')).map(e=>e.empId)});
+  $('p79LeaveHandoffStatus').textContent='尚有 '+handoff.entries.length+' 筆｜目前：'+entry.date+' '+(entry.name||entry.empId)+'，儲存成功後接續下一筆。';
+ }catch(error){
+  if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
+  setStatus('加班明細尚未完成：'+error.message,'warn');
+ }finally{p79LeaveHandoffBusy=false;}
+}
+window.p79OvertimeContext={
+ config:()=>p79LeaveOvertimeConfig,gasUrl:()=>GAS_URL,token:()=>leaveRequestToken(),
+ employees:()=>employees.filter(leaveEmployeeIsActive),canReport:p79CanReportOvertime,
+ saveReport:p79SaveWorkOvertimeDraft,refreshAccess:async()=>{await restoreAdmin();if(adminSession&&!employees.length)await loadCloud(false,true);return !!adminSession;},
+ canEditRules:()=>adminSession?.adminRole==='superadmin',persistConfig:()=>{}
+};
+window.addEventListener('p79-overtime-report-saved',()=>setTimeout(p79UpdateLeaveHandoffBanner,0));
+window.addEventListener('load',()=>{setTimeout(p79UpdateLeaveHandoffBanner,0);});
+
+</script>
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script>(function(global){
+'use strict';
+// Draft: management-only invalidation. It never writes domain records or submits punch requests.
+const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
+const ACTIONS={
+ hrUpsertEmployee:['people','permissions'],hrDeleteEmployee:['people','permissions','schedule'],hrSetEmploymentStatus:['people','schedule'],hrSaveOrgSettings:['organization','people'],
+ addLeave:['leave'],addLeaveRecord:['leave'],updateLeaveStatus:['leave','cover','schedule','overtime'],
+ deleteLeaveRecord:['leave','cover','schedule','overtime'],saveLeaveCoverAssignment:['leave','cover','schedule','overtime'],cleanupOrphanLeaveCovers:['cover','schedule','overtime'],
+ updateLeaveBalances:['leave'],syncSchedules:['schedule','overtime'],saveScheduleEmployee:['people','schedule'],saveScheduleGroups:['organization','schedule'],
+ saveOvertimeReportDirect:['overtime','schedule'],deleteOvertimeAssignment:['overtime','schedule'],
+ gcUpsertShipMaster:['efficiency','history'],gcDeleteShipMaster:['efficiency','history'],gcUpsertRecord:['efficiency','history'],gcDeleteRecord:['efficiency','history'],gcSyncAll:['efficiency','history'],gcUpsertGroup:['efficiency'],gcDeleteGroup:['efficiency'],gcAssignEmployee:['efficiency'],
+ updateRecord:['attendance','overtime'],deleteRecord:['attendance','overtime']
+};
+const DEPENDENCIES={attendance:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],hr:['people','organization','permissions'],leave:['people','organization','permissions','leave','cover','schedule','overtime'],schedule:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],workhours:['people','organization','permissions','leave','cover','schedule','overtime','attendance'],efficiency:['people','organization','permissions','efficiency'],history:['history','attendance','schedule','efficiency']};
+function topicsFor(action){return (ACTIONS[action]||[]).slice();}
+function validEvent(e){return !!e&&e.v===1&&typeof e.id==='string'&&e.id.length<150&&Number.isFinite(e.at)&&Array.isArray(e.topics)&&e.topics.length<=TOPICS.length&&e.topics.every(t=>TOPICS.includes(t));}
+function create(options){
+ const {system,isManager,refresh,isEditing,notify=()=>{},clock=Date.now}=options;
+ const dependencies=DEPENDENCIES[system]||[];let pending=new Set(),seen=new Set(),running=null,disposed=false,generation=0;
+ function status(){return {pending:[...pending],running:!!running,generation};}
+ function receive(event){
+  if(disposed||!isManager()||!validEvent(event)||seen.has(event.id))return false;
+  seen.add(event.id);if(seen.size>128)seen.delete(seen.values().next().value);
+  const relevant=event.topics.filter(t=>dependencies.includes(t));if(!relevant.length)return false;
+  relevant.forEach(t=>pending.add(t));generation++;notify(status());return true;
+ }
+ async function synchronize(){
+  if(disposed||!isManager())return {ok:false,reason:'permission'};
+  if(running)return running;
+  if(isEditing())return {ok:false,reason:'editing'};
+  if(!pending.size)return {ok:true,unchanged:true};
+  const captured=generation;
+  running=Promise.resolve().then(async()=>{try{
+   const result=await refresh([...pending]);
+   if(disposed||!isManager())return {ok:false,reason:'permission'};
+   if(result!==true)return {ok:false,reason:'unconfirmed'};
+   if(generation===captured)pending.clear();
+   return {ok:true,pending:pending.size>0};
+  }catch(error){return {ok:false,reason:'read-failed'};}finally{running=null;if(!disposed)notify(status());}});
+  return running;
+ }
+ function acknowledge(action,response){
+  const topics=topicsFor(action);if(!isManager()||!topics.length||response?.ok!==true||response?.retryable||response?.error)return null;
+  return {v:1,id:options.makeId(),at:clock(),topics};
+ }
+ return {receive,synchronize,acknowledge,status,dispose(){disposed=true;pending.clear();seen.clear();}};
+}
+function attach(options){
+ if(!options.isManager())return {dispose(){}};
+ const KEY=options.channelKey||'p79-management-revision-v1';const engine=create(options),listeners=[],priorFetch=global.fetch;
+ const handle=e=>{if(!engine.receive(e))return;try{const prev=Number(sessionStorage.getItem('port79_cache_mutated_at')||0);sessionStorage.setItem('port79_cache_mutated_at',String(Math.max(Date.now(),prev+1)));}catch(_){};};
+ const publish=event=>{if(!event)return;handle(event);try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};};
+ const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
+ global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));
+ function requestAction(input,init){
+  const method=String(init?.method||(typeof input==='object'?input.method:'GET')||'GET').toUpperCase();if(method==='GET')return '';
+  try{const url=new URL(typeof input==='string'?input:input.url,global.location.href);if(url.origin!==options.gasOrigin||url.pathname!==options.gasPath)return '';return JSON.parse(init?.body||'{}').action||'';}catch(_){return '';}
+ }
+ async function wrapped(input,init){
+  const action=options.isManager()?requestAction(input,init):'',response=await priorFetch.call(global,input,init);
+  if(topicsFor(action).length&&response.ok){
+   // Only an explicit domain ACK is a revision. HTTP 200/timeout is never a success.
+   void response.clone().json().then(body=>publish(engine.acknowledge(action,body))).catch(()=>{});
+  }
+  return response;
+ }
+ global.fetch=wrapped;
+ const onFocus=()=>{if(options.isManager()&&options.autoRefreshSafe?.())void engine.synchronize();};
+ global.addEventListener('focus',onFocus);listeners.push(()=>global.removeEventListener('focus',onFocus));
+ // No polling: receiver adapters decide when a form is safe to reload.
+ return {engine,publish,dispose(){listeners.forEach(f=>f());engine.dispose();if(global.fetch===wrapped)global.fetch=priorFetch;}};
+}
+global.P79ManagementSync={topicsFor,validEvent,create,attach,dependencies:DEPENDENCIES};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){
+'use strict';
+function makeAdapter(system,context){
+ if(!context||typeof context.canRead!=='function'||typeof context.readFresh!=='function'||typeof context.hasPendingChanges!=='function')throw Error('Incomplete management adapter: '+system);
+ let generation=0,disposed=false,reading=null;
+ return {
+  system,
+  isManager:()=>!disposed&&context.canRead()===true,
+  isEditing:()=>context.hasPendingChanges()!==false||context.isFormOpen?.()===true,
+  async refresh(topics){
+   if(disposed||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+   if(reading)return reading;
+   const epoch=++generation,identity=context.identity();
+   reading=Promise.resolve().then(async()=>{
+    const snapshot=await context.readFresh(topics);
+    if(disposed||epoch!==generation||context.identity()!==identity||context.canRead()!==true||context.hasPendingChanges()!==false||context.isFormOpen?.()===true)return false;
+    if(snapshot?.ok!==true||snapshot.fromCache===true||snapshot.confirmedFresh!==true)return false;
+    // Applying is a local display operation; adapters never submit domain writes.
+    await context.applySnapshot(snapshot,topics);
+    return true;
+   }).finally(()=>{reading=null;});return reading;
+  },
+  dispose(){disposed=true;generation++;}
+ };
+}
+g.P79ManagementAdapterFactory={makeAdapter};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(g){'use strict';
+g.P79ManagementContext={system:'leave',identity:()=>leaveRequestToken(),gas:()=>GAS_URL,token:()=>leaveRequestToken(),canRead:()=>!!adminSession&&leaveAccess!=='none',hasPendingChanges:()=>!!(adminCreateLeaveBusy||p79LeaveHandoffBusy),scope:()=>({}),
+readFresh:async read=>{const d=await read('getLeaveData');if(!Array.isArray(d.employees)||!Array.isArray(d.leaveRecords)||!Array.isArray(d.leaveCoverAssignments))throw Error('請假資料不完整');return {ok:true,confirmedFresh:true,data:d};},
+applySnapshot:async snapshot=>{const d=snapshot.data;employees=d.employees;leaveRecords=d.leaveRecords;window.p79LeaveCoverAssignments=d.leaveCoverAssignments;populateDepartments();renderAll();setStatus('☁️ 跨系統更新已讀回核對','');return true;}}
+;
+})(window);
+
+(function(g){
+'use strict';
+if(g.P79ManagementPageBridge)return;
+const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
+if(!context||!api||!factory)return;
+let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null;
+const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
+function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return ['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
+function openForm(){
+ const el=document.activeElement;if(el&&el.matches?.('input,textarea,[contenteditable="true"]'))return true;
+ return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
+}
+function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
+function readScope(){return JSON.stringify(context.scope?.()||{});}
+async function readFresh(action,params={}){
+ const originIdentity=context.identity(),scope=readScope(),raw=context.gas(),tk=context.token();if(!tk)throw Error('登入尚未完成');
+ const url=new URL(raw,location.href);if(url.origin!=='https://script.google.com'||!url.pathname.startsWith('/macros/s/'))throw Error('雲端來源不正確');
+ url.searchParams.set('action',action);url.searchParams.set('token',tk);url.searchParams.set('gcToken',tk);url.searchParams.set('_',Date.now());Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+ const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),12000);
+ try{const response=await fetch(url.toString(),{method:'GET',cache:'no-store',signal:ctl.signal});const data=await response.json();
+  if(!response.ok||data?.ok!==true||data.retryable)throw Error(data?.error||'雲端未確認讀取');
+  if(context.identity()!==originIdentity||readScope()!==scope||!context.canRead())throw Error('登入、權限或範圍已變更');return data;
+ }finally{clearTimeout(timeout);}
+}
+function ensureBar(){
+ if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
+ bar.style.cssText='display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 16px;background:#eff6ff;color:#1e3a8a;border-bottom:1px solid #93c5fd;font:700 13px system-ui;flex-wrap:wrap';
+ const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);
+ const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
+}
+function notify(state){
+ pendingState=state;if(!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜正在編輯，保留內容並延後套用':'｜準備同步');b.querySelector('button').disabled=state.running;
+ if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}
+}
+async function synchronize(){
+ clearTimeout(timer);timer=null;if(stopped||!binding||!roleAllowed()||editing()||document.visibilityState!=='visible')return;
+ const result=await binding.engine.synchronize();
+ if(result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?'正在編輯，保留內容並延後更新':'跨系統更新尚未確認｜保留目前資料，可按更新重試';}
+}
+function boot(){
+ if(stopped||binding||!roleAllowed())return;
+ if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
+ const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope(),readFresh:()=>context.readFresh(readFresh)});
+ const backend=new URL(context.gas(),location.href);
+ binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};
+}
+const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
+g.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);clearTimeout(bootTimer);binding?.dispose();document.removeEventListener('focusout',resume);document.removeEventListener('visibilitychange',resume);g.removeEventListener('focus',resume);},{once:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})(window);
+</script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';api.binding.publish({v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']});document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body>
+</html>
+
+
+
