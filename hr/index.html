@@ -419,7 +419,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </script>
 
 <script>
-const APP_VERSION='2026.10.15.58';
+const APP_VERSION='2026.10.16.101';
 const DEFAULT_GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 let employees=[],session=null,token='',hrAccess='none',editing=null;
@@ -1093,6 +1093,7 @@ async function saveCurrent(){
     $('saveTopBtn').disabled=true;button.disabled=true;button.textContent='儲存中…';$('status').textContent='☁️ 正在儲存這位員工，等待雲端確認…';
     const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
     if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
+    if(result.employee&&SYS.some(k=>normalizePerms(result.employee)[k]!==p[k]))throw new Error('雲端回覆的後台權限與設定不一致，請保留視窗並重新核對');
     const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
     const saved={...(index>=0?employees[index]:{}),...employee,...(result.employee||{})};
     if(index>=0)employees.splice(index,1,saved);else employees.push(saved);
@@ -1106,6 +1107,7 @@ async function saveCurrent(){
       const normalizeDate=v=>String(v||'').slice(0,10).replace(/\//g,'-');
       const textMatches=['name','dept','unit'].every(key=>String(cloudEmployee?.[key]||'').trim()===String(employee[key]||'').trim());
       if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.reportingDate)!==employee.reportingDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
+      if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k])){ $('status').textContent='⚠️ 雲端讀回的後台權限與設定不一致，尚未確認權限儲存成功，請重新開啟該人員核對';return; }
       p79ApplyHrEmployeesPayload(data,false,'cloud');
       $('status').textContent='✅ 人資資料已儲存，雲端人員清單已更新';
     }).catch(error=>{if(revision===p79HrSaveRevision)$('status').textContent='✅ 員工已儲存｜清單背景更新未完成，可稍後重新同步';console.warn('已儲存人員的背景同步失敗',error);});
