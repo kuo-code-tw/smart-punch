@@ -772,7 +772,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
 <link rel="stylesheet" href="../assets/port79-calendar-range.css">
 <style id="p79-overtime-compact-inline">
-#adminContentOvertime table:has(#overtimeTableBody){width:100%!important;min-width:1680px!important;table-layout:fixed!important}
+#adminContentOvertime table:has(#overtimeTableBody){width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important}
 #adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(1){width:8%!important}
 #adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(2){width:7%!important}
 #adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(3){width:8%!important}
@@ -782,11 +782,22 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(7){width:9%!important}
 #adminContentOvertime table:has(#overtimeTableBody) :is(th,td):nth-child(8){width:33%!important}
 
-#adminContentOvertime table:has(#overtimeTableBody) th,#adminContentOvertime table:has(#overtimeTableBody) td{padding:5px 9px!important;font-size:14px!important;line-height:24px!important;white-space:nowrap!important;text-align:center!important}
+#adminContentOvertime table:has(#overtimeTableBody) th,#adminContentOvertime table:has(#overtimeTableBody) td{padding:5px 9px!important;font-size:14px!important;line-height:24px!important;white-space:normal!important;overflow-wrap:anywhere;text-align:center!important}
 #adminContentOvertime table:has(#overtimeTableBody) th:last-child,#adminContentOvertime table:has(#overtimeTableBody) td:last-child{text-align:left!important}
-#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:8px;white-space:nowrap;font-size:14px;width:100%}
+#adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:6px;white-space:normal;font-size:14px;width:100%;min-width:0;flex-wrap:wrap}
 #adminContentOvertime .p79-overtime-inline button:first-of-type{margin-left:auto!important}
 #adminContentOvertime .p79-overtime-inline button{min-height:28px!important;padding:2px 6px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
+#adminContentOvertime .p79-overtime-inline>span{min-width:0;white-space:normal;overflow-wrap:anywhere}
+#adminContentOvertime .p79-overtime-inline button{flex:0 0 auto;white-space:nowrap}
+@media(max-width:850px){
+#adminContentOvertime table:has(#overtimeTableBody) thead{display:none}
+#adminContentOvertime table:has(#overtimeTableBody),#overtimeTableBody{display:block;width:100%!important;min-width:0!important}
+#overtimeTableBody>tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-bottom:1px solid #cbd5e1;padding:6px}
+#adminContentOvertime table:has(#overtimeTableBody) #overtimeTableBody>tr>td{display:block;width:auto!important;min-width:0;text-align:left!important;padding:5px!important}
+#overtimeTableBody>tr>td::before{content:attr(data-label);display:block;color:#64748b;font-size:12px;font-weight:700}
+#overtimeTableBody>tr>td:last-child{grid-column:1/-1}
+#overtimeTableBody>tr>td[colspan]{grid-column:1/-1}
+}
 </style>
 <style id="p79-attendance-balanced-columns-v69">
 #adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:1440px!important;table-layout:fixed!important}
@@ -2141,7 +2152,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.104';
+        const APP_VERSION='2026.10.16.105';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -12565,14 +12576,14 @@ function p79OvertimePeriodLabel(report){
                 const clockInCell = row.planned?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
                 const clockOutCell = row.planned?'待出勤':formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${row.overDailyLimit ? 'bg-rose-50/60 dark:bg-rose-950/10' : ''}">
-                    <td class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtml(String(row.dateKey || '').replace(/-/g, '/'))}</td>
-                    <td class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}</td>
-                    <td class="px-3 py-3">${escapeHtml(row.dept)}</td>
-                    <td class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
-                    <td class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
-                    <td class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
-                    <td class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}</td>
-                    <td class="px-3 py-3"><div class="p79-overtime-inline">${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td data-label="上班日期" class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtml(String(row.dateKey || '').replace(/-/g, '/'))}</td>
+                    <td data-label="姓名" class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}</td>
+                    <td data-label="部門" class="px-3 py-3">${escapeHtml(row.dept)}</td>
+                    <td data-label="職務" class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
+                    <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
+                    <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
+                    <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}</td>
+                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
