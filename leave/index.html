@@ -296,7 +296,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
           <div id="balanceAsOf" class="status info" style="margin-top:0">年假基準：尚無匯入資料</div>
           <div class="field"><label>假別</label>
             <select id="leaveType">
-              <option value="年假">年假</option>
+              <option value="特休假">年假</option>
               <option value="事假">事假</option>
               <option value="普通傷病假">普通傷病假</option>
               <option value="公傷病假">公傷病假</option>
@@ -353,7 +353,7 @@ body[data-p79-system="leave"] .leave-admin-table .actions button{font-size:13px!
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.92';
+const APP_VERSION='2026.10.16.100';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -494,7 +494,7 @@ function sameEmployee(l,e){return String(l.empId||'').trim().toUpperCase()===Str
 function badge(s){const c=s==='已核准'?'approved':s==='已駁回'?'rejected':'pending';return `<span class="badge ${c}">${esc(s||'待審核')}</span>`}
 function leaveTypeBadge(value){
  const name=String(value||'未設定假別');
- const kinds={'年假':'annual','特休':'annual','特別休假':'annual','事假':'personal','普通傷病假':'sick','病假':'sick','公傷病假':'injury','婚假':'marriage','喪假':'bereavement','公假':'official','產假':'maternity','產檢假':'prenatal','陪產檢及陪產假':'paternity','安胎休養請假':'pregnancy','家庭照顧假':'family','生理假':'menstrual','其他公司公告假別':'other'};
+ const kinds={'特休假':'annual','年假':'annual','特休':'annual','特別休假':'annual','事假':'personal','普通傷病假':'sick','病假':'sick','公傷病假':'injury','婚假':'marriage','喪假':'bereavement','公假':'official','產假':'maternity','產檢假':'prenatal','陪產檢及陪產假':'paternity','安胎休養請假':'pregnancy','家庭照顧假':'family','生理假':'menstrual','其他公司公告假別':'other'};
  return '<span class="p79-leave-type p79-leave-type-'+(kinds[name]||'other')+'">'+esc(name)+'</span>';
 }
 function renderMy(){
@@ -504,7 +504,7 @@ function updateDays(){const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s|
 async function submitLeave(){
  if(!currentEmployee)return;const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){setStatus('請選擇開始與結束日期','warn');return}updateDays();const days=Number($('leaveDays').value);if(!days){setStatus('結束日期不可早於開始日期','error');return}
  const btn=$('submitLeaveBtn');btn.disabled=true;btn.textContent='上傳中...';
- try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';await loadCloud()}
+ try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';await loadCloud()}
  catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
  finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
 }
