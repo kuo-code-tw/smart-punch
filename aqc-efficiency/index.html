@@ -1580,7 +1580,7 @@ body[data-p79-system="efficiency"] main{
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
 <script>
-const APP_VERSION='2026.10.16.99';
+const APP_VERSION='2026.10.16.118';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
@@ -13320,24 +13320,26 @@ async function autoRestoreVesselCloud(reason='auto',retryCount=3){
 
 function startShipFullAutoSync(){
   if(port79ShipAutoSyncTimer)clearInterval(port79ShipAutoSyncTimer);
-
-  // 背景每 60 秒確認一次；切回頁面也會立即拉取。
   port79ShipAutoSyncTimer=setInterval(()=>{
     if(document.visibilityState==='visible')autoRestoreVesselCloud('timer',2);
   },60000);
-
-  window.addEventListener('online',()=>{
-    setTimeout(()=>autoRestoreVesselCloud('online',3),400);
-  });
-
-  window.addEventListener('focus',()=>{
-    setTimeout(()=>autoRestoreVesselCloud('focus',2),400);
-  });
-
+  // Focus, visibility and online often arrive together. Register once and coalesce.
+  if(startShipFullAutoSync.resumeBound)return;
+  startShipFullAutoSync.resumeBound=true;
+  let resumeTimer=null;
+  const resume=reason=>{
+    if(document.visibilityState!=='visible')return;
+    clearTimeout(resumeTimer);
+    resumeTimer=setTimeout(()=>{
+      resumeTimer=null;
+      if(document.visibilityState==='visible'&&!port79ShipAutoSyncBusy)autoRestoreVesselCloud(reason,2);
+    },400);
+  };
+  window.addEventListener('online',()=>resume('online'));
+  window.addEventListener('focus',()=>resume('focus'));
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible'){
-      setTimeout(()=>autoRestoreVesselCloud('visible',2),400);
-    }
+    if(document.visibilityState==='visible')resume('visible');
+    else{clearTimeout(resumeTimer);resumeTimer=null;}
   });
 }
 
