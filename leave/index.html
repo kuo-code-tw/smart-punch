@@ -352,10 +352,9 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
         <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出Excel</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
-        <div class="field"><label>搜尋姓名／工號</label><input id="filterKeyword" oninput="renderAdmin()" placeholder="關鍵字"></div>
-        <div class="field"><label>部門</label><select id="filterDept" onchange="renderAdmin()"><option value="">全部部門</option></select></div>
+        <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
+        <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
-        <div class="field" style="position:relative"><label>日期範圍</label><details id="leaveAdminDateRangePicker" style="position:relative"><summary id="leaveAdminDateRangeSummary" class="btn btn-sec" style="list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:38px">📅 <span>全部日期</span></summary><div style="position:absolute;right:0;top:calc(100% + 8px);z-index:80;min-width:340px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 18px 45px rgba(15,23,42,.18)"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="field"><label>開始日期</label><input id="leaveAdminDateFrom" type="date" onchange="updateLeaveAdminDateRange();renderAdmin()"></div><div class="field"><label>結束日期</label><input id="leaveAdminDateTo" type="date" onchange="updateLeaveAdminDateRange();renderAdmin()"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px"><button type="button" class="btn btn-sec" onclick="clearLeaveAdminDateRange()">清除日期</button><button type="button" class="btn btn-main" onclick="document.getElementById('leaveAdminDateRangePicker').removeAttribute('open')">完成</button></div></div></details></div>
       </div>
       <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button>
       <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
@@ -370,7 +369,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.10.16.107';
+const APP_VERSION='2026.10.16.108';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -537,10 +536,18 @@ async function submitLeave(){
  catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
  finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
 }
-function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=cur}
+function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=ds.includes(cur)?cur:'';populateLeaveAdminJobs()}
 function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
-function updateLeaveAdminDateRange(){let a=$('leaveAdminDateFrom')?.value||'',b=$('leaveAdminDateTo')?.value||'';if(a&&b&&a>b){$('leaveAdminDateTo').value=a;b=a;}const span=$('leaveAdminDateRangeSummary')?.querySelector('span');if(span)span.textContent=!a&&!b?'全部日期':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`;}
-function clearLeaveAdminDateRange(){if($('leaveAdminDateFrom'))$('leaveAdminDateFrom').value='';if($('leaveAdminDateTo'))$('leaveAdminDateTo').value='';updateLeaveAdminDateRange();renderAdmin()}
+function p79LeaveJobForRecord(record){
+ const id=String(record.empId||'').trim().toUpperCase(),attNo=String(record.attNo||'').trim();
+ const employee=employees.find(e=>id&&String(e.empId||'').trim().toUpperCase()===id)||employees.find(e=>attNo&&String(e.attNo||'').trim()===attNo);
+ return String(employee?.jobTitle||employee?.deptDetail||record.jobTitle||record.deptDetail||'').trim();
+}
+function populateLeaveAdminJobs(){
+ const select=$('filterJob');if(!select)return;const dept=$('filterDept').value,current=select.value;
+ const jobs=[...new Set([...employees.filter(e=>!dept||String(e.dept||'')===dept).map(e=>String(e.jobTitle||e.deptDetail||'').trim()),...leaveRecords.filter(l=>!dept||String(l.dept||'')===dept).map(p79LeaveJobForRecord)].filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
+ select.innerHTML='<option value="">全部職稱</option>'+jobs.map(job=>`<option value="${esc(job)}">${esc(job)}</option>`).join('');select.value=jobs.includes(current)?current:'';
+}
 
 async function p79ComparisonOutput(title,rows,printMode){
  if(printMode){
@@ -563,13 +570,8 @@ function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
  $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
- const kw=$('filterKeyword').value.trim().toLowerCase(),dept=$('filterDept').value,status=$('filterStatus').value;
- const dateFrom=$('leaveAdminDateFrom')?.value||'',dateTo=$('leaveAdminDateTo')?.value||'';
- let rows=leaveRecords.filter(l=>{
-   const ls=normalizeLeaveFilterDate(l.startTime||l.startDate),le=normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate);
-   const rangeOk=(!dateFrom&&!dateTo)||!!ls&&!!le&&(!dateFrom||le>=dateFrom)&&(!dateTo||ls<=dateTo);
-   return rangeOk&&(!kw||[l.name,l.empId,l.attNo].some(v=>String(v||'').toLowerCase().includes(kw)))&&(!dept||String(l.dept||'')===dept)&&(!status||String(l.status||'')===status);
- });
+ const dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
+ let rows=leaveRecords.filter(l=>(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'')===status));
  p79LeaveComparisonRows=rows;
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
@@ -1158,7 +1160,6 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 const C=window.Port79CalendarRange;if(!C)return;
 C.mountRange({startId:'leaveStart',endId:'leaveEnd',label:'請假日期',allowClear:false});
-C.mountRange({hostId:'leaveAdminDateRangePicker',startId:'leaveAdminDateFrom',endId:'leaveAdminDateTo',compatSummaryId:'leaveAdminDateRangeSummary',compatSummaryHasSpan:true,allowClear:true,emptyText:'全部日期'});
 
 });
 </script>
