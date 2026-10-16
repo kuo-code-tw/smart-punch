@@ -274,7 +274,7 @@ const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79Manage
 if(!context||!api||!factory)return;
 let stopped=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
-function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return ['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
+function roleAllowed(){try{const s=JSON.parse(sessionStorage.getItem('admin_session')||sessionStorage.getItem('port79_user_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
  const el=document.activeElement;if(el&&el.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
  return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
