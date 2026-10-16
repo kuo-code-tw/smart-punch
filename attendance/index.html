@@ -2282,7 +2282,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.69';
+        const APP_VERSION='2026.10.16.83';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -6629,7 +6629,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
             return name === 'AbortError' || /aborted|aborterror|signal is aborted/i.test(msg);
         }
 
-        async function loadAttendanceMonthFromCloud(monthKey, showMessage = false) {
+        async function loadAttendanceMonthFromCloud(monthKey, showMessage = false, options = {}) {
             // 月份同步入口先確保全域 records 型別正確。
             if (!Array.isArray(records)) {
                 if (records && Array.isArray(records.records)) {
@@ -6684,11 +6684,11 @@ function p79IsMobileOrTabletForAttendanceSync() {
                 replaceAttendanceMonthInMemory(key, incoming);
 
                 // v2026.10.03.16.60：補讀前後月份，讓跨月底夜班可以配對。
-                await loadAttendanceBoundaryMonthsFromCloud(key);
+                if (!options.rawExport) await loadAttendanceBoundaryMonthsFromCloud(key);
 
                 if (Array.isArray(data.availableMonths)) updateAttendanceMonthOptionsFromCloud(data.availableMonths);
                 try { localStorage.setItem('sp_records_v5', JSON.stringify(records)); } catch(e) {}
-                initDropdowns(); renderAdminRecordsTable();
+                if (!options.rawExport) { initDropdowns(); renderAdminRecordsTable(); }
                 if (showMessage) showToast(`${key} 考勤已從 ${data.sheetName || '月份分頁'} 更新`, 'success');
                 return true;
             } catch (e) {
@@ -21212,9 +21212,6 @@ function p79EmployeeDateEligible(emp,date) {
             const update=message=>{if(progress)progress.textContent=message;if(button)button.textContent='匯出處理中…';};
             if(button)button.disabled=true;
             try {
-            update('正在準備 Excel 元件，請稍候…');
-            await window.p79LoadXlsxLibrary();
-            if(!window.XLSX?.utils)throw Error('Excel 元件未成功載入，請再試一次');
             const checkboxes = document.querySelectorAll('.export-field-checkbox');
             let selectedFields = [];
             checkboxes.forEach(cb => {
@@ -21234,39 +21231,33 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast('請選擇有效的匯出年／月份', 'warning');
                 return;
             }
-            if(getActiveGasUrl()){
-                update('正在核對雲端假別與班表，請稍候…');
-                const loaded=await loadCloudData(false,false);
-                if(!loaded)throw Error('雲端假別與班表尚未讀取完成，請稍後再匯出，避免漏資料');
-                update('正在讀取 '+exportMonth+' 考勤與跨月班次，請稍候…');
-                if(!await loadAttendanceMonthFromCloud(exportMonth,false))throw Error('所選月份考勤未讀取完成，請稍後再匯出');
-            }
-            if(!window.P79AttendanceV6?.buildShifts)throw Error('班次計算元件尚未載入，請稍後再試');
-            update('正在整理班次、假別與選取欄位…');
-            const reportPeople=getAdminAttendanceEmployees().filter(emp=>String(emp.empId||'')!=='ADMIN'&&(companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter)));
-            const reportSource=records.filter(canCurrentAdminViewDataRow);
-            const dailyReport=p79BuildAttendanceDayReport(exportMonth,reportPeople,reportSource);
+            update('正在讀取 '+exportMonth+' 考勤與準備 Excel，請稍候…');
+            await Promise.all([
+                window.p79LoadXlsxLibrary(),
+                (async()=>{if(getActiveGasUrl()&&!await loadAttendanceMonthFromCloud(exportMonth,false,{rawExport:true}))throw Error('所選月份考勤未讀取完成，請稍後再匯出');})()
+            ]);
+            if(!window.XLSX?.utils)throw Error('Excel 元件未成功載入，請再試一次');
+            if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
+            update('正在整理原始考勤與選取欄位…');
+            const identityPool=getAttendanceIdentityEmployeePool();
             const visibleRecords = records
                 .filter(record=>p79AttendanceExportMatchesMonth(record,exportMonth))
                 .filter(canCurrentAdminViewDataRow)
                 .filter(record => {
                     if (companyFilter === 'ALL') return true;
-                    const matchedEmployee = employees.find(emp =>
-                        String(emp.empId || '').trim().toUpperCase() === String(record.empId || '').trim().toUpperCase() ||
-                        normalizeAttendanceStatsAttNo(emp.attNo) === normalizeAttendanceStatsAttNo(record.attNo)
-                    );
+                    const matchedEmployee = findEmployeeForAttendanceIdentity(record,identityPool);
                     const recordEmpId = String(record.empId || matchedEmployee?.empId || '').trim().toUpperCase();
                     const company = recordEmpId.match(/^([A-Z]+)/)?.[1] || '';
                     return company === companyFilter;
                 });
-            if (visibleRecords.length === 0 && dailyReport.length<=1) {
+            if (visibleRecords.length === 0) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
             if (!ensureExcelLibrary()) throw Error('Excel 元件尚未就緒');
             const sheetRows = [selectedFields.map(f => f.label)];
             visibleRecords.forEach(r => {
-                const currentEmployee = findEmployeeForAttendanceIdentity(r, getAttendanceIdentityEmployeePool());
+                const currentEmployee = findEmployeeForAttendanceIdentity(r, identityPool);
                 const rowData = selectedFields.map(f => {
                     let val = "";
                     if (f.key === 'attNo') val = currentEmployee?.attNo ?? r.attNo ?? '';
@@ -21285,9 +21276,6 @@ function p79EmployeeDateEligible(emp,date) {
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
             worksheet['!cols'] = selectedFields.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, time: 22, status: 14, location: 28, note: 28 })[field.key] || 16 }));
             const workbook = XLSX.utils.book_new();
-            const dailySheet=XLSX.utils.aoa_to_sheet(dailyReport);
-            dailySheet['!cols']=[12,10,16,14,16,14,18,24,24].map(wch=>({wch}));
-            XLSX.utils.book_append_sheet(workbook,dailySheet,'班次與假別');
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
