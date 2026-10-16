@@ -50,7 +50,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const APP_VERSION='2026.10.15.65';
+    const APP_VERSION='2026.10.16.115';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -3601,7 +3601,7 @@ function p79EmployeeDateEligible(emp,date) {
         let res;
         try {
           res = await fetch(
-            GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&_=' + Date.now(),
+            GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&month=' + encodeURIComponent(currentScheduleMonthKey()) + '&_=' + Date.now(),
             { redirect:'follow', cache:'no-store', signal:controller?.signal }
           );
         } finally {
@@ -6629,7 +6629,7 @@ window.p79OpenScheduleModeModal=function(){const m=ensureModeModal();m.classList
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+<script src="../assets/port79-seven-top.js?v=20261016.115"></script>
 
 <script id="p79-logout-home-v20261004">
 (function(){
@@ -6823,6 +6823,33 @@ window.p79OpenReportDraft=async function(){
  window.addEventListener('load',()=>{const draft=JSON.parse(sessionStorage.getItem(P79Overtime.KEY)||'null');void p79OpenReportDraft(true);},{once:true});
 });
 </script>
+
+<script>
+window.P79ScheduleContinuationContext={
+ month:currentScheduleMonthKey,token:currentPort79SsoToken,canManage:canManageSchedule,
+ rule:()=>({algo:document.getElementById('schedule-algorithm').value,counts:['early-work-input','early-off-input','mid-work-input','mid-off-input','night-work-input','night-off-input'].map(key=>Number(document.getElementById(key).value)||0)}),
+ prepare:async()=>{if(!canManageSchedule())throw Error('沒有排班管理權限');if(!await flushSchedulePendingWrites())throw Error('目前班表有未儲存變更，請先完成儲存再延續');},
+ read:async month=>{
+  const token=currentPort79SsoToken();if(!token)throw Error('請重新登入');
+  const response=await scheduleLockFetch(GAS_URL+'?action=getScheduleDataSecure&month='+encodeURIComponent(month)+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},25000);
+  const text=await response.text();if(!response.ok||scheduleCloudLooksLikeGoogleHtml(text))throw Error('排班雲端讀取失敗，未使用空白資料繼續');
+  const data=JSON.parse(text);if(data.ok!==true||!Array.isArray(data.schedules)||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))throw Error(data.error||'排班資料未完整讀取');
+  if(token!==currentPort79SsoToken())throw Error('登入身分已改變');return data;
+ },
+ people:source=>source.employees.filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN').map(e=>({...e,id:String(e.empId||'').trim().toUpperCase()})),
+ eligible:(person,date)=>p79EmployeeDateEligible(person,date),
+ allocate:(schedule,meta,month,excluded,person)=>{const preserved=JSON.parse(JSON.stringify(meta));Object.values(preserved).forEach(m=>{if(m?.restAllocationSource==='auto-v1')m.restAllocationSource='preserved-continuation';});return p79AllocateRestMonth(schedule,preserved,month,excluded,p79EmploymentStartDate(person)).meta;},
+ acquire:async()=>{if(!scheduleEditLockState.mine&&!await manualAcquireScheduleEditLock())throw Error('尚未取得排班編輯權；他人編輯時不會強制接管');if(!requireScheduleEditLock(false))throw Error('排班編輯權已失效');},
+ requestId:p79CreateScheduleSaveRequestId,receipt:p79ConfirmScheduleSaveReceipt,
+ persist:async(month,rows,requestId)=>{
+  let failure;const result=await runScheduleCloudWrite(async()=>{try{return await cloudPost({action:'syncSchedules',month,schedules:rows,expectedEmployeeCount:rows.length,saveRequestId:requestId});}catch(error){failure=error;throw error;}});
+  if(!result?.ok){const error=failure||Error('雲端尚未確認月份儲存');if(!['SCHEDULE_SAVE_RESULT_UNKNOWN','GAS_HTML_RESPONSE','GAS_INVALID_JSON','SCHEDULE_LOCK_TIMEOUT'].includes(error.code)&&!scheduleLockIsTransientNetworkError(error))error.confirmedRejected=true;throw error;}return result;
+ },
+ afterSave:async month=>{document.getElementById('month-picker').value=month;const [a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();
+  const loaded=await loadCloudData(false);if(loaded){buildRoleTabsAndRender();renderTodaySchedulePanel();}else alert('下個月班表已儲存並核對，畫面尚未重新載入，請按重新整理。');}
+};
+</script>
+<script src="../assets/port79-schedule-continuation.js?v=20261016.115"></script>
 </body>
 </html>
 
