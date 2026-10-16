@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
-<head><base href="/smart-punch/attendance/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
+<head><script src="/smart-punch/integration-test/stage-navigation.js?v=20261017.2"></script><base href="/smart-punch/attendance/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
 <!-- PORT79 V6.0.21 MOBILE-PUNCH-FAST：員工手機打卡減少等待；GPS先快速定位、必要時才補高精度；員工主檔打卡入口只做單次雲端讀取；XLSX管理套件不再於員工打卡頁下載。 -->
 <!-- PORT79 V6.0.20 SYNC-IN-DATE-HEADER：精簡同步狀態移入日期切換白色區塊最上排，與日期摘要同行；移除獨立狀態列與說明文字。 -->
@@ -759,7 +759,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="../assets/port79-data-cache.js?v=20261011.30"></script>
+<script src="../assets/port79-data-cache.js?v=20261017.2"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -23797,6 +23797,6 @@ window.addEventListener('online',()=>setTimeout(reconcile,3000));
 setInterval(()=>{if(!document.hidden)reconcile()},60000);
 })();
 </script>
-<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" rel="opener" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" rel="opener" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script src="/smart-punch/integration-test/management-link.js?v=20261016.123"></script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';const event={v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']};api.binding.engine.receive(event);api.binding.publish(event);document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body>
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" rel="opener" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" rel="opener" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script src="/smart-punch/integration-test/management-link.js?v=20261017.2"></script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';const event={v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']};api.binding.engine.receive(event);api.binding.publish(event);document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body>
 </html>
 
