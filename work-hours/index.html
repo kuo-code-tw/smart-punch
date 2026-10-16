@@ -2119,7 +2119,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.15.77';
+        const APP_VERSION='2026.10.16.78';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14816,7 +14816,7 @@ window.p79MonthlyRestContext={
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
 <script src="../assets/port79-overtime-application.js?v=20261015.77"></script>
-<script src="../assets/port79-overtime-monthly-matrix.js?v=20261015.77"></script>
+<script src="../assets/port79-overtime-monthly-matrix.js?v=20261016.78"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.68"></script>
 </body>
 </html>
