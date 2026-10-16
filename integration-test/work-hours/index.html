@@ -14895,7 +14895,7 @@ window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,pre
 <script src="../assets/port79-overtime-application.js?v=20261015.77"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261016.82"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.68"></script>
-<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script>(function(global){
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" rel="opener" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" rel="opener" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script>(function(global){
 'use strict';
 // Draft: management-only invalidation. It never writes domain records or submits punch requests.
 const TOPICS=['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history'];
@@ -15002,7 +15002,7 @@ g.P79ManagementAdapterFactory={makeAdapter};
 g.P79ManagementContext={system:'workhours',identity:()=>currentPort79SsoToken()+'|'+getRequestedAttendanceCloudMonth()+'|'+(document.getElementById('overtimeMonthFilter')?.value||''),gas:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),canRead:()=>canReadAdminCloudData(),hasPendingChanges:()=>!!(window.p79V5GetStatus?.().pending||cloudOutboxBusy||cloudDirectWriteBusy>0),
 scope:()=>({month:document.getElementById('overtimeMonthFilter')?.value||getRequestedAttendanceCloudMonth()}),
 readFresh:async read=>{const selected=document.getElementById('overtimeMonthFilter')?.value||getRequestedAttendanceCloudMonth();if(!/^\d{4}-\d{2}$/.test(selected))throw Error('請先選擇單一月份再同步');const [core,roster]=await Promise.all([read('getAttendanceCoreData',{month:selected}),read('getScheduleDataSecure',{month:selected})]);if(!Array.isArray(core.employees)||!Array.isArray(core.records)||!Array.isArray(roster.schedules)||!Array.isArray(roster.leaveCoverAssignments))throw Error('加班資料不完整');return {ok:true,confirmedFresh:true,core,roster,month:selected,at:Date.now()};},
-applySnapshot:async s=>{employees=mergeCloudEmployees(s.core.employees.map(normalizeEmployeeIdentifiers));leaveRecords=Array.isArray(s.core.leaveRecords)?s.core.leaveRecords:leaveRecords;
+applySnapshot:async s=>{employees=mergeCloudEmployees(s.core.employees.map(normalizeEmployeeIdentifiers));if(currentEmp){const mine=employees.find(e=>String(e.empId).toUpperCase()===String(currentEmp.empId).toUpperCase());if(mine)currentEmp={...currentEmp,...mine};}leaveRecords=Array.isArray(s.core.leaveRecords)?s.core.leaveRecords:leaveRecords;
 const rows=s.core.records.map(normalizeAttendanceRecordIdentifiers);if(rows.length)replaceAttendanceMonthInMemory(s.month,mergeRecentAttendanceMutationsIntoRemote(rows,s.at));
 schedules=(schedules||[]).filter(r=>normalizeScheduleMonthKey(r.month)!==s.month).concat(s.roster.schedules);
 p79WorkOvertimeMonths.set(s.month,{token:currentPort79SsoToken(),at:Date.now(),pending:false,ready:true,rows:s.roster.schedules,covers:s.roster.leaveCoverAssignments,revision:s.roster.revision,canDelete:s.roster.overtimeLinkedDelete===true});p79OvertimeCalculationCache=null;initDropdowns();renderOvertimeStats();return true;}}
@@ -15055,7 +15055,7 @@ function boot(){
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope(),readFresh:()=>context.readFresh(readFresh)});
  const backend=new URL(context.gas(),location.href);
  binding=api.attach({system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
- g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};
+ g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入';}
 }
 const resume=()=>{if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
