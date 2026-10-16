@@ -1584,7 +1584,7 @@ const APP_VERSION='2026.10.16.118';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
 // BUILD: 2026.09.24-SHIFT-AUDIT-V18-DASHBOARD-FILTERS
 // BUILD 2026.09.24-MONTHLY-COMPARE-STABLE-V18
-const STORE={groups:'gc_groups_v1',assign:'gc_assign_v1',records:'gc_records_v1',ships:'gc_ship_masters_v1',employees:'gc_system_employees_v2',rev:'gc_revision_v1',queue:'gc_queue_v1'};
+const STORE={groups:'gc_groups_v1',assign:'gc_assign_v1',records:'gc_records_v1',ships:'gc_ship_masters_v1',employees:'gc_system_employees_v2',rev:'gc_revision_v1',queue:'gc_management_test_queue_v1'};
 const SHIP_OVERRIDE_STORE='gc_ship_manual_overrides_v3';
 const MONTHLY_CORRECTION_STORE='gc_monthly_manual_corrections_v1';
 let monthlyCorrectionStore={};
@@ -6728,7 +6728,7 @@ function p79EfficiencyOpenDb(){
  if(p79EfficiencyDbPromise)return p79EfficiencyDbPromise;
  p79EfficiencyDbPromise=new Promise((resolve,reject)=>{
   if(typeof indexedDB==='undefined')return reject(Error('瀏覽器資料庫不可用'));
-  const req=indexedDB.open('port79_efficiency_durable_v1',1);
+  const req=indexedDB.open('port79_efficiency_management_test_durable_v1',1);
   req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('state'))req.result.createObjectStore('state');};
   req.onerror=()=>reject(req.error||Error('瀏覽器資料庫開啟失敗'));req.onblocked=()=>reject(Error('瀏覽器資料庫被其他分頁占用'));
   req.onsuccess=()=>resolve(req.result);
@@ -6744,13 +6744,13 @@ async function ensureGcQueueReady(){
   let stored;
   try{stored=await p79EfficiencyDbReadQueue(legacy);}
   catch(error){
-   if(typeof indexedDB!=='undefined'||localStorage.getItem('gc_queue_storage_v2')==='indexeddb')throw Error('待同步資料庫暫時無法讀取，請保留此頁後重試');
+   if(typeof indexedDB!=='undefined'||localStorage.getItem('gc_management_test_queue_storage_v2')==='indexeddb')throw Error('待同步資料庫暫時無法讀取，請保留此頁後重試');
    gcQueueStorageMode='local';gcQueueMemory=legacy;gcQueueReady=true;return;
   }
   if(stored!==undefined&&!Array.isArray(stored))throw Error('待同步資料格式有誤，請保留原資料');
   gcQueueStorageMode='indexeddb';gcQueueMemory=stored===undefined?legacy:stored;gcQueueReady=true;
   // Remove the legacy duplicate only after its durable transaction succeeds.
-  try{localStorage.removeItem(STORE.queue);localStorage.setItem('gc_queue_storage_v2','indexeddb');}catch(ignore){}
+  try{localStorage.removeItem(STORE.queue);localStorage.setItem('gc_management_test_queue_storage_v2','indexeddb');}catch(ignore){}
  })();try{return await gcQueueReadyPromise;}finally{gcQueueReadyPromise=null;}
 }
 function readQueue(){
@@ -13944,5 +13944,5 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(17){width:4.0%!important;min-width:0!important}
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 </style>
-<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" rel="opener" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" rel="opener" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script src="/smart-punch/integration-test/management-link.js?v=20261017.2"></script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';const event={v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']};api.binding.engine.receive(event);api.binding.publish(event);document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body></html>
+<aside style="padding:10px;background:#fff7ed;color:#9a3412;font:700 14px system-ui;position:relative;z-index:20000" id="p79StageControls">隔離連接測試｜正式資料唯讀，所有 POST 已封鎖 <button id="p79StageSignal" type="button">測試更新通知</button> <a target="_blank" rel="opener" href="/smart-punch/integration-test/leave/">開啟請假測試分頁</a> <a target="_blank" rel="opener" href="/smart-punch/integration-test/work-hours/">開啟加班測試分頁</a> <span id="p79StageState">等待管理員驗證</span></aside><script src="/smart-punch/integration-test/management-link.js?v=20261017.3"></script><script>(function(){const button=document.getElementById('p79StageSignal');button.onclick=()=>{const api=window.P79ManagementPageBridge;if(!api?.binding?.engine)return document.getElementById('p79StageState').textContent='管理員尚未完成驗證';const event={v:1,id:'stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','leave','cover','schedule','overtime','efficiency','history']};api.binding.engine.receive(event);api.binding.publish(event);document.getElementById('p79StageState').textContent='測試通知已送出（沒有寫入正式資料）';};})();</script></body></html>
 
