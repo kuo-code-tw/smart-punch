@@ -888,183 +888,32 @@ body[data-p79-system="efficiency"] main{
     </div>
   </section>
   <section id="view-personstats" class="hidden space-y-4">
-    <div class="card p-4 dual-audit-card">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div class="text-xs font-black text-cyan-700">個人效率表與 WORKING SHEET 正確性核對</div>
-          <h2 class="text-xl font-black mt-1">🧭 雙檔差異比對</h2>
-          <div class="text-sm text-slate-500 mt-1">
-            先放「AQC 個人效率表」，再放同一艘船的「WORKING SHEET」。差異會自動排最前面，點「查看差異」可直接看到是哪個欄位、兩份檔案之間的差異。
-          </div>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <label class="btn bg-violet-600 text-white cursor-pointer text-sm">
-            ① 個人效率表
-            <input type="file" accept=".xlsx,.xls" class="hidden"
-                   onchange="handleDualPersonalFile(this.files[0]);this.value=''">
-          </label>
-          <label class="btn bg-emerald-600 text-white cursor-pointer text-sm">
-            ② 船舶 WORKING SHEET
-            <input type="file" accept=".xlsx,.xls" class="hidden"
-                   onchange="importDualWorkingExcel(this.files[0]);this.value=''">
-          </label>
-          <button type="button" onclick="rebuildDualSourceSystemAudit()" class="btn bg-sky-600 text-white text-sm">↻ 重新比對</button>
-          <button type="button" onclick="clearDualSourceSystemAudit()" class="btn bg-slate-100 text-sm">清除雙檔</button>
-        </div>
+    <div class="card p-4">
+      <h2 class="text-xl font-black">WORKING SHEET 資料交叉比對</h2>
+      <p class="text-sm text-slate-500 mt-2">匯入一份 Working Sheet Excel 檔案即可。WORKING SHEET 核對全船總數，WORKING REPORT 彙總每位司機；可篩選姓名與 AQC，並與系統已匯入的同船明細比對。</p>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <label class="btn bg-emerald-600 text-white cursor-pointer">匯入 WORKING SHEET 檔案<input type="file" accept=".xlsx,.xls" class="hidden" onchange="importWorkingSheetDriverAudit(this.files[0]);this.value=''"></label>
+        <button type="button" class="btn bg-slate-100" onclick="clearWorkingSheetDriverAudit()">清除比對檔案</button>
       </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-3">
-        <div id="dualPersonalFileState" class="rounded-xl border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-          ① 尚未放入 AQC 個人效率表
-        </div>
-        <div id="dualWorkingFileState" class="rounded-xl border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-          ② 尚未放入船舶 WORKING SHEET
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-        <div class="rounded-xl border bg-rose-50 p-3 text-center">
-          <div class="text-[10px] text-rose-700">差異項目</div>
-          <div id="dualIssueCount" class="text-xl font-black text-rose-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-amber-50 p-3 text-center">
-          <div class="text-[10px] text-amber-700">來源檔差異</div>
-          <div id="dualSourceIssueCount" class="text-xl font-black text-amber-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-emerald-50 p-3 text-center">
-          <div class="text-[10px] text-emerald-700">一致人員</div>
-          <div id="dualOkCount" class="text-xl font-black text-emerald-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-indigo-50 p-3 text-center">
-          <div class="text-[10px] text-indigo-700">比對船舶</div>
-          <div id="dualShipLabel" class="text-sm font-black text-indigo-700 mt-1">—</div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-2 mt-3">
-        <div>
-          <label class="block text-xs font-bold mb-1">顯示</label>
-          <select id="dualAuditFilter" class="border rounded-xl px-3 py-2 bg-white text-sm" onchange="renderDualSourceSystemAudit()">
-            <option value="issues">差異優先 / 只看差異</option>
-            <option value="source">只看來源檔問題</option>
-            <option value="ok">只看一致</option>
-            <option value="all">全部（差異仍排前面）</option>
-          </select>
-        </div>
-        <div class="flex-1 min-w-[220px]">
-          <label class="block text-xs font-bold mb-1">搜尋</label>
-          <input id="dualAuditSearch" class="w-full border rounded-xl px-3 py-2 bg-white text-sm"
-                 placeholder="姓名 / AQC / 差異欄位" oninput="renderDualSourceSystemAudit()">
-        </div>
-      </div>
-
-      <div class="overflow-auto max-h-[54vh] rounded-2xl border mt-3">
-        <table class="tbl w-full min-w-[1100px] text-center">
-          <thead>
-            <tr>
-              <th>狀態</th><th>人員 / 項目</th><th>AQC</th>
-              <th>個人效率表</th><th>WORKING SHEET</th>
-              <th>差異欄位</th><th>判定</th><th>查看</th>
-            </tr>
-          </thead>
-          <tbody id="dualAuditBody">
-            <tr><td colspan="8" class="p-5 text-slate-400">請依序放入兩份 Excel</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div id="workingSheetDriverFileState" class="mt-3 text-sm" role="status">尚未匯入 WORKING SHEET 檔案。</div>
     </div>
-
-    <div class="card p-4 personal-audit-card">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div class="text-xs font-black text-violet-600">AQC 個人效率月表 / 系統資料交叉檢查</div>
-          <h2 class="text-xl font-black mt-1">🔍 個人作業統計比對</h2>
-          <div class="text-sm text-slate-500 mt-1">
-            匯入「AQC個人效率表」後，自動比對每位人員的時數、櫃數、H/C、效率，以及每艘船/日期/AQC 的作業明細。
-          </div>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <label class="btn bg-violet-600 text-white cursor-pointer text-sm">
-            📥 匯入個人效率 Excel
-            <input type="file" accept=".xlsx,.xls" class="hidden"
-                   onchange="comparePersonalEfficiencyExcel(this.files[0]);this.value=''">
-          </label>
-          <button type="button" onclick="rebuildPersonalEfficiencyAudit()" class="btn bg-sky-600 text-white text-sm">↻ 重新比對</button>
-          <button type="button" onclick="clearPersonalEfficiencyAudit()" class="btn bg-slate-100 text-sm">清除比對</button>
-        </div>
-      </div>
-
-      <div id="personalAuditFileState"
-           class="mt-3 rounded-xl border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-        尚未匯入 AQC 個人效率表。
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-        <div class="rounded-xl border bg-white p-3 text-center">
-          <div class="text-[10px] text-slate-500">比對人數</div>
-          <div id="paPeopleCount" class="text-xl font-black">0</div>
-        </div>
-        <div class="rounded-xl border bg-emerald-50 p-3 text-center">
-          <div class="text-[10px] text-emerald-700">完全一致</div>
-          <div id="paOkCount" class="text-xl font-black text-emerald-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-rose-50 p-3 text-center">
-          <div class="text-[10px] text-rose-700">有差異人員</div>
-          <div id="paIssueCount" class="text-xl font-black text-rose-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-amber-50 p-3 text-center">
-          <div class="text-[10px] text-amber-700">來源 Excel 問題</div>
-          <div id="paSourceIssueCount" class="text-xl font-black text-amber-700">0</div>
-        </div>
-        <div class="rounded-xl border bg-indigo-50 p-3 text-center">
-          <div class="text-[10px] text-indigo-700">作業明細差異</div>
-          <div id="paDetailIssueCount" class="text-xl font-black text-indigo-700">0</div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-2 mt-3">
-        <div>
-          <label class="block text-xs font-bold mb-1">顯示</label>
-          <select id="personalAuditStatusFilter"
-                  class="border rounded-xl px-3 py-2 bg-white text-sm"
-                  onchange="renderPersonalEfficiencyAudit()">
-            <option value="issues">只看有問題</option>
-            <option value="all">全部人員</option>
-            <option value="ok">只看一致</option>
-            <option value="source">只看來源 Excel 問題</option>
-          </select>
-        </div>
-        <div class="flex-1 min-w-[220px]">
-          <label class="block text-xs font-bold mb-1">人員篩選</label>
-          <select id="personalAuditSearch"
-                  class="w-full border rounded-xl px-3 py-2 bg-white text-sm"
-                  onchange="renderPersonalEfficiencyAudit()">
-            <option value="">全部人員</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="overflow-auto max-h-[52vh] rounded-2xl border mt-3">
-        <table class="tbl w-full min-w-[1450px] text-center">
-          <thead>
-            <tr>
-              <th>姓名</th>
-              <th>Excel時數</th><th>系統時數</th><th>差</th>
-              <th>Excel櫃數</th><th>系統櫃數</th><th>差</th>
-              <th>Excel H/C</th><th>系統 H/C</th><th>差</th>
-              <th>Excel效率</th><th>系統效率</th>
-              <th>狀態</th><th>檢查</th>
-            </tr>
-          </thead>
-          <tbody id="personalAuditBody">
-            <tr><td colspan="14" class="text-slate-400 p-5">請先匯入個人效率 Excel</td></tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="card p-4">
+      <h3 class="font-black">全船來源核對</h3>
+      <div id="workingSheetDriverSourceAudit" class="mt-2 text-sm" role="status">請先匯入檔案。</div>
+      <p class="text-xs text-slate-500 mt-2">全船核對不受下方司機篩選影響。個人效率（含 H/C）＝（個人櫃數＋H/C）÷ WORKING REPORT 作業時數。</p>
     </div>
-
+    <div class="card p-4 overflow-auto">
+      <div class="flex flex-wrap items-end gap-3 mb-3">
+        <div><label for="workingSheetDriverName" class="block text-xs font-bold">司機姓名</label><select id="workingSheetDriverName" class="border rounded-xl px-3 py-2" onchange="renderWorkingSheetDriverAudit()"><option value="">全部司機</option></select></div>
+        <div><label for="workingSheetDriverAqc" class="block text-xs font-bold">AQC</label><select id="workingSheetDriverAqc" class="border rounded-xl px-3 py-2" onchange="renderWorkingSheetDriverAudit()"><option value="">全部 AQC</option></select></div>
+        <div id="workingSheetDriverCount" class="text-sm text-slate-500"></div>
+      </div>
+      <table class="tbl w-full min-w-[1250px] text-center">
+        <thead><tr><th>司機姓名</th><th>AQC</th><th>原檔 DISC</th><th>原檔 LOAD</th><th>原檔 H/C</th><th>原檔時數</th><th>原檔櫃數</th><th>原檔效率（含 H/C）</th><th>系統櫃數</th><th>櫃數差額</th><th>核對結果</th></tr></thead>
+        <tbody id="workingSheetDriverBody"><tr><td colspan="11" class="p-5 text-slate-400">請先匯入 WORKING SHEET 檔案。</td></tr></tbody>
+      </table>
+    </div>
   </section>
-
   <section id="view-workload" class="hidden space-y-4">
     <div class="card p-4 border-teal-200">
       <div class="text-xs font-black text-teal-700">資料來源：已匯入船舶 WORKING REPORT 人員作業明細</div>
@@ -1534,8 +1383,11 @@ body[data-p79-system="efficiency"] main{
   <p class="text-sm text-slate-500 mt-2">依完工月份匯出整月船邊作業量，不受目前頁籤與日期區間影響。</p>
   <label for="vesselMonthlyExportMonth" class="block text-sm font-bold mt-4">匯出月份</label>
   <input id="vesselMonthlyExportMonth" type="month" class="border rounded-xl px-3 py-2 mt-1">
+  <label for="vesselMonthlyExportCompany" class="block text-sm font-bold mt-4">公司名稱抬頭</label>
+  <input id="vesselMonthlyExportCompany" type="text" maxlength="80" class="border rounded-xl px-3 py-2 mt-1 w-full" placeholder="請輸入公司名稱">
+  <p class="text-xs text-slate-500 mt-2">公司名稱會記在此瀏覽器。A4 橫向列印，每頁最多 35 筆；各頁重複抬頭、表頭並置中。備註留白。</p>
   <div class="flex gap-2 mt-4">
-    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value)" class="btn bg-emerald-600 text-white">匯出每月作業量表</button>
+    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出每月作業量表</button>
     <button type="button" onclick="document.getElementById('vesselMonthlyExportDialog').close()" class="btn bg-slate-100">關閉</button>
   </div>
 </dialog>
@@ -2007,8 +1859,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='records'){populateSelects();renderRecords();return;}
   if(name==='personstats'){
     populateSelects();
-    if(personalAuditReference){buildPersonalEfficiencyAudit();renderPersonalEfficiencyAudit();}
-    if(personalAuditReference&&dualAuditWorkingReference){buildDualSourceSystemAudit();renderDualSourceSystemAudit();}
+    renderWorkingSheetDriverAudit();
     return;
   }
   if(name==='workload'){
@@ -4127,6 +3978,94 @@ function availableMonthsFromRecords(){
 const DUAL_AUDIT_WORKING_CACHE_KEY='port79_gc_dual_working_audit_v1';
 let dualAuditWorkingReference=null;
 let dualAuditResults=[];
+
+let workingSheetDriverImportVersion=0;
+function workingSheetDriverGroups(rows){
+  const groups=new Map();
+  (rows||[]).forEach(r=>{
+    const name=String(r.name||'未命名').trim(),nameKey=normalizePersonName(name),aqc=normalizeAqcNo(r.number||r.gcNo),key=JSON.stringify([nameKey,aqc]);
+    if(!groups.has(key))groups.set(key,{key,name,nameKey,aqc,disc:0,load:0,hc:0,hours:0,count:0});
+    const g=groups.get(key),m=workloadRecordMetrics(r);g.disc+=m.disc;g.load+=m.load;g.hc+=m.hc;g.hours+=m.hours;g.count++;
+  });
+  return [...groups.values()].map(g=>({...g,containers:g.disc+g.load,eff:g.hours>0?(g.disc+g.load+g.hc)/g.hours:0}));
+}
+function workingSheetDriverComparison(reference,systemRows){
+  const source=workingSheetDriverGroups(reference?.records||[]),system=workingSheetDriverGroups(systemRows||[]);
+  const sourceMap=new Map(source.map(g=>[g.key,g])),systemMap=new Map(system.map(g=>[g.key,g]));
+  const keys=new Set([...sourceMap.keys(),...systemMap.keys()]);
+  return [...keys].map(key=>{
+    const file=sourceMap.get(key)||null,sys=systemMap.get(key)||null,g=file||sys;
+    const reasons=[];
+    if(!file)reasons.push('原檔沒有此司機作業');
+    if(!sys)reasons.push('系統尚無此司機作業');
+    if(file&&sys){
+      for(const [field,label,tolerance] of [['disc','DISC',0.01],['load','LOAD',0.01],['hc','H/C',0.01],['hours','時數',0.01],['eff','效率',0.02]]){
+        if(Math.abs(file[field]-sys[field])>tolerance)reasons.push(`${label} 不一致`);
+      }
+    }
+    return {key,name:g.name,nameKey:g.nameKey,aqc:g.aqc,file,system:sys,diff:file&&sys?round(sys.containers-file.containers,2):null,status:!file?'mismatch':!sys?'pending':reasons.length?'mismatch':'match',reasons};
+  }).sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant')||a.aqc.localeCompare(b.aqc,undefined,{numeric:true}));
+}
+function workingSheetDriverSourceResult(reference){
+  const summary=reference?.summary||{},audit=summary.importAudit||{};
+  const master={workingSheetSource:{...audit,totalContainers:summary.totalContainers,totalMoves:summary.totalMoves,shiftMoves:summary.shiftMoves,hatches:summary.hatches,bundleDeduct:summary.bundleDeduct}};
+  return workloadSheetAudit(master,reference?.records||[]);
+}
+function renderWorkingSheetDriverAudit(){
+  const body=document.getElementById('workingSheetDriverBody');if(!body)return;
+  const state=document.getElementById('workingSheetDriverFileState'),sourceState=document.getElementById('workingSheetDriverSourceAudit'),nameSel=document.getElementById('workingSheetDriverName'),aqcSel=document.getElementById('workingSheetDriverAqc'),count=document.getElementById('workingSheetDriverCount');
+  const ref=dualAuditWorkingReference;
+  if(!ref){
+    if(state)state.textContent='尚未匯入 WORKING SHEET 檔案。';if(sourceState)sourceState.textContent='請先匯入檔案。';
+    if(nameSel)nameSel.innerHTML='<option value="">全部司機</option>';if(aqcSel)aqcSel.innerHTML='<option value="">全部 AQC</option>';if(count)count.textContent='';
+    body.innerHTML='<tr><td colspan="11" class="p-5 text-slate-400">請先匯入 WORKING SHEET 檔案。</td></tr>';return;
+  }
+  const s=ref.summary||{},no=String(s.workingNo||'').trim();
+  if(state)state.textContent=`${ref.fileName||'WORKING SHEET'}｜${no}｜${s.vessel||''} ${s.voyageE||s.voyageI||''}｜${ref.records.length} 筆原檔明細`;
+  const audit=workingSheetDriverSourceResult(ref);
+  if(sourceState){
+    sourceState.className=`mt-2 text-sm font-bold ${audit.status==='match'?'text-emerald-700':'text-rose-700'}`;
+    sourceState.textContent=`${audit.status==='match'?'來源一致':audit.status==='pending'?'來源待核對':'來源不一致'}｜WORKING REPORT：DISC ${audit.disc}＋LOAD ${audit.load}＝${audit.containers} 櫃，H/C ${audit.hc}｜WORKING SHEET：請款 ${audit.bill??'—'}、翻艙 ${audit.shift??'—'}、作業 Moves ${audit.moves??'—'}、H/C ${audit.sheetHc??'—'}${audit.reasons.length?'｜'+audit.reasons.join('；'):''}`;
+  }
+  // Match only the exact working number; another voyage or child job must never fill a gap.
+  const sys=no?canonicalOperationalRecords((records||[]).filter(r=>String(r.source||'')==='working-report'&&String(r.workingNo||'').trim()===no)):[];
+  const comparisons=workingSheetDriverComparison(ref,sys);
+  const populate=(sel,values,label)=>{
+    if(!sel)return '';const previous=sel.value;
+    sel.innerHTML=`<option value="">${label}</option>`+values.map(([key,text])=>`<option value="${esc(key)}">${esc(text)}</option>`).join('');
+    sel.value=values.some(([key])=>key===previous)?previous:'';return sel.value;
+  };
+  const names=[...new Map(comparisons.map(x=>[x.nameKey,x.name])).entries()],aqcs=[...new Set(comparisons.map(x=>x.aqc))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  const person=populate(nameSel,names,'全部司機'),aqc=populate(aqcSel,aqcs.map(x=>[x,x||'未填 AQC']),'全部 AQC');
+  const shown=comparisons.filter(x=>(!person||x.nameKey===person)&&(!aqc||x.aqc===aqc));
+  if(count)count.textContent=`顯示 ${shown.length} 組司機／AQC，共 ${names.length} 位司機。差額＝系統－原檔。`;
+  const display=(g,key,digits)=>!g?'—':digits===undefined?g[key]:g[key].toFixed(digits);
+  body.innerHTML=shown.map(x=>`<tr><td class="font-bold">${esc(x.name)}</td><td>${esc(x.aqc)}</td><td>${display(x.file,'disc')}</td><td>${display(x.file,'load')}</td><td>${display(x.file,'hc')}</td><td>${display(x.file,'hours',2)}</td><td class="font-black">${display(x.file,'containers')}</td><td>${display(x.file,'eff',2)}</td><td>${display(x.system,'containers')}</td><td>${x.diff===null?'—':x.diff}</td><td class="font-bold ${x.status==='match'?'text-emerald-700':x.status==='pending'?'text-amber-700':'text-rose-700'}">${x.status==='match'?'一致':x.status==='pending'?'待核對':'不一致'}${x.reasons.length?`<div class="text-xs">${esc(x.reasons.join('；'))}</div>`:''}</td></tr>`).join('')||'<tr><td colspan="11" class="p-5 text-slate-400">此司機／AQC 沒有作業資料。</td></tr>';
+}
+async function importWorkingSheetDriverAudit(file){
+  if(!file||!requireEfficiencyAccess())return;
+  const version=++workingSheetDriverImportVersion;
+  dualAuditWorkingReference=null;try{localStorage.removeItem(DUAL_AUDIT_WORKING_CACHE_KEY);}catch(_){}renderWorkingSheetDriverAudit();
+  const state=document.getElementById('workingSheetDriverFileState');if(state)state.textContent='正在解析 WORKING SHEET 與 WORKING REPORT…';
+  try{
+    await window.p79EnsureXlsx();const buf=await file.arrayBuffer(),book=XLSX.read(buf,{type:'array',cellDates:true});
+    if(version!==workingSheetDriverImportVersion)return;
+    if(!book.Sheets['WORKING SHEET']||!book.Sheets['WORKING REPORT'])throw Error('檔案需同時包含 WORKING SHEET 與 WORKING REPORT 分頁');
+    const summary=parseWorkingSheetSummary(book);if(!summary)throw Error('無法讀取 WORKING SHEET');
+    const raw=parseWorkingReportWorkbook(book,summary);if(!raw.length)throw Error('WORKING REPORT 沒有可讀取的司機明細');
+    dualAuditWorkingReference={fileName:file.name,summary,records:raw,rawRecordCount:raw.length,importedAt:new Date().toISOString()};
+    try{localStorage.setItem(DUAL_AUDIT_WORKING_CACHE_KEY,JSON.stringify(dualAuditWorkingReference));}catch(_){}
+    if(document.getElementById('workingSheetDriverName'))document.getElementById('workingSheetDriverName').value='';
+    if(document.getElementById('workingSheetDriverAqc'))document.getElementById('workingSheetDriverAqc').value='';
+    renderWorkingSheetDriverAudit();toast('WORKING SHEET 已載入，可選擇司機篩選比對');
+  }catch(error){
+    if(version!==workingSheetDriverImportVersion)return;
+    renderWorkingSheetDriverAudit();if(state)state.textContent='檔案讀取失敗：'+(error.message||error);toast('檔案讀取失敗：'+(error.message||error));
+  }
+}
+function clearWorkingSheetDriverAudit(){
+  workingSheetDriverImportVersion++;dualAuditWorkingReference=null;try{localStorage.removeItem(DUAL_AUDIT_WORKING_CACHE_KEY);}catch(_){}renderWorkingSheetDriverAudit();
+}
 
 function dualAuditGroupRecords(list,defaults={}){
   const map=new Map();
@@ -12943,17 +12882,17 @@ function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')
 function openVesselMonthlyExportDialog(){
   if(!requireSuperAdminAccess())return;
   document.getElementById('vesselMonthlyExportMonth').value=document.getElementById('filterMonth')?.value||isoTodayLocal().slice(0,7);
+  document.getElementById('vesselMonthlyExportCompany').value=window.P79VesselMonthlyReport.savedCompany();
   document.getElementById('vesselMonthlyExportDialog').showModal();
 }
-async function exportVesselMonthlyExcel(month=document.getElementById('filterMonth')?.value||''){
+async function exportVesselMonthlyExcel(month=document.getElementById('filterMonth')?.value||'',company=window.P79VesselMonthlyReport.savedCompany()){
   if(!requireSuperAdminAccess())return;
   if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return toast('請先選擇要匯出的月份');
   const btn=document.getElementById('vesselMonthlyExportBtn');
   if(btn?.disabled)return;
   if(btn){btn.disabled=true;btn.textContent='讀取月份資料中…';}
   try{
-    await window.p79EnsureXlsx();
-    if(!window.XLSX)throw Error('Excel 元件未載入，請重新整理後再試');
+    const companyName=window.P79VesselMonthlyReport.saveCompany(company);
     // Load the captured month before export, even if another month is selected during the request.
     if(!await loadEfficiencyCloudScope({month},true)){
       toast('無法取得該月份雲端資料，請同步成功後再匯出');
@@ -12961,9 +12900,7 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     }
     const rows=vesselMonthlyExportRows(month);
     if(!rows.length)return toast(`${month} 沒有可匯出的船舶資料`);
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,buildMonthlyOperationSheet(month,rows),'船邊作業量表');
-    XLSX.writeFile(wb,`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`);
+    await window.P79VesselMonthlyReport.download({month,company:companyName,rows,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
     document.getElementById('vesselMonthlyExportDialog')?.close();
     toast(`已匯出 ${month} 船邊作業量表，共 ${rows.length} 艘`);
   }catch(error){
@@ -13974,6 +13911,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
+<script src="../assets/port79-vessel-monthly-report.js?v=20261017-print35"></script>
 <script src="../assets/port79-seven-top.js?v=20261017-workload-export"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 效率總覽滿版寬度 + 年份選單防空白 -->
