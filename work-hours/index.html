@@ -2604,7 +2604,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         }
 
         const DEFAULT_DEPARTMENTS = [
-            '稽核室','第一事業部','第二事業部','企劃部','公關部','行政管理部','資訊部','職安室','財務部',
+            '稽核室','第一事業部','第二事業處','企劃部','公關部','行政管理部','資訊部','職安室','財務部',
             '營業部','營業部業務課','營業部計費課','第一事業處 (本場)','本場管理課','本場作業課','本場倉庫課',
             '港機經銷部總務會計課','港機經銷部經銷處國內課','港機經銷部經銷處國外課','港機經銷部維保處維保課',
             '第二事業處 (63W)','63W作業課','63W倉庫課','63W總務會計課','63W維修廠','70W維修廠','79W作業課','79W倉庫課','79W維修廠'
@@ -2687,7 +2687,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
         function normalizeDepartments(list) {
             const source = Array.isArray(list) && list.length ? list : DEFAULT_DEPARTMENTS;
-            const legacy = {'79號碼頭作業課':'79W作業課','79號碼頭倉庫課':'79W倉庫課','第二事業處':'第二事業部'};
+            const legacy = {'79號碼頭作業課':'79W作業課','79號碼頭倉庫課':'79W倉庫課'};
             return [...new Set(source.map(v => String(v || '').trim()).map(v => legacy[v] || v).filter(Boolean))]
                 .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
         }
@@ -2731,8 +2731,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         function migrateLegacyDepartments() {
             const mapping = {
                 '79號碼頭作業課': '79W作業課',
-                '79號碼頭倉庫課': '79W倉庫課',
-                '第二事業處': '第二事業部'
+                '79號碼頭倉庫課': '79W倉庫課'
             };
             let changed = false;
             [employees, records, leaveRecords].forEach(list => (list || []).forEach(item => {
@@ -13241,7 +13240,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 document.getElementById('empModalAttNo').value = employees.length + 1;
                 document.getElementById('empModalEmpId').value = 'BOSS' + Math.floor(Math.random() * 900 + 100);
                 document.getElementById('empModalName').value = '';
-                document.getElementById('empModalDept').value = sysConfig.departments.includes('第二事業部') ? '第二事業部' : sysConfig.departments[0];
+                document.getElementById('empModalDept').value = sysConfig.departments.includes('第二事業處') ? '第二事業處' : sysConfig.departments[0];
                 updateEmployeeDeptDetailOptions('經理');
                 document.getElementById('empModalPhone').value = '';
                 document.getElementById('empModalStartDate').value = '';
