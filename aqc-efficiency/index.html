@@ -638,9 +638,9 @@ body[data-p79-system="efficiency"] main{
   <section id="efficiencyMainTabs" class="card p-3 sm:p-4">
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 效率總覽</button>
-      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報比對</button>
+      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 作業明細</button>
-      <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員作業統計</button>
+      <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
 
     </div>
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
@@ -1251,6 +1251,7 @@ body[data-p79-system="efficiency"] main{
 </dialog>
 
   <section id="view-weekly" class="hidden space-y-4">
+  <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-slate-100" onclick="switchTab('ranking')">每月績效排行</button></div>
     <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="close">全部收合</button></div>
     <details class="p79-collapsible" data-collapse-key="view-weekly-1" open><summary><span>日期與人員篩選</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4">
@@ -1355,7 +1356,7 @@ body[data-p79-system="efficiency"] main{
 <section id="view-workload" class="hidden space-y-4">
     <input id="workloadStart" type="hidden"><input id="workloadEnd" type="hidden">
     <div id="workloadPersonMeta" class="card p-4 font-bold"></div>
-    <details class="p79-collapsible" data-collapse-key="view-workload-1" open><summary><span>個人作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <details class="p79-collapsible hidden" data-collapse-key="view-workload-1" open><summary><span>個人作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
       <div class="card p-4"><div class="text-xs text-slate-500">作業船數</div><div id="psVessels" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="psCount" class="text-2xl font-black">0</div></div>
@@ -1380,7 +1381,7 @@ body[data-p79-system="efficiency"] main{
     </div>
 </details>
 
-    <details class="p79-collapsible" data-collapse-key="view-workload-3" open><summary><span>各船作業統計</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <details class="p79-collapsible hidden" data-collapse-key="view-workload-3" open><summary><span>各船作業統計</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4 overflow-auto">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
@@ -1397,12 +1398,12 @@ body[data-p79-system="efficiency"] main{
 </details>
 
     <details class="p79-collapsible" data-collapse-key="view-workload-4" open><summary><span>作業時段與個人紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
-<div class="grid xl:grid-cols-[0.7fr_1.3fr] gap-4">
+<div class="space-y-4">
       <div class="card p-4 overflow-auto">
         <h2 class="font-black mb-3">⏱️ 作業時段統計</h2>
         <table class="tbl w-full"><thead><tr><th>時段</th><th>筆數</th><th>時數</th><th>櫃數</th><th>H/C</th><th>效率</th></tr></thead><tbody id="personShiftBody"><tr><td colspan="6" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
       </div>
-      <div class="card p-4 overflow-auto max-h-[70vh]">
+      <div class="card p-4 overflow-auto hidden max-h-[70vh]">
         <h2 class="font-black mb-3">📚 個人作業紀錄</h2>
         <table class="tbl w-full min-w-[1250px]"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名/航次</th><th>排班 AQC 組別</th><th>AQC#</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead><tbody id="personRecordBody"><tr><td colspan="13" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
       </div>
@@ -1410,6 +1411,22 @@ body[data-p79-system="efficiency"] main{
 </details>
   </section>
   </section>
+
+<section id="view-ranking" class="hidden space-y-4">
+  <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-slate-100" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('ranking')">每月績效排行</button></div>
+  <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-ranking" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-ranking" data-collapse-action="close">全部收合</button></div>
+  <details class="p79-collapsible" data-collapse-key="ranking-filters" open><summary><span>🏆 每月人員績效排行</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="card p-4"><p class="text-sm text-slate-500 mb-3">依作業日期統計每位人員整月資料。效率＝（DISC＋LOAD＋H/C）÷ 作業時數；同分並列名次。沒有作業資料或無有效時數者不列效率名次。排班 AQC 名冊內無作業資料的人員也會列出。</p>
+    <div class="flex flex-wrap items-end gap-3">
+      <div><label class="block text-xs font-bold" for="rankingMonth">月份</label><input id="rankingMonth" type="month" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking();loadMonthlyRanking(true)"></div>
+      <div><label class="block text-xs font-bold" for="rankingSort">排名依據</label><select id="rankingSort" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking()"><option value="eff">效率（含 H/C）</option><option value="containers">作業櫃數</option></select></div>
+      <div><label class="block text-xs font-bold" for="rankingGroup">排班組別</label><select id="rankingGroup" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking()"><option value="">全部組別</option></select></div>
+      <div><label class="block text-xs font-bold" for="rankingName">姓名</label><input id="rankingName" type="search" class="border rounded-xl px-3 py-2" placeholder="搜尋姓名" oninput="renderMonthlyRanking()"></div>
+      <button type="button" class="btn bg-sky-600 text-white" onclick="loadMonthlyRanking(true)">讀取整月雲端／歷史資料</button>
+    </div><div id="rankingLoadState" class="text-sm mt-3" role="status"></div><div class="flex flex-wrap gap-2 items-center mt-2"><span id="rankingScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div></div>
+  </details>
+  <details class="p79-collapsible" data-collapse-key="ranking-results" open><summary><span>全員月度排名</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></details>
+</section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
   <h3 class="text-lg font-black">匯出每月作業量表</h3>
@@ -1852,7 +1869,7 @@ function setPort79Year(year){
   if(!/^\d{4}$/.test(y))return;
   localStorage.setItem(PORT79_YEAR_KEY,y);
   document.querySelectorAll('.port79-year-select').forEach(sel=>sel.value=y);
-  ['filterMonth','personStatMonth','monthlyCompareMonth'].forEach(id=>{
+  ['filterMonth','personStatMonth','monthlyCompareMonth','rankingMonth'].forEach(id=>{
     const e=document.getElementById(id);
     if(e && e.value && !String(e.value).startsWith(y+'-'))e.value='';
   });
@@ -1877,7 +1894,7 @@ function shipMasterDateMatchesYear(s,year){
   return (records||[]).some(r=>String(r?.workingNo||'').trim()===no && String(r?.workDate||'').startsWith(y));
 }
 
-function activeEfficiencyTabName(){return document.querySelector('.tab.active')?.dataset?.tab||'dashboard';}
+function activeEfficiencyTabName(){const tab=document.querySelector('.tab.active')?.dataset?.tab||'dashboard';return tab==='weekly'&&document.getElementById?.('view-ranking')&&!document.getElementById('view-ranking').classList.contains('hidden')?'ranking':tab;}
 function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
@@ -1899,15 +1916,16 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='workload'){
     initWorkloadDateRangePicker();updateWorkloadDateRangeSummary();populatePersonStatPeople();renderPersonStats();return;
   }
+  if(name==='ranking'){renderMonthlyRanking();return;}
   if(name==='weekly'){renderWeeklyEfficiency();return;}
 }
 function switchTab(name,btn){if(name==='workload'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','compare','groups','personstats','weekly'].forEach(x=>{
+  ['dashboard','compare','groups','personstats','weekly','ranking'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name);
   });
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  const tabBtn=btn||document.querySelector(`[data-tab="${name}"]`);
+  const tabBtn=btn||document.querySelector(`[data-tab="${name==='ranking'?'weekly':name}"]`);
   tabBtn?.classList.add('active');
   renderEfficiencyTabFast(name);
 }
@@ -4051,10 +4069,11 @@ function renderOperationScheduleStatus(rows){
     else if(!String(gcToken||''))text='尚未取得登入驗證，請重新登入後讀取排班組別。';
     else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別`:state?.status==='loading'?`${month} 正在讀取排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
   }
-  ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
+  ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState','rankingScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
 }
 function operationRowsForActiveView(){
   const active=activeEfficiencyTabName();
+  if(active==='ranking'){const rows=monthlyRankingRecords();return rows.length?rows:[{workDate:(document.getElementById('rankingMonth')?.value||'')+'-01'}];}
   if(active==='weekly')return weeklyFilteredRecords();
   if(active==='records')return filteredRecords();
   if(active==='workload'){const pid=document.getElementById('personStatPerson')?.value||'';return workloadRowsInRange(buildWorkloadIndex().byPerson.get(pid)||[]);}
@@ -4067,7 +4086,8 @@ function retryOperationScheduleGroups(){
 
 function refreshOperationGroupView(){
   const active=activeEfficiencyTabName();
-  if(active==='weekly')renderWeeklyEfficiency();
+  if(active==='ranking')renderMonthlyRanking();
+  else if(active==='weekly')renderWeeklyEfficiency();
   else if(active==='workload')renderPersonStats();
   else if(active==='personstats'){renderVesselDriverView();if(document.getElementById('integratedRecordDetails')?.open)renderRecords();}
   else if(active==='records')renderRecords();
@@ -6345,6 +6365,41 @@ function renderPersonStats(){
     return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(String(r?.workingNo||'—'))}</td><td>${esc(vesselLabel||'—')}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td class="font-black text-teal-700">${m.containers}</td><td class="font-black text-indigo-700">${m.eff.toFixed(2)}</td></tr>`;
   }).join('')||'<tr><td colspan="13" class="text-center text-slate-400">此區間沒有作業紀錄</td></tr>';
 }
+const monthlyRankingReads=new Map();
+function monthlyRankingRecords(){
+  const month=document.getElementById('rankingMonth')?.value||'';
+  return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&String(r.workDate||'').slice(0,7)===month));
+}
+async function loadMonthlyRanking(force=false){
+  const month=document.getElementById('rankingMonth')?.value||'',token=String(gcToken||'');
+  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)||!requireEfficiencyAccess())return;
+  const key=token+'|'+month,state=monthlyRankingReads.get(key);
+  if(state?.status==='loading'||(!force&&state))return;
+  monthlyRankingReads.set(key,{status:'loading'});renderMonthlyRanking();
+  const results=await Promise.allSettled([apiGetQuick('gcGetData',{month},25000),apiGetQuick('historyGetMonthData',{type:'vessel',month},25000)]);
+  if(token!==String(gcToken||'')){monthlyRankingReads.delete(key);return;}
+  let count=0;for(const result of results){if(result.status==='fulfilled'&&(Array.isArray(result.value?.records)||Array.isArray(result.value?.shipMasters))){try{mergeEfficiencyCloudData(result.value);count++;}catch(_){}}}
+  monthlyRankingReads.set(key,{status:count===2?'ready':count?'partial':'error'});
+  if(count){saveLocal();invalidateWorkloadIndex();}
+  if(activeEfficiencyTabName()==='ranking')renderMonthlyRanking();
+}
+function renderMonthlyRanking(){
+  const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');if(!input||!body||!window.P79PersonnelRanking)return;
+  const year=getPort79Year();if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
+  const month=input.value,rows=monthlyRankingRecords();
+  ensureOperationScheduleGroups(rows.length?rows:[{workDate:month+'-01'}]);
+  const store=currentOperationScheduleStore(),roster=store?.has(month)?store.personnel(month):people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
+  const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:operationGroupForRecord,normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
+  const group=document.getElementById('rankingGroup'),previous=group?.value||'',groups=[...new Set(ranked.flatMap(p=>p.groups))].sort(compareDriverNames);
+  if(group){group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');group.value=groups.includes(previous)?previous:'';}
+  const name=normalizePersonName(document.getElementById('rankingName')?.value||''),shown=ranked.filter(p=>(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
+  body.innerHTML=shown.map(p=>`<tr><td class="font-black">${p.rank??'—'}</td><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${esc(p.groups.join('、')||'未取得排班組別')}</td><td>${p.ships}</td><td>${p.count}</td><td>${p.hours.toFixed(2)}</td><td>${p.disc}</td><td>${p.load}</td><td>${p.hc}</td><td class="font-bold">${p.containers}</td><td>${p.eff===null?'—':p.eff.toFixed(2)}</td><td>${!p.count?'尚無作業資料':p.hours<=0?'缺少有效時數':'已有作業資料'}</td></tr>`).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">此條件尚無人員資料</td></tr>';
+  const count=document.getElementById('rankingCount');if(count)count.textContent=`${month}｜顯示 ${shown.length}／${ranked.length} 人｜${rows.length} 筆作業紀錄。篩選保留全員原名次；效率以顯示的兩位小數判定同分。${store?.has(month)?'':'排班名冊尚未讀取，暫列現有人員及有作業紀錄的人員。'}`;
+  const key=String(gcToken||'')+'|'+month,state=monthlyRankingReads.get(key),load=document.getElementById('rankingLoadState');
+  if(load)load.textContent=state?.status==='loading'?'正在讀取整月雲端與歷史資料…':state?.status==='ready'?'整月雲端與歷史資料已讀取；排行依目前已匯入的作業資料計算。':state?.status==='partial'?'部分來源讀取失敗，以下為已取得資料的暫時排行，請重新讀取。':state?.status==='error'?'整月資料讀取失敗，以下僅以本機資料暫排，請重新讀取。':'尚未完成整月雲端讀取，以下為本機資料暫時排行。';
+  if(!state&&String(gcToken||''))void loadMonthlyRanking(false);
+}
+
 function isoTodayLocal(){
   const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
@@ -14140,7 +14195,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
-<script src="../assets/port79-aqc-schedule-groups.js?v=20261017-group-read2"></script>
+<script src="../assets/port79-aqc-schedule-groups.js?v=20261017-ranking"></script>
 <script src="../assets/port79-vessel-monthly-report.js?v=20261017-print35"></script>
 <script src="../assets/port79-seven-top.js?v=20261017-workload-export"></script>
 
@@ -14236,5 +14291,6 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(17){width:4.0%!important;min-width:0!important}
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 </style>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-collapsible-sections.js?v=20261017.1"></script></body></html>
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
+<script src="../assets/port79-collapsible-sections.js?v=20261017.1"></script></body></html>
 

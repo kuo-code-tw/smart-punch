@@ -41,7 +41,7 @@ function createStore(normalizeName=v=>String(v||'').replace(/\s+/g,'')){
   if(match.role.toUpperCase()!=='AQC')return {group:'排班非 AQC',status:'not-aqc'};
   return {group:match.group||'不分組',status:'ok',empId:match.id};
  }
- return {setOwner,apply,lookup,has:month=>months.has(month),invalidate:month=>months.delete(month),clear:()=>months.clear()};
+ return {setOwner,apply,lookup,personnel:month=>[...(months.get(month)?.byId.values()||[])].filter(p=>p.role.toUpperCase()==='AQC').map(p=>({empId:p.id,name:p.name,group:lookup(month,{empId:p.id}).group})),has:month=>months.has(month),invalidate:month=>months.delete(month),clear:()=>months.clear()};
 }
 const api={createStore};
 if(typeof module==='object'&&module.exports)module.exports=api;else {root.P79AqcScheduleGroups=api;root.dispatchEvent?.(new Event('p79-aqc-schedule-groups-ready'));}
