@@ -1853,7 +1853,6 @@ function getPort79Year(){
   const years=availablePort79Years();
   let y=String(localStorage.getItem(PORT79_YEAR_KEY)||'').trim();
   if(!/^\d{4}$/.test(y)||!years.includes(y))y=years[0]||String(new Date().getFullYear());
-  ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   localStorage.setItem(PORT79_YEAR_KEY,y);
   return y;
 }
@@ -1869,6 +1868,7 @@ function populatePort79YearFilters(){
 function setPort79Year(year){
   const y=String(year||'').trim();
   if(!/^\d{4}$/.test(y))return;
+  ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   localStorage.setItem(PORT79_YEAR_KEY,y);
   document.querySelectorAll('.port79-year-select').forEach(sel=>sel.value=y);
   ['filterMonth','personStatMonth','monthlyCompareMonth','rankingMonth'].forEach(id=>{
