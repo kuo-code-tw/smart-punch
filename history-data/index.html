@@ -91,7 +91,7 @@ function historyExcelColumns(kind){
   if(kind==='attendance')return [
     ['timeStr','日期/時間'],['empId','工號'],['name','姓名'],['dept','部門'],
     ['status','狀態']];
-  if(kind==='schedule')return [['empId','工號'],['name','姓名'],['group','組別'],['role','職務'],
+  if(kind==='schedule')return [['empId','工號'],['name','姓名'],['group','組別'],['role','職稱'],
     ...Array.from({length:31},(_,i)=>['d'+(i+1),String(i+1)])];
   return [['vesselName','船名'],['voyage','航次'],['workingNo','WORKING NO'],['firstDate','開始'],
     ['lastDate','結束'],['disc','卸船櫃數'],['load','裝船櫃數'],['totalMoves','總 Moves']];
@@ -177,7 +177,7 @@ function finishProgress(ok,detail){if(progressTimer){clearInterval(progressTimer
 function table(cols,rows){if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
 function recordTime(r){const v=r.timeStr??r.datetime??r.dateTime??r.timestamp??r.time??r.fullTime??r.attendanceTime??r.clockTime??r['完整考勤時間']??r['考勤時間']??'';if(v instanceof Date)return v.toLocaleString('zh-TW',{hour12:false});return v}
 async function loadAttendance(month){const d=await api('historyGetMonthData',{type:'attendance',month}),rows=Array.isArray(d.records)?d.records:[];historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
-async function loadSchedule(month){const d=await api('historyGetMonthData',{type:'schedule',month}),rows=Array.isArray(d.schedules)?d.schedules:[];historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);const cols=[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'組別',get:r=>r.group||r.schedule?.__personnel?.group||''},{label:'職務',get:r=>r.role||r.schedule?.__personnel?.role||''}];for(let i=1;i<=31;i++)cols.push({label:String(i),get:r=>r.schedule?.[i]??r.schedule?.[String(i)]??''});table(cols,rows)}
+async function loadSchedule(month){const d=await api('historyGetMonthData',{type:'schedule',month}),rows=Array.isArray(d.schedules)?d.schedules:[];historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);const cols=[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'組別',get:r=>r.group||r.schedule?.__personnel?.group||''},{label:'職稱',get:r=>r.role||r.schedule?.__personnel?.role||''}];for(let i=1;i<=31;i++)cols.push({label:String(i),get:r=>r.schedule?.[i]??r.schedule?.[String(i)]??''});table(cols,rows)}
 async function loadVessel(month){
   const d=await api('historyGetMonthData',{type:'vessel',month}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
   pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);

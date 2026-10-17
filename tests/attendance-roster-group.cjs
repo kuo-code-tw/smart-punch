@@ -6,5 +6,5 @@ test('explicit monthly unassignment overrides base employee group',()=>{state('�
 test('only same-month response personnel can provide fallback',()=>{state(null,{rows:[],people:[{empId:'E1',group:'D組'}]});assert.equal(c.p79AttendanceRosterGroup(row),'D組');assert.equal(c.p79AttendanceRosterGroup({...row,dateKey:'2026-09-30'},{empId:'E1',group:'A組'}),'')});
 test('duplicate contradictory monthly groups do not guess membership',()=>{state('A組');states.get('2026-10').rows.push({empId:'E1',month:'2026-10',group:'B組'});assert.equal(c.p79AttendanceRosterGroup(row),'')});
 test('loading or other-session snapshots never leak stale group',()=>{state('A組',{ready:false});assert.equal(c.p79AttendanceRosterGroup(row),'');state('A組',{token:'other'});assert.equal(c.p79AttendanceRosterGroup(row),'')});
-test('table inserts group immediately after role',()=>{assert(html.includes('職務</th>\n                                <th class="px-2 py-3 text-center whitespace-nowrap">組別</th>'));assert(html.includes('p79AttendanceRosterGroup(row,displayEmp)'))});
+test('table inserts group immediately after role',()=>{assert(html.includes('職稱</th>\n                                <th class="px-2 py-3 text-center whitespace-nowrap">組別</th>'));assert(html.includes('p79AttendanceRosterGroup(row,displayEmp)'))});
 console.log(JSON.stringify({passed,failed:0}));
