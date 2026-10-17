@@ -12352,14 +12352,26 @@ async function p79ComparisonOutput(title,rows,printMode){
 async function p79ExportOvertimeComparison(printMode){
  const fine=currentEmp?.finePermissions?.workhours||{};
  if(!isVerifiedSuperAdminSession()&&!(Object.prototype.hasOwnProperty.call(fine,'overtime.export')?fine['overtime.export']===true:canPerformAdminAction(currentEmp,'attendanceExport')))return alert('沒有匯出權限');
- renderOvertimeStats();const rows=[['上班日期','姓名','部門','職稱','上班時間','下班時間','出勤時數','出勤時段','加班時數','申報時數','換算時數'],...p79WorkOvertimeFilteredRows.map(r=>[r.rosterDate||r.dateKey,r.name,r.dept,r.jobTitle,r.clockIn?.timeStr||'',r.clockOut?.timeStr||'',r.totalMinutes/60,r.overtimeReport?.code||'',r.overtimeMinutes/60,r.overtimeReport?.declaredHours??'',r.overtimeReport?.convertedHours??''])];
+ renderOvertimeStats();const rows=[['上班日期','姓名','部門','職稱','上班時間','下班時間','出勤時數','出勤時段','加班時數','申報時數','換算時數','資料狀態'],...p79WorkOvertimeFilteredRows.map(r=>[r.rosterDate||r.dateKey,r.name,r.dept,r.jobTitle,r.clockIn?.timeStr||'',r.clockOut?.timeStr||'',r.totalMinutes/60,r.overtimeReport?.code||'',r.overtimeMinutes/60,r.overtimeReport?.declaredHours??'',r.overtimeReport?.convertedHours??'',r.attendanceIssue||''])];
  try{await p79ComparisonOutput('加班比對表',rows,printMode)}catch(e){alert(e.message)}
 }
         function p79ReportWorkOvertimeRow(index){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
+            if(row.timeCheckRequired){alert('此班次出勤時間待核對，請先點選上下班時間更正，再申報加班。');return;}
             const date=row.rosterDate||normalizeScheduleDateKey(row.dateKey),category=row.overtimeReport?.category||'延';
             const inferred=row.overtimeReport?null:P79Overtime.inferRule(p79DirectAttendanceTimestamp(row.clockIn),p79DirectAttendanceTimestamp(row.clockOut),date,P79Overtime.reportRules(),category);
             P79Overtime.openReport({empId:row.empId,date,forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||inferred?.[1]||'',category,requirePeriodSelection:!row.overtimeReport&&!inferred});
+        }
+        function p79OvertimeAttendanceIssue(session,start,end) {
+            if(session?.pairingIssue)return '班次配對待核對';
+            const complete=r=>/\s\d{1,2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(String(r?.timeStr||'').replace('T',' ').trim());
+            if(!complete(session?.clockIn)||!complete(session?.clockOut))return '打卡時間不完整';
+            const minutes=(end-start)/60000;
+            if(!Number.isFinite(minutes)||minutes<=0||minutes>18*60)return '原始出勤區間異常，請核對上下班';
+            const midnight=/[ T]00:00(?::00)?$/.test(String(session.clockIn.timeStr||'').trim());
+            const edited=session.clockIn.manuallyEdited===true||String(session.clockIn.manuallyEdited).toLowerCase()==='true';
+            if(midnight && minutes>12*60 && !edited)return '凌晨00:00起算且超過12小時，請核對原始上班時間';
+            return '';
         }
         let p79OvertimeCalculationCache = null;
         function buildOvertimeStatisticsRows() {
@@ -12420,8 +12432,9 @@ async function p79ExportOvertimeComparison(printMode){
                     if(restMeta?.overtimeExcluded)return null;
                     const reportMinutes=matchedReport.minutes;
                     // 自動未休假配對不是申報；未有申報或代班時，只計打卡超過8小時且超過30分的部分。
-                    const overtimeMinutes = reportMinutes===null?(totalMinutes>480+MIN_OVERTIME_MINUTES?totalMinutes-480:0):reportMinutes;
-                    if(!overtimeMinutes)return null;
+                    const attendanceIssue=p79OvertimeAttendanceIssue(session,start,end);
+                    const overtimeMinutes = reportMinutes===null?(attendanceIssue?0:(totalMinutes>480+MIN_OVERTIME_MINUTES?totalMinutes-480:0)):reportMinutes;
+                    if(!overtimeMinutes&&!attendanceIssue)return null;
                     const monthKey = String(session.dateKey || '').slice(0, 7);
                     return {
                         ...session,
@@ -12431,6 +12444,7 @@ async function p79ExportOvertimeComparison(printMode){
                         jobTitle: employee.jobTitle || employee.deptDetail || session.jobTitle || '未設定',
                         monthKey,
                         totalMinutes,
+                        attendanceIssue,timeCheckRequired:!!attendanceIssue,
                         overtimeMinutes,
                         overtimeReport:restMeta?.overtimeReport||null,
                         rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,coverAlreadyArranged:!!restMeta?.coverAlreadyArranged,
@@ -12595,8 +12609,8 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="職務" class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
-                    <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}</td>
-                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
+                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">出勤待核對｜暫不自動估算</span>`:''}${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
@@ -13523,6 +13537,13 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 .trim();
         }
 
+        function getAttendanceImportTimeValue(sheet,rowIndex,columnIndex,displayedValue) {
+            // raw:false 的顯示字串可能只有日期；保留原始 Excel Date／序號內的時間。
+            const range=XLSX.utils.decode_range(sheet['!ref']||'A1');
+            const cell=sheet[XLSX.utils.encode_cell({r:range.s.r+rowIndex,c:range.s.c+columnIndex})];
+            return cell && (cell.v instanceof Date || typeof cell.v==='number') ? cell.v : displayedValue;
+        }
+
         function normalizeImportedAttendanceTime(value) {
             if (value instanceof Date && !Number.isNaN(value.getTime())) {
                 return `${value.getFullYear()}/${String(value.getMonth() + 1).padStart(2, '0')}/${String(value.getDate()).padStart(2, '0')} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
@@ -13533,17 +13554,21 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 const parsed = XLSX.SSF.parse_date_code(Number(raw));
                 if (parsed) return `${parsed.y}/${String(parsed.m).padStart(2, '0')}/${String(parsed.d).padStart(2, '0')} ${String(parsed.H || 0).padStart(2, '0')}:${String(parsed.M || 0).padStart(2, '0')}`;
             }
-            const cleaned = raw.replace(/[年.-]/g, '/').replace(/月/g, '/').replace(/日/g, ' ').replace('T', ' ').replace(/\s+/g, ' ').trim();
-            const match = cleaned.match(/^(\d{3,4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+            let cleaned = raw.replace(/[年.-]/g, '/').replace(/月/g, '/').replace(/日/g, ' ').replace('T', ' ').replace(/\s+/g, ' ').trim();
+            const ampm=cleaned.match(/上午|下午|\bAM\b|\bPM\b/i)?.[0]||'';
+            cleaned=cleaned.replace(/上午|下午|\bAM\b|\bPM\b/gi,'').replace(/\s+/g,' ').trim();
+            // 日期不能當作打卡時間；未辨識的文字也不可默默補成凌晨。
+            const match = cleaned.match(/^(\d{3,4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.\d{1,3})?)?$/);
             if (!match) return '';
             let year = Number(match[1]);
             if (year < 1911) year += 1911;
             const month = Number(match[2]);
             const day = Number(match[3]);
-            const hour = Number(match[4] || 0);
+            let hour = Number(match[4]);
+            if(ampm){if(hour<1||hour>12)return '';hour=hour%12+(/下午|PM/i.test(ampm)?12:0);}
             const minute = Number(match[5] || 0);
             const test = new Date(year, month - 1, day, hour, minute);
-            if (test.getFullYear() !== year || test.getMonth() !== month - 1 || test.getDate() !== day || hour > 23 || minute > 59) return '';
+            if (test.getFullYear() !== year || test.getMonth() !== month - 1 || test.getDate() !== day || hour > 23 || minute > 59 || Number(match[6]||0)>59) return '';
             return `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
         }
 
@@ -13671,7 +13696,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                     const attNoRaw = String(valueAt(indexes.attNo) || '').trim();
                     const empIdRaw = String(valueAt(indexes.empId) || '').trim().toUpperCase();
                     const nameRaw = String(valueAt(indexes.name) || '').trim();
-                    const timeStr = normalizeImportedAttendanceTime(valueAt(indexes.time));
+                    const timeStr = normalizeImportedAttendanceTime(getAttendanceImportTimeValue(sheet,headerRowIndex+1+rowOffset,indexes.time,valueAt(indexes.time)));
                     const status = normalizeImportedAttendanceStatus(valueAt(indexes.status));
                     if ((!attNoRaw && !empIdRaw && !nameRaw) || !timeStr || !status) {
                         if (row.some(value => String(value ?? '').trim())) skippedInvalid++;
