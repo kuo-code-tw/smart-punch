@@ -639,7 +639,7 @@ body[data-p79-system="efficiency"] main{
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
-      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業紀錄</button>
+      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
 
     </div>
@@ -797,39 +797,34 @@ body[data-p79-system="efficiency"] main{
 
   <section id="view-personstats" class="hidden space-y-4">
     <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="close">全部收合</button></div>
-    <details class="p79-collapsible" data-collapse-key="view-personstats-1" open><summary><span>船舶與司機作業明細</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <details class="p79-collapsible" data-collapse-key="view-personstats-1" open><summary><span>司機作業</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4">
-      <h2 class="text-xl font-black">司機作業紀錄</h2>
-      <p class="text-sm text-slate-500 mt-2">查詢每艘船的逐筆司機作業紀錄。人員總作業量與排名請至「人員統計」查看。</p>
+            <p class="text-sm text-slate-500 mt-2">選船舶與姓名，即可查看司機的作業時間、櫃數與效率。</p>
       <div class="flex flex-wrap items-end gap-3 mt-3">
-        <div><label for="driverVesselMonth" class="block text-xs font-bold">船舶月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
+        <div><label for="driverVesselMonth" class="block text-xs font-bold">月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
         <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
 
-        <div><label for="driverVesselName" class="block text-xs font-bold">司機姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
-        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>
+        <div><label for="driverVesselName" class="block text-xs font-bold">姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
+
         <div id="driverVesselCount" class="text-sm text-slate-500"></div>
 
-        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">讀取雲端／歷史明細</button>
+
       </div>
-      <div id="driverVesselLoadState" class="mt-3 text-sm" role="status"></div>
-      <div id="driverVesselSourceState" class="mt-2 text-sm" role="status"></div>
-    <div class="overflow-auto mt-4">
-      <div class="flex flex-wrap items-center gap-2 mb-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
-      <p class="text-xs text-slate-500 mb-2">組別來源：作業當月排班表 AQC。效率（含 H/C）＝（櫃數＋H/C）÷ 作業時數。</p>
-      <table class="hidden tbl w-full min-w-[1200px] text-center">
-        <thead><tr><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead>
-        <tbody id="driverVesselBody"><tr><td colspan="10" class="p-5 text-slate-400">請選擇船舶。</td></tr></tbody>
-      </table>
-      <h3 class="font-black mt-5 mb-2">司機作業紀錄</h3>
-      <table class="tbl w-full min-w-[1350px] text-center">
-        <thead><tr><th>日期</th><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead>
+      <div id="driverVesselLoadState" class="mt-2 text-xs" role="status"></div>
+      <details class="mt-3 rounded-xl border p-3"><summary class="cursor-pointer text-sm text-slate-600">更多篩選與資料狀態</summary><div class="flex flex-wrap gap-3 items-end mt-3">        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">重新讀取資料</button></div>
+      <div id="driverVesselSourceState" class="mt-2 text-xs" role="status"></div>
+      <div class="flex flex-wrap items-center gap-2 mt-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取組別</button></div>
+      <p class="text-xs text-slate-500 mt-2">組別取自作業當月排班表。效率＝（櫃數＋H/C）÷ 時數。</p></details>
+      <div class="overflow-auto mt-4">
+      <table class="tbl w-full min-w-[920px] text-center">
+        <thead><tr><th>日期</th><th>姓名</th><th>組別</th><th>AQC</th><th>作業時間</th><th>時數</th><th>櫃數（可展開）</th><th>效率</th></tr></thead>
         <tbody id="driverVesselRecordBody"></tbody>
       </table>
     </div>
     </div>
 </details>
     <details id="integratedRecordDetails" class="space-y-3" ontoggle="if(this.open)openIntegratedRecordDetails()">
-      <summary class="card p-4 cursor-pointer font-bold">編輯作業紀錄（需要修改時展開）</summary>
+      <summary class="card p-4 cursor-pointer font-bold">進階維護（新增／修改紀錄）</summary>
   <section id="view-records" class="space-y-4">
     <details class="p79-collapsible" data-collapse-key="view-records-1" open><summary><span>完整明細篩選與操作</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4 space-y-4">
@@ -1257,7 +1252,7 @@ body[data-p79-system="efficiency"] main{
     <details class="p79-collapsible" data-collapse-key="view-weekly-1" open><summary><span>日期與人員篩選</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4">
       <h2 class="text-xl font-black mb-2">👥 人員作業統計</h2>
-      <p class="text-sm text-slate-500 mb-3">依日期、組別或姓名查看人員作業量與效率；選「本周」快速查詢，或切換「每月績效排行」。逐筆紀錄請至「司機作業紀錄」查看。</p>
+      <p class="text-sm text-slate-500 mb-3">依日期、組別或姓名查看人員作業量與效率；選「本周」快速查詢，或切換「每月績效排行」。逐筆紀錄請至「司機作業」查看。</p>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="min-w-[260px] max-w-[360px] flex-1">
           <label class="text-xs font-bold">日期區間</label>
@@ -4190,7 +4185,7 @@ async function loadDriverVesselMonth(force=false){
 }
 function renderVesselDriverView(){
   const body=document.getElementById('driverVesselBody'),monthInput=document.getElementById('driverVesselMonth'),shipSel=document.getElementById('driverVesselShip');
-  if(!body||!monthInput||!shipSel)return;
+  if(!monthInput||!shipSel)return;
   if(!monthInput.value)monthInput.value=document.getElementById('filterMonth')?.value||isoTodayLocal().slice(0,7);
   const month=monthInput.value,load=document.getElementById('driverVesselLoadState'),source=document.getElementById('driverVesselSourceState');
   const map=new Map((shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month)).map(s=>[String(s.workingNo||'').trim(),s]));
@@ -4204,7 +4199,7 @@ function renderVesselDriverView(){
   shipSel.innerHTML='<option value="">請選擇船舶</option>'+masters.map(s=>`<option value="${esc(s.workingNo)}">${esc(s.workingNo)}｜${esc(s.vessel||'')} ${esc(s.voyageE||s.voyageI||'')}</option>`).join('');
   shipSel.value=masters.some(s=>String(s.workingNo)===previous)?previous:String(masters[0]?.workingNo||'');
   const readKey=String(gcToken||'')+'|'+month,read=driverVesselReads.get(readKey);
-  if(load)load.textContent=read?.status==='loading'?'正在讀取船舶雲端與歷史明細…':read?.status==='error'?'雲端與歷史讀取失敗，顯示目前已保存資料；可按「讀取雲端／歷史明細」重試。':read?.status==='partial'?'部分來源讀取失敗，已保留讀取成功與本機資料。':read?.status==='ready'?`${month} 船舶雲端與歷史明細已讀取。`:'顯示已匯入的船舶資料。';
+  if(load)load.textContent=read?.status==='loading'?'更新資料中…':read?.status==='error'?'資料讀取失敗，目前顯示已保存紀錄。請展開「更多篩選與資料狀態」重新讀取。':read?.status==='partial'?'部分資料未讀取，目前顯示已取得的紀錄。可展開更多選項重試。':'';
   const ref=driverVesselReference(shipSel.value,masters,records),audit=workloadSheetAudit(ref.master,ref.rows);
   if(source)source.textContent=!shipSel.value?'本月份尚無船舶資料。':`${ref.master?.vessel||''} ${ref.master?.voyageE||ref.master?.voyageI||''}｜${ref.rows.length} 筆 WORKING REPORT｜司機 ${audit.containers} 櫃、H/C ${audit.hc}｜${audit.status==='match'?'與 WORKING SHEET 一致':audit.reasons.join('；')}`;
   ensureOperationScheduleGroups(ref.rows);
@@ -4213,12 +4208,13 @@ function renderVesselDriverView(){
   const names=[...new Map(grouped.map(g=>[g.nameKey,g.name])).entries()].sort((a,b)=>compareDriverNames(a[1],b[1]));
   const person=populate('driverVesselName',names,'全部司機'),aqcs=[...new Set(grouped.map(g=>g.aqc))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})),aqc=populate('driverVesselAqc',aqcs.map(v=>[v,v]),'全部 AQC');
   const shown=grouped.filter(g=>(!person||g.nameKey===person)&&(!aqc||g.aqc===aqc));
-  const count=document.getElementById('driverVesselCount');if(count)count.textContent=`顯示 ${ref.rows.filter(r=>(!person||normalizePersonName(displayPersonName(r.name))===person)&&(!aqc||normalizeAqcNo(r.number||r.gcNo)===aqc)).length} 筆作業紀錄，共 ${names.length} 位司機`;
-  body.innerHTML=shown.map(g=>`<tr><td class="font-bold">${esc(g.name)}</td><td>${esc(g.group)}</td><td>${esc(g.aqc)}</td><td>${g.count}</td><td>${g.hours.toFixed(2)}</td><td>${g.disc}</td><td>${g.load}</td><td>${g.hc}</td><td class="font-black">${g.containers}</td><td>${g.eff.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="10" class="p-5 text-slate-400">目前沒有司機明細；可讀取此月份的雲端／歷史明細。</td></tr>';
+  const visibleRows=ref.rows.filter(r=>(!person||normalizePersonName(displayPersonName(r.name))===person)&&(!aqc||normalizeAqcNo(r.number||r.gcNo)===aqc));
+  const count=document.getElementById('driverVesselCount');if(count)count.textContent=`${visibleRows.length} 筆紀錄・${new Set(visibleRows.map(r=>normalizePersonName(displayPersonName(r.name)))).size} 位司機`;
+  if(body)body.innerHTML=shown.map(g=>`<tr><td class="font-bold">${esc(g.name)}</td><td>${esc(g.group)}</td><td>${esc(g.aqc)}</td><td>${g.count}</td><td>${g.hours.toFixed(2)}</td><td>${g.disc}</td><td>${g.load}</td><td>${g.hc}</td><td class="font-black">${g.containers}</td><td>${g.eff.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="10" class="p-5 text-slate-400">目前沒有司機明細；可讀取此月份的雲端／歷史明細。</td></tr>';
   const detail=document.getElementById('driverVesselRecordBody');
-  if(detail)detail.innerHTML=ref.rows.filter(r=>(!person||normalizePersonName(displayPersonName(r.name))===person)&&(!aqc||normalizeAqcNo(r.number||r.gcNo)===aqc)).sort((a,b)=>`${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`)).map(r=>{
-    const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td>${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td>${m.containers}</td><td>${m.eff.toFixed(2)}</td></tr>`;
-  }).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">此船舶／司機目前沒有作業明細。</td></tr>';
+  if(detail)detail.innerHTML=visibleRows.sort((a,b)=>`${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`)).map(r=>{
+    const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td class="whitespace-nowrap">${esc(r.startTime||'—')} ～ ${esc(r.endTime||'—')}</td><td>${m.hours.toFixed(2)}</td><td><details><summary class="cursor-pointer font-bold" aria-label="${m.containers} 櫃，展開卸裝與艙蓋明細">${m.containers}</summary><div class="text-xs whitespace-nowrap mt-1">卸船 ${m.disc}｜裝船 ${m.load}<br>H/C ${m.hc}</div></details></td><td>${m.eff.toFixed(2)}</td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="p-5 text-slate-400">此船舶／司機目前沒有作業明細。</td></tr>';
   if(!read&&String(gcToken||''))void loadDriverVesselMonth(false);
 }
 
