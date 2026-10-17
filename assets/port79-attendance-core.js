@@ -116,6 +116,7 @@ function enqueue(payload){
     state:'pending'
   };
   const i=q.findIndex(x=>x.key===key);
+  if(i>=0 && q[i].paused && samePayload(q[i].payload,payload))return q.length;
   if(i>=0) q[i]=item; else q.push(item);
   saveQueue(q);
   return q.length;
@@ -168,7 +169,8 @@ function queueInfoForId(id){
     return {
       index:idx+1,
       total:q.length,
-      state:String(item?.state||'pending'),
+      state:item.paused?'paused':String(item?.state||'pending'),
+      paused:!!item.paused,
       description:desc(item?.payload),
       lastError:String(item?.lastError||'')
     };
@@ -329,6 +331,11 @@ async function send(payload,timeout=25000){
   }
 }
 
+function p79PauseAttendanceWrite(payload,error,attempts){
+  const edit=['updateRecord','editRecord'].includes(String(payload?.action||''));
+  const conflict=/原時間不符|原始時間不符|已由其他分頁修改|已被其他.*修改|TIME_CONFLICT|STALE_RECORD/i.test(String(error?.message||error||''));
+  return edit && (conflict || error?.retryable===false || attempts>=3);
+}
 function p79PunchUploadPriority(item){
   const action=String(item?.payload?.action||'');
   // 新打卡優先於管理員修改與整批修復；僅調整待送出順序，不提前宣告成功。
@@ -349,6 +356,7 @@ async function drain(force=false){
   if(navigator.onLine===false){updateUi();return false}
   let q=readQueue();
   if(!q.length){updateUi();return true}
+  if(!p79OrderedReadyQueue(q,force,Date.now()).length){updateUi();return false}
 
   writing=true;
   syncBatchTotal=Math.max(1,q.length);
@@ -434,11 +442,11 @@ async function drain(force=false){
         cur.attempts=attempts;
         cur.state='pending';
         cur.lastError=String(err?.message||err||'失敗');
-        cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+        cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
-        currentOpText='等待重試';
+        currentOpText=cur.paused?'已暫停，等待核對':'等待重試';
         updateUi();
         break;
       }
@@ -460,6 +468,7 @@ async function drainFast(force=true, concurrency=4){
 
   let q=readQueue();
   if(!q.length){updateUi();return true}
+  if(!p79OrderedReadyQueue(q,force,Date.now()).length){updateUi();return false}
 
   writing=true;
   syncBatchTotal=Math.max(1,q.length);
@@ -512,7 +521,7 @@ async function drainFast(force=true, concurrency=4){
       cur.attempts=attempts;
       cur.state='pending';
       cur.lastError=String(err?.message||err||'失敗');
-      cur.paused=['updateRecord','editRecord'].includes(String(cur.payload?.action||'')) && (attempts>=3 || err?.retryable===false);
+      cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
       return {ok:false,item,error:err,retryable:true};
@@ -571,7 +580,7 @@ async function drainFast(force=true, concurrency=4){
     writing=false;
     if(lastDoneAt)scheduleDelta(100);
     activeSyncRecordId='';
-    currentOpText=readQueue().length?'等待重試':'同步完成';
+    currentOpText=readQueue().length?(readQueue().every(x=>x.paused)?'已暫停，等待核對':'等待重試'):'同步完成';
     try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
     updateUi();
   }
@@ -722,7 +731,8 @@ function p79LatestCloudActivityAt(){
 function updateUi(){
   const el=ensurePanel();
   const q=readQueue();
-  const pending=q.length;
+  const paused=q.filter(x=>x.paused).length;
+  const pending=q.length-paused;
   const latestAt=p79LatestCloudActivityAt();
   const latestText=latestAt
     ? new Date(latestAt).toLocaleTimeString('zh-TW',{hour12:false})
@@ -734,25 +744,25 @@ function updateUi(){
     Number(syncBatchDone||0)+pending+(writing?1:0)
   );
   const currentIndex=Math.min(total,Math.max(1,Number(syncBatchDone||0)+1));
-  const nextDescription=pending?desc(q[0]?.payload):'';
+  const nextDescription=pending?desc(q.find(x=>!x.paused)?.payload):'';
 
   const storageWarning=queueStorage==='memory'?'⚠ 儲存空間不足：待傳資料僅留目前頁面，請勿關閉':queueStorage==='session'?'⚠ 已使用分頁備援保留待傳資料，請等待雲端確認':'';
   const mainState = writing
     ? `✍️ 寫入中 ${currentIndex}/${total}｜${currentOpText}`
     : (pending
         ? `🟠 等待寫入 ${pending} 筆｜下一筆：${nextDescription}`
-        : (latestAt
+        : (paused?`🟠 ${paused} 筆已暫停｜等待人工核對，不會自動重送`:(latestAt
             ? `✅ 已同步｜${latestText}`
-            : '● 待命｜尚未完成首次雲端作業'));
+            : '● 待命｜尚未完成首次雲端作業')));
 
   const html=`
     ${storageWarning?'<strong class="text-red-700">'+storageWarning+'</strong>':''}
     <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">⚡ V5 即時核心</span>
-    <span class="rounded-full border ${pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700'} px-2 py-1">${pending?`📤 同步佇列 ${pending} 筆`:'📤 同步佇列已清空'}</span>
-    <span class="rounded-full border ${writing?'border-indigo-200 bg-indigo-50 text-indigo-700':(pending?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700')} px-2 py-1">${mainState}</span>
+    <span class="rounded-full border ${(pending||paused)?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700'} px-2 py-1">${pending?`📤 同步佇列 ${pending} 筆`:paused?`🟠 待核對 ${paused} 筆`:'📤 同步佇列已清空'}</span>
+    <span class="rounded-full border ${writing?'border-indigo-200 bg-indigo-50 text-indigo-700':((pending||paused)?'border-amber-200 bg-amber-50 text-amber-700':'border-emerald-200 bg-emerald-50 text-emerald-700')} px-2 py-1">${mainState}</span>
     <span class="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-sky-700">📡 即時同步 ${deltaBusy?'讀取中':`監聽正常｜Seq ${lastSeq}`}</span>`;
 
-  const signature=[pending,writing,currentOpText,activeSyncRecordId,syncBatchTotal,syncBatchDone,deltaBusy,lastSeq,latestAt].join('|');
+  const signature=[pending,paused,writing,currentOpText,activeSyncRecordId,syncBatchTotal,syncBatchDone,deltaBusy,lastSeq,latestAt].join('|');
   if(signature!==lastStatusUiSignature){
     el.innerHTML=html;
     lastStatusUiSignature=signature;
@@ -772,7 +782,9 @@ function updateUi(){
       }else if(writing){
         setCloudSyncStatus(`第 ${currentIndex}/${total} 筆｜${currentOpText}`,'loading','write');
       }else if(pending){
-        setCloudSyncStatus(`等待寫入 ${pending} 筆｜下一筆：${nextDescription}`,'loading','write');
+        setCloudSyncStatus(`待同步 ${pending} 筆｜下一筆：${nextDescription}`,'warning','idle');
+      }else if(paused){
+        setCloudSyncStatus(`${paused} 筆修改已暫停，等待核對；不會自動重送`,'warning','idle');
       }else if(opState.mode === 'error'){
         // 最近同步失敗時保留錯誤，直到新的 GET/POST 確實成功。
       }else if(latestAt){
@@ -805,6 +817,8 @@ window.p79V5GetStatus=()=>({
   queueStorage,
   writing,
   pending:readQueue().length,
+  runnable:readQueue().filter(x=>!x.paused).length,
+  paused:readQueue().filter(x=>x.paused).length,
   currentOpText,
   activeSyncRecordId,
   syncBatchTotal,
@@ -827,6 +841,12 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     return {ok:false,error:'非考勤寫入未由 V5 處理'};
   }
 
+  const pausedItem=readQueue().find(x=>x.paused&&x.key===opKey(payload)&&samePayload(x.payload,payload));
+  if(pausedItem){
+    const reason=String(pausedItem.lastError||'此修改已暫停，請核對雲端時間後重新修改');
+    if(typeof onError==='function')try{onError(reason)}catch(e){}
+    updateUi();return {ok:false,queued:true,paused:true,error:reason};
+  }
   // 沒有其他 writer 時直接送 GAS。
   if(!writing && navigator.onLine !== false&&
       !p79OrderedReadyQueue(readQueue(),false,Date.now()).some(x=>p79PunchUploadPriority(x)<p79PunchUploadPriority({payload}))){
@@ -899,15 +919,22 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       }
 
       // 直送前已持久化；失敗時不能用舊 payload 覆蓋使用者後續修改。
-      currentOpText='等待自動重試';
+      if(current){
+        current.attempts=Number(current.attempts||0)+1;
+        current.lastError=reason;current.state='pending';
+        current.paused=p79PauseAttendanceWrite(payload,err,current.attempts);
+        current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(payload,current.attempts);
+        saveQueue(readQueue().map(x=>x.key===current.key&&samePayload(x.payload,payload)?current:x));
+      }
+      currentOpText=current?.paused?'已暫停，等待核對':'等待自動重試';
       updateUi();
 
       if(typeof onError==='function'){
         try{onError(reason)}catch(e){}
       }else{
-        try{showToast('雲端暫時未完成，這筆考勤已保留並會自動重試','warning')}catch(e){}
+        try{showToast(current?.paused?'修改已暫停；請核對雲端時間後重新修改，原修改內容保留':'雲端暫時未完成，這筆考勤已保留並會自動重試','warning')}catch(e){}
       }
-      return {ok:false,queued:true,error:reason};
+      return {ok:false,queued:true,paused:!!current?.paused,error:reason};
     }finally{
       writing=false;
       if(lastDoneAt)scheduleDelta(100);
