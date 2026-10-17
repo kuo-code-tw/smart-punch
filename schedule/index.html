@@ -2913,6 +2913,17 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       finally {clearTimeout(timer);p79NightRosterReadBusy=false;}
     }
 
+    let p79ScheduleAttendanceViewVersion=0;
+    function scheduleCanShowLiveAttendance() {
+      return currentScheduleMonthKey()===scheduleTaipeiTodayKey().slice(0,7);
+    }
+    function applyScheduleAttendanceMonthScope() {
+      const visible=scheduleCanShowLiveAttendance(),panel=document.getElementById('todaySchedulePanel');
+      if(panel)panel.hidden=!visible;
+      if(!visible)document.querySelectorAll('.today-attendance-active,.p79-person-checkin').forEach(el=>el.remove());
+      return visible;
+    }
+
     let todayScheduleExpanded = false;
     function toggleTodayScheduleDetail() {
       todayScheduleExpanded = !todayScheduleExpanded;
@@ -2933,6 +2944,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     function renderTodaySchedulePanel() {
+      if(!applyScheduleAttendanceMonthScope())return;
       const dateKey=scheduleTaipeiTodayKey();
       const nightDateKey=scheduleNightRosterDate();
       const nightSource=scheduleNightRosterSource(nightDateKey);
@@ -3158,6 +3170,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     async function refreshScheduleAttendanceState(showError=false) {
+      if(!applyScheduleAttendanceMonthScope())return false;
+      const requestMonth=currentScheduleMonthKey(),requestViewVersion=p79ScheduleAttendanceViewVersion;
       if (p79ScheduleAttendanceStateBusy || p79ScheduleAttendanceAuthExpired) return false;
       if (!isGasUrlConfigured()) { setScheduleAttendanceLiveStatus('error', '考勤燈號未同步：未設定正式 GAS'); return false; }
       const token = currentPort79SsoToken();
@@ -3177,6 +3191,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           if(!res.ok)throw Error('HTTP '+res.status);
           data=await res.json();
         } finally { clearTimeout(timer); }
+        if(requestViewVersion!==p79ScheduleAttendanceViewVersion||requestMonth!==currentScheduleMonthKey()||token!==currentPort79SsoToken())return false;
         if (!data?.ok) {
           const err=String(data?.error || '今日考勤狀態讀取失敗');
           if (/登入驗證.*(?:逾時|過期|失效|無效)|登入.*(?:逾時|過期)|token.*(?:expired|invalid)|session.*expired|請重新登入/i.test(err)) {
@@ -3193,6 +3208,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           data.activeEmpIds.map(v => String(v || '').trim().toUpperCase()).filter(Boolean)
         );
         const night = await readScheduleNightAttendance(token);
+        if(requestViewVersion!==p79ScheduleAttendanceViewVersion||requestMonth!==currentScheduleMonthKey()||!scheduleCanShowLiveAttendance()||token!==currentPort79SsoToken())return false;
         const nextSet = applyScheduleNightAttendance(baseSet,night);
 
         const before = [...todayAttendanceActiveEmpIds].sort().join('|');
@@ -3210,6 +3226,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         }
         return true;
       } catch(e) {
+        if(requestViewVersion!==p79ScheduleAttendanceViewVersion||requestMonth!==currentScheduleMonthKey())return false;
         console.warn('今日考勤狀態同步失敗：', e);
         setScheduleAttendanceLiveStatus('error', '考勤燈號同步失敗，正在重試：' + String(e?.message || e || '').slice(0, 110));
         return false;
@@ -4401,6 +4418,9 @@ function p79EmployeeDateEligible(emp,date) {
     function updateScheduleDateRangeSummary(){const a=document.getElementById('scheduleDateFrom')?.value||'',b=document.getElementById('scheduleDateTo')?.value||'',el=document.getElementById('scheduleDateRangeSummary');if(el)el.innerHTML=`<i class="fa-regular fa-calendar-check text-indigo-500 mr-1"></i>${!a&&!b?'日期範圍':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`}`;}
     function setScheduleFullMonthRange(){const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7),[a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
     async function onScheduleMonthPickerChange(){
+      p79ScheduleAttendanceViewVersion++;
+      p79ScheduleAttendanceHasSynced=false;
+      applyScheduleAttendanceMonthScope();
       const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7);
       const [a,b]=scheduleMonthBounds(month);
       const from=document.getElementById('scheduleDateFrom'),to=document.getElementById('scheduleDateTo');
@@ -4414,9 +4434,10 @@ function p79EmployeeDateEligible(emp,date) {
         if(currentScheduleMonthKey()!==month)return;
         if(status)status.textContent=ok?'':month+' 雲端讀取未完成，請按重新讀取；目前內容尚未確認';
         if(!ok){buildRoleTabsAndRender();renderTodaySchedulePanel();}
+        if(scheduleCanShowLiveAttendance())refreshScheduleAttendanceState(false);
       }catch(e){if(status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
     }
-    async function onScheduleDateRangeChange(side){const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');let a=aEl?.value||'',b=bEl?.value||'';if(a){const month=a.slice(0,7),oldMonth=document.getElementById('month-picker').value;if(month!==oldMonth){document.getElementById('month-picker').value=month;applySchedulePersonnelOverrides(month);initDefaultScheduleData(month);}const [,last]=scheduleMonthBounds(month);if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;}if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;}updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
+    async function onScheduleDateRangeChange(side){p79ScheduleAttendanceViewVersion++;p79ScheduleAttendanceHasSynced=false;applyScheduleAttendanceMonthScope();const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');let a=aEl?.value||'',b=bEl?.value||'';if(a){const month=a.slice(0,7),oldMonth=document.getElementById('month-picker').value;if(month!==oldMonth){document.getElementById('month-picker').value=month;applySchedulePersonnelOverrides(month);initDefaultScheduleData(month);}const [,last]=scheduleMonthBounds(month);if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;}if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;}updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
 
     async function onMonthOrRuleChange() {
       const yearMonth = document.getElementById('month-picker').value;
@@ -4638,7 +4659,7 @@ function p79EmployeeDateEligible(emp,date) {
       p79ScheduleRenderedDutyShift=next;renderTodaySchedulePanel();try{renderRoleScheduleView();}catch(ignore){}
     }
     function isScheduleEmployeeClockedIn(empId) {
-      return p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000&&todayAttendanceActiveEmpIds.has(String(empId || '').trim().toUpperCase());
+      return scheduleCanShowLiveAttendance()&&p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000&&todayAttendanceActiveEmpIds.has(String(empId || '').trim().toUpperCase());
     }
 
     function scheduleAttendanceActiveBadge(empId) {
@@ -7025,6 +7046,7 @@ document.addEventListener('DOMContentLoaded',()=>{const control=document.getElem
 
 
 <style id="p79-schedule-reference-layout">
+#todaySchedulePanel[hidden]{display:none!important}
 /* Schedule only: keep shared navigation and all editing/synchronization behavior. */
 body[data-p79-system="schedule"]{background:#f4f7fb!important;color:#142b49}
 body[data-p79-system="schedule"] #p79SevenTop{background:#112e50!important;border:0!important;color:#fff!important}
