@@ -1570,6 +1570,10 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
             <!-- 分頁 6：系統參數設定頁面 -->
             <div id="adminContentSettings" class="hidden space-y-6">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="font-black text-lg">系統設定</h2>
+                    <button type="button" onclick="closeSystemSettings()" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold">✕ 關閉</button>
+                </div>
                 <div id="systemInfoSection" class="rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-5 space-y-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -1663,7 +1667,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     👥 部門、單位、職稱與人員資料已統一由「人資管理系統」維護；考勤系統只讀取人資主檔供考勤篩選使用。
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" onclick="closeSystemSettings()" class="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl">關閉</button>
                     <button id="btnSaveSystemSettings" onclick="saveSystemSettings()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition">
                         💾 儲存系統設定
                     </button>
@@ -2850,7 +2855,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         }
 
         const DEFAULT_DEPARTMENTS = [
-            '稽核室','第一事業部','第二事業部','企劃部','公關部','行政管理部','資訊部','職安室','財務部',
+            '稽核室','第一事業部','第二事業處','企劃部','公關部','行政管理部','資訊部','職安室','財務部',
             '營業部','營業部業務課','營業部計費課','第一事業處 (本場)','本場管理課','本場作業課','本場倉庫課',
             '港機經銷部總務會計課','港機經銷部經銷處國內課','港機經銷部經銷處國外課','港機經銷部維保處維保課',
             '第二事業處 (63W)','63W作業課','63W倉庫課','63W總務會計課','63W維修廠','70W維修廠','79W作業課','79W倉庫課','79W維修廠'
@@ -2957,7 +2962,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
         function normalizeDepartments(list) {
             const source = Array.isArray(list) && list.length ? list : DEFAULT_DEPARTMENTS;
-            const legacy = {'79號碼頭作業課':'79W作業課','79號碼頭倉庫課':'79W倉庫課','第二事業處':'第二事業部'};
+            const legacy = {'79號碼頭作業課':'79W作業課','79號碼頭倉庫課':'79W倉庫課'};
             return [...new Set(source.map(v => String(v || '').trim()).map(v => legacy[v] || v).filter(Boolean))]
                 .sort((a,b) => a.localeCompare(b, 'zh-Hant'));
         }
@@ -3001,8 +3006,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         function migrateLegacyDepartments() {
             const mapping = {
                 '79號碼頭作業課': '79W作業課',
-                '79號碼頭倉庫課': '79W倉庫課',
-                '第二事業處': '第二事業部'
+                '79號碼頭倉庫課': '79W倉庫課'
             };
             let changed = false;
             [employees, records, leaveRecords].forEach(list => (list || []).forEach(item => {
@@ -8230,6 +8234,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             refreshJobTitleControls();
         }
 
+        function closeSystemSettings(saved=false) {
+            if(p79SystemSettingsSaveBusy&&!saved){showToast('設定正在儲存，請等雲端確認後再關閉','warning');return;}
+            const target=['records','live','overtime','stats'].find(tab=>canOpenAdminTab(tab));
+            if(target)switchAdminTab(target);
+            else {document.getElementById('adminContentSettings')?.classList.add('hidden');switchView('employee');}
+        }
         let p79SystemSettingsSaveBusy=false;
         function p79SettingsSaveFeedback(message,error=false){
             const button=document.getElementById('btnSaveSystemSettings');
@@ -8277,6 +8287,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 applySysConfigUI();
                 p79SettingsSaveFeedback('✅ 定位與系統設定已由雲端確認儲存');
                 showToast('定位與系統設定已儲存','success');
+                closeSystemSettings(true);
                 return result;
             }catch(error){
                 const message=String(error?.message||error||'未知錯誤');
@@ -17644,7 +17655,7 @@ function p79EmployeeDateEligible(emp,date) {
                 document.getElementById('empModalAttNo').value = employees.length + 1;
                 document.getElementById('empModalEmpId').value = 'BOSS' + Math.floor(Math.random() * 900 + 100);
                 document.getElementById('empModalName').value = '';
-                document.getElementById('empModalDept').value = sysConfig.departments.includes('第二事業部') ? '第二事業部' : sysConfig.departments[0];
+                document.getElementById('empModalDept').value = sysConfig.departments.includes('第二事業處') ? '第二事業處' : sysConfig.departments[0];
                 updateEmployeeDeptDetailOptions('經理');
                 document.getElementById('empModalPhone').value = '';
                 document.getElementById('empModalStartDate').value = '';

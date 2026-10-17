@@ -1518,6 +1518,18 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
         <button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button>
         <button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button>
+        <div id="schedule-legend-left">
+          <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
+          <div class="flex flex-wrap justify-start items-center gap-2 font-semibold">
+            <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
+            <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
+            <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
+            <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
+            <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
+            <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
+          </div>
+        </div>
+
       </div>
       <details class="p79-quick-guide"><summary>怎麼操作？</summary><div>
         <p><b>改班別：</b>先取得上方編輯權，再選擇職稱／組別，點日期格內的班別選單修改。</p>
@@ -1531,17 +1543,6 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     <!-- 圖片二：說明與全部職稱頁籤固定在上方，不會隨班表往下捲走 -->
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
       <div id="schedule-legend-row" class="max-w-[1920px] mx-auto bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
-        <div id="schedule-legend-left">
-          <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
-          <div class="flex flex-wrap justify-start items-center gap-2 font-semibold">
-            <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
-            <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
-            <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
-            <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
-            <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
-            <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
-          </div>
-        </div>
         <div id="overall-summary-badge" class="shrink-0 text-xs bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full font-bold">載入中...</div>
       </div>
     </div>
@@ -7070,6 +7071,14 @@ html.dark #app-main-container .p79-month-schedule-table :is(th,.p79-rest-example
 html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 @media(max-width:850px){#p79ScheduleQuickBar{padding:9px!important}#app-main-container{padding-left:8px!important;padding-right:8px!important}#scheduleActiveEditorBanner{margin-inline:8px!important}body[data-p79-system="schedule"] #p79SevenTop .top-row{padding:10px!important}#p79ScheduleQuickBar button{font-size:14px!important;padding:8px!important}}
 @media print{#app-main-container .p79-day-cell{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+#p79ScheduleQuickBar .p79-quick-actions{flex:1 1 700px;min-width:0}
+#p79ScheduleQuickBar #schedule-legend-left{display:flex!important;flex:1 1 430px;align-items:center;gap:6px!important;margin-left:6px;min-width:0}
+#p79ScheduleQuickBar #schedule-legend-left>div:first-child{white-space:nowrap;font-size:13px}
+#p79ScheduleQuickBar #schedule-legend-left>div:last-child{gap:4px!important}
+#p79ScheduleQuickBar #schedule-legend-left span{font-size:12px!important;white-space:nowrap}
+#p79ScheduleQuickBar #schedule-legend-left b{font-size:14px!important}
+@media(max-width:700px){#p79ScheduleQuickBar #schedule-legend-left{grid-column:1/-1;margin:0;flex-basis:100%;padding-top:4px}#p79ScheduleQuickBar .p79-quick-actions{flex-basis:100%}}
 </style>
 
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script></body>
