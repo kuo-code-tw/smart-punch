@@ -5393,23 +5393,25 @@ const now = new Date();
             const mode = String(state.mode || 'idle');
             const busy = !!state.busy;
             const stateText = String(state.text || '');
-            let pending = 0;
+            let pending = 0, paused = 0;
             try {
                 const q = typeof readCloudOutbox === 'function' ? readCloudOutbox() : [];
-                pending = Array.isArray(q) ? q.length : 0;
+                pending = Array.isArray(q) ? q.filter(x=>!x.paused).length : 0;
+                paused = Array.isArray(q) ? q.filter(x=>x.paused).length : 0;
             } catch (e) {}
 
             // V5 考勤與舊版非考勤分別有佇列，兩者都必須計入。
             let v5Writing = false;
             try {
                 const v5 = window.p79V5GetStatus?.();
-                pending += Math.max(0, Number(v5?.pending || 0));
+                pending += Math.max(0, Number(v5?.runnable ?? v5?.pending ?? 0));
+                paused += Math.max(0,Number(v5?.paused||0));
                 v5Writing = v5?.writing === true;
             } catch (ignore) {}
             const staleRead = busy && mode === 'read' &&
                 Date.now() - Number(state.updatedAt || 0) >= 90000;
             const isError = staleRead || mode === 'error' || /失敗|錯誤|逾時/.test(stateText);
-            const needsAttention = isError || busy || v5Writing || pending > 0;
+            const needsAttention = isError || busy || v5Writing || pending > 0 || paused > 0;
             const compactLabel = staleRead
                 ? '更新逾時'
                 : (isError
@@ -5418,7 +5420,7 @@ const now = new Date();
                         ? `待同步 ${pending}`
                         : (busy || v5Writing
                             ? (mode === 'read' ? '更新中' : '同步中')
-                            : '已同步')));
+                            : (paused > 0 ? `待核對 ${paused}` : '已同步'))));
 
             compactDot.className = `h-2 w-2 rounded-full shadow-sm ${needsAttention ? 'bg-amber-400' : 'bg-emerald-400'}`;
             compactText.textContent = compactLabel;
@@ -5431,7 +5433,7 @@ const now = new Date();
                     ? '雲端同步異常，詳情請查看雲端狀態及待同步明細'
                     : (pending > 0
                         ? `有 ${pending} 筆待同步；點此立即重試`
-                        : ((busy || v5Writing) ? '雲端作業進行中' : '考勤同步工作已完成')));
+                        : ((busy || v5Writing) ? '雲端作業進行中' : paused > 0 ? `${paused} 筆修改已暫停，內容保留；不會自動重送，請先核對雲端時間` : '考勤同步工作已完成')));
         }
 
         function setCloudSyncStatus(text, type = 'idle', explicitMode = '') {
@@ -14080,7 +14082,7 @@ function getManualPairRecordAnchor(record) {
             // 時間正上方只保留綠／黃小圓點：綠＝已同步，黃＝待同步或同步中。
             const syncWaiting = pending;
             const syncTitle = syncWaiting
-                ? (queueInfo?.state === 'syncing'
+                ? (queueInfo?.paused ? `已暫停｜${queueTitle}｜內容保留，請核對後重新修改` : queueInfo?.state === 'syncing'
                     ? `同步中${queueProgress ? ` ${queueProgress}` : ''}｜${queueTitle}`
                     : `待同步${queueProgress ? ` ${queueProgress}` : ''}｜${queueTitle}`)
                 : (cloudConfirmed
@@ -22885,7 +22887,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261015.68"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-conflict"></script>
 
 
 
