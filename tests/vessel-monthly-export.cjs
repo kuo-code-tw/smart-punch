@@ -7,7 +7,7 @@ const c={console,Date,document:{getElementById:id=>elements[id]},shipMasters:[],
   applyShipManualOverrides:s=>({...s,...s.manualOverrides}),monthlySerialFromWorkingNo:no=>String(no).slice(-4),
   recordsForVessel:no=>c.records.filter(r=>r.workingNo===no),recoveredMoveSplit:r=>r,
   requireSuperAdminAccess:()=>true,toast:m=>messages.push(m),loadEfficiencyCloudScope:async()=>true};
-c.window=c;c.p79EnsureXlsx=async()=>{};vm.createContext(c);
+c.window=c;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,download:async({month,rows,filename,company})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company})};vm.createContext(c);
 for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','vesselMonthlyExportRows','buildMonthlyOperationSheet','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
 let passed=0;function test(name,f){f();passed++;console.log('PASS '+name);}
 const master={workingNo:'5260159',vessel:'WAN HAI 292 N073',voyageE:'N073',firstDate:'2026-09-30',lastDate:'2026-10-01',totalContainers:497,hatches:8,shiftMoves:0,gph:23.06,gphHC:23.43,workingSheetSource:{disc:189,load:308}};
@@ -25,7 +25,7 @@ test('template headers, ROC month, leading-zero serial and subtotal use the sele
  c.loadEfficiencyCloudScope=async({month})=>{assert.equal(month,'2026-10');elements.filterMonth.value='2026-11';return true;};
  await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert(writes[0].name.includes('115年10月份'));assert(writes[0].wb.sheet.A1.v.includes('115年10月份'));passed++;
  elements.filterMonth.value='2026-12';c.loadEfficiencyCloudScope=async()=>true;await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);passed++;
- elements.filterMonth.value='2026-10';c.p79EnsureXlsx=async()=>{throw Error('load failed');};await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert.equal(elements.vesselMonthlyExportBtn.disabled,false);passed++;
+ elements.filterMonth.value='2026-10';c.P79VesselMonthlyReport.download=async()=>{throw Error('load failed');};await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert.equal(elements.vesselMonthlyExportBtn.disabled,false);passed++;
  assert(html.includes('id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()"'));passed++;
  if(process.env.P79_XLSX_PATH){
    c.XLSX=require(process.env.P79_XLSX_PATH);
