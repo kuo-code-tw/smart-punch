@@ -685,6 +685,7 @@ body[data-p79-system="efficiency"] main{
           <label class="text-xs font-bold">月份</label>
           <select id="filterMonth" class="block border rounded-xl px-3 py-2" onchange="onDashboardMonthChange()"><option value="">全部月份</option></select>
         </div>
+        <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出每月作業量表</button>
         <button onclick="clearDashboardFilter()" class="btn bg-slate-100 text-sm">清除全部篩選</button>
         <button id="forceVesselCloudPullBtn" type="button" onclick="forcePullVesselCloudData()" class="btn text-white text-sm font-black shadow-lg ring-2 ring-sky-300" style="background:#0284c7;color:#fff;min-width:190px" title="立即從 GC 即時資料與歷史船舶月份重新拉取">☁️ 立即雲端拉取船舶資料</button>
         <div id="dashboardTableFilterState" class="text-xs text-slate-500"></div>
@@ -12804,50 +12805,91 @@ function operationExportRows(list){return list.map(r=>{
     num(mv.disc)+num(mv.load),num(gph),num(r.deduct1)+num(r.deduct2)+num(r.deduct3)+num(r.deduct4),r.note||''
   ];
 });}
-function vesselMonthlyExportRows(){
-  const month=document.getElementById('filterMonth')?.value||'';
-  const masters=(shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month));
-  const rows=masters.map(s=>{
+function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.value||''){
+  // Use the same completion-month rule as the vessel list, independent of table filters.
+  const masters=canonicalShipMasters(shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month));
+  const rows=masters.map(raw=>{
+    const s=applyShipManualOverrides(raw),ws=s.workingSheetSource||{};
     const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>String(r.source||'')==='working-report');
-    const disc=rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0);
-    const load=rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0);
-    const hc=rs.reduce((a,r)=>a+num(r.hatches),0) || num(s.hatches);
-    const shift=num(s.shiftMoves);
-    const firstDate=String(
-      applyShipManualOverrides(s).compareDate ||
-      s.workingSheetSource?.compareDate ||
-      s.firstDate ||
-      rs.map(r=>String(r.workDate||'')).filter(Boolean).sort()[0] ||
-      ''
-    ).slice(0,10);
-    const serial=monthlySerialFromWorkingNo(s.workingNo);
-    const shipName=(()=>{const v=String(s.vessel||'').trim();const m=v.match(/(\d+)\s*$/);return m?m[1]:v})();
+    const metric=(...values)=>{
+      for(const v of values){
+        if(v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)))return Number(v);
+      }
+      return 0;
+    };
+    // WORKING SHEET quantities remain available when the detailed cache is incomplete.
+    const disc=metric(s.manualOverrides?.disc,ws.disc,rs.length?rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0):s.disc);
+    const load=metric(s.manualOverrides?.load,ws.load,rs.length?rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0):s.load);
+    const date=String(s.compareDate||ws.compareDate||s.firstDate||rs.map(r=>String(r.workDate||'')).filter(Boolean).sort()[0]||'').slice(0,10);
     return {
-      workingNo:String(s.workingNo||''),serial,date:firstDate,shipName,
-      voyage:String(s.voyageE||s.voyageI||''),disc,load,bill:num(s.totalContainers)||Math.max(0,disc+load-num(s.shiftMoves)),
-      bundle:num(s.bundleDeduct),hc,shift,productivity:round(num(s.gph),2),includeHC:round(num(s.gphHC),2),note:''
+      workingNo:String(s.workingNo||''),serial:monthlySerialFromWorkingNo(s.workingNo),date,
+      shipName:monthlyShipNo(s.vessel),voyage:String(s.voyageE||s.voyageI||''),disc,load,
+      bill:metric(s.totalContainers,ws.totalContainers,Math.max(0,disc+load-num(s.bundleDeduct))),
+      hc:metric(s.hatches,ws.hatches,rs.reduce((a,r)=>a+num(r.hatches),0)),shift:num(s.shiftMoves),
+      productivity:round(num(s.gph),2),includeHC:round(num(s.gphHC),2),note:String(s.note||'')
     };
   });
-  return rows.sort((a,b)=>`${a.date}|${a.serial}`.localeCompare(`${b.date}|${b.serial}`));
+  return rows.sort((a,b)=>`${a.date}|${a.serial}`.localeCompare(`${b.date}|${b.serial}`,undefined,{numeric:true}));
 }
-function buildMonthlyOperationSheet(){
-  const rows=vesselMonthlyExportRows();
+function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')?.value||'',rows=vesselMonthlyExportRows(month)){
+  const valid=/^(20\d{2})-(0[1-9]|1[0-2])$/.exec(month);
+  const period=valid?`${Number(valid[1])-1911}年${Number(valid[2])}月份`:'';
   const aoa=[
-    ['亞安顧問管理79W 船邊作業量表','','','','','','','','','效率','',''],
-    ['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','請款櫃數','翻艙蓋數','翻艙數','Productivity','Include HC','備註']
+    [`亞安顧問管理79W ${period}船邊作業量表`],[],
+    ['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','請款櫃數','翻艙蓋數','翻艙數','效率','','備註'],
+    ['','','','','','','','','','','Productivity','(Include HC)']
   ];
   rows.forEach((x,i)=>aoa.push([
-    i+1,x.serial,x.date,x.shipName,x.voyage,x.disc,x.load,x.bill,x.hc,x.shift,x.productivity,x.includeHC,x.note
+    i+1,x.serial,x.date?new Date(`${x.date}T00:00:00Z`):'',x.shipName,x.voyage,x.disc,x.load,x.bill,x.hc,x.shift,x.productivity,x.includeHC,x.note
   ]));
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!merges']=[
-    XLSX.utils.decode_range('A1:I1'),
-    XLSX.utils.decode_range('J1:L1')
-  ];
-  ws['!cols']=[
-    {wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:20}
-  ];
+  const totals=['小計','','','','',0,0,0,0,0,'','',''];
+  rows.forEach(x=>[x.disc,x.load,x.bill,x.hc,x.shift].forEach((v,i)=>totals[i+5]+=v));
+  aoa.push(totals);
+  const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:false});
+  ws['!merges']=[XLSX.utils.decode_range('A1:N2'),XLSX.utils.decode_range('K3:L3'),XLSX.utils.decode_range('M3:N4')];
+  'ABCDEFGHIJ'.split('').forEach(col=>ws['!merges'].push(XLSX.utils.decode_range(`${col}3:${col}4`)));
+  rows.forEach((x,i)=>{
+    const r=i+5;
+    ws['!merges'].push(XLSX.utils.decode_range(`M${r}:N${r}`));
+    if(ws[`C${r}`]?.t==='n')ws[`C${r}`].z='mm/dd';
+    ['K','L'].forEach(col=>{if(ws[`${col}${r}`])ws[`${col}${r}`].z='0.00';});
+  });
+  const last=rows.length+5;
+  ws['!merges'].push(XLSX.utils.decode_range(`M${last}:N${last}`));
+  if(rows.length)'FGHIJ'.split('').forEach(col=>{ws[`${col}${last}`].f=`SUM(${col}5:${col}${last-1})`;});
+  ws['!cols']=[8,10,12,14,12,12,12,12,12,10,16,16,14,10].map(wch=>({wch}));
+  ws['!rows']=[{hpt:24},{hpt:12},{hpt:25},{hpt:22}];
+  ws['!ref']=`A1:N${last}`;
+  ws['!margins']={left:0.25,right:0.25,top:0.4,bottom:0.4,header:0.2,footer:0.2};
   return ws;
+}
+async function exportVesselMonthlyExcel(){
+  if(!requireSuperAdminAccess())return;
+  const month=document.getElementById('filterMonth')?.value||'';
+  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return toast('請先選擇要匯出的月份');
+  const btn=document.getElementById('vesselMonthlyExportBtn');
+  if(btn?.disabled)return;
+  if(btn){btn.disabled=true;btn.textContent='讀取月份資料中…';}
+  try{
+    await window.p79EnsureXlsx();
+    if(!window.XLSX)throw Error('Excel 元件未載入，請重新整理後再試');
+    // Load the captured month before export, even if another month is selected during the request.
+    if(!await loadEfficiencyCloudScope({month},true)){
+      toast('無法取得該月份雲端資料，請同步成功後再匯出');
+      return;
+    }
+    const rows=vesselMonthlyExportRows(month);
+    if(!rows.length)return toast(`${month} 沒有可匯出的船舶資料`);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,buildMonthlyOperationSheet(month,rows),'船邊作業量表');
+    XLSX.writeFile(wb,`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`);
+    toast(`已匯出 ${month} 船邊作業量表，共 ${rows.length} 艘`);
+  }catch(error){
+    console.error('每月船邊作業量表匯出失敗',error);
+    toast(error.message||'匯出失敗，請稍後再試');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='📥 匯出每月作業量表';}
+  }
 }
 
 const EXPORT_FIELDS = {
