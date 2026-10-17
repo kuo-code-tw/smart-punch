@@ -3101,7 +3101,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const raw=String(record?.timeStr||record?.time||record?.dateTime||'').trim().replace('T',' ');
       const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
       if(!m)return 0;
-      return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]||0)).getTime();
+      return Date.parse(m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+'T'+m[4].padStart(2,'0')+':'+m[5]+':'+String(m[6]||'0').padStart(2,'0')+'+08:00');
     }
 
     function scheduleAttendanceRecordType(record) {
@@ -3109,6 +3109,51 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if(/下班|簽退|CLOCK[ _-]?OUT|(^|\W)OUT($|\W)/i.test(s))return 'OUT';
       if(/上班|簽到|CLOCK[ _-]?IN|(^|\W)IN($|\W)/i.test(s))return 'IN';
       return '';
+    }
+
+    function scheduleNightAttendanceLatest(records,people,now=Date.now()) {
+      const latest=new Map(),byAttendanceNo=new Map();
+      (people||[]).forEach(emp=>{
+        const key=String(emp.attNo||emp.attendanceNo||'').trim();if(!key)return;
+        const ids=byAttendanceNo.get(key)||new Set();ids.add(String(emp.id||emp.empId||'').trim().toUpperCase());byAttendanceNo.set(key,ids);
+      });
+      (records||[]).forEach(record=>{
+        if(record.deleted===true||record.isDeleted===true)return;
+        const ts=scheduleAttendanceRecordTimestamp(record),type=scheduleAttendanceRecordType(record);
+        if(!ts||!type||ts>now||ts<now-18*3600000)return;
+        let id=String(record.empId||'').trim().toUpperCase();
+        if(!id){const ids=byAttendanceNo.get(String(record.attNo||record.attendanceNo||'').trim());if(ids?.size===1)id=[...ids][0];}
+        if(!id)return;
+        const old=latest.get(id);
+        // At equal timestamps OUT wins; a check-out must never become a false green light.
+        if(!old||ts>old.ts||(ts===old.ts&&type==='OUT'))latest.set(id,{ts,type});
+      });
+      return latest;
+    }
+    async function readScheduleNightAttendance(token) {
+      const today=scheduleTaipeiTodayKey(),nightDate=scheduleNightRosterDate();
+      if(today===nightDate)return null;
+      const months=[...new Set([nightDate.slice(0,7),today.slice(0,7)])];
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+      try {
+        const results=await Promise.all(months.map(async month=>{
+          const response=await fetch(GAS_URL+'?action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',signal:controller.signal});
+          const data=await response.json();
+          if(!response.ok||!data.ok||!Array.isArray(data.records)||String(data.month||'')!==month)throw new Error(data.error||'跨日晚班正式考勤未完成讀取');
+          return data.records;
+        }));
+        if(token!==currentPort79SsoToken()||nightDate!==scheduleNightRosterDate())throw new Error('日期或登入狀態已變更，稍後重新核對晚班');
+        return {nightDate,latest:scheduleNightAttendanceLatest(results.flat(),employees)};
+      } finally {clearTimeout(timer);}
+    }
+    function applyScheduleNightAttendance(baseSet,night) {
+      const result=new Set(baseSet);if(!night)return result;
+      const earliest=Date.parse(night.nightDate+'T21:00:00+08:00');
+      night.latest.forEach((record,id)=>{
+        if(record.type==='IN'&&record.ts>=earliest)result.add(id);
+        else result.delete(id);
+      });
+      return result;
     }
 
     async function refreshScheduleAttendanceState(showError=false) {
@@ -3143,11 +3188,11 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         if (!Array.isArray(data.activeEmpIds)) throw new Error('雲端未提供即時出勤名單（請確認 GAS 已更新）');
         if (data.today && data.today !== scheduleTaipeiTodayKey()) throw new Error('雲端回傳的出勤日期不是今日');
 
-        const nextSet = new Set(
-          (Array.isArray(data.activeEmpIds) ? data.activeEmpIds : [])
-            .map(v => String(v || '').trim().toUpperCase())
-            .filter(Boolean)
+        const baseSet = new Set(
+          data.activeEmpIds.map(v => String(v || '').trim().toUpperCase()).filter(Boolean)
         );
+        const night = await readScheduleNightAttendance(token);
+        const nextSet = applyScheduleNightAttendance(baseSet,night);
 
         const before = [...todayAttendanceActiveEmpIds].sort().join('|');
         const after = [...nextSet].sort().join('|');
@@ -3156,7 +3201,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         p79ScheduleAttendanceHasSynced = true;
         p79ScheduleAttendanceLastSyncedAt = Date.now();
         const syncedAt = new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-        setScheduleAttendanceLiveStatus('ok', '考勤燈號已同步 ' + syncedAt + '｜已簽到未簽退 ' + nextSet.size + ' 人');
+        setScheduleAttendanceLiveStatus('ok', '考勤燈號已同步 ' + syncedAt + '｜已簽到未簽退 ' + nextSet.size + ' 人'+(night?'｜含 '+night.nightDate.replace(/-/g,'/')+' 跨日晚班':''));
 
         if (before !== after || !wasSynced) {
           renderTodaySchedulePanel();
