@@ -632,9 +632,7 @@ body[data-p79-system="efficiency"] main{
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 效率總覽</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報比對</button>
-      <button class="tab btn bg-slate-100" data-tab="groups" onclick="switchTab('groups',this)">👥 組別/人員</button>
-      <button class="tab btn bg-slate-100" data-tab="records" onclick="switchTab('records',this)">📝 作業明細</button>
-      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">🚢 船舶司機作業明細</button>
+      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="workload" onclick="switchTab('workload',this)">👤 個人作業量統計</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">📅 每周效率</button>
 
@@ -790,7 +788,39 @@ body[data-p79-system="efficiency"] main{
     </div>
   </section>
 
-  <section id="view-records" class="hidden space-y-4">
+  <section id="view-personstats" class="hidden space-y-4">
+    <div class="card p-4">
+      <h2 class="text-xl font-black">作業明細</h2>
+      <p class="text-sm text-slate-500 mt-2">直接使用匯入船舶檔案時已保存的 WORKING SHEET 與 WORKING REPORT，不必再上傳。選月份可讀取雲端與歷史船舶明細，再依司機姓名或 AQC 篩選。</p>
+      <div class="flex flex-wrap items-end gap-3 mt-3">
+        <div><label for="driverVesselMonth" class="block text-xs font-bold">船舶月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
+        <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
+        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">讀取雲端／歷史明細</button>
+      </div>
+      <div id="driverVesselLoadState" class="mt-3 text-sm" role="status"></div>
+      <div id="driverVesselSourceState" class="mt-2 text-sm" role="status"></div>
+    </div>
+    <div class="card p-4 overflow-auto">
+      <div class="flex flex-wrap items-end gap-3 mb-3">
+        <div><label for="driverVesselName" class="block text-xs font-bold">司機姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
+        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>
+        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mb-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
+      <p class="text-xs text-slate-500 mb-2">組別來源：作業當月排班表 AQC。效率（含 H/C）＝（櫃數＋H/C）÷ 作業時數。</p>
+      <table class="tbl w-full min-w-[1200px] text-center">
+        <thead><tr><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead>
+        <tbody id="driverVesselBody"><tr><td colspan="10" class="p-5 text-slate-400">請選擇船舶。</td></tr></tbody>
+      </table>
+      <h3 class="font-black mt-5 mb-2">司機作業紀錄</h3>
+      <table class="tbl w-full min-w-[1350px] text-center">
+        <thead><tr><th>日期</th><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead>
+        <tbody id="driverVesselRecordBody"></tbody>
+      </table>
+    </div>
+    <details id="integratedRecordDetails" class="space-y-3" ontoggle="if(this.open)openIntegratedRecordDetails()">
+      <summary class="card p-4 cursor-pointer font-bold">完整作業欄位與紀錄維護（新增／編輯）</summary>
+  <section id="view-records" class="space-y-4">
     <div class="card p-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-end">
         <button onclick="openRecordDialog()" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button>
@@ -888,35 +918,7 @@ body[data-p79-system="efficiency"] main{
       </table>
     </div>
   </section>
-  <section id="view-personstats" class="hidden space-y-4">
-    <div class="card p-4">
-      <h2 class="text-xl font-black">船舶司機作業明細</h2>
-      <p class="text-sm text-slate-500 mt-2">直接使用匯入船舶檔案時已保存的 WORKING SHEET 與 WORKING REPORT，不必再上傳。選月份可讀取雲端與歷史船舶明細，再依司機姓名或 AQC 篩選。</p>
-      <div class="flex flex-wrap items-end gap-3 mt-3">
-        <div><label for="driverVesselMonth" class="block text-xs font-bold">船舶月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
-        <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
-        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">讀取雲端／歷史明細</button>
-      </div>
-      <div id="driverVesselLoadState" class="mt-3 text-sm" role="status"></div>
-      <div id="driverVesselSourceState" class="mt-2 text-sm" role="status"></div>
-    </div>
-    <div class="card p-4 overflow-auto">
-      <div class="flex flex-wrap items-end gap-3 mb-3">
-        <div><label for="driverVesselName" class="block text-xs font-bold">司機姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
-        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>
-        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
-      </div>
-      <p class="text-xs text-slate-500 mb-2">組別來源：作業當月排班表 AQC。效率（含 H/C）＝（櫃數＋H/C）÷ 作業時數。</p>
-      <table class="tbl w-full min-w-[1200px] text-center">
-        <thead><tr><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead>
-        <tbody id="driverVesselBody"><tr><td colspan="10" class="p-5 text-slate-400">請選擇船舶。</td></tr></tbody>
-      </table>
-      <h3 class="font-black mt-5 mb-2">司機作業紀錄</h3>
-      <table class="tbl w-full min-w-[1350px] text-center">
-        <thead><tr><th>日期</th><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead>
-        <tbody id="driverVesselRecordBody"></tbody>
-      </table>
-    </div>
+    </details>
   </section>
   <section id="view-workload" class="hidden space-y-4">
     <div class="card p-4 border-teal-200">
@@ -944,6 +946,7 @@ body[data-p79-system="efficiency"] main{
         </div>
         <button type="button" onclick="clearWorkloadFilters()" class="btn bg-slate-100 text-slate-700">清除篩選</button>
       </div>
+      <div class="flex flex-wrap items-center gap-2 mt-2"><span id="workloadScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
       <div id="workloadPersonMeta" class="mt-3 rounded-xl border bg-teal-50 px-3 py-2 text-sm text-teal-800">請先選擇司機姓名。</div>
     </div>
 
@@ -1368,6 +1371,7 @@ body[data-p79-system="efficiency"] main{
             </button>
           </div>
         </div>
+        <div class="flex flex-wrap items-center gap-2 mb-2"><span id="weeklyScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
         <div id="weeklyGroupButtons" class="flex flex-wrap gap-2 mb-3"></div>
         <table class="tbl w-full min-w-[850px] text-center">
           <thead>
@@ -1871,8 +1875,8 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   }
   if(name==='weekly'){renderWeeklyEfficiency();return;}
 }
-function switchTab(name,btn){if(name==='groups')ensureEmployeeDataForGroups();
-  ['dashboard','compare','groups','records','personstats','workload','weekly'].forEach(x=>{
+function switchTab(name,btn){if(name==='groups'||name==='records'){name='personstats';btn=null;}
+  ['dashboard','compare','groups','personstats','workload','weekly'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name);
   });
@@ -3998,13 +4002,48 @@ function currentOperationScheduleStore(){
 }
 function operationGroupForRecord(r){
   const store=currentOperationScheduleStore(),month=String(r?.workDate||'').slice(0,7);
-  return store?store.lookup(month,{empId:r?.empId,name:r?.name}).group:'未取得排班組別';
+  if(!store)return '排班組別元件未載入';
+  const found=store.lookup(month,{empId:r?.empId,name:r?.name});
+  if(found.status!=='unavailable')return found.group;
+  const state=operationScheduleReads.get(month);
+  if(state?.status==='loading')return '讀取排班組別中…';
+  if(state?.status==='error')return '排班讀取失敗';
+  return found.group;
 }
+function operationScheduleErrorKind(error){
+  const message=String(error?.message||error||'');
+  if(/permission|unauthor|forbidden|token|登入|權限|驗證/i.test(message))return {text:'登入或排班讀取權限驗證失敗，請重新登入後重試',retry:false};
+  if(/忙碌|稍後|同步中|timeout|abort|逾時|network|fetch|HTTP 5|連線/i.test(message))return {text:'排班服務忙碌或連線逾時',retry:true};
+  if(/不完整|JSON|空白|格式|HTML/i.test(message))return {text:'排班回傳資料不完整或格式錯誤',retry:false};
+  return {text:'排班服務未完成讀取，請按重新讀取',retry:false};
+}
+function renderOperationScheduleStatus(rows){
+  const months=[...new Set((rows||[]).map(r=>String(r.workDate||'').slice(0,7)).filter(m=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(m)))];
+  let text='';
+  if(months.length){
+    if(!window.P79AqcScheduleGroups)text='排班組別元件尚未載入，請重新整理。';
+    else if(!String(gcToken||''))text='尚未取得登入驗證，請重新登入後讀取排班組別。';
+    else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別`:state?.status==='loading'?`${month} 正在讀取排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
+  }
+  ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
+}
+function operationRowsForActiveView(){
+  const active=activeEfficiencyTabName();
+  if(active==='weekly')return weeklyFilteredRecords();
+  if(active==='records')return filteredRecords();
+  if(active==='workload'){const pid=document.getElementById('personStatPerson')?.value||'';return workloadRowsInRange(buildWorkloadIndex().byPerson.get(pid)||[]);}
+  if(active==='personstats'){const no=document.getElementById('driverVesselShip')?.value||'';return driverVesselReference(no,shipMasters,records).rows;}
+  return [];
+}
+function retryOperationScheduleGroups(){
+  ensureOperationScheduleGroups(operationRowsForActiveView(),true);refreshOperationGroupView();
+}
+
 function refreshOperationGroupView(){
   const active=activeEfficiencyTabName();
   if(active==='weekly')renderWeeklyEfficiency();
   else if(active==='workload')renderPersonStats();
-  else if(active==='personstats')renderVesselDriverView();
+  else if(active==='personstats'){renderVesselDriverView();if(document.getElementById('integratedRecordDetails')?.open)renderRecords();}
   else if(active==='records')renderRecords();
 }
 function pumpOperationScheduleGroups(){
@@ -4012,12 +4051,26 @@ function pumpOperationScheduleGroups(){
     const task=operationScheduleQueue.shift();operationScheduleRunning++;
     (async()=>{
       try{
-        const data=await apiGetQuick('getScheduleDataSecure',{month:task.month},25000);
+        let data;
+        for(let attempt=0;attempt<2;attempt++){
+          try{data=await apiGetQuick('getScheduleDataSecure',{month:task.month},25000);break;}
+          catch(error){
+            if(task.owner!==String(gcToken||''))return;
+            if(attempt||!operationScheduleErrorKind(error).retry)throw error;
+            operationScheduleReads.set(task.month,{at:Date.now(),status:'loading',retrying:true});
+            refreshOperationGroupView();
+            await new Promise(resolve=>setTimeout(resolve,1200));
+            if(task.owner!==String(gcToken||''))return;
+          }
+        }
         if(task.owner!==String(gcToken||''))return;
         currentOperationScheduleStore().apply(task.month,data);
         operationScheduleReads.set(task.month,{at:Date.now(),status:'ready'});
       }catch(error){
-        if(task.owner===String(gcToken||'')){currentOperationScheduleStore()?.invalidate(task.month);operationScheduleReads.set(task.month,{at:Date.now(),status:'error'});}
+        if(task.owner===String(gcToken||'')){
+          currentOperationScheduleStore()?.invalidate(task.month);
+          operationScheduleReads.set(task.month,{at:Date.now(),status:'error',error:operationScheduleErrorKind(error).text});
+        }
       }finally{
         operationScheduleRunning--;
         if(task.owner===String(gcToken||''))refreshOperationGroupView();
@@ -4026,6 +4079,7 @@ function pumpOperationScheduleGroups(){
     })();
   }
 }
+
 function ensureOperationScheduleGroups(rows,force=false){
   const store=currentOperationScheduleStore(),owner=String(gcToken||'');if(!store||!owner)return;
   const months=[...new Set((rows||[]).map(r=>String(r.workDate||'').slice(0,7)).filter(m=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(m)))];
@@ -4036,6 +4090,14 @@ function ensureOperationScheduleGroups(rows,force=false){
     operationScheduleReads.set(month,{at:Date.now(),status:'loading'});operationScheduleQueue.push({month,owner});
   });
   pumpOperationScheduleGroups();
+  renderOperationScheduleStatus(rows);
+}
+window.addEventListener('p79-aqc-schedule-groups-ready',()=>{if(typeof refreshOperationGroupView==='function')refreshOperationGroupView();});
+function openIntegratedRecordDetails(){
+  populateSelects();
+  const select=document.getElementById('recordShipFilter'),no=document.getElementById('driverVesselShip')?.value||'';
+  if(select&&no&&[...select.options].some(o=>o.value===no))select.value=no;
+  renderRecords();
 }
 function driverVesselReference(workingNo,masters,allRows){
   const no=String(workingNo||'').trim();
@@ -14032,7 +14094,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
-<script src="../assets/port79-aqc-schedule-groups.js?v=20261017-driver-history"></script>
+<script src="../assets/port79-aqc-schedule-groups.js?v=20261017-group-read2"></script>
 <script src="../assets/port79-vessel-monthly-report.js?v=20261017-print35"></script>
 <script src="../assets/port79-seven-top.js?v=20261017-workload-export"></script>
 
