@@ -539,6 +539,13 @@ body[data-p79-system="efficiency"] main{
 .p79-collapsible>summary:focus-visible{outline:3px solid #6366f1;outline-offset:2px}.p79-collapse-hint{margin-left:auto;font-size:12px;font-weight:400;white-space:nowrap}.p79-collapse-hint:after{content:'展開'}.p79-collapsible[open] .p79-collapse-hint:after{content:'收合'}
 .p79-collapsible[open]>summary{margin-bottom:8px}.p79-collapse-toolbar{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.p79-collapsible>.grid{padding:8px}
 </style>
+<style id="p79-vessel-detail-readable-columns">
+#vesselDetailDialog{width:min(1600px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px)!important}
+#vesselDetailTable{table-layout:fixed!important;width:100%!important;min-width:1706px!important}
+#vesselDetailTable th,#vesselDetailTable td{padding:11px 10px!important;line-height:1.5!important;white-space:nowrap!important;word-break:keep-all!important;vertical-align:middle!important}
+#vesselDetailTable th:nth-child(8),#vesselDetailTable td:nth-child(8),#vesselDetailTable th:nth-child(16),#vesselDetailTable td:nth-child(16){white-space:normal!important;word-break:normal!important;overflow-wrap:anywhere}
+#vesselDetailTableWrap{overflow:auto;scrollbar-gutter:stable}
+</style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -1180,8 +1187,10 @@ body[data-p79-system="efficiency"] main{
         <button onclick="exportCurrentVessel()" class="btn bg-emerald-600 text-white text-sm">匯出這艘船</button>
       </div>
     </div>
-    <div class="overflow-auto max-h-[58vh] rounded-2xl border">
+    <div class="text-xs text-slate-500">欄位較多時，可左右滑動查看完整內容。</div>
+    <div id="vesselDetailTableWrap" class="overflow-auto max-h-[58vh] rounded-2xl border">
       <table id="vesselDetailTable" class="tbl w-full min-w-[1300px] text-center">
+        <colgroup><col style="width:116px"><col style="width:76px"><col style="width:108px"><col style="width:72px"><col style="width:80px"><col style="width:80px"><col style="width:76px"><col style="width:160px"><col style="width:70px"><col style="width:70px"><col style="width:120px"><col style="width:70px"><col style="width:80px"><col style="width:84px"><col style="width:84px"><col style="width:360px"></colgroup>
         <thead><tr><th>日期</th><th>AQC</th><th>姓名</th><th>組別</th><th>開始</th><th>結束</th><th>時數</th><th>艙位/SHIFT</th><th>DISC</th><th>LOAD</th><th>Bundle</th><th>H/C</th><th>櫃數</th><th>GPH</th><th>停工分</th><th>備註</th></tr></thead>
         <tbody id="vdBody"></tbody>
       </table>
