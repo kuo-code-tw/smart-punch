@@ -633,8 +633,7 @@ body[data-p79-system="efficiency"] main{
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 效率總覽</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報比對</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 作業明細</button>
-      <button class="tab btn bg-slate-100" data-tab="workload" onclick="switchTab('workload',this)">👤 個人作業量統計</button>
-      <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">📅 每周效率</button>
+      <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員作業統計</button>
 
     </div>
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
@@ -795,17 +794,16 @@ body[data-p79-system="efficiency"] main{
       <div class="flex flex-wrap items-end gap-3 mt-3">
         <div><label for="driverVesselMonth" class="block text-xs font-bold">船舶月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
         <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
+
+        <div><label for="driverVesselName" class="block text-xs font-bold">司機姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
+        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>
+        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
+
         <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">讀取雲端／歷史明細</button>
       </div>
       <div id="driverVesselLoadState" class="mt-3 text-sm" role="status"></div>
       <div id="driverVesselSourceState" class="mt-2 text-sm" role="status"></div>
-    </div>
-    <div class="card p-4 overflow-auto">
-      <div class="flex flex-wrap items-end gap-3 mb-3">
-        <div><label for="driverVesselName" class="block text-xs font-bold">司機姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
-        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>
-        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
-      </div>
+    <div class="overflow-auto mt-4">
       <div class="flex flex-wrap items-center gap-2 mb-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
       <p class="text-xs text-slate-500 mb-2">組別來源：作業當月排班表 AQC。效率（含 H/C）＝（櫃數＋H/C）÷ 作業時數。</p>
       <table class="tbl w-full min-w-[1200px] text-center">
@@ -817,6 +815,7 @@ body[data-p79-system="efficiency"] main{
         <thead><tr><th>日期</th><th>司機姓名</th><th>排班 AQC 組別</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead>
         <tbody id="driverVesselRecordBody"></tbody>
       </table>
+    </div>
     </div>
     <details id="integratedRecordDetails" class="space-y-3" ontoggle="if(this.open)openIntegratedRecordDetails()">
       <summary class="card p-4 cursor-pointer font-bold">完整作業欄位與紀錄維護（新增／編輯）</summary>
@@ -919,82 +918,6 @@ body[data-p79-system="efficiency"] main{
     </div>
   </section>
     </details>
-  </section>
-  <section id="view-workload" class="hidden space-y-4">
-    <div class="card p-4 border-teal-200">
-      <div class="text-xs font-black text-teal-700">資料來源：已匯入船舶 WORKING REPORT 人員作業明細</div>
-      <h2 class="text-xl font-black mt-1">👤 個人作業量統計</h2>
-      <div class="text-sm text-slate-500 mt-1">選日期區間與司機姓名，依 WORKING REPORT 彙總個人櫃數。效率（含 H/C）＝（DISC＋LOAD＋H/C）÷ 原表作業時數；停工時間不重複扣除。下方另用全船所有司機、全部日期核對 WORKING SHEET，差額不會分攤到個人。</div>
-    </div>
-
-    <div class="card p-4">
-      <div class="grid grid-cols-1 lg:grid-cols-[minmax(300px,420px)_minmax(260px,1fr)_auto] gap-3 items-end">
-        <div>
-          <label class="text-xs font-bold">日期區間</label>
-          <div id="workloadDateRangeWrap">
-            <input id="workloadDateRangeInput" type="text" readonly class="block w-full border rounded-xl px-3 py-2 min-h-[42px]" placeholder="點一下選開始日期，再點一下選結束日期" onclick="openWorkloadDateRangePicker()">
-            <span class="range-calendar-icon">📅</span>
-          </div>
-          <input id="workloadStart" type="hidden">
-          <input id="workloadEnd" type="hidden">
-        </div>
-        <div>
-          <label class="text-xs font-bold">司機姓名（筆畫排序）</label>
-          <select id="personStatPerson" class="block w-full border rounded-xl px-3 py-2 bg-white min-h-[42px]" onchange="renderPersonStats()">
-            <option value="">請選擇司機姓名</option>
-          </select>
-        </div>
-        <button type="button" onclick="clearWorkloadFilters()" class="btn bg-slate-100 text-slate-700">清除篩選</button>
-      </div>
-      <div class="flex flex-wrap items-center gap-2 mt-2"><span id="workloadScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
-      <div id="workloadPersonMeta" class="mt-3 rounded-xl border bg-teal-50 px-3 py-2 text-sm text-teal-800">請先選擇司機姓名。</div>
-    </div>
-
-    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-      <div class="card p-4"><div class="text-xs text-slate-500">作業船數</div><div id="psVessels" class="text-2xl font-black">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="psCount" class="text-2xl font-black">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">作業時數</div><div id="psHours" class="text-2xl font-black">0.00</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">DISC</div><div id="psDisc" class="text-2xl font-black">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">LOAD</div><div id="psLoad" class="text-2xl font-black">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">H/C</div><div id="psHatches" class="text-2xl font-black">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">總櫃數</div><div id="psContainers" class="text-2xl font-black text-teal-700">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">效率（含 H/C）</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
-    </div>
-
-    <div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
-      <h2 class="font-black text-lg">全船司機櫃數核對 WORKING SHEET</h2>
-      <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
-      <div id="workloadSheetAuditState" class="mt-2 text-sm font-bold" role="status"></div>
-      <table class="tbl w-full min-w-[1200px] text-center">
-        <thead><tr><th>WORKING NO.</th><th>船名／航次</th><th>全船司機 DISC</th><th>全船司機 LOAD</th><th>司機櫃數合計</th><th>WORKING SHEET 請款櫃數</th><th>翻艙作業數</th><th>WORKING SHEET 作業 Moves</th><th>櫃數差額</th><th>H/C 明細／原表</th><th>核對結果</th></tr></thead>
-        <tbody id="workloadSheetAuditBody"></tbody>
-      </table>
-    </div>
-
-    <div class="card p-4 overflow-auto">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div>
-          <h2 class="font-black text-lg">🚢 各船作業統計</h2>
-          <div class="text-xs text-slate-500 mt-1">同一位司機在日期區間內做過的每一艘船分開統計。</div>
-        </div>
-        <div id="personVesselCount" class="pill bg-teal-50 text-teal-700">0 艘</div>
-      </div>
-      <table class="tbl w-full min-w-[1250px] text-center">
-        <thead><tr><th>作業日期</th><th>WORKING NO.</th><th>船名/航次</th><th>AQC#</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>總櫃數</th><th>效率</th></tr></thead>
-        <tbody id="personVesselBody"><tr><td colspan="11" class="text-center text-slate-400 p-5">請先選擇司機姓名</td></tr></tbody>
-      </table>
-    </div>
-
-    <div class="grid xl:grid-cols-[0.7fr_1.3fr] gap-4">
-      <div class="card p-4 overflow-auto">
-        <h2 class="font-black mb-3">⏱️ 作業時段統計</h2>
-        <table class="tbl w-full"><thead><tr><th>時段</th><th>筆數</th><th>時數</th><th>櫃數</th><th>H/C</th><th>效率</th></tr></thead><tbody id="personShiftBody"><tr><td colspan="6" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
-      </div>
-      <div class="card p-4 overflow-auto max-h-[70vh]">
-        <h2 class="font-black mb-3">📚 個人作業紀錄</h2>
-        <table class="tbl w-full min-w-[1250px]"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名/航次</th><th>排班 AQC 組別</th><th>AQC#</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead><tbody id="personRecordBody"><tr><td colspan="13" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
-      </div>
-    </div>
   </section>
 
 </main>
@@ -1306,6 +1229,8 @@ body[data-p79-system="efficiency"] main{
 
   <section id="view-weekly" class="hidden space-y-4">
     <div class="card p-4">
+      <h2 class="text-xl font-black mb-2">👥 人員作業統計</h2>
+      <p class="text-sm text-slate-500 mb-3">預設列出所有人員。選日期、組別或姓名，統一查看作業量、效率及逐筆紀錄；選「本周」即可查看每周效率。</p>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="min-w-[260px] max-w-[360px] flex-1">
           <label class="text-xs font-bold">日期區間</label>
@@ -1327,6 +1252,10 @@ body[data-p79-system="efficiency"] main{
           </details>
         </div>
         <button onclick="setCurrentWeek()" class="btn bg-slate-100 text-sm">本周</button>
+        <button onclick="clearWeeklyRange()" class="btn bg-slate-100 text-sm">全部日期</button>
+        <div><label class="text-xs font-bold">姓名（筆畫排序）</label><select id="personStatPerson" class="block w-full border rounded-xl px-3 py-2 bg-white min-h-[42px]" onchange="renderWeeklyEfficiency()">
+            <option value="">全部人員</option>
+          </select></div>
       </div>
     </div>
 
@@ -1338,7 +1267,7 @@ body[data-p79-system="efficiency"] main{
       <div class="card p-4"><div class="text-xs text-slate-500">平均效率</div><div id="wkEfficiency" class="text-2xl font-black">0.0</div></div>
     </div>
 
-    <div class="grid xl:grid-cols-2 gap-4">
+    <div class="space-y-4">
       <div class="card p-4 overflow-auto">
         <div class="font-black text-lg mb-3">🚢 期間船舶效率</div>
         <table class="tbl w-full min-w-[900px] text-center">
@@ -1354,7 +1283,7 @@ body[data-p79-system="efficiency"] main{
 
       <div class="card p-4 overflow-auto">
         <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
-          <div><div class="font-black text-lg">👤 期間人員效率</div><p class="text-xs text-slate-500 mt-1">組別依作業當月排班表 AQC；跨月變更組別會分列。未取得排班資料時不沿用手動分組。</p></div>
+          <div><div class="font-black text-lg">👤 人員作業量與效率</div><p class="text-xs text-slate-500 mt-1">組別依作業當月排班表 AQC；跨月變更組別會分列。未取得排班資料時不沿用手動分組。</p></div>
           <div class="flex flex-wrap items-end gap-2">
             <div>
               <label class="text-xs font-bold">組別篩選</label>
@@ -1376,7 +1305,7 @@ body[data-p79-system="efficiency"] main{
         <table class="tbl w-full min-w-[850px] text-center">
           <thead>
             <tr>
-              <th>排名</th><th>姓名</th><th>組別</th><th>作業筆數</th><th>時數</th>
+              <th>序號</th><th>姓名</th><th>組別</th><th>作業筆數</th><th>時數</th>
               <th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率</th>
             </tr>
           </thead>
@@ -1384,6 +1313,60 @@ body[data-p79-system="efficiency"] main{
         </table>
       </div>
     </div>
+    <div class="card p-4 overflow-auto">
+      <h3 class="text-lg font-black mb-2">所有人員作業紀錄</h3>
+      <div id="personnelRecordCount" class="text-sm text-slate-500 mb-3" role="status"></div>
+      <table class="tbl w-full min-w-[1500px] text-center"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
+    </div>
+<section id="view-workload" class="hidden space-y-4">
+    <input id="workloadStart" type="hidden"><input id="workloadEnd" type="hidden">
+    <div id="workloadPersonMeta" class="card p-4 font-bold"></div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div class="card p-4"><div class="text-xs text-slate-500">作業船數</div><div id="psVessels" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="psCount" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">作業時數</div><div id="psHours" class="text-2xl font-black">0.00</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">DISC</div><div id="psDisc" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">LOAD</div><div id="psLoad" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">H/C</div><div id="psHatches" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">總櫃數</div><div id="psContainers" class="text-2xl font-black text-teal-700">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">效率（含 H/C）</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
+    </div>
+
+    <div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
+      <h2 class="font-black text-lg">全船司機櫃數核對 WORKING SHEET</h2>
+      <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
+      <div id="workloadSheetAuditState" class="mt-2 text-sm font-bold" role="status"></div>
+      <table class="tbl w-full min-w-[1200px] text-center">
+        <thead><tr><th>WORKING NO.</th><th>船名／航次</th><th>全船司機 DISC</th><th>全船司機 LOAD</th><th>司機櫃數合計</th><th>WORKING SHEET 請款櫃數</th><th>翻艙作業數</th><th>WORKING SHEET 作業 Moves</th><th>櫃數差額</th><th>H/C 明細／原表</th><th>核對結果</th></tr></thead>
+        <tbody id="workloadSheetAuditBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card p-4 overflow-auto">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h2 class="font-black text-lg">🚢 各船作業統計</h2>
+          <div class="text-xs text-slate-500 mt-1">同一位司機在日期區間內做過的每一艘船分開統計。</div>
+        </div>
+        <div id="personVesselCount" class="pill bg-teal-50 text-teal-700">0 艘</div>
+      </div>
+      <table class="tbl w-full min-w-[1250px] text-center">
+        <thead><tr><th>作業日期</th><th>WORKING NO.</th><th>船名/航次</th><th>AQC#</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>總櫃數</th><th>效率</th></tr></thead>
+        <tbody id="personVesselBody"><tr><td colspan="11" class="text-center text-slate-400 p-5">請先選擇司機姓名</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="grid xl:grid-cols-[0.7fr_1.3fr] gap-4">
+      <div class="card p-4 overflow-auto">
+        <h2 class="font-black mb-3">⏱️ 作業時段統計</h2>
+        <table class="tbl w-full"><thead><tr><th>時段</th><th>筆數</th><th>時數</th><th>櫃數</th><th>H/C</th><th>效率</th></tr></thead><tbody id="personShiftBody"><tr><td colspan="6" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
+      </div>
+      <div class="card p-4 overflow-auto max-h-[70vh]">
+        <h2 class="font-black mb-3">📚 個人作業紀錄</h2>
+        <table class="tbl w-full min-w-[1250px]"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名/航次</th><th>排班 AQC 組別</th><th>AQC#</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead><tbody id="personRecordBody"><tr><td colspan="13" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
+      </div>
+    </div>
+  </section>
   </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
@@ -1876,8 +1859,8 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   }
   if(name==='weekly'){renderWeeklyEfficiency();return;}
 }
-function switchTab(name,btn){if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','compare','groups','personstats','workload','weekly'].forEach(x=>{
+function switchTab(name,btn){if(name==='workload'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
+  ['dashboard','compare','groups','personstats','weekly'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name);
   });
@@ -6121,7 +6104,7 @@ function populatePersonStatPeople(){
     if(!start&&!end)return true;
     return (idx.byPerson.get(p.key)||[]).some(r=>{const d=String(r?.workDate||'').slice(0,10);return d&&(!start||d>=start)&&(!end||d<=end)});
   });
-  sel.innerHTML='<option value="">請選擇司機姓名</option>'+arr.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('');
+  sel.innerHTML='<option value="">全部人員</option>'+arr.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('');
   if([...sel.options].some(o=>o.value===prev))sel.value=prev;
   else sel.value='';
 }
@@ -6270,7 +6253,7 @@ function renderPersonStats(){
   const meta=document.getElementById('workloadPersonMeta');
   const idx=buildWorkloadIndex();
   renderWorkloadSheetAudit(pid?workloadRowsInRange(idx.byPerson.get(pid)||[]):workloadImportedRows(),idx.rows);
-  let rs=pid?workloadRowsInRange(idx.byPerson.get(pid)||[]):[];
+  let rs=pid?(activeEfficiencyTabName()==='weekly'?weeklyFilteredRecords():workloadRowsInRange(idx.byPerson.get(pid)||[])):[];
   rs=[...rs].sort((a,b)=>`${b.workDate||''} ${b.startTime||''}`.localeCompare(`${a.workDate||''} ${a.startTime||''}`));
   ensureOperationScheduleGroups(rs);
 
@@ -6343,13 +6326,33 @@ function clearWeeklyRange(){
   document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
   renderWeeklyEfficiency();
 }
-function weeklyFilteredRecords(){
+function preparePersonnelFilters(){
+  const start=document.getElementById('weeklyStart')?.value||'',end=document.getElementById('weeklyEnd')?.value||'';
+  const from=document.getElementById('workloadStart'),to=document.getElementById('workloadEnd');
+  if(from)from.value=start;if(to)to.value=end;
+  populatePersonStatPeople();
+}
+function renderPersonnelRecords(rows){
+  const body=document.getElementById('personnelRecordBody');if(!body)return;
+  const ordered=[...rows].sort((a,b)=>String(b.workDate||'').localeCompare(String(a.workDate||''))||compareDriverNames(a.name,b.name)||String(a.startTime||'').localeCompare(String(b.startTime||'')));
+  body.innerHTML=ordered.map(r=>{const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.workingNo||'—')}</td><td>${esc(vesselLabelForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td class="font-bold">${m.containers}</td><td>${m.eff.toFixed(2)}</td></tr>`;}).join('')||'<tr><td colspan="14" class="p-5 text-slate-400">此條件沒有作業紀錄</td></tr>';
+  const count=document.getElementById('personnelRecordCount');if(count)count.textContent=`共 ${rows.length} 筆作業紀錄；與上方人員、船舶統計使用相同篩選條件。`;
+  const pid=document.getElementById('personStatPerson')?.value||'',detail=document.getElementById('view-workload');
+  if(detail)detail.classList.toggle('hidden',!pid);
+  if(pid)renderPersonStats();
+}
+function weeklyFilteredRecords(baseOnly=false){
   const start=document.getElementById('weeklyStart')?.value||'';
   const end=document.getElementById('weeklyEnd')?.value||'';
   const year=getPort79Year();
   return canonicalOperationalRecords((records||[]).filter(r=>{
     const d=String(r.workDate||'').trim();
-    if(!d)return false;
+    if(!d||String(r.source||'')!=='working-report')return false;
+    if(!baseOnly){
+      const pid=document.getElementById('personStatPerson')?.value||'',group=document.getElementById('weeklyGroupFilter')?.value||'';
+      if(pid&&!workloadRecordMatchesPerson(r,pid))return false;
+      if(group&&operationGroupForRecord(r)!==group)return false;
+    }
     if(year&&!d.startsWith(year))return false;
     if(start&&d<start)return false;
     if(end&&d>end)return false;
@@ -6358,7 +6361,7 @@ function weeklyFilteredRecords(){
 }
 
 function weeklyGroupNames(){
-  return [...new Set(weeklyFilteredRecords().map(operationGroupForRecord))].sort((a,b)=>a.localeCompare(b,'zh-Hant-u-co-stroke',{numeric:true}));
+  return [...new Set(weeklyFilteredRecords(true).map(operationGroupForRecord))].sort((a,b)=>a.localeCompare(b,'zh-Hant-u-co-stroke',{numeric:true}));
 }
 
 function refreshWeeklyGroupFilter(){
@@ -6393,17 +6396,18 @@ function setWeeklyGroupFilter(groupNameValue){
 
 function renderWeeklyEfficiency(){
   updateWeeklyDateRangeSummary();
+  preparePersonnelFilters();
+  ensureOperationScheduleGroups(weeklyFilteredRecords(true));
+  refreshWeeklyGroupFilter();
   const rs=weeklyFilteredRecords();
-  ensureOperationScheduleGroups(rs);
 
   const peopleMap=new Map();
   let totalHours=0,totalContainers=0,totalHC=0;
 
   rs.forEach(r=>{
-    const hours=effectiveHours(r);
-    const mv=recoveredMoveSplit(r);
-    const cont=(mv.disc+mv.load)>0?(mv.disc+mv.load):num(r.containers);
-    const hc=num(r.hatches);
+    const metric=workloadRecordMetrics(r),hours=metric.hours;
+    const mv={disc:metric.disc,load:metric.load};
+    const cont=metric.containers,hc=metric.hc;
 
     totalHours+=hours;
     totalContainers+=cont;
@@ -6411,14 +6415,14 @@ function renderWeeklyEfficiency(){
 
     const name=String(r.name||'').trim()||'未命名';
     const group=operationGroupForRecord(r);
-    const key=JSON.stringify([normalizePersonName(name)||name,group]);
+    const key=JSON.stringify([String(r.empId||'')||normalizePersonName(name)||name,group]);
     if(!peopleMap.has(key))peopleMap.set(key,{name,group,rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
     const p=peopleMap.get(key);
     p.rows.push(r);p.hours+=hours;p.disc+=mv.disc;p.load+=mv.load;p.hc+=hc;p.containers+=cont;
   });
 
   const wkPeople=document.getElementById('wkPeople');
-  if(wkPeople)wkPeople.textContent=new Set(rs.map(r=>normalizePersonName(r.name))).size;
+  if(wkPeople)wkPeople.textContent=new Set(rs.map(r=>String(r.empId||'')||normalizePersonName(r.name))).size;
   const wkHours=document.getElementById('wkHours');
   if(wkHours)wkHours.textContent=totalHours.toFixed(1);
   const wkContainers=document.getElementById('wkContainers');
@@ -6479,9 +6483,7 @@ function renderWeeklyEfficiency(){
   const filteredPersons=persons
     .filter(p=>!selectedGroup || p.group===selectedGroup)
     .sort((a,b)=>{
-      if(b.eff!==a.eff)return b.eff-a.eff;
-      if(b.containers!==a.containers)return b.containers-a.containers;
-      return String(a.name).localeCompare(String(b.name),'zh-Hant');
+      return compareDriverNames(a.name,b.name)||compareDriverNames(a.group,b.group);
     });
 
   const personBody=document.getElementById('weeklyPersonBody');
@@ -6509,6 +6511,7 @@ function renderWeeklyEfficiency(){
       </tr>`).join('');
     }
   }
+  renderPersonnelRecords(rs);
 }
 
 function renderAll(){
