@@ -616,9 +616,9 @@ body.attendance-drawer-open{overflow:hidden}
 .attendance-records-wide-table{min-width:2016px!important}
 .attendance-records-wide-table th,
 .attendance-records-wide-table td{width:calc(100% / 12)!important;padding:12px 10px!important;box-sizing:border-box!important}
-.attendance-records-wide-table td:nth-child(7),
-.attendance-records-wide-table td:nth-child(8){font-size:11px!important}
-.attendance-records-wide-table td:nth-child(9){border-left:1px solid #e2e8f0}
+.attendance-records-wide-table td:nth-child(8),
+.attendance-records-wide-table td:nth-child(9){font-size:11px!important}
+.attendance-records-wide-table td:nth-child(10){border-left:1px solid #e2e8f0}
 
 </style>
 
@@ -922,14 +922,14 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:9%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:9%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:7%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:12%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:12%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:7%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:10%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:5%!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:12%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:7%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:8%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:10%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(13){width:5%!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9){font-size:12px!important;white-space:nowrap!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9)>*{margin-left:auto!important;margin-right:auto!important}
 </style>
 <style id="p79-attendance-single-line-toolbar">
 #attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
@@ -937,6 +937,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 #attendanceRecordsToolbar [aria-label="異常顏色圖例"],#attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center;gap:4px;white-space:nowrap!important}
 #attendanceRecordsToolbar button,#attendanceRecordsToolbar select,#attendanceRecordsToolbar span{white-space:nowrap!important;flex-shrink:0}
 </style>
+<style id="p79-attendance-roster-group-column">#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:5%!important;min-width:64px!important;white-space:nowrap!important;text-align:center!important;color:#147d72;font-weight:700}</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="port79-employee-only bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="attendance">
@@ -1288,6 +1289,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                                 <th class="px-2 py-3 text-center whitespace-nowrap">部門</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">單位</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">職務</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap">組別</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">上班簽到時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">下班簽退時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">加班時數</th>
@@ -14723,10 +14725,35 @@ function getManualPairRecordAnchor(record) {
                 if(!data.ok)throw new Error(data.error||'班表讀取失敗');
                 if(p79AttendanceOvertimeMonths.get(month)!==state || getAttendanceEmployeeMasterToken()!==token)return;
                 state.rows=Array.isArray(data.schedules)?data.schedules:[];
+                state.people=Array.isArray(data.employees)?data.employees:[];
                 state.covers=Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[];
                 state.ready=true;state.pending=false;
                 renderAdminRecordsTable();
               }).catch(()=>{state.pending=false;}).finally(()=>clearTimeout(timer));
+        }
+        function p79AttendanceRosterGroup(row,employee){
+            const month=p79AttendanceOvertimeDate(row).slice(0,7);
+            p79LoadAttendanceOvertimeMonth(month);
+            const state=p79AttendanceOvertimeMonths.get(month),token=getAttendanceEmployeeMasterToken();
+            if(!token||!state?.ready||state.token!==token)return '';
+            const id=String(employee?.empId||row?.empId||'').trim().toUpperCase();
+            if(!id)return '';
+            const meaningful=value=>{
+                const text=String(value??'').trim();
+                if(!text||/^(?:不分組|未分組|無分組|無|未設定|不輪班|—|--|-|none|null|undefined)$/i.test(text))return '';
+                return /^[a-z](?:組)?$/i.test(text)?text[0].toUpperCase()+'組':text;
+            };
+            const rows=state.rows.filter(r=>String(r.empId||'').trim().toUpperCase()===id&&(!r.month||r.month===month));
+            const groups=rows.map(r=>{
+                const personnel=r.schedule?.__personnel||{};
+                if(Object.prototype.hasOwnProperty.call(personnel,'group'))return meaningful(personnel.group);
+                if(Object.prototype.hasOwnProperty.call(r,'group'))return meaningful(r.group);
+                return undefined;
+            }).filter(g=>g!==undefined);
+            if(groups.length)return new Set(groups).size===1?groups[0]:'';
+            // 只有該月服務回傳的人員資料可備援，不拿現有人資組別套歷史月份。
+            const person=(state.people||[]).find(e=>String(e.empId||e.id||'').trim().toUpperCase()===id);
+            return meaningful(person?.group);
         }
         function p79AttendanceReportedOvertime(row,state) {
             const date=p79AttendanceOvertimeDate(row), id=String(row?.empId||'').trim().toUpperCase();
@@ -15329,7 +15356,7 @@ function getManualPairRecordAnchor(record) {
             renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount, rowPageInfo);
 
             if (dailyRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
                 return;
             }
 
@@ -15404,6 +15431,7 @@ function getManualPairRecordAnchor(record) {
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayDept}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${escapeHtml(p79AttendanceRosterGroup(row,displayEmp))}</td>
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
