@@ -1,0 +1,28 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const pages=['attendance/index.html','work-hours/index.html'].map(p=>fs.readFileSync(p,'utf8'));
+function fn(html,name){const start=html.indexOf('        function '+name+'(');assert(start>=0,name);return html.slice(start,html.indexOf('\n        }',start)+10)}
+let passed=0;function test(n,run){run();passed++;console.log('PASS '+n)}
+for(let i=0;i<pages.length;i++){
+ const c={Date,Number,String,decodeLegacyAttendanceExcelText:v=>v,XLSX:{utils:{decode_range:()=>({s:{r:3,c:2}}),encode_cell:({r,c})=>r+','+c},SSF:{parse_date_code:()=>({y:2026,m:10,d:9,H:7,M:40})}}};vm.createContext(c);for(const name of ['normalizeImportedAttendanceTime','getAttendanceImportTimeValue'])vm.runInContext(fn(pages[i],name),c);
+ test(i+' date-only and unrecognized time cannot silently become midnight',()=>{for(const raw of ['2026/10/09','115/10/09','2026/10/09 unknown','2026/10/09 99:00','2026/10/09 07:60','2026/10/09 07:30:65'])assert.equal(c.normalizeImportedAttendanceTime(raw),'')});
+ test(i+' explicit midnight and normal seconds are preserved',()=>{assert.equal(c.normalizeImportedAttendanceTime('2026/10/09 00:00'),'2026/10/09 00:00');assert.equal(c.normalizeImportedAttendanceTime('2026/10/09 07:40:12'),'2026/10/09 07:40')});
+ test(i+' Chinese AM/PM and ROC year retain the real hour',()=>{assert.equal(c.normalizeImportedAttendanceTime('115/10/09 上午 7:40'),'2026/10/09 07:40');assert.equal(c.normalizeImportedAttendanceTime('2026/10/09 下午 3:45'),'2026/10/09 15:45');assert.equal(c.normalizeImportedAttendanceTime('2026/10/09 12:00 AM'),'2026/10/09 00:00')});
+ test(i+' raw Excel Date defeats a date-only display format with range offsets',()=>{const sheet={'!ref':'C4:H20','8,4':{v:new Date(2026,9,9,7,40)}};const value=c.getAttendanceImportTimeValue(sheet,5,2,'2026/10/09');assert.equal(c.normalizeImportedAttendanceTime(value),'2026/10/09 07:40');assert.equal(c.getAttendanceImportTimeValue(sheet,5,3,'2026/10/09'),'2026/10/09')});
+ test(i+' raw numeric Excel timestamp is retained',()=>{const sheet={'!ref':'C4:H20','8,4':{v:46304.31944}};assert.equal(c.normalizeImportedAttendanceTime(c.getAttendanceImportTimeValue(sheet,5,2,'2026/10/09')),'2026/10/09 07:40')});
+ test(i+' import calls the raw-cell reader, not just formatted text',()=>assert(pages[i].includes('getAttendanceImportTimeValue(sheet,headerRowIndex+1+rowOffset,indexes.time,valueAt(indexes.time))')));
+ test(i+' all inline scripts parse',()=>{for(const m of pages[i].matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1])});
+}
+const c={Date,Number,String};vm.createContext(c);vm.runInContext(fn(pages[1],'p79OvertimeAttendanceIssue'),c);
+const row=(a,b)=>({clockIn:{timeStr:'2026/10/09 '+a},clockOut:{timeStr:'2026/10/09 '+b}});
+function issue(r,hours){return c.p79OvertimeAttendanceIssue(r,0,hours*3600000)}
+test('screenshot midnight-to-afternoon and midnight-to-night cases are flagged',()=>{assert(issue(row('00:00','15:58'),15+58/60));assert(issue(row('00:00','23:46'),23+46/60))});
+test('real midnight night shift remains valid',()=>assert.equal(issue(row('00:00','07:50'),7+50/60),''));
+test('cross-day night shift and normal 12-hour shift remain valid',()=>{const r=row('19:36','07:50');r.clockOut.timeStr='2026/10/10 07:50';assert.equal(issue(r,12+14/60),'');assert.equal(issue(row('07:40','19:40'),12),'')});
+test('manually confirmed midnight up to 18 hours is not guessed away',()=>{const r=row('00:00','15:58');r.clockIn.manuallyEdited=true;assert.equal(issue(r,15+58/60),'')});
+test('review assessment never changes original punches',()=>{const r=row('00:00','23:46'),before=JSON.stringify(r);issue(r,23+46/60);assert.equal(JSON.stringify(r),before)});
+// Exercise the actual statistics function: suspicious attendance remains visible but has no automatic overtime.
+const h=pages[1],employee={empId:'E1',attNo:'1',name:'Synthetic'};let session=row('00:00','23:46');Object.assign(session,{empId:'E1',dateKey:'2026/10/09',sortTime:1});
+Object.assign(c,{Map,Set,JSON,Math,employees:[employee],records:[session.clockIn,session.clockOut],p79WorkhoursEligibleEmployees:()=>[employee],normalizeAttendanceStatsAttNo:String,canCurrentAdminViewEmployee:()=>true,normalizeAdminIds:()=>[],sysConfig:{adminIds:[]},isAdminLoggedIn:true,isCurrentViewerSuperAdmin:()=>true,p79LoadWorkOvertimeMonths(){},schedules:[],p79WorkOvertimeMonths:new Map(),p79MergeWorkOvertimeSnapshot(){},normalizeScheduleDateKey:s=>s.replaceAll('/','-'),normalizeEmployeeLookupName:String,p79EmployeeDateEligible:()=>true,P79Overtime:{matchReport:()=>({meta:null,minutes:null,date:'2026-10-09'})},getAttendanceTimestamp:r=>Date.parse(r.timeStr.replaceAll('/','-').replace(' ','T')),buildDailyAttendanceRows:()=>[session],MIN_OVERTIME_MINUTES:30});c.records.forEach(r=>r.empId='E1');vm.runInContext('let p79OvertimeCalculationCache=null;',c);vm.runInContext(fn(h,'buildOvertimeStatisticsRows'),c);
+test('old suspicious rows stay visible and contribute zero automatically estimated overtime',()=>{const a=c.buildOvertimeStatisticsRows();assert.equal(a.length,1);assert(a[0].timeCheckRequired);assert.equal(a[0].overtimeMinutes,0)});
+test('existing declared overtime is preserved and visibly marked for review',()=>{c.records[0].manuallyEdited=false;c.P79Overtime.matchReport=()=>({meta:{overtimeReport:{declaredHours:4}},minutes:240,date:'2026-10-09'});vm.runInContext('p79OvertimeCalculationCache=null;',c);const a=c.buildOvertimeStatisticsRows()[0];assert.equal(a.overtimeMinutes,240);assert(a.timeCheckRequired)});
+console.log(JSON.stringify({passed,failed:0}));
