@@ -10742,6 +10742,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return '晚班';
         }
 
+        function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
+            const raw=getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
+            if(!clockIn)return raw; // An OUT without its IN cannot establish a shift date.
+            const ts=getAttendanceTimestamp(clockIn);if(!ts)return raw;
+            const date=new Date(ts),hour=date.getHours()+date.getMinutes()/60;
+            if(hour>=8)return raw;
+            const scheduled=getScheduleShiftLabelForPunch(emp,clockIn.timeStr);
+            const completed=clockOut?inferShiftFromCompletedSession(clockIn,clockOut,emp):'';
+            // Preserve early arrivals for the morning shift; midnight night shifts belong to yesterday.
+            const night=scheduled==='晚班'||(!scheduled&&(completed==='晚班'||(!completed&&hour<5)));
+            if(!night)return raw;
+            date.setDate(date.getDate()-1);
+            return getAttendanceDateKey(date.getFullYear()+'/'+String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'));
+        }
+
         function inferShiftFromCompletedSession(clockInRecord, clockOutRecord, emp = currentEmp) {
             if (!clockInRecord || !clockOutRecord) return '';
 
@@ -13885,12 +13900,10 @@ function getManualPairRecordAnchor(record) {
                         '',
                     key: `${String(g.attNo || g.empId || g.name)}__${baseTime}__${index}`,
                     dateKey: getAttendanceDateKey(baseTime),
-                    // v2026.10.03.16.60：完整跨日班次以上班簽到日歸屬。
-                    accountingDateKey: getAttendanceDateKey(
-                        g.clockIn?.timeStr || baseTime || g.clockOut?.timeStr
-                    ),
+                    // 夜班凌晨簽到仍歸前一工作日，原始打卡時間不變。
+                    accountingDateKey: p79AttendanceSessionWorkDate(g.clockIn,g.clockOut,currentEmployee),
                     accountingMonthKey: (() => {
-                        const source = g.clockIn?.timeStr || baseTime || g.clockOut?.timeStr;
+                        const source = p79AttendanceSessionWorkDate(g.clockIn,g.clockOut,currentEmployee);
                         const m = String(source || '').match(/^(\d{4})[\/-](\d{1,2})/);
                         return m ? `${m[1]}-${String(m[2]).padStart(2,'0')}` : '';
                     })(),
@@ -14425,8 +14438,8 @@ function getManualPairRecordAnchor(record) {
         function p79AttendanceScheduleAssessment(row){
             const timestamp=getAttendanceTimestamp(row.clockIn);
             const date=new Date(timestamp), dates=[scheduleDateKey(date)];
-            // 晚班可在前一晚 22:00 後提早簽到；班表仍以凌晨所在日查詢。
-            if(date.getHours()>=22){const next=new Date(date);next.setDate(next.getDate()+1);dates.push(scheduleDateKey(next));}
+            // 晚班以起始工作日記載，18 日凌晨查 17 日晚班（17 日 24:00）。
+            if(date.getHours()<8){const previous=new Date(date);previous.setDate(previous.getDate()-1);dates.push(scheduleDateKey(previous));}
             const states=dates.map(day=>{
                 const month=day.slice(0,7);p79LoadAttendanceOvertimeMonth(month);
                 return p79AttendanceOvertimeMonths.get(month);
@@ -14442,7 +14455,7 @@ function getManualPairRecordAnchor(record) {
                 const cover=state.covers.find(a=>day>=a.startDate && day<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
                 const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
                 const shift=['早','中','晚'].includes(code)?code:target[day];
-                const hours={早:8,中:16,晚:0};
+                const hours={早:8,中:16,晚:24};
                 let hour=hours[shift];
                 if(cover?.mode==='two' && hour!==undefined && !meta.overtimeStart){
                     const worker=cover.workerIds.findIndex(x=>String(x).trim().toUpperCase()===id);
@@ -15204,8 +15217,8 @@ function getManualPairRecordAnchor(record) {
             const key=String(row?.accountingDateKey||row?.dateKey||'').replaceAll('/','-');
             if(!/^\d{4}-\d{2}-\d{2}$/.test(key))return '--';
             const actual=String(row?.actualDateKey||getAttendanceDateKey(row?.clockIn?.timeStr||row?.clockOut?.timeStr||'')).replaceAll('/','-');
-            const adjusted=!!row?.clockIn&&!!row?.clockOut&&actual&&key!==actual;
-            return '<span class="block font-bold '+(adjusted?'text-blue-800 dark:text-blue-200':'text-slate-700 dark:text-slate-200')+'">'+escapeHtml(key.replaceAll('-','/'))+'</span>'+(adjusted?'<span class="inline-flex rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200" title="依完整班次歸屬前一工作日；簽到與簽退欄保留實際打卡時間">凌晨歸前日</span>':'');
+            const adjusted=!!row?.clockIn&&actual&&key!==actual;
+            return '<span class="block font-bold '+(adjusted?'text-blue-800 dark:text-blue-200':'text-slate-700 dark:text-slate-200')+'">'+escapeHtml(key.replaceAll('-','/'))+'</span>'+(adjusted?'<span class="inline-flex rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200" title="依晚班歸屬前一工作日；簽到與簽退欄保留實際打卡時間">凌晨歸前日</span>':'');
         }
         function renderAdminRecordsTable() {
             const tbody = document.getElementById('adminRecordsTableBody');

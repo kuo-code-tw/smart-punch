@@ -2873,6 +2873,45 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       }
     }
 
+    function scheduleNightRosterDate(now=new Date()) {
+      const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const p={};parts.forEach(x=>p[x.type]=x.value);
+      const date=new Date(Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day)-(Number(p.hour)<8?1:0)));
+      return date.toISOString().slice(0,10);
+    }
+    let p79NightRosterSnapshot=null;
+    let p79NightRosterReadBusy=false;
+    function scheduleNightRosterSource(dateKey) {
+      if(dateKey.slice(0,7)===currentScheduleMonthKey())return {data:monthlyScheduleData,meta:monthlyScheduleMeta};
+      const snapshot=p79NightRosterSnapshot;
+      if(snapshot?.month===dateKey.slice(0,7)&&snapshot.token===currentPort79SsoToken()&&Date.now()-snapshot.at<90000)return snapshot;
+      return null;
+    }
+    async function refreshNightRosterSnapshot() {
+      const dateKey=scheduleNightRosterDate(),month=dateKey.slice(0,7),token=currentPort79SsoToken();
+      if(month===currentScheduleMonthKey()||!token||p79NightRosterReadBusy)return;
+      const old=p79NightRosterSnapshot;
+      if(old?.month===month&&old.token===token&&Date.now()-old.at<30000)return;
+      p79NightRosterReadBusy=true;
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+      try {
+        const response=await fetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',signal:controller.signal});
+        const result=await response.json();
+        if(!response.ok||!result.ok||!Array.isArray(result.schedules))throw new Error('前一日班表未完成讀取');
+        if(token!==currentPort79SsoToken())return;
+        const data={},meta={};
+        result.schedules.forEach(row=>{
+          if(String(row.month||'')!==month)return;
+          const id=String(row.empId||'').trim().toUpperCase();if(!id)return;
+          data[id]=Object.assign({},row.schedule||{});meta[id]=data[id].__meta||{};
+        });
+        // Separate read-only snapshot: never replace the month being edited.
+        p79NightRosterSnapshot={month,token,at:Date.now(),data,meta};
+        renderTodaySchedulePanel();
+      } catch(error) {console.warn('跨日晚班班表讀取失敗，暫不顯示未核對名單',error);}
+      finally {clearTimeout(timer);p79NightRosterReadBusy=false;}
+    }
+
     let todayScheduleExpanded = false;
     function toggleTodayScheduleDetail() {
       todayScheduleExpanded = !todayScheduleExpanded;
@@ -2894,6 +2933,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     function renderTodaySchedulePanel() {
       const dateKey=scheduleTaipeiTodayKey();
+      const nightDateKey=scheduleNightRosterDate();
+      const nightSource=scheduleNightRosterSource(nightDateKey);
       const dateEl=document.getElementById('todayScheduleDate');
       const summaryEl=document.getElementById('todayScheduleSummary');
       const countsEl=document.getElementById('todayScheduleCounts');
@@ -2915,7 +2956,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         const meta=monthlyScheduleMeta?.[emp.id]?.[dateKey]||{};
         const approvedLeave=approvedLeaveForEmployee(emp?.id,dateKey,emp?.name);
         const item={
-          emp,shift,meta,
+          emp,shift,meta,dateKey,
           leave:approvedLeave,
           leaveLabel:scheduleRosterLeaveLabel(shift,approvedLeave)
         };
@@ -2927,9 +2968,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           groups.早.push(item);
         }else if(shift==='中'){
           groups.中.push(item);
-        }else if(shift==='晚'){
+        }else if(shift==='晚'&&nightDateKey===dateKey){
           groups.晚.push(item);
-        }else if(shift){
+        }else if(shift&&shift!=='晚'){
           groups.其他.push(item);
         }
 
@@ -2937,6 +2978,18 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           groups.加班代班.push(item);
         }
       });
+      if(nightDateKey!==dateKey&&nightSource){
+        (employees||[]).forEach(emp=>{
+          if(/主任|課長|副理|經理|協理|處長|部長|總監|副總|總經理|董事長|執行長|廠長/.test(String(emp.role||emp.jobTitle||'')))return;
+          if(String(nightSource.data?.[emp.id]?.[nightDateKey]||'').trim()!=='晚')return;
+          if(approvedLeaveForEmployee(emp.id,nightDateKey,emp.name))return;
+          const meta=nightSource.meta?.[emp.id]?.[nightDateKey]||{};
+          const personnel=nightSource.data?.[emp.id]?.__personnel;
+          const nightEmp=personnel?{...emp,role:personnel.role||emp.role,group:personnel.group||emp.group}:emp;
+          groups.晚.push({emp:nightEmp,shift:'晚',meta,dateKey:nightDateKey});
+        });
+      }
+
 
       const roleOrder=['領班','指揮手','AQC','ARMG','F/L','課長','主任','副理'];
       const roleRank=r=>{const i=roleOrder.indexOf(String(r||''));return i<0?99:i;};
@@ -2954,7 +3007,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const leaveCount=groups.休假.length;
 
       summaryEl.textContent=
-        `今日排班 ${totalScheduled} 人｜早班 ${groups.早.length}｜中班 ${groups.中.length}｜晚班 ${groups.晚.length}｜休假 ${leaveCount}`+
+        `班表人員 ${totalScheduled} 人｜早班 ${groups.早.length}｜中班 ${groups.中.length}｜晚班（${nightDateKey.slice(5).replace("-","/")}）${nightSource?groups.晚.length:"待讀取"}｜休假 ${leaveCount}`+
         (groups.加班代班.length?`｜加班／代班 ${groups.加班代班.length}`:'');
 
       // V10.22：上方「今日休假」整列取消，休假人員只在下方休假區顯示。
@@ -2964,10 +3017,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       }
 
       const countCards=[
-        ['今日排班',totalScheduled,'bg-indigo-50 text-indigo-700 border-indigo-200'],
+        ['班表人員',totalScheduled,'bg-indigo-50 text-indigo-700 border-indigo-200'],
         ['早班',groups.早.length,'bg-emerald-50 text-emerald-700 border-emerald-200'],
         ['中班',groups.中.length,'bg-amber-50 text-amber-700 border-amber-200'],
-        ['晚班',groups.晚.length,'bg-purple-50 text-purple-700 border-purple-200'],
+        ['晚班 '+nightDateKey.slice(5).replace('-','/'),nightSource?groups.晚.length:'待讀取','bg-purple-50 text-purple-700 border-purple-200'],
         ['休假',leaveCount,'bg-rose-50 text-rose-700 border-rose-200'],
         ['加班／代班',groups.加班代班.length,'bg-sky-50 text-sky-700 border-sky-200']
       ];
@@ -2984,7 +3037,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         const leaveBadge=isLeave
           ? `<span class="today-leave-pill ${scheduleLeavePillClass(x.leaveLabel)}">${scheduleEscapeHtml(x.leaveLabel)}</span>`
           : '';
-        const activeBadge=scheduleDutyBadge(x.shift,x.emp?.id);
+        const activeBadge=scheduleDutyBadge(x.shift,x.emp?.id,true,x.dateKey);
 
         return `<div class="today-person-row" title="${scheduleEscapeHtml(x.emp?.name||'')}｜${scheduleEscapeHtml(x.emp?.role||'')}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}">
           <div class="today-person-name">
@@ -3018,7 +3071,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const blocks=[
         block('早班',groups.早,'text-emerald-700','fa-sun'),
         block('中班',groups.中,'text-amber-700','fa-cloud-sun'),
-        block('晚班',groups.晚,'text-purple-700','fa-moon'),
+        block('晚班 · '+nightDateKey.replace(/-/g,'/')+(nightDateKey!==dateKey?'（前一日跨日）':''),groups.晚,'text-purple-700','fa-moon')+(nightSource?'':'<div class="text-amber-700 text-sm">尚未讀取此日期班表，暫不顯示晚班名單</div>'),
         block('休假',groups.休假,'text-rose-700','fa-umbrella-beach')
       ];
       if(groups.其他.length)blocks.push(block('其他排班',groups.其他,'text-indigo-700','fa-user-clock'));
@@ -3063,6 +3116,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if (!isGasUrlConfigured()) { setScheduleAttendanceLiveStatus('error', '考勤燈號未同步：未設定正式 GAS'); return false; }
       const token = currentPort79SsoToken();
       if (!token) { p79ScheduleAttendanceAuthExpired=true; setScheduleAttendanceLiveStatus('error', '考勤燈號暫停同步：登入驗證遺失，請重新登入'); return false; }
+      p79RefreshScheduleDutyPeriod();
+      refreshNightRosterSnapshot();
       p79ScheduleAttendanceStateBusy = true;
       if (!p79ScheduleAttendanceHasSynced) setScheduleAttendanceLiveStatus('loading', '考勤燈號：向正式雲端讀取中…');
       try {
@@ -4524,13 +4579,16 @@ function p79EmployeeDateEligible(emp,date) {
       const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
       return hour<8?'晚':hour<16?'早':'中';
     }
-    function scheduleDutyBadge(shift,empId,includeCheckIn=true){
+    function scheduleDutyBadge(shift,empId,includeCheckIn=true,dateKey=scheduleTaipeiTodayKey()){
       if(!isScheduleEmployeeClockedIn(empId))return '';
-      return '<span class="today-attendance-active" title="雲端最新打卡為上班簽到，尚未簽退"><span class="today-attendance-active-dot"></span>當班</span>'+(includeCheckIn?' <span class="today-person-badge bg-sky-100 text-sky-800">已簽到</span>':'');
+      const dutyDate=scheduleNightRosterDate();
+      if(shift&&dateKey!==dutyDate)return '';
+      if(shift&&scheduleTaipeiDutyShift()==='晚'&&shift!=='晚')return '';
+      return '<span class="today-attendance-active" title="雲端最新打卡為上班簽到，尚未簽退；凌晨晚班歸屬前一日"><span class="today-attendance-active-dot"></span>當班</span>'+(includeCheckIn?' <span class="today-person-badge bg-sky-100 text-sky-800">已簽到</span>':'');
     }
     let p79ScheduleRenderedDutyShift='';
     function p79RefreshScheduleDutyPeriod(){
-      const next=scheduleTaipeiDutyShift();if(next===p79ScheduleRenderedDutyShift)return;
+      const next=scheduleTaipeiTodayKey()+'|'+scheduleNightRosterDate()+'|'+scheduleTaipeiDutyShift();if(next===p79ScheduleRenderedDutyShift)return;
       p79ScheduleRenderedDutyShift=next;renderTodaySchedulePanel();try{renderRoleScheduleView();}catch(ignore){}
     }
     function isScheduleEmployeeClockedIn(empId) {
@@ -5714,7 +5772,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       queueScheduleEditRender(320);
 
       // 只有真的修改今天班別時才更新今日排班；其他日期不用多做一次全員統計。
-      if (dayStr === scheduleTaipeiTodayKey()) {
+      if (dayStr === scheduleTaipeiTodayKey() || dayStr === scheduleNightRosterDate()) {
         try { renderTodaySchedulePanel(); } catch (e) {}
       }
     }
