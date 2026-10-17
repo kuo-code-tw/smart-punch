@@ -532,12 +532,15 @@ body[data-p79-system="efficiency"] main{
 @media(max-width:640px){#view-dashboard #p79EfficiencyCumulative>.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-dashboard #p79EfficiencyCumulative>.grid>div{padding:5px 6px!important;gap:2px 4px}#view-dashboard #p79EfficiencyCumulative>.grid>div>.text-2xl{font-size:17px!important}}
 </style>
 <style id="p79-driver-record-alignment">#personRecordBody td,#personRecordBody th,#view-workload table:has(#personRecordBody) th,#driverVesselBody td,#driverVesselRecordBody td,#view-personstats th{text-align:center!important;vertical-align:middle!important}</style>
-<style id="p79-collapsible-style">
-.p79-collapsible{border:1px solid #cbd5e1;border-radius:16px;background:#fff;min-width:0}
-.p79-collapsible>summary{display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px 16px;font-weight:900;color:#334155;list-style:none;border-radius:16px;background:#f1f5f9}
-.p79-collapsible>summary::-webkit-details-marker{display:none}.p79-collapsible>summary:before{content:'▶';font-size:12px}.p79-collapsible[open]>summary:before{content:'▼'}
-.p79-collapsible>summary:focus-visible{outline:3px solid #6366f1;outline-offset:2px}.p79-collapse-hint{margin-left:auto;font-size:12px;font-weight:400;white-space:nowrap}.p79-collapse-hint:after{content:'展開'}.p79-collapsible[open] .p79-collapse-hint:after{content:'收合'}
-.p79-collapsible[open]>summary{margin-bottom:8px}.p79-collapse-toolbar{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.p79-collapsible>.grid{padding:8px}
+<style id="p79-vessel-detail-readable-columns">
+#vesselDetailDialog{width:min(1600px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px)!important}
+#vesselDetailTable{table-layout:fixed!important;width:100%!important;min-width:1706px!important}
+#vesselDetailTable th,#vesselDetailTable td{padding:11px 10px!important;line-height:1.5!important;white-space:nowrap!important;word-break:keep-all!important;vertical-align:middle!important}
+#vesselDetailTable th:nth-child(8),#vesselDetailTable td:nth-child(8),#vesselDetailTable th:nth-child(16),#vesselDetailTable td:nth-child(16){white-space:normal!important;word-break:normal!important;overflow-wrap:anywhere}
+#vesselDetailTableWrap{overflow:auto;scrollbar-gutter:stable}
+</style>
+<style id="p79-open-section-style">
+.p79-section{min-width:0}.p79-section>div:first-child{font-weight:900;color:#334155;padding:12px 16px;background:#f1f5f9;border-radius:14px;margin-bottom:8px}
 </style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
@@ -796,8 +799,7 @@ body[data-p79-system="efficiency"] main{
   </section>
 
   <section id="view-personstats" class="hidden space-y-4">
-    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="close">全部收合</button></div>
-    <details class="p79-collapsible" data-collapse-key="view-personstats-1" open><summary><span>司機作業</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-personstats-1"><div><span>司機作業</span></div>
 <div class="card p-4">
             <p class="text-sm text-slate-500 mt-2">選船舶與姓名，即可查看司機的作業時間、櫃數與效率。</p>
       <div class="flex flex-wrap items-end gap-3 mt-3">
@@ -811,22 +813,22 @@ body[data-p79-system="efficiency"] main{
 
       </div>
       <div id="driverVesselLoadState" class="mt-2 text-xs" role="status"></div>
-      <details class="mt-3 rounded-xl border p-3"><summary class="cursor-pointer text-sm text-slate-600">更多篩選與資料狀態</summary><div class="flex flex-wrap gap-3 items-end mt-3">        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">重新讀取資料</button></div>
+      <div class="mt-3 rounded-xl border p-3"><div class="text-sm text-slate-600">篩選與資料狀態</div><div class="flex flex-wrap gap-3 items-end mt-3">        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">重新讀取資料</button></div>
       <div id="driverVesselSourceState" class="mt-2 text-xs" role="status"></div>
       <div class="flex flex-wrap items-center gap-2 mt-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取組別</button></div>
-      <p class="text-xs text-slate-500 mt-2">組別取自作業當月排班表。效率＝（櫃數＋H/C）÷ 時數。</p></details>
+      <p class="text-xs text-slate-500 mt-2">組別取自作業當月排班表。效率＝（櫃數＋H/C）÷ 時數。</p></div>
       <div class="overflow-auto mt-4">
       <table class="tbl w-full min-w-[920px] text-center">
-        <thead><tr><th>日期</th><th>姓名</th><th>組別</th><th>AQC</th><th>作業時間</th><th>時數</th><th>櫃數（可展開）</th><th>效率</th></tr></thead>
+        <thead><tr><th>日期</th><th>姓名</th><th>組別</th><th>AQC</th><th>作業時間</th><th>時數</th><th>櫃數</th><th>效率</th></tr></thead>
         <tbody id="driverVesselRecordBody"></tbody>
       </table>
     </div>
     </div>
-</details>
-    <details id="integratedRecordDetails" class="space-y-3" ontoggle="if(this.open)openIntegratedRecordDetails()">
-      <summary class="card p-4 cursor-pointer font-bold">進階維護（新增／修改紀錄）</summary>
+</div>
+    <div id="integratedRecordDetails" class="space-y-3">
+      <div class="card p-4 font-bold">進階維護（新增／修改紀錄）</div>
   <section id="view-records" class="space-y-4">
-    <details class="p79-collapsible" data-collapse-key="view-records-1" open><summary><span>完整明細篩選與操作</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-records-1"><div><span>完整明細篩選與操作</span></div>
 <div class="card p-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-end">
         <button onclick="openRecordDialog()" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button>
@@ -917,24 +919,23 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
-</details>
-    <details class="p79-collapsible" data-collapse-key="view-records-2" open><summary><span>完整作業紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+</div>
+    <div class="p79-section" data-section-key="view-records-2"><div><span>完整作業紀錄</span></div>
 <div class="card p-4 overflow-auto max-h-[70vh]">
       <table class="tbl w-full min-w-[1580px] text-center">
         <thead><tr><th>組別</th><th>司機</th><th>AQC#</th><th>船名/航次</th><th>日期</th><th>TFC CODE-I</th><th>TFC CODE-E</th><th>開始</th><th>結束</th><th>DISC</th><th>LOAD</th><th>Bundle</th><th>H/C</th><th>Time</th><th>GPH</th><th>停工時間</th><th>停工內容</th><th>操作</th></tr></thead>
         <tbody id="recordBody"></tbody>
       </table>
     </div>
-</details>
+</div>
   </section>
-    </details>
+    </div>
   </section>
 
 </main>
 
 <section id="view-compare" class="hidden space-y-4">
-    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-compare" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-compare" data-collapse-action="close">全部收合</button></div>
-    <details class="p79-collapsible" data-collapse-key="view-compare-1" open><summary><span>月報匯入與操作</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-compare-1"><div><span>月報匯入與操作</span></div>
 <div class="card p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -959,9 +960,9 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
-</details>
+</div>
 
-    <details class="p79-collapsible" data-collapse-key="view-compare-2"><summary><span>月報資料輸入</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-compare-2"><div><span>月報資料輸入</span></div>
 <div class="card p-4">
       <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
         <div>
@@ -1013,11 +1014,11 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
-</details>
+</div>
 
 
 
-    <details class="p79-collapsible" data-collapse-key="view-compare-4" open><summary><span>月報比對結果</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-compare-4"><div><span>月報比對結果</span></div>
 <div id="monthlyCompareSummary" class="p-3 text-sm">
       尚未輸入或匯入月報資料。
     </div>
@@ -1026,7 +1027,7 @@ body[data-p79-system="efficiency"] main{
       <div class="font-black text-lg mb-2">🔎 比對差異</div>
       <div id="monthlyComparePageBody" class="space-y-3"></div>
     </div>
-</details>
+</div>
   </section>
 
 <dialog id="dualAuditDetailDialog" class="p-0 !w-[min(1120px,calc(100vw-18px))]" style="resize:both;overflow:auto;min-width:620px;min-height:360px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);">
@@ -1180,8 +1181,10 @@ body[data-p79-system="efficiency"] main{
         <button onclick="exportCurrentVessel()" class="btn bg-emerald-600 text-white text-sm">匯出這艘船</button>
       </div>
     </div>
-    <div class="overflow-auto max-h-[58vh] rounded-2xl border">
+    <div class="text-xs text-slate-500">欄位較多時，可左右滑動查看完整內容。</div>
+    <div id="vesselDetailTableWrap" class="overflow-auto max-h-[58vh] rounded-2xl border">
       <table id="vesselDetailTable" class="tbl w-full min-w-[1300px] text-center">
+        <colgroup><col style="width:116px"><col style="width:76px"><col style="width:108px"><col style="width:72px"><col style="width:80px"><col style="width:80px"><col style="width:76px"><col style="width:160px"><col style="width:70px"><col style="width:70px"><col style="width:120px"><col style="width:70px"><col style="width:80px"><col style="width:84px"><col style="width:84px"><col style="width:360px"></colgroup>
         <thead><tr><th>日期</th><th>AQC</th><th>姓名</th><th>組別</th><th>開始</th><th>結束</th><th>時數</th><th>艙位/SHIFT</th><th>DISC</th><th>LOAD</th><th>Bundle</th><th>H/C</th><th>櫃數</th><th>GPH</th><th>停工分</th><th>備註</th></tr></thead>
         <tbody id="vdBody"></tbody>
       </table>
@@ -1248,8 +1251,7 @@ body[data-p79-system="efficiency"] main{
 
   <section id="view-weekly" class="hidden space-y-4">
   <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-slate-100" onclick="switchTab('ranking')">每月績效排行</button></div>
-    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="close">全部收合</button></div>
-    <details class="p79-collapsible" data-collapse-key="personnel-groups" open><summary><span>人員作業量與效率</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="personnel-groups"><div><span>人員作業量與效率</span></div>
 <div class="card p-4">
       <p class="text-sm text-slate-500 mb-3">選日期及姓名，查看 A、B、C、D 組作業量。可選任意日期區間；本周以星期日至星期六計算。</p>
       <div class="flex flex-wrap gap-3 items-end">
@@ -1284,9 +1286,9 @@ body[data-p79-system="efficiency"] main{
       <div id="personnelGroupCards" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
       <div id="personnelUnassigned" class="mt-3" role="status"></div>
     </div>
-</details>
+</div>
 
-    <details class="p79-collapsible hidden" data-collapse-key="view-weekly-2" open><summary><span>人員作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section hidden" data-section-key="view-weekly-2"><div><span>人員作業摘要</span></div>
 <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <div class="card p-4"><div class="text-xs text-slate-500">人員</div><div id="wkPeople" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">統計時數</div><div id="wkHours" class="text-2xl font-black">0.0</div></div>
@@ -1294,10 +1296,10 @@ body[data-p79-system="efficiency"] main{
       <div class="card p-4"><div class="text-xs text-slate-500">H/C</div><div id="wkHC" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">平均效率</div><div id="wkEfficiency" class="text-2xl font-black">0.0</div></div>
     </div>
-</details>
+</div>
 
     <div class="space-y-4">
-      <details class="p79-collapsible hidden" data-collapse-key="view-weekly-3" open><summary><span>期間船舶效率</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+      <div class="p79-section hidden" data-section-key="view-weekly-3"><div><span>期間船舶效率</span></div>
 <div class="card p-4 overflow-auto">
         <div class="font-black text-lg mb-3">🚢 期間船舶效率</div>
         <table class="tbl w-full min-w-[900px] text-center">
@@ -1310,21 +1312,21 @@ body[data-p79-system="efficiency"] main{
           <tbody id="weeklyShipBody"></tbody>
         </table>
       </div>
-</details>
+</div>
 
 
     </div>
-    <details class="p79-collapsible hidden" data-collapse-key="view-weekly-5" open><summary><span>所有人員作業紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section hidden" data-section-key="view-weekly-5"><div><span>所有人員作業紀錄</span></div>
 <div class="card p-4 overflow-auto">
       <h3 class="text-lg font-black mb-2">所有人員作業紀錄</h3>
       <div id="personnelRecordCount" class="text-sm text-slate-500 mb-3" role="status"></div>
       <table class="tbl w-full min-w-[1500px] text-center"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
     </div>
-</details>
+</div>
 <section id="view-workload" class="hidden space-y-4">
     <input id="workloadStart" type="hidden"><input id="workloadEnd" type="hidden">
     <div id="workloadPersonMeta" class="card p-4 font-bold"></div>
-    <details class="p79-collapsible hidden" data-collapse-key="view-workload-1" open><summary><span>個人作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section hidden" data-section-key="view-workload-1"><div><span>個人作業摘要</span></div>
 <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
       <div class="card p-4"><div class="text-xs text-slate-500">作業船數</div><div id="psVessels" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="psCount" class="text-2xl font-black">0</div></div>
@@ -1335,9 +1337,9 @@ body[data-p79-system="efficiency"] main{
       <div class="card p-4"><div class="text-xs text-slate-500">總櫃數</div><div id="psContainers" class="text-2xl font-black text-teal-700">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">效率（含 H/C）</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
     </div>
-</details>
+</div>
 
-    <details class="p79-collapsible" data-collapse-key="view-workload-2" open><summary><span>全船櫃數核對</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-workload-2"><div><span>全船櫃數核對</span></div>
 <div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
       <h2 class="font-black text-lg">全船司機櫃數核對 WORKING SHEET</h2>
       <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
@@ -1347,9 +1349,9 @@ body[data-p79-system="efficiency"] main{
         <tbody id="workloadSheetAuditBody"></tbody>
       </table>
     </div>
-</details>
+</div>
 
-    <details class="p79-collapsible hidden" data-collapse-key="view-workload-3" open><summary><span>各船作業統計</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section hidden" data-section-key="view-workload-3"><div><span>各船作業統計</span></div>
 <div class="card p-4 overflow-auto">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
@@ -1363,9 +1365,9 @@ body[data-p79-system="efficiency"] main{
         <tbody id="personVesselBody"><tr><td colspan="11" class="text-center text-slate-400 p-5">請先選擇司機姓名</td></tr></tbody>
       </table>
     </div>
-</details>
+</div>
 
-    <details class="p79-collapsible" data-collapse-key="view-workload-4" open><summary><span>作業時段與個人紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+    <div class="p79-section" data-section-key="view-workload-4"><div><span>作業時段與個人紀錄</span></div>
 <div class="space-y-4">
       <div class="card p-4 overflow-auto">
         <h2 class="font-black mb-3">⏱️ 作業時段統計</h2>
@@ -1376,14 +1378,13 @@ body[data-p79-system="efficiency"] main{
         <table class="tbl w-full min-w-[1250px]"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名/航次</th><th>排班 AQC 組別</th><th>AQC#</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead><tbody id="personRecordBody"><tr><td colspan="13" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
       </div>
     </div>
-</details>
+</div>
   </section>
   </section>
 
 <section id="view-ranking" class="hidden space-y-4">
   <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-slate-100" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('ranking')">每月績效排行</button></div>
-  <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-ranking" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-ranking" data-collapse-action="close">全部收合</button></div>
-  <details class="p79-collapsible" data-collapse-key="ranking-filters" open><summary><span>🏆 每月人員績效排行</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+  <div class="p79-section" data-section-key="ranking-filters"><div><span>🏆 每月人員績效排行</span></div>
     <div class="card p-4"><p class="text-sm text-slate-500 mb-3">依作業日期統計每位人員整月資料。效率＝（DISC＋LOAD＋H/C）÷ 作業時數；同分並列名次。沒有作業資料或無有效時數者不列效率名次。排班 AQC 名冊內無作業資料的人員也會列出。</p>
     <div class="flex flex-wrap items-end gap-3">
       <div><label class="block text-xs font-bold" for="rankingMonth">月份</label><input id="rankingMonth" type="month" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking();loadMonthlyRanking(true)"></div>
@@ -1392,8 +1393,8 @@ body[data-p79-system="efficiency"] main{
       <div><label class="block text-xs font-bold" for="rankingName">姓名</label><input id="rankingName" type="search" class="border rounded-xl px-3 py-2" placeholder="搜尋姓名" oninput="renderMonthlyRanking()"></div>
       <button type="button" class="btn bg-sky-600 text-white" onclick="loadMonthlyRanking(true)">讀取整月雲端／歷史資料</button>
     </div><div id="rankingLoadState" class="text-sm mt-3" role="status"></div><div class="flex flex-wrap gap-2 items-center mt-2"><span id="rankingScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div></div>
-  </details>
-  <details class="p79-collapsible" data-collapse-key="ranking-results" open><summary><span>全員月度排名</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></details>
+  </div>
+  <div class="p79-section" data-section-key="ranking-results"><div><span>全員月度排名</span></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
 </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
@@ -1879,7 +1880,6 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='personstats'){
     populateSelects();
     renderVesselDriverView();
-    if(document.getElementById('integratedRecordDetails')?.open)renderRecords();
     return;
   }
   if(name==='workload'){
@@ -4059,7 +4059,7 @@ function refreshOperationGroupView(){
   if(active==='ranking')renderMonthlyRanking();
   else if(active==='weekly')renderWeeklyEfficiency();
   else if(active==='workload')renderPersonStats();
-  else if(active==='personstats'){renderVesselDriverView();if(document.getElementById('integratedRecordDetails')?.open)renderRecords();}
+  else if(active==='personstats')renderVesselDriverView();
   else if(active==='records')renderRecords();
 }
 function pumpOperationScheduleGroups(){
@@ -4171,7 +4171,7 @@ function renderVesselDriverView(){
   shipSel.innerHTML='<option value="">請選擇船舶</option>'+masters.map(s=>`<option value="${esc(s.workingNo)}">${esc(s.workingNo)}｜${esc(s.vessel||'')} ${esc(s.voyageE||s.voyageI||'')}</option>`).join('');
   shipSel.value=masters.some(s=>String(s.workingNo)===previous)?previous:String(masters[0]?.workingNo||'');
   const readKey=String(gcToken||'')+'|'+month,read=driverVesselReads.get(readKey);
-  if(load)load.textContent=read?.status==='loading'?'更新資料中…':read?.status==='error'?'資料讀取失敗，目前顯示已保存紀錄。請展開「更多篩選與資料狀態」重新讀取。':read?.status==='partial'?'部分資料未讀取，目前顯示已取得的紀錄。可展開更多選項重試。':'';
+  if(load)load.textContent=read?.status==='loading'?'更新資料中…':read?.status==='error'?'資料讀取失敗，目前顯示已保存紀錄。請按「重新讀取資料」重試。':read?.status==='partial'?'部分資料未讀取，目前顯示已取得的紀錄。可按「重新讀取資料」重試。':'';
   const ref=driverVesselReference(shipSel.value,masters,records),audit=workloadSheetAudit(ref.master,ref.rows);
   if(source)source.textContent=!shipSel.value?'本月份尚無船舶資料。':`${ref.master?.vessel||''} ${ref.master?.voyageE||ref.master?.voyageI||''}｜${ref.rows.length} 筆 WORKING REPORT｜司機 ${audit.containers} 櫃、H/C ${audit.hc}｜${audit.status==='match'?'與 WORKING SHEET 一致':audit.reasons.join('；')}`;
   ensureOperationScheduleGroups(ref.rows);
@@ -4185,8 +4185,9 @@ function renderVesselDriverView(){
   if(body)body.innerHTML=shown.map(g=>`<tr><td class="font-bold">${esc(g.name)}</td><td>${esc(g.group)}</td><td>${esc(g.aqc)}</td><td>${g.count}</td><td>${g.hours.toFixed(2)}</td><td>${g.disc}</td><td>${g.load}</td><td>${g.hc}</td><td class="font-black">${g.containers}</td><td>${g.eff.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="10" class="p-5 text-slate-400">目前沒有司機明細；可讀取此月份的雲端／歷史明細。</td></tr>';
   const detail=document.getElementById('driverVesselRecordBody');
   if(detail)detail.innerHTML=visibleRows.sort((a,b)=>`${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`)).map(r=>{
-    const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td class="whitespace-nowrap">${esc(r.startTime||'—')} ～ ${esc(r.endTime||'—')}</td><td>${m.hours.toFixed(2)}</td><td><details><summary class="cursor-pointer font-bold" aria-label="${m.containers} 櫃，展開卸裝與艙蓋明細">${m.containers}</summary><div class="text-xs whitespace-nowrap mt-1">卸船 ${m.disc}｜裝船 ${m.load}<br>H/C ${m.hc}</div></details></td><td>${m.eff.toFixed(2)}</td></tr>`;
+    const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td class="whitespace-nowrap">${esc(r.startTime||'—')} ～ ${esc(r.endTime||'—')}</td><td>${m.hours.toFixed(2)}</td><td><div><div class="font-bold">${m.containers}</div><div class="text-xs whitespace-nowrap mt-1">卸船 ${m.disc}｜裝船 ${m.load}<br>H/C ${m.hc}</div></div></td><td>${m.eff.toFixed(2)}</td></tr>`;
   }).join('')||'<tr><td colspan="8" class="p-5 text-slate-400">此船舶／司機目前沒有作業明細。</td></tr>';
+  if(document.getElementById('integratedRecordDetails'))openIntegratedRecordDetails();
   if(!read&&String(gcToken||''))void loadDriverVesselMonth(false);
 }
 
@@ -5941,7 +5942,7 @@ function openPersonalAuditDetail(normName){
   }
 
   if(sourceBox&&internalSource.length){
-    sourceBox.innerHTML+=`<details class="mt-2 border-t pt-2"><summary class="cursor-pointer text-slate-600">個人效率檔內部檢查 ${internalSource.length} 項（不影響雙檔比對）</summary><ul class="list-disc pl-5 text-xs mt-2">${internalSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></details>`;
+    sourceBox.innerHTML+=`<div class="mt-2 border-t pt-2"><div class="text-slate-600">個人效率檔內部檢查 ${internalSource.length} 項（不影響雙檔比對）</div><ul class="list-disc pl-5 text-xs mt-2">${internalSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>`;
   }
   if(body){
     body.innerHTML=x.groupResults.map(g=>{
@@ -6472,7 +6473,7 @@ function renderPersonnelGroupCards(persons){
   const box=document.getElementById('personnelGroupCards');if(!box)return;
   const groups={A:[],B:[],C:[],D:[]},unassigned=[];
   for(const person of persons){const code=personnelGroupCode(person.group);if(code)groups[code].push(person);else unassigned.push(person);}
-  const rows=list=>[...list].sort((a,b)=>compareDriverNames(a.name,b.name)).map(p=>`<tr><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${p.hours.toFixed(2)}</td><td><details><summary class="cursor-pointer font-bold">${p.containers}</summary><div class="text-xs whitespace-nowrap mt-1">卸船 ${p.disc}｜裝船 ${p.load}<br>H/C ${p.hc}｜${p.rows.length} 筆</div></details></td><td>${p.hours>0?p.eff.toFixed(2):'—'}</td></tr>`).join('');
+  const rows=list=>[...list].sort((a,b)=>compareDriverNames(a.name,b.name)).map(p=>`<tr><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${p.hours.toFixed(2)}</td><td><div><div class="font-bold">${p.containers}</div><div class="text-xs whitespace-nowrap mt-1">卸船 ${p.disc}｜裝船 ${p.load}<br>H/C ${p.hc}｜${p.rows.length} 筆</div></div></td><td>${p.hours>0?p.eff.toFixed(2):'—'}</td></tr>`).join('');
   const table=list=>`<div class="overflow-auto"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>時數</th><th>櫃數</th><th>效率</th></tr></thead><tbody>${rows(list)||'<tr><td colspan="4" class="p-4 text-slate-400">此期間沒有作業紀錄</td></tr>'}</tbody></table></div>`;
   const colors={A:'border-indigo-200 bg-indigo-50',B:'border-emerald-200 bg-emerald-50',C:'border-amber-200 bg-amber-50',D:'border-rose-200 bg-rose-50'};
   box.innerHTML=Object.entries(groups).map(([code,list])=>{
@@ -6480,7 +6481,7 @@ function renderPersonnelGroupCards(persons){
     return `<section class="rounded-2xl border ${colors[code]} overflow-hidden" aria-label="${code}組"><div class="p-3"><div class="flex justify-between items-center"><h3 class="font-black text-lg">${code}組</h3><span class="text-sm">${count} 人</span></div><div class="text-xs text-slate-600 mt-1">${containers} 櫃・${hours.toFixed(2)} 小時・效率 ${hours>0?((containers+hc)/hours).toFixed(2):'—'}</div></div>${table(list)}</section>`;
   }).join('');
   const other=document.getElementById('personnelUnassigned');
-  if(other)other.innerHTML=unassigned.length?`<details class="border border-amber-200 rounded-xl p-3"><summary class="cursor-pointer font-bold text-amber-800">${unassigned.length} 筆人員分組待核對（尚未列入 A～D 組）</summary><p class="text-xs mt-2">${unassigned.map(p=>`${esc(displayPersonName(p.name))}：${esc(p.group)}`).join('；')}</p>${table(unassigned)}</details>`:'';
+  if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-3"><div class="font-bold text-amber-800">${unassigned.length} 筆人員分組待核對（尚未列入 A～D 組）</div><p class="text-xs mt-2">${unassigned.map(p=>`${esc(displayPersonName(p.name))}：${esc(p.group)}`).join('；')}</p>${table(unassigned)}</div>`:'';
 }
 
 function renderWeeklyEfficiency(){
@@ -14287,5 +14288,5 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
-<script src="../assets/port79-collapsible-sections.js?v=20261017.1"></script></body></html>
+</body></html>
 
