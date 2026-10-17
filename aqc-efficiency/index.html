@@ -639,7 +639,7 @@ body[data-p79-system="efficiency"] main{
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
-      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 作業明細</button>
+      <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業紀錄</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
 
     </div>
@@ -799,7 +799,7 @@ body[data-p79-system="efficiency"] main{
     <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="close">全部收合</button></div>
     <details class="p79-collapsible" data-collapse-key="view-personstats-1" open><summary><span>船舶與司機作業明細</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4">
-      <h2 class="text-xl font-black">作業明細</h2>
+      <h2 class="text-xl font-black">司機作業紀錄</h2>
       <p class="text-sm text-slate-500 mt-2">查詢每艘船的逐筆司機作業紀錄。人員總作業量與排名請至「人員統計」查看。</p>
       <div class="flex flex-wrap items-end gap-3 mt-3">
         <div><label for="driverVesselMonth" class="block text-xs font-bold">船舶月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
@@ -1020,7 +1020,7 @@ body[data-p79-system="efficiency"] main{
     </div>
 </details>
 
-    
+
 
     <details class="p79-collapsible" data-collapse-key="view-compare-4" open><summary><span>月報比對結果</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div id="monthlyCompareSummary" class="p-3 text-sm">
@@ -1257,7 +1257,7 @@ body[data-p79-system="efficiency"] main{
     <details class="p79-collapsible" data-collapse-key="view-weekly-1" open><summary><span>日期與人員篩選</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
 <div class="card p-4">
       <h2 class="text-xl font-black mb-2">👥 人員作業統計</h2>
-      <p class="text-sm text-slate-500 mb-3">依日期、組別或姓名查看人員作業量與效率；選「本周」快速查詢，或切換「每月績效排行」。逐筆紀錄請至「作業明細」查看。</p>
+      <p class="text-sm text-slate-500 mb-3">依日期、組別或姓名查看人員作業量與效率；選「本周」快速查詢，或切換「每月績效排行」。逐筆紀錄請至「司機作業紀錄」查看。</p>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="min-w-[260px] max-w-[360px] flex-1">
           <label class="text-xs font-bold">日期區間</label>
