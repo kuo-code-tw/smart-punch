@@ -413,7 +413,7 @@ body[data-p79-system="efficiency"] #cloudState{
 </style>
 <link rel="stylesheet" href="../assets/port79-calendar-range.css">
 <style id="p79-efficiency-centered-layout-v20261007">
-/* 2026-10-07：效率總覽桌機版置中與比例統一 */
+/* 2026-10-07：船舶作業明細桌機版置中與比例統一 */
 body[data-p79-system="efficiency"]{
   overflow-x:hidden!important;
 }
@@ -637,7 +637,7 @@ body[data-p79-system="efficiency"] main{
   </div>
   <section id="efficiencyMainTabs" class="card p-3 sm:p-4">
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
-      <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 效率總覽</button>
+      <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
@@ -945,7 +945,7 @@ body[data-p79-system="efficiency"] main{
         <div>
           <div class="text-xs font-bold text-amber-600">月報核對</div>
           <h2 class="text-xl font-black">📋 月報核對</h2>
-          <div class="text-sm text-slate-500 mt-1">匯入或輸入月報，查看與系統船舶資料的差異。船舶總表請至「效率總覽」查看。</div>
+          <div class="text-sm text-slate-500 mt-1">匯入或輸入月報，查看與系統船舶資料的差異。船舶總表請至「船舶作業明細」查看。</div>
         </div>
         <div class="flex flex-wrap items-end gap-2">
           <div>
@@ -960,7 +960,7 @@ body[data-p79-system="efficiency"] main{
           <button type="button" onclick="addMonthlyEditorRow()" class="btn bg-sky-600 text-white text-sm">＋ 新增一列</button>
           <button type="button" onclick="applyMonthlyEditorRows()" class="btn bg-emerald-600 text-white text-sm">✓ 套用輸入並比對</button>
           <button type="button" onclick="clearMonthlyEditorRows()" class="btn bg-slate-100 text-sm">清空輸入</button>
-          <button type="button" onclick="switchTab('dashboard',document.querySelector('[data-tab=dashboard]'))" class="btn bg-slate-100 text-sm">← 回效率總覽</button>
+          <button type="button" onclick="switchTab('dashboard',document.querySelector('[data-tab=dashboard]'))" class="btn bg-slate-100 text-sm">← 回船舶作業明細</button>
         </div>
       </div>
     </div>
@@ -3309,7 +3309,7 @@ function renderDashboard(){
   updateShipChangeToolbar();
 
   // 月報已匯入且已選月份時，若狀態 Map 尚未建立，先重建比對結果。
-  // 這樣效率總覽的「月報比對」不會全部顯示「—」。
+  // 這樣船舶作業明細的「月報比對」不會全部顯示「—」。
   const cmpMonth=document.getElementById('monthlyCompareMonth')?.value||
                  localStorage.getItem(MONTHLY_COMPARE_MONTH_KEY)||'';
   if(!monthlyCompareRebuilding &&
@@ -8029,7 +8029,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     }
 
     // GC 即時資料仍為 0 時，再向「歷史資料中心」讀船舶月份。
-    // 避免資料已歸檔到 Google Drive 後，效率總覽整頁變成 0。
+    // 避免資料已歸檔到 Google Drive 後，船舶作業明細整頁變成 0。
     if(cloudMasters.length===0 && cloudRecords.length===0){
       try{
         cloudStatus('GC 即時資料為 0｜正在從歷史船舶月份找回...',false);
@@ -11632,7 +11632,7 @@ function persistMonthlyCorrectionToShip(serial,fieldKey,value){
 // ===== 2026-09-24 月報比對穩定版：只修已知舊版欄位，不重算全部歷史船 =====
 // 原因：前一版為了修復舊資料，會從 WORKING REPORT 明細重新推算所有船舶，
 // 使原本正常的歷史船也被改變比對來源，造成差異筆數越來越多。
-// 本版恢復「月報 vs 效率總覽同一筆船舶主檔」的比對方式，只保留一個非常窄的舊版相容規則。
+// 本版恢復「月報 vs 船舶作業明細同一筆船舶主檔」的比對方式，只保留一個非常窄的舊版相容規則。
 
 function chooseMonthlySystemJobStable(candidates,actual){
   let list=[...(candidates||[])];
@@ -11938,7 +11938,7 @@ async function compareMonthlyExcel(file) {
       toast('月報資料已讀取，但日期無法辨識月份；請確認日期欄格式。');
     }
 
-    // 優先沿用效率總覽目前月份；若月報只有一個月份就自動選該月。
+    // 優先沿用船舶作業明細目前月份；若月報只有一個月份就自動選該月。
     populateMonthlyCompareMonth(document.getElementById('filterMonth')?.value||'');
 
     switchTab('compare',document.querySelector('[data-tab="compare"]'));
@@ -12026,7 +12026,7 @@ async function applyMonthlyCorrection(serial,field){
   const compareMonth=document.getElementById('monthlyCompareMonth')?.value||row.actual?.month||'';
   saveMonthlyCorrection(compareMonth,serial,meta.key,value);
 
-  // 同時同步回船舶主檔/作業明細，讓效率總覽也使用相同數值。
+  // 同時同步回船舶主檔/作業明細，讓船舶作業明細也使用相同數值。
   persistMonthlyCorrectionToShip(serial,meta.key,value);
 
   // 船舶主檔與作業明細已由 persistMonthlyCorrectionToShip() 同步。
@@ -12145,7 +12145,7 @@ function renderMonthlyComparePage(){
     `｜共比對 <b>${monthlyCompareRows.length}</b> 筆｜`+
     `<span class="text-emerald-700 font-bold">一致 ${good}</span>｜`+
     `<span class="text-rose-700 font-bold">有差異 ${bad.length}</span>`+
-    `<br><span class="text-slate-500">效率總覽會顯示 ✓一致 / ⚠異常；0142 與 0142-2 會視為兩筆獨立資料分別比對。</span>`;
+    `<br><span class="text-slate-500">船舶作業明細會顯示 ✓一致 / ⚠異常；0142 與 0142-2 會視為兩筆獨立資料分別比對。</span>`;
 
   const rows=bad;
 
@@ -14203,7 +14203,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 <script src="../assets/port79-vessel-monthly-report.js?v=20261017-print35"></script>
 <script src="../assets/port79-seven-top.js?v=20261017-workload-export"></script>
 
-<!-- p79-efficiency-wide-history-fallback-20261007: 效率總覽滿版寬度 + 年份選單防空白 -->
+<!-- p79-efficiency-wide-history-fallback-20261007: 船舶作業明細滿版寬度 + 年份選單防空白 -->
 <style id="p79-efficiency-wide-history-fallback-20261007-style">
 body[data-p79-system="efficiency"]>main,
 body[data-p79-system="efficiency"] main.max-w-\[1880px\],
