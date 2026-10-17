@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),path=req
 const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'utf8');
 const dashboard=html.slice(html.indexOf('<section id="view-dashboard"'),html.indexOf('<section id="view-groups"'));
 assert(!dashboard.includes('data-collapse-key'));assert(!dashboard.includes('data-collapse-action'));
-assert.equal((html.match(/data-collapse-key=/g)||[]).length,18);
+assert.equal((html.match(/data-collapse-key=/g)||[]).length,17);
 const stored=new Map([['port79_efficiency_collapse_v1:a','closed']]),events={};
 function panel(key){return {dataset:{collapseKey:key},open:true,addEventListener(type,fn){this[type]=fn;}};}
 const a=panel('a'),b=panel('b'),c=panel('c');const view={id:'view-weekly',querySelectorAll:()=>[a,b]};
