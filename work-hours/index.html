@@ -8758,6 +8758,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return '晚班';
         }
 
+        function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
+            const raw=getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
+            if(!clockIn)return raw; // An OUT without its IN cannot establish a shift date.
+            const ts=getAttendanceTimestamp(clockIn);if(!ts)return raw;
+            const date=new Date(ts),hour=date.getHours()+date.getMinutes()/60;
+            if(hour>=8)return raw;
+            const scheduled=getScheduleShiftLabelForPunch(emp,clockIn.timeStr);
+            const completed=clockOut?inferShiftFromCompletedSession(clockIn,clockOut,emp):'';
+            // Preserve early arrivals for the morning shift; midnight night shifts belong to yesterday.
+            const night=scheduled==='晚班'||(!scheduled&&(completed==='晚班'||(!completed&&hour<5)));
+            if(!night)return raw;
+            date.setDate(date.getDate()-1);
+            return getAttendanceDateKey(date.getFullYear()+'/'+String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'));
+        }
+
         function inferShiftFromCompletedSession(clockInRecord, clockOutRecord, emp = currentEmp) {
             if (!clockInRecord || !clockOutRecord) return '';
 
@@ -10833,12 +10848,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     jobTitle: currentEmployee?.jobTitle || currentEmployee?.deptDetail || '',
                     key: `${String(g.attNo || g.empId || g.name)}__${baseTime}__${index}`,
                     dateKey: getAttendanceDateKey(baseTime),
-                    // v2026.10.03.16.60：完整跨日班次以上班簽到日歸屬。
-                    accountingDateKey: getAttendanceDateKey(
-                        g.clockIn?.timeStr || baseTime || g.clockOut?.timeStr
-                    ),
+                    // 夜班凌晨簽到仍歸前一工作日，原始打卡時間不變。
+                    accountingDateKey: p79AttendanceSessionWorkDate(g.clockIn,g.clockOut,currentEmployee),
                     accountingMonthKey: (() => {
-                        const source = g.clockIn?.timeStr || baseTime || g.clockOut?.timeStr;
+                        const source = p79AttendanceSessionWorkDate(g.clockIn,g.clockOut,currentEmployee);
                         const m = String(source || '').match(/^(\d{4})[\/-](\d{1,2})/);
                         return m ? `${m[1]}-${String(m[2]).padStart(2,'0')}` : '';
                     })(),
