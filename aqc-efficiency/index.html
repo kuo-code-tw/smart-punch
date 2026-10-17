@@ -532,6 +532,13 @@ body[data-p79-system="efficiency"] main{
 @media(max-width:640px){#view-dashboard #p79EfficiencyCumulative>.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-dashboard #p79EfficiencyCumulative>.grid>div{padding:5px 6px!important;gap:2px 4px}#view-dashboard #p79EfficiencyCumulative>.grid>div>.text-2xl{font-size:17px!important}}
 </style>
 <style id="p79-driver-record-alignment">#personRecordBody td,#personRecordBody th,#view-workload table:has(#personRecordBody) th,#driverVesselBody td,#driverVesselRecordBody td,#view-personstats th{text-align:center!important;vertical-align:middle!important}</style>
+<style id="p79-collapsible-style">
+.p79-collapsible{border:1px solid #cbd5e1;border-radius:16px;background:#fff;min-width:0}
+.p79-collapsible>summary{display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px 16px;font-weight:900;color:#334155;list-style:none;border-radius:16px;background:#f1f5f9}
+.p79-collapsible>summary::-webkit-details-marker{display:none}.p79-collapsible>summary:before{content:'▶';font-size:12px}.p79-collapsible[open]>summary:before{content:'▼'}
+.p79-collapsible>summary:focus-visible{outline:3px solid #6366f1;outline-offset:2px}.p79-collapse-hint{margin-left:auto;font-size:12px;font-weight:400;white-space:nowrap}.p79-collapse-hint:after{content:'展開'}.p79-collapsible[open] .p79-collapse-hint:after{content:'收合'}
+.p79-collapsible[open]>summary{margin-bottom:8px}.p79-collapse-toolbar{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.p79-collapsible>.grid{padding:8px}
+</style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -788,7 +795,9 @@ body[data-p79-system="efficiency"] main{
   </section>
 
   <section id="view-personstats" class="hidden space-y-4">
-    <div class="card p-4">
+    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-personstats" data-collapse-action="close">全部收合</button></div>
+    <details class="p79-collapsible" data-collapse-key="view-personstats-1" open><summary><span>船舶與司機作業明細</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4">
       <h2 class="text-xl font-black">作業明細</h2>
       <p class="text-sm text-slate-500 mt-2">直接使用匯入船舶檔案時已保存的 WORKING SHEET 與 WORKING REPORT，不必再上傳。選月份可讀取雲端與歷史船舶明細，再依司機姓名或 AQC 篩選。</p>
       <div class="flex flex-wrap items-end gap-3 mt-3">
@@ -817,10 +826,12 @@ body[data-p79-system="efficiency"] main{
       </table>
     </div>
     </div>
+</details>
     <details id="integratedRecordDetails" class="space-y-3" ontoggle="if(this.open)openIntegratedRecordDetails()">
       <summary class="card p-4 cursor-pointer font-bold">完整作業欄位與紀錄維護（新增／編輯）</summary>
   <section id="view-records" class="space-y-4">
-    <div class="card p-4 space-y-4">
+    <details class="p79-collapsible" data-collapse-key="view-records-1" open><summary><span>完整明細篩選與操作</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-end">
         <button onclick="openRecordDialog()" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button>
         <div class="flex-1 min-w-[320px]">
@@ -910,12 +921,15 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
-    <div class="card p-4 overflow-auto max-h-[70vh]">
+</details>
+    <details class="p79-collapsible" data-collapse-key="view-records-2" open><summary><span>完整作業紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto max-h-[70vh]">
       <table class="tbl w-full min-w-[1580px] text-center">
         <thead><tr><th>組別</th><th>司機</th><th>AQC#</th><th>船名/航次</th><th>日期</th><th>TFC CODE-I</th><th>TFC CODE-E</th><th>開始</th><th>結束</th><th>DISC</th><th>LOAD</th><th>Bundle</th><th>H/C</th><th>Time</th><th>GPH</th><th>停工時間</th><th>停工內容</th><th>操作</th></tr></thead>
         <tbody id="recordBody"></tbody>
       </table>
     </div>
+</details>
   </section>
     </details>
   </section>
@@ -923,7 +937,9 @@ body[data-p79-system="efficiency"] main{
 </main>
 
 <section id="view-compare" class="hidden space-y-4">
-    <div class="card p-4 sm:p-5">
+    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-compare" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-compare" data-collapse-action="close">全部收合</button></div>
+    <details class="p79-collapsible" data-collapse-key="view-compare-1" open><summary><span>月報匯入與操作</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div class="text-xs font-bold text-amber-600">月報資料輸入 / 匯入 / 比對</div>
@@ -947,8 +963,10 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
+</details>
 
-    <div class="card p-4">
+    <details class="p79-collapsible" data-collapse-key="view-compare-2" open><summary><span>月報資料輸入</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4">
       <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
         <div>
           <div class="font-black text-xl">✍️ 月報資料直接輸入</div>
@@ -999,15 +1017,20 @@ body[data-p79-system="efficiency"] main{
         </div>
       </div>
     </div>
+</details>
 
-    <div id="monthlyCompareSummary" class="card p-4 text-sm">
+    <details class="p79-collapsible" data-collapse-key="view-compare-3" open><summary><span>月報比對摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div id="monthlyCompareSummary" class="card p-4 text-sm">
       尚未輸入或匯入月報資料。
     </div>
+</details>
 
-    <div>
+    <details class="p79-collapsible" data-collapse-key="view-compare-4" open><summary><span>月報比對結果</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div>
       <div class="font-black text-lg mb-2">🔎 比對差異</div>
       <div id="monthlyComparePageBody" class="space-y-3"></div>
     </div>
+</details>
   </section>
 
 <dialog id="dualAuditDetailDialog" class="p-0 !w-[min(1120px,calc(100vw-18px))]" style="resize:both;overflow:auto;min-width:620px;min-height:360px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);">
@@ -1228,7 +1251,9 @@ body[data-p79-system="efficiency"] main{
 </dialog>
 
   <section id="view-weekly" class="hidden space-y-4">
-    <div class="card p-4">
+    <div class="p79-collapse-toolbar"><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="open">全部展開</button><button type="button" class="btn bg-slate-100 text-sm" data-collapse-view="view-weekly" data-collapse-action="close">全部收合</button></div>
+    <details class="p79-collapsible" data-collapse-key="view-weekly-1" open><summary><span>日期與人員篩選</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4">
       <h2 class="text-xl font-black mb-2">👥 人員作業統計</h2>
       <p class="text-sm text-slate-500 mb-3">預設列出所有人員。選日期、組別或姓名，統一查看作業量、效率及逐筆紀錄；選「本周」即可查看每周效率。</p>
       <div class="flex flex-wrap gap-3 items-end">
@@ -1258,17 +1283,21 @@ body[data-p79-system="efficiency"] main{
           </select></div>
       </div>
     </div>
+</details>
 
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+    <details class="p79-collapsible" data-collapse-key="view-weekly-2" open><summary><span>人員作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <div class="card p-4"><div class="text-xs text-slate-500">人員</div><div id="wkPeople" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">統計時數</div><div id="wkHours" class="text-2xl font-black">0.0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">櫃數</div><div id="wkContainers" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">H/C</div><div id="wkHC" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">平均效率</div><div id="wkEfficiency" class="text-2xl font-black">0.0</div></div>
     </div>
+</details>
 
     <div class="space-y-4">
-      <div class="card p-4 overflow-auto">
+      <details class="p79-collapsible" data-collapse-key="view-weekly-3" open><summary><span>期間船舶效率</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto">
         <div class="font-black text-lg mb-3">🚢 期間船舶效率</div>
         <table class="tbl w-full min-w-[900px] text-center">
           <thead>
@@ -1280,8 +1309,10 @@ body[data-p79-system="efficiency"] main{
           <tbody id="weeklyShipBody"></tbody>
         </table>
       </div>
+</details>
 
-      <div class="card p-4 overflow-auto">
+      <details class="p79-collapsible" data-collapse-key="view-weekly-4" open><summary><span>人員作業量與效率</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto">
         <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
           <div><div class="font-black text-lg">👤 人員作業量與效率</div><p class="text-xs text-slate-500 mt-1">組別依作業當月排班表 AQC；跨月變更組別會分列。未取得排班資料時不沿用手動分組。</p></div>
           <div class="flex flex-wrap items-end gap-2">
@@ -1312,16 +1343,20 @@ body[data-p79-system="efficiency"] main{
           <tbody id="weeklyPersonBody"></tbody>
         </table>
       </div>
+</details>
     </div>
-    <div class="card p-4 overflow-auto">
+    <details class="p79-collapsible" data-collapse-key="view-weekly-5" open><summary><span>所有人員作業紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto">
       <h3 class="text-lg font-black mb-2">所有人員作業紀錄</h3>
       <div id="personnelRecordCount" class="text-sm text-slate-500 mb-3" role="status"></div>
       <table class="tbl w-full min-w-[1500px] text-center"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
     </div>
+</details>
 <section id="view-workload" class="hidden space-y-4">
     <input id="workloadStart" type="hidden"><input id="workloadEnd" type="hidden">
     <div id="workloadPersonMeta" class="card p-4 font-bold"></div>
-    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+    <details class="p79-collapsible" data-collapse-key="view-workload-1" open><summary><span>個人作業摘要</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
       <div class="card p-4"><div class="text-xs text-slate-500">作業船數</div><div id="psVessels" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="psCount" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">作業時數</div><div id="psHours" class="text-2xl font-black">0.00</div></div>
@@ -1331,8 +1366,10 @@ body[data-p79-system="efficiency"] main{
       <div class="card p-4"><div class="text-xs text-slate-500">總櫃數</div><div id="psContainers" class="text-2xl font-black text-teal-700">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">效率（含 H/C）</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
     </div>
+</details>
 
-    <div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
+    <details class="p79-collapsible" data-collapse-key="view-workload-2" open><summary><span>全船櫃數核對</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
       <h2 class="font-black text-lg">全船司機櫃數核對 WORKING SHEET</h2>
       <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
       <div id="workloadSheetAuditState" class="mt-2 text-sm font-bold" role="status"></div>
@@ -1341,8 +1378,10 @@ body[data-p79-system="efficiency"] main{
         <tbody id="workloadSheetAuditBody"></tbody>
       </table>
     </div>
+</details>
 
-    <div class="card p-4 overflow-auto">
+    <details class="p79-collapsible" data-collapse-key="view-workload-3" open><summary><span>各船作業統計</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="card p-4 overflow-auto">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h2 class="font-black text-lg">🚢 各船作業統計</h2>
@@ -1355,8 +1394,10 @@ body[data-p79-system="efficiency"] main{
         <tbody id="personVesselBody"><tr><td colspan="11" class="text-center text-slate-400 p-5">請先選擇司機姓名</td></tr></tbody>
       </table>
     </div>
+</details>
 
-    <div class="grid xl:grid-cols-[0.7fr_1.3fr] gap-4">
+    <details class="p79-collapsible" data-collapse-key="view-workload-4" open><summary><span>作業時段與個人紀錄</span><span class="p79-collapse-hint" aria-hidden="true"></span></summary>
+<div class="grid xl:grid-cols-[0.7fr_1.3fr] gap-4">
       <div class="card p-4 overflow-auto">
         <h2 class="font-black mb-3">⏱️ 作業時段統計</h2>
         <table class="tbl w-full"><thead><tr><th>時段</th><th>筆數</th><th>時數</th><th>櫃數</th><th>H/C</th><th>效率</th></tr></thead><tbody id="personShiftBody"><tr><td colspan="6" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
@@ -1366,6 +1407,7 @@ body[data-p79-system="efficiency"] main{
         <table class="tbl w-full min-w-[1250px]"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名/航次</th><th>排班 AQC 組別</th><th>AQC#</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>GPH</th></tr></thead><tbody id="personRecordBody"><tr><td colspan="13" class="text-center text-slate-400">請先選擇司機姓名</td></tr></tbody></table>
       </div>
     </div>
+</details>
   </section>
   </section>
 
@@ -14194,5 +14236,5 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(17){width:4.0%!important;min-width:0!important}
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 </style>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script></body></html>
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-collapsible-sections.js?v=20261017.1"></script></body></html>
 
