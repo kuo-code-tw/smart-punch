@@ -11,4 +11,5 @@ end.value='2026-10-20';c.applyDashboardDateRange();assert(c.dateWithinDashboardR
 start.value='2026-10-21';c.applyDashboardDateRange();assert.equal(toasts,1);assert.equal(renders,2);
 c.clearDashboardFilter();assert.equal(start.value,'');assert.equal(end.value,'');assert.equal(c.dashboardDateRange().active,false);
 assert.equal((html.match(/id="dashboardStartDate"/g)||[]).length,1);assert(html.includes('id="dashboardStartDate" type="hidden"'));assert(html.includes('id="dashboardEndDate" type="hidden"'));assert(html.indexOf('id="dashboardDateRangePicker"')>html.indexOf('id="filterMonth"'));assert(html.includes("hostId:'dashboardDateRangePicker',startId:'dashboardStartDate',endId:'dashboardEndDate'"));
+assert(!fn('getPort79Year').includes('dashboardStartDate'));assert(fn('setPort79Year').includes('dashboardStartDate'));
 console.log(JSON.stringify({passed:5,failed:0,scope:'Single calendar control, inclusive dates, overlap, month exclusion and clear reset'}));
