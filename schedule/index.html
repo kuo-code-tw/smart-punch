@@ -2963,6 +2963,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const leaveShiftCodes=new Set(['休','特','年','事','病','公','喪','離']);
 
       (employees||[]).forEach(emp=>{
+        if(!p79EmployeeDateEligible(emp,dateKey))return;
         // 今日排班名單不顯示主任（含）以上主管；不刪除人資、排班或原始資料。
         const role=String(emp.role||emp.jobTitle||'').replace(/\s+/g,'');
         if(/主任|課長|副理|經理|協理|處長|部長|總監|副總|總經理|董事長|執行長|廠長/.test(role))return;
@@ -2994,6 +2995,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       });
       if(nightDateKey!==dateKey&&nightSource){
         (employees||[]).forEach(emp=>{
+          if(!p79EmployeeDateEligible(emp,nightDateKey))return;
           if(/主任|課長|副理|經理|協理|處長|部長|總監|副總|總經理|董事長|執行長|廠長/.test(String(emp.role||emp.jobTitle||'')))return;
           if(String(nightSource.data?.[emp.id]?.[nightDateKey]||'').trim()!=='晚')return;
           if(approvedLeaveForEmployee(emp.id,nightDateKey,emp.name))return;
