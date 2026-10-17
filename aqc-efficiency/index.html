@@ -1069,7 +1069,7 @@ body[data-p79-system="efficiency"] main{
     <div class="card p-4 border-teal-200">
       <div class="text-xs font-black text-teal-700">資料來源：已匯入船舶 WORKING REPORT 人員作業明細</div>
       <h2 class="text-xl font-black mt-1">👤 個人作業量統計</h2>
-      <div class="text-sm text-slate-500 mt-1">不需要先選船。先選日期區間，再直接選司機姓名；系統會把此人於區間內所有已匯入船舶的作業量、時數、DISC、LOAD、H/C、櫃數與效率自動彙總。</div>
+      <div class="text-sm text-slate-500 mt-1">選日期區間與司機姓名，依 WORKING REPORT 彙總個人櫃數。效率（含 H/C）＝（DISC＋LOAD＋H/C）÷ 原表作業時數；停工時間不重複扣除。下方另用全船所有司機、全部日期核對 WORKING SHEET，差額不會分攤到個人。</div>
     </div>
 
     <div class="card p-4">
@@ -1102,7 +1102,17 @@ body[data-p79-system="efficiency"] main{
       <div class="card p-4"><div class="text-xs text-slate-500">LOAD</div><div id="psLoad" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">H/C</div><div id="psHatches" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">總櫃數</div><div id="psContainers" class="text-2xl font-black text-teal-700">0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">平均效率</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">效率（含 H/C）</div><div id="psEfficiency" class="text-2xl font-black text-indigo-700">0.00</div></div>
+    </div>
+
+    <div class="card p-4 overflow-auto" id="workloadSheetAuditCard">
+      <h2 class="font-black text-lg">全船司機櫃數核對 WORKING SHEET</h2>
+      <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
+      <div id="workloadSheetAuditState" class="mt-2 text-sm font-bold" role="status"></div>
+      <table class="tbl w-full min-w-[1200px] text-center">
+        <thead><tr><th>WORKING NO.</th><th>船名／航次</th><th>全船司機 DISC</th><th>全船司機 LOAD</th><th>司機櫃數合計</th><th>WORKING SHEET 請款櫃數</th><th>翻艙作業數</th><th>WORKING SHEET 作業 Moves</th><th>櫃數差額</th><th>H/C 明細／原表</th><th>核對結果</th></tr></thead>
+        <tbody id="workloadSheetAuditBody"></tbody>
+      </table>
     </div>
 
     <div class="card p-4 overflow-auto">
@@ -1518,6 +1528,17 @@ body[data-p79-system="efficiency"] main{
       </div>
     </div>
   </section>
+
+<dialog id="vesselMonthlyExportDialog" class="p-5">
+  <h3 class="text-lg font-black">匯出每月作業量表</h3>
+  <p class="text-sm text-slate-500 mt-2">依完工月份匯出整月船邊作業量，不受目前頁籤與日期區間影響。</p>
+  <label for="vesselMonthlyExportMonth" class="block text-sm font-bold mt-4">匯出月份</label>
+  <input id="vesselMonthlyExportMonth" type="month" class="border rounded-xl px-3 py-2 mt-1">
+  <div class="flex gap-2 mt-4">
+    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value)" class="btn bg-emerald-600 text-white">匯出每月作業量表</button>
+    <button type="button" onclick="document.getElementById('vesselMonthlyExportDialog').close()" class="btn bg-slate-100">關閉</button>
+  </div>
+</dialog>
 
 <dialog id="exportDialog" class="p-0">
   <div class="p-5 space-y-4">
@@ -5987,6 +6008,61 @@ function workloadVesselGroupKey(r){
   const voyage=String(r?.voyageE||r?.voyageI||r?.voyage||'').trim();
   return `SHIP:${vessel}|${voyage}`;
 }
+function workloadSheetAudit(master,rows){
+  const ws=master?.workingSheetSource;
+  const numeric=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
+  const totals={disc:0,load:0,hc:0,bundle:0,rawDisc:0,rawLoad:0};
+  let mathOk=true;
+  (rows||[]).forEach(r=>{
+    const m=workloadRecordMetrics(r),raw=recordRawMoveSplit(r),bundle=num(effectiveBundleRecord(r).bundleDeduct);
+    totals.disc+=m.disc;totals.load+=m.load;totals.hc+=m.hc;totals.bundle+=bundle;
+    totals.rawDisc+=num(raw.disc);totals.rawLoad+=num(raw.load);
+    if(Math.abs(num(raw.disc)+num(raw.load)-bundle-m.containers)>0.01)mathOk=false;
+  });
+  const bill=numeric(ws?.totalContainers),shift=numeric(ws?.shiftMoves),moves=numeric(ws?.totalMoves);
+  const hc=numeric(ws?.hatches),bundle=numeric(ws?.bundleDeduct);
+  const containers=totals.disc+totals.load;
+  const diff=moves===null?null:round(containers-moves,2);
+  const rawDisc=numeric(ws?.disc),rawLoad=numeric(ws?.load);
+  // A zero-shift, zero-bundle ship also permits an independent DISC/LOAD check.
+  const splitOk=shift===0&&bundle===0&&rawDisc!==null&&rawLoad!==null
+    ? Math.abs(totals.rawDisc-rawDisc)<=0.01&&Math.abs(totals.rawLoad-rawLoad)<=0.01 : true;
+  const complete=!!ws&&[bill,shift,moves,hc,bundle].every(v=>v!==null);
+  const reasons=[];
+  if(!complete)reasons.push('未取得完整 WORKING SHEET，請重新匯入原始檔');
+  if(!(rows||[]).length)reasons.push('缺少 WORKING REPORT 司機明細');
+  if(complete&&(rows||[]).length){
+    if(Math.abs(diff)>0.01)reasons.push(`櫃數差額 ${diff}`);
+    if(Math.abs(totals.hc-hc)>0.01)reasons.push(`H/C 差額 ${round(totals.hc-hc,2)}`);
+    if(Math.abs(totals.bundle-bundle)>0.01)reasons.push('Bundle 扣除不一致');
+    if(!mathOk)reasons.push('司機原始櫃數與 Bundle 扣除計算不一致');
+    if(!splitOk)reasons.push('DISC／LOAD 分項不一致');
+  }
+  const status=!complete||!(rows||[]).length?'pending':reasons.length?'mismatch':'match';
+  return {...totals,containers,bill,shift,moves,sheetHc:hc,diff,status,reasons};
+}
+function renderWorkloadSheetAudit(scopeRows,allRows){
+  const body=document.getElementById('workloadSheetAuditBody'),state=document.getElementById('workloadSheetAuditState');
+  if(!body)return;
+  const groups=new Map(),wanted=new Set((scopeRows||[]).map(workloadVesselGroupKey));
+  (allRows||[]).forEach(r=>{
+    const key=workloadVesselGroupKey(r);
+    if(!wanted.has(key))return;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(r);
+  });
+  const masters=new Map((shipMasters||[]).map(s=>[workloadVesselGroupKey(s),s]));
+  let matches=0,pending=0;
+  const show=v=>v===null?'—':esc(v);
+  body.innerHTML=[...groups].map(([key,rows])=>{
+    const master=masters.get(key),a=workloadSheetAudit(master,rows);
+    if(a.status==='match')matches++;if(a.status==='pending')pending++;
+    const label=a.status==='match'?'一致':a.status==='pending'?'待核對':'不一致';
+    const color=a.status==='match'?'text-emerald-700':a.status==='pending'?'text-amber-700':'text-rose-700';
+    return `<tr><td>${esc(rows[0].workingNo||'—')}</td><td>${esc(vesselLabelForRecord(rows[0])||'—')}</td><td>${a.disc}</td><td>${a.load}</td><td class="font-black">${a.containers}</td><td>${show(a.bill)}</td><td>${show(a.shift)}</td><td>${show(a.moves)}</td><td class="${color}">${show(a.diff)}</td><td>${a.hc}／${show(a.sheetHc)}</td><td class="${color} font-bold">${label}${a.reasons.length?`<div class="text-xs">${esc(a.reasons.join('；'))}</div>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="11" class="p-5 text-slate-400">此區間沒有 WORKING REPORT 司機作業資料，請先匯入原始檔。</td></tr>';
+  if(state)state.textContent=`${groups.size} 艘船：${matches} 艘一致、${groups.size-matches-pending} 艘不一致、${pending} 艘待核對。`;
+}
 function renderPersonVesselStats(rs){
   const body=document.getElementById('personVesselBody');
   const count=document.getElementById('personVesselCount');
@@ -6060,6 +6136,7 @@ function renderPersonStats(){
   const pid=document.getElementById('personStatPerson')?.value||'';
   const meta=document.getElementById('workloadPersonMeta');
   const idx=buildWorkloadIndex();
+  renderWorkloadSheetAudit(pid?workloadRowsInRange(idx.byPerson.get(pid)||[]):workloadImportedRows(),idx.rows);
   let rs=pid?workloadRowsInRange(idx.byPerson.get(pid)||[]):[];
   rs=[...rs].sort((a,b)=>`${b.workDate||''} ${b.startTime||''}`.localeCompare(`${a.workDate||''} ${a.startTime||''}`));
 
@@ -12863,9 +12940,13 @@ function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')
   ws['!margins']={left:0.25,right:0.25,top:0.4,bottom:0.4,header:0.2,footer:0.2};
   return ws;
 }
-async function exportVesselMonthlyExcel(){
+function openVesselMonthlyExportDialog(){
   if(!requireSuperAdminAccess())return;
-  const month=document.getElementById('filterMonth')?.value||'';
+  document.getElementById('vesselMonthlyExportMonth').value=document.getElementById('filterMonth')?.value||isoTodayLocal().slice(0,7);
+  document.getElementById('vesselMonthlyExportDialog').showModal();
+}
+async function exportVesselMonthlyExcel(month=document.getElementById('filterMonth')?.value||''){
+  if(!requireSuperAdminAccess())return;
   if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return toast('請先選擇要匯出的月份');
   const btn=document.getElementById('vesselMonthlyExportBtn');
   if(btn?.disabled)return;
@@ -12883,6 +12964,7 @@ async function exportVesselMonthlyExcel(){
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,buildMonthlyOperationSheet(month,rows),'船邊作業量表');
     XLSX.writeFile(wb,`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`);
+    document.getElementById('vesselMonthlyExportDialog')?.close();
     toast(`已匯出 ${month} 船邊作業量表，共 ${rows.length} 艘`);
   }catch(error){
     console.error('每月船邊作業量表匯出失敗',error);
@@ -13892,7 +13974,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
-<script src="../assets/port79-seven-top.js?v=20261011-unified-management"></script>
+<script src="../assets/port79-seven-top.js?v=20261017-workload-export"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 效率總覽滿版寬度 + 年份選單防空白 -->
 <style id="p79-efficiency-wide-history-fallback-20261007-style">
