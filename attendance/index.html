@@ -1247,7 +1247,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             <select id="recordStatusFilter" onchange="onRecordStatusFilterChange()" class="w-full px-2 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                                 <option value="ALL">全部狀態</option>
                                 <option value="ABNORMAL">異常</option>
-                                <option value="PENDING">待簽退（未超過24小時）</option>
+                                <option value="PENDING">待確認（待簽退／班表待核對）</option>
                                 <option value="NORMAL">正常</option>
                             </select>
                         </div>
@@ -14413,6 +14413,46 @@ function getManualPairRecordAnchor(record) {
             return removeRecords.size;
         }
 
+        function p79AttendanceScheduleAssessment(row){
+            const timestamp=getAttendanceTimestamp(row.clockIn);
+            const date=new Date(timestamp), dates=[scheduleDateKey(date)];
+            // 晚班可在前一晚 22:00 後提早簽到；班表仍以凌晨所在日查詢。
+            if(date.getHours()>=22){const next=new Date(date);next.setDate(next.getDate()+1);dates.push(scheduleDateKey(next));}
+            const states=dates.map(day=>{
+                const month=day.slice(0,7);p79LoadAttendanceOvertimeMonth(month);
+                return p79AttendanceOvertimeMonths.get(month);
+            });
+            const token=getAttendanceEmployeeMasterToken(), id=String(row.empId||'').trim().toUpperCase();
+            const starts=[], labels=[];
+            let pending=false;
+            dates.forEach((day,index)=>{
+                const state=states[index];
+                if(!state?.ready || state.token!==token){pending=true;return;}
+                const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
+                const meta=roster.__meta?.[day]||{}, code=String(roster[day]||'').trim();
+                const cover=state.covers.find(a=>day>=a.startDate && day<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
+                const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
+                const shift=['早','中','晚'].includes(code)?code:target[day];
+                const hours={早:8,中:16,晚:0};
+                let hour=hours[shift];
+                if(cover?.mode==='two' && hour!==undefined && !meta.overtimeStart){
+                    const worker=cover.workerIds.findIndex(x=>String(x).trim().toUpperCase()===id);
+                    if(worker===1)hour+=4;
+                }
+                const add=(h,label)=>{const start=new Date(day+'T00:00:00');start.setMinutes(h*60);starts.push(start.getTime());labels.push(day+' '+label);};
+                if(hour!==undefined)add(hour,shift+'班 '+String(hour).padStart(2,'0')+':00');
+                // 明確申報的加班／代班起點也納入，避免把核准的提早出勤誤報。
+                if(meta.overtime || meta.restQuotaOvertime || meta.overtimeReport || meta.forEmpId || cover){
+                    const match=String(meta.overtimeStart||'').match(/^(\d{1,2}):(\d{2})$/);
+                    if(match && Number(match[1])<=24 && Number(match[2])<60 && (Number(match[1])<24 || Number(match[2])===0))add(Number(match[1])+Number(match[2])/60,'申報 '+match[0]);
+                }
+            });
+            // 沿用既有最多提早三小時的班次窗口；晚到由同一狀態列提醒核對。
+            if(starts.some(start=>timestamp>=start-3*3600000 && timestamp<start+60000))return null;
+            if(pending)return {kind:'PENDING',status:'班表待核對',reasons:['班表尚未讀取完成，不能確認正常']};
+            if(!starts.length)return {kind:'PENDING',status:'班表待核對',reasons:['查無當日出勤班別，請核對班表或代班申報']};
+            return {kind:'ABNORMAL',status:'時間需核對',reasons:['上班時間與班表不符（'+labels.join('／')+'）']};
+        }
         function p79AttendanceRowAssessment(row,now=Date.now()){
             const input=!!row?.clockIn,output=!!row?.clockOut;
             const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
@@ -14425,7 +14465,10 @@ function getManualPairRecordAnchor(record) {
                 const timeChecks=[];
                 if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班分鐘01–30');
                 if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<45)timeChecks.push('下班分鐘未在45–60');
+                const scheduled=p79AttendanceScheduleAssessment(row);
+                if(scheduled?.kind==='ABNORMAL')timeChecks.push(...scheduled.reasons);
                 if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
+                if(scheduled)return scheduled;
                 return {kind:'NORMAL',status:'正常'};
             }
             // 沒有排定下班時間時，只將尚未超過配對上限的單側簽到列為待確認，不宣稱正常。
@@ -14443,6 +14486,7 @@ function getManualPairRecordAnchor(record) {
             onRecordDataScopeChange();
         }
         function getAttendanceStatusBadge(status) {
+            if (status === '班表待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold">班表待核對</span>';
             if (status === '待簽退') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-sky-100 text-sky-800 font-bold" title="只有簽到，尚未超過24小時；待核對下班，不代表已完成正常班次">待簽退</span>';
             if (/班次配對異常|班次時間異常|缺少上下班|時間需核對/.test(String(status)))return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">'+escapeHtml(status)+'</span>';
             if (status === '正常') {
@@ -15308,9 +15352,10 @@ function getManualPairRecordAnchor(record) {
                     ''
                 ).trim();
 
-                const statusBadge = (Number(row.duplicateRecordCount)>0||String(row.attendanceStatus || '').includes('重複'))
+                const assessmentDetails = (row.attendanceAssessmentReasons || []).map(reason => `<span class="block mt-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
+                const statusBadge = ((Number(row.duplicateRecordCount)>0||String(row.attendanceStatus || '').includes('重複'))
                     ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對已整合的重複打卡">🔎 重複刷卡已整合</button>${getAttendanceStatusBadge(row.attendanceStatus)}`
-                    : getAttendanceStatusBadge(row.attendanceStatus);
+                    : getAttendanceStatusBadge(row.attendanceStatus)) + assessmentDetails;
                 const extraChecks = (Array.isArray(row.attendanceCheckLabels) ? row.attendanceCheckLabels : [])
                     .filter(label => label === '跨日班次' || label === '人工補卡')
                     .map(label => `<span class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">${escapeHtml(label)}</span>`).join('');
