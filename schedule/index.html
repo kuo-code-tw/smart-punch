@@ -2811,6 +2811,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     let p79ScheduleReadTask=null;
+    let p79ScheduleCloudReadController=null;
     async function loadScheduleCloudWithRetry(reason='auto',retryCount=3){
       const month=currentScheduleMonthKey();
       while(p79ScheduleReadTask){
@@ -3751,6 +3752,7 @@ function p79EmployeeDateEligible(emp,date) {
         // V10.16：雲端整包讀取最多等 10 秒，避免 GAS 冷啟動或網路異常時
         // port79ScheduleAutoSyncBusy 永久卡住；失敗交由背景重試，不阻擋進頁。
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        p79ScheduleCloudReadController=controller;
         const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
         let data;
         try {
@@ -3761,6 +3763,7 @@ function p79EmployeeDateEligible(emp,date) {
           data=await res.json();
         } finally {
           if (timer) clearTimeout(timer);
+          if(p79ScheduleCloudReadController===controller)p79ScheduleCloudReadController=null;
         }
         if(requestMonth!==currentScheduleMonthKey())return false;
         if (!data.ok) throw new Error(data.error || '讀取失敗');
@@ -4418,7 +4421,9 @@ function p79EmployeeDateEligible(emp,date) {
     function updateScheduleDateRangeSummary(){const a=document.getElementById('scheduleDateFrom')?.value||'',b=document.getElementById('scheduleDateTo')?.value||'',el=document.getElementById('scheduleDateRangeSummary');if(el)el.innerHTML=`<i class="fa-regular fa-calendar-check text-indigo-500 mr-1"></i>${!a&&!b?'日期範圍':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`}`;}
     function setScheduleFullMonthRange(){const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7),[a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
     async function onScheduleMonthPickerChange(){
+      p79ScheduleCloudReadController?.abort();
       p79ScheduleAttendanceViewVersion++;
+      const monthRequestVersion=p79ScheduleAttendanceViewVersion;
       p79ScheduleAttendanceHasSynced=false;
       applyScheduleAttendanceMonthScope();
       const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7);
@@ -4429,13 +4434,16 @@ function p79EmployeeDateEligible(emp,date) {
       try{initDefaultScheduleData(month)}catch(e){}
       const status=document.getElementById('p79QuickMonthStatus');
       if(status)status.textContent='正在讀取 '+month+' 班表…';
+      const workspace=document.getElementById('app-main-container');
+      if(workspace){workspace.setAttribute('aria-busy','true');workspace.innerHTML='<div role="status" class="p-6 text-slate-600">正在讀取 '+month+' 班表…</div>';}
       try{
         const ok=await loadScheduleCloudWithRetry('month',1);
         if(currentScheduleMonthKey()!==month)return;
         if(status)status.textContent=ok?'':month+' 雲端讀取未完成，請按重新讀取；目前內容尚未確認';
         if(!ok){buildRoleTabsAndRender();renderTodaySchedulePanel();}
         if(scheduleCanShowLiveAttendance())refreshScheduleAttendanceState(false);
-      }catch(e){if(status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
+      }catch(e){if(currentScheduleMonthKey()===month&&monthRequestVersion===p79ScheduleAttendanceViewVersion&&status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
+      finally{if(monthRequestVersion===p79ScheduleAttendanceViewVersion)workspace?.setAttribute('aria-busy','false');}
     }
     async function onScheduleDateRangeChange(side){p79ScheduleAttendanceViewVersion++;p79ScheduleAttendanceHasSynced=false;applyScheduleAttendanceMonthScope();const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');let a=aEl?.value||'',b=bEl?.value||'';if(a){const month=a.slice(0,7),oldMonth=document.getElementById('month-picker').value;if(month!==oldMonth){document.getElementById('month-picker').value=month;applySchedulePersonnelOverrides(month);initDefaultScheduleData(month);}const [,last]=scheduleMonthBounds(month);if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;}if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;}updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
 
@@ -4648,9 +4656,8 @@ function p79EmployeeDateEligible(emp,date) {
     }
     function scheduleDutyBadge(shift,empId,includeCheckIn=true,dateKey=scheduleTaipeiTodayKey()){
       if(!isScheduleEmployeeClockedIn(empId))return '';
-      const dutyDate=scheduleNightRosterDate();
-      if(shift&&dateKey!==dutyDate)return '';
-      if(shift&&scheduleTaipeiDutyShift()==='晚'&&shift!=='晚')return '';
+      const rosterDate=shift==='晚'?scheduleNightRosterDate():scheduleTaipeiTodayKey();
+      if(shift&&dateKey!==rosterDate)return '';
       return '<span class="today-attendance-active" title="雲端最新打卡為上班簽到，尚未簽退；凌晨晚班歸屬前一日"><span class="today-attendance-active-dot"></span>當班</span>'+(includeCheckIn?' <span class="today-person-badge bg-sky-100 text-sky-800">已簽到</span>':'');
     }
     let p79ScheduleRenderedDutyShift='';
@@ -6816,12 +6823,12 @@ document.addEventListener('click',function(e){
 </script>
 
 
-<script src="../assets/port79-calendar-range.js"></script>
+<script src="../assets/port79-calendar-range.js?v=20261018-month-navigation"></script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
 
 const C=window.Port79CalendarRange;if(!C)return;
-C.mountMonth({inputId:'month-picker'});
+C.mountMonth({inputId:'month-picker',onShift:step=>p79QuickScheduleMonth(step)});
 
 });
 </script>
@@ -7036,11 +7043,19 @@ async function p79QuickScheduleMonth(step){
  const picker=document.getElementById('month-picker'),status=document.getElementById('p79QuickMonthStatus');
  const old=picker.value,base=/^\d{4}-\d{2}$/.test(old)?old:scheduleTaipeiTodayKey().slice(0,7),parts=base.split('-').map(Number);
  const date=new Date(parts[0],parts[1]-1+step,1,12),next=step===0?scheduleTaipeiTodayKey().slice(0,7):date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
- if(next===old)return;p79QuickMonthBusy=true;const buttons=[...document.querySelectorAll('.p79-quick-month button')];buttons.forEach(b=>b.disabled=true);picker.disabled=true;status.textContent='正在確認修改並切換月份…';
- try{if(!await flushSchedulePendingWrites())throw Error('尚有未儲存修改，請先儲存排班再切換月份');picker.value=next;await onScheduleMonthPickerChange();}
- catch(e){status.textContent=e.message||'月份切換未完成，請重新讀取';}
- finally{p79QuickMonthBusy=false;buttons.forEach(b=>b.disabled=false);picker.disabled=false;}
+ if(next===old)return;
+ // Only unfinished writes block navigation; an obsolete read may be cancelled safely.
+ if(port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight){
+   p79QuickMonthBusy=true;status.textContent='正在確認尚未儲存的班表修改…';
+   try{if(!await flushSchedulePendingWrites())throw Error('尚有未儲存修改，請先儲存排班再切換月份');}
+   catch(e){status.textContent=e.message||'班表修改尚未確認，保留目前月份';return;}
+   finally{p79QuickMonthBusy=false;}
+ }
+ picker.value=next;window.Port79CalendarRange?.syncAll?.();
+ try{await onScheduleMonthPickerChange();}
+ catch(e){if(picker.value===next)status.textContent=e.message||'月份切換未完成，請重新讀取';}
 }
+
 document.addEventListener('DOMContentLoaded',()=>{const control=document.getElementById('scheduleRangeControl'),host=document.getElementById('p79QuickMonthHost');if(control&&host)host.appendChild(control);});
 </script>
 
