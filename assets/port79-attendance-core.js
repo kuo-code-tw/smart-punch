@@ -284,6 +284,27 @@ function confirmCloudDelete(id){
   return true;
 }
 
+async function p79ReadAttendanceEditCloud(id,signal){
+ const url=gasUrl();if(!url)throw new Error('未設定 GAS URL');
+ const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
+ const data=await response.json();
+ if(!response.ok||!data?.ok||!data.found||typeof data.found!=='object')throw new Error(data?.error||'無法核對雲端考勤，請稍後再試');
+ const record=data.found[String(id)];
+ if(!record||String(record.id)!==String(id))throw Object.assign(new Error('雲端尚未找到這筆考勤，請重新讀取後再修改'),{retryable:false});
+ return record;
+}
+async function p79PrepareAttendanceEdit(id){
+ const info=queueInfoForId(id);
+ if(info&&!info.paused)throw new Error('這筆考勤尚在同步，請等同步完成後再修改');
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try{return await p79ReadAttendanceEditCloud(id,controller.signal);}finally{clearTimeout(timer);}
+}
+function p79AttendanceEditAlreadySaved(payload,cloud){
+ const local=payload.record||{};
+ if(String(local.id)!==String(cloud.id))return false;
+ return ['timeStr','status','empId','attNo','note'].every(key=>normalizeCompareValue(local[key])===normalizeCompareValue(cloud[key]));
+}
+
 async function send(payload,timeout=25000){
   const url=gasUrl();
   if(!url) throw new Error('未設定 GAS URL');
@@ -294,6 +315,17 @@ async function send(payload,timeout=25000){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeout);
   try{
+    if(['updateRecord','editRecord'].includes(String(payload.action||''))){
+      const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal);
+      if(p79AttendanceEditAlreadySaved(payload,cloud))return {ok:true,alreadySaved:true};
+      if(normalizeCompareValue(payload.originalTimeStr)!==normalizeCompareValue(cloud.timeStr)||
+         (payload.originalPunchType&&String(payload.originalPunchType)!==(typeof getAttendanceRecordType==='function'?getAttendanceRecordType(cloud):String(cloud.status)))){
+        throw Object.assign(new Error('雲端時間與編輯時不同（目前：'+String(cloud.timeStr||'')+' '+String(cloud.status||'')+'）；修改草稿已保留，請重新開啟此筆核對後儲存'),{retryable:false});
+      }
+      // Normalize only equivalent date formatting; never rebase a changed cloud time.
+      body.originalTimeStr=cloud.timeStr;
+
+    }
     const r=await fetch(url,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -808,6 +840,7 @@ window.p79V5DrainFast=drainFast;
 window.p79V5StartDelta=startDelta;
 window.p79V5PollDelta=pollDelta;
 window.p79V5PendingForId=pendingForId;
+window.p79V5PrepareAttendanceEdit=p79PrepareAttendanceEdit;
 window.p79V5QueueInfoForId=queueInfoForId;
 window.p79V5ConfirmCloudRecord=confirmCloudRecord;
 window.p79V5ConfirmCloudDelete=confirmCloudDelete;
