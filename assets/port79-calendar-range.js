@@ -279,6 +279,7 @@ function mountMonth(opts){
   }
   function sync(){const x=parseMonth(input.value);nav.querySelector('.p79-umnav-label').textContent=`${x.y} 年 ${x.m} 月`}
   function shift(n){
+    if(typeof opts.onShift==='function'){opts.onShift(n);return;}
     let x=parseMonth(input.value);x.m+=n;
     while(x.m<1){x.m+=12;x.y--}while(x.m>12){x.m-=12;x.y++}
     input.value=`${x.y}-${pad(x.m)}`;sync();emit(input);
@@ -286,7 +287,7 @@ function mountMonth(opts){
   }
   nav.querySelector('.p79-mprev').onclick=()=>shift(-1);
   nav.querySelector('.p79-mnext').onclick=()=>shift(1);
-  input.addEventListener('change',sync);sync();return {sync};
+  input.addEventListener('change',sync);sync();const api={sync};instances.push(api);return api;
 }
 
 global.Port79CalendarRange={mountRange,mountSingle,mountMonth,syncAll:()=>instances.forEach(api=>api.sync?.())};
