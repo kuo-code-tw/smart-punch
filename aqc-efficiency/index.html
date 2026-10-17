@@ -690,6 +690,7 @@ body[data-p79-system="efficiency"] main{
           <label class="text-xs font-bold">月份</label>
           <select id="filterMonth" class="block border rounded-xl px-3 py-2" onchange="onDashboardMonthChange()"><option value="">全部月份</option></select>
         </div>
+        <div><label class="text-xs font-bold" for="dashboardDateRangePicker">日期篩選</label><div id="dashboardDateRangePicker"><input id="dashboardStartDate" type="hidden"><input id="dashboardEndDate" type="hidden"></div></div>
         <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出每月作業量表</button>
         <button onclick="clearDashboardFilter()" class="btn bg-slate-100 text-sm">清除全部篩選</button>
         <button id="forceVesselCloudPullBtn" type="button" onclick="forcePullVesselCloudData()" class="btn text-white text-sm font-black shadow-lg ring-2 ring-sky-300" style="background:#0284c7;color:#fff;min-width:190px" title="立即從 GC 即時資料與歷史船舶月份重新拉取">☁️ 立即雲端拉取船舶資料</button>
@@ -1852,6 +1853,7 @@ function getPort79Year(){
   const years=availablePort79Years();
   let y=String(localStorage.getItem(PORT79_YEAR_KEY)||'').trim();
   if(!/^\d{4}$/.test(y)||!years.includes(y))y=years[0]||String(new Date().getFullYear());
+  ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   localStorage.setItem(PORT79_YEAR_KEY,y);
   return y;
 }
@@ -2053,6 +2055,7 @@ function dashboardFilterDescription(){
 }
 
 function updateDashboardRangeState(){
+  globalThis.Port79CalendarRange?.syncAll();
   const el=document.getElementById('dashboardRangeState');
   if(!el)return;
   const {active}=dashboardDateRange();
@@ -6657,6 +6660,7 @@ function clearOldShipCache(){
   toast('舊船舶快取已清除，請重新匯入原始 WORKING SHEET Excel');
 }
 function clearDashboardFilter(){
+  ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const m=document.getElementById('filterMonth');if(m)m.value='';
   const v=document.getElementById('dashboardFilterVessel');if(v)v.value='';
   const w=document.getElementById('dashboardFilterWharf');if(w)w.value='';
@@ -14188,6 +14192,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 document.addEventListener("DOMContentLoaded",()=>{
 
 const C=window.Port79CalendarRange;if(!C)return;
+C.mountRange({hostId:'dashboardDateRangePicker',startId:'dashboardStartDate',endId:'dashboardEndDate',allowClear:true,emptyText:'全部日期',onChange:()=>applyDashboardDateRange()});
 C.mountRange({hostId:'recordDateRangePicker',startId:'recordDateFrom',endId:'recordDateTo',compatSummaryId:'recordDateRangeSummary',allowClear:true,emptyText:'全部日期'});
 C.mountRange({hostId:'weeklyDateRangePicker',startId:'weeklyStart',endId:'weeklyEnd',compatSummaryId:'weeklyDateRangeSummary',allowClear:true,emptyText:'全部日期'});
 C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業日期',allowClear:false});
