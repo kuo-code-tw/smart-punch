@@ -1868,6 +1868,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='personstats'){
     populateSelects();
     renderVesselDriverView();
+    if(document.getElementById('integratedRecordDetails')?.open)renderRecords();
     return;
   }
   if(name==='workload'){
