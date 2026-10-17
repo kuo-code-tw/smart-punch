@@ -1166,6 +1166,7 @@ body[data-p79-system="efficiency"] main{
       </div>
       <button onclick="document.getElementById('vesselDetailDialog').close()" class="btn bg-slate-100">關閉</button>
     </div>
+    <div class="flex flex-wrap gap-3 items-center rounded-xl bg-slate-50 p-3"><span id="vdDataMessage" class="text-sm" role="status"></span><button id="vdDataRetry" type="button" class="btn bg-sky-600 text-white text-sm" onclick="loadVesselDetailRecords(true)">重新讀取明細</button></div>
     <div id="vdKpis" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2"></div>
 
     <div id="vdQuantityAudit" class="rounded-2xl border p-3"></div>
@@ -12889,6 +12890,13 @@ function renderVesselPersonAuditFiltered(){
 }
 
 function renderVesselQuantityAudit(job, detailRows){
+  if(!(detailRows||[]).length){
+    const box=document.getElementById('vdQuantityAudit'),person=document.getElementById('vdPersonQuantityAudit');
+    if(box){box.className='rounded-2xl border border-amber-200 bg-amber-50 p-3';box.textContent='人員作業明細尚未取得，暫不核對櫃數與 H/C。船舶摘要仍保留。';}
+    if(person)person.innerHTML='<div class="text-sm text-slate-500">取得人員明細後，會自動顯示每位人員的作業量核對。</div>';
+    vesselAuditPersonRowsCurrent=[];return;
+  }
+
   const audit=vesselQuantityAudit(job,detailRows);
   const personRows=vesselPersonQuantityRows(detailRows);
   const linkedAuditSources=[...new Map((detailRows||[])
@@ -13040,13 +13048,65 @@ function renderVesselQuantityAudit(job, detailRows){
 
 }
 
+const vesselDetailReads=new Map();
+function vesselDetailReadKey(key=activeVesselKey){return String(gcToken||'')+'|'+String(key.workingNo||'').trim()+'|'+String(key.vessel||'').trim();}
+function vesselDetailReadMonths(key){
+  const no=String(key.workingNo||'').trim(),master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no)||findVesselJobExact(no,key.vessel)||{};
+  const values=[master.firstDate,master.lastDate,master._cloudFirstDate,master._cloudLastDate,master.compareDate,master.compareMonth,master.month].map(v=>String(v||'').slice(0,7)).filter(v=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(v));
+  if(!values.length){const selected=document.getElementById('filterMonth')?.value||'';if(/^20\d{2}-(0[1-9]|1[0-2])$/.test(selected))values.push(selected);}
+  return [...new Set(values)].slice(0,3);
+}
+function renderVesselDetailLoadState(){
+  const el=document.getElementById('vdDataMessage'),button=document.getElementById('vdDataRetry'),state=vesselDetailReads.get(vesselDetailReadKey()),count=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel).length;
+  if(el)el.textContent=state?.status==='loading'?'正在補讀這艘船的雲端與歷史人員明細…':state?.status==='error'?'人員明細讀取未完成，請重新讀取；目前不把未取得的明細當作 0 櫃。':state?.status==='missing'?'已查詢雲端與歷史來源，尚未找到這艘船的人員明細。可重新讀取；船舶摘要仍保留。':state?.status==='partial'?`已取得 ${count} 筆明細，部分來源讀取失敗，可重新讀取補齊。`:count?`已載入 ${count} 筆人員作業明細。`:'人員明細尚未取得，準備補讀。';
+  if(button)button.disabled=state?.status==='loading';
+}
+async function loadVesselDetailRecords(force=false){
+  if(!requireEfficiencyAccess())return;
+  const target={...activeVesselKey},owner=String(gcToken||''),key=vesselDetailReadKey(target),state=vesselDetailReads.get(key);
+  if(state?.status==='loading')return;
+  if(!force&&['missing','error'].includes(state?.status)&&Date.now()-state.at<60000){renderVesselDetailLoadState();return;}
+  vesselDetailReads.set(key,{status:'loading',at:Date.now()});renderVesselDetailLoadState();
+  let valid=0,failed=0;
+  const accept=result=>{
+    if(result.status==='fulfilled'&&(Array.isArray(result.value?.records)||Array.isArray(result.value?.shipMasters))){try{mergeEfficiencyCloudData(result.value);valid++;}catch(_){failed++;}}
+    else failed++;
+  };
+  try{
+    const months=vesselDetailReadMonths(target);
+    for(const month of months){
+      const results=await Promise.allSettled([apiGetQuick('gcGetData',{month},25000),apiGetQuick('historyGetMonthData',{type:'vessel',month},25000)]);
+      if(owner!==String(gcToken||''))return;
+      results.forEach(accept);
+    }
+    // Some summary scopes omit report details even when the ship master exists.
+    if(!officialRecordsForVessel(target.workingNo,target.vessel).length){
+      const results=await Promise.allSettled([apiGetQuick('gcGetData',{},25000)]);
+      if(owner!==String(gcToken||''))return;
+      results.forEach(accept);
+    }
+    const count=officialRecordsForVessel(target.workingNo,target.vessel).length;
+    vesselDetailReads.set(key,{status:count?(failed?'partial':'ready'):(failed||!valid?'error':'missing'),at:Date.now()});
+    if(valid){saveLocal();invalidateWorkloadIndex();}
+  }catch(_){if(owner===String(gcToken||''))vesselDetailReads.set(key,{status:'error',at:Date.now()});}
+  finally{
+    if(owner!==String(gcToken||''))vesselDetailReads.delete(key);
+    else if(vesselDetailReadKey()===key)refreshVesselDetailView(false);
+  }
+}
+
 function openVesselDetail(workingNo,vessel){
-  activeVesselKey={workingNo:String(workingNo||''),vessel:String(vessel||'')};
+  activeVesselKey={workingNo:String(workingNo||'').trim(),vessel:String(vessel||'').trim()};
+  refreshVesselDetailView(true);document.getElementById('vesselDetailDialog').showModal();
+  if(!officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel).length)void loadVesselDetailRecords(false);
+}
+function refreshVesselDetailView(resetFilters=false){
+  const previous={};['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>previous[id]=resetFilters?'':document.getElementById(id)?.value||'');
   const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel);
   const job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel)||{};
   const auditContext=buildVesselAuditContext(job);
   document.getElementById('vdTitle').textContent=`${job.vessel||activeVesselKey.vessel||'船舶'} ${[job.voyageI,job.voyageE].filter(Boolean).join(' / ')}`.trim();
-  document.getElementById('vdMeta').textContent=`NO. ${job.workingNo||'—'} ｜ 碼頭 ${job.wharf||'—'} ｜ 共 ${rs.length} 筆人員作業紀錄`;
+  document.getElementById('vdMeta').textContent=`NO. ${job.workingNo||'—'} ｜ 碼頭 ${job.wharf||'—'} ｜ ${rs.length?`共 ${rs.length} 筆人員作業紀錄`:'人員明細待讀取'}`;
   const items=[['總櫃數',job.totalContainers||0],['Bundle扣除',job.bundleDeduct||0],['H/C',job.hatches||0],['總 Moves',job.totalMoves||0],['SHIFT',job.shiftMoves||0],['GPH',num(job.gph).toFixed(2)],['GPH含H/C',num(job.gphHC).toFixed(2)],['VPH',num(job.vph).toFixed(2)],['VPH含H/C',num(job.vphHC).toFixed(2)]];
   document.getElementById('vdKpis').innerHTML=items.map(([a,b])=>`<div class="rounded-xl bg-slate-50 border p-3"><div class="text-[11px] text-slate-500">${a}</div><div class="font-black">${b}</div></div>`).join('');
   renderVesselQuantityAudit(job,auditContext.auditRows);
@@ -13054,8 +13114,8 @@ function openVesselDetail(workingNo,vessel){
   const names=[...new Set(rs.map(r=>String(r.name||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
   document.getElementById('vdAqc').innerHTML='<option value="">全部 AQC</option>'+aqcs.map(x=>`<option>${esc(x)}</option>`).join('');
   document.getElementById('vdPerson').innerHTML='<option value="">全部人員</option>'+names.map(x=>`<option>${esc(x)}</option>`).join('');
-  document.getElementById('vdDate').value='';document.getElementById('vdSearch').value='';
-  renderVesselDetailRows();document.getElementById('vesselDetailDialog').showModal();
+  ['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=previous[id]||'';});
+  renderVesselDetailRows();renderVesselDetailLoadState();
 }
 function vesselDetailFilteredRows(){
   const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel);
@@ -13084,7 +13144,7 @@ function renderVesselDetailRows(){
       : '—';
     const gph=c.statHours>0?(num(mv.disc)+num(mv.load)+num(r.hatches))/c.statHours:num(r.gph||c.effDeduct);
     return `<tr><td>${esc(r.workDate)}</td><td class="font-bold">${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td class="font-bold">${esc(r.name)}</td><td>${esc(group)}</td><td>${esc(r.startTime)}</td><td>${esc(r.endTime)}</td><td>${c.statHours.toFixed(2)}</td><td>${esc(r.shift)}</td><td>${num(mv.disc)}</td><td>${num(mv.load)}</td><td class="font-black text-fuchsia-700">${bundleText}</td><td>${num(r.hatches)}</td><td class="font-black">${num(mv.disc)+num(mv.load)}</td><td>${num(gph).toFixed(2)}</td><td>${stop.toFixed(1)}</td><td>${esc(r.note)}</td></tr>`;
-  }).join('')||(allRows.length===0?'<tr><td colspan="16" class="text-center p-5 text-rose-600 font-black bg-rose-50">⚠ 這艘船有船舶主檔，但系統沒有保存任何 WORKING REPORT 人員作業明細。請重新批次匯入原始 Excel；新版會直接列出哪一份檔案沒有成功解析，不再誤算成功。</td></tr>':'<tr><td colspan="16" class="text-center text-slate-400">目前篩選條件沒有資料</td></tr>');
+  }).join('')||(allRows.length===0?'<tr><td colspan="16" class="text-center p-5 text-amber-800 bg-amber-50">人員作業明細尚未取得；請查看上方讀取狀態，或按「重新讀取明細」。</td></tr>':'<tr><td colspan="16" class="text-center text-slate-400">目前篩選條件沒有資料</td></tr>');
 }
 function clearVesselDetailFilters(){['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});renderVesselDetailRows();}
 function shipSummaryExportRows(){return vesselJobRows().map(x=>[x.workingNo,x.vessel,x.voyageI,x.voyageE,x.wharf,x.totalContainers,x.bundleDeduct,x.hatches,x.totalMoves,x.shiftMoves,x.aqcCount,round(num(x.gph),2),round(num(x.gphHC),2),round(num(x.vph),2),round(num(x.vphHC),2)]);}
