@@ -882,7 +882,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
           <div><label class="text-xs font-bold">組別</label><select id="peopleGroupFilter" class="border rounded-xl px-3 py-2" onchange="renderPeople()"></select></div>
         </div>
         <div class="overflow-auto max-h-[62vh]">
-          <table class="tbl w-full min-w-[1050px] text-center"><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>職務</th><th>目前組別</th><th>調任日期</th><th>調組</th></tr></thead><tbody id="peopleBody"></tbody></table>
+          <table class="tbl w-full min-w-[1050px] text-center"><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>職稱</th><th>目前組別</th><th>調任日期</th><th>調組</th></tr></thead><tbody id="peopleBody"></tbody></table>
         </div>
       </div>
     </div>
@@ -1713,14 +1713,14 @@ function isAqcEmployee(e){
   if(!e)return false;
 
   // v2026.09.26.25：
-  // 「目前職務」優先於舊部門、歷史作業、舊分組文字。
+  // 「目前職稱」優先於舊部門、歷史作業、舊分組文字。
   // 例如員工已從 AQC 調任 ARMG，就不能因為部門/歷史資料仍含 AQC 而繼續顯示在 AQC 人員頁。
   const currentJob=currentOfficialJobTitle(e).toUpperCase();
   if(currentJob){
     return currentJob.includes('AQC');
   }
 
-  // 只有人資主檔真的沒有職務欄位時，才用部門做舊資料備援。
+  // 只有人資主檔真的沒有職稱欄位時，才用部門做舊資料備援。
   const deptText=[
     e?.dept,e?.department,e?.unit
   ].map(v=>String(v||'').toUpperCase()).join(' ');
@@ -1731,7 +1731,7 @@ function people(){
   const map=new Map();
   const byName=new Map();
 
-  // 正式人資主檔優先。只要職務/部門任一處含 AQC 即視為 AQC 人員。
+  // 正式人資主檔優先。只要職稱/部門任一處含 AQC 即視為 AQC 人員。
   (systemEmployees||[]).filter(isAqcEmployee).forEach(e=>{
     const id=String(
       e.empId||e.employeeId||e.id||e['工號']||
@@ -1767,8 +1767,8 @@ function people(){
 
     const sys=findOfficialEmployeeByName(name);
 
-    // 如果正式「人資主檔」已經有這個人，就完全以目前職務為準。
-    // 已調任 ARMG / F/L / 指揮手等非 AQC 職務的人，
+    // 如果正式「人資主檔」已經有這個人，就完全以目前職稱為準。
+    // 已調任 ARMG / F/L / 指揮手等非 AQC 職稱的人，
     // 即使舊 WORKING REPORT 還有 AQC 作業紀錄，也不能重新補回 AQC 名單。
     if(sys && !isAqcEmployee(sys)) return;
 
@@ -3527,8 +3527,8 @@ async function reloadEmployeeData(){
     const aqc=systemEmployees.filter(isAqcEmployee);
     const sample=aqc[0];
     toast(sample
-      ? `已讀取 ${systemEmployees.length} 人；目前職務為 AQC ${aqc.length} 人。已調任其他職務的人會自動排除。`
-      : `已讀取 ${systemEmployees.length} 人，但目前人資主檔沒有 AQC 職務人員`);
+      ? `已讀取 ${systemEmployees.length} 人；目前職稱為 AQC ${aqc.length} 人。已調任其他職稱的人會自動排除。`
+      : `已讀取 ${systemEmployees.length} 人，但目前人資主檔沒有 AQC 職稱人員`);
   }catch(e){
     console.error(e);
     toast(`人資主檔讀取失敗：${e.message||e}`);
@@ -7988,7 +7988,7 @@ function updateEmployeeDataState(source=''){
   const withDept=aqc.filter(e=>String(e.dept||e.department||'').trim()).length;
   const withJob=aqc.filter(e=>String(e.jobTitle||e.deptDetail||e.role||'').trim()).length;
 
-  state.textContent=`來源：${source||'人資員工主檔'}｜員工 ${rows.length}｜現職 AQC ${aqc.length}｜工號 ${withId}｜部門 ${withDept}｜職務 ${withJob}`;
+  state.textContent=`來源：${source||'人資員工主檔'}｜員工 ${rows.length}｜現職 AQC ${aqc.length}｜工號 ${withId}｜部門 ${withDept}｜職稱 ${withJob}`;
 }
 
 function mergeAssignmentsKeepLocal(localList,cloudList){

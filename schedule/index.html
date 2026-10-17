@@ -988,7 +988,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 </style>
 
 <style id="p79-schedule-compact-personnel-20261011">
-/* 員工欄縮緊並突出姓名，保留完整工號、職務與組別操作。 */
+/* 員工欄縮緊並突出姓名，保留完整工號、職稱與組別操作。 */
 #app-main-container .p79-month-schedule-table .p79-person-header,
 #app-main-container .p79-month-schedule-table .p79-person-cell{
   width:210px!important;min-width:210px!important;max-width:210px!important;
@@ -1055,7 +1055,7 @@ html.dark body[data-p79-system="schedule"] .p79-shift-select.bg-rose-100{
 </style>
 
 <style id="p79-compact-person-top-drag-scrollbar-20261011">
-/* 人員資訊：上行姓名+組別+排序把手，下行工號+職務+組別。 */
+/* 人員資訊：上行姓名+組別+排序把手，下行工號+職稱+組別。 */
 #app-main-container .p79-month-schedule-table .p79-person-cell,
 #app-main-container .p79-month-schedule-table .p79-person-header{
  width:194px!important;min-width:194px!important;max-width:194px!important;padding:4px 5px!important;
@@ -4126,8 +4126,8 @@ function p79EmployeeDateEligible(emp,date) {
       const target=employees.find(e=>e.id===targetId);
       if(!source || !target) return;
       if(source.role!==target.role || source.group!==target.group){
-        if(typeof showScheduleToast==='function') showScheduleToast('拖曳排序只能在同一職務、同一組別內調整','warning');
-        else alert('拖曳排序只能在同一職務、同一組別內調整');
+        if(typeof showScheduleToast==='function') showScheduleToast('拖曳排序只能在同一職稱、同一組別內調整','warning');
+        else alert('拖曳排序只能在同一職稱、同一組別內調整');
         return;
       }
       const peers=scheduleNormalizePeerOrders(source.role,source.group);
@@ -4775,7 +4775,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const choices=employees.filter(e=>String(emp.dept||'').trim()&&String(e.dept||'').trim()===String(emp.dept||'').trim())
         .sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.id).localeCompare(String(b.id)));
       const worker=document.getElementById('substitute-worker-emp');
-      // 第一位和第二位皆列出同職務完整名單；第一位在代替請假者時僅排除被代班者本人。
+      // 第一位和第二位皆列出同職稱完整名單；第一位在代替請假者時僅排除被代班者本人。
       // 不因「休」或請假狀態隱藏姓名；實際不合格人選在儲存時明確阻擋。
       worker.innerHTML='<option value="">— 請選擇加班／代班人員 —</option>'+choices.filter(e=>!fromAnnualLeave || String(e.id)!==String(empId)).map(e=>'<option value="'+scheduleEscapeHtml(e.id)+'">'+scheduleEscapeHtml(e.name)+'（'+scheduleEscapeHtml(e.id)+'）'+(p79IsUnavailableForSubstitute(e,dayStr)?'〔當日請假／不可安排〕':'')+'</option>').join('');
       worker.value=fromAnnualLeave || p79IsUnavailableForSubstitute(emp,dayStr) ? '' : String(empId);

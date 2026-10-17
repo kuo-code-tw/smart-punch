@@ -69,15 +69,15 @@
 <!-- PORT79 V5.10.7：日期篩選簡化成開始日期～結束日期，直接選取即時套用，不再彈出小視窗。 -->
 <!-- PORT79 V5.10.6：手機打卡/管理入口硬分流；punchOnly 不得被 actualAdminRole 或舊 admin_session 誤判。 -->
 <!-- PORT79 V5.10.4：本機考勤先顯示、日期欄直接顯示起訖、手機首頁Session可補主檔。 -->
-<!-- PORT79 V5.10.3：考勤表單位/職務直接依考勤號→員工主檔對照，姓名備援；不信任舊 empId。 -->
-<!-- PORT79 V5.10.2：員工主檔 fresh 強制更新單位職務＋日期開始/結束區間篩選。 -->
+<!-- PORT79 V5.10.3：考勤表單位/職稱直接依考勤號→員工主檔對照，姓名備援；不信任舊 empId。 -->
+<!-- PORT79 V5.10.2：員工主檔 fresh 強制更新單位職稱＋日期開始/結束區間篩選。 -->
 <!-- PORT79 V5.10：支援人資 allowPunchWithoutDeviceBinding，個別員工可免綁手機打卡。 -->
 <!-- PORT79 2026-10-05 V5.9.1：手機打卡 ReferenceError 修正＋所有提前退出路徑立即解除打卡鎖。 -->
 <!-- PORT79 2026-10-05 V5.9：修正手機 execPunch 誤用管理員補卡變數造成 ReferenceError／卡死。 -->
-<!-- PORT79 2026-10-05 V5.8：單位／職務身份對照修正；考勤號姓名優先，empId 不可信時不覆蓋。 -->
+<!-- PORT79 2026-10-05 V5.8：單位／職稱身份對照修正；考勤號姓名優先，empId 不可信時不覆蓋。 -->
 <!-- PORT79 2026-10-05 V5.7：V5.6 補卡身份鎖定＋手機員工主檔本機快取優先／雲端備援。 -->
 <!-- PORT79 2026-10-05 V5.6：補卡身份以畫面考勤號＋姓名鎖定，禁止錯誤 empId 導向別人。 -->
-<!-- PORT79 2026-10-05 V5.5：部門／職務／姓名篩選全部改由員工主檔建立，不受當日考勤結果影響。 -->
+<!-- PORT79 2026-10-05 V5.5：部門／職稱／姓名篩選全部改由員工主檔建立，不受當日考勤結果影響。 -->
 <!-- PORT79 2026-10-05 V5.4：全部考勤寫入入口硬性統一到 V5 單一 writer。 -->
 <!-- PORT79 2026-10-05 V5.3：考勤寫入改為 GAS 直送優先，失敗才進 outbox。 -->
 <!-- PORT79 2026-10-05 V5.2：補卡目標鎖定＋預設今日＋單一日期篩選。 -->
@@ -597,7 +597,7 @@ body.attendance-drawer-open{overflow:hidden}
 
 
 <style id="p79-attendance-records-wide-balanced-v20261001">
-/* 考勤管理表：拉寬、置中、部門/單位/職務與時間欄均衡 */
+/* 考勤管理表：拉寬、置中、部門/單位/職稱與時間欄均衡 */
 #viewAdmin{max-width:1920px!important}
 #viewAdmin .admin-desktop-content{min-width:0!important;width:100%!important}
 #adminRecordsTableContainer{
@@ -1288,7 +1288,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                                 <th class="px-2 py-3 text-center whitespace-nowrap" title="班次計算與日期篩選的歸屬日">工作日</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">部門</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">單位</th>
-                                <th class="px-2 py-3 text-center whitespace-nowrap">職務</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap">職稱</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">組別</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">上班簽到時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">下班簽退時間</th>
@@ -1324,9 +1324,9 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             </select>
                         </div>
                         <div>
-                            <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label>
+                            <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label>
                             <select id="liveJobTitleFilter" onchange="onLiveJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                <option value="ALL">全部職務</option>
+                                <option value="ALL">全部職稱</option>
                             </select>
                         </div>
                         <div>
@@ -1376,7 +1376,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                                 <th class="px-4 py-3">考勤號</th>
                                 <th class="px-4 py-3">姓名 (工號)</th>
                                 <th class="px-4 py-3">部門</th>
-                                <th class="px-4 py-3">職務</th>
+                                <th class="px-4 py-3">職稱</th>
                                 <th class="px-4 py-3">最新狀態</th>
                                 <th class="px-4 py-3">地點資訊</th>
                                 <th class="px-4 py-3">系統登入</th>
@@ -1421,7 +1421,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職務</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
+                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 姓名</label><select id="overtimeEmployeeFilter" onchange="onOvertimeEmployeeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
                     </div>
                 </div>
@@ -1436,7 +1436,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
                     <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-left text-xs">
                         <thead class="bg-slate-50 dark:bg-slate-900/50 font-semibold text-slate-600 dark:text-slate-400">
-                            <tr><th class="px-3 py-3">上班日期</th><th class="px-3 py-3">姓名</th><th class="px-3 py-3">部門</th><th class="px-3 py-3">職務</th><th class="px-3 py-3">上班簽到</th><th class="px-3 py-3">下班簽退</th><th class="px-3 py-3">出勤時數</th><th class="px-3 py-3">估算加班</th></tr>
+                            <tr><th class="px-3 py-3">上班日期</th><th class="px-3 py-3">姓名</th><th class="px-3 py-3">部門</th><th class="px-3 py-3">職稱</th><th class="px-3 py-3">上班簽到</th><th class="px-3 py-3">下班簽退</th><th class="px-3 py-3">出勤時數</th><th class="px-3 py-3">估算加班</th></tr>
                         </thead>
                         <tbody id="overtimeTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/50 bg-white dark:bg-slate-800"></tbody>
                     </table>
@@ -1466,7 +1466,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                         <div class="flex flex-wrap items-end gap-2">
                             <div class="min-w-[110px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">公司</label><select id="leaveBalanceCompanyFilter" onchange="onLeaveBalanceCompanyChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部公司</option></select></div>
                             <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveBalanceDeptFilter" onchange="onLeaveBalanceDeptChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                            <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職務</label><select id="leaveBalanceJobTitleFilter" onchange="onLeaveBalanceJobTitleChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
+                            <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveBalanceJobTitleFilter" onchange="onLeaveBalanceJobTitleChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                             <div class="min-w-[180px] flex-[2]"><label class="block text-[10px] font-semibold text-slate-500 mb-1">工號或姓名</label><input id="leaveBalanceKeywordFilter" type="search" placeholder="輸入工號或姓名" oninput="onLeaveBalanceKeywordChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div>
                             <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">未休狀態</label><select id="leaveBalanceRemainingFilter" onchange="renderAdminLeaveBalanceTable()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部狀態</option><option value="HAS">有未休天數</option><option value="ZERO">已休完（0天）</option></select></div>
                             <button type="button" onclick="resetLeaveBalanceFilters()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold">↺ 清除篩選</button>
@@ -1480,7 +1480,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                                     <th class="px-3 py-3">完整工號</th>
                                     <th class="px-3 py-3">姓名</th>
                                     <th class="px-3 py-3">部門</th>
-                                    <th class="px-3 py-3">職務</th>
+                                    <th class="px-3 py-3">職稱</th>
                                     <th class="px-3 py-3">遞延</th>
                                     <th class="px-3 py-3">今年年假</th>
                                     <th class="px-3 py-3">已休</th>
@@ -1497,7 +1497,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 <div class="p-3 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveDeptFilter" onchange="onLeaveDeptFilterChange(true, true)" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職務</label><select id="leaveJobTitleFilter" onchange="onLeaveJobTitleFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
+                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveJobTitleFilter" onchange="onLeaveJobTitleFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div class="min-w-[150px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">員工</label><select id="leaveEmpFilter" onchange="onLeaveEmployeeFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部員工</option></select></div>
                         <div class="min-w-[120px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">狀態</label><select id="leaveStatusFilter" onchange="onLeaveStatusFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部狀態</option><option value="待審核">待審核</option><option value="已核准">已核准</option><option value="已駁回">已駁回</option></select></div>
                         <div class="min-w-[190px] flex-1 relative"><label class="block text-[10px] font-semibold text-slate-500 mb-1">日期範圍</label><details id="leaveFilterDateRangePicker" class="relative"><summary id="leaveFilterDateRangeSummary" class="list-none cursor-pointer w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold">全部日期</summary><div class="absolute right-0 top-full mt-2 z-[80] min-w-[340px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 shadow-2xl"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] font-semibold text-slate-500 mb-1">開始日期</label><input id="leaveStartFilter" type="date" onchange="onLeaveStartFilterChange();updateAttendanceLeaveRangeSummary()" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div><div><label class="block text-[10px] font-semibold text-slate-500 mb-1">結束日期</label><input id="leaveEndFilter" type="date" onchange="syncLeaveFilterRange('end');updateAttendanceLeaveRangeSummary();onLeaveDataScopeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div></div><div class="flex justify-end gap-2 mt-3"><button type="button" onclick="document.getElementById('leaveStartFilter').value='';document.getElementById('leaveEndFilter').value='';updateAttendanceLeaveRangeSummary();onLeaveDataScopeChange()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-xs font-bold">清除日期</button><button type="button" onclick="document.getElementById('leaveFilterDateRangePicker').removeAttribute('open')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">完成</button></div></div></details></div>
@@ -1517,7 +1517,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                                 <th class="px-3 py-3">考勤號</th>
                                 <th class="px-3 py-3">工號/姓名</th>
                                 <th class="px-3 py-3">部門</th>
-                                <th class="px-3 py-3">職務</th>
+                                <th class="px-3 py-3">職稱</th>
                                 <th class="px-3 py-3">請假類型</th>
                                 <th class="px-3 py-3">起訖時間</th>
                                 <th class="px-3 py-3">天數</th>
@@ -1550,7 +1550,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">📅 統計年月</label><input id="attendanceStatsMonth" type="month" onchange="onAttendanceStatsMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">🏢 部門</label><select id="attendanceStatsDept" onchange="onAttendanceStatsDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">💼 職務</label><select id="attendanceStatsJobTitle" onchange="onAttendanceStatsJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職務</option></select></div>
+                        <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">💼 職稱</label><select id="attendanceStatsJobTitle" onchange="onAttendanceStatsJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">👤 姓名</label><select id="attendanceStatsEmployee" onchange="renderAttendanceStatsTable()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
                         <button type="button" onclick="resetAttendanceStatsFilters()" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold">↺ 清除篩選</button>
                     </div>
@@ -1708,9 +1708,9 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             </div>
 
             <div>
-                <label id="empModalDeptDetailLabel" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">職務 <span class="text-rose-500">*</span></label>
+                <label id="empModalDeptDetailLabel" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">職稱 <span class="text-rose-500">*</span></label>
                 <select id="empModalDeptDetail" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
-                <p id="empModalDeptDetailHint" class="mt-1 text-[10px] text-slate-400">可於編輯員工時調整部門與職務，例如由 AQC 調整為 ARMG。</p>
+                <p id="empModalDeptDetailHint" class="mt-1 text-[10px] text-slate-400">可於編輯員工時調整部門與職稱，例如由 AQC 調整為 ARMG。</p>
             </div>
 
             <div>
@@ -1922,7 +1922,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             </div>
 
             <div class="mt-2">
-                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 選擇職務</label>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 選擇職稱</label>
                 <select id="addModalJobSelect" onchange="p79AddModalJobChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
             </div>
 
@@ -2050,8 +2050,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                         <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">部門</span>
                     </label>
                     <label class="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition">
-                        <input type="checkbox" class="export-field-checkbox w-4 h-4 accent-indigo-600" value="jobTitle" data-label="職務" checked onchange="updateExportFieldCount()">
-                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">職務</span>
+                        <input type="checkbox" class="export-field-checkbox w-4 h-4 accent-indigo-600" value="jobTitle" data-label="職稱" checked onchange="updateExportFieldCount()">
+                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">職稱</span>
                     </label>
                     <label class="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition">
                         <input type="checkbox" class="export-field-checkbox w-4 h-4 accent-indigo-600" value="time" data-label="考勤時間" checked onchange="updateExportFieldCount()">
@@ -2186,10 +2186,10 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1">職務</label>
+                    <label class="block text-xs font-bold mb-1">職稱</label>
                     <select id="manualLeaveJobTitle" onchange="refreshManualLeaveEmployees()"
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                        <option value="ALL">全部職務</option>
+                        <option value="ALL">全部職稱</option>
                     </select>
                 </div>
                 <div>
@@ -3097,43 +3097,43 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
         }
 
         function addJobTitle() {
-            if (!requireAdminAction('departmentManage', '新增職務類別')) return;
+            if (!requireAdminAction('departmentManage', '新增職稱類別')) return;
             const input = document.getElementById('newJobTitleName');
             const name = String(input?.value || '').trim();
-            if (!name) { showToast('請輸入職務名稱', 'warning'); return; }
+            if (!name) { showToast('請輸入職稱名稱', 'warning'); return; }
             const before = normalizeJobTitles(sysConfig.jobTitles);
-            if (before.includes(name)) { showToast(`職務「${name}」已存在`, 'warning'); return; }
+            if (before.includes(name)) { showToast(`職稱「${name}」已存在`, 'warning'); return; }
             sysConfig.jobTitles = normalizeJobTitles([...before, name]);
             saveConfig();
             refreshJobTitleControls(name);
             if (input) input.value = '';
-            showToast(`已新增職務：${name}`, 'success');
+            showToast(`已新增職稱：${name}`, 'success');
         }
 
         function deleteJobTitle(encodedJobTitle) {
-            if (!requireAdminAction('departmentManage', '刪除或調動職務類別')) return;
+            if (!requireAdminAction('departmentManage', '刪除或調動職稱類別')) return;
             const jobTitle = decodeURIComponent(encodedJobTitle || '');
             if (!jobTitle) return;
             const allAssigned = employees.filter(emp => String(emp.jobTitle || emp.deptDetail || '') === jobTitle);
             const assigned = allAssigned.filter(canCurrentAdminViewEmployee);
             if (isAdminLoggedIn && !isCurrentViewerSuperAdmin() && allAssigned.length !== assigned.length) {
-                showToast('此職務包含受保護的管理員帳號，只有超級管理員可以刪除', 'warning');
+                showToast('此職稱包含受保護的管理員帳號，只有超級管理員可以刪除', 'warning');
                 return;
             }
             const others = normalizeJobTitles(sysConfig.jobTitles).filter(value => value !== jobTitle);
-            if (!others.length) { showToast('至少必須保留一個職務類別', 'warning'); return; }
+            if (!others.length) { showToast('至少必須保留一個職稱類別', 'warning'); return; }
             if (assigned.length) {
-                const target = prompt(`${jobTitle} 目前有 ${assigned.length} 位員工。\n請輸入要轉入的職務名稱：\n${others.join('、')}`);
+                const target = prompt(`${jobTitle} 目前有 ${assigned.length} 位員工。\n請輸入要轉入的職稱名稱：\n${others.join('、')}`);
                 if (target == null) return;
                 const exactTarget = others.find(value => value === String(target).trim());
-                if (!exactTarget) { showToast('找不到指定的轉入職務，未執行刪除', 'warning'); return; }
+                if (!exactTarget) { showToast('找不到指定的轉入職稱，未執行刪除', 'warning'); return; }
                 assigned.forEach(emp => {
                     emp.jobTitle = exactTarget;
                     emp.deptDetail = exactTarget;
                 });
                 saveEmployees();
                 postToCloud({ action: 'syncEmployees', employees });
-            } else if (!confirm(`確定刪除職務「${jobTitle}」嗎？`)) return;
+            } else if (!confirm(`確定刪除職稱「${jobTitle}」嗎？`)) return;
             sysConfig.jobTitles = others;
             saveConfig();
             refreshJobTitleControls();
@@ -3142,7 +3142,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             renderAdminLiveTable();
             renderAdminLeaveTable();
             renderAttendanceStatsTable();
-            showToast(`已刪除職務：${jobTitle}`, 'success');
+            showToast(`已刪除職稱：${jobTitle}`, 'success');
         }
 
         function ensureBuiltinAdminAccount() {
@@ -4845,7 +4845,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
             document.getElementById('empNameDisplay').textContent = sessionName || currentEmp?.name || empId;
             document.getElementById('empAttNoDisplay').textContent = sessionAttNo || currentEmp?.attNo || '--';
             document.getElementById('empDeptDisplay').textContent = sessionDept
-                ? `部門：${sessionDept}${sessionJob ? `｜職務：${sessionJob}` : ''}`
+                ? `部門：${sessionDept}${sessionJob ? `｜職稱：${sessionJob}` : ''}`
                 : '部門：首頁已驗證｜完整資料背景同步中';
             const roleBadge = document.getElementById('empRoleBadge');
             if (roleBadge) {
@@ -5011,7 +5011,7 @@ const now = new Date();
                             const dept = String(sessionNow?.dept || sessionNow?.department || currentEmp?.dept || '').trim();
                             const job = String(sessionNow?.jobTitle || sessionNow?.deptDetail || currentEmp?.jobTitle || '').trim();
                             document.getElementById('empDeptDisplay').textContent = dept
-                                ? `部門：${dept}${job ? `｜職務：${job}` : ''}`
+                                ? `部門：${dept}${job ? `｜職稱：${job}` : ''}`
                                 : '部門：首頁已驗證｜雲端資料背景重試中';
                             const roleBadge = document.getElementById('empRoleBadge');
                             if (roleBadge && currentEmp?.sessionFallback) roleBadge.textContent = '首頁已驗證';
@@ -6901,7 +6901,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
                     localStorage.setItem('sp_employees_v5', JSON.stringify(employees));
                 } catch (e) {}
 
-                // V5.10.2：完整主檔回來後，把單位／職務即時補到目前考勤 records。
+                // V5.10.2：完整主檔回來後，把單位／職稱即時補到目前考勤 records。
                 // 這不是改考勤時間，只是補顯示用的人資欄位，避免 buildDailyAttendanceRows 再次顯示 --。
                 try {
                     let enriched = false;
@@ -6962,7 +6962,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
 
                 try { initDropdowns(); } catch (e) {}
 
-                // V5.8：員工主檔一回來，立刻重新對照單位／職務並刷新考勤表。
+                // V5.8：員工主檔一回來，立刻重新對照單位／職稱並刷新考勤表。
                 if (!document.getElementById('viewAdmin')?.classList.contains('hidden')) {
                     try { renderAdminRecordsTable(); } catch (e) {}
                     try { renderAdminLiveTable(); } catch (e) {}
@@ -8322,7 +8322,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
             if (foundExact) return foundExact;
 
-            // 後台與員工入口皆可使用姓名；忽略空白及姓名後方的職務標記，例如「郭亞倫(F/L)」。
+            // 後台與員工入口皆可使用姓名；忽略空白及姓名後方的職稱標記，例如「郭亞倫(F/L)」。
             const foundByName = findEmployeesByName(cleanVal);
             if (foundByName.length === 1) return foundByName[0];
 
@@ -8785,7 +8785,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 let note = '';
                 if (myLeaves.length) note = `📝 ${myLeaves[0].leaveType || '請假'}已核准`;
                 else if (dayMeta) note = `${dayMeta.forName ? `🔄 代班：${dayMeta.forName}` : ''}${dayMeta.overtime ? `${dayMeta.forName ? '｜' : ''}⭐ 加班` : ''}`;
-                else if (coworkerLeaves.length) note = `⚠️ 同職務有人請假，留意代班／加班`;
+                else if (coworkerLeaves.length) note = `⚠️ 同職稱有人請假，留意代班／加班`;
                 upcoming.push(`<div class="rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 px-3 py-3">
                     <div class="flex items-center justify-between gap-2">
                         <div><div class="text-xs font-black text-slate-700 dark:text-slate-200">${offset === 0 ? '今天・' : ''}${escapeHtml(formatScheduleDayLabel(dateKey))}</div>${note ? `<div class="mt-1 text-[10px] text-amber-700 dark:text-amber-300 font-bold">${escapeHtml(note)}</div>` : ''}</div>
@@ -8798,7 +8798,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (alertEl) {
                 const uniqueAlerts = [...new Set(alertDates)];
                 if (uniqueAlerts.length) {
-                    alertEl.innerHTML = `<strong>⚠️ 本月代班／加班提醒：</strong><br>${uniqueAlerts.slice(0, 6).map(escapeHtml).join('<br>')}${uniqueAlerts.length > 6 ? `<br>另有 ${uniqueAlerts.length - 6} 天提醒` : ''}<br><span class="opacity-80">已正式指定的代班／加班會直接顯示；未指定時才依同職務已核准請假提供提醒。</span>`;
+                    alertEl.innerHTML = `<strong>⚠️ 本月代班／加班提醒：</strong><br>${uniqueAlerts.slice(0, 6).map(escapeHtml).join('<br>')}${uniqueAlerts.length > 6 ? `<br>另有 ${uniqueAlerts.length - 6} 天提醒` : ''}<br><span class="opacity-80">已正式指定的代班／加班會直接顯示；未指定時才依同職稱已核准請假提供提醒。</span>`;
                     alertEl.classList.remove('hidden');
                 } else {
                     alertEl.classList.add('hidden');
@@ -8942,7 +8942,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 .filter(emp => dept === 'ALL' || String(emp.dept || emp.leaveBalance.sourceDept || '') === dept)
                 .map(emp => String(emp.jobTitle || emp.deptDetail || '')).filter(Boolean))]
                 .sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-            jobTitleEl.innerHTML = '<option value="ALL">全部職務</option>' + jobTitles.map(v => `<option value="${v}">${v}</option>`).join('');
+            jobTitleEl.innerHTML = '<option value="ALL">全部職稱</option>' + jobTitles.map(v => `<option value="${v}">${v}</option>`).join('');
             jobTitleEl.value = jobTitles.includes(currentJobTitle) ? currentJobTitle : 'ALL';
             if (shouldRender) renderAdminLeaveBalanceTable();
         }
@@ -9142,7 +9142,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         '員工編號': normalizeLeaveEmployeeNo(id),
                         '員工姓名': emp.name || b.sourceName || '',
                         '部門': emp.dept || b.sourceDept || '',
-                        '職務': emp.jobTitle || emp.deptDetail || '',
+                        '職稱': emp.jobTitle || emp.deptDetail || '',
                         '遞延天數': Number(b.carryOver) || 0,
                         '今年年假天數': Number(b.annual) || 0,
                         '已休年假天數': Math.round(((Number(b.used) || 0) + info.newlyApproved) * 10) / 10,
@@ -9238,7 +9238,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 renderEmployeeSchedule(currentEmp);
                 document.getElementById('empNameDisplay').textContent = currentEmp.name;
                 document.getElementById('empAttNoDisplay').textContent = currentEmp.attNo;
-                document.getElementById('empDeptDisplay').textContent = `部門：${currentEmp.dept || '一般'}｜職務：${currentEmp.jobTitle || currentEmp.deptDetail || '未設定'}`;
+                document.getElementById('empDeptDisplay').textContent = `部門：${currentEmp.dept || '一般'}｜職稱：${currentEmp.jobTitle || currentEmp.deptDetail || '未設定'}`;
                 const canShowPrivateInfo = isFirstPunchVerified(currentEmp);
                 document.getElementById('empExtraInfoDisplay').innerHTML = canShowPrivateInfo ? `
                     <span>📞 電話: ${escapeHtml(normalizePhoneNumber(currentEmp.phone) || '無')}</span>
@@ -11439,7 +11439,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 .map(emp => String(emp.jobTitle || emp.deptDetail || '未設定').trim())
                 .filter(Boolean))]
                 .sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
-            jobSelect.innerHTML = '<option value="ALL">全部職務</option>' + jobTitles.map(job => `<option value="${escapeHtml(job)}">${escapeHtml(job)}</option>`).join('');
+            jobSelect.innerHTML = '<option value="ALL">全部職稱</option>' + jobTitles.map(job => `<option value="${escapeHtml(job)}">${escapeHtml(job)}</option>`).join('');
             jobSelect.value = jobTitles.includes(currentJob) ? currentJob : 'ALL';
             refreshManualLeaveEmployees();
         }
@@ -11658,7 +11658,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const currentEmp = empSelect.value || 'ALL';
             const departmentRows = getVisibleLeaveFilterRows().filter(row => dept === 'ALL' || row.dept === dept);
             const jobTitles = [...new Set(departmentRows.map(row => row.jobTitle).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-            jobTitleSelect.innerHTML = '<option value="ALL">全部職務</option>' + jobTitles.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+            jobTitleSelect.innerHTML = '<option value="ALL">全部職稱</option>' + jobTitles.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
             jobTitleSelect.value = jobTitles.includes(currentJobTitle) ? currentJobTitle : 'ALL';
             const selectedJobTitle = jobTitleSelect.value || 'ALL';
             const matchingRows = departmentRows.filter(row => selectedJobTitle === 'ALL' || row.jobTitle === selectedJobTitle);
@@ -11894,7 +11894,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     '工號': emp?.empId || l.empId || '',
                     '姓名': emp?.name || l.name || '',
                     '部門': emp?.dept || l.dept || '',
-                    '職務': emp?.jobTitle || emp?.deptDetail || '',
+                    '職稱': emp?.jobTitle || emp?.deptDetail || '',
                     '請假類型': l.leaveType || '',
                     '開始日期': formatDateOnly(l.startTime),
                     '結束日期': formatDateOnly(l.endTime),
@@ -12479,7 +12479,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 filteredEmps = filteredEmps.filter(e => (e.dept || '一般') === deptFilter);
             }
             const jobTitles = [...new Set(filteredEmps.map(e => String(e.jobTitle || e.deptDetail || '未設定')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-            jobTitleSelect.innerHTML = '<option value="ALL">全部職務</option>' + jobTitles.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+            jobTitleSelect.innerHTML = '<option value="ALL">全部職稱</option>' + jobTitles.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
             jobTitleSelect.value = jobTitles.includes(currentJobTitle) ? currentJobTitle : 'ALL';
             const jobTitleFilter = jobTitleSelect.value || 'ALL';
             if (jobTitleFilter !== 'ALL') {
@@ -15366,7 +15366,7 @@ function getManualPairRecordAnchor(record) {
 
             p79MainTableDuplicateRows = renderRows;
             tbody.innerHTML = renderRows.map((row, rowIndex) => {
-                // V5.10.3：顯示單位／職務時每列直接用考勤號查員工主檔。
+                // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
                 // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
                 const displayEmp = findEmployeeForAttendanceDisplay(row, visibleEmployees)
                     || findEmployeeForAttendanceIdentity(row, visibleEmployees);
@@ -16217,7 +16217,7 @@ function getManualPairRecordAnchor(record) {
 
 
         const p79AddStrokeSorter = new Intl.Collator('zh-Hant-TW-u-co-stroke', {numeric:true});
-        function p79AddJob(e){return String(e?.jobTitle||e?.deptDetail||'').trim()||'未設定職務';}
+        function p79AddJob(e){return String(e?.jobTitle||e?.deptDetail||'').trim()||'未設定職稱';}
         function p79AddEmployeesSorted(list){return list.slice().sort((a,b)=>p79AddStrokeSorter.compare(String(a?.name||''),String(b?.name||''))||String(a?.empId||'').localeCompare(String(b?.empId||'')));}
         function p79AddRefreshEmployeeOptions(preferred=''){
             const dept=document.getElementById('addModalDeptSelect')?.value||'';
@@ -16233,7 +16233,7 @@ function getManualPairRecordAnchor(record) {
             const select=document.getElementById('addModalJobSelect');if(!select)return;
             const current=preferred||select.value;
             const jobs=[...new Set(getAdminAttendanceEmployees().filter(e=>String(e?.dept||'一般')===dept).map(p79AddJob))].sort(p79AddStrokeSorter.compare);
-            select.innerHTML='<option value="">全部職務</option>'+jobs.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+            select.innerHTML='<option value="">全部職稱</option>'+jobs.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
             if(jobs.includes(current))select.value=current;
         }
         function p79AddModalJobChanged(){p79AddRefreshEmployeeOptions();}
@@ -17085,7 +17085,7 @@ function getManualPairRecordAnchor(record) {
             let scopedRows = monthEl.value === 'ALL' ? rows : rows.filter(row => row.monthKey === monthEl.value);
             replaceOvertimeOptions(deptEl, '全部部門', scopedRows.map(row => row.dept).sort((a, b) => a.localeCompare(b, 'zh-Hant')));
             if (deptEl.value !== 'ALL') scopedRows = scopedRows.filter(row => row.dept === deptEl.value);
-            replaceOvertimeOptions(jobEl, '全部職務', scopedRows.map(row => row.jobTitle).sort((a, b) => a.localeCompare(b, 'zh-Hant')));
+            replaceOvertimeOptions(jobEl, '全部職稱', scopedRows.map(row => row.jobTitle).sort((a, b) => a.localeCompare(b, 'zh-Hant')));
             if (jobEl.value !== 'ALL') scopedRows = scopedRows.filter(row => row.jobTitle === jobEl.value);
             const nameMap = new Map();
             scopedRows.forEach(row => nameMap.set(String(row.empId), row.name));
@@ -17234,7 +17234,7 @@ function getManualPairRecordAnchor(record) {
             const departmentEmployees = visibleEmployees.filter(emp => dept === 'ALL' || String(emp.dept || '一般') === dept);
             fillOptions(
                 jobEl,
-                '全部職務',
+                '全部職稱',
                 [...departmentEmployees].sort((a, b) => String(a.jobTitle || a.deptDetail || '').localeCompare(String(b.jobTitle || b.deptDetail || ''), 'zh-Hant')),
                 emp => emp.jobTitle || emp.deptDetail || '未設定',
                 emp => emp.jobTitle || emp.deptDetail || '未設定'
@@ -17356,7 +17356,7 @@ function p79EmployeeDateEligible(emp,date) {
             }).join('');
             head.innerHTML = `<tr>
                 <th class="p79-stats-dept-head sticky z-20 bg-slate-100 dark:bg-slate-900">部門</th>
-                <th class="p79-stats-job-head sticky z-20 bg-slate-100 dark:bg-slate-900">職務</th>
+                <th class="p79-stats-job-head sticky z-20 bg-slate-100 dark:bg-slate-900">職稱</th>
                 <th class="p79-stats-person-head sticky z-20 bg-slate-100 dark:bg-slate-900">姓名／工號</th>
                 ${dayHeaders}
                 <th class="p79-stats-total-head sticky right-0 z-20 border-l-2 border-indigo-200 dark:border-indigo-800 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">結算天數</th>
@@ -17422,7 +17422,7 @@ function p79EmployeeDateEligible(emp,date) {
             const attendanceDays = buildAttendanceDayMapByShift(visibleEmployees, year, month);
 
             const dayHeaders = Array.from({ length: 31 }, (_, index) => `${index + 1}日`);
-            const sheetRows = [['公司', '完整工號', '姓名', '部門', '職務', ...dayHeaders, '結算天數']];
+            const sheetRows = [['公司', '完整工號', '姓名', '部門', '職稱', ...dayHeaders, '結算天數']];
             visibleEmployees.forEach(emp => {
                 const empId = String(emp.empId || '');
                 const company = empId.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() || '';
@@ -17474,7 +17474,7 @@ function p79EmployeeDateEligible(emp,date) {
             setOptions(deptEl, '全部部門', visibleEmployees.map(e => String(e.dept || '一般')));
             const selectedDept = deptEl.value || 'ALL';
             const departmentEmployees = visibleEmployees.filter(e => selectedDept === 'ALL' || String(e.dept || '一般') === selectedDept);
-            setOptions(jobTitleEl, '全部職務', departmentEmployees.map(e => String(e.jobTitle || e.deptDetail || '')).filter(Boolean));
+            setOptions(jobTitleEl, '全部職稱', departmentEmployees.map(e => String(e.jobTitle || e.deptDetail || '')).filter(Boolean));
             const selectedJobTitle = jobTitleEl.value || 'ALL';
             const jobEmployees = departmentEmployees.filter(e => selectedJobTitle === 'ALL' || String(e.jobTitle || e.deptDetail || '') === selectedJobTitle);
             setOptions(nameEl, '全部姓名', jobEmployees.map(e => String(e.name || '')).filter(Boolean));
@@ -17586,8 +17586,8 @@ function p79EmployeeDateEligible(emp,date) {
             if (!deptEl || !detailEl) return;
             const dept = deptEl.value;
             const options = normalizeJobTitles(sysConfig.jobTitles);
-            if (labelEl) labelEl.innerHTML = '職務 <span class="text-rose-500">*</span>';
-            if (hintEl) hintEl.textContent = `${dept || '目前部門'}：可直接調整職務，例如 AQC 轉為 ARMG`;
+            if (labelEl) labelEl.innerHTML = '職稱 <span class="text-rose-500">*</span>';
+            if (hintEl) hintEl.textContent = `${dept || '目前部門'}：可直接調整職稱，例如 AQC 轉為 ARMG`;
             detailEl.innerHTML = options.map(v => `<option value="${v}">${v}</option>`).join('');
             if (selectedValue && !options.includes(selectedValue)) {
                 const option = document.createElement('option');
@@ -17827,7 +17827,7 @@ function p79EmployeeDateEligible(emp,date) {
                 return;
             }
             if (!ensureExcelLibrary()) return;
-            const headers = ['考勤號', '工號', '姓名', '部門', '電話', '到職日', '生日', '密碼', '後台角色', '監看權限', '員工清單權限', '公司', '職務', '操作權限'];
+            const headers = ['考勤號', '工號', '姓名', '部門', '電話', '到職日', '生日', '密碼', '後台角色', '監看權限', '員工清單權限', '公司', '職稱', '操作權限'];
             const rows = visibleEmployees.map(e => {
                 const permissions = Array.isArray(e.monitorPermissions) ? e.monitorPermissions.join('|') : '';
                 const actionPermissions = getActionPermissions(e).join('|');
@@ -22529,7 +22529,7 @@ window.p79AttendanceRecordCounts = function(){
     const mergedMonth=losslessMerge([remoteRows,same]);
     records=losslessMerge([mergedMonth,other]);
 
-    // V5.10.10：四來源聯集完成後立刻補姓名/部門/職務，
+    // V5.10.10：四來源聯集完成後立刻補姓名/部門/職稱，
     // 姓名篩選與補卡下拉不再等待下一次 render 才出現。
     try{repairAttendanceNamesInMemory();}catch(e){}
 

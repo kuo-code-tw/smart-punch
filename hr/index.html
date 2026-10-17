@@ -310,6 +310,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="orgbox"><h3>🧭 單位</h3><div style="display:flex;gap:6px"><input id="newUnit" placeholder="新增單位"><button class="btn primary" onclick="addOrgItem('units','newUnit')">新增</button></div><div id="unitList" class="orglist"></div></div>
     <div class="orgbox"><h3>🎖️ 職稱</h3><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
   </div>
+  <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
   <div class="footer"><div class="muted">刪除選項只會移除「選單選項」，不會刪掉既有人員歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
 </div></dialog>
 
@@ -603,7 +604,7 @@ async function jfetch(url,opt={},ms=16000){
     if(/未知操作\s*:\s*\[(hrSaveOrgSettings|hrUpsertEmployee|hrClearEmployeeHistory)\]/i.test(msg)){
       msg='目前人資網頁已更新，但 Google Apps Script 尚未部署到同一版本。請將 v2026.09.28.7.42 的 Code.gs 覆蓋後，在「管理部署作業」建立新版本並部署。';
     }
-    throw new Error(msg);
+    const error=new Error(msg);error.retryable=d.retryable;error.code=d.code;throw error;
   }
   return d;
 }
@@ -811,6 +812,7 @@ function openOrgSettings(){if(!canHr('org.view'))return alert('沒有查看組�
     units:uniqSorted(orgSettings.units).slice()
   };
   renderOrgSettings();
+  p79OrgSaveStatus('');
   orgDialog.showModal();
 }
 function renderOrgSettings(){
@@ -837,8 +839,9 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
   try{
     $('saveOrgBtn').disabled=true;
     $('saveOrgBtn').textContent='正在儲存…';
+    p79OrgSaveStatus('正在核對及儲存組織設定…');
     const draft=normalizeOrgSettings(orgDraft);
-    const currentConfig=await p79ReadCanonicalOrgOptions();
+    const currentConfig=await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
     const config={...currentConfig,[P79_HR_ORG_OPTIONS_KEY]:draft,departments:draft.departments,jobTitles:draft.jobTitles};
     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
     await p79RetryOrgSave(()=>({action:'hrSaveOrgSettings',settings:draft}));
@@ -849,26 +852,37 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
       if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
       return {action:'saveConfig',config:merged};
     });
-    await p79ReadCanonicalOrgOptions();
+    await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
     if(JSON.stringify(p79CanonicalOrgOptions)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
     orgSettings=draft;
     populateFilters();orgDialog.close();
     $('status').textContent='✅ 部門／職稱／單位已儲存到雲端，七大系統人資主檔可共用';
-  }catch(e){alert('組織設定儲存失敗：'+(e.message||e))}
+  }catch(e){p79OrgSaveStatus('尚未完成組織設定儲存：'+(e.message||e)+'。你的修改仍保留，請保留視窗並稍後再試。',true);}
   finally{$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
 }
-async function p79RetryOrgSave(makePayload){
+function p79OrgSaveStatus(text,error=false){
+  const el=$('orgSaveStatus');if(!el)return;
+  el.textContent=String(text||'');el.style.color=error?'#be123c':'#036980';
+}
+function p79OrgSaveIsLockBusy(error){
+  if(error?.retryable===false)return false;
+  return /雲端目前正在(?:處理其他資料|寫入資料)|(?:資料鎖|寫入鎖).*(?:忙碌|占用|佔用)|^(?:LOCK_BUSY|WRITE_LOCK_BUSY)$/i.test(String(error?.message||error||'')) || ['LOCK_BUSY','WRITE_LOCK_BUSY'].includes(String(error?.code||''));
+}
+async function p79RetryOrgOperation(operation){
   for(let attempt=0;attempt<4;attempt++){
-    try{return await apiPost(await makePayload())}
+    try{return await operation()}
     catch(error){
-      // 只重試明確尚未取得資料鎖的回應；網路逾時與驗證失敗不自動重送。
-      if(!/雲端目前正在處理其他資料/.test(String(error?.message||error)))throw error;
-      if(attempt===3)throw new Error('雲端仍忙碌，已重試3次；你的修改仍保留，請稍後再按儲存');
-      $('saveOrgBtn').textContent=`雲端忙碌，自動重試 ${attempt+1}/3…`;
+      // 僅重試明確的鎖忙碌回應；逾時、驗證、容量及其他錯誤不重送。
+      if(!p79OrgSaveIsLockBusy(error))throw error;
+      if(attempt===3)throw new Error('雲端仍忙碌，已重試3次');
+      const label=`雲端忙碌，自動重試 ${attempt+1}/3…`;
+      $('saveOrgBtn').textContent=label;p79OrgSaveStatus(label+' 目前修改內容會保留。');
       await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt)));
     }
   }
 }
+async function p79RetryOrgSave(makePayload){return p79RetryOrgOperation(async()=>apiPost(await makePayload()));}
+
 function openMasterPicker(kind,targetId){
   pickerKind=kind;pickerTarget=targetId;
   const label=kind==='departments'?'部門':kind==='units'?'單位':'職稱';
