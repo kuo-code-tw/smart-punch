@@ -15827,8 +15827,23 @@ function getManualPairRecordAnchor(record) {
             try { input.dispatchEvent(new Event('change', {bubbles:true})); } catch (e) {}
         }
 
-        function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null) {
+        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null) {
             if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
+            if (window.p79V5PrepareAttendanceEdit) {
+                try {
+                    const cloud = await window.p79V5PrepareAttendanceEdit(id);
+                    const existing = records.find(item => String(item.id) === String(id) && (!expectedType || getAttendanceRecordType(item) === expectedType));
+                    if (existing) {
+                        if ((existing.empId && String(existing.empId) !== String(cloud.empId)) || (expectedType && getAttendanceRecordType(cloud) !== expectedType)) throw new Error('雲端紀錄身分或上下班類型不同，請重新讀取考勤後核對');
+                        Object.assign(existing, cloud);
+                    }
+                    expectedTime = String(cloud.timeStr || '');
+                } catch (error) {
+                    showToast(String(error?.message || '雲端核對失敗，請稍後再試'), 'warning');
+                    return;
+                }
+            }
+
             const candidates = records.filter(item =>
                 String(item.id) === String(id) &&
                 (!expectedIdentity || p79AuditRecordIdentityMatches(expectedIdentity, item))
@@ -16067,8 +16082,8 @@ function getManualPairRecordAnchor(record) {
                     return;
                 }
 
-                const originalTimeStr = String(r.timeStr || '');
-                const originalPunchType = getAttendanceRecordType(r);
+                const originalTimeStr = String(snapshot?.timeStr || r.timeStr || '');
+                const originalPunchType = getAttendanceRecordType(snapshot || r);
                 const previousSnapshot = { ...r };
 
                 // 保存匯入時的原始事件識別。再次匯入同一事件時，人工修改版優先。
@@ -22915,7 +22930,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-conflict"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-edit-sync"></script>
 
 
 
