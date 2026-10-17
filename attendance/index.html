@@ -931,6 +931,12 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
 </style>
+<style id="p79-attendance-single-line-toolbar">
+#attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
+#attendanceRecordsToolbar>div{flex-wrap:nowrap!important;flex-shrink:0!important}
+#attendanceRecordsToolbar [aria-label="異常顏色圖例"],#attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center;gap:4px;white-space:nowrap!important}
+#attendanceRecordsToolbar button,#attendanceRecordsToolbar select,#attendanceRecordsToolbar span{white-space:nowrap!important;flex-shrink:0}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="port79-employee-only bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="attendance">
@@ -1162,7 +1168,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 
             <!-- 分頁 1：考勤紀錄管理與修改 -->
             <div id="adminContentRecords" class="space-y-4">
-                <div class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-2 mb-2">
+                <div id="attendanceRecordsToolbar" class="flex flex-nowrap justify-between items-center gap-2 mb-2">
                     <div class="flex flex-wrap items-center gap-2 min-w-0 flex-1">
                         <div class="flex items-center gap-2 min-w-0">
                             <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">📅 年月篩選：</label>
@@ -1170,16 +1176,15 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             <div id="attendanceMonthTabs" class="hidden sm:flex items-center gap-2 overflow-x-auto pb-1 max-w-full"></div>
                         </div>
                         <div class="min-w-0 flex-1 text-[9px] leading-tight" aria-label="異常顏色圖例">
-    <div class="flex flex-col gap-0.5 text-[9px] leading-tight text-slate-600 dark:text-slate-300" >
-                            <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+    <div class="flex flex-nowrap gap-1 text-[9px] leading-tight text-slate-600 dark:text-slate-300" >
+                            <div class="flex flex-nowrap items-center gap-x-1">
                                 <span class="font-bold whitespace-nowrap">💡 異常顏色：</span>
                                 <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
                                 <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300">缺卡｜缺少簽到</span>
                                 <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300">缺卡｜缺少簽退</span>
                             </div>
-                            <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                            <div class="flex flex-nowrap items-center gap-x-1">
                                 <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 dark:border-amber-800 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300">時間提醒｜上班分鐘 01–30</span>
-                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 dark:border-violet-800 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300">時間提醒｜下班分鐘不在 45–60</span>
                             </div>
                         </div>
                         </div>
@@ -15352,7 +15357,7 @@ function getManualPairRecordAnchor(record) {
                     ''
                 ).trim();
 
-                const assessmentDetails = (row.attendanceAssessmentReasons || []).map(reason => `<span class="block mt-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
+                const assessmentDetails = (row.attendanceAssessmentReasons || []).filter(reason => !String(reason).startsWith('上班時間與班表不符') && String(reason) !== '下班分鐘未在45–60').map(reason => `<span class="inline-flex ml-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
                 const statusBadge = ((Number(row.duplicateRecordCount)>0||String(row.attendanceStatus || '').includes('重複'))
                     ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對已整合的重複打卡">🔎 重複刷卡已整合</button>${getAttendanceStatusBadge(row.attendanceStatus)}`
                     : getAttendanceStatusBadge(row.attendanceStatus)) + assessmentDetails;
