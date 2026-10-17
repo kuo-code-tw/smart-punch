@@ -596,6 +596,13 @@ body[data-p79-system="efficiency"] #vesselDetailTable th,body[data-p79-system="e
 html.dark body[data-p79-system="efficiency"]{background:#101f30!important;color:#e5edf5}html.dark body[data-p79-system="efficiency"] .card{background:#172c40!important;border-color:#334b60!important}html.dark body[data-p79-system="efficiency"] table.tbl td{background:#172c40!important;color:#e5edf5!important}html.dark body[data-p79-system="efficiency"] table.tbl tbody tr:nth-child(even) td{background:#1d354c!important}html.dark body[data-p79-system="efficiency"] table.tbl th{background:#274259!important;color:#e3edf5!important}html.dark .vessel-section-title h2,html.dark .vessel-aqc-card strong{color:#e5edf5}html.dark .vessel-aqc-card{background:#1b3548}html.dark .vessel-source-state,html.dark .vessel-aqc-card>span{color:#b9cfdf!important}
 @media(max-width:800px){body[data-p79-system="efficiency"] main{padding:12px 10px 24px!important}.vessel-section-title{align-items:flex-start;flex-direction:column;gap:6px}.vessel-aqc-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.vessel-section-title h2{font-size:20px}#recordSelectedShipSummary .grid{width:100%;gap:12px!important}#recordSelectedShipName{font-size:20px!important}body[data-p79-system="efficiency"] #driverVesselDetailTable td{font-size:16px!important}.vessel-table-scroll{max-height:70vh}}
 @media(prefers-reduced-motion:no-preference){body[data-p79-system="efficiency"] .btn{transition:background .15s,box-shadow .15s}.vessel-edit:hover{box-shadow:0 2px 8px #193f5926}}
+
+body[data-p79-system="efficiency"] .tab[data-tab]{background:#fff!important;border:1px solid #d5e2ec!important;color:#46647b!important}
+body[data-p79-system="efficiency"] .tab[data-tab].active{background:#174d69!important;border-color:#174d69!important;color:#fff!important;box-shadow:0 4px 10px #174d6926}
+body[data-p79-system="efficiency"] #view-personstats #driverVesselDetailTable tbody .vessel-operation-row:nth-child(odd) td{background:#fff!important}
+body[data-p79-system="efficiency"] #view-personstats #driverVesselDetailTable tbody .vessel-operation-row:nth-child(even) td{background:#f4f9fb!important}
+body[data-p79-system="efficiency"] #view-personstats #driverVesselDetailTable tbody .vessel-operation-row:hover td{background:#e7f6f2!important}
+html.dark body[data-p79-system="efficiency"] #view-personstats #driverVesselDetailTable tbody .vessel-operation-row td{background:#1c354a!important}
 </style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
@@ -909,11 +916,11 @@ html.dark body[data-p79-system="efficiency"]{background:#101f30!important;color:
         <div class="text-sm font-black mb-2">篩選作業明細</div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
-            <label class="text-xs font-bold">組別</label>
+            <label for="recordGroupFilter" class="text-xs font-bold">組別</label>
             <select id="recordGroupFilter" class="block w-full border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部組別</option></select>
           </div>
           <div>
-            <label class="text-xs font-bold">司機</label>
+            <label for="driverVesselName" class="text-xs font-bold">姓名（筆畫排序）</label>
             <select id="driverVesselName" class="block w-full border rounded-xl px-3 py-2 bg-white" onchange="renderVesselDriverView()"><option value="">全部人員</option></select>
           </div>
           <div>
