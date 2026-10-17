@@ -15,4 +15,4 @@ vm.runInContext(fn('renderPersonnelRecords'),c);c.renderPersonnelRecords(rows.sl
 assert(!/<button[^>]*data-tab="workload"/.test(html));assert(/data-tab="weekly"[^>]*>👥 人員統計/.test(html));const weekly=html.slice(html.indexOf('<section id="view-weekly"'),html.indexOf('<dialog id="vesselMonthlyExportDialog"'));assert(weekly.includes('id="view-workload"'));assert(!weekly.includes('<th>備註</th>'));assert.equal((html.match(/id="personStatPerson"/g)||[]).length,1);
 console.log(JSON.stringify({passed:7,failed:0,scope:'Unified personnel totals, all-person default, shared filters, drilldown and no remarks'}));
 
-for(const key of ['view-weekly-2','view-weekly-3','view-weekly-5'])assert(html.includes('class="p79-collapsible hidden" data-collapse-key="'+key+'"'));
+for(const key of ['view-weekly-2','view-weekly-3','view-weekly-5'])assert(html.includes('class="p79-section hidden" data-section-key="'+key+'"'));
