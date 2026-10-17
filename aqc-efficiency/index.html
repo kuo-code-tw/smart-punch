@@ -806,35 +806,6 @@ body[data-p79-system="efficiency"] main{
   </section>
 
   <section id="view-personstats" class="hidden space-y-4">
-    <div class="p79-section" data-section-key="view-personstats-1"><div><span>司機作業</span></div>
-<div class="card p-4">
-            <p class="text-sm text-slate-500 mt-2">選船舶與姓名，即可查看司機的作業時間、櫃數與效率。</p>
-      <div class="flex flex-wrap items-end gap-3 mt-3">
-        <div><label for="driverVesselMonth" class="block text-xs font-bold">月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
-        <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
-
-        <div><label for="driverVesselName" class="block text-xs font-bold">姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
-
-        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
-
-
-      </div>
-      <div id="driverVesselLoadState" class="mt-2 text-xs" role="status"></div>
-      <div class="mt-3 rounded-xl border p-3"><div class="text-sm text-slate-600">篩選與資料狀態</div><div class="flex flex-wrap gap-3 items-end mt-3">        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">重新讀取資料</button></div>
-      <div id="driverVesselSourceState" class="mt-2 text-xs" role="status"></div>
-      <div class="flex flex-wrap items-center gap-2 mt-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取組別</button></div>
-      <p class="text-xs text-slate-500 mt-2">組別取自作業當月排班表。效率＝（櫃數＋H/C）÷ 時數。</p></div>
-      <div class="overflow-auto mt-4">
-      <table class="tbl w-full min-w-[920px] text-center">
-        <thead><tr><th>日期</th><th>姓名</th><th>組別</th><th>AQC</th><th>作業時間</th><th>時數</th><th>櫃數</th><th>效率</th></tr></thead>
-        <tbody id="driverVesselRecordBody"></tbody>
-      </table>
-    </div>
-    </div>
-</div>
-    <div id="integratedRecordDetails" class="space-y-3">
-      <div class="card p-4 font-bold">進階維護（新增／修改紀錄）</div>
-  <section id="view-records" class="space-y-4">
     <div class="p79-section" data-section-key="view-records-1"><div><span>完整明細篩選與操作</span></div>
 <div class="card p-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-end">
@@ -927,6 +898,35 @@ body[data-p79-system="efficiency"] main{
       </div>
     </div>
 </div>
+    <div class="p79-section" data-section-key="view-personstats-1"><div><span>司機作業</span></div>
+<div class="card p-4">
+            <p class="text-sm text-slate-500 mt-2">選船舶與姓名，即可查看司機的作業時間、櫃數與效率。</p>
+      <div class="flex flex-wrap items-end gap-3 mt-3">
+        <div><label for="driverVesselMonth" class="block text-xs font-bold">月份</label><input id="driverVesselMonth" type="month" class="border rounded-xl px-3 py-2" onchange="onDriverVesselMonthChange()"></div>
+        <div class="flex-1 min-w-[220px]"><label for="driverVesselShip" class="block text-xs font-bold">船舶／航次</label><select id="driverVesselShip" class="border rounded-xl px-3 py-2 w-full" onchange="renderVesselDriverView()"><option value="">請選擇船舶</option></select></div>
+
+        <div><label for="driverVesselName" class="block text-xs font-bold">姓名（筆畫排序）</label><select id="driverVesselName" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部司機</option></select></div>
+
+        <div id="driverVesselCount" class="text-sm text-slate-500"></div>
+
+
+      </div>
+      <div id="driverVesselLoadState" class="mt-2 text-xs" role="status"></div>
+      <div class="mt-3 rounded-xl border p-3"><div class="text-sm text-slate-600">篩選與資料狀態</div><div class="flex flex-wrap gap-3 items-end mt-3">        <div><label for="driverVesselAqc" class="block text-xs font-bold">AQC</label><select id="driverVesselAqc" class="border rounded-xl px-3 py-2" onchange="renderVesselDriverView()"><option value="">全部 AQC</option></select></div>        <button type="button" class="btn bg-sky-600 text-white" onclick="loadDriverVesselMonth(true)">重新讀取資料</button></div>
+      <div id="driverVesselSourceState" class="mt-2 text-xs" role="status"></div>
+      <div class="flex flex-wrap items-center gap-2 mt-2"><span id="driverVesselGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取組別</button></div>
+      <p class="text-xs text-slate-500 mt-2">組別取自作業當月排班表。效率＝（櫃數＋H/C）÷ 時數。</p></div>
+      <div class="overflow-auto mt-4">
+      <table class="tbl w-full min-w-[920px] text-center">
+        <thead><tr><th>日期</th><th>姓名</th><th>組別</th><th>AQC</th><th>作業時間</th><th>時數</th><th>櫃數</th><th>效率</th></tr></thead>
+        <tbody id="driverVesselRecordBody"></tbody>
+      </table>
+    </div>
+    </div>
+</div>
+    <div id="integratedRecordDetails" class="space-y-3">
+      <div class="card p-4 font-bold">進階維護（新增／修改紀錄）</div>
+  <section id="view-records" class="space-y-4">
     <div class="p79-section" data-section-key="view-records-2"><div><span>完整作業紀錄</span></div>
 <div class="card p-4 overflow-auto max-h-[70vh]">
       <table class="tbl w-full min-w-[1580px] text-center">
