@@ -153,7 +153,7 @@ const MENU={
  workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
- efficiency:[['import','📥 匯入'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
+ efficiency:[['import','📥 匯入'],['monthly-export','📥 匯出每月作業量表'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
  hr:[['import','📥 匯入人員'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
  history:[]
 };
@@ -249,6 +249,7 @@ async function runAction(sys,a){closeMenu();try{
   if(a==='save-cloud')return await window.manualCloudSync?.();
   if(a==='import'){document.getElementById('excelImport')?.click();return}
   if(a==='compare'){document.getElementById('compareExcelInput')?.click();return}
+  if(a==='monthly-export')return window.openVesselMonthlyExportDialog?.();
   if(a==='export')return window.openExportDialog?.();
  }
  if(sys==='hr'){
@@ -267,7 +268,7 @@ function buildMenu(sys){
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
  const GROUPS=[
-  ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','schedule-continue','import','export']],
+  ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','schedule-continue','import','export','monthly-export']],
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['stats','overtime-summary','overtime-application','overtime-print','overtime-policy','logs','attendance-compare','compare']],
