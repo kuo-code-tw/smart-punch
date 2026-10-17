@@ -9615,6 +9615,48 @@ async function handleExcelDrop(e){
   }
   await importExcelFiles(files);
 }
+
+// p79-import-readback-v20261017
+function p79CheckWorkingReportReadback(expected,cloud){
+  const masterNos=new Set((cloud.shipMasters||[]).map(x=>String(x?.workingNo||'').trim()));
+  const byId=new Map((cloud.records||[]).filter(x=>x?.id).map(x=>[String(x.id),x]));
+  const missingMasters=[],missingRecords=[],mismatchedRecords=[];
+  const textFields=['workingNo','source','name','workDate','startTime','endTime'];
+  const numberFields=['disc','load','hatches','timeHours','rawDisc','rawLoad','bundleDeduct','sheetShiftMoves'];
+  for(const item of expected){
+    const no=String(item.master?.workingNo||'').trim();
+    if(!masterNos.has(no))missingMasters.push(no);
+    for(const row of item.records||[]){
+      const remote=byId.get(String(row.id||''));
+      if(!row.id||!remote){missingRecords.push(String(row.id||''));continue;}
+      const badText=textFields.some(k=>row[k]!==undefined&&String(remote[k]??'').trim()!==String(row[k]??'').trim());
+      const badNumber=numberFields.some(k=>row[k]!==undefined&&(!Number.isFinite(Number(row[k]))||!Number.isFinite(Number(remote[k]))||Math.abs(Number(remote[k])-Number(row[k]))>0.0002));
+      if(badText||badNumber)mismatchedRecords.push(String(row.id));
+    }
+  }
+  return {ok:!missingMasters.length&&!missingRecords.length&&!mismatchedRecords.length,
+    missingMasters,missingRecords,mismatchedRecords};
+}
+async function p79VerifyWorkingReportImports(expected){
+  if(!expected.length)return {ok:true,verified:false};
+  if(expected.some(x=>!x.master?.workingNo||!x.records?.length))throw Error('缺少匯入核對快照，不能確認雲端完成');
+  const months=new Set();
+  expected.forEach(item=>{
+    [item.master?.firstDate,item.master?.lastDate,item.master?.compareMonth,...(item.records||[]).map(r=>r.workDate)]
+      .forEach(v=>{const m=String(v||'').slice(0,7);if(/^\d{4}-\d{2}$/.test(m))months.add(m);});
+  });
+  if(!months.size)throw Error('匯入月份無法確認，雲端讀回尚未通過');
+  const cloud={shipMasters:[],records:[]};
+  for(const month of months){
+    const d=await apiGetQuick('gcGetData',{month,fresh:'1'},25000);
+    if(d?.ok!==true||!Array.isArray(d.shipMasters)||!Array.isArray(d.records))throw Error('雲端明細回應不完整，尚未通過讀回核對');
+    cloud.shipMasters.push(...d.shipMasters);cloud.records.push(...d.records);
+  }
+  const result=p79CheckWorkingReportReadback(expected,cloud);
+  if(!result.ok)throw Error('雲端讀回未通過：主檔缺少 '+result.missingMasters.length+'；人員明細缺少 '+result.missingRecords.length+'；明細內容不符 '+result.mismatchedRecords.length+'。本機資料保留，請先核對同步狀態，勿重複匯入。');
+  return {...result,verified:true};
+}
+
 async function importExcelFiles(fileList){
   const incoming=[...(fileList||[])].filter(isExcelFile);
   if(!incoming.length)return;
@@ -9639,6 +9681,8 @@ async function importExcelFiles(fileList){
   }
 
   excelBatchImporting=true;
+  const importedExpectations=new Map();
+  let batchCloudOk=false,batchCloudSummary='沒有可同步的新資料';
   try{
     while(excelImportQueue.length){
       const file=excelImportQueue.shift();
@@ -9651,8 +9695,10 @@ async function importExcelFiles(fileList){
         lastExcelImportResult={ok:false,file:file.name,reason:'尚未完成驗證',records:0,workingNo:''};
         await importExcel(file);
         if(lastExcelImportResult?.ok){
+          const no=String(lastExcelImportResult.workingNo||'').trim();
+          if(no){const master=shipMasters.find(x=>String(x.workingNo||'').trim()===no);const rows=records.filter(r=>String(r.workingNo||'').trim()===no&&r.source==='working-report');if(!master||!rows.length)throw Error('本機匯入快照不完整，不能確認此檔完成');importedExpectations.set(no,JSON.parse(JSON.stringify({master,records:rows})));}
           excelQueueStats.success++;
-          updateExcelImportLiveStatus({stage:`✅ 此檔完成${lastExcelImportResult?.workingNo?`｜NO. ${lastExcelImportResult.workingNo}`:''}`,pct:100,state:'done',waiting:excelImportQueue.length});
+          updateExcelImportLiveStatus({stage:`本機解析完成${lastExcelImportResult?.workingNo?`｜NO. ${lastExcelImportResult.workingNo}`:''}`,pct:100,state:'done',waiting:excelImportQueue.length});
         }else{
           excelQueueStats.failed++;
           const reason=lastExcelImportResult?.reason||'未寫入人員作業明細';
@@ -9671,18 +9717,35 @@ async function importExcelFiles(fileList){
       }
     }
 
-    setExcelDropStatus(
-      `批次匯入完成：成功 ${excelQueueStats.success} 個${excelQueueStats.failed?`｜失敗 ${excelQueueStats.failed} 個`:''}｜共處理 ${excelQueueStats.processed} 個`,
-      excelQueueStats.failed===0
-    );
-    setExcelImportStage('完成最後整理',99);
+    // Always finalize successful files, even when the last file failed or was cancelled.
+    if(excelQueueStats.success){
+      try{
+        setExcelImportStage('統一同步成功解析的檔案',90);
+        const upload=await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+        if(!upload?.ok||upload.pendingCloudSync)throw Error('本機已保存，雲端待補傳');
+        setExcelImportStage('讀回核對船舶與人員明細',96);
+        const verification=await p79VerifyWorkingReportImports([...importedExpectations.values()]);
+        batchCloudOk=true;
+        batchCloudSummary=verification.verified?'船舶與人員明細已讀回核對':'雲端已確認接收（此格式未執行船舶明細核對）';
+        cloudStatus(batchCloudSummary,true);
+      }catch(error){
+        batchCloudSummary=String(error?.message||error);
+        cloudStatus(batchCloudSummary,false);
+      }
+    }
+    const summary='本機解析成功 '+excelQueueStats.success+' 份'+(excelQueueStats.failed?'｜未匯入 '+excelQueueStats.failed+' 份':'')+'｜'+batchCloudSummary;
+    setExcelDropStatus(summary,excelQueueStats.failed===0&&batchCloudOk);
     refreshMonthlyCompareAfterSystemChange();
     renderVesselSummary();
     renderEfficiencyTabFast('dashboard');
-    finishExcelImportLiveStatus(excelQueueStats.failed===0);
+    finishExcelImportLiveStatus(excelQueueStats.failed===0&&batchCloudOk);
+    updateExcelImportLiveStatus({stage:summary,pct:100,state:excelQueueStats.failed===0&&batchCloudOk?'done':'error'});
+
   }finally{
     excelCurrentImportKey='';
     excelBatchImporting=false;
+    const queued=excelImportQueue.splice(0);
+    if(queued.length)await importExcelFiles(queued);
   }
 }
 
@@ -10042,7 +10105,7 @@ async function importExcel(file) {
     toast(`已匯入 ${summary.vessel||'船舶'}：${imported.length} 筆 AQC 作業明細`);
     // 匯入佇列中還有檔案時，只先寫本機，不要每一份都重送整包雲端資料。
     // 最後由 importExcelFiles() 統一同步一次，速度會快很多。
-    const hasMoreQueuedFiles = excelBatchImporting && excelImportQueue.length > 0;
+    const hasMoreQueuedFiles = excelBatchImporting;
     if(hasMoreQueuedFiles){
       setExcelImportStage(`本檔完成｜等待其餘 ${excelImportQueue.length} 份`,96);
       return;
@@ -10062,20 +10125,13 @@ async function importExcel(file) {
       toast(`⚠️ 本機已更新，但雲端單筆更新失敗：${e?.message||e}`);
     }
 
-    Promise.resolve().then(async()=>{
-      try{
-        const verifyMonth=String(master?.compareMonth||master?.firstDate||summary?.workDate||'').slice(0,7);
-        const verify=await apiGet('gcGetData',/^\d{4}-\d{2}$/.test(verifyMonth)?{month:verifyMonth}:efficiencyCloudScopeParams());
-        const cloudMaster=(verify.shipMasters||[]).find(x=>String(x.workingNo||'').trim()===String(summary.workingNo).trim());
-        if(cloudMaster){
-          shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,verify.shipMasters||[]));
-          saveLocal();
-          cloudStatus('雲端資料已背景驗證');
-        }
-      }catch(e){
-        console.warn('背景驗證雲端船舶主檔失敗',e);
-      }
-    });
+    setExcelImportStage('讀回核對船舶與人員明細',98);
+    try{
+      await p79VerifyWorkingReportImports([{master,records:imported}]);
+      cloudStatus('船舶主檔與人員明細已讀回核對');
+    }catch(error){
+      cloudStatus(String(error?.message||error),false);
+    }
     return;
   }
   setExcelImportStage('辨識 Excel 格式',25);
@@ -10104,7 +10160,7 @@ async function importExcel(file) {
     });
     setExcelImportStage('寫入本機資料',75);
     saveLocal();toast(`已匯入 ${imported.length} 筆船舶效率明細`);
-    if(!(excelBatchImporting && excelImportQueue.length>0)){
+    if(!excelBatchImporting){
       setExcelImportStage('同步雲端',92);
       await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
     }else{
@@ -10126,7 +10182,7 @@ async function importExcel(file) {
   records.push(...imported);lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'效率明細已解析',records:imported.length,workingNo:''};
   setExcelImportStage('寫入本機資料',75);
   saveLocal();toast(`已匯入 ${imported.length} 筆`);
-  if(!(excelBatchImporting && excelImportQueue.length>0)){
+  if(!excelBatchImporting){
     setExcelImportStage('同步雲端',92);
     await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
   }else{
@@ -10463,7 +10519,7 @@ function dashboardFullSystemAudit(x){
 
   // 1) 船舶主檔存在就必須真的有 WORKING REPORT；不能拿 web/舊 GC 明細冒充已匯入。
   if(!wrRows.length){
-    issues.push({key:'personnel',label:'人員明細缺失',detail:'船舶主檔存在，但系統沒有保存任何 WORKING REPORT 人員作業明細'});
+    issues.push({key:'personnel',label:'人員明細未讀到',detail:'船舶主檔存在，但目前已載入資料找不到 WORKING REPORT 人員作業明細；雲端是否缺失仍需讀回核對'});
   }
   if(detailRows.length){
     // 2) 人員明細與船舶 WORKING SHEET 的數量/Bundle/SHIFT 必須真正一致。
@@ -10572,7 +10628,7 @@ function dashboardAuditAutoLocateHtml(master,audit){
   if(!rows.length){
     const personnelMissing=(audit.issues||[]).some(x=>x.key==='personnel');
     return personnelMissing
-      ? `<div class="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4"><div class="font-black text-rose-700">🎯 系統定位結果：WORKING REPORT 人員明細整批缺失</div><div class="mt-1 text-sm text-slate-700">這不是某一位人員算錯；目前這艘船沒有可供逐筆核對的人員資料。請重新匯入該艘原始 Working Sheet。</div></div>`
+      ? `<div class="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4"><div class="font-black text-rose-700">🎯 系統定位結果：目前未讀到 WORKING REPORT 人員明細</div><div class="mt-1 text-sm text-slate-700">這不是某一位人員算錯；目前已載入資料沒有這艘船可供逐筆核對的人員明細。請先核對雲端讀取與待補傳狀態，尚不能判定需要重新匯入。</div></div>`
       : '';
   }
 
@@ -12788,7 +12844,7 @@ function renderVesselDetailRows(){
       : '—';
     const gph=c.statHours>0?(num(mv.disc)+num(mv.load)+num(r.hatches))/c.statHours:num(r.gph||c.effDeduct);
     return `<tr><td>${esc(r.workDate)}</td><td class="font-bold">${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td class="font-bold">${esc(r.name)}</td><td>${esc(group)}</td><td>${esc(r.startTime)}</td><td>${esc(r.endTime)}</td><td>${c.statHours.toFixed(2)}</td><td>${esc(r.shift)}</td><td>${num(mv.disc)}</td><td>${num(mv.load)}</td><td class="font-black text-fuchsia-700">${bundleText}</td><td>${num(r.hatches)}</td><td class="font-black">${num(mv.disc)+num(mv.load)}</td><td>${num(gph).toFixed(2)}</td><td>${stop.toFixed(1)}</td><td>${esc(r.note)}</td></tr>`;
-  }).join('')||(allRows.length===0?'<tr><td colspan="16" class="text-center p-5 text-rose-600 font-black bg-rose-50">⚠ 這艘船有船舶主檔，但系統沒有保存任何 WORKING REPORT 人員作業明細。請重新批次匯入原始 Excel；新版會直接列出哪一份檔案沒有成功解析，不再誤算成功。</td></tr>':'<tr><td colspan="16" class="text-center text-slate-400">目前篩選條件沒有資料</td></tr>');
+  }).join('')||(allRows.length===0?'<tr><td colspan="16" class="text-center p-5 text-rose-600 font-black bg-rose-50">⚠ 這艘船有船舶主檔，但系統沒有保存任何 WORKING REPORT 人員作業明細。請先核對雲端讀取與待補傳狀態，尚不能判定需要重新匯入。</td></tr>':'<tr><td colspan="16" class="text-center text-slate-400">目前篩選條件沒有資料</td></tr>');
 }
 function clearVesselDetailFilters(){['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});renderVesselDetailRows();}
 function shipSummaryExportRows(){return vesselJobRows().map(x=>[x.workingNo,x.vessel,x.voyageI,x.voyageE,x.wharf,x.totalContainers,x.bundleDeduct,x.hatches,x.totalMoves,x.shiftMoves,x.aqcCount,round(num(x.gph),2),round(num(x.gphHC),2),round(num(x.vph),2),round(num(x.vphHC),2)]);}
