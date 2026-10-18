@@ -10202,6 +10202,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function getAttendanceTimestamp(record) {
+            if(typeof window!=='undefined' && window.P79AttendanceV6?.timestamp){
+                const value=window.P79AttendanceV6.timestamp(record);
+                if(Number.isFinite(value))return value;
+            }
             // 不再依賴 new Date("YYYY/MM/DD HH:mm")。
             // 不同瀏覽器對這種日期字串解析結果不同，解析失敗時會變成 0，
             // 造成 15:59 排在 07:33 前面，所以上下班永遠無法配對。
@@ -14908,7 +14912,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261015.62"></script>
+<script src="../attendance/v6-engine.js?v=20261018-midnight-eod"></script>
 
 <script>
 function p79CanExportOvertimeApplication(){
