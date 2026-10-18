@@ -24,22 +24,26 @@ for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(
 assert.match(html,/data-tab="dispatch"/);assert.match(html,/view-dispatch/);assert.match(html,/personnel-dispatch\.js/);
 console.log('PASS weighted volume/hour efficiency, H/C separation, month/source boundaries, invalid data, roster ambiguity, conservative simulation and group total conservation; page scripts parse');
 
-const person=(key,group,containers,hours=25)=>({key,name:key,group,containers,hours,hc:0,count:6,invalid:0,confirmed:true,eligible:true,eff:containers/hours});
-const sample=[person('a','A',500),person('b','A',500),person('c','C',700),person('d','C',562.5),person('e','B',575),person('f','D',575)];
-const original=JSON.stringify(sample),proposal=recommendSwap(sample);
-assert.ok(proposal.plan);assert.equal(proposal.moves.length,2);assert.notEqual(proposal.moves[0].from,proposal.moves[1].from);assert.equal(proposal.moves[0].to,proposal.moves[1].from);assert.ok(proposal.after.gap<proposal.before.gap);assert.equal(JSON.stringify(sample),original);
+const person=(key,group,containers,hours=10)=>({key,name:key,group,containers,hours,hc:0,count:6,invalid:0,confirmed:true,eligible:true,eff:containers/hours});
+const sample=[person('a1','A',50),person('a2','A',300),person('b1','B',100),person('b2','B',350),person('c1','C',150),person('c2','C',400),person('d1','D',10),person('d2','D',990)];
+const original=JSON.stringify(sample),proposal=recommendSwap(sample),policy=movementPolicy(sample);
+assert.deepEqual([...policy.locked],['D']);assert.ok(!policy.movable.has('d1'));assert.ok(policy.movable.has('a2'));
+assert.ok(proposal.plan);assert.equal(proposal.moves.length,6);assert.equal(JSON.stringify(sample),original);
+for(const group of ['A','B','C']){assert.equal(proposal.moves.filter(m=>m.from===group).length,2);assert.equal(proposal.moves.filter(m=>m.to===group).length,2);}
+assert.ok(proposal.moves.every(m=>m.from!==m.to&&m.from!=='D'&&m.to!=='D'));
 for(let i=0;i<4;i++)assert.equal(proposal.before.groups[i].people,proposal.after.groups[i].people);
 for(const field of ['containers','hours'])assert.equal(proposal.before.groups.reduce((s,g)=>s+g[field],0),proposal.after.groups.reduce((s,g)=>s+g[field],0));
+assert.deepEqual(proposal.before.groups[3],proposal.after.groups[3]);
+const smaller=recommendSwap(sample,{counts:{A:1,B:1,C:1}});assert.ok(smaller.plan);assert.equal(smaller.moves.length,3);assert.ok(smaller.moves.every(m=>m.person.key.endsWith('1')));
+assert.ok(!recommendSwap(sample,{counts:{A:3}}).plan);
+assert.ok(!recommendSwap(sample,{counts:{A:2,B:0,C:0}}).plan);
+assert.ok(!recommendSwap(sample,{counts:{A:0,B:0,C:0}}).plan);
+assert.ok(!recommendSwap(sample,{counts:{A:1.5}}).plan);
+assert.ok(!recommendSwap(sample,{counts:{A:21}}).plan);
 assert.ok(!recommendSwap(sample.map(p=>({...p,count:4}))).plan);
 assert.ok(!recommendSwap(sample.map(p=>({...p,hours:9}))).plan);
-assert.ok(!recommendSwap(sample.map(p=>({...p,containers:575,eff:23}))).plan);
 assert.ok(!recommendSwap(sample.filter(p=>p.group!=='D')).plan);
-assert.ok(!recommendSwap(sample.map(p=>p.group==='D'?{...p,invalid:1}:p)).plan);
-assert.match(html,/dispatchRecommendation/);
-console.log('PASS automatic swap recommendations preserve staffing and totals; enforce sample thresholds; skip incomparable and already balanced groups');
-
-const policy=movementPolicy(sample);assert.ok(policy.benchmark>0);assert.ok(policy.movable.has('a'));assert.ok(!policy.movable.has('c'));assert.ok(!policy.movable.has('e'));
-assert.ok(proposal.moves.every(m=>policy.movable.has(m.person.key)));assert.ok(!Object.hasOwn(proposal.plan,'c'));
-const exact=sample.map(p=>({...p,containers:575,hours:25}));assert.equal(movementPolicy(exact).movable.size,0);
-assert.ok(!recommendSwap(sample.map(p=>p.key==='d'?{...p,count:1}:p)).plan);
-console.log('PASS average-or-higher performers stay in their group; only below-weighted-average people can be recommended, including boundary and insufficient-low-sample cases');
+assert.deepEqual([...movementPolicy(sample,{lockedGroups:['C','D']}).locked],['C','D']);
+const balanced=sample.map(p=>({...p,containers:200,eff:20}));assert.equal(movementPolicy(balanced).movable.size,0);assert.ok(!recommendSwap(balanced).plan);
+assert.match(html,/dispatchGroupSettings/);
+console.log('PASS high efficiency groups locked including low individuals; six-person and three-person plans; per-group selection counts; lower efficiency candidate selection; protected destinations; staffing and totals preserved; invalid and infeasible counts');
