@@ -22955,7 +22955,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-paused-review"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-full-edit-time"></script>
 
 
 
@@ -23780,7 +23780,9 @@ function draw(){
   btn.innerHTML='☁️ 雲端同步明細<small>'+safe(storageWarning?storageWarning+'｜':'')+safe(pending?('全部待同步 '+pending+' 筆｜其中員工打卡 '+punchItems.length+' 筆｜'+officialText):(readError?'最新雲端核對未完成：'+readError:(a?.state?'上一筆送出紀錄：'+last:officialText)))+'</small>';
   const employeePage=document.getElementById('viewEmployee');
   const hasPunch=!!(employeePage && employeePage.contains(btn));
-  btn.hidden=!hasPunch;
+  // Employee home no longer exposes the diagnostic outbox/details panel.
+  // Keep acknowledgment hooks running for the punch success notification.
+  btn.hidden=true;
   details.innerHTML=(storageWarning?'<p style="color:#b91c1c;font-weight:800">'+safe(storageWarning)+'</p>':'')+'<p>版本：'+safe(typeof APP_VERSION!=='undefined'?APP_VERSION:'--')+'</p><p><strong>最近打卡確認：</strong>'+safe(last)+'</p><p style="margin-top:7px"><strong>正式雲端：</strong>'+safe(officialText)+'</p><p style="margin-top:10px"><strong>全部待同步：</strong>'+pending+' 筆（員工打卡 '+punchItems.length+' 筆）</p>'+
     (a?.time?'<p style="margin-top:8px"><strong>狀態更新：</strong>'+safe(new Date(a.time).toLocaleString('zh-TW'))+'</p>':'')+
     (reason?'<p style="margin-top:10px;color:#b91c1c;overflow-wrap:anywhere"><strong>最近錯誤：</strong>'+safe(reason)+'</p>':'')+

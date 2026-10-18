@@ -13,6 +13,18 @@ cloud.timeStr='2026/10/18 10:00:00';await assert.rejects(c.send(payload),e=>e.re
 queueInfo={paused:false};await assert.rejects(c.p79PrepareAttendanceEdit('1'),/尚在同步/);
 queueInfo={paused:true};assert.equal((await c.p79PrepareAttendanceEdit('1')).timeStr,cloud.timeStr);
 assert(!c.p79AttendanceEditAlreadySaved({...payload,record:{...cloud,note:'changed'}},cloud));
+// A date-only status response must be checked against the full official row.
+cloud.timeStr='2026/10/17';
+const fullRow={...cloud,timeStr:'2026/10/17 00:03:12'};
+let fullRows=[fullRow],fullMonth='2026-10',fullReads=0;
+c.fetch=async(url,opts)=>{if(opts.method==='POST'){posts++;return{text:async()=>JSON.stringify({ok:true})}}return{ok:true,json:async()=>{if(url.includes('action=getAttendanceMainDirect')){fullReads++;return{ok:true,month:fullMonth,records:fullRows}}return{ok:true,found:{'1':cloud}}}}};
+assert.equal((await c.p79PrepareAttendanceEdit('1')).timeStr,fullRow.timeStr);
+assert.equal(fullReads,1);
+fullRows=[{...fullRow,empId:'OTHER'}];await assert.rejects(c.p79PrepareAttendanceEdit('1'),/缺少完整打卡時間/);
+fullRows=[{...cloud}];await assert.rejects(c.p79PrepareAttendanceEdit('1'),e=>e.retryable===false);
+fullRows=[fullRow,{...fullRow}];await assert.rejects(c.p79PrepareAttendanceEdit('1'),/無法核對/);
+fullRows=[fullRow];fullMonth='2026-09';await assert.rejects(c.p79PrepareAttendanceEdit('1'),/主表核對失敗/);
+assert.equal(posts,1,'incomplete and ambiguous time checks must never write');
 for(const path of ['attendance/index.html','work-hours/index.html']){const s=fs.readFileSync(path,'utf8');for(const m of s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);}assert(s.includes('await window.p79V5PrepareAttendanceEdit(id)'));assert(s.includes("String(snapshot?.timeStr || r.timeStr || '')"));}
 console.log('PASS preflight, equivalent formatting, idempotent retry, real conflict, pending guard, paused recovery, note differences, both pages parse');
 })().catch(e=>{console.error(e);process.exitCode=1});
