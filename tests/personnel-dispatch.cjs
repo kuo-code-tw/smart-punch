@@ -52,3 +52,11 @@ const zeroRows=build([r('1',0,10)]),zero=zeroRows.find(p=>p.empId==='1');assert.
 const mixedZero=build([r('1',100,5),r('1',0,10)]).find(p=>p.empId==='1');assert.equal(mixedZero.eff,20);assert.equal(mixedZero.hours,5);assert.equal(mixedZero.zeroRecords,1);
 const sampleWithZero=[...sample,{...person('zero','A',0),eff:0,eligible:true}];assert.deepEqual(summarize(sampleWithZero).groups.map(g=>g.eff),summarize(sample).groups.map(g=>g.eff));assert.ok(!movementPolicy(sampleWithZero,{lockedGroups:[]}).movable.has('zero'));
 console.log('PASS zero-efficiency people excluded from group averages and transfers; zero-efficiency records and their hours excluded from monthly efficiency; raw records unchanged');
+
+const noGain=[person('n1','A',100),person('n2','B',200),person('n3','C',300),person('n4','D',400)];
+const settings={lockedGroups:[],counts:{A:1,B:1,C:1,D:1}};
+assert.ok(!recommendSwap(noGain,settings).plan);
+const preview=recommendSwap(noGain,{...settings,allowNonImproving:true});assert.ok(preview.plan);assert.equal(preview.recommended,false);assert.equal(preview.moves.length,4);assert.ok(preview.warning);assert.ok(preview.moves.every(m=>m.from!==m.to));
+assert.ok(!recommendSwap(noGain,{lockedGroups:['A','B','C','D'],allowNonImproving:true}).plan);
+assert.match(html,/dispatchGenerateButton/);assert.match(html,/dispatchConfirmState/);
+console.log('PASS feasible non-improving plans available as clearly warned previews; impossible settings remain blocked; explicit generate and confirmation controls wired');
