@@ -327,6 +327,47 @@ function p79PausedReviewIdentity(payload,cloud){
  const fields=['empId','attNo'].filter(k=>String(record[k]??'').trim());
  return fields.length>0&&fields.every(k=>normalizeCompareValue(record[k])===normalizeCompareValue(cloud[k]));
 }
+const WITHDRAWN_DRAFTS_KEY='port79_attendance_withdrawn_drafts_v1';
+function p79ReadWithdrawnAttendanceDrafts(){
+ const items=JSON.parse(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)||'[]');
+ if(!Array.isArray(items))throw new Error('撤回草稿備份格式異常，原資料保留');
+ return items.filter(x=>x.state==='withdrawn');
+}
+function p79WithdrawPausedAttendanceWrites(expectedItems){
+ if(typeof requireAdminAction!=='function'||!requireAdminAction('attendanceEdit','撤回暫停的考勤修改'))throw new Error('沒有考勤修改權限');
+ if(writing)throw new Error('目前仍有考勤正在送出，請完成後再撤回');
+ if(!Array.isArray(expectedItems)||!expectedItems.length)throw new Error('沒有可撤回的暫停修改');
+ const q=readQueue(),selected=new Set();
+ for(const expected of expectedItems){
+  if(!expected?.payload)throw new Error('缺少待同步修改快照，請重新開啟明細');
+  p79PausedReviewItem(expected.key,expected.payload);selected.add(expected.key);
+ }
+ const archive=JSON.parse(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)||'[]');
+ if(!Array.isArray(archive))throw new Error('撤回草稿備份格式異常，原佇列保留');
+ const at=Date.now(),drafts=q.filter(x=>selected.has(x.key)).map((item,i)=>({backupId:at+':'+i+':'+item.key,state:'withdrawn',withdrawnAt:at,item:JSON.parse(JSON.stringify(item))}));
+ const serialized=JSON.stringify([...archive,...drafts]);
+ // Persist and verify recovery data before touching the outbox. No cloud write.
+ localStorage.setItem(WITHDRAWN_DRAFTS_KEY,serialized);
+ if(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)!==serialized)throw new Error('草稿備份未完成，待同步修改仍保留');
+ if(!saveQueue(q.filter(x=>!selected.has(x.key)))){saveQueue(q);throw new Error('撤回狀態無法保存，原修改仍保留');}
+ currentOpText='已撤回 '+drafts.length+' 筆修改（草稿已備份，雲端未變更）';updateUi();
+ return {ok:true,count:drafts.length};
+}
+function p79RestoreWithdrawnAttendanceDraft(backupId){
+ if(typeof requireAdminAction!=='function'||!requireAdminAction('attendanceEdit','恢復撤回的考勤草稿'))throw new Error('沒有考勤修改權限');
+ if(writing)throw new Error('目前仍有考勤正在送出，請完成後再恢復');
+ const archive=JSON.parse(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)||'[]');
+ if(!Array.isArray(archive))throw new Error('撤回草稿備份格式異常');
+ const saved=archive.find(x=>x.backupId===backupId&&x.state==='withdrawn');
+ if(!saved)throw new Error('找不到這份撤回草稿，請重新開啟明細');
+ const q=readQueue();if(q.some(x=>x.key===saved.item.key))throw new Error('這筆已有待同步修改，請先核對，不會覆蓋');
+ const item={...saved.item,paused:true,state:'paused',nextRetryAt:Number.MAX_SAFE_INTEGER,lastError:'由撤回備份恢復，等待核對；不會自動送出'};
+ if(!saveQueue([...q,item])){saveQueue(q);throw new Error('無法保存恢復的草稿，備份仍保留');}
+ saved.state='restored';saved.restoredAt=Date.now();
+ try{localStorage.setItem(WITHDRAWN_DRAFTS_KEY,JSON.stringify(archive));}catch(e){/* The queued copy and original backup both remain recoverable. */}
+ updateUi();return {ok:true};
+}
+
 async function p79ReviewPausedAttendanceWrite(key){
  const item=p79PausedReviewItem(key),payload=JSON.parse(JSON.stringify(item.payload));
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
@@ -907,6 +948,9 @@ window.p79V5PollDelta=pollDelta;
 window.p79V5PendingForId=pendingForId;
 window.p79V5PrepareAttendanceEdit=p79PrepareAttendanceEdit;
 window.p79V5ReviewPausedWrite=p79ReviewPausedAttendanceWrite;
+window.p79V5WithdrawPausedWrites=p79WithdrawPausedAttendanceWrites;
+window.p79V5ReadWithdrawnDrafts=p79ReadWithdrawnAttendanceDrafts;
+window.p79V5RestoreWithdrawnDraft=p79RestoreWithdrawnAttendanceDraft;
 window.p79V5ApplyPausedReview=p79ApplyPausedAttendanceReview;
 window.p79V5QueueInfoForId=queueInfoForId;
 window.p79V5ConfirmCloudRecord=confirmCloudRecord;

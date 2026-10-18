@@ -14899,14 +14899,14 @@ function getManualPairRecordAnchor(record) {
                 <td class="px-3 py-2">${escapeHtml(String(row.name || row.empId || ''))}</td>
                 <td class="px-3 py-2">${escapeHtml(String(row.attNo || ''))}</td>
                 <td class="px-3 py-2 text-center font-bold">${Number(row.duplicateRecordCount || 0)}</td>
-                <td class="px-3 py-2"><button type="button" onclick="p79OpenDuplicateReview(${index})" class="font-bold text-cyan-700 underline">查看原始紀錄</button></td>
+                <td class="px-3 py-2"><button type="button" onclick="p79OpenDuplicateReview(${index})" class="font-bold text-cyan-700 underline">逐筆核對／刪除</button></td>
             </tr>`).join('');
             modal.innerHTML = `<div role="dialog" aria-modal="true" aria-label="疑似重複考勤清單" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl p-3 sm:p-5 w-full max-w-4xl flex flex-col min-h-0" style="max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px)">
                 <div class="flex justify-between items-center mb-3"><h3 class="font-black text-base">🔎 疑似重複考勤清單</h3><button type="button" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
                 <div class="text-sm font-bold mb-2">疑似重複班次：${list.length} 組｜整合多餘刷卡：${totalExtra} 筆</div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3">僅統計目前已載入、且你有權限查看的考勤資料；不是全年雲端全部重複筆數。這是班次整合候選，並非確認可刪資料。人工補卡與不同事件 ID 請逐筆核對。</p>
                 <div class="overflow-auto min-h-0 flex-1"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
-                <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">刪除重複考勤（系統優先）</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
+                <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">清理可確認的 Excel 重複</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
             </div>`;
             modal.addEventListener('click',e=>{if(e.target===modal)p79CloseDuplicateReview();});
             document.body.appendChild(modal);
@@ -15087,7 +15087,10 @@ function getManualPairRecordAnchor(record) {
             }
             const del=tasks.length,pro=0;
             if(!tasks.length) {
-                showToast('沒有可安全清理的紀錄；若之前失敗，請先核對雲端待同步佇列','warning');
+                showToast('目前候選包含人工補卡、員工刷卡或編號／待同步衝突，不能批次刪除；已開啟原始紀錄，請逐筆核對後刪除','warning');
+                if(rows.length && typeof p79OpenDuplicateReview==='function'){
+                    p79DuplicateReviewRows=rows;p79OpenDuplicateReview(0);
+                }
                 return false;
             }
             if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 Excel 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n任何未確認回覆會立即暫停並只讀核對，不會自動重送刪除。'))return false;
@@ -15199,7 +15202,8 @@ function getManualPairRecordAnchor(record) {
                 const sourceText = window.P79Messages?.source(source) || sourceLabels[sourceLower] || '其他系統紀錄';
                 const direction = String(r?.status || '').trim();
                 const sameDirectionCount = directionStats.get(getAttendanceRecordType(r)+'|'+getPunchChannel(r.status))||0;
-                const warning = !id?'缺少紀錄 ID':sameIdCount>1?'ID 衝突（'+sameIdCount+' 筆）':!unchanged?'來源或時間已更新，需重新核對':'';
+                const pending=!!window.p79V5QueueInfoForId?.(id);
+                const warning = !id?'缺少紀錄 ID':sameIdCount>1?'ID 衝突（'+sameIdCount+' 筆）':!unchanged?'來源或時間已更新，需重新核對':pending?'有待同步修改，請先從待同步明細核對或撤回':'';
                 const reviewText = warning|| (edited ? '人工補刷（請核對）' : sameDirectionCount > 1 ? '同方向疑似重複' : '一般打卡');
                 const reviewClass = edited ? 'text-amber-700 dark:text-amber-300' : sameDirectionCount > 1 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-300';
                 return `<tr class="border-b border-slate-200 dark:border-slate-700">
@@ -15209,7 +15213,7 @@ function getManualPairRecordAnchor(record) {
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(sourceText)}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(reviewText)}</td>
                     <td class="px-3 py-2 text-center align-middle">
-                        ${canDelete && uniqueId && unchanged && sameDirectionCount>1 ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">保留／待核對</span>'}
+                        ${canDelete && uniqueId && unchanged && !pending && sameDirectionCount>1 ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">保留／待核對</span>'}
                     </td>
                 </tr>`;
             }).join('');
@@ -23023,7 +23027,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-time-integrity-2"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-review-withdraw"></script>
 
 
 
@@ -23714,27 +23718,37 @@ C.mountRange({startId:'manualLeaveStart',endId:'manualLeaveEnd',label:'請假日
 #p79OutboxInspectBtn{margin-left:5px;padding:5px 9px;border:1px solid #fbbf24;border-radius:9px;background:#fffbeb;color:#92400e;font-size:11px;font-weight:800;cursor:pointer}
 #p79OutboxInspectPanel{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.58);padding:14px}
 #p79OutboxInspectPanel.p79-show{display:flex}
-#p79OutboxInspectCard{width:min(900px,100%);max-height:85vh;overflow:auto;background:white;color:#0f172a;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0004;font-size:13px}
-#p79OutboxInspectCard table{width:100%;border-collapse:collapse;word-break:break-word}
-#p79OutboxInspectCard td,#p79OutboxInspectCard th{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
-#p79OutboxInspectCard th{background:#f8fafc}
-#p79OutboxInspectCard button[data-review-key]{padding:7px 10px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:700;white-space:nowrap}
+#p79OutboxInspectPanel{box-sizing:border-box}
+#p79OutboxInspectCard{width:min(1480px,calc(100vw - 28px));max-width:100%;min-width:0;box-sizing:border-box;max-height:92dvh;overflow:auto;background:white;color:#0f172a;border-radius:16px;padding:18px;box-shadow:0 20px 60px #0004;font-size:13px}
+html[data-p79-design=vessel] body #p79OutboxInspectCard table{width:100%!important;min-width:0!important;table-layout:fixed;border-collapse:collapse}
+html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!important;padding:8px 6px!important;font-size:13px!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;text-align:left!important;vertical-align:top!important}
+#p79OutboxInspectCard :is(td,th):nth-child(1){width:4%}
+#p79OutboxInspectCard :is(td,th):nth-child(2){width:24%}
+#p79OutboxInspectCard :is(td,th):nth-child(3){width:6%}
+#p79OutboxInspectCard :is(td,th):nth-child(4){width:14%}
+#p79OutboxInspectCard :is(td,th):nth-child(5){width:34%}
+#p79OutboxInspectCard :is(td,th):nth-child(6){width:18%}
+#p79OutboxInspectCard button{max-width:100%;white-space:normal!important;padding:7px 9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:700}
+#p79OutboxInspectCard small{display:block;overflow-wrap:anywhere}
+#p79OutboxReview{overflow-wrap:anywhere}
+@media(max-width:700px){html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){font-size:11px!important;padding:6px 3px!important}#p79OutboxInspectCard{padding:12px;width:calc(100vw - 16px)}#p79OutboxInspectPanel{padding:8px}}
 </style>
 <div id="p79OutboxInspectPanel" role="dialog" aria-modal="true" aria-label="待同步明細">
 <div id="p79OutboxInspectCard">
 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div>
-<p style="color:#64748b;margin:10px 0">暫停的修改會先讀取雲端核對；只有按下「確認套用我的修改」才會送出變更。</p>
+<p style="color:#64748b;margin:10px 0">暫停項目不會自動送出，重新登入也會保留。可核對後套用修改，或撤回待傳並保存可恢復草稿；撤回不會刪除雲端考勤。</p>
 <div id="p79OutboxInspectBody"></div><div id="p79OutboxReview" role="status" aria-live="polite"></div>
 </div></div>
 <script id="p79-outbox-inspector">
 (function(){
 'use strict';
 const keys=[['sp_cloud_outbox_v1','舊版雲端同步'],['port79_attendance_v5_outbox','新版考勤快速同步']];
+let shownDrafts=new Map();
 function safe(t){return String(t??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function entries(key){try{if(key==='port79_attendance_v5_outbox'&&window.p79V5ReadPendingQueue)return window.p79V5ReadPendingQueue();const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[]}catch(e){return null;}}
 function show(autoReview=true){
  const root=document.getElementById('p79OutboxInspectPanel'),body=document.getElementById('p79OutboxInspectBody');if(!root||!body)return;
- let html='';
+ let html='';shownDrafts=new Map();
  for(const [key,label] of keys){
   const q=entries(key);html+='<h3 style="font-weight:800;margin:16px 0 6px">'+safe(label)+'：'+(q===null?'無法讀取':q.length+' 筆')+'</h3>';
   if(!q){html+='<p>資料格式異常，請勿清除。</p>';continue;}
@@ -23754,10 +23768,16 @@ function show(autoReview=true){
      else error=rawError;
    }
    const recordId=String(p.id??p.record?.id??entry?.recordId??'').trim();
-   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(names[action]||action)+(recordId?' <small style="color:#64748b">（紀錄ID '+safe(recordId)+'）</small>':'')+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td><td>'+((key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))?'<button type="button" data-review-key="'+safe(encodeURIComponent(entry.key))+'">核對並處理</button>':'—')+'</td></tr>';
+   if(key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))shownDrafts.set(entry.key,JSON.parse(JSON.stringify(p)));
+   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(names[action]||action)+(recordId?' <small style="color:#64748b">（紀錄ID '+safe(recordId)+'）</small>':'')+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td><td>'+((key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))?'<button type="button" data-review-key="'+safe(encodeURIComponent(entry.key))+'">核對並處理</button><button type="button" data-withdraw-key="'+safe(encodeURIComponent(entry.key))+'">撤回修改</button>':'—')+'</td></tr>';
   });
   html+='</tbody></table>';
  }
+ if(shownDrafts.size)html+='<p class="p79-outbox-actions"><button type="button" data-withdraw-all>撤回全部暫停修改（保留草稿）</button></p>';
+ try{
+  const saved=window.p79V5ReadWithdrawnDrafts?.()||[];
+  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，可恢復）</summary>'+saved.map(x=>'<p>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+' <button type="button" data-restore-draft="'+safe(encodeURIComponent(x.backupId))+'">恢復為待核對</button></p>').join('')+'</details>';
+ }catch(error){html+='<p>'+safe(error.message)+'</p>';}
  body.innerHTML=html;root.classList.add('p79-show');
  if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
 }
@@ -23785,7 +23805,22 @@ async function reviewEntry(key){
  }catch(error){el.textContent='核對未完成：'+String(error.message||error)+'。修改草稿保留。';}
  finally{reviewBusy=false;}
 }
-document.getElementById('p79OutboxInspectBody')?.addEventListener('click',event=>{const button=event.target.closest('[data-review-key]');if(button)reviewEntry(decodeURIComponent(button.dataset.reviewKey));});
+document.getElementById('p79OutboxInspectBody')?.addEventListener('click',event=>{
+ const button=event.target.closest('button');if(!button)return;
+ if(button.dataset.reviewKey){reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
+ if(reviewBusy)return;
+ const status=document.getElementById('p79OutboxReview');
+ try{
+  if(button.hasAttribute('data-withdraw-key')||button.hasAttribute('data-withdraw-all')){
+   const selected=button.hasAttribute('data-withdraw-all')?[...shownDrafts].map(([key,payload])=>({key,payload})):[{key:decodeURIComponent(button.dataset.withdrawKey),payload:shownDrafts.get(decodeURIComponent(button.dataset.withdrawKey))}];
+   if(!confirm('撤回 '+selected.length+' 筆暫停修改？草稿會先保存為可恢復備份，雲端考勤不會刪除或改寫。'))return;
+   const result=window.p79V5WithdrawPausedWrites(selected);show(false);
+   status.textContent='已撤回 '+result.count+' 筆待傳修改，草稿保存在下方備份；雲端資料未變更。本機已顯示的時間仍須重新拉取雲端核對。';
+  }else if(button.dataset.restoreDraft){
+   window.p79V5RestoreWithdrawnDraft(decodeURIComponent(button.dataset.restoreDraft));show(false);status.textContent='草稿已恢復為暫停待核對，不會自動送出。';
+  }
+ }catch(error){status.textContent='處理未完成：'+String(error.message||error);}
+});
 function mount(){
  const status=document.getElementById('attendanceSyncCompactStatus');
  if(status&&!document.getElementById('p79OutboxInspectBtn')){
