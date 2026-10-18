@@ -14487,22 +14487,42 @@ function getManualPairRecordAnchor(record) {
             if(!starts.length)return {kind:'PENDING',status:'班表待核對',reasons:['查無當日出勤班別，請核對班表或代班申報']};
             return {kind:'ABNORMAL',status:'時間需核對',reasons:['上班時間與班表不符（'+labels.join('／')+'）']};
         }
+        function p79MarkAttendanceDateConflicts(rows){
+            const singles=new Map();
+            rows.forEach(row=>{
+                if(!!row.clockIn===!!row.clockOut)return;
+                const r=row.clockIn||row.clockOut;
+                const identity=String(r.empId||row.empId||r.attNo||row.attNo||'').trim().toUpperCase();
+                if(!identity)return;
+                const day=String(r.timeStr||'').slice(0,10).replaceAll('/','-');
+                const key=identity+'|'+day;
+                if(!singles.has(key))singles.set(key,[]);
+                singles.get(key).push(row);
+            });
+            return rows.map(row=>{
+                if(!!row.clockIn===!!row.clockOut)return row;
+                const r=row.clockIn||row.clockOut;
+                const key=String(r.empId||row.empId||r.attNo||row.attNo||'').trim().toUpperCase()+'|'+String(r.timeStr||'').slice(0,10).replaceAll('/','-');
+                const other=(singles.get(key)||[]).find(o=>{
+                    const input=row.clockIn||o.clockIn,output=row.clockOut||o.clockOut;
+                    return input&&output&&getAttendanceTimestamp(output)<getAttendanceTimestamp(input);
+                });
+                return other?{...row,dateConflict:true}:row;
+            });
+        }
         function p79AttendanceRowAssessment(row,now=Date.now()){
             const input=!!row?.clockIn,output=!!row?.clockOut;
             const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
+            if(row?.dateConflict===true)return {kind:'PENDING',status:'補卡日期待核對',reasons:['同日下班時間早於上班；需核對跨日日期，原始時間未更動']};
             if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
             if(input&&output){
                 if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||b-a>24*3600000)return {kind:'ABNORMAL',status:'班次時間異常'};
                 const edited=r=>r?.manuallyEdited===true||String(r?.manuallyEdited||'').toLowerCase()==='true';
                 const minute=r=>{const m=String(r?.timeStr||'').match(/(?:\s|T)\d{1,2}:(\d{2})(?::\d{2})?$/);return m?Number(m[1]):null;};
-                const inMinute=minute(row.clockIn),outMinute=minute(row.clockOut);
+                const inMinute=minute(row.clockIn);
                 const timeChecks=[];
                 if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班分鐘01–30');
-                if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<45)timeChecks.push('下班分鐘未在45–60');
-                const scheduled=p79AttendanceScheduleAssessment(row);
-                if(scheduled?.kind==='ABNORMAL')timeChecks.push(...scheduled.reasons);
                 if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
-                if(scheduled)return scheduled;
                 return {kind:'NORMAL',status:'正常'};
             }
             // 沒有排定下班時間時，只將尚未超過配對上限的單側簽到列為待確認，不宣稱正常。
@@ -14520,6 +14540,7 @@ function getManualPairRecordAnchor(record) {
             onRecordDataScopeChange();
         }
         function getAttendanceStatusBadge(status) {
+            if (status === '補卡日期待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold" title="同日下班時間早於上班，請核對跨日日期">補卡日期待核對</span>';
             if (status === '班表待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold">班表待核對</span>';
             if (status === '待簽退') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-sky-100 text-sky-800 font-bold" title="只有簽到，尚未超過24小時；待核對下班，不代表已完成正常班次">待簽退</span>';
             if (/班次配對異常|班次時間異常|缺少上下班|時間需核對/.test(String(status)))return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">'+escapeHtml(status)+'</span>';
@@ -15285,6 +15306,7 @@ function getManualPairRecordAnchor(record) {
             let dailyRows = (window.P79AttendanceV6 && typeof window.P79AttendanceV6.buildShifts === 'function')
                 ? window.P79AttendanceV6.buildShifts(filtered)
                 : buildDailyAttendanceRows(filtered);
+            dailyRows = p79MarkAttendanceDateConflicts(dailyRows);
             // 先完成跨日／跨月班次配對。
             // 指定日期與月份都以「上班簽到日」歸屬；跨月下班仍留在原上班日。
             if (dateFrom || dateTo) {
@@ -22646,15 +22668,27 @@ window.p79AttendanceRecordCounts = function(){
   }
 
   async function fetchBoundaryMonth(month){
-    try{
-      const d=await readApi('getAttendanceMonthRaw',{month},`跨月原始邊界 ${month}`,12000);
-      return normRows(d.records).filter(r=>attendanceRecordMonthKey(r)===month);
-    }catch(rawError){
-      try{
-        const d=await readApi('getAttendanceMonthData',{month},`跨月相容邊界 ${month}`,12000);
-        return normRows(d.records).filter(r=>attendanceRecordMonthKey(r)===month);
-      }catch(e){console.debug('[PORT79 V2] 邊界月份讀取失敗',month,e);return [];}
-    }
+    // A successful empty raw reply does not prove archived boundary events are absent.
+    const replies=await Promise.allSettled([
+      readApi('getAttendanceMonthRaw',{month},`跨月原始邊界 ${month}`,12000),
+      readApi('historyGetMonthData',{type:'attendance',month},`跨月歷史邊界 ${month}`,12000)
+    ]);
+    const center=selectedMonth();
+    const edge=month<center
+      ? new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()
+      : 1;
+    const day=month+'-'+String(edge).padStart(2,'0');
+    const groups=replies.map(r=>r.status==='fulfilled'?normRows(r.value.records):[]);
+    if(replies.every(r=>r.status==='rejected') || (replies[1].status==='rejected'&&!groups[0].length))throw new Error('跨月邊界尚未讀取完成，請重新從雲端拉取');
+    const primary=groups[0].filter(r=>String(r.timeStr||'').slice(0,10).replaceAll('/','-')===day);
+    const seen=new Set(primary.flatMap(stableAliasKeys));
+    const extra=groups[1].filter(r=>{
+      if(String(r.timeStr||'').slice(0,10).replaceAll('/','-')!==day)return false;
+      const keys=stableAliasKeys(r);
+      if(keys.some(k=>seen.has(k)))return false;
+      keys.forEach(k=>seen.add(k));return true;
+    });
+    return [...primary,...extra];
   }
 
   async function syncMonth(month, options={}){
