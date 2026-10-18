@@ -935,8 +935,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(10){font-size:13px!important;white-space:nowrap!important}
 /* Keep editable punch times inside their own columns despite the global button theme. */
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button{font-size:13px!important;font-family:inherit!important;min-height:32px;padding:0!important;gap:4px!important;white-space:nowrap!important}
-#adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]{border-right:1px solid #e2e8f0}
-#adminRecordsTableContainer .attendance-records-wide-table td[data-p79-attendance-hours]{border-right:1px solid #e2e8f0}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td){border-left:0!important;border-right:0!important}
 </style>
 <style id="p79-attendance-single-line-toolbar">
 #attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
