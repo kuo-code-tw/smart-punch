@@ -47,3 +47,8 @@ assert.deepEqual([...movementPolicy(sample,{lockedGroups:['C','D']}).locked],['C
 const balanced=sample.map(p=>({...p,containers:200,eff:20}));assert.equal(movementPolicy(balanced).movable.size,0);assert.ok(!recommendSwap(balanced).plan);
 assert.match(html,/dispatchGroupSettings/);
 console.log('PASS high efficiency groups locked including low individuals; six-person and three-person plans; per-group selection counts; lower efficiency candidate selection; protected destinations; staffing and totals preserved; invalid and infeasible counts');
+
+const zeroRows=build([r('1',0,10)]),zero=zeroRows.find(p=>p.empId==='1');assert.equal(zero.eff,0);assert.equal(zero.eligible,false);assert.equal(zero.hours,0);assert.equal(zero.zeroHours,10);assert.equal(summarize(zeroRows).groups[0].eff,null);assert.equal(summarize(zeroRows).groups[0].hours,0);assert.ok(!movementPolicy(zeroRows,{lockedGroups:[]}).movable.has(zero.key));
+const mixedZero=build([r('1',100,5),r('1',0,10)]).find(p=>p.empId==='1');assert.equal(mixedZero.eff,20);assert.equal(mixedZero.hours,5);assert.equal(mixedZero.zeroRecords,1);
+const sampleWithZero=[...sample,{...person('zero','A',0),eff:0,eligible:true}];assert.deepEqual(summarize(sampleWithZero).groups.map(g=>g.eff),summarize(sample).groups.map(g=>g.eff));assert.ok(!movementPolicy(sampleWithZero,{lockedGroups:[]}).movable.has('zero'));
+console.log('PASS zero-efficiency people excluded from group averages and transfers; zero-efficiency records and their hours excluded from monthly efficiency; raw records unchanged');
