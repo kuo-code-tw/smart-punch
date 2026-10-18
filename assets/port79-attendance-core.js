@@ -717,7 +717,10 @@ function mergeDeltaEvent(event){
     if(typeof getAttendanceRecordType!=='function')return true;
     return getAttendanceRecordType(r)===nrType;
   });
-  if(idx>=0)records[idx]={...records[idx],...nr};
+  if(idx>=0){
+    const precise=typeof p79AttendancePreciseVersion==='function'?p79AttendancePreciseVersion(records[idx],nr):null;
+    records[idx]=precise||{...records[idx],...nr};
+  }
   else records.unshift(nr);
   return true;
 }

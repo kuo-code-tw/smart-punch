@@ -20,16 +20,21 @@
   }
   function normalizeTime(v){
     let x=s(v).replace(/-/g,'/').replace(/\s+/g,' ');
-    const m=x.match(/^(\d{2,4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    const m=x.match(/^(\d{2,4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if(!m) return x;
     let y=Number(m[1]); if(y<1911) y+=1911;
-    return `${String(y).padStart(4,'0')}/${String(Number(m[2])).padStart(2,'0')}/${String(Number(m[3])).padStart(2,'0')} ${String(Number(m[4]||0)).padStart(2,'0')}:${String(Number(m[5]||0)).padStart(2,'0')}:${String(Number(m[6]||0)).padStart(2,'0')}`;
+    const month=Number(m[2]),day=Number(m[3]),hour=Number(m[4]),minute=Number(m[5]),second=Number(m[6]||0);
+    const date=new Date(y,month-1,day,hour,minute,second);
+    if(date.getFullYear()!==y||date.getMonth()!==month-1||date.getDate()!==day||hour>23||minute>59||second>59)return x;
+    return `${String(y).padStart(4,'0')}/${String(month).padStart(2,'0')}/${String(day).padStart(2,'0')} ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:${String(second).padStart(2,'0')}`;
   }
+
   function ts(r){
     const n=normalizeTime(r&&r.timeStr||r&&r['出勤時間']);
     const m=n.match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
     if(!m) return NaN;
-    return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]),0).getTime();
+    const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]),0);
+    return d.getFullYear()===Number(m[1])&&d.getMonth()===Number(m[2])-1&&d.getDate()===Number(m[3])&&d.getHours()===Number(m[4])&&d.getMinutes()===Number(m[5])&&d.getSeconds()===Number(m[6])?d.getTime():NaN;
   }
   function identity(r){
     const a=normAtt(r&&(r.attNo!=null?r.attNo:r['考勤號碼'])); if(a) return 'ATT:'+a;
@@ -302,11 +307,13 @@
   function buildShifts(rawRecords){
     const prepared=(Array.isArray(rawRecords)?rawRecords:[])
       .map(normalizedRecord)
-      .filter(r=>r.__type!=='OTHER'&&r.__identity&&Number.isFinite(r.__ts));
+      .filter(r=>r.__type!=='OTHER'&&r.__identity);
+    const incomplete=prepared.filter(r=>!Number.isFinite(r.__ts));
+    const timed=prepared.filter(r=>Number.isFinite(r.__ts));
     // V6.0.7：舊 manual-pair-recovery 若同人同日同側已有真正事件，先丟掉 synthetic recovery。
     // 例如 23:40 IN 曾被舊 recovery 01:02 OUT 綁住，但同日另有真正 07:51 OUT，
     // 必須讓 07:51 參與正式班次配對，不能讓舊 recovery 永久搶走上班。
-    const normalized=dedupe(suppressReplacedSyntheticRecoveries(prepared));
+    const normalized=dedupe(suppressReplacedSyntheticRecoveries(timed));
     // V6.0.3：同一個舊 record.id 可能不只一筆，不能 Map(id -> 單筆)。
     // 改成 Map(id -> 候選陣列)，再用員工身份、方向、目標時間挑真正 target。
     const byId=new Map();
@@ -405,6 +412,15 @@
       open.forEach(i=>{if(!used.has(i)){used.add(i);sessions.push(pairSession(i,null,'open-in'));}});
     });
     const consolidated=consolidateNearDuplicateSessions(sessions);
+    // Keep damaged source rows visible for review; never fabricate midnight or
+    // discard the row because its source lost the time component.
+    incomplete.forEach(r=>{
+      const row=pairSession(r.__type==='IN'?r:null,r.__type==='OUT'?r:null,'incomplete-time');
+      row.timePrecisionIssue=true;
+      row.attendanceStatus='原始打卡時間不完整';
+      row.attendanceCheckLabels=['原始打卡時間不完整'];
+      consolidated.push(row);
+    });
     consolidated.sort((a,b)=>(b.sortTime||0)-(a.sortTime||0));
     return consolidated;
   }
@@ -412,7 +428,7 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.11-CALENDAR-WORKDATE';
+    window.p79AttendanceEngineVersion='V6.0.12-TIME-INTEGRITY';
     console.info('[PORT79] Attendance V6.0.11 calendar work-date installed');
     return true;
   }
