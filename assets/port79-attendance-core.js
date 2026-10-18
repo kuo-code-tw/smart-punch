@@ -305,6 +305,54 @@ function p79AttendanceEditAlreadySaved(payload,cloud){
  return ['timeStr','status','empId','attNo','note'].every(key=>normalizeCompareValue(local[key])===normalizeCompareValue(cloud[key]));
 }
 
+function p79PausedReviewItem(key,payload){
+ const item=readQueue().find(x=>x.key===key&&x.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||'')));
+ if(!item||(payload&&!samePayload(item.payload,payload)))throw new Error('這筆待同步修改已變更，請重新開啟明細核對');
+ return item;
+}
+function p79PausedReviewIdentity(payload,cloud){
+ const record=payload.record||{};
+ if(String(record.id)!==String(cloud.id))return false;
+ const fields=['empId','attNo'].filter(k=>String(record[k]??'').trim());
+ return fields.length>0&&fields.every(k=>normalizeCompareValue(record[k])===normalizeCompareValue(cloud[k]));
+}
+async function p79ReviewPausedAttendanceWrite(key){
+ const item=p79PausedReviewItem(key),payload=JSON.parse(JSON.stringify(item.payload));
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try {
+  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),controller.signal);
+  p79PausedReviewItem(key,payload);
+  if(!p79PausedReviewIdentity(payload,cloud))throw new Error('雲端紀錄的員工身分無法確認，草稿保留，請核對人員與紀錄 ID');
+  if(p79AttendanceEditAlreadySaved(payload,cloud)){
+   if(!remove(key,payload))throw new Error('待同步修改已變更，請重新核對');
+   try{markRecentAttendanceMutationCloudConfirmed?.(cloud.id)}catch(e){}
+   lastDoneAt=Date.now();updateUi();
+   return {state:'saved',cloud};
+  }
+  return {state:'review',key,payload,cloud};
+ } finally {clearTimeout(timer);}
+}
+async function p79ApplyPausedAttendanceReview(review){
+ if(typeof requireAdminAction!=='function'||!requireAdminAction('attendanceEdit','核對並套用考勤修改'))throw new Error('沒有考勤修改權限');
+ if(review?.state!=='review')throw new Error('請先核對雲端與草稿');
+ p79PausedReviewItem(review.key,review.payload);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ let cloud;
+ try{cloud=await p79ReadAttendanceEditCloud(payloadRecordId(review.payload),controller.signal);}finally{clearTimeout(timer);}
+ p79PausedReviewItem(review.key,review.payload);
+ if(!p79PausedReviewIdentity(review.payload,cloud)||!p79AttendanceEditAlreadySaved({record:review.cloud},cloud)||String(review.cloud.manuallyEditedAt||'')!==String(cloud.manuallyEditedAt||''))throw new Error('核對後雲端又有變更，未送出修改；請重新核對，草稿仍保留');
+ const record={...review.payload.record,manuallyEdited:true,manuallyEditedAt:new Date().toISOString()};
+ const payload={...review.payload,record,originalTimeStr:cloud.timeStr,originalPunchType:typeof getAttendanceRecordType==='function'?getAttendanceRecordType(cloud):cloud.status};
+ // The user reviewed both values. Queue replacement and the normal CAS write remain serialized.
+ const result=await submitAttendanceWrite(payload,'考勤修改已核對並同步雲端');
+ if(result?.ok&&!result.queued){
+  const index=records.findIndex(r=>String(r.id)===String(record.id)&&(typeof getAttendanceRecordType!=='function'||getAttendanceRecordType(r)===getAttendanceRecordType(cloud)));
+  if(index>=0)records[index]={...records[index],...record};
+  try{saveRecords?.();p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+ }
+ return result;
+}
+
 async function send(payload,timeout=25000){
   const url=gasUrl();
   if(!url) throw new Error('未設定 GAS URL');
@@ -841,6 +889,8 @@ window.p79V5StartDelta=startDelta;
 window.p79V5PollDelta=pollDelta;
 window.p79V5PendingForId=pendingForId;
 window.p79V5PrepareAttendanceEdit=p79PrepareAttendanceEdit;
+window.p79V5ReviewPausedWrite=p79ReviewPausedAttendanceWrite;
+window.p79V5ApplyPausedReview=p79ApplyPausedAttendanceReview;
 window.p79V5QueueInfoForId=queueInfoForId;
 window.p79V5ConfirmCloudRecord=confirmCloudRecord;
 window.p79V5ConfirmCloudDelete=confirmCloudDelete;
