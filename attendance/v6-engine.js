@@ -69,6 +69,7 @@
   }
   function prefer(a,b){
     if(!b) return a;
+    const at=Number.isFinite(a.__ts),bt=Number.isFinite(b.__ts);if(at!==bt)return at?a:b;
     const am=isManual(a), bm=isManual(b); if(am!==bm) return am?a:b;
     const ar=recency(a), br=recency(b); if(ar!==br) return ar>br?a:b;
     return (a.__index||0)>(b.__index||0)?a:b;
@@ -318,9 +319,15 @@
     });
   }
   function buildShifts(rawRecords){
-    const prepared=(Array.isArray(rawRecords)?rawRecords:[])
-      .map(normalizedRecord)
-      .filter(r=>r.__type!=='OTHER'&&r.__identity);
+    const snapshots=(Array.isArray(rawRecords)?rawRecords:[]).map(normalizedRecord);
+    const versions=new Map(),unversioned=[];
+    snapshots.forEach(r=>{
+      const id=s(r.id);
+      if(!id){unversioned.push(r);return;}
+      const key=[r.__identity,r.__type,id].join('|');
+      versions.set(key,prefer(r,versions.get(key)));
+    });
+    const prepared=[...versions.values(),...unversioned].filter(r=>r.__type!=='OTHER'&&r.__identity);
     const effective=suppressReplacedSyntheticRecoveries(prepared);
     const incomplete=effective.filter(r=>!Number.isFinite(r.__ts));
     const timed=effective.filter(r=>Number.isFinite(r.__ts));

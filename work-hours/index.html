@@ -5106,30 +5106,22 @@ const now = new Date();
         }
 
         function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
-            const merged = [];
-            const indexByKey = new Map();
-            [...(Array.isArray(primaryRecords) ? primaryRecords : []), ...(Array.isArray(secondaryRecords) ? secondaryRecords : [])]
-                .forEach(record => {
-                    if (!record || typeof record !== 'object') return;
-                    if (isLocallyDeletedAttendanceRecord(record)) return;
-                    const eventKey = getAttendanceImportEventKey(record);
-                    const fallbackKey = record.id !== null && record.id !== undefined && String(record.id) !== ''
-                        ? `ID:${String(record.id)}`
-                        : `ROW:${String(record.empId || record.attNo || record.name || '')}|${String(record.timeStr || '')}|${String(record.status || '')}`;
-                    const key = eventKey || fallbackKey;
-                    if (indexByKey.has(key)) {
-                        const index = indexByKey.get(key);
-                        const current = merged[index];
-                        // 雲端與本機同一事件衝突時，人工修改版本具有最高優先權。
-                        if (isManuallyEditedAttendanceRecord(record) && !isManuallyEditedAttendanceRecord(current)) {
-                            if (!record.sourceEventKey && current.sourceEventKey) record.sourceEventKey = current.sourceEventKey;
-                            merged[index] = record;
-                        }
-                        return;
-                    }
-                    indexByKey.set(key, merged.length);
-                    merged.push(record);
-                });
+            const merged=[],indexByKey=new Map(),indexByRecordId=new Map();
+            [...(Array.isArray(primaryRecords)?primaryRecords:[]),...(Array.isArray(secondaryRecords)?secondaryRecords:[])].forEach(record=>{
+                if(!record||typeof record!=='object'||isLocallyDeletedAttendanceRecord(record))return;
+                const type=getAttendanceRecordType(record);
+                const person=String(record.attNo||record.empId||record.name||'').trim().toUpperCase();
+                const id=record.id===null||record.id===undefined?'':String(record.id);
+                const idKey=id?`${person}|${type}|${id}`:'';
+                const key=getAttendanceImportEventKey(record)||idKey||`ROW:${person}|${String(record.timeStr||'')}|${type}`;
+                const index=idKey&&indexByRecordId.has(idKey)?indexByRecordId.get(idKey):indexByKey.get(key);
+                if(index!==undefined){
+                    if(preferCanonicalAttendanceRecord(record,merged[index]))merged[index]=record;
+                    indexByKey.set(key,index);if(idKey)indexByRecordId.set(idKey,index);
+                }else{
+                    const next=merged.length;indexByKey.set(key,next);if(idKey)indexByRecordId.set(idKey,next);merged.push(record);
+                }
+            });
             return merged;
         }
 
@@ -14926,7 +14918,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261018-time-integrity-2"></script>
+<script src="../attendance/v6-engine.js?v=20261018-time-integrity-3"></script>
 
 <script>
 function p79CanExportOvertimeApplication(){
