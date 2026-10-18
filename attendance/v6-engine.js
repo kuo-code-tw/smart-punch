@@ -318,9 +318,22 @@
     });
   }
   function buildShifts(rawRecords){
-    const prepared=(Array.isArray(rawRecords)?rawRecords:[])
-      .map(normalizedRecord)
-      .filter(r=>r.__type!=='OTHER'&&r.__identity);
+    const snapshots=(Array.isArray(rawRecords)?rawRecords:[]).map(normalizedRecord);
+    // Legacy imports reuse IDs across dates and even across shifts. IDs alone
+    // must never collapse timed events. Remove only a date-only version whose
+    // same employee/direction/ID/calendar date has exactly one precise time.
+    const precisionKey=r=>s(r.id)&&/^\d{4}\/\d{2}\/\d{2}/.test(r.timeStr)
+      ? [r.__identity,r.__type,s(r.id),r.timeStr.slice(0,10)].join('|') : '';
+    const preciseTimes=new Map();
+    snapshots.forEach(r=>{
+      const key=precisionKey(r);if(!key||!Number.isFinite(r.__ts))return;
+      if(!preciseTimes.has(key))preciseTimes.set(key,new Set());
+      preciseTimes.get(key).add(r.__ts);
+    });
+    const prepared=snapshots.filter(r=>r.__type!=='OTHER'&&r.__identity).filter(r=>{
+      if(Number.isFinite(r.__ts)||!/^\d{4}\/\d{2}\/\d{2}$/.test(r.timeStr))return true;
+      return preciseTimes.get(precisionKey(r))?.size!==1;
+    });
     const effective=suppressReplacedSyntheticRecoveries(prepared);
     const incomplete=effective.filter(r=>!Number.isFinite(r.__ts));
     const timed=effective.filter(r=>Number.isFinite(r.__ts));

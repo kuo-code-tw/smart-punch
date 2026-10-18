@@ -44,3 +44,19 @@ const dateOnlyRecovery={...full,id:'PAIRREC_IN_OLD',source:'manual-pair-recovery
 assert.equal(engine.buildShifts([anchor,replacement,dateOnlyRecovery]).length,1,'date-only synthetic does not duplicate genuine same-day side');
 
 c.records=[full];c.mergeDeltaEvent({kind:'upsert',record:{...full,timeStr:'2026/10/10 07:30',manuallyEdited:false,manuallyEditedAt:''}});assert.equal(c.records[0].timeStr,full.timeStr,'historical delta cannot undo a dated manual edit');assert.equal(c.records[0].manuallyEdited,true);
+
+for(const input of [[damaged,full],[full,damaged]]){
+ const shifts=engine.buildShifts([...input,{...full,id:'paired-out',status:'OUT',timeStr:'2026/10/11 07:51'}]);
+ assert.equal(shifts.length,1,'only the proven incomplete version is suppressed');assert(shifts[0].clockIn&&shifts[0].clockOut);
+}
+const reused=Array.from({length:5},(_,n)=>[
+ {...full,id:'legacy-reused',timeStr:`2026/10/${10+n} 07:35`},
+ {...full,id:'legacy-reused',status:'OUT',timeStr:`2026/10/${10+n} 15:45`}
+]).flat();
+assert.equal(engine.buildShifts(reused).length,5,'reused IDs across days preserve every shift');
+const split=[{...full,id:'reused',timeStr:'2026/10/10 07:35'},{...full,id:'reused',status:'OUT',timeStr:'2026/10/10 11:45'},{...full,id:'reused',timeStr:'2026/10/10 15:35'},{...full,id:'reused',status:'OUT',timeStr:'2026/10/10 23:45'}];
+assert.equal(engine.buildShifts(split).length,2,'same-date split shifts with reused IDs remain separate');
+assert(engine.buildShifts([...split,{...damaged,id:'reused'}]).some(r=>r.timePrecisionIssue),'ambiguous date-only version remains visible');
+assert.equal(engine.buildShifts([full,{...damaged,attNo:'other'},{...damaged,status:'OUT'}]).length,3,'identity and direction isolated');
+
+assert.equal(engine.buildShifts([full,{...full,timeStr:'2026/10/10 25:00'}]).length,2,'invalid timed values are not silently suppressed');
