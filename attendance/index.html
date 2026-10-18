@@ -5685,7 +5685,6 @@ const now = new Date();
 function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
             const merged = [];
             const indexByKey = new Map();
-            const indexByRecordId = new Map();
             const exactEventIndex = new Map();
             const lineageIndex = new Map();
 
@@ -5697,14 +5696,13 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                     const eventKey = getAttendanceImportEventKey(record);
                     const recordType = getAttendanceRecordType(record);
                     const fallbackKey = record.id !== null && record.id !== undefined && String(record.id) !== ''
-                        ? `ID:${String(record.id)}|TYPE:${recordType}|PERSON:${String(record.attNo||record.empId||record.name||'').trim().toUpperCase()}`
+                        ? `ID:${String(record.id)}|TYPE:${recordType}`
                         : `ROW:${String(record.empId || record.attNo || record.name || '')}|${String(record.timeStr || '')}|${String(record.status || '')}`;
                     const key = eventKey || fallbackKey;
                     const exactKey = p79ExactAttendanceLogicalEventKey(record);
                     const lineageKey = p79AttendanceLineageKey(record);
 
-                    const idKey=record.id!==null&&record.id!==undefined&&String(record.id)!=='' ? `${String(record.attNo||record.empId||record.name||'').trim().toUpperCase()}|${recordType}|${String(record.id)}` : '';
-                    let index = idKey&&indexByRecordId.has(idKey) ? indexByRecordId.get(idKey) : (indexByKey.has(key) ? indexByKey.get(key) : undefined);
+                    let index = indexByKey.has(key) ? indexByKey.get(key) : undefined;
                     if (index === undefined && lineageKey && lineageIndex.has(lineageKey)) index = lineageIndex.get(lineageKey);
                     if (index === undefined && exactKey && exactEventIndex.has(exactKey)) index = exactEventIndex.get(exactKey);
 
@@ -5715,7 +5713,6 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                             merged[index] = record;
                         }
                         indexByKey.set(key, index);
-                        if(idKey)indexByRecordId.set(idKey,index);
                         if (exactKey) exactEventIndex.set(exactKey, index);
                         if (lineageKey) lineageIndex.set(lineageKey, index);
                         return;
@@ -5723,7 +5720,6 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
 
                     const newIndex = merged.length;
                     indexByKey.set(key, newIndex);
-                    if(idKey)indexByRecordId.set(idKey,newIndex);
                     if (exactKey) exactEventIndex.set(exactKey, newIndex);
                     if (lineageKey) lineageIndex.set(lineageKey, newIndex);
                     merged.push(record);
@@ -23944,7 +23940,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261018-time-integrity-3"></script>
+<script src="./v6-engine.js?v=20261018-time-integrity-2"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';
