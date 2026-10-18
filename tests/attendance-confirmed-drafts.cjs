@@ -10,6 +10,6 @@ t=setup();t.c.cloud.empId='OTHER';await assert.rejects(t.c.p79CheckWithdrawnAtte
 t=setup();t.c.p79ReadAttendanceEditCloud=async()=>{throw Error('offline')};await assert.rejects(t.c.p79CheckWithdrawnAttendanceDraft('B1'),/offline/);assert.equal(t.c.p79ReadWithdrawnAttendanceDrafts().length,1);
 t=setup();t.c.localStorage.setItem=()=>{throw Error('quota')};await assert.rejects(t.c.p79CheckWithdrawnAttendanceDraft('B1'),/quota/);assert.equal(t.c.p79ReadWithdrawnAttendanceDrafts().length,1);
 t=setup();t.c.p79ReadAttendanceEditCloud=async()=>{t.data.set('backup','[]');return t.c.cloud};await assert.rejects(t.c.p79CheckWithdrawnAttendanceDraft('B1'),/草稿已變更/);
-const html=fs.readFileSync('attendance/index.html','utf8');assert(html.includes('data-check-draft='));assert(!html.match(/saved\.map\([^\n]+data-restore-draft/),'unchecked backups cannot offer restore');
+const html=fs.readFileSync('attendance/index.html','utf8');assert(!html.includes('已撤回草稿備份（'),'withdrawn drafts are not outstanding sync work');assert(!html.match(/saved\.map\([^\n]+data-restore-draft/),'withdrawn backups cannot offer restore in the pending panel');
 console.log('PASS completed backups cannot restore, empty-outbox cloud pull reconciles backups, only real differences allow review, network/quota/identity/race preserve state; no cloud writes');
 })().catch(e=>{console.error(e);process.exitCode=1});

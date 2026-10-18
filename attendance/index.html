@@ -23730,17 +23730,13 @@ html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!i
 #p79OutboxInspectCard :is(td,th):nth-child(6){width:18%}
 #p79OutboxInspectCard button{max-width:100%;white-space:normal!important;padding:7px 9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:700}
 #p79OutboxInspectCard small{display:block;overflow-wrap:anywhere}
-#p79OutboxInspectCard .p79-withdrawn-draft-list{display:flex;flex-direction:row;flex-wrap:wrap;align-items:stretch;gap:10px;margin-top:10px}
-#p79OutboxInspectCard .p79-withdrawn-draft-item{display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding:8px 10px;border:1px solid #dce6ef;border-radius:10px;background:#f8fafc}
-#p79OutboxInspectCard .p79-withdrawn-draft-item span{min-width:0;overflow-wrap:anywhere}
-#p79OutboxInspectCard .p79-withdrawn-draft-item button{flex-shrink:0;white-space:nowrap!important}
 #p79OutboxReview{overflow-wrap:anywhere}
 @media(max-width:700px){html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){font-size:11px!important;padding:6px 3px!important}#p79OutboxInspectCard{padding:12px;width:calc(100vw - 16px)}#p79OutboxInspectPanel{padding:8px}}
 </style>
 <div id="p79OutboxInspectPanel" role="dialog" aria-modal="true" aria-label="待同步明細">
 <div id="p79OutboxInspectCard">
 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div>
-<p style="color:#64748b;margin:10px 0">暫停項目不會自動送出，重新登入也會保留。可核對後套用修改，或撤回待傳並保存可恢復草稿；撤回不會刪除雲端考勤。</p>
+<p style="color:#64748b;margin:10px 0">此處只列尚未完成的待傳修改。撤回後即結束處理，保留雲端考勤，不再要求核對撤回草稿。</p>
 <div id="p79OutboxInspectBody"></div><div id="p79OutboxReview" role="status" aria-live="polite"></div>
 </div></div>
 <script id="p79-outbox-inspector">
@@ -23778,10 +23774,7 @@ function show(autoReview=true){
   html+='</tbody></table>';
  }
  if(shownDrafts.size)html+='<p class="p79-outbox-actions"><button type="button" data-withdraw-all>撤回全部暫停修改（保留草稿）</button></p>';
- try{
-  const saved=window.p79V5ReadWithdrawnDrafts?.()||[];
-  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，尚待雲端核對）</summary><div class="p79-withdrawn-draft-list">'+saved.map(x=>'<div class="p79-withdrawn-draft-item"><span>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+'</span><button type="button" data-check-draft="'+safe(encodeURIComponent(x.backupId))+'">核對雲端</button></div>').join('')+'</div></details>';
- }catch(error){html+='<p>'+safe(error.message)+'</p>';}
+ // Withdrawn edits are finished user decisions, not outstanding sync work.
  body.innerHTML=html;root.classList.add('p79-show');
  if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
 }
@@ -23819,7 +23812,7 @@ async function handleInspectorClick(event){
    const selected=button.hasAttribute('data-withdraw-all')?[...shownDrafts].map(([key,payload])=>({key,payload})):[{key:decodeURIComponent(button.dataset.withdrawKey),payload:shownDrafts.get(decodeURIComponent(button.dataset.withdrawKey))}];
    if(!confirm('撤回 '+selected.length+' 筆暫停修改？草稿會先保存為可恢復備份，雲端考勤不會刪除或改寫。'))return;
    const result=window.p79V5WithdrawPausedWrites(selected);show(false);
-   status.textContent='已撤回 '+result.count+' 筆待傳修改，草稿保存在下方備份；雲端資料未變更。本機已顯示的時間仍須重新拉取雲端核對。';
+   status.textContent='已撤回 '+result.count+' 筆待傳修改，已從待處理清單移除；雲端考勤保留。';
   }else if(button.dataset.checkDraft||button.dataset.restoreDraft){
    reviewBusy=true;button.disabled=true;status.textContent='正在核對這份撤回草稿與雲端資料…';
    const id=decodeURIComponent(button.dataset.checkDraft||button.dataset.restoreDraft);
