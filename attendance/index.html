@@ -915,24 +915,28 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 }
 </style>
 <style id="p79-attendance-balanced-columns-v69">
-#adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:1440px!important;table-layout:fixed!important}
+#adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:1694px!important;table-layout:fixed!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td){padding:10px 8px!important;text-align:center!important;vertical-align:middle!important;box-sizing:border-box!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(1){width:5%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(2){width:6%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(3){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:6%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:4%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:13%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:13%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:7%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:7%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:11%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(13){width:4%!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(1){width:70px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(2){width:90px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(3){width:110px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:110px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:90px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:70px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:220px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:220px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:120px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:120px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:130px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:180px!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(13){width:64px!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:13px!important;white-space:nowrap!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(10){font-size:13px!important;white-space:nowrap!important}
+/* Keep editable punch times inside their own columns despite the global button theme. */
+#adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button{font-size:13px!important;font-family:inherit!important;min-height:32px;padding:0!important;gap:4px!important;white-space:nowrap!important}
+#adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]{border-right:1px solid #e2e8f0}
+#adminRecordsTableContainer .attendance-records-wide-table td[data-p79-attendance-hours]{border-right:1px solid #e2e8f0}
 </style>
 <style id="p79-attendance-single-line-toolbar">
 #attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
