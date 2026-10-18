@@ -887,6 +887,12 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
  #exportRecordsModal .attendance-export-body>div:has(#exportFieldCount)>div{flex-wrap:wrap}
 }
 </style>
+<style id="attendance-query-unified-card">
+#attendanceQueryCard{padding:12px!important;display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+#attendanceQuickFilters>div:first-child{margin-bottom:8px!important}
+body[data-p79-system="attendance"] #attendanceQueryCard #recordsPagination{margin:0!important;padding:8px 0 0!important;border:0!important;border-top:1px solid #e2e8f0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.dark body[data-p79-system="attendance"] #attendanceQueryCard #recordsPagination{border-top-color:#334155!important}
+</style>
 <style id="p79-attendance-table-layout">
 #viewAdmin{max-width:1920px!important}
 #viewAdmin .admin-desktop-content{min-width:0!important;width:100%!important}
@@ -1200,7 +1206,8 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                     </div>
                 </div>
 
-                <div class="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 mb-4">
+                <div id="attendanceQueryCard" class="panel rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+                <div id="attendanceQuickFilters">
                     <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
                         <div class="flex items-center gap-2">
                             <span class="text-sm">🔎</span>
@@ -1257,6 +1264,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                 </div>
 
                 <div id="recordsPagination" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"></div>
+                </div>
 
 
                 <div id="adminRecordsTableContainer" class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
