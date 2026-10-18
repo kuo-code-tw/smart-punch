@@ -42,3 +42,5 @@ assert.equal(engine.buildShifts([anchor,replacement,{...stale,id:'genuine',sourc
 assert.equal(engine.buildShifts([anchor,replacement,{...stale,manualPairClockInId:'unknown'}]).length,2,'unproven old recovery retained');
 const dateOnlyRecovery={...full,id:'PAIRREC_IN_OLD',source:'manual-pair-recovery',timeStr:'2026/10/6'};
 assert.equal(engine.buildShifts([anchor,replacement,dateOnlyRecovery]).length,1,'date-only synthetic does not duplicate genuine same-day side');
+
+c.records=[full];c.mergeDeltaEvent({kind:'upsert',record:{...full,timeStr:'2026/10/10 07:30',manuallyEdited:false,manuallyEditedAt:''}});assert.equal(c.records[0].timeStr,full.timeStr,'historical delta cannot undo a dated manual edit');assert.equal(c.records[0].manuallyEdited,true);

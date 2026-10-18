@@ -719,7 +719,10 @@ function mergeDeltaEvent(event){
   });
   if(idx>=0){
     const precise=typeof p79AttendancePreciseVersion==='function'?p79AttendancePreciseVersion(records[idx],nr):null;
-    records[idx]=precise||{...records[idx],...nr};
+    const currentEdit=Date.parse(String(records[idx].manuallyEditedAt||''))||0;
+    const incomingEdit=Date.parse(String(nr.manuallyEditedAt||''))||0;
+    const staleEdit=currentEdit>incomingEdit;
+    records[idx]=precise||(staleEdit?records[idx]:{...records[idx],...nr});
   }
   else records.unshift(nr);
   return true;
