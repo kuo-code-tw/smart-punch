@@ -44,3 +44,12 @@ const dateOnlyRecovery={...full,id:'PAIRREC_IN_OLD',source:'manual-pair-recovery
 assert.equal(engine.buildShifts([anchor,replacement,dateOnlyRecovery]).length,1,'date-only synthetic does not duplicate genuine same-day side');
 
 c.records=[full];c.mergeDeltaEvent({kind:'upsert',record:{...full,timeStr:'2026/10/10 07:30',manuallyEdited:false,manuallyEditedAt:''}});assert.equal(c.records[0].timeStr,full.timeStr,'historical delta cannot undo a dated manual edit');assert.equal(c.records[0].manuallyEdited,true);
+
+for(const input of [[damaged,full],[full,damaged]]){
+ const shifts=engine.buildShifts([...input,{...full,id:'paired-out',status:'OUT',timeStr:'2026/10/11 07:51'}]);
+ assert.equal(shifts.length,1,'same typed employee/event ID must not appear as a second incomplete shift');assert(shifts[0].clockIn&&shifts[0].clockOut);
+}
+assert.equal(engine.buildShifts([full,{...full,attNo:'other',timeStr:'2026/10/10'},{...full,status:'OUT',timeStr:'2026/10/10 23:59'}]).length,2,'same ID across employees and directions must remain distinct');
+const mergeStart=html.indexOf('function mergeAttendanceRecordCollections('),mergeEnd=html.indexOf('\n        }',mergeStart)+10;
+const mergeContext={...c,getAttendanceImportEventKey:r=>/\d:\d/.test(r.timeStr)?r.attNo+'|'+r.timeStr+'|'+r.status:'',p79ExactAttendanceLogicalEventKey:()=>'',p79AttendanceLineageKey:()=>''};vm.createContext(mergeContext);vm.runInContext(html.slice(mergeStart,mergeEnd),mergeContext);
+for(const sides of [[damaged,full],[full,damaged]]){const merged=mergeContext.mergeAttendanceRecordCollections([sides[0]],[sides[1]]);assert.equal(merged.length,1,'backup merge must join ID fallback to timestamp event key');assert.equal(merged[0].timeStr,full.timeStr);}

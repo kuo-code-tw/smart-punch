@@ -5108,6 +5108,7 @@ const now = new Date();
         function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
             const merged = [];
             const indexByKey = new Map();
+            const indexByRecordId = new Map();
             [...(Array.isArray(primaryRecords) ? primaryRecords : []), ...(Array.isArray(secondaryRecords) ? secondaryRecords : [])]
                 .forEach(record => {
                     if (!record || typeof record !== 'object') return;
@@ -14926,7 +14927,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261018-time-integrity-2"></script>
+<script src="../attendance/v6-engine.js?v=20261018-time-integrity-3"></script>
 
 <script>
 function p79CanExportOvertimeApplication(){
