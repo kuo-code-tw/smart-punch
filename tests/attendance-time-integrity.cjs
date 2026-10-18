@@ -30,3 +30,17 @@ rows=engine.buildShifts([full,{...full,id:'out',status:'OUT',timeStr:'2026/10/11
 rows=engine.buildShifts([{...full,timeStr:'2026/10/11 00:00'},{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert.equal(rows[0].dateKey,'2026-10-11');
 for(const bad of ['2026/02/30 07:51','2026/10/10 25:00'])assert(engine.buildShifts([{...full,timeStr:bad}])[0].timePrecisionIssue);
 console.log('PASS precise source preserved through month/canonical/delta merges and repeated pulls; newer genuine midnight edit, cross-day pairing and damaged-row visibility; no cloud writes');
+
+assert.equal(engine.normalizeTime('2026/9/3'),'2026/09/03');
+vm.runInContext(fn('formatAttendanceTimeCell'),c);vm.runInContext(fn('getAttendanceStatusBadge'),c);c.escapeHtml=s=>String(s);assert(c.formatAttendanceTimeCell(damaged,'IN').includes('時間不完整'));assert(!c.formatAttendanceTimeCell(damaged,'IN').includes('00:00'));assert(!c.getAttendanceStatusBadge('原始打卡時間不完整').includes('未打卡'));
+
+const anchor={...full,id:'real-in',timeStr:'2026/10/06 23:32',v5PairTargetId:'real-out'};
+const replacement={...full,id:'real-out',status:'OUT',timeStr:'2026/10/07 07:48',v5PairTargetId:'real-in'};
+const stale={...full,id:'PAIRREC_OUT_OLD',source:'manual-pair-recovery',status:'OUT',timeStr:'2026/10/06 07:49',manualPairClockInId:'real-in'};
+assert.equal(engine.buildShifts([anchor,replacement,stale]).length,1,'exact manual replacement retires impossible old recovery across dates');
+assert.equal(engine.buildShifts([anchor,replacement,{...stale,id:'genuine',source:'manual-admin'}]).length,2,'real orphan retained');
+assert.equal(engine.buildShifts([anchor,replacement,{...stale,manualPairClockInId:'unknown'}]).length,2,'unproven old recovery retained');
+const dateOnlyRecovery={...full,id:'PAIRREC_IN_OLD',source:'manual-pair-recovery',timeStr:'2026/10/6'};
+assert.equal(engine.buildShifts([anchor,replacement,dateOnlyRecovery]).length,1,'date-only synthetic does not duplicate genuine same-day side');
+
+c.records=[full];c.mergeDeltaEvent({kind:'upsert',record:{...full,timeStr:'2026/10/10 07:30',manuallyEdited:false,manuallyEditedAt:''}});assert.equal(c.records[0].timeStr,full.timeStr,'historical delta cannot undo a dated manual edit');assert.equal(c.records[0].manuallyEdited,true);

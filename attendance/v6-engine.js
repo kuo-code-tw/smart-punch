@@ -21,7 +21,10 @@
   function normalizeTime(v){
     let x=s(v).replace(/-/g,'/').replace(/\s+/g,' ');
     const m=x.match(/^(\d{2,4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if(!m) return x;
+    if(!m){
+      const date=x.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+      return date?`${date[1]}/${date[2].padStart(2,'0')}/${date[3].padStart(2,'0')}`:x;
+    }
     let y=Number(m[1]); if(y<1911) y+=1911;
     const month=Number(m[2]),day=Number(m[3]),hour=Number(m[4]),minute=Number(m[5]),second=Number(m[6]||0);
     const date=new Date(y,month-1,day,hour,minute,second);
@@ -277,7 +280,7 @@
     list.forEach(r=>{
       const id=s(r.id);if(id){if(!byId.has(id))byId.set(id,[]);byId.get(id).push(r);}
       if(isSyntheticManualPairRecovery(r))return;
-      realKeys.add([r.__identity,r.__type,calendarDateKey(r)].join('|'));
+      if(Number.isFinite(r.__ts))realKeys.add([r.__identity,r.__type,calendarDateKey(r)].join('|'));
       if(isManual(r))manualReal.push(r);
     });
     return list.filter(r=>{
@@ -289,8 +292,18 @@
       // A same-day alternative alone is not evidence that a real punch is obsolete.
       const oldTargets=[explicitTargetId(r),legacyTargetId(r)].filter(Boolean);
       for(const real of manualReal){
-        if(real.__identity!==r.__identity||real.__type===r.__type||!validPair(r,real))continue;
+        if(real.__identity!==r.__identity||real.__type===r.__type)continue;
         const targets=[explicitTargetId(real),legacyTargetId(real)].filter(Boolean);
+        // An impossible old synthetic side is superseded when its exact real
+        // counterpart explicitly selects a valid replacement, even across dates.
+        // Never apply this to a genuine punch or an unlinked same-day alternative.
+        if(oldTargets.includes(s(real.id))&&!validPair(r,real)){
+          const replacements=targets.flatMap(id=>byId.get(id)||[]).filter(t=>
+            t!==r&&!isSyntheticManualPairRecovery(t)&&t.__identity===r.__identity&&
+            t.__type===r.__type&&validPair(t,real));
+          if(new Set(replacements.map(t=>s(t.id))).size===1)return false;
+        }
+        if(!validPair(r,real))continue;
         for(const targetId of targets){
           if(targetId===s(r.id))continue;
           const replacements=(byId.get(targetId)||[]).filter(t=>t.__identity===r.__identity&&t.__type===r.__type&&calendarDateKey(t)===calendarDateKey(r)&&validPair(t,real));
@@ -308,12 +321,13 @@
     const prepared=(Array.isArray(rawRecords)?rawRecords:[])
       .map(normalizedRecord)
       .filter(r=>r.__type!=='OTHER'&&r.__identity);
-    const incomplete=prepared.filter(r=>!Number.isFinite(r.__ts));
-    const timed=prepared.filter(r=>Number.isFinite(r.__ts));
+    const effective=suppressReplacedSyntheticRecoveries(prepared);
+    const incomplete=effective.filter(r=>!Number.isFinite(r.__ts));
+    const timed=effective.filter(r=>Number.isFinite(r.__ts));
     // V6.0.7：舊 manual-pair-recovery 若同人同日同側已有真正事件，先丟掉 synthetic recovery。
     // 例如 23:40 IN 曾被舊 recovery 01:02 OUT 綁住，但同日另有真正 07:51 OUT，
     // 必須讓 07:51 參與正式班次配對，不能讓舊 recovery 永久搶走上班。
-    const normalized=dedupe(suppressReplacedSyntheticRecoveries(timed));
+    const normalized=dedupe(timed);
     // V6.0.3：同一個舊 record.id 可能不只一筆，不能 Map(id -> 單筆)。
     // 改成 Map(id -> 候選陣列)，再用員工身份、方向、目標時間挑真正 target。
     const byId=new Map();
