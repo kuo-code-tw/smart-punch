@@ -1,0 +1,91 @@
+/* Shared visual system based on the vessel efficiency workspace. Business colors and data stay intact. */
+@media screen {
+html[data-p79-design="vessel"]{
+ --workspace-bg:#edf3f8;--workspace-panel:#fff;--workspace-ink:#18324c;--workspace-muted:#486477;
+ --workspace-line:#dce6ef;--workspace-head:#eaf2f8;--workspace-alt:#f5f9fc;--workspace-hover:#eaf8f6;
+ --workspace-navy:#123e5c;--workspace-teal:#0d9488;--workspace-focus:#14b8a626;
+ --workspace-shadow:0 4px 18px #16355408;
+ --p79-bg:var(--workspace-bg);--p79-panel:var(--workspace-panel);--p79-text:var(--workspace-ink);
+ --p79-border:var(--workspace-line);--p79-line:var(--workspace-line);--p79-muted:var(--workspace-muted);
+ --p79-shadow:var(--workspace-shadow);--bg:var(--workspace-bg);--panel:var(--workspace-panel);
+ --text:var(--workspace-ink);--border:var(--workspace-line);--muted:var(--workspace-muted);
+}
+html[data-p79-design="vessel"].dark,html[data-p79-design="vessel"][data-theme="dark"]{
+ --workspace-bg:#0b1827;--workspace-panel:#122338;--workspace-ink:#e2edf7;--workspace-muted:#b1c5d6;
+ --workspace-line:#2a435a;--workspace-head:#19364e;--workspace-alt:#152b40;--workspace-hover:#153e43;
+ --workspace-shadow:0 4px 18px #0002;
+}
+html[data-p79-design="vessel"] body{
+ background:var(--workspace-bg)!important;color:var(--workspace-ink)!important;
+ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif!important;
+ font-size:16px!important;line-height:1.55;zoom:1!important;
+}
+html[data-p79-design="vessel"] body :is(button,input,select,textarea){font-family:inherit!important}
+html[data-p79-design="vessel"] body :is(main,.wrap,#viewAdmin,#viewEmployee){max-width:1760px!important;margin-inline:auto!important}
+html[data-p79-design="vessel"] body :is(main,.wrap){padding:18px 24px 32px!important}
+html[data-p79-design="vessel"] body #app-main-container{max-width:1920px!important}
+html[data-p79-design="vessel"] body #p79SevenTop{background:linear-gradient(115deg,#123e5c,#176d7e)!important;border:0!important;box-shadow:0 4px 18px #123e5c18!important}
+html[data-p79-design="vessel"] body #p79SevenTop .top-row{padding:14px 24px!important;gap:16px!important}
+html[data-p79-design="vessel"] body #p79SevenTop .brand-name{font-size:22px!important;color:#fff!important}
+html[data-p79-design="vessel"] body #p79SevenTop .brand-sub{color:#cde5ef!important;font-size:12px!important}
+html[data-p79-design="vessel"] body #p79SevenNav{gap:5px!important}
+html[data-p79-design="vessel"] body #p79SevenNav a{border-radius:10px!important;padding:10px 14px!important;font-size:15px!important;color:#e5f3f8!important;white-space:nowrap}
+html[data-p79-design="vessel"] body #p79SevenNav a.active{background:#fff!important;color:#173f58!important;box-shadow:0 3px 9px #123e5c18!important}
+html[data-p79-design="vessel"] body :is(.card,.panel,.section,.today-schedule-card){background:var(--workspace-panel)!important;border:1px solid var(--workspace-line)!important;border-radius:18px!important;box-shadow:var(--workspace-shadow)!important}
+html[data-p79-design="vessel"] body :is(.filters,.toolbar,#attendanceRecordsToolbar,#p79ScheduleQuickBar){background:var(--workspace-panel)!important;border-color:var(--workspace-line)!important;border-radius:14px!important;padding:14px!important;gap:10px!important}
+html[data-p79-design="vessel"] body :is(label,.field label,.filter-label){font-size:14px!important;font-weight:700!important;color:var(--workspace-muted)}
+html[data-p79-design="vessel"] body :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]){min-height:42px!important;border:1px solid var(--workspace-line)!important;border-radius:10px!important;padding:8px 12px!important;font-size:15px!important;background:var(--workspace-panel)!important;color:var(--workspace-ink)!important}
+html[data-p79-design="vessel"] body :is(input,select,textarea):focus-visible{outline:3px solid var(--workspace-focus)!important;outline-offset:1px!important;border-color:var(--workspace-teal)!important}
+html[data-p79-design="vessel"] body :is(button,.btn,[role="button"]){min-height:40px;border-radius:10px!important;font-size:14px!important;font-weight:700!important;line-height:1.4}
+html[data-p79-design="vessel"] body :is(button,.btn,a,input,select,textarea):focus-visible{outline:3px solid #0d948866;outline-offset:2px}
+html[data-p79-design="vessel"] body :is(button,.btn):disabled{opacity:.5;cursor:not-allowed}
+html[data-p79-design="vessel"] body :is(.btn.primary,.btn-primary,button.primary){background:#0d8177!important;border-color:#0d8177!important;color:#fff!important}
+html[data-p79-design="vessel"] body :is(.tabs,.tabbar){gap:8px!important}
+html[data-p79-design="vessel"] body :is(.tab,.tabs button){border-radius:12px!important;min-height:44px!important;font-size:16px!important;padding:10px 18px!important}
+html[data-p79-design="vessel"] body :is(.tab.active,.tabs .active){background:#e5f4f1!important;color:#146a60!important;border-color:#a3d9d0!important}
+html[data-p79-design="vessel"] body:not([data-p79-system="schedule"]) :is(th,td){font-size:16px!important;text-align:center!important;vertical-align:middle!important;padding:11px 10px!important;line-height:1.4!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+html[data-p79-design="vessel"] body thead th{background:var(--workspace-head)!important;color:var(--workspace-muted)!important;border-bottom:1px solid var(--workspace-line)!important;font-weight:800!important}
+html[data-p79-design="vessel"] body:not([data-p79-system="schedule"]) tbody tr:nth-child(even){background:var(--workspace-alt)}
+html[data-p79-design="vessel"] body:not([data-p79-system="schedule"]) tbody tr:hover{background:var(--workspace-hover)}
+html[data-p79-design="vessel"] body :is(.tablewrap,.table-wrap,.table-scroll,.vessel-table-scroll){overflow:auto;border:1px solid var(--workspace-line)!important;border-radius:13px!important;scrollbar-gutter:stable}
+html[data-p79-design="vessel"] body :is(.stats,.summary-cards){gap:12px!important}
+html[data-p79-design="vessel"] body :is(.stat,.summary-card){border:1px solid var(--workspace-line)!important;border-left:4px solid #5193c7!important;border-radius:13px!important;background:#eff6ff!important;color:#2563a0!important;padding:15px 18px!important;box-shadow:none!important}
+html[data-p79-design="vessel"] body :is(.stat,.summary-card):nth-child(3n+2){border-left-color:#28a18b!important;background:#edf9f5!important;color:#09816e!important}
+html[data-p79-design="vessel"] body :is(.stat,.summary-card):nth-child(3n){border-left-color:#9980c6!important;background:#f5f1fd!important;color:#6950a3!important}
+html[data-p79-design="vessel"] body .stat .k{font-size:14px!important;font-weight:700!important}
+html[data-p79-design="vessel"] body .stat .v{font-size:28px!important;font-weight:900!important}
+html[data-p79-design="vessel"] body :is(dialog,[role="dialog"]){color:var(--workspace-ink);border-radius:18px!important}
+html[data-p79-design="vessel"] body dialog{background:var(--workspace-panel)!important;border:1px solid var(--workspace-line)!important}
+html[data-p79-design="vessel"] body dialog::backdrop{background:#102d4680;backdrop-filter:blur(3px)}
+html[data-p79-design="vessel"] body :is(.status,.banner){border-radius:12px!important;line-height:1.6!important;font-size:14px!important}
+/* Dense roster cells retain shift/holiday colors, usable controls, and existing sticky columns. */
+html[data-p79-design="vessel"] body[data-p79-system="schedule"] :is(th,td){font-size:14px!important;vertical-align:middle!important;text-align:center}
+html[data-p79-design="vessel"] body[data-p79-system="schedule"] td :is(input,select){min-height:30px!important;padding:3px 5px!important;font-size:14px!important}
+html[data-p79-design="vessel"] body[data-p79-system="schedule"] .today-person-row{border-radius:10px!important;border-color:var(--workspace-line)!important;padding:8px 10px!important}
+html[data-p79-design="vessel"] body[data-p79-system="schedule"] .today-person-name{font-size:16px!important}
+html[data-p79-design="vessel"] body[data-p79-system="schedule"] #todaySchedulePanel{padding-inline:24px!important}
+html[data-p79-design="vessel"] body[data-p79-system="attendance"] #viewAdmin .desktop-side-rail{border-radius:14px!important;background:var(--workspace-panel)!important;border-color:var(--workspace-line)!important}
+html[data-p79-design="vessel"] body[data-p79-system="attendance"] #viewAdmin .admin-desktop-content{border:0!important;background:transparent!important;padding:0!important}
+html[data-p79-design="vessel"] body:not([data-p79-system="efficiency"]) :is(h1,h2){color:var(--workspace-ink);font-weight:900;letter-spacing:.02em}
+html[data-p79-design="vessel"] body .perm{font-size:13px!important}
+html[data-p79-design="vessel"] body td :is(.note,.remark,.description){white-space:normal;min-width:180px;max-width:360px}
+html[data-p79-design="vessel"].dark body :is(.stat,.summary-card),html[data-p79-design="vessel"][data-theme="dark"] body :is(.stat,.summary-card){background:var(--workspace-alt)!important;color:var(--workspace-ink)!important}
+html[data-p79-design="vessel"].dark body :is(main,.wrap,#viewAdmin,#viewEmployee) .bg-white,html[data-p79-design="vessel"][data-theme="dark"] body :is(main,.wrap,#viewAdmin,#viewEmployee) .bg-white{background:var(--workspace-panel)!important}
+@media(max-width:1000px){
+ html[data-p79-design="vessel"] body #p79SevenTop .top-row{padding:12px 16px!important}
+ html[data-p79-design="vessel"] body :is(main,.wrap){padding:14px 16px 24px!important}
+ html[data-p79-design="vessel"] body #p79SevenNav{overflow-x:auto;max-width:100%;justify-content:flex-start!important}
+ html[data-p79-design="vessel"] body #p79SevenNav a{padding:9px 12px!important;font-size:14px!important}
+ html[data-p79-design="vessel"] body:not([data-p79-system="schedule"]) :is(th,td){font-size:14px!important;padding:10px 9px!important}
+}
+@media(max-width:600px){
+ html[data-p79-design="vessel"] body :is(main,.wrap){padding:12px 10px 20px!important}
+ html[data-p79-design="vessel"] body :is(button,.btn,[role="button"]){min-height:44px}
+ html[data-p79-design="vessel"] body :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]){font-size:16px!important}
+ html[data-p79-design="vessel"] body :is(.filters,.toolbar){display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:10px!important}
+ html[data-p79-design="vessel"] body :is(.filters,.toolbar)>*{min-width:0;max-width:100%}
+ html[data-p79-design="vessel"] body .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ html[data-p79-design="vessel"] body[data-p79-system="schedule"] #todaySchedulePanel{padding-inline:10px!important}
+ html[data-p79-design="vessel"] body :is(.card,.panel){border-radius:14px!important}
+}
+}
