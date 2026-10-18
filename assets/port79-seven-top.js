@@ -109,6 +109,32 @@ function currentSystem(){
  if(p.includes('/history-data/'))return 'history';
  const b=String(document.body?.dataset?.p79System||'').toLowerCase();return b==='work-hours'?'workhours':(META[b]?b:'attendance');
 }
+function navigationSession(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
+function systemLevel(key,session=navigationSession()){
+ if(!session)return 'none';
+ const role=String(session.adminRole||session.role||'employee').toLowerCase();
+ if(role==='superadmin'&&!session.punchOnly)return 'manage';
+ if(role==='employee'||session.punchOnly){if(!['attendance','leave'].includes(key))return 'none';return session.systemPermissions?.[key]==='none'?'none':'view';}
+ const raw=session.systemPermissions?.[key];
+ if(raw===undefined)return key==='attendance'||(role==='employee'&&key==='leave')?'view':'none';
+ return ['view','manage'].includes(String(raw).toLowerCase())?String(raw).toLowerCase():'none';
+}
+function actionAllowed(sys,action){
+ if(['global-theme','logout-system'].includes(action))return true;
+ const level=systemLevel(sys);if(level==='none')return false;
+ const manage=['add','import','attendance-import','balance-import','leave-edit','schedule-continue','schedule-lock','schedule-takeover','schedule-mode','reset-cloud','org','permissions','overtime-options','settings','clearDeleted'];
+ if(action==='schedule-takeover')return roleText()==='超級管理員';
+ return !manage.includes(action)||level==='manage';
+}
+let navigationSignature='';
+function syncPermissionNavigation(){
+ const allowed=NAV.filter(n=>systemLevel(n[0])!=='none');
+ const signature=JSON.stringify([navigationSession(),currentSystem()]);if(signature===navigationSignature)return;
+ navigationSignature=signature;
+ const nav=document.getElementById('p79SevenNav');if(nav)nav.innerHTML=allowed.map(n=>`<a class="${n[0]===currentSystem()?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')||'<span>目前沒有可開啟的管理系統，請聯絡管理員確認權限。</span>';
+ document.querySelectorAll('#p79SevenStatus [data-sys]').forEach(el=>{if(systemLevel(el.dataset.sys)==='none')el.style.setProperty('display','none','important');else el.style.removeProperty('display');});
+ ensureStandardMenu(currentSystem());
+}
 function roleText(){try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');const r=String(s?.adminRole||s?.role||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();return r==='superadmin'?'超級管理員':r==='admin'?'管理員':'一般員工'}catch(e){return'登入使用者'}}
 function userInfo(){try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')||{};const name=String(s.name||s.empName||s.employeeName||s.empId||sessionStorage.getItem('aqc_admin_name')||'登入使用者').trim();return{name,role:roleText()}}catch(e){return{name:'登入使用者',role:roleText()}}}
 function gasUrl(){try{if(typeof GAS_URL!=='undefined'&&GAS_URL)return String(GAS_URL)}catch(e){}try{if(window.GAS_URL)return String(window.GAS_URL)}catch(e){}try{for(const k of ['port79_gas_url','gasUrl','GAS_URL']){const v=sessionStorage.getItem(k)||localStorage.getItem(k);if(v&&/script\.google\.com/i.test(v))return v}}catch(e){}return''}
@@ -198,6 +224,7 @@ function closeMenu(){document.getElementById('p79SevenStandardMenu')?.classList.
 function toggleMenu(e){e?.stopPropagation();refreshScheduleLockMenu();document.getElementById('p79SevenStandardMenu')?.classList.toggle('open')}
 
 async function runAction(sys,a){closeMenu();try{
+ if(!actionAllowed(sys,a))return alert('沒有此功能的操作權限，請聯絡管理員確認授權');
  if(a==='overtime-options')return await window.P79Overtime?.openRules?.();
  if(a==='global-theme')return toggleGlobalTheme();
  if(a==='data-cache')return window.Port79DataCache?.openCenter?.();
@@ -287,7 +314,7 @@ function buildMenu(sys){
    menu.appendChild(b);
  }
  GROUPS.forEach(([heading,actions])=>{
-   const included=actions.filter(a=>(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['data-cache','global-theme','logout-system'].includes(a)));
+   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['data-cache','global-theme','logout-system'].includes(a)));
    if(!included.length)return;
    const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
    included.forEach(a=>{
@@ -403,7 +430,7 @@ function mount(){
    return;
  }
  const root=document.createElement('div');root.id='p79SevenTop';
- root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${NAV.map(n=>`<a class="${n[0]===sys?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><b>${l}</b><span>● 待命</span></span>`).join('')}</div>`;
+ root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${NAV.filter(n=>systemLevel(n[0])!=='none').map(n=>`<a class="${n[0]===sys?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><b>${l}</b><span>● 待命</span></span>`).join('')}</div>`;
  document.body.insertBefore(root,document.body.firstChild);
  ensureStandardMenu(sys);
  document.addEventListener('click',e=>{if(!e.target?.closest?.('#p79SevenMenuWrap'))closeMenu()});
@@ -434,9 +461,9 @@ function ensureCacheButtonInLegacyMenus(){
 function render(data){const systems={...(data?.systems||{})};
 if(!systems.workhours){
   systems.workhours={active:[],passive:true,lastCompleted:null};
-}const signature=SYSTEMS.map(([k])=>{const s=systems[k]||{},a=Array.isArray(s.active)?s.active:[],j=a[0]||{},last=s.lastCompleted||{};return[k,a.length,j.operation,j.action,j.label,last.ok,last.action,Math.floor(Number(last.ageMs||0)/10000)].join(':')}).join('|');if(signature===lastSignature)return;lastSignature=signature;SYSTEMS.forEach(([k])=>{const el=document.querySelector(`#p79SevenStatus [data-sys="${k}"]`);if(!el)return;const span=el.querySelector('span'),s=systems[k]||{},a=Array.isArray(s.active)?s.active:[];let state='idle',txt=(k==='workhours'&&s.passive?'● 被動':'● 待命');if(a.length){const j=a.find(x=>x.operation==='write')||a.find(x=>x.operation==='read')||a[0]||{};state='busy';txt=(j.operation==='write'?'✍️ ':'↙ ')+(j.operationLabel||'讀取')+'中｜'+(j.label||j.action||'雲端資料')}else if(s.lastCompleted&&Number(s.lastCompleted.ageMs||0)<15000){state=s.lastCompleted.ok===false?'error':'done';txt=(state==='done'?'✓ ':'! ')+(s.lastCompleted.operationLabel||'讀取')+'完成'}el.dataset.state=state;if(span.textContent!==txt)span.textContent=txt})}
+}const signature=SYSTEMS.map(([k])=>{const s=systems[k]||{},a=Array.isArray(s.active)?s.active:[],j=a[0]||{},last=s.lastCompleted||{};return[k,a.length,j.operation,j.action,j.label,last.ok,last.action,Math.floor(Number(last.ageMs||0)/10000)].join(':')}).join('|');if(signature===lastSignature)return;lastSignature=signature;SYSTEMS.forEach(([k])=>{const el=document.querySelector(`#p79SevenStatus [data-sys="${k}"]`);if(!el)return;const span=el.querySelector('span'),s=systems[k]||{},a=Array.isArray(s.active)?s.active:[];let state='idle',txt=(k==='workhours'&&s.passive?'● 被動':'● 待命');if(a.length){const j=a.find(x=>x.operation==='write')||a.find(x=>x.operation==='read')||a[0]||{};state='busy';txt=(j.operation==='write'?'✍️ ':'↙ ')+(j.operationLabel||'讀取')+'中｜'+(window.P79Messages?.operation(j.label||j.action)||'雲端資料')}else if(s.lastCompleted&&Number(s.lastCompleted.ageMs||0)<15000){state=s.lastCompleted.ok===false?'error':'done';txt=(state==='done'?'✓ ':'! ')+(s.lastCompleted.operationLabel||'讀取')+'完成'}el.dataset.state=state;if(span.textContent!==txt)span.textContent=txt})}
 async function poll(){if(statusBusy||document.visibilityState==='hidden')return;const url=gasUrl();if(!url)return;statusBusy=true;let ctrl,to;try{ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});const d=await r.json();if(d?.ok)render(d)}catch(e){}finally{if(to)clearTimeout(to);statusBusy=false}}
-function start(){mount();syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
+function start(){mount();syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,20),{once:true});else setTimeout(start,20);
 })();
 
