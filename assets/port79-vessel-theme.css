@@ -89,3 +89,11 @@ html[data-p79-design="vessel"].dark body :is(main,.wrap,#viewAdmin,#viewEmployee
  html[data-p79-design="vessel"] body :is(.card,.panel){border-radius:14px!important}
 }
 }
+
+/* Attendance desktop workspace uses the available viewport width. */
+@media screen and (min-width: 1001px) {
+ html[data-p79-design="vessel"] body[data-p79-system="attendance"] #viewAdmin {
+  max-width:none!important;width:100%!important;box-sizing:border-box!important;
+  margin-inline:0!important;padding-inline:12px!important;
+ }
+}
