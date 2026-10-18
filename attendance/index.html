@@ -894,9 +894,16 @@ body[data-p79-system="attendance"] #attendanceQueryCard #recordsPagination{margi
 .dark body[data-p79-system="attendance"] #attendanceQueryCard #recordsPagination{border-top-color:#334155!important}
 
 #attendanceDateRangeFilter{display:none!important}
-#attendanceQuickFilters>.grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,220px))!important;gap:8px!important;align-items:end}
+#attendanceQuickFilters>.grid{display:grid!important;grid-template-columns:110px 100px 130px 140px minmax(0,1fr)!important;gap:8px!important;align-items:end}
 #attendanceQuickFilters label{margin-bottom:2px!important}
 body[data-p79-system="attendance"] #attendanceQuickFilters select{min-height:34px!important;height:34px!important;padding:5px 8px!important;font-size:14px!important}
+@media(max-width:700px){#attendanceQuickFilters>.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+#attendanceRecordActionsHost>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#attendanceRecordActionsHost>div>div{gap:6px!important}
+#attendanceRecordActionsHost>div>div:first-child>span:first-child{display:none}
+body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input){min-height:34px!important;height:34px!important;padding:5px 8px!important;font-size:13px!important;white-space:nowrap}
+@media(max-width:1200px){#attendanceQuickFilters>.grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}#attendanceRecordActionsHost{grid-column:1/-1}}
 @media(max-width:700px){#attendanceQuickFilters>.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 </style>
 <style id="p79-attendance-table-layout">
@@ -1250,6 +1257,7 @@ body[data-p79-system="attendance"] #attendanceQuickFilters select{min-height:34p
                                 <option value="NORMAL">正常</option>
                             </select>
                         </div>
+                        <div id="attendanceRecordActionsHost" class="min-w-0"></div>
                         <div id="attendanceDateRangeFilter" hidden>
   <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 日期範圍</label>
   <div id="recordDateRangePicker" class="w-full">
@@ -14674,6 +14682,7 @@ function getManualPairRecordAnchor(record) {
             if (!box) return;
             const keys = Array.isArray(dateKeys) ? dateKeys : [];
             if (!keys.length) {
+                document.getElementById('attendanceRecordActionsHost')?.replaceChildren();
                 box.classList.add('hidden');
                 box.innerHTML = '';
                 return;
@@ -14735,6 +14744,9 @@ function getManualPairRecordAnchor(record) {
                     <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">${keys.length > 1 ? `<button type="button" onclick="showRecordsDateRange()" class="shrink-0 px-3 py-1.5 rounded-lg border text-xs font-black ${!selectedDate ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'}">顯示整段期間</button>` : ''}${dateButtons}</div>
                     ${rowPager}
                 </div>`;
+            const actionsHost = document.getElementById('attendanceRecordActionsHost');
+            const actionsRow = box.firstElementChild?.firstElementChild;
+            if (actionsHost && actionsRow) actionsHost.replaceChildren(actionsRow);
             refreshAttendanceSyncCompactStatus();
         }
 
