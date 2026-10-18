@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
 <head><script>window.P79ManagementOptimizationMode=true;</script>
+<script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
 <!-- PORT79 V6.0.21 MOBILE-PUNCH-FAST：員工手機打卡減少等待；GPS先快速定位、必要時才補高精度；員工主檔打卡入口只做單次雲端讀取；XLSX管理套件不再於員工打卡頁下載。 -->
 <!-- PORT79 V6.0.20 SYNC-IN-DATE-HEADER：精簡同步狀態移入日期切換白色區塊最上排，與日期摘要同行；移除獨立狀態列與說明文字。 -->
@@ -15150,7 +15151,7 @@ function getManualPairRecordAnchor(record) {
                 const sourceLower = source.toLowerCase();
                 const edited = !!(r?.manuallyEdited || sourceLower.includes('manual') || source.includes('補刷') || source.includes('補卡'));
                 const sourceLabels = {'excel-import':'Excel 匯入','employee-punch':'員工刷卡','mobile-punch':'手機刷卡','local-punch':'本機刷卡','manual-admin':'管理員補刷','manual-punch':'人工補刷','sync-import':'雲端同步','system-confirmed':'系統確認'};
-                const sourceText = sourceLabels[sourceLower] || source || '來源未標示';
+                const sourceText = window.P79Messages?.source(source) || sourceLabels[sourceLower] || '其他系統紀錄';
                 const direction = String(r?.status || '').trim();
                 const sameDirectionCount = directionStats.get(getAttendanceRecordType(r)+'|'+getPunchChannel(r.status))||0;
                 const warning = !id?'缺少紀錄 ID':sameIdCount>1?'ID 衝突（'+sameIdCount+' 筆）':!unchanged?'來源或時間已更新，需重新核對':'';
@@ -15158,7 +15159,7 @@ function getManualPairRecordAnchor(record) {
                 const reviewClass = edited ? 'text-amber-700 dark:text-amber-300' : sameDirectionCount > 1 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-300';
                 return `<tr class="border-b border-slate-200 dark:border-slate-700">
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(String(r?.timeStr || ''))}</td>
-                    <td class="px-3 py-2 text-center align-middle break-all" title="${escapeHtml(id)}">${escapeHtml(id||'缺少 ID')}</td>
+                    <td class="px-3 py-2 text-center align-middle break-all" title="${escapeHtml(id)}">${id?`<details><summary>${sourceLower==='manual-pair-recovery'?'人工補卡紀錄':'檢視紀錄編號'}</summary>${escapeHtml(id)}</details>`:'缺少編號'}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(String(r?.status || ''))}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(sourceText)}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(reviewText)}</td>
@@ -15169,8 +15170,8 @@ function getManualPairRecordAnchor(record) {
             }).join('');
             modal.innerHTML = `<div role="dialog" aria-modal="true" aria-label="重複刷卡原始紀錄核對" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl p-5 w-full max-w-4xl max-h-[85vh] overflow-auto">
                 <div class="relative flex items-center justify-center gap-2 mb-3"><h3 class="font-black text-base text-center">🔎 同班次重複刷卡核對</h3><button type="button" class="absolute right-0 top-0" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
-                <p class="text-xs text-amber-700 dark:text-amber-300 mb-3 text-center">這些是系統合併顯示的原始紀錄，不代表每一筆都該刪。上班和下班通常各要保留一筆；人工補卡請特別核對。刪除會同步至雲端，且可能影響工時。</p>
-                <div class="overflow-x-auto"><table class="min-w-full text-xs text-center"><thead><tr class="border-b"><th class="px-3 py-2 text-center align-middle">打卡時間</th><th class="px-3 py-2 text-center align-middle">紀錄 ID</th><th class="px-3 py-2 text-center align-middle">方向</th><th class="px-3 py-2 text-center align-middle">來源</th><th class="px-3 py-2 text-center align-middle">核對狀態</th><th class="px-3 py-2 text-center align-middle">操作</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+                <p class="text-xs text-amber-700 dark:text-amber-300 mb-3 text-center">同一班次有多筆簽到或簽退，請比對實際上、下班時間。人工補卡（系統恢復）表示系統找回過去的補卡資料，並不代表必須刪除；不確定時請按「全部保留／關閉」。刪除會影響工時及雲端資料。</p>
+                <div class="overflow-x-auto"><table class="min-w-full text-xs text-center"><thead><tr class="border-b"><th class="px-3 py-2 text-center align-middle">打卡時間</th><th class="px-3 py-2 text-center align-middle">紀錄編號</th><th class="px-3 py-2 text-center align-middle">方向</th><th class="px-3 py-2 text-center align-middle">來源</th><th class="px-3 py-2 text-center align-middle">核對狀態</th><th class="px-3 py-2 text-center align-middle">操作</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
                 <div class="flex justify-center mt-4"><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold">全部保留／關閉</button></div>
             </div>`;
             modal.addEventListener('click', e => { if(e.target === modal) p79CloseDuplicateReview(); });
@@ -22155,7 +22156,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261004-1416-full-attendance-db"></script>
+<script src="../assets/port79-seven-top.js?v=20261018-permissions"></script>
 
 <script id="p79-logout-home-v20261004">
 (function(){
