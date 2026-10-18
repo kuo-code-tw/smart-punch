@@ -23027,7 +23027,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-equivalent-edits"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-confirmed-drafts"></script>
 
 
 
@@ -23776,7 +23776,7 @@ function show(autoReview=true){
  if(shownDrafts.size)html+='<p class="p79-outbox-actions"><button type="button" data-withdraw-all>撤回全部暫停修改（保留草稿）</button></p>';
  try{
   const saved=window.p79V5ReadWithdrawnDrafts?.()||[];
-  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，可恢復）</summary>'+saved.map(x=>'<p>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+' <button type="button" data-restore-draft="'+safe(encodeURIComponent(x.backupId))+'">恢復為待核對</button></p>').join('')+'</details>';
+  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，尚待雲端核對）</summary>'+saved.map(x=>'<p>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+' <button type="button" data-check-draft="'+safe(encodeURIComponent(x.backupId))+'">核對雲端</button></p>').join('')+'</details>';
  }catch(error){html+='<p>'+safe(error.message)+'</p>';}
  body.innerHTML=html;root.classList.add('p79-show');
  if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
@@ -23805,7 +23805,7 @@ async function reviewEntry(key){
  }catch(error){el.textContent='核對未完成：'+String(error.message||error)+'。修改草稿保留。';}
  finally{reviewBusy=false;}
 }
-document.getElementById('p79OutboxInspectBody')?.addEventListener('click',event=>{
+async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
  if(button.dataset.reviewKey){reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
  if(reviewBusy)return;
@@ -23816,11 +23816,21 @@ document.getElementById('p79OutboxInspectBody')?.addEventListener('click',event=
    if(!confirm('撤回 '+selected.length+' 筆暫停修改？草稿會先保存為可恢復備份，雲端考勤不會刪除或改寫。'))return;
    const result=window.p79V5WithdrawPausedWrites(selected);show(false);
    status.textContent='已撤回 '+result.count+' 筆待傳修改，草稿保存在下方備份；雲端資料未變更。本機已顯示的時間仍須重新拉取雲端核對。';
-  }else if(button.dataset.restoreDraft){
-   window.p79V5RestoreWithdrawnDraft(decodeURIComponent(button.dataset.restoreDraft));show(false);status.textContent='草稿已恢復為暫停待核對，不會自動送出。';
+  }else if(button.dataset.checkDraft||button.dataset.restoreDraft){
+   reviewBusy=true;button.disabled=true;status.textContent='正在核對這份撤回草稿與雲端資料…';
+   const id=decodeURIComponent(button.dataset.checkDraft||button.dataset.restoreDraft);
+   const result=await window.p79V5CheckWithdrawnDraft(id);
+   if(result.state==='saved'){show(false);status.textContent='✅ 草稿內容與雲端相同，已確認完成。';}
+   else if(button.dataset.restoreDraft){window.p79V5RestoreWithdrawnDraft(id);show(false);status.textContent='不同內容的草稿已恢復為暫停待核對。';}
+   else{
+    status.innerHTML='<h3>草稿與雲端內容不同</h3><table><tr><th>項目</th><th>目前雲端</th><th>撤回的草稿</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(result.cloud[field]||'—')+'</td><td>'+safe(result.draft[field]||'—')+'</td></tr>').join('')+'</table><button type="button" data-restore-draft="'+safe(encodeURIComponent(id))+'">恢復這份不同內容的草稿</button>';
+   }
   }
  }catch(error){status.textContent='處理未完成：'+String(error.message||error);}
-});
+ finally{reviewBusy=false;button.disabled=false;}
+}
+document.getElementById('p79OutboxInspectBody')?.addEventListener('click',handleInspectorClick);
+document.getElementById('p79OutboxReview')?.addEventListener('click',handleInspectorClick);
 function mount(){
  const status=document.getElementById('attendanceSyncCompactStatus');
  if(status&&!document.getElementById('p79OutboxInspectBtn')){

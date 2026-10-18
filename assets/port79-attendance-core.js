@@ -233,6 +233,7 @@ function cloudRecordConfirmsItem(item, cloudRecord){
 }
 
 function confirmCloudRecord(cloudRecord){
+  try{if(typeof p79ConfirmWithdrawnAttendanceDrafts==='function')p79ConfirmWithdrawnAttendanceDrafts(cloudRecord)}catch(e){console.warn('撤回草稿核對狀態未保存，備份保留',e)}
   p79ClearMatchingLegacyEdit({action:'updateRecord',record:cloudRecord});
   const id=String(cloudRecord?.id??'');
   if(!id)return false;
@@ -340,6 +341,35 @@ function p79ReadWithdrawnAttendanceDrafts(){
  if(!Array.isArray(items))throw new Error('撤回草稿備份格式異常，原資料保留');
  return items.filter(x=>x.state==='withdrawn');
 }
+function p79ConfirmWithdrawnAttendanceDrafts(cloud){
+ const raw=localStorage.getItem(WITHDRAWN_DRAFTS_KEY);if(!raw)return 0;
+ const items=JSON.parse(raw);if(!Array.isArray(items))throw new Error('撤回草稿備份格式異常');
+ let count=0;
+ for(const saved of items){
+  if(saved.state!=='withdrawn'||!p79PausedReviewIdentity(saved.item?.payload||{},cloud)||!p79AttendanceEditAlreadySaved(saved.item.payload,cloud))continue;
+  saved.state='cloud-confirmed';saved.confirmedAt=Date.now();count++;
+ }
+ if(count)localStorage.setItem(WITHDRAWN_DRAFTS_KEY,JSON.stringify(items));
+ return count;
+}
+async function p79CheckWithdrawnAttendanceDraft(backupId){
+ if(typeof requireAdminAction!=='function'||!requireAdminAction('attendanceEdit','核對撤回草稿'))throw new Error('沒有考勤核對權限');
+ const saved=p79ReadWithdrawnAttendanceDrafts().find(x=>x.backupId===backupId);
+ if(!saved)throw new Error('這份草稿已完成或狀態已變更，請重新查看明細');
+ const snapshot=JSON.stringify(saved);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(saved.item.payload),controller.signal);
+  const current=p79ReadWithdrawnAttendanceDrafts().find(x=>x.backupId===backupId);
+  if(!current||JSON.stringify(current)!==snapshot)throw new Error('核對期間草稿已變更，請重新查看明細');
+  if(!p79PausedReviewIdentity(saved.item.payload,cloud))throw new Error('雲端員工身分不符，草稿保留');
+  if(p79AttendanceEditAlreadySaved(saved.item.payload,cloud)){
+   p79ConfirmWithdrawnAttendanceDrafts(cloud);return {state:'saved'};
+  }
+  return {state:'different',cloud,draft:saved.item.payload.record,backupId};
+ }finally{clearTimeout(timer);}
+}
+
 function p79WithdrawPausedAttendanceWrites(expectedItems){
  if(typeof requireAdminAction!=='function'||!requireAdminAction('attendanceEdit','撤回暫停的考勤修改'))throw new Error('沒有考勤修改權限');
  if(writing)throw new Error('目前仍有考勤正在送出，請完成後再撤回');
@@ -383,6 +413,7 @@ async function p79ReviewPausedAttendanceWrite(key){
   p79PausedReviewItem(key,payload);
   if(!p79PausedReviewIdentity(payload,cloud))throw new Error('雲端紀錄的員工身分無法確認，草稿保留，請核對人員與紀錄 ID');
   if(p79AttendanceEditAlreadySaved(payload,cloud)){
+   if(typeof p79ConfirmWithdrawnAttendanceDrafts==='function')p79ConfirmWithdrawnAttendanceDrafts(cloud);
    if(!remove(key,payload))throw new Error('待同步修改已變更，請重新核對');
    try{markRecentAttendanceMutationCloudConfirmed?.(cloud.id)}catch(e){}
    lastDoneAt=Date.now();updateUi();
@@ -957,6 +988,7 @@ window.p79V5PrepareAttendanceEdit=p79PrepareAttendanceEdit;
 window.p79V5ReviewPausedWrite=p79ReviewPausedAttendanceWrite;
 window.p79V5WithdrawPausedWrites=p79WithdrawPausedAttendanceWrites;
 window.p79V5ReadWithdrawnDrafts=p79ReadWithdrawnAttendanceDrafts;
+window.p79V5CheckWithdrawnDraft=p79CheckWithdrawnAttendanceDraft;
 window.p79V5RestoreWithdrawnDraft=p79RestoreWithdrawnAttendanceDraft;
 window.p79V5ApplyPausedReview=p79ApplyPausedAttendanceReview;
 window.p79V5QueueInfoForId=queueInfoForId;
