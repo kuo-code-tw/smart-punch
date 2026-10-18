@@ -23730,6 +23730,10 @@ html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!i
 #p79OutboxInspectCard :is(td,th):nth-child(6){width:18%}
 #p79OutboxInspectCard button{max-width:100%;white-space:normal!important;padding:7px 9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:700}
 #p79OutboxInspectCard small{display:block;overflow-wrap:anywhere}
+#p79OutboxInspectCard .p79-withdrawn-draft-list{display:flex;flex-direction:row;flex-wrap:wrap;align-items:stretch;gap:10px;margin-top:10px}
+#p79OutboxInspectCard .p79-withdrawn-draft-item{display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding:8px 10px;border:1px solid #dce6ef;border-radius:10px;background:#f8fafc}
+#p79OutboxInspectCard .p79-withdrawn-draft-item span{min-width:0;overflow-wrap:anywhere}
+#p79OutboxInspectCard .p79-withdrawn-draft-item button{flex-shrink:0;white-space:nowrap!important}
 #p79OutboxReview{overflow-wrap:anywhere}
 @media(max-width:700px){html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){font-size:11px!important;padding:6px 3px!important}#p79OutboxInspectCard{padding:12px;width:calc(100vw - 16px)}#p79OutboxInspectPanel{padding:8px}}
 </style>
@@ -23776,7 +23780,7 @@ function show(autoReview=true){
  if(shownDrafts.size)html+='<p class="p79-outbox-actions"><button type="button" data-withdraw-all>撤回全部暫停修改（保留草稿）</button></p>';
  try{
   const saved=window.p79V5ReadWithdrawnDrafts?.()||[];
-  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，尚待雲端核對）</summary>'+saved.map(x=>'<p>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+' <button type="button" data-check-draft="'+safe(encodeURIComponent(x.backupId))+'">核對雲端</button></p>').join('')+'</details>';
+  if(saved.length)html+='<details><summary>已撤回草稿備份（'+saved.length+' 筆，尚待雲端核對）</summary><div class="p79-withdrawn-draft-list">'+saved.map(x=>'<div class="p79-withdrawn-draft-item"><span>'+safe(x.item?.payload?.record?.name||x.item?.payload?.record?.empId||'考勤')+' '+safe(x.item?.payload?.record?.timeStr||'')+'</span><button type="button" data-check-draft="'+safe(encodeURIComponent(x.backupId))+'">核對雲端</button></div>').join('')+'</div></details>';
  }catch(error){html+='<p>'+safe(error.message)+'</p>';}
  body.innerHTML=html;root.classList.add('p79-show');
  if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
