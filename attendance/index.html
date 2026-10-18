@@ -617,8 +617,8 @@ body.attendance-drawer-open{overflow:hidden}
 .attendance-records-wide-table{min-width:2016px!important}
 .attendance-records-wide-table th,
 .attendance-records-wide-table td{width:calc(100% / 12)!important;padding:12px 10px!important;box-sizing:border-box!important}
-.attendance-records-wide-table td:nth-child(8),
-.attendance-records-wide-table td:nth-child(9){font-size:11px!important}
+.attendance-records-wide-table td:nth-child(7),
+.attendance-records-wide-table td:nth-child(8){font-size:11px!important}
 .attendance-records-wide-table td:nth-child(10){border-left:1px solid #e2e8f0}
 
 </style>
@@ -917,20 +917,22 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 <style id="p79-attendance-balanced-columns-v69">
 #adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:1440px!important;table-layout:fixed!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td){padding:10px 8px!important;text-align:center!important;vertical-align:middle!important;box-sizing:border-box!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(1){width:6%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(2){width:7%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(1){width:5%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(2){width:6%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(3){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:9%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:9%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:7%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:12%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:12%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(4){width:8%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(5){width:6%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(6){width:4%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(7){width:13%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(8){width:13%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(9){width:7%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(10){width:7%!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(11){width:8%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:10%!important}
-#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(13){width:5%!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9){font-size:12px!important;white-space:nowrap!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9)>*{margin-left:auto!important;margin-right:auto!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(12){width:11%!important}
+#adminRecordsTableContainer .attendance-records-wide-table :is(th,td):nth-child(13){width:4%!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(9),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(10){font-size:13px!important;white-space:nowrap!important}
 </style>
 <style id="p79-attendance-single-line-toolbar">
 #attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
@@ -1286,13 +1288,13 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
                             <tr>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">考勤號</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">姓名</th>
-                                <th class="px-2 py-3 text-center whitespace-nowrap" title="班次計算與日期篩選的歸屬日">工作日</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">部門</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">單位</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">職稱</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">組別</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">上班簽到時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">下班簽退時間</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap" title="依上下班完整打卡時間差計算">出勤時數</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">加班時數</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">狀態/異常</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">備註/地點</th>
@@ -14849,6 +14851,17 @@ function getManualPairRecordAnchor(record) {
             const compact=(t,isEnd)=>t==='00:00'?(isEnd?'24':'24'):String(t).replace(/:00$/,'');
             return {label:category+compact(times[0],false)+'-'+compact(times[1],true),minutes:(end-start+1440)%1440};
         }
+        function attendanceRowAttendanceMinutes(row) {
+            if (!row?.clockIn || !row?.clockOut) return null;
+            const start = getAttendanceTimestamp(row.clockIn), end = getAttendanceTimestamp(row.clockOut);
+            const elapsed = end - start;
+            if (!Number.isFinite(start) || !Number.isFinite(end) || elapsed <= 0 || elapsed > 24 * 3600000) return null;
+            return Math.floor(elapsed / 60000);
+        }
+        function attendanceRowAttendanceText(row) {
+            const minutes = attendanceRowAttendanceMinutes(row);
+            return minutes === null ? '—' : formatDurationMinutes(minutes);
+        }
         function attendanceRowOvertimeText(row) {
             const actual=attendanceRowOvertimeMinutes(row);
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
@@ -15502,13 +15515,13 @@ function getManualPairRecordAnchor(record) {
                         data-p79-out-time="${escapeHtml(String(normalizeImportedAttendanceTime(row.clockOut?.timeStr || '')))}">
                         <td class="px-2 py-3 text-center font-mono font-bold whitespace-nowrap">${row.attNo ?? ''}</td>
                         <td class="px-2 py-3 text-center font-semibold whitespace-nowrap">${row.name || ''}</td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap">${p79AttendanceWorkDateCell(row)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayDept}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${escapeHtml(p79AttendanceRosterGroup(row,displayEmp))}</td>
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
+                        <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
