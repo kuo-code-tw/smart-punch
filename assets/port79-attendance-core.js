@@ -291,6 +291,17 @@ async function p79ReadAttendanceEditCloud(id,signal){
  if(!response.ok||!data?.ok||!data.found||typeof data.found!=='object')throw new Error(data?.error||'無法核對雲端考勤，請稍後再試');
  const record=data.found[String(id)];
  if(!record||String(record.id)!==String(id))throw Object.assign(new Error('雲端尚未找到這筆考勤，請重新讀取後再修改'),{retryable:false});
+ // Older status replies can contain a date without its clock time. Never use
+ // that truncated value as the compare-and-swap baseline for a correction.
+ if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(record.timeStr||'').trim())){
+  const month=String(record.timeStr).trim().replace(/\//g,'-').slice(0,7);
+  const fullResponse=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
+  const full=await fullResponse.json();
+  if(!fullResponse.ok||!full?.ok||String(full.month)!==month||!Array.isArray(full.records))throw new Error(full?.error||'正式主表核對失敗，修改草稿已保留');
+  const matches=full.records.filter(r=>String(r.id)===String(id)&&['empId','attNo','status'].every(k=>String(r[k]??'').trim()===String(record[k]??'').trim()));
+  if(matches.length!==1||!/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(matches[0].timeStr||'').trim()))throw Object.assign(new Error('雲端這筆考勤只有日期、缺少完整打卡時間，無法核對原時間；修改草稿已保留，請管理員先修復正式主表的時間欄位後重新核對'),{retryable:false});
+  return matches[0];
+ }
  return record;
 }
 async function p79PrepareAttendanceEdit(id){
