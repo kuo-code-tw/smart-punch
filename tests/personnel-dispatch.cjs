@@ -1,5 +1,5 @@
 const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
-const {buildMonth,summarize}=require('../assets/port79-personnel-dispatch.js');
+const {buildMonth,summarize,recommendSwap}=require('../assets/port79-personnel-dispatch.js');
 const roster=[{empId:'1',name:'甲',group:'A組'},{empId:'2',name:'乙',group:'B組'},{empId:'3',name:'丙',group:'C組'},{empId:'4',name:'丁',group:'D組'}];
 const r=(id,disc,hours,extra={})=>({source:'working-report',workDate:'2026-10-01',empId:id,disc,load:0,hc:4,hours,...extra});
 const build=(records,people=roster)=>buildMonth({month:'2026-10',records,roster:people,metrics:x=>x});
@@ -23,3 +23,17 @@ const html=fs.readFileSync(require('path').join(__dirname,'../aqc-efficiency/ind
 for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/\bsrc=|application\/ld\+json/.test(match[1]))new vm.Script(match[2]);}
 assert.match(html,/data-tab="dispatch"/);assert.match(html,/view-dispatch/);assert.match(html,/personnel-dispatch\.js/);
 console.log('PASS weighted volume/hour efficiency, H/C separation, month/source boundaries, invalid data, roster ambiguity, conservative simulation and group total conservation; page scripts parse');
+
+const person=(key,group,containers,hours=25)=>({key,name:key,group,containers,hours,hc:0,count:6,invalid:0,confirmed:true,eligible:true,eff:containers/hours});
+const sample=[person('a','A',500),person('b','A',500),person('c','C',700),person('d','C',600),person('e','B',575),person('f','D',575)];
+const original=JSON.stringify(sample),proposal=recommendSwap(sample);
+assert.ok(proposal.plan);assert.equal(proposal.moves.length,2);assert.notEqual(proposal.moves[0].from,proposal.moves[1].from);assert.equal(proposal.moves[0].to,proposal.moves[1].from);assert.ok(proposal.after.gap<proposal.before.gap);assert.equal(JSON.stringify(sample),original);
+for(let i=0;i<4;i++)assert.equal(proposal.before.groups[i].people,proposal.after.groups[i].people);
+for(const field of ['containers','hours'])assert.equal(proposal.before.groups.reduce((s,g)=>s+g[field],0),proposal.after.groups.reduce((s,g)=>s+g[field],0));
+assert.ok(!recommendSwap(sample.map(p=>({...p,count:4}))).plan);
+assert.ok(!recommendSwap(sample.map(p=>({...p,hours:9}))).plan);
+assert.ok(!recommendSwap(sample.map(p=>({...p,containers:575,eff:23}))).plan);
+assert.ok(!recommendSwap(sample.filter(p=>p.group!=='D')).plan);
+assert.ok(!recommendSwap(sample.map(p=>p.group==='D'?{...p,invalid:1}:p)).plan);
+assert.match(html,/dispatchRecommendation/);
+console.log('PASS automatic swap recommendations preserve staffing and totals; enforce sample thresholds; skip incomparable and already balanced groups');

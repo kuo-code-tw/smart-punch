@@ -24,7 +24,20 @@ function summarize(persons,plan={}){
  const rows=Object.values(groups).map(g=>({...g,eff:g.hours>0&&!g.invalid?g.containers/g.hours:null}));
  const valid=rows.filter(g=>g.eff!==null);return {groups:rows,excluded,gap:valid.length===4?Math.max(...valid.map(g=>g.eff))-Math.min(...valid.map(g=>g.eff)):null};
 }
-const api={buildMonth,summarize,groupCode};
+function recommendSwap(persons,{minHours=10,minRecords=5}={}){
+ const before=summarize(persons);
+ if(before.gap===null)return {before,reason:'四組尚未都有可比較的有效作業時數，暫不提出調任建議。'};
+ const candidates=persons.filter(p=>p.eligible&&p.hours>=minHours&&p.count>=minRecords);
+ let best=null;
+ for(let i=0;i<candidates.length;i++)for(let j=i+1;j<candidates.length;j++){
+  const a=candidates[i],b=candidates[j];if(a.group===b.group)continue;
+  const plan={[a.key]:b.group,[b.key]:a.group},after=summarize(persons,plan),gap=after.gap,hourDifference=Math.abs(a.hours-b.hours);
+  if(gap===null||gap>=before.gap-0.005)continue;
+  if(!best||gap<best.after.gap-1e-9||Math.abs(gap-best.after.gap)<1e-9&&hourDifference<best.hourDifference)best={before,after,plan,moves:[{person:a,from:a.group,to:b.group},{person:b,from:b.group,to:a.group}],hourDifference};
+ }
+ return best||{before,reason:candidates.length<2?'符合至少 5 筆作業及 10 小時的有效人員不足，暫不建議調動。':'目前沒有能縮小四組效率差距的單次兩人互換方案，建議維持現況。'};
+}
+const api={buildMonth,summarize,groupCode,recommendSwap};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
 let plan={},owner='',planMonth='',latest=[],ready=false;const reads=new Map();
@@ -46,7 +59,20 @@ function render(){
  const search=normalizePersonName(el('dispatchName').value),sort=el('dispatchSort').value;
  const shown=latest.filter(p=>!search||normalizePersonName(p.name).includes(search)).slice().sort((a,b)=>sort==='hours'?b.hours-a.hours:sort==='containers'?b.containers-a.containers:((b.eff??-1)-(a.eff??-1)));
  el('dispatchBody').innerHTML=shown.map(p=>`<tr><td class="font-bold">${safe(p.name)}</td><td>${safe(p.empId||'—')}</td><td>${safe(p.confirmed&&p.group?p.group+'組':'待核對')}</td><td>${fmt(p.containers)}</td><td>${fmt(p.hours)}</td><td class="font-bold text-teal-700">${fmt(p.eff)}</td><td>${fmt(p.hc)}</td><td>${p.count}</td><td>${safe(!p.count?'尚無作業資料':p.invalid?'櫃數或時數待核對':!p.confirmed||!p.group?'排班身分／組別待核對':'可供試算')}</td><td><select aria-label="${safe(p.name)}的試算組別" data-dispatch-key="${safe(p.key)}" ${!ready||!p.eligible?'disabled':''}><option value="">維持原組</option>${codes.map(g=>`<option value="${g}" ${plan[p.key]===g?'selected':''}>${g}組</option>`).join('')}</select></td></tr>`).join('')||'<tr><td colspan="10">此月份或搜尋條件尚無人員資料</td></tr>';
- renderScenario();if(!state&&owner)void load(false);
+ renderRecommendation(rows);renderScenario();if(!state&&owner)void load(false);
+}
+function renderRecommendation(rows){
+ const box=el('dispatchRecommendation');if(!box)return;
+ const dates=[...new Set(rows.map(r=>String(r.workDate||'').slice(0,10)).filter(Boolean))].sort();
+ const coverage=dates.length?`資料範圍 ${dates[0]} ～ ${dates[dates.length-1]}，共 ${dates.length} 個有作業紀錄的日期。`:'';
+ if(!ready){box.innerHTML='<p>正在確認整月來源與排班名冊；確認完成後會自動顯示調任方向。</p>';return;}
+ const suggestion=recommendSwap(latest);
+ if(!suggestion.plan){box.innerHTML=`<p class="font-bold">${safe(suggestion.reason)}</p><p class="text-sm mt-2">${safe(coverage)}</p>`;return;}
+ box.innerHTML=`<p class="font-bold text-teal-800">建議 ${suggestion.moves.map(m=>`${safe(m.person.name)}：${m.from}組 → ${m.to}組`).join('；')}。其餘組別維持。</p>
+ <p class="text-sm mt-2">依作業量與時數試算，各組人數不變；四組效率差距由 <strong>${fmt(suggestion.before.gap)}</strong> 降至 <strong>${fmt(suggestion.after.gap)}</strong> 櫃／小時。</p>
+ <div class="overflow-auto mt-3"><table class="tbl w-full text-center"><thead><tr><th>人員</th><th>原組 → 建議組</th><th>作業櫃數</th><th>作業時數</th><th>個人月均效率</th></tr></thead><tbody>${suggestion.moves.map(m=>`<tr><td>${safe(m.person.name)}</td><td>${m.from}組 → ${m.to}組</td><td>${fmt(m.person.containers)}</td><td>${fmt(m.person.hours)}</td><td>${fmt(m.person.eff)}</td></tr>`).join('')}</tbody></table></div>
+ <p class="text-sm mt-2">${safe(coverage)}依已匯入資料提出暫定建議，不代表整月資料齊全。只比較 AQC 同職稱、名冊確認且至少 5 筆作業／10 小時的人員；先找單次兩人互換中差距最小的方案，同分時優先時數接近。未確認組別的人員未納入比較。</p>
+ <button type="button" class="btn bg-teal-700 text-white mt-3" onclick="P79PersonnelDispatch.useRecommendation()">帶入下方試算</button>`;
 }
 function renderScenario(){
  const before=summarize(latest),after=summarize(latest,ready?plan:{}),moves=latest.filter(p=>p.eligible&&plan[p.key]&&plan[p.key]!==p.group);
@@ -63,6 +89,7 @@ async function load(force=true){
  reads.set(key,success===2?'ready':success?'partial':'error');if(success){saveLocal();invalidateWorkloadIndex();}
  if(activeEfficiencyTabName()==='dispatch')render();
 }
+api.useRecommendation=()=>{if(!ready)return;const suggestion=recommendSwap(latest);if(suggestion.plan){plan={...suggestion.plan};render();}};
 api.render=render;api.load=load;api.rows=sourceRows;api.clear=()=>{plan={};render();};
 document.addEventListener('change',event=>{const key=event.target?.dataset?.dispatchKey;if(!key)return;const p=latest.find(p=>p.key===key),target=event.target.value;if(!ready||!p?.eligible||target&&!codes.includes(target))return;if(target&&target!==p.group)plan[key]=target;else delete plan[key];renderScenario();});
 })(typeof window!=='undefined'?window:globalThis);
