@@ -92,6 +92,14 @@ function saveQueue(q){
 function opKey(payload){
   const a=String(payload?.action||'');
   const id=String(payload?.record?.id ?? payload?.id ?? '');
+  if(id&&['updateRecord','editRecord'].includes(a)){
+    const r=payload.record||{},person=String(r.attNo||r.empId||r.name||'').trim().toUpperCase();
+    const m=String(payload.originalTimeStr||r.timeStr||'').match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if(person&&m){
+      const day=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+      return `updateRecord:${id}:${encodeURIComponent(person)}:${day}:${encodeURIComponent(String(r.status||''))}`;
+    }
+  }
   return `${a}:${id||JSON.stringify(payload||{})}`;
 }
 function desc(payload){
@@ -115,11 +123,14 @@ function enqueue(payload){
     nextRetryAt:0,
     state:'pending'
   };
-  const i=q.findIndex(x=>x.key===key);
-  if(i>=0 && q[i].paused && samePayload(q[i].payload,payload))return q.length;
-  if(i>=0) q[i]=item; else q.push(item);
-  saveQueue(q);
-  return q.length;
+  const isEdit=p=>['updateRecord','editRecord'].includes(String(p?.action||''));
+  const sameEdit=x=>isEdit(x?.payload)&&isEdit(payload)&&opKey(x.payload)===key;
+  const matches=x=>x.key===key||sameEdit(x);
+  const previous=q.find(x=>matches(x)&&x.paused&&samePayload(x.payload,payload));
+  const next=q.filter(x=>!matches(x));
+  next.push(previous||item);
+  saveQueue(next);
+  return next.length;
 }
 function samePayload(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function p79ClearMatchingLegacyEdit(payload){
@@ -130,7 +141,6 @@ function p79ClearMatchingLegacyEdit(payload){
   const keep=q.filter(item=>{
    const old=item?.payload;if(!['updateRecord','editRecord'].includes(String(old?.action||'')))return true;
    if(!cloudRecordConfirmsItem({payload:old},payload.record))return true;
-   for(const field of ['empId','attNo','note'])if(normalizeCompareValue(old.record?.[field])!==normalizeCompareValue(payload.record?.[field]))return true;
    return false;
   });
   if(keep.length!==q.length)localStorage.setItem('sp_cloud_outbox_v1',JSON.stringify(keep));
@@ -215,19 +225,9 @@ function cloudRecordConfirmsItem(item, cloudRecord){
     return true;
   }
 
-  // 修改則至少要確認時間與狀態已是本機要求的值。
-  if(action==='updateRecord'||action==='editRecord'){
-    const fields=['timeStr','status'];
-    for(const key of fields){
-      const wanted=normalizeCompareValue(local?.[key]);
-      if(wanted && normalizeCompareValue(cloudRecord?.[key])!==wanted)return false;
-    }
-
-    const localEditedAt=Date.parse(String(local?.manuallyEditedAt||''))||0;
-    const cloudEditedAt=Date.parse(String(cloudRecord?.manuallyEditedAt||''))||0;
-    if(localEditedAt && cloudEditedAt && cloudEditedAt<localEditedAt)return false;
-    return true;
-  }
+  // Confirm the actual employee/time/direction/content, not the edit timestamp.
+  // Multiple retries of an already-saved intent do not require another write.
+  if(action==='updateRecord'||action==='editRecord')return p79AttendanceEditAlreadySaved(payload,cloudRecord);
 
   return false;
 }
@@ -313,7 +313,14 @@ async function p79PrepareAttendanceEdit(id){
 function p79AttendanceEditAlreadySaved(payload,cloud){
  const local=payload.record||{};
  if(String(local.id)!==String(cloud.id))return false;
- return ['timeStr','status','empId','attNo','note'].every(key=>normalizeCompareValue(local[key])===normalizeCompareValue(cloud[key]));
+ if(!['timeStr','status','empId','attNo'].every(key=>normalizeCompareValue(local[key])===normalizeCompareValue(cloud[key])))return false;
+ // These are generated provenance labels, not a user-authored correction.
+ // A blank cloud note must not keep an otherwise identical punch in conflict.
+ const note=r=>{
+  const text=String(r?.note||'').trim();
+  return /^(管理員手動補刷|管理員手動補卡)$/.test(text)?'':text;
+ };
+ return note(local)===note(cloud);
 }
 
 function p79PausedReviewItem(key,payload){
