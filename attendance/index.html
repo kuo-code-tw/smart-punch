@@ -479,9 +479,6 @@ body[data-p79-system="attendance"] #adminContentRecords>div:nth-child(3) select,
 body[data-p79-system="attendance"] #adminContentRecords>div:nth-child(3) input,
 body[data-p79-system="attendance"] #adminContentRecords>div:nth-child(3) summary{min-height:43px!important;background:#f8fafc!important;border:1px solid #dbe4ee!important;border-radius:11px!important;color:#26344a!important;font-size:13px!important;}
 body[data-p79-system="attendance"] #adminRecordsTableContainer{overflow:auto!important;max-height:calc(100vh - 390px)!important;border-radius:17px!important;background:#fff!important;}
-body[data-p79-system="attendance"] #adminRecordsTableContainer table{min-width:1120px!important;border-collapse:separate!important;border-spacing:0!important;}
-body[data-p79-system="attendance"] #adminRecordsTableContainer thead th{position:sticky!important;top:0!important;z-index:8!important;background:#f0f4f9!important;color:#607087!important;border-bottom:1px solid #dce5ef!important;padding:13px 14px!important;font-size:12px!important;}
-body[data-p79-system="attendance"] #adminRecordsTableContainer tbody td{padding:13px 14px!important;background:#fff!important;border-bottom:1px solid #edf1f6!important;font-size:13px!important;}
 body[data-p79-system="attendance"] #adminRecordsTableContainer tbody tr:hover td{background:#f8fbff!important;}
 body[data-p79-system="attendance"] #recordsPagination{margin-top:12px!important;padding:10px 13px!important;}
 /* Employee view redesigned as dashboard */
@@ -896,7 +893,7 @@ body.port79-admin-mode.port79-employee-only #viewEmployee{display:none!important
 #adminRecordsTableContainer{width:100%!important;max-width:100%!important;overflow-x:auto;scrollbar-width:thin}
 #adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:2730px!important;table-layout:fixed!important;border-collapse:collapse}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td){width:auto!important;box-sizing:border-box!important;text-align:center!important;vertical-align:middle!important;padding:12px 8px!important;font-size:16px!important;line-height:1.4!important;white-space:nowrap!important;border-left:0!important;border-right:0!important}
-#adminRecordsTableContainer .attendance-records-wide-table th{height:46px;font-size:15px!important;font-weight:700!important;background:#f1f5f9;color:#475569}
+#adminRecordsTableContainer .attendance-records-wide-table th{position:sticky;top:0;z-index:8;height:46px;font-size:15px!important;font-weight:700!important;background:#f1f5f9;color:#475569}
 #adminRecordsTableContainer .attendance-records-wide-table td{height:56px}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]{font-size:15px!important;font-variant-numeric:tabular-nums}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]>span{display:inline-flex!important;align-items:center!important;justify-content:center!important;max-width:100%;margin:0 auto!important}
