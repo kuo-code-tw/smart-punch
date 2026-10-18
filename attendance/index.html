@@ -5697,7 +5697,7 @@ function mergeAttendanceRecordCollections(primaryRecords, secondaryRecords) {
                     const eventKey = getAttendanceImportEventKey(record);
                     const recordType = getAttendanceRecordType(record);
                     const fallbackKey = record.id !== null && record.id !== undefined && String(record.id) !== ''
-                        ? `ID:${String(record.id)}|TYPE:${recordType}`
+                        ? `ID:${String(record.id)}|TYPE:${recordType}|PERSON:${String(record.attNo||record.empId||record.name||'').trim().toUpperCase()}`
                         : `ROW:${String(record.empId || record.attNo || record.name || '')}|${String(record.timeStr || '')}|${String(record.status || '')}`;
                     const key = eventKey || fallbackKey;
                     const exactKey = p79ExactAttendanceLogicalEventKey(record);

@@ -53,3 +53,11 @@ assert.equal(engine.buildShifts([full,{...full,attNo:'other',timeStr:'2026/10/10
 const mergeStart=html.indexOf('function mergeAttendanceRecordCollections('),mergeEnd=html.indexOf('\n        }',mergeStart)+10;
 const mergeContext={...c,getAttendanceImportEventKey:r=>/\d:\d/.test(r.timeStr)?r.attNo+'|'+r.timeStr+'|'+r.status:'',p79ExactAttendanceLogicalEventKey:()=>'',p79AttendanceLineageKey:()=>''};vm.createContext(mergeContext);vm.runInContext(html.slice(mergeStart,mergeEnd),mergeContext);
 for(const sides of [[damaged,full],[full,damaged]]){const merged=mergeContext.mergeAttendanceRecordCollections([sides[0]],[sides[1]]);assert.equal(merged.length,1,'backup merge must join ID fallback to timestamp event key');assert.equal(merged[0].timeStr,full.timeStr);}
+
+assert.equal(mergeContext.mergeAttendanceRecordCollections([damaged],[{...damaged,attNo:'other'}]).length,2,'backup ID fallback cannot merge different employees');
+
+const workHours=fs.readFileSync('work-hours/index.html','utf8'),ws=workHours.indexOf('        function mergeAttendanceRecordCollections('),we=workHours.indexOf('\n        }',ws)+10;
+vm.runInContext(workHours.slice(ws,we),mergeContext);
+assert.equal(mergeContext.mergeAttendanceRecordCollections([damaged],[full])[0].timeStr,full.timeStr,'work-hours uses same precision rule');
+assert.equal(mergeContext.mergeAttendanceRecordCollections([damaged],[{...damaged,attNo:'other'}]).length,2);
+assert.equal(mergeContext.mergeAttendanceRecordCollections([damaged],[{...damaged,status:'OUT'}]).length,2);
