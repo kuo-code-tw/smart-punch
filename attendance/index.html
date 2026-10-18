@@ -7928,7 +7928,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     (anchor && currentKeys.has('ANCHOR:' + anchor + '|TYPE:' + type)) ||
                     (exact && currentKeys.has('EXACT:' + exact));
 
-                if (exists) return;
+                if (exists) {
+                    const matches=current.filter(r=>String(r?.id??'')===id && getAttendanceRecordType(r)===type);
+                    if(matches.length!==1 || p79AttendancePreciseVersion(matches[0],record)!==record)return;
+                }
                 recovered.push(record);
 
                 if (id) currentKeys.add('ID:' + id + '|TYPE:' + type);
@@ -14086,6 +14089,7 @@ function getManualPairRecordAnchor(record) {
 
         function formatAttendanceTimeCell(record, type) {
             if (!record) return '--';
+            if (!normalizeImportedAttendanceTime(record.timeStr)) return `<span class="text-rose-700 dark:text-rose-300 font-semibold">${escapeHtml(String(record.timeStr || '--'))}（時間不完整）</span>`;
             const text = escapeHtml(formatDateTime(record.timeStr));
             // 管理員已手動修正的時間視為完成確認，不再顯示黃／紫色異常提醒。
             if (isManuallyEditedAttendanceRecord(record)) {
@@ -14559,6 +14563,7 @@ function getManualPairRecordAnchor(record) {
             onRecordDataScopeChange();
         }
         function getAttendanceStatusBadge(status) {
+            if (status === '原始打卡時間不完整') return `<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">原始打卡時間不完整</span>`;
             if (status === '補卡日期待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold" title="同日下班時間早於上班，請核對跨日日期">補卡日期待核對</span>';
             if (status === '班表待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold">班表待核對</span>';
             if (status === '待簽退') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-sky-100 text-sky-800 font-bold" title="只有簽到，尚未超過24小時；待核對下班，不代表已完成正常班次">待簽退</span>';
@@ -22707,7 +22712,14 @@ window.p79AttendanceRecordCounts = function(){
     const extra=groups[1].filter(r=>{
       if(String(r.timeStr||'').slice(0,10).replaceAll('/','-')!==day)return false;
       const keys=stableAliasKeys(r);
-      if(keys.some(k=>seen.has(k)))return false;
+      if(keys.some(k=>seen.has(k))){
+        const index=primary.findIndex(p=>stableAliasKeys(p).some(k=>keys.includes(k)));
+        if(index>=0){
+          const precise=p79AttendancePreciseVersion(primary[index],r);
+          if(precise===r)primary[index]=r;
+        }
+        return false;
+      }
       keys.forEach(k=>seen.add(k));return true;
     });
     return [...primary,...extra];
@@ -23928,7 +23940,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261018-time-integrity"></script>
+<script src="./v6-engine.js?v=20261018-time-integrity-2"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';
