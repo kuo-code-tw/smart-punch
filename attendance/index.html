@@ -12587,6 +12587,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 否則人工補的 2026/10/04 下班會永遠配不到這筆上班。
             const raw = String(record && record.timeStr || '').trim();
             if (!raw) return 0;
+            if (!/(?:\s|T)\d{1,2}:\d{2}/.test(raw)) return NaN;
 
             const normalized = normalizeImportedAttendanceTime(raw);
             const s = String(normalized || raw).replace('T', ' ').replace(/-/g, '/');
@@ -13014,7 +13015,24 @@ function getManualPairRecordAnchor(record) {
             return '';
         }
 
+        // A date-only snapshot is not a newer midnight punch. Keep the precise
+        // version only for the same employee, direction and stable event ID.
+        function p79AttendancePreciseVersion(current, candidate) {
+            if (!current || !candidate) return null;
+            const identity = r => String(r.attNo || r.empId || r.name || '').replace(/\s+/g, '').toUpperCase();
+            if (!identity(current) || identity(current) !== identity(candidate) || getAttendanceRecordType(current) !== getAttendanceRecordType(candidate)) return null;
+            const sameId = String(current.id || '').trim() && String(current.id) === String(candidate.id);
+            const sameSource = String(current.sourceEventKey || '').trim() && String(current.sourceEventKey) === String(candidate.sourceEventKey);
+            if (!sameId && !sameSource) return null;
+            const precise = r => /(?:\s|T)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(String(r.timeStr || '').trim());
+            const a = precise(current), b = precise(candidate);
+            if (a === b) return null;
+            return a ? current : candidate;
+        }
+
         function preferCanonicalAttendanceRecord(candidate, current) {
+            const precise = p79AttendancePreciseVersion(current, candidate);
+            if (precise) return precise === candidate;
             if (!current) return true;
             const candidateManual = isManualAdminAttendanceRecord(candidate);
             const currentManual = isManualAdminAttendanceRecord(current);
@@ -14513,6 +14531,7 @@ function getManualPairRecordAnchor(record) {
         function p79AttendanceRowAssessment(row,now=Date.now()){
             const input=!!row?.clockIn,output=!!row?.clockOut;
             const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
+            if(row?.timePrecisionIssue===true)return {kind:'ABNORMAL',status:'原始打卡時間不完整',reasons:['雲端只有日期，未推測成00:00；需核對原始時間']};
             if(row?.dateConflict===true)return {kind:'PENDING',status:'補卡日期待核對',reasons:['同日下班時間早於上班；需核對跨日日期，原始時間未更動']};
             if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
             if(input&&output){
@@ -22495,6 +22514,8 @@ window.p79AttendanceRecordCounts = function(){
   function chooseBetter(current,candidate){
     if(!current)return candidate;
     if(!candidate)return current;
+    const precise=p79AttendancePreciseVersion(current,candidate);
+    if(precise)return precise;
     const cm=isManuallyEditedAttendanceRecord(current), nm=isManuallyEditedAttendanceRecord(candidate);
     if(cm!==nm)return nm?candidate:current;
     if(cm&&nm){
@@ -22628,7 +22649,8 @@ window.p79AttendanceRecordCounts = function(){
 
     const needFallback =
       rawRows.length===0 ||
-      (directRows.length>0 && rawRows.length<directRows.length);
+      (directRows.length>0 && rawRows.length<directRows.length) ||
+      losslessMerge([rawRows,directRows]).some(r=>!normalizeImportedAttendanceTime(r.timeStr));
 
     if(needFallback){
       fallbackUsed=true;
@@ -22989,7 +23011,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-full-edit-time"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-time-integrity"></script>
 
 
 
@@ -23906,7 +23928,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261015.62"></script>
+<script src="./v6-engine.js?v=20261018-time-integrity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';

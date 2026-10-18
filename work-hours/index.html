@@ -10207,6 +10207,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 造成 15:59 排在 07:33 前面，所以上下班永遠無法配對。
             const raw = String(record && record.timeStr || '').trim();
             if (!raw) return 0;
+            if (!/(?:\s|T)\d{1,2}:\d{2}/.test(raw)) return NaN;
 
             const s = raw.replace('T', ' ').replace(/-/g, '/');
             const m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
@@ -10261,7 +10262,24 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return '';
         }
 
+        // A date-only snapshot is not a newer midnight punch. Keep the precise
+        // version only for the same employee, direction and stable event ID.
+        function p79AttendancePreciseVersion(current, candidate) {
+            if (!current || !candidate) return null;
+            const identity = r => String(r.attNo || r.empId || r.name || '').replace(/\s+/g, '').toUpperCase();
+            if (!identity(current) || identity(current) !== identity(candidate) || getAttendanceRecordType(current) !== getAttendanceRecordType(candidate)) return null;
+            const sameId = String(current.id || '').trim() && String(current.id) === String(candidate.id);
+            const sameSource = String(current.sourceEventKey || '').trim() && String(current.sourceEventKey) === String(candidate.sourceEventKey);
+            if (!sameId && !sameSource) return null;
+            const precise = r => /(?:\s|T)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(String(r.timeStr || '').trim());
+            const a = precise(current), b = precise(candidate);
+            if (a === b) return null;
+            return a ? current : candidate;
+        }
+
         function preferCanonicalAttendanceRecord(candidate, current) {
+            const precise = p79AttendancePreciseVersion(current, candidate);
+            if (precise) return precise === candidate;
             if (!current) return true;
             const candidateManual = isManualAdminAttendanceRecord(candidate);
             const currentManual = isManualAdminAttendanceRecord(current);
@@ -14908,7 +14926,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261015.62"></script>
+<script src="../attendance/v6-engine.js?v=20261018-time-integrity"></script>
 
 <script>
 function p79CanExportOvertimeApplication(){
@@ -14947,7 +14965,7 @@ window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,pre
 </script>
 <script src="../assets/port79-overtime-application.js?v=20261015.77"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261016.82"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-full-edit-time"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-time-integrity"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 </body>
 </html>
