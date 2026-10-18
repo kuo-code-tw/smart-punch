@@ -12582,6 +12582,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function getAttendanceTimestamp(record) {
+            if(typeof window!=='undefined' && window.P79AttendanceV6?.timestamp){
+                const value=window.P79AttendanceV6.timestamp(record);
+                if(Number.isFinite(value))return value;
+            }
             // PORT79 V3.5：同時支援西元年與民國年。
             // 例：115/10/04 07:31 必須視為 2026/10/04 07:31，
             // 否則人工補的 2026/10/04 下班會永遠配不到這筆上班。
@@ -23906,7 +23910,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261015.62"></script>
+<script src="./v6-engine.js?v=20261018-midnight-eod"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';

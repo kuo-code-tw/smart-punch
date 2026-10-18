@@ -29,7 +29,10 @@
     const n=normalizeTime(r&&r.timeStr||r&&r['出勤時間']);
     const m=n.match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
     if(!m) return NaN;
-    return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]),0).getTime();
+    const date=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]),0);
+    // A 00:00 checkout closes the recorded workday; 00:01 belongs to the next day.
+    if(recordType(r)==='OUT'&&m[4]==='00'&&m[5]==='00')date.setDate(date.getDate()+1);
+    return date.getTime();
   }
   function identity(r){
     const a=normAtt(r&&(r.attNo!=null?r.attNo:r['考勤號碼'])); if(a) return 'ATT:'+a;
@@ -412,11 +415,11 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.11-CALENDAR-WORKDATE';
+    window.p79AttendanceEngineVersion='V6.0.12-MIDNIGHT-END-OF-DAY';
     console.info('[PORT79] Attendance V6.0.11 calendar work-date installed');
     return true;
   }
-  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
+  return {timestamp:ts,MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
 
