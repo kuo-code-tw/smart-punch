@@ -60,3 +60,13 @@ const preview=recommendSwap(noGain,{...settings,allowNonImproving:true});assert.
 assert.ok(!recommendSwap(noGain,{lockedGroups:['A','B','C','D'],allowNonImproving:true}).plan);
 assert.match(html,/dispatchGenerateButton/);assert.match(html,/dispatchConfirmState/);
 console.log('PASS feasible non-improving plans available as clearly warned previews; impossible settings remain blocked; explicit generate and confirmation controls wired');
+
+const employment=[{empId:'1',name:'甲',employmentStatus:'resigned'},{empId:'2',name:'乙',employmentStatus:'active'},{empId:'3',name:'丙',employmentStatus:'離職'},{empId:'4',name:'丁',employmentStatus:'active'}];
+const activeOnly=buildMonth({month:'2026-10',roster,employees:employment,records:[r('1',999,10),r('2',100,5),r('3',888,10),r('4',80,4),r('9',777,10)],metrics:x=>x});assert.deepEqual(activeOnly.map(p=>p.empId).sort(),['2','4']);assert.equal(activeOnly.reduce((s,p)=>s+p.containers,0),180);assert.equal(activeOnly.reduce((s,p)=>s+p.hours,0),9);assert.equal(summarize(activeOnly).groups[0].people,0);
+const restored=buildMonth({month:'2026-10',roster,employees:employment.map(e=>e.empId==='1'?{...e,employmentStatus:'active',terminationDate:'2026-01-01'}:e),records:[r('1',100,5)],metrics:x=>x});assert.equal(restored.find(p=>p.empId==='1').eff,20);
+assert.equal(buildMonth({month:'2026-10',roster,employees:[],records:[r('1',100,5)],metrics:x=>x}).length,0);
+const noId=buildMonth({month:'2026-10',roster,employees:employment,records:[r('',999,5,{name:'甲'})],metrics:x=>x});assert.ok(!noId.some(p=>p.name==='甲'));
+assert.match(fs.readFileSync(require('path').join(__dirname,'../assets/port79-personnel-dispatch.js'),'utf8'),/gcGetEmployees/);
+console.log('PASS resigned people removed from roster, records, totals and comparisons; old records cannot resurrect departed IDs; empty HR fails closed; explicit restored-active status respected');
+
+const namedActive=buildMonth({month:'2026-10',roster,employees:employment,records:[{...r('',100,5,{name:'乙'}),id:'WR-record-id'}],metrics:x=>x});assert.equal(namedActive.find(p=>p.empId==='2').eff,20);

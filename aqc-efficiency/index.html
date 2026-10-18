@@ -1459,7 +1459,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 <section id="view-dispatch" class="hidden space-y-4">
  <div class="card p-4 space-y-3">
   <h2 class="font-black text-xl">⚖️ 人員調度與月均效率</h2>
-  <p class="text-sm text-slate-600">依當月 WORKING REPORT 的 DISC＋LOAD 總櫃數與作業總時數比較，月均效率＝總櫃數 ÷ 總時數；H/C 另列，不混入櫃數效率。效率為 0 的作業與時數不列入平均，零效率人員不納入調任。</p>
+  <p class="text-sm text-slate-600">依當月 WORKING REPORT 的 DISC＋LOAD 總櫃數與作業總時數比較，月均效率＝總櫃數 ÷ 總時數；H/C 另列，不混入櫃數效率。效率為 0 的作業與時數不列入平均，零效率及已離職人員不納入調任；離職人員也不列入本頁作業量、時數與效率統計。</p>
   <div class="flex flex-wrap items-end gap-3">
    <div><label for="dispatchMonth" class="block font-bold text-sm">月份</label><input id="dispatchMonth" type="month" onchange="P79PersonnelDispatch.render();P79PersonnelDispatch.load(true)"></div>
    <div><label for="dispatchName" class="block font-bold text-sm">姓名</label><input id="dispatchName" type="search" placeholder="搜尋姓名" oninput="P79PersonnelDispatch.render()"></div>
@@ -14515,7 +14515,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
-<script src="../assets/port79-personnel-dispatch.js?v=20261018.6"></script>
+<script src="../assets/port79-personnel-dispatch.js?v=20261018.7"></script>
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 </body></html>
 

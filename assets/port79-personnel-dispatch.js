@@ -2,13 +2,17 @@
 'use strict';
 const codes=['A','B','C','D'];
 function groupCode(v){const m=String(v||'').trim().toUpperCase().match(/^([ABCD])(?:組)?$/);return m?m[1]:'';}
-function buildMonth({month,records=[],roster=[],metrics,normalize=v=>String(v||'').replace(/\s+/g,'')}){
+function buildMonth({month,records=[],roster=[],employees=null,metrics,normalize=v=>String(v||'').replace(/\s+/g,'')}){
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return [];
+ const employmentById=new Map(),employmentByName=new Map();
+ const departed=p=>/^(resigned|terminated|retired|離職|已離職|退休)$/i.test(String(p?.employmentStatus||p?.['在職狀態']||'').trim());
+ if(Array.isArray(employees))for(const e of employees){const id=String(e.empId||e.employeeId||e.id||'').trim().toUpperCase(),name=normalize(e.name||e.employeeName||'');if(id)employmentById.set(id,e);if(name){if(!employmentByName.has(name))employmentByName.set(name,[]);employmentByName.get(name).push(e);}}
+ const allowed=r=>{if(!Array.isArray(employees))return !departed(r);const id=String(r.empId||r.employeeId||(r.source?'':r.id)||'').trim().toUpperCase(),matches=employmentByName.get(normalize(r.name||''))||[];const e=id&&!id.startsWith('NAME:')?employmentById.get(id):matches.length===1?matches[0]:null;return !!e&&!departed(e);};
  const persons=new Map(),names=new Map();
  const idOf=v=>{const id=String(v||'').trim().toUpperCase();return id&&!id.startsWith('NAME:')?id:'';};
  function add(key,name,empId,group='',confirmed=false){if(!persons.has(key))persons.set(key,{key,name,empId,group:groupCode(group),confirmed,count:0,containers:0,hours:0,hc:0,invalid:0,zeroRecords:0,zeroHours:0});return persons.get(key);}
- for(const r of roster){const id=idOf(r.empId||r.id),name=String(r.name||'').trim();if(!name)continue;const key=id?'EMP:'+id:'NAME:'+normalize(name);const p=add(key,name,id,r.group,true);if(p.group!==groupCode(r.group))p.confirmed=false;const nk=normalize(name);if(!names.has(nk))names.set(nk,new Set());names.get(nk).add(key);}
- for(const r of records){if(r.source!=='working-report'||String(r.workDate||'').slice(0,7)!==month)continue;
+ for(const r of roster){if(!allowed(r))continue;const id=idOf(r.empId||r.id),name=String(r.name||'').trim();if(!name)continue;const key=id?'EMP:'+id:'NAME:'+normalize(name);const p=add(key,name,id,r.group,true);if(p.group!==groupCode(r.group))p.confirmed=false;const nk=normalize(name);if(!names.has(nk))names.set(nk,new Set());names.get(nk).add(key);}
+ for(const r of records){if(!allowed(r))continue;if(r.source!=='working-report'||String(r.workDate||'').slice(0,7)!==month)continue;
   const id=idOf(r.empId),name=String(r.name||'').trim()||'未命名',matches=names.get(normalize(name));
   const key=id?'EMP:'+id:matches?.size===1?[...matches][0]:'REPORT:'+normalize(name);
   const p=add(key,name,id),m=metrics(r)||{},disc=Number(m.disc),load=Number(m.load),hours=Number(m.hours),hc=Number(m.hc);
@@ -84,9 +88,9 @@ function render(){
  const input=el('dispatchMonth'),year=getPort79Year();if(!input.value)input.value=isoTodayLocal().startsWith(year+'-')?isoTodayLocal().slice(0,7):year+'-01';resetContext();
  const rows=sourceRows(),store=currentOperationScheduleStore();ensureOperationScheduleGroups(rows.length?rows:[{workDate:month()+'-01'}]);
  const roster=store?.has(month())?store.personnel(month()):[];
- latest=buildMonth({month:month(),records:rows,roster,metrics:workloadRecordMetrics,normalize:normalizePersonName});
+ latest=buildMonth({month:month(),records:rows,roster,employees:Array.isArray(systemEmployees)?systemEmployees:[],metrics:workloadRecordMetrics,normalize:normalizePersonName});
  const state=reads.get(owner+'|'+month());ready=state==='ready'&&!!store?.has(month());
- el('dispatchLoadState').textContent=(state==='loading'?'正在讀取整月即時及歷史作業資料…':state==='ready'?'整月即時與歷史來源已讀取。':state==='partial'?'部分來源讀取失敗，資料暫不完整，請重新讀取。':state==='error'?'雲端讀取失敗，目前顯示本機資料，請重新讀取。':'尚未讀取整月資料。')+(store?.has(month())?'':' 排班名冊尚未確認。');
+ el('dispatchLoadState').textContent=(state==='loading'?'正在讀取整月即時及歷史作業資料…':state==='ready'?'整月即時、歷史來源與最新在職名冊已讀取。':state==='partial'?'部分來源讀取失敗，資料或在職名冊暫不完整，請重新讀取。':state==='error'?'雲端讀取失敗，目前顯示本機資料，請重新讀取。':'尚未讀取整月資料。')+(store?.has(month())?'':' 排班名冊尚未確認。');
  renderOperationScheduleStatus(rows.length?rows:[{workDate:month()+'-01'}]);
  const total=latest.filter(p=>p.eff!==0).reduce((s,p)=>({containers:s.containers+p.containers,hours:s.hours+p.hours,invalid:s.invalid+p.invalid}),{containers:0,hours:0,invalid:0});
  el('dispatchSummary').textContent=`${month()}｜${latest.length} 人｜作業量 ${fmt(total.containers)} 櫃｜作業時數 ${fmt(total.hours)} 小時｜月均效率 ${fmt(total.hours>0&&!total.invalid?total.containers/total.hours:null)} 櫃／小時${total.invalid?'｜'+total.invalid+' 筆作業資料待核對':''}｜已排除 ${latest.reduce((n,p)=>n+(p.zeroRecords||0),0)} 筆零效率作業（時數不計入平均）`;
@@ -130,10 +134,11 @@ function renderScenario(){
 async function load(force=true){
  if(!requireEfficiencyAccess())return;resetContext();const requested=month(),token=String(gcToken||''),key=token+'|'+requested;
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(requested)||reads.get(key)==='loading'||!force&&reads.has(key))return;
- reads.set(key,'loading');render();const replies=await Promise.allSettled([apiGetQuick('gcGetData',{month:requested},25000),apiGetQuick('historyGetMonthData',{type:'vessel',month:requested},25000)]);
+ reads.set(key,'loading');render();const replies=await Promise.allSettled([apiGetQuick('gcGetData',{month:requested},25000),apiGetQuick('historyGetMonthData',{type:'vessel',month:requested},25000),apiGetQuick('gcGetEmployees',{},25000)]);
  if(token!==String(gcToken||''))return;let success=0;
- for(const r of replies){if(r.status==='fulfilled'&&Array.isArray(r.value?.records)){try{mergeEfficiencyCloudData(r.value);success++;}catch(_){}}}
- reads.set(key,success===2?'ready':success?'partial':'error');if(success){saveLocal();invalidateWorkloadIndex();}
+ for(const r of replies.slice(0,2)){if(r.status==='fulfilled'&&Array.isArray(r.value?.records)){try{mergeEfficiencyCloudData(r.value);success++;}catch(_){}}}
+ const personnel=replies[2];if(personnel?.status==='fulfilled'&&Array.isArray(personnel.value?.employees)){systemEmployees=personnel.value.employees.map(normalizeCloudEmployee).filter(Boolean);success++;}
+ reads.set(key,success===3?'ready':success?'partial':'error');if(success){saveLocal();invalidateWorkloadIndex();}
  if(activeEfficiencyTabName()==='dispatch')render();
 }
 api.generateRecommendation=()=>{render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});};
