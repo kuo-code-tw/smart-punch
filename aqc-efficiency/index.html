@@ -733,6 +733,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
+      <button class="tab btn bg-slate-100" data-tab="dispatch" onclick="switchTab('dispatch',this)">⚖️ 人員調度與月均效率</button>
 
     </div>
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
@@ -1455,6 +1456,33 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
   </section>
   </section>
 
+<section id="view-dispatch" class="hidden space-y-4">
+ <div class="card p-4 space-y-3">
+  <h2 class="font-black text-xl">⚖️ 人員調度與月均效率</h2>
+  <p class="text-sm text-slate-600">依當月 WORKING REPORT 的 DISC＋LOAD 總櫃數與作業總時數比較，月均效率＝總櫃數 ÷ 總時數；H/C 另列，不混入櫃數效率。</p>
+  <div class="flex flex-wrap items-end gap-3">
+   <div><label for="dispatchMonth" class="block font-bold text-sm">月份</label><input id="dispatchMonth" type="month" onchange="P79PersonnelDispatch.render();P79PersonnelDispatch.load(true)"></div>
+   <div><label for="dispatchName" class="block font-bold text-sm">姓名</label><input id="dispatchName" type="search" placeholder="搜尋姓名" oninput="P79PersonnelDispatch.render()"></div>
+   <div><label for="dispatchSort" class="block font-bold text-sm">比較依據</label><select id="dispatchSort" onchange="P79PersonnelDispatch.render()"><option value="eff">月均效率</option><option value="containers">作業總櫃數</option><option value="hours">作業總時數</option></select></div>
+   <button type="button" class="btn bg-sky-100 text-sky-800" onclick="P79PersonnelDispatch.load(true)">重新讀取整月資料</button>
+   <button type="button" class="btn bg-slate-100" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button>
+  </div>
+  <div id="dispatchLoadState" class="text-sm" role="status"></div><div id="dispatchScheduleGroupState" class="text-sm" role="status"></div>
+  <div id="dispatchSummary" class="rounded-xl bg-teal-50 text-teal-900 p-3 font-bold"></div>
+ </div>
+ <div class="card p-4">
+  <h3 class="font-bold mb-2">A、B、C、D 組調動前後比較</h3>
+  <p class="text-sm mb-3">試算假設人員帶著相同的歷史作業量與時數調組，用來比較各組組成；不代表未來實際產能，也不會修改排班。工作種類、船況及時數多寡會影響效率，請搭配原始櫃數與時數判斷。</p>
+  <div class="overflow-auto"><table class="tbl w-full text-center"><thead><tr><th>組別</th><th>人數（原 → 試算）</th><th>總櫃數（原 → 試算）</th><th>總時數（原 → 試算）</th><th>櫃／小時（原 → 試算）</th></tr></thead><tbody id="dispatchGroupBody"></tbody></table></div>
+  <div class="flex flex-wrap items-center gap-3 mt-3"><p id="dispatchScenarioState" class="text-sm" role="status"></p><button type="button" class="btn bg-slate-100" onclick="P79PersonnelDispatch.clear()">清除試算</button></div>
+  <p id="dispatchMoves" class="text-sm text-indigo-700 mt-2"></p>
+ </div>
+ <div class="card p-4 overflow-auto">
+  <h3 class="font-bold mb-3">人員作業量、時數與調動試算</h3>
+  <table class="tbl w-full text-center" style="min-width:1060px"><thead><tr><th>姓名</th><th>工號</th><th>排班組別</th><th>作業量（櫃）</th><th>作業時數</th><th>月均效率</th><th>H/C</th><th>作業筆數</th><th>資料狀態</th><th>試算調入組別</th></tr></thead><tbody id="dispatchBody"></tbody></table>
+ </div>
+</section>
+
 <section id="view-ranking" class="hidden space-y-4">
   <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-slate-100" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('ranking')">每月績效排行</button></div>
   <div class="p79-section" data-section-key="ranking-filters"><div><span>🏆 每月人員績效排行</span></div>
@@ -1912,7 +1940,7 @@ function setPort79Year(year){
   ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   localStorage.setItem(PORT79_YEAR_KEY,y);
   document.querySelectorAll('.port79-year-select').forEach(sel=>sel.value=y);
-  ['filterMonth','personStatMonth','monthlyCompareMonth','rankingMonth'].forEach(id=>{
+  ['filterMonth','personStatMonth','monthlyCompareMonth','rankingMonth','dispatchMonth'].forEach(id=>{
     const e=document.getElementById(id);
     if(e && e.value && !String(e.value).startsWith(y+'-'))e.value='';
   });
@@ -1958,11 +1986,12 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='workload'){
     initWorkloadDateRangePicker();updateWorkloadDateRangeSummary();populatePersonStatPeople();renderPersonStats();return;
   }
+  if(name==='dispatch'){window.P79PersonnelDispatch?.render();return;}
   if(name==='ranking'){renderMonthlyRanking();return;}
   if(name==='weekly'){renderWeeklyEfficiency();return;}
 }
 function switchTab(name,btn){if(name==='workload'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','compare','groups','personstats','weekly','ranking'].forEach(x=>{
+  ['dashboard','compare','groups','personstats','weekly','ranking','dispatch'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name);
   });
@@ -4134,10 +4163,11 @@ function renderOperationScheduleStatus(rows){
     else if(!String(gcToken||''))text='尚未取得登入驗證，請重新登入後讀取排班組別。';
     else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別`:state?.status==='loading'?`${month} 正在讀取排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
   }
-  ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState','rankingScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
+  ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState','rankingScheduleGroupState','dispatchScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
 }
 function operationRowsForActiveView(){
   const active=activeEfficiencyTabName();
+  if(active==='dispatch'){const rows=window.P79PersonnelDispatch?.rows()||[];return rows.length?rows:[{workDate:(document.getElementById('dispatchMonth')?.value||'')+'-01'}];}
   if(active==='ranking'){const rows=monthlyRankingRecords();return rows.length?rows:[{workDate:(document.getElementById('rankingMonth')?.value||'')+'-01'}];}
   if(active==='weekly')return weeklyFilteredRecords();
   if(active==='records')return filteredRecords();
@@ -4151,7 +4181,8 @@ function retryOperationScheduleGroups(){
 
 function refreshOperationGroupView(){
   const active=activeEfficiencyTabName();
-  if(active==='ranking')renderMonthlyRanking();
+  if(active==='dispatch')window.P79PersonnelDispatch?.render();
+  else if(active==='ranking')renderMonthlyRanking();
   else if(active==='weekly')renderWeeklyEfficiency();
   else if(active==='workload')renderPersonStats();
   else if(active==='personstats')renderVesselDriverView();
@@ -14478,5 +14509,6 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="../assets/port79-personnel-dispatch.js?v=20261018.1"></script>
 </body></html>
 
