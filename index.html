@@ -1049,7 +1049,7 @@ async function autoDetectLoginIdentity(){
     try{
       const localEmp=p79FindLocalEmployee(await p79ReadLocalEmployees(),loginId);
       if(localEmp){
-        if(seq!==identityLookupSeq)return;
+        if(seq!==identityLookupSeq||$('account').value.trim()!==loginId)return;
         const role=p79LocalRole(localEmp),displayName=String(localEmp.name||'').trim();
         if(role==='admin'||role==='superadmin'){
           $('password').disabled=false;$('password').placeholder='請輸入管理密碼';$('status').className='status ok';
@@ -1066,6 +1066,7 @@ async function autoDetectLoginIdentity(){
   }
   // v10.19：沒有本機快取時仍立即開放密碼欄，但背景先做一次身分查詢／GAS 登入列預熱。
   // 查詢不阻塞畫面；管理員按登入時若預熱仍在進行，只短暫等候同一個請求，不重複喚醒 GAS。
+  if(seq!==identityLookupSeq||$('account').value.trim()!==loginId)return;
   $('password').disabled=false;
   $('password').placeholder='管理員才需輸入密碼；一般員工請留空';
   $('status').className='status';
@@ -1133,7 +1134,7 @@ async function manageLogin(){
   catch(e){$('status').className='status error';const detail=String(e?.message||e);$('status').textContent=/Failed to fetch|NetworkError|Load failed|網路連線失敗/i.test(detail)?'管理登入暫時無法連線到驗證伺服器，請檢查網路後再試；這不代表密碼錯誤或沒有管理權限。':'管理登入失敗：'+detail}
   finally{if(slowTimer)clearTimeout(slowTimer);if(verySlowTimer)clearTimeout(verySlowTimer);loginBusy=false;$('punchLoginBtn').disabled=false;$('manageLoginBtn').disabled=false;$('punchLoginBtn').textContent='🕒 進入打卡';$('manageLoginBtn').textContent='🛡️ 管理員登入'}
 }
-$('punchLoginBtn').onclick=punchLogin;$('manageLoginBtn').onclick=manageLogin;$('account').oninput=()=>{if(port79DeploymentUpdating)return;passwordTouched=false;identityWarmPromise=null;identityWarmAccount='';$('password').value='';$('password').disabled=true;$('password').placeholder='正在判斷身分...';scheduleIdentityLookup()};$('account').onblur=()=>{if($('account').value.trim()&&!passwordTouched)autoDetectLoginIdentity()};$('account').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();autoDetectLoginIdentity().then(()=>{if(!$('password').disabled)$('password').focus();else punchLogin()})}};$('password').oninput=()=>{passwordTouched=true};$('password').onkeydown=e=>{if(e.key==='Enter')manageLogin()};$('logoutBtn').onclick=clearSession;
+$('punchLoginBtn').onclick=punchLogin;$('manageLoginBtn').onclick=manageLogin;$('account').oninput=()=>{if(port79DeploymentUpdating)return;passwordTouched=false;++identityLookupSeq;identityWarmPromise=null;identityWarmAccount='';$('password').value='';$('password').disabled=true;$('password').placeholder='正在判斷身分...';scheduleIdentityLookup()};$('account').onblur=()=>{if($('account').value.trim()&&!passwordTouched)autoDetectLoginIdentity()};$('account').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();autoDetectLoginIdentity().then(()=>{if(!$('password').disabled)$('password').focus();else punchLogin()})}};$('password').oninput=()=>{passwordTouched=true};$('password').onkeydown=e=>{if(e.key==='Enter')manageLogin()};$('logoutBtn').onclick=clearSession;
 
 function getToken(){return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim()}
 function buildSsoHref(base){
@@ -1421,7 +1422,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  html.p79-compact-login #loginBox .login-action-help,
  html.p79-compact-login #cloudProbe{display:none!important}
  html.p79-compact-login .body{padding:8px!important}
- html.p79-compact-login #loginBox{padding:10px!important;border-radius:12px!important}
+ html.p79-compact-login #loginBox{padding:10px!important;border-radius:12px!important;display:flex;flex-direction:column;overflow-anchor:none}
+ html.p79-compact-login #loginBox #status{order:1}
+ html.p79-compact-login #loginBox>.field:not(#adminPasswordField){order:2}
+ html.p79-compact-login #p79LoginKeypad{order:3;overflow-anchor:none}
+ html.p79-compact-login #loginBox>.p79-remember-id{order:4}
+ html.p79-compact-login #loginBox>.login-action-grid{order:5}
+ html.p79-compact-login #adminPasswordField{order:6;margin-top:7px}
+
  html.p79-compact-login #loginBox #status{height:40px!important;min-height:40px!important;max-height:40px!important;padding:5px 8px!important;margin-bottom:8px!important;font-size:11px!important;line-height:1.3!important}
  html.p79-compact-login #loginBox .field{margin-bottom:7px!important}
  html.p79-compact-login #loginBox label{font-size:12px!important;margin-bottom:3px!important}
