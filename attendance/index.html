@@ -14218,6 +14218,11 @@ function getManualPairRecordAnchor(record) {
                 recovered.manualPairClockInKey = getAttendanceStablePairKey(sourceRecord);
                 recovered.manualPairClockInTimeStr = String(sourceRecord?.timeStr || '').trim();
             }
+            // 已明確刪除的原目標或恢復紀錄，不得由舊配對 metadata 再生。
+            if(typeof isLocallyDeletedAttendanceRecord==='function'){
+                const originalId=isRecoverIn?getManualPairClockInId(sourceRecord):getManualPairClockOutId(sourceRecord);
+                if(isLocallyDeletedAttendanceRecord(recovered)||originalId&&isLocallyDeletedAttendanceRecord({...recovered,id:originalId}))return null;
+            }
             return normalizeAttendanceRecordIdentifiers(recovered);
         }
 
@@ -15173,6 +15178,48 @@ function getManualPairRecordAnchor(record) {
             }finally {p79BatchDuplicateBusy=false;}
         }
 
+        function p79PlanSinglePairDuplicateCleanup(row) {
+            const list=Array.isArray(row?.records)?row.records:[];
+            const ins=list.filter(r=>getAttendanceRecordType(r)==='IN').sort((a,b)=>getAttendanceTimestamp(a)-getAttendanceTimestamp(b));
+            const outs=list.filter(r=>getAttendanceRecordType(r)==='OUT').sort((a,b)=>getAttendanceTimestamp(b)-getAttendanceTimestamp(a));
+            if(!ins.length||!outs.length||ins.length+outs.length!==list.length)throw Error('必須有完整上下班，才可自動保留各一筆');
+            const keep=[ins[0],outs[0]],remove=list.filter(r=>!keep.includes(r));
+            const start=getAttendanceTimestamp(keep[0]),end=getAttendanceTimestamp(keep[1]);
+            if(!(end>start&&end-start<=24*3600000))throw Error('上下班區間不明，請逐筆核對');
+            const ids=new Set();
+            for(const r of list){
+                const id=String(r?.id??'').trim(),side=getAttendanceRecordType(r)==='IN'?keep[0]:keep[1];
+                if(!id||ids.has(id))throw Error('紀錄編號缺漏或衝突，請逐筆核對');ids.add(id);
+                if(!p79ImportIdentityMatches(r,keep[0])||getPunchChannel(r.status)!==getPunchChannel(keep[0].status))throw Error('包含不同人員或打卡類型，請逐筆核對');
+                if(!p79CanAutoCombineDuplicateSide(r,side))throw Error('同方向時間相差超過15分鐘，可能是不同班次，請逐筆核對');
+                const live=(records||[]).filter(x=>String(x?.id??'').trim()===id);
+                if(live.length!==1||!p79SameReviewedOriginal(r,live[0])||isLocallyDeletedAttendanceRecord(live[0]))throw Error('原始紀錄已變動，請重新開啟清單');
+                if(window.p79V5QueueInfoForId?.(id))throw Error('有待同步修改，請先完成同步');
+            }
+            return {keep,remove};
+        }
+        async function p79AutoKeepSingleAttendancePair(index) {
+            if(!requireAdminAction('attendanceDelete','整理同班次重複刷卡')||p79BatchDuplicateBusy)return;
+            const row=p79DuplicateReviewRows[index];let plan;
+            try{plan=p79PlanSinglePairDuplicateCleanup(row)}catch(error){showToast(error.message,'warning');return;}
+            if(!plan.remove.length){showToast('目前已是上下班各一筆','success');return;}
+            if(!confirm('本班保留：\n上班 '+plan.keep[0].timeStr+'\n下班 '+plan.keep[1].timeStr+'\n\n刪除其餘 '+plan.remove.length+' 筆重複紀錄（含雲端）。\n規則：最早上班、最晚下班；跨日仍算同一班。\n確定執行？'))return;
+            p79BatchDuplicateBusy=true;p79CloseDuplicateReview();let removed=0;
+            try{
+                for(const target of plan.remove){
+                    const currentPlan=p79PlanSinglePairDuplicateCleanup({records:[...plan.keep,...plan.remove.slice(removed)]});
+                    if(!currentPlan.keep.every((r,i)=>String(r.id)===String(plan.keep[i].id)))throw Error('保留紀錄已變動，停止整理');
+                    showToast('正在整理重複刷卡 '+removed+'/'+plan.remove.length,'warning');
+                    const result=await p79PerformDuplicateCloudRequest({action:'deleteRecord',id:String(target.id)});
+                    if(!result?.ok||result.queued)throw Error(result?.error||'雲端尚未確認刪除，已停止後續操作');
+                    if(!p79ApplyConfirmedAttendanceDelete(String(target.id),{skipRender:true}))throw Error('雲端已確認，本機更新未完成，請重新讀取');
+                    removed++;
+                }
+                showToast('已刪除 '+removed+' 筆重複紀錄，保留上下班各一筆','success');
+            }catch(error){showToast('已確認刪除 '+removed+' 筆；其餘停止：'+error.message,'warning');}
+            finally{p79BatchDuplicateBusy=false;renderAdminRecordsTable();try{renderAdminLiveTable()}catch(_){} }
+        }
+
                 function p79OpenDuplicateReview(index) {
             const row = p79DuplicateReviewRows[index];
             if (!row || !Array.isArray(row.records)) return;
@@ -15227,7 +15274,7 @@ function getManualPairRecordAnchor(record) {
                 <div class="relative flex items-center justify-center gap-2 mb-3"><h3 class="font-black text-base text-center">🔎 同班次重複刷卡核對</h3><button type="button" class="absolute right-0 top-0" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3 text-center">同一班次有多筆簽到或簽退，請比對實際上、下班時間。人工補卡（系統恢復）表示系統找回過去的補卡資料，並不代表必須刪除；不確定時請按「全部保留／關閉」。刪除會影響工時及雲端資料。</p>
                 <div class="overflow-x-auto"><table class="min-w-full text-xs text-center"><thead><tr class="border-b"><th class="px-3 py-2 text-center align-middle">打卡時間</th><th class="px-3 py-2 text-center align-middle">紀錄編號</th><th class="px-3 py-2 text-center align-middle">方向</th><th class="px-3 py-2 text-center align-middle">來源</th><th class="px-3 py-2 text-center align-middle">核對狀態</th><th class="px-3 py-2 text-center align-middle">操作</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
-                <div class="flex justify-center mt-4"><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold">全部保留／關閉</button></div>
+                <div class="flex flex-wrap gap-2 justify-center mt-4">${canDelete?`<button type="button" onclick="p79AutoKeepSingleAttendancePair(${index})" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold">自動保留上下班各一筆</button>`:''}<button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold">全部保留／關閉</button></div>
             </div>`;
             modal.addEventListener('click', e => { if(e.target === modal) p79CloseDuplicateReview(); });
             document.body.appendChild(modal);
