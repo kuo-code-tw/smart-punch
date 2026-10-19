@@ -9,7 +9,7 @@ function setup(){
   let queue=[],sequence=0;const statuses=[],messages=[],requests=[],revisions=[],states=[];
   const btn={disabled:false,textContent:'儲存',classList:{toggle(){}},title:''};
   const c={console:{warn(){},error(){}},Date,JSON,Promise,AbortController,setTimeout,clearTimeout,
-    p79VerifyTimedOutEfficiencyWrite:async()=>false,p79SetEfficiencySyncLight(){},p79EfficiencyManualSyncActive:false,ensureGcQueueReady:async()=>{},p79EfficiencyWriteOptional:(k,v)=>revisions.push(v),cloudBusy:false,groups:[],assignments:[],records:[],shipMasters:[],efficiencyHasUnsavedChanges:false,
+    p79EfficiencySyncStep(){},p79EfficiencySyncCurrentStage:'測試',p79EfficiencySyncTrace:[],p79VerifyTimedOutEfficiencyWrite:async()=>false,p79SetEfficiencySyncLight(){},p79EfficiencyManualSyncActive:false,ensureGcQueueReady:async()=>{},p79EfficiencyWriteOptional:(k,v)=>revisions.push(v),cloudBusy:false,groups:[],assignments:[],records:[],shipMasters:[],efficiencyHasUnsavedChanges:false,
     requireSuperAdminAccess:()=>true,requireEfficiencyAccess:()=>true,uid:()=>`Q${++sequence}`,
     readQueue:()=>plain(queue),saveQueue:q=>{queue=plain(q)},
     cloudStatus:(message,ok)=>statuses.push({message,ok}),toast:m=>messages.push(m),
