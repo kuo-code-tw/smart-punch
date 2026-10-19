@@ -672,6 +672,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       </div>
     </div>
     <div class="flex items-center gap-2">
+      <span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">尚未確認同步</span></span>
       <span id="cloudState" class="text-[11px] rounded-full px-3 py-1 bg-slate-700">本機模式｜按同步雲端</span>
       <span class="text-[11px] rounded-full px-3 py-1 bg-amber-600">🔐 權限控管模式</span>
       <button id="efficiencyThemeBtn" type="button" onclick="toggleEfficiencyTheme()" class="btn bg-slate-700 text-white text-xs">🌙 暗色</button>
@@ -7082,7 +7083,22 @@ async function gcLogout(){
   location.href='../?v=20260927.7.13';
 }
 
-function cloudStatus(t,ok=true){const e=document.getElementById('cloudState');e.textContent=t;e.className=`text-[11px] rounded-full px-3 py-1 ${ok?'bg-emerald-700':'bg-amber-600'}`}
+let p79EfficiencyManualSyncActive=false;
+function p79SetEfficiencySyncLight(state,message=''){
+ let pending=0;try{pending=readQueue().length}catch(_){}
+ if(state==='success'&&pending){state='pending';message='待同步 '+pending+' 筆';}
+ if(state==='success'&&p79EfficiencyManualSyncActive){state='syncing';message='正在讀回確認…';}
+ const colors={idle:['#94a3b8','#f1f5f9','#475569'],syncing:['#f59e0b','#fffbeb','#92400e'],pending:['#f59e0b','#fffbeb','#92400e'],error:['#ef4444','#fef2f2','#b91c1c'],success:['#10b981','#ecfdf5','#047857']};
+ const color=colors[state]||colors.idle,host=document.getElementById('efficiencySyncLight'),dot=document.getElementById('efficiencySyncDot'),label=document.getElementById('efficiencySyncLabel');
+ if(!host||!dot||!label)return;
+ host.dataset.state=state;host.style.background=color[1];host.style.color=color[2];dot.style.background=color[0];
+ label.textContent=message||({idle:'尚未確認同步',syncing:'同步中…',pending:'待同步 '+pending+' 筆',error:'同步失敗',success:'同步完成'}[state]);
+ host.title=state==='success'?'雲端讀取已完成，沒有待上傳項目；燈號不代表船舶數值核對一致':label.textContent;
+}
+function cloudStatus(t,ok=true){const e=document.getElementById('cloudState');e.textContent=t;e.className=`text-[11px] rounded-full px-3 py-1 ${ok?'bg-emerald-700':'bg-amber-600'}`;
+ if(!ok)p79SetEfficiencySyncLight(/失敗|不可用|無法/.test(t)?'error':'syncing');
+ // 中途「已回應」或其他系統讀取成功不代表整次同步完成，不得提前亮綠燈。
+} 
 async function apiGet(action,params={}){
   const url=getGasUrl();
   if(!url)throw Error('未設定 GAS URL');
@@ -7219,6 +7235,7 @@ function readQueue(){
  try{const q=JSON.parse(localStorage.getItem(STORE.queue)||'[]');return Array.isArray(q)?q:[];}catch{return[];}
 }
 function saveQueue(q){
+ if(q.length)p79SetEfficiencySyncLight('pending','待同步 '+q.length+' 筆');
  if(!gcQueueReady)return Promise.reject(Error('待同步資料尚未載入，請重試'));
  const snapshot=JSON.parse(JSON.stringify(q)),previous=gcQueueMemory;
  if(gcQueueStorageMode==='local'){
@@ -8001,7 +8018,8 @@ async function flushQueue(){
         }
       }
       const left=readQueue();
-      cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'雲端已同步',!left.length);
+      cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'上傳完成｜等待讀回確認',!left.length);
+      p79SetEfficiencySyncLight(left.length?'pending':'syncing',left.length?'待同步 '+left.length+' 筆':'上傳完成｜等待讀回確認');
       return {ok:!left.length,pendingCloudSync:!!left.length};
     }finally{cloudBusy=false}
   })();
@@ -8368,6 +8386,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     const afterRecords=(records||[]).length;
 
     cloudStatus(`船舶資料已恢復｜雲端主檔 ${cloudMasters.length}｜雲端明細 ${cloudRecords.length}`);
+    p79SetEfficiencySyncLight('success');
 
     if(showMessage){
       if(cloudMasters.length===0 && cloudRecords.length===0){
@@ -8443,6 +8462,7 @@ async function syncFromCloud(force=false){
    renderEfficiencyTabFast();
    updateEmployeeDataState(employeeSource);
    cloudStatus('雲端最新');
+   p79SetEfficiencySyncLight('success');
 
    Promise.resolve().then(async()=>{
      try{
@@ -8461,9 +8481,10 @@ async function syncFromCloud(force=false){
  finally{cloudBusy=false}
 }
 async function manualCloudSync(){
-  if(!requireEfficiencyAccess())return;
+  if(!requireEfficiencyAccess()||p79EfficiencyManualSyncActive)return;
   const btn=document.getElementById('efficiencyCloudSyncBtn');
   const oldText=btn?.textContent||'☁️ 同步雲端';
+  p79EfficiencyManualSyncActive=true;p79SetEfficiencySyncLight('syncing');
   try{
     if(btn){btn.disabled=true;btn.textContent='☁️ 同步中...';}
     cloudStatus('同步雲端...',false);
@@ -8476,14 +8497,17 @@ async function manualCloudSync(){
     await restoreVesselDataFromCloud(false,true);
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
 
+    p79EfficiencyManualSyncActive=false;p79SetEfficiencySyncLight('success');
     cloudStatus('雲端已同步');
     setEfficiencySaveState(false,'本機與雲端資料已完成同步');
     toast('✅ 雲端同步完成｜已上傳本機變更並取得最新船舶資料');
   }catch(e){
     console.error(e);
+    p79SetEfficiencySyncLight('error','同步未完成');
     cloudStatus('雲端同步失敗',false);
     toast(`❌ 雲端同步失敗：${e.message||e}`);
   }finally{
+    p79EfficiencyManualSyncActive=false;
     if(btn){btn.disabled=false;btn.textContent=oldText;btn.style.opacity='1';}
   }
 }
