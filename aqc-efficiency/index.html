@@ -659,7 +659,6 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       </div>
       <div class="flex flex-wrap gap-2">
         <button id="efficiencySaveBtn" onclick="saveEfficiencyChangesToCloud()" class="btn bg-blue-600 text-white text-sm">💾 儲存</button>
-        <button id="efficiencyCloudSyncBtn" onclick="manualCloudSync()" class="btn bg-sky-600 text-white text-sm">☁️ 同步雲端</button>
         <label class="btn bg-emerald-600 text-white cursor-pointer text-sm">📥 匯入 Excel
           <input id="excelImport" type="file" accept=".xlsx,.xls" multiple class="hidden"
                  onchange="importExcelFiles(this.files);this.value=''">
@@ -672,7 +671,6 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">尚未確認同步</span></span>
       <span id="cloudState" class="text-[11px] rounded-full px-3 py-1 bg-slate-700">本機模式｜按同步雲端</span>
       <span class="text-[11px] rounded-full px-3 py-1 bg-amber-600">🔐 權限控管模式</span>
       <button id="efficiencyThemeBtn" type="button" onclick="toggleEfficiencyTheme()" class="btn bg-slate-700 text-white text-xs">🌙 暗色</button>
@@ -788,6 +786,8 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
         <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出每月作業量表</button>
         <button onclick="clearDashboardFilter()" class="btn bg-slate-100 text-sm">清除全部篩選</button>
         <button id="forceVesselCloudPullBtn" type="button" onclick="forcePullVesselCloudData()" class="btn text-white text-sm font-black shadow-lg ring-2 ring-sky-300" style="background:#0284c7;color:#fff;min-width:190px" title="立即從 GC 即時資料與歷史船舶月份重新拉取">☁️ 立即雲端拉取船舶資料</button>
+        <button id="efficiencyCloudSyncBtn" onclick="manualCloudSync()" class="btn bg-sky-600 text-white text-sm">☁️ 同步船舶資料</button>
+      <span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">尚未確認同步</span></span>
         <div id="dashboardTableFilterState" class="text-xs text-slate-500"></div>
         <div class="ship-change-toolbar">
           <span id="shipNewCountBadge" class="ship-change-pill ship-change-new hidden">🟢 NEW 0</span>
