@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync('aqc-efficiency/index.html','utf8'),a=html.indexOf('function mergeCloudRecordsWithLocal('),code=html.slice(a,html.indexOf('\n}',a)+2);
+const stamp='2026-10-19T06:00:00Z';
+const c={Map,Set,Array,String,Object,Date,num:x=>Number(x)||0,recordIdentityKey:r=>r.id,shipMasters:[{workingNo:'SHIP1',workingSheetSource:{importedAt:stamp,reportRecordIds:['new1','new2']}}]};
+vm.createContext(c);vm.runInContext(code,c);
+const local=[{id:'new1',workingNo:'SHIP1',workingSheetImportedAt:stamp,source:'working-report',workingSheetRuleVersion:'SHIFT_X2',disc:381,load:0},{id:'new2',workingNo:'SHIP1',workingSheetImportedAt:stamp,source:'working-report',workingSheetRuleVersion:'SHIFT_X2',disc:0,load:390}];
+const remote=[{id:'old-extra',workingNo:'SHIP1',disc:102},{id:'new1',workingNo:'SHIP1',disc:400},{id:'other',workingNo:'SHIP2',disc:100},{id:'child',workingNo:'SHIP1-1',disc:20}];
+const out=c.mergeCloudRecordsWithLocal(remote,local);
+assert(!out.some(r=>r.id==='old-extra'));assert(out.some(r=>r.id==='other'));assert(out.some(r=>r.id==='child'));
+assert.equal(out.filter(r=>r.workingNo==='SHIP1').reduce((n,r)=>n+(r.disc||0)+(r.load||0),0),771);
+assert(c.mergeCloudRecordsWithLocal(remote,local.slice(0,1)).some(r=>r.id==='old-extra'),'partial local data cannot delete cloud history');
+const newer=remote.map(r=>r.id==='old-extra'?{...r,workingSheetImportedAt:'2026-10-20T00:00:00Z'}:r);
+assert(c.mergeCloudRecordsWithLocal(newer,local).some(r=>r.id==='old-extra'),'newer remote batch is protected');
+delete c.shipMasters[0].workingSheetSource.reportRecordIds;assert(c.mergeCloudRecordsWithLocal(remote,local).some(r=>r.id==='old-extra'),'legacy records without a replacement manifest retained');
+console.log('PASS complete reimport replaces exact job, preserves other jobs and child jobs, partial snapshots and newer cloud imports');
