@@ -40,7 +40,24 @@ function buildPlan(input){
     if(overlap<Math.min(7,period))continue;
     cycle=pattern;break;
    }
-   if(!cycle){summary.reason='來源月份正常班沒有足夠的重複順序，無法判定接續；請核對月底班表';continue;}
+   const knownByIndex=new Map(known.map(item=>[item.index,item.value]));
+   summary.sourceTail=sourceDays.map((date,index)=>({date,shift:knownByIndex.get(index)||String(original[date]||'空白')}));
+   const manual=Number(input.tailPeriods?.[emp]);
+   if(Number.isInteger(manual)&&manual>=1&&manual<=sourceDays.length){
+    const start=sourceDays.length-manual,pattern=sourceDays.slice(start).map((_,i)=>knownByIndex.get(start+i));
+    if(pattern.some(value=>!value)){summary.reason='選取的月底循環包含請假、加班或空白，請改選正常班完整區段';summary.canChooseTail=true;continue;}
+    cycle=pattern;phases=[-start];summary.manualTail=true;
+   }
+   if(!cycle){
+    // 月初調班不應擋住月底已穩定的循環；至少核對連續十四天。
+    for(let period=1;period<=15&&!cycle;period++){
+     const length=Math.max(14,period*2),start=sourceDays.length-length;if(start<0)continue;
+     const tail=sourceDays.slice(start).map((_,i)=>knownByIndex.get(start+i));
+     if(tail.some(value=>!value))continue;
+     if(tail.every((value,i)=>i<period||value===tail[i-period])){cycle=tail.slice(0,period);phases=[-start];summary.fromTail=true;}
+    }
+   }
+   if(!cycle){summary.reason='無法自動判定，請查看下方來源班表並指定月底循環天數，再套用預覽';summary.canChooseTail=true;continue;}
    summary.cycle=cycle.join('→');
   }
   const lastActual=canonical(original[sourceDays[sourceDays.length-1]]),firstExisting=canonical(byId.get(emp)?.schedule?.[targetDays[0]]);
@@ -70,15 +87,28 @@ let draft=null,busy=false,dialog=null;
 function ui(){if(dialog)return dialog;const style=document.createElement('style');style.textContent='#p79ContinueDialog{width:min(960px,calc(100vw - 24px));max-height:90dvh;padding:0;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a}#p79ContinueDialog::backdrop{background:#0f172a88}#p79ContinueDialog .sc-head,#p79ContinueDialog .sc-foot{padding:14px 18px;display:flex;gap:10px;justify-content:space-between;align-items:center}#p79ContinueDialog .sc-body{padding:0 18px 14px;max-height:65dvh;overflow:auto}#p79ContinueDialog .sc-fields{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0}#p79ContinueDialog input{border:1px solid #cbd5e1;border-radius:8px;padding:8px}#p79ContinueDialog button{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0}#p79ContinueDialog button:disabled{opacity:.5;cursor:wait}#p79ContinueDialog #scSave{background:#047857;color:#fff}#p79ContinueDialog .sc-person{padding:10px 0;border-top:1px solid #e2e8f0}#p79ContinueDialog .sc-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}#p79ContinueDialog .sc-days span{padding:4px 6px;border-radius:5px;background:#eff6ff;color:#1e40af}#p79ContinueDialog .sc-error{color:#b45309}html.dark #p79ContinueDialog{background:#0f172a;color:#e2e8f0}';document.head.appendChild(style);
  dialog=document.createElement('dialog');dialog.id='p79ContinueDialog';dialog.innerHTML='<div class="sc-head"><strong>延續到下個月</strong><button id="scClose">關閉</button></div><div class="sc-body"><p>依來源月份每位員工的實際正常班順序接續，只補下一個月的空白格。既有排班、請假、代班與加班保留；不複製來源月份的請假或加班。</p><div class="sc-fields"><label>來源月份 <input id="scSource" type="month"></label><label>目標月份 <input id="scTarget" type="month" readonly></label><button id="scPreview">產生預覽</button></div><div id="scStatus" role="status"></div><div id="scRows"></div></div><div class="sc-foot"><button id="scCancel">取消</button><button id="scSave" disabled>確認延續並儲存</button></div>';document.body.appendChild(dialog);
  const q=x=>dialog.querySelector('#'+x);q('scClose').onclick=q('scCancel').onclick=()=>{if(!busy)dialog.close();};dialog.oncancel=e=>{if(busy)e.preventDefault();};q('scSource').onchange=()=>{draft=null;q('scSave').disabled=true;q('scRows').textContent='';try{q('scTarget').value=nextMonth(q('scSource').value);}catch(e){q('scStatus').textContent=e.message;}};
- q('scPreview').onclick=preview;q('scSave').onclick=save;return dialog;
+ q('scRows').addEventListener('click',applyTail); q('scPreview').onclick=preview;q('scSave').onclick=save;return dialog;
 }
 function setBusy(v){busy=v;for(const key of ['scClose','scCancel','scPreview','scSource'])dialog.querySelector('#'+key).disabled=v;dialog.querySelector('#scSave').disabled=v||!draft?.plan.changes.length;}
 async function preview(){if(busy)return;if(draft?.uncertain){dialog.querySelector('#scStatus').textContent='上一筆儲存仍待確認，請按確認按鈕查詢回條，暫不產生另一份預覽';return;}const ctx=global.P79ScheduleContinuationContext,q=x=>dialog.querySelector('#'+x);draft=null;setBusy(true);q('scStatus').textContent='正在讀取來源與目標月份…';q('scRows').textContent='';try{
  if(!ctx.canManage())throw Error('沒有排班管理權限');await ctx.prepare();const sourceMonth=q('scSource').value,targetMonth=nextMonth(sourceMonth);q('scTarget').value=targetMonth;const token=ctx.token(),[source,target]=await Promise.all([ctx.read(sourceMonth),ctx.read(targetMonth)]);if(ctx.token()!==token)throw Error('登入身分已改變，請重新開啟');
- const rule={},people=ctx.people(source),plan=buildPlan({sourceMonth,targetMonth,source,target,people,rule,eligible:ctx.eligible,allocate:ctx.allocate});draft={token,sourceMonth,targetMonth,source,target,rule,people,plan,requestId:null,uncertain:false};
- q('scStatus').textContent='將新增 '+plan.changes.length+' 格；保留 '+plan.summaries.reduce((n,r)=>n+r.preserved,0)+' 格。'+(plan.warnings.length?' '+plan.warnings.join('；'):'');
- q('scRows').innerHTML=plan.summaries.map(r=>'<div class="sc-person"><b>'+esc(r.name)+'</b>　新增 '+r.added+' 格／保留 '+r.preserved+' 格'+(r.cycle?'<div>來源班表循環：'+esc(r.cycle)+'</div>':'')+(r.reason?'<div class="sc-error">'+esc(r.reason)+'</div>':'')+'<div class="sc-days">'+r.cells.map(c=>'<span>'+esc(c.date.slice(8))+' '+esc(c.shift)+'</span>').join('')+'</div></div>').join('');
+ const rule={},people=ctx.people(source),plan=buildPlan({sourceMonth,targetMonth,source,target,people,rule,eligible:ctx.eligible,allocate:ctx.allocate});draft={tailPeriods:{},token,sourceMonth,targetMonth,source,target,rule,people,plan,requestId:null,uncertain:false};
+ renderPlan();
  }catch(e){draft=null;q('scStatus').textContent='預覽未完成：'+e.message;}finally{setBusy(false);}}
+function renderPlan(){
+ const plan=draft.plan,q=x=>dialog.querySelector('#'+x);
+ q('scStatus').textContent='將新增 '+plan.changes.length+' 格；保留 '+plan.summaries.reduce((n,r)=>n+r.preserved,0)+' 格。'+(plan.warnings.length?' '+plan.warnings.join('；'):'');
+ q('scRows').innerHTML=plan.summaries.map((r,index)=>'<div class="sc-person"><b>'+esc(r.name)+'</b>　新增 '+r.added+' 格／保留 '+r.preserved+' 格'+(r.cycle?'<div>來源班表循環：'+esc(r.cycle)+'</div>':'')+(r.manualTail?'<div>已指定月底循環</div>':r.fromTail?'<div>依月底連續班表辨識</div>':'')+(r.reason?'<div class="sc-error">'+esc(r.reason)+'</div>':'')+(r.canChooseTail?'<div class="sc-days">'+(r.sourceTail||[]).map(c=>'<span>'+esc(c.date.slice(8))+' '+esc(c.shift)+'</span>').join('')+'</div><label>重複月底最後 <input id="scTail'+index+'" type="number" min="1" max="31" value="'+(draft.tailPeriods[r.empId]||7)+'" style="width:70px"> 天</label> <button type="button" data-tail-index="'+index+'">套用此人的月底循環</button>':'')+'<div class="sc-days">'+r.cells.map(c=>'<span>'+esc(c.date.slice(8))+' '+esc(c.shift)+'</span>').join('')+'</div></div>').join('');
+}
+function applyTail(event){
+ const button=event.target.closest?.('[data-tail-index]');if(!button||busy||!draft||draft.uncertain)return;
+ const index=Number(button.dataset.tailIndex),person=draft.plan.summaries[index],period=Number(dialog.querySelector('#scTail'+index).value);
+ if(!person||!Number.isInteger(period)||period<1||period>31){dialog.querySelector('#scStatus').textContent='請輸入 1 到 31 的循環天數';return;}
+ draft.tailPeriods[person.empId]=period;
+ const ctx=global.P79ScheduleContinuationContext;
+ draft.plan=buildPlan({...draft,eligible:ctx.eligible,allocate:ctx.allocate});
+ renderPlan();setBusy(false);
+}
 async function save(){if(busy||!draft?.plan.changes.length)return;const ctx=global.P79ScheduleContinuationContext,q=x=>dialog.querySelector('#'+x),d=draft;setBusy(true);q('scStatus').textContent='正在核對編輯權與雲端班表…';try{
  if(ctx.token()!==d.token||!ctx.canManage())throw Error('登入或管理權限已改變');await ctx.prepare();await ctx.acquire();
  if(d.uncertain){const receipt=await ctx.receipt(d.requestId,d.targetMonth);if(!receipt)throw Error('上一筆儲存結果仍未確認，請稍後再次核對，不會重送月份資料');}
