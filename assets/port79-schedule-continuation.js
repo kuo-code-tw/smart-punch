@@ -23,22 +23,25 @@ function buildPlan(input){
   if(!from){summary.reason='來源月份沒有正式班表，略過';continue;}
   const original=from.schedule||{},personnel=original.__personnel||{};
   if(personnel.lockType==='FIXED_LOCKED'||byId.get(emp)?.schedule?.__personnel?.lockType==='FIXED_LOCKED'){summary.reason='固定鎖定人員，保留原設定並略過';continue;}
-  const fixedWeekend=personnel.group==='不輪班'||rule.algo==='WEEKEND_OFF';let cycle,phases=[];
+  const fixedWeekend=personnel.group==='不輪班';let cycle,phases=[0];
   if(!fixedWeekend){
-   cycle=cycleFor(rule);
    const known=sourceDays.map((date,index)=>{const meta=original.__meta?.[date]||{};let value=canonical(original[date]);
     const originalShift=meta.reportOriginalShift??meta.overtimeOriginalShift;
     if(originalShift!==undefined)value=canonical(originalShift);
     else if(meta.overtime||meta.overtimeReport||meta.forEmpId||meta.coverAssignmentId||leaveOn(source,emp,date)||coverOn(source,emp,date))value='';
     return {index,value};}).filter(x=>x.value);
-   if(known.length<Math.min(4,cycle.length)){summary.reason='正常班資料不足，無法判定輪班位置';continue;}
-   const candidates=cycle.map((_,phase)=>({phase,score:known.reduce((n,k)=>n+(cycle[(k.index+phase)%cycle.length]===k.value?1:0),0)})),max=Math.max(...candidates.map(c=>c.score));
-   // A good whole-month score cannot override the actual end of the source month.
-   const tail=known.filter(k=>k.index>=sourceDays.length-7);
-   phases=candidates.filter(c=>c.score===max&&tail.every(k=>cycle[(k.index+c.phase)%cycle.length]===k.value)).map(c=>c.phase);
-   if(!tail.length||!phases.length){summary.reason='月底班別與輪班規則不一致，無法安全接續；請先確認月底順序';continue;}
-   const sequences=new Set(phases.map(phase=>targetDays.map((_,i)=>cycle[(sourceDays.length+i+phase)%cycle.length]).join('|')));
-   if(max/known.length<0.8||sequences.size!==1){summary.reason='班表與目前輪班規則不一致或位置不明，請人工確認';continue;}
+   // 以來源月本人的正常班找最短、可重複驗證的循環，與畫面輪班規則無關。
+   for(let period=1;period<=Math.min(21,sourceDays.length-1);period++){
+    if(known.length<period+Math.min(7,period))continue;
+    const pattern=Array(period).fill(null);let conflict=false;
+    for(const item of known){const slot=item.index%period;if(pattern[slot]&&pattern[slot]!==item.value){conflict=true;break;}pattern[slot]=item.value;}
+    if(conflict||pattern.some(value=>!value))continue;
+    const overlap=known.filter(item=>known.some(other=>other.index===item.index+period)).length;
+    if(overlap<Math.min(7,period))continue;
+    cycle=pattern;break;
+   }
+   if(!cycle){summary.reason='來源月份正常班沒有足夠的重複順序，無法判定接續；請核對月底班表';continue;}
+   summary.cycle=cycle.join('→');
   }
   const lastActual=canonical(original[sourceDays[sourceDays.length-1]]),firstExisting=canonical(byId.get(emp)?.schedule?.[targetDays[0]]);
   const firstPlanned=fixedWeekend?([0,6].includes(new Date(targetDays[0]+'T12:00:00Z').getUTCDay())?'休':'早'):cycle[(sourceDays.length+phases[0])%cycle.length];
@@ -65,29 +68,29 @@ function buildPlan(input){
 }
 let draft=null,busy=false,dialog=null;
 function ui(){if(dialog)return dialog;const style=document.createElement('style');style.textContent='#p79ContinueDialog{width:min(960px,calc(100vw - 24px));max-height:90dvh;padding:0;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a}#p79ContinueDialog::backdrop{background:#0f172a88}#p79ContinueDialog .sc-head,#p79ContinueDialog .sc-foot{padding:14px 18px;display:flex;gap:10px;justify-content:space-between;align-items:center}#p79ContinueDialog .sc-body{padding:0 18px 14px;max-height:65dvh;overflow:auto}#p79ContinueDialog .sc-fields{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0}#p79ContinueDialog input{border:1px solid #cbd5e1;border-radius:8px;padding:8px}#p79ContinueDialog button{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0}#p79ContinueDialog button:disabled{opacity:.5;cursor:wait}#p79ContinueDialog #scSave{background:#047857;color:#fff}#p79ContinueDialog .sc-person{padding:10px 0;border-top:1px solid #e2e8f0}#p79ContinueDialog .sc-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}#p79ContinueDialog .sc-days span{padding:4px 6px;border-radius:5px;background:#eff6ff;color:#1e40af}#p79ContinueDialog .sc-error{color:#b45309}html.dark #p79ContinueDialog{background:#0f172a;color:#e2e8f0}';document.head.appendChild(style);
- dialog=document.createElement('dialog');dialog.id='p79ContinueDialog';dialog.innerHTML='<div class="sc-head"><strong>延續到下個月</strong><button id="scClose">關閉</button></div><div class="sc-body"><p>依目前輪班規則接續正常班，只補下一個月的空白格。既有排班、請假、代班與加班保留；不複製來源月份的請假或加班。</p><div class="sc-fields"><label>來源月份 <input id="scSource" type="month"></label><label>目標月份 <input id="scTarget" type="month" readonly></label><button id="scPreview">產生預覽</button></div><div id="scStatus" role="status"></div><div id="scRows"></div></div><div class="sc-foot"><button id="scCancel">取消</button><button id="scSave" disabled>確認延續並儲存</button></div>';document.body.appendChild(dialog);
+ dialog=document.createElement('dialog');dialog.id='p79ContinueDialog';dialog.innerHTML='<div class="sc-head"><strong>延續到下個月</strong><button id="scClose">關閉</button></div><div class="sc-body"><p>依來源月份每位員工的實際正常班順序接續，只補下一個月的空白格。既有排班、請假、代班與加班保留；不複製來源月份的請假或加班。</p><div class="sc-fields"><label>來源月份 <input id="scSource" type="month"></label><label>目標月份 <input id="scTarget" type="month" readonly></label><button id="scPreview">產生預覽</button></div><div id="scStatus" role="status"></div><div id="scRows"></div></div><div class="sc-foot"><button id="scCancel">取消</button><button id="scSave" disabled>確認延續並儲存</button></div>';document.body.appendChild(dialog);
  const q=x=>dialog.querySelector('#'+x);q('scClose').onclick=q('scCancel').onclick=()=>{if(!busy)dialog.close();};dialog.oncancel=e=>{if(busy)e.preventDefault();};q('scSource').onchange=()=>{draft=null;q('scSave').disabled=true;q('scRows').textContent='';try{q('scTarget').value=nextMonth(q('scSource').value);}catch(e){q('scStatus').textContent=e.message;}};
  q('scPreview').onclick=preview;q('scSave').onclick=save;return dialog;
 }
 function setBusy(v){busy=v;for(const key of ['scClose','scCancel','scPreview','scSource'])dialog.querySelector('#'+key).disabled=v;dialog.querySelector('#scSave').disabled=v||!draft?.plan.changes.length;}
 async function preview(){if(busy)return;if(draft?.uncertain){dialog.querySelector('#scStatus').textContent='上一筆儲存仍待確認，請按確認按鈕查詢回條，暫不產生另一份預覽';return;}const ctx=global.P79ScheduleContinuationContext,q=x=>dialog.querySelector('#'+x);draft=null;setBusy(true);q('scStatus').textContent='正在讀取來源與目標月份…';q('scRows').textContent='';try{
  if(!ctx.canManage())throw Error('沒有排班管理權限');await ctx.prepare();const sourceMonth=q('scSource').value,targetMonth=nextMonth(sourceMonth);q('scTarget').value=targetMonth;const token=ctx.token(),[source,target]=await Promise.all([ctx.read(sourceMonth),ctx.read(targetMonth)]);if(ctx.token()!==token)throw Error('登入身分已改變，請重新開啟');
- const rule=ctx.rule(),people=ctx.people(source),plan=buildPlan({sourceMonth,targetMonth,source,target,people,rule,eligible:ctx.eligible,allocate:ctx.allocate});draft={token,sourceMonth,targetMonth,source,target,rule,people,plan,requestId:null,uncertain:false};
+ const rule={},people=ctx.people(source),plan=buildPlan({sourceMonth,targetMonth,source,target,people,rule,eligible:ctx.eligible,allocate:ctx.allocate});draft={token,sourceMonth,targetMonth,source,target,rule,people,plan,requestId:null,uncertain:false};
  q('scStatus').textContent='將新增 '+plan.changes.length+' 格；保留 '+plan.summaries.reduce((n,r)=>n+r.preserved,0)+' 格。'+(plan.warnings.length?' '+plan.warnings.join('；'):'');
- q('scRows').innerHTML=plan.summaries.map(r=>'<div class="sc-person"><b>'+esc(r.name)+'</b>　新增 '+r.added+' 格／保留 '+r.preserved+' 格'+(r.reason?'<div class="sc-error">'+esc(r.reason)+'</div>':'')+'<div class="sc-days">'+r.cells.map(c=>'<span>'+esc(c.date.slice(8))+' '+esc(c.shift)+'</span>').join('')+'</div></div>').join('');
+ q('scRows').innerHTML=plan.summaries.map(r=>'<div class="sc-person"><b>'+esc(r.name)+'</b>　新增 '+r.added+' 格／保留 '+r.preserved+' 格'+(r.cycle?'<div>來源班表循環：'+esc(r.cycle)+'</div>':'')+(r.reason?'<div class="sc-error">'+esc(r.reason)+'</div>':'')+'<div class="sc-days">'+r.cells.map(c=>'<span>'+esc(c.date.slice(8))+' '+esc(c.shift)+'</span>').join('')+'</div></div>').join('');
  }catch(e){draft=null;q('scStatus').textContent='預覽未完成：'+e.message;}finally{setBusy(false);}}
 async function save(){if(busy||!draft?.plan.changes.length)return;const ctx=global.P79ScheduleContinuationContext,q=x=>dialog.querySelector('#'+x),d=draft;setBusy(true);q('scStatus').textContent='正在核對編輯權與雲端班表…';try{
  if(ctx.token()!==d.token||!ctx.canManage())throw Error('登入或管理權限已改變');await ctx.prepare();await ctx.acquire();
  if(d.uncertain){const receipt=await ctx.receipt(d.requestId,d.targetMonth);if(!receipt)throw Error('上一筆儲存結果仍未確認，請稍後再次核對，不會重送月份資料');}
  else{
   const [source,target]=await Promise.all([ctx.read(d.sourceMonth),ctx.read(d.targetMonth)]);
-  if(JSON.stringify(source.employees)!==JSON.stringify(d.source.employees)||JSON.stringify(source.schedules)!==JSON.stringify(d.source.schedules)||JSON.stringify(target.schedules)!==JSON.stringify(d.target.schedules)||JSON.stringify(source.leaveRecords)!==JSON.stringify(d.source.leaveRecords)||JSON.stringify(target.leaveRecords)!==JSON.stringify(d.target.leaveRecords)||JSON.stringify(source.leaveCoverAssignments)!==JSON.stringify(d.source.leaveCoverAssignments)||JSON.stringify(target.leaveCoverAssignments)!==JSON.stringify(d.target.leaveCoverAssignments)||JSON.stringify(ctx.rule())!==JSON.stringify(d.rule))throw Error('班表、請假或輪班規則已變更，請重新產生預覽');
+  if(JSON.stringify(source.employees)!==JSON.stringify(d.source.employees)||JSON.stringify(source.schedules)!==JSON.stringify(d.source.schedules)||JSON.stringify(target.schedules)!==JSON.stringify(d.target.schedules)||JSON.stringify(source.leaveRecords)!==JSON.stringify(d.source.leaveRecords)||JSON.stringify(target.leaveRecords)!==JSON.stringify(d.target.leaveRecords)||JSON.stringify(source.leaveCoverAssignments)!==JSON.stringify(d.source.leaveCoverAssignments)||JSON.stringify(target.leaveCoverAssignments)!==JSON.stringify(d.target.leaveCoverAssignments))throw Error('班表或請假資料已變更，請重新產生預覽');
   d.requestId=d.requestId||ctx.requestId();d.uncertain=true;await ctx.persist(d.targetMonth,d.plan.rows,d.requestId);
  }
  const verified=await ctx.read(d.targetMonth),index=new Map((verified.schedules||[]).map(r=>[id(r.empId),r.schedule||{}]));
  if(d.plan.changes.some(c=>index.get(c.empId)?.[c.date]!==c.shift))throw Error('雲端尚未讀回完整延續結果，請保留視窗再核對');
  d.uncertain=false;q('scStatus').textContent='已核對並儲存 '+d.targetMonth+' 班表，共新增 '+d.plan.changes.length+' 格。';q('scSave').textContent='已儲存';draft=null;await ctx.afterSave(d.targetMonth);dialog.close();
  }catch(e){if(e.confirmedRejected)d.uncertain=false;q('scStatus').textContent='尚未確認完成：'+e.message;}finally{setBusy(false);}}
-function open(sourceMonth){const ctx=global.P79ScheduleContinuationContext;if(!ctx?.canManage())return alert('沒有排班管理權限');ui();draft=null;const month=typeof sourceMonth==='string'?sourceMonth:ctx.month();dialog.querySelector('#scSource').value=month;dialog.querySelector('#scTarget').value=nextMonth(month);dialog.querySelector('#scRows').textContent='';dialog.querySelector('#scStatus').textContent='請確認目前輪班規則，再產生預覽。';dialog.querySelector('#scSave').textContent='確認延續並儲存';setBusy(false);dialog.showModal();}
+function open(sourceMonth){const ctx=global.P79ScheduleContinuationContext;if(!ctx?.canManage())return alert('沒有排班管理權限');ui();draft=null;const month=typeof sourceMonth==='string'?sourceMonth:ctx.month();dialog.querySelector('#scSource').value=month;dialog.querySelector('#scTarget').value=nextMonth(month);dialog.querySelector('#scRows').textContent='';dialog.querySelector('#scStatus').textContent='依來源月份實際班表延續，不使用上方輪班規則；請產生預覽。';dialog.querySelector('#scSave').textContent='確認延續並儲存';setBusy(false);dialog.showModal();}
 global.P79ScheduleContinuation={buildPlan,nextMonth,cycleFor,open};
 })(typeof window==='undefined'?globalThis:window);
