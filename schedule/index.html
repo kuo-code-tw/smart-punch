@@ -3619,15 +3619,10 @@ function p79EmployeeDateEligible(emp,date) {
 }
 
     function scheduleEmployeeEligibleForMonth(emp, yearMonth) {
-      const start=p79EmploymentStartDate(emp);if(start&&String(yearMonth||'').slice(0,7)<start.slice(0,7))return false;
-      const status=normalizeScheduleEmploymentStatus(emp?.employmentStatus);
-      if(status==='active')return true;
-      if(status==='leave')return false;
-      const ym=String(yearMonth||'').slice(0,7);
-      const last=String(emp?.lastWorkDate||emp?.terminationDate||'').replace(/\//g,'-').slice(0,10);
-      if(!ym||!last)return false;
-      // 歷史月份若仍在最後工作日前，保留舊班表人員。
-      return `${ym}-01`<=last;
+      const start=p79EmploymentStartDate(emp);
+      if(start&&String(yearMonth||'').slice(0,7)<start.slice(0,7))return false;
+      // 排班操作名單僅保留在職人員；不刪除雲端既有班表。
+      return normalizeScheduleEmploymentStatus(emp?.employmentStatus)==='active';
     }
     function cloneScheduleEmployee(emp) {
       return {
