@@ -263,10 +263,28 @@ function confirmCloudRecord(cloudRecord){
   return true;
 }
 
+function p79ArchiveObsoleteAttendanceEdits(items,reason){
+ if(!items.length)return 0;
+ const q=readQueue();
+ const selected=items.filter(item=>q.some(current=>current.key===item.key&&samePayload(current.payload,item.payload)));
+ if(!selected.length)return 0;
+ const archive=JSON.parse(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)||'[]');
+ if(!Array.isArray(archive))throw new Error('舊修改備份格式異常，原佇列保留');
+ const at=Date.now();
+ const drafts=selected.map((item,i)=>({backupId:at+':obsolete:'+i+':'+item.key,state:'withdrawn',withdrawnAt:at,reason,item:JSON.parse(JSON.stringify(item))}));
+ const raw=JSON.stringify([...archive,...drafts]);
+ localStorage.setItem(WITHDRAWN_DRAFTS_KEY,raw);
+ if(localStorage.getItem(WITHDRAWN_DRAFTS_KEY)!==raw)throw new Error('舊修改備份未完成，原佇列保留');
+ const keep=q.filter(current=>!selected.some(item=>current.key===item.key&&samePayload(current.payload,item.payload)));
+ if(!saveQueue(keep)){saveQueue(q);throw new Error('待同步狀態無法保存，原修改保留');}
+ return selected.length;
+}
+
 function confirmCloudDelete(id){
   const wanted=String(id??'');
   if(!wanted)return false;
 
+  p79ArchiveObsoleteAttendanceEdits(readQueue().filter(item=>payloadRecordId(item?.payload)===wanted&&['updateRecord','editRecord'].includes(String(item.payload?.action||''))),'cloud-delete-confirmed');
   const q=readQueue();
   let removed=0;
   const keep=[];
@@ -297,15 +315,17 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
   const expected=context?.record||context;
   const months=[...new Set([context?.originalTimeStr,expected?.timeStr].map(value=>String(value||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
   if(expected&&['empId','attNo'].some(k=>String(expected[k]??'').trim())&&months.length){
-   const matches=[];
+   const matches=[];let anySameId=false;
    for(const month of months){
     const fullResponse=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
     const full=await fullResponse.json();
     if(!fullResponse.ok||!full?.ok||String(full.month)!==month||!Array.isArray(full.records))throw new Error(full?.error||'正式主表核對失敗，修改草稿已保留');
+    anySameId=anySameId||full.records.some(r=>String(r.id)===String(id));
     matches.push(...full.records.filter(r=>String(r.id)===String(id)&&['empId','attNo'].every(k=>!String(expected[k]??'').trim()||normalizeCompareValue(r[k])===normalizeCompareValue(expected[k]))&&((typeof getAttendanceRecordType==='function')?getAttendanceRecordType(r)===getAttendanceRecordType(expected):String(r.status)===String(expected.status))));
    }
    const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
    if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
+   if(!anySameId)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
    if(unique.length>1)throw Object.assign(new Error('正式主表有多筆相同編號及身分的考勤，無法唯一確認班次；修改草稿保留'),{retryable:false});
   }
   throw Object.assign(new Error('雲端正式主表仍找不到這筆考勤，可能已刪除；修改草稿保留，可撤回這筆修改'),{retryable:false});
@@ -438,6 +458,13 @@ async function p79ReviewPausedAttendanceWrite(key){
    return {state:'saved',cloud};
   }
   return {state:'review',key,payload,cloud};
+ } catch(error){
+  if(error?.recordAbsent===true){
+   const current=p79PausedReviewItem(key,payload);
+   p79ArchiveObsoleteAttendanceEdits([current],'official-month-record-absent');
+   updateUi();return {state:'obsolete',id:payloadRecordId(payload)};
+  }
+  throw error;
  } finally {clearTimeout(timer);}
 }
 async function p79ApplyPausedAttendanceReview(review){
@@ -574,7 +601,7 @@ async function drain(force=false){
           try{markRecentAttendanceMutationCloudConfirmed?.(rid)}catch(e){}
         }
         if(String(item?.payload?.action||'')==='deleteRecord'){
-            try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+            try{confirmCloudDelete(rid);window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
         }
         if(String(item?.payload?.action||'')==='addRecord' &&
             String(item?.payload?.record?.source||'').toLowerCase().includes('employee')){
@@ -675,7 +702,7 @@ async function drainFast(force=true, concurrency=4){
         try{markRecentAttendanceMutationCloudConfirmed?.(rid)}catch(e){}
       }
       if(String(item?.payload?.action||'')==='deleteRecord'){
-        try{window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
+        try{confirmCloudDelete(rid);window.p79ApplyConfirmedAttendanceDelete?.(rid)}catch(e){}
       }
       syncBatchDone++;
       lastDoneAt=Date.now();
@@ -1070,7 +1097,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       }
 
       if(String(payload?.action||'')==='deleteRecord'){
-        try{window.p79ApplyConfirmedAttendanceDelete?.(recordId)}catch(e){}
+        try{confirmCloudDelete(recordId);window.p79ApplyConfirmedAttendanceDelete?.(recordId)}catch(e){}
       }
       syncBatchDone++;
       lastDoneAt=Date.now();

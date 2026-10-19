@@ -23079,7 +23079,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-official-review"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
 
 
 
@@ -23845,6 +23845,7 @@ async function reviewEntry(key){
   if(!window.p79V5ReviewPausedWrite)throw new Error('核對功能尚未載入，請重新整理');
   const review=await window.p79V5ReviewPausedWrite(key);
   if(review.state==='saved'){show(false);el.textContent='✅ 雲端已是這份修改，已確認完成並解除待同步狀態。';return;}
+  if(review.state==='obsolete'){show(false);el.textContent='✅ 正式主表已無這筆紀錄，舊修改已備份並結束待同步；不會重新新增或改寫考勤。';return;}
   const cloud=review.cloud,draft=review.payload.record;
   el.innerHTML='<h3 style="margin-top:16px;font-weight:800">核對 '+safe(draft.name||cloud.name||draft.empId)+' 的修改</h3><table><tr><th>項目</th><th>目前雲端</th><th>你要的修改</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(cloud[field]||'—')+'</td><td>'+safe(draft[field]||'—')+'</td></tr>').join('')+'</table><p>原修改依據的舊時間：'+safe(review.payload.originalTimeStr||'未記錄')+'</p><button id="p79ApplyPausedReview" type="button" style="margin-top:10px;padding:10px;background:#2563eb;color:white;border-radius:8px">確認套用我的修改</button><button id="p79ReloadPausedReview" type="button" style="margin-left:10px;padding:10px">重新核對</button><p id="p79PausedReviewResult"></p>';
   document.getElementById('p79ReloadPausedReview').onclick=()=>reviewEntry(key);
