@@ -15,6 +15,16 @@ const screen=app.P79OvertimeMonthlyMatrix.screen(model,false,{});for(const color
 assert(!fs.readFileSync('assets/port79-overtime-application.js','utf8').includes('為預排資料，請切換預排申請表'));
 for(const m of hours.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS pending clock-in shown without invented duration, distinct rest colors and legend, quiet planned/missing-schedule notices, scripts parse');
+// 每日格固定實際時數，換算合計仍獨立使用來源換算欄。
+assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('普通傷病假'),'病');
+const actualModel=app.P79OvertimeMonthlyMatrix.build({schedules:[{empId:'AP1',schedule:{'2026-10-04':'普通傷病假',__meta:{'2026-10-11':{overtimeReport:{id:'A',category:'休',overtimeStart:'08',overtimeEnd:'16',convertedHours:12.7,planned:false}}}}}]},[emp],'2026-10');
+assert.equal(actualModel.rows[0].actualValues[10],8);assert.equal(actualModel.rows[0].actualValues[3],'病');
+const actualHtml=app.P79OvertimeMonthlyMatrix.html(actualModel);assert(/font-weight:700">8<\/td>/.test(actualHtml));assert(!actualHtml.includes('普通傷病假'));
+app.P79OvertimeApplication.zip=files=>files;
+const xlsx=app.P79OvertimeMonthlyMatrix.excel(actualModel),sheet=xlsx['xl/worksheets/sheet1.xml'];
+assert(/r="N8"[^>]*><f>SUMIFS\([^<]*!\$E\$2:[^<]*<\/f><v>8<\/v>/.test(sheet));
+assert(sheet.includes('SUMIFS(&#39;申報來源&#39;!$F$2:'));
+console.log('PASS one-character sick leave and actual daily hours in screen, print and Excel; converted total retains its own formula');
 (async()=>{
  let active=0,peak=0;const pending=[];
  const c={Date,Map,Set,Promise,Intl,AbortController,setTimeout,clearTimeout,encodeURIComponent,document:{getElementById:()=>({dataset:{p79MonthInitialized:'1'},value:'ALL'})},currentPort79SsoToken:()=> 'token',normalizeScheduleDateKey:x=>x,getAttendanceDateKey:x=>x,getActiveGasUrl:()=> 'https://example.invalid',p79WorkOvertimeMonths:new Map(),p79WorkOvertimeLoadLanes:[Promise.resolve(),Promise.resolve(),Promise.resolve()],p79WorkOvertimeLoadQueue:Promise.resolve(),p79WorkOvertimeNextLane:0,p79WorkOvertimeRenderTimer:null,p79OvertimeCalculationCache:null,renderOvertimeStats(){},fetch:()=>{active++;peak=Math.max(peak,active);return new Promise(resolve=>pending.push(()=>{active--;resolve({json:async()=>({ok:true,schedules:[],leaveRecords:[]})});}));}};
