@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');const html=fs.readFileSync('aqc-efficiency/index.html','utf8');function fn(name){let a=html.indexOf('function '+name+'(');if(html.slice(a-6,a)==='async ')a-=6;return html.slice(a,html.indexOf('\n}',a)+2);}
+const payload={records:[{id:'R1',workingNo:'W1',disc:381,load:390,hatches:26}],shipMasters:[{workingNo:'W1',totalContainers:771,hatches:26}],groups:[],assignments:[]};
+(async()=>{
+ let remote=JSON.parse(JSON.stringify(payload)),queue=[],posts=0;
+ const c={console:{warn(){}},Date,JSON,Map,String,Number,Math,ensureGcQueueReady:async()=>{},readQueue:()=>JSON.parse(JSON.stringify(queue)),saveQueue:async q=>queue=JSON.parse(JSON.stringify(q)),requireSuperAdminAccess:()=>true,cloudBusy:false,gcQueueFlushPromise:null,p79EfficiencyManualSyncActive:false,p79EfficiencySyncOverdue:false,p79SetEfficiencySyncLight(){},cloudStatus(){},p79EfficiencyWriteOptional(){},STORE:{rev:'r'},buildSafeGcSyncPayload:async p=>p,apiPost:async()=>{posts++;throw Error('雲端寫入逾時');},apiGetQuick:async()=>({ok:true,...remote})};
+ vm.createContext(c);vm.runInContext(fn('p79VerifyTimedOutEfficiencyWrite'),c);vm.runInContext(fn('flushQueue'),c);
+ assert(await c.p79VerifyTimedOutEfficiencyWrite('gcSyncAll',payload));remote.records[0].disc=400;assert.equal(await c.p79VerifyTimedOutEfficiencyWrite('gcSyncAll',payload),false);remote=JSON.parse(JSON.stringify(payload));remote.records.push({id:'OLD'});assert.equal(await c.p79VerifyTimedOutEfficiencyWrite('gcSyncAll',payload),false);
+ remote=JSON.parse(JSON.stringify(payload));queue=[{id:'Q1',action:'gcSyncAll',payload}];assert((await c.flushQueue()).ok);assert.equal(posts,1);assert.equal(queue.length,0,'lost response reconciled without a second POST');assert(c.p79EfficiencyReadbackRequired);
+ remote.records[0].disc=400;queue=[{id:'Q2',action:'gcSyncAll',payload}];assert.equal((await c.flushQueue()).ok,false);assert(queue[0].uncertainWrite);const previous=posts;await c.flushQueue();assert.equal(posts,previous,'uncertain write cannot blindly auto-retry');
+ remote=JSON.parse(JSON.stringify(payload));c.p79EfficiencyManualSyncActive=true;assert((await c.flushQueue()).ok);assert.equal(posts,previous,'manual retry verifies prior completion before sending');assert.equal(queue.length,0);
+ console.log('PASS timeout reads back full content, rejects wrong metrics/extra IDs, keeps uncertainty, stops automatic resend and reconciles without duplicate POST');
+})().catch(e=>{console.error(e);process.exitCode=1});
