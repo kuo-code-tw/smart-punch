@@ -24283,6 +24283,20 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 </script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+
+<style id="p79-attendance-mobile-readable-table">
+@media screen and (max-width:1000px){
+ #viewAdmin #adminRecordsTableContainer{min-width:0!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+ #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table{width:1800px!important;min-width:1800px!important;max-width:none!important;table-layout:fixed!important}
+ #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table :is(th,td){font-size:14px!important;padding:9px 6px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+ #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table td:nth-child(-n+6){overflow:visible!important;text-overflow:clip!important}
+ #viewAdmin #attendanceRecordsToolbar{flex-wrap:wrap!important;overflow-x:visible!important;min-width:0!important;max-width:100%!important}
+ #viewAdmin #attendanceRecordsToolbar>div{flex-wrap:wrap!important;flex:1 1 100%!important;min-width:0!important;max-width:100%!important}
+ #viewAdmin #attendanceRecordsToolbar [aria-label="異常顏色圖例"],
+ #viewAdmin #attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{flex-wrap:wrap!important;white-space:normal!important;min-width:0!important;max-width:100%!important}
+ #viewAdmin #attendanceRecordsToolbar [aria-label="異常顏色圖例"] span{font-size:11px!important}
+}
+</style>
 </body>
 </html>
 
