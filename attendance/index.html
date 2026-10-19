@@ -14802,7 +14802,14 @@ function getManualPairRecordAnchor(record) {
             if(groups.length)return new Set(groups).size===1?groups[0]:'';
             // 只有該月服務回傳的人員資料可備援，不拿現有人資組別套歷史月份。
             const person=(state.people||[]).find(e=>String(e.empId||e.id||'').trim().toUpperCase()===id);
-            return meaningful(person?.group);
+            if(meaningful(person?.group))return meaningful(person.group);
+            // 當月新進人員可能尚無月班表人員列，使用已辨識的人資主檔組別。
+            // 歷史月份仍只使用當月班表，避免目前組別覆蓋舊月份。
+            if(month===getTodayAttendanceIso().slice(0,7)){
+                const start=p79EmploymentStartDate(employee);
+                if(!start||p79AttendanceOvertimeDate(row)>=start)return meaningful(employee?.group);
+            }
+            return '';
         }
         function p79AttendanceReportedOvertime(row,state) {
             const date=p79AttendanceOvertimeDate(row), id=String(row?.empId||'').trim().toUpperCase();
