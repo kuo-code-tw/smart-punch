@@ -13,3 +13,14 @@ const newer=remote.map(r=>r.id==='old-extra'?{...r,workingSheetImportedAt:'2026-
 assert(c.mergeCloudRecordsWithLocal(newer,local).some(r=>r.id==='old-extra'),'newer remote batch is protected');
 delete c.shipMasters[0].workingSheetSource.reportRecordIds;assert(c.mergeCloudRecordsWithLocal(remote,local).some(r=>r.id==='old-extra'),'legacy records without a replacement manifest retained');
 console.log('PASS complete reimport replaces exact job, preserves other jobs and child jobs, partial snapshots and newer cloud imports');
+
+// 另一台裝置以新雲端完整批次取代舊本機，不能把舊列補回、再上傳。
+c.shipMasters[0].workingSheetSource.reportRecordIds=['new1','new2'];
+const otherDevice=c.mergeCloudRecordsWithLocal(local,remote);
+assert(!otherDevice.some(r=>r.id==='old-extra'));
+assert.equal(otherDevice.filter(r=>r.workingNo==='SHIP1').reduce((n,r)=>n+(r.disc||0)+(r.load||0),0),771);
+assert(otherDevice.some(r=>r.id==='other'));assert(otherDevice.some(r=>r.id==='child'));
+assert(c.mergeCloudRecordsWithLocal(local.slice(0,1),remote).some(r=>r.id==='old-extra'),'partial cloud snapshot cannot discard local rows');
+const savedMasters=c.shipMasters;c.shipMasters=[];
+assert(!c.mergeCloudRecordsWithLocal(local,remote,savedMasters).some(r=>r.id==='old-extra'),'pre-upload merge uses fetched manifest even if local master is stale');
+console.log('PASS second-device cloud replacement, partial cloud preservation and remote manifest during upload');
