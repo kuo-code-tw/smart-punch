@@ -16,3 +16,12 @@ assert.equal(plan({}).summaries[0].added,29,'leave exception does not become a c
 for(let i=1;i<=31;i++)delete schedule['2026-10-'+String(i).padStart(2,'0')];
 schedule['2026-10-31']='早';assert.equal(plan({}).summaries[0].added,0,'insufficient source pattern must not invent a roster');
 console.log('PASS per-person source cycles, ignored UI rules, continuous month boundary, preserved target and group, leave exceptions and insufficient evidence');
+source.leaveRecords=[];
+for(let i=0;i<31;i++)schedule['2026-10-'+String(i+1).padStart(2,'0')]=i<12?(i%3?'休':'早'):pattern[(i-12)%6];
+const tailPlan=plan({});assert.equal(tailPlan.summaries[0].added,29);assert.equal(tailPlan.summaries[0].fromTail,true,'stable final fortnight survives earlier irregular shifts');
+for(let i=0;i<31;i++)schedule['2026-10-'+String(i+1).padStart(2,'0')]=((i*i+3*i+Math.floor(i/4))%7<3)?'早':'休';
+const unresolved=plan({});assert.equal(unresolved.summaries[0].canChooseTail,true);
+const manual=c.P79ScheduleContinuation.buildPlan({sourceMonth:'2026-10',targetMonth:'2026-11',source,target,people,rule:{},tailPeriods:{E1:7},eligible:()=>true});
+assert.equal(manual.summaries[0].manualTail,true);assert.equal(manual.rows.find(r=>r.empId==='E1').schedule['2026-11-01'],schedule['2026-10-25']);
+assert.equal(manual.rows.find(r=>r.empId==='E1').schedule['2026-11-02'],'年');
+console.log('PASS stable month-end inference and explicitly selected source tail; existing target leave preserved');
