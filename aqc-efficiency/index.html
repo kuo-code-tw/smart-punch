@@ -7244,27 +7244,29 @@ function recordIdentityKey(r){
     String(r?.vessel||r?.shipName||'').trim()
   ].join('|');
 }
-function mergeCloudRecordsWithLocal(cloudRecords,localRecords){
-  const localList=Array.isArray(localRecords)?localRecords:[];
+function mergeCloudRecordsWithLocal(cloudRecords,localRecords,replacementMasters){
+  let localList=Array.isArray(localRecords)?localRecords:[];
   let cloudList=Array.isArray(cloudRecords)?cloudRecords:[];
-  // 完整重新匯入是取代，不是聯集；只有本機持有完整批次才排除雲端舊列。
-  const replacements=new Map();
-  (typeof shipMasters==='undefined'?[]:shipMasters||[]).forEach(master=>{
+  // 完整匯入批次可來自任一裝置；以主檔 manifest 驗證完整性後才排除舊列。
+  const masters=Array.isArray(replacementMasters)?replacementMasters:(typeof shipMasters==='undefined'?[]:shipMasters||[]);
+  masters.forEach(master=>{
     const manifest=master?.workingSheetSource?.reportRecordIds;
     const no=String(master?.workingNo||'').trim();
     const stamp=String(master?.workingSheetSource?.importedAt||master?.workingSheetImportedAt||'');
     const time=Date.parse(stamp),ids=new Set(Array.isArray(manifest)?manifest.map(String):[]);
     if(!no||!ids.size||!Number.isFinite(time))return;
-    const batch=localList.filter(row=>String(row?.workingNo||'').trim()===no&&String(row?.workingSheetImportedAt||'')===stamp);
-    const present=new Set(batch.map(row=>String(row.id||'')));
-    if(![...ids].every(key=>key&&present.has(key)))return;
-    // 遇到別處更新的較新匯入，不讓此裝置的舊批次刪除它。
-    if(cloudList.some(row=>String(row?.workingNo||'').trim()===no&&(Date.parse(row?.workingSheetImportedAt||'')||0)>time))return;
-    replacements.set(no,ids);
-  });
-  cloudList=cloudList.filter(row=>{
-    const ids=replacements.get(String(row?.workingNo||'').trim());
-    return !ids||ids.has(String(row?.id||''));
+    const complete=list=>{
+      const present=new Set(list.filter(row=>String(row?.workingNo||'').trim()===no&&String(row?.workingSheetImportedAt||'')===stamp).map(row=>String(row.id||'')));
+      return [...ids].every(key=>key&&present.has(key));
+    };
+    const localComplete=complete(localList),cloudComplete=complete(cloudList);
+    if(!localComplete&&!cloudComplete)return;
+    const newer=row=>String(row?.workingNo||'').trim()===no&&(Date.parse(row?.workingSheetImportedAt||'')||0)>time;
+    const keep=row=>String(row?.workingNo||'').trim()!==no||ids.has(String(row?.id||''))||newer(row);
+    // 較新批次未完整到齊前，保留它及既有資料，不用較舊 manifest 刪除。
+    if(localList.some(newer)||cloudList.some(newer))return;
+    localList=localList.filter(keep);
+    cloudList=cloudList.filter(keep);
   });
   const locals=new Map(localList.map(r=>[recordIdentityKey(r),r]));
   const usedLocalKeys=new Set();
@@ -7847,7 +7849,9 @@ async function buildSafeGcSyncPayload(payload={}){
     const freshByNo=new Map();
     incomingMasters.forEach(s=>{
       const no=String(s?.workingNo||'').trim();
-      if(no && s?.workingSheetImportedAt)freshByNo.set(no,s);
+      const localTime=Date.parse(s?.workingSheetSource?.importedAt||s?.workingSheetImportedAt||'')||0;
+      const remoteTime=remoteMasters.filter(r=>String(r?.workingNo||'').trim()===no).reduce((latest,r)=>Math.max(latest,Date.parse(r?.workingSheetSource?.importedAt||r?.workingSheetImportedAt||'')||0),0);
+      if(no && s?.workingSheetImportedAt && localTime>=remoteTime)freshByNo.set(no,s);
     });
 
     const sanitizedRemoteMasters=remoteMasters.map(s=>{
@@ -7873,7 +7877,8 @@ async function buildSafeGcSyncPayload(payload={}){
     // 作業明細：雲端先作基底，再套用本機較完整的新資料，且保留雙方不存在的紀錄。
     const sendingRecords=mergeCloudRecordsWithLocal(
       remoteRecords,
-      Array.isArray(localPayload.records)?localPayload.records:(records||[])
+      Array.isArray(localPayload.records)?localPayload.records:(records||[]),
+      mergeShipMastersPreferComplete(incomingMasters,remoteMasters)
     );
 
     // 人員分組不允許雲端空 groupId 洗掉本機已分組資料。
