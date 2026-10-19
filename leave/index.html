@@ -429,6 +429,8 @@ function p79ShowPendingLeavePrompt(){
  const pending=leaveRecords.filter(l=>!String(l.status||'').trim()||String(l.status).trim()==='待審核');
  p79PendingLeavePromptShown=true;
  if(!pending.length)return;
+ // 提示只提醒，不改申請狀態；主表同步保留待審核清單，關閉或 Esc 後仍可處理。
+ $('filterDept').value='';$('filterJob').value='';$('filterStatus').value='待審核';renderAdmin();
  const dialog=document.createElement('dialog');
  dialog.id='p79PendingLeavePrompt';
  dialog.setAttribute('aria-labelledby','p79PendingLeaveTitle');
