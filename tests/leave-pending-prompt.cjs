@@ -10,6 +10,7 @@ function run({admin=true,access='manage',mode='admin',rows=[]}={}){
 }
 const rows=[{name:'<員工>',status:'待審核'},{name:'核准者',status:'已核准'},{name:'舊資料'}];
 const r=run({rows});assert.equal(r.shown,1);assert(r.dialog.innerHTML.includes('待審核請假 2 筆'));assert(!r.dialog.innerHTML.includes('核准者'));assert(r.dialog.innerHTML.includes('&lt;員工>'));
+assert.equal(r.fields.filterStatus.value,'待審核','main list already shows pending before popup closes');r.controls['[data-close]'].onclick();assert.equal(r.fields.filterStatus.value,'待審核','later button leaves requests visible and pending');
 r.controls['[data-review]'].onclick();assert.equal(r.fields.filterDept.value,'');assert.equal(r.fields.filterJob.value,'');assert.equal(r.fields.filterStatus.value,'待審核');
 for(const opts of [{admin:false,rows},{access:'view',rows},{mode:'employee',rows},{}])assert.equal(run(opts).shown,0);
 assert(html.includes('renderAll();p79ShowPendingLeavePrompt();setStatus(adminSession?'));
