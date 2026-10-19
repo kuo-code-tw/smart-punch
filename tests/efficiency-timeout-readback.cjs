@@ -10,3 +10,13 @@ const payload={records:[{id:'R1',workingNo:'W1',disc:381,load:390,hatches:26}],s
  remote=JSON.parse(JSON.stringify(payload));c.p79EfficiencyManualSyncActive=true;assert((await c.flushQueue()).ok);assert.equal(posts,previous,'manual retry verifies prior completion before sending');assert.equal(queue.length,0);
  console.log('PASS timeout reads back full content, rejects wrong metrics/extra IDs, keeps uncertainty, stops automatic resend and reconciles without duplicate POST');
 })().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ const remote={ok:true,...JSON.parse(JSON.stringify(payload))},calls=[];
+ const x={console:{info(){},warn(){},error(){}},Date,JSON,Map,Set,String,Number,Math,groups:[],assignments:[],records:payload.records.map(r=>({...r})),shipMasters:payload.shipMasters.map(r=>({...r})),p79EfficiencyManualSyncActive:true,p79EfficiencySyncPreflightRemote:null,cloudStatus(){},efficiencyCloudScopeParams:()=>({month:'2026-10'}),apiGet(){throw Error('manual sync must not use repeated retry reader')},apiGetQuick:async(action,scope,budget)=>{calls.push({action,scope,budget});return remote;},canonicalShipMasters:r=>r,mergeShipMastersPreferComplete:(a,b)=>[...new Map([...a,...b].map(r=>[r.workingNo,r])).values()],mergeCloudRecordsWithLocal:(a,b)=>[...new Map([...a,...b].map(r=>[r.id,r])).values()],mergeAssignmentsKeepLocal:a=>a,saveLocal(){},invalidateWorkloadIndex(){}};
+ x.gcLocalSyncState=()=>JSON.stringify({groups:x.groups,assignments:x.assignments,records:x.records,shipMasters:x.shipMasters});
+ vm.createContext(x);vm.runInContext(fn('buildSafeGcSyncPayload'),x);vm.runInContext(fn('p79VerifyTimedOutEfficiencyWrite'),x);
+ const prepared=await x.buildSafeGcSyncPayload(payload);assert.equal(calls.length,1);assert.equal(Object.keys(calls[0].scope).length,0);assert.equal(calls[0].budget,35000);
+ assert(await x.p79VerifyTimedOutEfficiencyWrite('gcSyncAll',prepared,x.p79EfficiencySyncPreflightRemote.data));assert.equal(calls.length,1,'reuse complete preflight snapshot without duplicate GET');
+ const changed={...prepared,records:prepared.records.map(r=>({...r,note:'新的作業備註'}))};assert.equal(await x.p79VerifyTimedOutEfficiencyWrite('gcSyncAll',changed,remote),false,'same quantities cannot acknowledge unsaved notes');
+ console.log('PASS one full 35-second-budget preflight, reused verification snapshot, no duplicate request and no false ACK of metadata edits');
+})().catch(e=>{console.error(e);process.exitCode=1});
