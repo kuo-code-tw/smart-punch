@@ -3194,6 +3194,17 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         try { res = await fetch(url, {cache:'no-store', redirect:'follow', signal:controller.signal});
           if(!res.ok)throw Error('HTTP '+res.status);
           data=await res.json();
+          if(data?.ok){
+            // 所選月份端點只回該月；補讀上月人員設定，不複製每日班別。
+            const [year,number]=requestMonth.split('-').map(Number);
+            const previousDate=new Date(year,number-2,1);
+            const previous=previousDate.getFullYear()+'-'+String(previousDate.getMonth()+1).padStart(2,'0');
+            const priorResponse=await fetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(previous)+'&_='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller?.signal});
+            const prior=await priorResponse.json();
+            if(!prior?.ok)throw new Error(prior?.error||'上月組別讀取失敗，請重新整理');
+            const inheritedRows=(prior.schedules||[]).filter(row=>String(row.month||'').trim()===previous).map(row=>({...row,schedule:{__personnel:{...(row.schedule?.__personnel||{}),group:row.schedule?.__personnel?.group??row.group??'不分組'}}}));
+            data.schedules=[...(data.schedules||[]),...inheritedRows];
+          }
         } finally { clearTimeout(timer); }
         if(requestViewVersion!==p79ScheduleAttendanceViewVersion||requestMonth!==currentScheduleMonthKey()||token!==currentPort79SsoToken())return false;
         if (!data?.ok) {
@@ -3672,7 +3683,7 @@ function p79EmployeeDateEligible(emp,date) {
         .reverse();
       for (const month of months) {
         const ov = schedulePersonnelOverrides?.[month]?.[id];
-        if (ov && scheduleGroupIsMeaningful(ov.group)) {
+        if (ov && Object.prototype.hasOwnProperty.call(ov,'group')) {
           return { month, override: ov };
         }
       }
@@ -3704,21 +3715,10 @@ function p79EmployeeDateEligible(emp,date) {
         .filter(emp=>scheduleEmployeeEligibleForMonth(emp,month));
       const overrides = schedulePersonnelOverrides[month] || {};
 
-      const rolesToRecover = new Set();
-      [...new Set(base.map(emp => String(emp?.role || '').trim()).filter(Boolean))].forEach(role => {
-        if (scheduleRoleGroupRecoveryNeeded(base, overrides, role)) rolesToRecover.add(role);
-      });
-
       employees = base.map(emp => {
         const ov = overrides[emp.id] || null;
-        let group = String(ov?.group || emp.group || '不分組').trim() || '不分組';
-
-        if (rolesToRecover.has(String(emp?.role || '').trim()) && !scheduleGroupIsMeaningful(group)) {
-          const historical = latestHistoricalScheduleOverride(emp.id, month);
-          if (historical?.override?.group) {
-            group = String(historical.override.group).trim();
-          }
-        }
+        const inherited=!ov?latestHistoricalScheduleOverride(emp.id,month)?.override:null;
+        let group = String(ov?.group || inherited?.group || emp.group || '不分組').trim() || '不分組';
 
         return Object.assign(emp, ov ? {
           role: ov.role || emp.role,
@@ -3730,10 +3730,7 @@ function p79EmployeeDateEligible(emp,date) {
         });
       });
 
-      if (rolesToRecover.size) {
-        console.warn('[PORT79 SCHEDULE V10.24] 偵測到本月組別整批退回不分組，已從最近歷史月份恢復：',
-          [...rolesToRecover].join('、'));
-      }
+
     }
 
     async function loadCloudData(showAlert = false) {
