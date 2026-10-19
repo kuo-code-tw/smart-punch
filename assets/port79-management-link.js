@@ -186,6 +186,7 @@ applySnapshot:async snapshot=>{const data=snapshot.roster;if(data.scheduleAccess
             schedulePersonnelOverrides[month][empId] = {
               role: String(personnel.role || row.role || ''),
               group: String(personnel.group || row.group || '不分組'),
+              groupExplicit:personnel.groupExplicit===true,
               lockType: String(personnel.lockType || 'ROTATION'),
               order: scheduleOrderNumber(personnel.order ?? row.order)
             };
