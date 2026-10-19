@@ -22953,13 +22953,20 @@ window.p79AttendanceRecordCounts = function(){
           console.warn(`[PORT79 V2] ${month} 四通道皆 0 筆，保留本機`);
         }
 
-        // 跨月只補前後月份，不改目前月份選擇。
+        // 本月與跨月補讀分開處理；未來月份尚無真實打卡，不查詢未來歸檔。
+        const boundaryFailures=[];
         if(options.boundary!==false){
-          const prev=shiftAttendanceMonthKey(month,-1), next=shiftAttendanceMonthKey(month,1);
-          const boundary=await Promise.all([fetchBoundaryMonth(prev),fetchBoundaryMonth(next)]);
-          if(boundary[0].length)applyMonth(prev,boundary[0],{boundary:boundary[0].length},null);
-          if(boundary[1].length)applyMonth(next,boundary[1],{boundary:boundary[1].length},null);
-          // applyMonth 會 render，最後再依使用者目前選擇 render 一次即可。
+          const prev=shiftAttendanceMonthKey(month,-1),next=shiftAttendanceMonthKey(month,1);
+          const months=[prev,...(next<=monthNow()?[next]:[])];
+          const boundary=await Promise.allSettled(months.map(key=>fetchBoundaryMonth(key)));
+          boundary.forEach((result,index)=>{
+            if(result.status==='fulfilled'){
+              if(result.value.length)applyMonth(months[index],result.value,{boundary:result.value.length},null);
+            }else{
+              boundaryFailures.push(months[index]);
+              console.warn('[PORT79] 跨月補讀未完成；本月資料已保留',months[index],result.reason);
+            }
+          });
           try{p79RenderOnlyVisibleAttendanceView();}catch(e){}
         }
         V2.lastSyncAt.set(month,Date.now());
@@ -22968,9 +22975,11 @@ window.p79AttendanceRecordCounts = function(){
           const sc=src.counts||{};
           const rawMissing=Number(sc.rawMissingNames||0);
           const suffix=rawMissing?`｜原始空白姓名 ${rawMissing} 筆已嘗試補全`:'';
-          setCloudSyncStatus(`${month} 讀取完成｜本月 ${V2.lastSourceCounts.totalMonth||0} 筆${suffix}`,'success','read');
+          setCloudSyncStatus(boundaryFailures.length
+            ? `${month} 本月讀取完成｜跨月 ${boundaryFailures.join('、')} 尚未讀完，既有資料保留`
+            : `${month} 讀取完成｜本月 ${V2.lastSourceCounts.totalMonth||0} 筆${suffix}`,boundaryFailures.length?'warning':'success','read');
         }catch(e){}
-        if(options.showMessage)try{showToast(`${month} 考勤已重新對齊雲端`,'success');}catch(e){}
+        if(options.showMessage)try{showToast(boundaryFailures.length?`${month} 本月已更新；跨月 ${boundaryFailures.join('、')} 尚未完成，請稍後再拉取`:`${month} 考勤已重新對齊雲端`,boundaryFailures.length?'warning':'success');}catch(e){}
         console.info('[PORT79 Attendance V2]',{month,before,after,...src.counts,remoteMerged:totalRemote});
         return true;
       }catch(e){
