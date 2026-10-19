@@ -3663,6 +3663,7 @@ function p79EmployeeDateEligible(emp,date) {
       schedulePersonnelOverrides[month][id] = {
         role: String(emp.role || 'AQC'),
         group: String(emp.group || '不分組'),
+        groupExplicit:true,
         lockType: String(emp.lockType || 'ROTATION'),
         order: scheduleOrderNumber(emp.order)
       };
@@ -3717,8 +3718,9 @@ function p79EmployeeDateEligible(emp,date) {
 
       employees = base.map(emp => {
         const ov = overrides[emp.id] || null;
-        const inherited=!ov?latestHistoricalScheduleOverride(emp.id,month)?.override:null;
-        let group = String(ov?.group || inherited?.group || emp.group || '不分組').trim() || '不分組';
+        const inheritGroup=!ov||(!scheduleGroupIsMeaningful(ov.group)&&ov.group!=='不輪班'&&ov.groupExplicit!==true);
+        const inherited=inheritGroup?latestHistoricalScheduleOverride(emp.id,month)?.override:null;
+        let group = String((inheritGroup?inherited?.group:null)||ov?.group||emp.group||'不分組').trim()||'不分組';
 
         return Object.assign(emp, ov ? {
           role: ov.role || emp.role,
@@ -3837,6 +3839,7 @@ function p79EmployeeDateEligible(emp,date) {
             schedulePersonnelOverrides[month][empId] = {
               role: String(personnel.role || row.role || ''),
               group: String(personnel.group || row.group || '不分組'),
+              groupExplicit:personnel.groupExplicit===true,
               lockType: String(personnel.lockType || 'ROTATION'),
               order: scheduleOrderNumber(personnel.order ?? row.order)
             };
@@ -3937,6 +3940,7 @@ function p79EmployeeDateEligible(emp,date) {
         monthData.__personnel = {
           role: emp.role || 'AQC',
           group: emp.group || '不分組',
+          groupExplicit:schedulePersonnelOverrides[yearMonth]?.[emp.id]?.groupExplicit===true,
           groupOptions:scheduleRoleGroupList(emp.role,yearMonth).filter(g=>g!=='不分組'),
           lockType: emp.lockType || 'ROTATION',
           order: scheduleOrderNumber(emp.order)
@@ -7016,7 +7020,7 @@ window.P79ScheduleContinuationContext={
   const loaded=await loadCloudData(false);if(loaded){buildRoleTabsAndRender();renderTodaySchedulePanel();}else alert('下個月班表已儲存並核對，畫面尚未重新載入，請按重新整理。');}
 };
 </script>
-<script src="../assets/port79-schedule-continuation.js?v=20261019-source-tail"></script>
+<script src="../assets/port79-schedule-continuation.js?v=20261019-group-placeholder"></script>
 
 <style id="p79-schedule-usability">
 #p79ScheduleQuickBar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;margin:0 auto;max-width:1920px;background:#f8fafc;color:#1e293b;border-bottom:1px solid #cbd5e1}
@@ -7113,7 +7117,7 @@ html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 @media(max-width:700px){#p79ScheduleQuickBar #schedule-legend-left{grid-column:1/-1;margin:0;flex-basis:100%;padding-top:4px}#p79ScheduleQuickBar .p79-quick-actions{flex-basis:100%}}
 </style>
 
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261019-group-explicit"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 </body>
 </html>
