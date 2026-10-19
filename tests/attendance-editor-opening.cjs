@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),path=require('path');
-const html=fs.readFileSync(path.join(__dirname,'../attendance/index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../'+(process.env.P79_EDITOR_PAGE||'attendance')+'/index.html'),'utf8');
 const start=html.indexOf('        let p79AttendanceEditOpenGeneration ='),end=html.indexOf('        function getAttendanceDeleteLabel',start);
 function setup(){
  const nodes=new Map(),node=id=>{if(!nodes.has(id)){const classes=new Set(id==='editRecordModal'?['hidden']:[]);nodes.set(id,{value:'',disabled:false,textContent:'',classList:{add:v=>classes.add(v),remove:v=>classes.delete(v),contains:v=>classes.has(v)}});}return nodes.get(id);};
