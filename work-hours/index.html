@@ -12331,6 +12331,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         const p79WorkOvertimeMonths=new Map();
         let p79WorkOvertimeLoadQueue=Promise.resolve();
+        const p79WorkOvertimeLoadLanes=[Promise.resolve(),Promise.resolve(),Promise.resolve()];
+        let p79WorkOvertimeNextLane=0,p79WorkOvertimeRenderTimer=null;
         function p79LoadWorkOvertimeMonths(sourceRecords){
             const token=currentPort79SsoToken();if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
@@ -12340,17 +12342,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
                 const state={...(previous?.token===token?previous:{}),token,at:Date.now(),pending:true,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[]};p79WorkOvertimeMonths.set(month,state);
-                p79WorkOvertimeLoadQueue=p79WorkOvertimeLoadQueue.then(async()=>{
+                const lane=p79WorkOvertimeNextLane++%p79WorkOvertimeLoadLanes.length;
+                p79WorkOvertimeLoadLanes[lane]=p79WorkOvertimeLoadLanes[lane].then(async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
                     try{
                         const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
                         const data=await response.json();if(!data.ok)throw Error(data.error||'班表讀取失敗');
                         if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
-                        state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.ready=true;state.pending=false;state.at=Date.now();
-                        p79OvertimeCalculationCache=null;renderOvertimeStats();
+                        state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.at=Date.now();
+                        p79OvertimeCalculationCache=null;
+                        clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
                     }catch(e){state.pending=false;state.at=Date.now();}finally{clearTimeout(timer);}
                 });
+                state.promise=p79WorkOvertimeLoadLanes[lane];
+                p79WorkOvertimeLoadQueue=Promise.all(p79WorkOvertimeLoadLanes);
             });
         }
         function p79MergeWorkOvertimeSnapshot(state,metaByEmp){
@@ -12487,7 +12493,15 @@ async function p79ExportOvertimeComparison(printMode){
                 addUnique(employeeByName,normalizeEmployeeLookupName(employee.name),employee);
             });
             const indexedEmployee = session => employeeById.get(String(session.empId||'').trim().toUpperCase()) || employeeByAtt.get(normalizeAttendanceStatsAttNo(session.attNo)) || employeeByName.get(normalizeEmployeeLookupName(session.name)) || null;
-            const rows = buildDailyAttendanceRows(sourceRecords)
+            const attendanceSessions=buildDailyAttendanceRows(sourceRecords);
+            const attendanceByEmployeeDate=new Map();
+            for(const session of attendanceSessions){
+                const employee=indexedEmployee(session);if(!employee)continue;
+                const key=String(employee.empId).toUpperCase()+'|'+normalizeScheduleDateKey(session.accountingDateKey||session.dateKey);
+                const prior=attendanceByEmployeeDate.get(key);
+                if(!prior||Number(session.sortTime||0)>Number(prior.sortTime||0))attendanceByEmployeeDate.set(key,session);
+            }
+            const rows = attendanceSessions
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
                     const start = getAttendanceTimestamp(session.clockIn);
@@ -12523,12 +12537,13 @@ async function p79ExportOvertimeComparison(printMode){
                 })
                 .filter(Boolean);
 
-            const shown=new Set(rows.map(r=>String(r.empId).toUpperCase()+'|'+(r.rosterDate||r.dateKey)));
+            const shown=new Set(rows.map(r=>String(r.empId).toUpperCase()+'|'+normalizeScheduleDateKey(r.rosterDate||r.dateKey)));
             restMetaByEmp.forEach((map,id)=>{
                 const employee=visibleEmployees.find(e=>String(e.empId).toUpperCase()===id);if(!employee)return;
                 Object.entries(map).forEach(([date,meta])=>{
                     if(!meta.overtimeReport?.planned||meta.overtimeExcluded||shown.has(id+'|'+date)||!p79EmployeeDateEligible(employee,date))return;
-                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:null,clockOut:null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,forEmpId:meta.forEmpId||'',planned:true,overDailyLimit:false});
+                    const observed=attendanceByEmployeeDate.get(id+'|'+date);
+                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,forEmpId:meta.forEmpId||'',planned:true,overDailyLimit:false});
                 });
             });
             rows.sort((a, b) => b.sortTime - a.sortTime);
@@ -12670,8 +12685,8 @@ function p79OvertimePeriodLabel(report){
             const allowAttendanceEdit = canPerformAdminAction(currentEmp, 'attendanceEdit');
             p79WorkOvertimeDisplayedRows=pageRows;
             const overtimeRowsHtml = pageRows.length ? pageRows.map((row,rowIndex) => {
-                const clockInCell = row.planned?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
-                const clockOutCell = row.planned?'待出勤':formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
+                const clockInCell = row.planned&&!row.clockIn?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
+                const clockOutCell = row.planned&&!row.clockOut?(row.clockIn?'尚未下班':'待出勤'):formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${row.overDailyLimit ? 'bg-rose-50/60 dark:bg-rose-950/10' : ''}">
                     <td data-label="上班日期" class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtml(String(row.dateKey || '').replace(/-/g, '/'))}</td>
                     <td data-label="姓名" class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}</td>
@@ -12679,8 +12694,8 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="職稱" class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
-                    <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?'—':formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
-                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">出勤待核對｜暫不自動估算</span>`:''}${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">預排／待核對</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
+                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">出勤待核對｜暫不自動估算</span>`:''}${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
@@ -14968,7 +14983,13 @@ window.p79MonthlyRestContext={
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',month);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
    const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');return data;
   }finally{clearTimeout(timer)}};
-  const [roster,attendance,boundary]=await Promise.all([read('getScheduleDataSecure'),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw'),reportView&&!rosterOnly?read('getAttendanceMonthData'):Promise.resolve({records:[]})]);
+  const readRoster=async()=>{
+   const state=p79WorkOvertimeMonths.get(month);
+   if(state?.token===token&&state.pending&&state.promise)await state.promise;
+   if(state?.token===token&&state.ready&&Date.now()-state.at<60000&&currentPort79SsoToken()===token)return {schedules:state.rows,leaveRecords:state.leaveRecords||[]};
+   return read('getScheduleDataSecure');
+  };
+  const [roster,attendance,boundary]=await Promise.all([readRoster(),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw'),reportView&&!rosterOnly?read('getAttendanceMonthData'):Promise.resolve({records:[]})]);
   const attendanceRows=(attendance.records||[]).concat((boundary.records||[]).filter(r=>!normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).startsWith(month+'-')));
   const employees=p79WorkhoursEligibleEmployees(),allowed=new Set(employees.map(e=>String(e.empId).trim().toUpperCase()));
   const pairs=buildDailyAttendanceRows(attendanceRows).filter(r=>r.clockIn&&r.clockOut).map(row=>{
@@ -14987,8 +15008,8 @@ window.p79MonthlyRestContext={
 <script>
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
-<script src="../assets/port79-overtime-application.js?v=20261015.77"></script>
-<script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-nowrap"></script>
+<script src="../assets/port79-overtime-application.js?v=20261019-quiet"></script>
+<script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-rest-colors"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
