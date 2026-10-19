@@ -74,6 +74,9 @@ function buildPlan(input){
   }
   if(!created.length)continue;
   if(!roster.__personnel)roster.__personnel=clone(personnel);
+  else if(personnel.group&&personnel.group!=='不分組'&&(!roster.__personnel.group||roster.__personnel.group==='不分組')&&roster.__personnel.groupExplicit!==true){
+   roster.__personnel={...roster.__personnel,group:personnel.group};to.group=personnel.group;
+  }
   if(input.allocate){
    try{const excluded=targetDays.filter(d=>leaveOn(target,emp,d)||coverOn(target,emp,d));const allocated=input.allocate(roster,priorMeta,targetMonth,excluded,person);
     // 只保存新增格的自動假別資料，既有格的 metadata 一律原樣保留。
