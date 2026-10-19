@@ -7082,14 +7082,16 @@ async function gcLogout(){
   location.href='../?v=20260927.7.13';
 }
 
-let p79EfficiencyManualSyncActive=false;
+let p79EfficiencyManualSyncActive=false,p79EfficiencyReadbackRequired=false,p79EfficiencySyncOverdue=false;
 function p79SetEfficiencySyncLight(state,message=''){
  let pending=0;try{pending=readQueue().length}catch(_){}
+ if(p79EfficiencyManualSyncActive&&p79EfficiencySyncOverdue){state='error';message='逾時｜資料保留待確認';}
  if(state==='success'&&pending){state='pending';message='待同步 '+pending+' 筆';}
  if(state==='success'&&p79EfficiencyManualSyncActive){state='syncing';message='正在讀回確認…';}
  const colors={idle:['#94a3b8','#f1f5f9','#475569'],syncing:['#f59e0b','#fffbeb','#92400e'],pending:['#f59e0b','#fffbeb','#92400e'],error:['#ef4444','#fef2f2','#b91c1c'],success:['#10b981','#ecfdf5','#047857']};
  const color=colors[state]||colors.idle,host=document.getElementById('efficiencySyncLight'),dot=document.getElementById('efficiencySyncDot'),label=document.getElementById('efficiencySyncLabel');
  if(!host||!dot||!label)return;
+ if(state==='success')p79EfficiencyReadbackRequired=false;
  host.dataset.state=state;host.style.background='transparent';host.style.color='inherit';dot.style.background=color[0];
  const button=document.getElementById('efficiencyCloudSyncBtn');if(button){button.style.setProperty('background',color[1],'important');button.style.setProperty('color',color[2],'important');}
  label.textContent='同步船舶資料｜'+(message||({idle:'尚未確認同步',syncing:'同步中…',pending:'待同步 '+pending+' 筆',error:'同步失敗',success:'同步完成'}[state]));
@@ -7180,7 +7182,7 @@ async function vesselRevisionIsCurrent(timeoutMs=7000){
   return !!remoteRevision && remoteRevision===localRevision;
 }
 
-const GC_WRITE_TIMEOUT_MS=30000;
+const GC_WRITE_TIMEOUT_MS=45000;
 async function apiPost(action,payload={}){
   const url=getGasUrl();if(!url)throw Error('未設定 GAS URL');
   const controller=new AbortController();let timer;
@@ -7836,6 +7838,7 @@ async function onMonthlyCompareMonthChange(){
 
 function gcLocalSyncState(){return JSON.stringify({groups,assignments,records,shipMasters});}
 async function buildSafeGcSyncPayload(payload={}){
+  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>apiGetQuick(action,params,15000):apiGet;
   const localPayload={...payload};
   const beforeState=gcLocalSyncState();
   const matchesCurrent=JSON.stringify({
@@ -7855,7 +7858,7 @@ async function buildSafeGcSyncPayload(payload={}){
     let scopedError=null;
     const scope=efficiencyCloudScopeParams();
     try{
-      remote=await apiGet('gcGetData',scope);
+      remote=await read('gcGetData',scope);
     }catch(e){
       scopedError=e;
       console.warn('[GC safe sync] 範圍雲端讀取失敗，改讀完整資料',e);
@@ -7868,7 +7871,7 @@ async function buildSafeGcSyncPayload(payload={}){
     if(!remote || (scopeRequested && scopedMasters.length===0 && scopedRecords.length===0)){
       cloudStatus('範圍資料未取得｜改讀完整雲端後再安全合併...',false);
       try{
-        const full=await apiGet('gcGetData',{});
+        const full=await read('gcGetData',{});
         if(full?.ok) remote=full;
       }catch(fullError){
         console.warn('[GC safe sync] 完整雲端讀取也失敗',fullError);
@@ -7961,6 +7964,25 @@ async function buildSafeGcSyncPayload(payload={}){
   }
 }
 
+async function p79VerifyTimedOutEfficiencyWrite(action,payload){
+  if(action!=='gcSyncAll')return false;
+  try{
+    const remote=await apiGetQuick('gcGetData',{},12000);
+    if(!remote?.ok)return false;
+    const equalValue=(a,b)=>typeof a==='number'?Number.isFinite(Number(b))&&Math.abs(a-Number(b))<0.000001:String(a??'').trim()===String(b??'').trim();
+    const compare=(expected,actual,key,fields,exact=false)=>{
+      if(!Array.isArray(expected)||!Array.isArray(actual)||exact&&expected.length!==actual.length)return false;
+      const map=new Map(actual.map(row=>[String(row?.[key]||'').trim(),row]));
+      if(map.size!==actual.length)return false;
+      return expected.every(row=>{const other=map.get(String(row?.[key]||'').trim());return !!other&&fields.every(field=>row[field]===undefined||equalValue(row[field],other[field]));});
+    };
+    if(!compare(payload.records,remote.records,'id',['workingNo','empId','name','workDate','startTime','endTime','disc','load','hatches','containers','timeHours','rawDisc','rawLoad','bundleDeduct','workingSheetImportedAt'],true))return false;
+    if(!compare(payload.shipMasters,remote.shipMasters,'workingNo',['vessel','voyageI','voyageE','wharf','totalContainers','hatches','totalMoves','shiftMoves','bundleDeduct','workingSheetImportedAt']))return false;
+    if(!compare(payload.groups,remote.groups,'id',['name']))return false;
+    if(!compare(payload.assignments,remote.assignments,'empId',['groupId']))return false;
+    return true;
+  }catch(error){console.warn('逾時寫入尚未讀回確認，保留待同步資料',error);return false;}
+}
 let gcQueueFlushPromise=null;
 async function postCloud(action,payload){
   if(!requireSuperAdminAccess())return {ok:false};
@@ -7977,7 +7999,7 @@ async function postCloud(action,payload){
   setEfficiencySaveState(true,'本機已保存，等待雲端確認');
   await flushQueue();
   const pending=readQueue();
-  if(pending.some(x=>JSON.stringify(x)===JSON.stringify(item))){
+  if(pending.some(x=>String(x.id)===String(item.id))){
     cloudStatus(`本機已保存｜待補傳 ${pending.length} 筆`,false);
     toast('本機已保存，雲端尚未完成，請稍後同步');
     return {ok:false,pendingCloudSync:true,localSaved:true};
@@ -8002,13 +8024,23 @@ async function flushQueue(){
     let syncError='';
     try{
       while(readQueue().length){
+        if(typeof p79EfficiencySyncOverdue!=='undefined'&&p79EfficiencySyncOverdue&&p79EfficiencyManualSyncActive){syncError='本次同步等待超過60秒，已停止後續上傳；未確認資料仍保留';break;}
         const item=readQueue()[0];
+        if(item.uncertainWrite&&!p79EfficiencyManualSyncActive){syncError='上次寫入逾時、結果未確認；已停止自動重送，請按同步船舶資料先核對';break;}
         try{
           let payload=item.payload||{};
           // 所有整批補傳每次都重新讀雲端合併，包含舊版本留下的佇列。
           if(item.action==='gcSyncAll'&&!payload.__destructiveSync)payload=await buildSafeGcSyncPayload(payload);
           else if(item.action==='gcSyncAll'){payload={...payload};delete payload.__destructiveSync;}
-          const result=await apiPost(item.action,payload);
+          let result;
+          if(item.uncertainWrite&&await p79VerifyTimedOutEfficiencyWrite(item.action,payload))result={ok:true,verifiedReadback:true};
+          else{
+            try{result=await apiPost(item.action,payload);}
+            catch(writeError){
+              if(/逾時|timeout|Abort|fetch|Network/i.test(String(writeError?.message||writeError))&&await p79VerifyTimedOutEfficiencyWrite(item.action,payload))result={ok:true,verifiedReadback:true};
+              else throw writeError;
+            }
+          }
           // 只移除本次已確認的快照，保留上傳期間加入或修改的其他項目。
           const signature=JSON.stringify(item);
           const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===signature);
@@ -8016,13 +8048,18 @@ async function flushQueue(){
           if(result.revision)p79EfficiencyWriteOptional(STORE.rev,String(result.revision));
         }catch(e){
           syncError=String(e?.message||e);
+          if(/逾時|timeout|Abort|fetch|Network/i.test(syncError)){
+            const pending=readQueue(),entry=pending.find(row=>row.id===item.id);
+            if(entry){entry.uncertainWrite=true;entry.lastWriteError=syncError;try{await saveQueue(pending)}catch(_){} }
+          }
           console.warn('待補傳仍未完成，保留佇列',item?.action,e);
           break; // 舊修改未確認前，不能讓新修改越過它再被舊重試覆蓋。
         }
       }
       const left=readQueue();
       cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'上傳完成｜等待讀回確認',!left.length);
-      p79SetEfficiencySyncLight(left.length?'pending':'syncing',left.length?'待同步 '+left.length+' 筆':'上傳完成｜等待讀回確認');
+      if(!left.length)p79EfficiencyReadbackRequired=true;
+      p79SetEfficiencySyncLight(left.length||!p79EfficiencyManualSyncActive?'pending':'syncing',left.length?'待同步 '+left.length+' 筆':'已上傳｜等待讀回確認');
       return {ok:!left.length,pendingCloudSync:!!left.length,error:syncError};
     }finally{cloudBusy=false}
   })();
@@ -8221,6 +8258,7 @@ async function restoreVesselFromHistoryFallback(){
 async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=false){
   if(!requireEfficiencyAccess())return false;
 
+  const read=requireCloudSuccess?(action,params)=>apiGetQuick(action,params,15000):apiGet;
   try{
     cloudStatus('正在找回船舶資料...',false);
 
@@ -8228,7 +8266,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     restoreLastWorkingReportBackup();
 
     let scope=efficiencyCloudScopeParams();
-    let d=await apiGet('gcGetData',scope);
+    let d=await read('gcGetData',scope);
 
     let cloudMasters=Array.isArray(d?.shipMasters)?d.shipMasters.map(sanitizeShipMasterMetrics):[];
     let cloudRecords=Array.isArray(d?.records)?d.records:[];
@@ -8239,7 +8277,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     if((scope?.month||scope?.year) && cloudMasters.length===0){
       try{
         cloudStatus('指定月份未回資料｜正在改讀完整船舶雲端...',false);
-        const full=await apiGet('gcGetData',{});
+        const full=await read('gcGetData',{});
         const fullMasters=Array.isArray(full?.shipMasters)?full.shipMasters.map(sanitizeShipMasterMetrics):[];
         const fullRecords=Array.isArray(full?.records)?full.records:[];
         if(fullMasters.length||fullRecords.length){
@@ -8253,12 +8291,14 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
           });
         }
       }catch(fallbackError){
+        if(requireCloudSuccess)throw fallbackError;
         console.warn('完整船舶雲端備援讀取失敗',fallbackError);
       }
     }
 
     // GC 即時資料仍為 0 時，再向「歷史資料中心」讀船舶月份。
     // 避免資料已歸檔到 Google Drive 後，船舶作業明細整頁變成 0。
+    if(requireCloudSuccess&&cloudMasters.length===0&&cloudRecords.length===0)throw Error('雲端沒有傳回船舶資料，已停止同步並保留本機資料');
     if(cloudMasters.length===0 && cloudRecords.length===0){
       try{
         cloudStatus('GC 即時資料為 0｜正在從歷史船舶月份找回...',false);
@@ -8327,7 +8367,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     if(d?.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
 
     shipMasters=canonicalShipMasters(shipMasters||[]);
-    await p79ReadCompleteWorkingReportOnMismatch();
+    await p79ReadCompleteWorkingReportOnMismatch(requireCloudSuccess);
     saveLocal();
 
     // 2026-09-24 顯示修正：雲端明明有船舶資料，但舊月份／日期篩選可能把全部資料擋掉。
@@ -8422,7 +8462,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
 }
 
 const p79WorkingReportRepairReads=new Set();
-async function p79ReadCompleteWorkingReportOnMismatch(){
+async function p79ReadCompleteWorkingReportOnMismatch(strict=false){
   if(typeof workloadSheetAudit!=='function')return;
   const mismatches=(shipMasters||[]).filter(master=>{
     const no=String(master?.workingNo||'').trim();
@@ -8434,10 +8474,10 @@ async function p79ReadCompleteWorkingReportOnMismatch(){
   if(p79WorkingReportRepairReads.has(key))return;
   p79WorkingReportRepairReads.add(key);
   try{
-    const full=await apiGet('gcGetData',{});
+    const full=await (strict?apiGetQuick('gcGetData',{},15000):apiGet('gcGetData',{}));
     if(!full?.ok)throw Error(full?.error||'完整明細讀取失敗');
     mergeEfficiencyCloudData(full);
-  }catch(error){p79WorkingReportRepairReads.delete(key);console.warn('完整 WORKING REPORT 補讀失敗，保留既有明細',error);}
+  }catch(error){p79WorkingReportRepairReads.delete(key);console.warn('完整 WORKING REPORT 補讀失敗，保留既有明細',error);if(strict)throw error;}
 }
 async function syncFromCloud(force=false){
  if(!requireEfficiencyAccess()) return
@@ -8486,7 +8526,13 @@ async function syncFromCloud(force=false){
 async function manualCloudSync(){
   if(!requireEfficiencyAccess()||p79EfficiencyManualSyncActive)return;
   const btn=document.getElementById('efficiencyCloudSyncBtn');
+  p79EfficiencySyncOverdue=false;
   p79EfficiencyManualSyncActive=true;p79SetEfficiencySyncLight('syncing');
+  const watchdog=setTimeout(()=>{
+    p79EfficiencySyncOverdue=true;p79SetEfficiencySyncLight('error','逾時｜資料保留待確認');
+    const details=document.getElementById('efficiencySyncError'),text=document.getElementById('efficiencySyncErrorText');
+    if(details&&text){details.hidden=false;details.open=true;text.textContent='同步等待超過60秒，已停止後續上傳。正在等待已送出的請求結束，請勿重複按同步；未確認資料仍保留。';}
+  },60000);
   try{
     if(btn){btn.disabled=true;}
     const priorError=document.getElementById('efficiencySyncError');if(priorError)priorError.hidden=true;
@@ -8501,9 +8547,13 @@ async function manualCloudSync(){
       if(Date.now()>=waitUntil)throw Error('背景雲端讀取尚未結束，本次尚未開始上傳；資料已保留，請稍後再按同步');
       await new Promise(resolve=>setTimeout(resolve,120));
     }
+    p79SetEfficiencySyncLight('syncing','正在上傳 '+readQueue().length+' 筆…');
     const upload=await flushQueue();
     if(!upload?.ok || readQueue().length)throw Error(upload?.error||'仍有 '+readQueue().length+' 筆本機修改等待補傳，尚未完成同步');
+    p79SetEfficiencySyncLight('syncing','正在讀回確認…');
+    if(p79EfficiencySyncOverdue)throw Error('本次等待超過60秒，尚未完成讀回確認；資料已保留');
     const pulled=await restoreVesselDataFromCloud(false,true);
+    if(p79EfficiencySyncOverdue)throw Error('本次等待超過60秒，讀回結果需再核對；資料已保留');
     if(pulled===false)throw Error('船舶雲端讀取未完成，尚未確認同步');
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
 
@@ -8520,12 +8570,13 @@ async function manualCloudSync(){
     cloudStatus('雲端同步未完成：'+reason,false);
     toast(`❌ 雲端同步失敗：${e.message||e}`);
   }finally{
-    p79EfficiencyManualSyncActive=false;
+    clearTimeout(watchdog);
+    p79EfficiencyManualSyncActive=false;p79EfficiencySyncOverdue=false;
     if(btn){btn.disabled=false;btn.style.opacity='1';}
   }
 }
 
-async function checkRevision(){if(!requireEfficiencyAccess()||document.visibilityState==='hidden')return;try{await flushQueue();const d=await apiGetQuick('gcGetSyncMeta',{},6000),local=localStorage.getItem(STORE.rev)||'';if(String(d.revision)!==String(local))await syncFromCloud(true)}catch(e){console.warn('快速版本檢查失敗，保留本機資料',e)}}
+async function checkRevision(){if(!requireEfficiencyAccess()||document.visibilityState==='hidden')return;try{await flushQueue();const d=await apiGetQuick('gcGetSyncMeta',{},6000),local=localStorage.getItem(STORE.rev)||'';if((typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired)||String(d.revision)!==String(local))await syncFromCloud(true)}catch(e){console.warn('快速版本檢查失敗，保留本機資料',e)}}
 function excelTime(v){
  if(v==null||v==='')return''; if(typeof v==='number'){let mins=Math.round((v%1)*1440);if(mins===1440)mins=0;return `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`}
  const s=String(v).trim(),m=s.match(/(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:''
