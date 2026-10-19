@@ -9440,7 +9440,6 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if (l.status === '已核准') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold">已核准</span>`;
                 if (l.status === '已駁回') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-semibold">已駁回</span>`;
 
-                const mobileDuty=p79MobileAttendanceDuty(row);
                 return `
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                         <td class="px-3 py-2.5 font-bold text-indigo-600 dark:text-indigo-400">${l.leaveType}</td>
@@ -14069,20 +14068,6 @@ function getManualPairRecordAnchor(record) {
             return match ? Number(match[2]) : null;
         }
 
-        function p79MobileAttendanceDuty(row,now=Date.now()){
-            if(!row?.clockIn)return {state:'review',label:'缺少簽到'};
-            if(row.clockOut)return {state:'off',label:'已簽退'};
-            const start=getAttendanceTimestamp(row.clockIn);
-            if(!Number.isFinite(start)||start>now||now-start>=24*3600000)return {state:'review',label:'待核對'};
-            const emp=String(row.empId||row.clockIn.empId||'').trim().toUpperCase();
-            const att=String(row.attNo||row.clockIn.attNo||'').trim();
-            const newerOut=(typeof records==='undefined'?[]:records).some(record=>{
-                const same=emp?String(record.empId||'').trim().toUpperCase()===emp:att&&String(record.attNo||'').trim()===att;
-                return same&&getAttendanceRecordType(record)==='OUT'&&getAttendanceTimestamp(record)>start;
-            });
-            return newerOut?{state:'off',label:'已簽退'}:{state:'active',label:'上班中'};
-        }
-
         function formatAttendanceTimeCell(record, type) {
             if (!record) return '--';
             if (!normalizeImportedAttendanceTime(record.timeStr)) return `<span class="text-rose-700 dark:text-rose-300 font-semibold">${escapeHtml(String(record.timeStr || '--'))}（時間不完整）</span>`;
@@ -15527,7 +15512,6 @@ function getManualPairRecordAnchor(record) {
 
                 return `
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition"
-                        data-p79-mobile-duty="${mobileDuty.state}"
                         data-p79-att-no="${escapeHtml(String(row.attNo ?? ''))}"
                         data-p79-name="${escapeHtml(String(row.name || ''))}"
                         data-p79-in-id="${escapeHtml(String(row.clockIn?.id ?? ''))}"
@@ -15536,7 +15520,7 @@ function getManualPairRecordAnchor(record) {
                         data-p79-in-time="${escapeHtml(String(normalizeImportedAttendanceTime(row.clockIn?.timeStr || '')))}"
                         data-p79-out-time="${escapeHtml(String(normalizeImportedAttendanceTime(row.clockOut?.timeStr || '')))}">
                         <td class="px-2 py-3 text-center font-mono font-bold whitespace-nowrap">${row.attNo ?? ''}</td>
-                        <td class="px-2 py-3 text-center font-semibold whitespace-nowrap"><span>${row.name || ''}</span><span class="p79-mobile-duty-chip" aria-label="${mobileDuty.label}"><i aria-hidden="true"></i>${mobileDuty.label}</span><button type="button" class="p79-mobile-card-toggle" aria-expanded="false" onclick="const expanded=this.closest('tr').classList.toggle('p79-mobile-expanded');this.setAttribute('aria-expanded',String(expanded));this.textContent=expanded?'收合':'明細'">明細</button></td>
+                        <td class="px-2 py-3 text-center font-semibold whitespace-nowrap">${row.name || ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayDept}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
@@ -24312,44 +24296,6 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
  #viewAdmin #attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{flex-wrap:wrap!important;white-space:normal!important;min-width:0!important;max-width:100%!important}
  #viewAdmin #attendanceRecordsToolbar [aria-label="異常顏色圖例"] span{font-size:11px!important}
 }
-</style>
-
-<style id="p79-mobile-admin-attendance-cards">
-.p79-mobile-duty-chip,.p79-mobile-card-toggle{display:none!important}
-@media screen and (max-width:1000px){
- #viewAdmin #adminRecordsTableContainer{border:0!important;overflow:visible!important;background:transparent!important}
- #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important}
- #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table>colgroup,
- #viewAdmin #adminRecordsTableContainer>.attendance-records-wide-table>thead{display:none!important}
- #viewAdmin #adminRecordsTableBody{display:grid!important;grid-template-columns:1fr;gap:10px;background:transparent!important}
- #viewAdmin #adminRecordsTableBody>tr[data-p79-mobile-duty]{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 8px;padding:10px;border:1px solid #cbd5e1;border-left:4px solid #94a3b8;border-radius:14px;background:var(--workspace-panel,#fff)!important;min-width:0}
- #viewAdmin #adminRecordsTableBody>tr[data-p79-mobile-duty="active"]{border-left-color:#10b981;background:var(--workspace-panel,#f0fdf4)!important}
- #viewAdmin #adminRecordsTableBody>tr[data-p79-mobile-duty="review"]{border-left-color:#f59e0b}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr[data-p79-mobile-duty]>td{display:none!important;width:auto!important;min-width:0;height:auto!important;white-space:normal!important;overflow-wrap:anywhere!important;text-align:left!important;padding:4px!important;border:0!important;font-size:13px!important}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr[data-p79-mobile-duty]>td:nth-child(2){display:flex!important;align-items:center;gap:7px;grid-column:1/-1;order:0;font-size:17px!important;font-weight:800}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr[data-p79-mobile-duty]>td:nth-child(5),
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr[data-p79-mobile-duty]>td:nth-child(6){display:block!important;order:1}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr[data-p79-mobile-duty]>td[data-p79-side]{display:block!important;grid-column:1/-1;order:2;white-space:nowrap!important;font-variant-numeric:tabular-nums}
- #viewAdmin #adminRecordsTableBody td[data-p79-side]::before{display:inline-block;content:"上班 ";color:#64748b;margin-right:8px;font-size:12px}
- #viewAdmin #adminRecordsTableBody td[data-p79-side="OUT"]::before{content:"下班 "}
- #viewAdmin #adminRecordsTableBody td:nth-child(5)::before{content:"職稱 ";color:#64748b;font-size:11px}
- #viewAdmin #adminRecordsTableBody td:nth-child(6)::before{content:"組別 ";color:#64748b;font-size:11px}
- #viewAdmin #adminRecordsTableBody .p79-mobile-duty-chip{display:inline-flex!important;align-items:center;gap:5px;margin-left:auto;white-space:nowrap;font-size:12px;font-weight:700;color:#64748b}
- #viewAdmin #adminRecordsTableBody .p79-mobile-duty-chip i{width:9px;height:9px;border-radius:50%;background:#94a3b8}
- #viewAdmin #adminRecordsTableBody [data-p79-mobile-duty="active"] .p79-mobile-duty-chip{color:#047857}
- #viewAdmin #adminRecordsTableBody [data-p79-mobile-duty="active"] .p79-mobile-duty-chip i{background:#10b981;box-shadow:0 0 0 3px #10b98122}
- #viewAdmin #adminRecordsTableBody [data-p79-mobile-duty="review"] .p79-mobile-duty-chip i{background:#f59e0b}
- #viewAdmin #adminRecordsTableBody .p79-mobile-card-toggle{display:inline-flex!important;align-items:center;justify-content:center;min-width:44px!important;min-height:36px!important;padding:4px 7px!important;border:1px solid #cbd5e1;border-radius:9px;color:#475569;background:transparent;font-size:12px!important}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr.p79-mobile-expanded>td{display:block!important;order:3}
- #viewAdmin #adminRecordsTableContainer #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(2){display:flex!important;order:0}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(1)::before{content:"考勤號 ";color:#64748b}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(3)::before{content:"部門 ";color:#64748b}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(4)::before{content:"單位 ";color:#64748b}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(9)::before{content:"出勤時數 ";color:#64748b}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(10)::before{content:"加班時數 ";color:#64748b}
- #viewAdmin #adminRecordsTableBody>tr.p79-mobile-expanded>td:nth-child(n+11){grid-column:1/-1}
-}
-@media screen and (min-width:700px) and (max-width:1000px){#viewAdmin #adminRecordsTableBody{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </body>
 </html>
