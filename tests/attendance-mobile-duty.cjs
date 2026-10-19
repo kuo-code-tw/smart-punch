@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync('attendance/index.html','utf8'),a=html.indexOf('        function p79MobileAttendanceDuty('),code=html.slice(a,html.indexOf('\n        }',a)+10);
+const now=Date.parse('2026-10-19T08:00:00Z'),c={Date,Number,String,records:[],getAttendanceTimestamp:r=>Date.parse(r?.timeStr),getAttendanceRecordType:r=>r.type};
+vm.createContext(c);vm.runInContext(code,c);
+const row={empId:'E1',clockIn:{empId:'E1',timeStr:'2026-10-19T00:00:00Z'}};
+assert.equal(c.p79MobileAttendanceDuty(row,now).state,'active');
+assert.equal(c.p79MobileAttendanceDuty({...row,clockOut:{timeStr:'2026-10-19T07:00:00Z'}},now).state,'off');
+c.records=[{empId:'E2',type:'OUT',timeStr:'2026-10-19T07:00:00Z'}];assert.equal(c.p79MobileAttendanceDuty(row,now).state,'active');
+c.records.push({empId:'E1',type:'OUT',timeStr:'2026-10-19T07:00:00Z'});assert.equal(c.p79MobileAttendanceDuty(row,now).state,'off');
+c.records=[];assert.equal(c.p79MobileAttendanceDuty(row,now+24*3600000).state,'review');
+assert.equal(c.p79MobileAttendanceDuty({clockOut:{}},now).state,'review');
+assert(html.includes('id="p79-mobile-admin-attendance-cards"'));assert(html.includes('class="p79-mobile-card-toggle" aria-expanded="false"'));
+console.log('PASS mobile duty lamps reflect complete and latest OUT, reject stale IN and other employee events; expandable card controls present');
