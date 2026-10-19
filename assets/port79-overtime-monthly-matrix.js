@@ -2,7 +2,7 @@
 'use strict';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),id=x=>String(x||'').trim().toUpperCase(),round=x=>Math.round(x*100)/100,app=()=>g.P79OvertimeApplication;
 const leaveCodes={'特':'年','休息日':'休','例假日':'例','國定假日':'國','特休假':'年','特別休假':'年','特休':'年','年假':'年','事假':'事','病假':'病','公假':'公','喪假':'喪','婚假':'婚','產假':'產','產檢假':'檢','陪產檢及陪產假':'陪','陪產假':'陪','家庭照顧假':'顧','生理假':'經','安胎休養假':'安','公傷病假':'傷','職災傷病假':'傷','訂婚假':'訂','離職':'離','resigned':'離','terminated':'離'};
-const leaveCode=x=>leaveCodes[String(x||'').trim()]||String(x||'').trim(),isLeave=x=>['年','事','病','公','喪','婚','產','檢','陪','顧','經','安','傷','訂'].includes(x),jobGroup=x=>/領班/.test(x)?'領班':/指揮手/.test(x)?'船上指揮手':/AQC/i.test(x)?'AQC':/ARMG/i.test(x)?'ARMG':/F\/L/i.test(x)?'F/L':x;
+const leaveCode=x=>{const text=String(x||'').trim();return leaveCodes[text]||text.match(/^(例|休|國)\d{1,2}(?::\d{2})?-/)?.[1]||text;},isLeave=x=>['年','事','病','公','喪','婚','產','檢','陪','顧','經','安','傷','訂'].includes(x),jobGroup=x=>/領班/.test(x)?'領班':/指揮手/.test(x)?'船上指揮手':/AQC/i.test(x)?'AQC':/ARMG/i.test(x)?'ARMG':/F\/L/i.test(x)?'F/L':x;
 const rank={領班:0,船上指揮手:1,AQC:2,ARMG:3,'F/L':4},sum=(rows,key)=>rows.some(r=>r[key]===null)?null:round(rows.reduce((n,r)=>n+r[key],0));
 function build(snapshot,people,month,company='',jobs=[],mode='actual',context={}){
  const dates=app().datesFor('month','','',month),selectedJobs=new Set(jobs),issues=[],monthEnd=dates.at(-1),leaves=new Map(),reports=app().collect([snapshot],people,dates,company,jobs,mode);issues.push(...reports.issues);
