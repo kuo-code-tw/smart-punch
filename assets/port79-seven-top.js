@@ -398,16 +398,21 @@ function applyAttendanceMenuLayout(){
 function isAttendancePunchOnly(){
  if(currentSystem()!=='attendance')return false;
  try{
-  const session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
-  return session?.punchOnly===true;
- }catch(e){return false}
+  const session=navigationSession();
+  const mode=String(sessionStorage.getItem('port79_entry_mode')||session?.entryMode||'').toLowerCase();
+  if(mode==='punch'||session?.punchOnly===true)return true;
+  const role=String(session?.adminRole||session?.role||'').toLowerCase();
+  return !session||!['admin','superadmin'].includes(role);
+ }catch(e){return true}
 }
 function syncPunchOnlyNavigation(){
  if(currentSystem()!=='attendance')return;
  const punch=isAttendancePunchOnly();
  document.documentElement.classList.toggle('p79-punch-only',punch);
+ document.documentElement.classList.toggle('p79-attendance-management-chrome',!punch);
  const bar=document.getElementById('p79SevenTop');
- if(bar)bar.hidden=punch;
+ if(bar){bar.hidden=punch;bar.setAttribute('aria-hidden',String(punch));if(punch)bar.style.setProperty('display','none','important');else bar.style.removeProperty('display');}
+ else if(!punch)mount();
 }
 function p79NormalizeLegacyTop(sys){
  const m=META[sys]||META.attendance;
@@ -462,7 +467,7 @@ function render(data){const systems={...(data?.systems||{})};
 if(!systems.workhours){
   systems.workhours={active:[],passive:true,lastCompleted:null};
 }const signature=SYSTEMS.map(([k])=>{const s=systems[k]||{},a=Array.isArray(s.active)?s.active:[],j=a[0]||{},last=s.lastCompleted||{};return[k,a.length,j.operation,j.action,j.label,last.ok,last.action,Math.floor(Number(last.ageMs||0)/10000)].join(':')}).join('|');if(signature===lastSignature)return;lastSignature=signature;SYSTEMS.forEach(([k])=>{const el=document.querySelector(`#p79SevenStatus [data-sys="${k}"]`);if(!el)return;const span=el.querySelector('span'),s=systems[k]||{},a=Array.isArray(s.active)?s.active:[];let state='idle',txt=(k==='workhours'&&s.passive?'● 被動':'● 待命');if(a.length){const j=a.find(x=>x.operation==='write')||a.find(x=>x.operation==='read')||a[0]||{};state='busy';txt=(j.operation==='write'?'✍️ ':'↙ ')+(j.operationLabel||'讀取')+'中｜'+(window.P79Messages?.operation(j.label||j.action)||'雲端資料')}else if(s.lastCompleted&&Number(s.lastCompleted.ageMs||0)<15000){state=s.lastCompleted.ok===false?'error':'done';txt=(state==='done'?'✓ ':'! ')+(s.lastCompleted.operationLabel||'讀取')+'完成'}el.dataset.state=state;if(span.textContent!==txt)span.textContent=txt})}
-async function poll(){if(statusBusy||document.visibilityState==='hidden')return;const url=gasUrl();if(!url)return;statusBusy=true;let ctrl,to;try{ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});const d=await r.json();if(d?.ok)render(d)}catch(e){}finally{if(to)clearTimeout(to);statusBusy=false}}
+async function poll(){if(isAttendancePunchOnly()||statusBusy||document.visibilityState==='hidden')return;const url=gasUrl();if(!url)return;statusBusy=true;let ctrl,to;try{ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});const d=await r.json();if(d?.ok)render(d)}catch(e){}finally{if(to)clearTimeout(to);statusBusy=false}}
 function start(){mount();syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,20),{once:true});else setTimeout(start,20);
 })();
