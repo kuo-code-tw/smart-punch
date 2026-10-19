@@ -402,19 +402,41 @@ async function jsonFetch(url,opt={},timeout=25000){
  catch(e){if(timed||String(e?.name)==='AbortError'||/abort/i.test(String(e?.message||e)))throw new Error('雲端回應逾時，請再試一次');throw e}
  finally{if(t)clearTimeout(t)}
 }
+function p79LeaveEmployeeEntry(){
+ return new URLSearchParams(location.search).get('mode')==='employee';
+}
+async function p79RenewEmployeeLeaveSession(){
+ let session;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch{return false}
+ const empId=String(session?.empId||'').trim().toUpperCase();
+ const expected=String(sessionStorage.getItem('port79_leave_emp_id')||empId).trim().toUpperCase();
+ if(!empId||empId!==expected||String(session?.adminRole||'').toLowerCase()!=='employee'||adminSession)return false;
+ const d=await jsonFetch(GAS_URL+'?action=verifyUser&loginMode=punch&empId='+encodeURIComponent(empId)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+ const token=String(d?.userToken||'').trim();
+ if(!d?.ok||!token||String(d.empId||'').trim().toUpperCase()!==empId||d.punchOnly!==true||String(d.adminRole||'').toLowerCase()!=='employee')return false;
+ let current;try{current=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch{return false}
+ if(String(current?.empId||'').trim().toUpperCase()!==empId||String(current?.adminRole||'').toLowerCase()!=='employee'||String(sessionStorage.getItem('port79_leave_emp_id')||empId).trim().toUpperCase()!==expected)return false;
+ sessionStorage.setItem('port79_user_token',token);
+ sessionStorage.setItem('port79_user_session',JSON.stringify({...current,punchOnly:true,localCache:false,pendingCloudVerification:false,loginAt:new Date().toISOString()}));
+ return true;
+}
 function leaveRequestToken(){
- if(adminSession||adminToken)return String(adminToken||'').trim();
+ if(adminSession)return String(adminToken||'').trim();
  return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
 }
 async function loadCloud(show=false,requireFresh=false,identityReady=null){
- let last;
+ let last,renewed=false;
+ if(identityReady)await identityReady;
  for(let i=0;i<3;i++){
   try{
    if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
-   const userToken=leaveRequestToken();
+   let userToken=leaveRequestToken();
+   if(!userToken&&!adminSession&&!renewed){renewed=true;if(await p79RenewEmployeeLeaveSession())userToken=leaveRequestToken();}
    if(!userToken&&!adminSession){p79EmployeeLeaveReauth();return false;}
-   const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
-   if(identityReady)await identityReady;
+   let d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   if(!d?.ok&&!adminSession&&p79LeaveAuthError(d?.error)&&!renewed){
+    renewed=true;
+    if(await p79RenewEmployeeLeaveSession())d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   }
    if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
    if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
    employees=Array.isArray(d.employees)?d.employees:[];
@@ -464,6 +486,7 @@ async function postCloud(payload){
 function readHash(){try{const p=new URLSearchParams(String(location.hash||'').replace(/^#/,''));const gas=p.get('gasurl');if(gas)sessionStorage.setItem('port79_gas_url',gas);return String(p.get('port79sso')||'')}catch{return''}}
 function storedToken(){return String(readHash()||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim()}
 async function restoreAdmin(){
+ if(p79LeaveEmployeeEntry()){adminToken='';return false;}
  adminToken=storedToken();if(!adminToken)return false;
  let last;
  for(let i=0;i<2;i++){
@@ -483,7 +506,7 @@ async function restoreAdmin(){
    if(i===0)await new Promise(r=>setTimeout(r,900));
   }
  }
- adminSession=null;
+ adminSession=null;adminToken='';
  setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
  return false;
 }
