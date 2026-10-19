@@ -75,10 +75,19 @@ function recommendSwap(persons,{minHours=10,minRecords=5,counts={},lockedGroups,
  if(best.value>=score(before)-1e-9)return {before,reason:'固定保留組並依指定人數試算後，沒有改善可調組效率差距的方案；建議調整人數或維持現況。'};
  return best;
 }
-const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy};
+async function readDispatchSources(month,read){
+ const sources=[
+  {key:'live',label:'即時船舶作業',action:'gcGetData',params:{month},valid:d=>Array.isArray(d.records)||Array.isArray(d.shipMasters)},
+  {key:'history',label:'歷史作業明細',action:'historyGetMonthData',params:{type:'vessel',month},valid:d=>Array.isArray(d.records)},
+  {key:'people',label:'最新在職名冊',action:'gcGetEmployees',params:{},valid:d=>Array.isArray(d.employees)},
+  {key:'schedule',label:'當月排班組別',action:'getScheduleDataSecure',params:{month},valid:d=>Array.isArray(d.employees)&&Array.isArray(d.schedules)}
+ ];
+ return Promise.all(sources.map(async source=>{try{const data=await read(source.action,source.params);if(data?.ok!==true||data.retryable||!source.valid(data))throw Error(data?.error||'回傳資料格式不完整');return {...source,ok:true,data};}catch(error){const raw=String(error?.message||error);return {...source,ok:false,error:error?.name==='AbortError'?'連線逾時':/failed to fetch|network/i.test(raw)?'網路連線失敗':raw.slice(0,160)};}}));
+}
+const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,readDispatchSources};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
-let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:undefined};const reads=new Map();
+let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:undefined};const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
 const el=id=>document.getElementById(id),fmt=v=>v===null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),safe=v=>esc(String(v??''));
 function month(){return el('dispatchMonth')?.value||'';}
 function resetContext(){const token=String(gcToken||'');if(owner!==token||planMonth!==month()){plan={};latest=[];settings={counts:{},lockedGroups:undefined};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='';owner=token;planMonth=month();}}
@@ -102,7 +111,7 @@ function render(){
  renderSettings();renderRecommendation(rows);renderScenario();if(!state&&owner)void load(false);
 }
 function renderSettings(){
- const box=el('dispatchGroupSettings');if(!box)return;if(el('dispatchGenerateButton'))el('dispatchGenerateButton').disabled=!ready;
+ const box=el('dispatchGroupSettings');if(!box)return;if(el('dispatchGenerateButton')){el('dispatchGenerateButton').disabled=generating;el('dispatchGenerateButton').textContent=generating?'正在讀取並產生名單…':'產生調任名單';}
  const policy=movementPolicy(latest,settings),groups=summarize(latest).groups;
  box.innerHTML=groups.map(g=>`<div class="rounded-xl border border-slate-200 p-3"><div class="font-bold">${g.group}組｜${fmt(g.eff)} 櫃／小時</div><label class="flex items-center gap-2 mt-2"><input type="checkbox" data-dispatch-lock="${g.group}" ${policy.locked.has(g.group)?'checked':''} ${!ready?'disabled':''}>保留本組（勾選＝不調動）</label><label class="flex items-center gap-2 mt-2">取出人數 <input type="number" min="0" max="20" step="1" style="width:80px" aria-label="${g.group}組取出人數" data-dispatch-count="${g.group}" value="${settings.counts[g.group]??2}" ${!ready||policy.locked.has(g.group)?'disabled':''}></label></div>`).join('');
 }
@@ -110,7 +119,7 @@ function renderRecommendation(rows){
  const box=el('dispatchRecommendation');if(!box)return;
  const dates=[...new Set(rows.map(r=>String(r.workDate||'').slice(0,10)).filter(Boolean))].sort();
  const coverage=dates.length?`資料範圍 ${dates[0]} ～ ${dates[dates.length-1]}，共 ${dates.length} 個有作業紀錄的日期。`:'';
- if(!ready){box.innerHTML='<p>整月資料或排班名冊尚未確認，請先按「重新讀取整月資料」；讀取成功後才能產生和確認名單。</p>';return;}
+ if(!ready){const details=readDetails.get(owner+'|'+month())||[],failed=details.filter(item=>!item.ok);box.innerHTML=`<p>${reads.get(owner+'|'+month())==='loading'?'正在確認雲端作業、在職名冊及排班組別，請稍候。':'資料尚未完成確認；可直接按「產生調任名單」重新讀取。'}</p>${failed.length?'<ul class="mt-2">'+failed.map(item=>`<li>${safe(item.label)}：${safe(item.error)}</li>`).join('')+'</ul>':''}`;return;}
  const suggestion=recommendSwap(latest,{...settings,allowNonImproving:true}),policy=movementPolicy(latest,settings);
  const rule=`整組保留：${[...policy.locked].map(g=>g+'組').join('、')||'未設定'}。每個可調組依設定人數取效率較低的有效人員，其他人員維持原組。`;
  if(!suggestion.plan){
@@ -132,16 +141,28 @@ function renderScenario(){
  el('dispatchMoves').textContent=ready&&moves.length?moves.map(p=>`${p.name}：${p.group}組 → ${plan[p.key]}組（${fmt(p.containers)} 櫃／${fmt(p.hours)} 小時）`).join('；'):'尚未選擇調動人員。';
 }
 async function load(force=true){
- if(!requireEfficiencyAccess())return;resetContext();const requested=month(),token=String(gcToken||''),key=token+'|'+requested;
- if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(requested)||reads.get(key)==='loading'||!force&&reads.has(key))return;
- reads.set(key,'loading');render();const replies=await Promise.allSettled([apiGetQuick('gcGetData',{month:requested},25000),apiGetQuick('historyGetMonthData',{type:'vessel',month:requested},25000),apiGetQuick('gcGetEmployees',{},25000)]);
- if(token!==String(gcToken||''))return;let success=0;
- for(const r of replies.slice(0,2)){if(r.status==='fulfilled'&&Array.isArray(r.value?.records)){try{mergeEfficiencyCloudData(r.value);success++;}catch(_){}}}
- const personnel=replies[2];if(personnel?.status==='fulfilled'&&Array.isArray(personnel.value?.employees)){systemEmployees=personnel.value.employees.map(normalizeCloudEmployee).filter(Boolean);success++;}
- reads.set(key,success===3?'ready':success?'partial':'error');if(success){saveLocal();invalidateWorkloadIndex();}
- if(activeEfficiencyTabName()==='dispatch')render();
+ if(!requireEfficiencyAccess())return false;resetContext();const requested=month(),token=String(gcToken||''),key=token+'|'+requested;
+ if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(requested))return false;
+ if(inflight.has(key))return inflight.get(key);if(!force&&reads.has(key))return reads.get(key)==='ready';
+ reads.set(key,'loading');readDetails.delete(key);
+ const task=Promise.resolve().then(async()=>{
+  const results=await readDispatchSources(requested,async(action,params)=>{try{return await apiGetQuick(action,params,25000);}catch(error){if(!/忙碌|稍後|逾時|timeout|abort|network|fetch|HTTP 5/i.test(String(error?.message||error)))throw error;await new Promise(resolve=>setTimeout(resolve,700));if(token!==String(gcToken||''))throw Error('登入已變更');return apiGetQuick(action,params,25000);}});
+  if(token!==String(gcToken||''))return false;
+  for(const item of results){if(!item.ok)continue;try{
+   if(item.key==='live'||item.key==='history')mergeEfficiencyCloudData(item.data);
+   else if(item.key==='people')systemEmployees=item.data.employees.map(normalizeCloudEmployee).filter(Boolean);
+   else {currentOperationScheduleStore().apply(requested,item.data);operationScheduleReads.set(requested,{at:Date.now(),status:'ready'});}
+  }catch(error){item.ok=false;item.error=String(error?.message||'資料套用失敗');}}
+  const success=results.filter(item=>item.ok).length;readDetails.set(key,results);reads.set(key,success===4?'ready':success?'partial':'error');if(success){saveLocal();invalidateWorkloadIndex();}
+  if(activeEfficiencyTabName()==='dispatch')render();return success===4;
+ }).catch(error=>{reads.set(key,'error');readDetails.set(key,[{label:'資料讀取',ok:false,error:String(error?.message||error)}]);if(activeEfficiencyTabName()==='dispatch')render();return false;}).finally(()=>inflight.delete(key));
+ inflight.set(key,task);render();return task;
 }
-api.generateRecommendation=()=>{render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});};
+api.generateRecommendation=async()=>{
+ if(generating)return;generating=true;render();
+ try{if(!ready)await load(true);render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+ finally{generating=false;renderSettings();}
+};
 api.useRecommendation=()=>{if(!ready)return;const suggestion=recommendSwap(latest,{...settings,allowNonImproving:true});if(suggestion.plan){plan={...suggestion.plan};render();el('dispatchConfirmState').textContent=`已確認 ${suggestion.moves.length} 人，已帶入下方試算；尚未修改正式排班。`;el('dispatchGroupBody')?.scrollIntoView({behavior:'smooth',block:'nearest'});}};
 api.render=render;api.load=load;api.rows=sourceRows;api.clear=()=>{plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='已清除試算，正式排班未變更。';render();};
 document.addEventListener('change',event=>{

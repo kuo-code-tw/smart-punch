@@ -1,0 +1,18 @@
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),path=require('path');
+const {readDispatchSources}=require('../assets/port79-personnel-dispatch.js');
+(async()=>{
+ const payloads={gcGetData:{ok:true,records:[],shipMasters:[]},historyGetMonthData:{ok:true,records:[]},gcGetEmployees:{ok:true,employees:[]},getScheduleDataSecure:{ok:true,employees:[],schedules:[]}};
+ let calls=[];const result=await readDispatchSources('2026-10',async(action,params)=>{calls.push({action,params});return payloads[action];});assert.ok(result.every(r=>r.ok));assert.equal(calls.length,4);assert.equal(calls.find(c=>c.action==='getScheduleDataSecure').params.month,'2026-10');
+ const failed=await readDispatchSources('2026-10',async action=>action==='historyGetMonthData'?{ok:false,error:'權限不足'}:payloads[action]);assert.equal(failed.filter(r=>!r.ok).length,1);assert.equal(failed.find(r=>!r.ok).label,'歷史作業明細');
+ const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',innerHTML:'',textContent:'',disabled:false,scrollIntoView(){}});return nodes.get(id);};
+ node('dispatchMonth').value='2026-10';node('dispatchSort').value='eff';let failHistory=true,ready=false,readCount=0;
+ const persons=[['a1','A',50],['a2','A',300],['b1','B',100],['b2','B',350],['c1','C',150],['c2','C',400],['d1','D',10],['d2','D',990]].map(([empId,group,volume])=>({empId,name:empId,group:group+'組',volume,employmentStatus:'active'}));
+ const rows=persons.flatMap(p=>Array.from({length:6},(_,i)=>({id:p.empId+'-'+i,empId:p.empId,name:p.name,source:'working-report',workDate:'2026-10-01',disc:p.volume/6,load:0,hc:0,hours:2})));
+ const store={has:()=>ready,personnel:()=>persons,apply(){ready=true;}};
+ const c={document:{getElementById:node,addEventListener(){}},gcToken:'owner',records:rows,systemEmployees:persons,Date,Map,Set,Promise,console,setTimeout,clearTimeout,esc:String,canonicalOperationalRecords:x=>x,getPort79Year:()=> '2026',isoTodayLocal:()=> '2026-10-19',currentOperationScheduleStore:()=>store,ensureOperationScheduleGroups(){},renderOperationScheduleStatus(){},normalizePersonName:x=>String(x||''),workloadRecordMetrics:x=>x,operationScheduleReads:new Map(),requireEfficiencyAccess:()=>true,normalizeCloudEmployee:x=>x,mergeEfficiencyCloudData(){},saveLocal(){},invalidateWorkloadIndex(){},activeEfficiencyTabName:()=> 'dispatch',apiGetQuick:async action=>{readCount++;if(action==='historyGetMonthData'&&failHistory)throw Error('來源未就緒');if(action==='gcGetEmployees')return {ok:true,employees:persons};if(action==='getScheduleDataSecure')return {ok:true,employees:persons,schedules:[]};return {ok:true,records:rows,shipMasters:[]};}};
+ c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/port79-personnel-dispatch.js'),'utf8'),c);
+ c.P79PersonnelDispatch.render();await c.P79PersonnelDispatch.load(true);assert.equal(node('dispatchGenerateButton').disabled,false);assert.match(node('dispatchRecommendation').innerHTML,/歷史作業明細/);assert.match(node('dispatchRecommendation').innerHTML,/來源未就緒/);
+ failHistory=false;const generation=c.P79PersonnelDispatch.generateRecommendation();assert.equal(node('dispatchGenerateButton').disabled,true);await generation;assert.equal(node('dispatchGenerateButton').disabled,false);assert.match(node('dispatchRecommendation').innerHTML,/確認名單並帶入試算/);assert.ok(readCount>=8);assert.equal(ready,true);
+ c.P79PersonnelDispatch.useRecommendation();assert.match(node('dispatchConfirmState').textContent,/已確認 6 人/);
+ console.log('PASS actual UI module stays clickable after partial failure, reports exact source, retries all sources including schedule, generates six-person list, re-enables button and confirms the plan');
+})().catch(e=>{console.error(e);process.exitCode=1;});
