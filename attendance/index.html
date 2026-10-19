@@ -15109,7 +15109,7 @@ function getManualPairRecordAnchor(record) {
                     candidates.forEach(r=>{
                         if(!keys.has('d'+r.id)){
                             keys.add('d'+r.id);
-                            tasks.push({mode:'delete',record:r,id:String(r.id).trim()});
+                            tasks.push({mode:'delete',record:r,keeper:keep,id:String(r.id).trim()});
                         }
                     });
                 }
@@ -15151,6 +15151,7 @@ function getManualPairRecordAnchor(record) {
                             continue;
                         }
                         if(task.mode==='delete') {
+                            if(!p79HasLiveDuplicateReplacement({records:[r,task.keeper]},r)){markError('保留的原始打卡已變動，停止刪除以免班次缺卡',true);continue;}
                             const result=await p79PerformDuplicateCloudRequest({action:'deleteRecord',id});
                             if(result?.ok&&!result?.queued) {
                                 if(p79ApplyConfirmedAttendanceDelete(id,{skipRender:true})) {
@@ -15242,7 +15243,7 @@ function getManualPairRecordAnchor(record) {
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(sourceText)}</td>
                     <td class="px-3 py-2 text-center align-middle">${escapeHtml(reviewText)}</td>
                     <td class="px-3 py-2 text-center align-middle">
-                        ${canDelete && uniqueId && unchanged && !pending && sameDirectionCount>1 ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">保留／待核對</span>'}
+                        ${canDelete && uniqueId && unchanged && !pending && sameDirectionCount>1 && p79HasLiveDuplicateReplacement(row,r) ? `<button type="button" class="text-rose-600 font-bold underline" onclick="p79DeleteReviewedDuplicate(${index},${i})">刪除這筆</button>` : '<span class="text-slate-400">保留／待核對</span>'}
                     </td>
                 </tr>`;
             }).join('');
@@ -15254,6 +15255,16 @@ function getManualPairRecordAnchor(record) {
             </div>`;
             modal.addEventListener('click', e => { if(e.target === modal) p79CloseDuplicateReview(); });
             document.body.appendChild(modal);
+        }
+        function p79HasLiveDuplicateReplacement(row,record) {
+            const id=String(record?.id??''),direction=getAttendanceRecordType(record);
+            const queuedDeletes=new Set((window.p79V5ReadPendingQueue?.()||[]).filter(item=>item.payload?.action==='deleteRecord').map(item=>String(item.payload.id??item.payload.record?.id??'')));
+            return (row?.records||[]).some(candidate=>{
+                const otherId=String(candidate?.id??'');
+                if(!otherId||otherId===id||queuedDeletes.has(otherId)||getAttendanceRecordType(candidate)!==direction||getPunchChannel(candidate.status)!==getPunchChannel(record.status))return false;
+                const live=(Array.isArray(records)?records:[]).filter(item=>String(item.id??'')===otherId);
+                return live.length===1&&!isLocallyDeletedAttendanceRecord(live[0])&&p79SameReviewedOriginal(candidate,live[0]);
+            });
         }
         function p79DeleteReviewedDuplicate(index, recordIndex) {
             const row = p79DuplicateReviewRows[index];
@@ -15275,7 +15286,7 @@ function getManualPairRecordAnchor(record) {
             const dir=getAttendanceRecordType(r);
             const otherSameSide=(Array.isArray(row.records)?row.records:[])
                 .filter(x=>String(x?.id??'').trim()!==id && getAttendanceRecordType(x)===dir && getPunchChannel(x.status)===getPunchChannel(r.status));
-            if(['IN','OUT'].includes(dir) && otherSameSide.length===0){
+            if(['IN','OUT'].includes(dir) && !p79HasLiveDuplicateReplacement(row,r)){
                 showToast('同班這個方向只剩最後一筆，為避免整班空白，請保留原始打卡','warning');
                 return;
             }
@@ -21533,6 +21544,17 @@ function p79EmployeeDateEligible(emp,date) {
             });
             return {scheduleRows,dailyRows};
         }
+        function p79AuditAttendanceExportPairs(source,month = '') {
+            const ids=new Set(source.map(record=>String(record.id??''))),issues=[];
+            source.forEach(record=>['In','Out'].forEach(side=>{
+                const targetId=String(record['manualPairClock'+side+'Id']||''),time=record['manualPairClock'+side+'TimeStr'];
+                if(!targetId||!time||ids.has(targetId)||(month&&getAttendanceDateKey(time).replaceAll('/','-').slice(0,7)!==month))return;
+                const type=side==='In'?'IN':'OUT',ts=getAttendanceTimestamp({timeStr:time});
+                const alternate=source.some(other=>getAttendanceRecordType(other)===type&&String(other.empId||'').trim().toUpperCase()===String(record.empId||'').trim().toUpperCase()&&String(record.empId||'').trim()&&Math.abs(getAttendanceTimestamp(other)-ts)<=15*60000);
+                if(!alternate)issues.push([record.attNo||'',record.empId||'',record.name||'',record.timeStr||'',record.status||'',side==='In'?'缺少原配對簽到':'缺少原配對簽退',time,targetId,String(record.id||'')]);
+            }));
+            return issues;
+        }
         async function exportSelectedRecordsExcel() {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             const modal=document.getElementById('exportRecordsModal');
@@ -21631,11 +21653,17 @@ function p79EmployeeDateEligible(emp,date) {
                 XLSX.utils.book_append_sheet(workbook,scheduleSheet,exportMonth+'月排班表');
                 XLSX.utils.book_append_sheet(workbook,dailySheet,'排班與每日考勤');
             }
+            const missingPairs=p79AuditAttendanceExportPairs(visibleRecords,exportMonth);
+            if(missingPairs.length){
+                const auditSheet=XLSX.utils.aoa_to_sheet([['考勤號','工號','姓名','現存打卡時間','現存狀態','缺漏','配對內記載的時間（待核對）','缺少紀錄ID','現存紀錄ID'],...missingPairs]);
+                auditSheet['!cols']=[10,15,14,22,14,22,30,40,24].map(wch=>({wch}));
+                XLSX.utils.book_append_sheet(workbook,auditSheet,'考勤缺漏核對');
+            }
             update('正在產生 Excel 檔案…');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
-            showToast(`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`, "success");
+            showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`,missingPairs.length?'warning':'success');
             } catch(error) {
                 const message='匯出失敗：'+(error?.message||String(error));
                 if(progress)progress.textContent=message;
