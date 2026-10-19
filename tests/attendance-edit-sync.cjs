@@ -25,6 +25,14 @@ fullRows=[{...cloud}];await assert.rejects(c.p79PrepareAttendanceEdit('1'),e=>e.
 fullRows=[fullRow,{...fullRow}];await assert.rejects(c.p79PrepareAttendanceEdit('1'),/無法核對/);
 fullRows=[fullRow];fullMonth='2026-09';await assert.rejects(c.p79PrepareAttendanceEdit('1'),/主表核對失敗/);
 assert.equal(posts,1,'incomplete and ambiguous time checks must never write');
+// Missing status index must fall back to the official month with strict identity.
+fullMonth='2026-10';fullRows=[fullRow];
+c.fetch=async(url)=>({ok:true,json:async()=>url.includes('action=getAttendanceMainDirect')?{ok:true,month:fullMonth,records:fullRows}:{ok:true,found:{}}});
+assert.equal((await c.p79ReadAttendanceEditCloud('1',undefined,{record:fullRow,originalTimeStr:'2026/10/17 00:00'})).timeStr,fullRow.timeStr);
+fullRows=[{...fullRow,empId:'OTHER'}];await assert.rejects(c.p79ReadAttendanceEditCloud('1',undefined,{record:fullRow}),/找不到/);
+fullRows=[fullRow,{...fullRow,timeStr:'2026/10/17 12:00'}];await assert.rejects(c.p79ReadAttendanceEditCloud('1',undefined,{record:fullRow}),/無法唯一確認/);
+assert.equal(posts,1,'fallback only reads and never recreates missing records');
+
 for(const path of ['attendance/index.html','work-hours/index.html']){const s=fs.readFileSync(path,'utf8');for(const m of s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);}assert(s.includes('await window.p79V5PrepareAttendanceEdit(id)'));assert(s.includes("String(snapshot?.timeStr || r.timeStr || '')"));}
 console.log('PASS preflight, equivalent formatting, idempotent retry, real conflict, pending guard, paused recovery, note differences, both pages parse');
 })().catch(e=>{console.error(e);process.exitCode=1});

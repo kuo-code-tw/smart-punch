@@ -285,13 +285,31 @@ function confirmCloudDelete(id){
   return true;
 }
 
-async function p79ReadAttendanceEditCloud(id,signal){
+async function p79ReadAttendanceEditCloud(id,signal,context=null){
  const url=gasUrl();if(!url)throw new Error('未設定 GAS URL');
  const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
  const data=await response.json();
  if(!response.ok||!data?.ok||!data.found||typeof data.found!=='object')throw new Error(data?.error||'無法核對雲端考勤，請稍後再試');
  const record=data.found[String(id)];
- if(!record||String(record.id)!==String(id))throw Object.assign(new Error('雲端尚未找到這筆考勤，請重新讀取後再修改'),{retryable:false});
+ if(!record||String(record.id)!==String(id)){
+  // Status indexes can miss an older edited row. Read the official month(s)
+  // from the saved intent; never infer identity from a reused numeric ID alone.
+  const expected=context?.record||context;
+  const months=[...new Set([context?.originalTimeStr,expected?.timeStr].map(value=>String(value||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
+  if(expected&&['empId','attNo'].some(k=>String(expected[k]??'').trim())&&months.length){
+   const matches=[];
+   for(const month of months){
+    const fullResponse=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
+    const full=await fullResponse.json();
+    if(!fullResponse.ok||!full?.ok||String(full.month)!==month||!Array.isArray(full.records))throw new Error(full?.error||'正式主表核對失敗，修改草稿已保留');
+    matches.push(...full.records.filter(r=>String(r.id)===String(id)&&['empId','attNo'].every(k=>!String(expected[k]??'').trim()||normalizeCompareValue(r[k])===normalizeCompareValue(expected[k]))&&((typeof getAttendanceRecordType==='function')?getAttendanceRecordType(r)===getAttendanceRecordType(expected):String(r.status)===String(expected.status))));
+   }
+   const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
+   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
+   if(unique.length>1)throw Object.assign(new Error('正式主表有多筆相同編號及身分的考勤，無法唯一確認班次；修改草稿保留'),{retryable:false});
+  }
+  throw Object.assign(new Error('雲端正式主表仍找不到這筆考勤，可能已刪除；修改草稿保留，可撤回這筆修改'),{retryable:false});
+ }
  // Older status replies can contain a date without its clock time. Never use
  // that truncated value as the compare-and-swap baseline for a correction.
  if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(record.timeStr||'').trim())){
@@ -359,7 +377,7 @@ async function p79CheckWithdrawnAttendanceDraft(backupId){
  const snapshot=JSON.stringify(saved);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
  try{
-  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(saved.item.payload),controller.signal);
+  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(saved.item.payload),controller.signal,saved.item.payload);
   const current=p79ReadWithdrawnAttendanceDrafts().find(x=>x.backupId===backupId);
   if(!current||JSON.stringify(current)!==snapshot)throw new Error('核對期間草稿已變更，請重新查看明細');
   if(!p79PausedReviewIdentity(saved.item.payload,cloud))throw new Error('雲端員工身分不符，草稿保留');
@@ -409,7 +427,7 @@ async function p79ReviewPausedAttendanceWrite(key){
  const item=p79PausedReviewItem(key),payload=JSON.parse(JSON.stringify(item.payload));
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
  try {
-  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),controller.signal);
+  const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),controller.signal,payload);
   p79PausedReviewItem(key,payload);
   if(!p79PausedReviewIdentity(payload,cloud))throw new Error('雲端紀錄的員工身分無法確認，草稿保留，請核對人員與紀錄 ID');
   if(p79AttendanceEditAlreadySaved(payload,cloud)){
@@ -428,7 +446,7 @@ async function p79ApplyPausedAttendanceReview(review){
  p79PausedReviewItem(review.key,review.payload);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
  let cloud;
- try{cloud=await p79ReadAttendanceEditCloud(payloadRecordId(review.payload),controller.signal);}finally{clearTimeout(timer);}
+ try{cloud=await p79ReadAttendanceEditCloud(payloadRecordId(review.payload),controller.signal,review.payload);}finally{clearTimeout(timer);}
  p79PausedReviewItem(review.key,review.payload);
  if(!p79PausedReviewIdentity(review.payload,cloud)||!p79AttendanceEditAlreadySaved({record:review.cloud},cloud)||String(review.cloud.manuallyEditedAt||'')!==String(cloud.manuallyEditedAt||''))throw new Error('核對後雲端又有變更，未送出修改；請重新核對，草稿仍保留');
  const record={...review.payload.record,manuallyEdited:true,manuallyEditedAt:new Date().toISOString()};
@@ -454,7 +472,7 @@ async function send(payload,timeout=25000){
   const timer=setTimeout(()=>ctrl.abort(),timeout);
   try{
     if(['updateRecord','editRecord'].includes(String(payload.action||''))){
-      const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal);
+      const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal,payload);
       if(p79AttendanceEditAlreadySaved(payload,cloud))return {ok:true,alreadySaved:true};
       if(normalizeCompareValue(payload.originalTimeStr)!==normalizeCompareValue(cloud.timeStr)||
          (payload.originalPunchType&&String(payload.originalPunchType)!==(typeof getAttendanceRecordType==='function'?getAttendanceRecordType(cloud):String(cloud.status)))){
@@ -995,7 +1013,7 @@ window.p79V5QueueInfoForId=queueInfoForId;
 window.p79V5ConfirmCloudRecord=confirmCloudRecord;
 window.p79V5ConfirmCloudDelete=confirmCloudDelete;
 window.p79V5RefreshStatus=updateUi;
-window.p79V5ReadPendingQueue=()=>readQueue();
+window.p79V5ReadPendingQueue=()=>readQueue().map(item=>!writing&&item.state==='syncing'?{...item,state:'pending'}:item);
 window.p79V5GetStatus=()=>({
   queueStorage,
   writing,

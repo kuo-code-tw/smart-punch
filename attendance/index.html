@@ -23065,7 +23065,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261018-confirmed-drafts"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-official-review"></script>
 
 
 
@@ -23816,6 +23816,13 @@ function show(autoReview=true){
  body.innerHTML=html;root.classList.add('p79-show');
  if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
 }
+let inspectorQueueSnapshot='';
+setInterval(()=>{
+ const panel=document.getElementById('p79OutboxInspectPanel');
+ if(!panel?.classList.contains('p79-show')||reviewBusy)return;
+ const snapshot=JSON.stringify(keys.map(([key])=>entries(key)));
+ if(snapshot!==inspectorQueueSnapshot){inspectorQueueSnapshot=snapshot;show(false);}
+},1000);
 let reviewBusy=false;
 async function reviewEntry(key){
  if(reviewBusy)return;reviewBusy=true;
