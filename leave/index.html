@@ -423,6 +423,22 @@ function leaveRequestToken(){
  if(adminSession)return String(adminToken||'').trim();
  return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
 }
+let p79PendingLeavePromptShown=false;
+function p79ShowPendingLeavePrompt(){
+ if(p79PendingLeavePromptShown||!adminSession||leaveAccess!=='manage'||currentMode!=='admin')return;
+ const pending=leaveRecords.filter(l=>!String(l.status||'').trim()||String(l.status).trim()==='待審核');
+ p79PendingLeavePromptShown=true;
+ if(!pending.length)return;
+ const dialog=document.createElement('dialog');
+ dialog.id='p79PendingLeavePrompt';
+ dialog.setAttribute('aria-labelledby','p79PendingLeaveTitle');
+ dialog.style.cssText='width:min(720px,94vw);max-height:85vh;overflow:auto;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--card);color:var(--text)';
+ dialog.innerHTML='<h2 id="p79PendingLeaveTitle" style="margin-top:0">待審核請假 '+pending.length+' 筆</h2><div class="table-wrap" style="max-height:55vh"><table style="min-width:520px"><thead><tr><th>姓名</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th></tr></thead><tbody>'+pending.map(l=>'<tr><td>'+esc(l.name||l.empId||l.attNo||'')+'</td><td>'+esc(l.leaveType||'')+'</td><td>'+esc(l.startTime||l.startDate||'')+' ～ '+esc(l.endTime||l.endDate||'')+'</td><td>'+esc(l.days??l.hours??'')+'</td><td>'+esc(l.reason||'')+'</td></tr>').join('')+'</tbody></table></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" class="btn btn-sec" data-close>稍後處理</button><button type="button" class="btn btn-pri" data-review>前往審核</button></div>';
+ dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+ dialog.querySelector('[data-review]').onclick=()=>{ $('filterDept').value='';$('filterJob').value='';$('filterStatus').value='待審核';renderAdmin();dialog.close();$('adminLeaveBody').scrollIntoView({block:'start',behavior:'smooth'}); };
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ document.body.appendChild(dialog);dialog.showModal();
+}
 async function loadCloud(show=false,requireFresh=false,identityReady=null){
  let last,renewed=false;
  if(identityReady)await identityReady;
@@ -443,7 +459,7 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
    if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
-   populateDepartments();renderAll();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
+   populateDepartments();renderAll();p79ShowPendingLeavePrompt();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
   }catch(e){
    last=e;
    if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
@@ -595,7 +611,7 @@ function renderAdmin(){
  if(!adminSession)return;
  $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
  const dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
- let rows=leaveRecords.filter(l=>(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'')===status));
+ let rows=leaveRecords.filter(l=>(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'待審核').trim()===status));
  p79LeaveComparisonRows=rows;
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
