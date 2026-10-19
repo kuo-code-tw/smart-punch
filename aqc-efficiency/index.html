@@ -7246,7 +7246,26 @@ function recordIdentityKey(r){
 }
 function mergeCloudRecordsWithLocal(cloudRecords,localRecords){
   const localList=Array.isArray(localRecords)?localRecords:[];
-  const cloudList=Array.isArray(cloudRecords)?cloudRecords:[];
+  let cloudList=Array.isArray(cloudRecords)?cloudRecords:[];
+  // 完整重新匯入是取代，不是聯集；只有本機持有完整批次才排除雲端舊列。
+  const replacements=new Map();
+  (typeof shipMasters==='undefined'?[]:shipMasters||[]).forEach(master=>{
+    const manifest=master?.workingSheetSource?.reportRecordIds;
+    const no=String(master?.workingNo||'').trim();
+    const stamp=String(master?.workingSheetSource?.importedAt||master?.workingSheetImportedAt||'');
+    const time=Date.parse(stamp),ids=new Set(Array.isArray(manifest)?manifest.map(String):[]);
+    if(!no||!ids.size||!Number.isFinite(time))return;
+    const batch=localList.filter(row=>String(row?.workingNo||'').trim()===no&&String(row?.workingSheetImportedAt||'')===stamp);
+    const present=new Set(batch.map(row=>String(row.id||'')));
+    if(![...ids].every(key=>key&&present.has(key)))return;
+    // 遇到別處更新的較新匯入，不讓此裝置的舊批次刪除它。
+    if(cloudList.some(row=>String(row?.workingNo||'').trim()===no&&(Date.parse(row?.workingSheetImportedAt||'')||0)>time))return;
+    replacements.set(no,ids);
+  });
+  cloudList=cloudList.filter(row=>{
+    const ids=replacements.get(String(row?.workingNo||'').trim());
+    return !ids||ids.has(String(row?.id||''));
+  });
   const locals=new Map(localList.map(r=>[recordIdentityKey(r),r]));
   const usedLocalKeys=new Set();
 
@@ -10437,6 +10456,7 @@ async function importExcel(file) {
       workingSheetRuleVersion,
       workingSheetSource:{
         importedAt:workingSheetImportedAt,
+        reportRecordIds:imported.map(row=>String(row.id)),
         sourceWorkingNo:String(summary.sourceWorkingNo||summary.workingNo||'').trim(),
         sourceFileName:String(file?.name||''),
         ruleVersion:workingSheetRuleVersion,
