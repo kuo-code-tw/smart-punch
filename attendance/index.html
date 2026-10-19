@@ -326,8 +326,9 @@ window.p79LoadXlsxLibrary = function(){
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     s.defer=true;
-    s.onload=()=>resolve(window.XLSX);
-    s.onerror=()=>{window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入失敗，請檢查網路後重試'));};
+    const timer=setTimeout(()=>{window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入逾時，請檢查網路後重試'));},15000);
+    s.onload=()=>{clearTimeout(timer);resolve(window.XLSX);};
+    s.onerror=()=>{clearTimeout(timer);window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入失敗，請檢查網路後重試'));};
     document.head.appendChild(s);
   });
   return window.p79XlsxLoadPromise;
@@ -2021,6 +2022,7 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
                 <p class="text-[11px] text-slate-500 mt-2">只匯出所選月份的原始打卡紀錄，以每筆打卡的實際日期為準。</p>
             </div>
 
+            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 Excel）</label>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="selectAllExportFields(true)" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-xl text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50">☑️ 全部選取</button>
@@ -21456,6 +21458,52 @@ function p79EmployeeDateEligible(emp,date) {
             });
             return output;
         }
+        function p79RequireScheduleExport() {
+            if(isVerifiedSuperAdminSession()||['view','manage'].includes(getFourSystemPermissions(currentEmp||{}).schedule))return true;
+            showToast('此帳號沒有查看排班的權限，請取消勾選一併匯出排班','warning');return false;
+        }
+        async function p79ReadAttendanceExportSource(action,month) {
+            const url=new URL(getActiveGasUrl());
+            const token=getAttendanceEmployeeMasterToken();
+            url.searchParams.set('action',action);url.searchParams.set('month',month);
+            url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('t',String(Date.now()));
+            const data=await fetchGasJsonWithRetry(url.toString(),'匯出資料讀取',1,20000);
+            if(!data?.ok)throw Error(data?.error||'匯出資料未讀取完成');
+            if(action!=='getScheduleDataSecure'&&(!Array.isArray(data.records)||(data.month&&String(data.month)!==month)))throw Error('匯出考勤月份或資料格式不符');
+            if(action==='getScheduleDataSecure'&&!Array.isArray(data.schedules))throw Error('排班資料格式不符，未產生不完整報表');
+            return data;
+        }
+        async function p79ReadAttendanceExportMonth(month) {
+            const now=new Date(),current=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+            const data=await p79ReadAttendanceExportSource(month===current?'getAttendanceMainDirect':'getAttendanceMonthData',month);
+            return data.records.map(normalizeAttendanceRecordIdentifiers);
+        }
+        function p79BuildScheduleAttendanceExport(month,people,source,roster) {
+            const days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+            const scheduleRows=[['考勤號','工號','姓名','部門','職稱',...Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))]];
+            const dailyRows=[['日期','考勤號','工號','姓名','部門','職稱','排班','上班簽到','下班簽退','出勤時數','狀態']];
+            const byPersonDay=new Map();
+            buildDailyAttendanceRows(source).forEach(shift=>{
+                const day=String(shift.accountingDateKey||shift.dateKey||'').replaceAll('/','-');
+                if(day.slice(0,7)!==month)return;
+                const emp=findEmployeeForAttendanceIdentity(shift,people);if(!emp)return;
+                const key=String(emp.empId).toUpperCase()+'|'+day;
+                if(!byPersonDay.has(key))byPersonDay.set(key,[]);byPersonDay.get(key).push(shift);
+            });
+            people.forEach(emp=>{
+                const plan={};
+                roster.schedules.filter(row=>String(row.empId||'').toUpperCase()===String(emp.empId).toUpperCase()).forEach(row=>Object.entries(row.schedule||{}).forEach(([day,value])=>{const key=normalizeScheduleDateKey(day);if(key)plan[key]=String(value??'');}));
+                const labels=Array.from({length:days},(_,i)=>plan[month+'-'+String(i+1).padStart(2,'0')]||'');
+                scheduleRows.push([emp.attNo||'',emp.empId,emp.name||'',emp.dept||'',emp.jobTitle||emp.deptDetail||'',...labels]);
+                labels.forEach((label,i)=>{
+                    const date=month+'-'+String(i+1).padStart(2,'0');if(!p79EmployeeDateEligible(emp,date))return;
+                    const shifts=byPersonDay.get(String(emp.empId).toUpperCase()+'|'+date)||[];
+                    if(!label&&!shifts.length)return;
+                    (shifts.length?shifts:[null]).forEach(shift=>dailyRows.push([date,emp.attNo||'',emp.empId,emp.name||'',emp.dept||'',emp.jobTitle||emp.deptDetail||'',label,shift?.clockIn?.timeStr||'',shift?.clockOut?.timeStr||'',shift?attendanceRowAttendanceText(shift):'',shift?(shift.clockIn&&shift.clockOut?'上下班完整':(shift.clockIn?'缺少簽退':'缺少簽到')):'無打卡']));
+                });
+            });
+            return {scheduleRows,dailyRows};
+        }
         async function exportSelectedRecordsExcel() {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             const modal=document.getElementById('exportRecordsModal');
@@ -21486,16 +21534,19 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast('請選擇有效的匯出年／月份', 'warning');
                 return;
             }
-            update('正在讀取 '+exportMonth+' 考勤與準備 Excel，請稍候…');
-            await Promise.all([
-                window.p79LoadXlsxLibrary(),
-                (async()=>{if(getActiveGasUrl()&&!await loadAttendanceMonthFromCloud(exportMonth,false,{rawExport:true}))throw Error('所選月份考勤未讀取完成，請稍後再匯出');})()
+            const includeSchedule=document.getElementById('exportIncludeSchedule')?.checked===true;
+            if(includeSchedule&&!p79RequireScheduleExport())return;
+            update('正在讀取 '+exportMonth+' 最新考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
+            const [exportSource,roster]=await Promise.all([
+                p79ReadAttendanceExportMonth(exportMonth),
+                includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth):Promise.resolve(null),
+                window.p79LoadXlsxLibrary()
             ]);
             if(!window.XLSX?.utils)throw Error('Excel 元件未成功載入，請再試一次');
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             update('正在整理原始考勤與選取欄位…');
             const identityPool=getAttendanceIdentityEmployeePool();
-            const visibleRecords = records
+            const visibleRecords = exportSource
                 .filter(record=>p79AttendanceExportMatchesMonth(record,exportMonth))
                 .filter(canCurrentAdminViewDataRow)
                 .filter(record => {
@@ -21505,7 +21556,7 @@ function p79EmployeeDateEligible(emp,date) {
                     const company = recordEmpId.match(/^([A-Z]+)/)?.[1] || '';
                     return company === companyFilter;
                 });
-            if (visibleRecords.length === 0) {
+            if (visibleRecords.length === 0 && !includeSchedule) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
@@ -21532,6 +21583,26 @@ function p79EmployeeDateEligible(emp,date) {
             worksheet['!cols'] = selectedFields.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, time: 22, status: 14, location: 28, note: 28 })[field.key] || 16 }));
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
+            if(includeSchedule){
+                update('正在建立排班與每日考勤工作表…');
+                const people=getAdminAttendanceEmployees().filter(emp=>companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter));
+                let pairedSource=exportSource.filter(canCurrentAdminViewDataRow);
+                const date=new Date(Number(exportMonth.slice(0,4)),Number(exportMonth.slice(5)),1);
+                const next=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+                if(next<=getTodayAttendanceIso().slice(0,7)){
+                    update('正在核對月底跨日簽退…');
+                    const boundary=await p79ReadAttendanceExportMonth(next);
+                    pairedSource=pairedSource.concat(boundary.filter(canCurrentAdminViewDataRow));
+                }
+                if(!requireAdminAction('attendanceExport','匯出考勤')||!p79RequireScheduleExport())return;
+                const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,roster);
+                const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows),dailySheet=XLSX.utils.aoa_to_sheet(report.dailyRows);
+                scheduleSheet['!cols']=[10,15,14,16,14,...Array(report.scheduleRows[0].length-5).fill(12)].map(wch=>({wch}));
+                dailySheet['!cols']=[12,10,15,14,16,14,12,22,22,12,16].map(wch=>({wch}));
+                XLSX.utils.book_append_sheet(workbook,scheduleSheet,'月排班表');
+                XLSX.utils.book_append_sheet(workbook,dailySheet,'排班與每日考勤');
+            }
+            update('正在產生 Excel 檔案…');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
