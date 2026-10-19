@@ -1078,7 +1078,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <span class="inline-flex items-center rounded-lg border border-cyan-300 dark:border-cyan-800 bg-cyan-100 dark:bg-cyan-950 px-2 py-1 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
                     <span class="inline-flex items-center rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950 px-2 py-1 font-bold text-rose-800 dark:text-rose-300">缺卡異常｜缺少簽到</span>
                     <span class="inline-flex items-center rounded-lg border border-orange-300 dark:border-orange-800 bg-orange-100 dark:bg-orange-950 px-2 py-1 font-bold text-orange-800 dark:text-orange-300">缺卡異常｜缺少簽退</span>
-                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">時間提醒｜上班分鐘 01–30</span>
                     <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">時間提醒｜下班分鐘不在 45–60</span>
                 </div>
 
@@ -1239,7 +1238,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過 8 小時且延長超過 30 分鐘才列為估算加班。跨日歸入上班日期。</p>
                 <div class="flex flex-wrap items-center gap-2 mt-2 text-[11px]">
                     <span class="font-bold text-slate-600 dark:text-slate-300">💡 時間提醒：</span>
-                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">上班分鐘 01–30</span>
                     <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不在 45–60</span>
                 </div>
                     </div>
@@ -10941,9 +10939,6 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return `<span class="text-slate-700 dark:text-white font-semibold">${text}</span>`;
             }
             const minute = getAttendanceMinute(record);
-            if (type === 'IN' && minute !== null && minute >= 1 && minute <= 30) {
-                return `<span class="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold" title="上班簽到分鐘介於 01–30">${text}</span>`;
-            }
             // 分鐘 45–59，以及下一小時的 00 分，均視為 45–60 的正常範圍。
             if (type === 'OUT' && minute !== null && minute !== 0 && minute < 45) {
                 return `<span class="inline-flex px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-bold" title="下班簽退分鐘未介於 45–60">${text}</span>`;

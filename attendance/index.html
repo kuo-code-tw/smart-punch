@@ -1184,7 +1184,6 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
                                 <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300">缺卡｜缺少簽退</span>
                             </div>
                             <div class="flex flex-nowrap items-center gap-x-1">
-                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 dark:border-amber-800 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300">時間提醒｜上班分鐘 01–30</span>
                             </div>
                         </div>
                         </div>
@@ -1411,7 +1410,6 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
 
                 <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px]">
                     <span class="font-bold text-slate-600 dark:text-slate-300">💡 時間提醒：</span>
-                    <span class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950 px-2 py-1 font-bold text-amber-800 dark:text-amber-300">上班分鐘 01–30</span>
                     <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不在 45–60</span>
                 </div>
 
@@ -1853,6 +1851,7 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
                 <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
             </div>
 
+            <p id="editRecordCloudCheckStatus" role="status" class="text-xs text-slate-600 dark:text-slate-300"></p>
             <input type="hidden" id="modalRecordId">
 
             <div>
@@ -14098,9 +14097,6 @@ function getManualPairRecordAnchor(record) {
                 return `<span class="text-slate-700 dark:text-white font-semibold">${text}</span>`;
             }
             const minute = getAttendanceMinute(record);
-            if (type === 'IN' && minute !== null && minute >= 1 && minute <= 30) {
-                return `<span class="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold" title="上班簽到分鐘介於 01–30">${text}</span>`;
-            }
             // 分鐘 45–59，以及下一小時的 00 分，均視為 45–60 的正常範圍。
             if (type === 'OUT' && minute !== null && minute !== 0 && minute < 45) {
                 return `<span class="inline-flex px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-bold" title="下班簽退分鐘未介於 45–60">${text}</span>`;
@@ -14546,7 +14542,6 @@ function getManualPairRecordAnchor(record) {
                 const minute=r=>{const m=String(r?.timeStr||'').match(/(?:\s|T)\d{1,2}:(\d{2})(?::\d{2})?$/);return m?Number(m[1]):null;};
                 const inMinute=minute(row.clockIn);
                 const timeChecks=[];
-                if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班分鐘01–30');
                 if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
                 return {kind:'NORMAL',status:'正常'};
             }
@@ -15919,45 +15914,18 @@ function getManualPairRecordAnchor(record) {
             try { input.dispatchEvent(new Event('change', {bubbles:true})); } catch (e) {}
         }
 
-        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null) {
-            if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
-            if (window.p79V5PrepareAttendanceEdit) {
-                try {
-                    const cloud = await window.p79V5PrepareAttendanceEdit(id);
-                    const existing = records.find(item => String(item.id) === String(id) && (!expectedType || getAttendanceRecordType(item) === expectedType));
-                    if (existing) {
-                        if ((existing.empId && String(existing.empId) !== String(cloud.empId)) || (expectedType && getAttendanceRecordType(cloud) !== expectedType)) throw new Error('雲端紀錄身分或上下班類型不同，請重新讀取考勤後核對');
-                        Object.assign(existing, cloud);
-                    }
-                    expectedTime = String(cloud.timeStr || '');
-                } catch (error) {
-                    showToast(String(error?.message || '雲端核對失敗，請稍後再試'), 'warning');
-                    return;
-                }
-            }
-
-            const candidates = records.filter(item =>
-                String(item.id) === String(id) &&
-                (!expectedIdentity || p79AuditRecordIdentityMatches(expectedIdentity, item))
-            );
-            const r = candidates.find(item =>
-                (!expectedType || getAttendanceRecordType(item) === expectedType) &&
-                (!expectedTime || String(item.timeStr || '') === String(expectedTime))
-            ) || candidates.find(item => !expectedType || getAttendanceRecordType(item) === expectedType)
-              || candidates[0];
-
-            if (!r) {
-                showToast(
-                    expectedIdentity
-                        ? `找不到「${expectedIdentity.name || expectedIdentity.attNo || expectedIdentity.empId || ''}」對應的系統打卡紀錄，已停止開啟，避免修改到其他人`
-                        : '找不到這筆考勤紀錄',
-                    'warning'
-                );
-                return;
-            }
-            activeEditingAttendanceRecord = r;
-            activeEditingAttendanceRecordSnapshot = { ...r };
-
+        let p79AttendanceEditOpenGeneration = 0;
+        let p79AttendanceEditCloudReady = false;
+        function p79AttendanceEditFormFingerprint() {
+            return JSON.stringify(['modalDateInput','modalTimeHour','modalTimeMinute','modalStatusInput','modalNoteInput'].map(id=>document.getElementById(id)?.value||''));
+        }
+        function p79SetAttendanceEditCloudState(ready, message) {
+            p79AttendanceEditCloudReady=ready;
+            const status=document.getElementById('editRecordCloudCheckStatus');
+            if(status)status.textContent=message;
+            ['saveModalEditBtn','deleteModalRecordBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=!ready;});
+        }
+        function p79FillAttendanceEditForm(r) {
             document.getElementById('modalRecordId').value = r.id;
             const title = document.getElementById('editRecordModalTitle');
             if (title) title.textContent = `📝 修改${r.status || '考勤'}時間（24 小時制）`;
@@ -15983,7 +15951,58 @@ function getManualPairRecordAnchor(record) {
             selectModalStatus(r.status || '上班簽到');
             updateEditModalDeleteButton(r);
             setupMobileDateInputs();
+        }
+        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null) {
+            if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
+            const generation=++p79AttendanceEditOpenGeneration;
+            const candidates = records.filter(item =>
+                String(item.id) === String(id) &&
+                (!expectedIdentity || p79AuditRecordIdentityMatches(expectedIdentity, item))
+            );
+            const r = candidates.find(item =>
+                (!expectedType || getAttendanceRecordType(item) === expectedType) &&
+                (!expectedTime || String(item.timeStr || '') === String(expectedTime))
+            ) || candidates.find(item => !expectedType || getAttendanceRecordType(item) === expectedType)
+              || candidates[0];
+
+            if (!r) {
+                showToast(
+                    expectedIdentity
+                        ? `找不到「${expectedIdentity.name || expectedIdentity.attNo || expectedIdentity.empId || ''}」對應的系統打卡紀錄，已停止開啟，避免修改到其他人`
+                        : '找不到這筆考勤紀錄',
+                    'warning'
+                );
+                return;
+            }
+            activeEditingAttendanceRecord = r;
+            activeEditingAttendanceRecordSnapshot = { ...r };
+
+            p79FillAttendanceEditForm(r);
             document.getElementById('editRecordModal').classList.remove('hidden');
+            if(typeof window.p79V5PrepareAttendanceEdit!=='function'){
+                p79SetAttendanceEditCloudState(true,'');return;
+            }
+            p79SetAttendanceEditCloudState(false,'視窗已開啟，正在背景核對雲端原始紀錄；核對完成後可儲存。');
+            const original={...r},fingerprint=p79AttendanceEditFormFingerprint();
+            const stillOpen=()=>generation===p79AttendanceEditOpenGeneration&&activeEditingAttendanceRecord===r&&!document.getElementById('editRecordModal').classList.contains('hidden');
+            await new Promise(resolve=>{if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(resolve,0));else setTimeout(resolve,0);});
+            if(!stillOpen())return;
+            try{
+                const cloud=await window.p79V5PrepareAttendanceEdit(id);
+                if(!stillOpen())return;
+                const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
+                if(!same(cloud.id,original.id)||['empId','attNo'].some(key=>String(original[key]??'').trim()&&!same(original[key],cloud[key]))||getAttendanceRecordType(cloud)!==getAttendanceRecordType(original))throw Error('雲端紀錄身分或上下班類型不同，請重新整理後核對。');
+                const cloudChanged=['timeStr','status','note'].some(key=>String(cloud[key]||'')!==String(original[key]||''));
+                const userEdited=fingerprint!==p79AttendanceEditFormFingerprint();
+                const duplicateIds=records.filter(item=>String(item.id)===String(id)).length>1;
+                if(duplicateIds&&String(cloud.timeStr||'')!==String(original.timeStr||''))throw Error('同一編號存在不同打卡時間，請先重新整理核對，避免修改到另一班次。');
+                if(userEdited&&cloudChanged)throw Error('核對期間雲端原始紀錄已更新；你的輸入已保留，請取消後重新開啟核對。');
+                Object.assign(r,cloud);activeEditingAttendanceRecordSnapshot={...cloud};
+                if(!userEdited)p79FillAttendanceEditForm(r);
+                p79SetAttendanceEditCloudState(true,'雲端核對完成，可以儲存修改。');
+            }catch(error){
+                if(stillOpen())p79SetAttendanceEditCloudState(false,'核對未完成：'+String(error?.name==='AbortError'?'雲端讀取逾時，請取消後重新開啟':error?.message||'雲端讀取失敗，請取消後重新開啟'));
+            }
         }
 
 
@@ -16008,6 +16027,7 @@ function getManualPairRecordAnchor(record) {
         }
 
         function deleteCurrentModalAttendanceRecord() {
+            if(!p79AttendanceEditCloudReady){showToast('雲端原始紀錄尚未核對完成，暫時不能刪除','warning');return;}
             if (!requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
 
             const id = String(document.getElementById('modalRecordId')?.value || '').trim();
@@ -16087,6 +16107,7 @@ function getManualPairRecordAnchor(record) {
         }
 
         function closeEditModal() {
+            p79AttendanceEditOpenGeneration++;p79AttendanceEditCloudReady=false;
             document.getElementById('editRecordModal').classList.add('hidden');
             activeEditingAttendanceRecord = null;
             activeEditingAttendanceRecordSnapshot = null;
@@ -16107,7 +16128,7 @@ function getManualPairRecordAnchor(record) {
 
         function saveModalEdit() {
             const saveBtn = document.getElementById('saveModalEditBtn');
-            if (saveBtn?.disabled) return;
+            if (saveBtn?.disabled || !p79AttendanceEditCloudReady) return;
             if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
 
             const originalButtonText = saveBtn?.innerHTML || '💾 儲存變更';
