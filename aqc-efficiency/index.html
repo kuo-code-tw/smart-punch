@@ -786,8 +786,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
         <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出每月作業量表</button>
         <button onclick="clearDashboardFilter()" class="btn bg-slate-100 text-sm">清除全部篩選</button>
         <button id="forceVesselCloudPullBtn" type="button" onclick="forcePullVesselCloudData()" class="btn text-white text-sm font-black shadow-lg ring-2 ring-sky-300" style="background:#0284c7;color:#fff;min-width:190px" title="立即從 GC 即時資料與歷史船舶月份重新拉取">☁️ 立即雲端拉取船舶資料</button>
-        <button id="efficiencyCloudSyncBtn" onclick="manualCloudSync()" class="btn bg-sky-600 text-white text-sm">☁️ 同步船舶資料</button>
-      <span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">尚未確認同步</span></span>
+        <button id="efficiencyCloudSyncBtn" type="button" onclick="manualCloudSync()" class="btn bg-sky-600 text-white text-sm"><span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:0;border-radius:999px;background:transparent;color:inherit;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">同步船舶資料</span></span></button><details id="efficiencySyncError" hidden style="font-size:12px;color:#b91c1c;max-width:600px"><summary>查看同步未完成原因</summary><p id="efficiencySyncErrorText" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></details>
         <div id="dashboardTableFilterState" class="text-xs text-slate-500"></div>
         <div class="ship-change-toolbar">
           <span id="shipNewCountBadge" class="ship-change-pill ship-change-new hidden">🟢 NEW 0</span>
@@ -7091,12 +7090,13 @@ function p79SetEfficiencySyncLight(state,message=''){
  const colors={idle:['#94a3b8','#f1f5f9','#475569'],syncing:['#f59e0b','#fffbeb','#92400e'],pending:['#f59e0b','#fffbeb','#92400e'],error:['#ef4444','#fef2f2','#b91c1c'],success:['#10b981','#ecfdf5','#047857']};
  const color=colors[state]||colors.idle,host=document.getElementById('efficiencySyncLight'),dot=document.getElementById('efficiencySyncDot'),label=document.getElementById('efficiencySyncLabel');
  if(!host||!dot||!label)return;
- host.dataset.state=state;host.style.background=color[1];host.style.color=color[2];dot.style.background=color[0];
- label.textContent=message||({idle:'尚未確認同步',syncing:'同步中…',pending:'待同步 '+pending+' 筆',error:'同步失敗',success:'同步完成'}[state]);
+ host.dataset.state=state;host.style.background='transparent';host.style.color='inherit';dot.style.background=color[0];
+ const button=document.getElementById('efficiencyCloudSyncBtn');if(button){button.style.setProperty('background',color[1],'important');button.style.setProperty('color',color[2],'important');}
+ label.textContent='同步船舶資料｜'+(message||({idle:'尚未確認同步',syncing:'同步中…',pending:'待同步 '+pending+' 筆',error:'同步失敗',success:'同步完成'}[state]));
  host.title=state==='success'?'雲端讀取已完成，沒有待上傳項目；燈號不代表船舶數值核對一致':label.textContent;
 }
 function cloudStatus(t,ok=true){const e=document.getElementById('cloudState');e.textContent=t;e.className=`text-[11px] rounded-full px-3 py-1 ${ok?'bg-emerald-700':'bg-amber-600'}`;
- if(!ok)p79SetEfficiencySyncLight(/失敗|不可用|無法/.test(t)?'error':'syncing');
+ // 通用背景訊息只更新舊狀態列；船舶按鈕由實際同步步驟更新，避免無關讀取覆蓋結果。
  // 中途「已回應」或其他系統讀取成功不代表整次同步完成，不得提前亮綠燈。
 } 
 async function apiGet(action,params={}){
@@ -7995,9 +7995,11 @@ async function flushQueue(){
   await ensureGcQueueReady();
   if(gcQueueFlushPromise)return gcQueueFlushPromise;
   if(!readQueue().length)return {ok:true};
-  if(cloudBusy||!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0};
+  if(cloudBusy)return {ok:false,pendingCloudSync:readQueue().length>0,error:'其他雲端作業進行中，尚未開始上傳'};
+  if(!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0,error:'目前帳號沒有船舶資料寫入權限，待同步修改已保留'};
   cloudBusy=true;
   gcQueueFlushPromise=(async()=>{
+    let syncError='';
     try{
       while(readQueue().length){
         const item=readQueue()[0];
@@ -8013,6 +8015,7 @@ async function flushQueue(){
           if(index>=0){live.splice(index,1);await saveQueue(live)}
           if(result.revision)p79EfficiencyWriteOptional(STORE.rev,String(result.revision));
         }catch(e){
+          syncError=String(e?.message||e);
           console.warn('待補傳仍未完成，保留佇列',item?.action,e);
           break; // 舊修改未確認前，不能讓新修改越過它再被舊重試覆蓋。
         }
@@ -8020,7 +8023,7 @@ async function flushQueue(){
       const left=readQueue();
       cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'上傳完成｜等待讀回確認',!left.length);
       p79SetEfficiencySyncLight(left.length?'pending':'syncing',left.length?'待同步 '+left.length+' 筆':'上傳完成｜等待讀回確認');
-      return {ok:!left.length,pendingCloudSync:!!left.length};
+      return {ok:!left.length,pendingCloudSync:!!left.length,error:syncError};
     }finally{cloudBusy=false}
   })();
   try{return await gcQueueFlushPromise}finally{gcQueueFlushPromise=null}
@@ -8483,18 +8486,25 @@ async function syncFromCloud(force=false){
 async function manualCloudSync(){
   if(!requireEfficiencyAccess()||p79EfficiencyManualSyncActive)return;
   const btn=document.getElementById('efficiencyCloudSyncBtn');
-  const oldText=btn?.textContent||'☁️ 同步雲端';
   p79EfficiencyManualSyncActive=true;p79SetEfficiencySyncLight('syncing');
   try{
-    if(btn){btn.disabled=true;btn.textContent='☁️ 同步中...';}
+    if(btn){btn.disabled=true;}
+    const priorError=document.getElementById('efficiencySyncError');if(priorError)priorError.hidden=true;
     cloudStatus('同步雲端...',false);
 
     // 單一「同步雲端」現在同時做兩件事：
     // 1. 先把本機待上傳修改補傳。
     // 2. 再把 Google 雲端最新船舶/作業/人員資料安全合併回來。
+    const waitUntil=Date.now()+30000;
+    while(typeof cloudBusy!=='undefined'&&cloudBusy&&!(typeof gcQueueFlushPromise!=='undefined'&&gcQueueFlushPromise)){
+      p79SetEfficiencySyncLight('syncing','等待背景讀取完成…');
+      if(Date.now()>=waitUntil)throw Error('背景雲端讀取尚未結束，本次尚未開始上傳；資料已保留，請稍後再按同步');
+      await new Promise(resolve=>setTimeout(resolve,120));
+    }
     const upload=await flushQueue();
-    if(!upload?.ok || readQueue().length)throw Error('仍有本機修改等待補傳，尚未完成同步');
-    await restoreVesselDataFromCloud(false,true);
+    if(!upload?.ok || readQueue().length)throw Error(upload?.error||'仍有 '+readQueue().length+' 筆本機修改等待補傳，尚未完成同步');
+    const pulled=await restoreVesselDataFromCloud(false,true);
+    if(pulled===false)throw Error('船舶雲端讀取未完成，尚未確認同步');
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
 
     p79EfficiencyManualSyncActive=false;p79SetEfficiencySyncLight('success');
@@ -8503,12 +8513,15 @@ async function manualCloudSync(){
     toast('✅ 雲端同步完成｜已上傳本機變更並取得最新船舶資料');
   }catch(e){
     console.error(e);
+    const reason=String(e?.message||e);
     p79SetEfficiencySyncLight('error','同步未完成');
-    cloudStatus('雲端同步失敗',false);
+    const details=document.getElementById('efficiencySyncError'),detailText=document.getElementById('efficiencySyncErrorText');
+    if(details&&detailText){details.hidden=false;details.open=true;detailText.textContent=reason+'\n待同步：'+readQueue().length+' 筆（原資料保留）';}
+    cloudStatus('雲端同步未完成：'+reason,false);
     toast(`❌ 雲端同步失敗：${e.message||e}`);
   }finally{
     p79EfficiencyManualSyncActive=false;
-    if(btn){btn.disabled=false;btn.textContent=oldText;btn.style.opacity='1';}
+    if(btn){btn.disabled=false;btn.style.opacity='1';}
   }
 }
 
