@@ -1408,5 +1408,51 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 <link rel="stylesheet" href="assets/port79-vessel-theme.css?v=20261018-unified-design">
+
+<style id="p79-mobile-login-compact">
+@media(max-width:820px){
+ html.p79-compact-login body{align-items:flex-start!important;padding:6px!important}
+ html.p79-compact-login body>.card{margin:0 auto!important;border-radius:16px!important;max-width:560px!important}
+ html.p79-compact-login .header{padding:12px 70px 12px 12px!important}
+ html.p79-compact-login .cloud-title{font-size:17px!important;line-height:1.3!important}
+ html.p79-compact-login .cloud-sub,
+ html.p79-compact-login #todayWeather,
+ html.p79-compact-login #loginBox .employee-login-note,
+ html.p79-compact-login #loginBox .login-action-help,
+ html.p79-compact-login #cloudProbe{display:none!important}
+ html.p79-compact-login .body{padding:8px!important}
+ html.p79-compact-login #loginBox{padding:10px!important;border-radius:12px!important}
+ html.p79-compact-login #loginBox #status{height:40px!important;min-height:40px!important;max-height:40px!important;padding:5px 8px!important;margin-bottom:8px!important;font-size:11px!important;line-height:1.3!important}
+ html.p79-compact-login #loginBox .field{margin-bottom:7px!important}
+ html.p79-compact-login #loginBox label{font-size:12px!important;margin-bottom:3px!important}
+ html.p79-compact-login #loginBox input:not([type="checkbox"]){min-height:44px!important;height:44px!important;padding:8px 10px!important;font-size:16px!important}
+ html.p79-compact-login:not(.p79-login-password-ready) #adminPasswordField{display:none!important}
+ html.p79-compact-login #loginBox #p79TogglePassword{top:20px!important;height:36px!important}
+ html.p79-compact-login #p79LoginKeypad{padding:8px!important;margin:7px 0!important;border-radius:12px!important}
+ html.p79-compact-login .p79-keypad-title{margin-bottom:6px!important;font-size:12px!important}
+ html.p79-compact-login .p79-keypad-title small{display:none!important}
+ html.p79-compact-login .p79-keypad-grid{gap:6px!important}
+ html.p79-compact-login .p79-keypad-grid button{min-height:44px!important;height:44px!important;font-size:20px!important;border-radius:9px!important}
+ html.p79-compact-login .p79-keypad-grid .p79-keypad-action{font-size:15px!important}
+ html.p79-compact-login #p79KeypadConfirm{min-height:44px!important;height:44px!important;margin-top:6px!important;font-size:15px!important}
+ html.p79-compact-login #loginBox .p79-remember-id{margin:4px 0 7px!important;gap:6px!important;font-size:11px!important}
+ html.p79-compact-login #loginBox .login-action-grid{display:grid!important;grid-template-columns:1.3fr 1fr!important;gap:6px!important}
+ html.p79-compact-login #loginBox .login-action-grid button{min-height:44px!important;padding:8px!important;font-size:14px!important}
+}
+</style>
+<script id="p79-mobile-login-compact-state">
+(function(){
+ const box=document.getElementById('loginBox'),password=document.getElementById('password');
+ if(!box||!password)return;
+ function sync(){
+  document.documentElement.classList.toggle('p79-compact-login',box.style.display!=='none'&&!box.hidden);
+  document.documentElement.classList.toggle('p79-login-password-ready',!password.disabled);
+ }
+ sync();
+ const observer=new MutationObserver(sync);
+ observer.observe(box,{attributes:true,attributeFilter:['style','hidden']});
+ observer.observe(password,{attributes:true,attributeFilter:['disabled']});
+})();
+</script>
 </body>
 </html>
