@@ -1181,6 +1181,8 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
     <div class="flex flex-nowrap gap-1 text-[9px] leading-tight text-slate-600 dark:text-slate-300" >
                             <div class="flex flex-nowrap items-center gap-x-1">
                                 <span class="font-bold whitespace-nowrap">💡 異常顏色：</span>
+                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300">上班時間需核對｜01–30 分</span>
+                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300">下班時間需核對｜非 45–60 分</span>
                                 <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
                                 <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300">缺卡｜缺少簽到</span>
                                 <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300">缺卡｜缺少簽退</span>
@@ -14075,6 +14077,9 @@ function getManualPairRecordAnchor(record) {
                 return `<span class="text-slate-700 dark:text-white font-semibold">${text}</span>`;
             }
             const minute = getAttendanceMinute(record);
+            if(type==='IN'&&minute!==null&&minute>=1&&minute<=30){
+                return `<span class="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold" title="上班時間需核對：分鐘為 01 至 30">${text}</span>`;
+            }
             // 分鐘 45–59，以及下一小時的 00 分，均視為 45–60 的正常範圍。
             if (type === 'OUT' && minute !== null && minute !== 0 && minute < 45) {
                 return `<span class="inline-flex px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-bold" title="下班簽退分鐘未介於 45–60">${text}</span>`;
@@ -14520,6 +14525,9 @@ function getManualPairRecordAnchor(record) {
                 const minute=r=>{const m=String(r?.timeStr||'').match(/(?:\s|T)\d{1,2}:(\d{2})(?::\d{2})?$/);return m?Number(m[1]):null;};
                 const inMinute=minute(row.clockIn);
                 const timeChecks=[];
+                if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班時間需核對：分鐘為01至30');
+                const outMinute=minute(row.clockOut);
+                if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<45)timeChecks.push('下班分鐘未在45–60');
                 if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
                 return {kind:'NORMAL',status:'正常'};
             }
@@ -15469,10 +15477,13 @@ function getManualPairRecordAnchor(record) {
                     ''
                 ).trim();
 
-                const assessmentDetails = (row.attendanceAssessmentReasons || []).filter(reason => !String(reason).startsWith('上班時間與班表不符') && String(reason) !== '下班分鐘未在45–60').map(reason => `<span class="inline-flex ml-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
+                const visibleAssessmentReasons=(row.attendanceAssessmentReasons||[]).filter(reason=>!String(reason).startsWith('上班時間與班表不符')&&!String(reason).startsWith('上班時間需核對：')&&String(reason)!=='下班分鐘未在45–60');
+                const hiddenTimeOnly=row.attendanceStatus==='時間需核對'&&(row.attendanceAssessmentReasons||[]).length>0&&!visibleAssessmentReasons.length;
+                const statusText=hiddenTimeOnly?'':row.attendanceStatus;
+                const assessmentDetails = visibleAssessmentReasons.map(reason => `<span class="inline-flex ml-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
                 const statusBadge = ((Number(row.duplicateRecordCount)>0||String(row.attendanceStatus || '').includes('重複'))
-                    ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對已整合的重複打卡">🔎 重複刷卡已整合</button>${getAttendanceStatusBadge(row.attendanceStatus)}`
-                    : getAttendanceStatusBadge(row.attendanceStatus)) + assessmentDetails;
+                    ? `<button type="button" onclick="p79OpenMainTableDuplicateReview(${rowIndex})" class="px-2.5 py-1 rounded-lg text-[10px] bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold underline hover:ring-2 hover:ring-cyan-400" title="點擊核對已整合的重複打卡">🔎 重複刷卡已整合</button>${(statusText?getAttendanceStatusBadge(statusText):'')}`
+                    : (statusText?getAttendanceStatusBadge(statusText):'')) + assessmentDetails;
                 const extraChecks = (Array.isArray(row.attendanceCheckLabels) ? row.attendanceCheckLabels : [])
                     .filter(label => label === '跨日班次' || label === '人工補卡')
                     .map(label => `<span class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">${escapeHtml(label)}</span>`).join('');
