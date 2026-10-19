@@ -11,3 +11,12 @@ assert(text.includes('已報到早班'));assert(text.includes('今日報到'));c
 assert.equal(c.p79EmployeeDateEligible({reportingDate:'2026-10-18'},'2026-10-17'),false);assert.equal(c.p79EmployeeDateEligible({reportingDate:'2026-10-18'},'2026-10-18'),true);assert.equal(c.p79EmployeeDateEligible({reportingDate:'2026-10-20',startDate:'2026-10-01'},'2026-10-18'),false);assert.equal(c.p79EmployeeDateEligible({},'2026-10-18'),true);
 assert(!elements.todayScheduleSummary.textContent.includes('休假 1'));assert(!elements.todayScheduleSummary.textContent.includes('加班／代班 1'));assert.deepEqual(data.FUTURE,{'2026-10-18':'早','2026-10-17':'晚'});
 console.log('PASS future reporting/start dates excluded from today, previous night, leave/overtime and counts; reporting day included; ROC date and existing rows preserved');
+
+for(const n of ['normalizeScheduleEmploymentStatus','scheduleEmployeeEligibleForMonth'])vm.runInContext(fn(n),c);
+for(const status of ['resigned','離職','terminated','inactive','leave']){
+ assert.equal(c.scheduleEmployeeEligibleForMonth({employmentStatus:status,lastWorkDate:'2026-10-19'},'2026-10'),false);
+ assert.equal(c.scheduleEmployeeEligibleForMonth({employmentStatus:status,lastWorkDate:'2026-10-19'},'2026-09'),false);
+}
+assert.equal(c.scheduleEmployeeEligibleForMonth({employmentStatus:'active',reportingDate:'2026-10-19'},'2026-10'),true);
+assert.equal(c.scheduleEmployeeEligibleForMonth({employmentStatus:'active',reportingDate:'2026-11-01'},'2026-10'),false);
+console.log('PASS resigned staff excluded from all operational month rosters, active reporting month retained');
