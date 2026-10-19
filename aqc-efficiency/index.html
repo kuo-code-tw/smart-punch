@@ -7250,11 +7250,37 @@ function mergeCloudRecordsWithLocal(cloudRecords,localRecords,replacementMasters
   // 完整匯入批次可來自任一裝置；以主檔 manifest 驗證完整性後才排除舊列。
   const masters=Array.isArray(replacementMasters)?replacementMasters:(typeof shipMasters==='undefined'?[]:shipMasters||[]);
   masters.forEach(master=>{
-    const manifest=master?.workingSheetSource?.reportRecordIds;
+    let manifest=master?.workingSheetSource?.reportRecordIds;
     const no=String(master?.workingNo||'').trim();
     const stamp=String(master?.workingSheetSource?.importedAt||master?.workingSheetImportedAt||'');
-    const time=Date.parse(stamp),ids=new Set(Array.isArray(manifest)?manifest.map(String):[]);
-    if(!no||!ids.size||!Number.isFinite(time))return;
+    const time=Date.parse(stamp);
+    if(!no||!Number.isFinite(time))return;
+    // 舊匯入尚無 manifest：只接受原匯入時間一致、且完整通過原表核對的整批明細。
+    // 不從任意子集合湊總數；DISC/LOAD、H/C、Bundle、Moves 都必須通過既有核對。
+    if((!Array.isArray(manifest)||!manifest.length)&&typeof workloadSheetAudit==='function'){
+      const eligible=row=>String(row?.workingNo||'').trim()===no&&String(row?.workingSheetImportedAt||'')===stamp&&String(row?.source||'')==='working-report';
+      const newer=[...localList,...cloudList].some(row=>String(row?.workingNo||'').trim()===no&&(Date.parse(row?.workingSheetImportedAt||'')||0)>time);
+      if(!newer){
+        const localBatch=localList.filter(eligible),cloudBatch=cloudList.filter(eligible);
+        const union=(a,b)=>[...new Map([...a,...b].map(row=>[recordIdentityKey(row),row])).values()];
+        const candidates=[localBatch,cloudBatch,union(localBatch,cloudBatch),union(cloudBatch,localBatch)];
+        const verified=new Map();
+        candidates.forEach(batch=>{
+          if(!batch.length||batch.some(row=>!String(row.id||'').trim()))return;
+          if(workloadSheetAudit(master,batch).status!=='match')return;
+          const signature=JSON.stringify(batch.map(row=>[String(row.id),num(row.disc),num(row.load),num(row.hatches),num(row.bundleDeduct),num(row.timeHours)]).sort((a,b)=>a[0].localeCompare(b[0])));
+          verified.set(signature,batch);
+        });
+        if(verified.size===1){
+          const batch=[...verified.values()][0];manifest=batch.map(row=>String(row.id));
+          master.workingSheetSource={...master.workingSheetSource,reportRecordIds:manifest,legacyVerifiedReplacement:true};
+          localList=localList.filter(row=>String(row?.workingNo||'').trim()!==no).concat(batch);
+          cloudList=cloudList.filter(row=>String(row?.workingNo||'').trim()!==no).concat(batch);
+        }
+      }
+    }
+    const ids=new Set(Array.isArray(manifest)?manifest.map(String):[]);
+    if(!ids.size)return;
     const complete=list=>{
       const present=new Set(list.filter(row=>String(row?.workingNo||'').trim()===no&&String(row?.workingSheetImportedAt||'')===stamp).map(row=>String(row.id||'')));
       return [...ids].every(key=>key&&present.has(key));
@@ -7878,7 +7904,7 @@ async function buildSafeGcSyncPayload(payload={}){
     const sendingRecords=mergeCloudRecordsWithLocal(
       remoteRecords,
       Array.isArray(localPayload.records)?localPayload.records:(records||[]),
-      mergeShipMastersPreferComplete(incomingMasters,remoteMasters)
+      sendingMasters
     );
 
     // 人員分組不允許雲端空 groupId 洗掉本機已分組資料。
@@ -8280,6 +8306,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     if(d?.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
 
     shipMasters=canonicalShipMasters(shipMasters||[]);
+    await p79ReadCompleteWorkingReportOnMismatch();
     saveLocal();
 
     // 2026-09-24 顯示修正：雲端明明有船舶資料，但舊月份／日期篩選可能把全部資料擋掉。
@@ -8372,9 +8399,28 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
   }
 }
 
+const p79WorkingReportRepairReads=new Set();
+async function p79ReadCompleteWorkingReportOnMismatch(){
+  if(typeof workloadSheetAudit!=='function')return;
+  const mismatches=(shipMasters||[]).filter(master=>{
+    const no=String(master?.workingNo||'').trim();
+    const rows=(records||[]).filter(row=>String(row?.workingNo||'').trim()===no&&String(row?.source||'')==='working-report');
+    return no&&master?.workingSheetSource&&workloadSheetAudit(master,rows).status!=='match';
+  });
+  if(!mismatches.length)return;
+  const key=JSON.stringify([mismatches.map(m=>[m.workingNo,m.workingSheetSource?.importedAt]).sort()]);
+  if(p79WorkingReportRepairReads.has(key))return;
+  p79WorkingReportRepairReads.add(key);
+  try{
+    const full=await apiGet('gcGetData',{});
+    if(!full?.ok)throw Error(full?.error||'完整明細讀取失敗');
+    mergeEfficiencyCloudData(full);
+  }catch(error){p79WorkingReportRepairReads.delete(key);console.warn('完整 WORKING REPORT 補讀失敗，保留既有明細',error);}
+}
 async function syncFromCloud(force=false){
  if(!requireEfficiencyAccess()) return
  if(cloudBusy)return;cloudBusy=true;
+ if(force)p79WorkingReportRepairReads.clear();
  try{
    cloudStatus('讀取雲端...',false);
    const d=await apiGet('gcGetData',efficiencyCloudScopeParams());
@@ -8391,6 +8437,7 @@ async function syncFromCloud(force=false){
    }
 
    if(d.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
+   await p79ReadCompleteWorkingReportOnMismatch();
    saveLocal();
    invalidateWorkloadIndex();
    renderEfficiencyTabFast();
