@@ -8758,18 +8758,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
-            const raw=getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
-            if(!clockIn)return raw; // An OUT without its IN cannot establish a shift date.
-            const ts=getAttendanceTimestamp(clockIn);if(!ts)return raw;
-            const date=new Date(ts),hour=date.getHours()+date.getMinutes()/60;
-            if(hour>=8)return raw;
-            const scheduled=getScheduleShiftLabelForPunch(emp,clockIn.timeStr);
-            const completed=clockOut?inferShiftFromCompletedSession(clockIn,clockOut,emp):'';
-            // Preserve early arrivals for the morning shift; midnight night shifts belong to yesterday.
-            const night=scheduled==='晚班'||(!scheduled&&(completed==='晚班'||(!completed&&hour<5)));
-            if(!night)return raw;
-            date.setDate(date.getDate()-1);
-            return getAttendanceDateKey(date.getFullYear()+'/'+String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'));
+            return getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
         }
 
         function inferShiftFromCompletedSession(clockInRecord, clockOutRecord, emp = currentEmp) {
@@ -14961,7 +14950,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261018-precision-only"></script>
+<script src="../attendance/v6-engine.js?v=20261019-corrected-lineage"></script>
 
 <script>
 function p79CanExportOvertimeApplication(){

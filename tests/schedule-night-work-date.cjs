@@ -12,10 +12,10 @@ Object.assign(c,{isScheduleEmployeeClockedIn:()=>true,scheduleTaipeiDutyShift:()
 for(const file of ['attendance/index.html','work-hours/index.html']){
  const s=fs.readFileSync(file,'utf8');const ctx={Date,getAttendanceDateKey:v=>String(v||'').split(' ')[0].replaceAll('-','/'),getAttendanceTimestamp:r=>Date.parse(r.timeStr.replaceAll('/','-').replace(' ','T')),getScheduleShiftLabelForPunch:(emp)=>emp?.shift||'',inferShiftFromCompletedSession:()=> '晚班'};vm.createContext(ctx);vm.runInContext(fn(s,'p79AttendanceSessionWorkDate','        '),ctx);
  assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/17 23:35'},null,{}),'2026/10/17');
- assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/18 00:10'},null,{}),'2026/10/17');
- assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/11/01 00:10'},null,{}),'2026/10/31');
+ assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/18 00:10'},null,{}),'2026/10/18');
+ assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/11/01 00:10'},null,{}),'2026/11/01');
  assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/18 07:35'},null,{shift:'早班'}),'2026/10/18');
- assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/18 06:00'},null,{shift:'晚班'}),'2026/10/17');
+ assert.equal(ctx.p79AttendanceSessionWorkDate({timeStr:'2026/10/18 06:00'},null,{shift:'晚班'}),'2026/10/18');
  assert.equal(ctx.p79AttendanceSessionWorkDate(null,{timeStr:'2026/10/18 08:00'},{}),'2026/10/18');
  for(const m of s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
 }

@@ -2019,7 +2019,7 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
             <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
                 <label for="exportAttendanceMonth" class="block text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-2">匯出年／月份</label>
                 <input type="month" id="exportAttendanceMonth" required class="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm">
-                <p class="text-[11px] text-slate-500 mt-2">只匯出所選月份的原始打卡紀錄，以每筆打卡的實際日期為準。</p>
+                <p class="text-[11px] text-slate-500 mt-2">以上班日決定月份；跨月班次連同下月簽退一起匯出，原始打卡時間保留。</p>
             </div>
 
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 Excel）</label>
@@ -10776,18 +10776,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
-            const raw=getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
-            if(!clockIn)return raw; // An OUT without its IN cannot establish a shift date.
-            const ts=getAttendanceTimestamp(clockIn);if(!ts)return raw;
-            const date=new Date(ts),hour=date.getHours()+date.getMinutes()/60;
-            if(hour>=8)return raw;
-            const scheduled=getScheduleShiftLabelForPunch(emp,clockIn.timeStr);
-            const completed=clockOut?inferShiftFromCompletedSession(clockIn,clockOut,emp):'';
-            // Preserve early arrivals for the morning shift; midnight night shifts belong to yesterday.
-            const night=scheduled==='晚班'||(!scheduled&&(completed==='晚班'||(!completed&&hour<5)));
-            if(!night)return raw;
-            date.setDate(date.getDate()-1);
-            return getAttendanceDateKey(date.getFullYear()+'/'+String(date.getMonth()+1).padStart(2,'0')+'/'+String(date.getDate()).padStart(2,'0'));
+            return getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
         }
 
         function inferShiftFromCompletedSession(clockInRecord, clockOutRecord, emp = currentEmp) {
@@ -12015,46 +12004,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function attendanceRowIsCarryIntoMonth(row, selectedMonth) {
-            const selected = String(selectedMonth || '').trim();
-            if (!/^\d{4}-\d{2}$/.test(selected) || !row) return false;
-
-            const accountingMonth = attendanceRowAccountingMonthKey(row);
-            const previousMonth = shiftAttendanceMonthKey(selected, -1);
-            if (accountingMonth !== previousMonth) return false;
-
-            // 已完成：前月上班、目前月份下班。
-            const outMonth = attendanceMonthKeyFromRowRecord(row.clockOut);
-            if (outMonth === selected) return true;
-
-            // 人工配對下班時間。
-            const manualOut = String(
-                row.manualPairClockOutTimeStr ||
-                row.clockIn?.manualPairClockOutTimeStr ||
-                row.clockOut?.manualPairClockOutTimeStr ||
-                ''
-            ).trim();
-            if (manualOut) {
-                const mm = manualOut.match(/^(\d{4})[-\/](\d{1,2})/);
-                if (mm && `${mm[1]}-${String(Number(mm[2])).padStart(2,'0')}` === selected) return true;
-            }
-
-            // 未完成跨月夜班：僅帶入前月最後一天的未簽退上班。
-            if (!row.clockOut && row.clockIn) {
-                const ts = getAttendanceTimestamp(row.clockIn);
-                if (Number.isFinite(ts)) {
-                    const d = new Date(ts);
-                    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-                    if (d.getDate() === lastDay && shiftAttendanceMonthKey(accountingMonth, 1) === selected) return true;
-                }
-            }
-            return false;
+            return false; // Cross-month shifts appear only in their clock-in month.
         }
 
         function attendanceRowVisibleForMonth(row, selectedMonth) {
             const selected = String(selectedMonth || '').trim();
             if (!selected || selected === 'ALL') return true;
-            return attendanceRowAccountingMonthKey(row) === selected ||
-                   attendanceRowIsCarryIntoMonth(row, selected);
+            return attendanceRowAccountingMonthKey(row) === selected;
         }
 
         function attendanceRowCrossMonthLabel(row, selectedMonth) {
@@ -21495,6 +21451,36 @@ function p79EmployeeDateEligible(emp,date) {
             if(incomplete)throw Error('雲端考勤只有日期、缺少時分：'+String(incomplete.name||incomplete.empId||'')+' '+incomplete.timeStr+'；已停止匯出，避免誤當成 00:00。請重新整理核對時間欄位');
             return rows;
         }
+        function p79SelectAttendanceExportShifts(source,month) {
+            const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
+            const seen=new Set(),selected=[];
+            build(source).forEach(shift=>{
+                const day=String(shift.accountingDateKey||shift.dateKey||'').replaceAll('/','-');
+                if(day.slice(0,7)!==month)return;
+                [shift.clockIn,shift.clockOut].filter(Boolean).forEach(record=>{
+                    const key=[record.id,record.empId,record.status,record.timeStr].join('|');
+                    if(!seen.has(key)){seen.add(key);selected.push(record);}
+                });
+            });
+            return selected;
+        }
+        async function p79ReadAttendanceExportScope(month) {
+            const current=getTodayAttendanceIso().slice(0,7),previous=shiftAttendanceMonthKey(month,-1),next=shiftAttendanceMonthKey(month,1);
+            const read=async key=>{
+                const rows=await p79ReadAttendanceExportMonth(key);
+                if(key===current)return rows;
+                const direct=await p79ReadAttendanceExportSource('getAttendanceMainDirect',key);
+                const primary=direct.records.map(normalizeAttendanceRecordIdentifiers);
+                const identity=r=>[String(r.id),String(r.empId||r.attNo||''),getAttendanceRecordType(r)].join('|');
+                const ids=new Set(primary.map(identity));
+                return primary.concat(rows.filter(r=>!ids.has(identity(r))));
+            };
+            const [center,before,after]=await Promise.all([read(month),read(previous),next<=current?read(next):Promise.resolve([])]);
+            const edgeBefore=previous+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5))-1,0).getDate()).padStart(2,'0');
+            const date=r=>getAttendanceDateKey(r.timeStr||'').replaceAll('/','-');
+            const source=center.concat(before.filter(r=>date(r)===edgeBefore),after.filter(r=>date(r)===next+'-01'));
+            return {records:p79SelectAttendanceExportShifts(source,month),source};
+        }
         function p79AttendanceExportScheduleLabel(raw,meta,emp,date,roster) {
             if(!p79EmployeeDateEligible(emp,date))return '';
             const approved=(roster.leaveRecords||[]).find(leave=>String(leave.empId||'').trim().toUpperCase()===String(emp.empId).trim().toUpperCase()&&String(leave.status||'')==='已核准'&&normalizeScheduleDateKey(leave.startTime||leave.startDate)&&normalizeScheduleDateKey(leave.endTime||leave.endDate)&&normalizeScheduleDateKey(leave.startTime||leave.startDate)<=date&&normalizeScheduleDateKey(leave.endTime||leave.endDate)>=date);
@@ -21591,8 +21577,8 @@ function p79EmployeeDateEligible(emp,date) {
             const includeSchedule=document.getElementById('exportIncludeSchedule')?.checked===true;
             if(includeSchedule&&!p79RequireScheduleExport())return;
             update('正在讀取 '+exportMonth+' 最新考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
-            const [exportSource,roster]=await Promise.all([
-                p79ReadAttendanceExportMonth(exportMonth),
+            const [exportScope,roster]=await Promise.all([
+                p79ReadAttendanceExportScope(exportMonth),
                 includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth):Promise.resolve(null),
                 window.p79LoadXlsxLibrary()
             ]);
@@ -21600,8 +21586,8 @@ function p79EmployeeDateEligible(emp,date) {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             update('正在整理原始考勤與選取欄位…');
             const identityPool=getAttendanceIdentityEmployeePool();
+            const exportSource=exportScope.records;
             const visibleRecords = exportSource
-                .filter(record=>p79AttendanceExportMatchesMonth(record,exportMonth))
                 .filter(canCurrentAdminViewDataRow)
                 .filter(record => {
                     if (companyFilter === 'ALL') return true;
@@ -21640,14 +21626,7 @@ function p79EmployeeDateEligible(emp,date) {
             if(includeSchedule){
                 update('正在建立排班與每日考勤工作表…');
                 const people=getAdminAttendanceEmployees().filter(emp=>companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter));
-                let pairedSource=exportSource.filter(canCurrentAdminViewDataRow);
-                const date=new Date(Number(exportMonth.slice(0,4)),Number(exportMonth.slice(5)),1);
-                const next=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
-                if(next<=getTodayAttendanceIso().slice(0,7)){
-                    update('正在核對月底跨日簽退…');
-                    const boundary=await p79ReadAttendanceExportMonth(next);
-                    pairedSource=pairedSource.concat(boundary.filter(canCurrentAdminViewDataRow));
-                }
+                const pairedSource=exportScope.source.filter(canCurrentAdminViewDataRow);
                 if(!requireAdminAction('attendanceExport','匯出考勤')||!p79RequireScheduleExport())return;
                 const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,roster);
                 const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows),dailySheet=XLSX.utils.aoa_to_sheet(report.dailyRows);
@@ -24174,7 +24153,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261018-precision-only"></script>
+<script src="./v6-engine.js?v=20261019-corrected-lineage"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';

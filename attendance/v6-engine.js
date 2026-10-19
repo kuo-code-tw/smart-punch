@@ -330,7 +330,15 @@
       if(!preciseTimes.has(key))preciseTimes.set(key,new Set());
       preciseTimes.get(key).add(r.__ts);
     });
-    const prepared=snapshots.filter(r=>r.__type!=='OTHER'&&r.__identity).filter(r=>{
+    const versionsById=new Map();
+    snapshots.forEach(r=>{const key=[r.__identity,r.__type,s(r.id)].join('|');if(!versionsById.has(key))versionsById.set(key,[]);versionsById.get(key).push(r);});
+    const currentVersions=snapshots.filter(old=>!(versionsById.get([old.__identity,old.__type,s(old.id)].join('|'))||[]).some(corrected=>{
+      if(corrected===old||!isManual(corrected)||recency(corrected)<=recency(old))return false;
+      const key=s(corrected.sourceEventKey);if(!key||key.includes('PAIRGRP')||key.includes('TYPE:'))return false;
+      const match=key.match(/(\d{3,4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?)\|/);
+      return !!match&&normalizeTime(match[1])===old.timeStr;
+    }));
+    const prepared=currentVersions.filter(r=>r.__type!=='OTHER'&&r.__identity).filter(r=>{
       if(Number.isFinite(r.__ts)||!/^\d{4}\/\d{2}\/\d{2}$/.test(r.timeStr))return true;
       return preciseTimes.get(precisionKey(r))?.size!==1;
     });
