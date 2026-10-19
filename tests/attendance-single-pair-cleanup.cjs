@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');const html=fs.readFileSync('attendance/index.html','utf8');
+function fn(name){let a=html.indexOf('function '+name+'(');if(html.slice(a-6,a)==='async ')a-=6;return html.slice(a,html.indexOf('\n        }',a)+10);}
+const make=()=>[{id:'i2',empId:'E1',status:'IN',timeStr:'2026-09-30T23:35:00+08:00'},{id:'o1',empId:'E1',status:'OUT',timeStr:'2026-10-01T07:45:00+08:00'},{id:'i1',empId:'E1',status:'IN',timeStr:'2026-09-30T23:31:00+08:00'},{id:'o2',empId:'E1',status:'OUT',timeStr:'2026-10-01T07:46:00+08:00'}];
+function setup(mode='ok'){
+ const rows=make(),calls=[],c={console,records:rows.map(r=>({...r})),p79DuplicateReviewRows:[{records:rows}],p79BatchDuplicateBusy:false,window:{},getAttendanceRecordType:r=>r.status,getAttendanceTimestamp:r=>Date.parse(r.timeStr),getPunchChannel:()=> 'REGULAR',p79ImportIdentityMatches:(a,b)=>a.empId===b.empId,p79CanAutoCombineDuplicateSide:(a,b)=>a.status===b.status&&Math.abs(Date.parse(a.timeStr)-Date.parse(b.timeStr))<=900000,p79SameReviewedOriginal:(a,b)=>JSON.stringify(a)===JSON.stringify(b),isLocallyDeletedAttendanceRecord:()=>false,requireAdminAction:()=>true,confirm:()=>mode!=='cancel',p79CloseDuplicateReview(){},showToast(){},renderAdminRecordsTable(){},renderAdminLiveTable(){},p79PerformDuplicateCloudRequest:async payload=>{calls.push(payload.id);return mode==='queued'?{ok:true,queued:true}:{ok:true};},p79ApplyConfirmedAttendanceDelete:id=>{c.records=c.records.filter(r=>r.id!==id);return true;}};
+ vm.createContext(c);vm.runInContext(fn('p79PlanSinglePairDuplicateCleanup'),c);vm.runInContext(fn('p79AutoKeepSingleAttendancePair'),c);return{c,rows,calls};
+}
+(async()=>{
+ const t=setup(),p=t.c.p79PlanSinglePairDuplicateCleanup(t.c.p79DuplicateReviewRows[0]);assert.deepEqual(Array.from(p.keep,r=>r.id),['i1','o2']);await t.c.p79AutoKeepSingleAttendancePair(0);assert.deepEqual(t.calls,['i2','o1']);assert.deepEqual(t.c.records.map(r=>r.id),['i1','o2']);assert.equal(t.c.p79BatchDuplicateBusy,false);
+ for(const mode of ['cancel','queued']){const x=setup(mode);await x.c.p79AutoKeepSingleAttendancePair(0);assert.equal(x.c.records.length,4);assert.equal(x.calls.length,mode==='cancel'?0:1);}
+ for(const change of [x=>x.rows[0].empId='OTHER',x=>x.rows[0].timeStr='2026-09-30T20:00:00+08:00',x=>x.rows[0].id=x.rows[1].id,x=>x.c.window.p79V5QueueInfoForId=()=>({})]){const x=setup();change(x);await x.c.p79AutoKeepSingleAttendancePair(0);assert.equal(x.calls.length,0);}
+ assert(html.includes('自動保留上下班各一筆'));console.log('PASS same-shift cross-month earliest IN/latest OUT, confirmed deletes only, cancel/queued/conflict/other employee/pending protections');
+})().catch(e=>{console.error(e);process.exitCode=1;});
