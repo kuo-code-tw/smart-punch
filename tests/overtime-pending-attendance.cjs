@@ -9,6 +9,7 @@ const rows=ctx.buildOvertimeStatisticsRows();assert.equal(rows.length,1);assert.
 assert(hours.includes("row.planned&&!row.clockIn?'待出勤'"));assert(hours.includes("row.clockIn?'尚未下班':'待出勤'"));
 const app={};app.window=app;vm.runInNewContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),app);vm.runInNewContext(fs.readFileSync('assets/port79-overtime-monthly-matrix.js','utf8'),app);
 const snap={schedules:[{empId:'AP1',schedule:{'2026-10-01':'例','2026-10-02':'休','2026-10-03':'國',__meta:{}}}]};
+assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('休16-24'),'休');assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('國08-16'),'國');
 const model=app.P79OvertimeMonthlyMatrix.build(snap,[emp],'2026-10');assert(!model.issues.some(x=>x.includes('尚未排班')));
 const screen=app.P79OvertimeMonthlyMatrix.screen(model,false,{});for(const color of ['FFE4E6','DBEAFE','FEF3C7'])assert(screen.includes('background:#'+color+'!important'));assert(screen.includes('mm-rest-legend'));
 assert(!fs.readFileSync('assets/port79-overtime-application.js','utf8').includes('為預排資料，請切換預排申請表'));
