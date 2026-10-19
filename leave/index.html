@@ -330,8 +330,8 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
               <option value="其他公司公告假別">其他公司公告假別</option>
             </select>
           </div>
-          <div class="field"><label>開始日期</label><input id="leaveStart" type="date" onchange="updateDays()"></div>
-          <div class="field"><label>結束日期</label><input id="leaveEnd" type="date" onchange="updateDays()"></div>
+          <div class="field"><label for="leaveStart">開始日期</label><input id="leaveStart" type="date" required onchange="updateDays()"></div>
+          <div class="field"><label for="leaveEnd">結束日期</label><input id="leaveEnd" type="date" required onchange="updateDays()"></div>
           <div class="field"><label>請假天數</label><input id="leaveDays" value="1" readonly></div>
           <div class="field"><label>事由／備註</label><textarea id="leaveReason" placeholder="請輸入請假事由"></textarea></div>
           <button id="submitLeaveBtn" class="btn btn-pri" style="width:100%" onclick="submitLeave()">📤 送出請假申請</button>
@@ -926,11 +926,16 @@ document.getElementById('leaveBalanceImportFile')?.addEventListener('change',e=>
 function renderAll(){if(currentEmployee){const fresh=employees.find(e=>String(e.empId||'').toUpperCase()===String(currentEmployee.empId||'').toUpperCase());if(fresh)currentEmployee=fresh;showEmployee()}else renderMy();if(adminSession){renderAdmin();renderAdminBalances()}}
 
 (async function init(){
+ // 日期先就緒，不等待登入驗證或雲端讀取；保留員工已選日期。
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+ if(!$('leaveStart').value)$('leaveStart').value=today;
+ if(!$('leaveEnd').value)$('leaveEnd').value=today;
+ updateDays();
  const identityReady=restoreAdmin();
  const dataReady=loadCloud(false,false,identityReady);
  const sso=await identityReady;await dataReady;
  if(!sso&&$('employeeLeaveReauth').hidden){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
- const today=new Date().toISOString().slice(0,10);$('leaveStart').value=today;$('leaveEnd').value=today;updateDays();
+
 })();
 </script>
 
@@ -1156,14 +1161,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 
 <script src="../assets/port79-calendar-range.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded",()=>{
-
-const C=window.Port79CalendarRange;if(!C)return;
-C.mountRange({startId:'leaveStart',endId:'leaveEnd',label:'請假日期',allowClear:false});
-
-});
-</script>
+<!-- 員工請假保留原生開始／結束日期，手機可直接使用系統日曆。 -->
 <script src="../assets/port79-seven-top.js?v=20261018-permissions"></script>
 
 <style id="p79-leave-cover-style">
