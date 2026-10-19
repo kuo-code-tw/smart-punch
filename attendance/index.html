@@ -2018,8 +2018,13 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
             <div class="attendance-export-body">
             <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
                 <label for="exportAttendanceMonth" class="block text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-2">匯出年／月份</label>
-                <input type="month" id="exportAttendanceMonth" required class="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm">
-                <p class="text-[11px] text-slate-500 mt-2">以上班日決定月份；跨月班次連同下月簽退一起匯出，原始打卡時間保留。</p>
+                <input type="month" id="exportAttendanceMonth" onchange="p79ResetExportDateRange()" required class="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm">
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <label class="text-xs">開始日期<input type="date" id="exportAttendanceStart" required aria-label="匯出開始日期" class="w-full mt-1 px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm"></label>
+                    <label class="text-xs">結束日期<input type="date" id="exportAttendanceEnd" required aria-label="匯出結束日期" class="w-full mt-1 px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm"></label>
+                </div>
+                <button type="button" onclick="p79ResetExportDateRange()" class="mt-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 text-xs">整月</button>
+                <p class="text-[11px] text-slate-500 mt-2">日期範圍包含起訖日，考勤、排班與每日考勤均套用。以上班日決定月份；跨月班次連同下月簽退一起匯出，原始打卡時間保留。</p>
             </div>
 
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 Excel）</label>
@@ -21361,8 +21366,19 @@ function p79EmployeeDateEligible(emp,date) {
             const selectedMonth=document.getElementById('filterMonthSelect')?.value||'';
             document.getElementById('exportAttendanceMonth').value=/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)
                 ? selectedMonth : getTodayAttendanceIso().slice(0,7);
+            p79ResetExportDateRange();
             document.getElementById('exportRecordsModal').classList.remove('hidden');
             updateExportFieldCount();
+        }
+
+        function p79ResetExportDateRange() {
+            const month=document.getElementById('exportAttendanceMonth').value;
+            if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
+            const last=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()).padStart(2,'0');
+            ['exportAttendanceStart','exportAttendanceEnd'].forEach((id,i)=>{
+                const input=document.getElementById(id);
+                input.min=month+'-01';input.max=last;input.value=i?last:month+'-01';
+            });
         }
 
         function closeExportRecordsModal() {
@@ -21451,12 +21467,12 @@ function p79EmployeeDateEligible(emp,date) {
             if(incomplete)throw Error('雲端考勤只有日期、缺少時分：'+String(incomplete.name||incomplete.empId||'')+' '+incomplete.timeStr+'；已停止匯出，避免誤當成 00:00。請重新整理核對時間欄位');
             return rows;
         }
-        function p79SelectAttendanceExportShifts(source,month) {
+        function p79SelectAttendanceExportShifts(source,month,start=month+"-01",end=month+"-31") {
             const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
             const seen=new Set(),selected=[];
             build(source).forEach(shift=>{
                 const day=String(shift.accountingDateKey||shift.dateKey||'').replaceAll('/','-');
-                if(day.slice(0,7)!==month)return;
+                if(day.slice(0,7)!==month||day<start||day>end)return;
                 [shift.clockIn,shift.clockOut].filter(Boolean).forEach(record=>{
                     const key=[record.id,record.empId,record.status,record.timeStr].join('|');
                     if(!seen.has(key)){seen.add(key);selected.push(record);}
@@ -21574,6 +21590,12 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast('請選擇有效的匯出年／月份', 'warning');
                 return;
             }
+            const start=document.getElementById('exportAttendanceStart').value,end=document.getElementById('exportAttendanceEnd').value;
+            const last=exportMonth+'-'+String(new Date(Number(exportMonth.slice(0,4)),Number(exportMonth.slice(5)),0).getDate()).padStart(2,'0');
+            if(![start,end].every(value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&value>=exportMonth+'-01'&&value<=last)||start>end){
+                showToast('請選擇所選月份內的有效日期範圍，結束日期不可早於開始日期','warning');return;
+            }
+            const dateLabel=start+'_'+end;
             const includeSchedule=document.getElementById('exportIncludeSchedule')?.checked===true;
             if(includeSchedule&&!p79RequireScheduleExport())return;
             update('正在讀取 '+exportMonth+' 最新考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
@@ -21586,7 +21608,7 @@ function p79EmployeeDateEligible(emp,date) {
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             update('正在整理原始考勤與選取欄位…');
             const identityPool=getAttendanceIdentityEmployeePool();
-            const exportSource=exportScope.records;
+            const exportSource=p79SelectAttendanceExportShifts(exportScope.source,exportMonth,start,end);
             const visibleRecords = exportSource
                 .filter(canCurrentAdminViewDataRow)
                 .filter(record => {
@@ -21629,6 +21651,9 @@ function p79EmployeeDateEligible(emp,date) {
                 const pairedSource=exportScope.source.filter(canCurrentAdminViewDataRow);
                 if(!requireAdminAction('attendanceExport','匯出考勤')||!p79RequireScheduleExport())return;
                 const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,roster);
+                const keep=report.scheduleRows[0].map((date,i)=>i<5||(date>=start&&date<=end));
+                report.scheduleRows=report.scheduleRows.map(row=>row.filter((_,i)=>keep[i]));
+                report.dailyRows=report.dailyRows.filter((row,i)=>i===0||(row[0]>=start&&row[0]<=end));
                 const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows),dailySheet=XLSX.utils.aoa_to_sheet(report.dailyRows);
                 scheduleSheet['!cols']=[10,15,14,16,14,...Array(report.scheduleRows[0].length-5).fill(12)].map(wch=>({wch}));
                 dailySheet['!cols']=[12,10,15,14,16,14,12,22,22,12,16].map(wch=>({wch}));
@@ -21643,7 +21668,7 @@ function p79EmployeeDateEligible(emp,date) {
             }
             update('正在產生 Excel 檔案…');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
-            XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${exportMonth}_${companySuffix}.xlsx`);
+            XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${dateLabel}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
             showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`,missingPairs.length?'warning':'success');
             } catch(error) {
