@@ -14986,7 +14986,7 @@ window.p79MonthlyRestContext={
   const readRoster=async()=>{
    const state=p79WorkOvertimeMonths.get(month);
    if(state?.token===token&&state.pending&&state.promise)await state.promise;
-   if(state?.token===token&&state.ready&&Date.now()-state.at<60000&&currentPort79SsoToken()===token)return {schedules:state.rows,leaveRecords:state.leaveRecords||[]};
+   if(state?.token===token&&state.ready&&Array.isArray(state.leaveRecords)&&Date.now()-state.at<60000&&currentPort79SsoToken()===token)return {schedules:state.rows,leaveRecords:state.leaveRecords||[]};
    return read('getScheduleDataSecure');
   };
   const [roster,attendance,boundary]=await Promise.all([readRoster(),rosterOnly?Promise.resolve({records:[]}):read('getAttendanceMonthRaw'),reportView&&!rosterOnly?read('getAttendanceMonthData'):Promise.resolve({records:[]})]);
