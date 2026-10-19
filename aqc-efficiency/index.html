@@ -7190,7 +7190,8 @@ async function vesselRevisionIsCurrent(timeoutMs=7000){
   return !!remoteRevision && remoteRevision===localRevision;
 }
 
-const GC_WRITE_TIMEOUT_MS=45000;
+const GC_WRITE_TIMEOUT_MS=90000;
+const GC_FULL_READ_TIMEOUT_MS=90000; // Live GAS full read measured 51.8s on 2026-10-19.
 async function apiPost(action,payload={}){
   const url=getGasUrl();if(!url)throw Error('未設定 GAS URL');
   const controller=new AbortController();let timer;
@@ -7846,7 +7847,7 @@ async function onMonthlyCompareMonthChange(){
 
 function gcLocalSyncState(){return JSON.stringify({groups,assignments,records,shipMasters});}
 async function buildSafeGcSyncPayload(payload={}){
-  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>apiGetQuick(action,params,35000):apiGet;
+  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>apiGetQuick(action,params,GC_FULL_READ_TIMEOUT_MS):apiGet;
   const localPayload={...payload};
   const beforeState=gcLocalSyncState();
   const matchesCurrent=JSON.stringify({
@@ -7979,7 +7980,7 @@ async function p79VerifyTimedOutEfficiencyWrite(action,payload,readSnapshot=null
   if(action!=='gcSyncAll')return false;
   try{
     if(typeof p79EfficiencySyncStep==='function')p79EfficiencySyncStep(readSnapshot?'比對已讀取的完整資料':'讀回核對上次寫入結果');
-    const remote=readSnapshot||await apiGetQuick('gcGetData',{},35000);
+    const remote=readSnapshot||await apiGetQuick('gcGetData',{},GC_FULL_READ_TIMEOUT_MS);
     if(!remote?.ok)return false;
     const equalValue=(a,b)=>{
       if(Array.isArray(a))return Array.isArray(b)&&a.length===b.length&&a.every((value,i)=>equalValue(value,b[i]));
@@ -8275,7 +8276,7 @@ async function restoreVesselFromHistoryFallback(){
 async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=false){
   if(!requireEfficiencyAccess())return false;
 
-  const read=requireCloudSuccess?(action,params)=>apiGetQuick(action,params,35000):apiGet;
+  const read=requireCloudSuccess?(action,params)=>apiGetQuick(action,params,GC_FULL_READ_TIMEOUT_MS):apiGet;
   try{
     cloudStatus('正在找回船舶資料...',false);
 
