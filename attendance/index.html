@@ -10012,12 +10012,25 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return open;
         }
 
+        function p79GetUnresolvedPriorClockIn(emp = currentEmp) {
+            if (!emp) return null;
+            const now=Date.now();
+            return buildDailyAttendanceRows(getEmployeePunchRecords(emp,'REGULAR'))
+                .filter(row=>row.clockIn&&!row.clockOut&&getAttendanceTimestamp(row.clockIn)>0&&now-getAttendanceTimestamp(row.clockIn)>24*60*60*1000)
+                .sort((a,b)=>getAttendanceTimestamp(b.clockIn)-getAttendanceTimestamp(a.clockIn))[0]||null;
+        }
+
         function validateEmployeePunchSequence(statusText, emp = currentEmp) {
             if (!emp) return { ok:false, message:'請先完成員工登入' };
 
             const channel = getPunchChannel(statusText);
             const type = getPunchTypeFromStatus(statusText);
             if (!type) return { ok:true };
+
+            if(channel==='REGULAR'&&type==='IN'){
+                const unresolved=p79GetUnresolvedPriorClockIn(emp);
+                if(unresolved)return {ok:false,duplicate:true,message:`${formatDateTime(unresolved.clockIn.timeStr)} 的上班卡缺少下班簽退，請管理員補齊後再上班簽到`};
+            }
 
             const latest = getLatestEmployeePunchState(emp, channel);
             const now = Date.now();
@@ -10192,16 +10205,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return;
             }
 
+            const unresolvedPrior=p79GetUnresolvedPriorClockIn(currentEmp);
             const openId=String(openShift?.clockIn?.id??'');
             const cloudConfirmedIn=!!openId&&p79MobileHasOfficial(currentEmp)&&p79MobileOfficial.rows.some(row=>String(row?.id??'')===openId);
             // Keep duplicate prevention, but do not call a local-only punch cloud-confirmed.
             // 一般打卡狀態機：IN → OUT → IN。
             setButtonState(
                 clockInButton,
-                !openShift,
+                !openShift&&!unresolvedPrior,
                 '上班簽到',
-                cloudConfirmedIn?'✓ 已完成上班簽到':'上班已暫存｜待雲端確認',
-                openShift ? `已於 ${formatDateTime(openShift.clockIn.timeStr)} 完成上班簽到，請使用下班簽退` : ''
+                unresolvedPrior?'前次缺少簽退｜請管理員補卡':(cloudConfirmedIn?'✓ 已完成上班簽到':'上班已暫存｜待雲端確認'),
+                unresolvedPrior ? `${formatDateTime(unresolvedPrior.clockIn.timeStr)} 缺少下班簽退，請管理員補齊後再上班簽到` : (openShift ? `已於 ${formatDateTime(openShift.clockIn.timeStr)} 完成上班簽到，請使用下班簽退` : '')
             );
             setButtonState(
                 clockOutButton,
@@ -10244,7 +10258,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             );
 
             // 保留原本上班按鈕的色彩切換。
-            const locked = !!openShift;
+            const locked = !!openShift || !!unresolvedPrior;
             clockInButton.classList.toggle('bg-emerald-600', !locked);
             clockInButton.classList.toggle('hover:bg-emerald-700', !locked);
             clockInButton.classList.toggle('bg-slate-400', locked);
