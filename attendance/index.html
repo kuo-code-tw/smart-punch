@@ -21490,7 +21490,10 @@ function p79EmployeeDateEligible(emp,date) {
         async function p79ReadAttendanceExportMonth(month) {
             const now=new Date(),current=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
             const data=await p79ReadAttendanceExportSource(month===current?'getAttendanceMainDirect':'getAttendanceMonthData',month);
-            return data.records.map(normalizeAttendanceRecordIdentifiers);
+            const rows=data.records.map(normalizeAttendanceRecordIdentifiers);
+            const incomplete=rows.find(record=>/^\d{3,4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(record.timeStr||'').trim()));
+            if(incomplete)throw Error('雲端考勤只有日期、缺少時分：'+String(incomplete.name||incomplete.empId||'')+' '+incomplete.timeStr+'；已停止匯出，避免誤當成 00:00。請重新整理核對時間欄位');
+            return rows;
         }
         function p79AttendanceExportScheduleLabel(raw,meta,emp,date,roster) {
             if(!p79EmployeeDateEligible(emp,date))return '';
