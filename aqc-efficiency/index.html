@@ -7199,7 +7199,14 @@ async function apiPost(action,payload={}){
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},signal:controller.signal,body:JSON.stringify({action,gcToken,...payload})});
     const text=await r.text();let j;
     try{j=JSON.parse(text)}catch{throw Error('GAS 未回 JSON')}
-    if(!r.ok || !j.ok)throw Error(j.error||'雲端錯誤');return j;
+    if(!r.ok || !j.ok){
+      const error=Error(j.error||'雲端錯誤');
+      // Only a valid server rejection explicitly marked retryable proves no write began.
+      error.retryable=j.ok===false&&j.retryable===true;
+      error.writeRejected=j.ok===false;
+      throw error;
+    }
+    return j;
   })();
   try{
     return await Promise.race([request,new Promise((_,reject)=>{
@@ -8038,7 +8045,7 @@ async function flushQueue(){
   if(!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0,error:'目前帳號沒有船舶資料寫入權限，待同步修改已保留'};
   cloudBusy=true;
   gcQueueFlushPromise=(async()=>{
-    let syncError='';
+    let syncError='',busyRetryId='',busyRetryCount=0;
     try{
       while(readQueue().length){
         const item=readQueue()[0];
@@ -8063,9 +8070,21 @@ async function flushQueue(){
           const signature=JSON.stringify(item);
           const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===signature);
           if(index>=0){live.splice(index,1);await saveQueue(live)}
+          busyRetryId='';busyRetryCount=0;syncError='';
           if(result.revision)p79EfficiencyWriteOptional(STORE.rev,String(result.revision));
         }catch(e){
           syncError=String(e?.message||e);
+          // Retry only explicit busy rejections. Each retry re-reads and merges cloud data;
+          // unknown outcomes, permission errors and transport failures retain their guards.
+          if(e?.retryable===true&&e?.writeRejected===true&&/正在處理其他資料|正在寫入資料|雲端正忙|同步繁忙/.test(syncError)){
+            if(busyRetryId!==item.id){busyRetryId=item.id;busyRetryCount=0;}
+            if(busyRetryCount<3){
+              const delay=[2000,5000,10000][busyRetryCount++];
+              p79EfficiencySyncStep('雲端忙碌，等待後自動重試','第 '+busyRetryCount+'/3 次；待同步 '+readQueue().length+' 批，原資料保留');
+              await new Promise(resolve=>setTimeout(resolve,delay));
+              continue;
+            }
+          }
           if(/逾時|timeout|Abort|fetch|Network/i.test(syncError)){
             const pending=readQueue(),entry=pending.find(row=>row.id===item.id);
             if(entry){entry.uncertainWrite=true;entry.lastWriteError=syncError;try{await saveQueue(pending)}catch(_){} }
@@ -8549,7 +8568,7 @@ async function manualCloudSync(){
   const watchdog=setTimeout(()=>{
     p79SetEfficiencySyncLight('pending','回應較慢｜'+p79EfficiencySyncCurrentStage);
     const details=document.getElementById('efficiencySyncError'),text=document.getElementById('efficiencySyncErrorText');
-    if(details&&text){details.hidden=false;details.open=true;text.textContent='整次流程已超過60秒；目前：'+p79EfficiencySyncCurrentStage+'。仍在等待這一步的正式回覆，不能單憑總時間判定寫入失敗。各次讀取35秒、寫入45秒會獨立結束等待；資料與待同步項目保留。';}
+    if(details&&text){details.hidden=false;details.open=true;text.textContent='整次流程已超過60秒；目前：'+p79EfficiencySyncCurrentStage+'。仍在等待這一步的正式回覆，不能單憑總時間判定寫入失敗。各次讀取90秒、寫入90秒會獨立結束等待；資料與待同步項目保留。';}
   },60000);
   try{
     if(btn){btn.disabled=true;}
@@ -14020,10 +14039,21 @@ async function autoRestoreVesselCloud(reason='auto',retryCount=3){
 
   port79ShipAutoSyncBusy=true;
   try{
+    // Drain pending saves before revision shortcuts or cloud reads. Otherwise a busy
+    // rejection remains queued forever while the timer keeps reporting 'latest'.
+    await ensureGcQueueReady();
+    if(readQueue().length){
+      const upload=await flushQueue();
+      if(!upload?.ok||readQueue().length){
+        cloudStatus('船舶修改尚待同步｜保留 '+readQueue().length+' 批，下次自動再確認',false);
+        return false;
+      }
+    }
     // 有本機資料時先做輕量 revision 檢查。
     // revision 沒變：直接判定已是最新，不再呼叫大型 gcGetData。
     // meta 暫時連不上：保留本機資料，稍後背景再確認，不用大型重抓拖慢頁面。
-    if(hasLocalVesselData()){
+    const needsReadback=typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired;
+    if(hasLocalVesselData()&&!needsReadback){
       try{
         cloudStatus('快速確認雲端版本...',false);
         if(await vesselRevisionIsCurrent(6000)){
@@ -14043,8 +14073,9 @@ async function autoRestoreVesselCloud(reason='auto',retryCount=3){
     for(let attempt=1;attempt<=retryCount;attempt++){
       try{
         if(attempt>1)cloudStatus(`雲端資料更新重試 ${attempt}/${retryCount}...`,false);
-        const ok=await restoreVesselDataFromCloud(false);
+        const ok=await restoreVesselDataFromCloud(false,needsReadback);
         if(ok){
+          if(!readQueue().length){p79SetEfficiencySyncLight('success');setEfficiencySaveState(false,'本機與雲端資料已完成同步');}
           port79ShipLastAutoSyncAt=Date.now();
           cloudStatus(`已更新最新資料｜主檔 ${(shipMasters||[]).length}｜明細 ${(records||[]).length}`);
           return true;
