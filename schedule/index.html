@@ -74,7 +74,7 @@
 #app-main-container .p79-day-cell,#app-main-container .p79-day-head{width:39px!important;min-width:39px!important;max-width:39px!important;padding:1px!important}
 #app-main-container .p79-day-cell{height:34px!important;max-height:38px!important;vertical-align:middle!important}
 #app-main-container .p79-day-cell .p79-shift-select{height:28px!important;min-height:28px!important;line-height:28px!important;font-size:11px!important}
-#app-main-container .p79-day-cell .mt-1{display:none!important}
+#app-main-container .p79-day-cell .mt-1{display:flex!important}
 #app-main-container .p79-month-schedule-table tbody tr{height:38px!important}
 
 /* V10.34：所有單位縮短休假統計及班別格內空白 */
@@ -1444,6 +1444,15 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-group-select{grid-column:1 / -1!important;grid-row:2!important}
 </style>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
+
+<style id="p79-rest-overtime-visible-v1037">
+/* Compact shift cell: keep exception / un-rested overtime tags visible without adding blank rows. */
+#app-main-container .p79-month-schedule-table .p79-day-cell{position:relative!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1{position:absolute!important;top:0!important;right:0!important;z-index:2!important;margin:0!important;display:flex!important;width:auto!important;max-width:100%!important;justify-content:flex-end!important;pointer-events:none!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1:empty{display:none!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1 span{font-size:8px!important;line-height:11px!important;min-height:0!important;padding:0 2px!important;border-radius:3px!important;white-space:nowrap!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1 button{pointer-events:auto!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
