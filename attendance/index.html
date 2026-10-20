@@ -16421,11 +16421,10 @@ function getManualPairRecordAnchor(record) {
         function p79AddModalEmployeeChanged(){
             const modal=document.getElementById('addRecordModal');
             const locked=String(modal?.dataset?.p79LockedEmployeeKey||'');
-            const selected=String(document.getElementById('addModalEmpSelect')?.value||'');
-            if(locked&&selected!==locked){
-                resetManualAddPairing();
-                const hint=document.getElementById('addModalPairHint');
-                if(hint){hint.textContent='已切換員工，這筆將新增給目前選擇的人員。';hint.classList.remove('hidden');}
+            const select=document.getElementById('addModalEmpSelect');
+            if(locked&&String(select?.value||'')!==locked){
+                if(select)select.value=locked;
+                showToast('此補卡已綁定原員工，不能切換到其他人。','warning');
             }
         }
         function initAddModalDropdownsFast(preferredEmployee=null){
@@ -16500,6 +16499,7 @@ function getManualPairRecordAnchor(record) {
                 ? 'IN'
                 : (suggestedStatus === '上班簽到' ? 'OUT' : '');
 
+            resetManualAddPairing();
             const targetRecord = p79ResolveManualPairTargetExact(
                 targetRecordId,
                 targetTimeArg,
@@ -16639,7 +16639,7 @@ function getManualPairRecordAnchor(record) {
             p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(emp));
             if (empSelect) {
                 empSelect.value = attendanceEmployeeOptionValue(emp);
-                empSelect.disabled = false;
+                empSelect.disabled = true;
             }
 
             // V5.6：鎖定後再次驗證 Modal 選到的人必須和畫面列一致。
@@ -16866,6 +16866,7 @@ function getManualPairRecordAnchor(record) {
             const lockedEmployeeKey = String(modal?.dataset?.p79LockedEmployeeKey || '').trim();
             const lockedEmpId = String(modal?.dataset?.p79LockedEmpId || '').trim();
             const selectedEmployeeKey = document.getElementById('addModalEmpSelect')?.value || '';
+            if(lockedEmployeeKey && selectedEmployeeKey !== lockedEmployeeKey){showToast('員工身份不符，補卡已取消','warning');return;}
             const employeeKey = lockedEmployeeKey || lockedEmpId || selectedEmployeeKey;
             const emp = findAttendanceEmployeeByOptionValue(employeeKey);
             if (!emp) {
@@ -16947,6 +16948,7 @@ function getManualPairRecordAnchor(record) {
                     }
                 }
 
+                if(pairIdentityTarget && (String(pairIdentityTarget.empId||'')!==String(emp.empId||'') || String(pairIdentityTarget.attNo||'')!==String(emp.attNo||''))){throw new Error('配對目標員工身份不符');}
                 const targetStableForGroup = pairIdentityTarget ? getAttendanceStablePairKey(pairIdentityTarget) : '';
                 const targetTimeForGroup = pairIdentityTarget ? normalizeImportedAttendanceTime(pairIdentityTarget.timeStr) : '';
                 const pairGroupKey = pairIdentityTarget
@@ -16955,9 +16957,9 @@ function getManualPairRecordAnchor(record) {
 
                 const newRecord = {
                     id: Date.now(),
-                    attNo: pairIdentityTarget?.attNo ?? emp.attNo,
-                    empId: pairIdentityTarget?.empId || emp.empId,
-                    name: pairIdentityTarget?.name || emp.name,
+                    attNo: emp.attNo,
+                    empId: emp.empId,
+                    name: emp.name,
                     dept: pairIdentityTarget?.dept || emp.dept || '一般',
                     timeStr: `${effectiveDateVal.replace(/-/g, '/')} ${timeVal}`,
                     status: statusVal,
