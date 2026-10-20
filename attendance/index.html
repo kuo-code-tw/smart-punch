@@ -16357,6 +16357,7 @@ function getManualPairRecordAnchor(record) {
 
         function openManualAddModal() {
             if (!requireAdminAction('attendanceCreate', '新增上下班打卡')) return;
+            resetManualAddPairing();
             pendingManualPairClockInId = '';
             pendingManualPairClockOutId = '';
             pendingManualPairClockInKey = '';
@@ -16389,8 +16390,6 @@ function getManualPairRecordAnchor(record) {
             set24HourTime('addModal', `${hh}:${min}`);
             document.getElementById('addModalNoteInput').value = "管理員手動補卡";
 
-            repairAttendanceNamesInMemory();
-            initDropdowns();
             initAddModalDropdownsFast();
             selectAddModalStatus('上班簽到');
             setupMobileDateInputs();
@@ -16418,11 +16417,19 @@ function getManualPairRecordAnchor(record) {
             select.innerHTML='<option value="">全部職稱</option>'+jobs.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
             if(jobs.includes(current))select.value=current;
         }
-        function p79AddModalJobChanged(){p79AddRefreshEmployeeOptions();}
-        function p79AddModalEmployeeChanged(){}
+        function p79AddModalJobChanged(){p79AddRefreshEmployeeOptions();p79AddModalEmployeeChanged();}
+        function p79AddModalEmployeeChanged(){
+            const modal=document.getElementById('addRecordModal');
+            const locked=String(modal?.dataset?.p79LockedEmployeeKey||'');
+            const selected=String(document.getElementById('addModalEmpSelect')?.value||'');
+            if(locked&&selected!==locked){
+                resetManualAddPairing();
+                const hint=document.getElementById('addModalPairHint');
+                if(hint){hint.textContent='已切換員工，這筆將新增給目前選擇的人員。';hint.classList.remove('hidden');}
+            }
+        }
         function initAddModalDropdownsFast(preferredEmployee=null){
             const select=document.getElementById('addModalDeptSelect');if(!select)return;
-            repairAttendanceNamesInMemory();
             const list=getAdminAttendanceEmployees();
             const depts=[...new Set(list.map(e=>String(e?.dept||'一般').trim()||'一般'))].sort(p79AddStrokeSorter.compare);
             const desired=String(preferredEmployee?.dept||select.value||depts[0]||'一般');
@@ -16533,7 +16540,6 @@ function getManualPairRecordAnchor(record) {
             }
 
             const resolveManualEmployee = () => {
-                repairAttendanceNamesInMemory();
                 const visible = getAdminAttendanceEmployees();
 
                 const normalizeName = value =>
@@ -16629,10 +16635,11 @@ function getManualPairRecordAnchor(record) {
             const deptSelect = document.getElementById('addModalDeptSelect');
             const empSelect = document.getElementById('addModalEmpSelect');
             if (deptSelect) deptSelect.value = emp.dept || deptSelect.value || '一般';
-            onAddModalDeptChange();
+            p79AddRefreshJobs(p79AddJob(emp));
+            p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(emp));
             if (empSelect) {
                 empSelect.value = attendanceEmployeeOptionValue(emp);
-                empSelect.disabled = !!targetRecordId;
+                empSelect.disabled = false;
             }
 
             // V5.6：鎖定後再次驗證 Modal 選到的人必須和畫面列一致。
@@ -16681,9 +16688,13 @@ function getManualPairRecordAnchor(record) {
         }
 
         function closeAddModal() {
+            document.getElementById('addRecordModal')?.classList.add('hidden');
+            resetManualAddPairing();
+        }
+
+        function resetManualAddPairing() {
             const modal = document.getElementById('addRecordModal');
             if (modal) {
-                modal.classList.add('hidden');
                 delete modal.dataset.p79LockedEmpId;
                 delete modal.dataset.p79LockedEmployeeKey;
                 delete modal.dataset.p79LockedAttNo;
@@ -16706,7 +16717,7 @@ function getManualPairRecordAnchor(record) {
             pendingManualPairTargetName = '';
         }
 
-        function onAddModalDeptChange(){p79AddRefreshJobs();p79AddRefreshEmployeeOptions();}
+        function onAddModalDeptChange(){p79AddRefreshJobs();p79AddRefreshEmployeeOptions();p79AddModalEmployeeChanged();}
 
         function selectAddModalStatus(status) {
             document.getElementById('addModalStatusInput').value = status;
