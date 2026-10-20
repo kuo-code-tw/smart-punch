@@ -1267,10 +1267,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
 
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-4"><div class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">加班人數</div><div id="overtimeEmployeeCount" class="mt-1 text-2xl font-bold text-indigo-700 dark:text-indigo-300">0</div></div>
                     <div class="rounded-2xl border border-sky-100 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30 p-4"><div class="text-xs font-semibold text-sky-600 dark:text-sky-400">加班班次</div><div id="overtimeShiftCount" class="mt-1 text-2xl font-bold text-sky-700 dark:text-sky-300">0</div></div>
                     <div class="rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-4"><div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">估算加班合計</div><div id="overtimeTotalHours" class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">0 小時</div></div>
+                    <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4"><div class="text-xs font-semibold text-amber-700 dark:text-amber-400">加班時數（未換算）</div><div id="overtimeRawReportedHours" class="mt-1 text-2xl font-bold text-amber-800 dark:text-amber-300">0 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-4"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
 
@@ -12702,10 +12703,16 @@ function p79OvertimePeriodLabel(report){
             p79WorkOvertimeFilteredRows=rows;
             const uniqueEmployees = new Set(rows.map(row => String(row.empId || row.attNo || row.name))).size;
             const totalOvertimeMinutes = rows.reduce((total, row) => total + row.overtimeMinutes, 0);
+            // 加總已申報的原始加班時數，禁止使用 convertedHours 或倍數換算。
+            const rawReportedMinutes = rows.reduce((total, row) => {
+                const hours = Number(row.overtimeReport?.declaredHours);
+                return total + (row.overtimeReport && Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : 0);
+            }, 0);
             const over12Count = rows.filter(row => row.overDailyLimit).length;
             document.getElementById('overtimeEmployeeCount').textContent = uniqueEmployees;
             document.getElementById('overtimeShiftCount').textContent = rows.length;
             document.getElementById('overtimeTotalHours').textContent = formatDurationMinutes(totalOvertimeMinutes);
+            document.getElementById('overtimeRawReportedHours').textContent = formatDurationMinutes(rawReportedMinutes);
             document.getElementById('overtimeOver12Count').textContent = over12Count;
             document.getElementById('overtimeFilterResultCount').textContent = `(符合條件共 ${rows.length} 個班次)`;
 
