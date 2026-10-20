@@ -1848,7 +1848,7 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
     </div>
 
     <!-- 彈出式修改考勤紀錄 Modal -->
-    <div id="editRecordModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="editRecordModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 border border-slate-100 dark:border-slate-700">
             <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
                 <h3 id="editRecordModalTitle" class="text-base font-bold text-slate-800 dark:text-slate-100">📝 編輯考勤紀錄（24 小時制）</h3>
@@ -1912,7 +1912,7 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
     </div>
 
     <!-- 彈出式新增補打卡 Modal -->
-    <div id="addRecordModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="addRecordModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 border border-slate-100 dark:border-slate-700">
             <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">➕ 新增補打卡（24 小時制）</h3>
@@ -5111,6 +5111,7 @@ const now = new Date();
         }
 
         function p79RenderOnlyVisibleAttendanceView() {
+            if(typeof p79DeferAttendanceTableRender==='function'&&p79DeferAttendanceTableRender())return;
             if (isAdminLoggedIn) {
                 const tab = p79CurrentVisibleAdminTab();
                 if (tab === 'records') {
@@ -15345,6 +15346,7 @@ function getManualPairRecordAnchor(record) {
             return '<span class="block font-bold '+(adjusted?'text-blue-800 dark:text-blue-200':'text-slate-700 dark:text-slate-200')+'">'+escapeHtml(key.replaceAll('-','/'))+'</span>'+(adjusted?'<span class="inline-flex rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200" title="依晚班歸屬前一工作日；簽到與簽退欄保留實際打卡時間">凌晨歸前日</span>':'');
         }
         function renderAdminRecordsTable() {
+            if(typeof p79DeferAttendanceTableRender==='function'&&p79DeferAttendanceTableRender())return;
             const tbody = document.getElementById('adminRecordsTableBody');
 
             // V5.11.11：一般考勤表也自動救回消失人工補卡；節流避免每次 render 掃 localStorage。
@@ -17125,6 +17127,7 @@ function getManualPairRecordAnchor(record) {
         }
 
         function renderAdminLiveTable() {
+            if(typeof p79DeferAttendanceTableRender==='function'&&p79DeferAttendanceTableRender())return;
             const tbody = document.getElementById('adminLiveTableBody');
             if (!tbody) return;
 
@@ -23300,7 +23303,8 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
+<script src="../assets/port79-attendance-editor-render.js?v=20261020-editor-responsive"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261020-editor-responsive"></script>
 
 
 
