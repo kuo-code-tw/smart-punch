@@ -33,10 +33,17 @@ function plan(snapshot,people,month,rules){
    const m=roster.__meta?.[d]||{};
    return ['早','中','晚'].includes(roster[d])&&!m.overtimeReport&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&!(snapshot.leaveDates||[]).includes(id(emp.empId)+'|'+d);
   });
-  const final=candidates.filter(d=>Number(d.slice(8))>=g.p79RestQuota(month).days-7),older=candidates.filter(d=>!final.includes(d)).reverse();
-  const need=cats.reduce((n,c)=>n+b.remaining[c],0),take=Math.min(need,final.length),spread=[];
-  for(let i=0;i<take;i++)spread.push(final[take===1?final.length-1:Math.round(i*(final.length-1)/(take-1))]);
-  const dates=[...spread,...older,...final.filter(d=>!spread.includes(d))],used=new Set();
+  // 未休補加班從每月15日開始，依週輪流取日期，避免集中月底最後一週。
+  // 不把前半月當成自動補位；若後半月不足，列出未排項目供人工調整。
+  const weeks=[[],[],[]];
+  candidates.filter(d=>Number(d.slice(8))>=15).sort().forEach(d=>{
+   const day=Number(d.slice(8));weeks[day<=21?0:day<=28?1:2].push(d);
+  });
+  const dates=[];
+  while(weeks.some(group=>group.length)){
+   for(const group of weeks)if(group.length)dates.push(group.shift());
+  }
+  const used=new Set();
   for(const category of cats)for(let n=0;n<b.remaining[category];n++){
    let item;
    for(const date of dates){if(used.has(date))continue;const pairs=snapshot.pairs.filter(p=>id(p.empId)===id(emp.empId)&&p.date===date);if(pairs.length>1)continue;
@@ -54,7 +61,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">先扣例、休、國已休天數；未休申報依國、休、例安排。日期優先分散在月底前一週，可自行改選；已申報日期不重複帶入。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div id="mrSummary" class="summary"></div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">先扣例、休、國已休天數；未休申報依國、休、例安排。日期從15日起依週分散安排，不集中同一週；後半月不足時提示人工調整，已申報日期不重複帶入。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div id="mrSummary" class="summary"></div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[];
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
