@@ -24,7 +24,7 @@ function ruleFor(date,roster,pair,category,rules){
  return allowed.find(r=>r[6]+'-'+r[7]===range)||null;
 }
 function plan(snapshot,people,month,rules){
- const rows=[],balances=[],issues=[];
+ const rows=[],balances=[],issues=[],sharedDateCount=new Map();
  for(const emp of people){const roster=snapshot.schedules.find(r=>id(r.empId)===id(emp.empId))?.schedule;
   if(!roster){issues.push(emp.name+' 沒有本月班表');continue;}
   let b;try{b=balance(emp,roster,month)}catch(e){issues.push(e.message);continue;}
@@ -43,13 +43,16 @@ function plan(snapshot,people,month,rules){
   while(weeks.some(group=>group.length)){
    for(const group of weeks)if(group.length)dates.push(group.shift());
   }
-  const used=new Set();
+  const used=new Set(),weekCount=[0,0,0];
+  const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
   for(const category of cats)for(let n=0;n<b.remaining[category];n++){
    let item;
-   for(const date of dates){if(used.has(date))continue;const pairs=snapshot.pairs.filter(p=>id(p.empId)===id(emp.empId)&&p.date===date);if(pairs.length>1)continue;
+   // 先分散個人每週筆數，再盡量與其他申報人安排在同一天。
+   const rankedDates=dates.slice().sort((a,b)=>weekCount[weekOf(a)]-weekCount[weekOf(b)] || (sharedDateCount.get(b)||0)-(sharedDateCount.get(a)||0) || dates.indexOf(a)-dates.indexOf(b));
+   for(const date of rankedDates){if(used.has(date))continue;const pairs=snapshot.pairs.filter(p=>id(p.empId)===id(emp.empId)&&p.date===date);if(pairs.length>1)continue;
     const pair=pairs[0];if(!pair&&date<today())continue;
     const rule=ruleFor(date,roster,pair,category,rules);if(!rule)continue;
-    item={id:crypto.randomUUID(),empId:emp.empId,name:emp.name,date,category,rule:rule.slice(),checked:false,status:pair?'可申報':'預排／待核對',planned:!pair};used.add(date);break;
+    item={id:crypto.randomUUID(),empId:emp.empId,name:emp.name,date,category,rule:rule.slice(),checked:false,status:pair?'可申報':'預排／待核對',planned:!pair};used.add(date);weekCount[weekOf(date)]++;sharedDateCount.set(date,(sharedDateCount.get(date)||0)+1);break;
    }
    if(item)rows.push(item);else issues.push(emp.name+'「'+category+'」尚有1天找不到可申報日期或相符時段');
   }
@@ -61,7 +64,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">先扣例、休、國已休天數；未休申報依國、休、例安排。日期從15日起依週分散安排，不集中同一週；後半月不足時提示人工調整，已申報日期不重複帶入。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div id="mrSummary" class="summary"></div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">先扣例、休、國已休天數；未休申報依國、休、例安排。15日起優先將不同申報人排同一天，同一人的申報跨週分散；不足8小時會警示，已申報日期不重複帶入。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div id="mrSummary" class="summary"></div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[];
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
@@ -77,7 +80,7 @@ async function open(){
  function paint(){
   const total=c=>model.balances.reduce((n,b)=>n+b.remaining[c],0);
   q('#mrSummary').innerHTML=cats.map(c=>'<span class="'+c+'">'+c+'：應休 '+model.balances.reduce((n,b)=>n+b.quota[c],0)+'／已休 '+model.balances.reduce((n,b)=>n+b.off[c],0)+'／已申報 '+model.balances.reduce((n,b)=>n+b.reported[c],0)+'／待報 '+total(c)+' 天</span>').join('');
-  q('#mrRows').innerHTML=model.rows.map((r,i)=>'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td>'+esc(r.name)+'</td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時</td><td>'+esc(r.status)+'</td></tr>').join('');
+  q('#mrRows').innerHTML=model.rows.map((r,i)=>'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td>'+esc(r.name)+'</td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+(Number(r.rule[2])<8?'<span style="display:block;color:#b91c1c;font-weight:700">⚠ 未滿8小時</span>':'')+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   q('#mrSave').disabled=!model.rows.some(r=>r.checked&&!r.saved);
  }
  q('#mrRows').onchange=e=>{const tr=e.target.closest('[data-row]');if(!tr)return;const r=model.rows[Number(tr.dataset.row)];if(r.saved)return;if(!e.target.classList.contains('pick'))r.id=crypto.randomUUID();
@@ -98,6 +101,8 @@ async function open(){
  q('#mrSave').onclick=async()=>{
   if(busy||!model)return;const selected=model.rows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   const seen=new Set();for(const r of selected){const key=id(r.empId)+'|'+r.date;if(!r.date.startsWith(loadedMonth+'-')||seen.has(key)){setStatus('日期不符或同一人同日重複，請調整後再申報。');return;}seen.add(key);}
+  const short=selected.filter(r=>Number(r.rule[2])<8);
+  if(short.length&&!confirm('⚠ 有 '+short.length+' 筆未休加班申報未滿8小時：\\n'+short.map(r=>r.name+' '+r.date+'（'+r.rule[2]+'小時）').join('\\n')+'\\n確定仍要申報嗎？'))return;
   busy=true;stop=false;controls(true);let count=0;
   try{
    setStatus('正在重新核對未休額度與已申報紀錄…');
