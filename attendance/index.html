@@ -16669,7 +16669,16 @@ function getManualPairRecordAnchor(record) {
             const clickedEventDate = String(getAttendanceDateKey(targetTimeStr) || '').trim();
             const initialDate = /^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(clickedEventDate)
                 ? clickedEventDate : dateKey;
-            const normalizedPairDate = normalizeImportedAttendanceTime(`${initialDate} 00:00`);
+            // 跨日補下班：原上班時間位於深夜時，預設日期應為隔日，不能直接沿用上班日。
+            let proposedDate = initialDate;
+            if(suggestedStatus === '下班簽退' && expectedTargetType === 'IN' && targetTimeStr){
+                const matched=String(targetTimeStr).match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+                if(matched && Number(matched[4])>=18){
+                    const next=new Date(Date.UTC(Number(matched[1]),Number(matched[2])-1,Number(matched[3])+1));
+                    proposedDate=`${next.getUTCFullYear()}-${String(next.getUTCMonth()+1).padStart(2,'0')}-${String(next.getUTCDate()).padStart(2,'0')}`;
+                }
+            }
+            const normalizedPairDate = normalizeImportedAttendanceTime(`${proposedDate} 00:00`);
             const normalizedDateMatch = String(normalizedPairDate || '').match(/^(\d{4})\/(\d{2})\/(\d{2})/);
             if (normalizedDateMatch) {
                 document.getElementById('addModalDateInput').value =
@@ -16960,6 +16969,13 @@ function getManualPairRecordAnchor(record) {
                 }
 
                 if(pairIdentityTarget && (String(pairIdentityTarget.empId||'')!==String(emp.empId||'') || String(pairIdentityTarget.attNo||'')!==String(emp.attNo||''))){throw new Error('配對目標員工身份不符');}
+                // 禁止下班早於同班上班；跨日補卡必須寫入真正隔日日期。
+                if(pairIdentityTarget && statusVal === '下班簽退' && getAttendanceRecordType(pairIdentityTarget)==='IN'){
+                    const normal=(v)=>String(v||'').replace(/-/g,'/').replace(/\b(\d{1,2})(?=\/|\s|:)/g,m=>m.padStart(2,'0'));
+                    const inTime=normal(pairIdentityTarget.timeStr);
+                    const outTime=normal(`${effectiveDateVal} ${timeVal}`);
+                    if(outTime<=inTime)throw new Error('下班日期時間不得早於上班，跨日班請選隔日日期');
+                }
                 const targetStableForGroup = pairIdentityTarget ? getAttendanceStablePairKey(pairIdentityTarget) : '';
                 const targetTimeForGroup = pairIdentityTarget ? normalizeImportedAttendanceTime(pairIdentityTarget.timeStr) : '';
                 const pairGroupKey = pairIdentityTarget
