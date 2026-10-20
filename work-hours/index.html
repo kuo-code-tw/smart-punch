@@ -12409,12 +12409,27 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             let acquired=false;button.disabled=true;button.textContent='刪除中…';
             try{
                 const lock=await rpc('scheduleAcquireEditLock');if(!lock.mine)throw Error('班表正由 '+(lock.ownerName||'其他人')+' 編輯，請稍後再試');acquired=true;
-                const deleted=await rpc('deleteOvertimeAssignment',{empId:row.empId,date,expectedRevision:state.revision});
+                // 取得當下正式班表版號，避免使用過期快取造成刪除一直被拒絕。
+                const verifyCtl=new AbortController(),verifyTimer=setTimeout(()=>verifyCtl.abort(),12000);
+                let latest;
+                try{
+                    const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',signal:verifyCtl.signal});
+                    latest=await response.json();
+                }finally{clearTimeout(verifyTimer);}
+                if(!latest?.ok||!latest.revision)throw Error('無法取得最新班表版本，未執行刪除；請稍後重試');
+                if(latest.overtimeLinkedDelete!==true)throw Error('雲端尚未開放安全刪除，未執行刪除');
+                const deleted=await rpc('deleteOvertimeAssignment',{empId:row.empId,date,expectedRevision:latest.revision});
                 const affected=new Set(deleted.affectedEmployeeIds||[row.empId]);
                 for(const r of schedules||[]){if(normalizeScheduleMonthKey(r.month)===month&&affected.has(String(r.empId||'').trim().toUpperCase())){r.schedule=r.schedule||{};r.schedule.__meta=r.schedule.__meta||{};r.schedule.__meta[date]={overtimeExcluded:true};}}
                 p79WorkOvertimeMonths.delete(month);p79OvertimeCalculationCache=null;
                 renderOvertimeStats();alert('當日加班及對應代班安排已刪除，可重新申報。');
-            }catch(error){alert('刪除未確認：'+(error.message||error)+'。請重新整理核對後再操作。');}
+            }catch(error){
+                const message=String(error?.message||error);
+                const oldState=p79WorkOvertimeMonths.get(month);
+                if(oldState)oldState.at=0;
+                p79LoadWorkOvertimeMonths(records);
+                alert('刪除未確認：'+message+'。系統已重新讀取最新班表；請等待畫面更新後再確認該筆是否仍存在，勿連續重複刪除。');
+            }
             finally{if(acquired)try{await rpc('scheduleReleaseEditLock');}catch(ignore){}button.disabled=false;button.textContent='刪除加班';}
         }
 
