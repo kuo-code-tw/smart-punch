@@ -76,6 +76,12 @@
 #app-main-container .p79-day-cell .p79-shift-select{height:28px!important;min-height:28px!important;line-height:28px!important;font-size:11px!important}
 #app-main-container .p79-day-cell .mt-1{display:none!important}
 #app-main-container .p79-month-schedule-table tbody tr{height:38px!important}
+
+/* V10.34：所有單位縮短休假統計及班別格內空白 */
+#app-main-container .p79-rest-count-compact{width:46px!important;min-width:46px!important;max-width:46px!important;padding:1px 2px!important;white-space:nowrap!important;line-height:20px!important;font-size:11px!important}
+#app-main-container .p79-day-cell{height:30px!important;max-height:32px!important;padding:0 1px!important;vertical-align:middle!important}
+#app-main-container .p79-day-cell .p79-shift-select{height:25px!important;min-height:25px!important;line-height:25px!important}
+#app-main-container .p79-month-schedule-table tbody tr{height:33px!important}
 </style>
 
 <style id="port79-schedule-ui-polish-v20260925-4">body{background:radial-gradient(circle at 8% 0%,rgba(99,102,241,.10),transparent 28%),radial-gradient(circle at 92% 8%,rgba(14,165,233,.08),transparent 24%),#f8fafc!important;-webkit-font-smoothing:antialiased} body>header{background:rgba(255,255,255,.93)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom-color:rgba(148,163,184,.26)!important;box-shadow:0 8px 28px rgba(15,23,42,.07)!important} body>header>div>div:first-child>div:first-child{background:linear-gradient(135deg,#4f46e5,#2563eb)!important;box-shadow:0 10px 24px rgba(79,70,229,.22)!important} body>header h1{letter-spacing:.01em} body>header a,body>header button{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}body>header a:hover,body>header button:hover{transform:translateY(-1px)} input,select,textarea{transition:border-color .15s ease,box-shadow .15s ease}input:focus,select:focus,textarea:focus{border-color:#6366f1!important;box-shadow:0 0 0 4px rgba(99,102,241,.11)!important} .custom-scrollbar{border-radius:16px;box-shadow:0 10px 28px rgba(15,23,42,.055)} table{border-collapse:separate;border-spacing:0}tbody tr{transition:background-color .12s ease}tbody tr:hover td{background-color:#eef2ff!important} .sticky-col-left,.sticky-col-left-header{box-shadow:5px 0 16px -12px rgba(15,23,42,.30)} main [class*="rounded-2xl"],main [class*="rounded-xl"]{transition:box-shadow .16s ease} button:not(:disabled):active{transform:scale(.985)} @media(max-width:768px){body>header{padding:12px!important;backdrop-filter:none}body>header>div{gap:10px!important}.custom-scrollbar{border-radius:12px}}</style>
@@ -5532,7 +5538,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         for(const d of visibleDays){const date=yearMonth+'-'+String(d).padStart(2,'0'), m=automaticRestMeta[date];if(p79EmployeeDateEligible(emp,date)&&m?.restCategory){(m.restQuotaOvertime?restOvertimeStats:restStats)[m.restCategory]++;}}
         const restCategoryCells = ['例','休','國'].map(category => {
           const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-          return `<td class="py-1 px-2 text-center font-bold border-r text-xs ${color}" style="min-width:64px"><div class="whitespace-nowrap">${restStats[category]}天</div>${restOvertimeStats[category] ? `<div class="text-[10px] whitespace-nowrap mt-1">未休加班</div><div class="text-[10px] whitespace-nowrap">${restOvertimeStats[category]}天</div>` : ''}</td>`;
+          return `<td class="p79-rest-count-compact text-center font-bold border-r text-xs ${color}" title="${category}假 ${restStats[category]} 天；未休加班 ${restOvertimeStats[category]} 天"><span>${restStats[category]}/${restOvertimeStats[category]}</span></td>`;
         }).join('');
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
