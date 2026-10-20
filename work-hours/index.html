@@ -12718,9 +12718,11 @@ function p79OvertimePeriodLabel(report){
             const overtimeRowsHtml = pageRows.length ? pageRows.map((row,rowIndex) => {
                 const clockInCell = row.planned&&!row.clockIn?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
                 const clockOutCell = row.planned&&!row.clockOut?(row.clockIn?'尚未下班':'待出勤'):formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
+                // 只有已儲存的獨立申報才標紅點；自動估算或有代班連動的不標。
+                const manualOvertimeMark=!!(row.overtimeReport?.id && !row.forEmpId && !row.coverCandidate && !row.coverAlreadyArranged);
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${row.overDailyLimit ? 'bg-rose-50/60 dark:bg-rose-950/10' : ''}">
                     <td data-label="上班日期" class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtml(String(row.dateKey || '').replace(/-/g, '/'))}</td>
-                    <td data-label="姓名" class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}</td>
+                    <td data-label="姓名" class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}${manualOvertimeMark?'<span title="手動／獨立加班申報（無代班連動）" aria-label="手動或獨立加班申報" style="display:inline-block;margin-left:6px;width:9px;height:9px;background:#dc2626;border-radius:50%;vertical-align:middle"></span>':''}</td>
                     <td data-label="部門" class="px-3 py-3">${escapeHtml(row.dept)}</td>
                     <td data-label="職稱" class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
