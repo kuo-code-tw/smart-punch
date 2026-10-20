@@ -24,6 +24,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
   for(const [date,meta]of Object.entries(entry.schedule?.__meta||{})){const report=meta?.overtimeReport;if(!selected.has(date)||!report||meta.overtimeExcluded)continue;
    const key=uid(emp.empId)+'|'+date;if(seen.has(key))throw Error(emp.name+' '+date+' 有重複申報資料，請先核對');seen.add(key);
    if(!report.id){issues.push(emp.name+' '+date+' 缺少已儲存申報識別碼，未列入');continue;}
+   if(['國','休','例'].includes(report.category)){const review=g.P79RestAttendance?.reportIssue(snapshot,entry.empId,date);if(review){issues.push(emp.name+' '+date+'：'+review);continue;}}
    const planned=report.planned===true&&date>=today();
    if(mode==='actual'&&planned)continue;
    if(mode==='planned'&&!planned)continue;
