@@ -88,17 +88,17 @@ const META={
  workhours:['📊','加班管理','出勤統計・加班統計・月結工時'],
  leave:['📝','請假管理','請假申請・審核・特休資訊'],
  schedule:['📅','排班管理','人員班表・組別・今日出勤'],
- efficiency:['🚢','效率管理','船舶作業・效率統計・月報比對'],
+ efficiency:['🚢','船舶管理','船舶作業・效率統計・月報比對'],
  hr:['👥','人資管理','員工主檔・部門職稱・權限設定'],
  history:['🗄️','歷史資料管理','考勤・排班・船舶歷史查詢']
 };
 const NAV=[
  ['attendance','🕒','考勤管理','../attendance/'],['leave','📝','請假管理','../leave/'],
  ['workhours','📊','加班管理','../work-hours/'],['schedule','📅','排班管理','../schedule/'],
- ['efficiency','🚢','效率管理','../aqc-efficiency/'],['hr','👥','人資管理','../hr/'],
+ ['efficiency','🚢','船舶管理','../aqc-efficiency/'],['hr','👥','人資管理','../hr/'],
  ['history','🗄️','歷史資料管理','../history-data/']
 ];
-const SYSTEMS=[['attendance','考勤管理'],['workhours','加班管理'],['leave','請假管理'],['schedule','排班管理'],['efficiency','效率管理'],['hr','人資管理'],['history','歷史資料管理']];
+const SYSTEMS=[['attendance','考勤管理'],['workhours','加班管理'],['leave','請假管理'],['schedule','排班管理'],['efficiency','船舶管理'],['hr','人資管理'],['history','歷史資料管理']];
 let statusBusy=false,statusTimer=null,lastSignature='';
 
 function currentSystem(){
