@@ -291,9 +291,10 @@
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
  function reportPair(category,empId,forEmpId,people){
-  if(category!=='代')return {forEmpId:'',forName:''};
+  if(category!=='代'&&category!=='延')return {forEmpId:'',forName:''};
+  if(category==='延'&&!String(forEmpId||'').trim())return {forEmpId:'',forName:''};
   const target=people.find(e=>String(e.empId)===String(forEmpId));
-  if(!target||String(forEmpId)===String(empId))throw Error('休假代班加班請選擇另一位請假人員');
+  if(!target||String(forEmpId)===String(empId))throw Error('請選擇另一位有效的請假人員');
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
  function advanceLeaveHandoff(draft){
@@ -336,7 +337,7 @@
 
    const findPrefill=(code,category)=>{const exact=rows.findIndex(r=>r[1]===code&&r[0]===category);if(exact>=0)return exact;if(category!=='延')return -1;const m=String(code||'').match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);if(!m)return -1;const candidates=rows.map((r,i)=>({r,i})).filter(({r})=>r[0]==='延'&&((hour(m[1])%1440===hour(r[6])%1440&&hour(m[2])%1440===hour(r[7])%1440)||(hour(m[1])%1440===hour(r[8]==='after'?r[4]:r[6])%1440&&hour(m[2])%1440===hour(r[8]==='after'?r[7]:r[5])%1440)));return candidates.length===1?candidates[0].i:-1;};
    const refresh=()=>{const previous=select.value;select.innerHTML=rows.map((r,i)=>({r,i})).filter(({r})=>matches(r)).map(({r,i})=>'<option data-ot-category="'+r[0]+'" value="'+i+'">'+esc((r[0]==='延'?r[6]+'-'+r[7]:r[1])+(ruleType(r)!==kind.value?'｜'+ruleType(r):''))+'</option>').join('');if(previous!==''&&rows[Number(previous)]&&matches(rows[Number(previous)]))select.value=previous;preview()};
-   function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=!!prefill.leaveHandoffId||r?.[0]!=='代';empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=r?.[0]==='代'?'flex':'none';if(r?.[0]!=='代')forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'加班 '+r[6]+'-'+r[7]+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):'尚未設定這類加班規則';if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
+   function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'加班 '+r[6]+'-'+r[7]+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):'尚未設定這類加班規則';if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
    const refreshTypes=()=>{const previous=kind.value,options=typeOptions(global.p79OvertimeContext?.config?.()||{},rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    kind.onchange=()=>{prefill.preferredType='';refresh();};select.onchange=preview;forSelect.onchange=preview;empSelect.onchange=refresh;el.querySelector('#p79OtDate').onchange=refresh;refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
    if(prefill.empId||prefill.forEmpId){
