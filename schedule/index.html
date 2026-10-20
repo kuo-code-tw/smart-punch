@@ -2852,7 +2852,15 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             port79ScheduleLastAutoSyncAt = Date.now();
             const yearMonth = document.getElementById('month-picker')?.value;
             if (yearMonth) initDefaultScheduleData(yearMonth, false);
-            // 單次同步只做一次重繪；登入完成處不再重複渲染整張月表。
+            // 雲端班表成功載入後也核對缺打卡；先前只在手動存檔觸發，畫面一直顯示舊班別。
+            // 沒有排班編輯權、考勤資料不完整或月份已切換時不變更。
+            if(yearMonth && scheduleEditLockState.mine && !port79ScheduleDirty){
+              const changed=await p79ApplyNoPunchRestFromOfficial(yearMonth);
+              if(changed && currentScheduleMonthKey()===yearMonth && scheduleEditLockState.mine){
+                const saved=await saveScheduleMonthToCloud(false);
+                if(!saved)console.warn('無打卡自動改休已在本機顯示，但尚未成功儲存雲端');
+              }
+            }
             try { buildRoleTabsAndRender(); } catch(ignore) {}
             return true;
           }
