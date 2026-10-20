@@ -12338,7 +12338,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const token=currentPort79SsoToken();if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
             const selectedMonth=monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());
-            const months=[...new Set([...(selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[]),...sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m))])].filter(month=>!selectedMonth||selectedMonth==='ALL'||month===selectedMonth).sort().reverse();
+            const months=selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
@@ -12481,7 +12481,7 @@ async function p79ExportOvertimeComparison(printMode){
                     else delete map[key];
                 });
             });
-            p79WorkOvertimeMonths.forEach(state=>p79MergeWorkOvertimeSnapshot(state,restMetaByEmp));
+            p79WorkOvertimeMonths.forEach((state,month)=>{if(state.ready&&(!document.getElementById('overtimeMonthFilter')?.value||document.getElementById('overtimeMonthFilter').value==='ALL'||document.getElementById('overtimeMonthFilter').value===month))p79MergeWorkOvertimeSnapshot(state,restMetaByEmp);});
             const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp]]);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
