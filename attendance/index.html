@@ -15976,7 +15976,22 @@ function getManualPairRecordAnchor(record) {
         function p79SetAttendanceEditCloudState(ready, message) {
             p79AttendanceEditCloudReady=ready;
             const status=document.getElementById('editRecordCloudCheckStatus');
-            if(status)status.textContent=message;
+            if(status){
+                status.textContent=message;
+                // 僅供管理端編輯視窗重試核對；不解除雲端確認前的儲存鎖定。
+                if(!ready && /核對未完成|等待超過|讀取逾時/.test(String(message||''))){
+                    const retry=document.createElement('button');
+                    retry.type='button';
+                    retry.textContent='↻ 重新核對';
+                    retry.className='ml-2 px-2 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold';
+                    retry.onclick=()=>{
+                        const record=activeEditingAttendanceRecord;
+                        if(!record)return;
+                        openEditRecordModal(record.id,getAttendanceRecordType(record),record.timeStr,{empId:record.empId,attNo:record.attNo,name:record.name});
+                    };
+                    status.appendChild(retry);
+                }
+            }
             ['saveModalEditBtn','deleteModalRecordBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=!ready;});
         }
         function p79FillAttendanceEditForm(r) {
@@ -16042,7 +16057,11 @@ function getManualPairRecordAnchor(record) {
             await new Promise(resolve=>{if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(resolve,0));else setTimeout(resolve,0);});
             if(!stillOpen())return;
             try{
-                const cloud=await window.p79V5PrepareAttendanceEdit(id);
+                // 管理端編輯：雲端核對最長等 12 秒，避免修改視窗無限等待。
+                const cloud=await Promise.race([
+                    window.p79V5PrepareAttendanceEdit(id),
+                    new Promise((_,reject)=>setTimeout(()=>reject(new Error('雲端核對等待超過 12 秒')),12000))
+                ]);
                 if(!stillOpen())return;
                 const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
                 if(!same(cloud.id,original.id)||['empId','attNo'].some(key=>String(original[key]??'').trim()&&!same(original[key],cloud[key]))||getAttendanceRecordType(cloud)!==getAttendanceRecordType(original))throw Error('雲端紀錄身分或上下班類型不同，請重新整理後核對。');
