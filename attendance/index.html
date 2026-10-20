@@ -16405,9 +16405,16 @@ function getManualPairRecordAnchor(record) {
             const job=document.getElementById('addModalJobSelect')?.value||'';
             const select=document.getElementById('addModalEmpSelect');if(!select)return;
             const previous=preferred||select.value;
-            const list=p79AddEmployeesSorted(getAdminAttendanceEmployees().filter(e=>String(e?.dept||'一般')===dept&&(!job||p79AddJob(e)===job)));
+            const employees=getAdminAttendanceEmployees();
+            const list=p79AddEmployeesSorted(employees.filter(e=>String(e?.dept||'一般')===dept&&(!job||p79AddJob(e)===job)));
+            // 同列補卡的原始員工不能因部門別名／職稱欄位不同而從選單消失。
+            const locked=String(document.getElementById('addRecordModal')?.dataset?.p79LockedEmployeeKey||'');
+            const required=preferred||locked;
+            const selectedEmployee=required?findAttendanceEmployeeByOptionValue(required):null;
+            if(selectedEmployee&&!list.some(e=>attendanceEmployeeOptionValue(e)===required))list.unshift(selectedEmployee);
             select.innerHTML=list.map(e=>{const id=attendanceEmployeeOptionValue(e);return id?'<option value="'+escapeHtml(id)+'">'+escapeHtml(attendanceEmployeeDisplayLabel(e))+'</option>':'';}).join('');
-            if(previous&&list.some(e=>attendanceEmployeeOptionValue(e)===previous))select.value=previous;
+            if(required&&list.some(e=>attendanceEmployeeOptionValue(e)===required))select.value=required;
+            else if(previous&&list.some(e=>attendanceEmployeeOptionValue(e)===previous))select.value=previous;
         }
         function p79AddRefreshJobs(preferred=''){
             const dept=document.getElementById('addModalDeptSelect')?.value||'';
@@ -16639,6 +16646,10 @@ function getManualPairRecordAnchor(record) {
             p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(emp));
             if (empSelect) {
                 empSelect.value = attendanceEmployeeOptionValue(emp);
+                if(empSelect.value!==attendanceEmployeeOptionValue(emp)){
+                    showToast('補卡姓名未載入，已停止寫入，避免誤記其他員工。','warning');
+                    return;
+                }
                 empSelect.disabled = true;
             }
 
