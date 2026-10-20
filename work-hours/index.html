@@ -1397,7 +1397,8 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <label for="p79AttendanceGroupByDept" class="text-xs font-bold text-slate-600">部門顯示</label><select id="p79AttendanceGroupByDept" onchange="renderAttendanceStatsTable(true)" class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"><option value="group">依部門分組</option><option value="flat">不分組（依員工編號）</option></select>
                     <button type="button" onclick="p79OpenAttendanceRoleOrder()" class="px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold">⚙ 自訂職稱排序</button>
                 </div>
                 <div id="attendanceStatsDashboard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -11384,7 +11385,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const allowAttendanceCreate = canPerformAdminAction(currentEmp, 'attendanceCreate');
             const allowAttendanceDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
 
-            tbody.innerHTML = pageRows.map(row => {
+            tbody.innerHTML = pageRows.map((row, rowIndex) => {
                 const statusBadge = getAttendanceStatusBadge(row.attendanceStatus);
                 const recordIds = row.records.map(r => r.id).filter(id => id !== null && id !== undefined && String(id) !== '');
                 const manualEmpId = encodeURIComponent(String(row.empId || row.attNo || row.name || ''));
@@ -12931,6 +12932,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             const selectedDept = document.getElementById('attendanceStatsDept')?.value || 'ALL';
             const selectedJob = document.getElementById('attendanceStatsJobTitle')?.value || 'ALL';
             const selectedEmployee = document.getElementById('attendanceStatsEmployee')?.value || 'ALL';
+            const groupByDept = document.getElementById('p79AttendanceGroupByDept')?.value !== 'flat';
 
             if (!window.p79AttendanceStatsState) {
                 window.p79AttendanceStatsState = { page: 1, pageSize: 24, filterKey: '' };
@@ -12975,7 +12977,8 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 (selectedEmployee === 'ALL' || String(row.emp.empId || '') === selectedEmployee)
             );
 
-            const filterKey = [monthValue, selectedDept, selectedJob, selectedEmployee, filteredRows.length].join('|');
+            filteredRows.sort((a,b) => (groupByDept ? String(a.emp.dept||'一般').localeCompare(String(b.emp.dept||'一般'),'zh-Hant') : 0) || String(a.emp.empId||'').localeCompare(String(b.emp.empId||''),'en',{numeric:true}));
+            const filterKey = [monthValue, selectedDept, selectedJob, selectedEmployee, groupByDept, filteredRows.length].join('|');
             if (forcePageReset || window.p79AttendanceStatsState.filterKey !== filterKey) {
                 window.p79AttendanceStatsState.page = 1;
                 window.p79AttendanceStatsState.filterKey = filterKey;
@@ -13016,9 +13019,9 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 return `<th class="p79-stats-day-head border-l border-slate-200 dark:border-slate-700 ${unavailable ? 'bg-slate-200/70 dark:bg-slate-950 text-slate-400' : ''}">${day}</th>`;
             }).join('');
             head.innerHTML = `<tr>
-                <th class="p79-stats-dept-head sticky z-20 bg-slate-100 dark:bg-slate-900">部門</th>
-                <th class="p79-stats-job-head sticky z-20 bg-slate-100 dark:bg-slate-900">職稱</th>
-                <th class="p79-stats-person-head sticky z-20 bg-slate-100 dark:bg-slate-900">姓名／工號</th>
+                <th class="p79-stats-dept-head sticky z-20 bg-slate-100 dark:bg-slate-900">員工編號</th>
+                <th class="p79-stats-job-head sticky z-20 bg-slate-100 dark:bg-slate-900">姓名</th>
+                <th class="p79-stats-person-head sticky z-20 bg-slate-100 dark:bg-slate-900">職稱</th>
                 ${dayHeaders}
                 <th class="p79-stats-total-head sticky right-0 z-20 border-l-2 border-indigo-200 dark:border-indigo-800 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">結算天數</th>
             </tr>`;
@@ -13041,10 +13044,13 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                         if (days.has(day)) return `<td class="p79-stats-day-cell p79-att-v border-l border-slate-100 dark:border-slate-700">V</td>`;
                         return `<td class="p79-stats-day-cell p79-att-empty border-l border-slate-100 dark:border-slate-700">—</td>`;
                     }).join('');
-                    return `<tr>
-                        <td class="p79-stats-dept-cell sticky z-10 font-semibold bg-white dark:bg-slate-800">${escapeHtml(emp.dept || '一般')}</td>
-                        <td class="p79-stats-job-cell sticky z-10 bg-white dark:bg-slate-800">${escapeHtml(emp.jobTitle || emp.deptDetail || '未設定')}</td>
-                        <td class="p79-stats-person-cell sticky z-10 bg-white dark:bg-slate-800"><span class="p79-stats-person-name font-bold">${escapeHtml(emp.name || '未命名')}</span><span class="p79-stats-person-id font-mono text-slate-400">${escapeHtml(emp.empId || '--')}</span></td>
+                    const dept = String(emp.dept || '一般');
+                    const prevDept = rowIndex ? String(pageRows[rowIndex-1].emp.dept || '一般') : '';
+                    const deptTitle = groupByDept && (rowIndex === 0 || dept !== prevDept) ? `<tr class="p79-stats-group-row"><td colspan="35" class="text-left font-bold px-3 py-2 bg-slate-100 text-slate-700">🏢 ${escapeHtml(dept)}</td></tr>` : '';
+                    return `${deptTitle}<tr>
+                        <td class="p79-stats-dept-cell sticky z-10 font-semibold bg-white dark:bg-slate-800">${escapeHtml(emp.empId || '--')}</td>
+                        <td class="p79-stats-job-cell sticky z-10 bg-white dark:bg-slate-800">${escapeHtml(emp.name || '未命名')}</td>
+                        <td class="p79-stats-person-cell sticky z-10 bg-white dark:bg-slate-800">${escapeHtml(emp.jobTitle || emp.deptDetail || '未設定')}</td>
                         ${dayCells}
                         <td class="p79-stats-total-cell p79-att-total sticky right-0 z-10 border-l-2 border-indigo-100 dark:border-indigo-900 font-black">${row.totalDays}</td>
                     </tr>`;
@@ -15033,6 +15039,15 @@ window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,pre
     width:100%!important;max-width:none!important;
   }
 }
+</style>
+<style id="p79-attendance-roster-columns-20261020">
+/* 員工編號、姓名、職稱依序呈現；部門使用分組標題，不再擠佔表格固定欄。 */
+#attendanceStatsCompactTable .p79-stats-dept-head,#attendanceStatsCompactTable .p79-stats-dept-cell{left:0!important;width:116px!important;min-width:116px!important;max-width:116px!important;white-space:nowrap!important;font-size:11px!important}
+#attendanceStatsCompactTable .p79-stats-job-head,#attendanceStatsCompactTable .p79-stats-job-cell{left:116px!important;width:96px!important;min-width:96px!important;max-width:96px!important;font-size:11px!important}
+#attendanceStatsCompactTable .p79-stats-person-head,#attendanceStatsCompactTable .p79-stats-person-cell{left:212px!important;width:86px!important;min-width:86px!important;max-width:86px!important;font-size:11px!important}
+#attendanceStatsCompactTable .p79-stats-group-row td{position:static!important;text-align:left!important;font-size:12px!important}
+@media(min-width:1320px){#attendanceStatsCompactTable{min-width:0!important}}
+@media(max-width:1319px){#attendanceStatsCompactTable{min-width:1320px!important}}
 </style>
 </body>
 </html>
