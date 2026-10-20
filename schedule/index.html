@@ -5583,6 +5583,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
             ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
+          // 複合狀態只做視覺提示：已申報代班加班且本人同日排休／請假。
+          const combinedLeave = !!ownApprovedLeave || ['休','例','國','特','年','事','病','公','喪'].includes(String(shiftVal||''));
+          const combinedOvertime = dayMeta?.overtimeReport && (dayMeta.overtimeReport.category==='代'||dayMeta.overtimeReport.category==='延'||!!dayMeta.forEmpId);
+          const combinedMarker = combinedLeave && combinedOvertime
+            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
+            : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${substituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
@@ -5603,6 +5609,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="喪" ${!substituteLabel && shownShift==='喪'?'selected':''}>喪</option>
                 <option value="離" ${!substituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
+              ${combinedMarker}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
             </td>
@@ -7278,6 +7285,22 @@ html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 
 <script src="/smart-punch/assets/port79-management-link.js?v=20261019-group-explicit"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+<style id="p79-combined-shift-dot-20261020">
+.p79-day-cell{position:relative}
+.p79-combined-dot{position:absolute;right:2px;top:1px;z-index:5;color:#dc2626!important;font-size:15px!important;line-height:1!important;background:#fff!important;border:1px solid #fecaca;border-radius:50%;width:19px;height:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 3px #0002}
+.p79-combined-dot:hover{background:#fee2e2!important;transform:scale(1.1)}
+</style>
+<script>
+window.p79ShowCombinedShiftInfo=function(button){
+ const info=button.dataset;
+ const safe=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ document.getElementById('p79CombinedShiftDialog')?.remove();
+ const dialog=document.createElement('dialog');dialog.id='p79CombinedShiftDialog';
+ dialog.style.cssText='width:min(440px,calc(100vw - 24px));padding:20px;background:white;color:#172033;border:1px solid #cbd5e1;border-radius:16px;box-shadow:0 15px 45px #0003';
+ dialog.innerHTML='<h3 style="font-size:19px;font-weight:800;margin:0 0 12px">🔴 複合班別明細</h3><p><b>員工：</b>'+safe(info.combinedName)+'</p><p><b>工作日期：</b>'+safe(info.combinedDate)+'</p><p style="margin:10px 0;color:#047857"><b>代班／延長加班：</b>'+safe(info.combinedOvertime)+'</p><p style="margin:10px 0;color:#7c3aed"><b>本人休假狀態：</b>'+safe(info.combinedLeave)+'</p><p style="font-size:12px;background:#f1f5f9;padding:10px;border-radius:8px">此處僅供辨識。加班與休假分別核對，不會自動補卡、修改休息天數或申報時數。</p><button id="p79CombinedClose" style="display:block;margin:14px 0 0 auto;background:#334155;color:white;border-radius:8px;padding:8px 18px">關閉</button>';
+ document.body.appendChild(dialog);dialog.querySelector('#p79CombinedClose').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+};
+</script>
 </body>
 </html>
 
