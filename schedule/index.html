@@ -88,6 +88,21 @@
 #app-main-container .p79-person-cell .p79-person-name-line{min-height:26px!important;gap:2px!important}
 #app-main-container .p79-person-cell .p79-person-name{font-size:12px!important}
 #app-main-container .p79-person-cell .p79-mini-drag{width:20px!important;min-width:20px!important;flex-basis:20px!important;height:23px!important;min-height:23px!important}
+
+/* V10.36：全單位緊湊、分隔與新班別配色 */
+#app-main-container .p79-person-header,#app-main-container .p79-person-cell{width:120px!important;min-width:120px!important;max-width:120px!important;padding:1px 3px!important}
+#app-main-container .p79-person-cell .p79-person-name-line{justify-content:flex-start!important;gap:3px!important;min-height:27px!important}
+#app-main-container .p79-person-cell .p79-mini-drag{width:18px!important;min-width:18px!important;flex-basis:18px!important;height:20px!important;min-height:20px!important}
+#app-main-container .p79-month-schedule-table{border-collapse:separate!important;border-spacing:2px 3px!important}
+#app-main-container .p79-day-cell{border-radius:6px!important;background-clip:padding-box!important}
+#app-main-container .p79-day-cell .p79-shift-select{border-radius:5px!important}
+#app-main-container .p79-day-cell:has(option:checked[value="早"]){background:#dcfce7!important;color:#166534!important}
+#app-main-container .p79-day-cell:has(option:checked[value="中"]){background:#fef3c7!important;color:#92400e!important}
+#app-main-container .p79-day-cell:has(option:checked[value="晚"]){background:#dbeafe!important;color:#1e40af!important}
+#app-main-container .p79-day-cell:has(option:checked[value="例"]),
+#app-main-container .p79-day-cell:has(option:checked[value="休"]),
+#app-main-container .p79-day-cell:has(option:checked[value="國"]){background:#ffe4e6!important;color:#9f1239!important}
+#app-main-container .p79-rest-count-compact{background:#fff1f2!important;color:#9f1239!important}
 </style>
 
 <style id="port79-schedule-ui-polish-v20260925-4">body{background:radial-gradient(circle at 8% 0%,rgba(99,102,241,.10),transparent 28%),radial-gradient(circle at 92% 8%,rgba(14,165,233,.08),transparent 24%),#f8fafc!important;-webkit-font-smoothing:antialiased} body>header{background:rgba(255,255,255,.93)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom-color:rgba(148,163,184,.26)!important;box-shadow:0 8px 28px rgba(15,23,42,.07)!important} body>header>div>div:first-child>div:first-child{background:linear-gradient(135deg,#4f46e5,#2563eb)!important;box-shadow:0 10px 24px rgba(79,70,229,.22)!important} body>header h1{letter-spacing:.01em} body>header a,body>header button{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}body>header a:hover,body>header button:hover{transform:translateY(-1px)} input,select,textarea{transition:border-color .15s ease,box-shadow .15s ease}input:focus,select:focus,textarea:focus{border-color:#6366f1!important;box-shadow:0 0 0 4px rgba(99,102,241,.11)!important} .custom-scrollbar{border-radius:16px;box-shadow:0 10px 28px rgba(15,23,42,.055)} table{border-collapse:separate;border-spacing:0}tbody tr{transition:background-color .12s ease}tbody tr:hover td{background-color:#eef2ff!important} .sticky-col-left,.sticky-col-left-header{box-shadow:5px 0 16px -12px rgba(15,23,42,.30)} main [class*="rounded-2xl"],main [class*="rounded-xl"]{transition:box-shadow .16s ease} button:not(:disabled):active{transform:scale(.985)} @media(max-width:768px){body>header{padding:12px!important;backdrop-filter:none}body>header>div{gap:10px!important}.custom-scrollbar{border-radius:12px}}</style>
@@ -5556,8 +5571,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td class="p79-person-cell sticky-col-left border-r bg-white">
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
-                  <span class="p79-person-name" title="${emp.name}">${emp.name}</span>
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
+                  <span class="p79-person-name" title="${emp.name}">${emp.name}</span>
                 </div>
               </div>
             </td>
