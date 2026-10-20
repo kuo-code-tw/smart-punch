@@ -18,7 +18,7 @@
   const rest=[['08-16',8,12.7],['10-18',8,12.7],['12-20',8,12.7],['16-24',8,12.7],['24-08',8,12.7],['08-14',6,9.36],['14-20',6,9.36],['08-20',12,23.36],['24-04',4,6.02],['04-08',4,6.02],['08-18',10,18.02],['16-20',4,6.02],['20-22',2,2.68],['20-24',4,6.02],['20-01',5,7.67],['20-02',6,9.36],['20-03',7,11.03],['20-04',8,12.7],['20-05',9,15.35],['20-06',10,18.02],['20-07',11,20.69],['20-08',12,23.36],['14-24',10,18.02],['04-07',3,4.35]];
   const national=[['08-14',8,8],['14-20',8,8],['20-24',8,8],['24-04',8,8],['08-16',8,8],['04-08',8,8],['20-05',9,9.33],['20-06',10,10.68],['20-07',11,12.03],['16-24',8,8],['24-08',8,8],['10-18',8,8],['20-04',8,8]];
   const out=[...rest.map(r=>['休','休'+r[0],r[1],r[2],'','',...r[0].split('-'),'full']),...national.map(r=>['國','國'+r[0],r[1],r[2],'','',...r[0].split('-'),'full'])];
-  out.push(['代','代08-16',8,'','','','08','16','full'],['代','代16-24',8,'','','','16','24','full'],['代','代24-08',8,'','','','24','08','full'],['延','代16-20',4,'','08','16','16','20','after'],['延','代20-08',4,'','24','08','20','24','before']);
+  out.push(['代','代08-16',8,'','','','08','16','full'],['代','代16-24',8,'','','','16','24','full'],['代','代24-08',8,'','','','24','08','full'],['延','代16-20',4,6.02,'08','16','16','20','after'],['延','代20-08',4,'','24','08','20','24','before']);
   return out;
  }
  function validate(rows){
@@ -58,7 +58,7 @@
  }
  function normalizeStored(value){return value===undefined?defaults():validate(value);}
  function report(row){
-  const r=validate([row])[0];return {version:1,category:r[0],typeName:ruleType(r),code:r[1],declaredHours:Number(r[2]),convertedHours:r[3]===''?null:Number(r[3]),normalStart:r[4],normalEnd:r[5],overtimeStart:r[6],overtimeEnd:r[7],position:r[8]};
+  const r=validate([row])[0];return {version:1,category:r[0],typeName:ruleType(r),code:r[1],declaredHours:Number(r[2]),convertedHours:r[3]===''?(r[0]==='延'&&r[4]==='08'&&r[5]==='16'&&r[6]==='16'&&r[7]==='20'&&Number(r[2])===4?6.02:null):Number(r[3]),normalStart:r[4],normalEnd:r[5],overtimeStart:r[6],overtimeEnd:r[7],position:r[8]};
  }
  function interval(date,start,end,offset=0){
   const base=Date.parse(date+'T00:00:00+08:00'),a=hour(start),duration=span(start,end);
