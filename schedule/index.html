@@ -5586,8 +5586,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // 複合狀態只做視覺提示：已申報代班加班且本人同日排休／請假。
           const combinedLeave = !!ownApprovedLeave || ['休','例','國','特','年','事','病','公','喪'].includes(String(shiftVal||''));
           const combinedOvertime = dayMeta?.overtimeReport && (dayMeta.overtimeReport.category==='代'||dayMeta.overtimeReport.category==='延'||!!dayMeta.forEmpId);
-          const combinedMarker = combinedLeave && combinedOvertime
-            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
+          const leaveLink = window.P79CombinedLeaveLink?.resolve({empId:emp.id,date:dayStr,meta:dayMeta,assignments:leaveCoverAssignments,leaveRecords,employees}) || {links:[],conflict:false};
+          const hasCoverLink = leaveLink.links.length>0;
+          const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
+            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
           const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
@@ -7285,6 +7287,7 @@ html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 
 <script src="/smart-punch/assets/port79-management-link.js?v=20261019-group-explicit"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+<script src="../assets/port79-combined-leave-link.js?v=20261020-link1"></script>
 <style id="p79-combined-shift-dot-20261020">
 .p79-day-cell{position:relative}
 .p79-combined-dot{position:absolute;right:2px;top:1px;z-index:5;color:#dc2626!important;font-size:15px!important;line-height:1!important;background:#fff!important;border:1px solid #fecaca;border-radius:50%;width:19px;height:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 3px #0002}
@@ -7294,10 +7297,15 @@ html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 window.p79ShowCombinedShiftInfo=function(button){
  const info=button.dataset;
  const safe=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const employeeId=String(info.combinedEmp||'').trim().toUpperCase();
+ const date=String(info.combinedDate||'');
+ const meta=(typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[employeeId]?.[date]:null)||{};
+ const links=window.P79CombinedLeaveLink?.resolve({empId:employeeId,date,meta,assignments:typeof leaveCoverAssignments!=='undefined'?leaveCoverAssignments:[],leaveRecords:typeof leaveRecords!=='undefined'?leaveRecords:[],employees:typeof employees!=='undefined'?employees:[]})||{links:[],conflict:false};
+ const requesterHtml=links.links.length?links.links.map(link=>'<div style="padding:10px;margin:7px 0;border:1px solid #cbd5e1;border-radius:9px"><b>請假人員：</b>'+safe(link.name)+'（'+safe(link.targetId||'員工編號待核對')+'）<p><b>關聯來源：</b>'+safe(link.source)+'</p><p><b>請假類型：</b>'+safe(link.leaveType||'尚未核對')+'</p><p><b>請假日期：</b>'+safe(link.leaveStart&&link.leaveEnd?link.leaveStart+' 至 '+link.leaveEnd:'尚未核對')+'</p><p><b>代班涵蓋日期：</b>'+safe(link.coverStart)+' 至 '+safe(link.coverEnd)+'</p><p><b>連動狀態：</b>'+safe(link.status)+'</p></div>').join(''):'<p style="color:#b45309">尚未連結請假人員；請核對加班申報是否指定代班對象。</p>';
  document.getElementById('p79CombinedShiftDialog')?.remove();
  const dialog=document.createElement('dialog');dialog.id='p79CombinedShiftDialog';
  dialog.style.cssText='width:min(440px,calc(100vw - 24px));padding:20px;background:white;color:#172033;border:1px solid #cbd5e1;border-radius:16px;box-shadow:0 15px 45px #0003';
- dialog.innerHTML='<h3 style="font-size:19px;font-weight:800;margin:0 0 12px">🔴 複合班別明細</h3><p><b>員工：</b>'+safe(info.combinedName)+'</p><p><b>工作日期：</b>'+safe(info.combinedDate)+'</p><p style="margin:10px 0;color:#047857"><b>代班／延長加班：</b>'+safe(info.combinedOvertime)+'</p><p style="margin:10px 0;color:#7c3aed"><b>本人休假狀態：</b>'+safe(info.combinedLeave)+'</p><p style="font-size:12px;background:#f1f5f9;padding:10px;border-radius:8px">此處僅供辨識。加班與休假分別核對，不會自動補卡、修改休息天數或申報時數。</p><button id="p79CombinedClose" style="display:block;margin:14px 0 0 auto;background:#334155;color:white;border-radius:8px;padding:8px 18px">關閉</button>';
+ dialog.innerHTML='<h3 style="font-size:19px;font-weight:800;margin:0 0 12px">🔴 複合班別明細</h3><p><b>員工：</b>'+safe(info.combinedName)+'</p><p><b>工作日期：</b>'+safe(info.combinedDate)+'</p><p style="margin:10px 0;color:#047857"><b>代班／延長加班：</b>'+safe(info.combinedOvertime)+'</p><p style="margin:10px 0;color:#7c3aed"><b>本人休假狀態：</b>'+safe(info.combinedLeave)+'</p><div style="margin-top:12px"><b>請假代班關聯</b>'+requesterHtml+(links.conflict?'<p style="color:#b91c1c;font-weight:bold">多個對象或資料不一致，請先核對</p>':'')+'</div><p style="font-size:12px;background:#f1f5f9;padding:10px;border-radius:8px">此處僅供辨識。加班與休假分別核對，不會自動補卡、修改休息天數或申報時數。</p><button id="p79CombinedClose" style="display:block;margin:14px 0 0 auto;background:#334155;color:white;border-radius:8px;padding:8px 18px">關閉</button>';
  document.body.appendChild(dialog);dialog.querySelector('#p79CombinedClose').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
 };
 </script>
