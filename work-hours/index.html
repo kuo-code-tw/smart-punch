@@ -15013,6 +15013,27 @@ window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,pre
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+<style id="p79-monthly-attendance-wider-v20261020">
+/* 僅每月出勤天數統計：桌機使用接近整個視窗寬度，保留手機正常內距。 */
+@media (min-width:1024px){
+  body.p79-work-hours-page #viewAdmin:has(#adminContentStats:not(.hidden)){
+    width:calc(100vw - 24px)!important;
+    max-width:calc(100vw - 24px)!important;
+    margin-left:calc(50% - 50vw + 12px)!important;
+    margin-right:0!important;
+    padding:12px 4px 24px!important;
+  }
+  body.p79-work-hours-page #viewAdmin:has(#adminContentStats:not(.hidden)) .admin-desktop-content{
+    width:100%!important;max-width:none!important;padding:12px!important;
+  }
+  body.p79-work-hours-page #adminContentStats{
+    width:100%!important;max-width:none!important;
+  }
+  body.p79-work-hours-page #adminContentStats .p79-stats-table-wrap{
+    width:100%!important;max-width:none!important;
+  }
+}
+</style>
 </body>
 </html>
 
