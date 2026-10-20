@@ -1104,9 +1104,11 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       currentOpText='同步完成';
       activeSyncRecordId='';
 
-      try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
-      try{renderAdminRecordsTable?.()}catch(e){}
-      try{renderAdminLiveTable?.()}catch(e){}
+      // Render the active view once; its modal guard defers background table work.
+      try{
+        if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();
+        else renderAdminRecordsTable?.();
+      }catch(e){}
 
       if(successMsg)try{showToast(successMsg,'success')}catch(e){}
       if(typeof onSuccess==='function')try{onSuccess(data)}catch(e){}
