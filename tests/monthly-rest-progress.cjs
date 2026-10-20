@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const c={window:null};c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8'),c);
+const model={balances:[{emp:{empId:'A'},remaining:{國:2,休:1,例:0}},{emp:{empId:'B'},remaining:{國:1,休:1,例:0}}],rows:[{empId:'A',category:'國',checked:true},{empId:'A',category:'國',checked:true},{empId:'B',category:'休',checked:true}]};
+const progress=()=>JSON.parse(JSON.stringify(c.P79MonthlyRest.reportProgress(model)));
+assert.deepEqual(progress().國,{remaining:3,selected:2,saved:0,after:1,over:0});
+model.rows[0].saved=true;model.rows[0].checked=false;
+assert.deepEqual(progress().國,{remaining:2,selected:1,saved:1,after:1,over:0},'confirmed save deducts once and preserves pending selection');
+model.rows[1].checked=false;
+assert.equal(progress().國.after,2,'unchecked item remains unreported');
+model.rows[1].category='休';model.rows[1].checked=true;
+assert.equal(progress().國.selected,0);assert.equal(progress().休.selected,2);assert.equal(progress().休.after,0,'category edit updates forecast');
+model.rows.push({empId:'A',category:'休',checked:true});
+assert.equal(progress().休.over,1);assert.equal(progress().休.after,0,'overselection cannot produce negative days or consume another employee quota');
+model.rows[2].checked=false;
+assert.equal(progress().休.after,1);assert.equal(progress().休.over,1,'unused quota of another employee cannot hide excess');
+console.log('PASS report progress: selection, partial success, retry, uncheck, category change and per-person excess');

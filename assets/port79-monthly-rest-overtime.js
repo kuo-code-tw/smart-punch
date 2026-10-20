@@ -93,6 +93,15 @@ function plan(snapshot,people,month,rules){
  for(const state of states)for(const category of cats)for(let n=0;n<state.remaining[category];n++)issues.push(state.emp.name+'「'+category+'」尚有1天找不到可申報日期或相符時段');
  return {rows:sortRows(rows),balances,issues};
 }
+function reportProgress(model){
+ const result=Object.fromEntries(cats.map(c=>[c,{remaining:0,selected:0,saved:0,after:0,over:0}]));
+ for(const b of model.balances)for(const c of cats){
+  const rows=model.rows.filter(r=>id(r.empId)===id(b.emp.empId)&&r.category===c),saved=rows.filter(r=>r.saved).length,selected=rows.filter(r=>r.checked&&!r.saved).length;
+  const remaining=Math.max(0,b.remaining[c]-saved),t=result[c];
+  t.remaining+=remaining;t.selected+=selected;t.saved+=saved;t.after+=Math.max(0,remaining-selected);t.over+=Math.max(0,selected-remaining);
+ }
+ return result;
+}
 function styles(){if(document.getElementById('p79MonthlyRestStyle'))return;const el=document.createElement('style');el.id='p79MonthlyRestStyle';el.textContent=`#p79MonthlyRest{width:min(1080px,calc(100vw - 24px));max-height:90dvh;padding:0;border:0;border-radius:14px;color:#0f172a;background:#fff;box-shadow:0 20px 80px #0005;font:14px sans-serif}#p79MonthlyRest::backdrop{background:#0f172a88}#p79MonthlyRest header,#p79MonthlyRest footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f1f5f9}#p79MonthlyRest .body{padding:12px 16px;overflow:auto;max-height:calc(90dvh - 120px)}#p79MonthlyRest .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end}#p79MonthlyRest label{display:flex;flex-direction:column;gap:4px;font-size:12px}#p79MonthlyRest input,#p79MonthlyRest select{border:1px solid #cbd5e1;padding:6px;border-radius:7px;background:white;color:#0f172a;max-width:100%}#p79MonthlyRest button{padding:7px 12px;border:0;border-radius:8px;background:#e2e8f0;color:#0f172a;cursor:pointer}#p79MonthlyRest button.primary{background:#0369a1;color:white}#p79MonthlyRest button:disabled{opacity:.5;cursor:wait}#p79MonthlyRest table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}#p79MonthlyRest th,#p79MonthlyRest td{padding:7px 5px;border-bottom:1px solid #e2e8f0;text-align:center}#p79MonthlyRest .scroll{overflow:auto;margin-top:10px}#p79MonthlyRest .國{background:#fef3c7;color:#92400e}#p79MonthlyRest .休{background:#dbeafe;color:#1e40af}#p79MonthlyRest .例{background:#fee2e2;color:#991b1b}#p79MonthlyRest .summary{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#p79MonthlyRest .summary span{padding:7px;border-radius:8px}#p79MonthlyRest #mrStatus{white-space:pre-line;line-height:1.6;margin:10px 0;color:#475569}`;document.head.appendChild(el);}
 async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
@@ -113,8 +122,9 @@ async function open(){
  el.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(busy){stop=true;setStatus('將在目前這筆完成後停止，已確認儲存的資料會保留。');}else el.close();});el.oncancel=e=>{if(busy){e.preventDefault();stop=true;}};el.onclose=()=>el.remove();
  function paint(){
   sortRows(model.rows);
-  const total=c=>model.balances.reduce((n,b)=>n+b.remaining[c],0);
-  q('#mrSummary').innerHTML=cats.map(c=>'<span class="'+c+'">'+c+'：應休 '+model.balances.reduce((n,b)=>n+b.quota[c],0)+'／已休 '+model.balances.reduce((n,b)=>n+b.off[c],0)+'／已申報 '+model.balances.reduce((n,b)=>n+b.reported[c],0)+'／預排休 '+model.balances.reduce((n,b)=>n+(b.reserved?.[c]||0),0)+'／待報 '+total(c)+' 天</span>').join('');
+  const progress=reportProgress(model),sum=key=>cats.reduce((n,c)=>n+progress[c][key],0);
+  q('#mrSummary').innerHTML='<span style="flex-basis:100%;background:#ecfdf5;font-weight:700" aria-live="polite">合計：目前未報 '+sum('remaining')+' 天／本次要報 '+sum('selected')+' 天／報完後未報 '+sum('after')+' 天'+(sum('over')?'（勾選超額 '+sum('over')+' 天，請調整）':'')+'<small style="display:block;font-weight:400">多人合計以人天計算；每人每個申報日期算 1 天，含預排申報。</small></span>'+cats.map(c=>'<span class="'+c+'">'+c+'：應休 '+model.balances.reduce((n,b)=>n+b.quota[c],0)+'／已休 '+model.balances.reduce((n,b)=>n+b.off[c],0)+'／已申報 '+(model.balances.reduce((n,b)=>n+b.reported[c],0)+progress[c].saved)+'／預排休 '+model.balances.reduce((n,b)=>n+(b.reserved?.[c]||0),0)+'／目前未報 '+progress[c].remaining+'／本次要報 <b>'+progress[c].selected+'</b>／報完後未報 <b>'+progress[c].after+'</b> 天'+(progress[c].over?'（勾選超額 '+progress[c].over+' 天）':'')+'</span>').join('');
+  q('#mrSave').textContent='申報勾選項目（'+sum('selected')+' 天）';
   q('#mrRows').innerHTML=model.rows.map((r,i)=>'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td>'+esc(r.name)+'</td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+(Number(r.rule[2])<8?'<span style="display:block;color:#b91c1c;font-weight:700">⚠ 未滿8小時</span>':'')+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   q('#mrSave').disabled=!model.rows.some(r=>r.checked&&!r.saved);
  }
@@ -161,5 +171,5 @@ async function open(){
   finally{busy=false;controls(false);}
  };
 }
-g.P79MonthlyRest={open,plan,balance,ruleFor,sortRows};
+g.P79MonthlyRest={open,plan,balance,ruleFor,sortRows,reportProgress};
 })(window);
