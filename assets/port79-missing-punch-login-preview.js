@@ -1,6 +1,14 @@
 (function(){
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function shiftWindow(id,date){
+ let roster=[];try{if(typeof schedules!=='undefined'&&Array.isArray(schedules))roster=schedules;}catch(e){}
+ const schedule=roster.find(x=>String(x?.empId||'').trim().toUpperCase()===id)?.schedule||{};
+ const label=schedule[date]??schedule[date.replace(/-/g,'/')]??schedule[String(Number(date.slice(-2)))];
+ const ranges={早:[8,16],中:[16,24],晚:[24,32]};
+ const range=ranges[label],base=Date.parse(date+'T00:00:00+08:00');
+ return {label:String(label||'未知班別'),start:range?base+range[0]*3600000:null,end:range?base+range[1]*3600000:null};
+}
 function init(){
  const toolbar=document.getElementById('attendanceRecordsToolbar'),admin=document.getElementById('viewAdmin');
  if(!toolbar||document.getElementById('p79SessionCandidateBtn'))return;
@@ -22,9 +30,12 @@ function init(){
    let current=[];try{if(typeof sessionLogs!=='undefined'&&Array.isArray(sessionLogs))current=sessionLogs;}catch(e){}
    const logs=[...local,...current].filter(x=>x&&String(x.empId||'').trim().toUpperCase()===id&&['LOGIN','LOGOUT'].includes(x.action));
    const byId=new Map(logs.map(x=>[String(x.id||x.empId+'|'+x.action+'|'+x.timeStr),x]));
-   const from=Date.parse(date+'T00:00:00+08:00'),to=from+48*3600000;
-   const candidate=[...byId.values()].filter(x=>{const t=Date.parse(String(x.timeStr||'').replace(/\//g,'-').replace(' ','T')+'+08:00');return Number.isFinite(t)&&t>=from&&t<to;}).sort((a,b)=>String(a.timeStr).localeCompare(String(b.timeStr)));
-   out.innerHTML=candidate.length?'<strong>找到 '+candidate.length+' 筆候選紀錄（含當日及隔日，跨日僅供人工核對）</strong><ul style="padding-left:18px;margin-top:8px">'+candidate.map(x=>'<li>'+esc(x.timeStr)+'｜'+(x.action==='LOGIN'?'登入':'登出')+'｜'+esc(x.source||'未知來源')+'</li>').join('')+'</ul>':'沒有找到可用的登入／登出紀錄。舊紀錄可能未曾儲存、同步失敗或超過本機保留範圍；不能推算打卡時間。';
+   const shift=shiftWindow(id,date),base=Date.parse(date+'T00:00:00+08:00');
+   const from=shift.start===null?base:shift.start-7200000;
+   const to=shift.end===null?base+48*3600000:shift.end+7200000;
+   const candidate=[...byId.values()].filter(x=>{const t=Date.parse(String(x.timeStr||'').replace(/\\//g,'-').replace(' ','T')+'+08:00');return Number.isFinite(t)&&t>=from&&t<=to;}).sort((a,b)=>String(a.timeStr).localeCompare(String(b.timeStr)));
+   const heading='<strong>排班：'+esc(shift.label)+'</strong><p style="font-size:12px;margin:5px 0">'+(shift.start===null?'未找到可辨識的班別，保留當日及隔日查詢。':'依班別起迄前後各2小時查詢；跨日依工作日期處理。')+'</p>';
+   out.innerHTML=heading+(candidate.length?'<strong>找到 '+candidate.length+' 筆候選紀錄</strong><ul style="padding-left:18px;margin-top:8px">'+candidate.map(x=>'<li>'+esc(x.timeStr)+'｜'+(x.action==='LOGIN'?'登入':'登出')+'｜'+esc(x.source||'未知來源')+'</li>').join('')+'</ul>':'沒有找到可用的登入／登出紀錄，請人工核對。');
   };
   dlg.showModal();
   dlg.addEventListener('close',()=>dlg.remove(),{once:true});
