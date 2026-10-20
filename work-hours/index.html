@@ -12640,6 +12640,18 @@ async function p79ExportOvertimeComparison(printMode){
             renderOvertimeStats();
         }
 
+// 舊雲端申報可能仍存 convertedHours:null；匹配標準延長加班規則時顯示已設定換算。
+// 不覆寫考勤、申報或任意自訂規則。
+function p79DisplayedOvertimeConversion(report){
+ const value=report?.convertedHours;
+ if(value!==null&&value!==undefined&&value!=='')return escapeHtml(value)+'小時';
+ const norm=x=>String(x??'').trim().replace(/:00$/,'').padStart(2,'0');
+ const code=String(report?.code||'').trim();
+ const standardNormal=norm(report?.normalStart)==='08'&&norm(report?.normalEnd)==='16';
+ const standardOvertime=norm(report?.overtimeStart)==='16'&&norm(report?.overtimeEnd)==='20';
+ if((report?.category==='延'||report?.position==='after')&&standardNormal&&standardOvertime&&Number(report?.declaredHours)===4&&/^(?:代|延)?(?:08-20|16-20)$/.test(code))return '6.02小時';
+ return '未設定';
+}
 function p79OvertimePeriodLabel(report){
  const code=String(report?.code||'').trim();
  const extended=report?.category==='延'||['before','after'].includes(report?.position);
@@ -12696,7 +12708,7 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
-                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">出勤待核對｜暫不自動估算</span>`:''}${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.overtimeReport.convertedHours===null?'未設定':escapeHtml(row.overtimeReport.convertedHours)+'小時'}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">出勤待核對｜暫不自動估算</span>`:''}${row.planned?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${p79DisplayedOvertimeConversion(row.overtimeReport)}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
