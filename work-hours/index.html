@@ -823,6 +823,13 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7),#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8){font-size:12px!important;white-space:nowrap!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(7)>*,#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(8)>*{margin-left:auto!important;margin-right:auto!important}
 </style>
+<style id="p79-overtime-readable-font">
+/* 管理端加班統計：統一放大所有資料欄位，避免既有 text-xs 樣式覆蓋。 */
+#p79OvertimeStatsTable, #p79OvertimeStatsTable th, #p79OvertimeStatsTable td { font-size: 16px !important; line-height: 1.55 !important; }
+#p79OvertimeStatsTable td[data-label="姓名"] { font-size: 18px !important; font-weight: 700 !important; }
+#p79OvertimeStatsTable .text-xs, #p79OvertimeStatsTable .text-sm, #p79OvertimeStatsTable button { font-size: 15px !important; line-height: 1.45 !important; }
+#p79OvertimeStatsTable th { font-weight: 700 !important; }
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
@@ -1276,7 +1283,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
-                    <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-left text-xs">
+                    <table id="p79OvertimeStatsTable" class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-left text-base">
                         <thead class="bg-slate-50 dark:bg-slate-900/50 font-semibold text-slate-600 dark:text-slate-400">
                             <tr><th class="px-3 py-3">上班日期</th><th class="px-3 py-3">姓名</th><th class="px-3 py-3">部門</th><th class="px-3 py-3">職稱</th><th class="px-3 py-3">上班簽到</th><th class="px-3 py-3">下班簽退</th><th class="px-3 py-3">出勤時數</th><th class="px-3 py-3">估算加班</th></tr>
                         </thead>
