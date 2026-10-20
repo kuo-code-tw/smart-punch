@@ -15987,7 +15987,12 @@ function getManualPairRecordAnchor(record) {
                     retry.onclick=()=>{
                         const record=activeEditingAttendanceRecord;
                         if(!record)return;
+                        const inputIds=['modalDateInput','modalTimeHour','modalTimeMinute','modalNoteInput'];
+                        const values=inputIds.map(key=>document.getElementById(key)?.value);
+                        const statusValue=document.getElementById('modalStatusInput')?.value;
                         openEditRecordModal(record.id,getAttendanceRecordType(record),record.timeStr,{empId:record.empId,attNo:record.attNo,name:record.name});
+                        inputIds.forEach((key,i)=>{const el=document.getElementById(key);if(el&&values[i]!=null)el.value=values[i];});
+                        if(statusValue&&document.getElementById('modalStatusInput'))document.getElementById('modalStatusInput').value=statusValue;
                     };
                     status.appendChild(retry);
                 }
