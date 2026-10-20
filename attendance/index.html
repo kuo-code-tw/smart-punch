@@ -16055,7 +16055,22 @@ function getManualPairRecordAnchor(record) {
                 if(!userEdited)p79FillAttendanceEditForm(r);
                 p79SetAttendanceEditCloudState(true,'雲端核對完成，可以儲存修改。');
             }catch(error){
-                if(stillOpen())p79SetAttendanceEditCloudState(false,'核對未完成：'+String(error?.name==='AbortError'?'雲端讀取逾時，請取消後重新開啟':error?.message||'雲端讀取失敗，請取消後重新開啟'));
+                if(stillOpen()){
+                    const message=String(error?.message||'');
+                    const missing=/找不到|不存在|已刪除|not found|missing/i.test(message);
+                    if(missing){
+                        // 過期／已刪除的本機快取不是真正可修改的雲端紀錄。
+                        // 不得讓修改視窗一直維持可儲存的假象，亦不得把已刪除 ID 復活。
+                        const staleId=String(original.id??'');
+                        records=records.filter(item=>String(item?.id??'')!==staleId);
+                        try{forgetRecentAttendanceMutation(staleId);}catch(ignore){}
+                        p79ScheduleAttendanceMutationPersist([]);
+                        p79ScheduleAttendanceMutationRender();
+                        p79SetAttendanceEditCloudState(false,'此筆已不在雲端正式主表，不能再修改。已移除過期畫面紀錄；請從原上班列「＋」重新補卡。');
+                    }else{
+                        p79SetAttendanceEditCloudState(false,'核對未完成：'+String(error?.name==='AbortError'?'雲端讀取逾時，請取消後重新開啟':message||'雲端讀取失敗，請取消後重新開啟'));
+                    }
+                }
             }
         }
 
