@@ -12703,18 +12703,15 @@ function p79OvertimePeriodLabel(report){
             p79WorkOvertimeFilteredRows=rows;
             const uniqueEmployees = new Set(rows.map(row => String(row.empId || row.attNo || row.name))).size;
             const totalOvertimeMinutes = rows.reduce((total, row) => total + row.overtimeMinutes, 0);
-            // 未換算加班包含尚未申報的有效打卡估算，不能只讀已申報的 declaredHours，
-            // 否則有加班班次但尚未申報時會錯誤顯示為 0。
-            // 已申報者以原始申報時數為準，未申報者以原始出勤加班分鐘為準；
-            // 不使用 convertedHours，也不在同一班次重複加總兩者。
+            // 未換算加班只統計已正式申報的原始申報時數，不含尚未申報的出勤估算。
+            // 排除沒有申報紀錄的班次，不能從 overtimeMinutes 補算。
             const rawReportedMinutes = rows.reduce((total, row) => {
-                const declared = row.overtimeReport?.declaredHours;
-                const hasDeclared = declared !== null && declared !== undefined && String(declared).trim() !== '';
-                const declaredHours = hasDeclared ? Number(declared) : NaN;
-                const minutes = Number.isFinite(declaredHours) && declaredHours >= 0
-                    ? Math.round(declaredHours * 60)
-                    : Math.max(0, Math.floor(Number(row.overtimeMinutes) || 0));
-                return total + minutes;
+                const report = row.overtimeReport;
+                if (!report || report.planned === true) return total;
+                const hours = report.declaredHours;
+                if (hours === null || hours === undefined || String(hours).trim() === '') return total;
+                const amount = Number(hours);
+                return total + (Number.isFinite(amount) && amount > 0 ? Math.round(amount * 60) : 0);
             }, 0);
             const over12Count = rows.filter(row => row.overDailyLimit).length;
             document.getElementById('overtimeEmployeeCount').textContent = uniqueEmployees;
