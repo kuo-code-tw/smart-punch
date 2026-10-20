@@ -12400,7 +12400,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const date=row.rosterDate||normalizeScheduleDateKey(row.dateKey),month=date.slice(0,7),state=p79WorkOvertimeMonths.get(month);
             if(!state?.ready||!state.revision)return alert('正式班表尚未讀取完成，請稍後重試');
             if(!state.canDelete)return alert('刪除功能暫未啟用，尚未刪除任何資料');
-            if(!confirm('刪除 '+row.name+' '+date+' 的加班，並取消當日對應的代班安排？同筆安排若有兩位代班人員，兩位當日安排都會取消；其他日期、請假與打卡紀錄保留。'))return;
+            const hasCoverLink=!!(row.forEmpId||row.coverCandidate||row.coverAlreadyArranged);
+            if(!confirm(hasCoverLink
+                ? '刪除 '+row.name+' '+date+' 的加班，並取消當日對應的代班安排？同筆安排若有兩位代班人員，兩位當日安排都會取消；其他日期、請假與打卡紀錄保留。'
+                : '刪除 '+row.name+' '+date+' 這筆手動／獨立加班申報？本次不應影響其他人的代班、請假或打卡紀錄。'))return;
             const token=currentPort79SsoToken(),clientId='overtime-delete-'+crypto.randomUUID();
             const rpc=async(action,payload={})=>{
                 const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
@@ -12422,7 +12425,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const affected=new Set(deleted.affectedEmployeeIds||[row.empId]);
                 for(const r of schedules||[]){if(normalizeScheduleMonthKey(r.month)===month&&affected.has(String(r.empId||'').trim().toUpperCase())){r.schedule=r.schedule||{};r.schedule.__meta=r.schedule.__meta||{};r.schedule.__meta[date]={overtimeExcluded:true};}}
                 p79WorkOvertimeMonths.delete(month);p79OvertimeCalculationCache=null;
-                renderOvertimeStats();alert('當日加班及對應代班安排已刪除，可重新申報。');
+                renderOvertimeStats();alert(hasCoverLink?'加班及連動代班已刪除，可重新申報。':'手動／獨立加班刪除已由雲端確認，可重新申報。');
             }catch(error){
                 const message=String(error?.message||error);
                 const oldState=p79WorkOvertimeMonths.get(month);
