@@ -1476,6 +1476,14 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
   font-size:8px!important;color:#64748b!important;line-height:10px!important;padding:0!important;
 }
 </style>
+
+<style id="p79-schedule-name-group-v1039">
+/* 所有單位：姓名旁並排顯示組別，維持拖曳功能與窄欄。 */
+#app-main-container .p79-person-cell .p79-person-name-line{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:3px!important;white-space:nowrap!important}
+#app-main-container .p79-person-cell .p79-person-name{flex:0 0 auto!important;font-size:12px!important}
+#app-main-container .p79-person-cell .p79-person-group{display:inline-block!important;min-width:0!important;flex:0 1 auto!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:10px!important;color:#64748b!important;font-weight:600!important;white-space:nowrap!important}
+#app-main-container .p79-person-cell,#app-main-container .p79-person-header{width:148px!important;min-width:148px!important;max-width:148px!important}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -5611,7 +5619,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
-                  <span class="p79-person-name" title="${emp.name}">${emp.name}</span>
+                  <span class="p79-person-name" title="${emp.name}">${emp.name}</span><span class="p79-person-group" title="組別：${scheduleEscapeHtml(emp.group||'未分組')}">${scheduleEscapeHtml(emp.group||'未分組')}</span>
                 </div>
               </div>
             </td>
