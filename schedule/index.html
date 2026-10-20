@@ -1453,6 +1453,29 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1 span{font-size:8px!important;line-height:11px!important;min-height:0!important;padding:0 2px!important;border-radius:3px!important;white-space:nowrap!important}
 #app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1 button{pointer-events:auto!important}
 </style>
+
+<style id="p79-schedule-text-only-v1038">
+/* 各單位班表改為白底、純文字分色；只有真正代班才顯示小標記。 */
+#app-main-container .p79-month-schedule-table .p79-day-cell,
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift],
+#app-main-container .p79-month-schedule-table .p79-day-cell .p79-shift-select,
+#app-main-container .p79-month-schedule-table .p79-day-cell .clean-shift-select{
+  background:#fff!important;background-color:#fff!important;background-image:none!important;
+  box-shadow:none!important;
+}
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="早"] .p79-shift-select{color:#15803d!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="中"] .p79-shift-select{color:#b45309!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="晚"] .p79-shift-select{color:#1d4ed8!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="休"] .p79-shift-select,
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="例"] .p79-shift-select,
+#app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="國"] .p79-shift-select{color:#be123c!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell .p79-shift-select{font-weight:750!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell>.mt-1{top:1px!important;right:2px!important}
+#app-main-container .p79-month-schedule-table .p79-day-cell .p79-cover-only-mark{
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  font-size:8px!important;color:#64748b!important;line-height:10px!important;padding:0!important;
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -5525,10 +5548,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
           const subRec = (shiftVal === '事' || shiftVal === '病' || shiftVal === '喪' || shiftVal === '特') ? getSubstituteRecommendation(emp.role, emp.id, dayStr) : '';
 
-          const metaBadge = !substituteLabel && dayMeta && (dayMeta.forEmpId || dayMeta.overtime || dayMeta.restQuotaOvertime)
-            ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black text-[9px]" title="${scheduleEscapeHtml(dayMeta.note || '')}">${dayMeta.forEmpId ? '🔄代' : ''}${dayMeta.overtime ? '⭐加' : ''}${dayMeta.restQuotaOvertime ? dayMeta.restCategory+'加' : ''}</span>`
+          const metaBadge = dayMeta?.forEmpId
+            ? `<span class="p79-cover-only-mark" title="${scheduleEscapeHtml(dayMeta.forName ? '代班：'+dayMeta.forName : '代班')}">代班</span>`
             : '';
-          const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
+                    const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
           const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
           const shownShift = approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
           const shownShiftStyle = ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
