@@ -65,7 +65,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- SheetJS (Excel 匯入匯出) -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <style>body{font-family:'PingFang TC','Microsoft JhengHei',sans-serif;} .sticky-col-left{position:sticky;left:0;background-color:#ffffff;z-index:20;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} .sticky-col-left-header{position:sticky;left:0;background-color:#f8fafc;z-index:30;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} select.clean-shift-select{-webkit-appearance:none;-moz-appearance:none;appearance:none;text-align:center;text-align-last:center;background-image:none !important;padding:0 !important;} .custom-scrollbar::-webkit-scrollbar{height:10px;width:8px;} .custom-scrollbar::-webkit-scrollbar-track{background:#f1f5f9;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb:hover{background:#94a3b8;} @media print{.no-print{display:none !important;} body{overflow:visible !important;height:auto !important;background:white;}}</style>
+  <style>body{font-family:'PingFang TC','Microsoft JhengHei',sans-serif;} .sticky-col-left{position:sticky;left:0;background-color:#ffffff;z-index:20;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} .sticky-col-left-header{position:sticky;left:0;background-color:#f8fafc;z-index:30;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} select.clean-shift-select{-webkit-appearance:none;-moz-appearance:none;appearance:none;text-align:center;text-align-last:center;background-image:none !important;padding:0 !important;} .custom-scrollbar::-webkit-scrollbar{height:10px;width:8px;} .custom-scrollbar::-webkit-scrollbar-track{background:#f1f5f9;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb:hover{background:#94a3b8;} @media print{.no-print{display:none !important;} body{overflow:visible !important;height:auto !important;background:white;}}
+/* V10.33 所有單位共用：極簡緊湊班表，左欄只顯示姓名及可拖曳排序。 */
+#app-main-container .p79-person-cell,#app-main-container .p79-person-header{width:152px!important;min-width:152px!important;max-width:152px!important;padding:2px 7px!important}
+#app-main-container .p79-person-cell .p79-person-name-line{min-height:28px;display:flex;justify-content:space-between;align-items:center;gap:4px;overflow:visible}
+#app-main-container .p79-person-cell .p79-person-name{font-size:13px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#app-main-container .p79-person-cell .p79-mini-drag{position:static!important;flex:0 0 24px;width:24px!important;height:26px!important;min-height:26px!important;margin:0!important}
+#app-main-container .p79-day-cell,#app-main-container .p79-day-head{width:39px!important;min-width:39px!important;max-width:39px!important;padding:1px!important}
+#app-main-container .p79-day-cell{height:34px!important;max-height:38px!important;vertical-align:middle!important}
+#app-main-container .p79-day-cell .p79-shift-select{height:28px!important;min-height:28px!important;line-height:28px!important;font-size:11px!important}
+#app-main-container .p79-day-cell .mt-1{display:none!important}
+#app-main-container .p79-month-schedule-table tbody tr{height:38px!important}
+</style>
 
 <style id="port79-schedule-ui-polish-v20260925-4">body{background:radial-gradient(circle at 8% 0%,rgba(99,102,241,.10),transparent 28%),radial-gradient(circle at 92% 8%,rgba(14,165,233,.08),transparent 24%),#f8fafc!important;-webkit-font-smoothing:antialiased} body>header{background:rgba(255,255,255,.93)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom-color:rgba(148,163,184,.26)!important;box-shadow:0 8px 28px rgba(15,23,42,.07)!important} body>header>div>div:first-child>div:first-child{background:linear-gradient(135deg,#4f46e5,#2563eb)!important;box-shadow:0 10px 24px rgba(79,70,229,.22)!important} body>header h1{letter-spacing:.01em} body>header a,body>header button{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}body>header a:hover,body>header button:hover{transform:translateY(-1px)} input,select,textarea{transition:border-color .15s ease,box-shadow .15s ease}input:focus,select:focus,textarea:focus{border-color:#6366f1!important;box-shadow:0 0 0 4px rgba(99,102,241,.11)!important} .custom-scrollbar{border-radius:16px;box-shadow:0 10px 28px rgba(15,23,42,.055)} table{border-collapse:separate;border-spacing:0}tbody tr{transition:background-color .12s ease}tbody tr:hover td{background-color:#eef2ff!important} .sticky-col-left,.sticky-col-left-header{box-shadow:5px 0 16px -12px rgba(15,23,42,.30)} main [class*="rounded-2xl"],main [class*="rounded-xl"]{transition:box-shadow .16s ease} button:not(:disabled):active{transform:scale(.985)} @media(max-width:768px){body>header{padding:12px!important;backdrop-filter:none}body>header>div{gap:10px!important}.custom-scrollbar{border-radius:12px}}</style>
 
@@ -5394,7 +5405,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
           <div class="p79-roster-header-shell">
             <div class="p79-roster-fixed-header" id="p79RosterFixedHeader" aria-label="固定日期表頭"></div>
-            <div class="p79-roster-frozen-label" id="p79RosterFrozenHeaderLabel">姓名 / 狀態 / 組別</div>
+            <div class="p79-roster-frozen-label" id="p79RosterFrozenHeaderLabel">姓名</div>
           </div>
           <div class="p79-roster-bottom-scroll" id="p79RosterBottomScroll" aria-label="班表左右移動橫條"><div id="p79RosterBottomWidth"></div></div>\n          <div class="p79-roster-body-shell" id="p79RosterBodyShell">
             <div class="p79-roster-frozen-people" id="p79RosterPinnedPeople"><div class="p79-roster-frozen-inner" id="p79RosterPinnedInner"></div></div>
@@ -5402,7 +5413,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <table class="p79-month-schedule-table w-full text-xs text-left border-collapse">
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
-                  <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名 / 狀態 / 組別</th>
+                  <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日">例</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日">休</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日">國</th>
@@ -5530,22 +5541,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td class="p79-person-cell sticky-col-left border-r bg-white">
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
-                  <span class="p79-person-name">${emp.name}</span>
-                  ${scheduleAttendanceActiveBadge(emp.id)}
-                  ${lockBadge}
+                  <span class="p79-person-name" title="${emp.name}">${emp.name}</span>
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
                 </div>
-              </div>
-              <div class="p79-person-subline">
-                <div class="p79-person-controls">
-                  <select onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="p79-mini-select p79-role-select" title="跨單位支援">
-                    ${getRoleOptionsHtml(emp.role)}
-                  </select>
-                  <select onchange="updateEmpGroupAndResort('${emp.id}', this.value)" class="p79-mini-select p79-group-select" title="組別" style="${sortedScheduleGroups(emp.role).length>1?'':'display:none!important'}">
-                    ${getGroupOptionsHtml(emp.group,emp.role)}
-                  </select>
-                </div>
-                ${scheduleAttendanceCheckInBadge(emp.id)}
               </div>
             </td>
             ${restCategoryCells}
