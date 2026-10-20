@@ -5,7 +5,7 @@
 <script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261020-shift-evidence"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261020-rest-priority"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261020-schedule-source"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -15120,12 +15120,7 @@ window.p79MonthlyRestContext={
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',readMonth);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
    const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');return data;
   }finally{clearTimeout(timer)}};
-  const readRoster=async()=>{
-   const state=p79WorkOvertimeMonths.get(month);
-   if(state?.token===token&&state.pending&&state.promise)await state.promise;
-   if(state?.token===token&&state.ready&&Array.isArray(state.leaveRecords)&&Date.now()-state.at<60000&&currentPort79SsoToken()===token)return {schedules:state.rows,leaveRecords:state.leaveRecords||[]};
-   return read('getScheduleDataSecure');
-  };
+  const readRoster=()=>read('getScheduleDataSecure');
   const needAttendance=!rosterOnly||reportView;
   const monthDate=new Date(month+'-01T00:00:00Z'),currentMonth=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());
   const adjacent=n=>new Date(Date.UTC(monthDate.getUTCFullYear(),monthDate.getUTCMonth()+n,1)).toISOString().slice(0,7);
@@ -15150,7 +15145,7 @@ window.p79MonthlyRestContext={
    const first=toDateInputValue(leave.startTime||leave.startDate),last=toDateInputValue(leave.endTime||leave.endDate||leave.startTime||leave.startDate);if(!first||!last)continue;
    const days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();for(let d=1;d<=days;d++){const date=month+'-'+String(d).padStart(2,'0');if(date>=first&&date<=last)leaveDates.push(String(emp.empId).toUpperCase()+'|'+date);}
   }
-  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
+  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
 </script>

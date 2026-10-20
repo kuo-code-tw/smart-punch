@@ -7,26 +7,21 @@ function balance(emp,roster,month,snapshot=null){
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
  quota.slots.filter(s=>(!start||s.sourceDate>=start)&&(!end||s.sourceDate<end)).forEach(s=>counts[s.category]++);
  if(dates.some(d=>!roster[d]))throw Error(emp.name+' 本月班表未排完整，請先補齊');
- let actualOff=0,scheduledOffCount=0;
- for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport;
+ const excluded=dates.filter(d=>(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
+ const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start).meta;
+ let extraRest=0;
+ for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
+  const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
+  // The same allocation shown in the schedule is the authoritative baseline.
+  if(scheduledRest)(actual==='open'?reserved:off)[allocation.restCategory]++;
   if(r&&cats.includes(r.category)){
-   if(actual==='rest'){actualOff++;conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，原申報不列有效加班'});}
+   if(actual==='rest'){if(!scheduledRest)extraRest++;conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，原申報不列有效加班'});}
    else{reported[r.category]++;if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，原申報保留待核對'});}
-   continue;
-  }
-  if(actual==='worked'||actual==='missing')continue;
-  const rest=['例','國'].includes(roster[d])?roster[d]:roster[d]==='休'&&!m.restQuotaOvertime?m.restCategory:'';
-  const labelled=cats.includes(rest),scheduledOff=roster[d]==='休'&&!m.restQuotaOvertime&&!r&&!m.overtime;
-  if(actual==='open'){
-   if(labelled||scheduledOff)scheduledOffCount++;
-   continue;
-  }
-  if(labelled||scheduledOff||actual==='rest')actualOff++;
+  }else if(actual==='rest'&&!scheduledRest&&!excluded.includes(d))extraRest++;
  }
- // All rest days consume the monthly pool in order, regardless of roster labels.
- for(const c of ['例','休','國']){const n=Math.min(actualOff,counts[c]);off[c]=n;actualOff-=n;}
- for(const c of ['例','休','國']){const n=Math.min(scheduledOffCount,Math.max(0,counts[c]-off[c]));reserved[c]=n;scheduledOffCount-=n;}
+ // Completed unplanned absence supplements the roster; never count a scheduled rest twice.
+ for(const c of ['例','休','國']){const n=Math.min(extraRest,Math.max(0,counts[c]-off[c]-reserved[c]));off[c]+=n;extraRest-=n;}
  for(const c of cats){const excess=off[c]+reported[c]+reserved[c]-counts[c];if(excess>0)conflicts.push({date:'',reason:c+'已休、預排休與已申報合計超出額度'+excess+'天，請核對既有申報或排休'});}
  const remaining=Object.fromEntries(cats.map(c=>[c,Math.max(0,counts[c]-off[c]-reported[c]-reserved[c])]));
  return {quota:counts,off,reported,reserved,remaining,dates,conflicts};
@@ -108,7 +103,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">休假依例→休→國扣除；姓名旁依例／休／國顯示本次勾選申報後的未報天數（含預排），勾選時即時更新。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">未休額度依排班系統配對結果；姓名旁依例／休／國顯示本次勾選申報後的未報天數（含預排），勾選時即時更新。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[];
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
