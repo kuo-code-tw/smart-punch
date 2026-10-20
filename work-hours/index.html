@@ -15060,6 +15060,24 @@ body.p79-work-hours-page #attendanceStatsDashboard .p79-stat-card-sub{font-size:
 body.p79-work-hours-page #attendanceStatsSummary{padding:9px 13px!important;min-height:0!important;margin-top:0!important;border-radius:12px!important;}
 @media(min-width:1024px){body.p79-work-hours-page #adminContentStats{margin-top:-4px!important;}}
 </style>
+<style id="p79-overtime-wide-v20261020">
+/* 每日加班人員統計：桌機展開內容寬度，降低側邊留白；手機維持響應式滾動。 */
+@media(min-width:1024px){
+ body.p79-work-hours-page #viewAdmin:has(#adminContentOvertime:not(.hidden)){
+   width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;
+   margin-left:calc(50% - 50vw + 12px)!important;margin-right:0!important;
+   padding:12px 4px 24px!important;
+ }
+ body.p79-work-hours-page #viewAdmin:has(#adminContentOvertime:not(.hidden)) .admin-desktop-content{
+   width:100%!important;max-width:none!important;min-width:0!important;padding:12px!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime,
+ body.p79-work-hours-page #adminContentOvertime > *{
+   width:100%!important;max-width:none!important;min-width:0!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime table{width:100%!important;}
+}
+</style>
 </body>
 </html>
 
