@@ -3919,10 +3919,79 @@ function p79EmployeeDateEligible(emp,date) {
       return null;
     }
 
+    // 只在持有排班編輯鎖且正式考勤全月讀取成功時，自動把無任何打卡的已過日期改為「休」。
+    // 考勤歸屬以原上班日為準；隔日凌晨的 OUT 同時計入前一日，避免跨日班誤判。
+    async function p79ApplyNoPunchRestFromOfficial(yearMonth) {
+      if(!scheduleEditLockState.mine)return 0;
+      const token=currentPort79SsoToken();
+      if(!token)return 0;
+      const today=scheduleTaipeiTodayKey();
+      const [year,month]=yearMonth.split('-').map(Number);
+      if(!year||!month||yearMonth>today.slice(0,7))return 0;
+      const nextDate=new Date(Date.UTC(year,month,1));
+      const nextMonth=nextDate.toISOString().slice(0,7);
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),18000);
+      let fetched;
+      try{
+        fetched=await Promise.all([...new Set([yearMonth,nextMonth])].map(async m=>{
+          const url=GAS_URL+'?action=getAttendanceMainDirect&month='+encodeURIComponent(m)+'&token='+encodeURIComponent(token)+'&t='+Date.now();
+          const response=await fetch(url,{cache:'no-store',signal:controller.signal});
+          const data=await response.json();
+          if(!response.ok||data?.ok!==true||!Array.isArray(data.records)||String(data.month||'')!==m)throw Error('正式考勤月份核對失敗：'+m);
+          return data.records;
+        }));
+      }catch(error){
+        console.warn('未能安全核對全月正式考勤，排班保持原狀',error);
+        return 0;
+      }finally{clearTimeout(timeout);}
+      if(document.getElementById('month-picker')?.value!==yearMonth||!scheduleEditLockState.mine||currentPort79SsoToken()!==token)return 0;
+      const presence=new Set();
+      const stamp=record=>{
+        const raw=String(record?.timeStr||record?.time||'');
+        const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+        if(!m)return null;
+        return {date:m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'),hour:Number(m[4]),type:scheduleAttendanceRecordType(record)};
+      };
+      const byAtt=new Map();
+      employees.forEach(emp=>{const key=String(emp.attNo||emp.attendanceNo||'').trim();if(key){const set=byAtt.get(key)||new Set();set.add(String(emp.id||emp.empId||'').trim().toUpperCase());byAtt.set(key,set);}});
+      fetched.flat().forEach(record=>{
+        if(record?.deleted===true||record?.isDeleted===true)return;
+        const info=stamp(record);if(!info||!info.type)return;
+        let id=String(record.empId||'').trim().toUpperCase();
+        if(!id){const set=byAtt.get(String(record.attNo||record.attendanceNo||'').trim());if(set?.size===1)id=[...set][0];}
+        if(!id)return;
+        presence.add(id+'|'+info.date);
+        if(info.type==='OUT'&&info.hour<12){
+          const p=new Date(Date.parse(info.date+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+          presence.add(id+'|'+p);
+        }
+      });
+      let changed=0;
+      employees.forEach(emp=>{
+        const id=String(emp.id||emp.empId||'').trim().toUpperCase();
+        if(!id||!monthlyScheduleData[emp.id])return;
+        Object.keys(monthlyScheduleData[emp.id]).forEach(date=>{
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(yearMonth)||date>=today)return;
+          if(!p79EmployeeDateEligible(emp,date)||presence.has(id+'|'+date))return;
+          const shift=monthlyScheduleData[emp.id][date];
+          if(!shift||['休','例','國','特','年','事','病','公','喪','離'].includes(String(shift)))return;
+          const meta=monthlyScheduleMeta[emp.id]?.[date];
+          if(meta&&(meta.forEmpId||meta.overtime||meta.overtimeReport||meta.note))return;
+          if(approvedLeaveForEmployee(emp.id,date)||p79LeaveCoverOnDay(emp.id,date).length)return;
+          monthlyScheduleData[emp.id][date]='休';
+          changed++;
+        });
+      });
+      if(changed){p79MarkScheduleLocalMutation();try{buildRoleTabsAndRender();}catch(ignore){}}
+      return changed;
+    }
+
     async function saveScheduleMonthToCloud(showAlert = true) {
+      const yearMonth = document.getElementById('month-picker').value;
+      if(scheduleEditLockState.mine)await p79ApplyNoPunchRestFromOfficial(yearMonth);
       if (scheduleEditLockState.mine) p79ApplyAutomaticRestMetadata();
       const snapshotVersion=p79ScheduleLocalMutationVersion;
-      const yearMonth = document.getElementById('month-picker').value;
       const schedules = employees.map(emp => {
         const monthData = {};
         const allEmp = monthlyScheduleData[emp.id] || {};
