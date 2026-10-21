@@ -30,6 +30,7 @@
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261021-no-punch-roster"></script>
+<script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
   try{
@@ -6270,6 +6271,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
         alert('❌ 找不到班表匯入元件，請使用修正版排班頁。');
         return;
       }
+      const selectedRoles=await window.P79ScheduleTransferRoles.select({employees,mode:'import',month:currentScheduleMonthKey(),priority:getRolePriority});
+      if(!selectedRoles)return;
+      if(!canManageSchedule()||!scheduleCanEditNow())return alert('排班編輯權已變更，請重新取得編輯權後再匯入');
+      input.dataset.roleSelection=JSON.stringify(selectedRoles);
+      input.dataset.importMonth=currentScheduleMonthKey();
       input.value = '';
       input.click();
     }
@@ -6311,6 +6317,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if (!canManageSchedule()) throw new Error('此帳號沒有排班管理權限');
         if (!scheduleCanEditNow()) throw new Error('目前沒有取得排班編輯權，請重新整理後再試');
         if (typeof XLSX === 'undefined') throw new Error('Excel 元件尚未載入');
+        const selectedRoles=JSON.parse(input.dataset.roleSelection||'null');
+        if(!Array.isArray(selectedRoles)||!selectedRoles.length)throw new Error('請先勾選要匯入的職稱');
 
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
@@ -6331,6 +6339,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
         const yearMonth = String(document.getElementById('month-picker')?.value || '').trim();
         if (!/^\d{4}-\d{2}$/.test(yearMonth)) throw new Error('目前排班月份格式不正確');
+        if(input.dataset.importMonth!==yearMonth)throw new Error('排班月份已變更，請重新選擇職稱與匯入檔案');
         const [year, month] = yearMonth.split('-').map(Number);
         const totalDays = getDaysInMonth(year, month);
 
@@ -6367,6 +6376,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             if (rawId || rawName) notFound.push(rawId || rawName);
             continue;
           }
+          if(!selectedRoles.includes(window.P79ScheduleTransferRoles.role(emp)))continue;
           matchedRows++;
 
           // V10.26：組別與排班屬性是「排班月份設定」，可由系統匯出的 Excel 還原。
@@ -6423,7 +6433,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         }
 
         if (!matchedRows) {
-          throw new Error('Excel 裡的人員沒有任何一位能和目前人資主檔對上。請確認工號／姓名是否一致。');
+          throw new Error('Excel 裡沒有符合已勾選職稱的人員。請確認職稱選擇及工號／姓名。');
         }
         if (!updatedCells) {
           throw new Error('有找到人員，但沒有讀到任何 1日～31日 的班別欄位。請使用系統匯出的班表格式。');
@@ -6446,14 +6456,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if (ambiguous.length) notes.push(`同名無法判斷：${[...new Set(ambiguous)].slice(0, 5).join('、')}`);
         if (invalid.length) notes.push(`略過無法辨識班別 ${invalid.length} 格，例如：${invalid.slice(0, 3).join('；')}`);
 
-        alert(`✅ 班表匯入完成\n月份：${yearMonth}\n對到人員：${matchedRows} 列\n更新班別：${updatedCells} 格${updatedGroups ? `\n更新組別：${updatedGroups} 人` : ''}${updatedLockTypes ? `\n更新排班屬性：${updatedLockTypes} 人` : ''}\n並已同步 Google 雲端${notes.length ? '\n\n⚠️ ' + notes.join('\n⚠️ ') : ''}`);
+        alert(`✅ 班表匯入完成\n月份：${yearMonth}\n職稱：${selectedRoles.join('、')}\n對到人員：${matchedRows} 列\n更新班別：${updatedCells} 格${updatedGroups ? `\n更新組別：${updatedGroups} 人` : ''}${updatedLockTypes ? `\n更新排班屬性：${updatedLockTypes} 人` : ''}\n並已同步 Google 雲端${notes.length ? '\n\n⚠️ ' + notes.join('\n⚠️ ') : ''}`);
       } catch (err) {
         console.error('班表匯入失敗：', err);
         const msg = String(err?.message || err || '未知錯誤');
         const cloudSide = /Google Apps Script|Google 雲端|雲端|GAS|已成功讀取並套用/.test(msg);
         alert((cloudSide ? '⚠️ Excel 已讀取，但雲端儲存失敗：\n' : '❌ 班表匯入失敗：\n') + msg);
       } finally {
-        if (input) input.value = '';
+        if (input){input.value='';delete input.dataset.roleSelection;delete input.dataset.importMonth;}
       }
     }
 
@@ -6476,12 +6486,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(compact!==String(raw).trim()||['年','事','病','公','喪','婚','產','檢','陪','顧','經','安','傷','訂','假','離'].includes(compact))return compact;
       return p79SubstituteShiftLabel(emp.id,dayStr,meta)||(meta?.restQuotaOvertime?raw+'（'+meta.restCategory+'加）':raw==='休'&&meta?.restCategory?meta.restCategory:raw);
     }
-    function exportScheduleToExcel() {
+    async function exportScheduleToExcel() {
       const yearMonth = document.getElementById('month-picker').value;
       const [year, month] = yearMonth.split('-').map(Number);
       const totalDays = getDaysInMonth(year, month);
 
-      const sortedEmps = [...employees].sort((a, b) => {
+      const selectedRoles=await window.P79ScheduleTransferRoles.select({employees,mode:'export',month:yearMonth,priority:getRolePriority});
+      if(!selectedRoles)return;
+      if(document.getElementById('month-picker').value!==yearMonth)return alert('月份已變更，請重新選擇匯出職稱');
+      const selectedEmployees=window.P79ScheduleTransferRoles.filter(employees,selectedRoles);
+      if(!selectedEmployees.length)return alert('已勾選的職稱目前沒有人員');
+      const sortedEmps = selectedEmployees.sort((a, b) => {
         const rDiff = getRolePriority(a.role) - getRolePriority(b.role);
         if (rDiff !== 0) return rDiff;
         const gDiff = getGroupPriority(a.group) - getGroupPriority(b.group);
@@ -6536,8 +6551,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
       // 凍結/顯示左側欄位由 Excel 軟體決定；至少確保資料本身完整輸出。
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `${yearMonth}全廠班表`);
-      XLSX.writeFile(wb, `${yearMonth}_全月排班表.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, `${yearMonth}職稱班表`);
+      const roleLabel=selectedRoles.length===new Set(employees.map(window.P79ScheduleTransferRoles.role)).size?'全部職稱':selectedRoles.map(r=>r.replace(/[^\u3400-\u9fffA-Za-z0-9_-]+/g,'-')).join('_');
+      XLSX.writeFile(wb, `${yearMonth}_${roleLabel}_排班表.xlsx`);
     }
 
     // 明確掛到 window，確保上方「功能 → 匯出」與頁面按鈕都呼叫同一份正式函式。
