@@ -112,11 +112,8 @@ function reportProgress(model,empId=null){
 }
 function personSummary(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),sum=f=>cats.reduce((n,c)=>n+f(c),0);
- const unused=sum(c=>b.unused?.[c]??Math.max(0,(b.remaining[c]||0)+(b.reported?.[c]||0)));
- const reported=sum(c=>(b.reported?.[c]||0)+p[c].saved),selected=sum(c=>p[c].selected);
- const names={'例':'例假','休':'休息日','國':'國定假日'},detail=key=>['例','休','國'].filter(c=>p[c][key]>0).map(c=>names[c]+' '+p[c][key]+' 天').join('／')||'無';
- return '未休 '+unused+' 天｜已報 '+reported+' 天｜待報：'+detail('remaining')+(selected?'｜勾選 '+selected+' 天，報後待報：'+detail('after'):'');
+ const p=reportProgress(model,empId);
+ return ['例','休','國'].map(c=>c+p[c].remaining).join('／');
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
@@ -133,7 +130,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">未休額度依排班系統配對結果；姓名旁分列未休總數、已確認申報與待報天數（含預排）；勾選只更新報後預估，成功讀回才扣已報。點數字可查逐日明細。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">未休額度依排班系統配對結果；姓名後顯示尚待申報的例／休／國天數。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='';
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
