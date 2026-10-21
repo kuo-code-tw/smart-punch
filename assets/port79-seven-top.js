@@ -176,7 +176,7 @@ const MENU={
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
- workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
+ workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['project-bonus','💰 專案獎金'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
  schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入'],['monthly-export','📥 匯出每月作業量表'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
@@ -248,6 +248,7 @@ async function runAction(sys,a){closeMenu();try{
   if(a==='overtime-export')return await window.p79ExportOvertimeComparison?.(false);
   if(a==='overtime-summary')return window.P79OvertimeMonthlyMatrix?.open();
   if(a==='overtime-application')return window.P79OvertimeApplication?.open();
+  if(a==='project-bonus')return window.P79ProjectBonus?.open();
   if(a==='overtime-print')return await window.p79ExportOvertimeComparison?.(true);
   if(a==='overtime-policy')return window.openOvertimePolicyModal?.();
   if(a==='stats'){document.body.dataset.p79WorkhoursUserOpened='1';location.hash='stats';return window.switchAdminTab?.('stats')}
@@ -298,7 +299,7 @@ function buildMenu(sys){
   ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','schedule-continue','import','export','monthly-export']],
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
-  ['紀錄查詢',['stats','overtime-summary','overtime-application','overtime-print','overtime-policy','logs','attendance-compare','compare']],
+  ['紀錄查詢',['stats','overtime-summary','overtime-application','project-bonus','overtime-print','overtime-policy','logs','attendance-compare','compare']],
   ['進階工具',['clearDeleted','data-cache']],
   ['顯示設定',['year','global-theme']],
   ['登出系統',['logout-system']]
