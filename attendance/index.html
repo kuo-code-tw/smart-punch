@@ -911,10 +911,11 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
 <style id="p79-attendance-table-layout">
 #viewAdmin{max-width:1920px!important}
 #viewAdmin .admin-desktop-content{min-width:0!important;width:100%!important}
-#adminRecordsTableContainer{width:100%!important;max-width:100%!important;overflow-x:auto;scrollbar-width:thin}
-#adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse}
+#adminRecordsTableContainer{width:100%!important;max-width:100%!important;padding:0!important;overflow:auto!important;position:relative;isolation:isolate;scrollbar-width:thin}
+#adminRecordsTableContainer .attendance-records-wide-table thead{position:sticky!important;top:0!important;z-index:30!important;background:#eaf2f8;}
+#adminRecordsTableContainer .attendance-records-wide-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;border-collapse:separate!important;border-spacing:0!important}
 #adminRecordsTableContainer .attendance-records-wide-table :is(th,td){width:auto!important;box-sizing:border-box!important;text-align:center!important;vertical-align:middle!important;padding:12px 4px!important;font-size:clamp(14px,1vw,16px)!important;line-height:1.4!important;white-space:nowrap!important;border-left:0!important;border-right:0!important}
-#adminRecordsTableContainer .attendance-records-wide-table th{position:sticky;top:0;z-index:8;height:46px;font-size:clamp(12px,1vw,15px)!important;font-weight:700!important;background:#f1f5f9;color:#475569}
+#adminRecordsTableContainer .attendance-records-wide-table th{position:static!important;top:auto!important;z-index:auto;height:46px;font-size:clamp(12px,1vw,15px)!important;font-weight:700!important;background:#f1f5f9;color:#475569}
 #adminRecordsTableContainer .attendance-records-wide-table td{height:56px}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]{font-size:clamp(12px,1vw,15px)!important;font-variant-numeric:tabular-nums}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side]>span{display:inline-flex!important;align-items:center!important;justify-content:center!important;max-width:100%;margin:0 auto!important}

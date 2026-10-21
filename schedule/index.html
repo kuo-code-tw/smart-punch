@@ -26,9 +26,10 @@
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
 <script src="../assets/port79-rest-allocation.js?v=20261021-rest-ledger"></script>
-<script src="../assets/port79-rest-attendance.js?v=20261021-shift-overlap"></script>
+<script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261021-no-punch-roster"></script>
 <script id="p79-default-light-v20261001">
 (function(){
   try{
@@ -1620,7 +1621,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
             <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
             <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
-            <span class="text-xs text-slate-500">例／休／國：已排休＋已報／待報</span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
+            <span class="text-xs text-slate-500">例／休／國：已排休＋已報／待報</span><span id="scheduleRestEvidenceStatus" class="text-xs text-slate-500" role="status"></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
             <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
@@ -3962,6 +3963,7 @@ function p79EmployeeDateEligible(emp,date) {
         });
 
         window.P79ScheduleRestSummary.acceptRows(data.schedules||[]);
+        p79ScheduleRestClient().refresh(requestMonth);
         applySchedulePersonnelOverrides(currentScheduleMonthKey());
 
         const groupSet = new Set(['不分組']);
@@ -4176,6 +4178,7 @@ function p79EmployeeDateEligible(emp,date) {
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         window.P79ScheduleRestSummary.acceptRows(confirmedRestRows,yearMonth);
         p79RefreshScheduleRestCounts(yearMonth);
+        p79ScheduleRestClient().refresh(yearMonth);
         try{
           const draft=JSON.parse(sessionStorage.getItem(P79Overtime.KEY)||'null');
           if(draft&&schedules.some(row=>Object.values(row.schedule.__meta||{}).some(m=>m?.overtimeReport?.id===draft.id))){sessionStorage.removeItem(P79Overtime.KEY);document.getElementById('p79ReportBanner')?.remove();if(draft.leaveHandoffId){const handoff=JSON.parse(sessionStorage.getItem('port79_leave_overtime_handoff_v1')||'null');if(handoff?.id===draft.leaveHandoffId){handoff.entries=(handoff.entries||[]).filter(e=>!(String(e.empId)===String(draft.empId)&&e.date===draft.date));if(handoff.entries.length)sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify(handoff));else sessionStorage.removeItem('port79_leave_overtime_handoff_v1');setTimeout(()=>{location.href='../work-hours/?leaveReport=1#overtime'},0);}}}
@@ -5539,6 +5542,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
       roleEmps.forEach(emp => {
         const automaticRestMeta = p79AutomaticRestMetadata(emp.id, yearMonth);
+        const restBalance=p79ScheduleRestBalance(emp,yearMonth,automaticRestMeta);
         let workDays = 0;
         let offDays = 0;
 
@@ -5546,13 +5550,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
         for(const d of visibleDays) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
-          const shiftVal = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
-          const dayMeta = automaticRestMeta[dayStr] || null;
-          const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
+          const rosterShift = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
           const ownApprovedLeave = approvedLeaveForEmployee(emp.id, dayStr);
-          const coverageShift = p79CoverageShift(emp.id,dayStr);
+          const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave);
+          const shiftVal=noPunchRest?'休':rosterShift;
+          const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),restCategory:restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
+          const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
+          const coverageShift = noPunchRest?'':p79CoverageShift(emp.id,dayStr);
           const displayShift = coverageShift || shiftVal;
-          const substituteLabel = ownApprovedLeave ? '' : p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
+          const substituteLabel = ownApprovedLeave||noPunchRest ? '' : p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
 
 
           if(shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '離') {
@@ -5602,7 +5608,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
-          const cellTitle = [subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle = [noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${substituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
@@ -6021,10 +6027,29 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
     }
 
+    let p79ScheduleRestEvidenceClient=null;
+    function p79ScheduleRestLeaveDates(month,employeeId='') {
+      const dates=[];for(const emp of employees.filter(e=>!employeeId||e.id===employeeId))for(let d=1;d<=p79RestQuota(month).days;d++){const date=month+'-'+String(d).padStart(2,'0');if(approvedLeaveForEmployee(emp.id,date))dates.push(String(emp.id).toUpperCase()+'|'+date);}return dates;
+    }
+    function p79ScheduleRestClient() {
+      if(!p79ScheduleRestEvidenceClient)p79ScheduleRestEvidenceClient=window.P79ScheduleRestEvidence.create({
+        token:currentPort79SsoToken,employees:()=>employees,schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
+        buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
+        read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
+        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?'出勤核對中…':state.error?'出勤未完成核對：'+state.error:'';if(!state.pending)renderRoleScheduleView();}
+      });return p79ScheduleRestEvidenceClient;
+    }
+    function p79ScheduleRestBalance(emp,month,allocated=null) {
+      const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
+      return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
+    }
+    function p79ScheduleNoPunchRest(empId,date,shift,meta,leave) {
+      if(leave||!(['早','中','晚'].includes(shift)||meta?.overtimeReport))return false;
+      const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
+      return window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)==='rest';
+    }
     function p79ScheduleRestCountCells(emp,month) {
-      const days=p79RestQuota(month).days,leaveDates=[];
-      for(let day=1;day<=days;day++){const date=month+'-'+String(day).padStart(2,'0');if(approvedLeaveForEmployee(emp.id,date))leaveDates.push(String(emp.id).toUpperCase()+'|'+date);}
-      const result=window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments},p79EmploymentStartDate(emp));
+      const result=p79ScheduleRestBalance(emp,month);
       return ['例','休','國'].map(category=>{
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const remaining=result.remaining?.[category]??'—',quota=result.quota?.[category]??'—';
@@ -6446,6 +6471,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
       const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
       const meta=monthlyScheduleMeta[emp.id]?.[dayStr];
+      if(p79ScheduleNoPunchRest(emp.id,dayStr,raw,meta,null))return p79ScheduleRestBalance(emp,dayStr.slice(0,7)).ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休';
       const compact=p79ScheduleLeaveExportCode(raw);
       if(compact!==String(raw).trim()||['年','事','病','公','喪','婚','產','檢','陪','顧','經','安','傷','訂','假','離'].includes(compact))return compact;
       return p79SubstituteShiftLabel(emp.id,dayStr,meta)||(meta?.restQuotaOvertime?raw+'（'+meta.restCategory+'加）':raw==='休'&&meta?.restCategory?meta.restCategory:raw);
