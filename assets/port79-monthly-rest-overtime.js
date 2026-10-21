@@ -4,8 +4,8 @@ const KEY='port79_monthly_rest_overtime_v1',cats=['國','休','例'],esc=x=>Stri
 // balance() receives the official cloud roster; idless annotations are not saved declarations.
 const storedReport=r=>!!String(r?.id??'').trim();
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
-function balance(emp,roster,month,snapshot=null){
- const quota=g.p79RestQuota(month),start=g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
+function balance(emp,roster,month,snapshot=null,employmentStart=null){
+ const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
  quota.slots.filter(s=>(!start||s.sourceDate>=start)&&(!end||s.sourceDate<end)).forEach(s=>counts[s.category]++);
  if(dates.some(d=>!roster[d]))throw Error(emp.name+' 本月班表未排完整，請先補齊');
