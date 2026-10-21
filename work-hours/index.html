@@ -3,9 +3,9 @@
 <head><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
-<script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
-<script src="../assets/port79-rest-attendance.js?v=20261020-shift-evidence"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261021-all-roles-rest"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261021-rest-ledger"></script>
+<script src="../assets/port79-rest-attendance.js?v=20261021-rest-ledger"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261021-rest-ledger"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -12421,6 +12421,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const adjacent=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);
             return [adjacent(-1),month,...(adjacent(1)<=current?[adjacent(1)]:[])];
         }
+        function p79WorkRestLeaveDates(month,roster,employees){
+            const dates=new Set(),days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+            for(const leave of roster.leaveRecords||[]){
+                if(!['已核准','已核準'].includes(leave.status))continue;
+                const emp=employees.find(e=>leaveBelongsToEmployee(leave,e));if(!emp)continue;
+                const first=toDateInputValue(leave.startTime||leave.startDate),last=toDateInputValue(leave.endTime||leave.endDate||leave.startTime||leave.startDate);if(!first||!last)continue;
+                for(let d=1;d<=days;d++){const date=month+'-'+String(d).padStart(2,'0');if(date>=first&&date<=last)dates.add(String(emp.empId).trim().toUpperCase()+'|'+date);}
+            }
+            return [...dates];
+        }
         function p79BuildWorkRestAttendance(month,roster,attendanceRows,complete=true){
             const employees=p79WorkhoursEligibleEmployees(),allowed=new Set(employees.map(e=>String(e.empId).trim().toUpperCase()));
             const sessions=buildDailyAttendanceRows(attendanceRows).map(row=>{
@@ -12428,7 +12438,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const employee=employees.find(e=>String(e.empId).trim().toUpperCase()===String(row.empId||record.empId||'').trim().toUpperCase())||employees.find(e=>String(record.attNo||'').trim()&&normalizeAttendanceStatsAttNo(e.attNo)===normalizeAttendanceStatsAttNo(record.attNo));
                 return {empId:employee?.empId||'',date:normalizeScheduleDateKey(row.accountingDateKey||row.dateKey),start:row.clockIn?p79DirectAttendanceTimestamp(row.clockIn):null,end:row.clockOut?p79DirectAttendanceTimestamp(row.clockOut):null,time:p79DirectAttendanceTimestamp(record)};
             }).filter(p=>allowed.has(String(p.empId).toUpperCase()));
-            const attendanceEvidence=window.P79RestAttendance.build({complete,month,schedules:roster.schedules,sessions});
+            const attendanceEvidence=window.P79RestAttendance.build({complete,month,schedules:roster.schedules,sessions,leaveDates:p79WorkRestLeaveDates(month,roster,employees)});
             const pairs=sessions.map((p,index)=>({...p,date:attendanceEvidence.sessionDates?.[index]||p.date})).filter(p=>p.start!=null&&p.end!=null&&p.end>p.start&&p.date.startsWith(month+'-'));
             return {employees,allowed,sessions,attendanceEvidence,pairs};
         }
@@ -12455,7 +12465,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const batches=await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
                 if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
                 const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
-                state.attendanceEvidence=p79BuildWorkRestAttendance(month,{schedules:state.rows},rows).attendanceEvidence;
+                state.attendanceEvidence=p79BuildWorkRestAttendance(month,{schedules:state.rows,leaveRecords:state.leaveRecords||[]},rows).attendanceEvidence;
                 p79OvertimeCalculationCache=null;
             }catch(error){
                 if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){state.attendanceEvidence={complete:false,days:{}};state.restEvidenceError=error?.name==='AbortError'?'無卡休假核對逾時，請重新讀取':String(error?.message||error);}
@@ -15208,10 +15218,7 @@ window.p79MonthlyRestContext={
   else p79WorkOvertimeMonths.set(month,{token,ready:true,pending:false,at:Date.now(),rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],revision:roster.revision,canDelete:roster.overtimeLinkedDelete===true,attendanceEvidence});
   p79OvertimeCalculationCache=null;
 
-  const leaveDates=[];for(const leave of roster.leaveRecords||[]){if(leave.status!=='已核准')continue;const emp=employees.find(e=>leaveBelongsToEmployee(leave,e));if(!emp)continue;
-   const first=toDateInputValue(leave.startTime||leave.startDate),last=toDateInputValue(leave.endTime||leave.endDate||leave.startTime||leave.startDate);if(!first||!last)continue;
-   const days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();for(let d=1;d<=days;d++){const date=month+'-'+String(d).padStart(2,'0');if(date>=first&&date<=last)leaveDates.push(String(emp.empId).toUpperCase()+'|'+date);}
-  }
+  const leaveDates=p79WorkRestLeaveDates(month,roster,employees);
   return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,saveContext:needAttendance?{token,month,ready:roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
