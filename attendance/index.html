@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script>window.P79ManagementOptimizationMode=true;</script>
+<head><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script><script>window.P79ManagementOptimizationMode=true;</script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -15966,6 +15966,20 @@ function getManualPairRecordAnchor(record) {
 
         let p79AttendanceEditOpenGeneration = 0;
         let p79AttendanceEditCloudReady = false;
+        let p79WorkhoursEditConflict=null;
+        function p79WorkhoursEditEquivalent(a,b){return window.P79AttendanceEditCompare(a,b);}
+        function p79RetryWorkhoursAttendanceEdit(){
+            const r=activeEditingAttendanceRecord;if(!r)return;
+            const ids=['modalDateInput','modalTimeHour','modalTimeMinute','modalStatusInput','modalNoteInput'];
+            const draft=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)?.value||'']));
+            // This explicit button acknowledges the displayed newer baseline.
+            if(p79WorkhoursEditConflict&&String(p79WorkhoursEditConflict.id)===String(r.id)){
+                const matches=records.filter(item=>String(item.id)===String(r.id)&&String(item.empId||'')===String(r.empId||'')&&String(item.attNo||'')===String(r.attNo||''));
+                if(matches.length===1)Object.assign(matches[0],p79WorkhoursEditConflict);
+                Object.assign(r,p79WorkhoursEditConflict);
+            }
+            return openEditRecordModal(r.id,getAttendanceRecordType(r),r.timeStr,{empId:r.empId,attNo:r.attNo,name:r.name},draft);
+        }
         function p79AttendanceEditFormFingerprint() {
             return JSON.stringify(['modalDateInput','modalTimeHour','modalTimeMinute','modalStatusInput','modalNoteInput'].map(id=>document.getElementById(id)?.value||''));
         }
@@ -15974,23 +15988,11 @@ function getManualPairRecordAnchor(record) {
             const status=document.getElementById('editRecordCloudCheckStatus');
             if(status){
                 status.textContent=message;
-                // 僅供管理端編輯視窗重試核對；不解除雲端確認前的儲存鎖定。
-                if(!ready && /核對未完成|等待超過|讀取逾時/.test(String(message||''))){
-                    const retry=document.createElement('button');
-                    retry.type='button';
-                    retry.textContent='↻ 重新核對';
+                if(!ready&&/核對未完成/.test(String(message||''))){
+                    const retry=document.createElement('button');retry.type='button';
+                    retry.textContent=p79WorkhoursEditConflict?'保留輸入，依最新紀錄核對':'保留輸入，重新核對';
                     retry.className='ml-2 px-2 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold';
-                    retry.onclick=()=>{
-                        const record=activeEditingAttendanceRecord;
-                        if(!record)return;
-                        const inputIds=['modalDateInput','modalTimeHour','modalTimeMinute','modalNoteInput'];
-                        const values=inputIds.map(key=>document.getElementById(key)?.value);
-                        const statusValue=document.getElementById('modalStatusInput')?.value;
-                        openEditRecordModal(record.id,getAttendanceRecordType(record),record.timeStr,{empId:record.empId,attNo:record.attNo,name:record.name});
-                        inputIds.forEach((key,i)=>{const el=document.getElementById(key);if(el&&values[i]!=null)el.value=values[i];});
-                        if(statusValue&&document.getElementById('modalStatusInput'))document.getElementById('modalStatusInput').value=statusValue;
-                    };
-                    status.appendChild(retry);
+                    retry.onclick=p79RetryWorkhoursAttendanceEdit;status.appendChild(retry);
                 }
             }
             ['saveModalEditBtn','deleteModalRecordBtn'].forEach(id=>{const button=document.getElementById(id);if(button)button.disabled=!ready;});
@@ -16002,18 +16004,19 @@ function getManualPairRecordAnchor(record) {
             document.getElementById('modalEmpInfo').textContent = `${r.name} (${r.empId}) - ${r.dept || '一般'} (考勤號: ${r.attNo})`;
             document.getElementById('modalNoteInput').value = r.note || '';
 
-            if (r.timeStr) {
-                const parts = r.timeStr.replace(/-/g, '/').split(' ');
+            const normalized=normalizeImportedAttendanceTime(r.timeStr)||String(r.timeStr||'').replace('T',' ');
+            if (normalized) {
+                const parts = normalized.replace(/-/g, '/').split(' ');
                 const dateParts = parts[0].split('/');
                 if (dateParts.length === 3) {
-                    p79SetDateInputValue('modalDateInput', `${dateParts[0]}-${dateParts[1].padStart(2,'0')}-${dateParts[2].padStart(2,'0')}`);
+                    p79SetDateInputValue('modalDateInput',`${dateParts[0]}-${dateParts[1].padStart(2,'0')}-${dateParts[2].padStart(2,'0')}`);
                 }
                 if (parts[1]) {
                     set24HourTime('modal', parts[1].slice(0, 5));
                 }
             }
 
-            if (!r.timeStr || !r.timeStr.includes(' ')) {
+            if (!/\s\d{1,2}:\d{2}/.test(normalized)) {
                 const now = new Date();
                 set24HourTime('modal', `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
             }
@@ -16022,9 +16025,10 @@ function getManualPairRecordAnchor(record) {
             updateEditModalDeleteButton(r);
             setupMobileDateInputs();
         }
-        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null) {
+        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null, preservedDraft = null) {
             if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
             const generation=++p79AttendanceEditOpenGeneration;
+            p79WorkhoursEditConflict=null;
             const candidates = records.filter(item =>
                 String(item.id) === String(id) &&
                 (!expectedIdentity || p79AuditRecordIdentityMatches(expectedIdentity, item))
@@ -16048,11 +16052,16 @@ function getManualPairRecordAnchor(record) {
             activeEditingAttendanceRecordSnapshot = { ...r };
 
             p79FillAttendanceEditForm(r);
+            if(preservedDraft){
+                Object.entries(preservedDraft).forEach(([id,value])=>{const input=document.getElementById(id);if(input)input.value=value;});
+                p79SetDateInputValue('modalDateInput',preservedDraft.modalDateInput);
+                selectModalStatus(preservedDraft.modalStatusInput);
+            }
             document.getElementById('editRecordModal').classList.remove('hidden');
             if(typeof window.p79V5PrepareAttendanceEdit!=='function'){
                 p79SetAttendanceEditCloudState(true,'');return;
             }
-            p79SetAttendanceEditCloudState(false,'視窗已開啟，正在背景核對雲端原始紀錄；核對完成後可儲存。');
+            p79SetAttendanceEditCloudState(false,'可先修改日期與時間；正在核對雲端原始紀錄，完成後即可儲存。');
             const original={...r},fingerprint=p79AttendanceEditFormFingerprint();
             const stillOpen=()=>generation===p79AttendanceEditOpenGeneration&&activeEditingAttendanceRecord===r&&!document.getElementById('editRecordModal').classList.contains('hidden');
             await new Promise(resolve=>{if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(resolve,0));else setTimeout(resolve,0);});
@@ -16062,31 +16071,19 @@ function getManualPairRecordAnchor(record) {
                 if(!stillOpen())return;
                 const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
                 if(!same(cloud.id,original.id)||['empId','attNo'].some(key=>String(original[key]??'').trim()&&!same(original[key],cloud[key]))||getAttendanceRecordType(cloud)!==getAttendanceRecordType(original))throw Error('雲端紀錄身分或上下班類型不同，請重新整理後核對。');
-                const cloudChanged=['timeStr','status','note'].some(key=>String(cloud[key]||'')!==String(original[key]||''));
+                const cloudChanged=!p79WorkhoursEditEquivalent(original,cloud);
                 const userEdited=fingerprint!==p79AttendanceEditFormFingerprint();
                 const duplicateIds=records.filter(item=>String(item.id)===String(id)).length>1;
-                if(duplicateIds&&String(cloud.timeStr||'')!==String(original.timeStr||''))throw Error('同一編號存在不同打卡時間，請先重新整理核對，避免修改到另一班次。');
-                if(userEdited&&cloudChanged)throw Error('核對期間雲端原始紀錄已更新；你的輸入已保留，請取消後重新開啟核對。');
+                if(duplicateIds&&!p79WorkhoursEditEquivalent({...original,note:cloud.note,status:cloud.status},cloud))throw Error('同一編號存在不同打卡時間，請先重新整理核對，避免修改到另一班次。');
+                if((userEdited||preservedDraft)&&cloudChanged){
+                    p79WorkhoursEditConflict={...cloud};
+                    throw Error('雲端目前為 '+String(cloud.timeStr||'')+'；你的輸入已保留。請按「保留輸入，依最新紀錄核對」確認後繼續。');
+                }
                 Object.assign(r,cloud);activeEditingAttendanceRecordSnapshot={...cloud};
-                if(!userEdited)p79FillAttendanceEditForm(r);
+                if(!userEdited&&!preservedDraft)p79FillAttendanceEditForm(r);
                 p79SetAttendanceEditCloudState(true,'雲端核對完成，可以儲存修改。');
             }catch(error){
-                if(stillOpen()){
-                    const message=String(error?.message||'');
-                    const missing=/找不到|不存在|已刪除|not found|missing/i.test(message);
-                    if(missing){
-                        // 過期／已刪除的本機快取不是真正可修改的雲端紀錄。
-                        // 不得讓修改視窗一直維持可儲存的假象，亦不得把已刪除 ID 復活。
-                        const staleId=String(original.id??'');
-                        records=records.filter(item=>String(item?.id??'')!==staleId);
-                        try{forgetRecentAttendanceMutation(staleId);}catch(ignore){}
-                        p79ScheduleAttendanceMutationPersist([]);
-                        p79ScheduleAttendanceMutationRender();
-                        p79SetAttendanceEditCloudState(false,'此筆已不在雲端正式主表，不能再修改。已移除過期畫面紀錄；請從原上班列「＋」重新補卡。');
-                    }else{
-                        p79SetAttendanceEditCloudState(false,'核對未完成：'+String(error?.name==='AbortError'?'雲端讀取逾時，請取消後重新開啟':message||'雲端讀取失敗，請取消後重新開啟'));
-                    }
-                }
+                if(stillOpen())p79SetAttendanceEditCloudState(false,'核對未完成：'+String(error?.name==='AbortError'?'雲端讀取逾時，請按重新核對':error?.message||'雲端讀取失敗，請按重新核對'));
             }
         }
 
@@ -16192,6 +16189,7 @@ function getManualPairRecordAnchor(record) {
         }
 
         function closeEditModal() {
+            p79WorkhoursEditConflict=null;
             p79AttendanceEditOpenGeneration++;p79AttendanceEditCloudReady=false;
             document.getElementById('editRecordModal').classList.add('hidden');
             activeEditingAttendanceRecord = null;
