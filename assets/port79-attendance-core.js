@@ -305,31 +305,29 @@ function confirmCloudDelete(id){
 
 async function p79ReadAttendanceEditCloud(id,signal,context=null){
  const url=gasUrl();if(!url)throw new Error('未設定 GAS URL');
+ const expected=context?.record||context;
+ const months=[...new Set([context?.originalTimeStr,expected?.timeStr].map(value=>String(value||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
+ if(expected&&['empId','attNo'].some(k=>String(expected[k]??'').trim())&&months.length){
+  if(expected.id!=null&&String(expected.id)!==String(id))throw new Error('考勤編號與原始紀錄不同，修改草稿已保留');
+  const batches=await Promise.all(months.map(async month=>{
+   const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
+   const full=await response.json();
+   if(!response.ok||!full?.ok||String(full.month)!==month||!Array.isArray(full.records))throw new Error(full?.error||'正式主表核對失敗，修改草稿已保留');
+   return full.records;
+  }));
+  const rows=batches.flat(),sameId=rows.filter(r=>String(r.id)===String(id));
+  const matches=sameId.filter(r=>['empId','attNo'].every(k=>!String(expected[k]??'').trim()||normalizeCompareValue(r[k])===normalizeCompareValue(expected[k]))&&((typeof getAttendanceRecordType==='function')?getAttendanceRecordType(r)===getAttendanceRecordType(expected):String(r.status)===String(expected.status)));
+  const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
+  if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
+  if(!sameId.length)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
+  if(unique.length>1)throw Object.assign(new Error('正式主表有多筆相同編號及身分的考勤，無法唯一確認班次；修改草稿保留'),{retryable:false});
+  throw Object.assign(new Error('正式主表找不到身分及完整時間相符的考勤，修改草稿已保留'),{retryable:false});
+ }
  const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
  const data=await response.json();
  if(!response.ok||!data?.ok||!data.found||typeof data.found!=='object')throw new Error(data?.error||'無法核對雲端考勤，請稍後再試');
  const record=data.found[String(id)];
- if(!record||String(record.id)!==String(id)){
-  // Status indexes can miss an older edited row. Read the official month(s)
-  // from the saved intent; never infer identity from a reused numeric ID alone.
-  const expected=context?.record||context;
-  const months=[...new Set([context?.originalTimeStr,expected?.timeStr].map(value=>String(value||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
-  if(expected&&['empId','attNo'].some(k=>String(expected[k]??'').trim())&&months.length){
-   const matches=[];let anySameId=false;
-   for(const month of months){
-    const fullResponse=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
-    const full=await fullResponse.json();
-    if(!fullResponse.ok||!full?.ok||String(full.month)!==month||!Array.isArray(full.records))throw new Error(full?.error||'正式主表核對失敗，修改草稿已保留');
-    anySameId=anySameId||full.records.some(r=>String(r.id)===String(id));
-    matches.push(...full.records.filter(r=>String(r.id)===String(id)&&['empId','attNo'].every(k=>!String(expected[k]??'').trim()||normalizeCompareValue(r[k])===normalizeCompareValue(expected[k]))&&((typeof getAttendanceRecordType==='function')?getAttendanceRecordType(r)===getAttendanceRecordType(expected):String(r.status)===String(expected.status))));
-   }
-   const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
-   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
-   if(!anySameId)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
-   if(unique.length>1)throw Object.assign(new Error('正式主表有多筆相同編號及身分的考勤，無法唯一確認班次；修改草稿保留'),{retryable:false});
-  }
-  throw Object.assign(new Error('雲端正式主表仍找不到這筆考勤，可能已刪除；修改草稿保留，可撤回這筆修改'),{retryable:false});
- }
+ if(!record||String(record.id)!==String(id))throw Object.assign(new Error('雲端正式主表仍找不到這筆考勤，可能已刪除；修改草稿保留，可撤回這筆修改'),{retryable:false});
  // Older status replies can contain a date without its clock time. Never use
  // that truncated value as the compare-and-swap baseline for a correction.
  if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(record.timeStr||'').trim())){
@@ -343,11 +341,11 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
  }
  return record;
 }
-async function p79PrepareAttendanceEdit(id){
+async function p79PrepareAttendanceEdit(id,context=null){
  const info=queueInfoForId(id);
  if(info&&!info.paused)throw new Error('這筆考勤尚在同步，請等同步完成後再修改');
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
- try{return await p79ReadAttendanceEditCloud(id,controller.signal);}finally{clearTimeout(timer);}
+ try{return await p79ReadAttendanceEditCloud(id,controller.signal,context);}finally{clearTimeout(timer);}
 }
 function p79AttendanceEditAlreadySaved(payload,cloud){
  const local=payload.record||{};
