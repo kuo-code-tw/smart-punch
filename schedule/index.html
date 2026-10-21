@@ -4321,7 +4321,21 @@ function p79EmployeeDateEligible(emp,date) {
       const configured=scheduleRoleGroupOptions[month]||{};
       const groups=all?Object.values(configured).flat():configured[role];
       const assigned=employees.filter(e=>all||e.role===role).map(e=>e.group).filter(Boolean);
-      return [...new Set(['不分組',...assigned,...(Array.isArray(groups)?groups:[])])].filter(Boolean).sort((a,b)=>a==='不分組'?-1:b==='不分組'?1:String(a).localeCompare(String(b),'zh-Hant',{numeric:true}));
+      return [...new Set(['不分組',...assigned,...(Array.isArray(groups)?groups:[])])].filter(Boolean).sort((a,b)=>{const rank=g=>g==='不分組'?1:g==='不輪班'?2:0;return rank(a)-rank(b)||String(a).localeCompare(String(b),'zh-Hant',{numeric:true});});
+    }
+    function p79ScheduleGroupStyle(group,selected=false) {
+      const colors=[['#eff6ff','#1d4ed8'],['#ecfdf5','#047857'],['#f5f3ff','#6d28d9'],['#fff7ed','#c2410c'],['#fdf2f8','#be185d'],['#ecfeff','#0e7490']];
+      const key=String(group||'不分組').trim();
+      const groups=sortedScheduleGroups().filter(g=>!['不分組','不輪班'].includes(g));
+      const pair=['不分組','不輪班'].includes(key)?['#f8fafc','#64748b']:colors[Math.max(0,groups.indexOf(key))%colors.length];
+      return 'background:'+ (selected?pair[1]:pair[0])+'!important;color:'+(selected?'#fff':pair[1])+'!important;border-left:4px solid '+pair[1]+'!important;';
+    }
+    function p79RefreshRoleTabColors() {
+      document.querySelectorAll('#main-role-tabs-container button[onclick^="switchRoleTab"]').forEach(button=>{
+        const role=button.getAttribute('onclick').match(/switchRoleTab\('([^']+)'/)[1];
+        const selected=activeRoleTab===role&&(role==='EMP_MGMT'||!isScheduleRoleRosterCollapsed(role));
+        button.setAttribute('aria-pressed',String(selected));
+      });
     }
     function sortedScheduleGroups(role=activeRoleTab) {return scheduleRoleGroupList(role);}
     function p79RoleGroupTarget(){
@@ -4706,6 +4720,7 @@ function p79EmployeeDateEligible(emp,date) {
       const previousTop=oldScroll?.scrollTop || 0;
       const previousLeft=oldScroll?.scrollLeft || 0;
       container.innerHTML = html;
+      p79RefreshRoleTabColors();
       p79ConnectRosterScroll();
       const newScroll=document.getElementById('p79RosterScroll');
       if(newScroll){newScroll.scrollTop=previousTop;newScroll.scrollLeft=previousLeft;newScroll.dispatchEvent(new Event('scroll'));}
@@ -4761,7 +4776,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     function setGroupFilter(groupName) {
-      activeGroupFilter = groupName;
+      activeGroupFilter = activeGroupFilter===groupName?'ALL':groupName;
       renderRoleScheduleView();
     }
 
@@ -5241,6 +5256,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const map = readScheduleRoleCollapseMap();
       map[key] = !!collapsed;
       try { localStorage.setItem(P79_SCHEDULE_ROLE_COLLAPSE_KEY, JSON.stringify(map)); } catch (e) {}
+      p79RefreshRoleTabColors();
       renderRoleScheduleView();
     }
 
@@ -5283,6 +5299,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if(!source)return;
         const clone=document.createElement('div');
         clone.className='p79-fixed-person-row p79-person-cell';
+        clone.style.cssText=source.style.cssText;
         if(row.dataset.p79DragEmp){
           clone.dataset.p79DragEmp=row.dataset.p79DragEmp;
           clone.classList.add('p79-draggable-employee');
@@ -5424,7 +5441,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const count = groupCounts[gKey] || 0;
         const isActive = (activeGroupFilter === gKey);
         groupTabsHtml += `
-          <button onclick="setGroupFilter('${gKey}')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${isActive?'bg-teal-600 text-white shadow-md':'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'}">
+          <button onclick="setGroupFilter('${gKey}')" style="${p79ScheduleGroupStyle(gKey,isActive)}" aria-pressed="${isActive}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${isActive?'bg-teal-600 text-white shadow-md':'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'}">
             ${gKey} (${count})
           </button>
         `;
@@ -5641,7 +5658,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
         html += `
           <tr data-p79-drag-emp="${emp.id}" class="hover:bg-slate-50 transition p79-draggable-employee">
-            <td class="p79-person-cell sticky-col-left border-r bg-white">
+            <td class="p79-person-cell sticky-col-left border-r bg-white" style="${p79ScheduleGroupStyle(emp.group)}">
               <div class="p79-person-main">
                 <div class="p79-person-name-line">
                   <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle p79-mini-drag p79-drag-top" title="按住拖曳調整人員順序" aria-label="調整 ${emp.name} 人員順序"><i class="fa-solid fa-grip-vertical"></i></button>
@@ -5671,6 +5688,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const savedScrollLeft=oldRoster?oldRoster.scrollLeft:0;
       const savedPageY=window.scrollY;
       container.innerHTML = html;
+      p79RefreshRoleTabColors();
       p79ConnectRosterScroll();
       const newRoster=document.getElementById('p79RosterScroll');
       if(newRoster){
@@ -5938,6 +5956,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       `;
 
       container.innerHTML = html;
+      p79RefreshRoleTabColors();
       applyScheduleAccessUi();
     }
 
@@ -7384,3 +7403,10 @@ body[data-p79-system="schedule"] #schedule-cloud-sync-btn{display:inline-flex!im
 
 
 
+
+<style id="p79-role-tab-toggle-colors">
+#main-role-tabs-container button[aria-pressed="false"]{background:#fff!important;color:#475569!important;border:1px solid #cbd5e1!important;box-shadow:none!important}
+#main-role-tabs-container button[aria-pressed="false"] span{background:transparent!important;color:#475569!important}
+#main-role-tabs-container button[aria-pressed="true"]{background:#d97706!important;color:#fff!important;border:1px solid #b45309!important}
+#main-role-tabs-container button[aria-pressed="true"] :is(span,i){color:#fff!important}
+</style>
