@@ -16058,11 +16058,7 @@ function getManualPairRecordAnchor(record) {
             await new Promise(resolve=>{if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(resolve,0));else setTimeout(resolve,0);});
             if(!stillOpen())return;
             try{
-                // 管理端編輯：雲端核對最長等 12 秒，避免修改視窗無限等待。
-                const cloud=await Promise.race([
-                    window.p79V5PrepareAttendanceEdit(id),
-                    new Promise((_,reject)=>setTimeout(()=>reject(new Error('雲端核對等待超過 12 秒')),12000))
-                ]);
+                const cloud=await window.p79V5PrepareAttendanceEdit(id,{record:original});
                 if(!stillOpen())return;
                 const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
                 if(!same(cloud.id,original.id)||['empId','attNo'].some(key=>String(original[key]??'').trim()&&!same(original[key],cloud[key]))||getAttendanceRecordType(cloud)!==getAttendanceRecordType(original))throw Error('雲端紀錄身分或上下班類型不同，請重新整理後核對。');
@@ -23364,7 +23360,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261021-edit-month-source"></script>
 
 
 
