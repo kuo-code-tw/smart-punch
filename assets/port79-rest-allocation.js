@@ -16,11 +16,11 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='') {
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='') {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates);
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
-  const dates=allDates.filter(d=>!employmentStart||d>=employmentStart);
-  quota.slots=quota.slots.filter(s=>!employmentStart||s.sourceDate>=employmentStart);
+  const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
+  quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
   quota.counts=quota.slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0});
   if(dates.some(d=>!schedule[d]))throw new Error('本月有未排班日期，請補齊班表後再配對');
   // Remove only fields owned by this allocator; preserve manual overtime and substitutions.

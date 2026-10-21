@@ -2,6 +2,11 @@
 'use strict';
 const DAY=86400000,HOUR=3600000,id=x=>String(x||'').trim().toUpperCase();
 function shiftDate(date,n){return new Date(Date.parse(date+'T00:00:00Z')+n*DAY).toISOString().slice(0,10);}
+const leaveCodes=new Set(['年','年假','特','特休','事','事假','病','病假','公','公假','喪','喪假','婚','婚假','產','產假','陪產','生理假']);
+function isLeaveDay(snapshot,emp,date,roster={}){
+ const key=id(emp)+'|'+date;
+ return snapshot?.attendanceEvidence?.days?.[key]?.leave===true||leaveCodes.has(String(roster[date]||'').trim())||(snapshot?.leaveDates||[]).some(k=>String(k).toUpperCase()===key)||(snapshot?.approvedLeaves||[]).some(l=>id(l.empId)===id(emp)&&date>=l.start&&date<=l.end);
+}
 function period(date,roster){
  const meta=roster.__meta?.[date]||{},report=meta.overtimeReport||{},shift=meta.reportOriginalShift??meta.overtimeOriginalShift??roster[date];
  let hours=({早:[8,16],中:[16,24],晚:[24,32]})[shift];
@@ -38,11 +43,11 @@ function build(input){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(input.month+'-'))continue;
   const p=period(date,roster),events=marks.get(emp+'|'+date)||[];
   const state=events.length?(events.length===1&&events[0]==='worked'?'worked':'missing'):(now>=p.end?'rest':'open');
-  days[emp+'|'+date]={state,shiftEnd:p.end};
+  days[emp+'|'+date]={state,shiftEnd:p.end,leave:isLeaveDay(input,emp,date,roster)};
  }
  return{complete:true,month:input.month,checkedAt:now,days,sessionDates};
 }
 function state(snapshot,emp,date){return snapshot?.attendanceEvidence?.complete===true?snapshot.attendanceEvidence.days?.[id(emp)+'|'+date]?.state||'unknown':'unknown'}
 function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return s==='rest'?'整班無上下班卡，按休假處理，原申報不列有效加班':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':'';}
-g.P79RestAttendance={build,state,reportIssue,period};
+g.P79RestAttendance={build,state,reportIssue,period,isLeaveDay};
 })(window);
