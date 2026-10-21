@@ -10037,11 +10037,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const type = getPunchTypeFromStatus(statusText);
             if (!type) return { ok:true };
 
-            if(channel==='REGULAR'&&type==='IN'){
-                const unresolved=p79GetUnresolvedPriorClockIn(emp);
-                if(unresolved)return {ok:false,duplicate:true,message:`${formatDateTime(unresolved.clockIn.timeStr)} 的上班卡缺少下班簽退，請管理員補齊後再上班簽到`};
-            }
-
+            // Historical missing checkouts remain attendance exceptions, not a permanent
+            // lock on future shifts. Current open-shift and duplicate guards follow below.
             const latest = getLatestEmployeePunchState(emp, channel);
             const now = Date.now();
 
@@ -10215,17 +10212,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return;
             }
 
-            const unresolvedPrior=p79GetUnresolvedPriorClockIn(currentEmp);
             const openId=String(openShift?.clockIn?.id??'');
             const cloudConfirmedIn=!!openId&&p79MobileHasOfficial(currentEmp)&&p79MobileOfficial.rows.some(row=>String(row?.id??'')===openId);
             // Keep duplicate prevention, but do not call a local-only punch cloud-confirmed.
             // 一般打卡狀態機：IN → OUT → IN。
             setButtonState(
                 clockInButton,
-                !openShift&&!unresolvedPrior,
+                !openShift,
                 '上班簽到',
-                unresolvedPrior?'前次缺少簽退｜請管理員補卡':(cloudConfirmedIn?'✓ 已完成上班簽到':'上班已暫存｜待雲端確認'),
-                unresolvedPrior ? `${formatDateTime(unresolvedPrior.clockIn.timeStr)} 缺少下班簽退，請管理員補齊後再上班簽到` : (openShift ? `已於 ${formatDateTime(openShift.clockIn.timeStr)} 完成上班簽到，請使用下班簽退` : '')
+                cloudConfirmedIn?'✓ 已完成上班簽到':'上班已暫存｜待雲端確認',
+                openShift ? `已於 ${formatDateTime(openShift.clockIn.timeStr)} 完成上班簽到，請使用下班簽退` : ''
             );
             setButtonState(
                 clockOutButton,
@@ -10268,7 +10264,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             );
 
             // 保留原本上班按鈕的色彩切換。
-            const locked = !!openShift || !!unresolvedPrior;
+            const locked = !!openShift;
             clockInButton.classList.toggle('bg-emerald-600', !locked);
             clockInButton.classList.toggle('hover:bg-emerald-700', !locked);
             clockInButton.classList.toggle('bg-slate-400', locked);
