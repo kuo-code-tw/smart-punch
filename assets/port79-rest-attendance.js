@@ -25,16 +25,22 @@ function build(input){
   const emp=id(session.empId),roster=rosters.get(emp);if(!roster)continue;
   const start=Number(session.start),end=Number(session.end),hasIn=session.start!=null&&Number.isFinite(start),hasOut=session.end!=null&&Number.isFinite(end);
   const at=hasIn?start:hasOut?end:Number(session.time);if(!Number.isFinite(at))continue;
-  const date=new Date(at+8*HOUR).toISOString().slice(0,10),candidates=[];
+  const date=new Date(at+8*HOUR).toISOString().slice(0,10),candidates=[],paired=hasIn&&hasOut&&end>start;
   for(const offset of [-1,0,1]){
    const d=shiftDate(date,offset);if(!roster[d])continue;const p=period(d,roster);if(!p.known)continue;
    const distance=Math.abs(at-(hasIn?p.start:p.end));
-   if(distance<=4*HOUR&&(!hasIn||!hasOut||Math.min(end,p.end)>Math.max(start,p.start)))candidates.push({date:d,distance});
+   const overlap=paired?Math.max(0,Math.min(end,p.end)-Math.max(start,p.start)):0;
+   const inside=hasIn?at>=p.start&&at<p.end:at>p.start&&at<=p.end;
+   // A late/partial shift still proves attendance: use actual overlap, not a
+   // four-hour distance from the planned start. Keep single punches unresolved.
+   if(paired?overlap>0:inside||distance<=4*HOUR)candidates.push({date:d,distance,overlap});
   }
-  candidates.sort((a,b)=>a.distance-b.distance||a.date.localeCompare(b.date));
+  candidates.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||a.date.localeCompare(b.date));
   const target=candidates[0]?.date||(!hasIn&&hasOut&&new Date(at+8*HOUR).getUTCHours()<9?shiftDate(date,-1):date);
   sessionDates[index]=target;
-  mark(emp,target,hasIn&&hasOut&&end>start?'worked':'missing');
+  mark(emp,target,paired?'worked':'missing');
+  // One unpaired punch may fit adjacent shifts; neither is proven wholly absent.
+  if(!paired)for(const candidate of candidates)if(candidate.date!==target)mark(emp,candidate.date,'missing');
   if(!candidates.length&&!hasIn&&hasOut&&target!==date&&roster[date])mark(emp,date,'missing');
   const previous=shiftDate(date,-1);
   if(!candidates.length&&hasIn&&new Date(at+8*HOUR).getUTCHours()<8&&roster[previous]&&!period(previous,roster).known)mark(emp,previous,'missing');
