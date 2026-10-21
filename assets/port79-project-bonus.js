@@ -36,7 +36,7 @@ function rowHtml(r,i,print=false){
  const cells=r?[{v:i+1},{v:esc(r.empId)},{v:esc(r.job)},{v:esc(r.name)},
   {v:input('efficiency',r.efficiency)}, {v:r.leave?'×':''}, {v:r.leave?blankZero(r.factor):''}, {v:r.leave?'/':''}, {v:r.leave?30:''},
   {v:input('containers',r.containers),span:5},{v:r.converted===null?'待核對':blankZero(round(r.converted))},{v:input('note',r.note)}]:Array.from({length:12},(_,j)=>({v:'',...(j===9?{span:5}:{})}));
- return '<tr>'+cells.map((c,j)=>'<td'+(c.span?' colspan="'+c.span+'"':'')+' style="padding:2px;height:30px;border:1px solid #94a3b8;'+(j>=4&&j<=9?'border-left:0;border-right:0;':'')+'text-align:center;overflow:hidden">'+c.v+'</td>').join('')+'</tr>';
+ return '<tr>'+cells.map((c,j)=>'<td'+(c.span?' colspan="'+c.span+'"':'')+' style="padding:2px;height:30px;border:1px solid #94a3b8;'+(j>=4&&j<=8?'border-left:0;'+(j<8?'border-right:0;':''):'')+'text-align:center;overflow:hidden">'+c.v+'</td>').join('')+'</tr>';
 }
 function reportHtml(rows,month,manual={},print=false){const cfg=reportSettings(manual,month),pages=paginate(rows);
  return pages.map((page,p)=>'<section class="pb-page"><h2>'+esc(cfg.title)+'</h2><table class="pb-table"><colgroup>'+WIDTHS.map(w=>'<col style="width:'+w+'%">').join('')+'</colgroup><thead><tr>'+cfg.headers.map((label,i)=>'<th'+([4,5].includes(i)?' colspan="5"':'')+'>'+esc(label)+'</th>').join('')+'</tr></thead><tbody>'+page.map((r,i)=>rowHtml(r,p*30+i,print)).join('')+'</tbody></table><table class="pb-signatures"><tbody><tr>'+cfg.signatures.map(x=>'<td>'+esc(x)+'：</td>').join('')+'</tr><tr>'+cfg.signatures.map(()=>'<td style="height:48px"></td>').join('')+'</tr></tbody></table><div class="pb-page-number">第 '+(p+1)+' / '+pages.length+' 頁</div></section>').join('');
