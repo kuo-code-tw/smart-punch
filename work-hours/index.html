@@ -11584,7 +11584,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if(!item){
                 if(!consume&&[...p79WorkhoursEditWarmups.values()].filter(x=>x.pending).length>=2)return Promise.resolve(null);
                 item={pending:true,at:now,promise:null};
-                item.promise=Promise.resolve().then(()=>window.p79V5PrepareAttendanceEdit(record.id)).then(cloud=>{
+                item.promise=Promise.resolve().then(()=>window.p79V5PrepareAttendanceEdit(record.id,{record:{...record}})).then(cloud=>{
                     if(typeof currentPort79SsoToken==='function'&&currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新開啟');
                     item.pending=false;item.at=Date.now();return cloud;
                 }).catch(error=>{if(p79WorkhoursEditWarmups.get(key)===item)p79WorkhoursEditWarmups.delete(key);throw error;});
@@ -15188,7 +15188,7 @@ window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,pre
 </script>
 <script src="../assets/port79-overtime-application.js?v=20261020-shift-evidence"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-actual-hours"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261019-delete-settles-edits"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261021-edit-month-source"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <style id="p79-monthly-attendance-wider-v20261020">
