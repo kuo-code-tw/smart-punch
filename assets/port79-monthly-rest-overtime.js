@@ -18,7 +18,7 @@ function balance(emp,roster,month,snapshot=null){
   if(r&&cats.includes(r.category)){
    if(actual==='rest'){if(!scheduledRest)extraRest++;conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，原申報不列有效加班'});}
    else{reported[r.category]++;if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，原申報保留待核對'});}
-  }else if(actual==='rest'&&!scheduledRest&&!excluded.includes(d))extraRest++;
+  }else if(actual==='rest'&&!scheduledRest)extraRest++;
  }
  // Completed unplanned absence supplements the roster; never count a scheduled rest twice.
  for(const c of ['例','休','國']){const n=Math.min(extraRest,Math.max(0,counts[c]-off[c]-reserved[c]));off[c]+=n;extraRest-=n;}
