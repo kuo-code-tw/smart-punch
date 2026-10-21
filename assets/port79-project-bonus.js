@@ -44,6 +44,26 @@ function reportHtml(rows,month,manual={},print=false){const cfg=reportSettings(m
 const reportCss='.pb-page{background:white;color:#18314b;margin:12px 0 22px;break-inside:avoid}.pb-page h2{font-size:18px;text-align:center;margin:10px 0}.pb-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}.pb-table th{border:1px solid #94a3b8;background:#eef2f6;padding:5px 2px;font-weight:600;white-space:normal}.pb-signatures{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:0;font-size:13px}.pb-signatures td{border:1px solid #94a3b8;padding:4px 7px;text-align:left;vertical-align:top}.pb-page-number{text-align:right;font-size:11px;margin-top:4px}@media print{@page{size:A4 portrait;margin:10mm}.pb-page{break-after:page;margin:0}.pb-page:last-child{break-after:auto}.pb-page h2{font-size:14px;margin:0 0 3mm}.pb-table{font-size:9px}.pb-table td{height:6mm!important;padding:1px!important}.pb-table th{height:7mm}.pb-signatures{font-size:11px}.pb-signatures td{height:7mm}.pb-page-number{font-size:9px}}';
 function excelRows(rows,month,manual={}){const cfg=reportSettings(manual,month),h=cfg.headers;const output=[[cfg.title],[],[],[h[0],h[1],h[2],h[3],h[4],'','','','',h[5],'','','','',h[6],h[7]]];
  rows.forEach((r,i)=>output.push(r?[i+1,r.empId,r.job,r.name,blankZero(r.efficiency),r.leave?'X':'',r.leave?blankZero(r.factor):'',r.leave?'/':'',r.leave?30:'',blankZero(r.containers),'','','','',r.converted===null?'待核對':blankZero(r.converted),r.note]:Array(16).fill('')));return output;}
+function excelSheet(rows,month,manual={}){
+ const cfg=reportSettings(manual,month),pages=paginate(rows),out={rows:[],heights:[],widths:WIDTHS.map(w=>w*.93),merges:[],breaks:[]};
+ pages.forEach((page,p)=>{
+  const base=out.rows.length,values=excelRows(page,month,manual);
+  page.forEach((r,i)=>{if(r)values[i+4][0]=p*30+i+1;});
+  values.push([cfg.signatures[0]+'：','','','','',cfg.signatures[1]+'：','','','','',cfg.signatures[2]+'：']);
+  values.push([]);values.push(['第 '+(p+1)+' / '+pages.length+' 頁']);
+  values.forEach((values,r)=>{
+   out.rows.push(Array.from({length:16},(_,c)=>({value:values[c]??'',style:r<3?1:r===3?2:r<34?(c>=4&&c<=7?4:c===8?5:3):r<36?6:7})));
+   out.heights.push(r<3?10:r===3?24:r<34?17.01:r===34?20:r===35?36:12);
+  });
+  const merge=(a,b,c,d)=>out.merges.push(String.fromCharCode(65+a)+(base+b+1)+':'+String.fromCharCode(65+c)+(base+d+1));
+  merge(0,0,15,2);merge(4,3,8,3);merge(9,3,13,3);
+  for(let i=4;i<34;i++)merge(9,i,13,i);
+  for(const r of [34,35]){merge(0,r,4,r);merge(5,r,9,r);merge(10,r,15,r);}
+  merge(0,36,15,36);
+  if(p<pages.length-1){out.rows.push(Array.from({length:16},()=>({value:'',style:0})));out.heights.push(8);out.breaks.push(out.rows.length);}
+ });
+ return out;
+}
 const dialogCss=`
 #p79ProjectBonus{padding:0!important;border:1px solid #dbe4ef!important;border-radius:16px!important;box-shadow:0 24px 80px #16324f40;background:#f5f7fb!important;overflow:auto;font:14px/1.5 sans-serif}
 #p79ProjectBonus::backdrop{background:#142b4966}
@@ -94,9 +114,9 @@ async function open(){
  q('#pbRows').onchange=e=>{const id=e.target.dataset.id,field=e.target.dataset.field;if(!id||!field)return;manual.people=manual.people||{};manual.people[id]={...(manual.people[id]||{}),[field]:e.target.value};try{update();}catch(err){status(err.message);q('#pbExport').disabled=q('#pbPrint').disabled=true;}};
  q('#pbSave').onclick=()=>{try{if(!valid())throw Error('登入身分已變更');g.localStorage.setItem(key(),JSON.stringify(manual));status('人工欄位已儲存在此瀏覽器；請假與加班資料仍由雲端讀取。');}catch(e){status('儲存失敗：'+e.message);}};
  q('#pbLoad').onclick=async()=>{if(busy)return;busy=true;snapshot=null;rows=[];loadedMonth='';q('#pbRows').innerHTML='';q('#pbExport').disabled=q('#pbPrint').disabled=true;el.querySelectorAll('input,button').forEach(n=>n.disabled=true);const month=q('#pbMonth').value;try{if(!valid())throw Error('登入或權限已變更');dates(month);status('正在讀取 '+month+' 核准請假與正式加班…');const data=await a.snapshot(month);if(!el.isConnected)return;if(!valid()||q('#pbMonth').value!==month)throw Error('月份或登入身分已變更');snapshot=data;loadedMonth=month;update();const issueCount=rows.reduce((n,r)=>n+r.issues.length,0);status('已讀取 '+rows.length+' 人。'+(issueCount?'有 '+issueCount+' 筆加班待核對，相關人員不顯示為0。':''));}catch(e){snapshot=null;status('讀取失敗：'+e.message);}finally{busy=false;el.querySelectorAll('input,button').forEach(n=>n.disabled=false);q('#pbExport').disabled=q('#pbPrint').disabled=!snapshot||!rows.length;}};
- q('#pbExport').onclick=async()=>{try{if(!valid()||!snapshot||loadedMonth!==q('#pbMonth').value)throw Error('請重新讀取資料');update();if(!rows.length)throw Error('請勾選要匯出的人員範圍');await a.ensureXlsx();const wb=g.XLSX.utils.book_new();paginate(rows).forEach((page,p)=>{const values=excelRows(page,loadedMonth,manual);page.forEach((r,i)=>{if(r)values[i+4][0]=p*30+i+1;});const signRow=values.length,cfg=reportSettings(manual,loadedMonth);values.push([cfg.signatures[0]+'：','','','','',cfg.signatures[1]+'：','','','','',cfg.signatures[2]+'：']);values.push([]);const ws=g.XLSX.utils.aoa_to_sheet(values);ws['!merges']=[{s:{r:0,c:0},e:{r:2,c:15}},{s:{r:3,c:4},e:{r:3,c:8}},{s:{r:3,c:9},e:{r:3,c:13}},...Array.from({length:30},(_,i)=>({s:{r:i+4,c:9},e:{r:i+4,c:13}})),{s:{r:signRow,c:0},e:{r:signRow+1,c:4}},{s:{r:signRow,c:5},e:{r:signRow+1,c:9}},{s:{r:signRow,c:10},e:{r:signRow+1,c:15}}];ws['!cols']=WIDTHS.map(w=>({wch:w*1.1}));g.XLSX.utils.book_append_sheet(wb,ws,'第'+(p+1)+'頁');});g.XLSX.writeFile(wb,'79號碼頭專案獎金_'+loadedMonth+'.xlsx');}catch(e){status('匯出失敗：'+e.message);}};
+ q('#pbExport').onclick=()=>{try{if(!valid()||!snapshot||loadedMonth!==q('#pbMonth').value)throw Error('請重新讀取資料');update();if(!rows.length)throw Error('請勾選要匯出的人員範圍');if(!g.P79BonusXlsx)throw Error('Excel匯出元件尚未載入，請重新整理');g.P79BonusXlsx.download(excelSheet(rows,loadedMonth,manual),'79號碼頭專案獎金_'+loadedMonth+'.xlsx');}catch(e){status('匯出失敗：'+e.message);}};
  q('#pbPrint').onclick=()=>{try{if(!valid()||!snapshot||loadedMonth!==q('#pbMonth').value)throw Error('請重新讀取資料');update();if(!rows.length)throw Error('請勾選要列印的人員範圍');const popup=g.open('','_blank');if(!popup)throw Error('請允許開啟列印視窗');popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+esc(reportSettings(manual,loadedMonth).title)+'</title><style>'+reportCss+'</style><body>'+reportHtml(rows,loadedMonth,manual,true)+'</body></html>');popup.document.close();popup.focus();popup.print();}catch(e){status('列印失敗：'+e.message);}};
  q('#pbClose').onclick=()=>el.close();el.onclose=()=>el.remove();
 }
-g.P79ProjectBonus={open,dates,leaveDays,model,excelRows,rowHtml,paginate,reportSettings,reportHtml,reportCss,filterPeople,dialogHtml};
+g.P79ProjectBonus={open,dates,leaveDays,model,excelRows,excelSheet,rowHtml,paginate,reportSettings,reportHtml,reportCss,filterPeople,dialogHtml};
 })(window);
