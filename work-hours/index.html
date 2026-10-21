@@ -10957,7 +10957,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const encodedId = encodeURIComponent(String(record.id));
             const encodedTime = encodeURIComponent(String(record.timeStr || ''));
             const label = type === 'IN' ? '上班簽到' : '下班簽退';
-            return `<button type="button" onclick="openAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" class="group inline-flex items-center gap-1.5 rounded-lg hover:ring-2 hover:ring-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" title="點選修改${label}時間" aria-label="點選修改${label}時間">
+            return `<button type="button" onclick="openAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onpointerenter="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onfocus="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onpointerdown="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" class="group inline-flex items-center gap-1.5 rounded-lg hover:ring-2 hover:ring-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" title="點選修改${label}時間" aria-label="點選修改${label}時間">
                 ${display}<span class="text-[10px] text-indigo-500 dark:text-indigo-300 opacity-70 group-hover:opacity-100">✎</span>
             </button>`;
         }
@@ -11572,6 +11572,33 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         let p79AttendanceEditOpenGeneration = 0;
         let p79AttendanceEditCloudReady = false;
         let p79WorkhoursEditConflict=null;
+        const p79WorkhoursEditWarmups=new Map();
+        function p79PrepareWorkhoursEdit(record,consume=false){
+            const queue=window.p79V5QueueInfoForId?.(record.id);
+            if(queue&&!queue.paused)return Promise.reject(Error('這筆考勤尚在同步，請等同步完成後再修改'));
+            const token=typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'';
+            const key=JSON.stringify([token,record.id,record.empId,record.attNo,record.timeStr,record.status,record.note]);
+            const now=Date.now();
+            for(const [k,item] of p79WorkhoursEditWarmups)if(!item.pending&&now-item.at>5000)p79WorkhoursEditWarmups.delete(k);
+            let item=p79WorkhoursEditWarmups.get(key);
+            if(!item){
+                if(!consume&&[...p79WorkhoursEditWarmups.values()].filter(x=>x.pending).length>=2)return Promise.resolve(null);
+                item={pending:true,at:now,promise:null};
+                item.promise=Promise.resolve().then(()=>window.p79V5PrepareAttendanceEdit(record.id)).then(cloud=>{
+                    if(typeof currentPort79SsoToken==='function'&&currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新開啟');
+                    item.pending=false;item.at=Date.now();return cloud;
+                }).catch(error=>{if(p79WorkhoursEditWarmups.get(key)===item)p79WorkhoursEditWarmups.delete(key);throw error;});
+                p79WorkhoursEditWarmups.set(key,item);
+            }
+            return consume?item.promise.finally(()=>{if(p79WorkhoursEditWarmups.get(key)===item)p79WorkhoursEditWarmups.delete(key);}):item.promise;
+        }
+        function p79WarmAttendanceTimeEditor(encodedId,type,encodedTime){
+            if(typeof window.p79V5PrepareAttendanceEdit!=='function')return;
+            const id=decodeURIComponent(encodedId||''),time=decodeURIComponent(encodedTime||'');
+            const matches=records.filter(r=>String(r.id)===id&&getAttendanceRecordType(r)===type&&String(r.timeStr||'')===time);
+            if(matches.length===1)p79PrepareWorkhoursEdit({...matches[0]}).catch(()=>{});
+        }
+
         function p79WorkhoursEditEquivalent(a,b){
             const canonical=value=>{
                 const text=String(value??'').replace('T',' ').trim();
@@ -11583,6 +11610,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         function p79RetryWorkhoursAttendanceEdit(){
             const r=activeEditingAttendanceRecord;if(!r)return;
+            p79WorkhoursEditWarmups.clear();
             const ids=['modalDateInput','modalTimeHour','modalTimeMinute','modalStatusInput','modalNoteInput'];
             const draft=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)?.value||'']));
             // This explicit button acknowledges the displayed newer baseline.
@@ -11674,13 +11702,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if(typeof window.p79V5PrepareAttendanceEdit!=='function'){
                 p79SetAttendanceEditCloudState(true,'');return;
             }
-            p79SetAttendanceEditCloudState(false,'視窗已開啟，正在背景核對雲端原始紀錄；核對完成後可儲存。');
+            p79SetAttendanceEditCloudState(false,'可先修改日期與時間；正在核對雲端原始紀錄，完成後即可儲存。');
             const original={...r},fingerprint=p79AttendanceEditFormFingerprint();
             const stillOpen=()=>generation===p79AttendanceEditOpenGeneration&&activeEditingAttendanceRecord===r&&!document.getElementById('editRecordModal').classList.contains('hidden');
             await new Promise(resolve=>{if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(resolve,0));else setTimeout(resolve,0);});
             if(!stillOpen())return;
             try{
-                const cloud=await window.p79V5PrepareAttendanceEdit(id);
+                const cloud=await p79PrepareWorkhoursEdit(original,true);
                 if(!stillOpen())return;
                 const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
                 if(!same(cloud.id,original.id)||['empId','attNo'].some(key=>String(original[key]??'').trim()&&!same(original[key],cloud[key]))||getAttendanceRecordType(cloud)!==getAttendanceRecordType(original))throw Error('雲端紀錄身分或上下班類型不同，請重新整理後核對。');
@@ -11805,6 +11833,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function closeEditModal() {
+            p79WorkhoursEditWarmups.clear();
             p79AttendanceEditOpenGeneration++;
             p79AttendanceEditCloudReady=false;
             p79WorkhoursEditConflict=null;

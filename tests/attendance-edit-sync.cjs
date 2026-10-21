@@ -33,6 +33,6 @@ fullRows=[{...fullRow,empId:'OTHER'}];await assert.rejects(c.p79ReadAttendanceEd
 fullRows=[fullRow,{...fullRow,timeStr:'2026/10/17 12:00'}];await assert.rejects(c.p79ReadAttendanceEditCloud('1',undefined,{record:fullRow}),/無法唯一確認/);
 assert.equal(posts,1,'fallback only reads and never recreates missing records');
 
-for(const path of ['attendance/index.html','work-hours/index.html']){const s=fs.readFileSync(path,'utf8');for(const m of s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);}assert(s.includes('window.p79V5PrepareAttendanceEdit(id)'));assert(s.includes("String(snapshot?.timeStr || r.timeStr || '')"));}
+for(const path of ['attendance/index.html','work-hours/index.html']){const s=fs.readFileSync(path,'utf8');for(const m of s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);}if(path==='work-hours/index.html'){assert(s.includes('const cloud=await p79PrepareWorkhoursEdit(original,true)'));assert(s.includes('window.p79V5PrepareAttendanceEdit(record.id)'));}else assert(s.includes('window.p79V5PrepareAttendanceEdit(id)'));assert(s.includes("String(snapshot?.timeStr || r.timeStr || '')"));}
 console.log('PASS preflight, equivalent formatting, idempotent retry, real conflict, pending guard, paused recovery, note differences, both pages parse');
 })().catch(e=>{console.error(e);process.exitCode=1});
