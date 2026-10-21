@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script>window.P79ManagementOptimizationMode=true;</script>
+<head><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
@@ -11599,15 +11599,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if(matches.length===1)p79PrepareWorkhoursEdit({...matches[0]}).catch(()=>{});
         }
 
-        function p79WorkhoursEditEquivalent(a,b){
-            const canonical=value=>{
-                const text=String(value??'').replace('T',' ').trim();
-                const m=text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
-                return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+' '+m[4].padStart(2,'0')+':'+m[5].padStart(2,'0')+':'+String(m[6]||'0').padStart(2,'0'):text;
-            };
-            const note=r=>/^(管理員手動補刷|管理員手動補卡)$/.test(String(r?.note||'').trim())?'':String(r?.note||'').trim();
-            return canonical(a.timeStr)===canonical(b.timeStr)&&String(a.status||'').trim()===String(b.status||'').trim()&&note(a)===note(b);
-        }
+        function p79WorkhoursEditEquivalent(a,b){return window.P79AttendanceEditCompare(a,b);}
         function p79RetryWorkhoursAttendanceEdit(){
             const r=activeEditingAttendanceRecord;if(!r)return;
             p79WorkhoursEditWarmups.clear();
