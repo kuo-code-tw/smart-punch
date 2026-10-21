@@ -114,8 +114,9 @@ function personSummary(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
  const p=reportProgress(model,empId),sum=f=>cats.reduce((n,c)=>n+f(c),0);
  const unused=sum(c=>b.unused?.[c]??Math.max(0,(b.remaining[c]||0)+(b.reported?.[c]||0)));
- const reported=sum(c=>(b.reported?.[c]||0)+p[c].saved),remaining=sum(c=>p[c].remaining),selected=sum(c=>p[c].selected);
- return '未休 '+unused+' 天｜已報 '+reported+' 天｜待報 '+remaining+' 天（'+['例','休','國'].map(c=>c+p[c].remaining).join('／')+'）'+(selected?'｜勾選 '+selected+' 天，報後剩 '+sum(c=>p[c].after)+' 天':'');
+ const reported=sum(c=>(b.reported?.[c]||0)+p[c].saved),selected=sum(c=>p[c].selected);
+ const names={'例':'例假','休':'休息日','國':'國定假日'},detail=key=>['例','休','國'].filter(c=>p[c][key]>0).map(c=>names[c]+' '+p[c][key]+' 天').join('／')||'無';
+ return '未休 '+unused+' 天｜已報 '+reported+' 天｜待報：'+detail('remaining')+(selected?'｜勾選 '+selected+' 天，報後待報：'+detail('after'):'');
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
