@@ -10,6 +10,6 @@ const tick=()=>new Promise(setImmediate);
  t=setup();t.queue({paused:false});await assert.rejects(t.c.p79PrepareWorkhoursEdit(t.record,true),/尚在同步/);assert.equal(t.calls.length,0);
  t=setup();p=t.c.p79PrepareWorkhoursEdit(t.record);await tick();t.calls[0].reject(Error('offline'));await assert.rejects(p,/offline/);p=t.c.p79PrepareWorkhoursEdit(t.record,true);await tick();assert.equal(t.calls.length,2);t.calls[1].resolve({...t.record});await p;
  t=setup();t.c.p79WarmAttendanceTimeEditor('A','IN',encodeURIComponent(t.record.timeStr));t.c.p79WarmAttendanceTimeEditor('A','IN',encodeURIComponent(t.record.timeStr));await tick();assert.equal(t.calls.length,1,'pointer/focus warmup deduplicates');t.calls[0].resolve({...t.record});await tick();
- assert(html.includes('onpointerenter="p79WarmAttendanceTimeEditor('));assert(html.includes('onfocus="p79WarmAttendanceTimeEditor('));assert(html.includes('const cloud=await p79PrepareWorkhoursEdit(original,true)'));
+ assert(!html.includes('onpointerenter="p79WarmAttendanceTimeEditor('));assert(!html.includes('onfocus="p79WarmAttendanceTimeEditor('));assert(html.includes('const cloud=await p79PrepareWorkhoursEdit(original,true)'));
  console.log('PASS edit warmup: shared in-flight read, ready and stale preload, next edit fresh, identity switch, sync guard, retry and UI triggers');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -10957,7 +10957,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const encodedId = encodeURIComponent(String(record.id));
             const encodedTime = encodeURIComponent(String(record.timeStr || ''));
             const label = type === 'IN' ? '上班簽到' : '下班簽退';
-            return `<button type="button" onclick="openAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onpointerenter="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onfocus="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" onpointerdown="p79WarmAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" class="group inline-flex items-center gap-1.5 rounded-lg hover:ring-2 hover:ring-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" title="點選修改${label}時間" aria-label="點選修改${label}時間">
+            return `<button type="button" onclick="openAttendanceTimeEditor('${encodedId}', '${type}', '${encodedTime}')" class="group inline-flex items-center gap-1.5 rounded-lg hover:ring-2 hover:ring-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" title="點選修改${label}時間" aria-label="點選修改${label}時間">
                 ${display}<span class="text-[10px] text-indigo-500 dark:text-indigo-300 opacity-70 group-hover:opacity-100">✎</span>
             </button>`;
         }
@@ -11571,6 +11571,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         let p79AttendanceEditOpenGeneration = 0;
         let p79AttendanceEditCloudReady = false;
+        let p79AttendanceEditDeleteReady = false;
         let p79WorkhoursEditConflict=null;
         const p79WorkhoursEditWarmups=new Map();
         function p79PrepareWorkhoursEdit(record,consume=false){
@@ -11616,8 +11617,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function p79AttendanceEditFormFingerprint() {
             return JSON.stringify(['modalDateInput','modalTimeHour','modalTimeMinute','modalStatusInput','modalNoteInput'].map(id=>document.getElementById(id)?.value||''));
         }
-        function p79SetAttendanceEditCloudState(ready, message) {
+        function p79SetAttendanceEditCloudState(ready, message, deleteReady=ready) {
             p79AttendanceEditCloudReady=ready;
+            p79AttendanceEditDeleteReady=deleteReady;
             const status=document.getElementById('editRecordCloudCheckStatus');
             if(status){
                 status.textContent=message;
@@ -11658,7 +11660,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             updateEditModalDeleteButton(r);
             setupMobileDateInputs();
         }
-        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null, preservedDraft = null) {
+        async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null, preservedDraft = null, verifyCloud = false) {
             if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
             const generation=++p79AttendanceEditOpenGeneration;
             p79WorkhoursEditConflict=null;
@@ -11691,6 +11693,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 selectModalStatus(preservedDraft.modalStatusInput);
             }
             document.getElementById('editRecordModal').classList.remove('hidden');
+            // Editing uses the displayed baseline. send() still performs a fresh
+            // official-source identity/time check before every cloud update.
+            const queue=window.p79V5QueueInfoForId?.(r.id);
+            const completeBaseline=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(r.timeStr||'').trim());
+            if(!verifyCloud&&!preservedDraft&&!queue&&completeBaseline&&
+               (String(r.empId||'').trim()||String(r.attNo||'').trim())&&
+               records.filter(item=>String(item.id)===String(id)).length===1){
+                p79SetAttendanceEditCloudState(true,'可直接修改與儲存；送出時會核對最新雲端紀錄。',false);
+                return;
+            }
             if(typeof window.p79V5PrepareAttendanceEdit!=='function'){
                 p79SetAttendanceEditCloudState(true,'');return;
             }
@@ -11721,6 +11733,30 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
 
+        async function p79VerifyAttendanceDeleteBaseline() {
+            if(p79AttendanceEditDeleteReady)return true;
+            const generation=p79AttendanceEditOpenGeneration;
+            const record=activeEditingAttendanceRecord;
+            const snapshot=activeEditingAttendanceRecordSnapshot;
+            const button=document.getElementById('deleteModalRecordBtn');
+            if(!record||!snapshot||button?.disabled)return false;
+            if(button){button.disabled=true;button.textContent='⏳ 核對刪除紀錄…';}
+            try{
+                if(typeof window.p79V5PrepareAttendanceEdit!=='function')throw Error('考勤同步尚未就緒，請重新整理');
+                const cloud=await window.p79V5PrepareAttendanceEdit(snapshot.id,{record:{...snapshot}});
+                if(generation!==p79AttendanceEditOpenGeneration||record!==activeEditingAttendanceRecord)return false;
+                const same=(a,b)=>String(a??'').trim().toUpperCase()===String(b??'').trim().toUpperCase();
+                if(!same(cloud.id,snapshot.id)||['empId','attNo'].some(k=>String(snapshot[k]??'').trim()&&!same(cloud[k],snapshot[k]))||!p79WorkhoursEditEquivalent(snapshot,cloud))throw Error('雲端紀錄已變更，請重新整理核對後再刪除');
+                p79AttendanceEditDeleteReady=true;
+                return true;
+            }catch(error){
+                if(generation===p79AttendanceEditOpenGeneration)showToast('無法刪除：'+String(error?.message||error),'warning');
+                return false;
+            }finally{
+                if(generation===p79AttendanceEditOpenGeneration&&record===activeEditingAttendanceRecord&&button){button.disabled=false;updateEditModalDeleteButton(record);}
+            }
+        }
+
         function getAttendanceDeleteLabel(record) {
             const type = getAttendanceRecordType(record);
             const status = String(record?.status || '').trim();
@@ -11741,7 +11777,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             btn.title = `只刪除目前這一筆${label}，另一筆上下班紀錄會保留`;
         }
 
-        function deleteCurrentModalAttendanceRecord() {
+        async function deleteCurrentModalAttendanceRecord() {
+            if(!await p79VerifyAttendanceDeleteBaseline())return;
             if(!p79AttendanceEditCloudReady){showToast('雲端原始紀錄尚未核對完成，暫時不能刪除','warning');return;}
             if (!requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
 
