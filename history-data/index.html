@@ -58,6 +58,8 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 <main class="wrap">
 <section class="hero"><div><h1>歷史資料集中查詢</h1><p>歷史資料直接從 Google Drive 的「79號碼頭－出勤資料／排班資料／船舶資料」年度試算表讀取；第一次讀取後會保存本機快取。</p></div><div class="picker"><input id="month" type="month"><button id="loadBtn" type="button">讀取月份</button></div></section>
 <div class="history-excel-bar">
+<button type="button" id="historyBackupNow" disabled title="備份連線尚未就緒">☁️ 立即備份到歷史資料庫</button>
+<span id="historyBackupStatus" role="status">即時備份尚未啟用</span>
 <button type="button" id="historyExportExcel" disabled>📥 匯出當月 Excel</button>
 <button type="button" id="historyExcelTemplate">📄 Excel 格式範本</button>
 <button type="button" id="historyImportExcel">📤 匯入 Excel 核對</button>
@@ -69,6 +71,7 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 <section class="panel"><div class="panelhead"><div><strong id="panelTitle">考勤歷史</strong><div id="status" class="status">選擇月份後按「讀取月份」</div></div><div class="stats" id="stats"></div></div><div id="progressBox" class="progressbox"><div class="progressline"><span id="progressText">準備讀取…</span><span id="progressPct" class="num">0%</span></div><div class="progressbar"><div id="progressFill" class="progressfill"></div></div><div id="progressDetail" class="progressdetail">等待開始</div></div><div class="tablewrap" id="result"><div class="empty">尚未讀取資料</div></div></section>
 <div class="note"><span class="cache">● 共用快取啟用</span>｜GitHub 資料夾：<b>history-data/</b>｜歷史月份只需下載一次，後續切換直接使用本機保存資料。</div>
 </main>
+<script src="../assets/port79-history-schedule.js?v=20261021-detailed"></script>
 <script>
 (function(){
 'use strict';
@@ -76,6 +79,7 @@ const GAS_DEFAULT='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGn
 const $=id=>document.getElementById(id);let type='attendance';
 let historyLoaded=null;
 let historyXlsxPromise=null;
+const scheduleStyle=document.createElement('style');scheduleStyle.textContent=window.P79HistorySchedule.css;document.head.appendChild(scheduleStyle);
 function historyXlsx(){
   if(window.XLSX)return Promise.resolve(window.XLSX);
   if(historyXlsxPromise)return historyXlsxPromise;
@@ -103,8 +107,7 @@ function historyNormalizeExcelRow(r,kind){
     name:r.name||r.employeeName||'',dept:r.dept||r.department||'',
     status:r.status||r.type||r.action||'',location:r.location||r.place||r.address||'',
     note:r.note||r.remark||'',attNo:r.attNo||'',id:r.id||'',source:r.source||''};
-  if(kind==='schedule'){const v={empId:r.empId||'',name:r.name||r.employeeName||'',group:r.group||'',role:r.role||''};
-    for(let i=1;i<=31;i++)v['d'+i]=r.schedule?.[i]??r.schedule?.[String(i)]??'';return v}
+  if(kind==='schedule'){const month=historyLoaded?.month||$('month').value;const report=window.P79HistorySchedule.model([r],month),r0=report.rows[0];const v={empId:r0?.empId||'',name:r0?.name||'',group:r0?.group||'',role:r0?.role||''};for(let i=1;i<=window.P79HistorySchedule.days(month);i++)v['d'+i]=r0?.values[i-1]||'';return v}
   return r;
 }
 function historyWorkbookRows(kind,items){
@@ -116,8 +119,9 @@ function historyWorkbookRows(kind,items){
 }
 function historySaveExcel(items,kind,month,suffix){
   return historyXlsx().then(XLSX=>{
-    const ws=XLSX.utils.aoa_to_sheet(historyWorkbookRows(kind,items));
-    ws['!cols']=historyExcelColumns(kind).map(()=>({wch:18}));
+    const report=kind==='schedule'?window.P79HistorySchedule.model(items,month):null;
+    const ws=XLSX.utils.aoa_to_sheet(report?window.P79HistorySchedule.values(report):historyWorkbookRows(kind,items));
+    ws['!cols']=report?[{wch:16},{wch:12},{wch:12},{wch:10},{wch:14},...Array.from({length:report.headers.length-5},()=>({wch:8}))]:historyExcelColumns(kind).map(()=>({wch:18}));
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'歷史資料');
     XLSX.writeFile(wb,'PORT79_'+({attendance:'考勤歷史',schedule:'排班歷史',vessel:'船舶歷史'}[kind])+'_'+month+suffix+'.xlsx');
   });
@@ -178,7 +182,7 @@ function finishProgress(ok,detail){if(progressTimer){clearInterval(progressTimer
 function table(cols,rows){if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
 function recordTime(r){const v=r.timeStr??r.datetime??r.dateTime??r.timestamp??r.time??r.fullTime??r.attendanceTime??r.clockTime??r['完整考勤時間']??r['考勤時間']??'';if(v instanceof Date)return v.toLocaleString('zh-TW',{hour12:false});return v}
 async function loadAttendance(month){const d=await api('historyGetMonthData',{type:'attendance',month}),rows=Array.isArray(d.records)?d.records:[];historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
-async function loadSchedule(month){const d=await api('historyGetMonthData',{type:'schedule',month}),rows=Array.isArray(d.schedules)?d.schedules:[];historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);const cols=[{label:'工號',get:r=>r.empId||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'組別',get:r=>r.group||r.schedule?.__personnel?.group||''},{label:'職稱',get:r=>r.role||r.schedule?.__personnel?.role||''}];for(let i=1;i<=31;i++)cols.push({label:String(i),get:r=>r.schedule?.[i]??r.schedule?.[String(i)]??''});table(cols,rows)}
+async function loadSchedule(month){const d=await api('historyGetMonthData',{type:'schedule',month});if(!Array.isArray(d.schedules)||String(d.month||month)!==month)throw Error('歷史班表月份不符或尚未讀取完整');const rows=d.schedules,report=window.P79HistorySchedule.model(rows,month);historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${report.rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);$('result').innerHTML=window.P79HistorySchedule.html(report)}
 async function loadVessel(month){
   const d=await api('historyGetMonthData',{type:'vessel',month}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
   pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
@@ -235,6 +239,34 @@ $('historyExcelFile').addEventListener('change',async e=>{
     $('historyExcelMessage').textContent='已完成匯入預覽，尚未寫入雲端';
   }catch(err){$('historyExcelMessage').textContent='匯入核對失敗：'+err.message}
 });
+
+let backupAvailable=false,backupBusy=false,backupRequest=null;
+function canBackup(){const p=perms(),s=session();return backupAvailable&&p.level==='manage'&&String(s?.adminRole||s?.role||'').toLowerCase()==='superadmin'&&!s?.punchOnly;}
+async function checkBackup(){
+  try{const p=perms();if(p.level!=='manage'||session()?.punchOnly)return;const tk=token(),endpoint=gas();const d=await api('historyBackupCapabilities');if(token()!==tk||gas()!==endpoint)return;backupAvailable=d.historyBackupAvailable===true&&d.version===1;$('historyBackupNow').disabled=!canBackup();if(backupAvailable)$('historyBackupStatus').textContent='備份選取月份與目前資料類型；保留原始資料';}
+  catch(_){backupAvailable=false;$('historyBackupNow').disabled=true;}
+}
+async function backupNow(){
+  if(backupBusy||!canBackup())return;
+  const month=$('month').value,kind=type,capturedToken=token(),capturedGas=gas();
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
+  const scope=[capturedToken,capturedGas,kind,month].join('|');
+  if(!backupRequest||backupRequest.scope!==scope)backupRequest={scope,id:crypto.randomUUID()};
+  const requestId=backupRequest.id,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+  backupBusy=true;$('historyBackupNow').disabled=true;$('historyBackupStatus').textContent='正在建立歷史備份並讀回核對…';
+  try{
+    const r=await fetch(capturedGas,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'historyBackupMonth',type:kind,month,requestId,token:capturedToken,gcToken:capturedToken}),cache:'no-store',signal:controller.signal}),d=await r.json();
+    if(!r.ok||!d?.ok||d.verified!==true||d.type!==kind||d.month!==month||d.requestId!==requestId||d.sourceUnchanged!==true)throw Error(d?.error||'未取得完整備份確認');
+    if(token()!==capturedToken||gas()!==capturedGas||!canBackup())throw Error('登入身分已變更，未套用備份結果');
+    const url=new URL(d.backupUrl);if(url.protocol!=='https:'||url.hostname!=='docs.google.com')throw Error('備份檔案連結無法核對');
+    $('historyBackupStatus').textContent='備份完成：'+month+' '+({attendance:'考勤',schedule:'班表',vessel:'船舶'}[kind])+' '+Number(d.rows||0)+' 筆｜'+d.backupAt+' ';
+    const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener';link.textContent='開啟備份';$('historyBackupStatus').appendChild(link);backupRequest=null;
+  }catch(error){$('historyBackupStatus').textContent='尚未確認備份完成：'+String(error?.name==='AbortError'?'等候逾時；再次按備份會核對同一筆請求':error?.message||error);}
+  finally{clearTimeout(timer);backupBusy=false;$('historyBackupNow').disabled=!canBackup();}
+}
+$('historyBackupNow').addEventListener('click',backupNow);
+checkBackup();
+
 $('loadBtn').addEventListener('click',load);$('month').value=currentMonth();applyPerms();
 })();
 </script>
