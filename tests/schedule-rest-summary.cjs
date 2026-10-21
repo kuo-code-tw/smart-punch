@@ -23,3 +23,25 @@ twoNational.__meta[dates[0]]={overtimeReport:{id:'CONFIRMED-REST',category:'休'
 api.clear();assert.match(c.p79ScheduleRestCountCells(emp,month),/<span>—\/—<\/span>/,'unconfirmed data must not imply accounted days');
 assert(html.includes('acceptRows(data.schedules||[])'));assert(html.includes('acceptRows(confirmedRestRows,yearMonth)'));assert(html.includes('p79RefreshScheduleRestCounts(yearMonth)'));assert(!html.includes('for(const d of visibleDays){const date=yearMonth'));
 console.log('PASS schedule summary: full-month pending counts; official cloud reads; drafts/failure; successful write snapshots; retries; delete; identity/month reset; unknown state; shared calculation and rendered accounted/pending transition 4/1 to 5/0');
+
+// Legacy substitution keeps a manual rest marker from the original day off.
+const substituteRoster=Object.fromEntries(dates.map((d,i)=>[d,i<8?'休':'早']));
+const stale={restCategory:'例',restAllocationSource:'manual',forEmpId:'TARGET',forName:'測試代替',overtime:true,overtimeReport:{id:'SUB',category:'代',code:'代08-16'}};
+substituteRoster.__meta={[dates[23]]:stale};
+const original=JSON.stringify(substituteRoster);
+api.acceptRows([{empId:emp.id,schedule:substituteRoster}],month);
+let sub=api.summary(emp,substituteRoster,substituteRoster.__meta,month,{},'');
+assert.equal(sub.error,undefined);assert.deepEqual(json(sub.remaining),{國:2,休:1,例:0});
+assert.equal(sub.reported.例,0);assert.equal(JSON.stringify(substituteRoster),original,'source assignment and report remain intact');
+const allocation=c.p79AllocateRestMonth(substituteRoster,substituteRoster.__meta,month).meta[dates[23]];
+assert.equal(allocation.restCategory,undefined);assert.equal(allocation.forEmpId,'TARGET');assert.equal(allocation.overtimeReport.id,'SUB');
+for(const marker of [{type:'substitute'},{overtimeReport:{id:'SUB',category:'代'}}]){
+ const metadata={[dates[23]]:{restCategory:'例',restAllocationSource:'manual',...marker}};
+ assert.doesNotThrow(()=>c.p79AllocateRestMonth(substituteRoster,metadata,month));
+}
+const evidence={attendanceEvidence:{complete:true,days:{[emp.id+'|'+dates[23]]:{state:'rest'}}}};
+sub=api.summary(emp,substituteRoster,substituteRoster.__meta,month,evidence,'');
+assert.equal(sub.off.休,5,'whole no-card substitution still counts as actual rest');assert.equal(sub.remaining.休,0);
+assert.throws(()=>c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{restCategory:'例',restAllocationSource:'manual'}},month),/手動假別與班別不一致/,'unrelated inconsistencies remain visible');
+assert.throws(()=>c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{...stale,overtimeReport:{id:'REST',category:'例'}}},month),/手動假別與班別不一致/,'do not silently erase a real rest declaration');
+console.log('PASS legacy substitute rest metadata: numeric summary, no double deduction, immutable assignment, no-card rest, genuine conflicts retained');

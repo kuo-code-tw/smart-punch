@@ -29,7 +29,19 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
     if(!Object.keys(item).length)delete result[date];
   }
-  const available=dates.filter(d=>schedule[d]==='休'&&!excluded.has(d)&&!result[d]?.restCategory&&!result[d]?.overtime&&!result[d]?.forEmpId);
+  // A substitute assignment can retain the rest label from the original roster.
+  // That label is no longer an off day or a rest-quota declaration. Ignore only
+  // its allocation fields on this calculation copy; never delete the assignment.
+  const substitutionDates=new Set();
+  for(const date of dates) {
+    const item=result[date];if(!item)continue;
+    const substitute=item.forEmpId||item.type==='substitute'||item.overtimeReport?.category==='代';
+    const restReport=['例','休','國'].includes(item.overtimeReport?.category);
+    if(!substitute||restReport)continue;
+    substitutionDates.add(date);
+    for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
+  }
+  const available=dates.filter(d=>schedule[d]==='休'&&!substitutionDates.has(d)&&!excluded.has(d)&&!result[d]?.restCategory&&!result[d]?.overtime&&!result[d]?.forEmpId);
   const used=new Set(), slots=quota.slots.map(s=>({...s})), remaining=[];
   // Keep manually assigned categories and consume corresponding quota first.
   for(const date of dates) {
@@ -48,7 +60,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const offPriority={'例':0,'休':1,'國':2};
   slots.sort((a,b)=>offPriority[a.category]-offPriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
   for(const slot of slots) {const date=nearest(available,slot.sourceDate);if(date)assign(date,slot,false);else remaining.push(slot);}
-  const workers=dates.filter(d=>['早','中','晚'].includes(schedule[d])&&!excluded.has(d)&&!result[d]?.overtime&&!result[d]?.forEmpId&&!result[d]?.restCategory);
+  const workers=dates.filter(d=>['早','中','晚'].includes(schedule[d])&&!substitutionDates.has(d)&&!excluded.has(d)&&!result[d]?.overtime&&!result[d]?.forEmpId&&!result[d]?.restCategory);
   const unresolved=[];
   const overtimePriority={'國':0,'休':1,'例':2};
   remaining.sort((a,b)=>overtimePriority[a.category]-overtimePriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
