@@ -1620,7 +1620,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
             <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
             <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
-            <span class="text-xs text-slate-500">例／休／國：應休／待報</span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
+            <span class="text-xs text-slate-500">例／休／國：已排休＋已報／待報</span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
             <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
@@ -5506,9 +5506,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
                   <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：應休／待報">例</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：應休／待報">休</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：應休／待報">國</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：已排休＋已報／待報">例</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：已排休＋已報／待報">休</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：已排休＋已報／待報">國</th>
       `;
 
       const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -6028,8 +6028,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return ['例','休','國'].map(category=>{
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const remaining=result.remaining?.[category]??'—',quota=result.quota?.[category]??'—';
-        const title=result.error?result.error:category+'：應休 '+quota+' 天／待報 '+remaining+' 天；已排休 '+result.off[category]+' 天、已申報 '+result.reported[category]+' 天';
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color}" title="${scheduleEscapeHtml(title)}"><span>${quota}/${remaining}</span></td>`;
+        const accounted=result.error?'—':result.off[category]+result.reserved[category]+result.reported[category];
+        const title=result.error?result.error:category+'：已排休及已申報 '+accounted+' 天／待報 '+remaining+' 天；應休 '+quota+' 天、已申報 '+result.reported[category]+' 天';
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color}" title="${scheduleEscapeHtml(title)}"><span>${accounted}/${remaining}</span></td>`;
       }).join('');
     }
     function p79RefreshScheduleRestCounts(month) {
