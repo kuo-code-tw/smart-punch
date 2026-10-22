@@ -28,10 +28,11 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    // A scheduled rest-day overtime assignment consumes one planned quota day even
    // before the cloud has confirmed a report ID. Keep it reserved, never reported.
    // This avoids showing 8 when the roster has 8 off-days + 1 pending rest overtime.
-   const pendingRestOvertime=!!m.restQuotaOvertime&&cats.includes(m.restCategory)&&actual!=='rest'&&!storedReport(r);
+   const pendingCategory=cats.includes(m.restCategory)?m.restCategory:(cats.includes(r?.category)?r.category:null);
+   const pendingRestOvertime=!!pendingCategory&&(!!m.restQuotaOvertime||!!m.overtime||!!r)&&!storedReport(r)&&actual!=='rest';
    if(pendingRestOvertime){
-    reserved[m.restCategory]++;
-    ledger.push({date:d,kind:'reservedOvertime',category:m.restCategory,actual});
+    reserved[pendingCategory]++;
+    ledger.push({date:d,kind:'reservedOvertime',category:pendingCategory,actual});
     conflicts.push({date:d,reason:'休假加班已排入班表，尚未核對正式申報；已列入待確認額度'});
    }else if(scheduledRest){
     const kind=actual==='open'?'reserved':'off';
