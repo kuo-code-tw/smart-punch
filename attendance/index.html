@@ -8654,6 +8654,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         // Employee-only cloud roster: the punch data endpoint may omit schedules.
         // Use the existing authenticated schedule endpoint and keep only this employee.
         const p79EmployeeRosterPending = new Map();
+        const p79EmployeeRosterCheckedAt = new Map();
         async function p79LoadMyScheduleFromCloud(emp,month) {
             const empId=String(emp?.empId||'').trim().toUpperCase();
             if(!empId||!/^\d{4}-\d{2}$/.test(month))return false;
@@ -8661,6 +8662,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if(!token)return false;
             const key=empId+'|'+month;
             if(p79EmployeeRosterPending.has(key))return p79EmployeeRosterPending.get(key);
+            if(Date.now()-(p79EmployeeRosterCheckedAt.get(key)||0)<60000)return !!(schedules||[]).some(row=>String(row?.empId||'').trim().toUpperCase()===empId && Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')));
+            p79EmployeeRosterCheckedAt.set(key,Date.now());
             const job=(async()=>{
                 const controller=new AbortController();
                 const timer=setTimeout(()=>controller.abort(),15000);
