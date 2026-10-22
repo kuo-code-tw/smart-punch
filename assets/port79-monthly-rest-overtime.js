@@ -25,8 +25,19 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    ledger.push({date:d,kind:storedReport(r)?'reported':'unconfirmed',category:r.category,actual,reportId:r.id});
    if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，原申報保留待核對'});
   }else{
-   if(scheduledRest){const kind=actual==='open'?'reserved':'off';(kind==='reserved'?reserved:off)[allocation.restCategory]++;ledger.push({date:d,kind,category:allocation.restCategory,actual});}
-   else if(actual==='rest')extraRestDates.push(d);
+   // A scheduled rest-day overtime assignment consumes one planned quota day even
+   // before the cloud has confirmed a report ID. Keep it reserved, never reported.
+   // This avoids showing 8 when the roster has 8 off-days + 1 pending rest overtime.
+   const pendingRestOvertime=!!m.restQuotaOvertime&&cats.includes(m.restCategory)&&actual!=='rest'&&!storedReport(r);
+   if(pendingRestOvertime){
+    reserved[m.restCategory]++;
+    ledger.push({date:d,kind:'reservedOvertime',category:m.restCategory,actual});
+    conflicts.push({date:d,reason:'休假加班已排入班表，尚未核對正式申報；已列入待確認額度'});
+   }else if(scheduledRest){
+    const kind=actual==='open'?'reserved':'off';
+    (kind==='reserved'?reserved:off)[allocation.restCategory]++;
+    ledger.push({date:d,kind,category:allocation.restCategory,actual});
+   }else if(actual==='rest')extraRestDates.push(d);
    if(r&&cats.includes(r.category)&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，原申報不列有效加班'});
   }
  }
@@ -117,7 +128,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reported:'既有申報',unconfirmed:'未確認標記（不扣已報）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'休假加班待申報',reported:'既有申報',unconfirmed:'未確認標記（不扣已報）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+(x.actual==='rest'&&x.kind==='off'?'（整班無卡）':'')));
