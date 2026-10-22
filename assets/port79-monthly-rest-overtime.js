@@ -29,7 +29,11 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    // before the cloud has confirmed a report ID. Keep it reserved, never reported.
    // This avoids showing 8 when the roster has 8 off-days + 1 pending rest overtime.
    const pendingCategory=cats.includes(m.restCategory)?m.restCategory:(cats.includes(r?.category)?r.category:null);
-   const pendingRestOvertime=!!pendingCategory&&(!!m.restQuotaOvertime||!!m.overtime||!!r)&&!storedReport(r)&&actual!=='rest';
+   // An automatically allocated, unreported workday is merely a suggestion, not an approved overtime day.
+   // Never consume rest quota for synthetic auto-v1 overtime; only explicit saved/manual
+   // assignments can reserve quota. Actual rest days are handled by scheduledRest above.
+   const explicitPending=!!r||!!m.overtime||(!!m.restQuotaOvertime&&m.restAllocationSource!=='auto-v1');
+   const pendingRestOvertime=!!pendingCategory&&explicitPending&&!storedReport(r)&&actual!=='rest';
    if(pendingRestOvertime){
     reserved[pendingCategory]++;
     ledger.push({date:d,kind:'reservedOvertime',category:pendingCategory,actual});
