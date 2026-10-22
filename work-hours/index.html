@@ -1266,7 +1266,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <span id="overtimeFilterResultCount" class="text-[10px] text-slate-400 dark:text-slate-500"></span>
                     </div>
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
-                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
@@ -12511,6 +12511,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);}
             }
         }
+        function p79RefreshVisibleOvertimeEvidence(){
+            if(document.visibilityState!=='visible'||!document.getElementById('overtimeTableBody')?.getClientRects().length)return;
+            const month=document.getElementById('overtimeMonthFilter')?.value,token=currentPort79SsoToken();
+            if(!token)return;
+            p79WorkOvertimeMonths.forEach((state,key)=>{
+                if(state.token===token&&state.ready&&!state.pending&&!state.restEvidencePending&&(!month||month==='ALL'||month===key)&&(!state.attendanceEvidence?.complete||Date.now()-state.attendanceEvidence.checkedAt>=60000))p79EnsureWorkRestEvidence(key,state);
+            });
+        }
         function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth=''){
             const token=currentPort79SsoToken();if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
@@ -12896,7 +12904,7 @@ function p79OvertimePeriodLabel(report){
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
             const source = document.getElementById('overtimeSourceFilter')?.value || 'ALL';
             let rows = allOvertimeRows.filter(row =>
-                (source==='ALL' || (source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
+                (source==='ALL' || (source==='review' ? row.overtimeReport?.attendanceState==='rest' : source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
                 (month === 'ALL' || String(row.monthKey||'').replace(/\//g,'-') === month) &&
                 (dept === 'ALL' || row.dept === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle) &&
@@ -12924,7 +12932,7 @@ function p79OvertimePeriodLabel(report){
             const reportState=p79WorkOvertimeMonths.get(month);
             const reportStatus=reportState?.pending?'｜申報資料讀取中…':reportState?.error?'｜'+reportState.error:'';
             const restStatus=reportState?.restEvidencePending?'｜無卡休假核對中…':reportState?.restEvidenceError?'｜'+reportState.restEvidenceError:'';
-            document.getElementById('overtimeFilterResultCount').textContent = `(符合條件共 ${rows.length} 個班次)${reportStatus}${restStatus}`;
+            document.getElementById('overtimeFilterResultCount').textContent = `(符合條件共 ${rows.length} 個班次)${reportStatus}${restStatus}${rows.some(row=>row.overtimeReport?.attendanceState==='rest')?'｜🔴 疑似多報 '+rows.filter(row=>row.overtimeReport?.attendanceState==='rest').length+' 筆，請核對後刪除':''}`;
 
             const totalPages = Math.max(1, Math.ceil(rows.length / OVERTIME_PAGE_SIZE));
             overtimeCurrentPage = Math.min(Math.max(1, overtimeCurrentPage), totalPages);
@@ -12946,7 +12954,7 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
-                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'整班無卡｜按休息計算':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.overtimeReport.attendanceReview?'原申報（已停計）':row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
+                    <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'🔴 疑似多報｜整班無卡，請核對後刪除':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.overtimeReport.attendanceReview?'原申報（已停計）':row.coverAlreadyArranged?'已安排':row.coverCandidate?'已安排':'申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)}</span>` : ''}${p79CanReportOvertime()?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold">${row.coverAlreadyArranged?'設定換算':'申報加班'}</button>`:''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="刪除功能待啟用"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
 
@@ -15342,6 +15350,13 @@ body.p79-work-hours-page #adminContentOvertime #overtimeTableBody .p79-overtime-
 body.p79-work-hours-page #adminContentOvertime #overtimeTableBody>tr{height:48px!important;min-height:0!important;}
 @media(max-width:900px){body.p79-work-hours-page #adminContentOvertime table{min-width:1250px!important;}}
 </style>
+
+<script id="p79-overtime-rest-review-refresh">
+setInterval(p79RefreshVisibleOvertimeEvidence,60000);
+document.addEventListener('visibilitychange',p79RefreshVisibleOvertimeEvidence);
+window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
+</script>
+
 </body>
 </html>
 
