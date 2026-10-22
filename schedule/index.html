@@ -1496,6 +1496,13 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-person-cell .p79-person-group{font-size:9px!important;flex-shrink:1!important;max-width:44px!important}
 #app-main-container .p79-person-cell .p79-person-name-line{gap:3px!important;align-items:center!important;min-height:28px!important}
 </style>
+<style id="p79-rest-quota-alert-20261022">
+.p79-rest-count-compact.p79-rest-over-quota{background:#fee2e2!important;color:#b91c1c!important;box-shadow:inset 0 0 0 1px #f87171!important}
+.p79-rest-count-compact.p79-rest-pending-quota{background:#fffbeb!important;color:#92400e!important}
+.p79-rest-quota-tag,.p79-rest-pending-tag{display:block;width:max-content;max-width:100%;margin:2px auto 0;padding:1px 4px;border-radius:5px;font-size:10px;font-weight:800;line-height:1.3;white-space:nowrap}
+.p79-rest-quota-tag{background:#dc2626;color:white}
+.p79-rest-pending-tag{background:#fef3c7;color:#92400e}
+</style>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -6118,8 +6125,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const remaining=result.remaining?.[category]??'—',quota=result.quota?.[category]??'—';
         const accounted=result.error?'—':result.off[category]+result.reserved[category]+result.reported[category];
-        const title=result.error?result.error:category+'：已排休及已申報 '+accounted+' 天／待報 '+remaining+' 天；應休 '+quota+' 天、已申報 '+result.reported[category]+' 天';
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color}" title="${scheduleEscapeHtml(title)}"><span>${accounted}/${remaining}</span></td>`;
+        const extra=!result.error&&Number.isFinite(Number(accounted))?Math.max(0,Number(accounted)-Number(quota)):0;
+        const pending=!result.error?(result.ledger||[]).filter(item=>item.category===category&&item.kind==='reservedOvertime').length:0;
+        const title=result.error?result.error:category+'：應休額度 '+quota+' 天；已休 '+result.off[category]+' 天，已申報 '+result.reported[category]+' 天，預留 '+result.reserved[category]+' 天；未用 '+remaining+' 天'+(extra?'；超額 '+extra+' 天':'')+(pending?'；待確認未休加班 '+pending+' 天':'');
+        const alertClass=extra?'p79-rest-over-quota':pending?'p79-rest-pending-quota':'';
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${accounted}/${remaining}</span>${extra?`<small class="p79-rest-quota-tag">超+${extra}</small>`:pending?`<small class="p79-rest-pending-tag">待核${pending}</small>`:''}</td>`;
       }).join('');
     }
     function p79RefreshScheduleRestCounts(month) {
