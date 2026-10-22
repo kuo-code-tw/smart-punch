@@ -8696,6 +8696,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     reportStatus(own.length?('已載入 '+month+' 我的班表'):'雲端未找到此員工該月份班表，請核對排班系統是否已儲存。',own.length?'ok':'error');
                     return own.length>0;
                 } catch(e) {
+                    p79EmployeeRosterCheckedAt.delete(key);
                     reportStatus('班表讀取失敗：'+String(e?.message||e||'未知錯誤').slice(0,110),'error');
                     const note=document.getElementById('empScheduleTodayNote');
                     if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId&&note&&!employeeScheduleMap(emp)[scheduleDateKey(new Date())])
