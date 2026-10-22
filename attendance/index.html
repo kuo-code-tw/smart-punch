@@ -1155,7 +1155,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                                 </div>
                             </div>
                         </div>
-                        <select id="empScheduleMonthSelect" onchange="renderEmployeeSchedule(currentEmp)" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200">
+                        <select id="empScheduleMonthSelect" onchange="p79LoadMyScheduleFromCloud(currentEmp,this.value).catch(()=>{});renderEmployeeSchedule(currentEmp)" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200">
                             <option value="">本月</option>
                         </select>
                     </div>
@@ -8651,6 +8651,44 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return `${match[1]}-${String(match[2]).padStart(2, '0')}`;
         }
 
+        // Employee-only cloud roster: the punch data endpoint may omit schedules.
+        // Use the existing authenticated schedule endpoint and keep only this employee.
+        const p79EmployeeRosterPending = new Map();
+        async function p79LoadMyScheduleFromCloud(emp,month) {
+            const empId=String(emp?.empId||'').trim().toUpperCase();
+            if(!empId||!/^\d{4}-\d{2}$/.test(month))return false;
+            const token=currentPort79SsoToken();
+            if(!token)return false;
+            const key=empId+'|'+month;
+            if(p79EmployeeRosterPending.has(key))return p79EmployeeRosterPending.get(key);
+            const job=(async()=>{
+                const controller=new AbortController();
+                const timer=setTimeout(()=>controller.abort(),15000);
+                try {
+                    const url=getActiveGasUrl()+'?action=getScheduleDataSecure&month='+encodeURIComponent(month)+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now();
+                    const res=await fetch(url,{cache:'no-store',signal:controller.signal,redirect:'follow'});
+                    const data=await res.json();
+                    if(!data?.ok||!Array.isArray(data.schedules))throw Error(data?.error||'未取得班表');
+                    // Never cache other employees' schedules inside a punch-only session.
+                    const own=data.schedules.filter(row=>String(row?.empId||'').trim().toUpperCase()===empId);
+                    if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId){
+                        schedules=(schedules||[]).filter(row=>!(String(row?.empId||'').trim().toUpperCase()===empId && (String(row?.month||'').slice(0,7)===month || Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')))));
+                        schedules.push(...own);
+                        renderEmployeeSchedule(currentEmp);
+                        const note=document.getElementById('empScheduleTodayNote');
+                        if(!own.length&&note)note.textContent='雲端尚無此月份班表，請管理員核對排班是否已儲存';
+                    }
+                    return own.length>0;
+                } catch(e) {
+                    const note=document.getElementById('empScheduleTodayNote');
+                    if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId&&note&&!employeeScheduleMap(emp)[scheduleDateKey(new Date())])
+                        note.textContent='班表讀取失敗，請檢查網路或班表存取權限';
+                    return false;
+                } finally {clearTimeout(timer);}
+            })().finally(()=>p79EmployeeRosterPending.delete(key));
+            p79EmployeeRosterPending.set(key,job);
+            return job;
+        }
         function employeeScheduleMap(emp) {
             const empId = String(emp?.empId || '').trim().toUpperCase();
             const map = {};
@@ -9319,6 +9357,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 scheduleEmployeeSessionLogin(found);
                 renderEmployeeLeaveBalance(currentEmp);
                 renderEmployeeSchedule(currentEmp);
+                p79LoadMyScheduleFromCloud(currentEmp,scheduleDateKey(new Date()).slice(0,7)).catch(()=>{});
                 document.getElementById('empNameDisplay').textContent = currentEmp.name;
                 document.getElementById('empAttNoDisplay').textContent = currentEmp.attNo;
                 document.getElementById('empDeptDisplay').textContent = `部門：${currentEmp.dept || '一般'}｜職稱：${currentEmp.jobTitle || currentEmp.deptDetail || '未設定'}`;
