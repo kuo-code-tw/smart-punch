@@ -5584,7 +5584,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const substituteLabel = ownApprovedLeave||noPunchRest ? '' : p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
 
 
-          if(shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '離') {
+          if(manualNoPunch || shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '離') {
             offDays++;
           } else {
             workDays++;
