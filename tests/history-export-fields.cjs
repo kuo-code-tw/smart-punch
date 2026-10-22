@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),a=require('assert/strict');
+const h=fs.readFileSync('history-data/index.html','utf8');
+const context={Date,recordTime:r=>r.timeStr||'',historyLoaded:null};vm.createContext(context);
+vm.runInContext(h.slice(h.indexOf('function historyExcelColumns('),h.indexOf('function historySaveExcel(')),context);
+a.deepEqual(Array.from(context.historyExcelColumns('attendance'),x=>x[1]),['考勤號','工號','姓名','部門','職稱','考勤時間','出勤狀態','地點','備註']);
+const raw={vessel:'TEST SHIP',voyageE:'V1',load:0,disc:178,ttlCtnr:178,sheetHatches:2,shipGph:12.5},before=JSON.stringify(raw);
+const row=context.historyNormalizeExcelRow(raw,'vessel');a.equal(row.vesselName,'TEST SHIP');a.equal(row.load,0);a.equal(row.totalContainers,178);a.equal(row.hatches,2);a.equal(row.gph,12.5);a.equal(JSON.stringify(raw),before);a.equal(context.historyExcelColumns('vessel').length,17);a.equal(context.historyWorkbookRows('vessel',[raw])[1].length,17);a.throws(()=>context.historyNormalizeExcelRow({load:-2181571200000},'vessel'),/數量異常/);
+a(h.includes("historyLoaded={type:'vessel',month,rows,records}"));a(h.includes("Object.keys(r)"));a(h.includes("book_append_sheet(wb,detailSheet,'作業明細')"));
+vm.runInContext(fs.readFileSync('backend/vessel-quantity-cell.gs','utf8'),context);const n=context.p79GcQuantityNumber_;
+for(const x of [undefined,null,'',0,'0'])a.equal(n(x),0);
+a.equal(n('1,234'),1234);a.equal(n(new Date(-2181571200000)),319);a.equal(n(-2181571200000),319);a.equal(n(-2166192000000),497);a.equal(n(178),178);a.throws(()=>n(-1));a.throws(()=>n('2026/10/22'));a.throws(()=>n(new Date('2026-10-22')));
+console.log('PASS history export: attendance nine columns, vessel 17 columns/name aliases/zero/details and quantity Date recovery');

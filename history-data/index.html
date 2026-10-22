@@ -94,20 +94,23 @@ function historyXlsx(){
 }
 function historyExcelColumns(kind){
   if(kind==='attendance')return [
-    ['timeStr','日期/時間'],['empId','工號'],['name','姓名'],['dept','部門'],
-    ['status','狀態']];
+    ['attNo','考勤號'],['empId','工號'],['name','姓名'],['dept','部門'],['jobTitle','職稱'],['timeStr','考勤時間'],['status','出勤狀態'],['location','地點'],['note','備註']];
   if(kind==='schedule')return [['empId','工號'],['name','姓名'],['group','組別'],['role','職稱'],
     ...Array.from({length:31},(_,i)=>['d'+(i+1),String(i+1)])];
   return [['vesselName','船名'],['voyage','航次'],['workingNo','WORKING NO'],['firstDate','開始'],
-    ['lastDate','結束'],['disc','卸船櫃數'],['load','裝船櫃數'],['totalMoves','總 Moves']];
+    ['lastDate','結束'],['disc','卸船櫃數'],['load','裝船櫃數'],['totalContainers','請款櫃數'],['hatches','艙蓋 H/C'],['shiftMoves','翻艙 SHIFT'],['totalMoves','總 Moves'],['aqcCount','AQC台數'],['gph','GPH'],['gphHC','GPH含H/C'],['vph','VPH'],['vphHC','VPH含H/C'],['wharf','碼頭']];
 }
 function historyNormalizeExcelRow(r,kind){
   if(kind==='attendance')return {
     timeStr:recordTime(r),empId:r.empId||r.employeeId||'',
-    name:r.name||r.employeeName||'',dept:r.dept||r.department||'',
+    name:r.name||r.employeeName||'',dept:r.dept||r.department||'',jobTitle:r.jobTitle||r.deptDetail||r.role||'',
     status:r.status||r.type||r.action||'',location:r.location||r.place||r.address||'',
     note:r.note||r.remark||'',attNo:r.attNo||'',id:r.id||'',source:r.source||''};
   if(kind==='schedule'){const month=historyLoaded?.month||$('month').value;const report=window.P79HistorySchedule.model([r],month),r0=report.rows[0];const v={empId:r0?.empId||'',name:r0?.name||'',group:r0?.group||'',role:r0?.role||''};for(let i=1;i<=window.P79HistorySchedule.days(month);i++)v['d'+i]=r0?.values[i-1]||'';return v}
+  if(kind==='vessel'){
+    const number=(...keys)=>{const v=keys.map(k=>r[k]).find(v=>v!==undefined&&v!==null&&v!=='');if(v===undefined)return '';const n=Number(v);if(!Number.isFinite(n)||n<0)throw Error('船舶數量異常，請重新整理雲端資料後再匯出：'+String(r.workingNo||''));return n;};
+    return {...r,vesselName:r.vesselName||r.shipName||r.vessel||r.name||'',voyage:r.voyageE||r.voyageI||r.voyage||r.tfcCodeE||r.tfcCodeI||'',firstDate:r.firstDate||r.startDate||r.startTime||r.beginTime||'',lastDate:r.lastDate||r.endDate||r.endTime||r.finishTime||'',disc:number('disc'),load:number('load'),totalContainers:number('totalContainers','ttlCtnr','TTLCtnr','containerCount'),hatches:number('hatches','sheetHatches'),shiftMoves:number('shiftMoves','sheetShiftMoves'),totalMoves:number('totalMoves','sheetTotalMoves'),aqcCount:number('aqcCount','sheetAqcCount'),gph:number('gph','shipGph'),gphHC:number('gphHC','shipGphHC'),vph:number('vph','shipVph'),vphHC:number('vphHC','shipVphHC'),wharf:r.wharf||''};
+  }
   return r;
 }
 function historyWorkbookRows(kind,items){
@@ -122,7 +125,12 @@ function historySaveExcel(items,kind,month,suffix){
     const report=kind==='schedule'?window.P79HistorySchedule.model(items,month):null;
     const ws=XLSX.utils.aoa_to_sheet(report?window.P79HistorySchedule.values(report):historyWorkbookRows(kind,items));
     ws['!cols']=report?[{wch:16},{wch:12},{wch:12},{wch:10},{wch:14},...Array.from({length:report.headers.length-5},()=>({wch:8}))]:historyExcelColumns(kind).map(()=>({wch:18}));
-    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'歷史資料');
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,kind==='vessel'?'船舶總表':'歷史資料');
+    if(kind==='vessel'&&!suffix&&historyLoaded?.type==='vessel'&&historyLoaded.month===month){
+      const details=historyLoaded.records||[],keys=[...new Set(details.flatMap(r=>Object.keys(r)))],labels={id:'ID',empId:'工號',name:'姓名',workingNo:'WORKING NO',vessel:'船名',shipName:'船名主檔',voyageI:'航次I',voyageE:'航次E',workDate:'日期',shift:'時段',startTime:'開始時間',endTime:'結束時間',containers:'櫃數',disc:'卸船櫃數',load:'裝船櫃數',hatches:'艙蓋數',note:'備註',wharf:'碼頭'};
+      const detailRows=[keys.map(k=>labels[k]||k),...details.map(r=>keys.map(k=>r[k]&&typeof r[k]==='object'?JSON.stringify(r[k]):r[k]??''))];
+      const detailSheet=XLSX.utils.aoa_to_sheet(detailRows);detailSheet['!cols']=keys.map(()=>({wch:18}));XLSX.utils.book_append_sheet(wb,detailSheet,'作業明細');
+    }
     XLSX.writeFile(wb,'PORT79_'+({attendance:'考勤歷史',schedule:'排班歷史',vessel:'船舶歷史'}[kind])+'_'+month+suffix+'.xlsx');
   });
 }
@@ -186,29 +194,8 @@ async function loadSchedule(month){const d=await api('historyGetMonthData',{type
 async function loadVessel(month){
   const d=await api('historyGetMonthData',{type:'vessel',month}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
   pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
-  const rows=masters.length?masters:records;historyLoaded={type:'vessel',month,rows};$('historyExportExcel').disabled=false;
-  const n=v=>{const x=Number(v);return Number.isFinite(x)?x:''};
-  const voyage=r=>String(r.voyageE||r.voyageI||r.voyage||r.tfcCodeE||r.tfcCodeI||'').trim();
-  const dateOrTime=(r,a,b,c,d)=>r[a]||r[b]||r[c]||r[d]||'';
-  table([
-    {label:'船名',get:r=>r.vesselName||r.shipName||r.vessel||r.name||''},
-    {label:'航次',get:voyage},
-    {label:'WORKING NO',get:r=>r.workingNo||r.WORKING_NO||''},
-    {label:'開始',get:r=>dateOrTime(r,'firstDate','startDate','startTime','beginTime')},
-    {label:'結束',get:r=>dateOrTime(r,'lastDate','endDate','endTime','finishTime')},
-    {label:'卸船櫃數',get:r=>n(r.disc)},
-    {label:'裝船櫃數',get:r=>n(r.load)},
-    {label:'請款櫃數',get:r=>n(r.totalContainers??r.ttlCtnr??r.TTLCtnr??r.containerCount)},
-    {label:'艙蓋 H/C',get:r=>n(r.hatches??r.sheetHatches)},
-    {label:'翻艙 SHIFT',get:r=>n(r.shiftMoves??r.sheetShiftMoves)},
-    {label:'總 Moves',get:r=>n(r.totalMoves??r.sheetTotalMoves)},
-    {label:'AQC台數',get:r=>n(r.aqcCount??r.sheetAqcCount)},
-    {label:'GPH',get:r=>n(r.gph??r.shipGph)},
-    {label:'GPH含H/C',get:r=>n(r.gphHC??r.shipGphHC)},
-    {label:'VPH',get:r=>n(r.vph??r.shipVph)},
-    {label:'VPH含H/C',get:r=>n(r.vphHC??r.shipVphHC)},
-    {label:'碼頭',get:r=>r.wharf||''}
-  ],rows)
+  const rows=masters.map(r=>historyNormalizeExcelRow(r,'vessel'));historyLoaded={type:'vessel',month,rows,records};$('historyExportExcel').disabled=false;
+  table(historyExcelColumns('vessel').map(([key,label])=>({label,get:r=>r[key]??''})),rows)
 }
 async function load(requireFresh=false){historyLoaded=null;$('historyExportExcel').disabled=true;$('historyImportPreview').hidden=true;const m=$('month').value;if(!/^\d{4}-\d{2}$/.test(m))return;setStatus(`讀取 ${m} 中…`);$('loadBtn').disabled=true;startProgress(m);try{if(type==='attendance')await loadAttendance(m);else if(type==='schedule')await loadSchedule(m);else await loadVessel(m);setStatus(requireFresh===true?`${m} 已從雲端重新載入`:`${m} 已完成；下次同月份會優先使用本機保存資料`);finishProgress(true,`${m} 資料已整理完成`)}catch(e){setStatus(`讀取失敗：${e.message||e}`);$('result').innerHTML=`<div class="empty">${esc(e.message||e)}</div>`;finishProgress(false,e.message||String(e));if(requireFresh===true)throw e;}finally{$('loadBtn').disabled=false}}
 window.p79RefreshHistoryAll=async()=>{const p=perms();if(p.level==='none'||!p[type]||session()?.punchOnly)throw Error('請先登入並確認歷史資料查詢權限');if(!/^\d{4}-\d{2}$/.test($('month').value))throw Error('請先選擇月份');const oldResult=$('result').innerHTML,oldLoaded=historyLoaded;try{await load(true);}catch(error){$('result').innerHTML=oldResult;historyLoaded=oldLoaded;$('historyExportExcel').disabled=!oldLoaded;throw error;}};
