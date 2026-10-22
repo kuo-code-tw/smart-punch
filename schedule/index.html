@@ -6137,9 +6137,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const shift=String(rawSchedule[date]||'');
           const meta=rawMeta[date]||{};
           const report=meta.overtimeReport;
-          const confirmed=String(report?.id||'').trim()&&['例','休','國'].includes(report?.category)?report.category:'';
-          const manual=meta.restAllocationSource!=='auto-v1'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
-          const type=confirmed||manual||(['例','國'].includes(shift)?shift:shift==='休'?'休':'');
+          const explicitReport=['例','休','國'].includes(report?.category)&&!!(meta.overtime||report?.code||report?.overtimeStart||report?.id)?report.category:'';
+          const explicitManual=meta.restAllocationSource!=='auto-v1'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
+          // 同一份班表畫面顯示的「休16-24／國08-16」必須納入逐日計數，
+          // 不能只認帶 id 的申報；沒有 id 的項目仍可列為班表標記，但不視為核准申報。
+          const displayed=String(p79SubstituteShiftLabel(emp.id,date,meta)||'').trim();
+          const displayType=/^(例|休|國)(?=\\d{1,2}[:\\d]*[-–]\\d{1,2}|\\d{1,2}[-–]\\d{1,2})/.exec(displayed)?.[1]||'';
+          const type=explicitReport||displayType||explicitManual||(['例','國'].includes(shift)?shift:shift==='休'?'休':'');
           if(type===category)marked++;
         }
         const compared=result.error?accounted:Math.max(Number(accounted),marked);
