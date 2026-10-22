@@ -100,9 +100,13 @@ function historyExcelColumns(kind){
   return [['vesselName','船名'],['voyage','航次'],['workingNo','WORKING NO'],['firstDate','開始'],
     ['lastDate','結束'],['disc','卸船櫃數'],['load','裝船櫃數'],['totalContainers','請款櫃數'],['hatches','艙蓋 H/C'],['shiftMoves','翻艙 SHIFT'],['totalMoves','總 Moves'],['aqcCount','AQC台數'],['gph','GPH'],['gphHC','GPH含H/C'],['vph','VPH'],['vphHC','VPH含H/C'],['wharf','碼頭']];
 }
+function historyAttendanceTime(r){
+  const raw=String(recordTime(r)||''),m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T](\d{1,2}):(\d{2})/);
+  return m?m[1]+'/'+m[2].padStart(2,'0')+'/'+m[3].padStart(2,'0')+' '+m[4].padStart(2,'0')+':'+m[5]:raw;
+}
 function historyNormalizeExcelRow(r,kind){
   if(kind==='attendance')return {
-    timeStr:recordTime(r),empId:r.empId||r.employeeId||'',
+    timeStr:historyAttendanceTime(r),empId:r.empId||r.employeeId||'',
     name:r.name||r.employeeName||'',dept:r.dept||r.department||'',jobTitle:r.jobTitle||r.deptDetail||r.role||'',
     status:r.status||r.type||r.action||'',location:r.location||r.place||r.address||'',
     note:r.note||r.remark||'',attNo:r.attNo||'',id:r.id||'',source:r.source||''};
@@ -115,7 +119,8 @@ function historyNormalizeExcelRow(r,kind){
 }
 function historyWorkbookRows(kind,items){
   const cols=historyExcelColumns(kind);
-  return [cols.map(c=>c[1]),...(items||[]).map(r=>{
+  const ordered=kind==='attendance'?[...(items||[])].sort((a,b)=>historyAttendanceTime(b).localeCompare(historyAttendanceTime(a))):(items||[]);
+  return [cols.map(c=>c[1]),...ordered.map(r=>{
     const v=historyNormalizeExcelRow(r,kind);
     return cols.map(([k])=>v[k]??'');
   })];
