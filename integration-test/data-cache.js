@@ -7,6 +7,9 @@ const DB_VERSION=2;
 const STORE='snapshots';
 const SETTINGS='settings';
 const FOLDER_LABEL='79號碼頭雲端資料庫';
+const CANONICAL_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
+const DOWNLOAD_TIMEOUT_MS=60000;
+let recoveredGasUrl='';
 let folderHandle=null,folderLoaded=false,folderLoading=null,folderMessage='尚未連接電腦資料夾';
 let folderWrites=Promise.resolve();
 
@@ -89,7 +92,10 @@ function currentSystem(){
  if(p.includes('/aqc-efficiency/'))return 'efficiency';if(p.includes('/hr/'))return 'hr';
  if(p.includes('/history-data/'))return 'history';return 'attendance';
 }
-function token(){try{return String(sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_user_token')||'').trim()}catch(e){return''}}
+function token(){
+ try{const active=window.P79ManagementContext?.token?.();if(active)return String(active).trim()}catch(_){}
+ try{return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||'').trim()}catch(e){return''}
+}
 function viewerKey(){
  try{
   const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
@@ -99,11 +105,14 @@ function viewerKey(){
  }catch(e){return 'guest@employee'}
 }
 function gasUrl(){
+ if(recoveredGasUrl)return recoveredGasUrl;
+ try{const active=window.P79ManagementContext?.gas?.();if(validDownloadGasUrl(active))return String(active).trim()}catch(_){}
  try{if(typeof GAS_URL!=='undefined'&&GAS_URL)return String(GAS_URL)}catch(e){}
  try{if(window.GAS_URL)return String(window.GAS_URL)}catch(e){}
  try{for(const k of ['port79_gas_url','gasUrl','GAS_URL']){const v=sessionStorage.getItem(k)||localStorage.getItem(k);if(v&&/script\.google\.com/i.test(v))return v}}catch(e){}
  return '';
 }
+function validDownloadGasUrl(value){try{const u=new URL(String(value||'').trim());return u.origin==='https://script.google.com'&&/^\/macros\/s\/[\w-]+\/exec$/.test(u.pathname)}catch(_){return false}}
 function ymNow(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 function openDb(){
  if(dbPromise)return dbPromise;
@@ -448,8 +457,50 @@ function buildUrl(action,params={}){
  u.searchParams.set('_',Date.now());return u.toString();
 }
 async function fetchJson(action,params={},sys=''){
- const url=buildUrl(action,params);const c=new AbortController();const to=setTimeout(()=>c.abort(),30000);
- try{const r=await nativeFetch(url,{cache:'no-store',signal:c.signal});const raw=await r.text();if(!r.ok)throw new Error('HTTP '+r.status);let d;try{d=JSON.parse(raw)}catch(e){throw new Error('GAS 回傳不是 JSON')};if(d?.ok===false)throw new Error(d.error||'雲端讀取失敗');await storeApi(url,d,sys);return d}finally{clearTimeout(to)}
+ const viewer=viewerKey(),credential=token();
+ if(!credential)throw Object.assign(new Error('請先由首頁重新登入，再下載資料'),{code:'P79_AUTH'});
+ let url=buildUrl(action,params),lastError;
+ const primary=new URL(url),canonical=new URL(CANONICAL_GAS_URL);
+ if(!validDownloadGasUrl(primary.toString()))throw new Error('雲端網址設定不正確，請由首頁重新進入系統');
+ const labels={getAttendanceMonths:'考勤月份清單',getAttendanceEmployeeMaster:'員工主檔',getAttendanceMonthData:'考勤月份資料',getAttendanceMainDirect:'考勤主表',getLeaveData:'請假',getScheduleDataSecure:'排班',gcGetData:'效率',hrGetEmployees:'人資',getHistoricalDataCatalog:'歷史資料',historyGetMonthData:'歷史月份資料'};
+ const label=labels[action]||'雲端資料';
+ for(let attempt=0;attempt<2;attempt++){
+  const c=new AbortController();let timedOut=false,data;
+  const to=setTimeout(()=>{timedOut=true;c.abort()},DOWNLOAD_TIMEOUT_MS);
+  try{
+   if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，請重新開啟快取中心'),{code:'P79_AUTH'});
+   const r=await nativeFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
+   const raw=await r.text();
+   if(!r.ok)throw Object.assign(new Error(label+'：HTTP '+r.status),{status:r.status,retryable:[404,408,429,500,502,503,504].includes(r.status),code:'P79_TRANSPORT'});
+   try{data=JSON.parse(raw)}catch(_){throw Object.assign(new Error(label+'：雲端回傳網頁，部署網址可能已失效'),{retryable:true,code:'P79_TRANSPORT'})}
+   if(!data||typeof data!=='object')throw new Error(label+'：雲端資料格式不正確');
+   if(data.ok===false||data.retryable){
+    const message=String(data.error||'雲端暫時無法讀取');
+    const auth=/請.*登入|登入.*(?:逾時|過期|不存在|失效|重新)|(?:token|憑證).*(?:失效|過期|不存在)/i.test(message);
+    throw Object.assign(new Error(label+'：'+message),{code:auth?'P79_AUTH':'P79_CLOUD',retryable:!auth&&data.retryable===true});
+   }
+   if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，未保存其他帳號資料'),{code:'P79_AUTH'});
+  }catch(error){
+   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（60 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
+   else if(error?.name==='TypeError')error=Object.assign(new Error(label+'：無法連接雲端，請檢查網路'),{retryable:true,code:'P79_TRANSPORT'});
+   lastError=error;
+   if(attempt===1||!error.retryable)throw error;
+   // Only safe reads are retried. A retired deployment may recover through the
+   // same official /exec URL used by the system entrance; never change access.
+   const next=new URL(url);
+   if(error.status===404||/回傳網頁/.test(error.message)){
+    next.protocol=canonical.protocol;next.host=canonical.host;next.pathname=canonical.pathname;
+   }
+   next.searchParams.set('_',String(Date.now()+attempt+1));url=next.toString();
+   setProgress(label+'連線未完成，正在重試一次…');
+   continue;
+  }finally{clearTimeout(to)}
+  // Storage failures must not trigger another cloud request.
+  await storeApi(url,data,sys);
+  if(new URL(url).pathname!==primary.pathname)recoveredGasUrl=CANONICAL_GAS_URL;
+  return data;
+ }
+ throw lastError;
 }
 async function saveSystemSnapshot(sys,data){
  await put({key:systemKey(sys),kind:'system',system:sys,savedAt:Date.now(),size:safeSize(data),data});
@@ -499,6 +550,7 @@ async function downloadAttendanceDatabase(targetSys='attendance',onProgress){
    allRecords=mergeAttendanceRows(allRecords.concat(rows));
    monthStats.push({month,count:rows.length,ok:true});
   }catch(e){
+   if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))throw e;
    monthStats.push({month,count:0,ok:false,error:String(e?.message||e)});
   }
  }
@@ -531,16 +583,17 @@ async function downloadSystem(sys,onProgress){
 }
 async function downloadAll(onProgress){
  const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
- let attendanceSnapshot=null,attendanceError=null;
+ let attendanceSnapshot=null,attendanceError=null,connectionError=null;
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];onProgress?.(sys,i,systems.length,'loading');
   try{
+   if(connectionError)throw connectionError;
    if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`));
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else await downloadSystem(sys);
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
-  }catch(e){if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
+  }catch(e){if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
  return result;
