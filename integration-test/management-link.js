@@ -156,8 +156,7 @@ applySnapshot:async snapshot=>{const data=snapshot.roster;if(data.scheduleAccess
           }))
           .filter(emp => emp.id);
 
-        if (cloudEmployees.length) employeeMasterBase = cloudEmployees.map(cloneScheduleEmployee);
-        else if (!employeeMasterBase.length) employeeMasterBase = employees.map(cloneScheduleEmployee);
+        employeeMasterBase = cloudEmployees.map(cloneScheduleEmployee);
 
         leaveRecords = Array.isArray(data.leaveRecords) ? data.leaveRecords : [];
         leaveCoverAssignments = Array.isArray(data.leaveCoverAssignments) ? data.leaveCoverAssignments : [];

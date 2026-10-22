@@ -3,7 +3,7 @@
 <head><script>window.P79ManagementOptimizationMode=true;</script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-hr-import.js?v=20261013.58"></script>
-<script src="../assets/port79-overtime-report.js?v=20261013.96"></script>
+<script src="../assets/port79-overtime-report.js?v=20261013.96&rev=20261022-workflow"></script>
 <!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
 <!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜hr -->
@@ -1410,7 +1410,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261018-permissions"></script>
+<script src="../assets/port79-seven-top.js?v=20261018-permissions&rev=20261022-workflow"></script>
 
 <script id="p79-logout-home-v20261004">
 (function(){
@@ -1446,7 +1446,7 @@ C.mountRange({hostId:'hrDateRangePicker',startId:'hrDateFrom',endId:'hrDateTo',c
 window.p79HrImportContext={canCreate:()=>canHr('people.create'),canEdit:()=>canHr('people.edit'),ensureXlsx:()=>window.p79EnsureXlsx(),upsert:employee=>apiPost({action:'hrUpsertEmployee',originalEmpId:employee.empId,employee}),readEmployees:async()=>{const d=await apiGet('hrGetEmployees',30000);if(!Array.isArray(d.employees))throw new Error('雲端人員資料不完整，停止匯入');p79ApplyHrEmployeesPayload(d,false,'cloud');return d.employees;}};
 window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.adminRole||session?.role||session?.actualAdminRole||'').toLowerCase()==='superadmin'||hrAccess==='manage'};
 </script>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 </body></html>
 

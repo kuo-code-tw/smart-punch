@@ -1203,7 +1203,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 <script src="../assets/port79-calendar-range.js"></script>
 <!-- 員工請假保留原生開始／結束日期，手機可直接使用系統日曆。 -->
-<script src="../assets/port79-seven-top.js?v=20261018-permissions"></script>
+<script src="../assets/port79-seven-top.js?v=20261018-permissions&rev=20261022-workflow"></script>
 
 <style id="p79-leave-cover-style">
 .p79-leave-status-inline{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:210px}
@@ -1449,7 +1449,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261021-linked-type"></script>
+<script src="../assets/port79-overtime-report.js?v=20261021-linked-type&rev=20261022-workflow"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1544,7 +1544,7 @@ window.addEventListener('p79-overtime-report-saved',()=>setTimeout(p79UpdateLeav
 window.addEventListener('load',()=>{setTimeout(p79UpdateLeaveHandoffBanner,0);});
 
 </script>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 </body>
 </html>
