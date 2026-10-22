@@ -6137,12 +6137,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const shift=String(rawSchedule[date]||'');
           const meta=rawMeta[date]||{};
           const report=meta.overtimeReport;
-          // 計數只採用正式班表休假與有識別碼的正式申報。
-          // 絕不可把 p79SubstituteShiftLabel() 推導的「休xx-xx」視為已申報：
-          // 它可能只是自動額度分配或未確認標記，會讓全員虛增數天。
-          const savedCategory=String(report?.id||'').trim()&&['例','休','國'].includes(report.category)?report.category:'';
+          // 依畫面班別代碼計算：例/休/國，及例08-16、休16-24、國08-16等加班。
+          // 每個日期只歸類一次；不採用自動分配的 restCategory 作額外一筆。
+          const rawCode=String(shift||'').trim();
+          const hasExplicitCode=/^(例|休|國)(?:$|[0-9]{1,2}(?::[0-9]{2})?[-–][0-9]{1,2}(?::[0-9]{2})?$)/.exec(rawCode);
+          const reportCode=String(report?.code||'').trim();
+          const savedCategory=String(report?.id||'').trim()&&/^(例|休|國)/.test(reportCode)?reportCode[0]:'';
           const manualCategory=meta.restAllocationSource==='manual'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
-          const type=savedCategory||manualCategory||(['例','國'].includes(shift)?shift:shift==='休'?'休':'');
+          const type=hasExplicitCode?.[1]||savedCategory||manualCategory||'';
           if(type===category)marked++;
         }
         const compared=result.error?accounted:Math.max(Number(accounted),marked);
