@@ -6121,41 +6121,37 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
       return window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)==='rest';
     }
+    // 所有人員共用單一逐日分類器；不使用自動補配額度作為已休天數。
+    function p79DailyRestCount(emp,month) {
+      const counts={例:0,休:0,國:0},dates={例:[],休:[],國:[]};
+      const shifts=monthlyScheduleData[emp.id]||{},metadata=monthlyScheduleMeta[emp.id]||{};
+      const first=p79EmploymentStartDate(emp)||'';
+      const days=p79RestQuota(month).days;
+      for(let d=1;d<=days;d++){
+        const date=month+'-'+String(d).padStart(2,'0');
+        if(first&&date<first)continue;
+        const shift=String(shifts[date]||'').trim(),meta=metadata[date]||{};
+        if(['離','離職'].includes(shift))break;
+        // 先採用班表上實際顯示的假別；其次採用人工指定或正式加班申報。
+        // 自動補配只作建議，不能算成額外休假或加班。
+        const code=/^(例|休|國)(?:$|[0-9]{1,2}(?::[0-9]{2})?[-–][0-9]{1,2}(?::[0-9]{2})?$)/.exec(shift);
+        const report=meta.overtimeReport||{};
+        const reportType=String(report.id||'').trim()&&['例','休','國'].includes(report.category)?report.category:'';
+        const manual=meta.restAllocationSource==='manual'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
+        const category=code?.[1]||reportType||manual;
+        if(category){counts[category]++;dates[category].push(date.slice(8));}
+      }
+      return {counts,dates};
+    }
     function p79ScheduleRestCountCells(emp,month) {
-      const result=p79ScheduleRestBalance(emp,month);
+      const quota=p79RestQuota(month).counts;
+      const audit=p79DailyRestCount(emp,month);
       return ['例','休','國'].map(category=>{
+        const count=audit.counts[category],limit=quota[category];
+        const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        const remaining=result.remaining?.[category]??'—',quota=result.quota?.[category]??'—';
-        // 顯示已休、人工預留、正式申報的總數，不因額度用完就截成 0。
-        const accounted=result.error?'—':result.off[category]+result.reserved[category]+result.reported[category];
-        const rawSchedule=monthlyScheduleData[emp.id]||{};
-        const rawMeta=monthlyScheduleMeta[emp.id]||{};
-        const days=p79RestQuota(month).days;
-        let marked=0;
-        const countedDates=[];
-        for(let d=1;d<=days;d++){
-          const date=month+'-'+String(d).padStart(2,'0');
-          const shift=String(rawSchedule[date]||'');
-          const meta=rawMeta[date]||{};
-          const report=meta.overtimeReport;
-          // 依畫面班別代碼計算：例/休/國，及例08-16、休16-24、國08-16等加班。
-          // 每個日期只歸類一次；不採用自動分配的 restCategory 作額外一筆。
-          const rawCode=String(shift||'').trim();
-          const hasExplicitCode=/^(例|休|國)(?:$|[0-9]{1,2}(?::[0-9]{2})?[-–][0-9]{1,2}(?::[0-9]{2})?$)/.exec(rawCode);
-          const reportCode=String(report?.code||'').trim();
-          const savedCategory=String(report?.id||'').trim()&&/^(例|休|國)/.test(reportCode)?reportCode[0]:'';
-          const manualCategory=meta.restAllocationSource==='manual'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
-          const type=hasExplicitCode?.[1]||savedCategory||manualCategory||'';
-          if(type===category){marked++;countedDates.push(date.slice(8));}
-        }
-        // 只以逐日班表實際可辨識的假別計數；不可取配額分配器較大值，否則自動補配會灌成12天。
-        const compared=marked;
-        const displayedRemaining=Number.isFinite(Number(quota))?Math.max(0,Number(quota)-compared):'—';
-        const extra=!result.error&&Number.isFinite(Number(compared))?Math.max(0,Number(compared)-Number(quota)):0;
-        const pending=!result.error?(result.ledger||[]).filter(item=>item.category===category&&item.kind==='reservedOvertime').length:0;
-        const title=result.error?result.error:category+'：逐日計入 '+marked+' 天（日期：'+(countedDates.join('、')||'無')+'）；本月額度 '+quota+' 天；剩餘 '+displayedRemaining+' 天'+(extra?'；超額 '+extra+' 天':'');
-        const alertClass=extra?'p79-rest-over-quota':pending?'p79-rest-pending-quota':'';
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${compared}/${displayedRemaining}</span>${extra?`<strong class="p79-rest-quota-tag" role="status" aria-label="${category}假超過額度 ${extra} 天">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
+        const title=category+'：逐日計入 '+count+' 天（'+(audit.dates[category].join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'');
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${rest}</span>${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
       }).join('');
     }
     function p79RefreshScheduleRestCounts(month) {
