@@ -1,11 +1,11 @@
-# Immediate history backup — awaiting backend deployment
+# Immediate history backup
 
 The front end checks capabilities and keeps the backup button disabled until
-this backend extension is deployed. A disabled button does not mean a backup
+this backend extension is deployed. The production handler was deployed on 2026-10-22. A disabled button does not mean a backup
 was performed. The history roster presentation can ship independently.
 
 Before installation, read and back up the current Apps Script source. Add
-`history-immediate-backup.gs` as a new script file and add these routes to the
+`history-immediate-backup.gs` and `history-schedule-layout.gs` as script files and add these routes to the
 existing wrappers without changing their other branches.
 
 At the start of `doGet`, after `params` and `action` are computed:
@@ -38,3 +38,5 @@ For a production check, verify capabilities with the authorized account and
 create one explicitly selected month/type backup, then inspect its file,
 counts and source-sheet preservation. Do not claim that a local fixture test
 verified a production write.
+
+The frontend starts all three types for the selected month with one click, retains per-type receipts, and retries only unfinished types. Schedule snapshots open on a formatted month grid generated from the same model as the history Excel export; raw JSON and backup metadata remain available.

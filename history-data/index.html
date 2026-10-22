@@ -58,7 +58,7 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 <main class="wrap">
 <section class="hero"><div><h1>歷史資料集中查詢</h1><p>歷史資料直接從 Google Drive 的「79號碼頭－出勤資料／排班資料／船舶資料」年度試算表讀取；第一次讀取後會保存本機快取。</p></div><div class="picker"><input id="month" type="month"><button id="loadBtn" type="button">讀取月份</button></div></section>
 <div class="history-excel-bar">
-<button type="button" id="historyBackupNow" disabled title="備份連線尚未就緒">☁️ 立即備份到歷史資料庫</button>
+<button type="button" id="historyBackupNow" disabled title="備份連線尚未就緒">☁️ 一鍵備份整月資料</button>
 <span id="historyBackupStatus" role="status">即時備份尚未啟用</span>
 <button type="button" id="historyExportExcel" disabled>📥 匯出當月 Excel</button>
 <button type="button" id="historyExcelTemplate">📄 Excel 格式範本</button>
@@ -243,26 +243,51 @@ $('historyExcelFile').addEventListener('change',async e=>{
 let backupAvailable=false,backupBusy=false,backupRequest=null;
 function canBackup(){const p=perms(),s=session();return backupAvailable&&p.level==='manage'&&String(s?.adminRole||s?.role||'').toLowerCase()==='superadmin'&&!s?.punchOnly;}
 async function checkBackup(){
-  try{const p=perms();if(p.level!=='manage'||session()?.punchOnly)return;const tk=token(),endpoint=gas();const d=await api('historyBackupCapabilities');if(token()!==tk||gas()!==endpoint)return;backupAvailable=d.historyBackupAvailable===true&&d.version===1;$('historyBackupNow').disabled=!canBackup();if(backupAvailable)$('historyBackupStatus').textContent='備份選取月份與目前資料類型；保留原始資料';}
+  try{const p=perms();if(p.level!=='manage'||session()?.punchOnly)return;const tk=token(),endpoint=gas();const d=await api('historyBackupCapabilities');if(token()!==tk||gas()!==endpoint)return;backupAvailable=d.historyBackupAvailable===true&&d.version===1;$('historyBackupNow').disabled=!canBackup();if(backupAvailable)$('historyBackupStatus').textContent='一次備份所選月份的考勤、班表、船舶；保留原始資料';}
   catch(_){backupAvailable=false;$('historyBackupNow').disabled=true;}
+}
+function renderBackupResults(batch){
+  const box=$('historyBackupStatus'),labels={attendance:'考勤',schedule:'班表',vessel:'船舶'};
+  const all=batch.items.every(item=>item.result),failed=batch.items.some(item=>item.error);
+  box.textContent=batch.month+' '+(all?'全部備份完成':backupBusy?'整月備份中…':failed?'部分尚未完成，按備份可重試未完成項目':'尚未完成')+'｜';
+  for(const item of batch.items){
+    const part=document.createElement('span');
+    part.textContent=labels[item.type]+'：'+(item.result?Number(item.result.rows||0)+' 筆 ✓ ':item.error?'未完成（'+item.error+'） ':item.running?'備份及核對中… ':'等待備份 ');
+    if(item.result){const link=document.createElement('a');link.href=item.result.backupUrl;link.target='_blank';link.rel='noopener';link.textContent='開啟備份';part.appendChild(link);}
+    box.appendChild(part);box.appendChild(document.createTextNode('　'));
+  }
 }
 async function backupNow(){
   if(backupBusy||!canBackup())return;
-  const month=$('month').value,kind=type,capturedToken=token(),capturedGas=gas();
+  const month=$('month').value,capturedToken=token(),capturedGas=gas();
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
-  const scope=[capturedToken,capturedGas,kind,month].join('|');
-  if(!backupRequest||backupRequest.scope!==scope)backupRequest={scope,id:crypto.randomUUID()};
-  const requestId=backupRequest.id,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
-  backupBusy=true;$('historyBackupNow').disabled=true;$('historyBackupStatus').textContent='正在建立歷史備份並讀回核對…';
+  const scope=[capturedToken,capturedGas,month].join('|');
+  if(!backupRequest||backupRequest.scope!==scope)backupRequest={scope,month,items:['attendance','schedule','vessel'].map(kind=>({type:kind,id:crypto.randomUUID()}))};
+  const batch=backupRequest,sameSession=()=>token()===capturedToken&&gas()===capturedGas&&canBackup();
+  backupBusy=true;$('historyBackupNow').disabled=true;renderBackupResults(batch);
   try{
-    const r=await fetch(capturedGas,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'historyBackupMonth',type:kind,month,requestId,token:capturedToken,gcToken:capturedToken}),cache:'no-store',signal:controller.signal}),d=await r.json();
-    if(!r.ok||!d?.ok||d.verified!==true||d.type!==kind||d.month!==month||d.requestId!==requestId||d.sourceUnchanged!==true)throw Error(d?.error||'未取得完整備份確認');
-    if(token()!==capturedToken||gas()!==capturedGas||!canBackup())throw Error('登入身分已變更，未套用備份結果');
-    const url=new URL(d.backupUrl);if(url.protocol!=='https:'||url.hostname!=='docs.google.com')throw Error('備份檔案連結無法核對');
-    $('historyBackupStatus').textContent='備份完成：'+month+' '+({attendance:'考勤',schedule:'班表',vessel:'船舶'}[kind])+' '+Number(d.rows||0)+' 筆｜'+d.backupAt+' ';
-    const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener';link.textContent='開啟備份';$('historyBackupStatus').appendChild(link);backupRequest=null;
-  }catch(error){$('historyBackupStatus').textContent='尚未確認備份完成：'+String(error?.name==='AbortError'?'等候逾時；再次按備份會核對同一筆請求':error?.message||error);}
-  finally{clearTimeout(timer);backupBusy=false;$('historyBackupNow').disabled=!canBackup();}
+    for(const item of batch.items){
+      if(!sameSession())throw Error('登入身分已變更，已停止後續備份');
+      if(item.result)continue;
+      const kind=item.type,requestId=item.id,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+      item.running=true;item.error='';renderBackupResults(batch);
+      try{
+        const r=await fetch(capturedGas,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'historyBackupMonth',type:kind,month,requestId,token:capturedToken,gcToken:capturedToken}),cache:'no-store',signal:controller.signal}),d=await r.json();
+        if(!r.ok||!d?.ok||d.verified!==true||d.type!==kind||d.month!==month||d.requestId!==requestId||d.sourceUnchanged!==true)throw Error(d?.error||'未取得完整備份確認');
+        if(!sameSession())throw Error('登入身分已變更，未套用備份結果');
+        const url=new URL(d.backupUrl);if(url.protocol!=='https:'||url.hostname!=='docs.google.com')throw Error('備份檔案連結無法核對');
+        item.result=d;
+      }catch(error){item.error=String(error?.name==='AbortError'?'逾時；重試會核對同一筆請求':error?.message||error);}
+      finally{clearTimeout(timer);item.running=false;}
+      if(!sameSession())throw Error('登入身分已變更，已停止後續備份');
+      renderBackupResults(batch);
+    }
+  }catch(error){$('historyBackupStatus').textContent=String(error.message||error);}
+  finally{
+    backupBusy=false;
+    if(sameSession()){renderBackupResults(batch);if(batch.items.every(item=>item.result))backupRequest=null;}
+    $('historyBackupNow').disabled=!canBackup();
+  }
 }
 $('historyBackupNow').addEventListener('click',backupNow);
 checkBackup();
