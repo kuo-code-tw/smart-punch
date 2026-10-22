@@ -1218,6 +1218,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                                 <th class="px-2 py-3 text-center whitespace-nowrap">上班簽到時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">下班簽退時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">加班時數</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap">申報加班</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">狀態/異常</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">備註/地點</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">操作</th>
@@ -9823,7 +9824,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (countEl) countEl.textContent = `符合 ${validLeaves.length} 筆`;
 
             if (validLeaves.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="p-6 text-center text-slate-400">🔍 目前尚無任何請假預約申請紀錄</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">🔍 目前尚無任何請假預約申請紀錄</td></tr>`;
                 return;
             }
 
@@ -11409,6 +11410,23 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             return formatDurationMinutes(attendanceRowOvertimeMinutes(row));
         }
 
+        // 出勤清單採用與加班管理相同的正式雲端申報流程，不在考勤頁另建申報資料。
+        let p79AdminAttendanceReportRows=[];
+        function p79OpenAdminAttendanceOvertime(index) {
+            const row=p79AdminAttendanceReportRows[index];
+            if(!row || !p79CanReportOvertime())return showToast('目前沒有加班申報權限，請重新登入或確認權限', 'warning');
+            if(!row.clockIn || !row.clockOut)return showToast('此班次尚未完成上下班打卡，不能直接申報加班', 'warning');
+            const date=attendanceRowDateIso(row);
+            const employee=findEmployeeForAttendanceIdentity(row,getAdminVisibleEmployees());
+            if(!employee?.empId || !/^\d{4}-\d{2}-\d{2}$/.test(date))return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
+            if(typeof P79Overtime?.openReport!=='function')return showToast('加班申報功能尚未載入，請重新整理', 'warning');
+            // 不預選加班類型／申報時數，使用者須於正式申報視窗核對時段與換算規則。
+            P79Overtime.openReport({
+                empId:String(employee.empId),date,requirePeriodSelection:true,
+                periodHint:'已帶入 '+String(employee.name||row.name||'')+' 的 '+date+' 出勤班次。請核對加班類型、出勤時段與換算時數後再儲存；跨日班次以簽到日歸屬。'
+            });
+        }
+
         function renderAdminRecordsTable() {
             const tbody = document.getElementById('adminRecordsTableBody');
             if (!tbody) return;
@@ -11454,6 +11472,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             recordsCurrentPage = Math.min(Math.max(1, recordsCurrentPage), totalPages);
             const pageStart = (recordsCurrentPage - 1) * RECORDS_PAGE_SIZE;
             const pageRows = dailyRows.slice(pageStart, pageStart + RECORDS_PAGE_SIZE);
+            p79AdminAttendanceReportRows=pageRows;
 
             const countEl = document.getElementById('recordFilterResultCount');
             if (countEl) countEl.textContent = `(符合條件共 ${dailyRows.length} 筆／第 ${recordsCurrentPage} 頁，共 ${totalPages} 頁)`;
@@ -11469,6 +11488,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const allowAttendanceDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
 
             tbody.innerHTML = pageRows.map((row, rowIndex) => {
+                const reportEmployee=findEmployeeForAttendanceIdentity(row,visibleEmployees);
+                const canReportThisRow=p79CanReportOvertime() && !!(row.clockIn && row.clockOut && reportEmployee?.empId && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
                 const statusBadge = getAttendanceStatusBadge(row.attendanceStatus);
                 const recordIds = row.records.map(r => r.id).filter(id => id !== null && id !== undefined && String(id) !== '');
                 const manualEmpId = encodeURIComponent(String(row.empId || row.attNo || row.name || ''));
@@ -11492,6 +11513,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         <td class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
                         <td class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${canReportThisRow
+                            ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500" title="帶入員工與班次日期，開啟正式加班申報視窗">＋ 申報加班</button>`
+                            : '<span class="text-xs text-slate-400" title="需有申報權限且完成上下班打卡">—</span>'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
                             ${row.noteText ? `備註: ${row.noteText}<br>` : ''}
