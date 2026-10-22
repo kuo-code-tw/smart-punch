@@ -8713,9 +8713,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             requestLocationPermission((success, distance, nearestLocation) => {
                 if (!success) return;
                 if (distance <= nearestLocation.radius) {
-                    const locationLabel = nearestLocation.primary
-                        ? PRIMARY_IN_RANGE_LOCATION_LABEL
-                        : nearestLocation.name;
+                    // 使用管理員 GPS 設定的實際地點名稱；不可套用舊版固定字串。
+                    const locationLabel = String(nearestLocation.name || (nearestLocation.primary ? sysConfig.locationName : '') || '').trim() || '主要打卡地點';
                     execPunch(statusText, locationLabel);
                 } else {
                     showToast(`超出打卡範圍！距離 ${nearestLocation.name} ${distance.toFixed(1)} 公尺 (限制 ${nearestLocation.radius}m)`, "warning");
