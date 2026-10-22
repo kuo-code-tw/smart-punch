@@ -6128,11 +6128,26 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const remaining=result.remaining?.[category]??'—',quota=result.quota?.[category]??'—';
         // 顯示已休、人工預留、正式申報的總數，不因額度用完就截成 0。
         const accounted=result.error?'—':result.off[category]+result.reserved[category]+result.reported[category];
-        const extra=!result.error&&Number.isFinite(Number(accounted))?Math.max(0,Number(accounted)-Number(quota)):0;
+        const rawSchedule=monthlyScheduleData[emp.id]||{};
+        const rawMeta=monthlyScheduleMeta[emp.id]||{};
+        const days=p79RestQuota(month).days;
+        let marked=0;
+        for(let d=1;d<=days;d++){
+          const date=month+'-'+String(d).padStart(2,'0');
+          const shift=String(rawSchedule[date]||'');
+          const meta=rawMeta[date]||{};
+          const report=meta.overtimeReport;
+          const confirmed=String(report?.id||'').trim()&&['例','休','國'].includes(report?.category)?report.category:'';
+          const manual=meta.restAllocationSource!=='auto-v1'&&['例','休','國'].includes(meta.restCategory)?meta.restCategory:'';
+          const type=confirmed||manual||(['例','國'].includes(shift)?shift:shift==='休'?'休':'');
+          if(type===category)marked++;
+        }
+        const compared=result.error?accounted:Math.max(Number(accounted),marked);
+        const extra=!result.error&&Number.isFinite(Number(compared))?Math.max(0,Number(compared)-Number(quota)):0;
         const pending=!result.error?(result.ledger||[]).filter(item=>item.category===category&&item.kind==='reservedOvertime').length:0;
-        const title=result.error?result.error:category+'：應休額度 '+quota+' 天；已休 '+result.off[category]+' 天，已申報 '+result.reported[category]+' 天，預留 '+result.reserved[category]+' 天；未用 '+remaining+' 天'+(extra?'；超額 '+extra+' 天':'')+(pending?'；待確認未休加班 '+pending+' 天':'');
+        const title=result.error?result.error:category+'：班表標記 '+marked+' 天；額度 '+quota+' 天；已休 '+result.off[category]+' 天，已申報 '+result.reported[category]+' 天，預留 '+result.reserved[category]+' 天；未用 '+remaining+' 天'+(extra?'；超額 '+extra+' 天':'')+(pending?'；待確認未休加班 '+pending+' 天':'');
         const alertClass=extra?'p79-rest-over-quota':pending?'p79-rest-pending-quota':'';
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${accounted}/${remaining}</span>${extra?`<strong class="p79-rest-quota-tag" role="status" aria-label="${category}假超過額度 ${extra} 天">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${compared}/${remaining}</span>${extra?`<strong class="p79-rest-quota-tag" role="status" aria-label="${category}假超過額度 ${extra} 天">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
       }).join('');
     }
     function p79RefreshScheduleRestCounts(month) {
