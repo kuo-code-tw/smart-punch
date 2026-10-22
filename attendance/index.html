@@ -14844,6 +14844,25 @@ function getManualPairRecordAnchor(record) {
                 renderAdminRecordsTable();
               }).catch(()=>{state.pending=false;}).finally(()=>clearTimeout(timer));
         }
+        // Refresh schedule/overtime metadata when returning from scheduling in another tab.
+        // Prevent deleted overtime assignments lingering in the attendance table's 60s cache.
+        let p79OvertimeRevalidateAt=0;
+        function p79RevalidateAttendanceOvertimeOnReturn(){
+            if(document.visibilityState==='hidden'||Date.now()-p79OvertimeRevalidateAt<5000)return;
+            p79OvertimeRevalidateAt=Date.now();
+            const token=getAttendanceEmployeeMasterToken();
+            if(!token)return;
+            for(const [month,state] of p79AttendanceOvertimeMonths){
+                if(state?.token!==token)continue;
+                if(state.pending)continue;
+                p79AttendanceOvertimeMonths.delete(month);
+                p79LoadAttendanceOvertimeMonth(month);
+            }
+        }
+        window.addEventListener('focus',p79RevalidateAttendanceOvertimeOnReturn);
+        document.addEventListener('visibilitychange',()=>{
+            if(document.visibilityState==='visible')p79RevalidateAttendanceOvertimeOnReturn();
+        });
         function p79AttendanceRosterGroup(row,employee){
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
             p79LoadAttendanceOvertimeMonth(month);
