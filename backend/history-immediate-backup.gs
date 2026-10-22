@@ -62,6 +62,7 @@ function p79HistoryBackupMonth_(data) {
     const actual=range.getValues().map(function(r){return r.map(String);});
     if(JSON.stringify(actual)!==JSON.stringify(values))throw Error('備份讀回內容不符，未標記完成；原資料保留');
     const meta=file.insertSheet('備份資訊');meta.getRange(1,1,6,2).setNumberFormat('@').setValues([['月份',month],['類型',type],['建立時間',at],['建立人',String(session.empId||'ADMIN')],['筆數',String(source.rows.length)],['來源摘要',JSON.stringify(source.counts)]]);
+    if(type==='attendance')p79HistoryBackupAttendanceView_(file,source,ss);
     if(type==='schedule')p79HistoryBackupScheduleView_(file,source,month);
     SpreadsheetApp.flush();file.setName(name);
     const receipt={ok:true,action:'historyBackupMonth',verified:true,month:month,type:type,requestId:requestId,rows:source.rows.length,counts:source.counts,backupAt:at,backupId:file.getId(),backupUrl:file.getUrl(),sourceUnchanged:true};
