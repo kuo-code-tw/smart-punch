@@ -21620,7 +21620,12 @@ function p79EmployeeDateEligible(emp,date) {
             const token=getAttendanceEmployeeMasterToken();
             url.searchParams.set('action',action);url.searchParams.set('month',month);
             url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('t',String(Date.now()));
-            const data=await fetchGasJsonWithRetry(url.toString(),'匯出資料讀取',1,20000);
+            let data;
+            try{data=await fetchGasJsonWithRetry(url.toString(),'匯出資料讀取',1,60000);}
+            catch(error){
+                if(error?.name==='AbortError'||/signal is aborted|aborted without reason|operation was aborted/i.test(String(error?.message||'')))throw Error(month+' 匯出資料讀取超過 60 秒，尚未產生檔案；請稍後再按確認匯出');
+                throw error;
+            }
             if(!data?.ok)throw Error(data?.error||'匯出資料未讀取完成');
             if(action!=='getScheduleDataSecure'&&(!Array.isArray(data.records)||(data.month&&String(data.month)!==month)))throw Error('匯出考勤月份或資料格式不符');
             if(action==='getScheduleDataSecure'){
@@ -21630,8 +21635,7 @@ function p79EmployeeDateEligible(emp,date) {
             return data;
         }
         async function p79ReadAttendanceExportMonth(month) {
-            const now=new Date(),current=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-            const data=await p79ReadAttendanceExportSource(month===current?'getAttendanceMainDirect':'getAttendanceMonthData',month);
+            const data=await p79ReadAttendanceExportSource('getAttendanceMonthRaw',month);
             const rows=data.records.map(normalizeAttendanceRecordIdentifiers);
             const incomplete=rows.find(record=>/^\d{3,4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(record.timeStr||'').trim()));
             if(incomplete)throw Error('雲端考勤只有日期、缺少時分：'+String(incomplete.name||incomplete.empId||'')+' '+incomplete.timeStr+'；已停止匯出，避免誤當成 00:00。請重新整理核對時間欄位');
@@ -21652,15 +21656,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
         async function p79ReadAttendanceExportScope(month) {
             const current=getTodayAttendanceIso().slice(0,7),previous=shiftAttendanceMonthKey(month,-1),next=shiftAttendanceMonthKey(month,1);
-            const read=async key=>{
-                const rows=await p79ReadAttendanceExportMonth(key);
-                if(key===current)return rows;
-                const direct=await p79ReadAttendanceExportSource('getAttendanceMainDirect',key);
-                const primary=direct.records.map(normalizeAttendanceRecordIdentifiers);
-                const identity=r=>[String(r.id),String(r.empId||r.attNo||''),getAttendanceRecordType(r)].join('|');
-                const ids=new Set(primary.map(identity));
-                return primary.concat(rows.filter(r=>!ids.has(identity(r))));
-            };
+            const read=key=>p79ReadAttendanceExportMonth(key);
             const [center,before,after]=await Promise.all([read(month),read(previous),next<=current?read(next):Promise.resolve([])]);
             const edgeBefore=previous+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5))-1,0).getDate()).padStart(2,'0');
             const date=r=>getAttendanceDateKey(r.timeStr||'').replaceAll('/','-');
