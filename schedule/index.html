@@ -6147,12 +6147,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const type=hasExplicitCode?.[1]||savedCategory||manualCategory||'';
           if(type===category)marked++;
         }
-        const compared=result.error?accounted:Math.max(Number(accounted),marked);
+        // 只以逐日班表實際可辨識的假別計數；不可取配額分配器較大值，否則自動補配會灌成12天。
+        const compared=marked;
+        const displayedRemaining=Number.isFinite(Number(quota))?Math.max(0,Number(quota)-compared):'—';
         const extra=!result.error&&Number.isFinite(Number(compared))?Math.max(0,Number(compared)-Number(quota)):0;
         const pending=!result.error?(result.ledger||[]).filter(item=>item.category===category&&item.kind==='reservedOvertime').length:0;
         const title=result.error?result.error:category+'：班表標記 '+marked+' 天；額度 '+quota+' 天；已休 '+result.off[category]+' 天，已申報 '+result.reported[category]+' 天，預留 '+result.reserved[category]+' 天；未用 '+remaining+' 天'+(extra?'；超額 '+extra+' 天':'')+(pending?'；待確認未休加班 '+pending+' 天':'');
         const alertClass=extra?'p79-rest-over-quota':pending?'p79-rest-pending-quota':'';
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${compared}/${remaining}</span>${extra?`<strong class="p79-rest-quota-tag" role="status" aria-label="${category}假超過額度 ${extra} 天">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${alertClass}" title="${scheduleEscapeHtml(title)}"><span>${compared}/${displayedRemaining}</span>${extra?`<strong class="p79-rest-quota-tag" role="status" aria-label="${category}假超過額度 ${extra} 天">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
       }).join('');
     }
     function p79RefreshScheduleRestCounts(month) {
