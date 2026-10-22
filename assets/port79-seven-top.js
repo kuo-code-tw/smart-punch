@@ -50,7 +50,7 @@ else p79BootLogoutControls();
 
 /* Attendance anomaly legend: compact, aligned 3+2 grid inside its existing filter row. */
 (function(){
- const words=['已整合','缺少簽到','缺少簽退','上班分鐘','下班分鐘'];
+ const words=['重複已整合','缺上班卡','缺下班卡','上班核對','下班核對'];
  function adjust(){
   if(currentSystem()!=='attendance')return;
   const nodes=[...document.querySelectorAll('span')];
@@ -220,11 +220,28 @@ function refreshScheduleLockMenu(root=document){
 }
 window.p79RefreshScheduleLockMenu=refreshScheduleLockMenu;
 
+const WORKFLOWS={
+ attendance:{title:'考勤系統',steps:[['查詢考勤','選擇月份、日期與人員，查看上下班紀錄。'],['找缺卡','使用缺上班卡／缺下班卡篩選，比對班表與跨日班次。'],['修改與補卡','有管理權限時選擇紀錄，修改時間或補卡；按儲存並確認成功。'],['匯入與匯出','從功能選單選擇匯入、匯出；匯入前先檢查人員及日期。']]},
+ workhours:{title:'加班管理',steps:[['選擇月份與人員','先選月份，再依姓名、職稱或單位篩選。'],['申報加班','選擇日期、類型、人員及時段，確認後儲存；收到成功確認後視窗自動關閉。'],['核對已申報','開啟已申報／撤銷紀錄，依狀態與假別查詢；待核對不代表已撤銷。'],['撤銷與列印','確認休假超額後再勾選撤銷；以雲端讀回結果為準。需要報表時從功能選單匯出。']]},
+ schedule:{title:'排班系統',steps:[['選擇月份','選月份、單位與組別，確認人員名單。離職人員不列操作名單，歷史資料保留。'],['調任支援','在人員名冊修改單位或組別。系統先取得編輯權，保留既有每日班別；他人持鎖時不得修改。'],['修改班別','選擇早／中／晚／例／休／國／颱等班別；颱為颱風假，不扣例休國。連結請假或代班時先處理連動。'],['儲存與核對','確認雲端儲存成功。人工班別保留；無卡待核表示需核對考勤，不能視為已出勤。']]},
+ leave:{title:'請假系統',steps:[['填寫申請','選擇人員、假別與起迄時間，核對天數。'],['送出申請','確認內容後送出，等待核准。'],['審核與安排','管理人員核對申請並審核；需要代班時逐日安排人員及時段。'],['變更或取消','從原申請處理修改／取消，確認排班及代班連動結果。']]},
+ efficiency:{title:'船舶效率系統',steps:[['選擇資料','依月份、船舶或人員查詢作業。'],['維護作業','有管理權限時填寫船名、作業時間與裝卸櫃數。'],['儲存核對','確認儲存成功，再核對船名、人員與櫃數合計。'],['匯出報表','從功能選單選擇匯出或每月作業量表，確認月份及範圍。']]},
+ hr:{title:'人資系統',steps:[['查詢人員','以姓名、工號、部門與在職狀態查詢。'],['維護主檔','有權限時新增／修改到職、報到、部門與職稱，確認後儲存。'],['離職與復職','使用辦理離職／恢復在職，核對日期；歷史紀錄會保留。'],['設定權限','依工作需要設定各系統查看或管理權限，儲存後確認生效。']]},
+ history:{title:'歷史資料管理',steps:[['選擇期間','選擇月份及要查看的資料類型。'],['讀取歷史','按讀取並等待完成；讀取失敗時依提示重新讀取。'],['立即備份','需要保存目前月份時使用立即備份，等待各資料類型的完成結果。'],['查看與匯出','核對班表、考勤或船舶內容，再選擇匯出；備份不代表刪除現有資料。']]}
+};
+function openWorkflow(sys){
+ const prior=document.getElementById('p79WorkflowDialog');if(prior){prior.focus();return;}
+ const guide=WORKFLOWS[sys];if(!guide)return;
+ const dialog=document.createElement('dialog');dialog.id='p79WorkflowDialog';dialog.setAttribute('aria-labelledby','p79WorkflowTitle');
+ dialog.innerHTML=`<style>#p79WorkflowDialog{width:min(660px,calc(100vw - 28px));max-height:85dvh;overflow:auto;padding:24px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#17354b;font:15px/1.7 'Microsoft JhengHei',sans-serif}#p79WorkflowDialog::backdrop{background:#0f172a88}#p79WorkflowDialog h2{margin:0;font-size:21px}#p79WorkflowDialog ol{padding-left:26px}#p79WorkflowDialog li{padding:9px 0}#p79WorkflowDialog p{margin:3px 0;color:#526677}#p79WorkflowDialog button{padding:8px 22px;border:0;border-radius:8px;background:#126487;color:white;cursor:pointer}#p79WorkflowDialog footer{text-align:right}</style><h2 id="p79WorkflowTitle">${esc(guide.title)}｜操作流程</h2><ol>${guide.steps.map(([title,text])=>`<li><b>${esc(title)}</b><p>${esc(text)}</p></li>`).join('')}</ol><p>可使用的功能依帳號權限顯示；儲存未確認或失敗時，請保留內容並核對狀態。</p><footer><button type="button" autofocus>關閉</button></footer>`;
+ dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();document.body.appendChild(dialog);dialog.showModal();
+}
 function closeMenu(){document.getElementById('p79SevenStandardMenu')?.classList.remove('open')}
 function toggleMenu(e){e?.stopPropagation();refreshScheduleLockMenu();document.getElementById('p79SevenStandardMenu')?.classList.toggle('open')}
 
 async function runAction(sys,a){closeMenu();try{
  if(!actionAllowed(sys,a))return alert('沒有此功能的操作權限，請聯絡管理員確認授權');
+ if(a==='workflow')return openWorkflow(sys);
  if(a==='overtime-options')return await window.P79Overtime?.openRules?.();
  if(a==='global-theme')return toggleGlobalTheme();
  if(a==='data-cache')return window.Port79DataCache?.openCenter?.();
@@ -300,6 +317,7 @@ function buildMenu(sys){
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['stats','overtime-summary','overtime-application','project-bonus','overtime-print','overtime-policy','logs','attendance-compare','compare']],
+  ['操作說明',['workflow']],
   ['進階工具',['clearDeleted','data-cache']],
   ['顯示設定',['year','global-theme']],
   ['登出系統',['logout-system']]
@@ -315,11 +333,12 @@ function buildMenu(sys){
    menu.appendChild(b);
  }
  GROUPS.forEach(([heading,actions])=>{
-   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['data-cache','global-theme','logout-system'].includes(a)));
+   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['workflow','data-cache','global-theme','logout-system'].includes(a)));
    if(!included.length)return;
    const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
    included.forEach(a=>{
-     if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
+     if(a==='workflow')addAction(a,'📖 操作流程','common');
+     else if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
      else if(a==='global-theme')addAction(a,'🌙 全系統顯示模式','common theme');
      else if(a==='logout-system')addAction(a,'↪ 登出系統','danger');
      else {const [,label,cls]=items.get(a);addAction(a,sys==='schedule'&&a==='schedule-lock'?scheduleLockMenuLabel():label,cls)}

@@ -1182,11 +1182,11 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
     <div class="flex flex-nowrap gap-1 text-[9px] leading-tight text-slate-600 dark:text-slate-300" >
                             <div class="flex flex-nowrap items-center gap-x-1">
                                 <span class="font-bold whitespace-nowrap">💡 異常顏色：</span>
-                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300">上班時間需核對｜01–30 分</span>
-                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300">下班時間需核對｜非 45–60 分</span>
-                                <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300">已整合｜同班次重複刷卡</span>
-                                <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300">缺卡｜缺少簽到</span>
-                                <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300">缺卡｜缺少簽退</span>
+                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300" title="上班時間需核對｜01–30 分">上班核對</span>
+                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300" title="下班時間需核對｜非 45–60 分">下班核對</span>
+                                <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300" title="已整合｜同班次重複刷卡">重複已整合</span>
+                                <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300" title="缺卡｜缺少簽到">缺上班卡</span>
+                                <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300" title="缺卡｜缺少簽退">缺下班卡</span>
                             </div>
                             <div class="flex flex-nowrap items-center gap-x-1">
                             </div>
@@ -22560,7 +22560,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
-<script src="../assets/port79-seven-top.js?v=20261019-employee-header"></script>
+<script src="../assets/port79-seven-top.js?v=20261019-employee-header&rev=20261022-workflow"></script>
 
 <script id="p79-logout-home-v20261004">
 (function(){
@@ -24439,7 +24439,7 @@ window.addEventListener('online',()=>setTimeout(reconcile,3000));
 setInterval(()=>{if(!document.hidden)reconcile()},60000);
 })();
 </script>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <script src="../assets/port79-missing-punch-login-preview.js?v=20261021-search"></script>
 </body>

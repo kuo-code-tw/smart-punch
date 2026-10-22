@@ -410,7 +410,7 @@
          else if(progress){el.querySelector('#p79OtStatus').textContent='✅ 本次請假代班的加班申報已全部完成。';button.textContent='全部申報完成';el.close();}
          else el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；待申報清單已變更，請按接續申報核對剩餘項目。';
         }catch(error){el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；接續申報未完成：'+error.message+'。請按接續申報核對剩餘項目。';}
-       }
+       }else{completed=true;el.close();}
 
       }finally{button.disabled=completed}
      }else throw Error('申報儲存模組尚未載入；內容已保留，請重新整理後接續申報。');
