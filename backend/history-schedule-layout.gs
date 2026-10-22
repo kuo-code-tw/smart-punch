@@ -31,6 +31,8 @@ function p79HistoryBackupScheduleView_(file,source,month){
   source.rows.forEach(function(r){const row=JSON.parse(r[2]),key=String(row.empId||row.id||'').toUpperCase();if(!people.has(key))people.set(key,row);});
   const report=p79HistoryScheduleLayout.P79HistorySchedule.model(Array.from(people.values()),month),data=p79HistoryScheduleLayout.P79HistorySchedule.values(report),width=data[0].length;
   const view=file.insertSheet('班表'),values=[[month+' 人員班表'].concat(Array(width-1).fill(''))].concat(data);
+  if(view.getMaxColumns()<width)view.insertColumnsAfter(view.getMaxColumns(),width-view.getMaxColumns());
+  if(view.getMaxRows()<values.length)view.insertRowsAfter(view.getMaxRows(),values.length-view.getMaxRows());
   const range=view.getRange(1,1,values.length,width);range.setNumberFormat('@').setValues(values);
   SpreadsheetApp.flush();
   if(JSON.stringify(range.getValues().map(function(r){return r.map(String);}))!==JSON.stringify(values))throw Error('班表版面讀回核對失敗，未標記備份完成');
