@@ -3,8 +3,12 @@
 if(window.Port79DataCache)return;
 
 const DB_NAME='port79-system-cache-v1';
-const DB_VERSION=1;
+const DB_VERSION=2;
 const STORE='snapshots';
+const SETTINGS='settings';
+const FOLDER_LABEL='79號碼頭雲端資料庫';
+let folderHandle=null,folderLoaded=false,folderLoading=null,folderMessage='尚未連接電腦資料夾';
+let folderWrites=Promise.resolve();
 
 // PORT79 FAST CORE V2:
 // 1) IndexedDB connection reuse
@@ -105,7 +109,8 @@ function openDb(){
  if(dbPromise)return dbPromise;
  dbPromise=new Promise((resolve,reject)=>{
   const r=indexedDB.open(DB_NAME,DB_VERSION);
-  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'})};
+  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'});if(!db.objectStoreNames.contains(SETTINGS))db.createObjectStore(SETTINGS,{keyPath:'key'})};
+  r.onblocked=()=>{setProgress('請關閉其他舊版系統分頁，再重新開啟。')};
   r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>{try{db.close()}catch(e){}dbPromise=null};resolve(db)};
   r.onerror=()=>{dbPromise=null;reject(r.error)};
  });
@@ -113,13 +118,110 @@ function openDb(){
 }
 async function put(row){
  rememberMemory(row);
+ const disk=mirrorSnapshot(row);
+ try{await putLocal(row);return true}catch(error){if(await disk)return true;throw error}
+}
+async function putLocal(row){
  const db=await openDb();
- return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(row);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)});
+ return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(row);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});
 }
 async function get(key){
  const cached=recallMemory(key);if(cached)return cached;
+ let row=null;
+ try{const db=await openDb();row=await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}catch(_){}
+ if(!row)row=await readFolderSnapshot(key);
+ if(row)rememberMemory(row);
+ return row;
+}
+
+// A folder is a read-cache mirror, never an upload queue or a source of cloud writes.
+// Only snapshots for the signed-in viewer and exact request key may be restored.
+async function folderSetting(value){
  const db=await openDb();
- return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>{const row=r.result||null;if(row)rememberMemory(row);resolve(row)};r.onerror=()=>reject(r.error)});
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(SETTINGS,value===undefined?'readonly':'readwrite'),s=tx.objectStore(SETTINGS);
+  if(value===undefined){const r=s.get('folder');r.onsuccess=()=>resolve(r.result?.handle||null);r.onerror=()=>reject(r.error)}
+  else{s.put({key:'folder',handle:value});tx.oncomplete=()=>resolve(true)}
+  tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ });
+}
+async function loadFolder(){
+ if(folderLoading)await folderLoading;
+ if(!folderLoaded){folderLoading=(async()=>{try{folderHandle=await folderSetting()}catch(_){}finally{folderLoaded=true;folderLoading=null}})();await folderLoading}
+ return folderHandle;
+}
+async function allowedFolder(){
+ const h=await loadFolder();if(!h)return null;
+ try{if(await h.queryPermission({mode:'readwrite'})==='granted')return h;
+  folderMessage='資料夾需要重新授權，請按「重新授權資料夾」';
+ }catch(_){folderMessage='資料夾暫時無法存取，請重新選擇'}
+ return null;
+}
+async function folderFilename(key){
+ const hash=await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(key));
+ return Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('')+'.json';
+}
+async function snapshotDirectory(handle,create=false){return handle.getDirectoryHandle('port79-snapshots-v1',{create})}
+function currentViewerRow(row){return !!token()&&row?.key?.startsWith(viewerKey()+'|')&&['api','system'].includes(row.kind)&&row.data&&Number.isFinite(row.savedAt)}
+function mirrorSnapshot(row){
+ // Serialize writes so an older response cannot finish after a newer snapshot.
+ const task=folderWrites.then(async()=>{
+  if(!currentViewerRow(row))return false;
+  const handle=await allowedFolder();if(!handle)return false;
+  const dir=await snapshotDirectory(handle,true),name=await folderFilename(row.key);
+  try{const old=JSON.parse(await(await(await dir.getFileHandle(name)).getFile()).text());if(old?.row?.key===row.key&&old.row.savedAt>row.savedAt)return true}catch(_){}
+  const file=await dir.getFileHandle(name,{create:true}),writer=await file.createWritable();
+  try{await writer.write(JSON.stringify({format:'port79-cache',version:1,row}));await writer.close()}
+  catch(error){try{await writer.abort()}catch(_){}throw error}
+  folderMessage='已連接：'+handle.name+'；讀取資料會自動保存至電腦';return true;
+ }).catch(error=>{folderMessage='資料夾保存失敗：'+String(error?.message||error);return false});
+ folderWrites=task;return task;
+}
+async function readFolderSnapshot(key){
+ if(!token()||!key.startsWith(viewerKey()+'|'))return null;
+ try{
+  const handle=await allowedFolder();if(!handle)return null;
+  const dir=await snapshotDirectory(handle),file=await(await dir.getFileHandle(await folderFilename(key))).getFile();
+  if(file.size>64*1024*1024)return null;
+  const doc=JSON.parse(await file.text()),row=doc?.row;
+  if(doc.format!=='port79-cache'||doc.version!==1||row?.key!==key||!currentViewerRow(row)||row.savedAt>Date.now()+60000)return null;
+  await putLocal(row).catch(()=>{});return row;
+ }catch(_){return null}
+}
+async function connectFolder(){
+ if(!token())throw new Error('請先登入系統');
+ if(typeof window.showDirectoryPicker!=='function')throw new Error('此裝置請使用「保留手機／瀏覽器資料」');
+ // Keep the picker as the first awaited operation to preserve user activation.
+ const selected=await window.showDirectoryPicker({id:'port79-cloud-cache',mode:'readwrite',startIn:'documents'});
+ folderHandle=selected;folderLoaded=true;
+ let remembered=true;try{await folderSetting(selected)}catch(_){remembered=false}
+ const rows=await all().catch(()=>[]);let saved=0,failed=0;
+ for(const row of rows)if(currentViewerRow(row)){if(await mirrorSnapshot(row))saved++;else failed++}
+ const writable=await allowedFolder();if(!writable)throw new Error(folderMessage);
+ if(failed)throw new Error('已連接資料夾，但有 '+failed+' 份快取保存失敗；請確認硬碟空間與權限');
+ folderMessage='已連接：'+selected.name+'；已保存 '+saved+' 份快取'+(remembered?'':'；此分頁關閉後需重新選擇');
+ return folderMessage;
+}
+async function reconnectFolder(){
+ const h=await loadFolder();if(!h)return connectFolder();
+ if(await h.requestPermission({mode:'readwrite'})!=='granted')throw new Error('尚未授權資料夾，仍使用瀏覽器快取');
+ folderMessage='已重新連接：'+h.name;return folderMessage;
+}
+async function disconnectFolder(){
+ await folderWrites;folderHandle=null;folderLoaded=true;
+ await folderSetting(null).catch(()=>{});folderMessage='已停止使用資料夾；硬碟檔案仍保留';return folderMessage;
+}
+async function retainDeviceData(){
+ const storage=window.navigator?.storage;
+ if(!storage?.persist) return '此瀏覽器未提供保留資料功能；仍可使用本機快取';
+ const granted=await storage.persist();
+ return granted?'已獲准保留本機資料；手動清除網站資料仍會刪除快取':'瀏覽器尚未同意保留；仍可使用快取，建議加入主畫面後再試';
+}
+async function deviceStatus(){
+ const h=await allowedFolder();
+ if(h&&(folderMessage==='尚未連接電腦資料夾'||folderMessage.startsWith('資料夾需要重新授權')))folderMessage='已連接：'+h.name;
+ let retained=false;try{retained=await window.navigator?.storage?.persisted?.()}catch(_){}
+ return {folderSupported:typeof window.showDirectoryPicker==='function',folder:folderMessage,retained:!!retained};
 }
 async function all(){
  const db=await openDb();
@@ -444,21 +546,29 @@ function ensureStyle(){if(document.getElementById('p79CacheStyle'))return;const 
 `;document.head.appendChild(s)}
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
- b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 資料快取中心</div><div class="p79-cache-sub">資料存於此瀏覽器 IndexedDB；不是公開 GitHub 資料。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載七大系統完整快取</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div id="p79CacheProgress" class="p79-cache-note">考勤／工時按「下載」會讀取全部考勤月份＋員工主檔，完成後直接套用畫面；其他系統依各自雲端資料建立本機快取。</div></div>`;
+ b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載七大系統完整快取</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div id="p79CacheProgress" class="p79-cache-note">考勤／工時按「下載」會讀取全部考勤月份＋員工主檔，完成後直接套用畫面；其他系統依各自雲端資料建立本機快取。</div></div>`;
  document.body.appendChild(b);b.querySelector('.p79-cache-close').onclick=()=>b.classList.remove('open');b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')});
  b.addEventListener('click',async e=>{const btn=e.target.closest('[data-cache-action]');if(!btn)return;const act=btn.dataset.cacheAction;const buttons=[...b.querySelectorAll('[data-cache-action]')];buttons.forEach(x=>x.disabled=true);try{
-   if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除本機快取。');await refreshModal()}}
+   if(act==='folder'){setProgress(await connectFolder());await refreshModal()}
+   if(act==='reconnect'){setProgress(await reconnectFolder());await refreshModal()}
+   if(act==='disconnect'){setProgress(await disconnectFolder());await refreshModal()}
+   if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
+   if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
    if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
    if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]).join('、'):''}`);await refreshModal()}
-  }catch(err){setProgress('❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
+  }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
 function setProgress(t){const e=document.getElementById('p79CacheProgress');if(e)e.textContent=t}
 async function refreshModal(){
+ const status=await deviceStatus(),el=document.getElementById('p79DeviceStatus');
+ if(el)el.textContent=(status.folderSupported?status.folder:'此裝置使用手機／瀏覽器內部快取')+'｜本機保留：'+(status.retained?'已獲准':'尚未獲准');
+ const folderButton=document.querySelector('[data-cache-action=folder]');if(folderButton)folderButton.hidden=!status.folderSupported;
+ const reconnectButton=document.querySelector('[data-cache-action=reconnect]');if(reconnectButton)reconnectButton.hidden=!status.folderSupported;
  const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=boundedManagementMemory()?await managementSystemMetadata():await all();const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
-window.Port79DataCache={openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 
