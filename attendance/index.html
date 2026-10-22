@@ -933,11 +933,25 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button>span.inline-flex{padding:4px 2px!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(12)>span{max-width:100%!important}
 </style>
-<style id="p79-attendance-single-line-toolbar">
-#attendanceRecordsToolbar{flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;padding-bottom:4px;scrollbar-width:thin}
-#attendanceRecordsToolbar>div{flex-wrap:nowrap!important;flex:0 0 auto!important;min-width:max-content!important}
-#attendanceRecordsToolbar [aria-label="異常顏色圖例"],#attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center;gap:4px;white-space:nowrap!important}
-#attendanceRecordsToolbar button,#attendanceRecordsToolbar select,#attendanceRecordsToolbar span{white-space:nowrap!important;flex-shrink:0}
+<style id="p79-attendance-responsive-toolbar">
+/* Keep the legend's intrinsic widths separate from the action buttons. */
+body[data-p79-system="attendance"] #attendanceRecordsToolbar{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:visible!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar>div{display:flex!important;flex-wrap:wrap!important;align-items:center;flex:initial!important;min-width:0!important;max-width:100%;gap:10px 12px!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar>div:last-child{justify-content:flex-start!important;padding-top:10px;border-top:1px solid var(--workspace-line,#dce6ef)}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar [aria-label="異常顏色圖例"]{display:block!important;flex:0 1 auto!important;min-width:0!important;max-width:100%}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar [aria-label="異常顏色圖例"] div{display:flex!important;flex-wrap:wrap!important;align-items:center;gap:5px 6px!important;min-width:0!important;max-width:100%;white-space:normal!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar .p79-anomaly-legend-host{padding:0!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar .p79-anomaly-legend-grid{display:flex!important;flex:0 1 auto!important;flex-wrap:wrap!important;width:auto!important;max-width:100%;min-width:0!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar [aria-label="異常顏色圖例"] span{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto!important;width:auto!important;max-width:100%;height:auto!important;min-height:24px!important;padding:3px 6px!important;box-sizing:border-box;font-size:12px!important;line-height:1.4!important;white-space:nowrap!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar .p79-anomaly-legend-title{padding-left:0!important}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar :is(button,select){flex:0 0 auto;max-width:100%;white-space:nowrap;box-sizing:border-box}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoadedStatus{flex:1 1 100%;white-space:normal;overflow-wrap:anywhere}
+body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoadedStatus:empty{display:none}
+@media(max-width:640px){
+ body[data-p79-system="attendance"] #attendanceRecordsToolbar>div:first-child>div:first-child{flex-wrap:wrap!important;max-width:100%;min-width:0}
+ body[data-p79-system="attendance"] #attendanceRecordsToolbar [aria-label="異常顏色圖例"]{flex-basis:100%!important}
+ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceMonthTabs{max-width:100%;flex-basis:100%}
+}
 </style>
 
 </head>
@@ -24441,7 +24455,7 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 </script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
-<script src="../assets/port79-missing-punch-login-preview.js?v=20261021-search"></script>
+<script src="../assets/port79-missing-punch-login-preview.js?v=20261022-toolbar"></script>
 </body>
 </html>
 

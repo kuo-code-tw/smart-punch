@@ -111,7 +111,8 @@ function init(){
   };
   dlg.showModal();dlg.addEventListener('close',()=>{generation++;snapshot=null;dlg.remove();},{once:true});
  });
- toolbar.appendChild(btn);
+ const actions=toolbar.querySelector(':scope > div:nth-child(2)');
+ (actions||toolbar).appendChild(btn);
 }
 g.P79MissingPunchSearch={timestamp,dateRange,shiftWindow,candidates,missingRows,filterRows,load};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
