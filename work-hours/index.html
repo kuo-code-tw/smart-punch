@@ -13090,13 +13090,15 @@ function p79OvertimePeriodLabel(report){
 
 
 function p79EmploymentStartDate(emp) {
-  const raw=String(emp?.reportingDate||emp?.startDate||'').trim();
-  const m=raw.match(/^(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/);
-  if(!m)return '';
-  let y=Number(m[1]);if(y<1911)y+=1911;
-  const month=Number(m[2]),day=Number(m[3]),check=new Date(y,month-1,day);
-  if(check.getFullYear()!==y||check.getMonth()!==month-1||check.getDate()!==day)return '';
-  return String(y).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  const dates=[emp?.startDate,emp?.reportingDate].map(value=>{
+    const m=String(value||'').trim().match(/^(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if(!m)return '';
+    let y=Number(m[1]);if(y<1911)y+=1911;
+    const month=Number(m[2]),day=Number(m[3]),check=new Date(y,month-1,day);
+    if(check.getFullYear()!==y||check.getMonth()!==month-1||check.getDate()!==day)return '';
+    return String(y).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  }).filter(Boolean).sort();
+  return dates.at(-1)||'';
 }
 function p79EmployeeDateEligible(emp,date) {
   const start=p79EmploymentStartDate(emp);
