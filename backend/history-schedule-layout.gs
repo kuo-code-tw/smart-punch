@@ -36,7 +36,7 @@ function p79HistoryBackupScheduleView_(file,source,month){
   const range=view.getRange(1,1,values.length,width);range.setNumberFormat('@').setValues(values);
   SpreadsheetApp.flush();
   if(JSON.stringify(range.getValues().map(function(r){return r.map(String);}))!==JSON.stringify(values))throw Error('班表版面讀回核對失敗，未標記備份完成');
-  view.getRange(1,1,1,width).merge().setBackground('#17365d').setFontColor('#ffffff').setFontSize(16);
+  view.getRange(1,1,1,width).setBackground('#17365d').setFontColor('#ffffff').setFontSize(16);
   view.getRange(2,1,1,width).setBackground('#dbeafe').setFontWeight('bold');
   const color=function(v){return v==='早'?'#d1fae5':v==='中'?'#fef3c7':v==='晚'?'#ede9fe':/^[例休國]$/.test(v)?'#ffedd5':/^(代|延|休\d|例\d|國\d)/.test(v)?'#cffafe':/^[年事病公喪婚產檢陪顧經安傷訂假離]/.test(v)?'#fee2e2':'#ffffff';};
   if(report.rows.length)view.getRange(3,1,report.rows.length,width).setBackgrounds(data.slice(1).map(function(row){return row.map(function(v,i){return i<5?'#f8fafc':color(String(v));});}));
