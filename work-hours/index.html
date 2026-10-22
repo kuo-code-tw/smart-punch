@@ -6,6 +6,7 @@
 <script src="../assets/port79-rest-allocation.js?v=20261021-substitute-rest"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261021-schedule-pending"></script>
+<script src="../assets/port79-overtime-status.js?v=20261022-live"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -1264,6 +1265,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <span>🔎</span>
                         <span class="text-xs font-bold text-slate-700 dark:text-slate-200">加班統計篩選</span>
                         <span id="overtimeFilterResultCount" class="text-[10px] text-slate-400 dark:text-slate-500"></span>
+                        <button type="button" onclick="P79OvertimeStatus.open()" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">已申報／撤銷紀錄</button>
                     </div>
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">出勤加班／已申報／已安排代班</option><option value="arranged">已申報／已安排代班</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
@@ -15270,6 +15272,33 @@ window.p79MonthlyRestContext={
 </script>
 
 <script>
+window.p79OvertimeStatusContext={
+ canOpen:p79CanExportOvertimeApplication,canRevoke:p79CanDeleteOvertime,
+ account:()=>String(currentEmp?.empId||'')+'|'+getActiveGasUrl(),session:currentPort79SsoToken,
+ employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),
+ snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
+ balance:(emp,roster,month,snapshot)=>P79MonthlyRest.balance(emp,roster,month,snapshot),
+ refresh:()=>{p79WorkOvertimeMonths.clear();p79OvertimeCalculationCache=null;renderOvertimeStats();},
+ revoke:async function(row,snapshot){
+  const token=currentPort79SsoToken(),month=row.date.slice(0,7),clientId='quota-revoke-'+crypto.randomUUID();
+  if(!token||!p79CanDeleteOvertime()||snapshot?.saveContext?.token!==token)throw Error('登入或撤銷權限已變更');
+  if(snapshot.saveContext.cloud.overtimeRevocationVersion!==1)throw Error('雲端尚未開放保留紀錄的撤銷');
+  const rpc=async(action,payload=null)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),60000);try{
+   const url=new URL(getActiveGasUrl());let options={cache:'no-store',signal:ctl.signal};
+   if(payload)options={...options,method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action,token,gcToken:token,scheduleClientId:clientId})};
+   else{url.searchParams.set('action',action);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('month',month);url.searchParams.set('_',Date.now());}
+   const response=await P79OvertimeStatus.fetch(url.toString(),options),data=await response.json();if(!response.ok||data.ok!==true||data.queued===true)throw Error(data.error||'雲端未確認完成');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取核對');return data;
+  }finally{clearTimeout(timer)}};
+  let acquired=false;try{
+   const lease=await rpc('scheduleAcquireEditLock',{});if(!lease.mine)throw Error('班表正由其他人編輯，未撤銷');acquired=true;
+   const latest=await rpc('getScheduleDataSecure');if(latest.overtimeRevocationVersion!==1||latest.revision!==snapshot.saveContext.cloud.revision)throw Error('班表或請假資料已更新，未撤銷，請重新讀取');
+   const saved=latest.schedules?.find(r=>String(r.empId).toUpperCase()===String(row.empId).toUpperCase())?.schedule?.__meta?.[row.date]?.overtimeReport;
+   if(!saved||saved.id!==row.id||JSON.stringify(saved)!==JSON.stringify(row.report))throw Error('原申報已變更，未撤銷');
+   if(!p79CanDeleteOvertime())throw Error('撤銷權限已變更');
+   return await rpc('deleteOvertimeAssignment',{empId:row.empId,date:row.date,expectedReportId:row.id,reason:'rest_quota_excess',expectedRevision:latest.revision});
+  }finally{if(acquired)try{await rpc('scheduleReleaseEditLock',{});}catch(ignore){}}
+ }
+};
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
 <script src="../assets/port79-overtime-application.js?v=20261021-all-roles-rest"></script>
