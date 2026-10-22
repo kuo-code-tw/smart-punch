@@ -11419,9 +11419,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const date=attendanceRowDateIso(row);
             const employee=findEmployeeForAttendanceIdentity(row,getAdminVisibleEmployees());
             if(!employee?.empId || !/^\d{4}-\d{2}-\d{2}$/.test(date))return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
-            if(typeof P79Overtime?.openReport!=='function')return showToast('加班申報功能尚未載入，請重新整理', 'warning');
+            if(typeof window.P79Overtime?.openReport!=='function')return showToast('加班申報功能尚未載入，請重新整理', 'warning');
             // 不預選加班類型／申報時數，使用者須於正式申報視窗核對時段與換算規則。
-            P79Overtime.openReport({
+            window.P79Overtime.openReport({
                 empId:String(employee.empId),date,requirePeriodSelection:true,
                 periodHint:'已帶入 '+String(employee.name||row.name||'')+' 的 '+date+' 出勤班次。請核對加班類型、出勤時段與換算時數後再儲存；跨日班次以簽到日歸屬。'
             });
