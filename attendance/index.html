@@ -1158,6 +1158,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                         <select id="empScheduleMonthSelect" onchange="p79LoadMyScheduleFromCloud(currentEmp,this.value).catch(()=>{});renderEmployeeSchedule(currentEmp)" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200">
                             <option value="">本月</option>
                         </select>
+                        <div id="empScheduleCloudStatus" role="status" aria-live="polite" class="text-xs text-slate-500 mt-2">登入後會讀取你的當月班表</div>
                     </div>
 
                     <div id="empScheduleSummaryStats" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -8658,12 +8659,23 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function p79LoadMyScheduleFromCloud(emp,month) {
             const empId=String(emp?.empId||'').trim().toUpperCase();
             if(!empId||!/^\d{4}-\d{2}$/.test(month))return false;
-            const token=currentPort79SsoToken();
-            if(!token)return false;
+            const token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
+            const status=document.getElementById('empScheduleCloudStatus');
+            const reportStatus=(message,type='info')=>{
+                if(!status)return;
+                status.textContent=message;
+                status.classList.remove('hidden','text-rose-700','text-emerald-700','text-slate-500');
+                status.classList.add(type==='error'?'text-rose-700':type==='ok'?'text-emerald-700':'text-slate-500');
+            };
+            if(!token){
+                reportStatus('尚未取得雲端登入憑證，請從首頁重新登入後再讀取班表。','error');
+                return false;
+            }
             const key=empId+'|'+month;
             if(p79EmployeeRosterPending.has(key))return p79EmployeeRosterPending.get(key);
             if(Date.now()-(p79EmployeeRosterCheckedAt.get(key)||0)<60000)return !!(schedules||[]).some(row=>String(row?.empId||'').trim().toUpperCase()===empId && Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')));
             p79EmployeeRosterCheckedAt.set(key,Date.now());
+            reportStatus('正在讀取 '+month+' 班表…');
             const job=(async()=>{
                 const controller=new AbortController();
                 const timer=setTimeout(()=>controller.abort(),15000);
@@ -8671,7 +8683,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const url=getActiveGasUrl()+'?action=getScheduleDataSecure&month='+encodeURIComponent(month)+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now();
                     const res=await fetch(url,{cache:'no-store',signal:controller.signal,redirect:'follow'});
                     const data=await res.json();
-                    if(!data?.ok||!Array.isArray(data.schedules))throw Error(data?.error||'未取得班表');
+                    if(!data?.ok||!Array.isArray(data.schedules))throw Error(data?.error||'雲端未回傳班表資料');
                     // Never cache other employees' schedules inside a punch-only session.
                     const own=data.schedules.filter(row=>String(row?.empId||'').trim().toUpperCase()===empId);
                     if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId){
@@ -8681,8 +8693,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         const note=document.getElementById('empScheduleTodayNote');
                         if(!own.length&&note)note.textContent='雲端尚無此月份班表，請管理員核對排班是否已儲存';
                     }
+                    reportStatus(own.length?('已載入 '+month+' 我的班表'):'雲端未找到此員工該月份班表，請核對排班系統是否已儲存。',own.length?'ok':'error');
                     return own.length>0;
                 } catch(e) {
+                    reportStatus('班表讀取失敗：'+String(e?.message||e||'未知錯誤').slice(0,110),'error');
                     const note=document.getElementById('empScheduleTodayNote');
                     if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId&&note&&!employeeScheduleMap(emp)[scheduleDateKey(new Date())])
                         note.textContent='班表讀取失敗，請檢查網路或班表存取權限';
