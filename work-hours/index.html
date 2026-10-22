@@ -12597,7 +12597,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
-                const state={...(previous?.token===token?previous:{}),token,at:Date.now(),pending:true,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[]};p79WorkOvertimeMonths.set(month,state);
+                const state={token,at:Date.now(),pending:true,ready:false,revision:null,rows:[],covers:[],leaveRecords:[],attendanceEvidence:null,error:'',restEvidenceError:''};p79WorkOvertimeMonths.set(month,state);
                 const load=async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
@@ -12710,8 +12710,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }
                 p79WorkOvertimeMonths.delete(month);p79OvertimeCalculationCache=null;
                 p79LoadWorkOvertimeMonths(records,month);
+                const refreshed=p79WorkOvertimeMonths.get(month);
+                await refreshed?.promise;
+                if(!refreshed?.ready||refreshed.error)throw Error('已確認刪除，但重新同步失敗：'+(refreshed?.error||'班表未讀取完成'));
+                p79OvertimeCalculationCache=null;
                 renderOvertimeStats();
-                alert('已由雲端確認刪除，加班與連動班表正重新載入。');
+                alert('已由雲端確認刪除，並完成正式班表重新同步。');
             }catch(error){
                 const message=String(error?.message||error);
                 const oldState=p79WorkOvertimeMonths.get(month);
