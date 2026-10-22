@@ -852,6 +852,28 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  #adminContentOvertime .p79-overtime-metrics>div:last-child{grid-column:span 2}
 }
 </style>
+
+<style id="p79-overtime-table-medium-font-20261022">
+/* Comfortable desktop table typography; override former oversized 16/18px rules. */
+#adminContentOvertime #p79OvertimeStatsTable,
+#adminContentOvertime #p79OvertimeStatsTable th,
+#adminContentOvertime #p79OvertimeStatsTable td{
+ font-size:13px!important;line-height:1.4!important;
+}
+#adminContentOvertime #p79OvertimeStatsTable td[data-label="姓名"]{
+ font-size:14px!important;font-weight:700!important;
+}
+#adminContentOvertime #p79OvertimeStatsTable :is(.text-xs,.text-sm,button,span){
+ font-size:12px!important;line-height:1.35!important;
+}
+#adminContentOvertime #p79OvertimeStatsTable th{font-weight:700!important}
+#adminContentOvertime #p79OvertimeStatsTable :is(th,td){padding-top:8px!important;padding-bottom:8px!important}
+@media(max-width:640px){
+ #adminContentOvertime #p79OvertimeStatsTable,
+ #adminContentOvertime #p79OvertimeStatsTable th,
+ #adminContentOvertime #p79OvertimeStatsTable td{font-size:12px!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
