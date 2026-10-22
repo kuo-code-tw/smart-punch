@@ -5198,22 +5198,57 @@ async function p79SaveScheduleOvertimeDraft(draft){
       renderRoleScheduleView();renderTodaySchedulePanel();
     }
 
-    function clearSubstituteAssignment() {
-      if (!requireScheduleEditLock()) return;
-      const empId = String(document.getElementById('substitute-worker-emp')?.value || document.getElementById('substitute-cover-emp-id')?.value || '').trim().toUpperCase();
-      const dayStr = String(document.getElementById('substitute-date-key')?.value || '').trim();
-      const meta=monthlyScheduleMeta[empId]?.[dayStr];
-      if(meta?.overtimeAssignedShift && monthlyScheduleData[empId]?.[dayStr]===meta.overtimeAssignedShift && meta.overtimeOriginalShift!==undefined)
-        monthlyScheduleData[empId][dayStr]=meta.reportOriginalShift??meta.overtimeOriginalShift;
-      if (monthlyScheduleMeta[empId] && monthlyScheduleMeta[empId][dayStr]) {
-        const kept={};if(meta?.overtimeReport)for(const k of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])if(meta[k]!==undefined)kept[k]=meta[k];
-        if(kept.restCategory)kept.restQuotaOvertime=['早','中','晚'].includes(monthlyScheduleData[empId]?.[dayStr]);
-        if(Object.keys(kept).length)monthlyScheduleMeta[empId][dayStr]=kept;else delete monthlyScheduleMeta[empId][dayStr];
-      }
-      queueScheduleCloudSave();
-      closeSubstituteAssignment();
-      renderRoleScheduleView();
-      renderTodaySchedulePanel();
+    // Cancel the linked overtime in the authoritative cloud store, not only local __meta.
+    async function clearSubstituteAssignment() {
+      if (!requireScheduleEditLock() || p79OvertimeShiftEditBusy) return;
+      const empId=String(document.getElementById('substitute-worker-emp')?.value || document.getElementById('substitute-cover-emp-id')?.value || '').trim().toUpperCase();
+      const dayStr=String(document.getElementById('substitute-date-key')?.value || '').trim();
+      if(!empId||!/^\d{4}-\d{2}-\d{2}$/.test(dayStr)){alert('請先選擇要取消的員工與日期');return;}
+      if(!confirm('確定取消此人當日加班／代班？將同步刪除雲端相關申報，保留原始打卡紀錄。'))return;
+      p79OvertimeShiftEditBusy=true;
+      try {
+        if(!await flushSchedulePendingWrites())throw Error('尚有班表修改未儲存，無法安全刪除');
+        await runScheduleCloudWrite(async()=>{
+          const month=dayStr.slice(0,7),token=currentPort79SsoToken();
+          const read=async()=>{
+            const response=await scheduleLockFetch(GAS_URL+'?action=getScheduleDataSecure&month='+month+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+            const data=await response.json();
+            if(!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'無法核對雲端班表');
+            return data;
+          };
+          const before=await read();
+          if(!before.overtimeLinkedDelete||!before.revision)throw Error('雲端尚未支援加班連動刪除，未修改本機資料');
+          const result=await cloudPost({action:'deleteOvertimeAssignment',empId,date:dayStr,expectedRevision:before.revision,scheduleClientId:getScheduleClientId()});
+          if(result?.ok===false)throw Error(result.error||'雲端刪除失敗');
+          const after=await read();
+          const affected=new Set(result?.affectedEmployeeIds||[empId]);affected.add(empId);
+          for(const id of affected){
+            const row=after.schedules.find(r=>String(r.empId).trim().toUpperCase()===String(id).trim().toUpperCase());
+            if(!row)throw Error('雲端刪除後找不到相關員工班表');
+            const meta=row.schedule?.__meta?.[dayStr]||{};
+            if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.restQuotaOvertime)throw Error('雲端仍存在加班／代班申報，刪除未通過核對');
+          }
+          for(const id of affected){
+            const row=after.schedules.find(r=>String(r.empId).trim().toUpperCase()===String(id).trim().toUpperCase());
+            if(!monthlyScheduleData[id])monthlyScheduleData[id]={};
+            if(!monthlyScheduleMeta[id])monthlyScheduleMeta[id]={};
+            if(row.schedule?.[dayStr]!==undefined)monthlyScheduleData[id][dayStr]=row.schedule[dayStr];
+            else delete monthlyScheduleData[id][dayStr];
+            const meta=row.schedule?.__meta?.[dayStr];
+            if(meta)monthlyScheduleMeta[id][dayStr]={...meta};
+            else delete monthlyScheduleMeta[id][dayStr];
+          }
+          leaveCoverAssignments=after.leaveCoverAssignments||[];
+          return true;
+        });
+        closeSubstituteAssignment();
+        renderRoleScheduleView();
+        renderTodaySchedulePanel();
+        alert('加班／代班已從雲端刪除，並完成讀回核對；原始打卡保留。');
+      } catch(error){
+        alert('無法確認雲端已刪除：'+(error?.message||error)+'。請重新讀取班表核對，系統不會假裝刪除成功。');
+        renderRoleScheduleView();
+      } finally {p79OvertimeShiftEditBusy=false;}
     }
 
     function getSubstituteRecommendation(unitRole, targetEmpId, dayStr) {
