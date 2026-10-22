@@ -15274,7 +15274,7 @@ window.p79MonthlyRestContext={
 <script>
 window.p79OvertimeStatusContext={
  canOpen:p79CanExportOvertimeApplication,canRevoke:p79CanDeleteOvertime,
- account:()=>String(currentEmp?.empId||'')+'|'+currentPort79SsoToken()+'|'+getActiveGasUrl(),
+ account:()=>String(currentEmp?.empId||'')+'|'+getActiveGasUrl(),session:currentPort79SsoToken,
  employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),
  snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
  balance:(emp,roster,month,snapshot)=>P79MonthlyRest.balance(emp,roster,month,snapshot),
