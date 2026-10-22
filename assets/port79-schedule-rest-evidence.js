@@ -11,7 +11,7 @@ function create(ctx){
  function status(month){const s=states.get(month);return s?.token===ctx.token()?s:{pending:false,error:'',evidence:{complete:false,days:{}}};}
  function refresh(month){
   const token=ctx.token();if(!token)return Promise.resolve(null);const prior=states.get(month);if(prior?.token===token&&prior.pending)return prior.promise;
-  const state={token,pending:true,error:'',evidence:{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
+  const state={token,pending:true,error:'',evidence:prior?.token===token&&prior.evidence?.complete===true?prior.evidence:{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
   state.promise=(async()=>{try{
    const batches=await Promise.all(months(month).map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
    const records=new Map();for(const batch of batches)for(const r of batch){if(!Number.isFinite(ctx.timestamp(r)))throw Error('出勤時間無效，不能判定整班無卡');const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);records.set(key,r);}
