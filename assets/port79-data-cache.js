@@ -440,7 +440,12 @@ window.p79EnsureXlsx=p79EnsureXlsx;
 
 function buildUrl(action,params={}){
  const base=gasUrl();if(!base)throw new Error('找不到 Google Apps Script 網址');
- const u=new URL(base);u.searchParams.set('action',action);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});u.searchParams.set('_',Date.now());return u.toString();
+ const u=new URL(base);u.searchParams.set('action',action);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});
+ // Downloads use nativeFetch, so they do not pass through the fetch auth wrapper.
+ if(u.origin==='https://script.google.com'&&u.pathname.startsWith('/macros/s/')&&!['token','userToken','gcToken','adminToken'].some(k=>String(u.searchParams.get(k)||'').trim())){
+  const t=token();if(t)u.searchParams.set('token',t);
+ }
+ u.searchParams.set('_',Date.now());return u.toString();
 }
 async function fetchJson(action,params={},sys=''){
  const url=buildUrl(action,params);const c=new AbortController();const to=setTimeout(()=>c.abort(),30000);
@@ -470,32 +475,35 @@ async function downloadAttendanceDatabase(targetSys='attendance',onProgress){
  const t=token();
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  onProgress?.('attendance',0,1,'catalog','讀取月份清單');
- const catalog=await fetchJson('getAttendanceMonths',{},'');
+ const catalog=await fetchJson('getAttendanceMonths',{token:t},'');
+ if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
  const months=[...new Set((Array.isArray(catalog?.months)?catalog.months:[]).filter(m=>/^\d{4}-\d{2}$/.test(String(m))))].sort();
  if(!months.length)months.push(ymNow());
 
  onProgress?.('attendance',0,months.length+1,'master','讀取員工主檔');
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'');
- const employees=Array.isArray(master?.employees)?master.employees:[];
+ if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
+ const employees=master.employees;
 
  let allRecords=[];const monthStats=[];
  for(let i=0;i<months.length;i++){
   const month=months[i];
   onProgress?.('attendance',i+1,months.length,'month',`讀取 ${month}`);
   try{
-   const d=await fetchJson('getAttendanceMonthData',{month},'');
-   let rows=Array.isArray(d?.records)?d.records:[];
-   try{
-    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
-    const directRows=Array.isArray(direct?.records)?direct.records:[];
-    if(directRows.length)rows=mergeAttendanceRows(rows.concat(directRows));
-   }catch(e){}
+   const d=await fetchJson('getAttendanceMonthData',{month,token:t},'');
+   if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
+   let rows=d.records;
+   const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
+   if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
+   if(direct.records.length)rows=mergeAttendanceRows(rows.concat(direct.records));
    allRecords=mergeAttendanceRows(allRecords.concat(rows));
    monthStats.push({month,count:rows.length,ok:true});
   }catch(e){
    monthStats.push({month,count:0,ok:false,error:String(e?.message||e)});
   }
  }
+ const failedMonths=monthStats.filter(x=>!x.ok);
+ if(failedMonths.length)throw new Error('考勤／工時未完整下載：'+failedMonths.map(x=>x.month+'（'+x.error+'）').join('、')+'；已保留原有完整快取，請重試');
  const snapshot={
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
   generatedAt:Date.now(),months,monthStats,records:allRecords,employees,
@@ -523,15 +531,16 @@ async function downloadSystem(sys,onProgress){
 }
 async function downloadAll(onProgress){
  const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
- let attendanceSnapshot=null;
+ let attendanceSnapshot=null,attendanceError=null;
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];onProgress?.(sys,i,systems.length,'loading');
   try{
    if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`));
+   else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else await downloadSystem(sys);
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
-  }catch(e){result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
+  }catch(e){if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
  return result;
@@ -555,7 +564,7 @@ function ensureModal(){
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
    if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
-   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]).join('、'):''}`);await refreshModal()}
+   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
   }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
