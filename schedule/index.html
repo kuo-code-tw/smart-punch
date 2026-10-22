@@ -4710,14 +4710,14 @@ function p79EmployeeDateEligible(emp,date) {
         html += `
           <button type="button" onclick="switchRoleTab('EMP_MGMT',event)" class="px-4 py-2 text-sm font-bold rounded-xl shadow-md transition flex items-center gap-2 bg-purple-600 text-white border border-purple-600">
             <i class="fa-solid fa-users-gear"></i>
-            <span>👥 人員與固定班別鎖定</span>
+            <span>🔄 人員調動／支援</span>
           </button>
         `;
       } else {
         html += `
           <button type="button" onclick="switchRoleTab('EMP_MGMT',event)" class="px-4 py-2 text-sm font-bold transition flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white shadow-sm">
             <i class="fa-solid fa-users-gear"></i>
-            <span>👥 人員與固定班別鎖定</span>
+            <span>🔄 人員調動／支援</span>
           </button>
         `;
       }
@@ -5890,7 +5890,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td class="py-3 px-4 font-mono font-bold text-indigo-600">${emp.id}</td>
             <td class="py-3 px-4 font-bold text-slate-800">${emp.name}</td>
             <td class="py-3 px-4">
-              <select onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="px-2 py-1 border border-purple-300 rounded-lg text-xs font-bold text-purple-700 bg-purple-50">
+              <select id="p79-transfer-role-${emp.id}" aria-label="${emp.name} 調動單位／支援" onchange="updateEmpRoleAndResort('${emp.id}', this.value)" class="px-2 py-1 border border-purple-300 rounded-lg text-xs font-bold text-purple-700 bg-purple-50">
                 ${getRoleOptionsHtml(emp.role)}
               </select>
             </td>
@@ -5910,7 +5910,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <button type="button" data-schedule-edit="1" onpointerdown="scheduleDragHandlePointerDown(event,'${emp.id}')" class="p79-drag-handle w-8 h-8 inline-flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black rounded-lg border border-indigo-200 transition touch-none cursor-grab active:cursor-grabbing" title="按住拖曳調整人員順序">
                 <i class="fa-solid fa-grip-vertical"></i>
               </button>
-              <button onclick="openEditModal('${emp.id}')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition text-xs flex items-center gap-1">
+              <button type="button" data-schedule-edit="1" onclick="document.getElementById('p79-transfer-role-${emp.id}')?.focus()" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold rounded-lg border border-purple-200 text-xs" title="從左側單位下拉選擇調動目的地">🔄 調動</button>
+               <button onclick="openEditModal('${emp.id}')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition text-xs flex items-center gap-1">
                 <i class="fa-solid fa-pen-to-square"></i> 編輯
               </button>
               <button onclick="deleteEmployee('${emp.id}')" class="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg transition text-xs flex items-center gap-1">
@@ -5933,7 +5934,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <i class="fa-solid fa-users-gear text-purple-600"></i> 人員名冊（來源：人資管理系統人員主檔）與排班設定
               </h2>
-              <p class="text-xs text-slate-500 mt-1">人員基本資料由人資管理系統人員主檔統一維護；可用 ↑／↓ 調整同單位同組別的人員顯示與輪班順序，順序會儲存在目前月份班表。</p>
+              <p class="text-xs text-slate-500 mt-1">調動人員請在「調動單位／支援」欄選擇目的單位，再按「儲存變更」同步雲端；也可用 ↑／↓ 調整同單位同組別的人員順序，順序會儲存在目前月份班表。</p>
               <div class="flex flex-wrap items-center gap-2 mt-3">
                 <span class="text-xs font-bold text-slate-500"><i class="fa-solid fa-filter text-purple-500"></i> 按職稱撈取：</span>
                 ${roleFilterBtnsHtml}
@@ -5968,7 +5969,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   <th class="py-3 px-4 w-12">#</th>
                   <th onclick="handleMgmtSort('id')" class="py-3 px-4 cursor-pointer hover:bg-slate-200 transition">工號/考勤號 ${getSortIcon('id')}</th>
                   <th onclick="handleMgmtSort('name')" class="py-3 px-4 cursor-pointer hover:bg-slate-200 transition">姓名 ${getSortIcon('name')}</th>
-                  <th onclick="handleMgmtSort('role')" class="py-3 px-4 cursor-pointer hover:bg-slate-200 transition">所屬單位/支援 ${getSortIcon('role')}</th>
+                  <th onclick="handleMgmtSort('role')" class="py-3 px-4 cursor-pointer hover:bg-slate-200 transition">調動單位／支援 ${getSortIcon('role')}</th>
                   <th onclick="handleMgmtSort('group')" class="py-3 px-4 cursor-pointer hover:bg-slate-200 transition">組別標籤 ${getSortIcon('group')}</th>
                   <th class="py-3 px-4">排班鎖定屬性</th>
                   <th class="py-3 px-4 w-56">順序／管理操作</th>
