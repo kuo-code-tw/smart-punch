@@ -9222,7 +9222,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // 此時「本機以前驗證過」的 localStorage 旗標不得再放行，
             // 否則員工永遠不會再看到綁定視窗，系統還會偷偷重新自動綁定。
             if (!savedDeviceId) {
-                try { localStorage.removeItem(getFirstPunchVerificationKey(emp)); } catch (e) {}
+                if(!emp.sessionFallback){try { localStorage.removeItem(getFirstPunchVerificationKey(emp)); } catch (e) {}}
                 return false;
             }
 
@@ -9807,6 +9807,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         // 手機快速打卡：已綁定且本機裝置一致時，不再每次打卡前等待完整 getData。
         // 首次綁定仍交由 GAS setEmployeeDevice 驗證，避免兩支手機搶綁。
+        async function p79RefreshPunchDeviceFromMaster() {
+            const employee=currentEmp,empId=String(employee?.empId||'').trim().toUpperCase();
+            if(!window.P79PunchDeviceState)throw Error('手機驗證元件尚未載入，請重新整理');
+            const master=await window.P79PunchDeviceState.read(employee);
+            if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId)throw Error('登入身分已變更，請重試');
+            currentEmp=normalizeEmployeeIdentifiers({...employee,...master,sessionFallback:false,masterTemporarilyUnavailable:false});
+            const local=employees.find(e=>String(e.empId||'').trim().toUpperCase()===empId);
+            if(local)Object.assign(local,currentEmp);else employees.push({...currentEmp});
+            saveEmployees();savePersistentEmployeeSession(currentEmp);return true;
+        }
+
         async function verifyAndBindCurrentDevice() {
             if (!currentEmp) return false;
             const empId = String(currentEmp.empId || '').trim().toUpperCase();
@@ -9858,28 +9869,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return true;
             }
 
-            // 第一次使用這支手機才需要等待一次雲端綁定確認。
-            if (sysConfig.gasUrl) {
-                try {
-                    const payload = { action: 'setEmployeeDevice', empId, deviceId: currentDeviceId };
-                    const result = await performCloudRequest(payload, 12000);
-                    if (!result?.ok) {
-                        showToast('手機綁定失敗：' + (result?.error || '雲端拒絕綁定'), 'warning');
-                        return false;
-                    }
-                } catch (error) {
-                    showToast('第一次手機綁定需要連上雲端，目前連線失敗，請稍後再試', 'warning');
-                    return false;
-                }
+            // A missing deviceId on a fallback is unknown, not an unbound phone.
+            // Read the employee's own binding before considering any binding write.
+            if(currentEmp.sessionFallback){
+                try{await p79RefreshPunchDeviceFromMaster();return verifyAndBindCurrentDevice();}
+                catch(error){showToast('手機綁定狀態尚未核對完成：'+String(error?.message||error)+'。請保留此頁，按打卡重試。','warning');return false;}
             }
-
-            currentEmp.deviceId = currentDeviceId;
-            const localEmp = employees.find(emp => String(emp.empId || '').trim().toUpperCase() === empId);
-            if (localEmp) localEmp.deviceId = currentDeviceId;
-            saveEmployees();
-            markFirstPunchVerifiedLocally(currentEmp);
-            savePersistentEmployeeSession(currentEmp);
-            return true;
+            openFirstPunchVerifyModal(pendingFirstPunchStatus||'上班簽到');
+            return false;
         }
 
 
@@ -9981,9 +9978,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const fallbackEmpId = String(currentEmp.empId || '').trim().toUpperCase();
 
                     try {
-                        await preloadAttendanceEmployeeMaster(false, true);
-                    } catch (e) {
-                        console.debug('打卡前員工主檔快速補齊失敗：', e);
+                        await p79RefreshPunchDeviceFromMaster();
+                    } catch (error) {
+                        showToast('手機綁定狀態尚未核對完成：'+String(error?.message||error)+'。請保留此頁，按打卡重試。','warning');
+                        releasePunchGuard();return;
                     }
 
                     const fullEmp = (Array.isArray(employees) ? employees : []).find(emp =>
@@ -10055,7 +10053,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             currentEmp = normalizeEmployeeIdentifiers(fallback);
                             currentEmp.sessionFallback = true;
                             currentEmp.masterTemporarilyUnavailable = true;
-                            showToast('已使用目前登入身分繼續驗證，員工主檔正在背景補抓。', 'warning');
+                            console.debug('員工主檔正在背景補抓，保留目前登入身分。');
 
                             setTimeout(async () => {
                                 try { await preloadAttendanceEmployeeMaster(false, true); }
@@ -21679,6 +21677,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 </script>
 
 
+<script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
 <script id="p79-attendance-v5-clean-core">
 (function(){
 'use strict';
