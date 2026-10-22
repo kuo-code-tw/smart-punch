@@ -3,6 +3,7 @@ const h=fs.readFileSync('history-data/index.html','utf8');
 const context={Date,recordTime:r=>r.timeStr||'',historyLoaded:null};vm.createContext(context);
 vm.runInContext(h.slice(h.indexOf('function historyExcelColumns('),h.indexOf('function historySaveExcel(')),context);
 a.deepEqual(Array.from(context.historyExcelColumns('attendance'),x=>x[1]),['考勤號','工號','姓名','部門','職稱','考勤時間','出勤狀態','地點','備註']);
+const punches=[{timeStr:'2026/10/21 6:48:00'},{timeStr:'2026/10/22 07:41:00'}],punchBefore=JSON.stringify(punches),exportRows=context.historyWorkbookRows('attendance',punches);a.equal(exportRows[1][5],'2026/10/22 07:41');a.equal(exportRows[2][5],'2026/10/21 06:48');a.equal(JSON.stringify(punches),punchBefore);
 const raw={vessel:'TEST SHIP',voyageE:'V1',load:0,disc:178,ttlCtnr:178,sheetHatches:2,shipGph:12.5},before=JSON.stringify(raw);
 const row=context.historyNormalizeExcelRow(raw,'vessel');a.equal(row.vesselName,'TEST SHIP');a.equal(row.load,0);a.equal(row.totalContainers,178);a.equal(row.hatches,2);a.equal(row.gph,12.5);a.equal(JSON.stringify(raw),before);a.equal(context.historyExcelColumns('vessel').length,17);a.equal(context.historyWorkbookRows('vessel',[raw])[1].length,17);a.throws(()=>context.historyNormalizeExcelRow({load:-2181571200000},'vessel'),/數量異常/);
 a(h.includes("historyLoaded={type:'vessel',month,rows,records}"));a(h.includes("Object.keys(r)"));a(h.includes("book_append_sheet(wb,detailSheet,'作業明細')"));
