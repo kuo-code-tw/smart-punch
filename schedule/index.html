@@ -29,7 +29,7 @@
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261021-no-punch-roster"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261022-rest-review"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -3448,6 +3448,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
       port79ScheduleAutoSyncTimer = setInterval(() => {
         if (document.visibilityState === 'visible') {
+          p79RefreshScheduleRestEvidence();
           loadScheduleCloudWithRetry('timer', 2);
         }
       }, 60000);
@@ -3459,6 +3460,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         if (scheduleResumeSyncTimer) clearTimeout(scheduleResumeSyncTimer);
         scheduleResumeSyncTimer = setTimeout(() => {
           scheduleResumeSyncTimer = null;
+          p79RefreshScheduleRestEvidence();
           if (!port79ScheduleAutoSyncBusy) loadScheduleCloudWithRetry(reason, 2);
         }, 450);
       };
@@ -6058,6 +6060,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
         read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
         update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?'出勤核對中…':state.error?'出勤未完成核對：'+state.error:'';if(!state.pending)renderRoleScheduleView();}
       });return p79ScheduleRestEvidenceClient;
+    }
+    function p79RefreshScheduleRestEvidence() {
+      const month=currentScheduleMonthKey();
+      if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return;
+      // 出勤核對獨立於班表同步；編輯鎖或尚未儲存的班表不應阻止晚班結束後核對。
+      return p79ScheduleRestClient().refreshIfStale(month);
     }
     function p79ScheduleRestBalance(emp,month,allocated=null) {
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
