@@ -1,9 +1,6 @@
-Warning: truncated output (original token count: 15110)
-Total output lines: 300
-
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-special-overtime"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-overtime-delete-sync"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261023-custom-type-visible"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261021-substitute-rest"></script>
@@ -12726,6 +12723,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!fresh?.ok||!Array.isArray(fresh.schedules))throw Error('刪除指令已送出，但最新班表讀回失敗，請重新整理核對');
                 const remaining=fresh.schedules.find(r=>String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase())?.schedule?.__meta?.[date];
                 if(remaining?.overtimeReport||remaining?.overtime)throw Error('雲端仍存在此筆加班，不顯示刪除成功；請查核雲端資料');
+                try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month,empId:row.empId,date,at:Date.now()}));}catch(_){}
                 const affected=new Set((deleted.affectedEmployeeIds||[row.empId]).map(id=>String(id).trim().toUpperCase()));
                 for(const r of schedules||[]){
                     if(normalizeScheduleMonthKey(r.month)!==month||!affected.has(String(r.empId||'').trim().toUpperCase()))continue;

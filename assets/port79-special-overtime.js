@@ -2,6 +2,7 @@
 'use strict';
 const TYPHOON_KEY='p79-manual-typhoon-days-v1';
 const ELECTION_KEY='p79-manual-election-days-v1';
+const SCHEDULE_OVERTIME_CHANGED_KEY='p79_schedule_overtime_changed_v1';
 const OFFICIAL_ELECTION_DATES=new Set(['2026-11-28']);
 const DAY_MS=86400000;
 const taipeiDate=(value)=>{
@@ -50,6 +51,17 @@ function installWorkhoursAttendanceBridge(){
  if(!doc||!g.addEventListener)return;
  const start=()=>{
   const isWorkhoursPage=()=>doc.body?.dataset?.p79System==='workhours'||/\/work-hours\/?$/.test(String(g.location?.pathname||''));
+  const isAttendancePage=()=>doc.body?.dataset?.p79System==='attendance'||/\/attendance\/?$/.test(String(g.location?.pathname||''));
+  if(isAttendancePage()){
+   g.addEventListener('storage',event=>{
+    if(event.key!==SCHEDULE_OVERTIME_CHANGED_KEY||!event.newValue)return;
+    let change;try{change=JSON.parse(event.newValue)}catch(_){return}
+    try{
+     const CustomEventCtor=g.CustomEvent;
+     if(typeof CustomEventCtor==='function')g.dispatchEvent(new CustomEventCtor('p79:schedule-overtime-changed',{detail:change}));
+    }catch(_){}
+   });
+  }
   if(!isWorkhoursPage())return;
   const handoffUrl=()=>{
    try{

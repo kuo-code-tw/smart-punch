@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-special-overtime"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-overtime-delete-sync"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -14950,6 +14950,15 @@ function getManualPairRecordAnchor(record) {
             }
         }
         window.addEventListener('focus',p79RevalidateAttendanceOvertimeOnReturn);
+        window.addEventListener('p79:schedule-overtime-changed',event=>{
+            const month=String(event?.detail?.month||'').trim();
+            const targets=/^\d{4}-\d{2}$/.test(month)?[month]:Array.from(p79AttendanceOvertimeMonths.keys());
+            targets.forEach(key=>{
+                if(!/^\d{4}-\d{2}$/.test(key))return;
+                p79AttendanceOvertimeMonths.delete(key);
+                p79LoadAttendanceOvertimeMonth(key);
+            });
+        });
         document.addEventListener('visibilitychange',()=>{
             if(document.visibilityState==='visible')p79RevalidateAttendanceOvertimeOnReturn();
         });
