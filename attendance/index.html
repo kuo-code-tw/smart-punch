@@ -15023,7 +15023,7 @@ function getManualPairRecordAnchor(record) {
             if (!row.clockIn || !row.clockOut) return showToast('此班次尚未完成上下班打卡，不能直接申報加班', 'warning');
             const date = attendanceRowDateIso(row);
             const employee = findEmployeeForAttendanceIdentity(row, getAdminVisibleEmployees());
-            if (!employee?.empId || !/^\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+            if (!employee?.empId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
             }
             try {
@@ -15679,7 +15679,7 @@ function getManualPairRecordAnchor(record) {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
                 const canReportThisRow = p79CanReportOvertime()
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
-                        && /^\d{4}-\\d{2}-\\d{2}$/.test(attendanceRowDateIso(row)));
+                        && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
                 // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
                 // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
                 const displayEmp = findEmployeeForAttendanceDisplay(row, visibleEmployees)
