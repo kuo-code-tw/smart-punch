@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW">
-<head><script>window.P79ManagementOptimizationMode=true;</script>
+<head><script src="../assets/port79-official-calendar.js?v=20261023-1"></script><script>window.P79ManagementOptimizationMode=true;</script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261021-linked-type&rev=20261022-workflow"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
@@ -1528,6 +1528,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           <div class="schedule-action-middle">
             <div id="scheduleRangeControl" class="schedule-top-action relative flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
               <label for="month-picker" class="text-xs font-black text-slate-600 dark:text-slate-300 whitespace-nowrap"><i class="fa-regular fa-calendar-days text-indigo-500 mr-1"></i>月份</label>
+              <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" style="padding:7px 11px;background:#0369a1;color:#fff;border-radius:9px;font-size:12px;font-weight:800">↻ 拉取官方假日</button><span id="p79OfficialHolidayStatus" role="status" style="font-size:11px;color:#475569">官方停班公告需另外核對</span><a href="https://alerts.ncdr.nat.gov.tw/RssAtomFeed.ashx?AlertType=33" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#0369a1;text-decoration:underline">高雄停班公告來源</a>
               <input type="month" id="month-picker" value="" onchange="onScheduleMonthPickerChange()" class="bg-transparent border-0 outline-none text-sm font-black text-slate-800 dark:text-slate-100 min-w-[125px] cursor-pointer">
               <input type="hidden" id="scheduleDateFrom">
               <input type="hidden" id="scheduleDateTo">
@@ -5397,6 +5398,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
         pairs.length=0;
       };
     }
+    async function p79PullOfficialHolidays(){
+      const button=document.getElementById('p79PullOfficialHolidays'),status=document.getElementById('p79OfficialHolidayStatus'),month=document.getElementById('month-picker')?.value;
+      if(!button||!month)return;
+      if(button.disabled)return;
+      button.disabled=true;if(status)status.textContent='正在核對政府辦公日曆…';
+      try{
+        const count=await window.P79OfficialCalendar.pull(month);
+        if(status)status.textContent='已核對 '+month+' 官方日曆（'+count+' 筆已知假日標記）；颱風停班需核對高雄公告，未自動套用。';
+        renderRoleScheduleView();
+      }catch(error){if(status)status.textContent='拉取失敗：'+error.message;}
+      finally{button.disabled=false;}
+    }
     function renderRoleScheduleView() {
       p79DisposeRosterScroll();
       // 沒有選單位時不建立大型排班 DOM，避免頁面一進來就渲染全部人員。
@@ -5575,7 +5588,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
         const dateObj = new Date(year, month - 1, d);
         const dayOfWeek = dateObj.getDay();
-        const holidayName = NATIONAL_HOLIDAYS[dayStr];
+        const official=window.P79OfficialCalendar?.get(dayStr);
+        const holidayName=official?.name||NATIONAL_HOLIDAYS[dayStr];
+        const officialTag=official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
         let thBgClass = isWeekend ? 'bg-indigo-100/70 text-indigo-900 font-bold' : 'bg-slate-100 text-slate-700';
@@ -5584,7 +5599,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         html += `
           <th class="p79-day-head text-center border-r border-b ${thBgClass}" title="${holidayName || ''}">
             <div class="text-xs font-black">${d}</div>
-            <div class="text-[10px] ${holidayName ? 'text-red-600 font-bold' : isWeekend ? 'text-indigo-800' : 'text-slate-500'}">${holidayName ? '國定' : weekNames[dayOfWeek]}</div>
+            <div class="text-[10px] ${holidayName ? 'text-red-600 font-bold' : isWeekend ? 'text-indigo-800' : 'text-slate-500'}">${holidayName ? officialTag : weekNames[dayOfWeek]}</div>
           </th>
         `;
       }
