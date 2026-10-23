@@ -7,20 +7,26 @@ function invalidResponse(text,status){
  return failure('service','雲端暫時回傳錯誤網頁，未取得完整歷史資料；請稍後重新讀取。',true);
 }
 async function read(url,options){
- const opt=options||{},request=opt.fetch||g.fetch.bind(g),timeout=opt.timeoutMs||90000;
+ const opt=options||{},request=opt.fetch||g.fetch.bind(g),timeout=opt.timeoutMs||90000,forceCloud=opt.forceCloud===true;
  for(let attempt=0;attempt<2;attempt++){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
+  const controller=forceCloud?new AbortController():null;let timer=0;
   try{
    const target=new URL(url);target.searchParams.set('_',Date.now()+'-'+attempt);
-   const response=await request(target.toString(),{method:'GET',cache:'no-store',redirect:'follow',signal:controller.signal});
-   const body=(await response.text()).replace(/^\uFEFF/,'').trim();let data;
-   try{data=JSON.parse(body);}catch(ignore){throw invalidResponse(body,response.status);}
-   if(!data||typeof data!=='object'||Array.isArray(data))throw failure('format','雲端未回傳完整的歷史資料，請重新讀取。',true);
-   if(data.ok!==true)throw failure('api',String(data.error||'雲端讀取失敗'),false);
-   if(!response.ok)throw invalidResponse('',response.status);
-   return data;
+   const init={method:'GET',cache:forceCloud?'no-store':'default',redirect:'follow'};
+   if(controller)init.signal=controller.signal;
+   const operation=(async()=>{
+    const response=await request(target.toString(),init);
+    const body=(await response.text()).replace(/^\uFEFF/,'').trim();let data;
+    try{data=JSON.parse(body);}catch(ignore){throw invalidResponse(body,response.status);}
+    if(!data||typeof data!=='object'||Array.isArray(data))throw failure('format','雲端未回傳完整的歷史資料，請重新讀取。',true);
+    if(data.ok!==true)throw failure('api',String(data.error||'雲端讀取失敗'),false);
+    if(!response.ok)throw invalidResponse('',response.status);
+    return data;
+   })();
+   const timedOut=new Promise((resolve,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(failure('timeout','歷史資料讀取逾時，尚未取得完整資料；請稍後重新讀取。',false));},timeout)});
+   return await Promise.race([operation,timedOut]);
   }catch(error){
-   if(controller.signal.aborted||error?.name==='AbortError')throw failure('timeout','歷史資料讀取逾時，尚未取得完整資料；請稍後重新讀取。',false);
+   if(controller?.signal.aborted||error?.name==='AbortError'||error?.kind==='timeout')throw failure('timeout','歷史資料讀取逾時，尚未取得完整資料；請稍後重新讀取。',false);
    const known=typeof error?.retryable==='boolean',problem=known?error:failure('network','歷史資料連線中斷，請確認網路後重新讀取。',true);
    if(attempt===0&&problem.retryable)continue;
    throw problem;

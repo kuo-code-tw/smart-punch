@@ -23186,9 +23186,11 @@ window.p79AttendanceRecordCounts = function(){
     const pkeys=Object.keys(primary);
     const settled=await Promise.allSettled(pkeys.map(k=>primary[k]));
     const data={};
+    const sourceErrors={};
+    const errorSummary=error=>String(error?.message||error||'讀取失敗').replace(/\b(token|gcToken|adminToken)=([^&\s]+)/ig,'$1=[隱去]').replace(/\s+/g,' ').slice(0,100);
     settled.forEach((r,i)=>{
       if(r.status==='fulfilled')data[pkeys[i]]=r.value;
-      else console.debug(`[PORT79 V5.10.14] ${pkeys[i]}失敗`,r.reason);
+      else{sourceErrors[pkeys[i]]=errorSummary(r.reason);console.debug(`[PORT79 V5.10.14] ${pkeys[i]}失敗`,r.reason);}
     });
 
     let rawRows=normRows(data.raw?.records).filter(r=>attendanceRecordMonthKey(r)===month);
@@ -23212,7 +23214,7 @@ window.p79AttendanceRecordCounts = function(){
       const fsettled=await Promise.allSettled(fkeys.map(k=>fallback[k]));
       fsettled.forEach((r,i)=>{
         if(r.status==='fulfilled')data[fkeys[i]]=r.value;
-        else console.debug(`[PORT79 V5.10.14] ${fkeys[i]}備援失敗`,r.reason);
+        else{sourceErrors[fkeys[i]]=errorSummary(r.reason);console.debug(`[PORT79 V5.10.14] ${fkeys[i]}備援失敗`,r.reason);}
       });
       monthRows=normRows(data.month?.records).filter(r=>attendanceRecordMonthKey(r)===month);
       coreRows=normRows(data.core?.records).filter(r=>attendanceRecordMonthKey(r)===month);
@@ -23220,7 +23222,9 @@ window.p79AttendanceRecordCounts = function(){
 
     // 四條正式 API 全部失敗，不可誤當「0 筆＝成功」。
     if (!Object.keys(data).length) {
-      throw new Error('正式考勤雲端來源全部讀取失敗，已保留本機資料');
+      const labels={raw:'原始全量',direct:'主表直讀',month:'月份相容資料',core:'月份核心資料'};
+      const details=Object.entries(sourceErrors).map(([key,value])=>`${labels[key]||key}：${value}`).join('；');
+      throw new Error('正式考勤雲端來源全部讀取失敗，已保留本機資料'+(details?'｜'+details:''));
     }
     const rows=losslessMerge([rawRows,directRows,monthRows,coreRows]);
     return {
