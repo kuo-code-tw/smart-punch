@@ -5415,15 +5415,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79TyphoonDates(){
       try{
         const values=JSON.parse(localStorage.getItem(P79_TYPHOON_DATES_KEY)||'[]');
-        return Array.isArray(values)?values.filter(x=>/^\\d{4}-\\d{2}-\\d{2}$/.test(x)):[];
+        return Array.isArray(values)?values.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)):[];
       }catch(e){return [];}
     }
     function p79ToggleTyphoonDay(){
       const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7);
-      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記日期再次輸入可取消。\\n僅標示在這台瀏覽器的排班月曆，不會更改班別或薪資。',month+'-01');
+      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記日期再次輸入可取消。\n僅標示在這台瀏覽器的排班月曆，不會更改班別或薪資。',month+'-01');
       if(raw===null)return;
       const date=raw.trim();
-      if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
         alert('請使用 YYYY-MM-DD 格式，例如 2026-10-23。');return;
       }
       const d=new Date(date+'T12:00:00');
