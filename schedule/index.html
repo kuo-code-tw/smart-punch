@@ -1505,7 +1505,23 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-rest-over-quota .p79-rest-quota-tag{max-width:none!important}
 .p79-rest-pending-tag{background:#fef3c7;color:#92400e}
 </style>
-</head>
+<style id="p79-quickbar-usability-20261023">
+#p79ScheduleQuickBar{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px 14px!important;align-items:center!important;padding:10px 16px!important;max-width:100%!important}
+#p79ScheduleQuickBar .p79-quick-month{grid-column:1!important;grid-row:1!important;display:flex!important;gap:6px!important;min-width:0!important;flex-wrap:wrap!important;align-items:center!important}
+#p79ScheduleQuickBar .p79-quick-actions{grid-column:2!important;grid-row:1!important;display:flex!important;gap:6px!important;align-items:center!important;flex-wrap:wrap!important;justify-content:flex-end!important;min-width:0!important}
+#p79ScheduleQuickBar .p79-quick-actions>button,#p79ScheduleQuickBar .p79-quick-month>button{height:34px!important;min-height:34px!important;padding:5px 10px!important;font-size:12px!important;white-space:nowrap!important}
+#p79ScheduleQuickBar .p79-official-action{background:#0369a1!important;color:white!important;border-color:#0369a1!important;font-weight:800!important}
+#p79ScheduleQuickBar .p79-quick-more,#p79ScheduleQuickBar .p79-quick-legend{position:relative!important;flex-shrink:0!important;font-size:12px!important}
+#p79ScheduleQuickBar .p79-quick-more>summary,#p79ScheduleQuickBar .p79-quick-legend>summary{list-style:none!important;cursor:pointer!important;border:1px solid #cbd5e1!important;border-radius:8px!important;padding:8px 10px!important;background:#fff!important;color:#334155!important;font-weight:700!important;white-space:nowrap!important}
+#p79ScheduleQuickBar .p79-quick-more>div,#p79ScheduleQuickBar .p79-quick-legend>#schedule-legend-left{position:absolute!important;right:0!important;top:calc(100% + 5px)!important;width:max-content!important;max-width:min(92vw,470px)!important;padding:12px!important;background:#fff!important;border:1px solid #cbd5e1!important;border-radius:10px!important;box-shadow:0 12px 32px #0f172a26!important;z-index:250!important}
+#p79ScheduleQuickBar .p79-quick-more>div{display:flex!important;gap:8px!important;flex-direction:column!important;align-items:stretch!important}
+#p79ScheduleQuickBar .p79-quick-more button,#p79ScheduleQuickBar .p79-quick-more a{display:block!important;padding:8px!important;text-align:left!important}
+#p79ScheduleQuickBar .p79-quick-legend #schedule-legend-left{display:block!important;white-space:normal!important}
+#p79ScheduleQuickBar .p79-official-message{grid-column:1/-1!important;grid-row:2!important;display:flex!important;gap:12px!important;flex-wrap:wrap!important;color:#64748b!important;font-size:11px!important}
+#p79ScheduleQuickBar .p79-quick-guide{grid-column:1/-1!important;grid-row:3!important;font-size:12px!important}
+@media(max-width:1050px){#p79ScheduleQuickBar{grid-template-columns:minmax(0,1fr)!important}#p79ScheduleQuickBar .p79-quick-month,#p79ScheduleQuickBar .p79-quick-actions{grid-column:1!important;justify-content:flex-start!important}#p79ScheduleQuickBar .p79-quick-actions{grid-row:2!important}#p79ScheduleQuickBar .p79-official-message{grid-row:3!important}#p79ScheduleQuickBar .p79-quick-guide{grid-row:4!important}}
+@media(max-width:600px){#p79ScheduleQuickBar{padding:8px!important}#p79ScheduleQuickBar .p79-quick-actions>button{font-size:11px!important;padding:5px 8px!important}#p79ScheduleQuickBar .p79-quick-legend>div{right:auto!important;left:0!important}}
+</style></head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
 
@@ -1515,11 +1531,6 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       <div class="max-w-[1920px] mx-auto space-y-3">
 
         <!-- 圖片一：常用操作全部拉到最上面 -->
-        <div id="p79OfficialHolidayToolbar" style="display:flex!important;align-items:center;flex-wrap:wrap;gap:10px;width:100%;padding:10px 12px;margin-bottom:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;position:relative;z-index:60">
-            <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" style="display:inline-flex!important;align-items:center;visibility:visible!important;opacity:1!important;padding:9px 14px;background:#0369a1;color:white;border:0;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">↻ 拉取官方假日</button>
-            <span id="p79OfficialHolidayStatus" role="status" style="font-size:12px;color:#334155">選擇月份後可手動核對官方假日；颱風停班尚未自動套用</span>
-            <a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#0369a1;text-decoration:underline">高雄市停班課專區 ↗</a>
-          </div>
           <div id="schedule-top-actions">
           <div class="schedule-action-left">
             <a href="../?v=20260927.7.13" class="schedule-top-action inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 text-xs font-bold shadow-sm no-underline" title="返回79號碼頭雲端智慧系統首頁">
@@ -1629,9 +1640,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       <div class="p79-quick-actions">
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
         <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
-        <button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button>
-        <button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button>
-        <div id="schedule-legend-left">
+<button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
+        <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
+        <details class="p79-quick-legend"><summary>班別圖例 ▾</summary><div id="schedule-legend-left">
           <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
           <div class="flex flex-wrap justify-start items-center gap-2 font-semibold">
             <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
@@ -1641,7 +1652,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
-        </div>
+        </div></details>
 
       </div>
       <details class="p79-quick-guide"><summary>怎麼操作？</summary><div>
@@ -1651,7 +1662,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         <p><b>不能修改：</b>已連動請假或代班的日期，請先在請假管理完成刪除；他人編輯時須先取得編輯權。</p>
         <p><b>完成修改：</b>按「儲存排班」並確認成功訊息；儲存失敗時保留畫面，稍後重試。</p>
       </div></details>
-      <span id="p79QuickMonthStatus" role="status" aria-live="polite"></span>
+      <div class="p79-official-message"><span id="p79OfficialHolidayStatus" role="status">選擇月份後可拉取官方日曆；颱風停班公告須另外核對</span><span id="p79QuickMonthStatus" role="status" aria-live="polite"></span></div>
     </section>
     <!-- 圖片二：說明與全部職稱頁籤固定在上方，不會隨班表往下捲走 -->
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
