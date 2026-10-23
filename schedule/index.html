@@ -5703,8 +5703,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
                     const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
           const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
-          const shownShift = approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
-          const shownShiftStyle = ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
+          // A confirmed no-punch day on a manually marked typhoon date is displayed as 颱.
+          // Keep the underlying roster shift untouched; never infer absence without attendance evidence.
+          const typhoonEvidenceState=window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(yearMonth).evidence},emp.id,dayStr);
+          const typhoonNoPunch=p79TyphoonDates().includes(dayStr)&&typhoonEvidenceState==='rest'&&!ownApprovedLeave&&rosterShift!=='離';
+          const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
+          const shownShiftStyle = typhoonNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
             shownShift==='休'?'bg-blue-100 text-red-700 font-black':
             shownShift==='國'?'bg-green-100 text-red-700 font-black':
@@ -5726,7 +5730,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
-          const cellTitle = [manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle = [typhoonNoPunch?'颱風停班日，考勤核對無上下班紀錄（僅顯示標記，原班別未更動）':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${substituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
