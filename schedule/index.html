@@ -5716,9 +5716,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
                     const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
           const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
-          // A confirmed no-punch day on a manually marked typhoon date is displayed as 颱.
-          // Keep the underlying roster shift untouched; never infer absence without attendance evidence.
-          const typhoonNoPunch=typhoonDays.has(dayStr)&&attendanceState==='rest'&&!ownApprovedLeave&&rosterShift!=='離';
+          // A verified whole-shift absence is final. On an in-progress typhoon day,
+          // a completed attendance snapshot with no punch events is a provisional 颱;
+          // an actual punch changes the evidence state to missing/worked and restores the roster.
+          // Never infer absence from an incomplete snapshot or a future shift.
+          const typhoonShiftPeriod=typhoonDays.has(dayStr)?window.P79RestAttendance.period(dayStr,monthlyScheduleData[emp.id]||{}):null;
+          const typhoonProvisional=attendanceEvidence.complete===true&&attendanceState==='open'&&
+            dayStr<=scheduleTaipeiTodayKey()&&typhoonShiftPeriod&&Date.now()>=typhoonShiftPeriod.start;
+          const typhoonNoPunch=typhoonDays.has(dayStr)&&(attendanceState==='rest'||typhoonProvisional)&&
+            !ownApprovedLeave&&rosterShift!=='離';
           const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
           const visibleSubstituteLabel=typhoonNoPunch?'':substituteLabel;
           const shownShiftStyle = typhoonNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
@@ -5743,7 +5749,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
-          const cellTitle = [typhoonNoPunch?'颱風停班日，考勤核對無上下班紀錄（僅顯示標記，原班別未更動）':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle = [typhoonNoPunch?(typhoonProvisional?'颱風停班日：目前考勤已同步但尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
