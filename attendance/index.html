@@ -923,15 +923,15 @@ body[data-p79-system="attendance"] #attendanceRecordActionsHost :is(button,input
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button>span.inline-flex{padding:4px!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:last-child button{min-height:30px!important;height:30px!important;width:30px!important;padding:0!important}
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(6){color:#147d72;font-weight:700}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(12){font-size:14px!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(13){font-size:14px!important}
 .dark #adminRecordsTableContainer .attendance-records-wide-table th{background:#0f172a;color:#cbd5e1}
 
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(11) span{font-size:14px!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(12) span{font-size:14px!important}
 
 #adminRecordsTableContainer .attendance-records-wide-table td:nth-child(-n+6){overflow:hidden;text-overflow:ellipsis}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button{gap:2px!important}
 #adminRecordsTableContainer .attendance-records-wide-table td[data-p79-side] button>span.inline-flex{padding:4px 2px!important}
-#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(12)>span{max-width:100%!important}
+#adminRecordsTableContainer .attendance-records-wide-table td:nth-child(13)>span{max-width:100%!important}
 </style>
 <style id="p79-attendance-responsive-toolbar">
 /* Keep the legend's intrinsic widths separate from the action buttons. */
@@ -1357,6 +1357,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                                 <th class="px-2 py-3 text-center whitespace-nowrap">下班簽退時間</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap" title="依上下班完整打卡時間差計算">出勤時數</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">加班時數</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap">申報加班</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">狀態/異常</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">備註/地點</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">操作</th>
@@ -2364,7 +2365,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.109';
+        const APP_VERSION='2026.10.23.110';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -14997,6 +14998,49 @@ function getManualPairRecordAnchor(record) {
             return `<div class="text-cyan-700 dark:text-cyan-300">${label}</div>${planned.minutes!==null?`<div class="text-xs">申報 ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
         }
 
+        function p79CanManageOvertime() {
+            if (isVerifiedSuperAdminSession()) return true;
+            if (!isAdminLoggedIn || !hasValidHomepageAdminSession()) return false;
+            return Object.prototype.hasOwnProperty.call(currentEmp?.systemPermissions || {}, 'workhours')
+                ? currentEmp.systemPermissions.workhours === 'manage'
+                : canPerformAdminAction(currentEmp, 'attendanceEdit');
+        }
+        function p79CanReportOvertime() {
+            if (isVerifiedSuperAdminSession()) return true;
+            if (!hasValidHomepageAdminSession() || !currentEmp) return false;
+            const level = currentEmp.systemPermissions?.workhours;
+            if (level !== undefined && !['view', 'manage'].includes(level)) return false;
+            const fine = currentEmp?.finePermissions?.workhours || {};
+            return Object.prototype.hasOwnProperty.call(fine, 'overtime.report')
+                ? fine['overtime.report'] === true
+                : p79CanManageOvertime();
+        }
+
+        let p79AdminAttendanceReportRows = [];
+        function p79OpenAdminAttendanceOvertime(index) {
+            const row = p79AdminAttendanceReportRows[index];
+            if (!row || !p79CanReportOvertime()) return showToast('目前沒有加班申報權限，請重新登入或確認權限', 'warning');
+            if (!row.clockIn || !row.clockOut) return showToast('此班次尚未完成上下班打卡，不能直接申報加班', 'warning');
+            const date = attendanceRowDateIso(row);
+            const employee = findEmployeeForAttendanceIdentity(row, getAdminVisibleEmployees());
+            if (!employee?.empId || !/^\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+                return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
+            }
+            try {
+                sessionStorage.setItem('port79_attendance_overtime_request_v1', JSON.stringify({
+                    empId: String(employee.empId), name: String(employee.name || row.name || ''), date
+                }));
+                const target = new URL('../work-hours/', location.href);
+                target.search = '';
+                target.searchParams.set('v', '20261023-attendance-report-v1');
+                target.searchParams.set('attendanceOvertimeReport', '1');
+                target.hash = location.hash || '';
+                location.assign(target.toString());
+            } catch (error) {
+                showToast('無法開啟加班申報，請重新整理後再試', 'warning');
+            }
+        }
+
         let p79LastManualRecoveryCheckAt = 0;
         // 只顯示重複候選原始打卡；人工核對後才允許刪除單筆，絕不自動刪。
         let p79DuplicateReviewRows = [];
@@ -15621,7 +15665,7 @@ function getManualPairRecordAnchor(record) {
             renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount, rowPageInfo);
 
             if (dailyRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="13" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="14" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
                 return;
             }
 
@@ -15630,7 +15674,12 @@ function getManualPairRecordAnchor(record) {
             const allowAttendanceDelete = canPerformAdminAction(currentEmp, 'attendanceDelete');
 
             p79MainTableDuplicateRows = renderRows;
+            p79AdminAttendanceReportRows = renderRows;
             tbody.innerHTML = renderRows.map((row, rowIndex) => {
+                const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
+                const canReportThisRow = p79CanReportOvertime()
+                    && !!(row.clockIn && row.clockOut && reportEmployee?.empId
+                        && /^\d{4}-\\d{2}-\\d{2}$/.test(attendanceRowDateIso(row)));
                 // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
                 // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
                 const displayEmp = findEmployeeForAttendanceDisplay(row, visibleEmployees)
@@ -15703,6 +15752,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap"><button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button></td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
                             ${row.noteText ? `<span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.noteText))}">備註：${escapeHtml(String(row.noteText).length > 14 ? String(row.noteText).slice(0,14)+'…' : String(row.noteText))}</span>` : ''}
