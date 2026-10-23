@@ -15731,6 +15731,18 @@ function getManualPairRecordAnchor(record) {
                 const manualClockOutId = encodeURIComponent(String(row.clockOut?.id ?? ''));
                 const manualClockInTime = encodeURIComponent(String(row.clockIn?.timeStr ?? ''));
                 const manualClockOutTime = encodeURIComponent(String(row.clockOut?.timeStr ?? ''));
+                // Read the manually designated typhoon dates from the same-origin roster.
+                // This is a display label only: it does not alter punch records or payroll.
+                let p79TyphoonCheckInBadge='';
+                if(row.clockIn){
+                    const punchDate=String(getAttendanceDateKey(row.clockIn.timeStr)||'').trim();
+                    try{
+                        const marked=JSON.parse(localStorage.getItem('p79-manual-typhoon-days-v1')||'[]');
+                        if(Array.isArray(marked)&&marked.includes(punchDate)){
+                            p79TyphoonCheckInBadge='<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="此上班簽到日期已由管理員標記為颱風停班日（本瀏覽器）">颱</span>';
+                        }
+                    }catch(ignored){}
+                }
                 const inTime = row.clockIn
                     ? formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit)
                     : `<span class="inline-flex items-center gap-1.5">--${allowAttendanceCreate ? `<button type="button" onclick="openRowManualAdd('${manualIdentity}', '${manualDate}', '上班簽到', '${manualClockOutId}', '${manualAttNo}', '${manualName}', '${manualClockOutTime}')" class="inline-flex w-6 h-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-black hover:ring-2 hover:ring-amber-400" title="手動補刷上班簽到" aria-label="手動補刷上班簽到">＋</button>` : ''}</span>`;
@@ -15753,7 +15765,7 @@ function getManualPairRecordAnchor(record) {
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${escapeHtml(p79AttendanceRosterGroup(row,displayEmp))}</td>
-                        <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${inTime}</td>
+                        <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${p79TyphoonCheckInBadge}${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
