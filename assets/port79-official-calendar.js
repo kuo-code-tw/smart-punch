@@ -5,7 +5,7 @@ const SOURCES={
  '2026':'https://www.dgpa.gov.tw/FileConversion?filename=dgpa%2Ffiles%2F202506%2Fa52331bd-a189-466b-b0f0-cae3062bbf74.csv&name=115%E5%B9%B4%E4%B8%AD%E8%8F%AF%E6%B0%91%E5%9C%8B%E6%94%BF%E5%BA%9C%E8%A1%8C%E6%94%BF%E6%A9%9F%E9%97%9C%E8%BE%A6%E5%85%AC%E6%97%A5%E6%9B%86%E8%A1%A8.csv&nfix=',
  '2027':'https://www.dgpa.gov.tw/FileConversion?filename=dgpa%2Ffiles%2F202607%2Ff538b1ff-ba60-4c63-9477-10db8e6612d1.csv&name=116%E5%B9%B4%E4%B8%AD%E8%8F%AF%E6%B0%91%E5%9C%8B%E6%94%BF%E5%BA%9C%E8%A1%8C%E6%94%BF%E6%A9%9F%E9%97%8C%E8%BE%A6%E5%85%AC%E6%97%A5%E6%9B%86%E8%A1%A8_utf8bom.csv&nfix='
 };
-const DISASTER='https://alerts.ncdr.nat.gov.tw/RssAtomFeed.ashx?AlertType=33';
+const DISASTER='https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C';
 function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){return {}}}
 function write(v){localStorage.setItem(KEY,JSON.stringify(v))}
 function csv(line){const out=[];let cur='',quote=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quote&&line[i+1]==='"'){cur+='"';i++}else quote=!quote;}else if(ch===','&&!quote){out.push(cur);cur=''}else cur+=ch;}out.push(cur);return out;}
