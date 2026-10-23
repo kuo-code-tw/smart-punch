@@ -1641,7 +1641,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
         <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
 <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
-        <button type="button" onclick="p79ToggleTyphoonDay()">＋ 颱風假日期</button>
+        <button type="button" id="p79TyphoonDayButton" onclick="p79ToggleTyphoonDay()" title="標記或取消颱風停班日期">＋ 颱風假日期</button>
         <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
         <details class="p79-quick-legend"><summary>班別圖例 ▾</summary><div id="schedule-legend-left">
           <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
@@ -5429,9 +5429,20 @@ async function p79SaveScheduleOvertimeDraft(draft){
         return Array.isArray(values)?values.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)):[];
       }catch(e){return [];}
     }
+    function p79UpdateTyphoonDayButton(month,evidenceReady=false){
+      const button=document.getElementById('p79TyphoonDayButton');
+      if(!button||!/^\d{4}-\d{2}$/.test(String(month||'')))return;
+      const days=p79TyphoonDates().filter(date=>date.startsWith(month+'-')).sort();
+      const label=days.map(date=>date.slice(5).replace('-','/')).join('、');
+      button.textContent=days.length?'颱風假：'+label+(evidenceReady?'':'（考勤待核）'):'＋ 颱風假日期（本月未設定）';
+      button.title=days.length?'本月已標記：'+days.join('、')+'。點此新增日期，或再次輸入同一天取消。颱風標記目前只保存在此瀏覽器。':'本月尚未標記颱風停班日。點此輸入日期後，班表日期表頭才會顯示颱假。';
+    }
     function p79ToggleTyphoonDay(){
       const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7);
-      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記日期再次輸入可取消。\n僅標示在這台瀏覽器的排班月曆，不會更改班別或薪資。',month+'-01');
+      const markedDates=p79TyphoonDates().filter(date=>date.startsWith(month+'-')).sort();
+      const today=scheduleTaipeiTodayKey();
+      const suggestion=today.startsWith(month+'-')?today:month+'-01';
+      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記的日期再次輸入可取消。\n本月已標記：'+(markedDates.join('、')||'尚未設定')+'\n此標記只保存在這台瀏覽器；不會修改班別或薪資。',suggestion);
       if(raw===null)return;
       const date=raw.trim();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
@@ -5467,6 +5478,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function renderRoleScheduleView() {
       p79DisposeRosterScroll();
+      const currentTyphoonMonth=document.getElementById('month-picker')?.value||'';
+      const monthEvidence=currentTyphoonMonth?p79ScheduleRestClient().status(currentTyphoonMonth):null;
+      p79UpdateTyphoonDayButton(currentTyphoonMonth,monthEvidence?.evidence?.complete===true);
       // 沒有選單位時不建立大型排班 DOM，避免頁面一進來就渲染全部人員。
       if (!activeRoleTab) {
         const container = document.getElementById('app-main-container');
@@ -5488,6 +5502,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if (rangeToEl) rangeToEl.value = monthTo;
       updateScheduleDateRangeSummary();
       const visibleDays = Array.from({length: totalDays}, (_, i) => i + 1);
+      // Cache typhoon markers and attendance evidence once per render; avoid storage
+      // parsing and evidence lookups on every employee/day cell.
+      const typhoonDays=new Set(p79TyphoonDates().filter(date=>date.startsWith(yearMonth+'-')));
+      const attendanceEvidence=monthEvidence?.evidence||{complete:false,days:{}};
+      const attendanceSnapshot={attendanceEvidence};
 
       let roleEmps = employees.filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
 
@@ -5644,7 +5663,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const dateObj = new Date(year, month - 1, d);
         const dayOfWeek = dateObj.getDay();
         const official=window.P79OfficialCalendar?.get(dayStr);
-        const manualTyphoon=p79TyphoonDates().includes(dayStr);
+        const manualTyphoon=typhoonDays.has(dayStr);
         const holidayName=manualTyphoon?'手動標記：颱風停班':official?.name||NATIONAL_HOLIDAYS[dayStr];
         const officialTag=manualTyphoon?'颱假':official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
@@ -5679,8 +5698,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
           const rosterShift = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
           const ownApprovedLeave = approvedLeaveForEmployee(emp.id, dayStr);
-          const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave);
-          const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(yearMonth).evidence},emp.id,dayStr)==='rest';
+          const attendanceState=window.P79RestAttendance.state(attendanceSnapshot,emp.id,dayStr);
+          const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
+          const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
           const shiftVal=noPunchRest?'休':rosterShift;
           const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),restCategory:restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
           const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
@@ -5716,8 +5736,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
           // A confirmed no-punch day on a manually marked typhoon date is displayed as 颱.
           // Keep the underlying roster shift untouched; never infer absence without attendance evidence.
-          const typhoonEvidenceState=window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(yearMonth).evidence},emp.id,dayStr);
-          const typhoonNoPunch=p79TyphoonDates().includes(dayStr)&&typhoonEvidenceState==='rest'&&!ownApprovedLeave&&rosterShift!=='離';
+          const typhoonNoPunch=typhoonDays.has(dayStr)&&attendanceState==='rest'&&!ownApprovedLeave&&rosterShift!=='離';
           const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
           const shownShiftStyle = typhoonNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
@@ -6191,8 +6210,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
     }
-    function p79ScheduleNoPunchRest(empId,date,shift,meta,leave) {
+    function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
       if(leave||meta?.manualRosterShift===shift||!(['早','中','晚'].includes(shift)||meta?.overtimeReport))return false;
+      if(knownState!==null)return knownState==='rest';
       const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
       return window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)==='rest';
     }
