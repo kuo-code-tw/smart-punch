@@ -2240,7 +2240,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.16.114';
+        const APP_VERSION='2026.10.23.115';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -15313,6 +15313,24 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null){
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
 window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+document.addEventListener('DOMContentLoaded',()=>{
+  const params=new URLSearchParams(location.search);
+  if(params.get('attendanceOvertimeReport')!=='1')return;
+  const key='port79_attendance_overtime_request_v1';
+  let request=null;
+  try{request=JSON.parse(sessionStorage.getItem(key)||'null');}catch(error){}
+  try{sessionStorage.removeItem(key);}catch(error){}
+  if(!request?.empId||!/^\d{4}-\\d{2}-\\d{2}$/.test(String(request.date||''))){
+    showToast('找不到考勤列的申報資料，請從考勤紀錄重新點選', 'warning');return;
+  }
+  if(typeof window.P79Overtime?.openReport!=='function'){
+    showToast('加班申報功能尚未載入，請重新整理後再試', 'warning');return;
+  }
+  window.P79Overtime.openReport({
+    empId:String(request.empId),date:String(request.date),requirePeriodSelection:true,
+    periodHint:'已帶入 '+String(request.name||'員工')+' 的 '+String(request.date)+' 出勤班次。請核對加班類型、出勤時段與換算時數後再儲存；跨日班次以簽到日歸屬。'
+  });
+},{once:true});
 let p79LeaveHandoffBusy=false;
 async function p79OpenLeaveOvertimeHandoff(){
   if(p79LeaveHandoffBusy)return;
