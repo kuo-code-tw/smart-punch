@@ -8,7 +8,7 @@ const saved=JSON.parse(JSON.stringify(schedule));api.acceptRows([{empId:emp.id,s
 // Retrying a confirmed snapshot never deducts twice, and later local mutation does not alter receipt.
 api.acceptRows([{empId:emp.id,schedule:saved}],month);assert.equal(sum().reported.休,1);saved.__meta[dates[0]].overtimeReport.category='國';assert.equal(sum().reported.休,1,'accepted reports are immutable');
 const updated=JSON.parse(JSON.stringify(schedule));updated.__meta[dates[16]]={overtimeReport:{id:'NATIONAL',category:'國',code:'國08-16'}};api.acceptRows([{empId:emp.id,schedule:updated}],month);assert.equal(sum().remaining.國,1);assert.equal(sum().remaining.休,0);
-const deleted=JSON.parse(JSON.stringify(schedule));deleted.__meta={};api.acceptRows([{empId:emp.id,schedule:deleted}],month);assert.equal(sum().remaining.休,1,'confirmed deletion releases quota');
+const deleted=JSON.parse(JSON.stringify(schedule));deleted.__meta={};api.acceptRows([{empId:emp.id,schedule:deleted}],month);assert.equal(api.summary(emp,deleted,deleted.__meta,month,{},'').remaining.休,1,'confirmed deletion releases quota');
 const idless=JSON.parse(JSON.stringify(schedule));idless.__meta[dates[0]].overtimeReport.id='';api.acceptRows([{empId:emp.id,schedule:idless}],month);assert.equal(sum().reported.休,0);
 api.acceptRows([{empId:'OTHER',schedule:updated}],month);assert.equal(sum().reported.國,0,'employee identities never share deductions');
 api.acceptRows([{empId:emp.id,schedule:updated}],month);api.acceptRows([{empId:emp.id,schedule:{'2026-11-01':'早'}}],'2026-11');assert.equal(sum().reported.國,1,'another month does not erase confirmed October');
