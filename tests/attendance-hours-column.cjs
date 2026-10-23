@@ -9,5 +9,5 @@ assert.equal(c.attendanceRowAttendanceText(row('2026/10/17 23:35','2026/10/18 07
 assert.equal(c.attendanceRowAttendanceMinutes(row('2026/10/17 23:59','2026/10/18 00:00')),1);
 assert.equal(c.attendanceRowAttendanceMinutes(row('2026/10/17 00:00','2026/10/18 00:00')),1440);
 for(const r of [{}, {clockIn:{timeStr:'2026/10/18 07:39'}},row('2026/10/18 16:00','2026/10/18 07:00'),row('2026/10/17 00:00','2026/10/18 01:00'),row('2026/10/18','2026/10/18 07:00')])assert.equal(c.attendanceRowAttendanceText(r),'—');
-const a=html.indexOf('<div id="adminRecordsTableContainer"'),b=html.indexOf('</thead>',a),headers=[...html.slice(a,b).matchAll(/<th\b[^>]*>([^<]*)<\/th>/g)].map(x=>x[1]);assert.equal(headers.length,13);assert(!headers.includes('工作日'));assert.equal(headers.indexOf('出勤時數')+1,headers.indexOf('加班時數'));
+const a=html.indexOf('<div id="adminRecordsTableContainer"'),b=html.indexOf('</thead>',a),headers=[...html.slice(a,b).matchAll(/<th\b[^>]*>([^<]*)<\/th>/g)].map(x=>x[1]);assert.equal(headers.length,14);assert(!headers.includes('工作日'));assert.equal(headers.indexOf('出勤時數')+1,headers.indexOf('加班時數'));assert.equal(headers.indexOf('加班時數')+1,headers.indexOf('申報加班'));
 console.log('PASS elapsed attendance duration, overnight/midnight/24-hour boundaries, incomplete/invalid punches, and requested column order');
