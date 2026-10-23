@@ -5434,7 +5434,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(!button||!/^\d{4}-\d{2}$/.test(String(month||'')))return;
       const days=p79TyphoonDates().filter(date=>date.startsWith(month+'-')).sort();
       const label=days.map(date=>date.slice(5).replace('-','/')).join('、');
-      button.textContent=days.length?'颱風假：'+label+(evidenceReady?'':'（考勤待核）'):'＋ 颱風假日期（本月未設定）';
+      const evidenceStatus=p79ScheduleRestClient().status(month);
+      button.textContent=days.length?'颱風假：'+label+(evidenceReady?'':evidenceStatus.error?'（考勤讀取失敗）':'（考勤待核）'):'＋ 颱風假日期（本月未設定）';
       button.title=days.length?'本月已標記：'+days.join('、')+'。點此新增日期，或再次輸入同一天取消。颱風標記目前只保存在此瀏覽器。':'本月尚未標記颱風停班日。點此輸入日期後，班表日期表頭才會顯示颱假。';
     }
     function p79ToggleTyphoonDay(){
@@ -5463,6 +5464,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       try{localStorage.setItem(P79_TYPHOON_DATES_KEY,JSON.stringify([...selected].sort()));}
       catch(e){alert('儲存失敗，瀏覽器可能禁止儲存資料。');return;}
       renderRoleScheduleView();
+      // Ensure the absence/presence check starts even if the day was marked after initial page load.
+      p79RefreshScheduleRestEvidence();
     }
     async function p79PullOfficialHolidays(){
       const button=document.getElementById('p79PullOfficialHolidays'),status=document.getElementById('p79OfficialHolidayStatus'),month=document.getElementById('month-picker')?.value;
@@ -5738,6 +5741,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // Keep the underlying roster shift untouched; never infer absence without attendance evidence.
           const typhoonNoPunch=typhoonDays.has(dayStr)&&attendanceState==='rest'&&!ownApprovedLeave&&rosterShift!=='離';
           const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
+          const visibleSubstituteLabel=typhoonNoPunch?'':substituteLabel;
           const shownShiftStyle = typhoonNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
             shownShift==='休'?'bg-blue-100 text-red-700 font-black':
@@ -5762,24 +5766,24 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
           const cellTitle = [typhoonNoPunch?'颱風停班日，考勤核對無上下班紀錄（僅顯示標記，原班別未更動）':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
-            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${substituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
+            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
-                title="${scheduleEscapeHtml(substituteLabel || shownShift)}"
-                class="clean-shift-select p79-shift-select ${substituteLabel ? 'p79-substitute-time'+(substituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                ${substituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(substituteLabel)}</option>` : ''}
-                <option value="早" ${!substituteLabel && shownShift==='早'?'selected':''}>早</option>
-                <option value="中" ${!substituteLabel && shownShift==='中'?'selected':''}>中</option>
-                <option value="晚" ${!substituteLabel && shownShift==='晚'?'selected':''}>晚</option>
-                <option value="休" ${!substituteLabel && shownShift==='休'?'selected':''}>休</option>
-                <option value="例" ${!substituteLabel && shownShift==='例'?'selected':''}>例</option>
-                <option value="國" ${!substituteLabel && shownShift==='國'?'selected':''}>國</option>
-                <option value="颱" ${!substituteLabel && shownShift==='颱'?'selected':''}>颱</option>
-                <option value="年" ${!substituteLabel && shownShift==='年'?'selected':''}>年</option>
-                <option value="事" ${!substituteLabel && shownShift==='事'?'selected':''}>事</option>
-                <option value="病" ${!substituteLabel && shownShift==='病'?'selected':''}>病</option>
-                <option value="公" ${!substituteLabel && shownShift==='公'?'selected':''}>公</option>
-                <option value="喪" ${!substituteLabel && shownShift==='喪'?'selected':''}>喪</option>
-                <option value="離" ${!substituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
+                title="${scheduleEscapeHtml(visibleSubstituteLabel || shownShift)}"
+                class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
+                ${visibleSubstituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
+                <option value="早" ${!visibleSubstituteLabel && shownShift==='早'?'selected':''}>早</option>
+                <option value="中" ${!visibleSubstituteLabel && shownShift==='中'?'selected':''}>中</option>
+                <option value="晚" ${!visibleSubstituteLabel && shownShift==='晚'?'selected':''}>晚</option>
+                <option value="休" ${!visibleSubstituteLabel && shownShift==='休'?'selected':''}>休</option>
+                <option value="例" ${!visibleSubstituteLabel && shownShift==='例'?'selected':''}>例</option>
+                <option value="國" ${!visibleSubstituteLabel && shownShift==='國'?'selected':''}>國</option>
+                <option value="颱" ${!visibleSubstituteLabel && shownShift==='颱'?'selected':''}>颱</option>
+                <option value="年" ${!visibleSubstituteLabel && shownShift==='年'?'selected':''}>年</option>
+                <option value="事" ${!visibleSubstituteLabel && shownShift==='事'?'selected':''}>事</option>
+                <option value="病" ${!visibleSubstituteLabel && shownShift==='病'?'selected':''}>病</option>
+                <option value="公" ${!visibleSubstituteLabel && shownShift==='公'?'selected':''}>公</option>
+                <option value="喪" ${!visibleSubstituteLabel && shownShift==='喪'?'selected':''}>喪</option>
+                <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${combinedMarker}
               ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="人工指定班別保留；整班無卡，休假統計仍按實際考勤核對">無卡待核</span>':''}
