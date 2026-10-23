@@ -1641,6 +1641,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
         <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
 <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
+        <button type="button" onclick="p79ToggleTyphoonDay()">＋ 颱風假日期</button>
         <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
         <details class="p79-quick-legend"><summary>班別圖例 ▾</summary><div id="schedule-legend-left">
           <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
@@ -5408,6 +5409,39 @@ async function p79SaveScheduleOvertimeDraft(draft){
         pairs.length=0;
       };
     }
+    // Manual typhoon closures are visual annotations only; never alter attendance/payroll.
+    // Stored in this browser because the official calendar does not expose a write API.
+    const P79_TYPHOON_DATES_KEY='p79-manual-typhoon-days-v1';
+    function p79TyphoonDates(){
+      try{
+        const values=JSON.parse(localStorage.getItem(P79_TYPHOON_DATES_KEY)||'[]');
+        return Array.isArray(values)?values.filter(x=>/^\\d{4}-\\d{2}-\\d{2}$/.test(x)):[];
+      }catch(e){return [];}
+    }
+    function p79ToggleTyphoonDay(){
+      const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7);
+      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記日期再次輸入可取消。\\n僅標示在這台瀏覽器的排班月曆，不會更改班別或薪資。',month+'-01');
+      if(raw===null)return;
+      const date=raw.trim();
+      if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)){
+        alert('請使用 YYYY-MM-DD 格式，例如 2026-10-23。');return;
+      }
+      const d=new Date(date+'T12:00:00');
+      if(Number.isNaN(d.getTime())||d.getFullYear()!==Number(date.slice(0,4))||d.getMonth()+1!==Number(date.slice(5,7))||d.getDate()!==Number(date.slice(8,10))){
+        alert('日期無效，請重新輸入。');return;
+      }
+      const selected=new Set(p79TyphoonDates());
+      if(selected.has(date)){
+        if(!confirm('取消 '+date+' 的颱風假標記？'))return;
+        selected.delete(date);
+      }else{
+        if(!confirm('將 '+date+' 標記為颱風停班日？請先確認地方政府公告。'))return;
+        selected.add(date);
+      }
+      try{localStorage.setItem(P79_TYPHOON_DATES_KEY,JSON.stringify([...selected].sort()));}
+      catch(e){alert('儲存失敗，瀏覽器可能禁止儲存資料。');return;}
+      renderRoleScheduleView();
+    }
     async function p79PullOfficialHolidays(){
       const button=document.getElementById('p79PullOfficialHolidays'),status=document.getElementById('p79OfficialHolidayStatus'),month=document.getElementById('month-picker')?.value;
       if(!button||!month)return;
@@ -5599,8 +5633,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const dateObj = new Date(year, month - 1, d);
         const dayOfWeek = dateObj.getDay();
         const official=window.P79OfficialCalendar?.get(dayStr);
-        const holidayName=official?.name||NATIONAL_HOLIDAYS[dayStr];
-        const officialTag=official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
+        const manualTyphoon=p79TyphoonDates().includes(dayStr);
+        const holidayName=manualTyphoon?'手動標記：颱風停班':official?.name||NATIONAL_HOLIDAYS[dayStr];
+        const officialTag=manualTyphoon?'颱假':official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
         let thBgClass = isWeekend ? 'bg-indigo-100/70 text-indigo-900 font-bold' : 'bg-slate-100 text-slate-700';
