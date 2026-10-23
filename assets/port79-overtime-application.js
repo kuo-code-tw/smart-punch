@@ -37,6 +37,32 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note:'吊櫃作業',planned,reportId:report.id});
   }
  }
+ if(mode==='actual'&&g.P79SpecialOvertime?.overlap){
+  const auto=new Map();
+  for(const snapshot of snapshots){
+   const reportByEmp=new Map((snapshot.schedules||[]).map(entry=>[uid(entry.empId),entry.schedule||{}]));
+   for(const pair of snapshot.pairs||[]){
+    const emp=people.get(uid(pair.empId));if(!emp)continue;
+    const job=String(emp.jobTitle||emp.deptDetail||'未設定'),co=companyFor(emp);
+    if(company&&company!==co||jobSet.size&&!jobSet.has(job))continue;
+    const schedule=reportByEmp.get(uid(emp.empId))||{};
+    for(const part of g.P79SpecialOvertime.overlap(pair.start,pair.end)){
+     if(!selected.has(part.date))continue;
+     const meta=schedule.__meta?.[part.date]||{};
+     const pendingPlan=meta.overtimeReport?.planned===true&&part.date>=today();
+     if(meta.overtimeExcluded||meta.overtimeReport&&!pendingPlan)continue;
+     const key=uid(emp.empId)+'|'+part.date;
+     const item=auto.get(key)||{date:part.date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,minutes:0,kinds:new Set()};
+     item.minutes+=part.minutes;part.kinds.forEach(kind=>item.kinds.add(kind.code));auto.set(key,item);
+    }
+   }
+  }
+  for(const item of auto.values()){
+   const hours=Math.round(item.minutes/60*100)/100;if(hours<=0)continue;
+   const periods=['','','',hours];
+   rows.push({...item,periods,actual:hours,converted:hours,planned:false,reportId:'auto-special-day:'+uid(item.empId)+'|'+item.date,note:[...item.kinds].map(code=>code==='颱'?'颱風日自動計算':'選舉日自動計算').join('、')});
+  }
+ }
  const rank={領班:0,船上指揮手:1,指揮手:1,AQC:2,ARMG:3,'F/L':4};
  rows.sort((a,b)=>a.date.localeCompare(b.date)||a.company.localeCompare(b.company,'zh-Hant')||(rank[a.job]??99)-(rank[b.job]??99)||a.job.localeCompare(b.job,'zh-Hant')||a.name.localeCompare(b.name,'zh-Hant-u-co-stroke')||a.empId.localeCompare(b.empId));
  return {rows,issues};

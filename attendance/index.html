@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-special-overtime"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -15761,33 +15761,21 @@ function getManualPairRecordAnchor(record) {
                 const manualClockOutId = encodeURIComponent(String(row.clockOut?.id ?? ''));
                 const manualClockInTime = encodeURIComponent(String(row.clockIn?.timeStr ?? ''));
                 const manualClockOutTime = encodeURIComponent(String(row.clockOut?.timeStr ?? ''));
-                // Read the manually designated typhoon dates from the same-origin roster.
-                // This is a display label only: it does not alter punch records or payroll.
+                // Special-day hours are calculated from the exact clock interval; an open overnight shift is shown as pending.
                 let p79TyphoonCheckInBadge='';
                 if(row.clockIn){
-                    const punchDate=String(getAttendanceDateKey(row.clockIn.timeStr)||'').trim().replace(/\//g,'-');
                     try{
-                        const normalizeTyphoonDate=value=>String(value||'').trim().replace(/\//g,'-');
-                        const marked=JSON.parse(localStorage.getItem('p79-manual-typhoon-days-v1')||'[]');
-                        const shiftDates=new Set();
-                        const start=new Date(punchDate+'T00:00:00Z');
-                        let endKey=row.clockOut?normalizeTyphoonDate(getAttendanceDateKey(row.clockOut.timeStr)||''):punchDate;
-                        const inHourMatch=String(row.clockIn.timeStr||'').match(/(?:\s|T)(\d{1,2}):/);
-                        const inHour=inHourMatch?Number(inHourMatch[1]):-1;
-                        if(!row.clockOut&&inHour>=22){
-                            const overnightEnd=new Date(punchDate+'T00:00:00Z');
-                            overnightEnd.setUTCDate(overnightEnd.getUTCDate()+1);
-                            endKey=overnightEnd.toISOString().slice(0,10);
-                        }
-                        const end=new Date(endKey+'T00:00:00Z');
-                        if(Array.isArray(marked)&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime())){
-                            for(let day=new Date(start),limit=0;day<=end&&limit<4;day.setUTCDate(day.getUTCDate()+1),limit++){
-                                shiftDates.add(day.toISOString().slice(0,10));
-                            }
-                            if(marked.some(day=>shiftDates.has(normalizeTyphoonDate(day)))){
-                                p79TyphoonCheckInBadge='<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="此班次跨越管理員標記的颱風停班日期（本瀏覽器）">颱</span>';
-                            }
-                        }
+                        const parts=window.P79SpecialOvertime?.forShift(
+                            getAttendanceTimestamp(row.clockIn),
+                            row.clockOut?getAttendanceTimestamp(row.clockOut):null,
+                            row.clockIn.timeStr
+                        )||[];
+                        p79TyphoonCheckInBadge=parts.map(part=>{
+                            const codes=part.kinds.map(kind=>kind.code).join('/');
+                            const names=part.kinds.map(kind=>kind.name).join('、');
+                            const hours=part.pending?'待結算':part.hours.toFixed(2)+' 小時';
+                            return '<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="'+escapeHtml(names+'｜此班次涵蓋特殊假日')+'">'+escapeHtml(codes+' '+hours)+'</span>';
+                        }).join('');
                     }catch(ignored){}
                 }
                 const inTime = row.clockIn
