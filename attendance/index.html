@@ -15773,8 +15773,7 @@ function getManualPairRecordAnchor(record) {
                         p79TyphoonCheckInBadge=parts.map(part=>{
                             const codes=part.kinds.map(kind=>kind.code).join('/');
                             const names=part.kinds.map(kind=>kind.name).join('、');
-                            const hours=part.pending?'待結算':part.hours.toFixed(2)+' 小時';
-                            return '<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="'+escapeHtml(names+'｜此班次涵蓋特殊假日')+'">'+escapeHtml(codes+' '+hours)+'</span>';
+                            return '<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="'+escapeHtml(names+'｜此班次涵蓋特殊假日')+'">'+escapeHtml(codes)+'</span>';
                         }).join('');
                     }catch(ignored){}
                 }
