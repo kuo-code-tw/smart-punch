@@ -17,13 +17,18 @@ const normalizeDate=value=>{
  return String(year).padStart(4,'0')+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
 };
 const readDays=key=>{try{const v=JSON.parse(g.localStorage?.getItem(key)||'[]');return new Set(Array.isArray(v)?v.map(normalizeDate).filter(Boolean):[])}catch(_){return new Set()}};
+function electionDates(){
+ const manual=readDays(ELECTION_KEY);
+ if(g.localStorage?.getItem('p79-election-days-configured-v1')!=='1')for(const date of OFFICIAL_ELECTION_DATES)manual.add(date);
+ return [...manual].sort();
+}
 function kindsForDate(value){
  const date=normalizeDate(value);if(!date)return [];
  const out=[];
  if(readDays(TYPHOON_KEY).has(date))out.push({code:'颱',kind:'typhoon',category:'國',name:'颱風停班日'});
  const official=g.P79OfficialCalendar?.get?.(date);
  const officialName=String(official?.name||'');
- if(OFFICIAL_ELECTION_DATES.has(date)||readDays(ELECTION_KEY).has(date)||/選舉|投票/.test(officialName))out.push({code:'選',kind:'election',category:'國',name:officialName||'選舉日'});
+ if(electionDates().includes(date)||/選舉|投票/.test(officialName))out.push({code:'選',kind:'election',category:'國',name:officialName||'選舉日'});
  return out;
 }
 function overlap(startMs,endMs){
@@ -44,7 +49,7 @@ function forShift(startMs,endMs,clockInText=''){
  if(pending&&hour>=22){const nextDate=new Date(Date.parse(taipeiDate(start)+'T00:00:00Z')+DAY_MS).toISOString().slice(0,10);end=Date.parse(nextDate+'T00:00:00+08:00')+1;}
  return overlap(start,end).map(item=>({...item,pending,hours:pending?null:item.hours}));
 }
-g.P79SpecialOvertime={normalizeDate,kindsForDate,overlap,forShift,signature:()=>JSON.stringify([[...OFFICIAL_ELECTION_DATES],g.localStorage?.getItem(TYPHOON_KEY)||'',g.localStorage?.getItem(ELECTION_KEY)||'',g.localStorage?.getItem('p79_official_calendar_annotations_v1')||''])};
+g.P79SpecialOvertime={electionDates,normalizeDate,kindsForDate,overlap,forShift,signature:()=>JSON.stringify([[...OFFICIAL_ELECTION_DATES],g.localStorage?.getItem(TYPHOON_KEY)||'',g.localStorage?.getItem(ELECTION_KEY)||'',g.localStorage?.getItem('p79-election-days-configured-v1')||'',g.localStorage?.getItem('p79_official_calendar_annotations_v1')||''])};
 
 function installWorkhoursAttendanceBridge(){
  const doc=g.document;

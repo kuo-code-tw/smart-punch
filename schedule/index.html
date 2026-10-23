@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-1"></script><script>window.P79ManagementOptimizationMode=true;</script>
+<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261023-1"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261021-linked-type&rev=20261022-workflow"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
@@ -1641,7 +1642,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
         <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
 <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
-        <button type="button" id="p79TyphoonDayButton" onclick="p79ToggleTyphoonDay()" title="標記或取消颱風停班日期">＋ 颱風假日期</button>
+        <button type="button" id="p79TyphoonDayButton" onclick="p79ToggleTyphoonDay()" title="編輯多筆颱風假及選舉日">颱風假／選舉日</button>
         <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
         <details class="p79-quick-legend"><summary>班別圖例 ▾</summary><div id="schedule-legend-left">
           <div class="flex items-center space-x-2 font-bold text-slate-700 dark:text-slate-200"><i class="fa-solid fa-circle-info text-indigo-500"></i><span>班別顏色：</span></div>
@@ -2971,16 +2972,13 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             port79ScheduleLastAutoSyncAt = Date.now();
             const yearMonth = document.getElementById('month-picker')?.value;
             if (yearMonth) initDefaultScheduleData(yearMonth, false);
+            // 先顯示已讀到的班表；整月考勤核對及寫入不阻擋首次顯示。
+            try { buildRoleTabsAndRender(); } catch(ignore) {}
             // 雲端班表成功載入後也核對缺打卡；先前只在手動存檔觸發，畫面一直顯示舊班別。
             // 沒有排班編輯權、考勤資料不完整或月份已切換時不變更。
             if(yearMonth && scheduleEditLockState.mine && !port79ScheduleDirty){
-              const changed=await p79ApplyNoPunchRestFromOfficial(yearMonth);
-              if(changed && currentScheduleMonthKey()===yearMonth && scheduleEditLockState.mine){
-                const saved=await saveScheduleMonthToCloud(false);
-                if(!saved)console.warn('無打卡自動改休已在本機顯示，但尚未成功儲存雲端');
-              }
+              p79QueueScheduleNoPunchReconcile(yearMonth);
             }
-            try { buildRoleTabsAndRender(); } catch(ignore) {}
             return true;
           }
           if (attempt < retryCount) {
@@ -2991,6 +2989,20 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       } finally {
         port79ScheduleAutoSyncBusy = false;
       }
+    }
+
+    const p79ScheduleNoPunchTasks=new Map();
+    function p79QueueScheduleNoPunchReconcile(yearMonth){
+      if(p79ScheduleNoPunchTasks.has(yearMonth))return p79ScheduleNoPunchTasks.get(yearMonth);
+      const task=p79ApplyNoPunchRestFromOfficial(yearMonth).then(async changed=>{
+        if(changed && currentScheduleMonthKey()===yearMonth && scheduleEditLockState.mine){
+          const saved=await saveScheduleMonthToCloud(false);
+          if(!saved)console.warn('無打卡自動改休已在本機顯示，但尚未成功儲存雲端');
+        }
+      }).catch(error=>console.warn('排班背景考勤核對失敗',error)).finally(()=>{
+        if(p79ScheduleNoPunchTasks.get(yearMonth)===task)p79ScheduleNoPunchTasks.delete(yearMonth);
+      });
+      p79ScheduleNoPunchTasks.set(yearMonth,task);return task;
     }
 
     function scheduleTaipeiTodayKey() {
@@ -4050,7 +4062,9 @@ function p79EmployeeDateEligible(emp,date) {
     // 只在持有排班編輯鎖且正式考勤全月讀取成功時，自動把無任何打卡的已過日期改為「休」。
     // 考勤歸屬以原上班日為準；隔日凌晨的 OUT 同時計入前一日，避免跨日班誤判。
     async function p79ApplyNoPunchRestFromOfficial(yearMonth) {
-      if(!scheduleEditLockState.mine)return 0;
+      const requestMutationVersion=p79ScheduleLocalMutationVersion;
+      const requestViewVersion=p79ScheduleAttendanceViewVersion;
+      if(!scheduleEditLockState.mine||port79ScheduleDirty)return 0;
       const token=currentPort79SsoToken();
       if(!token)return 0;
       const today=scheduleTaipeiTodayKey();
@@ -4073,7 +4087,7 @@ function p79EmployeeDateEligible(emp,date) {
         console.warn('未能安全核對全月正式考勤，排班保持原狀',error);
         return 0;
       }finally{clearTimeout(timeout);}
-      if(document.getElementById('month-picker')?.value!==yearMonth||!scheduleEditLockState.mine||currentPort79SsoToken()!==token)return 0;
+      if(document.getElementById('month-picker')?.value!==yearMonth||!scheduleEditLockState.mine||currentPort79SsoToken()!==token||requestViewVersion!==p79ScheduleAttendanceViewVersion||requestMutationVersion!==p79ScheduleLocalMutationVersion||port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight)return 0;
       const presence=new Set();
       const stamp=record=>{
         const raw=String(record?.timeStr||record?.time||'');
@@ -5412,39 +5426,16 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const button=document.getElementById('p79TyphoonDayButton');
       if(!button||!/^\d{4}-\d{2}$/.test(String(month||'')))return;
       const days=p79TyphoonDates().filter(date=>date.startsWith(month+'-')).sort();
-      const label=days.map(date=>date.slice(5).replace('-','/')).join('、');
-      const evidenceStatus=p79ScheduleRestClient().status(month);
-      button.textContent=days.length?'颱風假：'+label+(evidenceReady?'':evidenceStatus.error?'（考勤讀取失敗）':'（考勤待核）'):'＋ 颱風假日期（本月未設定）';
-      button.title=days.length?'本月已標記：'+days.join('、')+'。點此新增日期，或再次輸入同一天取消。颱風標記目前只保存在此瀏覽器。':'本月尚未標記颱風停班日。點此輸入日期後，班表日期表頭才會顯示颱假。';
+      const elections=window.P79SpecialOvertime.electionDates().filter(date=>date.startsWith(month+'-'));
+      const label=dates=>dates.map(date=>date.slice(5).replace('-','/')).join('、');
+      button.textContent='編輯颱風假／選舉日'+(days.length?'｜颱 '+days.length+'天':'')+(elections.length?'｜選 '+elections.length+'天':'');
+      button.title='颱風假：'+(label(days)||'未設定')+'；選舉日：'+(label(elections)||'未設定')+'。點擊開啟日期清單，可新增、修改、刪除及設定連續多天。';
     }
     function p79ToggleTyphoonDay(){
-      const month=document.getElementById('month-picker')?.value||new Date().toISOString().slice(0,7);
-      const markedDates=p79TyphoonDates().filter(date=>date.startsWith(month+'-')).sort();
-      const today=scheduleTaipeiTodayKey();
-      const suggestion=today.startsWith(month+'-')?today:month+'-01';
-      const raw=prompt('輸入颱風停班日期（YYYY-MM-DD）。已標記的日期再次輸入可取消。\n本月已標記：'+(markedDates.join('、')||'尚未設定')+'\n此標記只保存在這台瀏覽器；不會修改班別或薪資。',suggestion);
-      if(raw===null)return;
-      const date=raw.trim();
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
-        alert('請使用 YYYY-MM-DD 格式，例如 2026-10-23。');return;
-      }
-      const d=new Date(date+'T12:00:00');
-      if(Number.isNaN(d.getTime())||d.getFullYear()!==Number(date.slice(0,4))||d.getMonth()+1!==Number(date.slice(5,7))||d.getDate()!==Number(date.slice(8,10))){
-        alert('日期無效，請重新輸入。');return;
-      }
-      const selected=new Set(p79TyphoonDates());
-      if(selected.has(date)){
-        if(!confirm('取消 '+date+' 的颱風假標記？'))return;
-        selected.delete(date);
-      }else{
-        if(!confirm('將 '+date+' 標記為颱風停班日？請先確認地方政府公告。'))return;
-        selected.add(date);
-      }
-      try{localStorage.setItem(P79_TYPHOON_DATES_KEY,JSON.stringify([...selected].sort()));}
-      catch(e){alert('儲存失敗，瀏覽器可能禁止儲存資料。');return;}
-      renderRoleScheduleView();
-      // Ensure the absence/presence check starts even if the day was marked after initial page load.
-      p79RefreshScheduleRestEvidence();
+      window.P79SpecialDaysEditor.open({month:currentScheduleMonthKey(),onSave:()=>{
+        renderRoleScheduleView();
+        p79RefreshScheduleRestEvidence();
+      }});
     }
     async function p79PullOfficialHolidays(){
       const button=document.getElementById('p79PullOfficialHolidays'),status=document.getElementById('p79OfficialHolidayStatus'),month=document.getElementById('month-picker')?.value;
@@ -5487,6 +5478,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // Cache typhoon markers and attendance evidence once per render; avoid storage
       // parsing and evidence lookups on every employee/day cell.
       const typhoonDays=new Set(p79TyphoonDates().filter(date=>date.startsWith(yearMonth+'-')));
+      const electionDays=new Set(window.P79SpecialOvertime.electionDates().filter(date=>date.startsWith(yearMonth+'-')));
       const attendanceEvidence=monthEvidence?.evidence||{complete:false,days:{}};
       const attendanceSnapshot={attendanceEvidence};
       const typhoonToday=scheduleTaipeiTodayKey();
@@ -5647,8 +5639,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const dayOfWeek = dateObj.getDay();
         const official=window.P79OfficialCalendar?.get(dayStr);
         const manualTyphoon=typhoonDays.has(dayStr);
-        const holidayName=manualTyphoon?'手動標記：颱風停班':official?.name||NATIONAL_HOLIDAYS[dayStr];
-        const officialTag=manualTyphoon?'颱假':official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
+        const electionDay=electionDays.has(dayStr)||/選舉|投票/.test(String(official?.name||''));
+        const holidayName=[manualTyphoon?'手動標記：颱風停班':'',electionDay?'選舉日':'',official?.name||NATIONAL_HOLIDAYS[dayStr]||''].filter(Boolean).join('／');
+        const officialTag=manualTyphoon?(electionDay?'颱／選':'颱假'):electionDay?'選舉':official?.kind==='補假'?'補假':official?'官休':holidayName?'國定':'';
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
         let thBgClass = isWeekend ? 'bg-indigo-100/70 text-indigo-900 font-bold' : 'bg-slate-100 text-slate-700';
