@@ -15772,7 +15772,7 @@ function getManualPairRecordAnchor(record) {
                         const shiftDates=new Set();
                         const start=new Date(punchDate+'T00:00:00Z');
                         let endKey=row.clockOut?normalizeTyphoonDate(getAttendanceDateKey(row.clockOut.timeStr)||''):punchDate;
-                        const inHourMatch=String(row.clockIn.timeStr||'').match(/(?:\\s|T)(\\d{1,2}):/);
+                        const inHourMatch=String(row.clockIn.timeStr||'').match(/(?:\s|T)(\d{1,2}):/);
                         const inHour=inHourMatch?Number(inHourMatch[1]):-1;
                         if(!row.clockOut&&inHour>=22){
                             const overnightEnd=new Date(punchDate+'T00:00:00Z');
@@ -15781,7 +15781,7 @@ function getManualPairRecordAnchor(record) {
                         }
                         const end=new Date(endKey+'T00:00:00Z');
                         if(Array.isArray(marked)&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime())){
-                            for(const day=new Date(start),limit=0;day<=end&&limit<4;day.setUTCDate(day.getUTCDate()+1),limit++){
+                            for(let day=new Date(start),limit=0;day<=end&&limit<4;day.setUTCDate(day.getUTCDate()+1),limit++){
                                 shiftDates.add(day.toISOString().slice(0,10));
                             }
                             if(marked.some(day=>shiftDates.has(normalizeTyphoonDate(day)))){
