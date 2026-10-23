@@ -15765,10 +15765,10 @@ function getManualPairRecordAnchor(record) {
                 // This is a display label only: it does not alter punch records or payroll.
                 let p79TyphoonCheckInBadge='';
                 if(row.clockIn){
-                    const punchDate=String(getAttendanceDateKey(row.clockIn.timeStr)||'').trim();
+                    const punchDate=String(getAttendanceDateKey(row.clockIn.timeStr)||'').trim().replace(/\//g,'-');
                     try{
                         const marked=JSON.parse(localStorage.getItem('p79-manual-typhoon-days-v1')||'[]');
-                        if(Array.isArray(marked)&&marked.includes(punchDate)){
+                        if(Array.isArray(marked)&&marked.some(day=>String(day||'').trim().replace(/\//g,'-')===punchDate)){
                             p79TyphoonCheckInBadge='<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="此上班簽到日期已由管理員標記為颱風停班日（本瀏覽器）">颱</span>';
                         }
                     }catch(ignored){}
