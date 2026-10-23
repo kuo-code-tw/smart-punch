@@ -3,7 +3,7 @@ const api=c.P79ScheduleRestSummary,emp={id:'FIXTURE',name:'測試'},month='2026-
 assert.equal(sum().remaining,null,'local cached roster does not prove cloud declarations');
 api.acceptRows([{empId:emp.id,schedule}]);assert.deepEqual(json(sum().remaining),{國:2,休:1,例:0},'all month including hidden 28th/29th is counted');
 schedule.__meta[dates[0]]={restCategory:'休',restQuotaOvertime:true,restAllocationSource:'manual',overtimeReport:{id:'DRAFT',category:'休',code:'休08-16'}};
-assert.equal(sum().reported.休,0,'unsaved local draft is not counted as a stored declaration');assert.equal(sum().remaining.休,1);
+assert.equal(sum().reported.休,0,'unsaved local draft is not counted as a stored declaration');assert.equal(sum().reserved.休,1,'explicit pending rest overtime reserves its quota');assert.equal(sum().remaining.休,0);
 const saved=JSON.parse(JSON.stringify(schedule));api.acceptRows([{empId:emp.id,schedule:saved}],month);assert.equal(sum().reported.休,1);assert.equal(sum().remaining.休,0);assert.equal(sum().remaining.國,2);
 // Retrying a confirmed snapshot never deducts twice, and later local mutation does not alter receipt.
 api.acceptRows([{empId:emp.id,schedule:saved}],month);assert.equal(sum().reported.休,1);saved.__meta[dates[0]].overtimeReport.category='國';assert.equal(sum().reported.休,1,'accepted reports are immutable');
