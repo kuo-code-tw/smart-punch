@@ -13,16 +13,13 @@ const idless=JSON.parse(JSON.stringify(schedule));idless.__meta[dates[0]].overti
 api.acceptRows([{empId:'OTHER',schedule:updated}],month);assert.equal(sum().reported.國,0,'employee identities never share deductions');
 api.acceptRows([{empId:emp.id,schedule:updated}],month);api.acceptRows([{empId:emp.id,schedule:{'2026-11-01':'早'}}],'2026-11');assert.equal(sum().reported.國,1,'another month does not erase confirmed October');
 const incomplete={...schedule};delete incomplete[dates[10]];assert.equal(api.summary(emp,incomplete,{},month,{},'').remaining,null,'incomplete roster is not a false zero');api.clear();assert.equal(sum().remaining,null,'session reset cannot reuse another account confirmations');
-// Renderer uses the same pending result; day-view filters cannot affect it.
-const html=fs.readFileSync('schedule/index.html','utf8');let a=html.indexOf('    function p79ScheduleRestCountCells('),b=html.indexOf('    function p79RefreshScheduleRestCounts(',a);Object.assign(c,{p79RestQuota:c.p79RestQuota,approvedLeaveForEmployee:()=>null,leaveCoverAssignments:[],p79EmploymentStartDate:()=>'',monthlyScheduleData:{[emp.id]:schedule},p79AutomaticRestMetadata:()=>schedule.__meta,scheduleEscapeHtml:x=>String(x||'')});c.p79ScheduleRestBalance=(e,m)=>api.summary(e,schedule,schedule.__meta,m,{},'');vm.runInContext(html.slice(a,b),c);
-api.acceptRows([{empId:emp.id,schedule:updated}],month);const rendered=c.p79ScheduleRestCountCells(emp,month);assert.match(rendered,/<span>4\/0<\/span>/);assert.match(rendered,/<span>5\/0<\/span>/);assert.match(rendered,/<span>1\/1<\/span>/);assert.match(rendered,/已申報 1 天/);
-// Requested display: four rest days and one pending become five accounted after cloud success.
-const twoNational=JSON.parse(JSON.stringify(schedule));twoNational.__meta={};for(const date of [dates[16],dates[17]])twoNational.__meta[date]={overtimeReport:{id:'N'+date,category:'國'}};
-api.acceptRows([{empId:emp.id,schedule:twoNational}],month);let counts=c.p79ScheduleRestCountCells(emp,month);assert.match(counts,/<span>4\/0<\/span>/);assert.match(counts,/<span>4\/1<\/span>/);assert.match(counts,/<span>2\/0<\/span>/);
-twoNational.__meta[dates[0]]={overtimeReport:{id:'CONFIRMED-REST',category:'休'}};api.acceptRows([{empId:emp.id,schedule:twoNational}],month);counts=c.p79ScheduleRestCountCells(emp,month);assert.match(counts,/<span>5\/0<\/span>/,'successful extra rest declaration changes 4/1 to 5/0');
-api.clear();assert.match(c.p79ScheduleRestCountCells(emp,month),/<span>—\/—<\/span>/,'unconfirmed data must not imply accounted days');
+// Renderer formats the current per-category audit; cloud snapshot accounting is tested above.
+const html=fs.readFileSync('schedule/index.html','utf8');let a=html.indexOf('    function p79ScheduleRestCountCells('),b=html.indexOf('    function p79RefreshScheduleRestCounts(',a);
+Object.assign(c,{p79RestQuota:()=>({counts:{例:4,休:5,國:2}}),p79DailyRestCount:()=>({counts:{例:4,休:5,國:1},dates:{例:['01','02','03','04'],休:['05','06','07','08','09'],國:['10']}}),scheduleEscapeHtml:x=>String(x||'')});
+vm.runInContext(html.slice(a,b),c);
+const rendered=c.p79ScheduleRestCountCells(emp,month);assert.match(rendered,/<span>4\/0<\/span>/);assert.match(rendered,/<span>5\/0<\/span>/);assert.match(rendered,/<span>1\/1<\/span>/);assert.match(rendered,/國超額|p79-rest-national/);
 assert(html.includes('acceptRows(data.schedules||[])'));assert(html.includes('acceptRows(confirmedRestRows,yearMonth)'));assert(html.includes('p79RefreshScheduleRestCounts(yearMonth)'));assert(!html.includes('for(const d of visibleDays){const date=yearMonth'));
-console.log('PASS schedule summary: full-month pending counts; official cloud reads; drafts/failure; successful write snapshots; retries; delete; identity/month reset; unknown state; shared calculation and rendered accounted/pending transition 4/1 to 5/0');
+console.log('PASS schedule summary: full-month cloud accounting, drafts/failure, successful write snapshots, retries, delete, identity/month reset, unknown state and category audit rendering');
 
 // Legacy substitution keeps a manual rest marker from the original day off.
 const substituteRoster=Object.fromEntries(dates.map((d,i)=>[d,i<8?'休':'早']));
