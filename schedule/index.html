@@ -3300,6 +3300,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return result;
     }
 
+    // Reuse read-only previous-month personnel metadata during frequent live-punch polls.
+    // Manual refresh bypasses this short cache; token and month changes invalidate it.
+    let p79PreviousMonthPersonnelCache=null;
     async function refreshScheduleAttendanceState(showError=false) {
       if(!applyScheduleAttendanceMonthScope())return false;
       const requestMonth=currentScheduleMonthKey(),requestViewVersion=p79ScheduleAttendanceViewVersion;
@@ -3326,10 +3329,18 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             const [year,number]=requestMonth.split('-').map(Number);
             const previousDate=new Date(year,number-2,1);
             const previous=previousDate.getFullYear()+'-'+String(previousDate.getMonth()+1).padStart(2,'0');
-            const priorResponse=await fetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(previous)+'&_='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller?.signal});
-            const prior=await priorResponse.json();
-            if(!prior?.ok)throw new Error(prior?.error||'上月組別讀取失敗，請重新整理');
-            const inheritedRows=(prior.schedules||[]).filter(row=>String(row.month||'').trim()===previous).map(row=>({...row,schedule:{__personnel:{...(row.schedule?.__personnel||{}),group:row.schedule?.__personnel?.group??row.group??'不分組'}}}));
+            const cached=p79PreviousMonthPersonnelCache;
+            let inheritedRows;
+            if(!showError&&cached?.month===previous&&cached?.token===token&&Date.now()-cached.at<120000){
+              inheritedRows=cached.rows;
+            }else{
+              const priorResponse=await fetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(previous)+'&_='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller.signal});
+              if(!priorResponse.ok)throw new Error('上月組別讀取失敗（HTTP '+priorResponse.status+'）');
+              const prior=await priorResponse.json();
+              if(!prior?.ok)throw new Error(prior?.error||'上月組別讀取失敗，請重新整理');
+              inheritedRows=(prior.schedules||[]).filter(row=>String(row.month||'').trim()===previous).map(row=>({...row,schedule:{__personnel:{...(row.schedule?.__personnel||{}),group:row.schedule?.__personnel?.group??row.group??'不分組'}}}));
+              p79PreviousMonthPersonnelCache={month:previous,token,at:Date.now(),rows:inheritedRows};
+            }
             data.schedules=[...(data.schedules||[]),...inheritedRows];
           }
         } finally { clearTimeout(timer); }
