@@ -15032,7 +15032,7 @@ function getManualPairRecordAnchor(record) {
                 }));
                 const target = new URL('../work-hours/', location.href);
                 target.search = '';
-                target.searchParams.set('v', '20261023-attendance-report-v1');
+                target.searchParams.set('v', '20261023-attendance-report-v2');
                 target.searchParams.set('attendanceOvertimeReport', '1');
                 target.hash = location.hash || '';
                 location.assign(target.toString());
