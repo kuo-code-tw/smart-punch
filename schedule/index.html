@@ -1515,7 +1515,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       <div class="max-w-[1920px] mx-auto space-y-3">
 
         <!-- 圖片一：常用操作全部拉到最上面 -->
-        <div id="schedule-top-actions">
+        <div id="p79OfficialHolidayToolbar" style="display:flex!important;align-items:center;flex-wrap:wrap;gap:10px;width:100%;padding:10px 12px;margin-bottom:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;position:relative;z-index:60">
+            <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" style="display:inline-flex!important;align-items:center;visibility:visible!important;opacity:1!important;padding:9px 14px;background:#0369a1;color:white;border:0;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">↻ 拉取官方假日</button>
+            <span id="p79OfficialHolidayStatus" role="status" style="font-size:12px;color:#334155">選擇月份後可手動核對官方假日；颱風停班尚未自動套用</span>
+            <a href="https://alerts.ncdr.nat.gov.tw/RssAtomFeed.ashx?AlertType=33" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#0369a1;text-decoration:underline">官方停班公告</a>
+          </div>
+          <div id="schedule-top-actions">
           <div class="schedule-action-left">
             <a href="../?v=20260927.7.13" class="schedule-top-action inline-flex items-center px-3 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 text-xs font-bold shadow-sm no-underline" title="返回79號碼頭雲端智慧系統首頁">
               <i class="fa-solid fa-house mr-1"></i> 返回首頁
@@ -1528,7 +1533,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           <div class="schedule-action-middle">
             <div id="scheduleRangeControl" class="schedule-top-action relative flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
               <label for="month-picker" class="text-xs font-black text-slate-600 dark:text-slate-300 whitespace-nowrap"><i class="fa-regular fa-calendar-days text-indigo-500 mr-1"></i>月份</label>
-              <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" style="padding:7px 11px;background:#0369a1;color:#fff;border-radius:9px;font-size:12px;font-weight:800">↻ 拉取官方假日</button><span id="p79OfficialHolidayStatus" role="status" style="font-size:11px;color:#475569">官方停班公告需另外核對</span><a href="https://alerts.ncdr.nat.gov.tw/RssAtomFeed.ashx?AlertType=33" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#0369a1;text-decoration:underline">高雄停班公告來源</a>
+              
               <input type="month" id="month-picker" value="" onchange="onScheduleMonthPickerChange()" class="bg-transparent border-0 outline-none text-sm font-black text-slate-800 dark:text-slate-100 min-w-[125px] cursor-pointer">
               <input type="hidden" id="scheduleDateFrom">
               <input type="hidden" id="scheduleDateTo">
