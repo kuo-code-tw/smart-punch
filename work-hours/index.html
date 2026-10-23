@@ -12820,7 +12820,7 @@ async function p79ExportOvertimeComparison(printMode){
                 restMetaByEmp.forEach(map=>Object.keys(map).forEach(date=>{if(date.startsWith(month+'-'))delete map[date];}));
                 p79MergeWorkOvertimeSnapshot(state,restMetaByEmp);
             });
-            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp],window.P79SpecialOvertime?.signature?.()||'']);
+            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp],globalThis.P79SpecialOvertime?.signature?.()||'']);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
             const employeeById = new Map(), employeeByAtt = new Map(), employeeByName = new Map();
@@ -12864,7 +12864,7 @@ async function p79ExportOvertimeComparison(printMode){
                     const attendanceIssue=p79OvertimeAttendanceIssue(session,start,end)||restMeta?.overtimeReport?.attendanceReview||'';
                     const baseOvertimeMinutes = restMeta?.overtimeReport?.attendanceReview?0:reportMinutes===null?(attendanceIssue?0:(totalMinutes>480+MIN_OVERTIME_MINUTES?totalMinutes-480:0)):reportMinutes;
                     const empKey=String(employee.empId).trim().toUpperCase();
-                    const specialParts=attendanceIssue?[]:(window.P79SpecialOvertime?.overlap(start,end)||[]).filter(part=>{
+                    const specialParts=attendanceIssue?[]:(globalThis.P79SpecialOvertime?.overlap(start,end)||[]).filter(part=>{
                         const specialMeta=restMetaByEmp.get(empKey)?.[part.date];
                         return !specialMeta?.overtimeExcluded&&!specialMeta?.overtimeReport;
                     });
