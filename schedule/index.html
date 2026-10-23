@@ -5489,6 +5489,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const typhoonDays=new Set(p79TyphoonDates().filter(date=>date.startsWith(yearMonth+'-')));
       const attendanceEvidence=monthEvidence?.evidence||{complete:false,days:{}};
       const attendanceSnapshot={attendanceEvidence};
+      const typhoonToday=scheduleTaipeiTodayKey();
 
       let roleEmps = employees.filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
 
@@ -5719,10 +5720,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // A verified whole-shift absence is final. On an in-progress typhoon day,
           // a completed attendance snapshot with no punch events is a provisional 颱;
           // an actual punch changes the evidence state to missing/worked and restores the roster.
-          // Never infer absence from an incomplete snapshot or a future shift.
-          const typhoonShiftPeriod=typhoonDays.has(dayStr)?window.P79RestAttendance.period(dayStr,monthlyScheduleData[emp.id]||{}):null;
+          // Never infer absence from an incomplete snapshot or a future date.
           const typhoonProvisional=attendanceEvidence.complete===true&&attendanceState==='open'&&
-            dayStr<=scheduleTaipeiTodayKey()&&typhoonShiftPeriod&&Date.now()>=typhoonShiftPeriod.start;
+            dayStr<=typhoonToday;
           const typhoonNoPunch=typhoonDays.has(dayStr)&&(attendanceState==='rest'||typhoonProvisional)&&
             !ownApprovedLeave&&rosterShift!=='離';
           const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
