@@ -127,7 +127,7 @@ function installWorkhoursAttendanceBridge(){
   doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='visible')refresh()});
   const generatedOnly=cell=>{
    const text=String(cell?.textContent||'');
-   return text.includes('國定假日自動加班')&&!/(申報|已安排|設定換算)/.test(text);
+   return /特殊日待申報|國定假日自動加班/.test(text)&&!/(已申報|申報\s*\d|已安排|設定換算)/.test(text);
   };
   const cleanGeneratedDeleteButtons=()=>{
    const table=doc.getElementById('overtimeTableBody');

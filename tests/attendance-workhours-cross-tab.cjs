@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const source=fs.readFileSync('assets/port79-special-overtime.js','utf8');
 const listeners={},docListeners={};let queuedTimer=null,refreshes=0,renders=0,alerts=[],removedAuto=0,removedReported=0;
 const button=(cell,kind)=>({textContent:'刪除加班',closest:()=>cell,remove(){kind==='auto'?removedAuto++:removedReported++}});
-const autoCell={textContent:'國定假日自動加班｜4.55 小時（颱）',querySelectorAll:()=>[button(autoCell,'auto')]};
+const autoCell={textContent:'特殊日待申報｜4.55 小時（颱）',querySelectorAll:()=>[button(autoCell,'auto')]};
 const reportedCell={textContent:'國定假日自動加班｜8 小時（颱）申報 8小時',querySelectorAll:()=>[button(reportedCell,'reported')]};
 const row=cell=>({querySelectorAll:selector=>selector==='td'?Array.from({length:7},()=>({})).concat(cell):[]});
 const table={querySelectorAll:()=>[row(autoCell),row(reportedCell)]};

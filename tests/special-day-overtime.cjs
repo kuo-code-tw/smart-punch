@@ -17,13 +17,13 @@ assert.equal(election.minutes,240);assert.equal(election.kinds[0].code,'選');
 vm.runInContext(app,ctx);
 const employee={empId:'A1',name:'測試員',jobTitle:'AQC'};
 const exportTyphoon=ctx.P79OvertimeApplication.collect([{schedules:[{empId:'A1',schedule:{__meta:{}}}],pairs:[{empId:'A1',start,end}]}],[employee],['2026-10-23'],'',[],'actual');
-assert.equal(exportTyphoon.rows.length,1);assert.equal(exportTyphoon.rows[0].periods[3],8);assert.equal(exportTyphoon.rows[0].actual,8);assert.equal(exportTyphoon.rows[0].converted,8);assert.match(exportTyphoon.rows[0].note,/颱風/);
+assert.equal(exportTyphoon.rows.length,0,'special-day overtime must not auto-create formal declaration rows');
 const electionStart=Date.parse('2026-11-28T08:00:00+08:00'),electionEnd=Date.parse('2026-11-28T12:00:00+08:00');
 const exportElection=ctx.P79OvertimeApplication.collect([{schedules:[{empId:'A1',schedule:{__meta:{}}}],pairs:[{empId:'A1',start:electionStart,end:electionEnd}]}],[employee],['2026-11-28'],'',[],'actual');
-assert.equal(exportElection.rows[0].actual,4);assert.equal(exportElection.rows[0].converted,4);assert.match(exportElection.rows[0].note,/選舉/);
+assert.equal(exportElection.rows.length,0,'election-day work must also wait for a saved declaration');
 const manual={id:'M1',category:'國',typeName:'國定假日加班',overtimeStart:'24',overtimeEnd:'08',declaredHours:8,convertedHours:8};
 const noDouble=ctx.P79OvertimeApplication.collect([{schedules:[{empId:'A1',schedule:{__meta:{'2026-10-23':{overtimeReport:manual}}}}],pairs:[{empId:'A1',start,end}]}],[employee],['2026-10-23'],'',[],'actual');
 assert.equal(noDouble.rows.length,1);assert.equal(noDouble.rows[0].actual,8);
 for(const [label,html] of [['attendance',attendance],['work-hours',workhours]]){let count=0;for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){if(match[1].trim()){new vm.Script(match[1]);count++;}}assert(count>0);assert(html.includes('port79-special-overtime.js'));}
-assert(workhours.includes('ordinaryWorkMinutes=Math.max(0,totalMinutes-specialOvertimeMinutes)'));assert(workhours.includes('specialOvertimeMinutes'));assert(attendance.includes('P79SpecialOvertime?.forShift'));
-console.log('PASS typhoon midnight overlap, election-day hours, open shift pending, 1:1 overtime export, duplicate-report guard, and page wiring');
+assert(workhours.includes('overtimeMinutes=ordinaryWorkMinutes>480+MIN_OVERTIME_MINUTES?ordinaryWorkMinutes-480:0'));assert(workhours.includes('特殊日待申報'));assert(workhours.includes('p79CanReportOvertime()?'));assert(attendance.includes('P79SpecialOvertime?.forShift'));assert(attendance.includes('24-08'));assert(attendance.includes('已申報'));assert(attendance.includes("preferredType:saved?.typeName||(specialParts.length?'國定假日加班':'')"));assert(app.includes('未建立正式申報前不產生加班申報匯出列'));
+console.log('PASS typhoon/election manual declarations, no auto-generated report rows, attendance status, and page wiring');

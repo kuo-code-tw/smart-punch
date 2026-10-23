@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-overtime-delete-sync"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-manual-overtime-report-v1"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -14997,25 +14997,29 @@ function getManualPairRecordAnchor(record) {
             const date=p79AttendanceOvertimeDate(row), id=String(row?.empId||'').trim().toUpperCase();
             const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
             const meta=roster.__meta?.[date]||{};
+            const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
+            const reportDate=[date,...specialDates].find(day=>roster.__meta?.[day]?.overtimeReport)||date;
+            const reportMeta=roster.__meta?.[reportDate]||{};
+            const report=reportMeta.overtimeReport||meta.overtimeReport||null;
             const cover=state.covers.find(a=>date>=a.startDate && date<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
             const substitute=!!cover || !!meta.forEmpId || meta.type==='substitute';
-            if(!substitute && !meta.overtime && !meta.restQuotaOvertime && !meta.overtimeReport)return null;
+            if(!substitute && !meta.overtime && !meta.restQuotaOvertime && !report)return null;
             const ranges={早:['08:00','16:00'],中:['16:00','00:00'],晚:['00:00','08:00']};
             const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
             const shift=ranges[roster[date]]?roster[date]:target[date];
-            let times=meta.overtimeStart && meta.overtimeEnd?[meta.overtimeStart,meta.overtimeEnd]:ranges[shift];
-            if(cover?.mode==='two' && !meta.overtimeStart && times){
+            let times=report?.overtimeStart&&report?.overtimeEnd?[report.overtimeStart,report.overtimeEnd]:meta.overtimeStart && meta.overtimeEnd?[meta.overtimeStart,meta.overtimeEnd]:ranges[shift];
+            if(cover?.mode==='two' && !meta.overtimeStart && !report && times){
                 const index=cover.workerIds.findIndex(x=>String(x).trim().toUpperCase()===id);
                 const halves={早:[['08:00','12:00'],['12:00','16:00']],中:[['16:00','20:00'],['20:00','00:00']],晚:[['00:00','04:00'],['04:00','08:00']]};
                 times=halves[shift]?.[index===1?1:0];
             }
-            const category=substitute?'代':meta.overtimeReport?.category || (meta.restQuotaOvertime?meta.restCategory:'加');
-            if(!times)return {label:category+'班',minutes:null};
-            const minutes=t=>{const m=String(t).match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):NaN;};
+            const category=substitute?'代':report?.category||meta.overtimeReport?.category||(meta.restQuotaOvertime?meta.restCategory:'加');
+            if(!times)return {label:category+'班',minutes:null,report};
+            const minutes=t=>{const m=String(t).match(/^(\d{1,2})(?::(\d{2}))?$/);return m?Number(m[1])*60+Number(m[2]||0):NaN;};
             const start=minutes(times[0]),end=minutes(times[1]);
-            if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null};
-            const compact=(t,isEnd)=>t==='00:00'?(isEnd?'24':'24'):String(t).replace(/:00$/,'');
-            return {label:category+compact(times[0],false)+'-'+compact(times[1],true),minutes:(end-start+1440)%1440};
+            if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null,report};
+            const compact=(t,isEnd)=>t==='00:00'||t==='24:00'||String(t)==='24'?'24':String(t).replace(/:00$/,'');
+            return {label:category+compact(times[0],false)+'-'+compact(times[1],true),minutes:(end-start+1440)%1440,report};
         }
         function attendanceRowAttendanceMinutes(row) {
             if (!row?.clockIn || !row?.clockOut) return null;
@@ -15031,12 +15035,15 @@ function getManualPairRecordAnchor(record) {
         function attendanceRowOvertimeText(row) {
             const actual=attendanceRowOvertimeMinutes(row);
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
-            p79LoadAttendanceOvertimeMonth(month);
-            const state=p79AttendanceOvertimeMonths.get(month);
-            const planned=state?.ready && state.token===getAttendanceEmployeeMasterToken()?p79AttendanceReportedOvertime(row,state):null;
+            const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
+            const months=[...new Set([month,...specialDates.map(date=>date.slice(0,7))])];
+            months.forEach(key=>p79LoadAttendanceOvertimeMonth(key));
+            const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===getAttendanceEmployeeMasterToken());
+            const planned=states.map(state=>p79AttendanceReportedOvertime(row,state)).find(value=>value?.report)||states.map(state=>p79AttendanceReportedOvertime(row,state)).find(Boolean)||null;
             if(!planned)return formatDurationMinutes(actual);
             const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-            return `<div class="text-cyan-700 dark:text-cyan-300">${label}</div>${planned.minutes!==null?`<div class="text-xs">申報 ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
+            const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
+            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${declared}</div>${planned.minutes!==null?`<div class="text-xs">申報 ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
         }
 
         function p79CanManageOvertime() {
@@ -15068,12 +15075,24 @@ function getManualPairRecordAnchor(record) {
                 return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
             }
             try {
+                const shiftStart=getAttendanceTimestamp(row.clockIn),shiftEnd=getAttendanceTimestamp(row.clockOut);
+                const specialParts=window.P79SpecialOvertime?.forShift(shiftStart,shiftEnd,row.clockIn.timeStr)||[];
+                // 申報仍使用考勤簽到日；跨午夜時「24-08」代表簽到日之後的00:00-08:00。
+                const reportDate=date;
+                const reportStart=String(row.clockIn.timeStr||''),reportEnd=String(row.clockOut.timeStr||'');
+                const month=reportDate.slice(0,7),state=p79AttendanceOvertimeMonths.get(month);
+                const saved=state?.ready&&state.token===getAttendanceEmployeeMasterToken()?p79AttendanceReportedOvertime(row,state)?.report:null;
                 sessionStorage.setItem('port79_attendance_overtime_request_v1', JSON.stringify({
-                    empId: String(employee.empId), name: String(employee.name || row.name || ''), date
+                    empId: String(employee.empId), name: String(employee.name || row.name || ''), date:reportDate,
+                    clockIn:String(row.clockIn.timeStr||''),clockOut:String(row.clockOut.timeStr||''),
+                    reportStart,reportEnd,
+                    category:saved?.category||(specialParts.length?'國':''),
+                    preferredType:saved?.typeName||(specialParts.length?'國定假日加班':''),
+                    code:saved?.code||''
                 }));
                 const target = new URL('../work-hours/', location.href);
                 target.search = '';
-                target.searchParams.set('v', '20261023-attendance-report-v2');
+                target.searchParams.set('v', '20261023-attendance-overtime-sync-v3');
                 target.searchParams.set('attendanceOvertimeReport', '1');
                 target.hash = location.hash || '';
                 location.assign(target.toString());

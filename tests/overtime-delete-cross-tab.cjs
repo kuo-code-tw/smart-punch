@@ -6,6 +6,8 @@ assert(workhours.startsWith('<!DOCTYPE html>'),'remove accidental output-truncat
 const verification=workhours.indexOf("if(remaining?.overtimeReport||remaining?.overtime)throw Error('雲端仍存在此筆加班");
 const broadcast=workhours.indexOf("localStorage.setItem('p79_schedule_overtime_changed_v1'");
 assert(verification>=0&&broadcast>verification,'broadcast only after the server confirms deletion');
+const savedReportBroadcast=workhours.indexOf("localStorage.setItem('p79_schedule_overtime_changed_v1'",workhours.indexOf('async function p79SaveWorkOvertimeDraft'));
+assert(savedReportBroadcast>0,'saved declaration notifies attendance to refresh its cloud overtime status');
 assert(attendance.includes("window.addEventListener('p79:schedule-overtime-changed'"),'attendance listens for schedule updates');
 assert(attendance.includes('p79AttendanceOvertimeMonths.delete(key);')&&attendance.includes('p79LoadAttendanceOvertimeMonth(key);'),'attendance invalidates and reloads cached schedule data');
 const listeners={},dispatched=[];
