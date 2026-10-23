@@ -49,7 +49,37 @@ function installWorkhoursAttendanceBridge(){
  const doc=g.document;
  if(!doc||!g.addEventListener)return;
  const start=()=>{
-  if(doc.body?.dataset?.p79System!=='workhours')return;
+  const isWorkhoursPage=()=>doc.body?.dataset?.p79System==='workhours'||/\/work-hours\/?$/.test(String(g.location?.pathname||''));
+  if(!isWorkhoursPage())return;
+  const handoffUrl=()=>{
+   try{
+    const url=new URL(g.location.href);
+    if(url.searchParams.get('attendanceOvertimeReport')!=='1')return;
+    const key='port79_attendance_overtime_request_v1';
+    let request=null;
+    try{request=JSON.parse(g.sessionStorage?.getItem(key)||'null')}catch(_){}
+    if(!request?.empId||!/^\d{4}-\d{2}-\d{2}$/.test(String(request.date||''))){
+     const empId=String(url.searchParams.get('empId')||'').trim(),date=String(url.searchParams.get('date')||'').trim();
+     if(empId&&/^\d{4}-\d{2}-\d{2}$/.test(date)){
+      request={empId,date,name:String(url.searchParams.get('name')||'')};
+      try{g.sessionStorage?.setItem(key,JSON.stringify(request))}catch(_){}
+     }
+    }
+    const clean=()=>{
+     try{
+      const next=new URL(g.location.href);
+      ['attendanceOvertimeReport','empId','date','name'].forEach(name=>next.searchParams.delete(name));
+      g.history?.replaceState(g.history.state,'',next.pathname+next.search+next.hash);
+     }catch(_){}
+    };
+    if(request?.empId&&/^\d{4}-\d{2}-\d{2}$/.test(String(request.date||'')))g.setTimeout(clean,0);
+    else{
+     clean();
+     g.setTimeout(()=>g.showToast?.('申報連結資料已失效，請從考勤紀錄重新點選。', 'warning'),0);
+    }
+   }catch(_){}
+  };
+  handoffUrl();
   let refreshTimer=0,refreshBusy=false,refreshAgain=false;
   const hasPendingAttendanceWrites=()=>{
    try{
