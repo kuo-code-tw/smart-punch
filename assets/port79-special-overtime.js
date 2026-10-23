@@ -44,4 +44,75 @@ function forShift(startMs,endMs,clockInText=''){
  return overlap(start,end).map(item=>({...item,pending,hours:pending?null:item.hours}));
 }
 g.P79SpecialOvertime={normalizeDate,kindsForDate,overlap,forShift,signature:()=>JSON.stringify([[...OFFICIAL_ELECTION_DATES],g.localStorage?.getItem(TYPHOON_KEY)||'',g.localStorage?.getItem(ELECTION_KEY)||'',g.localStorage?.getItem('p79_official_calendar_annotations_v1')||''])};
+
+function installWorkhoursAttendanceBridge(){
+ const doc=g.document;
+ if(!doc||!g.addEventListener)return;
+ const start=()=>{
+  if(doc.body?.dataset?.p79System!=='workhours')return;
+  let refreshTimer=0,refreshBusy=false,refreshAgain=false;
+  const hasPendingAttendanceWrites=()=>{
+   try{
+    const queue=JSON.parse(g.localStorage?.getItem('sp_cloud_outbox_v1')||'[]');
+    return Array.isArray(queue)&&queue.some(item=>['addRecord','updateRecord','editRecord','deleteRecord','persistEmployeePunch'].includes(String(item?.payload?.action||'')));
+   }catch(_){return false}
+  };
+  const refresh=()=>{
+   if(hasPendingAttendanceWrites())return;
+   if(refreshBusy){refreshAgain=true;return}
+   if(refreshTimer)clearTimeout(refreshTimer);
+   refreshTimer=setTimeout(async()=>{
+    refreshTimer=0;
+    if(doc.visibilityState==='hidden'||hasPendingAttendanceWrites())return;
+    refreshBusy=true;
+    try{
+     let ok=false;
+     if(typeof g.p79StartupAttendanceCurrentMonthSync==='function')ok=await g.p79StartupAttendanceCurrentMonthSync(false);
+     if(!ok&&typeof g.p79PollAttendanceDelta==='function')await g.p79PollAttendanceDelta(true);
+     if(ok&&typeof g.renderOvertimeStats==='function')g.renderOvertimeStats();
+    }catch(_){}
+    finally{
+     refreshBusy=false;
+     if(refreshAgain){refreshAgain=false;refresh()}
+    }
+   },250);
+  };
+  g.addEventListener('storage',event=>{
+   if(event.key==='sp_records_v5')refresh();
+   if(event.key==='sp_cloud_outbox_v1'&&!hasPendingAttendanceWrites())refresh();
+  });
+  g.addEventListener('focus',refresh);
+  doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='visible')refresh()});
+  const generatedOnly=cell=>{
+   const text=String(cell?.textContent||'');
+   return text.includes('國定假日自動加班')&&!/(申報|已安排|設定換算)/.test(text);
+  };
+  const cleanGeneratedDeleteButtons=()=>{
+   const table=doc.getElementById('overtimeTableBody');
+   if(!table)return;
+   table.querySelectorAll('tr').forEach(row=>{
+    const cell=row.querySelectorAll('td')[7];
+    if(!generatedOnly(cell))return;
+    cell.querySelectorAll('button').forEach(button=>{
+     if(String(button.textContent||'').includes('刪除加班'))button.remove();
+    });
+   });
+  };
+  doc.addEventListener('click',event=>{
+   const button=event.target?.closest?.('button');
+   if(!button||!String(button.textContent||'').includes('刪除加班'))return;
+   if(!generatedOnly(button.closest('td')))return;
+   event.preventDefault();
+   event.stopImmediatePropagation();
+   g.alert?.('這筆是依考勤時間自動計算的假日加班，請修改考勤時間；沒有獨立加班申報可刪除。');
+  },true);
+  if(typeof g.MutationObserver==='function'){
+   const observer=new g.MutationObserver(cleanGeneratedDeleteButtons);
+   observer.observe(doc.body,{childList:true,subtree:true});
+   cleanGeneratedDeleteButtons();
+  }
+ };
+ if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',start,{once:true});else start();
+}
+installWorkhoursAttendanceBridge();
 })(window);
