@@ -4936,7 +4936,9 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             return true;
         }
 
-        window.onload = async function() {
+        // 管理員初始化只需要 DOM，不必等圖片、字型等資源全部載完。
+        // 把本機快取繪製提前到 DOMContentLoaded，縮短考勤首屏等待。
+        document.addEventListener('DOMContentLoaded', async function() {
             // V5.11.3：員工打卡快速啟動。
             // 員工只需要自己的身分、打卡狀態、班表/請假摘要，不應先渲染整個管理員考勤大表。
             const p79FastEmployeeBoot = (() => {
@@ -4972,6 +4974,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     try { initDropdowns(); } catch (e) {}
                     try { renderAdminRecordsTable(); } catch (e) {}
                 }
+                window.__p79AttendanceInitialLocalRenderDone = true;
             } catch (e) {
                 console.debug('考勤快取優先顯示失敗，繼續正常啟動：', e);
             }
@@ -5104,7 +5107,7 @@ const now = new Date();
             }
             startAttendanceRevisionWatch();
             startAutoUpdateCheck();
-        };
+        }, { once: true });
 
         let cloudSyncBusy = false;
         let cloudLoadPromise = null;
@@ -12196,6 +12199,30 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             setRecordDateRangeToMonth(month,false);
         }
 
+        function p79ShiftAttendanceIsoDate(isoDate, days){
+            const hit=String(isoDate||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if(!hit)return '';
+            const date=new Date(Number(hit[1]),Number(hit[2])-1,Number(hit[3])+Number(days||0));
+            return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+        }
+
+        function p79RecordWithinAttendanceViewWindow(record, monthFilter, dateFrom, dateTo){
+            let first=String(dateFrom||'').trim();
+            let last=String(dateTo||'').trim();
+            if(!first&&!last&&/^\d{4}-\d{2}$/.test(String(monthFilter||''))){
+                const range=getAttendanceMonthDateRange(monthFilter);
+                first=range.first;last=range.last;
+            }
+            if(!first&&!last)return true;
+            const rawDate=String(getAttendanceDateKey(record?.timeStr||record?.time||record?.dateTime||'')||'').replaceAll('/','-');
+            const date=normalizeRecordFilterDate(rawDate);
+            // 格式不明的舊資料先保留，優先確保不因效能篩選而漏列。
+            if(!date)return true;
+            const lower=first?p79ShiftAttendanceIsoDate(first,-2):'';
+            const upper=last?p79ShiftAttendanceIsoDate(last,2):'';
+            return (!lower||date>=lower)&&(!upper||date<=upper);
+        }
+
         function updateRecordDateRangeSummary(){
             const start=document.getElementById('recordDateFilter');
             const end=document.getElementById('recordDateEndFilter');
@@ -15549,6 +15576,9 @@ function getManualPairRecordAnchor(record) {
 
             let filtered = records.filter(r => {
                 if (!canCurrentAdminViewDataRow(r)) return false;
+                // 先限縮到目前月份／日期前後兩天，再執行昂貴的班次配對。
+                // 前後緩衝保留跨日、跨月與人工指定配對的相關事件。
+                if (!p79RecordWithinAttendanceViewWindow(r, monthFilter, dateFrom, dateTo)) return false;
                 const emp = findEmployeeForAttendanceDisplay(r, visibleEmployees)
                     || findEmployeeForAttendanceIdentity(r, visibleEmployees);
                 const currentDept = emp?.unit || emp?.deptUnit || emp?.orgUnit || emp?.dept || r.unit || r.dept || '一般';
@@ -22460,51 +22490,26 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   // 頁面啟動規則：
   // 1. 真正離線：先用 IndexedDB 備援。
   // 2. 有網路：雲端是唯一主資料；等雲端完成後只「覆寫保存」IndexedDB，不可再把舊快取合併回畫面。
-  const oldOnload=window.onload;
-  window.onload=async function(ev){
-    // PORT79 2026-10-04 IDB-FIRST：
-    // 已下載過「資料快取中心」後，開頁先用完整 IndexedDB 快取立即顯示，
-    // 雲端同步只在背景更新，不再阻塞畫面。
-    let fullCacheRow=null;
-    try{
-      fullCacheRow=await window.Port79DataCache?.getSystemSnapshot?.('attendance');
-      if(fullCacheRow?.data?.fullDatabase && Array.isArray(fullCacheRow.data.records)){
-        await window.p79ApplyAttendanceFullCache?.(fullCacheRow.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true});
-        try{setCloudSyncStatus(`⚡ 已載入本機完整快取｜考勤 ${fullCacheRow.data.records.length} 筆`,'success')}catch(e){}
-      }
-    }catch(e){console.warn('本機完整快取啟動失敗',e)}
-
-    // 保留原本 IndexedDB/離線快照，僅作舊版相容備援。
-    let snapshot=null;
-    try{snapshot=await p79LoadLocalDbSnapshot()}catch(e){}
-    const online = typeof navigator==='undefined' ? true : navigator.onLine!==false;
-    if(!fullCacheRow && !online && snapshot){
-      try{p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true})}catch(e){}
-    }
-
-    if(typeof oldOnload==='function') await oldOnload.call(this,ev);
-
-    // 舊頁面初始化可能重建月份選單；最後再保證一次預設為目前月份。
-    try{
-      const monthSelect=document.getElementById('filterMonthSelect');
-      if(monthSelect){
-        const now=new Date();
-        const currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-        if([...monthSelect.options].some(o=>o.value===currentMonth)) monthSelect.value=currentMonth;
-        monthSelect.dataset.p79MonthInitialized='1';
-        try{renderAttendanceMonthTabs([...monthSelect.options].map(o=>o.value),currentMonth)}catch(e){}
-        recordsCurrentPage=1;
-        try{renderAdminRecordsTable()}catch(e){}
-      }
-    }catch(e){}
-
-    // oldOnload 已會自己啟動背景雲端同步。
-    // 這裡不再額外 await p79StartupAttendanceCurrentMonthSync()，
-    // 避免開頁重複抓月份、造成「明明有快取還是等很久」。
-    if(!online && !fullCacheRow && snapshot){
-      try{p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true})}catch(e){}
-    }
-  };
+  // 本機 IndexedDB 是離線備援；有網路時讓首頁既有的瀏覽器快取先立即顯示，
+  // 雲端同步再於背景更新。不要為了讀完整快取而擋住首屏，也避免舊快照晚到覆蓋新資料。
+  document.addEventListener('DOMContentLoaded',()=>{
+    if(typeof navigator!=='undefined'&&navigator.onLine!==false)return;
+    setTimeout(async()=>{
+      let fullCacheRow=null;
+      try{
+        fullCacheRow=await window.Port79DataCache?.getSystemSnapshot?.('attendance');
+        if(fullCacheRow?.data?.fullDatabase&&Array.isArray(fullCacheRow.data.records)){
+          await window.p79ApplyAttendanceFullCache?.(fullCacheRow.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true});
+          try{setCloudSyncStatus(`⚡ 已載入本機完整快取｜考勤 ${fullCacheRow.data.records.length} 筆`,'success')}catch(e){}
+        }
+      }catch(e){console.warn('本機完整快取啟動失敗',e)}
+      if(fullCacheRow)return;
+      try{
+        const snapshot=await p79LoadLocalDbSnapshot();
+        if(snapshot)p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
+      }catch(e){}
+    },0);
+  },{once:true});
 
   window.addEventListener('online',()=>{
     setTimeout(()=>{
@@ -23349,17 +23354,18 @@ window.p79AttendanceRecordCounts = function(){
     const sel=document.getElementById('filterMonthSelect');
     if(sel && sel.value==='ALL')sel.value=month;
 
-    // V5.10.36：LOCAL-FIRST。
-    // 進考勤頁時先把瀏覽器已有考勤立即畫出來，絕不等待任何 GAS 請求。
-    try{
-      if((!Array.isArray(records)||!records.length) && typeof restoreAttendanceRecordsFromLocalCaches==='function'){
-        restoreAttendanceRecordsFromLocalCaches();
+    // 傳統啟動流程已在 DOMContentLoaded 同步完成本機讀取與首屏繪製時，
+    // 不重複掃描歷史備份、重建篩選選單與整張表；獨立呼叫仍保留 LOCAL-FIRST 備援。
+    if(window.__p79AttendanceInitialLocalRenderDone!==true){
+      try{
+        if((!Array.isArray(records)||!records.length) && typeof restoreAttendanceRecordsFromLocalCaches==='function'){
+          restoreAttendanceRecordsFromLocalCaches();
+        }
+      }catch(e){}
+      try{repairAttendanceNamesInMemory?.();}catch(e){}
+      try{p79RenderOnlyVisibleAttendanceView?.();}catch(e){
+        try{renderAdminRecordsTable?.();}catch(_){}
       }
-    }catch(e){}
-    try{repairAttendanceNamesInMemory?.();}catch(e){}
-    try{initDropdowns?.();}catch(e){}
-    try{p79RenderOnlyVisibleAttendanceView?.();}catch(e){
-      try{renderAdminRecordsTable?.();}catch(_){}
     }
     try{
       const localMonthCount=(Array.isArray(records)?records:[])
