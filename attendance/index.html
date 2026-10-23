@@ -15767,9 +15767,26 @@ function getManualPairRecordAnchor(record) {
                 if(row.clockIn){
                     const punchDate=String(getAttendanceDateKey(row.clockIn.timeStr)||'').trim().replace(/\//g,'-');
                     try{
+                        const normalizeTyphoonDate=value=>String(value||'').trim().replace(/\//g,'-');
                         const marked=JSON.parse(localStorage.getItem('p79-manual-typhoon-days-v1')||'[]');
-                        if(Array.isArray(marked)&&marked.some(day=>String(day||'').trim().replace(/\//g,'-')===punchDate)){
-                            p79TyphoonCheckInBadge='<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="此上班簽到日期已由管理員標記為颱風停班日（本瀏覽器）">颱</span>';
+                        const shiftDates=new Set();
+                        const start=new Date(punchDate+'T00:00:00Z');
+                        let endKey=row.clockOut?normalizeTyphoonDate(getAttendanceDateKey(row.clockOut.timeStr)||''):punchDate;
+                        const inHourMatch=String(row.clockIn.timeStr||'').match(/(?:\\s|T)(\\d{1,2}):/);
+                        const inHour=inHourMatch?Number(inHourMatch[1]):-1;
+                        if(!row.clockOut&&inHour>=22){
+                            const overnightEnd=new Date(punchDate+'T00:00:00Z');
+                            overnightEnd.setUTCDate(overnightEnd.getUTCDate()+1);
+                            endKey=overnightEnd.toISOString().slice(0,10);
+                        }
+                        const end=new Date(endKey+'T00:00:00Z');
+                        if(Array.isArray(marked)&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime())){
+                            for(const day=new Date(start),limit=0;day<=end&&limit<4;day.setUTCDate(day.getUTCDate()+1),limit++){
+                                shiftDates.add(day.toISOString().slice(0,10));
+                            }
+                            if(marked.some(day=>shiftDates.has(normalizeTyphoonDate(day)))){
+                                p79TyphoonCheckInBadge='<span class="inline-flex items-center justify-center rounded bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 mr-1 font-black" title="此班次跨越管理員標記的颱風停班日期（本瀏覽器）">颱</span>';
+                            }
                         }
                     }catch(ignored){}
                 }
