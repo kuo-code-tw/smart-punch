@@ -16,6 +16,10 @@ const STATE_KEY='port79_attendance_v5_state';
 const ACTIVE_MS=30000;
 const IDLE_MS=60000;
 const MAX_BACKOFF=15000;
+// Keep the legacy queue writer before the V5 bridge replaces the public name.
+if(!window.p79LegacyFlushCloudOutbox&&typeof window.flushCloudOutbox==='function'){
+  window.p79LegacyFlushCloudOutbox=window.flushCloudOutbox;
+}
 // 刪除失敗不應每 15 秒重新佔用 GAS；保留資料並採漸進退避（5分鐘至1小時）。
 function p79AttendanceRetryDelay(payload, attempts) {
   if(String(payload?.action||'')==='deleteRecord'){
@@ -1267,10 +1271,6 @@ if(!window.p79LegacyPerformCloudRequest && typeof window.performCloudRequest==='
 if(!window.p79LegacyEnqueueCloudOperation && typeof window.enqueueCloudOperation==='function'){
   window.p79LegacyEnqueueCloudOperation=window.enqueueCloudOperation;
 }
-if(!window.p79LegacyFlushCloudOutbox && typeof window.flushCloudOutbox==='function'){
-  window.p79LegacyFlushCloudOutbox=window.flushCloudOutbox;
-}
-
 window.performCloudRequest=async function(payload,timeoutMs=0){
   if(isV5AttendanceWrite(payload)){
     return submitAttendanceWrite(payload,'',null,null);
@@ -1293,8 +1293,14 @@ window.enqueueCloudOperation=function(payload,scheduleRetry=true){
   return false;
 };
 
-window.flushCloudOutbox=function(force=false){
-  // 考勤只跑 V5 outbox。舊 outbox 不再負責考勤。
+window.flushCloudOutbox=async function(force=false){
+  // The badge aggregates both queues. Drain legacy work first, then V5, so
+  // tapping the badge cannot report "nothing pending" for a V5-only queue.
+  const legacy=window.p79LegacyFlushCloudOutbox;
+  if(typeof legacy==='function'&&legacy!==window.flushCloudOutbox){
+    const legacyDone=await legacy(force);
+    if(legacyDone===false)return false;
+  }
   return drain(force);
 };
 

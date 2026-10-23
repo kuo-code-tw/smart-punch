@@ -4243,15 +4243,19 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 
         async function retryCloudOutboxNow() {
             const queue = readCloudOutbox();
-            if (!queue.length) {
+            let v5Queue = [];
+            try { v5Queue = window.p79V5ReadPendingQueue?.() || []; } catch (e) {}
+            const pending = queue.length + v5Queue.length;
+            if (!pending) {
+                refreshAttendanceSyncCompactStatus();
                 showToast('目前沒有待同步資料', 'success');
                 return;
             }
             if (isAdminLoggedIn && currentEmp && !canPerformAdminAction(currentEmp, 'cloudSync')) return;
-            setCloudSyncStatus(`☁️ 正在立即重試 ${queue.length} 筆資料…`, 'loading');
+            setCloudSyncStatus(`☁️ 正在立即重試 ${pending} 筆資料…`, 'loading');
             const completed = await flushCloudOutbox(true);
             if (!completed) {
-                const remaining = readCloudOutbox();
+                const remaining = [...readCloudOutbox(), ...(window.p79V5ReadPendingQueue?.() || [])];
                 const reason = remaining.map(item => String(item.lastError || '').trim()).find(Boolean) || '雲端尚未完成回應';
                 showToast(`同步尚未完成：${reason}`, 'warning');
                 updateCloudOutboxStatus();
@@ -5512,6 +5516,7 @@ const now = new Date();
                         ? `有 ${pending} 筆待同步；點此立即重試`
                         : ((busy || v5Writing) ? '雲端作業進行中' : paused > 0 ? `${paused} 筆修改已暫停，內容保留；不會自動重送，請先核對雲端時間` : '考勤同步工作已完成')));
         }
+        window.p79RefreshAttendanceSyncCompactStatus = refreshAttendanceSyncCompactStatus;
 
         function setCloudSyncStatus(text, type = 'idle', explicitMode = '') {
             const el = document.getElementById('cloudSyncStatus');
@@ -23573,7 +23578,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261021-edit-month-source"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
 
 
 
@@ -24293,6 +24298,7 @@ let shownDrafts=new Map();
 function safe(t){return String(t??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function entries(key){try{if(key==='port79_attendance_v5_outbox'&&window.p79V5ReadPendingQueue)return window.p79V5ReadPendingQueue();const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[]}catch(e){return null;}}
 function show(autoReview=true){
+ window.p79RefreshAttendanceSyncCompactStatus?.();
  const root=document.getElementById('p79OutboxInspectPanel'),body=document.getElementById('p79OutboxInspectBody');if(!root||!body)return;
  let html='';shownDrafts=new Map();
  for(const [key,label] of keys){
@@ -24331,6 +24337,15 @@ setInterval(()=>{
  const snapshot=JSON.stringify(keys.map(([key])=>entries(key)));
  if(snapshot!==inspectorQueueSnapshot){inspectorQueueSnapshot=snapshot;show(false);}
 },1000);
+window.addEventListener('storage',event=>{
+ if(!event.key||keys.some(([key])=>key===event.key))window.p79RefreshAttendanceSyncCompactStatus?.();
+});
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
+});
+setInterval(()=>{
+ if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
+},2000);
 let reviewBusy=false;
 async function reviewEntry(key){
  if(reviewBusy)return;reviewBusy=true;
