@@ -24,6 +24,8 @@ const c={
  p79SubstituteShiftLabel:(id,date)=>/^颱\\d/.test(shifts[date]||'')?shifts[date]:'',
 };
 c.window=c;vm.createContext(c);
+vm.runInContext(body('p79CompactOvertimeCode','    function p79SubstituteShiftLabel('),c);
+vm.runInContext(body('p79ScheduleConfirmedOvertime','    // 與排班畫面'),c);
 vm.runInContext(body('p79ScheduleSpecialNoPunchCode','    function p79ScheduleNoPunchRest('),c);
 vm.runInContext(body('p79ScheduleExportDay','    async function exportScheduleToExcel('),c);
 const emp={id:'E',name:'測試'};
@@ -47,3 +49,16 @@ assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'選','verified election-d
 assert(html.includes('const shownShift = specialNoPunch || approvedLeaveCode'),'web rendering uses same special-day classification');
 assert(html.includes('await p79ScheduleRestClient().refreshIfStale(yearMonth)'),'export waits for missing attendance evidence when special days exist');
 console.log('PASS: typhoon and election no-punch export, partial/full punches, approved leave, overtime code, evidence guard and web parity');
+
+for(const state of ['rest','open','worked','missing']){
+ status.state=state;
+ for(const prefix of ['颱','選']){
+  c.monthlyScheduleMeta.E['2026-10-23']={overtimeReport:{code:prefix+'24-08',category:'國'}};
+  assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),prefix+'24-08');
+  assert.equal(c.p79ScheduleSpecialNoPunchCode('E','2026-10-23','晚',null),'');
+ }
+ c.monthlyScheduleMeta.E={};shifts['2026-10-23']='颱24-01';
+ assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱24-01');
+ shifts['2026-10-23']='晚';
+}
+console.log('PASS saved overnight reports override stale no-punch evidence across all attendance states');

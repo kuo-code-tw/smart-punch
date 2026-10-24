@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync('schedule/index.html','utf8');
+const block=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
+const c={activeRoleTab:'ALL',activeGroupFilter:'ALL',window:{},sessionStorage:{setItem(){}},localStorage:{getItem(){return '{"ALL":true}';},setItem(){throw Error('must not persist collapse');}},renders:0,p79RefreshRoleTabColors(){},renderRoleScheduleView(){c.renders++;},buildRoleTabsAndRender(){c.renders++;}};
+vm.createContext(c);
+vm.runInContext(block('    const p79ScheduleRoleCollapseMap','    // Frozen people pane'),c);
+vm.runInContext(block('    function switchRoleTab(','    function setGroupFilter('),c);
+assert.equal(c.isScheduleRoleRosterCollapsed(),false,'old browser preference must not hide newly opened roster');
+c.toggleScheduleRoleRosterCollapsed();assert.equal(c.isScheduleRoleRosterCollapsed(),true);
+c.switchRoleTab('ALL');assert.equal(c.isScheduleRoleRosterCollapsed(),false);
+c.switchRoleTab('ALL');assert.equal(c.isScheduleRoleRosterCollapsed(),false,'repeated tab clicks keep roster open');
+c.setScheduleRoleRosterCollapsed(true,'AQC');c.switchRoleTab('AQC');assert.equal(c.isScheduleRoleRosterCollapsed('AQC'),false);
+assert.equal(c.renders,5);console.log('PASS explicit collapse, repeat tab expansion, switching to collapsed role, stale stored preferences');
