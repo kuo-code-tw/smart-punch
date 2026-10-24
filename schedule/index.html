@@ -4859,7 +4859,8 @@ function p79EmployeeDateEligible(emp,date) {
       const next = String(roleName || '').trim();
       if (!next) return;
 
-      if(next===activeRoleTab&&next!=='EMP_MGMT'){toggleScheduleRoleRosterCollapsed();return;}
+      if(next===activeRoleTab&&next!=='EMP_MGMT'){setScheduleRoleRosterCollapsed(false,next);return;}
+      if(next!=='EMP_MGMT')p79ScheduleRoleCollapseMap[next]=false;
       activeRoleTab = next;
       activeGroupFilter = 'ALL';
       try { sessionStorage.setItem('port79_schedule_active_role_tab', activeRoleTab); } catch (e) {}
@@ -5354,16 +5355,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return '⚠️ 當日無人休假，需跨單位支援';
     }
 
-    const P79_SCHEDULE_ROLE_COLLAPSE_KEY = 'port79_schedule_role_roster_collapsed_v1';
-
-    function readScheduleRoleCollapseMap() {
-      try {
-        const raw = JSON.parse(localStorage.getItem(P79_SCHEDULE_ROLE_COLLAPSE_KEY) || '{}');
-        return raw && typeof raw === 'object' ? raw : {};
-      } catch (e) {
-        return {};
-      }
-    }
+    const p79ScheduleRoleCollapseMap = {};
+    function readScheduleRoleCollapseMap() { return p79ScheduleRoleCollapseMap; }
 
     function isScheduleRoleRosterCollapsed(roleKey = activeRoleTab) {
       const key = String(roleKey || 'ALL');
@@ -5374,7 +5367,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const key = String(roleKey || 'ALL');
       const map = readScheduleRoleCollapseMap();
       map[key] = !!collapsed;
-      try { localStorage.setItem(P79_SCHEDULE_ROLE_COLLAPSE_KEY, JSON.stringify(map)); } catch (e) {}
+      // 收合只保留在這次頁面，重新開啟班表時正常展開。
       p79RefreshRoleTabColors();
       renderRoleScheduleView();
     }
@@ -6273,10 +6266,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
     }
+    function p79ScheduleConfirmedOvertime(empId,date,shift) {
+      const report=monthlyScheduleMeta[empId]?.[date]?.overtimeReport;
+      const code=p79CompactOvertimeCode(report?.code);
+      if(code)return p79OvertimePeriodLabel({...report,code});
+      const own=p79CompactOvertimeCode(shift);
+      return own?(p79SubstituteShiftLabel(empId,date)||own):'';
+    }
     // 與排班畫面、Excel 匯出共用判定：只有考勤已完整核對且整班無卡，
     // 才以颱風／選舉日覆蓋原班別；單邊打卡、已出勤、請假、未核對與未來日期不覆蓋。
     function p79ScheduleSpecialNoPunchCode(empId,date,shift,leave,knownState=null,knownEvidence=null,specialDates=null,today=null) {
-      if(leave||['離','離職'].includes(String(shift||'').trim()))return '';
+      if(leave||['離','離職'].includes(String(shift||'').trim())||p79ScheduleConfirmedOvertime(empId,date,shift))return '';
       const todayKey=today||scheduleTaipeiTodayKey();
       if(date>todayKey)return '';
       const evidence=knownEvidence||p79ScheduleRestClient().status(date.slice(0,7)).evidence;
@@ -6289,6 +6289,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
     }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
+      if(p79ScheduleConfirmedOvertime(empId,date,shift))return false;
       if(leave||meta?.manualRosterShift===shift||!(['早','中','晚'].includes(shift)||meta?.overtimeReport))return false;
       if(knownState!==null)return knownState==='rest';
       const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
@@ -6755,6 +6756,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
       const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
       const meta=monthlyScheduleMeta[emp.id]?.[dayStr];
+      const reported=p79ScheduleConfirmedOvertime(emp.id,dayStr,raw);
+      if(reported)return reported;
       const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,raw,null);
       if(specialNoPunch)return specialNoPunch;
       if(p79ScheduleNoPunchRest(emp.id,dayStr,raw,meta,null))return p79ScheduleRestBalance(emp,dayStr.slice(0,7)).ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休';
