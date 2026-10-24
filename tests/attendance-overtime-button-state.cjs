@@ -2,10 +2,11 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('node:assert/strict');
 const html = fs.readFileSync('attendance/index.html', 'utf8');
-const start = html.indexOf('        function p79AttendanceOvertimeSubmissionState(');
-const end = html.indexOf('\n        }', start);
-assert(start > 0 && end > start, 'submission-state helper must exist');
-const code = html.slice(start, end + 10);
+function extract(name) {
+    const start=html.indexOf('        function '+name+'('),end=html.indexOf('\n        }',start);
+    assert(start>0&&end>start,name+' must exist');
+    return html.slice(start,end+10);
+}
 const date = '2026-10-23';
 const other = '2026-10-24';
 let specialDays = [];
@@ -21,7 +22,7 @@ const context = {
     window: {P79SpecialOvertime: {forShift: () => specialDays.map(day => ({date: day}))}}
 };
 vm.createContext(context);
-vm.runInContext(code, context);
+for(const name of ['p79AttendanceSpecialParts','p79AttendanceLoadViewMonth','p79AttendanceRosterRows','p79AttendanceOvertimeSubmissionState']) vm.runInContext(extract(name),context);
 const row = {empId: 'OTHER-ID', dateKey: date, clockIn: {id: 'IN', at: 1}, clockOut: {id: 'OUT', at: 2}};
 const employee = {empId: 'E1'};
 const active = id => ({overtimeReport: {id, code: '颱08-12'}});

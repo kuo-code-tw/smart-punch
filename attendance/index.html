@@ -14660,7 +14660,7 @@ function getManualPairRecordAnchor(record) {
                 const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
                 const meta=roster.__meta?.[day]||{}, code=String(roster[day]||'').trim();
                 const cover=state.covers.find(a=>day>=a.startDate && day<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
-                const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
+                const target=p79AttendanceRosterRows(state,cover?.leaveEmpId||meta.forEmpId,view)[0]?.schedule||{};
                 const shift=['早','中','晚'].includes(code)?code:target[day];
                 const hours={早:8,中:16,晚:24};
                 let hour=hours[shift];
@@ -14959,9 +14959,52 @@ function getManualPairRecordAnchor(record) {
         function p79AttendanceOvertimeDate(row) {
             return getAttendanceDateKey(row?.accountingDateKey || row?.dateKey || row?.clockIn?.timeStr || row?.clockOut?.timeStr).replace(/\//g,'-');
         }
-        function p79LoadAttendanceOvertimeMonth(month) {
+        // Cache only for one visible table render; cloud refreshes start with clean data.
+        function p79AttendanceSpecialParts(row, view, allowOpen=false) {
+            if (!row?.clockIn || (!row.clockOut && !allowOpen)) return [];
+            if (view?.specialParts?.has(row)) return view.specialParts.get(row);
+            let parts = [];
+            try {
+                parts = window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn), row.clockOut ? getAttendanceTimestamp(row.clockOut) : null, row.clockIn.timeStr) || [];
+            } catch (_) {}
+            view?.specialParts?.set(row,parts);
+            return parts;
+        }
+        function p79AttendanceLoadViewMonth(month,view) {
+            if (view?.loadedMonths?.has(month)) return;
+            view?.loadedMonths?.add(month);
+            p79LoadAttendanceOvertimeMonth(month,view?.token);
+        }
+        function p79AttendanceRosterRows(state,empId,view) {
+            const id=String(empId||'').trim().toUpperCase();
+            if (!state||!id) return [];
+            if (!view?.rosterIndex) return (state.rows||[]).filter(r=>String(r.empId||'').trim().toUpperCase()===id);
+            let index=view.rosterIndex.get(state);
+            if (!index) {
+                index=new Map();
+                for (const r of state.rows||[]) {
+                    const key=String(r.empId||'').trim().toUpperCase();
+                    if(!index.has(key))index.set(key,[]);
+                    index.get(key).push(r);
+                }
+                view.rosterIndex.set(state,index);
+            }
+            return index.get(id)||[];
+        }
+        let p79AttendanceOvertimeRepaintQueued=false;
+        function p79QueueAttendanceOvertimeRepaint(){
+            if(p79AttendanceOvertimeRepaintQueued)return;
+            p79AttendanceOvertimeRepaintQueued=true;
+            const repaint=()=>{
+                p79AttendanceOvertimeRepaintQueued=false;
+                renderAdminRecordsTable();
+            };
+            if(typeof requestAnimationFrame==='function')requestAnimationFrame(repaint);
+            else setTimeout(repaint,0);
+        }
+        function p79LoadAttendanceOvertimeMonth(month, knownToken) {
             if(!/^\d{4}-\d{2}$/.test(month))return;
-            const token=getAttendanceEmployeeMasterToken();
+            const token=knownToken||getAttendanceEmployeeMasterToken();
             if(!token)return;
             const old=p79AttendanceOvertimeMonths.get(month);
             if(old?.token===token && (old.pending || Date.now()-old.at<60000))return;
@@ -14977,7 +15020,7 @@ function getManualPairRecordAnchor(record) {
                 state.people=Array.isArray(data.employees)?data.employees:[];
                 state.covers=Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[];
                 state.ready=true;state.pending=false;
-                renderAdminRecordsTable();
+                p79QueueAttendanceOvertimeRepaint();
               }).catch(()=>{state.pending=false;}).finally(()=>clearTimeout(timer));
         }
         // Refresh schedule/overtime metadata when returning from scheduling in another tab.
@@ -15008,10 +15051,10 @@ function getManualPairRecordAnchor(record) {
         document.addEventListener('visibilitychange',()=>{
             if(document.visibilityState==='visible')p79RevalidateAttendanceOvertimeOnReturn();
         });
-        function p79AttendanceRosterGroup(row,employee){
+        function p79AttendanceRosterGroup(row,employee,view){
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
-            p79LoadAttendanceOvertimeMonth(month);
-            const state=p79AttendanceOvertimeMonths.get(month),token=getAttendanceEmployeeMasterToken();
+            p79AttendanceLoadViewMonth(month,view);
+            const state=p79AttendanceOvertimeMonths.get(month),token=view?.token||getAttendanceEmployeeMasterToken();
             if(!token||!state?.ready||state.token!==token)return '';
             const id=String(employee?.empId||row?.empId||'').trim().toUpperCase();
             if(!id)return '';
@@ -15020,7 +15063,7 @@ function getManualPairRecordAnchor(record) {
                 if(!text||/^(?:不分組|未分組|無分組|無|未設定|不輪班|—|--|-|none|null|undefined)$/i.test(text))return '';
                 return /^[a-z](?:組)?$/i.test(text)?text[0].toUpperCase()+'組':text;
             };
-            const rows=state.rows.filter(r=>String(r.empId||'').trim().toUpperCase()===id&&(!r.month||r.month===month));
+            const rows=p79AttendanceRosterRows(state,id,view).filter(r=>!r.month||r.month===month);
             const groups=rows.map(r=>{
                 const personnel=r.schedule?.__personnel||{};
                 if(Object.prototype.hasOwnProperty.call(personnel,'group'))return meaningful(personnel.group);
@@ -15039,11 +15082,11 @@ function getManualPairRecordAnchor(record) {
             }
             return '';
         }
-        function p79AttendanceReportedOvertime(row,state) {
+        function p79AttendanceReportedOvertime(row,state,view) {
             const date=p79AttendanceOvertimeDate(row), id=String(row?.empId||'').trim().toUpperCase();
-            const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
+            const roster=p79AttendanceRosterRows(state,id,view)[0]?.schedule||{};
             const meta=roster.__meta?.[date]||{};
-            const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
+            const specialDates=p79AttendanceSpecialParts(row,view).map(part=>part.date);
             const activeReport=day=>{
                 const m=roster.__meta?.[day],r=m?.overtimeReport;
                 if(!r?.id||m.overtimeExcluded||(m.overtimeRevocations||[]).some(a=>a.confirmed===true&&a.reportId===r.id))return false;
@@ -15092,14 +15135,16 @@ function getManualPairRecordAnchor(record) {
             const minutes = attendanceRowAttendanceMinutes(row);
             return minutes === null ? '—' : formatDurationMinutes(minutes);
         }
-        function attendanceRowOvertimeText(row) {
+        function attendanceRowOvertimeText(row,view) {
             const actual=attendanceRowOvertimeMinutes(row);
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
-            const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
+            const specialDates=p79AttendanceSpecialParts(row,view).map(part=>part.date);
             const months=[...new Set([month,...specialDates.map(date=>date.slice(0,7))])];
-            months.forEach(key=>p79LoadAttendanceOvertimeMonth(key));
-            const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===getAttendanceEmployeeMasterToken());
-            const planned=states.map(state=>p79AttendanceReportedOvertime(row,state)).find(value=>value?.report)||states.map(state=>p79AttendanceReportedOvertime(row,state)).find(Boolean)||null;
+            months.forEach(key=>p79AttendanceLoadViewMonth(key,view));
+            const token=view?.token||getAttendanceEmployeeMasterToken();
+            const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===token);
+            const plans=states.map(state=>p79AttendanceReportedOvertime(row,state,view));
+            const planned=plans.find(value=>value?.report)||plans.find(Boolean)||null;
             if(!planned)return formatDurationMinutes(actual);
             const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
@@ -15126,24 +15171,15 @@ function getManualPairRecordAnchor(record) {
 
         // Only a persisted, non-revoked declaration hides the action.
         // Never infer a submission from calculated overtime, holiday quotas or legacy flags.
-        function p79AttendanceOvertimeSubmissionState(row, employee) {
+        function p79AttendanceOvertimeSubmissionState(row, employee, view) {
             const dates = [attendanceRowDateIso(row), p79AttendanceOvertimeDate(row)];
-            if (row?.clockIn && row?.clockOut) {
-                try {
-                    const parts = window.P79SpecialOvertime?.forShift(
-                        getAttendanceTimestamp(row.clockIn),
-                        getAttendanceTimestamp(row.clockOut),
-                        row.clockIn.timeStr
-                    ) || [];
-                    parts.forEach(part => dates.push(String(part?.date || '').trim()));
-                } catch (_) {}
-            }
+            p79AttendanceSpecialParts(row,view).forEach(part => dates.push(String(part?.date || '').trim()));
             const days = [...new Set(dates.filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day)))];
             const months = [...new Set(days.map(day => day.slice(0, 7)))];
-            const token = getAttendanceEmployeeMasterToken();
+            const token = view?.token || getAttendanceEmployeeMasterToken();
             const empId = String(employee?.empId || row?.empId || '').trim().toUpperCase();
             if (!token || !empId || !days.length) return 'pending';
-            months.forEach(month => p79LoadAttendanceOvertimeMonth(month));
+            months.forEach(month => p79AttendanceLoadViewMonth(month,view));
             let allReady = true;
             for (const month of months) {
                 const state = p79AttendanceOvertimeMonths.get(month);
@@ -15151,9 +15187,7 @@ function getManualPairRecordAnchor(record) {
                     allReady = false;
                     continue;
                 }
-                const roster = state.rows?.find(item =>
-                    String(item.empId || '').trim().toUpperCase() === empId
-                )?.schedule;
+                const roster = p79AttendanceRosterRows(state,empId,view)[0]?.schedule;
                 for (const day of days) {
                     if (day.slice(0, 7) !== month) continue;
                     const meta = roster?.__meta?.[day];
@@ -15823,9 +15857,10 @@ function getManualPairRecordAnchor(record) {
 
             p79MainTableDuplicateRows = renderRows;
             p79AdminAttendanceReportRows = renderRows;
+            const overtimeView={token:getAttendanceEmployeeMasterToken(),specialParts:new WeakMap(),rosterIndex:new WeakMap(),loadedMonths:new Set()};
             tbody.innerHTML = renderRows.map((row, rowIndex) => {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
-                const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee);
+                const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee, overtimeView);
                 const canReportThisRow = p79CanReportOvertime()
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
                         && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
@@ -15879,11 +15914,7 @@ function getManualPairRecordAnchor(record) {
                 let p79TyphoonCheckInBadge='';
                 if(row.clockIn){
                     try{
-                        const parts=window.P79SpecialOvertime?.forShift(
-                            getAttendanceTimestamp(row.clockIn),
-                            row.clockOut?getAttendanceTimestamp(row.clockOut):null,
-                            row.clockIn.timeStr
-                        )||[];
+                        const parts=p79AttendanceSpecialParts(row,overtimeView,true);
                         p79TyphoonCheckInBadge=parts.map(part=>{
                             const codes=part.kinds.map(kind=>kind.code).join('/');
                             const names=part.kinds.map(kind=>kind.name).join('、');
@@ -15912,11 +15943,11 @@ function getManualPairRecordAnchor(record) {
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayDept}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayUnit || '--'}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${displayJobTitle || '--'}</td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap">${escapeHtml(p79AttendanceRosterGroup(row,displayEmp))}</td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${escapeHtml(p79AttendanceRosterGroup(row,displayEmp,overtimeView))}</td>
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${p79TyphoonCheckInBadge}${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
-                        <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
+                        <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row,overtimeView)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${overtimeSubmissionState === 'none' ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button>` : ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">

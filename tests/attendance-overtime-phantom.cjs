@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),a=require('assert/strict'),html=fs.readFileSync('attendance/index.html','utf8');
-const name='p79AttendanceReportedOvertime',start=html.indexOf('        function '+name+'('),code=html.slice(start,html.indexOf('\n        }',start)+10);
-const date='2026-10-23',context={p79AttendanceOvertimeDate:()=>date,window:{P79SpecialOvertime:{forShift:()=>[{date}]}},getAttendanceTimestamp:r=>r.at};vm.createContext(context);vm.runInContext(code,context);
+function extract(name){const start=html.indexOf('        function '+name+'(');a(start>=0,name);return html.slice(start,html.indexOf('\n        }',start)+10);}
+const date='2026-10-23',context={p79AttendanceOvertimeDate:()=>date,window:{P79SpecialOvertime:{forShift:()=>[{date}]}},getAttendanceTimestamp:r=>r.at};vm.createContext(context);for(const name of ['p79AttendanceSpecialParts','p79AttendanceRosterRows','p79AttendanceReportedOvertime'])vm.runInContext(extract(name),context);
 const row=id=>({empId:id,clockIn:{id:'IN-'+id,at:Date.parse(date+'T07:32:00+08:00')},clockOut:{id:'OUT-'+id,at:Date.parse(date+'T11:55:00+08:00')}});
 const state=meta=>({rows:[{empId:'468',schedule:{[date]:'早',__meta:{[date]:meta}}}],covers:[]});
 for(const category of ['國','休','例'])for(let i=1;i<=83;i++){
