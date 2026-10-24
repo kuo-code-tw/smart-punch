@@ -5797,17 +5797,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
                     const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
           const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
-          // A verified whole-shift absence is final. On an in-progress typhoon day,
-          // a completed attendance snapshot with no punch events is a provisional 颱;
-          // an actual punch changes the evidence state to missing/worked and restores the roster.
-          // Never infer absence from an incomplete snapshot or a future date.
-          const typhoonProvisional=attendanceEvidence.complete===true&&attendanceState==='open'&&
-            dayStr<=typhoonToday;
-          const typhoonNoPunch=typhoonDays.has(dayStr)&&(attendanceState==='rest'||typhoonProvisional)&&
-            !ownApprovedLeave&&rosterShift!=='離';
-          const shownShift = typhoonNoPunch?'颱':approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
-          const visibleSubstituteLabel=typhoonNoPunch?'':substituteLabel;
-          const shownShiftStyle = typhoonNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
+          // 網頁和 Excel 使用同一項考勤／特殊日判定，避免颱字匯出後變回早中晚。
+          const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,attendanceState,attendanceEvidence,{typhoon:typhoonDays,election:electionDays},typhoonToday);
+          const shownShift = specialNoPunch || approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
+          const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
+          const shownShiftStyle = specialNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
             shownShift==='休'?'bg-blue-100 text-red-700 font-black':
             shownShift==='國'?'bg-green-100 text-red-700 font-black':
@@ -6279,6 +6273,21 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
     }
+    // 與排班畫面、Excel 匯出共用判定：只有考勤已完整核對且整班無卡，
+    // 才以颱風／選舉日覆蓋原班別；單邊打卡、已出勤、請假、未核對與未來日期不覆蓋。
+    function p79ScheduleSpecialNoPunchCode(empId,date,shift,leave,knownState=null,knownEvidence=null,specialDates=null,today=null) {
+      if(leave||['離','離職'].includes(String(shift||'').trim()))return '';
+      const todayKey=today||scheduleTaipeiTodayKey();
+      if(date>todayKey)return '';
+      const evidence=knownEvidence||p79ScheduleRestClient().status(date.slice(0,7)).evidence;
+      if(evidence?.complete!==true)return '';
+      const state=knownState!==null?knownState:window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date);
+      if(state!=='rest'&&state!=='open')return '';
+      const typhoon=specialDates?.typhoon||new Set(p79TyphoonDates());
+      if(typhoon.has(date))return '颱';
+      const election=specialDates?.election||new Set(window.P79SpecialOvertime?.electionDates?.()||[]);
+      return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
+    }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
       if(leave||meta?.manualRosterShift===shift||!(['早','中','晚'].includes(shift)||meta?.overtimeReport))return false;
       if(knownState!==null)return knownState==='rest';
@@ -6746,6 +6755,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
       const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
       const meta=monthlyScheduleMeta[emp.id]?.[dayStr];
+      const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,raw,null);
+      if(specialNoPunch)return specialNoPunch;
       if(p79ScheduleNoPunchRest(emp.id,dayStr,raw,meta,null))return p79ScheduleRestBalance(emp,dayStr.slice(0,7)).ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休';
       const compact=p79ScheduleLeaveExportCode(raw);
       if(compact!==String(raw).trim()||['年','事','病','公','喪','颱','婚','產','檢','陪','顧','經','安','傷','訂','假','離'].includes(compact))return compact;
@@ -6762,6 +6773,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(document.getElementById('month-picker').value!==yearMonth)return alert('月份已變更，請重新選擇匯出職稱');
       const selectedEmployees=window.P79ScheduleTransferRoles.filter(employees,selectedRoles);
       if(!selectedEmployees.length)return alert('已勾選的職稱目前沒有人員');
+      // 排班畫面可能已讀齊考勤；有特殊日時才需要確認該證據。
+      // 不允許在核對失敗時靜默匯出原班別，造成颱／選遺失。
+      const hasSpecialDays=p79TyphoonDates().some(day=>day.startsWith(yearMonth+'-'))||
+        (window.P79SpecialOvertime?.electionDates?.()||[]).some(day=>day.startsWith(yearMonth+'-'));
+      if(hasSpecialDays&&p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
+        await p79ScheduleRestClient().refreshIfStale(yearMonth);
+        if(p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
+          alert('本月考勤尚未完成核對，無法正確判斷颱風／選舉日無打卡情形，請先完成考勤同步再匯出。');
+          return;
+        }
+      }
       const sortedEmps = selectedEmployees.sort((a, b) => {
         const rDiff = getRolePriority(a.role) - getRolePriority(b.role);
         if (rDiff !== 0) return rDiff;
