@@ -5853,7 +5853,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${combinedMarker}
               ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="人工指定班別保留；整班無卡，休假統計仍按實際考勤核對">無卡待核</span>':''}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
-              ${dayMeta?.overtimeReport?.id && canManageSchedule() ? `<button type="button" class="p79-edit-overtime-report no-print text-[9px] rounded border border-sky-300 text-sky-800 px-1" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" aria-label="編輯 ${scheduleEscapeHtml(emp.name)} ${dayStr} 加班申報">編輯申報</button>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
             </td>
           `;
