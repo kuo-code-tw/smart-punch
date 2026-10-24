@@ -66,7 +66,7 @@ assert.equal(status(), 'pending', 'stale month data cannot authorize reporting')
 specialDays = [];
 setMonth('2026-10', {[date]: active('A')});
 assert.equal(context.p79AttendanceOvertimeSubmissionState(row, {empId:'E2'}), 'none', 'other worker report does not hide this worker action');
-assert(html.includes("const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee);"));
+assert(html.includes("const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee, overtimeView);"));
 assert(html.includes("overtimeSubmissionState === 'none' ? `<button"), 'reported rows have no submit button markup');
 assert(html.includes("if (p79AttendanceOvertimeSubmissionState(row, employee) !== 'none')"), 'stale click must be rejected');
 assert(loaded.includes('2026-11'), 'cross-month request is loaded');
