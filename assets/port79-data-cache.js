@@ -174,6 +174,25 @@ async function folderFilename(key){
 }
 async function snapshotDirectory(handle,create=false){return handle.getDirectoryHandle('port79-snapshots-v1',{create})}
 function currentViewerRow(row){return !!token()&&row?.key?.startsWith(viewerKey()+'|')&&['api','system'].includes(row.kind)&&row.data&&Number.isFinite(row.savedAt)}
+let folderNoticeAt=0,folderNoticeTimer=null;
+function notifyFolderSaved(handle){
+ try{
+  if(!document.body||typeof document.createElement!=='function')return;
+  const now=Date.now();let notice=document.getElementById('p79FolderSavedNotice');
+  // One notice for a burst of snapshot writes, rather than one per API response.
+  if(!notice&&folderNoticeAt&&now-folderNoticeAt<60000)return;
+  if(!notice){
+   notice=document.createElement('div');notice.id='p79FolderSavedNotice';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');
+   notice.style.cssText='position:fixed;right:16px;bottom:20px;z-index:21000;max-width:min(420px,calc(100vw - 32px));padding:14px 16px;border-radius:14px;background:#064e3b;color:#fff;box-shadow:0 8px 30px #0003;font:14px/1.6 sans-serif';
+   const message=document.createElement('span');message.dataset.folderSavedMessage='1';notice.appendChild(message);
+   const close=document.createElement('button');close.type='button';close.textContent='知道了';close.style.cssText='display:block;margin-top:6px;background:transparent;color:inherit;border:1px solid #ffffff80;border-radius:6px;padding:3px 10px;cursor:pointer';close.onclick=()=>notice.remove();notice.appendChild(close);
+   document.body.appendChild(notice);folderNoticeAt=now;
+   // Keep the notice bounded even when background sync keeps writing.
+   folderNoticeTimer=setTimeout(()=>{notice.remove();folderNoticeTimer=null;},8000);
+  }
+  notice.querySelector('[data-folder-saved-message]').textContent='已自動保存至「'+handle.name+'」資料夾。';
+ }catch(_){} // A notification must never change the outcome of a completed write.
+}
 function mirrorSnapshot(row){
  // Serialize writes so an older response cannot finish after a newer snapshot.
  const task=folderWrites.then(async()=>{
@@ -184,7 +203,9 @@ function mirrorSnapshot(row){
   const file=await dir.getFileHandle(name,{create:true}),writer=await file.createWritable();
   try{await writer.write(JSON.stringify({format:'port79-cache',version:1,row}));await writer.close()}
   catch(error){try{await writer.abort()}catch(_){}throw error}
-  folderMessage='已連接：'+handle.name+'；讀取資料會自動保存至電腦';return true;
+  folderMessage='已連接：'+handle.name+'；已自動保存至電腦';
+  if(currentViewerRow(row))notifyFolderSaved(handle);
+  return true;
  }).catch(error=>{folderMessage='資料夾保存失敗：'+String(error?.message||error);return false});
  folderWrites=task;return task;
 }
