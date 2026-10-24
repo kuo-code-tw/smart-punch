@@ -15001,7 +15001,14 @@ function getManualPairRecordAnchor(record) {
             const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
             const meta=roster.__meta?.[date]||{};
             const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
-            const activeReport=day=>{const m=roster.__meta?.[day],r=m?.overtimeReport;return r?.id&&!m.overtimeExcluded&&!(m.overtimeRevocations||[]).some(a=>a.confirmed===true&&a.reportId===r.id);};
+            const activeReport=day=>{
+                const m=roster.__meta?.[day],r=m?.overtimeReport;
+                if(!r?.id||m.overtimeExcluded||(m.overtimeRevocations||[]).some(a=>a.confirmed===true&&a.reportId===r.id))return false;
+                if(r.attendanceInId&&row.clockIn?.id&&String(r.attendanceInId)!==String(row.clockIn.id))return false;
+                if(r.attendanceOutId&&row.clockOut?.id&&String(r.attendanceOutId)!==String(row.clockOut.id))return false;
+                if(row.clockIn&&row.clockOut&&window.P79Overtime?.overtimeMinutes?.(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),day,{overtimeReport:r})===0)return false;
+                return true;
+            };
             const candidates=[...new Set([date,...specialDates])].filter(activeReport);
             const exact=candidates.find(day=>{const r=roster.__meta[day].overtimeReport;return r.attendanceInId&&String(r.attendanceInId)===String(row.clockIn?.id)||r.attendanceOutId&&String(r.attendanceOutId)===String(row.clockOut?.id);});
             const reportDate=exact||candidates[0]||date;
