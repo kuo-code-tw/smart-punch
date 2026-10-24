@@ -16,9 +16,10 @@ const tick=()=>new Promise(r=>setImmediate(r));
  let t=setup();t.c.p79StartSchedulePreview('2026-10');const pending=t.c.loadCloudData();t.cache();await tick();
  assert(t.events.includes('render'));assert(!t.events.includes('cloud'));assert(t.source.textContent.includes('本機快取'));assert.equal(t.c.scheduleCanEditNow(),false,'editor lock alone must not permit stale cache writes');
  await assert.rejects(t.c.cloudPost({action:'syncSchedules'}),/只能查看/);
+ t.cloud();assert(await pending);assert.equal(t.c.scheduleCanEditNow(),true);assert(t.events.includes('persist'));assert(t.source.textContent.includes('雲端班表已更新'));
  t=setup();t.main.textContent='正在讀取班表…';t.c.p79StartSchedulePreview('2026-10');t.cache();await tick();assert(t.events.includes('direct-render'),'cached data must repaint a stuck loading roster');
  t=setup();t.c.buildRoleTabsAndRender=()=>{throw Error('panel failure')};t.c.p79StartSchedulePreview('2026-10');t.cache();await tick();assert(t.events.includes('direct-render'),'a failed auxiliary panel may not block the cached roster');
- t.cloud();assert(await pending);assert.equal(t.c.scheduleCanEditNow(),true);assert(t.events.includes('persist'));assert(t.source.textContent.includes('雲端班表已更新'));
+
  t=setup();t.c.p79StartSchedulePreview('2026-10');const fast=t.c.loadCloudData();t.cloud();assert(await fast);t.cache();await tick();assert.equal(t.events.filter(e=>e==='cache').length,0,'slow disk cannot overwrite fresh cloud');
  for(const change of [t=>t.month('2026-11'),t=>t.token('OTHER'),t=>t.c.p79ScheduleLocalMutationVersion++,t=>t.c.port79ScheduleDirty=true,t=>t.c.p79SchedulePreviewEpoch+=2]){
   t=setup();t.c.p79StartSchedulePreview('2026-10');change(t);t.cache();await tick();assert(!t.events.includes('cache'),'stale cache reply rejected');
