@@ -517,7 +517,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261022-download-recovery"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261022-download-recovery&rev=20261023-all-system-preview"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 
 <style id="p79-work-hours-page-css">
@@ -4523,7 +4523,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             return true;
         }
 
-        window.onload = async function() {
+        async function p79WorkhoursBoot() {
             // 有首頁管理員 SSO 就接手；沒有 SSO 也不阻擋一般員工使用打卡頁。
             // 這裡不能再把整個考勤系統設成 SUPERADMIN-ONLY，否則一般員工會被送回登入頁。
             const ssoAccepted = await consumePort79SsoHandoff();
@@ -4587,6 +4587,7 @@ const now = new Date();
 
             // v7.37：新手機／清除瀏覽器資料後 sysConfig.gasUrl 可能還是空的，
             // 但 getActiveGasUrl() 仍可取得程式內建正式 GAS URL。不可因此跳過員工主檔同步。
+            void p79PreviewAttendanceFolder();
             const startupGasUrl = getActiveGasUrl();
             if (isValidGasWebAppUrl(startupGasUrl)) {
                 sysConfig.gasUrl = startupGasUrl;
@@ -6121,6 +6122,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     }
                 }
 
+                window.Port79DataCache?.finishStartupPreview?.('workhours');
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
                 initDropdowns();
@@ -6186,6 +6188,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             cloudLoadPromise = fetchGasJsonWithRetry(requestUrl, '考勤資料', 3, 25000)
             .then(async data => {
                 if (!data?.ok) throw new Error(data?.error || '雲端回應失敗');
+                window.Port79DataCache?.finishStartupPreview?.('workhours');
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
 
@@ -14778,9 +14781,9 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   // 頁面啟動規則：
   // 1. 真正離線：先用 IndexedDB 備援。
   // 2. 有網路：雲端是唯一主資料；等雲端完成後只「覆寫保存」IndexedDB，不可再把舊快取合併回畫面。
-  const oldOnload=window.onload;
-  window.onload=async function(ev){
-    const localPromise=p79LoadLocalDbSnapshot();
+  document.addEventListener('DOMContentLoaded',async function(ev){
+    const localPromise=p79LoadLocalDbSnapshot().catch(()=>null);
+    await p79WorkhoursBoot();
     const snapshot=await localPromise;
     const online = typeof navigator==='undefined' ? true : navigator.onLine!==false;
 
@@ -14788,7 +14791,6 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
       p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
     }
 
-    if(typeof oldOnload==='function') await oldOnload.call(this,ev);
 
     if(online && p79AttendanceSyncAuthenticated()){
       let cloudOk = false;
@@ -14805,7 +14807,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
         p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
       }
     }
-  };
+  },{once:true});
 
   window.addEventListener('online',()=>{
     setTimeout(()=>{
@@ -15542,6 +15544,16 @@ body.p79-work-hours-page #adminContentOvertime #overtimeTableBody .p79-overtime-
 setInterval(p79RefreshVisibleOvertimeEvidence,60000);
 document.addEventListener('visibilitychange',p79RefreshVisibleOvertimeEvidence);
 window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
+</script>
+
+
+<script id="p79-folder-startup-preview">
+function p79PreviewAttendanceFolder(){
+ const month=getRequestedAttendanceCloudMonth();
+ return window.Port79DataCache?.showStartupPreview?.({system:'workhours',actions:['getAttendanceMonthData','getAttendanceMainDirect','getAttendanceCoreData','getData'],host:'#viewAdmin',month,
+  canShow:()=>canReadAdminCloudData()&&getRequestedAttendanceCloudMonth()===month&&!(records||[]).length,
+  select:d=>Array.isArray(d.records)?{label:month+' 考勤明細（工時、加班待最新班表核對）',columns:['工號','姓名','日期／時間','狀態'],rows:d.records.filter(r=>attendanceRecordMonthKey(r)===month&&canCurrentAdminViewDataRow(r)).map(r=>[r.empId||r.attNo,r.name,r.timeStr||r.datetime||r.dateTime,r.status||r.type||r.action])}:null});
+}
 </script>
 
 </body>
