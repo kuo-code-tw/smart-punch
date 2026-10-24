@@ -80,7 +80,7 @@ function recallMemory(key){
  return row;
 }
 function clearMemory(){memoryCache.clear();memoryWeights.clear();memoryPayloadBytes=0;}
-window.addEventListener?.('pagehide',()=>{if(boundedManagementMemory())clearMemory();});
+window.addEventListener?.('pagehide',()=>{if(boundedManagementMemory())clearMemory();void flushFolder();});
 const inflightReads=new Map();
 const readVersions=new Map();
 let startupPreview=null;
@@ -299,7 +299,6 @@ function writeFolderSnapshot(row){
  folderWrites=task;return task;
 }
 // 離頁時僅嘗試排空已待寫快取；真正原始資料已在 IndexedDB／正式雲端。
-window.addEventListener?.('pagehide',()=>{void flushFolder()});
 document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushFolder()});
 async function readFolderSnapshot(key){
  if(!token()||!key.startsWith(viewerKey()+'|'))return null;
