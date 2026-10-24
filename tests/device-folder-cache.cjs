@@ -2,10 +2,10 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{webcryp
 const source=fs.readFileSync(require('path').join(__dirname,'../assets/port79-data-cache.js'),'utf8');
 const storage=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}};
 function directory(name='79號碼頭雲端資料庫'){
- const files=new Map(),dirs=new Map();let permission='granted',fail=false;
- return {name,files,dirs,setPermission:p=>permission=p,setFailure:v=>fail=v,queryPermission:async()=>permission,requestPermission:async()=>permission,
+ const files=new Map(),dirs=new Map();let permission='granted',fail=false,writes=0,reads=0;
+ return {name,files,dirs,counts:()=>({writes,reads}),setPermission:p=>permission=p,setFailure:v=>fail=v,queryPermission:async()=>permission,requestPermission:async()=>permission,
  async getDirectoryHandle(n,{create=false}={}){if(!dirs.has(n)){if(!create)throw Error('NotFound');dirs.set(n,directory(n))}return dirs.get(n)},
- async getFileHandle(n,{create=false}={}){if(!files.has(n)){if(!create)throw Error('NotFound');files.set(n,'')}return {getFile:async()=>({size:Buffer.byteLength(files.get(n)),text:async()=>files.get(n)}),createWritable:async()=>{let pending;return {write:async s=>{if(fail)throw Error('disk full');pending=s},close:async()=>{files.set(n,pending)},abort:async()=>{}}}}}
+ async getFileHandle(n,{create=false}={}){if(!files.has(n)){if(!create)throw Error('NotFound');files.set(n,'')}return {getFile:async()=>({size:Buffer.byteLength(files.get(n)),text:async()=>{reads++;return files.get(n)}}),createWritable:async()=>{let pending;return {write:async s=>{if(fail)throw Error('disk full');pending=s},close:async()=>{files.set(n,pending);writes++},abort:async()=>{}}}}}
  };
 }
 function setup({folder=directory(),stores=new Map(),persistent=false,dbFails=false,doc={},timer=setTimeout}={}){
@@ -60,12 +60,26 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   const x=setup();await x.api.connectFolder();await x.api.storeSchedulePreview('2026-10',{ok:true,employees:[],schedules:[]},'A@admin','TOKEN');await x.api.flushFolder();await x.api.clear();x.folder.setPermission('prompt');
   assert.equal(await x.api.getSchedulePreview('2026-10'),null);assert((await x.api.deviceStatus()).folder.includes('重新授權'));
  });
- await test('successful close shows a real folder-save notice once per burst; dismiss works',async()=>{
-  const {doc,nodes,timers}=noticeDom(),x=setup({doc,timer:fn=>{timers.push(fn);return timers.length}});
-  await x.api.connectFolder();assert.equal(nodes.size,0,'selecting a folder alone is not a successful write');
-  await x.api.put(row());await x.api.flushFolder();const notice=nodes.get('p79FolderSavedNotice');assert(notice);assert.equal(notice.attrs.role,'status');assert(notice.children[0].textContent.includes('已自動保存至「79號碼頭雲端資料庫」'));
-  await x.api.put(row(2));await x.api.flushFolder();assert.equal(nodes.size,1);assert.equal(timers.length,1,'a burst cannot keep extending the toast');
-  notice.children[1].onclick();assert.equal(nodes.size,0);await x.api.put(row(3));await x.api.flushFolder();assert.equal(nodes.size,0,'dismissed notice is throttled for the next minute');timers[0]();
+ await test('completed folder backup stays silent; no success popup or acknowledgment button',async()=>{
+  const {doc,nodes,timers}=noticeDom(),x=setup({doc});
+  await x.api.connectFolder();await x.api.put(row());await x.api.flushFolder();
+  assert.equal(nodes.size,0,'disk backup must not create the green success popup');
+  assert.equal(timers.length,0);
+  assert.equal((await x.api.getFolderSyncStatus()).state,'done','computer status light still shows successful save');
+ });
+ await test('writes are coalesced by key and repeated identical data does not touch the disk',async()=>{
+  const x=setup();await x.api.connectFolder();
+  await x.api.put(row(1));await x.api.put(row(2));await x.api.put(row(3));
+  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1'),before=dir.counts();
+  assert.equal(before.writes,0,'no immediate write during burst');
+  assert.equal((await x.api.getFolderSyncStatus()).state,'busy','pending backup is visible as saving');
+  await x.api.flushFolder();
+  assert.equal(dir.counts().writes,1,'one disk write for three updates to the same key');
+  assert.equal((await x.api.getFolderSyncStatus()).state,'done');
+  await x.api.put(row(4));await x.api.flushFolder();assert.equal(dir.counts().writes,2);
+  const same={...row(5),data:{ok:true,version:4}};
+  await x.api.put(same);await x.api.flushFolder();
+  assert.equal(dir.counts().writes,2,'unchanged snapshot does not write again');
  });
  await test('failed close, failed write and revoked permission never claim disk-save success',async()=>{
   for(const mode of ['write','close','permission']){
@@ -112,7 +126,7 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
  await test('pending close stays busy; failed close stays red even if another file saves',async()=>{
   const x=setup();await x.api.connectFolder();const d=await x.folder.getDirectoryHandle('port79-snapshots-v1',{create:true}),original=d.getFileHandle;let release,entered;
   const waiting=new Promise(r=>entered=r);d.getFileHandle=async(...args)=>{const h=await original(...args),open=h.createWritable;h.createWritable=async()=>{const w=await open(),close=w.close;w.close=async()=>{entered();await new Promise(r=>release=r);await close()};return w;};return h;};
-  await x.api.put(row());await waiting;let status=await x.api.getFolderSyncStatus();assert.equal(status.state,'busy');assert.equal(status.savedAt,0);release();await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'done');
+  await x.api.put(row());const pending=x.api.flushFolder();await waiting;let status=await x.api.getFolderSyncStatus();assert.equal(status.state,'busy');assert.equal(status.savedAt,0);release();await pending;assert.equal((await x.api.getFolderSyncStatus()).state,'done');
   d.getFileHandle=async(...args)=>{const h=await original(...args),open=h.createWritable;h.createWritable=async()=>{const w=await open();w.close=async()=>{throw Error('disk close failed')};return w;};return h;};
   await x.api.put(row(2));await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'error');
   d.getFileHandle=original;await x.api.put(row(3,'A@admin|system|leave'));await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'error','a different file succeeding cannot mask a failed snapshot');
