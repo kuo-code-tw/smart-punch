@@ -130,7 +130,10 @@ function openDb(){
 async function put(row){
  rememberMemory(row);
  const disk=mirrorSnapshot(row);
- try{await putLocal(row);return true}catch(error){if(await disk)return true;throw error}
+ try{await putLocal(row);return true}catch(error){
+  // IndexedDB 失敗時不可等待延後計時器；立刻將待寫資料實際落盤作為備援。
+  await flushFolder();if(await disk)return true;throw error
+ }
 }
 async function putLocal(row){
  const db=await openDb();
@@ -221,41 +224,73 @@ async function getFolderSyncStatus(){
  if(pending)return {state:'busy',label:'保存中',folder,savedAt:state.savedAt,pending};
  return {state:state.savedAt?'done':'idle',label:state.savedAt?'已保存':'已連接，待保存',folder,savedAt:state.savedAt};
 }
-let folderNoticeAt=0,folderNoticeTimer=null;
-function notifyFolderSaved(handle){
- try{
-  if(!document.body||typeof document.createElement!=='function')return;
-  const now=Date.now();let notice=document.getElementById('p79FolderSavedNotice');
-  // One notice for a burst of snapshot writes, rather than one per API response.
-  if(!notice&&folderNoticeAt&&now-folderNoticeAt<60000)return;
-  if(!notice){
-   notice=document.createElement('div');notice.id='p79FolderSavedNotice';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');
-   notice.style.cssText='position:fixed;right:16px;bottom:20px;z-index:21000;max-width:min(420px,calc(100vw - 32px));padding:14px 16px;border-radius:14px;background:#064e3b;color:#fff;box-shadow:0 8px 30px #0003;font:14px/1.6 sans-serif';
-   const message=document.createElement('span');message.dataset.folderSavedMessage='1';notice.appendChild(message);
-   const close=document.createElement('button');close.type='button';close.textContent='知道了';close.style.cssText='display:block;margin-top:6px;background:transparent;color:inherit;border:1px solid #ffffff80;border-radius:6px;padding:3px 10px;cursor:pointer';close.onclick=()=>notice.remove();notice.appendChild(close);
-   document.body.appendChild(notice);folderNoticeAt=now;
-   // Keep the notice bounded even when background sync keeps writing.
-   folderNoticeTimer=setTimeout(()=>{notice.remove();folderNoticeTimer=null;},8000);
-  }
-  notice.querySelector('[data-folder-saved-message]').textContent='已自動保存至「'+handle.name+'」資料夾。';
- }catch(_){} // A notification must never change the outcome of a completed write.
+// 電腦資料夾是 IndexedDB 的備份鏡像：瀏覽器資料即時保存，硬碟寫入則按鍵合併。
+const FOLDER_QUIET_MS=12000,FOLDER_MAX_MS=60000;
+const folderQueue=new Map(),folderKnownPayload=new Map();
+let folderQueueTimer=null,folderQueueSince=0;
+function scheduleFolderFlush(){
+ if(folderQueueTimer!==null)clearTimeout(folderQueueTimer);
+ const remaining=Math.max(0,FOLDER_MAX_MS-(Date.now()-folderQueueSince));
+ folderQueueTimer=setTimeout(()=>{folderQueueTimer=null;void flushFolder()},Math.min(FOLDER_QUIET_MS,remaining));
 }
 function mirrorSnapshot(row){
+ if(!currentViewerRow(row)||folderLoaded&&!folderHandle)return Promise.resolve(false);
+ const viewer=viewerKey();
+ let entry=folderQueue.get(row.key);
+ if(!entry){
+  entry={row,viewer,waiters:[]};folderQueue.set(row.key,entry);
+  if(!folderQueueSince)folderQueueSince=Date.now();
+  folderPending.set(viewer,(folderPending.get(viewer)||0)+1);
+  emitFolderSync();
+ }else if(Number(row.savedAt)>=Number(entry.row.savedAt))entry.row=row;
+ const result=new Promise(resolve=>entry.waiters.push(resolve));
+ scheduleFolderFlush();
+ return result;
+}
+async function flushFolder(){
+ if(folderQueueTimer!==null){clearTimeout(folderQueueTimer);folderQueueTimer=null}
+ const batch=[...folderQueue.values()];
+ folderQueue.clear();folderQueueSince=0;
+ if(!batch.length)return folderWrites;
+ // Only the last version of each key enters the disk queue; waiters receive that result.
+ const jobs=batch.map(entry=>writeFolderSnapshot(entry.row).then(ok=>{
+  entry.waiters.forEach(resolve=>resolve(ok));return ok;
+ }).catch(()=>{entry.waiters.forEach(resolve=>resolve(false));return false}).finally(()=>{
+  folderPending.set(entry.viewer,Math.max(0,(folderPending.get(entry.viewer)||1)-1));emitFolderSync();
+ }));
+ await Promise.all(jobs);
+ return folderWrites;
+}
+function writeFolderSnapshot(row){
  if(!currentViewerRow(row))return Promise.resolve(false);
  const viewer=viewerKey();let writeHandle=null;
  folderPending.set(viewer,(folderPending.get(viewer)||0)+1);emitFolderSync();
- // Serialize writes so an older response cannot finish after a newer snapshot.
  const task=folderWrites.then(async()=>{
   if(!currentViewerRow(row))return false;
   const handle=await allowedFolder();if(!handle)return false;writeHandle=handle;
   const dir=await snapshotDirectory(handle,true),name=await folderFilename(row.key);
-  try{const old=JSON.parse(await(await(await dir.getFileHandle(name)).getFile()).text());if(old?.row?.key===row.key&&old.row.savedAt>row.savedAt)return true}catch(_){}
+  const payload=JSON.stringify(row.data);
+  // An unchanged cloud result may have a newer download timestamp. Never write it again
+  // just to refresh that timestamp. Folder status time must mean a real disk commit.
+  const prior=folderKnownPayload.get(row.key);
+  if(prior?.handle===handle&&prior.data===payload&&prior.savedAt>=Number(row.savedAt||0))return true;
+  try{
+   const old=JSON.parse(await(await(await dir.getFileHandle(name)).getFile()).text());
+   if(old?.row?.key===row.key){
+    if(Number(old.row.savedAt)>Number(row.savedAt))return true;
+    if(old.row.kind===row.kind&&old.row.system===row.system&&JSON.stringify(old.row.data)===payload){
+     folderKnownPayload.set(row.key,{handle,data:payload,savedAt:Math.max(Number(old.row.savedAt||0),Number(row.savedAt||0))});
+     return true;
+    }
+   }
+  }catch(_){}
   const file=await dir.getFileHandle(name,{create:true}),writer=await file.createWritable();
   try{await writer.write(JSON.stringify({format:'port79-cache',version:1,row}));await writer.close()}
   catch(error){try{await writer.abort()}catch(_){}throw error}
+  folderKnownPayload.set(row.key,{handle,data:payload,savedAt:Number(row.savedAt)||0});
   await recordFolderResult(handle,viewer,row.key);
   folderMessage='已連接：'+handle.name+'；已自動保存至電腦';
-  if(currentViewerRow(row))notifyFolderSaved(handle);
+  // 成功記錄只更新「電腦」燈號，不再顯示阻擋畫面的綠色通知。
   return true;
  }).catch(async error=>{
   folderMessage='資料夾保存失敗：'+String(error?.message||error);
@@ -263,6 +298,9 @@ function mirrorSnapshot(row){
  }).finally(()=>{folderPending.set(viewer,Math.max(0,(folderPending.get(viewer)||1)-1));emitFolderSync()});
  folderWrites=task;return task;
 }
+// 離頁時僅嘗試排空已待寫快取；真正原始資料已在 IndexedDB／正式雲端。
+window.addEventListener?.('pagehide',()=>{void flushFolder()});
+document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushFolder()});
 async function readFolderSnapshot(key){
  if(!token()||!key.startsWith(viewerKey()+'|'))return null;
  try{
@@ -282,7 +320,7 @@ async function connectFolder(){
  folderHandle=selected;folderLoaded=true;emitFolderSync();
  let remembered=true;try{await folderSetting(selected)}catch(_){remembered=false}
  const rows=await all().catch(()=>[]);let saved=0,failed=0;
- for(const row of rows)if(currentViewerRow(row)){if(await mirrorSnapshot(row))saved++;else failed++}
+ for(const row of rows)if(currentViewerRow(row)){if(await writeFolderSnapshot(row))saved++;else failed++}
  const writable=await allowedFolder();if(!writable)throw new Error(folderMessage);
  if(failed)throw new Error('已連接資料夾，但有 '+failed+' 份快取保存失敗；請確認硬碟空間與權限');
  folderMessage='已連接：'+selected.name+'；已保存 '+saved+' 份快取'+(remembered?'':'；此分頁關閉後需重新選擇');
@@ -294,7 +332,7 @@ async function reconnectFolder(){
  folderMessage='已重新連接：'+h.name;emitFolderSync();return folderMessage;
 }
 async function disconnectFolder(){
- await folderWrites;folderHandle=null;folderLoaded=true;
+ await flushFolder();await folderWrites;folderHandle=null;folderLoaded=true;
  await folderSetting(null).catch(()=>{});folderMessage='已停止使用資料夾；硬碟檔案仍保留';emitFolderSync();return folderMessage;
 }
 async function retainDeviceData(){
@@ -330,7 +368,7 @@ async function managementSystemMetadata(){
  });
 }
 async function clear(){
- clearMemory();
+ await flushFolder();clearMemory();
  const db=await openDb();
  return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).clear();tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)});
 }
@@ -854,6 +892,6 @@ async function refreshModal(){
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
-window.Port79DataCache={getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,showStartupPreview,finishStartupPreview,hasStartupPreview:()=>!!startupPreview,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,showStartupPreview,finishStartupPreview,hasStartupPreview:()=>!!startupPreview,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 
