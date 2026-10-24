@@ -498,7 +498,7 @@ async function refreshComputerSync(){
   button=document.createElement('button');button.id='p79ComputerSync';button.type='button';button.className='sys';
   button.style.cssText='font:inherit;cursor:pointer;color:inherit';
   const icon=document.createElement('span');icon.className='p79-sys-icon';icon.textContent='💻';icon.setAttribute('aria-hidden','true');
-  const name=document.createElement('b');name.textContent='電腦';const text=document.createElement('span');text.className='p79-sys-state';text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.append(icon,name,text);
+  const name=document.createElement('b');name.textContent='電腦';const text=document.createElement('span');text.className='p79-sys-state';text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.appendChild(icon);button.appendChild(name);button.appendChild(text);
   button.addEventListener('click',()=>window.Port79DataCache?.openCenter?.());host.insertBefore(button,host.querySelector('[data-sys]'));
  }
  computerSyncBusy=true;
