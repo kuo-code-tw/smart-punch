@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),a=require('assert/strict');
+let config={other:'keep',overtimeConversionRowsV1:[['國','颱08-11','3','4','','','08','11','full','颱風日加班']],overtimeReportTypesV1:[['颱風日加班','國']]},posts=0,fail=false,edit=true;
+const c={TextEncoder,AbortController,setTimeout,clearTimeout,sessionStorage:{getItem:()=>''},p79OvertimeContext:{gasUrl:()=> 'https://example.test',token:()=> 'test',config:()=>({}),persistConfig(){},canEditRules:()=>edit}};c.window=c;
+c.fetch=async(url,options)=>{if(options.body){posts++;if(!fail)config=JSON.parse(options.body).config;}return {ok:true,json:async()=>({ok:true,config:JSON.parse(JSON.stringify(config))})}};
+vm.createContext(c);vm.runInContext(fs.readFileSync('assets/port79-rest-attendance.js','utf8'),c);vm.runInContext(fs.readFileSync('assets/port79-overtime-report.js','utf8'),c);
+(async()=>{const api=c.P79Overtime,rows=api.specialRows(config.overtimeConversionRowsV1,config);a.equal(rows.length,48);a.equal(rows.find(r=>r[1]==='颱08-11')[3],'4','existing conversion retained');for(const code of ['颱24-08','颱24-01','選24-08','選24-01','選16-24'])a(rows.some(r=>r[1]===code),code);a.equal(api.specialRows(rows,config).length,48,'idempotent');
+ const date='2026-10-23',ts=t=>Date.parse(date+'T'+t+':00+08:00');for(const [code,prefix]of [['颱','颱'],['選','選']])for(const [end,expected]of [['11:45','11'],['11:46','12']])a.equal(api.suggestRule(ts('07:32'),ts(end),date,{[date]:'早'},rows,[{code}])[1],prefix+'08-'+expected);
+ a.equal(api.suggestRule(ts('07:32'),ts('11:45'),date,{},rows,[{code:'颱'}]),null);
+ const row=rows.find(r=>r[1]==='選24-01');await api.ensureSpecialRule(row);a.equal(posts,1);a.equal(config.other,'keep');a.equal(config.overtimeConversionRowsV1.length,2,'persist only selected missing rule');a(config.overtimeReportTypesV1.some(t=>t[0]==='選舉日加班'));await api.ensureSpecialRule(row);a.equal(posts,1,'no duplicate cloud write');
+ edit=false;await a.rejects(api.ensureSpecialRule(rows.find(r=>r[1]==='選24-02')),/權限/);a.equal(posts,1);edit=true;fail=true;await a.rejects(api.ensureSpecialRule(rows.find(r=>r[1]==='選24-03')),/讀回/);
+ console.log('PASS generated typhoon/election periods, scheduled 45/46 boundaries, existing conversions, idempotent cloud persistence, permissions and failed readback');
+})().catch(e=>{console.error(e);process.exitCode=1});

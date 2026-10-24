@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261024-clockout-45"></script>
+<script src="../assets/port79-overtime-report.js?v=20261024-special-auto"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261021-substitute-rest"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261021-schedule-pending"></script>
@@ -12777,7 +12777,7 @@ async function p79ExportOvertimeComparison(printMode){
             const start=p79DirectAttendanceTimestamp(row.clockIn),end=p79DirectAttendanceTimestamp(row.clockOut),roster=p79WorkOvertimeRoster(row.empId,date);
             const kinds=(globalThis.P79SpecialOvertime?.overlap(start,end)||[]).flatMap(p=>p.kinds);
             const inferred=row.overtimeReport?null:P79Overtime.suggestRule(start,end,date,roster,P79Overtime.reportRules(),kinds);
-            P79Overtime.openReport({empId:row.empId,date,attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||inferred?.[1]||'',category:row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!row.overtimeReport&&!inferred});
+            P79Overtime.openReport({empId:row.empId,date,roster,savedReport:!!row.overtimeReport,attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:row.overtimeReport?.code||inferred?.[1]||'',category:row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!row.overtimeReport&&!inferred});
         }
         function p79OvertimeAttendanceIssue(session,start,end) {
             if(session?.pairingIssue)return '班次配對待核對';
