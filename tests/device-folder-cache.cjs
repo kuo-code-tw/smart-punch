@@ -102,5 +102,26 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   await x.api.put({key:'A@admin|system|attendance',kind:'system',system:'attendance',savedAt:stamp,data:{ok:true,fullDatabase:true,months:[month],monthStats:[{month,ok:true}],records:[{id:'new',timeStr:'2026/10/01 08:00'}]}});
   assert.equal((await x.api.getExportSnapshot('getAttendanceMonthRaw',month)).data.records[0].id,'new');
  });
+ await test('computer light distinguishes unconnected, connected and an actually completed disk write',async()=>{
+  const x=setup();assert.equal((await x.api.getFolderSyncStatus()).state,'idle');await x.api.connectFolder();
+  let state=await x.api.getFolderSyncStatus();assert.equal(state.label,'已連接，待保存');assert.equal(state.savedAt,0);
+  await x.api.put(row());await x.api.flushFolder();state=await x.api.getFolderSyncStatus();assert.equal(state.state,'done');assert(state.savedAt>0);
+  const fresh=setup({folder:x.folder,stores:x.stores});assert.equal((await fresh.api.getFolderSyncStatus()).savedAt,state.savedAt,'same authorized folder retains last actual save time after reload');
+  await x.api.disconnectFolder();assert.equal((await x.api.getFolderSyncStatus()).label,'未連接');
+ });
+ await test('pending close stays busy; failed close stays red even if another file saves',async()=>{
+  const x=setup();await x.api.connectFolder();const d=await x.folder.getDirectoryHandle('port79-snapshots-v1',{create:true}),original=d.getFileHandle;let release,entered;
+  const waiting=new Promise(r=>entered=r);d.getFileHandle=async(...args)=>{const h=await original(...args),open=h.createWritable;h.createWritable=async()=>{const w=await open(),close=w.close;w.close=async()=>{entered();await new Promise(r=>release=r);await close()};return w;};return h;};
+  await x.api.put(row());await waiting;let status=await x.api.getFolderSyncStatus();assert.equal(status.state,'busy');assert.equal(status.savedAt,0);release();await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'done');
+  d.getFileHandle=async(...args)=>{const h=await original(...args),open=h.createWritable;h.createWritable=async()=>{const w=await open();w.close=async()=>{throw Error('disk close failed')};return w;};return h;};
+  await x.api.put(row(2));await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'error');
+  d.getFileHandle=original;await x.api.put(row(3,'A@admin|system|leave'));await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'error','a different file succeeding cannot mask a failed snapshot');
+  await x.api.put(row(4));await x.api.flushFolder();assert.equal((await x.api.getFolderSyncStatus()).state,'done','successful retry of the failed snapshot clears its error');
+ });
+ await test('permission loss, account switches and a different folder cannot inherit a green light',async()=>{
+  const x=setup();await x.api.connectFolder();await x.api.put(row());await x.api.flushFolder();x.folder.setPermission('prompt');assert.equal((await x.api.getFolderSyncStatus()).state,'permission');
+  x.folder.setPermission('granted');x.ss.setItem('port79_user_session',JSON.stringify({empId:'B',adminRole:'admin'}));assert.equal((await x.api.getFolderSyncStatus()).savedAt,0);
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));const other=directory('另一個資料夾');x.window.showDirectoryPicker=async()=>other;await x.api.clear();await x.api.connectFolder();assert.equal((await x.api.getFolderSyncStatus()).savedAt,0);
+ });
  console.log(JSON.stringify({passed,scope:'Simulated folder permissions, IndexedDB resets and disk failures; no cloud data'}));
 })().catch(e=>{console.error(e);process.exitCode=1});
