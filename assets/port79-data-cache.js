@@ -132,7 +132,7 @@ async function put(row){
  const disk=mirrorSnapshot(row);
  try{await putLocal(row);return true}catch(error){
   // IndexedDB 失敗時不可等待延後計時器；立刻將待寫資料實際落盤作為備援。
-  await flushFolder();if(await disk)return true;throw error
+  await loadFolder().catch(()=>null);await Promise.resolve();await flushFolder();if(await disk)return true;throw error
  }
 }
 async function putLocal(row){
@@ -234,7 +234,13 @@ function scheduleFolderFlush(){
  folderQueueTimer=setTimeout(()=>{folderQueueTimer=null;void flushFolder()},Math.min(FOLDER_QUIET_MS,remaining));
 }
 function mirrorSnapshot(row){
- if(!currentViewerRow(row)||folderLoaded&&!folderHandle)return Promise.resolve(false);
+ if(!currentViewerRow(row))return Promise.resolve(false);
+ // Do not queue timers or disk operations at all when no folder is connected.
+ // On first use only, restore the saved handle from IndexedDB before deciding.
+ if(!folderLoaded)return loadFolder().then(handle=>handle&&currentViewerRow(row)?enqueueFolderSnapshot(row):false).catch(()=>false);
+ return folderHandle?enqueueFolderSnapshot(row):Promise.resolve(false);
+}
+function enqueueFolderSnapshot(row){
  const viewer=viewerKey();
  let entry=folderQueue.get(row.key);
  if(!entry){
