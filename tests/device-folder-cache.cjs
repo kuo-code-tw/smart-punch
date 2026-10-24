@@ -30,5 +30,30 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
  await test('disconnect leaves disk files intact and disables later restores',async()=>{const x=setup();await x.api.connectFolder();await x.api.put(row());await x.api.flushFolder();await x.api.disconnectFolder();await x.api.clear();assert.equal(await x.api.get(row().key),null);assert([...x.folder.dirs.values()][0].files.size>0)});
  await test('mobile retain button reports actual browser decision',async()=>{for(const persistent of [false,true]){const x=setup({persistent});delete x.window.showDirectoryPicker;const message=await x.api.retainDeviceData();assert(message.includes(persistent?'已獲准':'尚未同意'));assert.equal((await x.api.deviceStatus()).folderSupported,false)}});
  await test('signed-out sessions cannot connect or restore folder cache',async()=>{const x=setup();x.ss.removeItem('port79_user_token');await assert.rejects(x.api.connectFolder(),/登入/);assert.equal(await x.api.get(row().key),null)});
+ await test('schedule preview restores the existing whole-system folder download and selects only requested month',async()=>{
+  const a=setup(),data={ok:true,employees:[{empId:'QA',name:'Fixture'}],schedules:[{empId:'QA',month:'2026-10',schedule:{'2026-10-01':'早'}},{empId:'QA',month:'2026-11',schedule:{'2026-11-01':'晚'}}],leaveRecords:[],leaveCoverAssignments:[]};
+  await a.api.connectFolder();await a.api.put({key:'A@admin|system|schedule',kind:'system',system:'schedule',savedAt:Date.now()-86400000,size:100,data});await a.api.flushFolder();
+  const b=setup({folder:a.folder,stores:a.stores});await b.api.clear();
+  const preview=await b.api.getSchedulePreview('2026-10');assert(preview);assert.equal(preview.data.schedules.length,1);assert.equal(preview.data.schedules[0].schedule['2026-10-01'],'早');assert.equal(preview.data.month,'2026-10');
+  assert.equal(await b.api.getSchedulePreview('2026-12'),null,'missing month must not use another month');
+ });
+ await test('successful ordinary roster read stores a detached monthly preview, newer complete download wins',async()=>{
+  const x=setup();await x.api.connectFolder();const data={ok:true,employees:[{empId:'QA'}],schedules:[{empId:'QA',month:'2026-10',schedule:{'2026-10-01':'中'}}]};
+  const at=Date.now()-1000;assert(await x.api.storeSchedulePreview('2026-10',data,'A@admin','TOKEN',at));data.schedules[0].schedule['2026-10-01']='UNSAVED';
+  assert.equal((await x.api.getSchedulePreview('2026-10')).data.schedules[0].schedule['2026-10-01'],'中');
+  await x.api.flushFolder();await x.api.clear();assert.equal((await x.api.getSchedulePreview('2026-10')).savedAt,at,'normal read persisted to folder');
+  await x.api.put({key:'A@admin|system|schedule',kind:'system',system:'schedule',savedAt:Date.now(),size:100,data:{...data,schedules:[{empId:'QA',month:'2026-10',schedule:{'2026-10-01':'晚'}}]}});
+  assert.equal((await x.api.getSchedulePreview('2026-10')).data.schedules[0].schedule['2026-10-01'],'晚');
+ });
+ await test('schedule preview account and token guards prevent cross-login cache writes',async()=>{
+  const x=setup(),data={ok:true,employees:[],schedules:[]};assert.equal(await x.api.storeSchedulePreview('2026-10',data,'B@admin','TOKEN'),false);assert.equal(await x.api.storeSchedulePreview('2026-10',data,'A@admin','OLD'),false);
+  assert(await x.api.storeSchedulePreview('2026-10',data,'A@admin','TOKEN'));assert(await x.api.getSchedulePreview('2026-10'),'explicit empty month is a valid cached response');
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'B',adminRole:'admin'}));assert.equal(await x.api.getSchedulePreview('2026-10'),null);
+  x.ss.removeItem('port79_user_token');assert.equal(await x.api.getSchedulePreview('2026-10'),null);
+ });
+ await test('folder permission loss cannot create a fake cached month or a cloud write',async()=>{
+  const x=setup();await x.api.connectFolder();await x.api.storeSchedulePreview('2026-10',{ok:true,employees:[],schedules:[]},'A@admin','TOKEN');await x.api.flushFolder();await x.api.clear();x.folder.setPermission('prompt');
+  assert.equal(await x.api.getSchedulePreview('2026-10'),null);assert((await x.api.deviceStatus()).folder.includes('重新授權'));
+ });
  console.log(JSON.stringify({passed,scope:'Simulated folder permissions, IndexedDB resets and disk failures; no cloud data'}));
 })().catch(e=>{console.error(e);process.exitCode=1});

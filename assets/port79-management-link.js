@@ -221,6 +221,7 @@ applySnapshot:async snapshot=>{const data=snapshot.roster;if(data.scheduleAccess
         cloudLoaded = true;
         saveAllDataToLocalStorage();
 
+g.p79ConfirmScheduleSource?.(data,currentScheduleMonthKey());
 buildRoleTabsAndRender();renderTodaySchedulePanel();return true;}
 };
 })(window);

@@ -82,6 +82,8 @@ function recallMemory(key){
 function clearMemory(){memoryCache.clear();memoryWeights.clear();memoryPayloadBytes=0;}
 window.addEventListener?.('pagehide',()=>{if(boundedManagementMemory())clearMemory();});
 const inflightReads=new Map();
+const readVersions=new Map();
+let startupPreview=null;
 let dbPromise=null;
 let mutationGeneration=0;
 
@@ -319,8 +321,47 @@ function isMutationAction(action){
 }
 
 async function getSystemSnapshot(sys){
+ if(!token())return null;
+ const viewer=viewerKey(),credential=token();
  const row=await get(systemKey(sys));
- return row&&row.data?row:null;
+ return viewer===viewerKey()&&credential===token()&&row&&currentViewerRow(row)&&row.data?row:null;
+}
+// Explicit read-only roster previews: ordinary authoritative fetches still bypass cache.
+function schedulePreviewData(data,month,scoped=false){
+ if(!data||data.ok!==true||!Array.isArray(data.employees)||!Array.isArray(data.schedules))return null;
+ if(data.month&&String(data.month)!==month)return null;
+ const schedules=data.schedules.filter(row=>row&&String(row.month||'')===month&&row.schedule&&typeof row.schedule==='object'&&!Array.isArray(row.schedule));
+ if(!scoped&&!schedules.length)return null;
+ if(scoped&&schedules.length!==data.schedules.length)return null;
+ return {ok:true,month,employees:data.employees,schedules,
+  leaveRecords:Array.isArray(data.leaveRecords)?data.leaveRecords:[],
+  leaveCoverAssignments:Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[],
+  scheduleGroups:Array.isArray(data.scheduleGroups)?data.scheduleGroups:[]};
+}
+async function getSchedulePreview(month){
+ if(!/^\d{4}-\d{2}$/.test(month)||!token())return null;
+ const viewer=viewerKey(),credential=token(),base=systemKey('schedule');
+ const rows=await Promise.all([get(base+'|'+month),get(base)].map(p=>p.catch(()=>null)));
+ if(viewerKey()!==viewer||token()!==credential)return null;
+ const candidates=rows.map(row=>{
+  if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='schedule'||row.savedAt<=0||row.savedAt>Date.now()+60000)return null;
+  const scoped=row.key===base+'|'+month&&row.month===month;
+  const data=schedulePreviewData(row.data,month,scoped);
+  return data?{data,savedAt:row.savedAt}:null;
+ }).filter(Boolean).sort((a,b)=>b.savedAt-a.savedAt);
+ return candidates[0]||null;
+}
+async function storeSchedulePreview(month,data,expectedViewer,expectedToken,readAt=Date.now()){
+ if(!/^\d{4}-\d{2}$/.test(month)||!token()||viewerKey()!==expectedViewer||token()!==expectedToken)return false;
+ const selected=schedulePreviewData(data,month,false);
+ // A successful month-scoped response may legitimately contain no schedules yet.
+ const payload=selected||(!data?.schedules?.length?schedulePreviewData(data,month,true):null);
+ if(!payload)return false;
+ const key=systemKey('schedule')+'|'+month;
+ // Detach from mutable page state before storing in memory, IndexedDB or the folder.
+ const snapshot=JSON.parse(JSON.stringify(payload));
+ await put({key,kind:'system',system:'schedule',month,savedAt:readAt,size:safeSize(snapshot),data:snapshot});
+ return true;
 }
 async function restoreSystemSnapshot(sys,options={}){
  const row=await getSystemSnapshot(sys);
@@ -340,20 +381,81 @@ function jsonResponse(data,cacheState='1'){
  return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json;charset=UTF-8','X-PORT79-CACHE':cacheState}});
 }
 
-const nativeFetch=window.fetch.bind(window);
+// Render read-only DOM without passing disk snapshots through business renderers:
+// those renderers can repair records, populate write queues or change permissions.
+async function showStartupPreview(options){
+ try{
+ const {system,actions,canShow,select,host,month}=options;
+ if(!token()||!canShow())return false;
+ const viewer=viewerKey(),credential=token(),generation=mutationGeneration;
+ const versions=actions.map(a=>readVersions.get(a)||0);
+ const candidates=await Promise.all([getSystemSnapshot(system),...(month?[get(systemKey(system)+'|'+month)]:[])].map(p=>p.catch(()=>null)));
+ const row=candidates.filter(r=>r&&currentViewerRow(r)&&r.savedAt>0&&r.savedAt<=Date.now()+60000).sort((a,b)=>b.savedAt-a.savedAt)[0];
+ if(!row||row.data?.ok!==true||viewer!==viewerKey()||credential!==token()||generation!==mutationGeneration||!canShow()||actions.some((a,i)=>(readVersions.get(a)||0)!==versions[i]))return false;
+ if(startupPreview)return true;
+ const model=select(row.data,row.scope||{});
+ if(!model||!Array.isArray(model.rows)||!model.rows.length)return false;
+ const parent=document.querySelector(host);if(!parent)return false;
+ const card=document.createElement('section');card.id='p79StartupCacheStatus';card.setAttribute('aria-label','本機快取預覽');
+ card.style.cssText='margin:12px 0;padding:16px;border:1px solid #93c5fd;border-radius:14px;background:#eff6ff;color:#0f172a';
+ const heading=document.createElement('h2');heading.style.cssText='font-size:16px;font-weight:700;margin:0 0 8px';heading.textContent=SYSTEM_LABELS[system]+' · 本機快取預覽';card.appendChild(heading);
+ const status=document.createElement('p');status.setAttribute('role','status');status.style.cssText='font-size:12px;margin:0 0 10px';status.textContent=fmtTime(row.savedAt)+'｜'+(model.label||'')+'｜唯讀；正在讀取雲端最新資料。';card.appendChild(status);
+ const scroller=document.createElement('div');scroller.style.cssText='max-height:320px;overflow:auto';
+ const table=document.createElement('table');table.style.cssText='width:100%;border-collapse:collapse;font-size:13px;background:white;color:#0f172a';
+ const head=document.createElement('thead'),tr=document.createElement('tr');
+ for(const title of model.columns){const cell=document.createElement('th');cell.textContent=title;cell.style.cssText='text-align:left;padding:8px;border-bottom:1px solid #cbd5e1;white-space:nowrap';tr.appendChild(cell);}head.appendChild(tr);table.appendChild(head);
+ const body=document.createElement('tbody');
+ for(const values of model.rows.slice(0,100)){const tr=document.createElement('tr');for(const value of values){const cell=document.createElement('td');cell.textContent=String(value??'');cell.style.cssText='padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap';tr.appendChild(cell);}body.appendChild(tr);}
+ table.appendChild(body);scroller.appendChild(table);card.appendChild(scroller);
+ const footer=document.createElement('p');footer.style.cssText='font-size:12px;margin:10px 0 0';footer.textContent='共 '+model.rows.length+' 筆'+(model.rows.length>100?'，預覽前 100 筆':'')+'；最新資料讀取完成後自動切回完整操作畫面。';card.appendChild(footer);
+ const retry=document.createElement('a');retry.href=location.href;retry.textContent='重新讀取';retry.style.cssText='display:inline-block;margin-top:8px;color:#1d4ed8;text-decoration:underline';card.appendChild(retry);
+ parent.prepend(card);
+ startupPreview={system,actions,close(){card.remove();startupPreview=null;}};
+ return true;
+ }catch(error){console.warn('本機預覽無法顯示，繼續讀取雲端',error);return false;}
+}
+function finishStartupPreview(system){if(startupPreview?.system===system)startupPreview.close();}
+async function getHistoryPreview(url){
+ const info=urlInfo(url),key=actionKey(url),viewer=viewerKey(),credential=token();
+ if(!credential||info.action!=='historyGetMonthData'||!key)return null;
+ const row=await get(key).catch(()=>null);
+ if(!row||viewer!==viewerKey()||credential!==token()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
+ if(row.data.month&&row.data.month!==info.u.searchParams.get('month'))return null;
+ return {...row.data,sourceLabel:'本機歷史快取 · '+fmtTime(row.savedAt)};
+}
+const rawFetch=window.fetch.bind(window);
+function nativeFetch(input,init){
+ const url=typeof input==='string'?input:input?.url||String(input);
+ const method=String(init?.method||input?.method||'GET').toUpperCase(),info=urlInfo(url);
+ const key=method==='GET'?actionKey(url):null;
+ const viewer=viewerKey(),credential=token(),generation=mutationGeneration,startedAt=Date.now();
+ const requestCredentials=['token','userToken','gcToken','adminToken'].map(k=>info.u?.searchParams.get(k)).filter(Boolean);
+ return rawFetch(input,init).then(response=>{
+  if(key){
+   readVersions.set(info.action,(readVersions.get(info.action)||0)+1);
+   if(response.ok){
+    // Parsing and both disk stores run in the background, never on the response path.
+    void response.clone().json().then(async data=>{
+     if(data?.ok!==true||data.retryable||!requestCredentials.length||requestCredentials.some(t=>t!==credential)||viewer!==viewerKey()||credential!==token()||!credential||generation!==mutationGeneration)return;
+     const writes=[storeApi(url,data,'',startedAt)];
+     const sys={getLeaveData:'leave',hrGetEmployees:'hr',gcGetData:'efficiency',getHistoricalDataCatalog:'history'}[info.action];
+     // Preserve the request scope so a downloaded month cannot masquerade as all data.
+     if(sys)writes.push(put({key:systemKey(sys),kind:'system',system:sys,savedAt:startedAt,size:safeSize(data),scope:Object.fromEntries(['month','year','scope','type'].filter(k=>info.u.searchParams.has(k)).map(k=>[k,info.u.searchParams.get(k)])),data}));
+     const month=info.u.searchParams.get('month');
+     if(info.action==='getAttendanceMonthData'&&/^\d{4}-\d{2}$/.test(month||'')&&Array.isArray(data.records)&&(!data.month||data.month===month)){
+      for(const target of ['attendance','workhours'])writes.push(put({key:systemKey(target)+'|'+month,kind:'system',system:target,month,savedAt:startedAt,size:safeSize(data),data}));
+     }
+     await Promise.allSettled(writes);
+    }).catch(()=>{});
+   }
+  }
+  return response;
+ });
+}
 function coalescedNetwork(key,input,init,url){
  let p=inflightReads.get(key);
  if(!p){
-  const generation=mutationGeneration,startedAt=Date.now();
-  p=nativeFetch(input,init).then(async r=>{
-   try{
-    if(r.ok){
-      const d=await r.clone().json();
-      if(d&&d.ok!==false&&generation===mutationGeneration&&key===actionKey(url))await storeApi(url,d,'',startedAt);
-    }
-   }catch(e){}
-   return r;
-  }).finally(()=>{if(inflightReads.get(key)===p)inflightReads.delete(key)});
+  p=nativeFetch(input,init).finally(()=>{if(inflightReads.get(key)===p)inflightReads.delete(key)});
   inflightReads.set(key,p);
  }
  return p.then(r=>r.clone());
@@ -384,7 +486,7 @@ window.fetch=async function(input,init){
  if(!key)return nativeFetch(input,init);
 
  let cached=null;
- try{cached=await get(key)}catch(e){}
+ try{cached=await Promise.race([get(key),new Promise(resolve=>setTimeout(()=>resolve(null),40))])}catch(e){}
  const stamp=mutationStamp();
  if(cached&&Number(cached.savedAt||0)<stamp)cached=null;
 
@@ -469,7 +571,7 @@ async function fetchJson(action,params={},sys=''){
   const to=setTimeout(()=>{timedOut=true;c.abort()},DOWNLOAD_TIMEOUT_MS);
   try{
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，請重新開啟快取中心'),{code:'P79_AUTH'});
-   const r=await nativeFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
+   const r=await rawFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
    const raw=await r.text();
    if(!r.ok)throw Object.assign(new Error(label+'：HTTP '+r.status),{status:r.status,retryable:[404,408,429,500,502,503,504].includes(r.status),code:'P79_TRANSPORT'});
    try{data=JSON.parse(raw)}catch(_){throw Object.assign(new Error(label+'：雲端回傳網頁，部署網址可能已失效'),{retryable:true,code:'P79_TRANSPORT'})}
@@ -495,6 +597,7 @@ async function fetchJson(action,params={},sys=''){
    setProgress(label+'連線未完成，正在重試一次…');
    continue;
   }finally{clearTimeout(to)}
+  readVersions.set(action,(readVersions.get(action)||0)+1);
   // Storage failures must not trigger another cloud request.
   await storeApi(url,data,sys);
   if(new URL(url).pathname!==primary.pathname)recoveredGasUrl=CANONICAL_GAS_URL;
@@ -631,6 +734,6 @@ async function refreshModal(){
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
-window.Port79DataCache={connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={showStartupPreview,finishStartupPreview,hasStartupPreview:()=>!!startupPreview,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 

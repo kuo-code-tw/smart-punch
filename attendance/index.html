@@ -735,7 +735,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261022-download-recovery"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261022-download-recovery&rev=20261023-all-system-preview"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -5061,6 +5061,7 @@ const now = new Date();
 
             // v7.37：新手機／清除瀏覽器資料後 sysConfig.gasUrl 可能還是空的，
             // 但 getActiveGasUrl() 仍可取得程式內建正式 GAS URL。不可因此跳過員工主檔同步。
+            void p79PreviewAttendanceFolder();
             const startupGasUrl = getActiveGasUrl();
             if (isValidGasWebAppUrl(startupGasUrl)) {
                 sysConfig.gasUrl = startupGasUrl;
@@ -7208,6 +7209,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     }
                 }
 
+                window.Port79DataCache?.finishStartupPreview?.('attendance');
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
                 initDropdowns();
@@ -7283,6 +7285,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             cloudLoadPromise = fetchGasJsonWithRetry(requestUrl, '考勤資料', 3, 25000)
             .then(async data => {
                 if (!data?.ok) throw new Error(data?.error || '雲端回應失敗');
+                window.Port79DataCache?.finishStartupPreview?.('attendance');
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
 
@@ -23210,6 +23213,7 @@ window.p79AttendanceRecordCounts = function(){
     // remote 沒有的 Delta / 本機新事件也會由 same 補回，絕不因快照缺漏而消失。
     const mergedMonth=losslessMerge([remoteRows,same]);
     records=losslessMerge([mergedMonth,other]);
+    window.Port79DataCache?.finishStartupPreview?.('attendance');
 
     // V5.10.10：四來源聯集完成後立刻補姓名/部門/職稱，
     // 姓名篩選與補卡下拉不再等待下一次 render 才出現。
@@ -24693,6 +24697,16 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <script src="../assets/port79-missing-punch-login-preview.js?v=20261022-toolbar"></script>
+
+<script id="p79-folder-startup-preview">
+function p79PreviewAttendanceFolder(){
+ const month=getRequestedAttendanceCloudMonth();
+ return window.Port79DataCache?.showStartupPreview?.({system:'attendance',actions:['getAttendanceMonthData','getAttendanceMainDirect','getAttendanceCoreData','getData'],host:'#viewAdmin',month,
+  canShow:()=>canReadAdminCloudData()&&getRequestedAttendanceCloudMonth()===month&&!(records||[]).length,
+  select:d=>Array.isArray(d.records)?{label:month+' 考勤明細',columns:['工號','姓名','日期／時間','狀態'],rows:d.records.filter(r=>attendanceRecordMonthKey(r)===month&&canCurrentAdminViewDataRow(r)).map(r=>[r.empId||r.attNo,r.name,r.timeStr||r.datetime||r.dateTime,r.status||r.type||r.action])}:null});
+}
+</script>
+
 </body>
 </html>
 
