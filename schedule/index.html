@@ -6775,7 +6775,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(!selectedEmployees.length)return alert('已勾選的職稱目前沒有人員');
       // 排班畫面可能已讀齊考勤；有特殊日時才需要確認該證據。
       // 不允許在核對失敗時靜默匯出原班別，造成颱／選遺失。
-      const hasSpecialDays=p79TyphoonDates().some(day=>day.startsWith(yearMonth+'-'))||
+      const typhoonMarkers=typeof p79TyphoonDates==='function'?p79TyphoonDates():[];
+      const hasSpecialDays=typhoonMarkers.some(day=>day.startsWith(yearMonth+'-'))||
         (window.P79SpecialOvertime?.electionDates?.()||[]).some(day=>day.startsWith(yearMonth+'-'));
       if(hasSpecialDays&&p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
         await p79ScheduleRestClient().refreshIfStale(yearMonth);
