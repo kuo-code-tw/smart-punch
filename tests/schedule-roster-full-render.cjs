@@ -20,7 +20,7 @@ const c={
  employees:[{id:'E',name:'測試員工',role:'ARMG',group:'A組',lockType:'ROTATION'}],
  monthlyScheduleData:{E:{'2026-10-23':'晚','2026-10-25':'早'}},
  monthlyScheduleMeta:{E:{}},leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
- p79DisposeRosterScroll(){},p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=> '2026-10',
+ p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=> '2026-10',
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}})}),
  p79UpdateTyphoonDayButton(){},getDaysInMonth:()=>31,
  scheduleMonthBounds:()=>['2026-10-01','2026-10-31'],updateScheduleDateRangeSummary(){},
