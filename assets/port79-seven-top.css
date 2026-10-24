@@ -404,3 +404,58 @@ body[data-p79-system] #p79UnifiedShellV103{display:none!important}
 @media(max-width:850px){
   #p79SevenNav a{min-height:45px!important;min-width:106px!important;font-size:14px!important;padding:9px 11px!important}
 }
+
+
+/* 2026-10-24：雲端七系統狀態燈與「電腦」統一字級、圖示與膠囊尺寸。 */
+#p79SevenStatus{
+  min-height:41px;
+  padding:5px 12px 6px;
+  gap:7px;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.2;
+}
+#p79SevenStatus .sys{
+  min-height:29px;
+  padding:5px 9px;
+  gap:6px;
+  border-radius:10px;
+  font-family:inherit;
+  font-size:inherit;
+  font-weight:800;
+  line-height:1.2;
+  white-space:nowrap;
+}
+#p79SevenStatus .sys .p79-sys-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 17px;
+  width:17px;
+  height:18px;
+  font-size:15px;
+  font-weight:400;
+  line-height:1;
+}
+#p79SevenStatus .sys b{
+  color:#f8fafc;
+  font-size:12.5px;
+  font-weight:850;
+  line-height:1.2;
+}
+#p79SevenStatus .sys .p79-sys-state{
+  font-size:11.5px;
+  font-weight:800;
+  line-height:1.2;
+}
+#p79SevenStatus button.sys{
+  color:inherit;
+  cursor:pointer;
+}
+#p79SevenStatus button.sys:focus-visible{
+  outline:2px solid #93c5fd;
+  outline-offset:2px;
+}
+@media(max-width:1150px){
+  #p79SevenStatus{justify-content:flex-start;}
+}
