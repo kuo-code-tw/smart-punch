@@ -483,12 +483,55 @@ function ensureCacheButtonInLegacyMenus(){
  });
 }
 
-function render(data){const systems={...(data?.systems||{})};
-if(!systems.workhours){
-  systems.workhours={active:[],passive:true,lastCompleted:null};
-}const signature=SYSTEMS.map(([k])=>{const s=systems[k]||{},a=Array.isArray(s.active)?s.active:[],j=a[0]||{},last=s.lastCompleted||{};return[k,a.length,j.operation,j.action,j.label,last.ok,last.action,Math.floor(Number(last.ageMs||0)/10000)].join(':')}).join('|');if(signature===lastSignature)return;lastSignature=signature;SYSTEMS.forEach(([k])=>{const el=document.querySelector(`#p79SevenStatus [data-sys="${k}"]`);if(!el)return;const span=el.querySelector('span'),s=systems[k]||{},a=Array.isArray(s.active)?s.active:[];let state='idle',txt=(k==='workhours'&&s.passive?'● 被動':'● 待命');if(a.length){const j=a.find(x=>x.operation==='write')||a.find(x=>x.operation==='read')||a[0]||{};state='busy';txt=(j.operation==='write'?'✍️ ':'↙ ')+(j.operationLabel||'讀取')+'中｜'+(window.P79Messages?.operation(j.label||j.action)||'雲端資料')}else if(s.lastCompleted&&Number(s.lastCompleted.ageMs||0)<15000){state=s.lastCompleted.ok===false?'error':'done';txt=(state==='done'?'✓ ':'! ')+(s.lastCompleted.operationLabel||'讀取')+'完成'}el.dataset.state=state;if(span.textContent!==txt)span.textContent=txt})}
+function computerSyncModel(status={}){
+ const state=status.state||'idle',colors={done:'#86efac',busy:'#93c5fd',permission:'#fdba74',error:'#fca5a5',idle:'#cbd5e1'},dots={done:'●',busy:'●',permission:'●',error:'●',idle:'●'};
+ const saved=status.savedAt?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(status.savedAt)):'';
+ const label=(dots[state]||dots.idle)+' '+(status.label||'檢查中')+(state==='done'&&saved?' '+saved:'');
+ const detail=[status.folder?'資料夾：'+status.folder:'',status.savedAt?'最近成功保存：'+new Date(status.savedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'',status.error||'','點擊開啟資料快取中心'].filter(Boolean).join('｜');
+ return {state,label,color:colors[state]||colors.idle,detail};
+}
+let computerSyncBusy=false;
+async function refreshComputerSync(){
+ const host=document.getElementById('p79SevenStatus');if(!host||document.visibilityState==='hidden'||isAttendancePunchOnly()||computerSyncBusy)return;
+ let button=document.getElementById('p79ComputerSync');
+ if(!button){
+  button=document.createElement('button');button.id='p79ComputerSync';button.type='button';button.className='sys';
+  button.style.cssText='font:inherit;cursor:pointer;color:inherit';
+  const name=document.createElement('b');name.textContent='💻 電腦';const text=document.createElement('span');text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.appendChild(name);button.appendChild(text);
+  button.addEventListener('click',()=>window.Port79DataCache?.openCenter?.());host.insertBefore(button,host.querySelector('[data-sys]'));
+ }
+ computerSyncBusy=true;
+ try{
+  const api=window.Port79DataCache;
+  const status=api?.getFolderSyncStatus?await api.getFolderSyncStatus():{state:'idle',label:'待載入資料夾狀態'};
+  const model=computerSyncModel(status),text=button.querySelector('span');
+  button.dataset.state=model.state;button.title=model.detail;button.setAttribute('aria-label','電腦資料夾：'+model.label+'；'+model.detail);
+  if(text.textContent!==model.label)text.textContent=model.label;text.style.color=model.color;
+ }catch(_){const text=button.querySelector('span');text.textContent='🔴 狀態讀取失敗';text.style.color='#fca5a5';button.dataset.state='error';}
+ finally{computerSyncBusy=false;}
+}
+function render(data){
+ const systems={...(data?.systems||{})};
+ if(!systems.workhours)systems.workhours={active:[],passive:true};
+ const colors={idle:'#cbd5e1',busy:'#93c5fd',done:'#86efac',error:'#fca5a5'};
+ SYSTEMS.forEach(([key,name])=>{
+  const el=document.querySelector(`#p79SevenStatus [data-sys="${key}"]`);if(!el)return;
+  const info=systems[key]||{},jobs=Array.isArray(info.active)?info.active:[],last=info.lastCompleted;
+  let state='idle',label=info.passive?'被動待命':'待命',details=[];
+  const describe=j=>window.P79Messages?.operation(j.label||j.action)||j.label||j.action||'雲端資料';
+  if(jobs.length){state='busy';label=jobs.some(j=>j.operation==='write')?'寫入中':'讀取中';details=jobs.map(j=>(j.operation==='write'?'寫入：':'讀取：')+describe(j));}
+  else if(last){
+   if(Number(last.ageMs||0)<15000){state=last.ok===false?'error':'done';label=last.ok===false?'工作失敗':'工作完成';}
+   details.push('最近工作：'+describe(last)+'（'+(last.ok===false?'失敗':'完成')+'）');
+   if(Number.isFinite(Number(last.ageMs)))details.push('最近完成時間：'+new Date(Date.now()-Number(last.ageMs)).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}));
+   if(last.error||last.message)details.push(String(last.error||last.message));
+  }else details.push(info.passive?'依其他系統資料更新，目前無主動工作':'目前沒有進行中的工作');
+  const span=el.querySelector('span');el.dataset.state=state;span.textContent='● '+label;span.style.color=colors[state];
+  el.title=name+'｜'+label+'\n'+details.join('\n');el.tabIndex=0;el.setAttribute('aria-label',el.title);
+ });
+}
 async function poll(){if(isAttendancePunchOnly()||statusBusy||document.visibilityState==='hidden')return;const url=gasUrl();if(!url)return;statusBusy=true;let ctrl,to;try{ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});const d=await r.json();if(d?.ok)render(d)}catch(e){}finally{if(to)clearTimeout(to);statusBusy=false}}
-function start(){mount();syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
+function start(){mount();refreshComputerSync();setInterval(refreshComputerSync,5000);window.addEventListener?.('p79-folder-sync-changed',refreshComputerSync);window.addEventListener?.('focus',refreshComputerSync);syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,20),{once:true});else setTimeout(start,20);
 })();
 
