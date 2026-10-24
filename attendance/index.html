@@ -15001,12 +15001,17 @@ function getManualPairRecordAnchor(record) {
             const roster=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===id)?.schedule||{};
             const meta=roster.__meta?.[date]||{};
             const specialDates=row?.clockIn&&row?.clockOut?(window.P79SpecialOvertime?.forShift(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),row.clockIn.timeStr)||[]).map(part=>part.date):[];
-            const reportDate=[date,...specialDates].find(day=>roster.__meta?.[day]?.overtimeReport)||date;
+            const activeReport=day=>{const m=roster.__meta?.[day],r=m?.overtimeReport;return r?.id&&!m.overtimeExcluded&&!(m.overtimeRevocations||[]).some(a=>a.confirmed===true&&a.reportId===r.id);};
+            const candidates=[...new Set([date,...specialDates])].filter(activeReport);
+            const exact=candidates.find(day=>{const r=roster.__meta[day].overtimeReport;return r.attendanceInId&&String(r.attendanceInId)===String(row.clockIn?.id)||r.attendanceOutId&&String(r.attendanceOutId)===String(row.clockOut?.id);});
+            const reportDate=exact||candidates[0]||date;
             const reportMeta=roster.__meta?.[reportDate]||{};
-            const report=reportMeta.overtimeReport||meta.overtimeReport||null;
-            const cover=state.covers.find(a=>date>=a.startDate && date<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
-            const substitute=!!cover || !!meta.forEmpId || meta.type==='substitute';
-            if(!substitute && !meta.overtime && !meta.restQuotaOvertime && !report)return null;
+            const report=activeReport(reportDate)?reportMeta.overtimeReport:null;
+            const cover=(state.covers||[]).find(a=>date>=a.startDate && date<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
+            const substitute=!!cover || !!report&&(!!reportMeta.forEmpId||reportMeta.type==='substitute');
+            // Quota allocation and legacy overtime flags are not saved declarations.
+            // Only a live report ID or a current leave-cover assignment may supply a label.
+            if(!report&&!cover)return null;
             const ranges={早:['08:00','16:00'],中:['16:00','00:00'],晚:['00:00','08:00']};
             const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
             const shift=ranges[roster[date]]?roster[date]:target[date];
@@ -15022,7 +15027,9 @@ function getManualPairRecordAnchor(record) {
             const start=minutes(times[0]),end=minutes(times[1]);
             if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null,report};
             const compact=(t,isEnd)=>t==='00:00'||t==='24:00'||String(t)==='24'?'24':String(t).replace(/:00$/,'');
-            return {label:category+compact(times[0],false)+'-'+compact(times[1],true),minutes:(end-start+1440)%1440,report};
+            const label=report?.code||category+compact(times[0],false)+'-'+compact(times[1],true);
+            const declared=Number(report?.declaredHours);
+            return {label,minutes:report&&Number.isFinite(declared)?declared*60:(end-start+1440)%1440,report,pending:!report};
         }
         function attendanceRowAttendanceMinutes(row) {
             if (!row?.clockIn || !row?.clockOut) return null;
@@ -15046,7 +15053,7 @@ function getManualPairRecordAnchor(record) {
             if(!planned)return formatDurationMinutes(actual);
             const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
-            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${declared}</div>${planned.minutes!==null?`<div class="text-xs">申報 ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
+            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${declared}</div>${planned.minutes!==null?`<div class="text-xs">${planned.pending?'已安排／待申報':'申報'} ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
         }
 
         function p79CanManageOvertime() {
