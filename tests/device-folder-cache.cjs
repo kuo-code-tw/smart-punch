@@ -77,5 +77,30 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
    await x.api.put(row());await x.api.flushFolder();assert.equal(nodes.size,0,mode);assert.equal(timers.length,0,mode);
   }
  });
+ await test('raw export cache persists to the existing folder and restores after browser storage is cleared',async()=>{
+  const x=setup();await x.api.connectFolder();const month='2026-10',data={ok:true,month,records:[{empId:'A',timeStr:'2026/10/01 08:00'}]};
+  assert(await x.api.storeExportSnapshot('getAttendanceMonthRaw',month,data,'A@admin','TOKEN'));await x.api.flushFolder();await x.api.clear();
+  const hit=await x.api.getExportSnapshot('getAttendanceMonthRaw',month);assert.equal(hit.data.records[0].timeStr,'2026/10/01 08:00');assert(hit.savedAt>0);
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'B',adminRole:'admin'}));assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw',month),null);
+ });
+ await test('complete downloaded database supplies only the requested month; partial month data is never a raw export',async()=>{
+  const x=setup(),key='A@admin|system|attendance',month='2026-10';
+  await x.api.put({key,kind:'system',system:'attendance',savedAt:Date.now(),data:{ok:true,fullDatabase:true,months:[month],monthStats:[{month,ok:true}],records:[{timeStr:'115/10/01 08:00'},{timeStr:'2026/09/30 23:30'}]}});
+  assert.equal((await x.api.getExportSnapshot('getAttendanceMonthRaw',month)).data.records.length,1);assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw','2026-09'),null);
+  await x.api.put({key,kind:'system',system:'attendance',savedAt:Date.now(),data:{ok:true,month,records:[]}});assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw',month),null);
+ });
+ await test('local mutations and changed credentials invalidate export snapshots',async()=>{
+  const x=setup(),month='2026-10',data={ok:true,month,records:[]};
+  assert.equal(await x.api.storeExportSnapshot('getAttendanceMonthRaw',month,data,'A@admin','OLD'),false);
+  assert(await x.api.storeExportSnapshot('getAttendanceMonthRaw',month,data,'A@admin','TOKEN',Date.now()-1000));
+  x.ss.setItem('port79_cache_mutated_at',String(Date.now()));assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw',month),null);
+  assert.equal(await x.api.storeExportSnapshot('getAttendanceMonthRaw',month,data,'A@admin','TOKEN',Date.now()-2000),false);
+ });
+ await test('a newly downloaded complete database supersedes an older export snapshot',async()=>{
+  const x=setup(),month='2026-10',stamp=Date.now();
+  assert(await x.api.storeExportSnapshot('getAttendanceMonthRaw',month,{ok:true,month,records:[{id:'old'}]},'A@admin','TOKEN',stamp-1000));
+  await x.api.put({key:'A@admin|system|attendance',kind:'system',system:'attendance',savedAt:stamp,data:{ok:true,fullDatabase:true,months:[month],monthStats:[{month,ok:true}],records:[{id:'new',timeStr:'2026/10/01 08:00'}]}});
+  assert.equal((await x.api.getExportSnapshot('getAttendanceMonthRaw',month)).data.records[0].id,'new');
+ });
  console.log(JSON.stringify({passed,scope:'Simulated folder permissions, IndexedDB resets and disk failures; no cloud data'}));
 })().catch(e=>{console.error(e);process.exitCode=1});
