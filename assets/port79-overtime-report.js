@@ -130,6 +130,44 @@
   }).sort((a,b)=>a.priority-b.priority||a.index-b.index);
   return candidates[0]?.row||null;
  }
+ // Generated choices are available immediately; only the selected new rule is persisted.
+ const specialTypes=[['颱風日加班','颱'],['選舉日加班','選']];
+ function specialRows(rows,config={},extra=[]){
+  const out=validate(rows),options=typeOptions(config,out);
+  for(const [name,prefix] of specialTypes){
+   const category=options.find(t=>t.name===name)?.category||'國';
+   const periods=[];
+   for(const begin of [8,16,24])for(let duration=1;duration<=8;duration++)periods.push([begin,duration]);
+   periods.push(...extra);
+   for(const [begin,duration] of periods){
+    if(!Number.isInteger(begin)||!Number.isInteger(duration)||duration<1||duration>18)continue;
+    const end=(begin+duration)%24||24,a=String(begin||24).padStart(2,'0'),b=String(end).padStart(2,'0');
+    if(out.some(r=>ruleType(r)===name&&hour(r[6])%1440===hour(a)%1440&&hour(r[7])%1440===hour(b)%1440))continue;
+    out.push([category,prefix+a+'-'+b,String(duration),String(duration),'','',a,b,'full',name]);
+   }
+  }
+  return validate(out);
+ }
+ let specialSaveQueue=Promise.resolve();
+ function ensureSpecialRule(row){
+  if(!specialTypes.some(([name])=>ruleType(row)===name))return Promise.resolve();
+  const run=async()=>{
+   const fresh=await loadRules(),name=ruleType(row),same=fresh.rows.find(r=>ruleType(r)===name&&r[1]===row[1]);
+   if(same){if(JSON.stringify(report(same))!==JSON.stringify(report(row)))throw Error('此出勤時段已更新，請更新雲端時段選項後再申報');return;}
+   if(!global.p79OvertimeContext?.canEditRules?.())throw Error('此時段尚未存入雲端，請由有加班選項管理權限的人員首次儲存');
+   const custom=typeOptions(fresh.config,fresh.rows).filter(t=>!isBuiltinType(t.name)).map(t=>[t.name,t.category]);
+   for(const [type] of specialTypes)if(!custom.some(t=>t[0]===type))custom.push([type,type===name?row[0]:'國']);
+   const config={...fresh.config,[CONFIG]:validate([...fresh.rows,row]),[TYPECONFIG]:custom};
+   if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，新時段尚未儲存');
+   const latest=await loadRules();
+   if(JSON.stringify(latest.config)!==JSON.stringify(fresh.config))throw Error('加班設定已由其他人修改，請重試以合併最新設定');
+   await rpc('saveConfig',{config});
+   const check=await loadRules();
+   if(!check.rows.some(r=>JSON.stringify(report(r))===JSON.stringify(report(row)))||!check.config[TYPECONFIG]?.some(t=>t[0]===name&&t[1]===row[0]))throw Error('新出勤時段尚未通過雲端讀回確認，未送出申報');
+   Object.assign(global.p79OvertimeContext.config(),check.config);global.p79OvertimeContext.persistConfig?.();
+  };
+  const pending=specialSaveQueue.then(run);specialSaveQueue=pending.catch(()=>{});return pending;
+ }
  function matchReport(start,end,date,map){
   const direct=map?.[date]||null,base=Date.parse(date+'T00:00:00+08:00');
   if(!Number.isFinite(base))return {meta:direct,date,minutes:null};
@@ -361,7 +399,15 @@
   }catch(error){loading.querySelector('#p79OtStatus').textContent='人員載入失敗：'+error.message;return;}
   const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
-   let rows=reportRules();const people=global.p79OvertimeContext.employees();
+   const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
+   if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
+   let rows=specialRows(reportRules(),global.p79OvertimeContext.config(),extra);
+   if(prefill.attendance&&prefill.roster&&!prefill.savedReport){
+    const kinds=global.P79SpecialOvertime?.forShift(prefill.attendance.start,prefill.attendance.end)||[];
+    const special=kinds.flatMap(p=>p.kinds).filter(k=>['颱','選'].includes(k.code));
+    if(special.length){const inferred=suggestRule(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster,rows,special);if(inferred)prefill={...prefill,code:inferred[1],category:inferred[0],preferredType:ruleType(inferred),requirePeriodSelection:false};}
+   }
+   const people=global.p79OvertimeContext.employees();
    el.insertAdjacentHTML('beforeend','<div class="p79-report-grid"><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"></select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label id="p79OtForWrap">請假人員<select id="p79OtForEmp" style="'+inputStyle+'"></select></label><label>職稱篩選<select id="p79OtRole" style="'+inputStyle+'"></select></label><label>代班／加班人員<select id="p79OtEmp" style="'+inputStyle+'"></select></label><label>出勤時段<select id="p79OtCode" style="'+inputStyle+'"></select></label><label>備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label></div><div id="p79OtPreview" style="padding:8px;border-radius:8px"></div><p style="font-size:12px;color:#64748b;margin:4px 0">每位人員分別儲存一筆；儲存後可切換下一位人員繼續申報。</p><button id="p79OtStage" type="button" style="background:#0369a1;color:white;padding:9px 16px;border-radius:8px">儲存加班申報</button>');
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
@@ -413,7 +459,7 @@
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
     const previous=select.selectedIndex>=0?rows[Number(select.value)]:null;
-    rows=nextRows;refreshTypes();
+    rows=specialRows(nextRows,global.p79OvertimeContext.config(),extra);refreshTypes();
     const code=previous?.[1]||prefill.code,category=previous?.[0]||prefill.category;
     const index=findPrefill(code,category);
     if(index>=0){if(!matches(rows[index])){kind.value=ruleType(rows[index]);refresh();}select.value=String(index);preview();}
@@ -443,6 +489,7 @@
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
       const button=el.querySelector('#p79OtStage');if(button.disabled)return;let completed=false;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
       try{
+       await ensureSpecialRule(rows[Number(select.value)]);
        const result=await global.p79OvertimeContext.saveReport(draft);
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
        sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent=result.report?.planned?'✅ 預排加班已儲存；待實際出勤完成後核算，不會先填入打卡時間。':'✅ 加班申報已儲存，已更新加班管理。';
@@ -463,7 +510,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 

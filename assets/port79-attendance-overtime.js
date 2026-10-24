@@ -65,7 +65,7 @@ async function open({row,employee,date}){
   const roster=cloud.schedules?.find(r=>id(r.empId)===id(employee.empId))?.schedule||{},saved=roster.__meta?.[date]?.overtimeReport;
   const start=getAttendanceTimestamp(row.clockIn),end=getAttendanceTimestamp(row.clockOut),parts=P79SpecialOvertime.forShift(start,end,row.clockIn.timeStr),kinds=parts.flatMap(p=>p.kinds);
   const inferred=saved?null:P79Overtime.suggestRule(start,end,date,roster,options.rows,kinds);
-  await P79Overtime.openReport({empId:String(employee.empId),date,attendance:{start,end},code:saved?.code||inferred?.[1]||'',category:saved?.category||inferred?.[0]||(parts.length?'國':'延'),preferredType:saved?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!saved&&!inferred,periodHint:'依排定班別起算，下班分鐘超過45分才進位。尚無相符時段，請新增或核對出勤時段。'});
+  await P79Overtime.openReport({empId:String(employee.empId),date,roster,savedReport:!!saved,attendance:{start,end},code:saved?.code||inferred?.[1]||'',category:saved?.category||inferred?.[0]||(parts.length?'國':'延'),preferredType:saved?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!saved&&!inferred,periodHint:'依排定班別起算，下班分鐘超過45分才進位。尚無相符時段，請新增或核對出勤時段。'});
  }catch(error){showToast('申報未開啟：'+String(error.message||error),'warning');}
  finally{opening=false;}
 }
