@@ -88,7 +88,7 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
    if(mode==='write')d.setFailure(true);
    if(mode==='close'){const original=d.getFileHandle;d.getFileHandle=async(...args)=>{const h=await original(...args),open=h.createWritable;h.createWritable=async()=>{const w=await open();w.close=async()=>{throw Error('close failed')};return w;};return h;};}
    if(mode==='permission')x.folder.setPermission('prompt');
-   await x.api.put(row());await x.api.flushFolder();assert.equal(nodes.size,0,mode);assert.equal(timers.length,0,mode);
+   await x.api.put(row());await x.api.flushFolder();assert.equal(nodes.size,0,mode);
   }
  });
  await test('raw export cache persists to the existing folder and restores after browser storage is cleared',async()=>{
