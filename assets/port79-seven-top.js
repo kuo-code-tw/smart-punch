@@ -455,7 +455,7 @@ function mount(){
    return;
  }
  const root=document.createElement('div');root.id='p79SevenTop';
- root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${NAV.filter(n=>systemLevel(n[0])!=='none').map(n=>`<a class="${n[0]===sys?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><b>${l}</b><span>● 待命</span></span>`).join('')}</div>`;
+ root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${NAV.filter(n=>systemLevel(n[0])!=='none').map(n=>`<a class="${n[0]===sys?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><span class="p79-sys-icon" aria-hidden="true">${META[k]?.[0]||'☁️'}</span><b>${l}</b><span class="p79-sys-state">● 待命</span></span>`).join('')}</div>`;
  document.body.insertBefore(root,document.body.firstChild);
  ensureStandardMenu(sys);
  document.addEventListener('click',e=>{if(!e.target?.closest?.('#p79SevenMenuWrap'))closeMenu()});
@@ -497,17 +497,18 @@ async function refreshComputerSync(){
  if(!button){
   button=document.createElement('button');button.id='p79ComputerSync';button.type='button';button.className='sys';
   button.style.cssText='font:inherit;cursor:pointer;color:inherit';
-  const name=document.createElement('b');name.textContent='💻 電腦';const text=document.createElement('span');text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.appendChild(name);button.appendChild(text);
+  const icon=document.createElement('span');icon.className='p79-sys-icon';icon.textContent='💻';icon.setAttribute('aria-hidden','true');
+  const name=document.createElement('b');name.textContent='電腦';const text=document.createElement('span');text.className='p79-sys-state';text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.append(icon,name,text);
   button.addEventListener('click',()=>window.Port79DataCache?.openCenter?.());host.insertBefore(button,host.querySelector('[data-sys]'));
  }
  computerSyncBusy=true;
  try{
   const api=window.Port79DataCache;
   const status=api?.getFolderSyncStatus?await api.getFolderSyncStatus():{state:'idle',label:'待載入資料夾狀態'};
-  const model=computerSyncModel(status),text=button.querySelector('span');
+  const model=computerSyncModel(status),text=button.querySelector('.p79-sys-state');
   button.dataset.state=model.state;button.title=model.detail;button.setAttribute('aria-label','電腦資料夾：'+model.label+'；'+model.detail);
   if(text.textContent!==model.label)text.textContent=model.label;text.style.color=model.color;
- }catch(_){const text=button.querySelector('span');text.textContent='🔴 狀態讀取失敗';text.style.color='#fca5a5';button.dataset.state='error';}
+ }catch(_){const text=button.querySelector('.p79-sys-state');text.textContent='🔴 狀態讀取失敗';text.style.color='#fca5a5';button.dataset.state='error';}
  finally{computerSyncBusy=false;}
 }
 function render(data){
@@ -526,7 +527,7 @@ function render(data){
    if(Number.isFinite(Number(last.ageMs)))details.push('最近完成時間：'+new Date(Date.now()-Number(last.ageMs)).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}));
    if(last.error||last.message)details.push(String(last.error||last.message));
   }else details.push(info.passive?'依其他系統資料更新，目前無主動工作':'目前沒有進行中的工作');
-  const span=el.querySelector('span');el.dataset.state=state;span.textContent='● '+label;span.style.color=colors[state];
+  const span=el.querySelector('.p79-sys-state');el.dataset.state=state;span.textContent='● '+label;span.style.color=colors[state];
   el.title=name+'｜'+label+'\n'+details.join('\n');el.tabIndex=0;el.setAttribute('aria-label',el.title);
  });
 }
