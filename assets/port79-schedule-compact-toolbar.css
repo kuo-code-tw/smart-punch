@@ -1,0 +1,28 @@
+/* Keep the month controls, source status and role filters close together. */
+body[data-p79-system="schedule"] #schedule-control-shell{
+  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:0;
+}
+#schedule-control-shell>header,#schedule-control-shell>#p79ScheduleQuickBar{grid-column:1/-1;width:100%;box-sizing:border-box}
+body[data-p79-system="schedule"] #p79ScheduleQuickBar{padding:4px 10px!important;gap:2px 10px!important}
+#p79ScheduleQuickBar .p79-quick-month,#p79ScheduleQuickBar .p79-quick-actions{gap:5px!important}
+#p79ScheduleQuickBar .p79-quick-month>button,#p79ScheduleQuickBar .p79-quick-actions>button,
+#p79ScheduleQuickBar .p79-umnav>button{height:30px!important;min-height:30px!important;padding:3px 8px!important;line-height:20px!important}
+#p79ScheduleQuickBar .p79-quick-more>summary,#p79ScheduleQuickBar .p79-quick-legend>summary{padding:5px 8px!important;line-height:20px!important}
+body[data-p79-system="schedule"] #p79QuickMonthHost #scheduleRangeControl{height:34px!important;min-height:0!important;padding:0 4px!important}
+#p79QuickMonthHost .p79-umnav{padding:0!important;min-height:0!important;gap:4px!important}
+#p79QuickMonthHost .p79-umnav-label{font-size:13px!important}
+#p79ScheduleQuickBar #p79ScheduleDataSource{grid-column:1/-1;margin:0!important;padding:0!important;min-height:0!important;line-height:16px!important;font-size:11px!important}
+#p79ScheduleDataSource:empty{display:none}
+body[data-p79-system="schedule"] #schedule-control-shell>div:has(#schedule-legend-row){grid-column:1;padding:0 6px 0 10px!important}
+body[data-p79-system="schedule"] #schedule-control-shell>div:has(#main-role-tabs-container){grid-column:2;padding:0 10px 0 0!important;min-width:0}
+body[data-p79-system="schedule"] #schedule-legend-row{min-height:0!important;margin:0!important;padding:0!important;gap:0!important}
+body[data-p79-system="schedule"] #overall-summary-badge{padding:2px 6px!important;font-size:11px!important;line-height:18px!important}
+body[data-p79-system="schedule"] #main-role-tabs-container{padding:2px 0!important;gap:5px!important;border-bottom:0!important}
+body[data-p79-system="schedule"] #main-role-tabs-container button{min-height:30px!important;padding:3px 8px!important;font-size:12px!important;line-height:20px!important}
+#main-role-tabs-container .h-6{height:20px!important}
+@media(max-width:900px){
+  body[data-p79-system="schedule"] #schedule-control-shell{grid-template-columns:minmax(0,1fr)}
+  body[data-p79-system="schedule"] #schedule-control-shell>div:has(#schedule-legend-row),
+  body[data-p79-system="schedule"] #schedule-control-shell>div:has(#main-role-tabs-container){grid-column:1;padding:0 6px!important}
+  body[data-p79-system="schedule"] #p79ScheduleQuickBar{padding:4px 6px!important}
+}
