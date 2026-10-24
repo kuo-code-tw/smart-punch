@@ -225,7 +225,7 @@ async function getFolderSyncStatus(){
  return {state:state.savedAt?'done':'idle',label:state.savedAt?'已保存':'已連接，待保存',folder,savedAt:state.savedAt};
 }
 // 電腦資料夾是 IndexedDB 的備份鏡像：瀏覽器資料即時保存，硬碟寫入則按鍵合併。
-const FOLDER_QUIET_MS=12000,FOLDER_MAX_MS=60000;
+const FOLDER_QUIET_MS=30000,FOLDER_MAX_MS=120000;
 const folderQueue=new Map(),folderKnownPayload=new Map();
 let folderQueueTimer=null,folderQueueSince=0;
 function scheduleFolderFlush(){
@@ -273,7 +273,7 @@ function writeFolderSnapshot(row){
   // An unchanged cloud result may have a newer download timestamp. Never write it again
   // just to refresh that timestamp. Folder status time must mean a real disk commit.
   const prior=folderKnownPayload.get(row.key);
-  if(prior?.handle===handle&&prior.data===payload&&prior.savedAt>=Number(row.savedAt||0))return true;
+  if(prior?.handle===handle&&prior.data===payload){prior.savedAt=Math.max(prior.savedAt,Number(row.savedAt)||0);return true;}
   try{
    const old=JSON.parse(await(await(await dir.getFileHandle(name)).getFile()).text());
    if(old?.row?.key===row.key){
@@ -318,6 +318,8 @@ async function connectFolder(){
  // Keep the picker as the first awaited operation to preserve user activation.
  const selected=await window.showDirectoryPicker({id:'port79-cloud-cache',mode:'readwrite',startIn:'documents'});
  folderHandle=selected;folderLoaded=true;emitFolderSync();
+ // Finish any pre-connection browser writes once, before enumerating the complete cache.
+ await flushFolder();
  let remembered=true;try{await folderSetting(selected)}catch(_){remembered=false}
  const rows=await all().catch(()=>[]);let saved=0,failed=0;
  for(const row of rows)if(currentViewerRow(row)){if(await writeFolderSnapshot(row))saved++;else failed++}
