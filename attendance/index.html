@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script><script src="../assets/port79-overtime-report.js?v=20261024-clockout-45"></script><script src="../assets/port79-attendance-overtime.js?v=20261024-inline"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -15077,31 +15077,7 @@ function getManualPairRecordAnchor(record) {
             if (!employee?.empId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
             }
-            try {
-                const shiftStart=getAttendanceTimestamp(row.clockIn),shiftEnd=getAttendanceTimestamp(row.clockOut);
-                const specialParts=window.P79SpecialOvertime?.forShift(shiftStart,shiftEnd,row.clockIn.timeStr)||[];
-                // 申報仍使用考勤簽到日；跨午夜時「24-08」代表簽到日之後的00:00-08:00。
-                const reportDate=date;
-                const reportStart=String(row.clockIn.timeStr||''),reportEnd=String(row.clockOut.timeStr||'');
-                const month=reportDate.slice(0,7),state=p79AttendanceOvertimeMonths.get(month);
-                const saved=state?.ready&&state.token===getAttendanceEmployeeMasterToken()?p79AttendanceReportedOvertime(row,state)?.report:null;
-                sessionStorage.setItem('port79_attendance_overtime_request_v1', JSON.stringify({
-                    empId: String(employee.empId), name: String(employee.name || row.name || ''), date:reportDate,
-                    clockIn:String(row.clockIn.timeStr||''),clockOut:String(row.clockOut.timeStr||''),
-                    reportStart,reportEnd,
-                    category:saved?.category||(specialParts.length?'國':''),
-                    preferredType:saved?.typeName||(specialParts.length?'國定假日加班':''),
-                    code:saved?.code||''
-                }));
-                const target = new URL('../work-hours/', location.href);
-                target.search = '';
-                target.searchParams.set('v', '20261023-attendance-overtime-sync-v3');
-                target.searchParams.set('attendanceOvertimeReport', '1');
-                target.hash = location.hash || '';
-                location.assign(target.toString());
-            } catch (error) {
-                showToast('無法開啟加班申報，請重新整理後再試', 'warning');
-            }
+            void window.P79AttendanceOvertime.open({row,employee,date});
         }
 
         let p79LastManualRecoveryCheckAt = 0;

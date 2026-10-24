@@ -65,6 +65,32 @@
   if(!Number.isFinite(base)||!Number.isFinite(duration))throw Error('日期或時段無效');
   const x=base+(a+offset*1440)*60000;return [x,x+duration*60000];
  }
+ // Declaration hours use the scheduled start and the clock-out minute, not elapsed-time rounding.
+ function declarationEnd(end){
+  if(end===null||end===undefined||end===''||!Number.isFinite(Number(end)))return NaN;
+  const value=Number(end),hour=Math.floor(value/3600000)*3600000;
+  return hour+(new Date(value).getUTCMinutes()>45?3600000:0);
+ }
+ function declarationWindow(start,end,date,roster){
+  if(!(Number.isFinite(start)&&end>start))return null;
+  const period=global.P79RestAttendance?.period(date,roster||{});
+  if(!period?.known)return null;
+  const cutoff=declarationEnd(end);
+  return {start:period.start,end:Math.max(period.start,cutoff),minutes:Math.max(0,(cutoff-period.start)/60000)};
+ }
+ function ruleAttendanceIssue(start,end,date,row,roster=null){
+  if(!(Number.isFinite(start)&&Number.isFinite(end)&&end>start))return '尚未完成上下班打卡，請核對';
+  const r=validate([row])[0];let ot=interval(date,r[6],r[7]);
+  if(r[0]==='延'){
+   const normal=interval(date,r[4],r[5]),offset=r[8]==='after'?normal[1]-ot[0]:normal[0]-ot[1];
+   ot=ot.map(t=>t+offset);
+  }
+  const scheduled=roster?declarationWindow(start,end,date,roster):null;
+  if(r[0]!=='延'&&scheduled&&ot[0]<scheduled.start)return '申報起點早於排定班別，請依班別起算';
+  if(ot[1]>declarationEnd(end))return '下班分鐘須超過45分才進位；此申報時段超過可計算的下班整點，請選較短時段';
+  if(start>ot[0]+45*60000)return '打卡上班時間與申報起點不符，請核對排定班別';
+  return '';
+ }
  function overtimeMinutes(start,end,date,meta){
   const r=meta?.overtimeReport;if(!r||!(end>start))return null;
   let offset=0;
@@ -87,12 +113,22 @@
      if(offset%86400000)return;ot=ot.map(t=>t+offset);
      a=row[8]==='after'?normal[0]:ot[0];b=row[8]==='after'?ot[1]:normal[1];
     }
-    if(Math.abs(start-a)>45*60000||Math.abs(end-b)>45*60000)return;
+    if(Math.abs(start-a)>45*60000||Math.abs(end-b)>45*60000||b>declarationEnd(end))return;
     const minutes=Math.max(0,Math.floor((Math.min(end,ot[1])-Math.max(start,ot[0]))/60000));
     if(minutes)candidates.push({row,index,minutes,distance:Math.abs(start-a)+Math.abs(end-b)});
    }catch(ignore){}
   });
   candidates.sort((a,b)=>a.distance-b.distance||a.index-b.index);return candidates[0]?.row||null;
+ }
+ function suggestRule(start,end,date,roster,rows,kinds=[]){
+  const window=declarationWindow(start,end,date,roster);if(!window||!window.minutes)return null;
+  const typhoon=kinds.some(k=>k.code==='颱'),election=kinds.some(k=>k.code==='選');
+  const ranked=validate(rows).map((row,index)=>({row,index,priority:typhoon&&/颱/.test(ruleType(row))?0:election&&/選舉|投票/.test(ruleType(row))?0:(typhoon||election)&&row[0]==='國'?1:2}));
+  const candidates=ranked.filter(({row})=>{
+   if(typhoon||election){const named=typhoon&&/颱/.test(ruleType(row))||election&&/選舉|投票/.test(ruleType(row));if(!named&&ruleType(row)!=='國定假日加班')return false;}else if(row[0]!=='延')return false;
+   try{const r=inferRule(window.start,end,date,[row]);if(!r)return false;const span=interval(date,row[6],row[7]);return row[0]==='延'||span[0]===window.start&&span[1]===window.end;}catch(_){return false;}
+  }).sort((a,b)=>a.priority-b.priority||a.index-b.index);
+  return candidates[0]?.row||null;
  }
  function matchReport(start,end,date,map){
   const direct=map?.[date]||null,base=Date.parse(date+'T00:00:00+08:00');
@@ -398,6 +434,7 @@
     try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
+     if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,rows[Number(select.value)]);if(issue)throw Error(issue);}
      const draft={id:crypto.randomUUID(),empId,date,rule:report(rows[Number(select.value)]),...reportPair(prefill.leaveHandoffId?'代':rows[Number(select.value)][0],empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
      try{const pending=JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
@@ -426,7 +463,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,filterReportEmployees,reportPair,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
