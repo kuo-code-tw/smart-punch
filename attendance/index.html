@@ -15083,6 +15083,52 @@ function getManualPairRecordAnchor(record) {
                 : p79CanManageOvertime();
         }
 
+        // Only a persisted, non-revoked declaration hides the action.
+        // Never infer a submission from calculated overtime, holiday quotas or legacy flags.
+        function p79AttendanceOvertimeSubmissionState(row, employee) {
+            const dates = [attendanceRowDateIso(row), p79AttendanceOvertimeDate(row)];
+            if (row?.clockIn && row?.clockOut) {
+                try {
+                    const parts = window.P79SpecialOvertime?.forShift(
+                        getAttendanceTimestamp(row.clockIn),
+                        getAttendanceTimestamp(row.clockOut),
+                        row.clockIn.timeStr
+                    ) || [];
+                    parts.forEach(part => dates.push(String(part?.date || '').trim()));
+                } catch (_) {}
+            }
+            const days = [...new Set(dates.filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day)))];
+            const months = [...new Set(days.map(day => day.slice(0, 7)))];
+            const token = getAttendanceEmployeeMasterToken();
+            const empId = String(employee?.empId || row?.empId || '').trim().toUpperCase();
+            if (!token || !empId || !days.length) return 'pending';
+            months.forEach(month => p79LoadAttendanceOvertimeMonth(month));
+            let allReady = true;
+            for (const month of months) {
+                const state = p79AttendanceOvertimeMonths.get(month);
+                if (!state?.ready || state.token !== token) {
+                    allReady = false;
+                    continue;
+                }
+                const roster = state.rows?.find(item =>
+                    String(item.empId || '').trim().toUpperCase() === empId
+                )?.schedule;
+                for (const day of days) {
+                    if (day.slice(0, 7) !== month) continue;
+                    const meta = roster?.__meta?.[day];
+                    if (!meta || meta.overtimeExcluded) continue;
+                    const reports = [
+                        ...(Array.isArray(meta.overtimeReports) ? meta.overtimeReports : []),
+                        meta.overtimeReport
+                    ].filter(Boolean);
+                    if (reports.some(report => report.id && !(meta.overtimeRevocations || []).some(
+                        item => item.confirmed === true && String(item.reportId) === String(report.id)
+                    ))) return 'reported';
+                }
+            }
+            return allReady ? 'none' : 'pending';
+        }
+
         let p79AdminAttendanceReportRows = [];
         function p79OpenAdminAttendanceOvertime(index) {
             const row = p79AdminAttendanceReportRows[index];
@@ -15092,6 +15138,9 @@ function getManualPairRecordAnchor(record) {
             const employee = findEmployeeForAttendanceIdentity(row, getAdminVisibleEmployees());
             if (!employee?.empId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 return showToast('無法核對員工或班次日期，請先重新讀取考勤', 'warning');
+            }
+            if (p79AttendanceOvertimeSubmissionState(row, employee) !== 'none') {
+                return showToast('已有加班申報或申報資料尚未核對，請先確認原申報已刪除', 'warning');
             }
             void window.P79AttendanceOvertime.open({row,employee,date});
         }
@@ -15735,6 +15784,7 @@ function getManualPairRecordAnchor(record) {
             p79AdminAttendanceReportRows = renderRows;
             tbody.innerHTML = renderRows.map((row, rowIndex) => {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
+                const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee);
                 const canReportThisRow = p79CanReportOvertime()
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
                         && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
@@ -15826,7 +15876,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap"><button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button></td>
+                        <td class="px-2 py-3 text-center whitespace-nowrap">${overtimeSubmissionState === 'none' ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button>` : ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
                             ${row.noteText ? `<span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.noteText))}">備註：${escapeHtml(String(row.noteText).length > 14 ? String(row.noteText).slice(0,14)+'…' : String(row.noteText))}</span>` : ''}
