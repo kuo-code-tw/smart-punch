@@ -70,7 +70,7 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
  await test('writes are coalesced by key and repeated identical data does not touch the disk',async()=>{
   const x=setup();await x.api.connectFolder();
   await x.api.put(row(1));await x.api.put(row(2));await x.api.put(row(3));
-  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1'),before=dir.counts();
+  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1',{create:true}),before=dir.counts();
   assert.equal(before.writes,0,'no immediate write during burst');
   assert.equal((await x.api.getFolderSyncStatus()).state,'busy','pending backup is visible as saving');
   await x.api.flushFolder();
