@@ -1204,8 +1204,7 @@ window.startAttendanceDeltaWatch=startDelta;
 // 不能在每次進入考勤頁時清除舊版待同步資料，以免未核對的補卡遺失。
 
 // PORT79 V5 已核實刪除請求一次性整理（2026-10-10）。
-// 以上 5 個 ID 已在 companytest.tw@gmail.com 所擁有的正式 GPS考勤資料庫
-// (ID 1QlixVO7V0tAdx64n1npQmWCFW8sNvsfdVh-vEtGpakE) 驗證：
+// 以上 5 個 ID 已在正式 GPS考勤資料庫驗證：
 // 「考勤永久刪除保護索引」有 ID、「考勤紀錄」主表沒有 ID。
 // 只解除這 5 筆已完成的 deleteRecord 本機重試，不觸碰其他雲端/個人 Drive。
 // 歷史歸檔實體清除狀態仍須由後端維護，不以這段本機整理冒充已清除歷史歸檔。
