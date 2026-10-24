@@ -4977,7 +4977,7 @@ function p79EmployeeDateEligible(emp,date) {
       return ['早','中','晚'].includes(original)?original:'';
     }
     function p79CompactOvertimeCode(value){
-      const code=String(value||'').trim(),match=code.match(/^([代休國例延]?)(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?$/);
+      const code=String(value||'').trim(),match=code.match(/^([代休國例延颱選]?)(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?$/);
       if(!match)return '';
       const hour=(h,m)=>{const n=Number(h),minutes=Number(m||0);if(n>24||minutes>59||(n===24&&minutes))return null;return String(Math.round(n+minutes/60)).padStart(2,'0');};
       const start=hour(match[2],match[3]),end=hour(match[4],match[5]);return start!==null&&end!==null?(match[1]||'')+start+'-'+end:'';
@@ -4985,7 +4985,11 @@ function p79EmployeeDateEligible(emp,date) {
     function p79OvertimePeriodLabel(report){
  const code=String(report?.code||'').trim();
  const extended=report?.category==='延'||['before','after'].includes(report?.position);
- if(!extended)return code;
+ if(!extended){
+   // Keep the saved special-day code; older named reports may still use 國 as their prefix.
+   const prefix=/颱/.test(String(report?.typeName||''))?'颱':/選舉|投票/.test(String(report?.typeName||''))?'選':'';
+   return prefix&&/^[國休例]?\d/.test(code)?prefix+code.replace(/^[國休例]/,''):code;
+ }
  const start=String(report.overtimeStart||'').trim(),end=String(report.overtimeEnd||'').trim();
  const part=value=>{const m=value.match(/^(\d{1,2})(?::(\d{2}))?$/);if(!m||Number(m[1])>24||Number(m[2]||0)>59||(Number(m[1])===24&&Number(m[2]||0)))return '';return m[1].padStart(2,'0')+(m[2]&&m[2]!=='00'?':'+m[2]:'');};
  if(part(start)&&part(end))return part(start)+'-'+(part(end)==='00'?'24':part(end));
@@ -5443,7 +5447,24 @@ async function p79SaveScheduleOvertimeDraft(draft){
         fixedInner.style.height=Math.ceil(table.getBoundingClientRect().height)+'px';
         spacer.style.width=table.scrollWidth+'px';
         const headTable=header.querySelector('table');
-        if(headTable)headTable.style.width=table.scrollWidth+'px';
+        if(headTable){
+          // The detached header must use the body's actual columns. Quota warnings can
+          // expand 例/休/國 cells beyond their nominal 64px minimum.
+          const sourceCells=pairs[0]?.row.cells;
+          const headCells=headTable.querySelectorAll('thead tr:first-child th');
+          if(sourceCells?.length===headCells.length){
+            const widths=Array.from(sourceCells,cell=>cell.getBoundingClientRect().width);
+            headCells.forEach((cell,index)=>{
+              for(const property of ['width','min-width','max-width'])cell.style.setProperty(property,widths[index]+'px','important');
+              cell.style.setProperty('box-sizing','border-box','important');
+            });
+            headTable.style.setProperty('width',widths.reduce((a,b)=>a+b,0)+'px','important');
+            headTable.style.setProperty('min-width','0','important');
+            headTable.style.setProperty('max-width','none','important');
+          }
+          // Reserve the body's vertical scrollbar so both horizontal scroll limits match.
+          header.style.setProperty('width',main.clientWidth+'px','important');
+        }
         syncViewport();
       };
       const syncViewport=()=>{
