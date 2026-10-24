@@ -384,6 +384,51 @@ async function storeSchedulePreview(month,data,expectedViewer,expectedToken,read
  await put({key,kind:'system',system:'schedule',month,savedAt:readAt,size:safeSize(snapshot),data:snapshot});
  return true;
 }
+// Explicit export cache: never treat a partial month response as a complete raw export.
+const exportSnapshotReads=new Map();
+function readExportSnapshotRow(key){
+ if(!exportSnapshotReads.has(key)){
+  const pending=get(key).catch(()=>null).finally(()=>{if(exportSnapshotReads.get(key)===pending)exportSnapshotReads.delete(key)});
+  exportSnapshotReads.set(key,pending);
+ }
+ return exportSnapshotReads.get(key);
+}
+function exportSnapshotKey(action,month){return systemKey(action==='getScheduleDataSecure'?'schedule':'attendance')+'|export|'+month;}
+function validExportPayload(action,month,data){
+ if(data?.ok!==true||String(data.month||'')!==month)return false;
+ return action==='getAttendanceMonthRaw'?Array.isArray(data.records):Array.isArray(data.schedules)&&data.schedules.every(r=>String(r.month||'')===month);
+}
+async function getExportSnapshot(action,month){
+ if(!['getAttendanceMonthRaw','getScheduleDataSecure'].includes(action)||!/^\d{4}-\d{2}$/.test(month)||!token())return null;
+ const viewer=viewerKey(),credential=token(),valid=row=>row&&currentViewerRow(row)&&row.savedAt>0&&row.savedAt>=mutationStamp()&&row.savedAt<=Date.now()+60000;
+ const row=await get(exportSnapshotKey(action,month)).catch(()=>null);
+ if(viewer!==viewerKey()||credential!==token())return null;
+ const exact=()=>valid(row)&&validExportPayload(action,month,row.data)?{data:row.data,savedAt:row.savedAt}:null;
+ if(action==='getScheduleDataSecure'){
+  const cached=await getSchedulePreview(month).catch(()=>null);
+  if(viewer!==viewerKey()||credential!==token())return null;
+  const prior=exact();
+  return cached?.savedAt>=mutationStamp()&&cached.data.schedules.length&&(!prior||cached.savedAt>prior.savedAt)?cached:prior;
+ }
+ const full=await readExportSnapshotRow(systemKey('attendance')),data=full?.data;
+ if(viewer!==viewerKey()||credential!==token())return null;
+ const prior=exact();
+ if(!valid(full)||!data?.fullDatabase||!Array.isArray(data.records)||!Array.isArray(data.months)||!data.months.includes(month)||!data.monthStats?.some(m=>m.month===month&&m.ok===true)||prior&&prior.savedAt>=full.savedAt)return prior;
+ const records=data.records.filter(record=>{
+  const m=String(record.timeStr||'').match(/^(\d{3,4})[-/](\d{1,2})[-/]/);if(!m)return false;
+  const year=Number(m[1])<1911?Number(m[1])+1911:Number(m[1]);
+  return year+'-'+m[2].padStart(2,'0')===month;
+ });
+ return {data:{ok:true,month,records},savedAt:full.savedAt};
+}
+async function storeExportSnapshot(action,month,data,expectedViewer,expectedToken,readAt=Date.now()){
+ if(!/^\d{4}-\d{2}$/.test(month)||!token()||viewerKey()!==expectedViewer||token()!==expectedToken||!['getAttendanceMonthRaw','getScheduleDataSecure'].includes(action))return false;
+ const payload={...data,month};if(!validExportPayload(action,month,payload)||readAt<mutationStamp())return false;
+ const key=exportSnapshotKey(action,month),snapshot=JSON.parse(JSON.stringify(payload));
+ const old=await get(key).catch(()=>null);
+ if(viewerKey()!==expectedViewer||token()!==expectedToken||old?.savedAt>readAt)return false;
+ await put({key,kind:'system',system:action==='getScheduleDataSecure'?'schedule':'attendance',month,savedAt:readAt,size:safeSize(snapshot),data:snapshot});return true;
+}
 async function restoreSystemSnapshot(sys,options={}){
  const row=await getSystemSnapshot(sys);
  if(!row?.data)return null;
@@ -755,6 +800,6 @@ async function refreshModal(){
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
-window.Port79DataCache={showStartupPreview,finishStartupPreview,hasStartupPreview:()=>!!startupPreview,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={getExportSnapshot,storeExportSnapshot,showStartupPreview,finishStartupPreview,hasStartupPreview:()=>!!startupPreview,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder:()=>folderWrites,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 
