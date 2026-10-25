@@ -678,7 +678,7 @@ window.fetch=async function(input,init){
 function p79EnsureXlsx(){
  if(window.XLSX)return Promise.resolve(window.XLSX);
  if(window.__p79XlsxPromise)return window.__p79XlsxPromise;
- // 下載只在用到 Excel 時才執行；來源故障時依序備援，下一次可重新嘗試。
+ // 下載只在用到 試算表 時才執行；來源故障時依序備援，下一次可重新嘗試。
  const sources=[
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
@@ -693,7 +693,7 @@ function p79EnsureXlsx(){
      const tag=document.createElement('script');
      tag.src=src;tag.async=true;tag.dataset.p79XlsxLazy='1';
      let settled=false;
-     const timer=setTimeout(()=>finish(new Error('Excel 下載超時')),12000);
+     const timer=setTimeout(()=>finish(new Error('試算表 下載超時')),12000);
      function finish(error){
       if(settled)return;
       settled=true;clearTimeout(timer);
@@ -701,14 +701,14 @@ function p79EnsureXlsx(){
       if(error){tag.remove();reject(error)}
       else resolve();
      }
-     tag.onload=()=>window.XLSX?finish(null):finish(new Error('Excel 元件不完整'));
-     tag.onerror=()=>finish(new Error('Excel 來源連線失敗'));
+     tag.onload=()=>window.XLSX?finish(null):finish(new Error('試算表 元件不完整'));
+     tag.onerror=()=>finish(new Error('試算表 來源連線失敗'));
      document.head.appendChild(tag);
     });
     if(window.XLSX)return window.XLSX;
    }catch(error){lastError=error}
   }
-  throw new Error('所有 Excel 下載來源均無法使用，請檢查網路連線：'+(lastError?.message||''));
+  throw new Error('所有 試算表 下載來源均無法使用，請檢查網路連線：'+(lastError?.message||''));
  })().catch(error=>{window.__p79XlsxPromise=null;throw error});
  return window.__p79XlsxPromise;
 }
