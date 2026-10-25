@@ -8,7 +8,7 @@
 <!-- PORT79 Schedule V10.29 SINGLE-SAVE：移除排班功能選單重複的「儲存雲端」入口；月班表儲存按鈕統一名稱為「儲存排班」，實際仍寫入 Google 雲端。 -->
 <!-- PORT79 Schedule V10.28 INSTANT-LOCK-SAVE：他人鎖定改1秒確認；點鎖定時先即時查雲端再取得；離頁 beacon+keepalive 雙送釋放；「儲存雲端」統一真正儲存，成功明確顯示「儲存完畢」；手動讀雲端失敗改非阻斷提示。 -->
 <!-- PORT79 Schedule V10.27 FAST-EDITOR-HANDOFF：他人編輯中時每2秒確認鎖定狀態；離頁用 sendBeacon 優先即時釋放；本人心跳維持30秒、無人鎖定低頻查詢，兼顧快速切換與 GAS 負載。 -->
-<!-- PORT79 Schedule V10.26 IMPORT-CLOUD-GUARD：班表匯入辨識 Google HTML/登入頁，不再顯示整串原始碼；雲端 POST 加明確 JSON header/逾時/一次重試；Excel 組別與排班屬性一併匯入目前月份。 -->
+<!-- PORT79 Schedule V10.26 IMPORT-CLOUD-GUARD：班表匯入辨識 Google HTML/登入頁，不再顯示整串原始碼；雲端 POST 加明確 JSON header/逾時/一次重試；試算表 組別與排班屬性一併匯入目前月份。 -->
 <!-- PORT79 Schedule V10.25 LOCK-TIMEOUT-SILENT-VERIFY：編輯鎖逾時不再連續跳 alert；手動鎖定延長等待，逾時後先查伺服器實際鎖定結果再重試，避免 GAS 已成功但前端誤判失敗。 -->
 <!-- PORT79 Schedule V10.24 GROUP-RECOVERY：本月人員組別若異常整批退回「不分組」，自動從最近歷史月份同工號的有效組別恢復；A/B/C 等歷史組別同步回到篩選列，不改每日早中晚休班表。 -->
 <!-- PORT79 Schedule V10.23 COLLAPSIBLE-ROLE-ROSTER：單位專屬月排班表新增同款收合／展開標題列；收合時不建立31天大型班表 DOM，並記住各單位收合狀態。 -->
@@ -17,7 +17,7 @@
 <!-- PORT79 Schedule V10.20 ROSTER-FIRST：今日面板恢復以正式班表為唯一名單來源；早/中/晚/休假四區分開，請假假別直接標示；考勤「出勤中」只做附加提示，不參與排班人數與分組。 -->
 <!-- PORT79 Schedule V10.19 ACTUAL-ATTENDANCE-FIX：修正目前出勤誤把前36小時舊IN算入；改以今日完整原始考勤為主，僅合理晚班跨日可承接；身份以考勤號/姓名核對後才採工號，與考勤頁一致。 -->
 <!-- PORT79 Schedule V10.18 ATTENDANCE-LEAVE-LIVE：今日面板分開顯示排班/目前出勤/請假；出勤中改依正式考勤最新 IN/OUT 判斷，簽退立即消失；今日已核准假別置頂顯示並同步標在姓名旁。 -->
-<!-- PORT79 Schedule V10.17 RESIGNED-SHIFT：新增每日班別「離職」；0工時、不算今日出勤、不顯示代班；Excel 匯入支援離/離職，匯出顯示離職；智慧排班保留已標記離職日。 -->
+<!-- PORT79 Schedule V10.17 RESIGNED-SHIFT：新增每日班別「離職」；0工時、不算今日出勤、不顯示代班；試算表 匯入支援離/離職，匯出顯示離職；智慧排班保留已標記離職日。 -->
 <!-- PORT79 Schedule V10.16 FAST START：同一登入沿用已驗證 SSO；排班先顯示、雲端背景載入；getScheduleDataSecure 加 10 秒逾時，避免 GAS 慢時卡住進頁。 -->
 <!-- PORT79 SCHEDULE V10.16：班表匯出固定保留工號／姓名／職稱／組別／排班屬性＋1日至月底。 -->
 <!-- PORT79 SCHEDULE V10.15：雲端舊GET不可覆蓋新修改；儲存後本機保護；編輯鎖快速背景確認。 -->
@@ -70,8 +70,8 @@
   </script>
   <!-- FontAwesome 圖示 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- SheetJS (Excel 匯入匯出) -->
-  <!-- Excel is loaded by p79EnsureXlsx only when import/export is requested. -->
+  <!-- SheetJS (試算表 匯入匯出) -->
+  <!-- 試算表 is loaded by p79EnsureXlsx only when import/export is requested. -->
   <style>body{font-family:'PingFang TC','Microsoft JhengHei',sans-serif;} .sticky-col-left{position:sticky;left:0;background-color:#ffffff;z-index:20;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} .sticky-col-left-header{position:sticky;left:0;background-color:#f8fafc;z-index:30;box-shadow:2px 0 6px -2px rgba(0,0,0,0.08);} select.clean-shift-select{-webkit-appearance:none;-moz-appearance:none;appearance:none;text-align:center;text-align-last:center;background-image:none !important;padding:0 !important;} .custom-scrollbar::-webkit-scrollbar{height:10px;width:8px;} .custom-scrollbar::-webkit-scrollbar-track{background:#f1f5f9;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;} .custom-scrollbar::-webkit-scrollbar-thumb:hover{background:#94a3b8;} @media print{.no-print{display:none !important;} body{overflow:visible !important;height:auto !important;background:white;}}
 /* V10.33 所有單位共用：極簡緊湊班表，左欄只顯示姓名及可拖曳排序。 */
 #app-main-container .p79-person-cell,#app-main-container .p79-person-header{width:152px!important;min-width:152px!important;max-width:152px!important;padding:2px 7px!important}
@@ -1562,12 +1562,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <button id="schedule-diag-btn" type="button" onclick="openScheduleDiagnostics()" class="schedule-top-action px-3 py-2 text-sm bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="新分頁開啟唯讀 GAS 連線診斷，不會修改班表">
               <i class="fa-solid fa-stethoscope"></i> 連線診斷
             </button>
-            <button id="schedule-import-btn" type="button" onclick="openScheduleImportPicker()" class="schedule-top-action px-3 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="匯入由本系統匯出的班表 Excel，或同欄位格式的 Excel">
-              <i class="fa-solid fa-file-import"></i> 匯入班表
+            <button id="schedule-import-btn" type="button" onclick="openScheduleImportPicker()" class="schedule-top-action px-3 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="匯入由本系統匯出的班表 試算表，或同欄位格式的 試算表">
+              <i class="fa-solid fa-file-import"></i> 匯入排班
             </button>
             <input id="schedule-import-file" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleScheduleImportFile(event)">
             <button onclick="exportScheduleToExcel()" class="schedule-top-action px-3 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
-              <i class="fa-solid fa-file-excel"></i> 匯出班表
+              <i class="fa-solid fa-file-excel"></i> 匯出排班
             </button>
             <button id="schedule-cloud-sync-btn" type="button" onclick="manualCloudSyncSchedule()" class="schedule-top-action px-3 py-2 text-sm bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="同步 Google 雲端最新排班、人員、組別與編輯鎖狀態">
               <i class="fa-solid fa-cloud-arrow-down"></i> 雲端同步
@@ -6244,7 +6244,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               </button>
 
               <button onclick="exportEmployeeListToExcel()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition text-xs flex items-center gap-1.5">
-                <i class="fa-solid fa-file-excel"></i> 匯出名冊
+                <i class="fa-solid fa-file-excel"></i> 匯出排班名冊
               </button>
 
               <button onclick="openAddModal()" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5 text-xs">
@@ -6412,7 +6412,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const own=p79CompactOvertimeCode(shift);
       return own?(p79SubstituteShiftLabel(empId,date)||own):'';
     }
-    // 與排班畫面、Excel 匯出共用判定：只有考勤已完整核對且整班無卡，
+    // 與排班畫面、試算表 匯出共用判定：只有考勤已完整核對且整班無卡，
     // 才以颱風／選舉日覆蓋原班別；單邊打卡、已出勤、請假、未核對與未來日期不覆蓋。
     function p79ScheduleSpecialNoPunchCode(empId,date,shift,leave,knownState=null,knownEvidence=null,specialDates=null,today=null) {
       if(leave||['離','離職'].includes(String(shift||'').trim())||p79ScheduleConfirmedOvertime(empId,date,shift))return '';
@@ -6451,7 +6451,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
     }
     // Single source of truth for the daily SELECTED value in both roster UI
-    // and Excel export. The underlying official roster is never rewritten here.
+    // and 試算表 export. The underlying official roster is never rewritten here.
     function p79ScheduleDisplayContext(emp,month,allocation=null) {
       const automaticRestMeta=allocation||p79AutomaticRestMetadata(emp.id,month);
       const attendanceEvidence=p79ScheduleRestClient().status(month).evidence;
@@ -6895,7 +6895,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
     async function p79LoadScheduleExcel(){
       try{await window.p79EnsureXlsx();return true;}
-      catch(error){alert('Excel 元件載入失敗：'+error.message);return false;}
+      catch(error){alert('試算表 元件載入失敗：'+error.message);return false;}
     }
     async function exportEmployeeListToExcel() {
       if(typeof XLSX==='undefined'&&!await p79LoadScheduleExcel())return;
@@ -6986,13 +6986,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       try {
         if (!canManageSchedule()) throw new Error('此帳號沒有排班管理權限');
         if (!scheduleCanEditNow()) throw new Error('目前沒有取得排班編輯權，請重新整理後再試');
-        if (typeof XLSX === 'undefined') throw new Error('Excel 元件尚未載入');
+        if (typeof XLSX === 'undefined') throw new Error('試算表 元件尚未載入');
         const selectedRoles=JSON.parse(input.dataset.roleSelection||'null');
         if(!Array.isArray(selectedRoles)||!selectedRoles.length)throw new Error('請先勾選要匯入的職稱');
 
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
-        if (!wb.SheetNames || !wb.SheetNames.length) throw new Error('Excel 內沒有可讀取的工作表');
+        if (!wb.SheetNames || !wb.SheetNames.length) throw new Error('試算表 內沒有可讀取的工作表');
 
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
@@ -7049,8 +7049,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(!selectedRoles.includes(window.P79ScheduleTransferRoles.role(emp)))continue;
           matchedRows++;
 
-          // V10.26：組別與排班屬性是「排班月份設定」，可由系統匯出的 Excel 還原。
-          // 職稱仍以人資主檔為唯一來源，不從 Excel 覆蓋。
+          // V10.26：組別與排班屬性是「排班月份設定」，可由系統匯出的 試算表 還原。
+          // 職稱仍以人資主檔為唯一來源，不從 試算表 覆蓋。
           if (groupKey) {
             const importedGroup = String(row[groupKey] ?? '').trim();
             if (importedGroup && importedGroup !== emp.group) {
@@ -7103,7 +7103,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         }
 
         if (!matchedRows) {
-          throw new Error('Excel 裡沒有符合已勾選職稱的人員。請確認職稱選擇及工號／姓名。');
+          throw new Error('試算表 裡沒有符合已勾選職稱的人員。請確認職稱選擇及工號／姓名。');
         }
         if (!updatedCells) {
           throw new Error('有找到人員，但沒有讀到任何 1日～31日 的班別欄位。請使用系統匯出的班表格式。');
@@ -7115,7 +7115,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const ok = await saveScheduleMonthToCloud(false);
         if (!ok) {
           throw new Error(
-            'Excel 已成功讀取並套用到目前畫面，但尚未存進 Google 雲端。\n\n' +
+            '試算表 已成功讀取並套用到目前畫面，但尚未存進 Google 雲端。\n\n' +
             (lastScheduleCloudError || '同步 Google 雲端失敗') +
             '\n\n在雲端修復前請先不要重新整理頁面。'
           );
@@ -7131,7 +7131,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         console.error('班表匯入失敗：', err);
         const msg = String(err?.message || err || '未知錯誤');
         const cloudSide = /Google Apps Script|Google 雲端|雲端|GAS|已成功讀取並套用/.test(msg);
-        alert((cloudSide ? '⚠️ Excel 已讀取，但雲端儲存失敗：\n' : '❌ 班表匯入失敗：\n') + msg);
+        alert((cloudSide ? '⚠️ 試算表 已讀取，但雲端儲存失敗：\n' : '❌ 班表匯入失敗：\n') + msg);
       } finally {
         if (input){input.value='';delete input.dataset.roleSelection;delete input.dataset.importMonth;}
       }
@@ -7214,7 +7214,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const eligibleEvent=selected.eligible&&typhoonMarked&&
             (selected.attendanceState!=='missing'||typhoonWorked)&&
             (!selected.ownApprovedLeave||selected.approvedLeaveCode==='颱'||typhoonWorked);
-          // A non-destructive Excel cell note carries the small "颱日" badge
+          // A non-destructive 試算表 cell note carries the small "颱日" badge
           // while keeping the editable shift value identical to the UI select.
           if(eligibleEvent&&selected.shownShift!=='颱')exportTyphoonNotes.push({
             row:exportRows.length+1,col:5+d-1,date:dayStr,
@@ -7236,7 +7236,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           ws[address].c=[{a:'排班系統',t:note.text}];
         }
       }
-      // 固定欄寬，避免打開 Excel 時左側資料看起來像不見。
+      // 固定欄寬，避免打開 試算表 時左側資料看起來像不見。
       ws['!cols'] = [
         { wch: 16 }, // 工號
         { wch: 12 }, // 姓名
@@ -7246,7 +7246,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ...Array.from({ length: totalDays }, () => ({ wch: 6 }))
       ];
 
-      // 凍結/顯示左側欄位由 Excel 軟體決定；至少確保資料本身完整輸出。
+      // 凍結/顯示左側欄位由 試算表 軟體決定；至少確保資料本身完整輸出。
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `${yearMonth}職稱班表`);
       const roleLabel=selectedRoles.length===new Set(employees.map(window.P79ScheduleTransferRoles.role)).size?'全部職稱':selectedRoles.map(r=>r.replace(/[^\u3400-\u9fffA-Za-z0-9_-]+/g,'-')).join('_');
