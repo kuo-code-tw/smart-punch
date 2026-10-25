@@ -18,8 +18,7 @@ const c={
  },
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true}})}),
  p79ScheduleRestBalance:()=>({ledger:[]}),p79ScheduleNoPunchRest:()=>false,
- p79CoverageShift:()=>'',p79SubstituteShiftLabel:(emp,date)=>date===day(22)?'國08-16':'',
- p79ScheduleLeaveExportCode:x=>x,scheduleLeaveTypeText:x=>x,
+ p79CoverageShift:()=>'',p79ScheduleLeaveExportCode:x=>x,scheduleLeaveTypeText:x=>x,
  p79ScheduleSpecialNoPunchCode:()=>'',scheduleTaipeiTodayKey:()=>day(31)
 };c.window=c;vm.createContext(c);
 vm.runInContext(source,c);
@@ -28,8 +27,10 @@ const extract=n=>{
  const i=html.indexOf('    function '+n+'('),j=html.indexOf('\n    }',i);
  assert(i>=0&&j>i,'missing function '+n);return html.slice(i,j+6);
 };
-for(const n of ['p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79VisibleRestKind',
- 'p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
+for(const n of ['p79CompactOvertimeCode','p79OvertimePeriodLabel','p79SubstituteShiftLabel',
+ 'p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79ScheduleConfirmedOvertime',
+ 'p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79VisibleRestKind',
+ 'p79ScheduleDisplayContext','p79ScheduleDisplayDay',
  'p79ScheduleExportDay','p79VisibleRestDayAudit','p79DailyRestCount'])
  vm.runInContext(extract(n),c);
 let confirmed=0,revoked=0,weak=0,timed=0,idless=0,typhoonCases=0;
@@ -70,10 +71,14 @@ for(let i=0;i<people.length;i++){
    assert.equal(balance.conflicts.some(x=>x.date===day(22)),false);
    assert.equal(balance.reported.國,0);
    assert.equal(balance.ledger.some(x=>x.date===day(22)&&x.kind==='reservedOvertime'),false);
+   assert.equal(c.p79SubstituteShiftLabel(id,day(22),meta[day(22)]),'',
+     'incomplete old flags must not invent 國08-16 on screen or Excel');
  }else if(scenario===1){
    timed++;
    assert(balance.conflicts.some(x=>x.date===day(22)&&x.reason.includes('人工加班時段')));
    assert.equal(balance.reported.國,0);
+   assert.equal(c.p79SubstituteShiftLabel(id,day(22),meta[day(22)]),'國08-16',
+     'actual manual time stays visible but must remain unconfirmed');
  }else if(scenario===2){
    confirmed++;
    assert.equal(balance.reported.國,1,'verified cloud id counts exactly once');
