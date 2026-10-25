@@ -1293,7 +1293,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <input type="file" id="attendanceExcelInput" accept=".xlsx,.xls" class="hidden" onchange="importAttendanceExcel(event)">
-                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700" title="先載入整份 試算表，不會立刻寫入考勤">📤 匯入考勤（先載入檔案）</button>
+                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700" title="先載入整份 試算表，不會立刻寫入考勤">📤 匯入考勤</button>
                         <select id="attendanceExcelDateSelect"
                                 onchange="p79OnExcelImportDateChange()"
                                 class="px-3 py-1.5 bg-white dark:bg-slate-900 border border-sky-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold"
