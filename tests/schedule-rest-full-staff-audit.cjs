@@ -14,6 +14,7 @@ const c={window:null,Date,Map,Set,Math,JSON,String,Number,Array,Object,console,
  activeRoleTab:'ARMG',activeGroupFilter:'C組',
  approvedLeaveForEmployee:()=>false,p79LeaveCoverOnDay:()=>[],
  p79EmploymentStartDate:()=>'',p79TyphoonDates:()=>[],requireScheduleEditLock:()=>true,
+ P79SpecialOvertime:{electionDates:()=>[]},
  document:{getElementById:()=>({value:month})},
  queueScheduleCloudSave:()=>saves++,buildRoleTabsAndRender:()=>renders++,
  p79MarkScheduleLocalMutation:()=>mutations++,
@@ -21,7 +22,7 @@ const c={window:null,Date,Map,Set,Math,JSON,String,Number,Array,Object,console,
 c.window=c;
 vm.createContext(c);
 vm.runInContext(fs.readFileSync('assets/port79-rest-allocation.js','utf8'),c);
-for(const n of ['p79DailyRestCount','p79RestQuotaAuditSnapshot','p79AutoAllocateRest'])vm.runInContext(extract(n),c);
+for(const n of ['p79DailyRestCount','p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79RestQuotaAuditSnapshot','p79AutoAllocateRest'])vm.runInContext(extract(n),c);
 // Legacy allocation regression uses a simple displayed-day stub. A separate
 // full-render regression tests the real day-cell classifier with overlays.
 c.p79VisibleRestDayAudit=(emp,mo,allocation)=>{
@@ -72,7 +73,7 @@ assert.equal(mutations,1);
 assert.equal(c.p79DailyRestCount(example,month,monthlyScheduleMeta[example.id]).counts.例,4,'persist refreshed fourth example day');
 assert.notEqual(monthlyScheduleMeta[ten.id][month+'-31']?.restQuotaOvertime,true,'do not auto-assign overtime');
 assert.equal(Object.values(monthlyScheduleMeta[ten.id]).filter(m=>m?.restQuotaOvertime===true).length,0,'shortfall must not fabricate overtime');
-assert(alerts.at(-1).includes('全員 83 人'));
+assert(alerts.at(-1).includes('已重新核對 83 人'));
 const paid=employees[2],saved={id:'SAVED-REPORT',category:'國',code:'國08-16'},paidDate=month+'-20';
 monthlyScheduleMeta[paid.id][paidDate]={overtimeReport:saved,restCategory:'國',restQuotaOvertime:true,restAllocationSource:'manual'};
 c.p79AutoAllocateRest();

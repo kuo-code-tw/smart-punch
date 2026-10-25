@@ -6576,14 +6576,34 @@ async function p79SaveScheduleOvertimeDraft(draft){
         [...template.content.querySelectorAll('[data-rest-category]')].forEach((cell,i)=>cells[i]?.replaceWith(cell));
       });
     }
+    // Never allocate an 例/休/國 slot to a day whose visible roster is replaced
+    // by an officially marked typhoon/election day or an approved leave/cover.
+    // This is a calendar event exclusion, not a mutation of the original roster.
+    function p79RestAutomaticExcludedDates(emp,month) {
+      const quota=p79RestQuota(month),typhoon=new Set(p79TyphoonDates());
+      const elections=new Set(window.P79SpecialOvertime?.electionDates?.()||[]);
+      const dates=[];
+      for(let n=1;n<=quota.days;n++){
+        const date=month+'-'+String(n).padStart(2,'0');
+        if(approvedLeaveForEmployee(emp.id,date)||
+           p79LeaveCoverOnDay(emp.id,date).length||
+           typhoon.has(date)||elections.has(date))dates.push(date);
+      }
+      return dates;
+    }
+    function p79RestAutomaticPlan(emp,month,metadata=null) {
+      const schedule=monthlyScheduleData[emp.id]||{};
+      const end=String(emp.lastWorkDate||emp.terminationDate||'').replaceAll('/','-').slice(0,10);
+      return p79AllocateRestMonth(schedule,metadata||monthlyScheduleMeta[emp.id]||{},month,
+        p79RestAutomaticExcludedDates(emp,month),p79EmploymentStartDate(emp),
+        /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'');
+    }
     function p79AutomaticRestMetadata(empId, month) {
       const existing=monthlyScheduleMeta[empId]||{};
-      try {
-        const quota=p79RestQuota(month);
-        const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))
-          .filter(d=>approvedLeaveForEmployee(empId,d)||p79LeaveCoverOnDay(empId,d).length);
-        return p79AllocateRestMonth(monthlyScheduleData[empId]||{},existing,month,excluded,p79EmploymentStartDate(employees.find(e=>e.id===empId))).meta;
-      } catch (error) { return existing; }
+      const person=employees.find(e=>e.id===empId);
+      if(!person)return existing;
+      try {return p79RestAutomaticPlan(person,month,existing).meta;}
+      catch(error){return existing;}
     }
 
     function p79ApplyAutomaticRestMetadata() {
@@ -6610,9 +6630,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if(dates.every(d=>['離','離職'].includes(schedule[d])))continue;
         totals.checked++;
         try {
-          const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))
-            .filter(d=>approvedLeaveForEmployee(emp.id,d)||p79LeaveCoverOnDay(emp.id,d).length);
-          const result=p79AllocateRestMonth(schedule,prior,month,excluded,p79EmploymentStartDate(emp));
+          const result=p79RestAutomaticPlan(emp,month,prior);
           // Audit the true 31-day displayed values, including approved leave,
           // typhoon overlays and overtime labels. Previously both before and
           // after only checked metadata and could falsely report 例4 when
@@ -6666,18 +6684,37 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if(monthDays.length&&monthDays.every(d=>['離','離職'].includes(schedule[d])))continue;
         if(!monthDays.length){errors.push(emp.name+'：本月沒有班表，不能當作已完成配對');continue;}
         try {
-          const quota=p79RestQuota(month);
-          const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>approvedLeaveForEmployee(emp.id,d)||p79LeaveCoverOnDay(emp.id,d).length);
-          results.push({emp,result:p79AllocateRestMonth(schedule,monthlyScheduleMeta[emp.id]||{},month,excluded,p79EmploymentStartDate(emp))});
+          results.push({emp,result:p79RestAutomaticPlan(emp,month)});
         } catch(error) {errors.push(emp.name+'：'+error.message);}
       }
       if(errors.length){alert('全員配對未執行：\n'+errors.join('\n'));return;}
-      results.forEach(({emp,result})=>monthlyScheduleMeta[emp.id]=result.meta);
-      p79MarkScheduleLocalMutation();
-      queueScheduleCloudSave();buildRoleTabsAndRender();
-      const quota=p79RestQuota(month).counts;
-      alert(month+' 全員 '+results.length+' 人配對；月額度：例 '+quota['例']+'／休 '+quota['休']+'／國 '+quota['國']+'\n'+
-        results.map(({emp,result})=>emp.name+'：已配休假 '+result.off+' 天、加班 '+result.overtime+' 天'+(result.unresolved.length?'、尚無可用工作日 '+result.unresolved.length+' 天':'')).join('\n')+'\n已列入待儲存；雲端結果請查看儲存狀態。');
+      const changed=results.filter(({emp,result})=>JSON.stringify(result.meta)!==
+        JSON.stringify(monthlyScheduleMeta[emp.id]||{}));
+      // A successful plan is not proof that a hidden 例 is visible. Verify the
+      // same individual day-cell classifier that the full-staff audit uses.
+      const quota=p79RestQuota(month).counts,shortages=[];
+      for(const {emp,result} of results){
+        try {
+          const visible=p79VisibleRestDayAudit(emp,month,result.meta);
+          const typhoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
+          const counts=Object.fromEntries(['例','休','國'].map(kind=>
+            [kind,visible[kind].filter(d=>kind!=='國'||!typhoon.has(d)).length]));
+          const missing=['例','休','國'].filter(kind=>counts[kind]<result.quota[kind])
+            .map(kind=>kind+' '+counts[kind]+'/'+result.quota[kind]);
+          if(missing.length)shortages.push(emp.name+'：'+missing.join('、')+
+            '（例優先；剩餘休假日不足或原指定、請假及加班不可覆蓋）');
+        }catch(error){shortages.push(emp.name+'：無法核對實際班格 '+String(error.message||error));}
+      }
+      if(changed.length){
+        changed.forEach(({emp,result})=>monthlyScheduleMeta[emp.id]=result.meta);
+        p79MarkScheduleLocalMutation();
+        queueScheduleCloudSave();
+        buildRoleTabsAndRender();
+      }
+      alert(month+' 已重新核對 '+results.length+' 人；實際調整 '+changed.length+' 人。\n'+
+        '配對優先順序：例 → 休 → 國；颱風、選舉日和已核准請假不占用自動配對日期。\n'+
+        (shortages.length?'仍不足（請按全員檢查查看日期）：\n'+shortages.join('\n')+'\n':'全部可配日期已按優先順序處理。\n')+
+        (changed.length?'修改已排入雲端儲存，請確認儲存狀態。':'資料沒有變化，未重複寫入雲端。'));
     }
 
     function autoScheduleCurrentTab() {
