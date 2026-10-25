@@ -1003,6 +1003,87 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  #adminContentOvertime .p79-overtime-action-group button{font-size:11px!important;padding:7px 9px!important}
 }
 </style>
+
+<style id="p79-overtime-single-panel-compact-20261025">
+/* Overtime audit and daily statistics share one compact white panel. */
+#adminContentOvertime .p79-overtime-unified{
+  padding:9px 12px 10px!important;
+  border-radius:15px!important;
+}
+#adminContentOvertime .p79-accounting-change-banner{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  flex-wrap:wrap!important;gap:6px 12px!important;
+  margin:0 0 9px!important;padding:5px 8px 8px!important;
+  min-height:35px!important;border:0!important;border-bottom:1px solid #e2e8f0!important;
+  border-radius:0!important;background:transparent!important;color:#475569!important;
+}
+#adminContentOvertime .p79-accounting-change-banner[hidden]{display:none!important}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="changed"]{
+  background:#fffbeb!important;border-bottom-color:#fbbf24!important;color:#92400e!important
+}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="clear"]{
+  background:transparent!important;border-bottom-color:#e2e8f0!important
+}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="loading"]{
+  background:#f8fafc!important;border-bottom-color:#e2e8f0!important
+}
+#adminContentOvertime .p79-change-copy{
+  display:flex!important;flex:1 1 530px!important;flex-direction:row!important;
+  align-items:center!important;gap:6px 10px!important;flex-wrap:wrap!important;min-width:0!important
+}
+#adminContentOvertime .p79-change-copy strong{
+  font-size:12px!important;font-weight:800!important;white-space:nowrap
+}
+#adminContentOvertime #p79OvertimeChangeText{font-size:12px!important;font-weight:650!important}
+#adminContentOvertime #p79ChangeHint{font-size:11px!important;line-height:1.3!important;color:#64748b}
+#adminContentOvertime .p79-change-actions{
+  display:flex!important;flex:0 0 auto!important;align-items:center!important;gap:6px!important
+}
+#adminContentOvertime .p79-change-actions button{
+  min-height:28px!important;padding:4px 10px!important;
+  font-size:11px!important;line-height:1.25!important;border-radius:7px!important;
+}
+#adminContentOvertime .p79-overtime-compact-first{
+  column-gap:10px!important;row-gap:6px!important;padding-bottom:7px!important
+}
+#adminContentOvertime .p79-overtime-compact-title strong{font-size:13px!important}
+#adminContentOvertime .p79-overtime-action-group button{
+  min-height:31px!important;padding:6px 9px!important;font-size:11px!important
+}
+/* Inputs no longer stretch across the full screen. Reduce the source input
+   from ~500px to 320px and the other four from ~280px to 155px. */
+#adminContentOvertime .p79-overtime-compact-filters>div{
+  display:grid!important;max-width:1000px!important;width:100%!important;
+  grid-template-columns:minmax(240px,320px) repeat(4,minmax(115px,155px))!important;
+  justify-content:start!important;gap:8px!important;overflow:visible!important
+}
+#adminContentOvertime .p79-overtime-compact-filters>div>div{
+  flex:unset!important;min-width:0!important
+}
+#adminContentOvertime .p79-overtime-compact-filters label{
+  font-size:10px!important;margin-bottom:3px!important
+}
+#adminContentOvertime .p79-overtime-compact-filters select{
+  height:33px!important;min-height:33px!important;
+  padding:5px 8px!important;font-size:11px!important;border-radius:8px!important
+}
+#adminContentOvertime .p79-overtime-metrics{
+  padding-top:7px!important;gap:6px!important
+}
+@media(max-width:1050px){
+ #adminContentOvertime .p79-overtime-compact-filters>div{
+  grid-template-columns:260px repeat(4,145px)!important;
+  max-width:100%!important;overflow-x:auto!important;padding-bottom:4px!important
+ }
+}
+@media(max-width:640px){
+ #adminContentOvertime .p79-accounting-change-banner{align-items:flex-start!important}
+ #adminContentOvertime .p79-change-copy{flex-basis:100%!important}
+ #adminContentOvertime .p79-change-actions{width:100%;flex-wrap:wrap!important}
+ #adminContentOvertime .p79-change-actions button{flex:0 1 auto!important}
+ #adminContentOvertime .p79-overtime-compact-first{row-gap:8px!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="p79-work-hours-page bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
@@ -1413,7 +1494,8 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
             <!-- 分頁 3：加班人員統計 -->
             <div id="adminContentOvertime" class="hidden space-y-3">
-                <!-- Accounting banner: count only cloud-verified saved modifications and cancellations. -->
+                <div class="p79-overtime-unified rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4 shadow-sm">
+                <!-- Compact cloud-verified accounting alert in the same panel as overtime controls. -->
                 <section id="p79OvertimeChangeNotice" data-p79-state="loading"
                          class="p79-accounting-change-banner" aria-label="加班異動提醒" aria-live="polite">
                     <div class="p79-change-copy">
@@ -1426,7 +1508,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <button id="p79ChangeCancelled" type="button" onclick="P79OvertimeStatus.open({state:'revoked'})" disabled>查看已取消（—）</button>
                     </div>
                 </section>
-                <div class="p79-overtime-unified rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4 shadow-sm">
                 <div class="p79-overtime-compact-first">
                   <div class="p79-overtime-compact-title" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">
                     <strong>每日加班人員統計</strong>
