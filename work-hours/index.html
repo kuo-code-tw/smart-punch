@@ -15335,7 +15335,16 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null){
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
  if(draft.preventReplace&&((previous&&previous.id!==draft.id)||(!previous&&(dayMeta.overtime||dayMeta.forEmpId||dayMeta.coverAssignmentId))))throw Error('此日期已有加班或代班安排，未覆蓋原資料；請重新讀取核對');
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ // Persist special-day and leave-cover reasons in the official report
+ // so accountants can recognize them even on a different browser/account.
+ const reason=window.P79OvertimeReason?.classify?.({
+   empId:draft.empId,date:draft.date,meta:dayMeta,roster,snapshot:cloud,
+   report:{...draft.rule,note:draft.note||'',leaveId:draft.leaveHandoffId||''}
+ });
+ const originalNote=String(draft.note||'').trim(),reasonNote=reason?.exempt?reason.label:'';
+ const finalNote=reasonNote&&!originalNote.includes(reasonNote)
+   ?[reasonNote,originalNote].filter(Boolean).join('／'):originalNote;
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
