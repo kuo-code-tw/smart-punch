@@ -15648,16 +15648,31 @@ window.p79MonthlyRestContext={
  saveReport:p79SaveWorkOvertimeDraft,refresh:()=>{p79OvertimeCalculationCache=null;renderOvertimeStats();},
  snapshot:async function(month,rosterOnly=false,reportView=false){
   const token=currentPort79SsoToken();if(!token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('沒有操作權限');
-  const read=async (action,readMonth=month)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{
+  const read=async (action,readMonth=month)=>{
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',readMonth);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
-   const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');return data;
-  }finally{clearTimeout(timer)}};
+   // 月報屬唯讀操作：避免大量跨月考勤資料在 45 秒自動中止時整張表空白。
+   // 僅月報使用有逾時中文訊息與重試的讀取；一般申報流程維持原本機制。
+   if(reportView){
+    const label=(action==='getScheduleDataSecure'?'加班月報班表 ':'加班月報考勤 ')+readMonth;
+    const data=await fetchGasJsonWithRetry(url.toString(),label,2,75000);
+    if(data?.ok!==true)throw Error(data?.error||label+' 雲端讀取失敗');
+    if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
+    return data;
+   }
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+   try{
+    const response=await fetch(url,{cache:'no-store',signal:ctl.signal}),data=await response.json();
+    if(!response.ok||data.ok!==true)throw Error(data.error||'雲端讀取失敗');
+    if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
+    return data;
+   }finally{clearTimeout(timer)}
+  };
   const readRoster=()=>read('getScheduleDataSecure');
   const needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
-  const [roster,batches]=await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
+  const [roster,batches]=await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
   if(!Array.isArray(roster.schedules))throw Error('班表資料未讀齊，不能判定無卡休假');
-  if(needAttendance&&batches.some(data=>!Array.isArray(data.records)))throw Error('原始考勤資料未讀齊，不能判定無卡休假');
+  if(needAttendance&&batches.some((data,i)=>!Array.isArray(data.records)||(data.month!=null&&String(data.month)!==months[i])))throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
   const attendanceRows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
   const {employees,allowed,sessions,attendanceEvidence,pairs}=p79BuildWorkRestAttendance(month,roster,attendanceRows,needAttendance);
   const cached=p79WorkOvertimeMonths.get(month);if(cached?.token===token){if(needAttendance)cached.attendanceEvidence=attendanceEvidence;}
