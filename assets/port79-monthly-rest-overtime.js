@@ -10,13 +10,19 @@ const confirmedReport=(meta,report)=>{
 };
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
- const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
+ const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
  quota.slots.filter(s=>(!start||s.sourceDate>=start)&&(!end||s.sourceDate<end)).forEach(s=>counts[s.category]++);
  if(dates.some(d=>!roster[d]))throw Error(emp.name+' 本月班表未排完整，請先補齊');
  // Typhoon is an independent schedule status, never a quota rest day or a
  // suggested 例／休／國 overtime day. Keep raw roster and saved reports intact.
- const declaredTyphoon=typeof g.p79TyphoonDates==='function'?g.p79TyphoonDates():[];
+ const declaredTyphoon=typeof g.p79TyphoonDates==='function'?g.p79TyphoonDates():(()=>{
+   // Work-hours loads this shared module without the schedule page's helper.
+   // Read the same browser-local typhoon markers so both pages exclude 颱 equally.
+   try{const dates=JSON.parse(g.localStorage?.getItem('p79-manual-typhoon-days-v1')||'[]');
+     return Array.isArray(dates)?dates.filter(x=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(x)):[];
+   }catch(_){return [];}
+ })();
  const typhoonProtected=new Set(dates.filter(d=>
    (Array.isArray(declaredTyphoon)&&declaredTyphoon.includes(d))||
    String(roster[d]||'').trim()==='颱'));
