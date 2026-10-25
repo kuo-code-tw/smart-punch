@@ -69,4 +69,16 @@ a.equal(c.p79ScheduleExportDay(emp,typhoon,context),selected.visibleCode,'Excel 
 const verified=order.reduce((o,k)=>(o[k]=0,o),{});
 for(const d of days){const v=c.p79ScheduleDisplayDay(emp,d,context);if(verified[v.visibleRestKind]!==undefined)verified[v.visibleRestKind]++;}
 a.deepEqual(verified,{例:4,休:5,國:1},'颱風日不計例／休／國，畫面數量要真實');
-console.log('PASS 83 employees: 颱 fixed; ordinary rests 4/5/1 and actual shortage reported, saved OT/locked respected, screen=Excel, idempotent');
+// The separate monthly unworked-rest overtime calculator must use the same rule.
+c.P79RestAttendance.state=(snapshot,id,date)=>base[date]==='休'?'rest':'worked';
+c.P79RestAttendance.isLeaveDay=()=>false;
+c.p79MonthlyRestContext={employmentStart:()=>''};
+vm.runInContext(fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8'),c);
+const balance=c.P79MonthlyRest.balance({...emp,empId:emp.id},
+ {...base,__meta:planned.meta},month,{leaveDates:[],leaveCoverAssignments:[]},'');
+a.equal(balance.off.例,4);
+a.equal(balance.off.休,5);
+a.equal(balance.off.國,1,'颱風日不得被未休假加班計算器補成國');
+a.equal(balance.remaining.國,1);
+a.equal(balance.ledger.find(x=>x.date===typhoon)?.kind,'typhoon');
+console.log('PASS 83 employees: 颱 fixed; ordinary rests 4/5/1, overtime calculator excludes 颱, screen=Excel, idempotent');
