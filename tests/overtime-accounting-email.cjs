@@ -32,6 +32,7 @@ const header=['requestId','status','sentAt','createdAt','reportId','empId','date
 let grid=null,sent=0,denied=false,rosters=[{empId:'E1',schedule:{__meta:{[day]:{overtimeReport:{...report}}}}}];
 function fakeRange(row,col,h=1,w=1){
  return {
+  setNumberFormat(){return this},
   getValue(){return (grid[row-1]||[])[col-1]},
   getValues(){return Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>(grid[row+i-1]||[])[col+j-1]??''))},
   setValue(v){while(grid.length<row)grid.push([]);grid[row-1][col-1]=v;return this},
