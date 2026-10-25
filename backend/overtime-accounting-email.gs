@@ -98,7 +98,8 @@ function p79OvertimeMailSend_(ss,data){
   var empId=p79OvertimeMailUid_(data.empId),date=String(data.date||''),
     reportId=String(data.reportId||''),recipientId=String(data.recipientId||''),
     requestId=String(data.requestId||'');
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId||!reportId||
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId||
+    !/^[A-Za-z0-9_.:-]{1,120}$/.test(reportId)||
     !/^[A-Za-z0-9_-]{12,90}$/.test(requestId))throw Error('缺少有效的加班申報或寄送請求編號');
   var receiver=p79OvertimeMailRecipients_().find(function(r){return r.id===recipientId;});
   if(!receiver)throw Error('收件人不在核准的會計名單內');
@@ -138,23 +139,25 @@ function p79OvertimeMailSend_(ss,data){
     var next=log.sheet.getLastRow()+1;
     log.sheet.getRange(next,1,1,values.length).setValues([values]);
     SpreadsheetApp.flush();
-    var type=String(report.typeName||report.category||'加班'),period=String(report.code||'');
+    var safe=x=>String(x??'').replace(/[\r\n\u0000-\u001f]/g,' ').slice(0,240);
+    var type=safe(report.typeName||report.category||'加班'),period=safe(report.code||'');
     var body=[
       '此通知由加班管理系統寄出，請依申報編號與目前版本核對。',
-      '姓名：'+String(person.name||empId),
+      '姓名：'+safe(person.name||empId),
       '工號：'+empId,
       '加班日期：'+date,
       '加班類型：'+type,
       '出勤時段：'+period,
-      '申報時數：'+String(report.declaredHours??'')+' 小時',
+      '申報時數：'+safe(report.declaredHours??'')+' 小時',
+      '申報性質：'+(report.planned===true?'預排加班（尚須核對實際出勤）':'已申報加班'),
       '申報編號：'+reportId,
-      '申報備註：'+String(report.note||meta.note||'').slice(0,200),
-      '寄送管理員：'+actor,
+      '申報備註：'+safe(report.note||meta.note||''),
+      '寄送管理員：'+safe(actor),
       '重要：若此筆後續修改或取消，請依新通知或系統核對紀錄處理。'
     ].join('\n');
     try{
       MailApp.sendEmail({to:receiver.email,
-        subject:'【加班申報通知】'+date+' '+String(person.name||empId)+'／'+reportId,
+        subject:'【加班申報通知】'+date+' '+safe(person.name||empId)+'／'+reportId,
         body:body,name:'PORT79 加班管理'});
     }catch(error){
       log.sheet.getRange(next,2).setValue('failed');
