@@ -1545,17 +1545,17 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         各職稱加班時數與人均統計
                         <span class="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">點擊展開／收合</span>
                     </summary>
-                    <p class="text-xs text-slate-500 mt-2 mb-2">依目前月份、部門、職稱及紀錄來源統計｜每人平均分擔＝職稱加班合計 ÷ 職稱總人數（包含未加班人員）</p>
+                    <p class="text-xs text-slate-500 mt-2 mb-2">依目前月份、部門、職稱及紀錄來源統計｜請假天數為該職稱所有人員當月已核准請假合計；平均分擔＝未換算加班合計 ÷ 總人數</p>
                     <div id="p79OvertimeJobTitleNotice" class="text-xs text-amber-700 dark:text-amber-300 mb-2" role="status"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[780px] text-sm text-left" aria-label="各職稱加班未換算、換算及平均時數">
+                        <table class="w-full min-w-[780px] text-sm text-left" aria-label="各職稱總人數、請假天數、未換算加班與平均分擔">
                             <thead class="bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200">
-                                <tr><th class="p-2">職稱</th><th class="p-2 text-right">職稱總人數</th><th class="p-2 text-right">已申報人數</th><th class="p-2 text-right">有效筆數</th><th class="p-2 text-right">未換算合計（小時）</th><th class="p-2 text-right">換算合計（小時）</th><th class="p-2 text-right">每人平均分擔未換算（小時）</th><th class="p-2 text-right">每人平均分擔換算（小時）</th></tr>
+                                <tr><th class="p-2">職稱</th><th class="p-2 text-right">總人數</th><th class="p-2 text-right">請假天數</th><th class="p-2 text-right">已申報人數</th><th class="p-2 text-right">有效筆數</th><th class="p-2 text-right">未換算合計（小時）</th><th class="p-2 text-right">每人平均分擔（小時）</th></tr>
                             </thead>
                             <tbody id="p79OvertimeJobTitleRows"></tbody>
                         </table>
                     </div>
-                    <p class="mt-2 text-xs text-slate-500">平均分擔以該職稱全部符合條件的員工人數計算（包括零加班人員）；即使上方選擇單一姓名，這張表仍看整個職稱。職稱總人數依目前可見員工主檔及到職日期計算。時數只統計未撤銷、非預排且可核對的正式申報，未換算每筆限 4 或 8 小時，換算使用已儲存小數；未設定換算不視為 0。</p>
+                    <p class="mt-2 text-xs text-slate-500">總人數與請假天數皆按該職稱全部符合權限及到職日期的員工計算，包含沒有加班的人；即使上方篩選單一姓名，也不縮小這張職稱表。請假只計當月已核准的各類假別，跨月依實際落在當月的日期計算；資料未讀取或無法精確分攤時顯示「—」。加班時數只統計已核實、非撤銷的正式申報，未換算每筆限 4 或 8 小時；這張表已移除換算時數。</p>
                 </details>
                 <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
                     <table id="p79OvertimeStatsTable" class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-left text-base">
@@ -13332,6 +13332,43 @@ function p79OvertimePeriodLabel(report){
             return {groups:items,totals,invalidHours,missingConversion,invalidConversion};
         }
 
+
+        // 所有職稱人員的已核准請假天數（包括 0 加班者），只取成功讀回的排班雲端請假資料。
+        // 已存在的 getLeaveDays 會處理新式請假天數及舊資料相容；跨月份且無法辨識分日比例者不估計。
+        function p79BuildOvertimeTitleLeaveDays(personnel,approvedLeaves,month) {
+            const result=new Map(),isMonth=/^\d{4}-\d{2}$/.test(String(month||'')),loaded=Array.isArray(approvedLeaves)&&isMonth;
+            for(const emp of personnel){
+                const title=String(emp.jobTitle||emp.deptDetail||'未設定').trim()||'未設定';
+                if(!result.has(title))result.set(title,{days:0,unknown:false});
+            }
+            if(!loaded)return {byTitle:result,loaded:false,unknown:0};
+            const first=month+'-01',last=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()).padStart(2,'0');
+            const dateNumber=x=>Date.parse(x+'T00:00:00Z');
+            const seen=new Set();
+            for(const leave of approvedLeaves){
+                if(!['已核准','已核準'].includes(String(leave?.status||'').trim()))continue;
+                const emp=personnel.find(person=>leaveBelongsToEmployee(leave,person));
+                if(!emp)continue;
+                const start=toDateInputValue(leave.startTime||leave.startDate);
+                const end=toDateInputValue(leave.endTime||leave.endDate||leave.startTime||leave.startDate);
+                if(!start||!end||start>end)continue;
+                if(end<first||start>last)continue;
+                const key=String(emp.empId||'').trim().toUpperCase()+'|'+String(leave.id||[start,end,leave.leaveType||'',leave.days??leave.hours??''].join('|'));
+                if(seen.has(key))continue;
+                seen.add(key);
+                const title=String(emp.jobTitle||emp.deptDetail||'未設定').trim()||'未設定',item=result.get(title);
+                const declared=Number(getLeaveDays(leave)),span=Math.round((dateNumber(end)-dateNumber(start))/86400000)+1;
+                const overlapStart=start<first?first:start,overlapEnd=end>last?last:end;
+                const overlap=Math.round((dateNumber(overlapEnd)-dateNumber(overlapStart))/86400000)+1;
+                if(!Number.isFinite(declared)||declared<0||!Number.isFinite(span)||span<1){item.unknown=true;continue;}
+                if(start>=first&&end<=last)item.days+=declared;
+                else if(Math.abs(declared-span)<1e-7)item.days+=overlap;
+                else item.unknown=true; // 跨月部分天／半天未給逐日明細，不能猜測在何月
+            }
+            let unknown=0;for(const item of result.values()){item.days=Math.round(item.days*100)/100;if(item.unknown)unknown++;}
+            return {byTitle:result,loaded:true,unknown};
+        }
+
         function renderOvertimeStats() {
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
@@ -13373,25 +13410,36 @@ function p79OvertimePeriodLabel(report){
             document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)+' 小時'+(totals.missing?'（'+totals.missing+'筆待換算）':'');
             document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時';
             document.getElementById('overtimeOver12Count').textContent = over12Count;
+            const monthRosterState=p79WorkOvertimeMonths.get(month);
+            const titleLeave=p79BuildOvertimeTitleLeaveDays(
+                staff,monthRosterState?.ready&&!monthRosterState.error&&Array.isArray(monthRosterState.leaveRecords)?monthRosterState.leaveRecords:null,month
+            );
+            const showLeave=(job)=>{
+                if(!titleLeave.loaded)return '—';
+                const info=titleLeave.byTitle.get(job);
+                if(!info||info.unknown)return '—';
+                return String(Number(info.days.toFixed(2)));
+            };
+            const totalLeave=titleLeave.loaded&&!titleLeave.unknown
+                ?Number([...titleLeave.byTitle.values()].reduce((n,v)=>n+v.days,0).toFixed(2)):null;
             const jobBody=document.getElementById('p79OvertimeJobTitleRows');
             if(jobBody){
                 const cells=g=>'<td class="p-2 font-semibold">'+escapeHtml(g.jobTitle)+'</td>'+
                     '<td class="p-2 text-right">'+g.staffCount+'</td>'+
+                    '<td class="p-2 text-right">'+(g.jobTitle==='全部職稱合計'?(totalLeave===null?'—':String(totalLeave)):showLeave(g.jobTitle))+'</td>'+
                     '<td class="p-2 text-right">'+g.people+'</td><td class="p-2 text-right">'+g.count+'</td>'+
                     '<td class="p-2 text-right">'+g.raw+'</td>'+
-                    '<td class="p-2 text-right">'+formatConverted(g.converted)+(g.missing?' <small class="text-amber-700" title="有未設定換算的加班申報">（'+g.missing+'筆未設定）</small>':'')+'</td>'+
-                    '<td class="p-2 text-right">'+formatAverage(g.rawAverage)+'</td>'+
-                    '<td class="p-2 text-right">'+formatAverage(g.convertedAverage)+'</td>';
+                    '<td class="p-2 text-right">'+formatAverage(g.rawAverage)+'</td>';
                 jobBody.innerHTML=overtimeSummary.groups.length
                     ?overtimeSummary.groups.map(g=>'<tr class="border-b border-slate-100 dark:border-slate-700">'+cells(g)+'</tr>').join('')+
                     '<tr class="bg-indigo-50 dark:bg-slate-900 font-bold">'+cells({...overtimeSummary.totals,jobTitle:'全部職稱合計'})+'</tr>'
-                    :'<tr><td colspan="8" class="p-3 text-center text-slate-500">目前篩選條件沒有可統計的職稱人員</td></tr>';
+                    :'<tr><td colspan="7" class="p-3 text-center text-slate-500">目前篩選條件沒有可統計的職稱人員</td></tr>';
             }
             const deptNotice=document.getElementById('p79OvertimeJobTitleNotice');
             if(deptNotice)deptNotice.textContent=[
-                overtimeSummary.invalidHours?'有 '+overtimeSummary.invalidHours+' 筆申報時數不是 4 或 8 小時，未計入合計，請核對原始申報與換算規則。':'',
-                overtimeSummary.missingConversion?'有 '+overtimeSummary.missingConversion+' 筆尚未設定換算時數；換算總數及平均目前僅為已設定部分。':'',
-                overtimeSummary.invalidConversion?'有 '+overtimeSummary.invalidConversion+' 筆換算數值無效，請核對。':''
+                overtimeSummary.invalidHours?'有 '+overtimeSummary.invalidHours+' 筆申報時數不是 4 或 8 小時，未計入合計，請核對原始申報。':'',
+                !titleLeave.loaded?'請假天數尚未取得所選月份的正式雲端請假資料，載入後再顯示；切換到單一月份可核對。':'',
+                titleLeave.unknown?'有 '+titleLeave.unknown+' 個職稱含跨月部分天請假，缺少逐日資料無法精確分配，該職稱及合計顯示「—」。':''
             ].filter(Boolean).join(' ');
             const reportState=p79WorkOvertimeMonths.get(month);
             const reportStatus=reportState?.pending?'｜申報資料讀取中…':reportState?.error?'｜'+reportState.error:'';
