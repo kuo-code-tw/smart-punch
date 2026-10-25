@@ -1,0 +1,46 @@
+// Guards the production type selector and cloud-evidence date indicators.
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const overtime={};overtime.window=overtime;vm.createContext(overtime);
+vm.runInContext(fs.readFileSync('assets/port79-overtime-report.js','utf8'),overtime);
+const api=overtime.P79Overtime;
+const national=['國','國24-07',7,7,'','','24','07','full'];
+const typhoon=['國','台16-19',3,3,'','','16','19','full','颱風日加班'];
+const rest=['休','休16-24',8,12.7,'','','16','24','full'];
+const substitute=['代','代08-16',8,8,'','','08','16','full'];
+assert.equal(api.displayPeriodCode(national),'國24-07｜國定假日加班');
+assert.equal(api.displayPeriodCode(typhoon),'颱16-19｜颱風日加班');
+assert.equal(api.displayPeriodCode(rest),'休16-24｜休息日加班');
+assert.equal(api.displayPeriodCode(substitute),'代08-16｜休假代班加班');
+assert(api.matchesReportType(national,'國定假日加班'));
+assert(!api.matchesReportType(typhoon,'國定假日加班'),'typhoon must not appear under national holiday type');
+assert(api.matchesReportType(typhoon,'颱風日加班'));
+assert.equal(api.report(typhoon).code,'台16-19','only screen text is normalized, cloud identity remains untouched');
+const day='2026-10-15';
+const records=['E1','E2','E3'].map(empId=>({empId,schedule:{__meta:{}}}));
+records[0].schedule.__meta[day]={overtimeReport:{id:'R1',code:'國08-16',declaredHours:8}};
+records[1].schedule.__meta[day]={overtimeReport:{id:'R2',code:'颱08-11',declaredHours:3,reportedAt:'created',modifiedAt:'edited'}};
+records[2].schedule.__meta[day]={overtimeRevocations:[{confirmed:true,reportId:'R3',report:{id:'R3',code:'休08-16',declaredHours:8},empId:'E3',date:day,actor:'主管',at:'2026-10-25'}]};
+const state={ready:true,rows:records,people:records.map(row=>({empId:row.empId,name:row.empId}))};
+const button={style:{removeProperty(){},setProperty(key,value){this[key]=value;}},dataset:{},removeAttribute(){},setAttribute(){}};
+const strip={querySelectorAll(){return [button];},querySelector(){return null;},appendChild(){}};
+const doc={readyState:'complete',getElementById:id=>id==='p79AttendanceDateStrip'?strip:null,
+createElement(){return {style:{},textContent:''};}};
+const context={document:doc,renderRecordsPagination(){return 1},addEventListener(){},
+p79AttendanceOvertimeMonths:new Map([['2026-10',state]])};
+context.window=context;
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('assets/port79-attendance-overtime.js','utf8'),context);
+const ui=context.P79AttendanceOvertimeDayStatus;
+const result=ui.overtimeDayIndicator(day,state);
+assert.equal(result.kind,'revoked');
+assert.equal(result.count,3);
+assert.match(result.title,/已申報 1｜已修改 1｜已取消 1/);
+assert.match(result.title,/未登記列印／交會計/);
+assert.match(result.title,/不會把已申報或已匯出直接認定為已列印/);
+ui.decorateOvertimeDateStrip([day],day);
+assert.equal(button.dataset.p79OvertimeAudit,'revoked');
+assert(context.renderRecordsPagination.p79OvertimeDecorated);
+const work=fs.readFileSync('work-hours/index.html','utf8'),attendance=fs.readFileSync('attendance/index.html','utf8');
+assert(work.includes('P79Overtime.displayPeriodCode'));
+assert(attendance.includes('port79-attendance-overtime.js?v=20261025-date-status-v2'));
+console.log('PASS strict overtime type grouping, uniform full labels, stored code compatibility, audited attendance dates and unknown print status');
