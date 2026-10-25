@@ -227,8 +227,9 @@ function open(){
   lastMonth=month;paint();
   const result=ready?('已讀取 '+rows.length+' 筆有效申報'+(cached?'（來自已讀取的考勤班表快取，僅供預覽）':'（來自雲端班表）')+
    '，可選日期查看當天明細。'):('加班申報讀取失敗：'+rosterError);
-  msg(result+(mailError?'\nMail 功能未就緒：'+mailError+'。可查看明細，但不能儲存信箱或發送 Mail。':
-     (mailReady&&snapshotFresh?'\n已確認 Mail 服務，可選擇核准收件信箱並發送。':'')));
+  msg(result+(cached?'\n目前顯示的快取只供查詢；正式申報重新核對成功以前不會開放發送。':'')+
+   (mailError?'\nMail 功能未就緒：'+mailError+'。可查看明細，但不能儲存信箱或發送 Mail。':
+    (mailReady&&snapshotFresh?'\n已確認 Mail 服務，可選擇核准收件信箱並發送。':'')));
  }
  function updateDateRange(){
   const limits=range(q('#omMonth').value);
