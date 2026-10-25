@@ -33,7 +33,7 @@ assert.deepEqual(Array.from(changed,r=>r.note),['設備檢修','臨時吊櫃支�
 const v3=verify(changed);
 assert(v3.preview.includes('臨時吊櫃支援')&&v3.cells.includes('臨時吊櫃支援'),'individual override must reach printed report and Excel');
 const summary=app.aggregate(changed,['2026-10-01']);
-assert(summary[0].note.includes('設備檢修')&&summary[0].note.includes('臨時吊櫃支援'),'summary remarks must preserve unique notes');
+assert(summary.map(r=>r.note).join('／').includes('設備檢修')&&summary.map(r=>r.note).join('／').includes('臨時吊櫃支援'),'summary remarks must preserve per-employee notes');
 const cleared=app.applyExportRemarks(original,' ',new Map([[1,'  ']]));
 assert.deepEqual(Array.from(cleared,r=>r.note),['吊櫃作業','吊櫃作業']);
 assert.equal(original[0].note,'加班申報 / 每月未休假加班','original cloud note must remain untouched');
