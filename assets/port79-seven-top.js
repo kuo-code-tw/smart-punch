@@ -172,7 +172,7 @@ applyGlobalTheme(savedGlobalTheme(),{save:false});
 const MENU={
  attendance:[
   ['clearDeleted','🗑️ 清空已刪除考勤'],
-  ['attendance-import','考勤匯入'],['attendance-export','考勤匯出'],['attendance-compare','Excel 比對'],
+  ['attendance-import','考勤匯入'],['attendance-export','考勤匯出'],['attendance-compare','考勤比對'],
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
