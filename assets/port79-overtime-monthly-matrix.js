@@ -143,7 +143,7 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '#p79MonthlyMatrix .mm-feedback-error .mm-feedback-icon{background:#ffe0e0;color:#b03540}',
  '#p79MonthlyMatrix .mm-progress{height:4px;max-width:450px;background:#d8e8f7;border-radius:10px;overflow:hidden;margin-top:12px}',
  '#p79MonthlyMatrix .mm-progress:before{content:"";display:block;width:33%;height:100%;border-radius:10px;background:#198aca;animation:mmMove 1.5s ease-in-out infinite}',
- '#p79MonthlyMatrix .mm-progress[hidden]{display:none!important}',
+ '#p79MonthlyMatrix .mm-progress[hidden],#p79MonthlyMatrix #mmDeploymentDiagnostic[hidden]{display:none!important}',
  '#p79MonthlyMatrix .mm-empty{min-height:205px;display:flex;justify-content:center;align-items:center;flex-direction:column;gap:9px;text-align:center;padding:22px;border:1px dashed #c9d8e9;background:#fff;border-radius:16px}',
  '#p79MonthlyMatrix .mm-empty-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:#e9f5ff;font-size:26px;color:#1677b2}',
  '#p79MonthlyMatrix .mm-empty strong{font-size:15px;color:#284967}',
@@ -199,9 +199,16 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  mmStatusElement.replaceWith(mmFeedback);
  mmStatusElement.removeAttribute('style');mmStatusElement.removeAttribute('role');mmFeedback.querySelector('#mmFeedbackCopy').appendChild(mmStatusElement);
  const mmEmptyMarkup='<div class="mm-empty"><div class="mm-empty-icon" aria-hidden="true">▦</div><strong>報表會顯示在這裡</strong><span>設定月份與篩選條件，系統將為你整理整月資料。</span></div>';
+ const diagnosticLink=document.createElement('a');
+ diagnosticLink.id='mmDeploymentDiagnostic';diagnosticLink.hidden=true;diagnosticLink.target='_blank';diagnosticLink.rel='noopener noreferrer';
+ diagnosticLink.textContent='檢查目前雲端服務是否可連線（不傳送登入資料）';
+ diagnosticLink.style.cssText='display:inline-block;font-size:12px;font-weight:800;color:#075e91;text-decoration:underline;margin-top:7px';
+ mmFeedback.querySelector('#mmFeedbackCopy').appendChild(diagnosticLink);
+
  document.body.appendChild(dialog);
  const q=s=>dialog.querySelector(s),status=t=>q('#mmStatus').textContent=t;
  const feedback=(kind,title,detail)=>{
+   const diagnostic=q('#mmDeploymentDiagnostic');if(diagnostic){diagnostic.hidden=true;diagnostic.removeAttribute('href');}
    const node=q('#mmFeedback');node.className='mm-feedback mm-feedback-'+kind;
    q('#mmFeedbackIcon').textContent=({loading:'↻',success:'✓',warning:'!',error:'!',empty:'ⓘ',idle:'ⓘ'})[kind]||'ⓘ';
    q('#mmFeedbackTitle').textContent=title;
@@ -250,7 +257,23 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
   }catch(e){
    loaded=null;
    const message=String(e?.message||e||'未知錯誤');
-   feedback('error','雲端資料尚未讀取完成',message+'\n沒有修改任何加班申報資料。請確認網路與權限後，按「重新載入統計」再試。');
+   const deploymentMissing=/\bHTTP\s*404\b/i.test(message);
+   if(deploymentMissing){
+    feedback('error','加班月報雲端服務找不到（HTTP 404）',
+     '目前正式班表服務回傳 HTTP 404，並非本月沒有加班資料。請由系統管理員至 Google Apps Script「部署 → 管理部署」核對網頁應用程式是否仍有效、正式 /exec 網址是否變更。若後端部署已更換，需要同步更新系統的正式服務網址。原始加班申報沒有因此被修改。\n詳細訊息：'+message);
+    const diagnostic=q('#mmDeploymentDiagnostic');
+    if(diagnostic){
+     try{
+      const base=new URL(context.deploymentUrl?.()||'');
+      if(base.protocol==='https:'&&base.hostname==='script.google.com'&&base.pathname.startsWith('/macros/s/')&&base.pathname.endsWith('/exec')){
+       base.search='';base.searchParams.set('action','deploymentCheck');
+       diagnostic.href=base.toString();diagnostic.hidden=false;
+      }
+     }catch(ignore){}
+    }
+   }else{
+    feedback('error','雲端資料尚未讀取完成',message+'\n沒有修改任何加班申報資料。請確認網路與權限後，按「重新載入統計」再試。');
+   }
    q('#mmPreview').innerHTML='<div class="mm-empty"><div class="mm-empty-icon" aria-hidden="true">!</div><strong>本次沒有產生統計表</strong><span>上方保留詳細原因，核對後可重新讀取。</span></div>';
   }finally{lock(false)}
  };
