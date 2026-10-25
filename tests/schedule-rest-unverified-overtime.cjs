@@ -25,7 +25,7 @@ const c={
 vm.runInContext(source,c);
 vm.runInContext(fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8'),c);
 const extract=n=>{
- const i=html.indexOf('    function '+n+'('),j=html.indexOf('\\n    }',i);
+ const i=html.indexOf('    function '+n+'('),j=html.indexOf('\n    }',i);
  assert(i>=0&&j>i,'missing function '+n);return html.slice(i,j+6);
 };
 for(const n of ['p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79VisibleRestKind',
@@ -61,7 +61,7 @@ for(let i=0;i<people.length;i++){
  const balance=c.P79MonthlyRest.balance(emp,roster,month,
    {states,leaveDates:[],leaveCoverAssignments:[]},'');
  const plan=c.p79RestAutomaticPlan(emp,month);
- assert.deepEqual(balance.conflicts.filter(x=>/休假加班已排入班表|已列入待確認額度/.test(x.reason)),[],
+ assert.equal(balance.conflicts.filter(x=>/休假加班已排入班表|已列入待確認額度/.test(x.reason)).length,0,
    id+' must not create phantom pending report');
  assert.equal(balance.ledger.find(x=>x.date===typhoon)?.kind,'typhoon');
  assert.equal(JSON.stringify(roster),original,'no destructive metadata/roster change');
