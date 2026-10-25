@@ -195,7 +195,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <button class="btn" onclick="openPermissionOverview()">🔐 <span class="txt">權限總覽</span></button>
     <button class="btn" id="sessionLogBtn" onclick="openSessionLogs()">🧾 <span class="txt">登入紀錄</span></button>
     <button class="btn" id="orgSettingsBtn" onclick="openOrgSettings()">⚙️ <span class="txt">部門／職稱／單位</span></button>
-    <button class="btn" onclick="exportEmployees()">📥 <span class="txt">匯出</span></button>
+    <button class="btn" onclick="exportEmployees()">📥 <span class="txt">匯出人資名冊</span></button>
     <button class="btn primary" id="addBtn" onclick="openEditor()">＋ 新增員工</button>
   </div>
 </div></header>
@@ -211,7 +211,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   </div>
   <section class="card">
     <div style="display:flex;gap:7px;flex-wrap:wrap;padding:12px 12px 0">
-      <button class="btn" id="p79HrImportToolbar" type="button" onclick="P79HrImport.open()">📥 匯入人員</button>
+      <button class="btn" id="p79HrImportToolbar" type="button" onclick="P79HrImport.open()">📥 匯入人資名冊</button>
       <button class="btn primary" id="p79HrAddPersonToolbar" type="button" onclick="openEditor()">＋ 新增人員</button>
       <button class="btn" onclick="setStatusView('active')">👥 在職人員</button>
       <button class="btn" onclick="setStatusView('resigned')">🚪 離職人員</button>
@@ -431,12 +431,12 @@ let pickerKind='',pickerTarget='';
 const SYS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
 const LABEL={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
 const FINE_CATALOG={
- attendance:[['punch','刷卡'],['records.view','查看考勤紀錄'],['realtime.view','查看即時考勤'],['records.create','新增/補登'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['exceptions.manage','異常處理']],
+ attendance:[['punch','刷卡'],['records.view','查看考勤紀錄'],['realtime.view','查看即時考勤'],['records.create','新增/補登'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出考勤'],['exceptions.manage','異常處理']],
  workhours:[['attendance.view','查看出勤統計'],['overtime.view','查看加班統計'],['attendance.export','匯出出勤統計'],['overtime.export','匯出加班統計'],['overtime.report','申報加班']],
- leave:[['apply','提出請假'],['own.view','查看自己的申請'],['records.view','查看請假紀錄'],['approve','核准'],['reject','退回'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['balance.view','查看假別餘額'],['balance.edit','修改假別餘額']],
- schedule:[['own.view','查看自己的班表'],['records.view','查看班表'],['records.create','新增排班'],['records.edit','修改排班'],['records.delete','刪除排班'],['records.export','匯出'],['import','匯入'],['support.manage','調任/支援']],
- efficiency:[['records.view','查看效率資料'],['monthly.view','查看月報'],['records.create','新增'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出'],['import','匯入'],['monthly.edit','修改月報'],['sync','同步']],
- hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人員'],['employment.edit','在職/離職/留停'],['org.view','查看部門/單位/職稱'],['org.manage','管理部門/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
+ leave:[['apply','提出請假'],['own.view','查看自己的申請'],['records.view','查看請假紀錄'],['approve','核准'],['reject','退回'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出請假'],['balance.view','查看假別餘額'],['balance.edit','修改假別餘額']],
+ schedule:[['own.view','查看自己的班表'],['records.view','查看班表'],['records.create','新增排班'],['records.edit','修改排班'],['records.delete','刪除排班'],['records.export','匯出排班'],['import','匯入排班'],['support.manage','調任/支援']],
+ efficiency:[['records.view','查看效率資料'],['monthly.view','查看月報'],['records.create','新增'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出船舶效率'],['import','匯入船舶效率'],['monthly.edit','修改月報'],['sync','同步']],
+ hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人資名冊'],['employment.edit','在職/離職/留停'],['org.view','查看部門/單位/職稱'],['org.manage','管理部門/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
  history:[['attendance.view','查看考勤歷史'],['schedule.view','查看排班歷史'],['vessel.view','查看船舶歷史']]
 };
 function p79AvailableJobScopes(){
@@ -1284,7 +1284,7 @@ async function clearSessionLogs(){
 }
 
 async function exportEmployees() {
-  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
 init();
 </script>
 
