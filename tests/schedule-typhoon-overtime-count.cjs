@@ -59,7 +59,7 @@ assert.equal([...htmlCells.matchAll(/<td\b/g)].length,4,'only one additional sum
 assert.match(c.p79ScheduleRestCountCells(emp,month,{}),/>9 天<\/span>/,'async refresh recomputes both groups without visible row');
 assert.equal(c.p79ScheduleTyphoonHasWork('EMP1',date(4),meta[date(4)],'rest',evidence),false);
 assert.equal(c.p79ScheduleTyphoonHasWork('EMP1',date(3),meta[date(3)],'rest',evidence),true);
-assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates)'));
+assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates)'));
 const before=JSON.stringify({roster,meta});c.p79ScheduleRestCountCells(emp,month,{});assert.equal(JSON.stringify({roster,meta}),before,'read-only tally');
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS typhoon total includes marked-date attendance and overtime, saved/assigned/overnight, excludes revoked/leave/unpaired and deduplicates dates without changing quotas');

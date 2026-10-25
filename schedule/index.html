@@ -5858,6 +5858,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         let offDays = 0;
         const typhoonShownDates=[];
         const typhoonWorkedDates=[];
+        const visibleRestDates={例:[],休:[],國:[]};
 
         let cellsHtml = '';
         for(const d of visibleDays) {
@@ -5909,6 +5910,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(typhoonMarked&&typhoonWorked)typhoonWorkedDates.push(dayStr);
           else if(shownShift==='颱')typhoonShownDates.push(dayStr);
           const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
+          const visibleRestKind=p79VisibleRestKind(shownShift,visibleSubstituteLabel);
+          if(visibleRestKind)visibleRestDates[visibleRestKind].push(dayStr);
           const shownShiftStyle = specialNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
             shownShift==='休'?'bg-blue-100 text-red-700 font-black':
@@ -5933,7 +5936,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             : '';
           const cellTitle = [specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
-            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
+            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonMarked&&typhoonWorked?'work':shownShift==='颱'?'off':''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml(visibleSubstituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
@@ -5960,7 +5963,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           `;
         }
 
-        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates);
+        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates);
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
         html += `
@@ -6410,6 +6413,41 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
       return window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)==='rest';
     }
+    // Rest totals must describe the SELECTED value the employee sees in each
+    // day cell, not hidden auto-allocation or a superseded overtime report.
+    function p79VisibleRestKind(shift,substitute='') {
+      const value=String(substitute||shift||'').trim();
+      return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
+    }
+    // On-demand full staff check uses the same precedence as the month grid.
+    function p79VisibleRestDayAudit(emp,month,allocation=null) {
+      const dates={例:[],休:[],國:[]},meta=allocation||p79AutomaticRestMetadata(emp.id,month);
+      const balance=p79ScheduleRestBalance(emp,month,meta);
+      const evidence=p79ScheduleRestClient().status(month).evidence;
+      const snapshot={attendanceEvidence:evidence};
+      const typhoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
+      const election=new Set(window.P79SpecialOvertime?.electionDates?.().filter(d=>d.startsWith(month+'-'))||[]);
+      const today=scheduleTaipeiTodayKey();
+      const days=p79RestQuota(month).days;
+      for(let n=1;n<=days;n++){
+        const day=month+'-'+String(n).padStart(2,'0');
+        if(!p79EmployeeDateEligible(emp,day))continue;
+        const original=monthlyScheduleData[emp.id]?.[day]||'休';
+        const leave=approvedLeaveForEmployee(emp.id,day);
+        const state=window.P79RestAttendance.state(snapshot,emp.id,day);
+        const noPunch=p79ScheduleNoPunchRest(emp.id,day,original,meta[day],leave,state);
+        const shift=noPunch?'休':original;
+        const detail=noPunch?{...(meta[day]||{}),restCategory:balance.ledger?.find(x=>x.date===day&&x.kind==='off')?.category||'休',restQuotaOvertime:false}:meta[day]||null;
+        const coverage=noPunch?'':p79CoverageShift(emp.id,day);
+        const approved=leave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(leave)):'';
+        const special=p79ScheduleSpecialNoPunchCode(emp.id,day,original,leave,state,evidence,{typhoon,election},today);
+        const shown=special||approved||(shift==='休'&&detail?.restCategory?detail.restCategory:coverage||shift);
+        const overtime=special||leave||noPunch?'':p79SubstituteShiftLabel(emp.id,day,detail);
+        const type=p79VisibleRestKind(shown,overtime);
+        if(type)dates[type].push(day);
+      }
+      return dates;
+    }
     // 所有人員共用單一逐日分類器；不使用自動補配額度作為已休天數。
     function p79DailyRestCount(emp,month,knownAllocation=null) {
       const counts={例:0,休:0,國:0},dates={例:[],休:[],國:[]};
@@ -6481,7 +6519,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
       return result;
     }
-    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null) {
+    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null,visibleRestDates=null) {
       const quota=p79RestQuota(month).counts;
       const audit=p79DailyRestCount(emp,month,knownAllocation);
       // Use one identical set of typhoon dates for the new counter AND for
@@ -6491,12 +6529,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
       const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
       const typhoonSet=new Set([...offDates,...workedDates]);
-      const nationalDates=audit.dates.國.filter(day=>!typhoonSet.has(month+'-'+day));
-      const nationalDuplicates=audit.dates.國.length-nationalDates.length;
+      const dates=kind=>visibleRestDates?visibleRestDates[kind]||[]:audit.dates[kind].map(d=>month+'-'+d);
+      const nationalDates=dates('國').filter(day=>!typhoonSet.has(day));
+      const nationalDuplicates=dates('國').length-nationalDates.length;
       const total=typhoonSet.size;
       const quotaCells=['例','休','國'].map(category=>{
-        const count=category==='國'?Math.max(0,audit.counts.國-nationalDuplicates):audit.counts[category];
-        const displayDates=category==='國'?nationalDates:audit.dates[category];
+        const count=category==='國'?nationalDates.length:visibleRestDates?dates(category).length:audit.counts[category];
+        const displayDates=(category==='國'?nationalDates:dates(category)).map(day=>day.slice(-2));
         const limit=quota[category],rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const title=category+'：逐日計入 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'')+
@@ -6514,7 +6553,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
       document.querySelectorAll('tr[data-p79-drag-emp]').forEach(row=>{
         const emp=employees.find(e=>e.id===row.dataset.p79DragEmp);if(!emp)return;
         const cells=row.querySelectorAll('[data-rest-category]');if(!cells.length)return;
-        const template=document.createElement('template');template.innerHTML='<table><tbody><tr>'+p79ScheduleRestCountCells(emp,month,p79AutomaticRestMetadata(emp.id,month))+'</tr></tbody></table>';
+        const restDates={例:[],休:[],國:[]},typhoonOff=[],typhoonWorked=[];
+        // A cloud refresh must not overwrite the displayed numbers with hidden
+        // old metadata; count only the day's actual selected cell value.
+        row.querySelectorAll('td.p79-day-cell[data-rest-date]').forEach(cell=>{
+          const date=cell.dataset.restDate,category=cell.dataset.restVisible;
+          if(restDates[category])restDates[category].push(date);
+          if(cell.dataset.typhoonCount==='work')typhoonWorked.push(date);
+          else if(cell.dataset.typhoonCount==='off')typhoonOff.push(date);
+        });
+        const template=document.createElement('template');template.innerHTML='<table><tbody><tr>'+
+          p79ScheduleRestCountCells(emp,month,p79AutomaticRestMetadata(emp.id,month),typhoonOff,typhoonWorked,restDates)+'</tr></tbody></table>';
         [...template.content.querySelectorAll('[data-rest-category]')].forEach((cell,i)=>cells[i]?.replaceWith(cell));
       });
     }
@@ -6555,16 +6604,29 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const excluded=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))
             .filter(d=>approvedLeaveForEmployee(emp.id,d)||p79LeaveCoverOnDay(emp.id,d).length);
           const result=p79AllocateRestMonth(schedule,prior,month,excluded,p79EmploymentStartDate(emp));
-          const before=p79DailyRestCount(emp,month,prior).counts;
-          const after=p79DailyRestCount(emp,month,result.meta).counts;
+          // Audit the true 31-day displayed values, including approved leave,
+          // typhoon overlays and overtime labels. Previously both before and
+          // after only checked metadata and could falsely report 例4 when
+          // the visible roster displayed just three 例 cells.
+          const current=p79VisibleRestDayAudit(emp,month,prior);
+          const planned=p79VisibleRestDayAudit(emp,month,result.meta);
+          const typhoonDates=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
+          const counted=dates=>Object.fromEntries(['例','休','國'].map(category=>
+            [category,dates[category].filter(d=>category!=='國'||!typhoonDates.has(d)).length]));
+          const before=counted(current),after=counted(planned);
           const missing=Object.entries(result.quota).filter(([kind,n])=>after[kind]<n)
             .map(([kind,n])=>kind+'少'+(n-after[kind])+'天');
+          const hidden=p79DailyRestCount(emp,month,result.meta).counts;
+          const mismatch=['例','休','國'].filter(kind=>kind==='國'
+            ?hidden[kind]>after[kind]+current.國.filter(d=>typhoonDates.has(d)).length
+            :hidden[kind]!==after[kind]);
           const refreshed=['例','休','國'].some(kind=>before[kind]!==after[kind]);
-          if(refreshed)totals.needsUpdate++;
+          if(refreshed||mismatch.length)totals.needsUpdate++;
           if(missing.length)totals.unresolved++;
-          if(refreshed||missing.length)findings.push(emp.name+'：'+
-            '目前 '+['例','休','國'].map(c=>c+before[c]).join('／')+
-            ' → 重配 '+['例','休','國'].map(c=>c+after[c]).join('／')+
+          if(refreshed||missing.length||mismatch.length)findings.push(emp.name+'：'+
+            '目前 '+['例','休','國'].map(c=>c+before[c]+'天('+((current[c]||[]).map(d=>d.slice(-2)).join('、')||'無')+')').join('／')+
+            ' → 重新配對預覽 '+['例','休','國'].map(c=>c+after[c]).join('／')+
+            (mismatch.length?'｜配對註記與實際畫面不符：'+mismatch.join('、'):'')+
             (missing.length?'｜'+missing.join('、')+'（未自動建立加班）':''));
           else totals.complete++;
         }catch(error){totals.blocked++;findings.push(emp.name+'：無法安全配對－'+String(error.message||error));}

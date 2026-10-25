@@ -45,6 +45,6 @@ assert.match(cell(result,'國'),/<span>1\/1<\/span>/,'formal overtime category �
 assert.match(cell(result,'颱'),/<span>2 天<\/span>/);
 assert.equal(JSON.stringify(c.monthlyScheduleMeta),unchanged,'confirmed overtime report is preserved');
 assert.equal(JSON.stringify(roster),JSON.stringify({...JSON.parse(initial),[day(4)]:'早'}),'do not change shifts');
-assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates)'));
+assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates)'));
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
 console.log('PASS national/typhoon no-double-count, typhoon simple total, duplicate/off+worked, saved report unchanged, quota unchanged');

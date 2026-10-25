@@ -22,6 +22,17 @@ c.window=c;
 vm.createContext(c);
 vm.runInContext(fs.readFileSync('assets/port79-rest-allocation.js','utf8'),c);
 for(const n of ['p79DailyRestCount','p79RestQuotaAuditSnapshot','p79AutoAllocateRest'])vm.runInContext(extract(n),c);
+// Legacy allocation regression uses a simple displayed-day stub. A separate
+// full-render regression tests the real day-cell classifier with overlays.
+c.p79VisibleRestDayAudit=(emp,mo,allocation)=>{
+ const out={例:[],休:[],國:[]},roster=monthlyScheduleData[emp.id]||{};
+ for(const day of days){
+  if(roster[day]!=='休')continue;
+  const kind=allocation?.[day]?.restCategory;
+  if(out[kind])out[kind].push(day);
+ }
+ return out;
+};
 c.p79AutomaticRestMetadata=(id,mo)=>{
  const quota=c.p79RestQuota(mo);
  const excluded=days.filter(day=>c.approvedLeaveForEmployee(id,day)||c.p79LeaveCoverOnDay(id,day).length);
@@ -77,7 +88,7 @@ c.p79AutoAllocateRest();
 assert.equal(saves,savesBefore,'one incomplete employee blocks all-staff write');
 assert.equal(JSON.stringify(monthlyScheduleMeta),beforeBlocked,'failed batch never partially mutates');
 assert(alerts.at(-1).includes('未執行'));
-assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates)'));
+assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates)'));
 assert(html.includes('p79AuditAllRestQuota()'));
 assert(html.includes('const selected=employees.slice()'));
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
