@@ -5522,8 +5522,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         pairs.length=0;
       };
     }
-    // Manual typhoon closures are visual annotations only; never alter attendance/payroll.
-    // Stored in this browser because the official calendar does not expose a write API.
+    // Manual typhoon markers only alter roster display, not attendance/payroll. A separately
+    // confirmed leave-admin action may cancel matching cloud leave + cover records.
+    // Dates remain browser-local because the official calendar has no write API.
     const P79_TYPHOON_DATES_KEY='p79-manual-typhoon-days-v1';
     function p79TyphoonDates(){
       try{
@@ -5547,7 +5548,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(!dates.length)return;
       let session=null;
       try{session=JSON.parse(sessionStorage.getItem('admin_session')||'null');}catch(_){}
-      const role=String(session?.adminRole||'').toLowerCase();
+      const role=String(session?.adminRole||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
       const leaveManage=role==='superadmin'||String(session?.systemPermissions?.leave||'').toLowerCase()==='manage';
       if(!canManageSchedule()||!leaveManage){
         showScheduleNotice('颱風日期已儲存；請由同時具備排班及請假管理權限的管理員，重新開啟此日期清單儲存後執行請假連動取消。','info',9000);
