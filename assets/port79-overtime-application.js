@@ -22,6 +22,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
  const selected=new Set(dates),jobSet=new Set(jobs),people=new Map(employees.map(e=>[uid(e.empId),e])),rows=[],issues=[],seen=new Set();
  for(const snapshot of snapshots)for(const entry of snapshot.schedules||[]){const emp=people.get(uid(entry.empId));if(!emp)continue;const job=String(emp.jobTitle||emp.deptDetail||'未設定'),co=companyFor(emp);if(company&&company!==co||jobSet.size&&!jobSet.has(job))continue;
   for(const [date,meta]of Object.entries(entry.schedule?.__meta||{})){const report=meta?.overtimeReport;if(!selected.has(date)||!report||meta.overtimeExcluded)continue;
+    if((meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id)))continue;
    const key=uid(emp.empId)+'|'+date;if(seen.has(key))throw Error(emp.name+' '+date+' 有重複申報資料，請先核對');seen.add(key);
    if(!report.id){issues.push(emp.name+' '+date+' 缺少已儲存申報識別碼，未列入');continue;}
    const review=g.P79RestAttendance?.reportIssue(snapshot,entry.empId,date);if(review){issues.push(emp.name+' '+date+'：'+review);continue;}
@@ -34,7 +35,10 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    const actual=periodHours(report);
    const converted=report.convertedHours===null||report.convertedHours===undefined||report.convertedHours===''?null:Number(report.convertedHours);
    if(converted!==null&&(!Number.isFinite(converted)||converted<0))throw Error(emp.name+' 換算時數無效，請核對申報');
-   rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note:'吊櫃作業',planned,reportId:report.id});
+   const reasons=g.P79OvertimeReason;
+    const note=reasons?.reportNote?.({empId:emp.empId,date,meta,report,roster:entry.schedule||{},snapshot})||
+      String(report.note||report.typeName||'加班申報');
+    rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note,planned,reportId:report.id});
   }
  }
  // 特殊日工時只供考勤頁人工申報；未建立正式申報前不產生加班申報匯出列。
@@ -48,7 +52,10 @@ const number=x=>x===null?'—':Number(x).toFixed(2);
 function dateLabel(date){if(!validDate(date))throw Error('加班日期無效');const day=new Date(date+'T00:00:00Z').getUTCDay();return (Number(date.slice(0,4))-1911)+date.slice(4).replaceAll('-','/')+'（星期'+['日','一','二','三','四','五','六'][day]+'）';}
 function aggregate(rows,dates){
  const groups=new Map(),sorted=[...dates].sort(),range='統計日期：'+dateLabel(sorted[0])+(sorted.length>1?'～'+dateLabel(sorted.at(-1))+'（共選取'+sorted.length+'天）':'');
- for(const row of rows){const key=JSON.stringify([row.company,row.job,uid(row.empId)]);let item=groups.get(key);if(!item){item={...row,date:sorted[0],summary:true,rangeEnd:sorted.at(-1),rangeLabel:range,periods:[0,0,0,0],actual:0,converted:0};groups.set(key,item);}row.periods.forEach((period,i)=>{if(period)item.periods[i]=Math.round((item.periods[i]+row.actual)*100)/100;});item.actual=Math.round((item.actual+row.actual)*100)/100;item.converted=item.converted===null||row.converted===null?null:Math.round((item.converted+row.converted)*100)/100;}
+ for(const row of rows){const key=JSON.stringify([row.company,row.job,uid(row.empId)]);let item=groups.get(key);if(!item){item={...row,date:sorted[0],summary:true,rangeEnd:sorted.at(-1),rangeLabel:range,periods:[0,0,0,0],actual:0,converted:0};groups.set(key,item);}row.periods.forEach((period,i)=>{if(period)item.periods[i]=Math.round((item.periods[i]+row.actual)*100)/100;});
+ item.actual=Math.round((item.actual+row.actual)*100)/100;
+ item.converted=item.converted===null||row.converted===null?null:Math.round((item.converted+row.converted)*100)/100;
+ item.note=[...new Set([...(item.note||'').split('／'),...(row.note||'').split('／')].filter(Boolean))].join('／');}
  const rank={領班:0,船上指揮手:1,指揮手:1,AQC:2,ARMG:3,'F/L':4};return [...groups.values()].sort((a,b)=>a.company.localeCompare(b.company,'zh-Hant')||(rank[a.job]??99)-(rank[b.job]??99)||a.job.localeCompare(b.job,'zh-Hant')||a.name.localeCompare(b.name,'zh-Hant-u-co-stroke')||a.empId.localeCompare(b.empId));
 }
 const reportTitle=(rows,planned)=>rows[0]?.summary?(planned?'加班預排時數統計表':'加班時數統計表'):(planned?'加班預排申請表':'加班費明細表');
