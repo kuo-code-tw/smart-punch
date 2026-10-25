@@ -122,10 +122,11 @@ function p79OvertimeMailSend_(ss,data){
     var log=p79OvertimeMailRows_(ss,true),duplicate=null,pending=null;
     log.rows.forEach(function(row){
       if(String(row[0])===requestId&&(String(row[4])!==reportId||
+          p79OvertimeMailUid_(row[5])!==empId||String(row[6])!==date||
           String(row[7])!==recipientId||String(row[12])!==json))
         throw Error('寄送請求編號重複但內容不一致');
       if(String(row[4])===reportId&&p79OvertimeMailUid_(row[5])===empId&&
-         String(row[7])===recipientId&&String(row[12])===json){
+         String(row[6])===date&&String(row[7])===recipientId&&String(row[12])===json){
         if(String(row[1])==='sent')duplicate=p79OvertimeMailReceipt_(row);
         else if(String(row[1])==='sending')pending=true;
       }
@@ -137,7 +138,8 @@ function p79OvertimeMailSend_(ss,data){
     var values=[requestId,'sending','',created,reportId,empId,date,receiver.id,receiver.email,
       receiver.name,String(session.empId||''),actor,json,''];
     var next=log.sheet.getLastRow()+1;
-    log.sheet.getRange(next,1,1,values.length).setValues([values]);
+    // Preserve date, ISO timestamp and JSON as literal text for stable readback.
+    log.sheet.getRange(next,1,1,values.length).setNumberFormat('@').setValues([values]);
     SpreadsheetApp.flush();
     var safe=x=>String(x??'').replace(/[\r\n\u0000-\u001f]/g,' ').slice(0,240);
     var type=safe(report.typeName||report.category||'加班'),period=safe(report.code||'');
