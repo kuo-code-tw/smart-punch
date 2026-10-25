@@ -34,132 +34,236 @@ function receiptStatus(row,receipts,recipientId=''){
  const stale=relevant.filter(r=>r.status==='sent').sort((a,b)=>String(b.sentAt||'').localeCompare(String(a.sentAt||'')))[0];
  return stale?{kind:'stale',receipt:stale}:{kind:'new',receipt:null};
 }
+
+/* Send exactly one message per date. Every person in this table is merely
+ * a preview row; none creates its own email. */
+function dailyItems(rows,date){
+ return (rows||[]).filter(r=>r.date===date).map(r=>({
+  empId:r.empId,id:r.id,report:r.report
+ })).sort((a,b)=>a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));
+}
+function dayStatus(date,items,receipts,recipientId){
+ const current=canonical(items);
+ const daily=(receipts||[]).filter(r=>r.empId==='__DAY__'&&r.date===date&&r.recipientId===recipientId);
+ const exact=r=>r.reportId==='DAY:'+date&&r.reportJson===current;
+ const sent=daily.find(r=>r.status==='sent'&&exact(r));
+ if(sent)return {kind:'sent',receipt:sent};
+ const pending=daily.find(r=>r.status==='sending'&&exact(r));
+ if(pending)return {kind:'pending',receipt:pending};
+ const old=daily.find(r=>r.status==='sent');
+ return old?{kind:'stale',receipt:old}:{kind:'new',receipt:null};
+}
 function open(){
  const ctx=g.p79OvertimeMailContext;
- if(!ctx?.canSend?.())return g.alert('沒有寄送加班申報給會計的權限');
- const prior=g.document.getElementById('p79OvertimeMailDialog');if(prior){prior.focus();return}
- const el=g.document.createElement('dialog');el.id='p79OvertimeMailDialog';
- el.style.cssText='width:min(1150px,97vw);max-height:92dvh;overflow:auto;border:1px solid #d6e0e9;border-radius:14px;padding:18px;background:white;color:#193550';
+ if(!ctx?.canSend?.())return g.alert('沒有發送加班申報 Mail 的權限');
+ const previous=g.document.getElementById('p79OvertimeMailDialog');
+ if(previous){previous.focus();return;}
+ const el=g.document.createElement('dialog');
+ el.id='p79OvertimeMailDialog';
+ el.style.cssText='width:min(1040px,96vw);max-height:92dvh;overflow:auto;border:1px solid #d5e1eb;border-radius:14px;padding:18px;background:#fff;color:#20364d';
  el.innerHTML='<style>'+
-  '#p79OvertimeMailDialog *{box-sizing:border-box}#p79OvertimeMailDialog h2{margin:0;font-size:20px}'+
-  '#p79OvertimeMailDialog .om-head,#p79OvertimeMailDialog .om-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between}'+
-  '#p79OvertimeMailDialog .om-controls{margin:14px 0;padding:12px;background:#f4f7fb;border-radius:10px;justify-content:flex-start}'+
-  '#p79OvertimeMailDialog label{font-size:13px;display:grid;gap:5px;font-weight:650}'+
-  '#p79OvertimeMailDialog select,#p79OvertimeMailDialog input,#p79OvertimeMailDialog button{font:inherit;padding:9px 10px;border-radius:7px;border:1px solid #cad5e2;background:white;color:#173b54}'+
-  '#p79OvertimeMailDialog button{cursor:pointer;font-weight:700}#p79OvertimeMailDialog button:disabled{opacity:.45;cursor:not-allowed}'+
-  '#p79OvertimeMailDialog .om-main{overflow:auto;max-height:50vh;border:1px solid #e2e8f0;border-radius:9px}'+
-  '#p79OvertimeMailDialog table{border-collapse:collapse;width:100%;min-width:750px;font-size:13px}'+
-  '#p79OvertimeMailDialog th{position:sticky;top:0;background:#eaf1f8;white-space:nowrap}'+
-  '#p79OvertimeMailDialog td,#p79OvertimeMailDialog th{padding:10px;border-bottom:1px solid #e5edf3;text-align:center}'+
-  '#p79OvertimeMailDialog .om-state{font-weight:750}#p79OvertimeMailDialog .om-state.sent{color:#1d4ed8}'+
-  '#p79OvertimeMailDialog .om-state.stale{color:#b45309}#p79OvertimeMailDialog .om-state.pending{color:#a21caf}'+
-  '#p79OvertimeMailDialog .om-state.new{color:#64748b}#p79OvertimeMailDialog .om-send{background:#075985;color:white;border-color:#075985}'+
-  '#p79OvertimeMailDialog .om-hint{font-size:12px;color:#536779;line-height:1.7}#p79OvertimeMailDialog .om-message{font-size:13px;margin-top:12px;white-space:pre-wrap;min-height:24px}'+
-  '#p79OvertimeMailDialog .om-head{padding-bottom:14px;border-bottom:1px solid #e2e8f0;align-items:center}'+
-  '#p79OvertimeMailDialog .om-head h2{font-size:20px;font-weight:800;color:#075985}'+
-  '#p79OvertimeMailDialog .om-controls{display:grid!important;grid-template-columns:minmax(170px,190px) minmax(250px,340px) 160px;align-items:end!important;justify-content:start!important;gap:12px!important;background:#eff6ff!important;border:1px solid #dbeafe;border-radius:12px;padding:16px!important}'+
-  '#p79OvertimeMailDialog .om-controls label{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;min-width:0;font-weight:750;color:#334155}'+
-  '#p79OvertimeMailDialog .om-controls input,#p79OvertimeMailDialog .om-controls select{width:100%!important;min-width:0!important;height:42px!important;min-height:42px!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;color:#0f172a!important;padding:8px 12px!important;text-align:left}'+
-  '#p79OvertimeMailDialog #omReload{height:42px!important;min-height:42px!important;align-self:end!important;margin:0!important;padding:8px 12px!important;background:#2563eb!important;color:#fff!important;border-color:#1d4ed8!important;border-radius:9px!important;white-space:nowrap!important}'+
-  '#p79OvertimeMailDialog #omReload:hover{background:#1d4ed8!important}'+
-  '#p79OvertimeMailDialog #omClose{background:#f1f5f9!important;color:#475569!important;border-color:#cbd5e1!important;padding:8px 13px!important}'+
-  '#p79OvertimeMailDialog #omClose:hover{background:#e2e8f0!important}'+
-  '#p79OvertimeMailDialog .om-send{background:#0284c7!important;border-color:#0369a1!important;color:#fff!important;border-radius:8px!important;padding:7px 12px!important}'+
-  '#p79OvertimeMailDialog .om-send:hover:not(:disabled){background:#0369a1!important}'+
-  '#p79OvertimeMailDialog .om-state{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 10px;white-space:nowrap}'+
-  '#p79OvertimeMailDialog .om-state.sent{background:#dbeafe;color:#1d4ed8}'+
-  '#p79OvertimeMailDialog .om-state.stale{background:#ffedd5;color:#9a3412}'+
-  '#p79OvertimeMailDialog .om-state.pending{background:#fae8ff;color:#86198f}'+
-  '#p79OvertimeMailDialog .om-state.new{background:#f1f5f9;color:#475569}'+
-  '#p79OvertimeMailDialog th{background:#e0f2fe!important;color:#0c4a6e!important}'+
-  '#p79OvertimeMailDialog button:focus-visible,#p79OvertimeMailDialog input:focus-visible,#p79OvertimeMailDialog select:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}'+
-  '@media(max-width:780px){#p79OvertimeMailDialog .om-controls{grid-template-columns:repeat(2,minmax(0,1fr))!important}#p79OvertimeMailDialog #omReload{grid-column:1/-1;justify-self:start}}'+
-  '@media(max-width:520px){#p79OvertimeMailDialog .om-controls{grid-template-columns:minmax(0,1fr)!important}#p79OvertimeMailDialog #omReload{grid-column:auto;width:100%}}'+
-  '</style><div class="om-head"><h2>加班申報｜寄送 Mail</h2><button id="omClose" type="button">✕ 關閉</button></div>'+
-  '<p class="om-hint">請選擇管理員核准的會計收件人，再逐筆確認寄送。只寄送該筆申報摘要，不寄送整月考勤名冊。郵件服務確認且雲端留存紀錄後才標記已寄送；不代表收件人已閱讀。</p>'+
-  '<div class="om-controls"><label>加班月份<input id="omMonth" type="month" value="'+esc(ctx.month()||'')+'"></label>'+
-  '<label>寄送收件人<select id="omRecipient"><option value="">讀取核准名單中…</option></select></label>'+
-  '<button id="omReload" type="button">重新核對雲端</button></div>'+
-  '<div id="omCount" class="om-hint"></div>'+
-  '<div class="om-main"><table><thead><tr><th>申報日期</th><th>姓名／工號</th><th>加班類型／時段</th><th>時數</th><th>郵件狀態</th><th>操作</th></tr></thead><tbody id="omRows"></tbody></table></div>'+
-  '<div id="omMessage" class="om-message" role="status"></div>';
- g.document.body.appendChild(el);el.showModal();
- const q=s=>el.querySelector(s);
- let busy=false,ready=false,rows=[],receipts=[],recipients=[],lastMonth='',account=ctx.identity();
- const message=t=>{q('#omMessage').textContent=t};
- const guard=()=>{if(account!==ctx.identity()||!ctx.canSend())throw Error('登入身分或寄送權限已變更，請重新開啟')};
- const selected=()=>q('#omRecipient').value;
- function paint(){
-  q('#omCount').textContent=ready?'符合條件 '+rows.length+' 筆有效申報':'請先從雲端核對';
-  q('#omRows').innerHTML=ready&&rows.length?rows.map((r,i)=>{
-   const state=receiptStatus(r,receipts,selected());
-   const label={sent:'已寄送此版本',stale:'舊版已寄／須重寄',pending:'寄送結果待核對',new:'尚未寄給此人'}[state.kind];
-   const tip=state.receipt?(state.receipt.recipientName||'')+'／'+(state.receipt.sentAt||'待核對'):'尚未留存寄送紀錄';
-   return '<tr><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'<div style="font-size:11px;color:#64748b">'+esc(r.empId)+'</div></td>'+
-    '<td>'+esc(r.type)+'<div style="font-size:11px;color:#64748b">'+esc(r.code)+'</div></td>'+
-    '<td>'+esc(r.hours)+' 小時</td><td title="'+esc(tip)+'"><span class="om-state '+state.kind+'">'+label+'</span></td>'+
-    '<td><button class="om-send" type="button" data-send="'+i+'" '+(busy||!selected()||state.kind==='sent'||state.kind==='pending'?'disabled':'')+'>'+
-    (state.kind==='stale'?'重新寄送':'寄給會計')+'</button></td></tr>';
-  }).join(''):'<tr><td colspan="6">'+(ready?'這個月份沒有可寄送的有效申報':'正在核對寄送權限與加班申報')+'</td></tr>';
-  for(const id of ['omClose','omMonth','omRecipient','omReload'])q('#'+id).disabled=busy;
+ '#p79OvertimeMailDialog *{box-sizing:border-box}'+
+ '#p79OvertimeMailDialog .om-head{display:flex;gap:12px;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #e2e8f0}'+
+ '#p79OvertimeMailDialog .om-head h2{margin:0;font-weight:800;font-size:19px;color:#075985}'+
+ '#p79OvertimeMailDialog .om-intro{font-size:12px;line-height:1.6;color:#64748b;margin:10px 0}'+
+ '#p79OvertimeMailDialog .om-controls{display:grid;grid-template-columns:minmax(155px,200px) minmax(160px,210px) minmax(220px,1fr) 140px;gap:11px;padding:13px;border-radius:11px;background:#eff6ff;border:1px solid #dbeafe;align-items:end}'+
+ '#p79OvertimeMailDialog label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#334155;min-width:0}'+
+ '#p79OvertimeMailDialog input,#p79OvertimeMailDialog select,#p79OvertimeMailDialog button{font:inherit;border:1px solid #cbd5e1;background:#fff;color:#193550;border-radius:8px;padding:8px 11px;min-height:39px}'+
+ '#p79OvertimeMailDialog input,#p79OvertimeMailDialog select{width:100%;min-width:0}'+
+ '#p79OvertimeMailDialog button{font-weight:700;cursor:pointer}'+
+ '#p79OvertimeMailDialog button:disabled{opacity:.5;cursor:not-allowed}'+
+ '#p79OvertimeMailDialog button:focus-visible,#p79OvertimeMailDialog input:focus-visible,#p79OvertimeMailDialog select:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}'+
+ '#p79OvertimeMailDialog .om-blue{color:#fff!important;background:#2563eb!important;border-color:#1d4ed8!important}'+
+ '#p79OvertimeMailDialog .om-blue:hover:not(:disabled){background:#1d4ed8!important}'+
+ '#p79OvertimeMailDialog .om-green{color:#fff!important;background:#0e7490!important;border-color:#0e7490!important}'+
+ '#p79OvertimeMailDialog .om-green:hover:not(:disabled){background:#155e75!important}'+
+ '#p79OvertimeMailDialog .om-muted{background:#f1f5f9!important;color:#475569!important}'+
+ '#p79OvertimeMailDialog .om-address-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0}'+
+ '#p79OvertimeMailDialog .om-address-actions button{min-height:32px;font-size:12px;padding:6px 10px}'+
+ '#p79OvertimeMailDialog .om-recipient-editor{padding:12px;background:#ecfeff;border:1px solid #bae6fd;border-radius:10px;margin-bottom:10px}'+
+ '#p79OvertimeMailDialog .om-recipient-editor>div{display:flex;gap:9px;align-items:end;flex-wrap:wrap}'+
+ '#p79OvertimeMailDialog .om-recipient-editor label{flex:1 1 190px}'+
+ '#p79OvertimeMailDialog .om-recipient-editor button{min-height:39px}'+
+ '#p79OvertimeMailDialog .om-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;background:#f8fafc;border-radius:10px;margin:8px 0}'+
+ '#p79OvertimeMailDialog .om-summary strong{font-size:15px}'+
+ '#p79OvertimeMailDialog .om-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}'+
+ '#p79OvertimeMailDialog .om-status.sent{background:#dbeafe;color:#1d4ed8}'+
+ '#p79OvertimeMailDialog .om-status.stale{background:#ffedd5;color:#9a3412}'+
+ '#p79OvertimeMailDialog .om-status.pending{background:#fae8ff;color:#86198f}'+
+ '#p79OvertimeMailDialog .om-status.new{background:#e2e8f0;color:#475569}'+
+ '#p79OvertimeMailDialog .om-list{overflow:auto;border:1px solid #dbe5ef;border-radius:9px;max-height:42vh}'+
+ '#p79OvertimeMailDialog table{width:100%;border-collapse:collapse;font-size:13px;min-width:610px}'+
+ '#p79OvertimeMailDialog th,#p79OvertimeMailDialog td{padding:10px;text-align:center;border-bottom:1px solid #e5e7eb}'+
+ '#p79OvertimeMailDialog th{position:sticky;top:0;background:#e0f2fe;color:#0c4a6e}'+
+ '#p79OvertimeMailDialog tbody tr:nth-child(even){background:#f8fafc}'+
+ '#p79OvertimeMailDialog .om-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px}'+
+ '#p79OvertimeMailDialog .om-message{white-space:pre-wrap;color:#475569;font-size:12px;line-height:1.6;flex:1 1 320px}'+
+ '@media(max-width:850px){#p79OvertimeMailDialog .om-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}'+
+ '@media(max-width:510px){#p79OvertimeMailDialog .om-controls{grid-template-columns:minmax(0,1fr)}#p79OvertimeMailDialog .om-bottom button{width:100%}}'+
+ '</style>'+
+ '<div class="om-head"><h2>加班申報｜發送 Mail</h2><button id="omClose" class="om-muted" type="button">✕ 關閉</button></div>'+
+ '<p class="om-intro">選擇月份與日期，將當天所有有效加班申報彙整為一封 Mail。可在下方新增收件信箱；每次寄送前都會重新核對雲端版本。</p>'+
+ '<div class="om-controls"><label>加班月份<input id="omMonth" type="month" value="'+esc(ctx.month()||'')+'"></label>'+
+ '<label>選擇申報日期<input id="omDate" type="date"></label>'+
+ '<label>發送到哪個 Mail？<select id="omRecipient"><option value="">讀取 Mail 名單…</option></select></label>'+
+ '<button id="omReload" class="om-blue" type="button">重新核對雲端</button></div>'+
+ '<div class="om-address-actions"><button id="omAddRecipient" type="button" class="om-green">＋ 新增 Mail</button>'+
+ '<button id="omRemoveRecipient" type="button" class="om-muted">移除選取信箱</button>'+
+ '<span style="font-size:11px;color:#64748b">信箱僅儲存於受權限保護的 Google 後端設定</span></div>'+
+ '<div id="omRecipientEditor" class="om-recipient-editor" hidden><div>'+
+ '<label>收件人名稱<input id="omRecipientName" maxlength="60" placeholder="例如：會計／主管"></label>'+
+ '<label>Mail 信箱<input id="omRecipientEmail" type="email" placeholder="name@company.com"></label>'+
+ '<button id="omSaveRecipient" class="om-green" type="button">儲存 Mail</button>'+
+ '<button id="omCancelRecipient" class="om-muted" type="button">取消</button></div></div>'+
+ '<div id="omSummary" class="om-summary"><strong>請先核對申報日期</strong></div>'+
+ '<div class="om-list"><table><thead><tr><th>申報日期</th><th>姓名／工號</th><th>加班類型／時段</th><th>時數</th></tr></thead>'+
+ '<tbody id="omRows"><tr><td colspan="4">載入中…</td></tr></tbody></table></div>'+
+ '<div class="om-bottom"><div id="omMessage" class="om-message" role="status"></div>'+
+ '<button id="omSendDay" class="om-green" type="button" disabled>發送當日 Mail</button></div>';
+ g.document.body.appendChild(el);
+ el.showModal();
+ const q=id=>el.querySelector(id);
+ const initialAccount=ctx.identity();
+ let busy=false,ready=false,rows=[],receipts=[],recipients=[],lastMonth='',canManage=false;
+ const guard=()=>{if(initialAccount!==ctx.identity()||!ctx.canSend())throw Error('登入身分或發送權限已變更，請重新開啟')};
+ const msg=text=>{q('#omMessage').textContent=text};
+ const recipient=()=>recipients.find(r=>r.id===q('#omRecipient').value);
+ const date=()=>q('#omDate').value;
+ function range(month){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return null;
+  const y=Number(month.slice(0,4)),m=Number(month.slice(5,7));
+  const last=new Date(Date.UTC(y,m,0)).getUTCDate();
+  return [month+'-01',month+'-'+String(last).padStart(2,'0')];
  }
- async function load(){
+ function paint(){
+  const filtered=ready?rows.filter(r=>r.date===date()):[];
+  const items=dailyItems(rows,date());
+  const target=recipient();
+  const state=target?dayStatus(date(),items,receipts,target.id):{kind:'new'};
+  const statusLabel={sent:'當日目前版本已發送',stale:'舊版已發送／目前版本須重寄',pending:'發送結果待核對',new:'尚未確認發送'}[state.kind];
+  const sum=filtered.reduce((v,r)=>v+(Number(r.hours)||0),0);
+  const people=new Set(filtered.map(r=>r.empId)).size;
+  q('#omSummary').innerHTML='<strong>'+esc(date()||'尚未選擇日期')+'</strong>'+
+   '<span>'+people+' 人｜'+filtered.length+' 筆申報｜'+Number(sum.toFixed(2))+' 小時</span>'+
+   '<span class="om-status '+state.kind+'">'+statusLabel+'</span>'+
+   (state.receipt?'<small>已記錄：'+esc(state.receipt.sentAt||'待核對')+'</small>':'');
+  q('#omRows').innerHTML=filtered.length?filtered.map(r=>
+   '<tr><td>'+esc(r.date)+'</td><td>'+esc(r.name)+
+   '<div style="color:#64748b;font-size:11px">'+esc(r.empId)+'</div></td>'+
+   '<td>'+esc(r.type)+'<div style="color:#64748b;font-size:11px">'+esc(r.code)+'</div></td>'+
+   '<td>'+esc(r.hours)+' 小時</td></tr>').join(''):
+   '<tr><td colspan="4">'+(ready?'此日期沒有已確認的有效加班申報':'尚未核對雲端資料')+'</td></tr>';
+  q('#omSendDay').disabled=busy||!ready||!filtered.length||!target||state.kind==='sent'||state.kind==='pending';
+  q('#omSendDay').textContent=state.kind==='stale'?'重新發送當日 Mail':'發送當日 Mail（'+filtered.length+'筆）';
+  for(const id of ['omMonth','omDate','omRecipient','omReload','omAddRecipient','omRemoveRecipient',
+                    'omSaveRecipient','omRecipientName','omRecipientEmail','omCancelRecipient'])q('#'+id).disabled=busy;
+  q('#omAddRecipient').disabled=busy||!canManage;
+  q('#omRemoveRecipient').disabled=busy||!canManage||!target;
+  q('#omSaveRecipient').disabled=busy||!canManage;
+ }
+ function fillRecipients(preferred){
+  q('#omRecipient').innerHTML='<option value="">請選擇 Mail 信箱</option>'+
+   recipients.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name+'（'+r.email+'）')+'</option>').join('');
+  if(preferred&&recipients.some(r=>r.id===preferred))q('#omRecipient').value=preferred;
+ }
+ async function load(preferred){
   guard();ready=false;rows=[];receipts=[];paint();
-  const month=q('#omMonth').value;
-  if(!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month))throw Error('請選擇正確月份');
-  message('正在核對收件人、申報版本與雲端寄送紀錄…');
+  const month=q('#omMonth').value,limits=range(month);
+  if(!limits)throw Error('請選擇有效月份');
+  const previousDate=date();
+  q('#omDate').min=limits[0];q('#omDate').max=limits[1];
+  msg('正在核對當月有效申報與 Mail 收件名單…');
   const config=await ctx.request('getOvertimeMailOptions',{month});guard();
-  if(config.overtimeMailVersion!==1||!Array.isArray(config.recipients)||!Array.isArray(config.receipts))
-   throw Error('雲端尚未啟用安全寄信與稽核紀錄，已禁止寄送');
-  recipients=config.recipients.filter(r=>r.id&&r.name&&r.email);
-  const priorSelection=selected();
-  q('#omRecipient').innerHTML='<option value="">請選擇收件人</option>'+recipients.map(r=>
-    '<option value="'+esc(r.id)+'">'+esc(r.name+'（'+r.email+'）')+'</option>').join('');
-  if(recipients.some(r=>r.id===priorSelection))q('#omRecipient').value=priorSelection;
-  receipts=config.receipts;
+  if(config.overtimeMailVersion!==2||!Array.isArray(config.recipients)||!Array.isArray(config.receipts))
+    throw Error('雲端後端尚未支援「每日一封 Mail」，請先部署新版後端，已停止發送');
+  recipients=config.recipients;receipts=config.receipts;
+  canManage=config.canManageRecipients===true;
+  fillRecipients(preferred||q('#omRecipient').value);
   const snapshot=await ctx.snapshot(month);guard();
-  rows=collect(snapshot,ctx.employees(),month);ready=true;lastMonth=month;paint();
-  message(recipients.length?'已讀取雲端核准名單與有效申報，選擇收件人後逐筆寄送。':'尚未設定會計收件人，請管理員先完成雲端安全名單設定。');
+  rows=collect(snapshot,ctx.employees(),month);
+  const dates=[...new Set(rows.map(r=>r.date))].sort().reverse();
+  q('#omDate').value=dates.includes(previousDate)?previousDate:(dates[0]||limits[0]);
+  ready=true;lastMonth=month;paint();
+  msg(dates.length?'可從日期選擇當天所有人的加班申報，確認後只會寄出一封 Mail。':'此月目前沒有可發送的有效加班申報。');
+ }
+ function updateDateRange(){
+  const limits=range(q('#omMonth').value);
+  if(limits){q('#omDate').min=limits[0];q('#omDate').max=limits[1];q('#omDate').value=limits[0];}
  }
  q('#omClose').onclick=()=>el.close();el.onclose=()=>el.remove();
- q('#omRecipient').onchange=paint;
- q('#omMonth').onchange=()=>{ready=false;rows=[];receipts=[];paint();message('月份已變更，請按重新核對雲端。')};
- q('#omReload').onclick=async()=>{if(busy)return;busy=true;paint();
-  try{await load()}catch(error){ready=false;rows=[];message('目前無法寄送：'+(error.message||error))}
-  finally{busy=false;paint()}
- };
- q('#omRows').onclick=async event=>{
-  const index=event.target.closest('[data-send]')?.dataset.send;
-  if(index===undefined||busy||!ready||q('#omMonth').value!==lastMonth)return;
-  const row=rows[Number(index)],recipient=recipients.find(r=>r.id===selected());
-  if(!row||!recipient)return;
-  const state=receiptStatus(row,receipts,recipient.id);
-  if(['sent','pending'].includes(state.kind))return;
-  if(!g.confirm('確認寄送加班申報給 '+recipient.name+'（'+recipient.email+'）？\n\n'+
-     row.name+'｜'+row.date+'｜'+row.type+'｜'+row.code+'｜'+row.hours+' 小時\n申報編號：'+row.id+
-     (state.kind==='stale'?'\n注意：舊版曾寄送，請會計以最新通知為準。':'')))return;
-  busy=true;paint();message('正在寄送並核對雲端回條，請勿重複點擊…');
+ q('#omDate').onchange=paint;q('#omRecipient').onchange=paint;
+ q('#omMonth').onchange=()=>{ready=false;rows=[];receipts=[];updateDateRange();paint();msg('已切換月份，請按「重新核對雲端」')};
+ q('#omReload').onclick=async()=>{if(busy)return;busy=true;paint();try{await load(q('#omRecipient').value)}
+  catch(e){ready=false;rows=[];msg('無法發送：'+(e.message||e))}
+  finally{busy=false;paint()}};
+ q('#omAddRecipient').onclick=()=>{if(!canManage)return;const e=q('#omRecipientEditor');e.hidden=!e.hidden;if(!e.hidden)q('#omRecipientName').focus()};
+ q('#omCancelRecipient').onclick=()=>{q('#omRecipientEditor').hidden=true};
+ q('#omSaveRecipient').onclick=async()=>{
+  if(busy||!canManage)return;
+  const name=q('#omRecipientName').value.trim(),email=q('#omRecipientEmail').value.trim();
+  if(!name||!q('#omRecipientEmail').checkValidity())return msg('請輸入收件人名稱及有效的 Mail 信箱');
+  if(!g.confirm('要將 '+name+'（'+email+'）加入核准的 Mail 收件名單？'))return;
+  busy=true;paint();
   try{
    guard();
-   const requestId='otmail_'+(g.crypto?.randomUUID?.()||String(Date.now())+'_'+Math.random().toString(36).slice(2));
-   const sent=await ctx.request('sendOvertimeAccountingMail',
-    {empId:row.empId,date:row.date,reportId:row.id,recipientId:recipient.id,expectedReport:row.report,requestId});
+   const result=await ctx.request('manageOvertimeMailRecipients',{operation:'add',name,email});
    guard();
-   if(sent.overtimeMailVersion!==1||sent.sent!==true||sent.receipt?.status!=='sent'||
-       sent.receipt.reportId!==row.id||sent.receipt.recipientId!==recipient.id)
-    throw Error('伺服器未提供可確認的寄送回條');
-   const checked=await ctx.request('getOvertimeMailOptions',{month:lastMonth});guard();
-   if(checked.overtimeMailVersion!==1||!checked.receipts?.some(r=>
-     r.status==='sent'&&r.requestId===sent.receipt.requestId&&receiptStatus(row,[r],recipient.id).kind==='sent'))
-    throw Error('寄送已回覆成功，但稽核讀回未完成；請查核紀錄，勿直接重送');
-   receipts=checked.receipts;paint();
-   message('雲端已確認郵件服務接受寄送並保存紀錄。考勤日期會顯示已寄送（不代表對方已閱讀）。');
-   try{g.localStorage?.setItem('p79_overtime_mail_updated_v1',JSON.stringify({month:lastMonth,at:Date.now()}))}catch(_){}
-   ctx.onSent?.(lastMonth);
-  }catch(error){message('寄送結果未確認：'+(error.message||error)+'。請先重新核對雲端或請會計查收，避免重複發信。')}
+   if(result.overtimeMailVersion!==2||!result.recipients?.some(r=>r.email.toLowerCase()===email.toLowerCase()))throw Error('雲端未確認新增成功');
+   const added=result.recipients.find(r=>r.email.toLowerCase()===email.toLowerCase());
+   recipients=result.recipients;fillRecipients(added.id);
+   q('#omRecipientEditor').hidden=true;
+   q('#omRecipientName').value='';q('#omRecipientEmail').value='';
+   msg('已將 Mail 信箱儲存在雲端核准名單：'+added.name+'（'+added.email+'）');
+  }catch(e){msg('新增 Mail 失敗：'+(e.message||e))}
   finally{busy=false;paint()}
  };
- paint();q('#omReload').click();
+ q('#omRemoveRecipient').onclick=async()=>{
+  if(busy||!canManage||!recipient())return;
+  const r=recipient();
+  if(!g.confirm('確定移除 Mail 收件信箱：'+r.name+'（'+r.email+'）？\n已寄出的歷史紀錄會保留。'))return;
+  busy=true;paint();
+  try{
+   guard();
+   const result=await ctx.request('manageOvertimeMailRecipients',{operation:'remove',recipientId:r.id});
+   guard();
+   if(result.overtimeMailVersion!==2||result.recipients?.some(x=>x.id===r.id))throw Error('雲端未確認移除完成');
+   recipients=result.recipients;fillRecipients('');
+   msg('已從核准名單移除 Mail 信箱；歷史紀錄仍保留');
+  }catch(e){msg('移除 Mail 失敗：'+(e.message||e))}
+  finally{busy=false;paint()}
+ };
+ q('#omSendDay').onclick=async()=>{
+  if(busy||!ready||q('#omMonth').value!==lastMonth)return;
+  const to=recipient(),selectedDate=date(),items=dailyItems(rows,selectedDate),status=to?dayStatus(selectedDate,items,receipts,to.id):{kind:'new'};
+  if(!to||!items.length||['sent','pending'].includes(status.kind))return;
+  const staff=new Set(items.map(r=>r.empId)).size;
+  if(!g.confirm('確認發送 Mail？\n\n日期：'+selectedDate+'\n人數：'+staff+' 人\n申報：'+items.length+' 筆\n收件人：'+to.name+'（'+to.email+'）\n\n只發送一封包含當日全部申報的 Mail。'+
+   (status.kind==='stale'?'\n\n先前版本已寄過，會發送新的完整版本。':'')))return;
+  busy=true;paint();msg('正在重新核對當日全部申報並發送一封 Mail…');
+  try{
+   guard();
+   const requestId='otmailday_'+(g.crypto?.randomUUID?.()||String(Date.now())+'_'+Math.random().toString(36).slice(2));
+   const response=await ctx.request('sendOvertimeAccountingDayMail',{
+    date:selectedDate,recipientId:to.id,requestId,expectedReports:items
+   });
+   guard();
+   if(response.overtimeMailVersion!==2||response.sent!==true||response.receipt?.status!=='sent'||
+     response.receipt.reportId!=='DAY:'+selectedDate||response.receipt.recipientId!==to.id)
+     throw Error('伺服器未回覆可靠的每日寄送憑據');
+   const rechecked=await ctx.request('getOvertimeMailOptions',{month:lastMonth});
+   guard();
+   if(rechecked.overtimeMailVersion!==2||!rechecked.receipts?.some(r=>
+      r.status==='sent'&&r.requestId===response.receipt.requestId&&
+      dayStatus(selectedDate,items,[r],to.id).kind==='sent'))
+      throw Error('Mail 可能已寄出，但雲端回條尚未讀回；請先核對，勿重複發送');
+   receipts=rechecked.receipts;
+   msg('已發送 '+selectedDate+' 的完整加班申報，共 '+staff+' 人／'+items.length+' 筆，雲端寄送紀錄已確認。');
+   try{g.localStorage?.setItem('p79_overtime_mail_updated_v1',JSON.stringify({month:lastMonth,at:Date.now()}))}catch(_){}
+   ctx.onSent?.(lastMonth);
+  }catch(e){msg('發送結果未確認：'+(e.message||e)+'。請先查詢 Mail 或雲端紀錄，避免重複發送。')}
+  finally{busy=false;paint()}
+ };
+ updateDateRange();paint();q('#omReload').click();
 }
-g.P79OvertimeMail={canonical,collect,receiptStatus,open};
+g.P79OvertimeMail={canonical,collect,receiptStatus,dailyItems,dayStatus,open};
 })(window);
