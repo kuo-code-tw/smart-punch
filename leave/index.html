@@ -350,7 +350,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
-        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
+        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假比對</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
         <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
