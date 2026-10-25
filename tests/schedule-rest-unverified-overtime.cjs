@@ -103,6 +103,17 @@ for(let i=0;i<people.length;i++){
  }
  assert.equal(c.p79ScheduleExportDay(emp,typhoon,view),'颱');
 }
+// Work-hours does not define p79TyphoonDates(); shared browser marker still protects 颱.
+const originalTyphoonHelper=c.p79TyphoonDates;
+delete c.p79TyphoonDates;
+c.localStorage={getItem:key=>key==='p79-manual-typhoon-days-v1'?JSON.stringify([typhoon]):null};
+const sample=people[0],sampleRoster=c.monthlyScheduleData[sample.id],sampleStates={};
+for(let n=1;n<=31;n++)sampleStates[sample.id+'|'+day(n)]=sampleRoster[day(n)]==='休'?'rest':'worked';
+const fallback=c.P79MonthlyRest.balance(sample,sampleRoster,month,
+ {states:sampleStates,leaveDates:[],leaveCoverAssignments:[]},'');
+assert.equal(fallback.ledger.find(x=>x.date===typhoon)?.kind,'typhoon',
+ 'work-hours fallback must never count typhoon day as 例休國');
+c.p79TyphoonDates=originalTyphoonHelper;
 console.log('PASS 83 employee scenarios: weak '+weak+', assigned '+timed+
  ', verified '+confirmed+', revoked '+revoked+', idless '+idless+
  ', typhoon '+typhoonCases+'; no ghost quota, no ghost warnings, no cloud mutation');
