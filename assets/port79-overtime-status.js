@@ -1,29 +1,68 @@
 (function(g){
 'use strict';
 const directFetch=g.fetch?.bind(g);
-const labels={reported:'已申報',review:'休假超額・待核對',revoked:'休假超額・已撤銷',unverified:'核對未完成'},uid=x=>String(x||'').trim().toUpperCase(),cats=['例','休','國'];
+const labels={reported:'已申報',amended:'已修改・有效',review:'休假超額・待核對',revoked:'已取消／撤銷',unverified:'核對未完成'},uid=x=>String(x||'').trim().toUpperCase(),cats=['例','休','國'];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function status(row){if(row.revocation?.confirmed===true&&row.revocation.reportId===row.id&&row.revocation.reason==='休假超額')return 'revoked';if(row.issue)return 'unverified';return row.excessDays>0?'review':'reported';}
+function status(row){
+ if(row.revocation?.confirmed===true&&row.revocation.reportId===row.id)return 'revoked';
+ if(row.issue)return 'unverified';
+ if(!row.exempt&&row.excessDays>0)return 'review';
+ return row.amendment?.verified?'amended':'reported';
+}
 function filter(rows,q={}){const term=String(q.name||'').trim().toLowerCase();return rows.filter(r=>(!q.status||status(r)===q.status)&&(!q.category||r.category===q.category)&&(!q.dept||r.dept===q.dept)&&(!q.job||r.job===q.job)&&(!term||[r.name,r.empId].some(v=>String(v).toLowerCase().includes(term))));}
 function collect(snapshot,people,month,balance){
  if(snapshot?.attendanceEvidence?.complete!==true||snapshot.attendanceEvidence.month!==month||!Array.isArray(snapshot.schedules))throw Error('考勤或班表尚未完整核對，不能判定休假超額');
  const employees=new Map(people.map(e=>[uid(e.empId),e])),rows=[],issues=[],seen=new Set();
- for(const entry of snapshot.schedules){const emp=employees.get(uid(entry.empId));if(!emp)continue;const roster=entry.schedule||{},meta=roster.__meta||{};
-  const active=Object.entries(meta).filter(([date,m])=>date.startsWith(month+'-')&&m.overtimeReport?.id&&!m.overtimeExcluded),counts=Object.fromEntries(cats.map(c=>[c,active.filter(([d,m])=>m.overtimeReport.category===c).length]));
-  let b,error='',excess={};try{b=balance(emp,roster,month,snapshot);const off={...b.off};
-   // Actual rest takes precedence over declarations. balance's extraRest ledger
-   // contains actual no-card days that declarations had occupied quota for.
+ const R=g.P79OvertimeReason;
+ if(!R?.classify)throw Error('特殊日及代班申報分類模組未載入，不能安全判定超額');
+ for(const entry of snapshot.schedules){
+  const emp=employees.get(uid(entry.empId));if(!emp)continue;
+  const roster=entry.schedule||{},meta=roster.__meta||{};
+  const valid=([date,m])=>date.startsWith(month+'-')&&!!String(m?.overtimeReport?.id??'').trim()&&
+    m.overtimeExcluded!==true&&!(m.overtimeRevocations||[]).some(x=>
+     x?.confirmed===true&&String(x.reportId)===String(m.overtimeReport.id));
+  const active=Object.entries(meta).filter(valid);
+  const countEligible=([date,m])=>!R.classify({empId:emp.empId,date,meta:m,report:m.overtimeReport,roster,snapshot}).exempt;
+  const counts=Object.fromEntries(cats.map(c=>[c,active.filter(pair=>countEligible(pair)&&pair[1].overtimeReport.category===c).length]));
+  let b,error='',excess={};
+  try{
+   b=balance(emp,roster,month,snapshot);const off={...b.off};
    let extras=b.ledger.filter(x=>x.kind==='excessRest').length;
-   for(const c of cats){const n=Math.min(extras,Math.max(0,b.quota[c]-off[c]-b.reserved[c]));off[c]+=n;extras-=n;excess[c]=Math.max(0,off[c]+b.reserved[c]+counts[c]-b.quota[c]);}
+   for(const c of cats){
+    const n=Math.min(extras,Math.max(0,b.quota[c]-off[c]-b.reserved[c]));
+    off[c]+=n;extras-=n;
+    excess[c]=Math.max(0,off[c]+b.reserved[c]+counts[c]-b.quota[c]);
+   }
   }catch(e){error=e.message;issues.push((emp.name||entry.empId)+'：'+error);}
   const common={empId:emp.empId,name:emp.name||emp.empId,dept:emp.dept||'',job:emp.jobTitle||emp.deptDetail||''};
-  for(const [date,m]of Object.entries(meta)){if(!date.startsWith(month+'-'))continue;
-   const add=(report,audit)=>{const key=uid(emp.empId)+'|'+date+'|'+report.id+'|'+(audit?'revoked':'active');if(seen.has(key))return;seen.add(key);rows.push({...common,id:report.id,date,report:JSON.parse(JSON.stringify(report)),category:report.category,type:report.typeName||({例:'例假加班',休:'休息日加班',國:'國定假日加班',延:'平日延長加班',代:'休假代班加班'}[report.category])||report.code,period:String(report.overtimeStart||'')+'–'+String(report.overtimeEnd||''),hours:report.declaredHours,excessDays:!audit?(excess[report.category]||0):0,issue:!audit?error:'',linked:!!(m.forEmpId||report.leaveId),revocation:audit||null});};
-   if(m.overtimeReport?.id&&!m.overtimeExcluded)add(m.overtimeReport,null);
-   for(const audit of m.overtimeRevocations||[])if(audit.confirmed===true&&audit.reason==='休假超額'&&audit.report?.id===audit.reportId&&uid(audit.empId)===uid(emp.empId)&&audit.date===date&&audit.actor&&audit.at)add(audit.report,audit);
+  for(const [date,m] of Object.entries(meta)){
+   if(!date.startsWith(month+'-'))continue;
+   const add=(report,audit)=>{
+    if(!String(report?.id??'').trim())return;
+    const key=uid(emp.empId)+'|'+date+'|'+report.id+'|'+(audit?'revoked':'active');
+    if(seen.has(key))return;seen.add(key);
+    const reason=R.classify({empId:emp.empId,date,meta:m,report,roster,snapshot});
+    const amendment=R.amended(report,m);
+    rows.push({...common,id:report.id,date,report:JSON.parse(JSON.stringify(report)),
+      category:report.category,type:report.typeName||({例:'例假加班',休:'休息日加班',國:'國定假日加班',延:'平日延長加班',代:'休假代班加班'}[report.category])||report.code,
+      period:String(report.overtimeStart||'')+'–'+String(report.overtimeEnd||''),hours:report.declaredHours,
+      excessDays:!audit&&!reason.exempt?(excess[report.category]||0):0,issue:!audit?error:'',
+      linked:reason.kind==='cover'||!!(m.forEmpId||report.leaveId),reasonLabel:reason.label,
+      exemptionNote:reason.detail,exempt:reason.exempt,amendment,note:R.reportNote({empId:emp.empId,date,meta:m,report,roster,snapshot}),
+      revocation:audit||null});
+   };
+   if(valid([date,m]))add(m.overtimeReport,null);
+   // A verified cloud revocation remains visible whatever its reason:
+   // quota correction, manager cancellation, or amended-and-replaced report.
+   for(const audit of m.overtimeRevocations||[]){
+    if(audit?.confirmed===true&&audit.report?.id===audit.reportId&&
+       uid(audit.empId)===uid(emp.empId)&&audit.date===date&&audit.actor&&audit.at)
+      add(audit.report,audit);
+   }
   }
  }
- rows.sort((a,b)=>b.date.localeCompare(a.date)||a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));return {rows,issues};
+ rows.sort((a,b)=>b.date.localeCompare(a.date)||a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));
+ return {rows,issues};
 }
 function open(){
  const ctx=g.p79OvertimeStatusContext;if(!ctx?.canOpen())return alert('沒有加班申報查看權限');const existing=document.getElementById('p79OvertimeStatus');if(existing){existing.focus();return;}
