@@ -1326,7 +1326,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <input type="file" id="attendanceExcelInput" accept=".xlsx,.xls" class="hidden" onchange="importAttendanceExcel(event)">
-                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">📤 匯入考勤 Excel</button>
+                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">📤 匯入考勤</button>
                         <button type="button" id="btnAttendanceExport" onclick="openExportRecordsModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出考勤</button>
                         <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700">＋ 新增補打卡</button>
                     </div>
@@ -1558,9 +1558,9 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="flex flex-wrap gap-2">
                         <button id="btnLeavePolicyInfo" type="button" onclick="openLeavePolicyModal()" class="px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-semibold shadow hover:bg-amber-600">📖 請假規定說明</button>
                         <input type="file" id="leaveBalanceExcelInput" accept=".xlsx,.xls" multiple class="hidden" onchange="importLeaveBalanceExcel(event)">
-                        <button id="btnLeaveBalanceImport" type="button" onclick="document.getElementById('leaveBalanceExcelInput').click()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">匯入可休天數統計表 Excel</button>
-                        <button id="btnLeaveBalanceExport" type="button" onclick="exportLeaveBalanceExcel()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">匯出員工未休特休 Excel</button>
-                        <button id="btnLeaveRequestExport" type="button" onclick="exportLeaveExcel()" class="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-purple-700">📥 匯出請假清單 (Excel)</button>
+                        <button id="btnLeaveBalanceImport" type="button" onclick="document.getElementById('leaveBalanceExcelInput').click()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">匯入請假可休天數</button>
+                        <button id="btnLeaveBalanceExport" type="button" onclick="exportLeaveBalanceExcel()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">匯出請假可休天數</button>
+                        <button id="btnLeaveRequestExport" type="button" onclick="exportLeaveExcel()" class="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-purple-700">📥 匯出請假清單</button>
                     </div>
                 </div>
                 <div id="leaveBalanceImportSummary" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">尚未匯入可休天數統計表</div>
@@ -1649,7 +1649,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="flex flex-wrap items-center justify-end gap-2 text-[11px]">
                         <span class="inline-flex items-center gap-1"><span class="w-5 h-5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-black">V</span>有出勤</span>
                         <span class="inline-flex items-center gap-1"><span class="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">—</span>無紀錄</span>
-                        <button id="btnAttendanceStatsExport" type="button" onclick="exportAttendanceStatsExcel()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出統計 Excel</button>
+                        <button id="btnAttendanceStatsExport" type="button" onclick="exportAttendanceStatsExcel()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出考勤統計</button>
                     </div>
                 </div>
 
@@ -1961,7 +1961,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div id="empModalActionPermissions"
                          class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceCreate">新增／補刷上下班打卡</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceImport">匯入考勤 Excel</label>
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceImport">匯入考勤</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceEdit">編輯打卡紀錄</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceDelete">刪除打卡紀錄</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveCreate">手動新增請假</label>
@@ -1972,7 +1972,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="settingsManage">修改系統與定位設定</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="cloudSync">查看雲端狀態／手動拉取</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceExport">匯出考勤</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveExport">匯出請假清單 Excel</label>
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveExport">匯出請假清單</label>
                     </div>
                     <p class="mt-1 text-[11px] text-slate-400">管理員預設全部不勾選，僅能觀看；需要哪項操作再單獨開放。</p>
                 </div>
@@ -2139,7 +2139,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         </div>
     </div>
 
-    <!-- 彈出式考勤紀錄 Excel 欄位選擇 Modal -->
+    <!-- 彈出式考勤紀錄 試算表 欄位選擇 Modal -->
     <div id="exportRecordsModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-2xl max-w-2xl w-full space-y-5 border border-slate-100 dark:border-slate-700">
             <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
@@ -2211,7 +2211,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
             <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                 <button type="button" onclick="closeExportRecordsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">取消</button>
-                <button type="button" onclick="exportSelectedRecordsExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700">📥 確認匯出 Excel</button>
+                <button type="button" onclick="exportSelectedRecordsExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700">📥 確認匯出考勤</button>
             </div>
         </div>
     </div>
@@ -3181,7 +3181,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         const ADMIN_ACTION_OPTIONS = ['attendanceCreate', 'attendanceImport', 'attendanceEdit', 'attendanceDelete', 'leaveCreate', 'leaveReview', 'leaveDelete', 'leaveBalanceImport', 'departmentManage', 'settingsManage', 'cloudSync', 'attendanceExport', 'leaveExport'];
 
         // 2026/08 可休天數統計表：79W 作業課與倉庫課基準資料。
-        // 後台日後匯入新版 Excel 時，會以新資料覆蓋這份初始基準。
+        // 後台日後匯入新版 試算表 時，會以新資料覆蓋這份初始基準。
         const BUILTIN_LEAVE_BALANCES_202608 = {
             '0870058':[0,30,0,30], '0870059':[0,30,0,30], '0890019':[0,30,0,30],
             '0890021':[0,30,4,26], '0890026':[0,30,16,14], '0890028':[0,30,0,30],
@@ -3811,7 +3811,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             const text = String(value == null ? '' : value).trim();
             if (!text) return '';
             const digits = text.replace(/\D/g, '');
-            // 台灣手機號碼若 Excel 以數值儲存，開頭 0 會被吃掉（例：925832898）。
+            // 台灣手機號碼若 試算表 以數值儲存，開頭 0 會被吃掉（例：925832898）。
             if (digits.length === 9 && digits.startsWith('9')) return `0${digits}`;
             return digits || text;
         }
@@ -3856,7 +3856,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         }
 
         // 人工補卡指定配對輔助函式。
-        // 這四個函式會被雲端同步、班次配對與 Excel 匯入共同使用，
+        // 這四個函式會被雲端同步、班次配對與 試算表 匯入共同使用，
         // 必須集中定義，避免雲端拉取時發生 ReferenceError。
         function getManualPairClockInId(record) {
             return String(record?.manualPairClockInId ?? '').trim();
@@ -7721,7 +7721,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (!meta) {
                 const builtinCount = employees.filter(emp => emp.leaveBalance && emp.leaveBalance.source === 'builtin-202608').length;
                 el.textContent = builtinCount
-                    ? `目前使用 2026/08 內建可休天數基準｜已配對 ${builtinCount} 人｜可匯入新版可休天數統計表 Excel 更新`
+                    ? `目前使用 2026/08 內建可休天數基準｜已配對 ${builtinCount} 人｜可匯入新版可休天數統計表 試算表 更新`
                     : '尚未匯入可休天數統計表';
                 return;
             }
@@ -7887,7 +7887,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const files = [...(input.files || [])];
             if (!files.length) return;
             if (typeof XLSX === 'undefined') {
-                showToast('Excel 讀取元件尚未載入，請重新整理後再試', 'warning');
+                showToast('試算表 讀取元件尚未載入，請重新整理後再試', 'warning');
                 input.value = '';
                 return;
             }
@@ -7990,7 +7990,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     renderEmployeeLeaveBalance(currentEmp);
                 }
             } catch(err) {
-                showToast('可休天數統計表 Excel 匯入失敗：' + (err.message || err), 'warning');
+                showToast('可休天數統計表 試算表 匯入失敗：' + (err.message || err), 'warning');
             } finally {
                 input.value = '';
             }
@@ -7999,7 +7999,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function exportLeaveBalanceExcel() {
           await window.p79EnsureXlsx();
             if (typeof XLSX === 'undefined') {
-                showToast('Excel 匯出元件尚未載入，請重新整理後再試', 'warning');
+                showToast('試算表 匯出元件尚未載入，請重新整理後再試', 'warning');
                 return;
             }
             const rows = sortEmployeesById(getFilteredLeaveBalanceEmployees())
@@ -10144,7 +10144,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         function ensureExcelLibrary() {
             if (typeof XLSX !== 'undefined') return true;
-            showToast('Excel 元件尚未載入，請重新整理後再試', 'warning');
+            showToast('試算表 元件尚未載入，請重新整理後再試', 'warning');
             return false;
         }
 
@@ -10178,7 +10178,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '請假清單');
             XLSX.writeFile(workbook, `請假預約紀錄_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToast("請假清單 Excel 匯出成功！", "success");
+            showToast("請假清單 試算表 匯出成功！", "success");
         }
 
         function normalizeRecordFilterDate(value) {
@@ -11161,7 +11161,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (!candidate) return false;
             if (!current) return true;
             // 人工修改會保留原始事件鍵。若其中一筆明確取代另一筆原始事件，
-            // 永遠採用人工修正值，不再按簽到早／簽退晚的規則選回 Excel 舊時間。
+            // 永遠採用人工修正值，不再按簽到早／簽退晚的規則選回 試算表 舊時間。
             const candidateSourceKey = String(candidate.sourceEventKey || '').trim();
             const currentSourceKey = String(current.sourceEventKey || '').trim();
             const candidateEventKey = getAttendanceImportEventKey(candidate);
@@ -11472,7 +11472,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     return;
                 }
 
-                // 完全相同事件若包含人工修改版本，必須保留人工版本，避免重新匯入後被原始 Excel 覆蓋。
+                // 完全相同事件若包含人工修改版本，必須保留人工版本，避免重新匯入後被原始 試算表 覆蓋。
                 const type = getAttendanceRecordType(record);
                 const preferCurrent = shouldPreferAttendanceRecord(record, kept, type);
                 const primary = preferCurrent ? record : kept;
@@ -12951,7 +12951,7 @@ async function p79ComparisonOutput(title,rows,printMode){
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+escape(title)+'</title><style>body{font:12px sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:6px;text-align:center}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style><h2>'+escape(title)+'</h2><table>'+rows.map((r,i)=>'<tr>'+r.map(v=>'<'+(i?'td':'th')+'>'+escape(v)+'</'+(i?'td':'th')+'>').join('')+'</tr>').join('')+'</table></html>');popup.document.close();popup.focus();popup.print();return;
  }
- await window.p79EnsureXlsx();if(!window.XLSX)throw Error('Excel元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
+ await window.p79EnsureXlsx();if(!window.XLSX)throw Error('試算表元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
 }
 async function p79ExportOvertimeComparison(printMode){
  const fine=currentEmp?.finePermissions?.workhours||{};
@@ -13756,7 +13756,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, `${year}-${String(month).padStart(2, '0')}出勤統計`);
             XLSX.writeFile(workbook, `出勤天數統計_${monthValue}.xlsx`);
-            showToast('出勤天數統計 Excel 匯出成功！', 'success');
+            showToast('出勤天數統計 試算表 匯出成功！', 'success');
         }
 
         function escapeHtml(value) {
@@ -14093,7 +14093,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
         }
 
         function downloadCleanExcelWorkbook(workbook, fileName) {
-            // SheetJS 瀏覽器版在部分 Excel 版本會把殘留樣式寫入 styles.xml，
+            // SheetJS 瀏覽器版在部分 試算表 版本會把殘留樣式寫入 styles.xml，
             // 因此匯出前明確移除儲存格樣式與自訂格式，只保留資料、欄寬和工作表結構。
             Object.values(workbook.Sheets || {}).forEach(sheet => {
                 Object.keys(sheet || {}).forEach(address => {
@@ -14156,7 +14156,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '員工清單');
             downloadCleanExcelWorkbook(workbook, `員工清單_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToast("員工清單 Excel 匯出成功！", "success");
+            showToast("員工清單 試算表 匯出成功！", "success");
         }
 
         async function importEmployeesExcel(event) {
@@ -14226,8 +14226,8 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 postToCloud({ action: 'syncEmployees', employees: employees }, `成功匯入 ${count} 筆員工資料！`);
                 renderAdminEmployeeTable();
             } catch (error) {
-                console.error('員工 Excel 匯入失敗：', error);
-                showToast('員工 Excel 匯入失敗：' + (error?.message || error), 'warning');
+                console.error('員工 試算表 匯入失敗：', error);
+                showToast('員工 試算表 匯入失敗：' + (error?.message || error), 'warning');
             } finally {
                 event.target.value = '';
             }
@@ -14253,7 +14253,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
         }
 
         function getAttendanceImportTimeValue(sheet,rowIndex,columnIndex,displayedValue) {
-            // raw:false 的顯示字串可能只有日期；保留原始 Excel Date／序號內的時間。
+            // raw:false 的顯示字串可能只有日期；保留原始 試算表 Date／序號內的時間。
             const range=XLSX.utils.decode_range(sheet['!ref']||'A1');
             const cell=sheet[XLSX.utils.encode_cell({r:range.s.r+rowIndex,c:range.s.c+columnIndex})];
             return cell && (cell.v instanceof Date || typeof cell.v==='number') ? cell.v : displayedValue;
@@ -14428,7 +14428,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                         dept: matchedEmployee?.dept || String(valueAt(indexes.dept) || '一般').trim() || '一般',
                         timeStr,
                         status,
-                        location: String(valueAt(indexes.location) || '').trim() || `Excel匯入：${file.name}`,
+                        location: String(valueAt(indexes.location) || '').trim() || `試算表匯入：${file.name}`,
                         note: String(valueAt(indexes.note) || '').trim(),
                         source: 'excel-import',
                         importFile: file.name
@@ -14475,8 +14475,8 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 );
                 showToast(`${successMessage}，正在同步雲端`, 'success');
             } catch (error) {
-                console.error('考勤 Excel 匯入失敗：', error);
-                showToast('考勤 Excel 匯入失敗：' + (error?.message || error), 'warning');
+                console.error('考勤 試算表 匯入失敗：', error);
+                showToast('考勤 試算表 匯入失敗：' + (error?.message || error), 'warning');
             } finally {
                 input.value = '';
             }
@@ -14584,7 +14584,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${companySuffix}_${new Date().toISOString().slice(0,10)}.xlsx`);
             closeExportRecordsModal();
-            showToast("考勤紀錄 Excel 匯出成功！", "success");
+            showToast("考勤紀錄 試算表 匯出成功！", "success");
         }
 
         // 首頁預設日期若已經是同一天，載入後立即顯示 1 天，而不是舊制的 8 小時。
