@@ -969,8 +969,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime .p79-overtime-action-group button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 #adminContentOvertime .p79-ot-btn-history{background:#ede9fe!important;color:#5b21b6!important;border-color:#c4b5fd!important}
 #adminContentOvertime .p79-ot-btn-history:hover{background:#ddd6fe!important}
-#adminContentOvertime .p79-ot-btn-mail{background:#0891b2!important;color:#fff!important;border-color:#0e7490!important}
-#adminContentOvertime .p79-ot-btn-mail:hover{background:#0e7490!important}
 #adminContentOvertime .p79-ot-btn-monthly{background:#4338ca!important;color:#fff!important;border-color:#4338ca!important}
 #adminContentOvertime .p79-ot-btn-monthly:hover{background:#3730a3!important}
 #adminContentOvertime .p79-ot-btn-report{background:#0369a1!important;color:#fff!important;border-color:#0369a1!important}
@@ -1526,7 +1524,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   <div class="p79-overtime-compact-actions">
                     <div class="p79-overtime-action-group">
                       <button type="button" onclick="P79OvertimeStatus.open()" class="p79-ot-btn-history">申報／異動紀錄</button>
-                      <button type="button" onclick="P79OvertimeMail.open()" class="p79-ot-btn-mail">✉ 發送 Mail</button>
                       <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">每月未休假加班</button>
                       <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
@@ -15701,38 +15698,8 @@ window.p79OvertimeStatusContext={
   }finally{if(acquired)try{await rpc('scheduleReleaseEditLock',{});}catch(ignore){}}
  }
 };
-window.p79OvertimeMailContext={
- canSend:()=>p79CanDeleteOvertime()&&p79CanExportOvertimeApplication(),
- identity:()=>String(currentEmp?.empId||'')+'|'+String(currentPort79SsoToken()||'')+'|'+String(getActiveGasUrl()||''),
- month:()=>window.p79MonthlyRestContext.month(),
- snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
- // Cloud-verified roster already loaded for this page, useful as a READ-ONLY
- // preview if an additional fetch fails. Never use a cached preview to send.
- preview:month=>{
-  const cached=p79WorkOvertimeMonths.get(month),token=currentPort79SsoToken();
-  if(!cached?.ready||cached.token!==token||cached.error||!Array.isArray(cached.rows))return null;
-  const allowed=new Set(p79WorkhoursEligibleEmployees().map(e=>String(e.empId||'').toUpperCase()));
-  return {schedules:cached.rows.filter(r=>allowed.has(String(r.empId||'').toUpperCase()))};
- },
- employees:()=>p79WorkhoursEligibleEmployees(),
- request:async function(action,payload={}){
-  if(!this.canSend())throw Error('沒有寄送會計申報的管理權限');
-  const token=currentPort79SsoToken(),url=getActiveGasUrl();
-  if(!token||!url)throw Error('管理員登入資料不完整');
-  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
-  try{
-   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({...payload,action,token,gcToken:token}),signal:ctl.signal,cache:'no-store'});
-   const data=await response.json();
-   if(!response.ok||data?.ok!==true||data?.queued===true)throw Error(data?.error||'寄送服務未確認完成');
-   if(token!==currentPort79SsoToken())throw Error('登入身分已變更');
-   return data;
-  }finally{clearTimeout(timer)}
- }
-};
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
-<script src="../assets/port79-overtime-mail.js?v=20261025-preview-decoupled-v6"></script>
 <script src="../assets/port79-overtime-application.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-actual-hours"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
