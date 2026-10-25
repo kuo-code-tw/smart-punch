@@ -15,14 +15,14 @@ function ensureExcelJS(){
     await new Promise((resolve,reject)=>{
      const script=root.document.createElement('script');let done=false;
      const finish=error=>{if(done)return;done=true;clearTimeout(timer);script.onload=script.onerror=null;if(error){script.remove();reject(error);}else resolve();};
-     const timer=setTimeout(()=>finish(Error('Excel 排版元件載入逾時')),20000);
-     script.src=url;script.onload=()=>finish(root.ExcelJS?null:Error('Excel 排版元件未載入'));script.onerror=()=>finish(Error('Excel 排版元件載入失敗'));
+     const timer=setTimeout(()=>finish(Error('試算表 排版元件載入逾時')),20000);
+     script.src=url;script.onload=()=>finish(root.ExcelJS?null:Error('試算表 排版元件未載入'));script.onerror=()=>finish(Error('試算表 排版元件載入失敗'));
      root.document.head.appendChild(script);
     });
     return root.ExcelJS;
    }catch(error){if(root.ExcelJS)return root.ExcelJS;}
   }
-  throw Error('Excel 排版元件無法載入，請稍後再試');
+  throw Error('試算表 排版元件無法載入，請稍後再試');
  })().catch(error=>{loading=null;throw error;});
  return loading;
 }
