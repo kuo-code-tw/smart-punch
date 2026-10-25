@@ -172,15 +172,15 @@ applyGlobalTheme(savedGlobalTheme(),{save:false});
 const MENU={
  attendance:[
   ['clearDeleted','🗑️ 清空已刪除考勤'],
-  ['attendance-import','考勤匯入'],['attendance-export','考勤匯出'],['attendance-compare','考勤比對'],
+  ['attendance-import','匯入考勤'],['attendance-export','匯出考勤'],['attendance-compare','考勤比對'],
   ['settings','📍 定位地點設定（多地點）'],
   ['year','📆 年份顯示']
  ],
- workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['project-bonus','💰 專案獎金'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
- leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入可休天數'],['balance-export','📤 匯出可休天數']],
- schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入'],['export','📤 匯出'],['reset-cloud','↻ 重設雲端排班']],
- efficiency:[['import','📥 匯入'],['monthly-export','📥 匯出每月作業量表'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
- hr:[['import','📥 匯入人員'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出'],['year','📆 年份顯示']],
+ workhours:[['stats','📅 出勤天數統計'],['overtime-summary','📊 加班時數統計表'],['overtime-application','📄 加班申報表'],['project-bonus','💰 專案獎金'],['overtime-reload','↻ 重新讀取加班'],['overtime-export','📤 匯出加班'],['overtime-print','🖨️ 列印比對'],['overtime-options','⚙️ 加班選項管理'],['overtime-policy','📖 勞基法規則說明'],['year','📆 年份顯示']],
+ leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入請假可休天數'],['balance-export','📤 匯出請假可休天數']],
+ schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入排班'],['export','📤 匯出排班'],['reset-cloud','↻ 重設雲端排班']],
+ efficiency:[['import','📥 匯入船舶資料'],['monthly-export','📥 匯出船舶月作業量表'],['compare','🔎 比對月報'],['year','📆 年份顯示']],
+ hr:[['import','📥 匯入人資名冊'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出人資名冊'],['year','📆 年份顯示']],
  history:[]
 };
 function scheduleLockMenuState(){
