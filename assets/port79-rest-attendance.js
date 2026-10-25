@@ -19,13 +19,25 @@ function period(date,roster){
 }
 function build(input){
  if(input?.complete!==true)return{complete:false,days:{}};
- const now=Number(input.now??Date.now()),rosters=new Map((input.schedules||[]).map(r=>[id(r.empId),r.schedule||{}])),days={},marks=new Map(),sessionDates=[];
+ const now=Number(input.now??Date.now()),rosters=new Map((input.schedules||[]).map(r=>[id(r.empId),r.schedule||{}])),days={},marks=new Map(),sessionDates=[],workCalendarDays={};
  const mark=(emp,date,kind)=>{const key=id(emp)+'|'+date;if(!marks.has(key))marks.set(key,[]);marks.get(key).push(kind)};
  for(const [index,session] of (input.sessions||[]).entries()){
   const emp=id(session.empId),roster=rosters.get(emp);if(!roster)continue;
   const start=Number(session.start),end=Number(session.end),hasIn=session.start!=null&&Number.isFinite(start),hasOut=session.end!=null&&Number.isFinite(end);
   const at=hasIn?start:hasOut?end:Number(session.time);if(!Number.isFinite(at))continue;
   const date=new Date(at+8*HOUR).toISOString().slice(0,10),candidates=[],paired=hasIn&&hasOut&&end>start;
+  // Calendar-date evidence for typhoon-day statistics. Roster attendance
+  // accounting still belongs to the shift start date, but actual night-shift
+  // hours after midnight must be attributed to the next calendar day too.
+  if(paired){
+   const first=new Date(start+8*HOUR).toISOString().slice(0,10);
+   const last=new Date(end-1+8*HOUR).toISOString().slice(0,10);
+   let day=first;
+   for(let guard=0;day<=last&&guard<5;guard++){
+    if(day.startsWith(input.month+'-'))workCalendarDays[emp+'|'+day]=true;
+    day=shiftDate(day,1);
+   }
+  }
   for(const offset of [-1,0,1]){
    const d=shiftDate(date,offset);if(!roster[d])continue;const p=period(d,roster);if(!p.known)continue;
    const distance=Math.abs(at-(hasIn?p.start:p.end));
@@ -51,7 +63,7 @@ function build(input){
   const state=events.length?(events.length===1&&events[0]==='worked'?'worked':'missing'):(now>=p.end?'rest':'open');
   days[emp+'|'+date]={state,shiftEnd:p.end,leave:isLeaveDay(input,emp,date,roster)};
  }
- return{complete:true,month:input.month,checkedAt:now,days,sessionDates};
+ return{complete:true,month:input.month,checkedAt:now,days,sessionDates,workCalendarDays};
 }
 function state(snapshot,emp,date){return snapshot?.attendanceEvidence?.complete===true?snapshot.attendanceEvidence.days?.[id(emp)+'|'+date]?.state||'unknown':'unknown'}
 function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return s==='rest'?'整班無上下班卡，按休假處理，原申報不列有效加班':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':'';}

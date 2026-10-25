@@ -5818,7 +5818,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：已排休＋已報／待報">例</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：已排休＋已報／待報">休</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：已排休＋已報／待報；不包含颱風停班">國</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="颱風停班：獨立計算實際顯示颱的日期，不併入國定假日額度">颱</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="颱風日：停班、實際出勤及加班均計入；同日只算一次，不併入國定假日額度">颱</th>
       `;
 
       const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -5857,6 +5857,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         let workDays = 0;
         let offDays = 0;
         const typhoonShownDates=[];
+        const typhoonWorkedDates=[];
 
         let cellsHtml = '';
         for(const d of visibleDays) {
@@ -5903,7 +5904,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // 網頁和 Excel 使用同一項考勤／特殊日判定，避免颱字匯出後變回早中晚。
           const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,attendanceState,attendanceEvidence,{typhoon:typhoonDays,election:electionDays},typhoonToday);
           const shownShift = specialNoPunch || approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
-          if(shownShift==='颱')typhoonShownDates.push(dayStr);
+          const typhoonWorked=p79ScheduleTyphoonHasWork(emp.id,dayStr,dayMeta,attendanceState,attendanceEvidence);
+          const typhoonMarked=typhoonDays.has(dayStr)||rosterShift==='颱'||approvedLeaveCode==='颱';
+          if(typhoonMarked&&typhoonWorked)typhoonWorkedDates.push(dayStr);
+          else if(shownShift==='颱')typhoonShownDates.push(dayStr);
           const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
           const shownShiftStyle = specialNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
@@ -5956,7 +5960,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           `;
         }
 
-        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates);
+        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates);
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
         html += `
@@ -6436,13 +6440,31 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // Same visible shift precedence as the day grid: verified typhoon no-punch,
     // approved typhoon leave, or an explicitly assigned 颱 shift. A holiday
     // marker alone does not count as a completed typhoon absence.
-    function p79ScheduleTyphoonDays(emp,month) {
+    // Typhoon is an event-day statistic, not a statutory holiday quota.
+    // A reported or roster-assigned overtime shift still counts even when its
+    // main grid cell displays 早／中／晚 or an overtime time-code.
+    function p79ScheduleTyphoonHasWork(empId,date,meta,attendanceState,evidence=null) {
+      const key=String(empId||'').trim().toUpperCase()+'|'+date;
+      const hasPairedCalendarData=evidence?.complete===true&&!!evidence.workCalendarDays;
+      if(hasPairedCalendarData?evidence.workCalendarDays[key]===true:attendanceState==='worked')return true;
+      if(meta?.overtimeExcluded)return false;
+      const reports=[meta?.overtimeReport,...(Array.isArray(meta?.overtimeReports)?meta.overtimeReports:[])]
+        .filter(report=>String(report?.id||'').trim());
+      const revoked=meta?.overtimeRevocations||[];
+      if(reports.some(report=>!revoked.some(item=>
+        item?.confirmed===true&&String(item.reportId)===String(report.id)
+      )))return true;
+      // Do not let an old assignment flag resurrect a fully revoked report.
+      if(reports.length)return false;
+      return !!(meta?.overtime||meta?.forEmpId||meta?.restQuotaOvertime||meta?.type==='substitute');
+    }
+    function p79ScheduleTyphoonDays(emp,month,workedDates=null) {
       const result=[],quota=p79RestQuota(month);
       const evidence=p79ScheduleRestClient().status(month).evidence;
       const snapshot={attendanceEvidence:evidence};
       const markers={typhoon:new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-'))),election:new Set()};
       const today=scheduleTaipeiTodayKey();
-      const shifts=monthlyScheduleData[emp.id]||{},first=p79EmploymentStartDate(emp)||'';
+      const shifts=monthlyScheduleData[emp.id]||{},metadata=monthlyScheduleMeta[emp.id]||{},first=p79EmploymentStartDate(emp)||'';
       for(let n=1;n<=quota.days;n++){
         const date=month+'-'+String(n).padStart(2,'0');
         if(first&&date<first)continue;
@@ -6452,11 +6474,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const leaveCode=approved?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved)):'';
         const state=window.P79RestAttendance.state(snapshot,emp.id,date);
         const special=p79ScheduleSpecialNoPunchCode(emp.id,date,shift,approved,state,evidence,markers,today);
-        if((special||leaveCode||shift)==='颱')result.push(date);
+        const marked=markers.typhoon.has(date)||shift==='颱'||leaveCode==='颱';
+        if(marked&&p79ScheduleTyphoonHasWork(emp.id,date,metadata[date],state,evidence)) {
+          workedDates?.push(date);
+        } else if((special||leaveCode||shift)==='颱')result.push(date);
       }
       return result;
     }
-    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null) {
+    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null) {
       const quota=p79RestQuota(month).counts;
       const audit=p79DailyRestCount(emp,month,knownAllocation);
       return ['例','休','國'].map(category=>{
@@ -6466,11 +6491,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const title=category+'：逐日計入 '+count+' 天（'+(audit.dates[category].join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'');
         return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${rest}</span>${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
       }).join('')+(()=>{
-        const typhoonDays=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month):[]))];
-        const label=typhoonDays.map(d=>d.slice(-2)).join('、')||'無';
+        const computedWork=[];
+        const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
+        const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
+        const worked=new Set(workedDates);
+        const off=offDates.filter(date=>!worked.has(date));
+        const total=off.length+workedDates.length;
+        const offLabel=off.map(d=>d.slice(-2)).join('、')||'無';
+        const workedLabel=workedDates.map(d=>d.slice(-2)).join('、')||'無';
         return '<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
-          scheduleEscapeHtml('颱風停班：'+typhoonDays.length+' 天（'+label+'）；此欄獨立統計，不占用國定假日、例假或休息日額度')+
-          '"><span>'+typhoonDays.length+' 天</span></td>';
+          scheduleEscapeHtml('颱風日共'+total+'天；停班 '+off.length+'天（'+offLabel+'）；出勤／加班 '+workedDates.length+'天（'+workedLabel+'）；同一日期只計一次，不占用國定假日、例假或休息日額度')+
+          '"><span>'+total+' 天</span><span class="block text-[9px] leading-tight font-normal">停'+off.length+'／勤'+workedDates.length+'</span></td>';
       })();
     }
     function p79RefreshScheduleRestCounts(month) {

@@ -77,7 +77,7 @@ c.p79AutoAllocateRest();
 assert.equal(saves,savesBefore,'one incomplete employee blocks all-staff write');
 assert.equal(JSON.stringify(monthlyScheduleMeta),beforeBlocked,'failed batch never partially mutates');
 assert(alerts.at(-1).includes('未執行'));
-assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates)'));
+assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates)'));
 assert(html.includes('p79AuditAllRestQuota()'));
 assert(html.includes('const selected=employees.slice()'));
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
