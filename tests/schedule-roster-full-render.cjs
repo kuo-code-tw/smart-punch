@@ -31,7 +31,8 @@ const c={
  p79ScheduleRestBalance:()=>({ledger:[]}),p79EmployeeDateEligible:()=>true,
  approvedLeaveForEmployee:()=>null,p79ScheduleNoPunchRest:()=>false,p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=>'',getSubstituteRecommendation:()=>'',p79ScheduleLeaveExportCode:()=>'',scheduleLeaveTypeText:()=>'',p79LeaveCoverBadge:()=>'',p79LeaveCoverOnDay:()=>[],
  p79ScheduleSpecialNoPunchCode:(id,date)=>date==='2026-10-23'?'颱':date==='2026-10-25'?'選':'',
- canManageSchedule:()=>false,p79OvertimePeriodLabel:()=>'',scheduleCanEditNow:()=>false,p79ScheduleRestCountCells:()=>'<td>0</td><td>0</td><td>0</td>',
+ p79ScheduleTyphoonHasWork:()=>false,
+ canManageSchedule:()=>false,p79OvertimePeriodLabel:()=>'',scheduleCanEditNow:()=>false,p79ScheduleRestCountCells:()=>'<td>0</td><td>0</td><td>0</td><td>0</td>',
  p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){}
 };
 vm.createContext(c);
