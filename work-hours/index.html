@@ -15706,6 +15706,14 @@ window.p79OvertimeMailContext={
  identity:()=>String(currentEmp?.empId||'')+'|'+String(currentPort79SsoToken()||'')+'|'+String(getActiveGasUrl()||''),
  month:()=>window.p79MonthlyRestContext.month(),
  snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
+ // Cloud-verified roster already loaded for this page, useful as a READ-ONLY
+ // preview if an additional fetch fails. Never use a cached preview to send.
+ preview:month=>{
+  const cached=p79WorkOvertimeMonths.get(month),token=currentPort79SsoToken();
+  if(!cached?.ready||cached.token!==token||cached.error||!Array.isArray(cached.rows))return null;
+  const allowed=new Set(p79WorkhoursEligibleEmployees().map(e=>String(e.empId||'').toUpperCase()));
+  return {schedules:cached.rows.filter(r=>allowed.has(String(r.empId||'').toUpperCase()))};
+ },
  employees:()=>p79WorkhoursEligibleEmployees(),
  request:async function(action,payload={}){
   if(!this.canSend())throw Error('沒有寄送會計申報的管理權限');
