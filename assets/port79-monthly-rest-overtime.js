@@ -52,7 +52,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    const datedAssignment=m.overtime===true&&m.overtimeType==='rest'&&
      /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeStart||''))&&
      /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeEnd||''));
-   if(!verified&&!hasUnverifiedReport&&datedAssignment&&actual!=='rest'){
+   if(!verified&&!storedReport(r)&&!hasUnverifiedReport&&datedAssignment&&actual!=='rest'){
     ledger.push({date:d,kind:'unconfirmedAssignment',category:'',actual});
     conflicts.push({date:d,reason:'班表有人工加班時段但無正式申報編號；未當成已申報或預留額度，請核對'});
    }
