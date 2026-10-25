@@ -6417,6 +6417,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     // Rest totals must describe the SELECTED value the employee sees in each
     // day cell, not hidden auto-allocation or a superseded overtime report.
+    function p79ConfirmedRestOvertime(meta) {
+      const report=meta?.overtimeReport;
+      return !!String(report?.id??'').trim()&&['例','休','國'].includes(report?.category)&&
+        meta.overtimeExcluded!==true&&!(meta.overtimeRevocations||[]).some(item=>
+          item?.confirmed===true&&String(item.reportId)===String(report.id));
+    }
     function p79VisibleRestKind(shift,substitute='') {
       const value=String(substitute||shift||'').trim();
       return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
@@ -6465,7 +6471,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,noPunchRest,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,
-        visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?'':p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
+        visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''
+          :visibleSubstituteLabel&&!p79ConfirmedRestOvertime(dayMeta)?''
+          :p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
     }
     // On-demand full staff check uses the same precedence as the month grid.
     function p79VisibleRestDayAudit(emp,month,allocation=null) {
@@ -6498,11 +6506,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const report=meta.overtimeReport||{};
         const revoked=!!meta.overtimeExcluded||(meta.overtimeRevocations||[]).some(x=>x.confirmed===true&&String(x.reportId)===String(report.id));
         const reportType=!revoked&&String(report.id||'').trim()&&['例','休','國'].includes(report.category)?report.category:'';
-        // Unallocated bare 休 remains a day off, but must not fabricate another
-        // 休 quota: the allocator can reserve only 例→休→國 slots.
+        // A working-day manual restCategory/restQuotaOvertime without a cloud report
+        // is an unverified annotation, not an approved rest-quota deduction.
         const category=reportType||(code?.[1]&&shift!=='休'?code[1]:'')||
-          (['例','休','國'].includes(assigned.restCategory)&&
-           (shift==='休'||assigned.restAllocationSource==='manual'||assigned.restQuotaOvertime&&assigned.restAllocationSource!=='auto-v1')?assigned.restCategory:'');
+          (['例','休','國'].includes(assigned.restCategory)&&shift==='休'?assigned.restCategory:'');
         if(category){counts[category]++;dates[category].push(date.slice(8));}
       }
       return {counts,dates};
