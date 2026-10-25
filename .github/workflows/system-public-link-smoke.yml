@@ -11,6 +11,10 @@ jobs:
   public-links:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Verify local cross-system links and API wiring
+        run: node tests/system-point-to-point-links.cjs
       - name: Check homepage and seven system entrypoints (GET only)
         env:
           BASE_URL: https://kuo-code-tw.github.io/smart-punch
