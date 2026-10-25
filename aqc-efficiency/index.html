@@ -659,12 +659,12 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       </div>
       <div class="flex flex-wrap gap-2">
         <button id="efficiencySaveBtn" onclick="saveEfficiencyChangesToCloud()" class="btn bg-blue-600 text-white text-sm">💾 儲存</button>
-        <label class="btn bg-emerald-600 text-white cursor-pointer text-sm">📥 匯入 Excel
+        <label class="btn bg-emerald-600 text-white cursor-pointer text-sm">📥 匯入船舶資料
           <input id="excelImport" type="file" accept=".xlsx,.xls" multiple class="hidden"
                  onchange="importExcelFiles(this.files);this.value=''">
         </label>
-        <button onclick="openExportDialog()" class="btn bg-indigo-600 text-white text-sm">📤 匯出 Excel</button>
-        <label class="btn bg-amber-500 text-white cursor-pointer text-sm">🔎 比對月報 Excel
+        <button onclick="openExportDialog()" class="btn bg-indigo-600 text-white text-sm">📤 匯出船舶資料</button>
+        <label class="btn bg-amber-500 text-white cursor-pointer text-sm">🔎 比對船舶月報
           <input id="compareExcelInput" type="file" accept=".xlsx,.xls" class="hidden"
                  onchange="compareMonthlyExcel(this.files[0]);this.value=''">
         </label>
@@ -684,7 +684,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div class="flex items-center gap-2 shrink-0">
           <span id="excelLiveIcon" class="text-base">⏳</span>
-          <span class="text-xs font-black text-cyan-200">Excel 匯入動態</span>
+          <span class="text-xs font-black text-cyan-200">試算表 匯入動態</span>
         </div>
         <span id="excelLiveCount" class="rounded-full bg-cyan-950/70 px-2 py-0.5 text-[11px] font-black text-cyan-100">0 / 0</span>
         <span id="excelLiveWaiting" class="text-[11px] font-bold text-amber-300"></span>
@@ -705,7 +705,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
          ondragover="handleExcelDragOver(event)"
          ondragleave="handleExcelDragLeave(event)"
          ondrop="handleExcelDrop(event)">
-      <div class="font-black text-cyan-200">📂 拖曳 Excel 到這裡批次匯入（也可直接點這裡選檔）</div>
+      <div class="font-black text-cyan-200">📂 拖曳 試算表 到這裡批次匯入（也可直接點這裡選檔）</div>
       <div class="text-[11px] text-slate-300 mt-1">支援多個 .xlsx / .xls，一次拖進來即可依序匯入</div>
       <div id="excelDropStatus" class="text-xs font-black text-amber-300 mt-1 hidden"></div>
     </div>
@@ -722,7 +722,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
        ondrop="handleExcelDrop(event)">
     <div class="rounded-3xl border-4 border-dashed border-white bg-white/10 px-10 py-12 text-center text-white pointer-events-none">
       <div class="text-6xl mb-4">📥</div>
-      <div class="text-2xl font-black">放開滑鼠即可匯入 Excel</div>
+      <div class="text-2xl font-black">放開滑鼠即可匯入 試算表</div>
       <div class="mt-2 text-sm">支援多檔批次匯入</div>
     </div>
   </div>
@@ -783,7 +783,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
           <select id="filterMonth" class="block border rounded-xl px-3 py-2" onchange="onDashboardMonthChange()"><option value="">全部月份</option></select>
         </div>
         <div><label class="text-xs font-bold" for="dashboardDateRangePicker">日期篩選</label><div id="dashboardDateRangePicker"><input id="dashboardStartDate" type="hidden"><input id="dashboardEndDate" type="hidden"></div></div>
-        <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出每月作業量表</button>
+        <button id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()" class="btn bg-emerald-600 text-white text-sm">📥 匯出船舶月作業量表</button>
         <button onclick="clearDashboardFilter()" class="btn bg-slate-100 text-sm">清除全部篩選</button>
         <button id="forceVesselCloudPullBtn" type="button" onclick="forcePullVesselCloudData()" class="btn text-white text-sm font-black shadow-lg ring-2 ring-sky-300" style="background:#0284c7;color:#fff;min-width:190px" title="立即從 GC 即時資料與歷史船舶月份重新拉取">☁️ 立即雲端拉取船舶資料</button>
         <button id="efficiencyCloudSyncBtn" type="button" onclick="manualCloudSync()" class="btn bg-sky-600 text-white text-sm"><span id="efficiencySyncLight" role="status" aria-live="polite" data-state="idle" style="display:inline-flex;align-items:center;gap:7px;padding:0;border-radius:999px;background:transparent;color:inherit;font-size:12px;font-weight:800"><span id="efficiencySyncDot" aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#94a3b8"></span><span id="efficiencySyncLabel">同步船舶資料</span></span></button><details id="efficiencySyncError" hidden style="font-size:12px;color:#b91c1c;max-width:600px"><summary>查看同步未完成原因</summary><p id="efficiencySyncErrorText" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></details>
@@ -1022,7 +1022,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
               <option value="">請選擇月份</option>
             </select>
           </div>
-          <label class="btn bg-amber-500 text-white cursor-pointer text-sm">📥 匯入月報 Excel
+          <label class="btn bg-amber-500 text-white cursor-pointer text-sm">📥 匯入船舶月報
             <input type="file" accept=".xlsx,.xls" class="hidden" onchange="compareMonthlyExcel(this.files[0]);this.value=''">
           </label>
           <button type="button" onclick="addMonthlyEditorRow()" class="btn bg-sky-600 text-white text-sm">＋ 新增一列</button>
@@ -1078,8 +1078,8 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       </div>
 
       <div class="mt-4 rounded-2xl bg-slate-50 border p-3">
-        <div class="font-black text-sm mb-2">📋 從 Excel 直接複製貼上</div>
-        <textarea id="monthlyPasteBox" rows="4" class="w-full border rounded-xl px-3 py-2 text-sm font-mono" placeholder="可從 Excel 複製多列後貼在這裡。欄位順序：序號、日期、船名、航次、DISC、LOAD、請款櫃數、H/C、翻艙數、GPH、GPH含H/C。總 Moves 不用貼，系統會自動計算"></textarea>
+        <div class="font-black text-sm mb-2">📋 從 試算表 直接複製貼上</div>
+        <textarea id="monthlyPasteBox" rows="4" class="w-full border rounded-xl px-3 py-2 text-sm font-mono" placeholder="可從 試算表 複製多列後貼在這裡。欄位順序：序號、日期、船名、航次、DISC、LOAD、請款櫃數、H/C、翻艙數、GPH、GPH含H/C。總 Moves 不用貼，系統會自動計算"></textarea>
         <div class="mt-2 flex flex-wrap gap-2">
           <button type="button" onclick="importMonthlyPasteRows()" class="btn bg-indigo-600 text-white text-sm">解析貼上資料</button>
           <span class="text-xs text-slate-500 self-center">有表頭也可以，程式會略過表頭。</span>
@@ -1148,11 +1148,11 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
         <thead>
           <tr>
             <th>狀態</th><th>序號</th><th>船名</th><th>日期</th><th>AQC</th>
-            <th>Excel時段</th><th>系統時段</th>
-            <th>Excel時數</th><th>系統時數</th>
-            <th>Excel櫃數</th><th>系統櫃數</th>
-            <th>Excel H/C</th><th>系統 H/C</th>
-            <th>Excel效率</th><th>系統效率</th>
+            <th>試算表時段</th><th>系統時段</th>
+            <th>試算表時數</th><th>系統時數</th>
+            <th>試算表櫃數</th><th>系統櫃數</th>
+            <th>試算表 H/C</th><th>系統 H/C</th>
+            <th>試算表效率</th><th>系統效率</th>
             <th>問題位置</th>
           </tr>
         </thead>
@@ -1252,7 +1252,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
         <div class="min-w-[180px]"><label class="text-xs font-bold">人員</label><select id="vdPerson" class="block w-full border rounded-xl px-3 py-2 bg-white" onchange="renderVesselDetailRows()"></select></div>
         <div class="flex-1 min-w-[180px]"><label class="text-xs font-bold">搜尋</label><input id="vdSearch" class="block w-full border rounded-xl px-3 py-2 bg-white" placeholder="姓名 / AQC / 艙位 / 備註" oninput="renderVesselDetailRows()"></div>
         <button onclick="clearVesselDetailFilters()" class="btn bg-white border text-sm">清除</button>
-        <button onclick="exportCurrentVessel()" class="btn bg-emerald-600 text-white text-sm">匯出這艘船</button>
+        <button onclick="exportCurrentVessel()" class="btn bg-emerald-600 text-white text-sm">匯出船舶明細</button>
       </div>
     </div>
     <div class="text-xs text-slate-500">欄位較多時，可左右滑動查看完整內容。</div>
@@ -1505,7 +1505,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
-  <h3 class="text-lg font-black">匯出每月作業量表</h3>
+  <h3 class="text-lg font-black">匯出船舶月作業量表</h3>
   <p class="text-sm text-slate-500 mt-2">依完工月份匯出整月船邊作業量，不受目前頁籤與日期區間影響。</p>
   <label for="vesselMonthlyExportMonth" class="block text-sm font-bold mt-4">匯出月份</label>
   <input id="vesselMonthlyExportMonth" type="month" class="border rounded-xl px-3 py-2 mt-1">
@@ -1513,7 +1513,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
   <input id="vesselMonthlyExportCompany" type="text" maxlength="80" class="border rounded-xl px-3 py-2 mt-1 w-full" placeholder="請輸入公司名稱">
   <p class="text-xs text-slate-500 mt-2">公司名稱會記在此瀏覽器。A4 橫向列印，每頁最多 35 筆；各頁重複抬頭、表頭並置中。備註留白。</p>
   <div class="flex gap-2 mt-4">
-    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出每月作業量表</button>
+    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出船舶月作業量表</button>
     <button type="button" onclick="document.getElementById('vesselMonthlyExportDialog').close()" class="btn bg-slate-100">關閉</button>
   </div>
 </dialog>
@@ -1572,7 +1572,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
     <div class="flex justify-end gap-2">
       <button type="button" onclick="document.getElementById('exportDialog').close()" class="btn bg-slate-100">取消</button>
-      <button type="button" onclick="exportSelectedExcel()" class="btn bg-indigo-600 text-white">匯出所選項目</button>
+      <button type="button" onclick="exportSelectedExcel()" class="btn bg-indigo-600 text-white">匯出船舶所選項目</button>
     </div>
   </div>
 </dialog>
@@ -2289,7 +2289,7 @@ function clearStaleCorrectionsForWorkingSheetImport(master){
   const no=String(master.workingNo||'').trim();
   const serial=normalizeMonthlySerial(monthlySerialFromWorkingNo(no));
 
-  // 重新匯入原始 WORKING SHEET，原始 Excel 必須是最高優先來源。
+  // 重新匯入原始 WORKING SHEET，原始 試算表 必須是最高優先來源。
   // 舊的「套用月報值 / 手動修正」不可再蓋回新解析結果。
   try{
     const keys=new Set();
@@ -3483,7 +3483,7 @@ function renderDashboard(){
       ${dashboardChangeCell(x,'vph',num(x.vph).toFixed(2),'font-bold')}
       ${dashboardChangeCell(x,'vphHC',num(x.vphHC).toFixed(2))}
     </tr>`;
-  }).join('')||'<tr><td colspan="19" class="text-center text-slate-400">尚無船舶資料，請匯入含 WORKING SHEET + WORKING REPORT 的 Excel</td></tr>';
+  }).join('')||'<tr><td colspan="19" class="text-center text-slate-400">尚無船舶資料，請匯入含 WORKING SHEET + WORKING REPORT 的 試算表</td></tr>';
 
   renderSummaryPagination(jobs.length,totalPages);
 
@@ -4701,7 +4701,7 @@ function renderDualSourceSystemAudit(){
   const put=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
   if(!personalAuditReference||!dualAuditWorkingReference){
     put('dualIssueCount',0);put('dualSystemIssueCount',0);put('dualSourceIssueCount',0);put('dualOkCount',0);put('dualShipLabel','—');
-    body.innerHTML='<tr><td colspan="8" class="p-5 text-slate-400">請依序放入兩份 Excel；兩份都載入後會自動核對檔案內容。</td></tr>';
+    body.innerHTML='<tr><td colspan="8" class="p-5 text-slate-400">請依序放入兩份 試算表；兩份都載入後會自動核對檔案內容。</td></tr>';
     return;
   }
 
@@ -4771,7 +4771,7 @@ function openDualAuditDetail(index){
       verdict.textContent='✓ 這一筆個人效率表與 WORKING SHEET 一致。';
     }else{
       verdict.className='rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-900 font-black';
-      verdict.textContent='⚠ 來源 Excel 之間有差異：請核對下方標出的姓名、日期、船名或數值。';
+      verdict.textContent='⚠ 來源 試算表 之間有差異：請核對下方標出的姓名、日期、船名或數值。';
     }
   }
   if(body){
@@ -4839,7 +4839,7 @@ function clearDualSourceSystemAudit(){
 function rebuildDualSourceSystemAudit(){
   if(!personalAuditReference||!dualAuditWorkingReference){
     renderDualSourceSystemAudit();
-    toast('請先放入「個人效率表」與「船舶 WORKING SHEET」兩份 Excel');
+    toast('請先放入「個人效率表」與「船舶 WORKING SHEET」兩份 試算表');
     return;
   }
   buildDualSourceSystemAudit();renderDualSourceSystemAudit();
@@ -5264,17 +5264,17 @@ function parsePersonalEfficiencyWorkbook(book,fileName=''){
 }
 // v2026.09.27.7.15：個人效率核對不可用「當月只要有一筆 WORKING REPORT，
 // 就整月只看 WORKING REPORT」的舊規則。那會把 gc-driver-efficiency / web / 舊雲端
-// 的有效系統明細整批排除，造成 Excel 明明有資料，系統時數卻顯示「—」。
+// 的有效系統明細整批排除，造成 試算表 明明有資料，系統時數卻顯示「—」。
 // 改成逐筆合併，並以 WORKING REPORT 為最高優先；excel-import 是拿來當參考檔匯入的
 // 舊格式，不能反過來當成系統真值，避免自己跟自己比。
 // v2026.09.27.7.18：
 /*
   個人效率比對的系統資料來源整理規則：
   1. 同一人/序號/船名/日期/AQC 若同時存在多種來源，只採最高優先來源，避免舊匯入重複累加。
-  2. 舊資料若缺 workingNo / 船名，但可由 Excel「唯一」定位到同一人、日期、AQC，
+  2. 舊資料若缺 workingNo / 船名，但可由 試算表「唯一」定位到同一人、日期、AQC，
      僅拿來補缺；同群組已有正式綁定資料時，舊殘留列不再重複計算。
-  3. 既沒有序號/船名，又無法唯一定位到 Excel 的孤兒資料，不納入個人效率核對，
-     避免錯誤顯示成「Excel 無對應資料」。
+  3. 既沒有序號/船名，又無法唯一定位到 試算表 的孤兒資料，不納入個人效率核對，
+     避免錯誤顯示成「試算表 無對應資料」。
 */
 function personalAuditDirectSerial(r){
   // AQC number 絕對不是船舶序號；只採真正代表船舶序號的欄位。
@@ -5407,7 +5407,7 @@ function personalAuditSystemRecords(month){
     const nativeRows=rows.filter(r=>r._auditNativeLinked);
     const nativeWorkingReport=nativeRows.filter(r=>String(r?.source||'')==='working-report');
 
-    // 找同一組 Excel 參考值，用來判斷正式 WORKING REPORT 是否已完整。
+    // 找同一組 試算表 參考值，用來判斷正式 WORKING REPORT 是否已完整。
     const ref=refGroups.get(groupKey)||null;
     const aggregate=list=>{
       let containers=0,hatches=0,hours=0;
@@ -5439,7 +5439,7 @@ function personalAuditSystemRecords(month){
 
     let candidateRows=rows;
     if(wrCoreMatches){
-      // 正式 WORKING REPORT 已和 Excel 核心資料一致：只採正式資料。
+      // 正式 WORKING REPORT 已和 試算表 核心資料一致：只採正式資料。
       candidateRows=nativeWorkingReport;
     }else if(nativeRows.length){
       // 只要已有正式綁船資料，就不再混入推測補綁的孤兒資料。
@@ -5695,7 +5695,7 @@ function buildPersonalEfficiencyAudit(){
     ));
 
     // 月表常保留「本月 0 作業」的人員。
-    // Excel 為 0 且系統也沒有紀錄時，視為 0 = 0，不應誤報缺資料。
+    // 試算表 為 0 且系統也沒有紀錄時，視為 0 = 0，不應誤報缺資料。
     if(!ssum && rsum && !refHasData){
       ssum={
         name:rsum.name,normName,
@@ -5710,18 +5710,18 @@ function buildPersonalEfficiencyAudit(){
     ];
 
     const summaryIssues=[];
-    if(!rsum)summaryIssues.push('系統有此人本月資料，但匯入 Excel 總表沒有此人');
-    if(!ssum && refHasData)summaryIssues.push('匯入 Excel 有此人作業，但系統本月沒有作業資料');
+    if(!rsum)summaryIssues.push('系統有此人本月資料，但匯入 試算表 總表沒有此人');
+    if(!ssum && refHasData)summaryIssues.push('匯入 試算表 有此人作業，但系統本月沒有作業資料');
 
     if(rsum&&ssum){
       if(!personalAuditNear(rsum.hours,ssum.hours,0.03))
-        summaryIssues.push(`時數：Excel ${personalAuditRound(rsum.hours,2)} / 系統 ${personalAuditRound(ssum.hours,2)}`);
+        summaryIssues.push(`時數：試算表 ${personalAuditRound(rsum.hours,2)} / 系統 ${personalAuditRound(ssum.hours,2)}`);
       if(!personalAuditNear(rsum.containers,ssum.containers,0.01))
-        summaryIssues.push(`櫃數：Excel ${personalAuditRound(rsum.containers,0)} / 系統 ${personalAuditRound(ssum.containers,0)}`);
+        summaryIssues.push(`櫃數：試算表 ${personalAuditRound(rsum.containers,0)} / 系統 ${personalAuditRound(ssum.containers,0)}`);
       if(!personalAuditNear(rsum.hatches,ssum.hatches,0.01))
-        summaryIssues.push(`H/C：Excel ${personalAuditRound(rsum.hatches,0)} / 系統 ${personalAuditRound(ssum.hatches,0)}`);
+        summaryIssues.push(`H/C：試算表 ${personalAuditRound(rsum.hatches,0)} / 系統 ${personalAuditRound(ssum.hatches,0)}`);
       if(!personalAuditNear(rsum.efficiency,ssum.efficiency,0.05))
-        summaryIssues.push(`效率：Excel ${personalAuditRound(rsum.efficiency,2)} / 系統 ${personalAuditRound(ssum.efficiency,2)}`);
+        summaryIssues.push(`效率：試算表 ${personalAuditRound(rsum.efficiency,2)} / 系統 ${personalAuditRound(ssum.efficiency,2)}`);
     }
 
     const personRefGroups=refGroups.filter(g=>g.normName===normName);
@@ -5737,7 +5737,7 @@ function buildPersonalEfficiencyAudit(){
       if(!sg){
         const id=[g.serial||'—',`船 ${g.ship||'—'}`,g.dateValid?g.date:(g.dateRaw||'日期空白'),g.aqc?`AQC ${g.aqc}`:''].filter(Boolean).join('｜');
         if(!g.dateValid){
-          issues.push(`Excel 日期錯誤：${g.dateRaw||'空白'}`);
+          issues.push(`試算表 日期錯誤：${g.dateRaw||'空白'}`);
         }
         const masterExists=(shipMasters||[]).some(sm=>normalizeMonthlySerial(sm?.workingNo)===normalizeMonthlySerial(g.serial));
         const near=(sysGroups||[])
@@ -5745,7 +5745,7 @@ function buildPersonalEfficiencyAudit(){
           .map(x=>({x,score:personalAuditOperationalFingerprint(g,x)}))
           .sort((a,b)=>b.score-a.score)[0];
         if(near && near.score>=8){
-          issues.push(`找到疑似同一筆系統紀錄但關聯欄位不同：Excel ${id}；系統為 ${near.x.serial||'—'}｜船 ${near.x.ship||'—'}｜${near.x.date||'—'}${near.x.aqc?`｜AQC ${near.x.aqc}`:''}｜${(near.x.intervals||[]).join('、')||'—'}。請檢查序號/船名/AQC 綁定。`);
+          issues.push(`找到疑似同一筆系統紀錄但關聯欄位不同：試算表 ${id}；系統為 ${near.x.serial||'—'}｜船 ${near.x.ship||'—'}｜${near.x.date||'—'}${near.x.aqc?`｜AQC ${near.x.aqc}`:''}｜${(near.x.intervals||[]).join('、')||'—'}。請檢查序號/船名/AQC 綁定。`);
         }else if(masterExists){
           issues.push(`系統人員明細缺失：${id}（船舶主檔存在，但核對後仍找不到可信配對；已檢查日期、AQC、時段、櫃數、H/C）`);
         }else{
@@ -5757,27 +5757,27 @@ function buildPersonalEfficiencyAudit(){
         // 只有「實際欄位真的不同」才列錯誤；
         // 不再因為使用備援配對模式就顯示籠統的「來源欄位疑似誤植」。
         if(g.serial!==sg.serial)
-          issues.push(`序號錯誤：Excel ${g.serial||'—'} / 系統 ${sg.serial||'—'}`);
+          issues.push(`序號錯誤：試算表 ${g.serial||'—'} / 系統 ${sg.serial||'—'}`);
         if(g.ship!==sg.ship)
-          issues.push(`船名錯誤：Excel ${g.ship||'—'} / 系統 ${sg.ship||'—'}`);
+          issues.push(`船名錯誤：試算表 ${g.ship||'—'} / 系統 ${sg.ship||'—'}`);
         if(!g.dateValid){
-          issues.push(`日期錯誤：Excel ${g.dateRaw||'空白'} / 系統 ${sg.date||'—'}`);
+          issues.push(`日期錯誤：試算表 ${g.dateRaw||'空白'} / 系統 ${sg.date||'—'}`);
         }else if(g.date!==sg.date){
-          issues.push(`日期錯誤：Excel ${g.date||'—'} / 系統 ${sg.date||'—'}`);
+          issues.push(`日期錯誤：試算表 ${g.date||'—'} / 系統 ${sg.date||'—'}`);
         }
         if(g.aqc && sg.aqc && g.aqc!==sg.aqc)
-          issues.push(`AQC錯誤：Excel ${g.aqc} / 系統 ${sg.aqc}`);
+          issues.push(`AQC錯誤：試算表 ${g.aqc} / 系統 ${sg.aqc}`);
         if(!personalAuditIntervalsEquivalent(g.intervals,sg.intervals))
-          issues.push(`時段不符：Excel ${g.intervals.join('、')||'—'} / 系統 ${sg.intervals.join('、')||'—'}`);
+          issues.push(`時段不符：試算表 ${g.intervals.join('、')||'—'} / 系統 ${sg.intervals.join('、')||'—'}`);
 
         if(!personalAuditNear(g.hours,sg.hours,0.03))
-          issues.push(`時數不符：Excel ${personalAuditRound(g.hours,2)} / 系統 ${personalAuditRound(sg.hours,2)} / 差 ${personalAuditDiffText(g.hours,sg.hours,2)} 小時`);
+          issues.push(`時數不符：試算表 ${personalAuditRound(g.hours,2)} / 系統 ${personalAuditRound(sg.hours,2)} / 差 ${personalAuditDiffText(g.hours,sg.hours,2)} 小時`);
         if(!personalAuditNear(g.containers,sg.containers,0.01))
-          issues.push(`櫃數不符：Excel ${personalAuditRound(g.containers,0)} / 系統 ${personalAuditRound(sg.containers,0)} / 差 ${personalAuditDiffText(g.containers,sg.containers,0)}`);
+          issues.push(`櫃數不符：試算表 ${personalAuditRound(g.containers,0)} / 系統 ${personalAuditRound(sg.containers,0)} / 差 ${personalAuditDiffText(g.containers,sg.containers,0)}`);
         if(!personalAuditNear(g.hatches,sg.hatches,0.01))
-          issues.push(`H/C不符：Excel ${personalAuditRound(g.hatches,0)} / 系統 ${personalAuditRound(sg.hatches,0)} / 差 ${personalAuditDiffText(g.hatches,sg.hatches,0)}`);
+          issues.push(`H/C不符：試算表 ${personalAuditRound(g.hatches,0)} / 系統 ${personalAuditRound(sg.hatches,0)} / 差 ${personalAuditDiffText(g.hatches,sg.hatches,0)}`);
         if(!personalAuditNear(g.efficiency,sg.efficiency,0.05))
-          issues.push(`效率不符：Excel ${personalAuditRound(g.efficiency,2)} / 系統 ${personalAuditRound(sg.efficiency,2)} / 差 ${personalAuditDiffText(g.efficiency,sg.efficiency,2)}`);
+          issues.push(`效率不符：試算表 ${personalAuditRound(g.efficiency,2)} / 系統 ${personalAuditRound(sg.efficiency,2)} / 差 ${personalAuditDiffText(g.efficiency,sg.efficiency,2)}`);
       }
 
       groupResults.push({
@@ -5791,11 +5791,11 @@ function buildPersonalEfficiencyAudit(){
     personSysGroups.forEach(g=>{
       if(used.has(g.key))return;
 
-      // 若 Excel 沒有對應群組，標成 Excel 缺少這筆系統作業。
+      // 若 試算表 沒有對應群組，標成 試算表 缺少這筆系統作業。
       groupResults.push({
         status:'extra-system',
         ref:null,sys:g,
-        issues:[`Excel 無對應資料：${g.serial||'—'}｜船 ${g.ship||'—'}｜${g.date||'—'}${g.aqc?`｜AQC ${g.aqc}`:''}`]
+        issues:[`試算表 無對應資料：${g.serial||'—'}｜船 ${g.ship||'—'}｜${g.date||'—'}${g.aqc?`｜AQC ${g.aqc}`:''}`]
       });
     });
 
@@ -5938,7 +5938,7 @@ function renderPersonalEfficiencyAudit(){
       .forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='0';});
     const personSel=document.getElementById('personalAuditSearch');
     if(personSel)personSel.innerHTML='<option value="">全部人員</option>';
-    if(body)body.innerHTML='<tr><td colspan="14" class="text-slate-400 p-5">請先匯入個人效率 Excel</td></tr>';
+    if(body)body.innerHTML='<tr><td colspan="14" class="text-slate-400 p-5">請先匯入個人效率 試算表</td></tr>';
     return;
   }
 
@@ -5954,7 +5954,7 @@ function renderPersonalEfficiencyAudit(){
     const sourceCount=topSource+personSource;
     state.className=`mt-3 rounded-xl border px-3 py-2 text-xs font-bold ${sourceCount?'bg-amber-50 text-amber-800 border-amber-200':'bg-emerald-50 text-emerald-800 border-emerald-200'}`;
     state.innerHTML=
-      `已載入：<b>${esc(ref.fileName||'個人效率表')}</b> ｜ 比對月份：<b>${esc(ref.month||'—')}</b>${ref.monthSource?'（依'+esc(ref.monthSource)+'）':''} ｜ Excel ${ref.summary.length} 人 / 個人表 ${ref.details.length} 筆 / 總表 ${ref.combinedDetailCount??'—'} 筆`+
+      `已載入：<b>${esc(ref.fileName||'個人效率表')}</b> ｜ 比對月份：<b>${esc(ref.month||'—')}</b>${ref.monthSource?'（依'+esc(ref.monthSource)+'）':''} ｜ 試算表 ${ref.summary.length} 人 / 個人表 ${ref.details.length} 筆 / 總表 ${ref.combinedDetailCount??'—'} 筆`+
       (sourceCount?` ｜ ⚠ 來源檔問題 ${sourceCount} 項`:' ｜ ✓ 來源檔基本結構正常');
   }
 
@@ -6037,12 +6037,12 @@ function paFieldFlags(g){
   if(/H\/C不符/.test(text)){ flags.refHatches=!!rr; flags.sysHatches=!!ss; }
   if(/效率不符/.test(text)){ flags.refEfficiency=!!rr; flags.sysEfficiency=!!ss; }
 
-  // 系統缺資料：Excel 那側有值不是錯，只框系統側缺值。
+  // 系統缺資料：試算表 那側有值不是錯，只框系統側缺值。
   if(/系統人員明細缺失|系統無對應資料/.test(text)){
     flags.sysHours=true; flags.sysContainers=true; flags.sysHatches=true; flags.sysEfficiency=true;
   }
-  // Excel 缺資料反向處理。
-  if(/Excel 無對應資料/.test(text)){
+  // 試算表 缺資料反向處理。
+  if(/試算表 無對應資料/.test(text)){
     flags.refHours=true; flags.refContainers=true; flags.refHatches=true; flags.refEfficiency=true;
   }
   return flags;
@@ -6073,7 +6073,7 @@ function openPersonalAuditDetail(normName){
   const body=document.getElementById('paDetailBody');
 
   if(title)title.textContent=x.name;
-  if(meta)meta.textContent=`比對月份 ${personalAuditReference?.month||'—'}｜Excel 與系統作業資料逐船核對`;
+  if(meta)meta.textContent=`比對月份 ${personalAuditReference?.month||'—'}｜試算表 與系統作業資料逐船核對`;
 
   const r=x.refSummary,s=x.sysSummary;
   if(summary){
@@ -6087,7 +6087,7 @@ function openPersonalAuditDetail(normName){
       const bad=a!=null&&b!=null&&!personalAuditNear(a,b,label==='效率'?0.05:(label==='時數'?0.03:0.01));
       return `<div class="rounded-xl border p-3 ${bad?'bg-rose-50 border-rose-200':'bg-slate-50'}">
         <div class="text-[10px] text-slate-500">${label}</div>
-        <div class="font-black">Excel ${a!=null?personalAuditRound(a,d):'—'} / 系統 ${b!=null?personalAuditRound(b,d):'—'}</div>
+        <div class="font-black">試算表 ${a!=null?personalAuditRound(a,d):'—'} / 系統 ${b!=null?personalAuditRound(b,d):'—'}</div>
         <div class="text-xs ${bad?'text-rose-600 font-black':'text-slate-400'}">差：${a!=null&&b!=null?personalAuditDiffText(a,b,d):'—'}</div>
       </div>`;
     }).join('');
@@ -6103,7 +6103,7 @@ function openPersonalAuditDetail(normName){
       sourceBox.innerHTML=`<div class="font-black text-amber-800 mb-1">⚠ 檢查重點</div><div class="text-xs mb-2">個人效率檔：${esc(personalAuditReference?.fileName||'未命名')}。檔案內部差異與下方系統比對分開判斷；不代表 WORKING REPORT 沒有該筆。</div><ul class="list-disc pl-5 text-xs font-bold text-amber-800 space-y-1">${allSource.map(v=>`<li>${esc(v)}</li>`).join('')}</ul><div class="mt-2 text-[11px] text-rose-700 font-black">下方表格已用紅框直接標出錯誤欄位，方便你比對。</div>`;
     }else{
       sourceBox.className='rounded-2xl border border-emerald-200 bg-emerald-50 p-3';
-      sourceBox.innerHTML='<div class="font-black text-emerald-700">✓ 總表數字與來源 Excel 結構沒有發現問題</div>';
+      sourceBox.innerHTML='<div class="font-black text-emerald-700">✓ 總表數字與來源 試算表 結構沒有發現問題</div>';
     }
   }
 
@@ -6775,7 +6775,7 @@ function renderAll(){
   invalidateWorkloadIndex();
   // v2026.09.26.25：
   // v20 已經把「D8 5BN/20FR」備註存下來，只是解析成 0。
-  // 因此更新後先自動重新解析既有紀錄，不一定要再匯入 Excel。
+  // 因此更新後先自動重新解析既有紀錄，不一定要再匯入 試算表。
   repairBundleRecordsFromRemarks();
 
   populateSelects();
@@ -6814,7 +6814,7 @@ function clearOldShipCache(){
   localStorage.removeItem('gc_last_full_working_report_backup');
   records=[];shipMasters=[];lastVesselSummary=null;
   saveLocal();renderAll();renderVesselSummary(null);
-  toast('舊船舶快取已清除，請重新匯入原始 WORKING SHEET Excel');
+  toast('舊船舶快取已清除，請重新匯入原始 WORKING SHEET 試算表');
 }
 function clearDashboardFilter(){
   ['dashboardStartDate','dashboardEndDate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -7258,12 +7258,12 @@ function saveQueue(q){
  const snapshot=JSON.parse(JSON.stringify(q)),previous=gcQueueMemory;
  if(gcQueueStorageMode==='local'){
   try{localStorage.setItem(STORE.queue,JSON.stringify(snapshot));gcQueueMemory=snapshot;return Promise.resolve(true);}
-  catch(error){return Promise.reject(Error('本機空間不足，尚未保存待同步資料；請保留此頁與原始 Excel，勿關閉或重新整理'));}
+  catch(error){return Promise.reject(Error('本機空間不足，尚未保存待同步資料；請保留此頁與原始 試算表，勿關閉或重新整理'));}
  }
  gcQueueMemory=snapshot;
  const operation=gcQueueStorageWrites.catch(()=>{}).then(()=>p79EfficiencyDbWriteQueue(snapshot));
  gcQueueStorageWrites=operation;
- return operation.catch(error=>{if(gcQueueMemory===snapshot)gcQueueMemory=previous;throw Error('待同步資料尚未保存，請保留此頁與原始 Excel：'+(error.message||error));});
+ return operation.catch(error=>{if(gcQueueMemory===snapshot)gcQueueMemory=previous;throw Error('待同步資料尚未保存，請保留此頁與原始 試算表：'+(error.message||error));});
 }
 
 function recordIdentityKey(r){
@@ -7367,7 +7367,7 @@ function mergeCloudRecordsWithLocal(cloudRecords,localRecords,replacementMasters
     });
 
     // 同一筆 WORKING REPORT 若本機是較新的 x1/x2 解析版本，
-    // 本機的原始 Excel 摘要與 DISC/LOAD 必須優先，不能被舊雲端非零值蓋回。
+    // 本機的原始 試算表 摘要與 DISC/LOAD 必須優先，不能被舊雲端非零值蓋回。
     const localImportTs=Date.parse(String(l.workingSheetImportedAt||''))||0;
     const cloudImportTs=Date.parse(String(c.workingSheetImportedAt||''))||0;
     const localRule=String(l.workingSheetRuleVersion||'');
@@ -7869,7 +7869,7 @@ async function buildSafeGcSyncPayload(payload={}){
     cloudStatus('同步前確認雲端資料...',false);
 
     // 先讀目前範圍；範圍讀取失敗或回傳完全空白時，自動改讀完整雲端。
-    // 舊版只要第一支 request 失敗就直接停止匯入後同步，造成「明明 Excel 已讀到卻顯示匯入失敗」。
+    // 舊版只要第一支 request 失敗就直接停止匯入後同步，造成「明明 試算表 已讀到卻顯示匯入失敗」。
     let remote=null;
     let scopedError=null;
     const scope=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?{}:efficiencyCloudScopeParams();
@@ -7932,7 +7932,7 @@ async function buildSafeGcSyncPayload(payload={}){
       const no=String(s?.workingNo||'').trim();
       const fresh=freshByNo.get(no);
       if(!fresh)return s;
-      // fresh spread 在最後：0 也要能覆蓋舊非 0；新 Excel 的 38 也一定覆蓋舊 19。
+      // fresh spread 在最後：0 也要能覆蓋舊非 0；新 試算表 的 38 也一定覆蓋舊 19。
       const out={...s,...fresh};
       delete out.manualOverrides;
       return out;
@@ -9173,7 +9173,7 @@ function workingValueDatePart(v){
   }
 
   if(typeof v==='number'){
-    // Excel 日期序號通常遠大於 1；小於 1 通常只是時間。
+    // 試算表 日期序號通常遠大於 1；小於 1 通常只是時間。
     if(v>=1000){
       const d=excelDateTime(v);
       if(d && d.getFullYear()>=2000){
@@ -9201,7 +9201,7 @@ function workingValueTimePart(v){
   if(v==null||v==='')return null;
 
   if(v instanceof Date){
-    // Excel 時間若用 cellDates=true，可能會是 1899/1900 年。
+    // 試算表 時間若用 cellDates=true，可能會是 1899/1900 年。
     return {h:v.getHours(),m:v.getMinutes(),s:v.getSeconds()};
   }
 
@@ -9716,7 +9716,7 @@ function parseWorkingReportProductivity(book,summary){
   const aqcs=summary?.aqcs||[];
   const totalAqcHours=aqcs.reduce((s,a)=>s+num(a.hours),0);
 
-  // 最後才自行計算，避免把 Excel 原表已核定的 Productivity 蓋掉。
+  // 最後才自行計算，避免把 試算表 原表已核定的 Productivity 蓋掉。
   if(!gph&&totalAqcHours>0)gph=total/totalAqcHours;
   if(!gphHC&&totalAqcHours>0)gphHC=(total+hc)/totalAqcHours;
 
@@ -10244,7 +10244,7 @@ function setExcelDropStatus(text='',ok=true){
 }
 function setExcelDropActive(active){
   // v2026.09.26.4：不顯示拖曳區或全螢幕提示。
-  // 使用者只要把 Excel 拖到頁面任意位置放開即可直接匯入。
+  // 使用者只要把 試算表 拖到頁面任意位置放開即可直接匯入。
 }
 function handleExcelDragEnter(e){
   e.preventDefault(); e.stopPropagation();
@@ -10267,7 +10267,7 @@ async function handleExcelDrop(e){
   setExcelDropActive(false);
   const files=[...(e.dataTransfer?.files||[])].filter(isExcelFile);
   if(!files.length){
-    setExcelDropStatus('沒有找到可匯入的 Excel 檔案（.xlsx / .xls）',false);
+    setExcelDropStatus('沒有找到可匯入的 試算表 檔案（.xlsx / .xls）',false);
     return;
   }
   await importExcelFiles(files);
@@ -10303,7 +10303,7 @@ async function importExcelFiles(fileList){
       const currentNo=excelQueueStats.processed+1;
       const dynamicTotal=excelQueueStats.processed+1+excelImportQueue.length;
       setExcelDropStatus(`正在匯入 ${currentNo} / ${dynamicTotal}：${file.name}${excelImportQueue.length?`｜等待 ${excelImportQueue.length} 個`:''}`);
-      updateExcelImportLiveStatus({fileName:file.name,stage:'準備讀取 Excel',current:currentNo,total:dynamicTotal,waiting:excelImportQueue.length,pct:3,state:'working'});
+      updateExcelImportLiveStatus({fileName:file.name,stage:'準備讀取 試算表',current:currentNo,total:dynamicTotal,waiting:excelImportQueue.length,pct:3,state:'working'});
       try{
         lastExcelImportResult={ok:false,file:file.name,reason:'尚未完成驗證',records:0,workingNo:''};
         await importExcel(file);
@@ -10347,7 +10347,7 @@ async function importExcelFiles(fileList){
 
 // v2026.09.28.7.46：同 WORKING NO. 子作業採嚴格隔離；父作業只有在核對數學完全改善/吻合時才引用子作業做人員總量核對。
 // 同時修正相同來源 5260149-1 被重匯成 -2/-3 的問題。
-// v2026.09.28.7.44：同一 Excel WORKING NO. 可能被不同作業重複使用。
+// v2026.09.28.7.44：同一 試算表 WORKING NO. 可能被不同作業重複使用。
 // 不能再只用 workingNo 當唯一鍵；若同 NO. 但碼頭/日期/作業不同，自動配置獨立儲存 NO.
 // 原始 NO. 保存在 sourceWorkingNo，避免不同作業互相覆蓋。
 function importSourceWorkingNo(v){
@@ -10387,8 +10387,8 @@ function resolveImportWorkingNo(summary, imported, fileName=''){
     sourceFileName:String(fileName||'')
   };
 
-  // 先找「Excel 現在的 NO. 已經存在，而且核心作業相同」。
-  // 例如舊檔 NO=5260149，系統自動拆成 5260149-1；之後使用者把 Excel NO 改成 5260149-1，
+  // 先找「試算表 現在的 NO. 已經存在，而且核心作業相同」。
+  // 例如舊檔 NO=5260149，系統自動拆成 5260149-1；之後使用者把 試算表 NO 改成 5260149-1，
   // 即使舊版日期曾解析錯，也必須沿用 -1，不能再生出 -2。
   const storedMatches=(shipMasters||[]).filter(s=>
     String(s?.workingNo||'').trim()===rawNo && sameImportJobCoreLoose(s,candidate)
@@ -10453,9 +10453,9 @@ async function importExcel(file) {
   await window.p79EnsureXlsx();if(!requireSuperAdminAccess())return;
  if(!file)return;
  try{
-  setExcelImportStage('讀取 Excel 檔案',8);
+  setExcelImportStage('讀取 試算表 檔案',8);
   const buf=await file.arrayBuffer();
-  setExcelImportStage('解析 Excel 工作表',15);
+  setExcelImportStage('解析 試算表 工作表',15);
   const book=XLSX.read(buf,{type:'array',cellDates:true});
   if(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')){
     setExcelImportStage('解析 WORKING SHEET 船舶主檔',25);
@@ -10737,7 +10737,7 @@ async function importExcel(file) {
     });
     return;
   }
-  setExcelImportStage('辨識 Excel 格式',25);
+  setExcelImportStage('辨識 試算表 格式',25);
   let driverFormat=false;
   for(const sn of book.SheetNames){
     const rows=XLSX.utils.sheet_to_json(book.Sheets[sn],{header:1,raw:true,defval:''});
@@ -10772,7 +10772,7 @@ async function importExcel(file) {
     return;
   }
 
-  setExcelImportStage('解析一般效率 Excel',42);
+  setExcelImportStage('解析一般效率 試算表',42);
   const year=detectYear(book);
   if(book.SheetNames.includes('總表')){
     const rows=XLSX.utils.sheet_to_json(book.Sheets['總表'],{header:1,raw:true,defval:''});
@@ -11157,7 +11157,7 @@ function dashboardFullSystemAudit(x){
   // 4) 月報比對：人工確認過的欄位由 liveMonthlyCompareForJob/compareOneMonthlyRow 依最高優先規則處理。
   const monthly=liveMonthlyCompareForJob(x);
   if(monthly && (monthly.diffs||[]).length){
-    const vals=(monthly.values||[]).map(v=>`${v.field}：系統 ${v.system??'—'} / Excel ${v.actual??'—'}`);
+    const vals=(monthly.values||[]).map(v=>`${v.field}：系統 ${v.system??'—'} / 試算表 ${v.actual??'—'}`);
     (monthly.diffs||[]).forEach(label=>{
       const match=vals.find(v=>v.startsWith(String(label)+ '：'))||'';
       const splitNote=(monthly?.childSplitJobs||[]).length
@@ -11364,7 +11364,7 @@ function monthlyCompareBadge(x){
   }
 
   const labels=(r.diffs||[]).map(v=>String(v||'')).filter(Boolean);
-  const values=(r.values||[]).map(v=>`${v.field}：系統 ${v.system??'—'} / Excel ${v.actual??'—'}`).join('；');
+  const values=(r.values||[]).map(v=>`${v.field}：系統 ${v.system??'—'} / 試算表 ${v.actual??'—'}`).join('；');
   return `<button type="button"
           onclick="event.stopPropagation();openMonthlyCompareError('${esc(serial)}')"
           class="text-rose-600 font-black hover:underline"
@@ -11530,7 +11530,7 @@ function clearMonthlyEditorRows(){
 function importMonthlyPasteRows(){
   const box=document.getElementById('monthlyPasteBox');
   const raw=String(box?.value||'').trim();
-  if(!raw)return toast('請先貼上從 Excel 複製的月報資料');
+  if(!raw)return toast('請先貼上從 試算表 複製的月報資料');
   const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   const parsed=[];
   lines.forEach(line=>{
@@ -11867,7 +11867,7 @@ function availableMonthlyCompareMonths(){
     if(/^\d{4}-\d{2}$/.test(l))set.add(l);
   });
 
-  // 月報 Excel 中可辨識的月份
+  // 月報 試算表 中可辨識的月份
   (monthlyActualRows||[]).forEach(r=>{
     if(/^\d{4}-\d{2}$/.test(String(r.month||'')))set.add(r.month);
   });
@@ -12226,7 +12226,7 @@ function compareOneMonthlyRow(sys,actual){
   const values=[];
 
   // 人工輸入一定是正確基準：只要該欄位已由使用者人工確認/修正，
-  // 月報 Excel 與它不同時只能視為「月報來源差異」，不能再列成系統錯誤、
+  // 月報 試算表 與它不同時只能視為「月報來源差異」，不能再列成系統錯誤、
   // 也不能再次跳出修正視窗要求使用者反覆修改。
   const manual=(sys?.manualOverrides&&typeof sys.manualOverrides==='object')?sys.manualOverrides:{};
   const hasManual=(...keys)=>keys.some(k=>
@@ -12286,7 +12286,7 @@ async function compareMonthlyExcel(file) {
     saveMonthlyCompareCache(file?.name||'');
 
     if(!monthlyActualRows.length)
-      return toast('這份 Excel 沒找到「序號 / 船名 / 請款櫃數」月報格式');
+      return toast('這份 試算表 沒找到「序號 / 船名 / 請款櫃數」月報格式');
 
     const identifiable=monthlyActualRows.filter(r=>r.month).length;
     if(!identifiable){
@@ -12470,7 +12470,7 @@ function renderMonthlyComparePage(){
   renderMonthlyInputEditor();
 
   if(!monthlyActualRows.length){
-    summary.innerHTML='尚未套用月報資料。你可以直接在上方表格輸入、從 Excel 複製貼上，或匯入月報 Excel。';
+    summary.innerHTML='尚未套用月報資料。你可以直接在上方表格輸入、從 試算表 複製貼上，或匯入月報 試算表。';
     box.innerHTML='';
     return;
   }
@@ -13609,7 +13609,7 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     console.error('每月船邊作業量表匯出失敗',error);
     toast(error.message||'匯出失敗，請稍後再試');
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='📥 匯出每月作業量表';}
+    if(btn){btn.disabled=false;btn.textContent='📥 匯出船舶月作業量表';}
   }
 }
 
