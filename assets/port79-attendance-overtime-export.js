@@ -108,11 +108,11 @@ async function fetchMonth(month,force){
 }
 async function open(date,force=false){
  if(!dateValid(date))return notify('請先選擇正確的考勤日期','warning');
+ if(loading){notify('上一個日期的加班資料仍在載入，請核對完成後再選其他日期','warning');return;}
  const d=ensureDialog();
  currentDate=date;
  d.querySelector('#p79OtExportTitle').textContent='匯出 '+date+' 加班明細';
  if(!d.open)d.showModal();
- if(loading)return;
  loading=true;d.querySelector('#p79OtExportSave').disabled=true;setStatus('正在核對正式班表與雲端匯出紀錄…');
  d.querySelector('#p79OtExportRows').innerHTML='';
  try{
