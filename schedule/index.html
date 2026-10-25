@@ -5859,22 +5859,19 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const typhoonShownDates=[];
         const typhoonWorkedDates=[];
         const visibleRestDates={例:[],休:[],國:[]};
+        const displayContext={automaticRestMeta,restBalance,attendanceEvidence,attendanceSnapshot,
+          typhoonDays,electionDays,typhoonToday};
 
         let cellsHtml = '';
         for(const d of visibleDays) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
-          const rosterShift = (monthlyScheduleData[emp.id] && monthlyScheduleData[emp.id][dayStr]) || '休';
-          const ownApprovedLeave = approvedLeaveForEmployee(emp.id, dayStr);
-          const attendanceState=window.P79RestAttendance.state(attendanceSnapshot,emp.id,dayStr);
-          const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
-          const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
-          const shiftVal=noPunchRest?'休':rosterShift;
-          const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),restCategory:restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
-          const hasAssignment = !!(dayMeta?.forEmpId || dayMeta?.overtime || dayMeta?.overtimeReport || dayMeta?.note);
-          const coverageShift = noPunchRest?'':p79CoverageShift(emp.id,dayStr);
-          const displayShift = coverageShift || shiftVal;
-          const substituteLabel = ownApprovedLeave||noPunchRest ? '' : p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
+          const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
+          const {rosterShift,ownApprovedLeave,attendanceState,noPunchRest,manualNoPunch,
+            shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
+            approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
+            visibleRestKind}=selected;
+          const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
           if(manualNoPunch || shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '颱' || shiftVal === '離') {
@@ -5901,10 +5898,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             ? `<span class="p79-cover-only-mark" title="${scheduleEscapeHtml(dayMeta.forName ? '代班：'+dayMeta.forName : '代班')}">代班</span>`
             : '';
                     const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
-          const approvedLeaveCode = ownApprovedLeave ? p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)) : '';
-          // 網頁和 Excel 使用同一項考勤／特殊日判定，避免颱字匯出後變回早中晚。
-          const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,attendanceState,attendanceEvidence,{typhoon:typhoonDays,election:electionDays},typhoonToday);
-          const shownShift = specialNoPunch || approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
+          // Daily selected label was already resolved by p79ScheduleDisplayDay.
           const typhoonWorked=p79ScheduleTyphoonHasWork(emp.id,dayStr,dayMeta,attendanceState,attendanceEvidence);
           const typhoonMarked=(typhoonDays.has(dayStr)&&dayStr<=typhoonToday)||rosterShift==='颱'||approvedLeaveCode==='颱';
           // A global typhoon-day marker applies to this employee even if that
@@ -5915,8 +5909,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
             (!ownApprovedLeave||approvedLeaveCode==='颱'||typhoonWorked);
           if(typhoonCounted&&typhoonWorked)typhoonWorkedDates.push(dayStr);
           else if(typhoonCounted)typhoonShownDates.push(dayStr);
-          const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
-          const visibleRestKind=p79VisibleRestKind(shownShift,visibleSubstituteLabel);
           if(visibleRestKind)visibleRestDates[visibleRestKind].push(dayStr);
           const shownShiftStyle = specialNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
@@ -5947,6 +5939,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 title="${scheduleEscapeHtml(visibleSubstituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${visibleSubstituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
+                ${!visibleSubstituteLabel&&!['早','中','晚','休','例','國','颱','年','事','病','公','喪','離'].includes(shownShift)?
+                  `<option value="__display__" selected>${scheduleEscapeHtml(shownShift)}</option>`:''}
                 <option value="早" ${!visibleSubstituteLabel && shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${!visibleSubstituteLabel && shownShift==='中'?'selected':''}>中</option>
                 <option value="晚" ${!visibleSubstituteLabel && shownShift==='晚'?'selected':''}>晚</option>
@@ -6426,32 +6420,56 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const value=String(substitute||shift||'').trim();
       return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
     }
+    // Single source of truth for the daily SELECTED value in both roster UI
+    // and Excel export. The underlying official roster is never rewritten here.
+    function p79ScheduleDisplayContext(emp,month,allocation=null) {
+      const automaticRestMeta=allocation||p79AutomaticRestMetadata(emp.id,month);
+      const attendanceEvidence=p79ScheduleRestClient().status(month).evidence;
+      return {
+        automaticRestMeta,restBalance:p79ScheduleRestBalance(emp,month,automaticRestMeta),
+        attendanceEvidence,attendanceSnapshot:{attendanceEvidence},
+        typhoonDays:new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-'))),
+        electionDays:new Set(window.P79SpecialOvertime?.electionDates?.().filter(d=>d.startsWith(month+'-'))||[]),
+        typhoonToday:scheduleTaipeiTodayKey()
+      };
+    }
+    function p79ScheduleDisplayDay(emp,dayStr,context=null) {
+      if(!p79EmployeeDateEligible(emp,dayStr))return {eligible:false,visibleCode:''};
+      const ctx=context||p79ScheduleDisplayContext(emp,dayStr.slice(0,7));
+      const automaticRestMeta=ctx.automaticRestMeta;
+      const rosterShift=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
+      const ownApprovedLeave=approvedLeaveForEmployee(emp.id,dayStr);
+      const attendanceState=window.P79RestAttendance.state(ctx.attendanceSnapshot,emp.id,dayStr);
+      const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
+      const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
+        ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
+      const shiftVal=noPunchRest?'休':rosterShift;
+      const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
+        restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
+        restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
+      const coverageShift=noPunchRest?'':p79CoverageShift(emp.id,dayStr);
+      const displayShift=coverageShift||shiftVal;
+      const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
+      const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
+      const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
+        attendanceState,ctx.attendanceEvidence,{typhoon:ctx.typhoonDays,election:ctx.electionDays},ctx.typhoonToday);
+      const shownShift=specialNoPunch||approvedLeaveCode||
+        (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
+      const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
+      const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
+      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,noPunchRest,
+        manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
+        approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,
+        visibleRestKind:p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
+    }
     // On-demand full staff check uses the same precedence as the month grid.
     function p79VisibleRestDayAudit(emp,month,allocation=null) {
-      const dates={例:[],休:[],國:[]},meta=allocation||p79AutomaticRestMetadata(emp.id,month);
-      const balance=p79ScheduleRestBalance(emp,month,meta);
-      const evidence=p79ScheduleRestClient().status(month).evidence;
-      const snapshot={attendanceEvidence:evidence};
-      const typhoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
-      const election=new Set(window.P79SpecialOvertime?.electionDates?.().filter(d=>d.startsWith(month+'-'))||[]);
-      const today=scheduleTaipeiTodayKey();
-      const days=p79RestQuota(month).days;
-      for(let n=1;n<=days;n++){
+      const dates={例:[],休:[],國:[]};
+      const context=p79ScheduleDisplayContext(emp,month,allocation);
+      for(let n=1;n<=p79RestQuota(month).days;n++){
         const day=month+'-'+String(n).padStart(2,'0');
-        if(!p79EmployeeDateEligible(emp,day))continue;
-        const original=monthlyScheduleData[emp.id]?.[day]||'休';
-        const leave=approvedLeaveForEmployee(emp.id,day);
-        const state=window.P79RestAttendance.state(snapshot,emp.id,day);
-        const noPunch=p79ScheduleNoPunchRest(emp.id,day,original,meta[day],leave,state);
-        const shift=noPunch?'休':original;
-        const detail=noPunch?{...(meta[day]||{}),restCategory:balance.ledger?.find(x=>x.date===day&&x.kind==='off')?.category||'休',restQuotaOvertime:false}:meta[day]||null;
-        const coverage=noPunch?'':p79CoverageShift(emp.id,day);
-        const approved=leave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(leave)):'';
-        const special=p79ScheduleSpecialNoPunchCode(emp.id,day,original,leave,state,evidence,{typhoon,election},today);
-        const shown=special||approved||(shift==='休'&&detail?.restCategory?detail.restCategory:coverage||shift);
-        const overtime=special||leave||noPunch?'':p79SubstituteShiftLabel(emp.id,day,detail);
-        const type=p79VisibleRestKind(shown,overtime);
-        if(type)dates[type].push(day);
+        const selected=p79ScheduleDisplayDay(emp,day,context);
+        if(selected.eligible&&selected.visibleRestKind)dates[selected.visibleRestKind].push(day);
       }
       return dates;
     }
@@ -7082,20 +7100,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(/假/.test(text))return /特|年/.test(text)?'年':/事/.test(text)?'事':/喪/.test(text)?'喪':/公/.test(text)?'公':Array.from(text)[0]||'假';
       return text;
     }
-    function p79ScheduleExportDay(emp,dayStr) {
-      if(!p79EmployeeDateEligible(emp,dayStr))return '';
-      const approved=approvedLeaveForEmployee(emp.id,dayStr,emp.name);
-      if(approved)return p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved));
-      const raw=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
-      const meta=monthlyScheduleMeta[emp.id]?.[dayStr];
-      const reported=p79ScheduleConfirmedOvertime(emp.id,dayStr,raw);
-      if(reported)return reported;
-      const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,raw,null);
-      if(specialNoPunch)return specialNoPunch;
-      if(p79ScheduleNoPunchRest(emp.id,dayStr,raw,meta,null))return p79ScheduleRestBalance(emp,dayStr.slice(0,7)).ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休';
-      const compact=p79ScheduleLeaveExportCode(raw);
-      if(compact!==String(raw).trim()||['年','事','病','公','喪','颱','婚','產','檢','陪','顧','經','安','傷','訂','假','離'].includes(compact))return compact;
-      return p79SubstituteShiftLabel(emp.id,dayStr,meta)||(meta?.restQuotaOvertime?raw+'（'+meta.restCategory+'加）':raw==='休'&&meta?.restCategory?meta.restCategory:raw);
+    function p79ScheduleExportDay(emp,dayStr,context=null) {
+      return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;
     }
     async function exportScheduleToExcel() {
       if(typeof XLSX==='undefined'&&!await p79LoadScheduleExcel())return;
@@ -7141,7 +7147,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       ];
 
       const exportRows = [];
+      const exportTyphoonNotes=[];
       sortedEmps.forEach(emp => {
+        const displayContext=p79ScheduleDisplayContext(emp,yearMonth);
         const row = {
           '工號': String(emp.id || ''),
           '姓名': String(emp.name || ''),
@@ -7152,7 +7160,21 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
         for (let d = 1; d <= totalDays; d++) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-          row[String(d)] = p79ScheduleExportDay(emp,dayStr);
+          const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
+          row[String(d)]=selected.visibleCode;
+          const typhoonMarked=(displayContext.typhoonDays.has(dayStr)&&dayStr<=displayContext.typhoonToday)||
+            selected.rosterShift==='颱'||selected.approvedLeaveCode==='颱';
+          const typhoonWorked=selected.eligible&&p79ScheduleTyphoonHasWork(emp.id,dayStr,
+            selected.dayMeta,selected.attendanceState,displayContext.attendanceEvidence);
+          const eligibleEvent=selected.eligible&&typhoonMarked&&
+            (selected.attendanceState!=='missing'||typhoonWorked)&&
+            (!selected.ownApprovedLeave||selected.approvedLeaveCode==='颱'||typhoonWorked);
+          // A non-destructive Excel cell note carries the small "颱日" badge
+          // while keeping the editable shift value identical to the UI select.
+          if(eligibleEvent&&selected.shownShift!=='颱')exportTyphoonNotes.push({
+            row:exportRows.length+1,col:5+d-1,date:dayStr,
+            text:'颱日：原班別仍為 '+selected.visibleCode+'；同日只算一筆'
+          });
         }
 
         exportRows.push(row);
@@ -7163,6 +7185,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
         skipHeader: false
       });
 
+      for(const note of exportTyphoonNotes){
+        const address=XLSX.utils.encode_cell({r:note.row,c:note.col});
+        if(ws[address]){
+          ws[address].c=[{a:'排班系統',t:note.text}];
+        }
+      }
       // 固定欄寬，避免打開 Excel 時左側資料看起來像不見。
       ws['!cols'] = [
         { wch: 16 }, // 工號
