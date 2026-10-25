@@ -15793,9 +15793,43 @@ window.p79OvertimeStatusContext={
   }finally{if(acquired)try{await rpc('scheduleReleaseEditLock',{});}catch(ignore){}}
  }
 };
-window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
+window.p79OvertimeApplicationContext={
+ employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,
+ employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),
+ snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
+ auditRead:async month=>{
+  const token=String(typeof currentPort79SsoToken==='function'?currentPort79SsoToken():sessionStorage.getItem('port79_user_token')||'').trim();
+  if(!token)throw Error('尚未登入，不能查看雲端匯出紀錄');
+  const url=new URL(getActiveGasUrl());url.searchParams.set('action','getOvertimeExportAudit');url.searchParams.set('month',month);url.searchParams.set('gcToken',token);
+  const response=await fetch(url.toString(),{cache:'no-store'});if(!response.ok)throw Error('讀取失敗 HTTP '+response.status);
+  const data=await response.json();if(!data.ok)throw Error(data.error||'正式 GAS 尚未部署匯出紀錄功能');return data;
+ },
+ auditWrite:async payload=>{
+  if(!p79CanExportOvertimeApplication())throw Error('匯出權限已失效');
+  const token=String(typeof currentPort79SsoToken==='function'?currentPort79SsoToken():sessionStorage.getItem('port79_user_token')||'').trim();
+  if(!token)throw Error('尚未登入');
+  const response=await fetch(getActiveGasUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action:'recordOvertimeReportExport',token,gcToken:token})});
+  if(!response.ok)throw Error('記錄失敗 HTTP '+response.status);
+  const data=await response.json();if(!data.ok)throw Error(data.error||'正式 GAS 尚未部署加班匯出紀錄功能');return data;
+ }
+};
 </script>
-<script src="../assets/port79-overtime-application.js?v=20261025-zh-import-export"></script>
+<script src="../assets/port79-overtime-application.js?v=20261025-export-audit-v1"></script>
+<script>
+(function(){
+ const date=new URLSearchParams(location.search).get('overtimeExportDate');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return;
+ let count=0;
+ const open=()=>{
+  if(window.P79OvertimeApplication?.open&&window.p79OvertimeApplicationContext?.canExport?.()){
+   const url=new URL(location.href);url.searchParams.delete('overtimeExportDate');history.replaceState(null,'',url.pathname+url.search+url.hash);
+   window.P79OvertimeApplication.open({date});return;
+  }
+  if(++count<35)setTimeout(open,1000);
+ };
+ if(document.readyState==='complete')setTimeout(open,250);else window.addEventListener('load',()=>setTimeout(open,250),{once:true});
+})();
+</script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261025-zh-import-export"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
