@@ -1540,18 +1540,18 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 </div>
                 </div>
 
-                <section id="p79OvertimeDepartmentSummary" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 my-3" aria-labelledby="p79OvertimeDepartmentSummaryTitle">
+                <section id="p79OvertimeJobTitleSummary" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 my-3" aria-labelledby="p79OvertimeJobTitleSummaryTitle">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <h3 id="p79OvertimeDepartmentSummaryTitle" class="font-bold text-slate-800 dark:text-slate-100">各單位加班時數與人均統計</h3>
-                        <span class="text-xs text-slate-500">依目前年月、部門、職稱、姓名及紀錄來源篩選｜人均＝合計 ÷ 該單位已申報人數</span>
+                        <h3 id="p79OvertimeJobTitleSummaryTitle" class="font-bold text-slate-800 dark:text-slate-100">各職稱加班時數與人均統計</h3>
+                        <span class="text-xs text-slate-500">依目前年月、部門、職稱、姓名及紀錄來源篩選｜人均＝合計 ÷ 該職稱已申報人數</span>
                     </div>
-                    <div id="p79OvertimeDepartmentNotice" class="text-xs text-amber-700 dark:text-amber-300 mb-2" role="status"></div>
+                    <div id="p79OvertimeJobTitleNotice" class="text-xs text-amber-700 dark:text-amber-300 mb-2" role="status"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[780px] text-sm text-left" aria-label="各單位加班未換算、換算及平均時數">
+                        <table class="w-full min-w-[780px] text-sm text-left" aria-label="各職稱加班未換算、換算及平均時數">
                             <thead class="bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200">
-                                <tr><th class="p-2">單位／部門</th><th class="p-2 text-right">已申報人數</th><th class="p-2 text-right">有效筆數</th><th class="p-2 text-right">未換算合計（小時）</th><th class="p-2 text-right">換算合計（小時）</th><th class="p-2 text-right">人均未換算（小時）</th><th class="p-2 text-right">人均換算（小時）</th></tr>
+                                <tr><th class="p-2">職稱</th><th class="p-2 text-right">已申報人數</th><th class="p-2 text-right">有效筆數</th><th class="p-2 text-right">未換算合計（小時）</th><th class="p-2 text-right">換算合計（小時）</th><th class="p-2 text-right">人均未換算（小時）</th><th class="p-2 text-right">人均換算（小時）</th></tr>
                             </thead>
-                            <tbody id="p79OvertimeDepartmentRows"></tbody>
+                            <tbody id="p79OvertimeJobTitleRows"></tbody>
                         </table>
                     </div>
                     <p class="mt-2 text-xs text-slate-500">只統計未撤銷、非預排且可核對的正式申報。未換算時數只接受每筆 4 或 8 小時；其他申報保留原始資料並提示核對。換算欄依已儲存的換算時數計算，不使用打卡估算；缺少換算設定不視為 0。</p>
@@ -13275,7 +13275,7 @@ function p79OvertimePeriodLabel(report){
         }
         // 此彙總只讀取正式加班申報，不將出勤推算分鐘混入換算時數。
         // 對不符合 4/8 小時的舊申報僅標示異常，不更改或自動捨入雲端資料。
-        function p79BuildOvertimeDepartmentSummary(rows) {
+        function p79BuildOvertimeJobTitleSummary(rows) {
             const groups=new Map(),dedup=new Set();
             let invalidHours=0,missingConversion=0,invalidConversion=0;
             for(const row of rows){
@@ -13288,9 +13288,9 @@ function p79OvertimePeriodLabel(report){
                 const key=empId+'|'+date+'|'+id;
                 if(dedup.has(key))continue;
                 dedup.add(key);
-                const dept=String(row.dept||'一般').trim()||'一般';
-                if(!groups.has(dept))groups.set(dept,{dept,people:new Set(),count:0,raw:0,converted:0,missing:0,invalid:0});
-                const group=groups.get(dept);
+                const jobTitle=String(row.jobTitle||'未設定').trim()||'未設定';
+                if(!groups.has(jobTitle))groups.set(jobTitle,{jobTitle,people:new Set(),count:0,raw:0,converted:0,missing:0,invalid:0});
+                const group=groups.get(jobTitle);
                 const declared=Number(report.declaredHours);
                 if(!Number.isFinite(declared)||![4,8].includes(declared)){
                     group.invalid++;invalidHours++;
@@ -13308,8 +13308,8 @@ function p79OvertimePeriodLabel(report){
                 // 換算值保留兩位小數精度，不經過出勤分鐘再推算。
                 group.converted+=Math.round(converted*100);
             }
-            const items=[...groups.values()].sort((a,b)=>a.dept.localeCompare(b.dept,'zh-Hant')).map(g=>({
-                dept:g.dept,people:g.people.size,count:g.count,raw:g.raw,
+            const items=[...groups.values()].sort((a,b)=>a.jobTitle.localeCompare(b.jobTitle,'zh-Hant')).map(g=>({
+                jobTitle:g.jobTitle,people:g.people.size,count:g.count,raw:g.raw,
                 converted:g.converted/100,missing:g.missing,invalid:g.invalid,
                 rawAverage:g.people.size?g.raw/g.people.size:null,
                 convertedAverage:g.people.size?g.converted/100/g.people.size:null
@@ -13345,7 +13345,7 @@ function p79OvertimePeriodLabel(report){
             );
             p79WorkOvertimeFilteredRows=rows;
             const uniqueEmployees = new Set(rows.map(row => String(row.empId || row.attNo || row.name))).size;
-            const overtimeSummary=p79BuildOvertimeDepartmentSummary(rows);
+            const overtimeSummary=p79BuildOvertimeJobTitleSummary(rows);
             const formatConverted=number=>Number(number).toFixed(2);
             const formatAverage=number=>number===null?'—':Number(number).toFixed(2);
             const {totals}=overtimeSummary;
@@ -13355,9 +13355,9 @@ function p79OvertimePeriodLabel(report){
             document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)+' 小時'+(totals.missing?'（'+totals.missing+'筆待換算）':'');
             document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時';
             document.getElementById('overtimeOver12Count').textContent = over12Count;
-            const deptBody=document.getElementById('p79OvertimeDepartmentRows');
+            const deptBody=document.getElementById('p79OvertimeJobTitleRows');
             if(deptBody){
-                const cells=g=>'<td class="p-2 font-semibold">'+escapeHtml(g.dept)+'</td>'+
+                const cells=g=>'<td class="p-2 font-semibold">'+escapeHtml(g.jobTitle)+'</td>'+
                     '<td class="p-2 text-right">'+g.people+'</td><td class="p-2 text-right">'+g.count+'</td>'+
                     '<td class="p-2 text-right">'+g.raw+'</td>'+
                     '<td class="p-2 text-right">'+formatConverted(g.converted)+(g.missing?' <small class="text-amber-700" title="有未設定換算的加班申報">（'+g.missing+'筆未設定）</small>':'')+'</td>'+
@@ -13365,10 +13365,10 @@ function p79OvertimePeriodLabel(report){
                     '<td class="p-2 text-right">'+formatAverage(g.convertedAverage)+'</td>';
                 deptBody.innerHTML=overtimeSummary.groups.length
                     ?overtimeSummary.groups.map(g=>'<tr class="border-b border-slate-100 dark:border-slate-700">'+cells(g)+'</tr>').join('')+
-                    '<tr class="bg-indigo-50 dark:bg-slate-900 font-bold">'+cells({...totals,dept:'全部單位合計'})+'</tr>'
+                    '<tr class="bg-indigo-50 dark:bg-slate-900 font-bold">'+cells({...totals,jobTitle:'全部職稱合計'})+'</tr>'
                     :'<tr><td colspan="7" class="p-3 text-center text-slate-500">目前篩選條件沒有已核實的正式加班申報</td></tr>';
             }
-            const deptNotice=document.getElementById('p79OvertimeDepartmentNotice');
+            const deptNotice=document.getElementById('p79OvertimeJobTitleNotice');
             if(deptNotice)deptNotice.textContent=[
                 overtimeSummary.invalidHours?'有 '+overtimeSummary.invalidHours+' 筆申報時數不是 4 或 8 小時，未計入合計，請核對原始申報與換算規則。':'',
                 overtimeSummary.missingConversion?'有 '+overtimeSummary.missingConversion+' 筆尚未設定換算時數；換算總數及平均目前僅為已設定部分。':'',
