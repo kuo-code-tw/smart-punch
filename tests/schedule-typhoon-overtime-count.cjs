@@ -53,8 +53,8 @@ assert(!worked.includes(date(13)),'unpaired attendance alone cannot be marked wo
 assert.equal(new Set([...worked,...off]).size,9,'one employee-date is never double counted');
 let htmlCells=c.p79ScheduleRestCountCells(emp,month,{},off,worked);
 assert.match(htmlCells,/>9 天<\/span>/);
-assert.match(htmlCells,/停4／勤5/);
-assert.match(htmlCells,/出勤／加班 5天/);
+assert.doesNotMatch(htmlCells,/停4／勤5|停\d+／勤\d+|出勤／加班 \d+天/);
+assert.match(htmlCells,/有出勤、加班或颱風停班同一天都只算 1 筆/);
 assert.equal([...htmlCells.matchAll(/<td\b/g)].length,4,'only one additional summary column');
 assert.match(c.p79ScheduleRestCountCells(emp,month,{}),/>9 天<\/span>/,'async refresh recomputes both groups without visible row');
 assert.equal(c.p79ScheduleTyphoonHasWork('EMP1',date(4),meta[date(4)],'rest',evidence),false);

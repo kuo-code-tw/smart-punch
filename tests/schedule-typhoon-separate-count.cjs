@@ -41,7 +41,7 @@ for(const category of ['例','休','國','颱'])assert(cells.includes('data-rest
 assert.equal([...cells.matchAll(/<td\b/g)].length,4,'three quotas plus one separate typhoon counter');
 cells=c.p79ScheduleRestCountCells(emp,month,{});
 assert.match(cells,/>5 天<\/span>/,'async refresh includes the one verified typhoon work day');
-assert.match(cells,/停4／勤1/);
+assert.doesNotMatch(cells,/停4／勤1|停\d+／勤\d+/);
 assert.equal(markerReads,before+1);
 const unsynced={...evidence,complete:false};evidence.complete=false;
 shifts[date(5)]='早';approved.delete(date(4));

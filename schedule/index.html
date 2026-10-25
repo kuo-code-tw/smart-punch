@@ -6484,25 +6484,30 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null) {
       const quota=p79RestQuota(month).counts;
       const audit=p79DailyRestCount(emp,month,knownAllocation);
-      return ['例','休','國'].map(category=>{
-        const count=audit.counts[category],limit=quota[category];
-        const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
+      // Use one identical set of typhoon dates for the new counter AND for
+      // excluding duplicate 國 classifications. Do not mutate the cloud roster,
+      // statutory quota or any approved overtime report.
+      const computedWork=[];
+      const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
+      const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
+      const typhoonSet=new Set([...offDates,...workedDates]);
+      const nationalDates=audit.dates.國.filter(day=>!typhoonSet.has(month+'-'+day));
+      const nationalDuplicates=audit.dates.國.length-nationalDates.length;
+      const total=typhoonSet.size;
+      const quotaCells=['例','休','國'].map(category=>{
+        const count=category==='國'?Math.max(0,audit.counts.國-nationalDuplicates):audit.counts[category];
+        const displayDates=category==='國'?nationalDates:audit.dates[category];
+        const limit=quota[category],rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        const title=category+'：逐日計入 '+count+' 天（'+(audit.dates[category].join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'');
+        const title=category+'：逐日計入 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'')+
+          (category==='國'&&nationalDuplicates?'；另有 '+nationalDuplicates+' 天颱風日已移至「颱」統計，不重複計入':'');
         return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${rest}</span>${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
-      }).join('')+(()=>{
-        const computedWork=[];
-        const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
-        const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
-        const worked=new Set(workedDates);
-        const off=offDates.filter(date=>!worked.has(date));
-        const total=off.length+workedDates.length;
-        const offLabel=off.map(d=>d.slice(-2)).join('、')||'無';
-        const workedLabel=workedDates.map(d=>d.slice(-2)).join('、')||'無';
-        return '<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
-          scheduleEscapeHtml('颱風日共'+total+'天；停班 '+off.length+'天（'+offLabel+'）；出勤／加班 '+workedDates.length+'天（'+workedLabel+'）；同一日期只計一次，不占用國定假日、例假或休息日額度')+
-          '"><span>'+total+' 天</span><span class="block text-[9px] leading-tight font-normal">停'+off.length+'／勤'+workedDates.length+'</span></td>';
-      })();
+      }).join('');
+      const days=[...typhoonSet].sort().map(date=>date.slice(-2)).join('、')||'無';
+      const typhoonCell='<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
+        scheduleEscapeHtml('颱風日：'+total+' 天（'+days+'）；有出勤、加班或颱風停班同一天都只算 1 筆；不重複計入國定假日')+
+        '"><span>'+total+' 天</span></td>';
+      return quotaCells+typhoonCell;
     }
     function p79RefreshScheduleRestCounts(month) {
       if(currentScheduleMonthKey()!==month)return;
