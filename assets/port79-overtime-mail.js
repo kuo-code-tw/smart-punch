@@ -159,9 +159,9 @@ function open(){
   q('#omSendDay').textContent=state.kind==='stale'?'重新發送當日 Mail':'發送當日 Mail（'+filtered.length+'筆）';
   for(const id of ['omMonth','omDate','omRecipient','omReload','omAddRecipient','omRemoveRecipient',
                     'omSaveRecipient','omRecipientName','omRecipientEmail','omCancelRecipient'])q('#'+id).disabled=busy;
-  q('#omAddRecipient').disabled=busy||!canManage;
+  q('#omAddRecipient').disabled=busy;
   q('#omRemoveRecipient').disabled=busy||!canManage||!target;
-  q('#omSaveRecipient').disabled=busy||!canManage;
+  q('#omSaveRecipient').disabled=busy;
  }
  function fillRecipients(preferred){
   q('#omRecipient').innerHTML='<option value="">請選擇 Mail 信箱</option>'+
@@ -196,12 +196,12 @@ function open(){
  q('#omDate').onchange=paint;q('#omRecipient').onchange=paint;
  q('#omMonth').onchange=()=>{ready=false;rows=[];receipts=[];updateDateRange();paint();msg('已切換月份，請按「重新核對雲端」')};
  q('#omReload').onclick=async()=>{if(busy)return;busy=true;paint();try{await load(q('#omRecipient').value)}
-  catch(e){ready=false;rows=[];msg('無法發送：'+(e.message||e))}
+  catch(e){ready=false;rows=[];msg('雲端版本核對失敗：'+(e.message||e)+'。你仍可點「＋ 新增 Mail」輸入信箱，實際儲存要由雲端後端成功確認；目前不會發送郵件。')}
   finally{busy=false;paint()}};
- q('#omAddRecipient').onclick=()=>{if(!canManage)return;const e=q('#omRecipientEditor');e.hidden=!e.hidden;if(!e.hidden)q('#omRecipientName').focus()};
+ q('#omAddRecipient').onclick=()=>{const e=q('#omRecipientEditor');e.hidden=!e.hidden;if(!e.hidden)q('#omRecipientName').focus()};
  q('#omCancelRecipient').onclick=()=>{q('#omRecipientEditor').hidden=true};
  q('#omSaveRecipient').onclick=async()=>{
-  if(busy||!canManage)return;
+  if(busy)return;
   const name=q('#omRecipientName').value.trim(),email=q('#omRecipientEmail').value.trim();
   if(!name||!q('#omRecipientEmail').checkValidity())return msg('請輸入收件人名稱及有效的 Mail 信箱');
   if(!g.confirm('要將 '+name+'（'+email+'）加入核准的 Mail 收件名單？'))return;
@@ -216,7 +216,7 @@ function open(){
    q('#omRecipientEditor').hidden=true;
    q('#omRecipientName').value='';q('#omRecipientEmail').value='';
    msg('已將 Mail 信箱儲存在雲端核准名單：'+added.name+'（'+added.email+'）');
-  }catch(e){msg('新增 Mail 失敗：'+(e.message||e))}
+  }catch(e){msg('新增 Mail 未完成：'+(e.message||e)+(String(e.message||e).includes('未知操作')?'。目前使用中的 Apps Script 未開放 manageOvertimeMailRecipients，請更新原部署的後端路由。':''))}
   finally{busy=false;paint()}
  };
  q('#omRemoveRecipient').onclick=async()=>{
