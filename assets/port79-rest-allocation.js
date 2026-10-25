@@ -103,7 +103,12 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const assign=(date,slot)=>{
     const prior=result[date]||{},hadManualRest=prior.restCategory==='休'&&prior.restAllocationSource==='manual';
     const preference=prior.restPreferredCategory==='休'||hadManualRest?'休':'';
-    result[date]={...prior,restCategory:slot.category,restSourceDate:slot.sourceDate,
+    // Keep stable field order across repeated automatic allocations, so the
+    // second click/save does not trigger a false cloud write.
+    const clean={...prior};
+    for(const field of ['restCategory','restSourceDate','restHolidayName',
+      'restQuotaOvertime','restAllocationSource','restPreferredCategory'])delete clean[field];
+    result[date]={...clean,restCategory:slot.category,restSourceDate:slot.sourceDate,
       restHolidayName:slot.holidayName||'',restQuotaOvertime:false,restAllocationSource:'auto-v1',
       ...(preference?{restPreferredCategory:preference}:{})};
     used.add(date);
