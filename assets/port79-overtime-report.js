@@ -216,6 +216,17 @@
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
   return defaults();
  }
+ function reportEmployeeRole(e){
+  return String(e?.jobTitle||e?.deptDetail||e?.role||e?.position||'未設定職稱').trim()||'未設定職稱';
+ }
+ function prefillReportRole(select,people,empId){
+  const worker=people.find(e=>String(e.empId)===String(empId));
+  if(!worker)return false;
+  const value=reportEmployeeRole(worker);
+  if(!Array.from(select.options||[]).some(option=>option.value===value))return false;
+  select.value=value;
+  return true;
+ }
  function filterReportEmployees(people,department='',jobTitle=''){
   const dept=e=>String(e.dept||'一般'),title=e=>String(e.jobTitle||e.deptDetail||'未設定');
   const unique=xs=>[...new Set(xs)].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
@@ -453,7 +464,7 @@
     if(special.length){const inferred=suggestRule(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster,rows,special);if(inferred)prefill={...prefill,code:inferred[1],category:inferred[0],preferredType:ruleType(inferred),requirePeriodSelection:false};}
    }
    const people=global.p79OvertimeContext.employees();
-   el.insertAdjacentHTML('beforeend','<div class="p79-report-grid"><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"></select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label id="p79OtLeaveDatesWrap" style="display:none">請假日期（依核准紀錄）<select id="p79OtLeaveDates" style="'+inputStyle+'"></select></label><label id="p79OtForWrap">請假人員<select id="p79OtForEmp" style="'+inputStyle+'"></select></label><label>職稱篩選<select id="p79OtRole" style="'+inputStyle+'"></select></label><label>代班／加班人員<select id="p79OtEmp" style="'+inputStyle+'"></select></label><label>出勤時段<select id="p79OtCode" style="'+inputStyle+'"></select></label><label>備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label></div><div id="p79OtPreview" style="padding:8px;border-radius:8px"></div><p style="font-size:12px;color:#64748b;margin:4px 0">每位人員分別儲存一筆；儲存後可切換下一位人員繼續申報。</p><button id="p79OtStage" type="button" style="background:#0369a1;color:white;padding:9px 16px;border-radius:8px">儲存加班申報</button>');
+   el.insertAdjacentHTML('beforeend','<div class="p79-report-grid"><label>加班類型<select id="p79OtKind" style="'+inputStyle+'"></select></label><label>加班日期<input id="p79OtDate" type="date" style="'+inputStyle+'"></label><label id="p79OtLeaveDatesWrap" style="display:none">請假日期（依核准紀錄）<select id="p79OtLeaveDates" style="'+inputStyle+'"></select></label><label id="p79OtForWrap">請假人員<select id="p79OtForEmp" style="'+inputStyle+'"></select></label><label>職稱<select id="p79OtRole" style="'+inputStyle+'"></select></label><label>代班／加班人員<select id="p79OtEmp" style="'+inputStyle+'"></select></label><label>出勤時段<select id="p79OtCode" style="'+inputStyle+'"></select></label><label>備註<input id="p79OtNote" maxlength="200" style="'+inputStyle+'"></label></div><div id="p79OtPreview" style="padding:8px;border-radius:8px"></div><p style="font-size:12px;color:#64748b;margin:4px 0">每位人員分別儲存一筆；儲存後可切換下一位人員繼續申報。</p><button id="p79OtStage" type="button" style="background:#0369a1;color:white;padding:9px 16px;border-radius:8px">儲存加班申報</button>');
    el.querySelector('#p79OtDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
    const dateInput=el.querySelector('#p79OtDate'),leaveDateSelect=el.querySelector('#p79OtLeaveDates'),leaveDateWrap=el.querySelector('#p79OtLeaveDatesWrap');
@@ -463,7 +474,7 @@
    const sortedPeople=[...people].sort((a,b)=>stroke.compare(String(a.name||''),String(b.name||''))||String(a.empId).localeCompare(String(b.empId)));
    const sorted=()=>sortedPeople;
    const roleSelect=el.querySelector('#p79OtRole');
-   const roleOf=e=>String(e.jobTitle||e.role||e.position||'未設定職稱').trim()||'未設定職稱';
+   const roleOf=reportEmployeeRole;
    const roles=[...new Set(sortedPeople.map(roleOf))].sort((a,b)=>stroke.compare(a,b));
    roleSelect.innerHTML='<option value="">全部職稱</option>'+roles.map(role=>'<option value="'+esc(role)+'">'+esc(role)+'</option>').join('');
    forSelect.innerHTML='<option value="">請選擇請假人員</option>'+sorted().map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
@@ -517,8 +528,9 @@
     if(categoryMatch>=0){kind.value=ruleType(rows[categoryMatch]);refresh();}
     if(match>=0){select.value=String(match);preview();}
     else if(prefill.code||prefill.requirePeriodSelection){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent=prefill.periodHint|| (prefill.code?'班表時段 '+prefill.code+' 尚無相符選項，請新增或選擇正確時段。':'代班已確認；班表無法推算時段，請自行選擇正確出勤時段。');}
-    const prefilledWorker=people.find(e=>String(e.empId)===String(prefill.empId));
-    if(prefilledWorker&&roleSelect.value&&roleOf(prefilledWorker)!==roleSelect.value)roleSelect.value='';
+    // 請假新增／代班安排已選過人員：依人資主檔自動帶入相同職稱，免再次手選。
+    // 同時支援 jobTitle 與請假頁採用的 deptDetail，保留職稱下拉切換能力。
+    prefillReportRole(roleSelect,people,prefill.empId);
     refreshPairPeople();empSelect.value=String(prefill.empId);syncApprovedLeaveDate();preview();
    }
    function applyPreferredType(){
@@ -586,7 +598,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
