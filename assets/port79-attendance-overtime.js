@@ -69,5 +69,116 @@ async function open({row,employee,date}){
  }catch(error){showToast('申報未開啟：'+String(error.message||error),'warning');}
  finally{opening=false;}
 }
+
+/**
+ * Attendance daily date-strip cloud reporting indicators.
+ * "Printed" is intentionally NOT inferred from a declaration or file export:
+ * a print/dialog action is not an accounting receipt.
+ */
+function auditChanged(report,meta){
+ const history=Array.isArray(meta.overtimeAmendments)?meta.overtimeAmendments:
+  Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
+  Array.isArray(report?.amendments)?report.amendments:[];
+ const verified=history.some(a=>a?.confirmed===true&&String(a.at||'').trim()&&String(a.actor||'').trim());
+ const modified=String(report?.modifiedAt||report?.updatedAt||'').trim();
+ const created=String(report?.reportedAt||report?.createdAt||'').trim();
+ return verified||!!String(report?.replacesReportId||'').trim()||!!(modified&&created&&modified!==created);
+}
+function overtimeDayIndicator(date,monthState){
+ if(monthState?.ready!==true)return null;
+ const people=new Map((monthState.people||[]).map(p=>[id(p.empId),p.name||p.empId]));
+ const entries=[],seen=new Set();
+ for(const item of monthState.rows||[]){
+  const empId=id(item.empId),name=people.get(empId)||String(item.name||empId);
+  const meta=item.schedule?.__meta?.[date];
+  if(!meta)continue;
+  for(const audit of meta.overtimeRevocations||[]){
+   const report=audit?.report;
+   if(audit?.confirmed!==true||!String(audit.reportId||'').trim()||
+      String(audit.reportId)!==String(report?.id)||id(audit.empId)!==empId||
+      audit.date!==date||!audit.at||!audit.actor)continue;
+   const key=empId+'|'+date+'|'+report.id+'|revoked';
+   if(seen.has(key))continue;seen.add(key);
+   entries.push({kind:'revoked',name,code:String(report.code||''),hours:report.declaredHours||'',
+     detail:'已取消；原因：'+(audit.reason||'未填')+'；時間：'+audit.at});
+  }
+  const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(Boolean);
+  for(const report of reports){
+   if(!report?.id||meta.overtimeExcluded===true||
+      (meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id)))continue;
+   const kind=auditChanged(report,meta)?'amended':'reported';
+   const key=empId+'|'+date+'|'+report.id+'|'+kind;
+   if(seen.has(key))continue;seen.add(key);
+   entries.push({kind,name,code:String(report.code||''),hours:report.declaredHours||'',
+     detail:kind==='amended'?'申報已修改，先前列印版本可能失效；請核對會計資料':'已申報；未登記列印／交會計完成狀態'});
+  }
+ }
+ if(!entries.length)return null;
+ const counts={reported:0,amended:0,revoked:0};
+ for(const row of entries)counts[row.kind]++;
+ const kind=counts.revoked?'revoked':counts.amended?'amended':'reported';
+ const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜');
+ const lines=entries.slice(0,24).map(row=>row.name+'：'+(row.kind==='revoked'?'已取消':row.kind==='amended'?'已修改':'已申報')+
+  (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
+ if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
+ return {kind,count:entries.length,title:date+'\n'+summary+'\n'+lines.join('\n')+
+  '\n注意：此畫面不會把已申報或已匯出直接認定為已列印／已交會計。'};
+}
+function decorateOvertimeDateStrip(keys,selectedDate=''){
+ const host=g.document?.getElementById?.('p79AttendanceDateStrip');
+ if(!host||!Array.isArray(keys))return;
+ let months;
+ try{months=typeof p79AttendanceOvertimeMonths!=='undefined'?p79AttendanceOvertimeMonths:null;}catch(_){return;}
+ if(!months)return;
+ const buttons=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')];
+ for(let i=0;i<buttons.length;i++){
+  const date=String(keys[i]||'').replaceAll('/','-'),state=months.get(date.slice(0,7));
+  const info=overtimeDayIndicator(date,state),button=buttons[i];
+  button.removeAttribute('data-p79-overtime-audit');
+  button.style.removeProperty('background-color');
+  button.style.removeProperty('color');
+  button.style.removeProperty('border-color');
+  button.style.removeProperty('box-shadow');
+  button.removeAttribute('title');
+  if(!info)continue;
+  const palette=info.kind==='revoked'?['#fee2e2','#991b1b','#f87171']:
+   info.kind==='amended'?['#fef3c7','#92400e','#f59e0b']:
+   ['#dcfce7','#166534','#4ade80'];
+  button.style.setProperty('background-color',palette[0],'important');
+  button.style.setProperty('color',palette[1],'important');
+  button.style.setProperty('border-color',palette[2],'important');
+  if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px '+palette[1],'important');
+  button.dataset.p79OvertimeAudit=info.kind;
+  button.title=info.title;
+  button.setAttribute('aria-label',date+'｜'+info.title.replaceAll('\n','；'));
+ }
+ if(!host.querySelector('#p79OvertimeDateLegend')){
+  const legend=g.document.createElement('span');
+  legend.id='p79OvertimeDateLegend';
+  legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
+  legend.textContent='綠：已申報｜黃：已修改｜紅：已取消｜列印狀態須另行確認';
+  host.appendChild(legend);
+ }
+}
+function installOvertimeDateIndicators(){
+ const original=g.renderRecordsPagination;
+ if(typeof original!=='function'||original.p79OvertimeDecorated)return;
+ const wrapped=function(...args){
+  const result=original.apply(this,args);
+  decorateOvertimeDateStrip(args[0],args[1]);
+  return result;
+ };
+ wrapped.p79OvertimeDecorated=true;
+ g.renderRecordsPagination=wrapped;
+ try{
+  if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))
+   decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);
+ }catch(_){}
+}
+if(g.document?.readyState==='loading')g.document.addEventListener('DOMContentLoaded',installOvertimeDateIndicators);
+else installOvertimeDateIndicators();
+g.addEventListener?.('load',installOvertimeDateIndicators);
+g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip};
+
 g.P79AttendanceOvertime={open,save};
 })(window);
