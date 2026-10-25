@@ -5,7 +5,7 @@ function fixture(report){const schedule={...Object.fromEntries(dates.map((d,i)=>
 const total=x=>Object.values(x).reduce((a,b)=>a+b,0);
 for(const report of [null,{category:'休',code:'休24-08'},{category:'休',id:'',code:'休24-08'},{category:'休',id:'   ',code:'休24-08'}]){
  const b=fixture(report),model={balances:[{emp,...b}],rows:[]};assert.equal(total(b.unused),3);assert.equal(total(b.reported),0);assert.equal(total(b.remaining),3);assert.match(api.personSummary(model,emp.empId),/^例0／休1／國2$/);
- if(report){assert(b.ledger.some(x=>x.kind==='unconfirmed'));assert.match(api.auditText(model,emp.empId),/未確認標記（不扣已報）/);}
+ if(report){assert(b.ledger.some(x=>x.kind==='unconfirmed'));assert.match(api.auditText(model,emp.empId),/缺少申報編號（不扣額度）/);}
 }
 const b=fixture({category:'休',id:'CLOUD-FIXTURE',code:'休24-08'}),model={balances:[{emp,...b}],rows:[{empId:emp.empId,category:'國',date:dates[16],checked:false,acknowledged:false,saved:false}]};
 assert.equal(total(b.unused),3);assert.equal(total(b.reported),1);assert.equal(total(b.remaining),2);assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/);
