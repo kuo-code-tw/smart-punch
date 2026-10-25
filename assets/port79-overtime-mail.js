@@ -55,7 +55,27 @@ function open(){
   '#p79OvertimeMailDialog .om-state.stale{color:#b45309}#p79OvertimeMailDialog .om-state.pending{color:#a21caf}'+
   '#p79OvertimeMailDialog .om-state.new{color:#64748b}#p79OvertimeMailDialog .om-send{background:#075985;color:white;border-color:#075985}'+
   '#p79OvertimeMailDialog .om-hint{font-size:12px;color:#536779;line-height:1.7}#p79OvertimeMailDialog .om-message{font-size:13px;margin-top:12px;white-space:pre-wrap;min-height:24px}'+
-  '</style><div class="om-head"><h2>加班申報｜寄送會計 Email</h2><button id="omClose" type="button">✕ 關閉</button></div>'+
+  '#p79OvertimeMailDialog .om-head{padding-bottom:14px;border-bottom:1px solid #e2e8f0;align-items:center}'+
+  '#p79OvertimeMailDialog .om-head h2{font-size:20px;font-weight:800;color:#075985}'+
+  '#p79OvertimeMailDialog .om-controls{display:grid!important;grid-template-columns:minmax(170px,190px) minmax(250px,340px) 160px;align-items:end!important;justify-content:start!important;gap:12px!important;background:#eff6ff!important;border:1px solid #dbeafe;border-radius:12px;padding:16px!important}'+
+  '#p79OvertimeMailDialog .om-controls label{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;min-width:0;font-weight:750;color:#334155}'+
+  '#p79OvertimeMailDialog .om-controls input,#p79OvertimeMailDialog .om-controls select{width:100%!important;min-width:0!important;height:42px!important;min-height:42px!important;border:1px solid #cbd5e1!important;border-radius:9px!important;background:#fff!important;color:#0f172a!important;padding:8px 12px!important;text-align:left}'+
+  '#p79OvertimeMailDialog #omReload{height:42px!important;min-height:42px!important;align-self:end!important;margin:0!important;padding:8px 12px!important;background:#2563eb!important;color:#fff!important;border-color:#1d4ed8!important;border-radius:9px!important;white-space:nowrap!important}'+
+  '#p79OvertimeMailDialog #omReload:hover{background:#1d4ed8!important}'+
+  '#p79OvertimeMailDialog #omClose{background:#f1f5f9!important;color:#475569!important;border-color:#cbd5e1!important;padding:8px 13px!important}'+
+  '#p79OvertimeMailDialog #omClose:hover{background:#e2e8f0!important}'+
+  '#p79OvertimeMailDialog .om-send{background:#0284c7!important;border-color:#0369a1!important;color:#fff!important;border-radius:8px!important;padding:7px 12px!important}'+
+  '#p79OvertimeMailDialog .om-send:hover:not(:disabled){background:#0369a1!important}'+
+  '#p79OvertimeMailDialog .om-state{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 10px;white-space:nowrap}'+
+  '#p79OvertimeMailDialog .om-state.sent{background:#dbeafe;color:#1d4ed8}'+
+  '#p79OvertimeMailDialog .om-state.stale{background:#ffedd5;color:#9a3412}'+
+  '#p79OvertimeMailDialog .om-state.pending{background:#fae8ff;color:#86198f}'+
+  '#p79OvertimeMailDialog .om-state.new{background:#f1f5f9;color:#475569}'+
+  '#p79OvertimeMailDialog th{background:#e0f2fe!important;color:#0c4a6e!important}'+
+  '#p79OvertimeMailDialog button:focus-visible,#p79OvertimeMailDialog input:focus-visible,#p79OvertimeMailDialog select:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}'+
+  '@media(max-width:780px){#p79OvertimeMailDialog .om-controls{grid-template-columns:repeat(2,minmax(0,1fr))!important}#p79OvertimeMailDialog #omReload{grid-column:1/-1;justify-self:start}}'+
+  '@media(max-width:520px){#p79OvertimeMailDialog .om-controls{grid-template-columns:minmax(0,1fr)!important}#p79OvertimeMailDialog #omReload{grid-column:auto;width:100%}}'+
+  '</style><div class="om-head"><h2>加班申報｜寄送 Mail</h2><button id="omClose" type="button">✕ 關閉</button></div>'+
   '<p class="om-hint">請選擇管理員核准的會計收件人，再逐筆確認寄送。只寄送該筆申報摘要，不寄送整月考勤名冊。郵件服務確認且雲端留存紀錄後才標記已寄送；不代表收件人已閱讀。</p>'+
   '<div class="om-controls"><label>加班月份<input id="omMonth" type="month" value="'+esc(ctx.month()||'')+'"></label>'+
   '<label>寄送收件人<select id="omRecipient"><option value="">讀取核准名單中…</option></select></label>'+
