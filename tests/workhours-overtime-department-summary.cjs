@@ -50,7 +50,7 @@ assert(fold&&!/\bopen\b/.test(fold[0]),'job-title summary must be collapsible an
 assert(html.includes('<summary id="p79OvertimeJobTitleSummaryTitle"'),'job-title fold must have a clickable heading');
 assert(html.includes('點擊展開／收合'),'job-title fold must explain the interaction');
 assert(html.includes('id="p79OvertimeJobTitleRows"'),'job-title table must be visible');
-assert(html.includes('職稱總人數'),'job-title population column must appear');
+assert(html.includes('>總人數</th>')&&html.includes('>請假天數</th>'),'job-title population and approved leave days columns must appear');
 assert(html.includes("p79BuildOvertimeJobTitleSummary(jobTitleRows,staff)"),'job-title aggregation must include all jobs, even when one employee is filtered');
 assert(html.includes("let rows=jobTitleRows.filter("),'personal daily-row filtering must not restrict title-wide distribution');
 assert(html.includes('id="p79OvertimeJobTitleNotice"'),'abnormal report notice must be visible');
