@@ -64,6 +64,68 @@ function collect(snapshot,people,month,balance){
  rows.sort((a,b)=>b.date.localeCompare(a.date)||a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));
  return {rows,issues};
 }
+
+/**
+ * Lightweight alert driven strictly by saved cloud audit evidence.
+ * Do not synthesize "modified" from an ordinary roster update, and never
+ * interpret the absence of audit rows as proof that no historical edits happened.
+ */
+function auditSummary(scheduleEntries,people,month){
+ const permitted=new Set((people||[]).map(e=>uid(e.empId)));
+ const modified=[],cancelled=[],seen=new Set(),R=g.P79OvertimeReason;
+ for(const entry of scheduleEntries||[]){
+  const empId=uid(entry.empId);if(!permitted.has(empId))continue;
+  const emp=(people||[]).find(e=>uid(e.empId)===empId)||{};
+  for(const [date,m] of Object.entries(entry.schedule?.__meta||{})){
+   if(!date.startsWith(month+'-')||!m||typeof m!=='object')continue;
+   const report=m.overtimeReport;
+   const revoked=(m.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report?.id));
+   if(String(report?.id??'').trim()&&m.overtimeExcluded!==true&&!revoked){
+    const amendment=R?.amended?.(report,m);
+    if(amendment?.verified===true){
+     const key=empId+'|'+date+'|'+report.id+'|modified';
+     if(!seen.has(key)){seen.add(key);modified.push({empId,name:emp.name||empId,date,id:report.id,
+      at:amendment.modifiedAt||'',kind:'amended'});}
+    }
+   }
+   for(const audit of m.overtimeRevocations||[]){
+    if(audit?.confirmed!==true||!String(audit.reportId??'').trim()||
+      String(audit.report?.id)!==String(audit.reportId)||
+      uid(audit.empId)!==empId||audit.date!==date||!audit.actor||!audit.at)continue;
+    const key=empId+'|'+date+'|'+audit.reportId+'|revoked';
+    if(seen.has(key))continue;seen.add(key);
+    cancelled.push({empId,name:emp.name||empId,date,id:audit.reportId,
+      at:audit.at,actor:audit.actor,reason:audit.reason||'',kind:'revoked'});
+   }
+  }
+ }
+ const newest=[...modified,...cancelled].sort((a,b)=>String(b.at||b.date).localeCompare(String(a.at||a.date)))[0]||null;
+ return {month,modified:modified.length,cancelled:cancelled.length,total:modified.length+cancelled.length,newest};
+}
+function updateBanner(summary=null,options={}){
+ const host=g.document?.getElementById?.('p79OvertimeChangeNotice');if(!host)return;
+ const text=host.querySelector('#p79OvertimeChangeText'),edit=host.querySelector('#p79ChangeModified'),
+  cancel=host.querySelector('#p79ChangeCancelled'),tip=host.querySelector('#p79ChangeHint');
+ if(!text||!edit||!cancel||!tip)return;
+ const ready=options.ready===true;
+ host.dataset.p79State=!ready?'loading':summary?.total?'changed':'clear';
+ if(!ready){
+  text.textContent=options.message||'雲端異動紀錄尚未核對';
+  tip.textContent='請選擇月份並重新讀取加班紀錄';
+ }else if(summary.total){
+  text.textContent='本月有 '+summary.total+' 筆加班異動紀錄，請會計核對';
+  tip.textContent=summary.newest?
+    '最近紀錄：'+summary.newest.name+'／'+summary.newest.date+
+      (summary.newest.kind==='revoked'?' 已取消（請勿付款）':' 已修改'):'點選下方查看';
+ }else{
+  text.textContent='目前未讀到有留痕的加班修改或取消';
+  tip.textContent='舊資料若未保留雲端異動歷史，仍須人工核對';
+ }
+ edit.textContent='查看已修改（'+(ready?summary.modified:'—')+'）';
+ cancel.textContent='查看已取消（'+(ready?summary.cancelled:'—')+'）';
+ edit.disabled=cancel.disabled=!ready;
+}
+
 function accountingCsv(rows){
   const cols=['申報日期','姓名','工號','部門','職稱','申報編號','申報類型','加班時段','申報時數','備註','超額排除原因','會計狀態','修改日期','取代原編號','取消原因','取消人','取消時間'];
   const values=rows.map(r=>[r.date,r.name,r.empId,r.dept,r.job,r.id,r.type,r.period,r.hours,
@@ -73,11 +135,22 @@ function accountingCsv(rows){
   return '\ufeff'+[cols,...values].map(line=>line.map(safe).join(',')).join('\r\n');
  }
 
-function open(){
- const ctx=g.p79OvertimeStatusContext;if(!ctx?.canOpen())return alert('沒有加班申報查看權限');const existing=document.getElementById('p79OvertimeStatus');if(existing){existing.focus();return;}
+function open(options={}){
+ const ctx=g.p79OvertimeStatusContext;if(!ctx?.canOpen())return alert('沒有加班申報查看權限');
+ const initialState=['amended','revoked','review','reported'].includes(options.state)?options.state:'';
+ const existing=document.getElementById('p79OvertimeStatus');
+ if(existing){
+  existing.focus();
+  if(initialState){
+   const select=existing.querySelector('#osState');
+   if(select){select.value=initialState;select.dispatchEvent(new Event('change'));}
+  }
+  return;
+ }
  const el=document.createElement('dialog');el.id='p79OvertimeStatus';el.style.cssText='width:min(1320px,96vw);max-height:92vh;border:1px solid #d5dfeb;border-radius:14px;padding:20px;background:#fff;color:#18334e;';
  el.innerHTML=`<style>#p79OvertimeStatus *{box-sizing:border-box}#p79OvertimeStatus h2{font-size:20px;margin:0}#p79OvertimeStatus header,#p79OvertimeStatus footer{display:flex;justify-content:space-between;gap:12px;align-items:center}#p79OvertimeStatus button,#p79OvertimeStatus select,#p79OvertimeStatus input{font:inherit;padding:8px 10px;border:1px solid #c9d5e3;border-radius:7px;background:#fff;color:#17334f}#p79OvertimeStatus button{cursor:pointer;font-weight:bold}#p79OvertimeStatus button:disabled{opacity:.45;cursor:default}#p79OvertimeStatus .os-filters{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0;background:#f4f7fb;padding:12px;border-radius:10px}#p79OvertimeStatus label{display:grid;gap:5px;font-size:12px}#p79OvertimeStatus .os-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}#p79OvertimeStatus .os-tabs button[aria-pressed=true]{background:#e9f2fc;border-color:#658bb3}#p79OvertimeStatus .os-table{overflow:auto;max-height:49vh;border:1px solid #e2e8f0;border-radius:8px}#p79OvertimeStatus table{border-collapse:collapse;width:100%;white-space:nowrap;font-size:13px}#p79OvertimeStatus th{background:#edf3f9;position:sticky;top:0}#p79OvertimeStatus td,#p79OvertimeStatus th{padding:11px 10px;border-bottom:1px solid #e8eef5;text-align:center}#p79OvertimeStatus .badge{padding:5px 8px;border-radius:6px;font-size:12px;font-weight:bold;display:inline-block}#p79OvertimeStatus .reported{background:#e9f7ef;color:#19734c}#p79OvertimeStatus .amended{background:#e6f2ff;color:#185d9c}#p79OvertimeStatus .review{background:#ffedf0;color:#ad3040}#p79OvertimeStatus .revoked{background:#edf0f4;color:#637183}#p79OvertimeStatus .unverified{background:#fff2cf;color:#91620c}#p79OvertimeStatus .os-status{min-height:28px;white-space:pre-wrap;font-size:13px;margin:10px 0}#p79OvertimeStatus .os-hint{font-size:12px;color:#687d94;line-height:1.7;margin:10px 0}#p79OvertimeStatus .danger{background:#b83647;color:white;border-color:#b83647}</style><header><h2>已申報加班／異動與取消紀錄</h2><button data-close>關閉</button></header><div class="os-hint">颱風天加班及已連結請假的代班不列入例／休／國超額；只有雲端核實的修改及取消才顯示異動紀錄。取消後原申報仍留在查詢和會計匯出中，但不計入有效申報。</div><div class="os-filters"><label>月份<input id="osMonth" type="month" value="${esc(ctx.month()||new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()).slice(0,7))}"></label><label>姓名／工號<input id="osName" placeholder="搜尋姓名或工號"></label><label>部門<select id="osDept"><option value="">全部部門</option></select></label><label>職稱<select id="osJob"><option value="">全部職稱</option></select></label><label>假別<select id="osCat"><option value="">全部假別</option>${['例','休','國','延','代'].map(c=>'<option>'+c+'</option>').join('')}</select></label><label>申報狀態<select id="osState"><option value="">全部狀態</option>${Object.entries(labels).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')}</select></label><button id="osLoad">重新讀取</button><button id="osAccountingExport" type="button">匯出會計異動清單</button></div><div class="os-tabs">${[['','全部'],['reported','已申報'],['amended','已修改'],['review','🔴 休假超額・待核對'],['revoked','⚪ 已取消／撤銷']].map(([k,v])=>'<button data-state="'+k+'" aria-pressed="false">'+v+' <span></span></button>').join('')}</div><div id="osCount"></div><div class="os-table"><table><thead><tr><th><input id="osAll" type="checkbox" aria-label="勾選目前的待核對申報"></th><th>申報日期</th><th>姓名／工號</th><th>加班類型</th><th>申報時段</th><th>申報時數</th><th>備註／不計超額原因</th><th>休假核對</th><th>申報狀態</th><th>處理紀錄</th></tr></thead><tbody id="osRows"></tbody></table></div><div id="osMessage" class="os-status" role="status"></div><footer><span class="os-hint">失敗或逾時不會改成已撤銷；每筆處理前都會重新核對。</span><button id="osRevoke" class="danger" disabled>撤銷勾選申報（0）</button></footer>`;
  document.body.appendChild(el);el.showModal();const q=s=>el.querySelector(s),identity=()=>ctx.account()+'|'+ctx.session();let data=null,loaded=null,selected=new Set(),busy=false,visible=[],account=identity();
+ if(initialState)q('#osState').value=initialState;
  const message=s=>q('#osMessage').textContent=s;
  const query=()=>({name:q('#osName').value,category:q('#osCat').value,status:q('#osState').value,dept:q('#osDept').value,job:q('#osJob').value});
  function paint(){
@@ -110,7 +183,11 @@ function open(){
   q('#osRevoke').textContent='撤銷勾選申報（'+selected.size+'）';
  }
  function lock(on){busy=on;el.querySelectorAll('.os-filters input,.os-filters select,.os-filters button,.os-tabs button,[data-close]').forEach(n=>n.disabled=on);paint();}
- async function load(){const month=q('#osMonth').value;if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('請選有效月份');if(identity()!==account||!ctx.canOpen())throw Error('登入身分已變更，請關閉後重新開啟');const snapshot=await ctx.snapshot(month);if(identity()!==account)throw Error('登入身分已變更');const result=collect(snapshot,ctx.employees(),month,ctx.balance);loaded=snapshot;data=result;selected.clear();paint();return result;}
+ async function load(){const month=q('#osMonth').value;if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('請選有效月份');if(identity()!==account||!ctx.canOpen())throw Error('登入身分已變更，請關閉後重新開啟');const snapshot=await ctx.snapshot(month);if(identity()!==account)throw Error('登入身分已變更');const result=collect(snapshot,ctx.employees(),month,ctx.balance);
+ loaded=snapshot;data=result;selected.clear();paint();
+ // Keep the prominent banner in sync after an authoritative full reload.
+ updateBanner(auditSummary(snapshot.schedules,ctx.employees(),month),{ready:true});
+ return result;}
  function options(){for(const [key,field]of [['#osDept','dept'],['#osJob','job']]){const v=q(key).value;q(key).innerHTML='<option value="">全部'+(field==='dept'?'部門':'職稱')+'</option>'+[...new Set((data?.rows||[]).map(r=>r[field]).filter(Boolean))].sort().map(v=>'<option>'+esc(v)+'</option>').join('');q(key).value=v;}}
  q('#osLoad').onclick=async()=>{if(busy)return;data=loaded=null;selected.clear();lock(true);message('正在核對完整月份班表、跨日考勤與既有申報…');try{await load();options();message((data.issues||[]).join('\n')||(loaded.saveContext?.cloud?.overtimeRevocationVersion===1?'已從雲端核對完成。':'已讀取申報；雲端尚未開放保留紀錄的撤銷功能。'));}catch(e){data=loaded=null;message('讀取未完成：'+e.message);}finally{lock(false);}};
  q('#osMonth').onchange=()=>{data=loaded=null;selected.clear();paint();message('月份已變更，請重新讀取。');};
@@ -145,5 +222,5 @@ function open(){
  };
  paint();q('#osLoad').click();
 }
-g.P79OvertimeStatus={labels,status,filter,collect,accountingCsv,open,fetch:directFetch};
+g.P79OvertimeStatus={labels,status,filter,collect,accountingCsv,auditSummary,updateBanner,open,fetch:directFetch};
 })(window);
