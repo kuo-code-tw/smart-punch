@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261024-special-auto"></script>
+<script src="../assets/port79-overtime-report.js?v=20261025-period-names-v2"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261025-special-audit-v1"></script>
@@ -13079,13 +13079,18 @@ function p79DisplayedOvertimeConversion(report){
 }
 function p79OvertimePeriodLabel(report){
  const code=String(report?.code||'').trim();
- const extended=report?.category==='延'||['before','after'].includes(report?.position);
- if(!extended)return code;
- const start=String(report.overtimeStart||'').trim(),end=String(report.overtimeEnd||'').trim();
- const part=value=>{const m=value.match(/^(\d{1,2})(?::(\d{2}))?$/);if(!m||Number(m[1])>24||Number(m[2]||0)>59||(Number(m[1])===24&&Number(m[2]||0)))return '';return m[1].padStart(2,'0')+(m[2]&&m[2]!=='00'?':'+m[2]:'');};
- if(part(start)&&part(end))return part(start)+'-'+(part(end)==='00'?'24':part(end));
- const bare=code.replace(/^[代延]/,'');
- return ({'08-20':'16-20','20-08':'20-24'})[bare]||bare;
+ // Display uses the same fully-named format as the申報下拉選單.
+ // The underlying declaration code and statutory category are never rewritten.
+ if(window.P79Overtime?.displayPeriodCode){
+  return window.P79Overtime.displayPeriodCode([
+   report?.category||'',code,report?.declaredHours||'',report?.convertedHours??'',
+   report?.normalStart||'',report?.normalEnd||'',report?.overtimeStart||'',report?.overtimeEnd||'',
+   report?.position||'full',report?.typeName||''
+  ]);
+ }
+ const names={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'};
+ const name=String(report?.typeName||names[report?.category]||'加班申報');
+ return code+'｜'+name;
 }
 
         function p79UpdateOvertimeChangeAlert(){
