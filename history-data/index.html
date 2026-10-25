@@ -61,9 +61,9 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 <div class="history-excel-bar">
 <button type="button" id="historyBackupNow" disabled title="備份連線尚未就緒">☁️ 一鍵備份整月資料</button>
 <span id="historyBackupStatus" role="status">即時備份尚未啟用</span>
-<button type="button" id="historyExportExcel" disabled>📥 匯出當月 Excel</button>
-<button type="button" id="historyExcelTemplate">📄 Excel 格式範本</button>
-<button type="button" id="historyImportExcel">📤 匯入 Excel 核對</button>
+<button type="button" id="historyExportExcel" disabled>📥 匯出考勤歷史</button>
+<button type="button" id="historyExcelTemplate">📄 匯出考勤歷史範本</button>
+<button type="button" id="historyImportExcel">📤 匯入考勤歷史核對</button>
 <input type="file" id="historyExcelFile" accept=".xlsx,.xls" hidden>
 <span id="historyExcelMessage" aria-live="polite">先讀取月份，再匯出或比對</span>
 </div>
@@ -87,8 +87,8 @@ function historyXlsx(){
   historyXlsxPromise=new Promise((resolve,reject)=>{
     const script=document.createElement('script');
     script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('Excel 套件載入失敗'));
-    script.onerror=()=>reject(new Error('Excel 套件下載失敗，請確認網路'));
+    script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('試算表 套件載入失敗'));
+    script.onerror=()=>reject(new Error('試算表 套件下載失敗，請確認網路'));
     document.head.appendChild(script);
   }).catch(err=>{historyXlsxPromise=null;throw err});
   return historyXlsxPromise;
@@ -156,7 +156,7 @@ function historyPreviewImport(items,kind,month){
     unique.add(key);candidates.push(row);
   }
   box.hidden=false;
-  box.innerHTML='<strong>Excel 匯入核對｜'+esc(month)+'</strong>'+
+  box.innerHTML='<strong>歷史資料匯入核對｜'+esc(month)+'</strong>'+
     '<p>來源 '+items.length+' 筆｜重複 '+repeated+' 筆｜欄位不完整 '+invalid+' 筆｜非本月份 '+wrongMonth+' 筆｜待確認 '+candidates.length+' 筆</p>'+
     '<p><b>安全保護：</b>這裡只預覽與比對，不會寫入 Google Drive，也不會刪除或覆蓋歷史原始紀錄。正式匯入須先部署具權限驗證的 GAS 寫入 API。</p>'+
     '<button type="button" id="historyClosePreview">關閉預覽</button>';
@@ -209,7 +209,7 @@ function applyPerms(){const p=perms();document.querySelectorAll('.tab').forEach(
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{if(b.disabled)return;document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');type=b.dataset.type;$('panelTitle').textContent=type==='attendance'?'考勤歷史':type==='schedule'?'排班歷史':'船舶歷史';historyLoaded=null;$('historyExportExcel').disabled=true;$('historyImportPreview').hidden=true;$('result').innerHTML='<div class="empty">按「讀取月份」查看資料</div>';pills([]);setStatus('已切換資料類型')}));
 $('historyExportExcel').addEventListener('click',async()=>{
   if(!historyLoaded||historyLoaded.type!==type||historyLoaded.month!==$('month').value)return;
-  try{await historySaveExcel(historyLoaded.rows,type,historyLoaded.month,'');$('historyExcelMessage').textContent='當月 Excel 已匯出'}
+  try{await historySaveExcel(historyLoaded.rows,type,historyLoaded.month,'');$('historyExcelMessage').textContent='當月 試算表 已匯出'}
   catch(e){$('historyExcelMessage').textContent='匯出失敗：'+e.message}
 });
 $('historyExcelTemplate').addEventListener('click',async()=>{
@@ -301,5 +301,23 @@ C.mountMonth({inputId:'month'});
 <script src="../assets/port79-seven-top.js?v=20261024-silent-batched-disk"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+
+<script id="p79-history-transfer-zh-20261025">
+(function(){
+ const names={attendance:'考勤歷史',schedule:'排班歷史',vessel:'船舶歷史'};
+ function update(){
+   const current=document.querySelector('.tabs .tab.active')?.getAttribute('data-type')||'attendance';
+   const name=names[current]||'歷史資料';
+   const exportButton=document.getElementById('historyExportExcel');
+   const importButton=document.getElementById('historyImportExcel');
+   const templateButton=document.getElementById('historyExcelTemplate');
+   if(exportButton)exportButton.textContent='📥 匯出'+name;
+   if(importButton)importButton.textContent='📤 匯入'+name+'核對';
+   if(templateButton)templateButton.textContent='📄 匯出'+name+'範本';
+ }
+ document.querySelectorAll('.tabs .tab').forEach(el=>el.addEventListener('click',()=>queueMicrotask(update)));
+ update();
+})();
+</script>
 </body></html>
 
