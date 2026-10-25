@@ -1,0 +1,61 @@
+name: Public system link smoke check
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/system-public-link-smoke.yml
+permissions:
+  contents: read
+jobs:
+  public-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check homepage and seven system entrypoints (GET only)
+        env:
+          BASE_URL: https://kuo-code-tw.github.io/smart-punch
+        shell: bash
+        run: |
+          set -uo pipefail
+          failed=0
+          for route in "" "attendance/" "leave/" "schedule/" "work-hours/" "aqc-efficiency/" "hr/" "history-data/"; do
+            url="$BASE_URL/$route"
+            body="$(mktemp)"
+            code="$(curl --silent --show-error --location --max-time 25 --output "$body" --write-out '%{http_code}' "$url")" || code="network-error"
+            if [ "$code" = "200" ] && grep -Eiq '<!doctype html|<html' "$body"; then
+              echo "PASS $route (HTTP $code)"
+            else
+              echo "::error::Public entrypoint $route returned HTTP $code or invalid HTML"
+              failed=1
+            fi
+            rm -f "$body"
+          done
+          exit "$failed"
+  gas-public-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify canonical GAS deploymentCheck (GET without login or token)
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec
+        shell: bash
+        run: |
+          set -uo pipefail
+          body="$(mktemp)"
+          code="$(curl --silent --show-error --location --max-time 30 --output "$body" --write-out '%{http_code}' "$GAS_URL?action=deploymentCheck")" || code="network-error"
+          echo "GAS deploymentCheck HTTP status: $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Canonical GAS Web App returned HTTP $code; verify Apps Script Manage deployments. No credentials were sent."
+            exit 1
+          fi
+          BODY_PATH="$body" node - <<'NODE'
+          const fs=require('fs');
+          const raw=fs.readFileSync(process.env.BODY_PATH,'utf8');
+          let data;
+          try{data=JSON.parse(raw)}
+          catch(e){console.error('::error::GAS did not return JSON (check deployment permissions and URL)');process.exit(1)}
+          if(data.ok!==true||data.action!=='deploymentCheck'){
+            console.error('::error::GAS public deploymentCheck did not report success');
+            process.exit(1);
+          }
+          console.log('PASS canonical GAS deploymentCheck JSON, no authentication or write requests');
+          NODE
