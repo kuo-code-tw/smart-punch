@@ -1288,14 +1288,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
    <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div>
   </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
-  <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" style="width:16px;height:16px;min-height:16px" onchange="p79ToggleCreateNoCover()">無須代班人員</label>
+  <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" style="width:16px;height:16px;min-height:16px" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
    <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div></div>
    <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
   </div>
   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
   <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
-  <p class="note">一位代8小時；兩位各代4小時。加班類型會帶入後續申報，出勤時段可逐筆選擇。</p>
+  <p class="note">若是補登請假、排班表已安排代班或已申報加班，請勾選「只補登請假」；系統不新增代班、也不改動原有班表。一位代8小時；兩位各代4小時。</p>
   <p id="adminCreateLeaveMessage" role="status"></p>
  </div>
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
@@ -1423,7 +1423,7 @@ async function p79SaveCreateLeaveWithoutCover(employee,days){
   }else{
    await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:type,startDate:start,endDate:end,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin-no-cover'}});
   }
-  $('adminCreateLeaveDialog').close();setStatus('✅ 請假已儲存｜無須代班人員');void loadCloud(false,true);
+  $('adminCreateLeaveDialog').close();setStatus('✅ 請假已儲存｜沒有新增代班，既有排班與加班保留','success');void loadCloud(false,true);
  }catch(error){$('adminCreateLeaveMessage').textContent='儲存未確認：'+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;p79ToggleCreateNoCover();}
 }
