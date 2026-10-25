@@ -48,7 +48,7 @@ shifts[date(5)]='早';approved.delete(date(4));
 assert.deepEqual([...c.p79ScheduleTyphoonDays(emp,month)],[],'pending evidence must not fabricate a typhoon day');
 evidence.complete=true;
 // UI must use exactly the displayed shift instead of counting calendar typhoon markers alone.
-assert(html.includes('else if(shownShift===\'颱\')typhoonShownDates.push(dayStr);'));
+assert(html.includes('else if(typhoonCounted)typhoonShownDates.push(dayStr);'));
 assert(html.includes('if(typhoonCounted&&typhoonWorked)typhoonWorkedDates.push(dayStr);'));
 assert(html.includes('p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates)'));
 assert(html.includes('title="颱風日：停班、實際出勤及加班均計入；同日只算一次，不併入國定假日額度"'));
