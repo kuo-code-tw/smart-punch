@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-1"></script><script>window.P79ManagementOptimizationMode=true;</script>
-<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261023-1"></script>
+<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261023-1"></script><script src="../assets/port79-typhoon-leave-sync.js?v=20261025-1"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261024-special-auto"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
@@ -5522,8 +5522,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         pairs.length=0;
       };
     }
-    // Manual typhoon closures are visual annotations only; never alter attendance/payroll.
-    // Stored in this browser because the official calendar does not expose a write API.
+    // Manual typhoon markers only alter roster display, not attendance/payroll. A separately
+    // confirmed leave-admin action may cancel matching cloud leave + cover records.
+    // Dates remain browser-local because the official calendar has no write API.
     const P79_TYPHOON_DATES_KEY='p79-manual-typhoon-days-v1';
     function p79TyphoonDates(){
       try{
@@ -5540,10 +5541,77 @@ async function p79SaveScheduleOvertimeDraft(draft){
       button.textContent='編輯颱風假／選舉日'+(days.length?'｜颱 '+days.length+'天':'')+(elections.length?'｜選 '+elections.length+'天':'');
       button.title='颱風假：'+(label(days)||'未設定')+'；選舉日：'+(label(elections)||'未設定')+'。點擊開啟日期清單，可新增、修改、刪除及設定連續多天。';
     }
+    let p79TyphoonLeaveCancelBusy=false;
+    async function p79AutoCancelTyphoonLeaves(){
+      if(p79TyphoonLeaveCancelBusy)return;
+      const dates=p79TyphoonDates();
+      if(!dates.length)return;
+      let session=null;
+      try{session=JSON.parse(sessionStorage.getItem('admin_session')||'null');}catch(_){}
+      const role=String(session?.adminRole||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
+      const leaveManage=role==='superadmin'||String(session?.systemPermissions?.leave||'').toLowerCase()==='manage';
+      if(!canManageSchedule()||!leaveManage){
+        showScheduleNotice('颱風日期已儲存；請由同時具備排班及請假管理權限的管理員，重新開啟此日期清單儲存後執行請假連動取消。','info',9000);
+        return;
+      }
+      if(!p79ScheduleHasOfficialData()){
+        showScheduleNotice('班表尚未讀回正式雲端資料；本次不刪除任何請假或代班，請重新同步後再執行。','error',9000);
+        return;
+      }
+      const token=currentPort79SsoToken();
+      if(!token)return;
+      p79TyphoonLeaveCancelBusy=true;
+      const read=async()=>{
+        const url=GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now();
+        const response=await scheduleLockFetch(url,{cache:'no-store',redirect:'follow'},22000);
+        const data=await readScheduleSsoJson(response);
+        if(!data?.ok||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))
+          throw new Error(data?.error||'雲端未傳回完整請假與代班資料');
+        return data;
+      };
+      const remove=async(id,note)=>{
+        // Do not retry a destructive request if the response is uncertain.
+        const response=await scheduleLockFetch(GAS_URL,{
+          method:'POST',
+          headers:{'Content-Type':'text/plain;charset=UTF-8','Accept':'application/json'},
+          body:JSON.stringify({action:'deleteLeaveRecord',id,token,gcToken:token,cancelReason:note}),
+          redirect:'follow',cache:'no-store'
+        },25000);
+        const result=await readScheduleSsoJson(response);
+        if(!result?.ok)throw new Error(result?.error||'請假連動刪除失敗');
+        return result;
+      };
+      try{
+        showScheduleNotice('正在核對颱風停班日的請假與代班資料…','info',5500);
+        const result=await window.P79TyphoonLeaveSync.run({
+          dates,read,remove,confirm:message=>window.confirm(message)
+        });
+        const messages=[];
+        if(result.deleted.length){
+          messages.push(result.note+'：已自動取消 '+result.deleted.length+' 筆請假及關聯代班。');
+          const updated=await loadScheduleCloudWithRetry('typhoon-leave-cancel',1);
+          if(!updated)messages.push('排班畫面尚未重新核對，請按「重新讀取雲端」。');
+        }
+        if(result.review.length)messages.push('另有 '+result.review.length+' 筆跨日請假只部分遇到颱風假，已保留，請至「請假管理」調整非停班日期，避免錯刪。');
+        if(result.balanceReview.length)messages.push('另有 '+result.balanceReview.length+' 筆年假已列入匯入餘額基準或人員無法核對，已保留，請先核對年假回補方式再處理。');
+        if(result.skipped.length)messages.push(result.skipped.length+' 筆請假資料在確認期間變更，本次未刪除。');
+        if(result.errors.length)messages.push('連動刪除未完成／待核對：'+result.errors.join('；'));
+        if(messages.length){
+          const message=messages.join('\n');
+          showScheduleNotice(message,result.errors.length?'error':'success',11000);
+          if(result.review.length||result.balanceReview.length||result.skipped.length||result.errors.length)alert(message);
+        }else if(result.confirmed){
+          showScheduleNotice('沒有需要刪除的請假紀錄。','info');
+        }
+      }catch(error){
+        showScheduleNotice('颱風停班免計假：雲端請假資料未能核對，未繼續自動刪除。'+String(error?.message||error),'error',12000);
+      }finally{p79TyphoonLeaveCancelBusy=false;}
+    }
     function p79ToggleTyphoonDay(){
       window.P79SpecialDaysEditor.open({month:currentScheduleMonthKey(),onSave:()=>{
         renderRoleScheduleView();
         p79RefreshScheduleRestEvidence();
+        void p79AutoCancelTyphoonLeaves();
       }});
     }
     async function p79PullOfficialHolidays(){
