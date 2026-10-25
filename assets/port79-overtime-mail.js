@@ -159,7 +159,7 @@ function open(){
   q('#omSendDay').textContent=state.kind==='stale'?'重新發送當日 Mail':'發送當日 Mail（'+filtered.length+'筆）';
   for(const id of ['omMonth','omDate','omRecipient','omReload','omAddRecipient','omRemoveRecipient',
                     'omSaveRecipient','omRecipientName','omRecipientEmail','omCancelRecipient'])q('#'+id).disabled=busy;
-  q('#omAddRecipient').disabled=busy;
+  q('#omAddRecipient').disabled=false; // The address form remains openable during initial cloud checks.
   q('#omRemoveRecipient').disabled=busy||!canManage||!target;
   q('#omSaveRecipient').disabled=busy;
  }
