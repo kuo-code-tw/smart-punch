@@ -108,7 +108,34 @@ function open(){
  for(const id of ['#osName','#osDept','#osJob','#osCat','#osState'])q(id)[id==='#osName'?'oninput':'onchange']=()=>{selected.clear();paint();};
  el.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>{q('#osState').value=b.dataset.state;selected.clear();paint();});q('[data-close]').onclick=()=>el.close();el.onclose=()=>el.remove();el.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
  q('#osRows').onchange=e=>{const value=e.target.dataset.pick;if(value===undefined||busy)return;const r=visible[Number(value)];e.target.checked?selected.add(r.id):selected.delete(r.id);paint();};q('#osAll').onchange=()=>{visible.filter(r=>status(r)==='review'&&!r.linked).forEach(r=>q('#osAll').checked?selected.add(r.id):selected.delete(r.id));paint();};
- q('#osRows').onclick=e=>{const v=e.target.closest('[data-detail]')?.dataset.detail;if(v===undefined)return;const r=visible[Number(v)],a=r.revocation;alert([r.name+' '+r.empId,r.date+' '+r.type+' '+r.period,'原申報 '+r.hours+' 小時｜'+labels[status(r)],'原申報編號：'+r.id,...(a?['撤銷原因：'+a.reason,'撤銷人：'+a.actor,'撤銷時間：'+a.at]:[])].join('\n'));};
+ q('#osRows').onclick=e=>{
+  const v=e.target.closest('[data-detail]')?.dataset.detail;if(v===undefined)return;
+  const r=visible[Number(v)],a=r.revocation;
+  alert([r.name+' '+r.empId,r.date+' '+r.type+' '+r.period,
+   '申報 '+r.hours+' 小時｜'+labels[status(r)],'申報編號：'+r.id,
+   '備註：'+r.note,r.exemptionNote||'',
+   ...(r.amendment?.verified?['修改日期：'+(r.amendment.modifiedAt||'請看下方紀錄'),
+     '取代原編號：'+(r.amendment.priorId||'未提供'),
+     ...(r.amendment.history||[]).map(h=>'修改：'+h.at+'／'+h.actor+'／'+(h.reason||'申報異動'))]:[]),
+   ...(a?['取消原因：'+(a.reason||'未填'),'取消人：'+a.actor,'取消時間：'+a.at,'原始申報已作廢，不得重複請款']:[])
+  ].filter(Boolean).join('\n'));
+ };
+ function accountingCsv(rows){
+  const cols=['申報日期','姓名','工號','部門','職稱','申報編號','申報類型','加班時段','申報時數','備註','超額排除原因','會計狀態','修改日期','取代原編號','取消原因','取消人','取消時間'];
+  const values=rows.map(r=>[r.date,r.name,r.empId,r.dept,r.job,r.id,r.type,r.period,r.hours,
+   r.note,r.exemptionNote||'',status(r)==='revoked'?'已取消（請勿付款）':status(r)==='amended'?'已修改（依目前有效版本）':status(r)==='review'?'已申報待核對':status(r)==='unverified'?'核對未完成':'已申報有效',
+   r.amendment?.modifiedAt||'',r.amendment?.priorId||'',r.revocation?.reason||'',r.revocation?.actor||'',r.revocation?.at||'']);
+  const safe=v=>{const t=String(v??'');return '"'+(/^[=+@\-]/.test(t)?"'"+t:t).replace(/"/g,'""')+'"';};
+  return '\ufeff'+[cols,...values].map(line=>line.map(safe).join(',')).join('\r\n');
+ }
+ q('#osAccountingExport').onclick=()=>{
+  if(!data?.rows?.length||busy)return;
+  const content=accountingCsv(data.rows);
+  const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');
+  link.href=url;link.download='會計加班異動清單_'+q('#osMonth').value+'.csv';
+  link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
  q('#osRevoke').onclick=async()=>{if(busy||!loaded||!ctx.canRevoke()||identity()!==account)return;const picked=data.rows.filter(r=>selected.has(r.id)&&status(r)==='review'&&!r.linked);if(!picked.length)return;if(!confirm('確認撤銷以下 '+picked.length+' 筆候選申報？每筆會重新核對，超額解除後不再撤銷其他候選。\n'+picked.map(r=>r.name+' '+r.date+' '+r.type+' '+r.period).join('\n')+'\n原申報與撤銷紀錄會保留；不刪除打卡。'))return;
   lock(true);let done=0,skipped=0;try{for(const original of picked){if(!ctx.canRevoke()||identity()!==account)throw Error('登入或撤銷權限已變更');message('正在重新核對 '+original.name+' '+original.date+'…');await load();const current=data.rows.find(r=>r.id===original.id&&r.empId===original.empId&&r.date===original.date&&!r.revocation);if(!current||status(current)!=='review'){skipped++;continue;}if(current.linked)throw Error('仍有請假代班連結，未撤銷');if(JSON.stringify(current.report)!==JSON.stringify(original.report))throw Error('原申報內容已變更，請重新核對');const receipt=await ctx.revoke(current,loaded);if(receipt?.revocationVerified!==true||receipt.revocation?.reportId!==current.id)throw Error('撤銷回條未確認');done++;await load();if(!data.rows.some(r=>r.id===current.id&&r.empId===current.empId&&status(r)==='revoked'))throw Error('撤銷已確認，但畫面讀回未完成，請重新讀取核對');}
    message('已撤銷 '+done+' 筆；已解除超額或無須處理 '+skipped+' 筆。勾選已取消，可篩選「已撤銷」查看紀錄。');ctx.refresh();
@@ -116,5 +143,5 @@ function open(){
  };
  paint();q('#osLoad').click();
 }
-g.P79OvertimeStatus={labels,status,filter,collect,open,fetch:directFetch};
+g.P79OvertimeStatus={labels,status,filter,collect,accountingCsv,open,fetch:directFetch};
 })(window);
