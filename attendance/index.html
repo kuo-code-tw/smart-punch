@@ -11,49 +11,49 @@
 <!-- PORT79 V6.0.17 DATE-PICKER-PAGE：考勤紀錄改成日期點選，一天一頁；同一天所有班次一次顯示，不再每50筆翻頁；跨月班次依目前月份可見日期分組。 -->
 <!-- PORT79 V6.0.16 STALE-RECOVERY-SAFE：同人同日同側已有真正事件時，忽略舊 manual-pair-recovery，避免 23:40→01:02 舊配對搶走 07:51 真正下班；跨月完整班次維持原規則。 -->
 <!-- PORT79 V6.0.15 NEAR-DUPLICATE-SHIFT-MERGE：同人同側 15 分鐘內重複刷卡由 V6.0.4 班次引擎整合為同一列；上班保留最早、下班保留最晚；完整雙班只在 IN/OUT 都接近時才合併。 -->
-<!-- PORT79 V6.0.14 DELETE-NO-RESURRECT：修正表格垃圾桶/整日刪除未建立刪除墓碑；Delta upsert 與 Excel 匯入候選全面尊重 tombstone，避免刪除後被舊雲端快照或匯入比對重新補回。 -->
-<!-- PORT79 V6.0.13：以 V6.0.12 正式版為基底，只修正同一員工同日多筆班次比對；Excel→系統班次改為全域最高分一對一配對，避免前一班搶走後一班。保留 V6.0.12 分日期匯入、Excel 快取修復、15分鐘近似防重、人工補卡配對、快速雲端同步等全部功能。 -->
-<!-- PORT79 V6.0.12：同步雲端改快速佇列；不同考勤最多4筆並行，取消每次重送整批Excel與整月讀回。 -->
-<!-- PORT79 V6.0.11：Excel整檔只載入來源，改由日期下拉逐日匯入；取消載入後全檔自動核對，加入清空Excel匯入。 -->
-<!-- PORT79 V6.0.10：上次Excel完整來源全日期自動補缺；重新整理即可補IN/OUT、修跨日配對、清近似重複。 -->
-<!-- PORT79 V6.0.9：Excel匯入前先拉齊雲端月份；15分鐘近似事件不重複新增；自動清除既有Excel重複副本。 -->
-<!-- PORT79 V6.0.8：已匯入Excel來源在重新整理後自動修復斷裂班次；只修真正未配對列，不新增重複打卡。 -->
-<!-- PORT79 V6.0.7：Excel完整班次會修復既有原始打卡配對；資料已存在不重複新增，跨日OUT可重新掛回原IN。 -->
-<!-- PORT79 V6.0.6：Excel有而系統沒有的完整班次自動補入；精確事件雙重去重，重複資料永不新增。 -->
-<!-- PORT79 V6.0.5：Excel匯入自動補齊系統空白側；補入事件強制掛回原班次；匯入後自動重算比對。 -->
-<!-- PORT79 V6.0.4：Excel比對「系統獨立班次」人工補卡也立即回掛原班次；核對補卡鎖定原始時間。 -->
+<!-- PORT79 V6.0.14 DELETE-NO-RESURRECT：修正表格垃圾桶/整日刪除未建立刪除墓碑；Delta upsert 與 試算表 匯入候選全面尊重 tombstone，避免刪除後被舊雲端快照或匯入比對重新補回。 -->
+<!-- PORT79 V6.0.13：以 V6.0.12 正式版為基底，只修正同一員工同日多筆班次比對；試算表→系統班次改為全域最高分一對一配對，避免前一班搶走後一班。保留 V6.0.12 分日期匯入、試算表 快取修復、15分鐘近似防重、人工補卡配對、快速雲端同步等全部功能。 -->
+<!-- PORT79 V6.0.12：同步雲端改快速佇列；不同考勤最多4筆並行，取消每次重送整批試算表與整月讀回。 -->
+<!-- PORT79 V6.0.11：試算表整檔只載入來源，改由日期下拉逐日匯入；取消載入後全檔自動核對，加入清空試算表匯入。 -->
+<!-- PORT79 V6.0.10：上次試算表完整來源全日期自動補缺；重新整理即可補IN/OUT、修跨日配對、清近似重複。 -->
+<!-- PORT79 V6.0.9：試算表匯入前先拉齊雲端月份；15分鐘近似事件不重複新增；自動清除既有試算表重複副本。 -->
+<!-- PORT79 V6.0.8：已匯入試算表來源在重新整理後自動修復斷裂班次；只修真正未配對列，不新增重複打卡。 -->
+<!-- PORT79 V6.0.7：試算表完整班次會修復既有原始打卡配對；資料已存在不重複新增，跨日OUT可重新掛回原IN。 -->
+<!-- PORT79 V6.0.6：試算表有而系統沒有的完整班次自動補入；精確事件雙重去重，重複資料永不新增。 -->
+<!-- PORT79 V6.0.5：試算表匯入自動補齊系統空白側；補入事件強制掛回原班次；匯入後自動重算比對。 -->
+<!-- PORT79 V6.0.4：試算表比對「系統獨立班次」人工補卡也立即回掛原班次；核對補卡鎖定原始時間。 -->
 <!-- PORT79 V6.0.3：補卡 UI 鎖定考勤號＋姓名＋班次日期＋原始時間；重複 record.id 不再更新錯列。 -->
 <!-- PORT79 V6.0.2：主考勤表明確直呼V6配對，不再依賴舊全域同名函式覆蓋。 -->
-<!-- PORT79 V6.0.1：補卡原列立即顯示＋整表/Excel核對/雲端同步背景化。 -->
+<!-- PORT79 V6.0.1：補卡原列立即顯示＋整表/試算表核對/雲端同步背景化。 -->
 <!-- PORT79 V5.11.12：人工補卡資料已存在但未顯示時，顯示層依同人＋時間順序＋24小時內回掛缺卡班次，不再只依賴pair metadata。 -->
 <!-- PORT79 V5.11.11：已消失人工補卡自安全備份/保護檔/最近異動自動救回；僅恢復明確人工配對且尊重刪除墓碑。 -->
 <!-- PORT79 V5.11.10：跨月09/30→10/01原始下班回掛原班次；人工補卡雙向pair metadata同步雲端，避免重新讀取後又變空白。 -->
-<!-- PORT79 V5.11.9：補卡雙向鎖定防舊快照覆蓋＋Excel/系統重新比對改身份索引候選，343班級別不再逐班掃完整考勤。 -->
+<!-- PORT79 V5.11.9：補卡雙向鎖定防舊快照覆蓋＋試算表/系統重新比對改身份索引候選，343班級別不再逐班掃完整考勤。 -->
 <!-- PORT79 V5.11.8：核對表直接辨識指定人工補卡；即使班次引擎暫未配入，也立即顯示系統補上班/下班時間。 -->
 <!-- PORT79 V5.11.7：核對表修改後保留真正 .p79as-scroll 捲動位置與原列定位，不再跳回第一筆。 -->
 <!-- PORT79 V5.11.6：異常核對表修改/補卡後固定返回核對頁；從核對表開修改視窗時不再切回考勤管理首頁。 -->
 <!-- PORT79 V5.11.5：員工打卡首頁快速載入；只讀正式 v5 必要快取，不再掃描/合併所有歷史考勤備份；手機員工打卡改真正 100vw 滿版。 -->
-<!-- PORT79 V5.11.4：考勤 Excel 匯入改為本機立即完成＋雲端背景同步；不再 await 每筆雲端確認才結束匯入。 -->
+<!-- PORT79 V5.11.4：考勤 試算表 匯入改為本機立即完成＋雲端背景同步；不再 await 每筆雲端確認才結束匯入。 -->
 <!-- PORT79 V5.11.3：員工打卡快速啟動；員工入口不渲染管理員大表、不等待非必要 UI 初始化，首頁已驗證 Session 立即顯示，雲端資料背景補齊。 -->
 <!-- PORT79 V5.11.2：王振耿 AP0900032 案例：員工主檔工號精確命中優先，避免歷史考勤號差異把同一人的 IN/OUT 拆成兩個 bucket。 -->
 <!-- PORT79 V5.11.1：修正同一上下班事件被拆成「完整班次 + 單邊孤立重複列」；完整班次優先，僅在顯示層移除子集合重複，不刪雲端原始考勤。 -->
 <!-- PORT79 V5.11 STABLE CORE：保留既有 UI/樣式/欄位，重整考勤資料核心；修正同ID上下班合併、Delta游標重置、日期排序與30秒權威補漏。 -->
-<!-- PORT79 V5.10.38：Excel↔系統考勤比對入口固定保留；比對視窗改回適中桌機寬度，不再撐滿全螢幕，欄位依內容緊湊配置。 -->
-<!-- PORT79 V5.10.37：Excel 核對完成後可一鍵只保留正式系統考勤；已有正式同側則刪 Excel 副本，Excel 唯一補缺則原 ID 轉正為 system-confirmed。 -->
+<!-- PORT79 V5.10.38：試算表↔系統考勤比對入口固定保留；比對視窗改回適中桌機寬度，不再撐滿全螢幕，欄位依內容緊湊配置。 -->
+<!-- PORT79 V5.10.37：試算表 核對完成後可一鍵只保留正式系統考勤；已有正式同側則刪 試算表 副本，試算表 唯一補缺則原 ID 轉正為 system-confirmed。 -->
 <!-- PORT79 V5.10.36：考勤即開即顯示；進頁先渲染本機快取，不等待雲端；當月/前後月與員工主檔改背景同步，Delta 持續即時更新；手動重新整理仍等待雲端確認。 -->
 <!-- PORT79 V5.10.35：修正雲端已有下班簽退但考勤畫面仍缺少簽退；同 record.id 的 IN/OUT 不再互相覆蓋，Delta 與顯示層去重均加入打卡類型判斷。 -->
 <!-- PORT79 V5.10.34：匯入比對明細改為桌機自適應寬版；姓名/工號/日期/狀態/操作保持單行，只有比對結果允許換行；手機保留橫向捲動。 -->
-<!-- PORT79 V5.10.33：修正匯入比對修改錯人、修改日期未顯示、修改後返回比對明細；Excel/系統欄位用不同底色區分。 -->
-<!-- PORT79 V5.10.32：完整班次改為 Excel/系統四欄皆有才成立；雙方同缺一側不再誤判完整；原始資料配對異常改成明確診斷；比對明細可人工補缺側。 -->
-<!-- PORT79 V5.10.31：匯入比對改為異常判定；完整班次若 Excel/系統時間差過大不再顯示正常；待處理數自動重算減少；上下皆可重新比對。 -->
+<!-- PORT79 V5.10.33：修正匯入比對修改錯人、修改日期未顯示、修改後返回比對明細；試算表/系統欄位用不同底色區分。 -->
+<!-- PORT79 V5.10.32：完整班次改為 試算表/系統四欄皆有才成立；雙方同缺一側不再誤判完整；原始資料配對異常改成明確診斷；比對明細可人工補缺側。 -->
+<!-- PORT79 V5.10.31：匯入比對改為異常判定；完整班次若 試算表/系統時間差過大不再顯示正常；待處理數自動重算減少；上下皆可重新比對。 -->
 <!-- PORT79 V5.10.30：匯入比對明細加入固定關閉鈕、逐列修改/補卡、重新比對；直接沿用既有考勤編輯與補卡流程。 -->
 <!-- PORT79 V5.10.29：修正從工時/請假/排班/效率/人資/歷史資料返回考勤時誤進打卡頁；跨系統返回管理員固定進考勤後台。 -->
-<!-- PORT79 V5.10.28：匯入逐班比對明細改為 Excel .xlsx 報表；包含總覽、逐班比對、需要補卡三個工作表。 -->
-<!-- PORT79 V5.10.27：Excel 匯入改為班次級逐筆比對；跨日 IN→OUT 正確辨識、系統已有一側只補另一側、保留人工/現有時間；新增完整匯入比對明細。 -->
-<!-- PORT79 V5.10.26：Excel 匯入只補空白上下班；已有上班/下班不再新增同側資料；同日多筆 Excel 上班取最早、下班取最晚。保留 V5.10.25 同步雲端按鈕與全部既有修正。 -->
-<!-- PORT79 V5.10.25：新增「同步雲端」按鈕；先補傳待同步，再重送本機 Excel 匯入原始打卡，最後讀回雲端確認。只新增手動同步入口，不改配對/防重刷核心。 -->
-<!-- PORT79 V5.10.24：匯入缺少上班/下班自動補齊；移除同類型60分鐘內誤判；Excel 有而系統缺的 IN/OUT 先顯示，再分批寫入雲端。 -->
-<!-- PORT79 V5.10.23：修正 Excel 匯入後部分考勤未上雲端與筆數誤判；匯入不再把不同時間的原始打卡整合刪除，改依月份分批上傳；畫面分開顯示班次數與原始打卡筆數。保留 V5.10.22 以前全部修正。 -->
+<!-- PORT79 V5.10.28：匯入逐班比對明細改為 試算表 .xlsx 報表；包含總覽、逐班比對、需要補卡三個工作表。 -->
+<!-- PORT79 V5.10.27：試算表 匯入改為班次級逐筆比對；跨日 IN→OUT 正確辨識、系統已有一側只補另一側、保留人工/現有時間；新增完整匯入比對明細。 -->
+<!-- PORT79 V5.10.26：試算表 匯入只補空白上下班；已有上班/下班不再新增同側資料；同日多筆 試算表 上班取最早、下班取最晚。保留 V5.10.25 同步雲端按鈕與全部既有修正。 -->
+<!-- PORT79 V5.10.25：新增「同步雲端」按鈕；先補傳待同步，再重送本機 試算表 匯入原始打卡，最後讀回雲端確認。只新增手動同步入口，不改配對/防重刷核心。 -->
+<!-- PORT79 V5.10.24：匯入缺少上班/下班自動補齊；移除同類型60分鐘內誤判；試算表 有而系統缺的 IN/OUT 先顯示，再分批寫入雲端。 -->
+<!-- PORT79 V5.10.23：修正 試算表 匯入後部分考勤未上雲端與筆數誤判；匯入不再把不同時間的原始打卡整合刪除，改依月份分批上傳；畫面分開顯示班次數與原始打卡筆數。保留 V5.10.22 以前全部修正。 -->
 <!-- PORT79 V5.10.22：修正重新整理後只剩頂欄、主畫面全白；員工/管理模式互斥、恢復 Session 後清除舊 inline 隱藏、加入 only-if-blank 顯示保護。保留 V5.10.21 讀寫狀態與全部既有考勤邏輯。 -->
 <!-- PORT79 V5.10.21：雲端狀態文字明確區分「讀取中／寫入中／完成／待命／錯誤」；只改狀態顯示，不動考勤資料、配對、防重刷與同步核心。 -->
 <!-- PORT79 V5.10.20：同步進度可視化＋雲端確認自動清除待同步＋單格日期範圍視窗（確定/取消）＋月份選擇不再被日期篩選改成全部月份。保留 V5.10.19 之前所有配對/防重刷/姓名/CPU 修正。 -->
@@ -94,7 +94,7 @@
 <!-- PORT79 2026-10-05 V3.7：修正補卡確認 ReferenceError，Modal 下拉局部更新，移除雙重 render。 -->
 <!-- PORT79 2026-10-05 V3.6：人工補卡明確指定配對先強制組成同列；民國日期補卡視窗先轉西元。 -->
 <!-- PORT79 2026-10-05 V3.5：民國年115考勤先轉2026再排序/配對/顯示，修復補下班仍空白。 -->
-<!-- PORT79 2026-10-05 V3.4：Excel匯入前備份 localStorage 滿時自動改用 IndexedDB。 -->
+<!-- PORT79 2026-10-05 V3.4：試算表匯入前備份 localStorage 滿時自動改用 IndexedDB。 -->
 <!-- PORT79 2026-10-05 V3.3：完整員工主檔暫時失聯時，已驗證裝置仍可安全打卡；背景自動補抓。 -->
 <!-- PORT79 2026-10-04 RAW-V3.2：跨來源完全同事件精準去重；不使用30/60分鐘視窗。 -->
 <!-- PORT79 2026-10-04 RAW-V3.1：人工指定補卡先依 target 配對再分組，避免補卡存在但下班仍空白。 -->
@@ -326,9 +326,9 @@ window.p79LoadXlsxLibrary = function(){
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     s.defer=true;
-    const timer=setTimeout(()=>{window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入逾時，請檢查網路後重試'));},15000);
+    const timer=setTimeout(()=>{window.p79XlsxLoadPromise=null;s.remove();reject(new Error('試算表 元件載入逾時，請檢查網路後重試'));},15000);
     s.onload=()=>{clearTimeout(timer);resolve(window.XLSX);};
-    s.onerror=()=>{clearTimeout(timer);window.p79XlsxLoadPromise=null;s.remove();reject(new Error('Excel 元件載入失敗，請檢查網路後重試'));};
+    s.onerror=()=>{clearTimeout(timer);window.p79XlsxLoadPromise=null;s.remove();reject(new Error('試算表 元件載入失敗，請檢查網路後重試'));};
     document.head.appendChild(s);
   });
   return window.p79XlsxLoadPromise;
@@ -1293,30 +1293,30 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <input type="file" id="attendanceExcelInput" accept=".xlsx,.xls" class="hidden" onchange="importAttendanceExcel(event)">
-                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700" title="先載入整份 Excel，不會立刻寫入考勤">📤 載入考勤 Excel</button>
+                        <button type="button" id="btnAttendanceImport" onclick="document.getElementById('attendanceExcelInput').click()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700" title="先載入整份 試算表，不會立刻寫入考勤">📤 匯入考勤（先載入檔案）</button>
                         <select id="attendanceExcelDateSelect"
                                 onchange="p79OnExcelImportDateChange()"
                                 class="px-3 py-1.5 bg-white dark:bg-slate-900 border border-sky-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold"
                                 style="min-width:150px"
                                 disabled>
-                            <option value="">先載入 Excel</option>
+                            <option value="">先載入 試算表</option>
                         </select>
                         <button type="button"
                                 id="btnAttendanceImportSelectedDate"
                                 onclick="p79ImportSelectedExcelDate()"
                                 class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                disabled>✅ 匯入選定日期</button>
+                                disabled>✅ 匯入當日考勤</button>
                         <button type="button"
                                 id="btnAttendanceClearExcelImport"
                                 onclick="p79ClearExcelImportData()"
                                 class="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold shadow-sm hover:bg-rose-100"
-                                title="只清除 Excel 匯入來源與 Excel 匯入產生的未確認考勤；不刪正式系統/人工考勤">🧹 清空 Excel 匯入</button>
+                                title="只清除 試算表 匯入來源與 試算表 匯入產生的未確認考勤；不刪正式系統/人工考勤">🧹 清空考勤匯入</button>
                         <span id="attendanceExcelLoadedStatus" class="text-[10px] font-bold text-slate-500 dark:text-slate-400"></span>
-                        <button type="button" id="btnAttendanceCloudSync" onclick="syncAttendanceCloudNow()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="快速送出真正待同步資料；不重送整批 Excel、不重抓整月">
+                        <button type="button" id="btnAttendanceCloudSync" onclick="syncAttendanceCloudNow()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="快速送出真正待同步資料；不重送整批 試算表、不重抓整月">
                             ⚡ 快速同步 <span id="btnAttendanceCloudSyncCount" class="ml-1 opacity-90"></span>
                         </button>
                         <button type="button" id="btnAttendanceDuplicateList" onclick="p79OpenDuplicateList()" class="px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-cyan-700" title="統計目前已載入資料的疑似重複班次，不會自動刪除">🔎 重複清單 <span id="p79DuplicateListCount"></span></button>
-                        <button type="button" id="btnAttendanceExport" onclick="openExportRecordsModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出 Excel</button>
+                        <button type="button" id="btnAttendanceExport" onclick="openExportRecordsModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出考勤</button>
                         
                     </div>
                 </div>
@@ -1556,9 +1556,9 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     <div class="flex flex-wrap gap-2">
                         <button id="btnLeavePolicyInfo" type="button" onclick="openLeavePolicyModal()" class="px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-semibold shadow hover:bg-amber-600">📖 請假規定說明</button>
                         <input type="file" id="leaveBalanceExcelInput" accept=".xlsx,.xls" multiple class="hidden" onchange="importLeaveBalanceExcel(event)">
-                        <button id="btnLeaveBalanceImport" type="button" onclick="document.getElementById('leaveBalanceExcelInput').click()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">匯入可休天數統計表 Excel</button>
-                        <button id="btnLeaveBalanceExport" type="button" onclick="exportLeaveBalanceExcel()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">匯出員工未休特休 Excel</button>
-                        <button id="btnLeaveRequestExport" type="button" onclick="exportLeaveExcel()" class="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-purple-700">📥 匯出請假清單 (Excel)</button>
+                        <button id="btnLeaveBalanceImport" type="button" onclick="document.getElementById('leaveBalanceExcelInput').click()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">匯入請假可休天數</button>
+                        <button id="btnLeaveBalanceExport" type="button" onclick="exportLeaveBalanceExcel()" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-sky-700">匯出請假可休天數</button>
+                        <button id="btnLeaveRequestExport" type="button" onclick="exportLeaveExcel()" class="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-purple-700">📥 匯出請假清單</button>
                     </div>
                 </div>
                 <div id="leaveBalanceImportSummary" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">尚未匯入可休天數統計表</div>
@@ -1647,7 +1647,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     <div class="flex flex-wrap items-center justify-end gap-2 text-[11px]">
                         <span class="inline-flex items-center gap-1"><span class="w-5 h-5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-black">V</span>有出勤</span>
                         <span class="inline-flex items-center gap-1"><span class="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">—</span>無紀錄</span>
-                        <button id="btnAttendanceStatsExport" type="button" onclick="exportAttendanceStatsExcel()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出統計 Excel</button>
+                        <button id="btnAttendanceStatsExport" type="button" onclick="exportAttendanceStatsExcel()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-emerald-700">📥 匯出考勤統計</button>
                     </div>
                 </div>
 
@@ -1923,7 +1923,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     <div id="empModalActionPermissions"
                          class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceCreate">新增／補刷上下班打卡</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceImport">匯入考勤 Excel</label>
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceImport">匯入考勤</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceEdit">編輯打卡紀錄</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceDelete">刪除打卡紀錄</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveCreate">手動新增請假</label>
@@ -1934,7 +1934,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="settingsManage">修改系統與定位設定</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="cloudSync">查看雲端狀態／手動拉取</label>
                         <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="attendanceExport">匯出考勤</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveExport">匯出請假清單 Excel</label>
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="action-permission w-4 h-4 accent-indigo-600" value="leaveExport">匯出請假清單</label>
                     </div>
                     <p class="mt-1 text-[11px] text-slate-400">管理員預設全部不勾選，僅能觀看；需要哪項操作再單獨開放。</p>
                 </div>
@@ -2106,7 +2106,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         </div>
     </div>
 
-    <!-- 彈出式考勤紀錄 Excel 欄位選擇 Modal -->
+    <!-- 彈出式考勤紀錄 試算表 欄位選擇 Modal -->
     <div id="exportRecordsModal" class="fixed inset-0 z-50 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="attendance-export-dialog bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-100 dark:border-slate-700" role="dialog" aria-modal="true" aria-labelledby="attendanceExportTitle">
             <div class="attendance-export-header flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
@@ -2130,8 +2130,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             </div>
 
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportPreferCache" type="checkbox" checked class="w-4 h-4">優先使用本機快取（含已連接的電腦資料夾）</label>
-            <p class="text-[11px] text-slate-500">缺少的月份會向雲端讀取。使用快取時，Excel 會附上各月份保存時間；需要最新雲端資料時，請取消勾選。</p>
-            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 Excel）</label>
+            <p class="text-[11px] text-slate-500">缺少的月份會向雲端讀取。使用快取時，試算表 會附上各月份保存時間；需要最新雲端資料時，請取消勾選。</p>
+            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 試算表）</label>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="selectAllExportFields(true)" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-xl text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50">☑️ 全部選取</button>
@@ -2194,7 +2194,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             </div>
             <div class="attendance-export-footer flex justify-end border-t border-slate-100 dark:border-slate-700">
                 <button type="button" onclick="closeExportRecordsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">取消</button>
-                <button type="button" onclick="exportSelectedRecordsExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700">📥 確認匯出 Excel</button>
+                <button type="button" onclick="exportSelectedRecordsExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700">📥 確認匯出考勤</button>
             </div>
         </div>
     </div>
@@ -3303,7 +3303,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         const ADMIN_ACTION_OPTIONS = ['attendanceCreate', 'attendanceImport', 'attendanceEdit', 'attendanceDelete', 'leaveCreate', 'leaveReview', 'leaveDelete', 'leaveBalanceImport', 'departmentManage', 'settingsManage', 'cloudSync', 'attendanceExport', 'leaveExport'];
 
         // 2026/08 可休天數統計表：79W 作業課與倉庫課基準資料。
-        // 後台日後匯入新版 Excel 時，會以新資料覆蓋這份初始基準。
+        // 後台日後匯入新版 試算表 時，會以新資料覆蓋這份初始基準。
         const BUILTIN_LEAVE_BALANCES_202608 = {
             '0870058':[0,30,0,30], '0870059':[0,30,0,30], '0890019':[0,30,0,30],
             '0890021':[0,30,4,26], '0890026':[0,30,16,14], '0890028':[0,30,0,30],
@@ -3936,7 +3936,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             const text = String(value == null ? '' : value).trim();
             if (!text) return '';
             const digits = text.replace(/\D/g, '');
-            // 台灣手機號碼若 Excel 以數值儲存，開頭 0 會被吃掉（例：925832898）。
+            // 台灣手機號碼若 試算表 以數值儲存，開頭 0 會被吃掉（例：925832898）。
             if (digits.length === 9 && digits.startsWith('9')) return `0${digits}`;
             return digits || text;
         }
@@ -4025,7 +4025,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         }
 
         // 人工補卡指定配對輔助函式。
-        // 這四個函式會被雲端同步、班次配對與 Excel 匯入共同使用，
+        // 這四個函式會被雲端同步、班次配對與 試算表 匯入共同使用，
         // 必須集中定義，避免雲端拉取時發生 ReferenceError。
         function getManualPairClockInId(record) {
             return String(record?.manualPairClockInId ?? '').trim();
@@ -4994,7 +4994,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                 }
             })();
 
-            // 員工打卡不需要 Excel 匯入套件；管理後台才背景載入，減少手機首屏下載與 JS 解析。
+            // 員工打卡不需要 試算表 匯入套件；管理後台才背景載入，減少手機首屏下載與 JS 解析。
             if (!p79FastEmployeeBoot) {
                 setTimeout(() => window.p79LoadXlsxLibrary?.().catch(()=>{}), 0);
             }
@@ -6813,7 +6813,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
                     }
                     initDropdowns();
                     renderAdminRecordsTable();
-                    // 回傳 false：保留畫面不代表成功取得雲端完整月份，Excel 不得據此補卡。
+                    // 回傳 false：保留畫面不代表成功取得雲端完整月份，試算表 不得據此補卡。
                     return false;
                 }
 
@@ -9045,7 +9045,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (!meta) {
                 const builtinCount = employees.filter(emp => emp.leaveBalance && emp.leaveBalance.source === 'builtin-202608').length;
                 el.textContent = builtinCount
-                    ? `目前使用 2026/08 內建可休天數基準｜已配對 ${builtinCount} 人｜可匯入新版可休天數統計表 Excel 更新`
+                    ? `目前使用 2026/08 內建可休天數基準｜已配對 ${builtinCount} 人｜可匯入新版可休天數統計表 試算表 更新`
                     : '尚未匯入可休天數統計表';
                 return;
             }
@@ -9210,7 +9210,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const files = [...(input.files || [])];
             if (!files.length) return;
             if (typeof XLSX === 'undefined') {
-                showToast('Excel 讀取元件尚未載入，請重新整理後再試', 'warning');
+                showToast('試算表 讀取元件尚未載入，請重新整理後再試', 'warning');
                 input.value = '';
                 return;
             }
@@ -9313,7 +9313,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     renderEmployeeLeaveBalance(currentEmp);
                 }
             } catch(err) {
-                showToast('可休天數統計表 Excel 匯入失敗：' + (err.message || err), 'warning');
+                showToast('可休天數統計表 試算表 匯入失敗：' + (err.message || err), 'warning');
             } finally {
                 input.value = '';
             }
@@ -9321,7 +9321,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         function exportLeaveBalanceExcel() {
             if (typeof XLSX === 'undefined') {
-                showToast('Excel 匯出元件尚未載入，請重新整理後再試', 'warning');
+                showToast('試算表 匯出元件尚未載入，請重新整理後再試', 'warning');
                 return;
             }
             const rows = sortEmployeesById(getFilteredLeaveBalanceEmployees())
@@ -10278,7 +10278,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 });
             if (openShift) return openShift;
 
-            // 手機讀回紀錄後，配對引擎可能因舊 Excel / 補卡 metadata 無法辨識尚未簽退的班次。
+            // 手機讀回紀錄後，配對引擎可能因舊 試算表 / 補卡 metadata 無法辨識尚未簽退的班次。
             // 僅在同員工最近一筆有效原始刷卡是 IN、沒有更新的 OUT 時，安全恢復下班狀態；
             // 不新增、不刪除原始打卡，且正式送出仍走原本的 GPS 與寫入驗證。
             const recent = myRecords
@@ -12082,7 +12082,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         function ensureExcelLibrary() {
             if (typeof XLSX !== 'undefined') return true;
-            showToast('Excel 元件尚未載入，請重新整理後再試', 'warning');
+            showToast('試算表 元件尚未載入，請重新整理後再試', 'warning');
             return false;
         }
 
@@ -12115,7 +12115,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '請假清單');
             XLSX.writeFile(workbook, `請假預約紀錄_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToast("請假清單 Excel 匯出成功！", "success");
+            showToast("請假清單 試算表 匯出成功！", "success");
         }
 
         function normalizeRecordFilterDate(value) {
@@ -14226,7 +14226,7 @@ function getManualPairRecordAnchor(record) {
             if (!candidate) return false;
             if (!current) return true;
             // 人工修改會保留原始事件鍵。若其中一筆明確取代另一筆原始事件，
-            // 永遠採用人工修正值，不再按簽到早／簽退晚的規則選回 Excel 舊時間。
+            // 永遠採用人工修正值，不再按簽到早／簽退晚的規則選回 試算表 舊時間。
             const candidateSourceKey = String(candidate.sourceEventKey || '').trim();
             const currentSourceKey = String(current.sourceEventKey || '').trim();
             const candidateEventKey = getAttendanceImportEventKey(candidate);
@@ -14581,7 +14581,7 @@ function getManualPairRecordAnchor(record) {
                     return;
                 }
 
-                // 完全相同事件若包含人工修改版本，必須保留人工版本，避免重新匯入後被原始 Excel 覆蓋。
+                // 完全相同事件若包含人工修改版本，必須保留人工版本，避免重新匯入後被原始 試算表 覆蓋。
                 const type = getAttendanceRecordType(record);
                 const preferCurrent = shouldPreferAttendanceRecord(record, kept, type);
                 const primary = preferCurrent ? record : kept;
@@ -15266,7 +15266,7 @@ function getManualPairRecordAnchor(record) {
                 <div class="text-sm font-bold mb-2">疑似重複班次：${list.length} 組｜整合多餘刷卡：${totalExtra} 筆</div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3">僅統計目前已載入、且你有權限查看的考勤資料；不是全年雲端全部重複筆數。這是班次整合候選，並非確認可刪資料。人工補卡與不同事件 ID 請逐筆核對。</p>
                 <div class="overflow-auto min-h-0 flex-1"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
-                <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">清理可確認的 Excel 重複</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
+                <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">清理可確認的 試算表 重複</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
             </div>`;
             modal.addEventListener('click',e=>{if(e.target===modal)p79CloseDuplicateReview();});
             document.body.appendChild(modal);
@@ -15429,7 +15429,7 @@ function getManualPairRecordAnchor(record) {
                     if(!group.length)continue;
                     if(group.some(r=>manual(r)||!safe(r))) {skipped.add(row);continue;}
                     // 只以真實員工刷卡為保留基準；其餘來源一律不得自動刪除。
-                    // 必須恰好一筆員工刷卡，且候選全部為 Excel 匯入，避免誤刪手機打卡或人工補卡。
+                    // 必須恰好一筆員工刷卡，且候選全部為 試算表 匯入，避免誤刪手機打卡或人工補卡。
                     const punched=group.filter(r=>source(r)==='employee-punch');
                     if(punched.length!==1) {skipped.add(row);continue;}
                     const keep=punched[0];
@@ -15453,7 +15453,7 @@ function getManualPairRecordAnchor(record) {
                 }
                 return false;
             }
-            if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 Excel 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n任何未確認回覆會立即暫停並只讀核對，不會自動重送刪除。'))return false;
+            if(!confirm('確認僅刪除與員工刷卡同班同方向且相近的 試算表 重複紀錄？\\n員工刷卡全部保留\\n雲端刪除 '+del+' 筆\\nExcel 轉正式系統 '+pro+' 筆\\n保留待核對 '+skipped.size+' 組\\n任何未確認回覆會立即暫停並只讀核對，不會自動重送刪除。'))return false;
             p79BatchDuplicateBusy=true;
             p79BatchDuplicateProgressHidden=false;
             if(p79BatchDuplicateProgressHideTimer!==null) {
@@ -15522,7 +15522,7 @@ function getManualPairRecordAnchor(record) {
                 if(stats.aborted) {
                     showToast('雲端未確認，已立即停止批次；已嘗試 '+stats.done+'/'+stats.total+' 筆。原因：'+stats.lastError,'warning');
                 }else {
-                    showToast('重複考勤：已刪 '+stats.removed+' 筆、Excel轉系統 '+stats.converted+' 筆、未完成 '+stats.failed+' 筆',stats.failed?'warning':'success');
+                    showToast('重複考勤：已刪 '+stats.removed+' 筆、試算表轉系統 '+stats.converted+' 筆、未完成 '+stats.failed+' 筆',stats.failed?'warning':'success');
                 }
                 return stats.failed===0&&!stats.aborted;
             }finally {p79BatchDuplicateBusy=false;}
@@ -15601,7 +15601,7 @@ function getManualPairRecordAnchor(record) {
                 const source = String(r?.source || r?.dataSource || r?.['資料來源'] || '');
                 const sourceLower = source.toLowerCase();
                 const edited = !!(r?.manuallyEdited || sourceLower.includes('manual') || source.includes('補刷') || source.includes('補卡'));
-                const sourceLabels = {'excel-import':'Excel 匯入','employee-punch':'員工刷卡','mobile-punch':'手機刷卡','local-punch':'本機刷卡','manual-admin':'管理員補刷','manual-punch':'人工補刷','sync-import':'雲端同步','system-confirmed':'系統確認'};
+                const sourceLabels = {'excel-import':'試算表 匯入','employee-punch':'員工刷卡','mobile-punch':'手機刷卡','local-punch':'本機刷卡','manual-admin':'管理員補刷','manual-punch':'人工補刷','sync-import':'雲端同步','system-confirmed':'系統確認'};
                 const sourceText = window.P79Messages?.source(source) || sourceLabels[sourceLower] || '其他系統紀錄';
                 const direction = String(r?.status || '').trim();
                 const sameDirectionCount = directionStats.get(getAttendanceRecordType(r)+'|'+getPunchChannel(r.status))||0;
@@ -16261,7 +16261,7 @@ function getManualPairRecordAnchor(record) {
                     try { renderEmpHistoryTable(); } catch (e) {}
                 }
 
-                // V6.0.1：Excel 核對屬於重工作，不能阻塞補卡後第一個 paint。
+                // V6.0.1：試算表 核對屬於重工作，不能阻塞補卡後第一個 paint。
                 // 先讓考勤表完成顯示，再背景重新比對。
                 setTimeout(() => {
                     try {
@@ -17530,7 +17530,7 @@ function getManualPairRecordAnchor(record) {
                 );
 
                 // V6.0.1：先直接改目前這一列，讓補卡時間立刻出現。
-                // 完整班次重建 / Excel 核對 / 雲端同步全部背景處理。
+                // 完整班次重建 / 試算表 核對 / 雲端同步全部背景處理。
                 const patchedImmediately = p79PatchManualAttendanceRowImmediately(newRecord, pairedTarget);
                 closeAddModal();
 
@@ -18109,7 +18109,7 @@ function p79EmployeeDateEligible(emp,date) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, `${year}-${String(month).padStart(2, '0')}出勤統計`);
             XLSX.writeFile(workbook, `出勤天數統計_${monthValue}.xlsx`);
-            showToast('出勤天數統計 Excel 匯出成功！', 'success');
+            showToast('出勤天數統計 試算表 匯出成功！', 'success');
         }
 
         function escapeHtml(value) {
@@ -18446,7 +18446,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         function downloadCleanExcelWorkbook(workbook, fileName) {
-            // SheetJS 瀏覽器版在部分 Excel 版本會把殘留樣式寫入 styles.xml，
+            // SheetJS 瀏覽器版在部分 試算表 版本會把殘留樣式寫入 styles.xml，
             // 因此匯出前明確移除儲存格樣式與自訂格式，只保留資料、欄寬和工作表結構。
             Object.values(workbook.Sheets || {}).forEach(sheet => {
                 Object.keys(sheet || {}).forEach(address => {
@@ -18509,7 +18509,7 @@ function p79EmployeeDateEligible(emp,date) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '員工清單');
             downloadCleanExcelWorkbook(workbook, `員工清單_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToast("員工清單 Excel 匯出成功！", "success");
+            showToast("員工清單 試算表 匯出成功！", "success");
         }
 
         async function importEmployeesExcel(event) {
@@ -18578,8 +18578,8 @@ function p79EmployeeDateEligible(emp,date) {
                 postToCloud({ action: 'syncEmployees', employees: employees }, `成功匯入 ${count} 筆員工資料！`);
                 renderAdminEmployeeTable();
             } catch (error) {
-                console.error('員工 Excel 匯入失敗：', error);
-                showToast('員工 Excel 匯入失敗：' + (error?.message || error), 'warning');
+                console.error('員工 試算表 匯入失敗：', error);
+                showToast('員工 試算表 匯入失敗：' + (error?.message || error), 'warning');
             } finally {
                 event.target.value = '';
             }
@@ -18605,7 +18605,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         function getAttendanceImportTimeValue(sheet,rowIndex,columnIndex,displayedValue) {
-            // raw:false 的顯示字串可能只有日期；保留原始 Excel Date／序號內的時間。
+            // raw:false 的顯示字串可能只有日期；保留原始 試算表 Date／序號內的時間。
             const range=XLSX.utils.decode_range(sheet['!ref']||'A1');
             const cell=sheet[XLSX.utils.encode_cell({r:range.s.r+rowIndex,c:range.s.c+columnIndex})];
             return cell && (cell.v instanceof Date || typeof cell.v==='number') ? cell.v : displayedValue;
@@ -18804,7 +18804,7 @@ function p79EmployeeDateEligible(emp,date) {
         const P79_IMPORT_MAX_SHIFT_MS = 24 * 60 * 60 * 1000;
         const P79_IMPORT_SIDE_MATCH_MS = 90 * 60 * 1000;
         // V6.0.9：只有很接近的同側事件才可自動視為「同一實際打卡」。
-        // Excel 與正式系統常有 1~數分鐘鐘差；15 分鐘內保留正式系統，不再新增 Excel 副本。
+        // 試算表 與正式系統常有 1~數分鐘鐘差；15 分鐘內保留正式系統，不再新增 試算表 副本。
         const P79_IMPORT_NEAR_DUPLICATE_MS = 15 * 60 * 1000;
 
         function p79ImportShiftIdentity(recordOrRow) {
@@ -18834,7 +18834,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         // V5.11.9：重新比對期間建立一次身份索引。
-        // 舊版每個 Excel 班次都掃完整 systemShifts / records，資料一多會呈平方級變慢。
+        // 舊版每個 試算表 班次都掃完整 systemShifts / records，資料一多會呈平方級變慢。
         let p79ActiveImportRecordIndex = null;
 
         function p79ImportIdentityIndexKeys(item) {
@@ -19077,7 +19077,7 @@ function p79EmployeeDateEligible(emp,date) {
             if (exact) return exact;
 
             // 同一人、同一類型、90 分鐘內的事件視為已存在。
-            // 例如 Excel 07:31、系統 07:32，不得再新增另一筆上班。
+            // 例如 試算表 07:31、系統 07:32，不得再新增另一筆上班。
             return p79FindNearbySystemSide(sourceRecord, P79_IMPORT_SIDE_MATCH_MS);
         }
 
@@ -19120,43 +19120,43 @@ function p79EmployeeDateEligible(emp,date) {
                 needsAttention = true;
                 action = '系統原始上下班都有，但班次配對異常｜需重新配對';
             }
-            // Excel 與系統上下班四欄都完整就視為正常。
+            // 試算表 與系統上下班四欄都完整就視為正常。
             // 時間差異不再列入錯誤／待處理，避免把正常班次塞進異常表。
             else if (excelComplete && systemComplete) {
                 isComplete = true;
                 severity = 'ok';
                 needsAttention = false;
-                action = 'Excel／系統皆有完整上下班｜比對正常';
+                action = '試算表／系統皆有完整上下班｜比對正常';
             }
-            // Excel 完整，但系統缺資料：可依 Excel 補空白側。
+            // 試算表 完整，但系統缺資料：可依 試算表 補空白側。
             else if (excelComplete && !systemComplete) {
                 severity = 'missing';
                 needsAttention = true;
 
-                if (!hasSystemIn && !hasSystemOut) action = '系統缺上班＋下班｜可依 Excel 補兩側';
+                if (!hasSystemIn && !hasSystemOut) action = '系統缺上班＋下班｜可依 試算表 補兩側';
                 else if (!hasSystemIn) action = '系統缺上班｜只補上班';
                 else action = '系統缺下班｜只補下班';
             }
-            // 系統完整，但 Excel 來源本身不完整：不能稱完整比對，但系統不需補。
+            // 系統完整，但 試算表 來源本身不完整：不能稱完整比對，但系統不需補。
             else if (!excelComplete && systemComplete) {
                 severity = 'source';
                 sourceIssue = true;
                 needsAttention = false;
 
-                if (!hasExcelIn && hasExcelOut) action = 'Excel 缺上班｜系統班次完整，不補系統';
-                else if (hasExcelIn && !hasExcelOut) action = 'Excel 缺下班｜系統班次完整，不補系統';
-                else action = 'Excel 來源班次不完整｜系統班次完整';
+                if (!hasExcelIn && hasExcelOut) action = '試算表 缺上班｜系統班次完整，不補系統';
+                else if (hasExcelIn && !hasExcelOut) action = '試算表 缺下班｜系統班次完整，不補系統';
+                else action = '試算表 來源班次不完整｜系統班次完整';
             }
-            // Excel、系統都缺同一側：沒有來源可以自動補，必須人工查核。
+            // 試算表、系統都缺同一側：沒有來源可以自動補，必須人工查核。
             else if (!hasExcelIn && !hasSystemIn) {
                 severity = 'error';
                 sourceIssue = true;
                 needsAttention = true;
 
                 if (hasExcelOut && !hasSystemOut) {
-                    action = 'Excel／系統皆缺上班；系統另缺下班｜可補下班，但上班需人工查核';
+                    action = '試算表／系統皆缺上班；系統另缺下班｜可補下班，但上班需人工查核';
                 } else {
-                    action = 'Excel／系統皆缺上班｜Excel 無上班來源，需人工查核／補卡';
+                    action = '試算表／系統皆缺上班｜試算表 無上班來源，需人工查核／補卡';
                 }
             }
             else if (!hasExcelOut && !hasSystemOut) {
@@ -19165,19 +19165,19 @@ function p79EmployeeDateEligible(emp,date) {
                 needsAttention = true;
 
                 if (hasExcelIn && !hasSystemIn) {
-                    action = 'Excel／系統皆缺下班；系統另缺上班｜可補上班，但下班需人工查核';
+                    action = '試算表／系統皆缺下班；系統另缺上班｜可補上班，但下班需人工查核';
                 } else {
-                    action = 'Excel／系統皆缺下班｜Excel 無下班來源，需人工查核／補卡';
+                    action = '試算表／系統皆缺下班｜試算表 無下班來源，需人工查核／補卡';
                 }
             }
-            // Excel 只有一側，而系統剛好缺 Excel 有的那一側。
+            // 試算表 只有一側，而系統剛好缺 試算表 有的那一側。
             else {
                 severity = 'missing';
                 needsAttention = true;
                 sourceIssue = !excelComplete;
 
-                if (hasExcelIn && !hasSystemIn) action = '系統缺上班｜可依 Excel 補上班';
-                else if (hasExcelOut && !hasSystemOut) action = '系統缺下班｜可依 Excel 補下班';
+                if (hasExcelIn && !hasSystemIn) action = '系統缺上班｜可依 試算表 補上班';
+                else if (hasExcelOut && !hasSystemOut) action = '系統缺下班｜可依 試算表 補下班';
                 else action = '班次資料不完整｜需人工確認';
             }
 
@@ -19215,7 +19215,7 @@ function p79EmployeeDateEligible(emp,date) {
             }
 
             // 一側缺失時，用另一側定位同一班次：
-            // 例如 Excel 10/03 23:33 -> 10/04 07:50，
+            // 例如 試算表 10/03 23:33 -> 10/04 07:50，
             // 系統只有 10/04 07:55 OUT，仍是同一班，應補 23:33 IN。
             if (sourceShift.clockIn && sourceShift.clockOut) {
                 if (!systemShift.clockIn && systemShift.clockOut && outMatch.matched) score += 700;
@@ -19347,13 +19347,13 @@ function p79EmployeeDateEligible(emp,date) {
             return candidates[0] || null;
         }
 
-        // V6.0.5：Excel 匯入只補系統空白側，而且補入事件必須固定掛回原本那一班。
+        // V6.0.5：試算表 匯入只補系統空白側，而且補入事件必須固定掛回原本那一班。
         // 這個 metadata 會被 V6 配對引擎直接採用；既有的另一側完全不修改。
         function p79PrepareExcelAutoFillRecord(sourceRecord, targetRecord, missingType) {
             const record = { ...(sourceRecord || {}) };
             record.source = 'excel-import';
-            record.location = String(record.location || 'Excel匯入自動補缺');
-            record.note = String(record.note || 'Excel匯入自動補缺');
+            record.location = String(record.location || '試算表匯入自動補缺');
+            record.note = String(record.note || '試算表匯入自動補缺');
 
             const targetId = String(targetRecord?.id ?? '').trim();
             const targetTime = String(targetRecord?.timeStr || '').trim();
@@ -19372,7 +19372,7 @@ function p79EmployeeDateEligible(emp,date) {
             }
 
             // 已成功比對到系統班次時，以該班次身份作為補入事件的最終身份，
-            // 避免 Excel 舊工號／空工號讓補入事件被 V6 拆到另一列。
+            // 避免 試算表 舊工號／空工號讓補入事件被 V6 拆到另一列。
             if (targetRecord) {
                 if (targetRecord.attNo != null && String(targetRecord.attNo).trim() !== '') record.attNo = targetRecord.attNo;
                 if (String(targetRecord.empId || '').trim()) record.empId = targetRecord.empId;
@@ -19422,7 +19422,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         function p79ReconcileImportByShift(sourceRecords) {
-            // 先對 Excel 本身完全重複去重，姓名/工號/考勤號仍保留。
+            // 先對 試算表 本身完全重複去重，姓名/工號/考勤號仍保留。
             const uniqueSource = [];
             const seenSource = new Set();
             let sourceDuplicateCount = 0;
@@ -19442,7 +19442,7 @@ function p79EmployeeDateEligible(emp,date) {
             const systemShifts = p79BuildSystemShiftRowsForImport();
 
             // V5.11.9：兩個索引都只建立一次。
-            // systemShiftIndex 用於 Excel 班次 -> 系統班次候選；
+            // systemShiftIndex 用於 試算表 班次 -> 系統班次候選；
             // p79ActiveImportRecordIndex 用於 nearby/raw/人工 pair 查找。
             const systemShiftIndex = p79BuildImportShiftMatchIndex(systemShifts);
             p79ActiveImportRecordIndex = p79BuildImportCandidateIndex(
@@ -19452,7 +19452,7 @@ function p79EmployeeDateEligible(emp,date) {
             const selected = [];
             const audit = [];
 
-            // V6.0.13：同一人同日有多個班次時，不能依 Excel 先後逐筆搶 systemShift。
+            // V6.0.13：同一人同日有多個班次時，不能依 試算表 先後逐筆搶 systemShift。
             // 先收集全部候選，再依「配對分數高 → 時間距離近」全域一對一分配。
             const pairCandidates = [];
             sourceShifts.forEach((sourceShift, sourceIndex) => {
@@ -19506,9 +19506,9 @@ function p79EmployeeDateEligible(emp,date) {
                     : -1;
                 const systemShift = assignedIndex >= 0 ? systemShifts[assignedIndex] : null;
 
-                // Excel 比對必須和考勤主表使用完全相同的「最終班次」結果。
+                // 試算表 比對必須和考勤主表使用完全相同的「最終班次」結果。
                 // raw event 即使存在，只要沒有被主表班次引擎配進這一班，就不能冒充 systemIn/systemOut。
-                // 否則會出現：主表顯示缺下班，但 Excel 比對卻誤判正常。
+                // 否則會出現：主表顯示缺下班，但 試算表 比對卻誤判正常。
                 let systemIn = systemShift?.clockIn || null;
                 let systemOut = systemShift?.clockOut || null;
 
@@ -19625,8 +19625,8 @@ function p79EmployeeDateEligible(emp,date) {
             });
 
             // 2026-10-07：雙向全量比對。
-            // 原本只從 Excel 班次出發，因此「系統有異常、Excel 沒建立對應班次」會完全消失。
-            // 現在把同一匯入月份內、尚未被 Excel 配對到的系統班次也補進 audit。
+            // 原本只從 試算表 班次出發，因此「系統有異常、試算表 沒建立對應班次」會完全消失。
+            // 現在把同一匯入月份內、尚未被 試算表 配對到的系統班次也補進 audit。
             const sourceMonths = new Set(
                 uniqueSource
                     .map(record => attendanceRecordMonthKey(record))
@@ -19639,9 +19639,9 @@ function p79EmployeeDateEligible(emp,date) {
                 let systemIn = systemShift?.clockIn || null;
                 let systemOut = systemShift?.clockOut || null;
 
-                // V6.0.4：Excel 沒有對應班次的「系統獨立班次」也必須套用人工補卡配對。
-                // 否則像：系統上班 07:33、Excel 無班次，人工補下班後，
-                // 第一段 Excel-based 比對不會碰到這列，第二段又只看主班次引擎，
+                // V6.0.4：試算表 沒有對應班次的「系統獨立班次」也必須套用人工補卡配對。
+                // 否則像：系統上班 07:33、試算表 無班次，人工補下班後，
+                // 第一段 試算表-based 比對不會碰到這列，第二段又只看主班次引擎，
                 // 就會一直顯示「系統缺下班資料」。
                 if (systemIn && !systemOut) {
                     const explicitOut = p79FindExplicitManualPairSide(systemIn, 'OUT');
@@ -19665,7 +19665,7 @@ function p79EmployeeDateEligible(emp,date) {
                 const anchorTime = systemIn?.timeStr || systemOut?.timeStr || '';
                 const systemMonth = attendanceRecordMonthKey({timeStr:anchorTime});
 
-                // 只補進這次 Excel 實際涵蓋的月份，避免把整個歷史系統資料全部灌進本次比對。
+                // 只補進這次 試算表 實際涵蓋的月份，避免把整個歷史系統資料全部灌進本次比對。
                 if (sourceMonths.size && !sourceMonths.has(systemMonth)) return;
 
                 const hasSystemIn = !!String(systemIn?.timeStr || '').trim();
@@ -19685,11 +19685,11 @@ function p79EmployeeDateEligible(emp,date) {
                     systemInStatus: String(systemIn?.status || ''),
                     systemOutStatus: String(systemOut?.status || ''),
                     systemStatus: hasSystemIn && hasSystemOut
-                        ? '系統完整但 Excel 無對應班次'
+                        ? '系統完整但 試算表 無對應班次'
                         : (systemShift?.attendanceStatus || (
-                        hasSystemIn && hasSystemOut ? '系統完整但 Excel 無對應班次' :
-                        hasSystemIn ? '系統缺下班且 Excel 無對應班次' :
-                        hasSystemOut ? '系統缺上班且 Excel 無對應班次' :
+                        hasSystemIn && hasSystemOut ? '系統完整但 試算表 無對應班次' :
+                        hasSystemIn ? '系統缺下班且 試算表 無對應班次' :
+                        hasSystemOut ? '系統缺上班且 試算表 無對應班次' :
                         '系統無有效班次'
                     )),
                     pairingIssue: false,
@@ -19707,12 +19707,12 @@ function p79EmployeeDateEligible(emp,date) {
                     systemComplete: hasSystemIn && hasSystemOut,
                     auditSeverity: (!hasSystemIn || !hasSystemOut) ? 'error' : 'source',
                     action: (!hasSystemIn && !hasSystemOut)
-                        ? 'Excel 無對應班次｜系統亦無完整上下班'
+                        ? '試算表 無對應班次｜系統亦無完整上下班'
                         : (!hasSystemIn)
-                            ? 'Excel 無對應班次｜系統缺上班資料'
+                            ? '試算表 無對應班次｜系統缺上班資料'
                             : (!hasSystemOut)
-                                ? 'Excel 無對應班次｜系統缺下班資料'
-                                : 'Excel 無對應班次｜系統班次存在，需確認 Excel 是否漏資料'
+                                ? '試算表 無對應班次｜系統缺下班資料'
+                                : '試算表 無對應班次｜系統班次存在，需確認 試算表 是否漏資料'
                 };
 
                 audit.push(draftRow);
@@ -19748,10 +19748,10 @@ function p79EmployeeDateEligible(emp,date) {
             return keys;
         }
 
-        // V6.0.6：Excel 匯入候選的最後一道精確去重。
+        // V6.0.6：試算表 匯入候選的最後一道精確去重。
         // key = 同一人 + 上/下班類型 + 完整標準化時間。
         // 1. 系統目前已存在的完全相同事件不新增。
-        // 2. 同一批 Excel 自己重複的事件只保留第一筆。
+        // 2. 同一批 試算表 自己重複的事件只保留第一筆。
         // 3. 不用「只看日期」去重，避免合法的一天多班被誤刪。
         function p79FilterNewImportCandidates(importRows) {
             const existingKeys = p79ImportExistingExactEventKeys();
@@ -19776,7 +19776,7 @@ function p79EmployeeDateEligible(emp,date) {
                 }
 
                 // V6.0.9：正式系統同人、同側、15分鐘內已有打卡 = 同一實際事件。
-                // 例如正式 16:32、Excel 16:31，不可再新增第二筆。
+                // 例如正式 16:32、試算表 16:31，不可再新增第二筆。
                 if (p79FindCanonicalNearDuplicateSide(record)) {
                     nearDuplicateCount++;
                     return;
@@ -19787,7 +19787,7 @@ function p79EmployeeDateEligible(emp,date) {
                     return;
                 }
 
-                // 同一批 Excel 的同人、同方向、15 分鐘內近似資料只取一筆，
+                // 同一批 試算表 的同人、同方向、15 分鐘內近似資料只取一筆，
                 // 避免來源檔有重複刷卡時一次補進多個原始事件。
                 const candidateType = getAttendanceRecordType(record);
                 const candidateTs = getAttendanceTimestamp(record);
@@ -19818,14 +19818,14 @@ function p79EmployeeDateEligible(emp,date) {
             };
         }
 
-        // V6.0.7：Excel 明確完整班次是「配對證據」，但不是覆蓋系統時間的指令。
+        // V6.0.7：試算表 明確完整班次是「配對證據」，但不是覆蓋系統時間的指令。
         // 若 IN / OUT 原始事件其實都已存在，只是班次引擎沒有掛在同一列：
         // 1. 不新增任何重複打卡；
         // 2. 保留系統原本時間；
         // 3. 只補 reciprocal pair metadata，讓 V6 強制把兩側掛回同一班。
-        // V6.0.9：清理由舊匯入流程誤新增的 Excel 近似副本。
+        // V6.0.9：清理由舊匯入流程誤新增的 試算表 近似副本。
         // 規則非常保守：只有 source=excel-import、未人工修改，而且正式系統同人同側 15 分鐘內已有資料才刪。
-        // 系統真正缺少的 Excel 那一側沒有正式替代資料，因此一定會保留。
+        // 系統真正缺少的 試算表 那一側沒有正式替代資料，因此一定會保留。
         function p79CleanupNearDuplicateExcelImports(options = {}) {
             const current = Array.isArray(records) ? [...records] : [];
             const toDelete = [];
@@ -19877,7 +19877,7 @@ function p79EmployeeDateEligible(emp,date) {
             }
 
             if (options.syncCloud !== false) {
-                // 只刪明確 Excel 副本。每筆走既有 V5 outbox，失敗會自動重試。
+                // 只刪明確 試算表 副本。每筆走既有 V5 outbox，失敗會自動重試。
                 Promise.resolve().then(async () => {
                     for (const id of ids) {
                         try {
@@ -19888,7 +19888,7 @@ function p79EmployeeDateEligible(emp,date) {
                                 () => {}
                             ));
                         } catch (e) {
-                            console.warn('刪除 Excel 重複副本雲端同步失敗：', id, e);
+                            console.warn('刪除 試算表 重複副本雲端同步失敗：', id, e);
                         }
                     }
                 });
@@ -19922,7 +19922,7 @@ function p79EmployeeDateEligible(emp,date) {
                     if (inId && outId) currentPairedKeys.add(inId + '|' + outId);
                 });
             } catch (e) {
-                console.warn('建立 Excel 配對修復基準失敗：', e);
+                console.warn('建立 試算表 配對修復基準失敗：', e);
             }
 
             const findBestSide = (sourceSide, wantedType) => {
@@ -20062,7 +20062,7 @@ function p79EmployeeDateEligible(emp,date) {
             countEl.textContent = pending > 0 ? `(${pending})` : '';
             button.title = pending > 0
                 ? ('目前有 ' + pending + ' 筆考勤等待寫入雲端。快速同步最多同時送 4 筆不同考勤。')
-                : '目前沒有待同步資料；點擊只做輕量雲端確認，不重送整批 Excel。';
+                : '目前沒有待同步資料；點擊只做輕量雲端確認，不重送整批 試算表。';
         }
 
         async function syncAttendanceCloudNow() {
@@ -20268,7 +20268,7 @@ function p79EmployeeDateEligible(emp,date) {
                 url.searchParams.set('t', String(Date.now()));
                 const read = async action => {
                     url.searchParams.set('action', action);
-                    const data = await fetchGasJsonWithRetry(url.toString(), 'Excel 清理重新讀取', 1, 20000);
+                    const data = await fetchGasJsonWithRetry(url.toString(), '試算表 清理重新讀取', 1, 20000);
                     if (!data?.ok || !Array.isArray(data.records)) throw new Error(data?.error || '雲端考勤讀取失敗');
                     return data;
                 };
@@ -20290,16 +20290,16 @@ function p79EmployeeDateEligible(emp,date) {
             if (p79FinalizeExcelAttendanceBusy) return false;
             const audit = getStoredAttendanceImportAudit();
             if (!audit.length || audit.some(row => row?.needsAttention === true)) {
-                showToast('請先完成所有 Excel 核對項目', 'warning');
+                showToast('請先完成所有 試算表 核對項目', 'warning');
                 return false;
             }
             const officialIds = new Set(audit.flatMap(row => [row.systemInId, row.systemOutId]).filter(Boolean).map(String));
             const excelRows = records.filter(row => officialIds.has(String(row.id)) && row.source === 'excel-import');
             if (!excelRows.length) {
-                showToast('沒有 Excel 匯入考勤需要清理', 'success');
+                showToast('沒有 試算表 匯入考勤需要清理', 'success');
                 return true;
             }
-            if (!confirm(`核對完成後，將 ${excelRows.length} 筆 Excel 補缺轉正式考勤，已有正式對應紀錄的副本才會刪除。雲端重新讀取確認成功後才清理，確定繼續？`)) return false;
+            if (!confirm(`核對完成後，將 ${excelRows.length} 筆 試算表 補缺轉正式考勤，已有正式對應紀錄的副本才會刪除。雲端重新讀取確認成功後才清理，確定繼續？`)) return false;
             p79FinalizeExcelAttendanceBusy = true;
             let confirmed = 0;
             try {
@@ -20363,7 +20363,7 @@ function p79EmployeeDateEligible(emp,date) {
                 saveRecords();
                 saveAttendanceSafetyBackup(records);
                 if (confirmed === excelRows.length) {
-                    // Excel 可包含尚未處理的其他日期，只移除本次已確認的來源事件。
+                    // 試算表 可包含尚未處理的其他日期，只移除本次已確認的來源事件。
                     const cached = p79ReadCachedExcelSource();
                     const lineage = new Set(jobs.map(job => p79ImportSourceLineageKey(job.original)).filter(Boolean));
                     if (cached) {
@@ -20379,7 +20379,7 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast(`雲端已確認 ${confirmed}/${excelRows.length} 筆；未確認資料保留，可重新核對`, confirmed === excelRows.length ? 'success' : 'warning');
                 return confirmed === excelRows.length;
             } catch (error) {
-                showToast(`尚未完成清理：${error.message}。Excel 來源與未確認資料保留`, 'warning');
+                showToast(`尚未完成清理：${error.message}。試算表 來源與未確認資料保留`, 'warning');
                 return false;
             } finally { p79FinalizeExcelAttendanceBusy = false; }
         }
@@ -20442,8 +20442,8 @@ function p79EmployeeDateEligible(emp,date) {
             // V5.10.38：比對入口固定顯示，不能因 localStorage/audit 暫時沒有資料就整顆消失。
             button.classList.remove('hidden');
             if (!total) {
-                button.textContent = '🔎 Excel ↔ 系統比對';
-                button.title = '先匯入考勤 Excel，即可逐班比對 Excel 與目前系統上下班';
+                button.textContent = '🔎 試算表 ↔ 系統比對';
+                button.title = '先匯入考勤，即可逐班比對 試算表 與目前系統上下班';
                 button.classList.remove('bg-amber-600','hover:bg-amber-700','bg-emerald-600','hover:bg-emerald-700');
                 button.classList.add('bg-violet-600','hover:bg-violet-700');
                 return;
@@ -20460,13 +20460,13 @@ function p79EmployeeDateEligible(emp,date) {
                 button.classList.add('bg-violet-600','hover:bg-violet-700');
                 button.title = `共有 ${total} 班，系統尚有 ${pending} 班需要處理`;
             } else if (sourceIssues > 0) {
-                button.textContent = `⚠️ 匯入比對｜Excel來源缺資料 ${sourceIssues} / ${total}`;
+                button.textContent = `⚠️ 匯入比對｜試算表來源缺資料 ${sourceIssues} / ${total}`;
                 button.classList.add('bg-amber-600','hover:bg-amber-700');
-                button.title = `系統目前無待補，但 Excel 有 ${sourceIssues} 班來源不完整，不能算完整比對`;
+                button.title = `系統目前無待補，但 試算表 有 ${sourceIssues} 班來源不完整，不能算完整比對`;
             } else {
                 button.textContent = `✅ 匯入比對｜完整 ${complete} / ${total}`;
                 button.classList.add('bg-emerald-600','hover:bg-emerald-700');
-                button.title = `Excel 與系統四欄皆完整，且沒有待處理異常`;
+                button.title = `試算表 與系統四欄皆完整，且沒有待處理異常`;
             }
         }
 
@@ -20483,10 +20483,10 @@ function p79EmployeeDateEligible(emp,date) {
             if (!hasSystemOut) return '系統缺下班資料';
             if (row?.pairingIssue === true) return '系統班次配對異常';
 
-            // 系統完整後，Excel 缺資料只算來源提醒，不算考勤異常。
-            if (!hasExcelIn && !hasExcelOut) return '系統正常｜Excel無對應班次';
-            if (!hasExcelIn) return '系統正常｜Excel缺上班';
-            if (!hasExcelOut) return '系統正常｜Excel缺下班';
+            // 系統完整後，試算表 缺資料只算來源提醒，不算考勤異常。
+            if (!hasExcelIn && !hasExcelOut) return '系統正常｜試算表無對應班次';
+            if (!hasExcelIn) return '系統正常｜試算表缺上班';
+            if (!hasExcelOut) return '系統正常｜試算表缺下班';
 
             return '✅ 系統正常';
         }
@@ -20494,7 +20494,7 @@ function p79EmployeeDateEligible(emp,date) {
         function p79AuditIsAbnormal(row) {
             if (!row) return false;
             // 最終判定只看「考勤系統」：系統有完整上班＋下班才算正常。
-            // Excel 缺資料屬於來源問題，不再把考勤系統判成異常。
+            // 試算表 缺資料屬於來源問題，不再把考勤系統判成異常。
             const hasSystemIn = !!String(row.systemIn || '').trim();
             const hasSystemOut = !!String(row.systemOut || '').trim();
             return !(hasSystemIn && hasSystemOut && row?.pairingIssue !== true);
@@ -20541,8 +20541,8 @@ function p79EmployeeDateEligible(emp,date) {
                 : allRows.filter(r => p79AuditMonthKey(r) === selectedMonth);
 
             // 2026-10-07：此表只顯示「有問題」的班次。
-            // 系統異常、Excel來源缺資料、配對/時間差異需確認都保留；
-            // Excel 與系統皆完整正常的列直接隱藏。
+            // 系統異常、試算表來源缺資料、配對/時間差異需確認都保留；
+            // 試算表 與系統皆完整正常的列直接隱藏。
             const issueRows = monthRows.filter(row =>
                 p79AuditIsAbnormal(row) ||
                 p79AuditHasExcelSourceIssue(row) ||
@@ -20563,7 +20563,7 @@ function p79EmployeeDateEligible(emp,date) {
             const excelMissingIn = sourceIssueRows.filter(r => !String(r.excelIn || '').trim()).length;
             const excelMissingOut = sourceIssueRows.filter(r => !String(r.excelOut || '').trim()).length;
 
-            summary.textContent = `${selectedMonth==='ALL'?'全部月份':selectedMonth}｜只顯示錯誤 ${rows.length} 班｜系統異常 ${abnormalRows.length}｜系統缺上班 ${systemMissingIn}｜系統缺下班 ${systemMissingOut}｜Excel來源缺資料 ${sourceIssueRows.length}（缺上班 ${excelMissingIn}／缺下班 ${excelMissingOut}）`;
+            summary.textContent = `${selectedMonth==='ALL'?'全部月份':selectedMonth}｜只顯示錯誤 ${rows.length} 班｜系統異常 ${abnormalRows.length}｜系統缺上班 ${systemMissingIn}｜系統缺下班 ${systemMissingOut}｜試算表來源缺資料 ${sourceIssueRows.length}（缺上班 ${excelMissingIn}／缺下班 ${excelMissingOut}）`;
 
             body.innerHTML = rows.length ? rows.map((row, rowIndex) => {
                 const auditRowKey = encodeURIComponent(p79AttendanceAuditRowKey(row));
@@ -20598,7 +20598,7 @@ function p79EmployeeDateEligible(emp,date) {
                         ${abnormal && !String(row.systemOut || '').trim()
                             ? `<button type="button" onclick="openAttendanceImportAuditAction('${auditRowKey}','addOut')" class="bg-orange-100 text-orange-700 font-bold">${row.excelOut ? '＋ 補下班' : '＋ 人工補下班'}</button>`
                             : ''}
-                        ${!abnormal && sourceIssue ? '<span style="color:#92400e;font-weight:900">系統正常｜Excel來源缺資料</span>' : ''}
+                        ${!abnormal && sourceIssue ? '<span style="color:#92400e;font-weight:900">系統正常｜試算表來源缺資料</span>' : ''}
                         ${!abnormal && !sourceIssue ? '<span style="color:#047857;font-weight:900">系統正常</span>' : ''}
                       </div>
                     </td>
@@ -20854,13 +20854,13 @@ function p79EmployeeDateEligible(emp,date) {
                         encodeURIComponent(name),
                         encodeURIComponent(String(row.systemOut || ''))
                     );
-                    // 預先帶入 Excel 的時間，使用者仍可確認/修改後再儲存。
+                    // 預先帶入 試算表 的時間，使用者仍可確認/修改後再儲存。
                     setTimeout(() => {
                         const m = String(row.excelIn || '').match(/(\d{1,2}):(\d{2})/);
                         if (m) {
                             set24HourTime('addModal', `${String(m[1]).padStart(2,'0')}:${m[2]}`);
                         } else {
-                            showToast('Excel 也沒有上班時間，請人工輸入正確上班時間', 'warning');
+                            showToast('試算表 也沒有上班時間，請人工輸入正確上班時間', 'warning');
                         }
                     }, 30);
                 }, 0);
@@ -20891,7 +20891,7 @@ function p79EmployeeDateEligible(emp,date) {
                         if (m) {
                             set24HourTime('addModal', `${String(m[1]).padStart(2,'0')}:${m[2]}`);
                         } else {
-                            showToast('Excel 也沒有下班時間，請人工輸入正確下班時間', 'warning');
+                            showToast('試算表 也沒有下班時間，請人工輸入正確下班時間', 'warning');
                         }
                     }, 30);
                 }, 0);
@@ -20909,7 +20909,7 @@ function p79EmployeeDateEligible(emp,date) {
             let sourceRecords = [];
             let sourceFileName = '';
 
-            // 優先用完整 Excel 原始打卡資料重新組班，跨日下班才不會因舊 audit 快照遺失。
+            // 優先用完整 試算表 原始打卡資料重新組班，跨日下班才不會因舊 audit 快照遺失。
             try {
                 const cached = JSON.parse(localStorage.getItem('port79_last_attendance_import_source_v2') || 'null');
                 if (cached && Array.isArray(cached.records) && cached.records.length) {
@@ -20920,14 +20920,14 @@ function p79EmployeeDateEligible(emp,date) {
                     sourceFileName = String(cached.fileName || '');
                 }
             } catch (e) {
-                console.warn('讀取完整 Excel 原始來源失敗：', e);
+                console.warn('讀取完整 試算表 原始來源失敗：', e);
             }
 
             // 舊版沒有完整來源時，才退回舊 audit 快照。
             if (!sourceRecords.length) {
                 const oldAudit = getStoredAttendanceImportAudit();
                 if (!oldAudit.length) {
-                    showToast('目前沒有完整 Excel 來源，請重新選一次原始考勤 Excel', 'warning');
+                    showToast('目前沒有完整 試算表 來源，請重新選一次原始考勤 試算表', 'warning');
                     return;
                 }
 
@@ -20978,7 +20978,7 @@ function p79EmployeeDateEligible(emp,date) {
                     );
                 } else {
                     showToast(
-                        `目前仍使用舊比對快照｜舊快照可能漏掉跨日或另一側打卡，顯示的待處理 ${pending} 筆不代表真正異常。請重新選一次原始考勤 Excel，建立完整比對來源。`,
+                        `目前仍使用舊比對快照｜舊快照可能漏掉跨日或另一側打卡，顯示的待處理 ${pending} 筆不代表真正異常。請重新選一次原始考勤 試算表，建立完整比對來源。`,
                         'warning'
                     );
                 }
@@ -20992,7 +20992,7 @@ function p79EmployeeDateEligible(emp,date) {
         function showAttendanceImportAuditModal(options = {}) {
             const audit = getStoredAttendanceImportAudit();
             if (!audit.length) {
-                showToast('目前還沒有匯入比對明細；請先匯入一份 Excel', 'warning');
+                showToast('目前還沒有匯入比對明細；請先匯入一份 試算表', 'warning');
                 return;
             }
             renderAttendanceImportAudit(audit);
@@ -21050,7 +21050,7 @@ function p79EmployeeDateEligible(emp,date) {
                 return;
             }
             if (typeof XLSX === 'undefined' || !XLSX?.utils) {
-                showToast('Excel 元件尚未載入，請重新整理後再試', 'warning');
+                showToast('試算表 元件尚未載入，請重新整理後再試', 'warning');
                 return;
             }
 
@@ -21070,11 +21070,11 @@ function p79EmployeeDateEligible(emp,date) {
                 ['需要補下班', fillOut],
                 ['真正完整班次', completeCount],
                 ['系統待處理', pendingCount],
-                ['Excel來源缺資料', sourceIssueCount],
+                ['試算表來源缺資料', sourceIssueCount],
                 ['跨日班次', crossDay],
                 ['需要補卡班次', needRows.length],
                 ['', ''],
-                ['比對規則', 'Excel 先組成 IN→OUT 班次，再與系統班次逐班比對；已有側保留，只補空白側。']
+                ['比對規則', '試算表 先組成 IN→OUT 班次，再與系統班次逐班比對；已有側保留，只補空白側。']
             ];
 
             const detailRows = audit.map(row => ({
@@ -21082,8 +21082,8 @@ function p79EmployeeDateEligible(emp,date) {
                 '考勤號': row.attNo || '',
                 '工號': row.empId || '',
                 '姓名': row.name || '',
-                'Excel上班': row.excelIn || '',
-                'Excel下班': row.excelOut || '',
+                '試算表上班': row.excelIn || '',
+                '試算表下班': row.excelOut || '',
                 '系統上班': row.systemIn || '',
                 '系統下班': row.systemOut || '',
                 '系統上班ID': row.systemInId || '',
@@ -21094,10 +21094,10 @@ function p79EmployeeDateEligible(emp,date) {
                 '下班差異(分)': row.outDiffMin ?? '',
                 '補上班': row.addIn ? '是' : '否',
                 '補下班': row.addOut ? '是' : '否',
-                'Excel完整': row.excelComplete ? '是' : '否',
+                '試算表完整': row.excelComplete ? '是' : '否',
                 '系統完整': row.systemComplete ? '是' : '否',
                 '真正完整班次': row.isComplete && !row.needsAttention ? '是' : '否',
-                'Excel來源缺資料': row.sourceIssue ? '是' : '否',
+                '試算表來源缺資料': row.sourceIssue ? '是' : '否',
                 '待處理': row.needsAttention ? '是' : '否',
                 '異常等級': row.auditSeverity || '',
                 '比對結果/動作': row.action || ''
@@ -21108,8 +21108,8 @@ function p79EmployeeDateEligible(emp,date) {
                 '考勤號': row.attNo || '',
                 '工號': row.empId || '',
                 '姓名': row.name || '',
-                'Excel上班': row.excelIn || '',
-                'Excel下班': row.excelOut || '',
+                '試算表上班': row.excelIn || '',
+                '試算表下班': row.excelOut || '',
                 '系統上班': row.systemIn || '',
                 '系統下班': row.systemOut || '',
                 '要補上班': row.addIn ? '是' : '否',
@@ -21154,7 +21154,7 @@ function p79EmployeeDateEligible(emp,date) {
                 String(now.getMinutes()).padStart(2,'0')
             ].join('');
             XLSX.writeFile(wb, `PORT79_考勤匯入逐班比對_${stamp}.xlsx`);
-            showToast(`Excel 比對報表已產生：逐班 ${audit.length}｜需要補卡 ${needRows.length}`, 'success');
+            showToast(`試算表 比對報表已產生：逐班 ${audit.length}｜需要補卡 ${needRows.length}`, 'success');
         }
 
         function exportAttendanceImportAuditCsv() {
@@ -21163,7 +21163,7 @@ function p79EmployeeDateEligible(emp,date) {
 
             const headers = [
                 '序號','考勤號','工號','姓名',
-                'Excel上班','Excel下班','系統上班','系統下班',
+                '試算表上班','試算表下班','系統上班','系統下班',
                 '系統狀態','跨日','比對結果'
             ];
             const rows = audit.map(row => [
@@ -21201,7 +21201,7 @@ function p79EmployeeDateEligible(emp,date) {
         window.exportAttendanceImportAuditCsv = exportAttendanceImportAuditCsv;
         window.updateAttendanceImportAuditButton = updateAttendanceImportAuditButton;
 
-        // V6.0.8：使用者之前匯入過 Excel 後，完整原始來源已保存在 localStorage。
+        // V6.0.8：使用者之前匯入過 試算表 後，完整原始來源已保存在 localStorage。
         // 重新整理正式版時自動檢查一次：只修「原始 IN/OUT 都存在但顯示仍斷裂」的班次。
         // 不新增任何事件，因此不會造成重複考勤。
         let p79CachedExcelPairRepairBusy = false;
@@ -21225,18 +21225,18 @@ function p79EmployeeDateEligible(emp,date) {
                 const doneKey = 'port79_cached_excel_all_dates_reconcile_v610';
                 if (sessionStorage.getItem(doneKey) === stamp) return false;
 
-                setCloudSyncStatus('Excel 全日期核對中｜先拉齊正式考勤', 'loading', 'read');
+                setCloudSyncStatus('試算表 全日期核對中｜先拉齊正式考勤', 'loading', 'read');
 
-                // ① Excel 涵蓋的所有月份先從正式雲端拉齊。
+                // ① 試算表 涵蓋的所有月份先從正式雲端拉齊。
                 const preflight = await p79PreflightExcelImportCloudMonths(cached.records);
 
-                // ② 先清舊版本誤新增的近似 Excel 副本。
+                // ② 先清舊版本誤新增的近似 試算表 副本。
                 const cleanup = p79CleanupNearDuplicateExcelImports({
                     syncCloud:true,
                     render:false
                 });
 
-                // ③ 用完整 Excel 原始來源逐班比對。
+                // ③ 用完整 試算表 原始來源逐班比對。
                 const reconcile = p79ReconcileImportByShift(cached.records);
                 const filtered = p79FilterNewImportCandidates(reconcile.selected);
                 const candidates = filtered.records;
@@ -21247,11 +21247,11 @@ function p79EmployeeDateEligible(emp,date) {
                     try { archiveAttendanceRecords(candidates); } catch (e) {}
                 }
 
-                // ⑤ 補完缺側後，再把 Excel 對應班次強制修回同一列（含跨日）。
+                // ⑤ 補完缺側後，再把 試算表 對應班次強制修回同一列（含跨日）。
                 const repair = p79RepairExistingPairsFromExcelSource(cached.records);
                 const repairRows = Array.isArray(repair?.updates) ? repair.updates : [];
 
-                // ⑥ 再清一次近似副本，只留下真正補缺且沒有正式替代事件的 Excel 資料。
+                // ⑥ 再清一次近似副本，只留下真正補缺且沒有正式替代事件的 試算表 資料。
                 const cleanupAfter = p79CleanupNearDuplicateExcelImports({
                     syncCloud:true,
                     render:false
@@ -21269,7 +21269,7 @@ function p79EmployeeDateEligible(emp,date) {
                     try { p79RenderOnlyVisibleAttendanceView(); } catch (_) {}
                 }
 
-                // ⑦ 所有日期一起重新建立 Excel↔系統核對。
+                // ⑦ 所有日期一起重新建立 試算表↔系統核對。
                 try {
                     const rebuilt = p79ReconcileImportByShift(cached.records);
                     window.p79LastAttendanceImportAudit = rebuilt.audit;
@@ -21280,7 +21280,7 @@ function p79EmployeeDateEligible(emp,date) {
                     renderAttendanceImportAudit(rebuilt.audit);
                     updateAttendanceImportAuditButton();
                 } catch (e) {
-                    console.warn('Excel 全日期補缺後重新比對失敗：', e);
+                    console.warn('試算表 全日期補缺後重新比對失敗：', e);
                 }
 
                 sessionStorage.setItem(doneKey, stamp);
@@ -21291,10 +21291,10 @@ function p79EmployeeDateEligible(emp,date) {
                         try {
                             await syncImportedAttendanceRecordsToCloud(
                                 cloudRows,
-                                { fileName:String(cached.fileName || '已匯入Excel全日期自動補缺') }
+                                { fileName:String(cached.fileName || '已匯入試算表全日期自動補缺') }
                             );
                         } catch (e) {
-                            console.warn('Excel 全日期自動補缺雲端同步失敗：', e);
+                            console.warn('試算表 全日期自動補缺雲端同步失敗：', e);
                         }
                     });
                 }
@@ -21307,17 +21307,17 @@ function p79EmployeeDateEligible(emp,date) {
                 const pending = finalAudit.filter(row => row?.needsAttention === true).length;
 
                 setCloudSyncStatus(
-                    `Excel 全日期核對完成｜新增 ${candidates.length}｜修復 ${repair?.repairedPairs || 0} 班`,
+                    `試算表 全日期核對完成｜新增 ${candidates.length}｜修復 ${repair?.repairedPairs || 0} 班`,
                     'success',
                     'write'
                 );
 
                 showToast(
-                    `Excel 全日期自動整理完成：補上班 ${addSummary.inCount}｜補下班 ${addSummary.outCount}｜修復配對 ${repair?.repairedPairs || 0} 班｜清除重複 ${removed} 筆｜剩餘待查 ${pending} 班`,
+                    `試算表 全日期自動整理完成：補上班 ${addSummary.inCount}｜補下班 ${addSummary.outCount}｜修復配對 ${repair?.repairedPairs || 0} 班｜清除重複 ${removed} 筆｜剩餘待查 ${pending} 班`,
                     pending > 0 ? 'warning' : 'success'
                 );
 
-                console.info('[PORT79 V6.0.10] Excel 全日期核對', {
+                console.info('[PORT79 V6.0.10] 試算表 全日期核對', {
                     sourceRows:cached.records.length,
                     months:preflight?.months || [],
                     cloudMonthsRefreshed:preflight?.refreshed || 0,
@@ -21331,7 +21331,7 @@ function p79EmployeeDateEligible(emp,date) {
 
                 return true;
             } catch (e) {
-                console.warn('Excel 全日期自動補缺失敗：', e);
+                console.warn('試算表 全日期自動補缺失敗：', e);
                 return false;
             } finally {
                 p79CachedExcelPairRepairBusy = false;
@@ -21339,16 +21339,16 @@ function p79EmployeeDateEligible(emp,date) {
         }
         window.p79RepairCachedExcelPairsOnce = p79RepairCachedExcelPairsOnce;
 
-        // V6.0.11：禁止頁面載入後自動跑整份 Excel。
-        // 只恢復「已載入的 Excel 日期選單」，真正寫入一定由管理員選日期後手動開始。
+        // V6.0.11：禁止頁面載入後自動跑整份 試算表。
+        // 只恢復「已載入的 試算表 日期選單」，真正寫入一定由管理員選日期後手動開始。
         window.addEventListener('load', () => {
             setTimeout(() => {
                 try { p79PopulateExcelImportDateSelect(); } catch (e) {}
             }, 900);
         }, { once:true });
 
-        // V6.0.9：Excel 比對前先拉齊檔案涵蓋月份的正式雲端考勤。
-        // 防止瀏覽器當下只載到部分資料，就把 Excel 誤判為「系統沒有」而新增第二套班次。
+        // V6.0.9：試算表 比對前先拉齊檔案涵蓋月份的正式雲端考勤。
+        // 防止瀏覽器當下只載到部分資料，就把 試算表 誤判為「系統沒有」而新增第二套班次。
         async function p79PreflightExcelImportCloudMonths(parsedRecords) {
             const months = Array.from(new Set(
                 (Array.isArray(parsedRecords) ? parsedRecords : [])
@@ -21366,14 +21366,14 @@ function p79EmployeeDateEligible(emp,date) {
                     else failedMonths.push(month);
                 } catch (e) {
                     failedMonths.push(month);
-                    console.warn('Excel 核對前月份同步失敗：', month, e);
+                    console.warn('試算表 核對前月份同步失敗：', month, e);
                 }
             }
             if (!months.length || failedMonths.length) {
                 throw new Error(
                     '無法確認完整雲端考勤（' +
                     (failedMonths.length ? failedMonths.join('、') : '無有效月份') +
-                    '），為避免重複補卡已停止 Excel 匯入，請確認網路及雲端後重試'
+                    '），為避免重複補卡已停止 試算表 匯入，請確認網路及雲端後重試'
                 );
             }
             return { months, refreshed, failedMonths:[] };
@@ -21470,7 +21470,7 @@ function p79EmployeeDateEligible(emp,date) {
 
             const rows = Array.isArray(cached?.records) ? cached.records : [];
             if (!rows.length) {
-                select.innerHTML = '<option value="">先載入 Excel</option>';
+                select.innerHTML = '<option value="">先載入 試算表</option>';
                 select.disabled = true;
                 button.disabled = true;
                 if (status) status.textContent = '';
@@ -21495,7 +21495,7 @@ function p79EmployeeDateEligible(emp,date) {
             if (dates.includes(current)) select.value = current;
             button.disabled = !String(select.value || '');
 
-            // 保留 Excel 日期選擇及匯入功能，但不顯示冗長的檔名／筆數摘要。
+            // 保留 試算表 日期選擇及匯入功能，但不顯示冗長的檔名／筆數摘要。
             if (status) { status.textContent = ''; status.classList.add('hidden'); }
             return true;
         }
@@ -21512,11 +21512,11 @@ function p79EmployeeDateEligible(emp,date) {
             const input = event.target;
             const file = input.files?.[0];
             if (!file) return;
-            if (!requireAdminAction('attendanceImport', '載入考勤 Excel')) { input.value = ''; return; }
+            if (!requireAdminAction('attendanceImport', '載入考勤 試算表')) { input.value = ''; return; }
             if (!ensureExcelLibrary()) { input.value = ''; return; }
 
             try {
-                setCloudSyncStatus('正在讀取 Excel｜只載入來源，不寫入考勤', 'loading', 'read');
+                setCloudSyncStatus('正在讀取 試算表｜只載入來源，不寫入考勤', 'loading', 'read');
 
                 const workbook = XLSX.read(await file.arrayBuffer(), {
                     type:'array',
@@ -21596,7 +21596,7 @@ function p79EmployeeDateEligible(emp,date) {
                         dept:matchedEmployee?.dept || String(valueAt(indexes.dept) || '一般').trim() || '一般',
                         timeStr,
                         status:statusText,
-                        location:String(valueAt(indexes.location) || '').trim() || `Excel匯入：${file.name}`,
+                        location:String(valueAt(indexes.location) || '').trim() || `試算表匯入：${file.name}`,
                         note:String(valueAt(indexes.note) || '').trim(),
                         source:'excel-import',
                         importFile:file.name
@@ -21612,7 +21612,7 @@ function p79EmployeeDateEligible(emp,date) {
                 });
 
                 if (!parsedImportRecords.length) {
-                    throw new Error(`Excel 沒有可用的考勤資料；格式無效 ${skippedInvalid} 筆`);
+                    throw new Error(`試算表 沒有可用的考勤資料；格式無效 ${skippedInvalid} 筆`);
                 }
 
                 const cached = {
@@ -21634,15 +21634,15 @@ function p79EmployeeDateEligible(emp,date) {
                 updateAttendanceImportAuditButton();
 
                 const groups = p79ExcelDateGroups(parsedImportRecords);
-                setCloudSyncStatus('Excel 已載入｜等待選擇日期', 'success', 'read');
+                setCloudSyncStatus('試算表 已載入｜等待選擇日期', 'success', 'read');
                 showToast(
-                    `Excel 已載入：${parsedImportRecords.length} 筆｜${groups.size} 個班次日期。請選日期後按「匯入選定日期」；目前尚未寫入任何考勤。`,
+                    `試算表 已載入：${parsedImportRecords.length} 筆｜${groups.size} 個班次日期。請選日期後按「匯入選定日期」；目前尚未寫入任何考勤。`,
                     'success'
                 );
             } catch (error) {
-                console.error('考勤 Excel 載入失敗：', error);
-                setCloudSyncStatus('Excel 載入失敗', 'error', 'read');
-                showToast('考勤 Excel 載入失敗：' + (error?.message || error), 'warning');
+                console.error('考勤 試算表 載入失敗：', error);
+                setCloudSyncStatus('試算表 載入失敗', 'error', 'read');
+                showToast('考勤 試算表 載入失敗：' + (error?.message || error), 'warning');
             } finally {
                 input.value = '';
             }
@@ -21662,7 +21662,7 @@ function p79EmployeeDateEligible(emp,date) {
 
             const cached = p79ReadCachedExcelSource();
             if (!cached?.records?.length) {
-                showToast('目前沒有已載入的 Excel，請先按「載入考勤 Excel」', 'warning');
+                showToast('目前沒有已載入的 試算表，請先按「載入考勤 試算表」', 'warning');
                 p79PopulateExcelImportDateSelect();
                 return false;
             }
@@ -21670,7 +21670,7 @@ function p79EmployeeDateEligible(emp,date) {
             const group = p79ExcelDateGroups(cached.records).get(dateKey);
             const dayRecords = Array.isArray(group?.records) ? group.records : [];
             if (!dayRecords.length) {
-                showToast('這個日期沒有可匯入的 Excel 班次', 'warning');
+                showToast('這個日期沒有可匯入的 試算表 班次', 'warning');
                 return false;
             }
 
@@ -21678,7 +21678,7 @@ function p79EmployeeDateEligible(emp,date) {
 
             try {
                 setCloudSyncStatus(
-                    `Excel ${dateKey.replaceAll('-','/')}｜先同步正式考勤`,
+                    `試算表 ${dateKey.replaceAll('-','/')}｜先同步正式考勤`,
                     'loading',
                     'read'
                 );
@@ -21695,14 +21695,14 @@ function p79EmployeeDateEligible(emp,date) {
                 const finalDedupe = p79FilterNewImportCandidates(candidates);
                 candidates = finalDedupe.records;
 
-                // 系統優先：重複 Excel 只排除待匯入候選，不刪正式資料。
+                // 系統優先：重複 試算表 只排除待匯入候選，不刪正式資料。
                 const skippedExcelDuplicates = ['existingDuplicateCount','nearDuplicateCount','batchDuplicateCount']
                     .reduce((n,k) => n + Number(deduped[k] || 0) + Number(finalDedupe[k] || 0),0);
                 const importSideSummary = p79ImportMissingSideSummary(candidates);
 
                 if (candidates.length) {
                     const backupOk = await backupAttendanceRecordsBeforeImport(
-                        `${cached.fileName || 'Excel'}｜${dateKey}`
+                        `${cached.fileName || '試算表'}｜${dateKey}`
                     );
                     if (!backupOk) {
                         throw new Error('無法備份目前考勤，為避免資料遺失已取消這一天的匯入');
@@ -21744,7 +21744,7 @@ function p79EmployeeDateEligible(emp,date) {
 
                 const pending = finalReconcile.audit.filter(row => row?.needsAttention === true).length;
                 setCloudSyncStatus(
-                    `Excel ${dateKey.replaceAll('-','/')}｜補缺 ${candidates.length} 筆｜跳過重複 ${skippedExcelDuplicates} 筆`,
+                    `試算表 ${dateKey.replaceAll('-','/')}｜補缺 ${candidates.length} 筆｜跳過重複 ${skippedExcelDuplicates} 筆`,
                     'success',
                     'write'
                 );
@@ -21768,21 +21768,21 @@ function p79EmployeeDateEligible(emp,date) {
                             const hasPending = result.failed > 0 || result.queued > 0;
                             setCloudSyncStatus(
                                 hasPending
-                                    ? `Excel ${dateKey.replaceAll('-','/')}｜雲端待補傳 ${result.queued}`
-                                    : `Excel ${dateKey.replaceAll('-','/')}｜雲端已同步 ${result.confirmed}`,
+                                    ? `試算表 ${dateKey.replaceAll('-','/')}｜雲端待補傳 ${result.queued}`
+                                    : `試算表 ${dateKey.replaceAll('-','/')}｜雲端已同步 ${result.confirmed}`,
                                 hasPending ? 'loading' : 'success',
                                 'write'
                             );
                         } catch (e) {
-                            console.warn('選定日期 Excel 雲端同步失敗：', e);
-                            setCloudSyncStatus('Excel 本機已完成｜雲端待補傳', 'idle', 'write');
+                            console.warn('選定日期 試算表 雲端同步失敗：', e);
+                            setCloudSyncStatus('試算表 本機已完成｜雲端待補傳', 'idle', 'write');
                         }
                     });
                 }
 
                 return true;
             } catch (error) {
-                console.error('選定日期 Excel 匯入失敗：', error);
+                console.error('選定日期 試算表 匯入失敗：', error);
                 showToast(
                     `${dateKey.replaceAll('-','/')} 匯入失敗：${error?.message || error}`,
                     'warning'
@@ -21795,7 +21795,7 @@ function p79EmployeeDateEligible(emp,date) {
         window.p79ImportSelectedExcelDate = p79ImportSelectedExcelDate;
 
         async function p79ClearExcelImportData() {
-            if (!requireAdminAction('attendanceImport', '清空 Excel 匯入資料')) return false;
+            if (!requireAdminAction('attendanceImport', '清空 試算表 匯入資料')) return false;
 
             const excelRows = (Array.isArray(records) ? records : []).filter(record =>
                 record &&
@@ -21807,15 +21807,15 @@ function p79EmployeeDateEligible(emp,date) {
             const cachedCount = Array.isArray(cached?.records) ? cached.records.length : 0;
 
             if (!excelRows.length && !cachedCount) {
-                showToast('目前沒有 Excel 匯入資料需要清空', 'success');
+                showToast('目前沒有 試算表 匯入資料需要清空', 'success');
                 p79PopulateExcelImportDateSelect();
                 return true;
             }
 
             const confirmed = confirm(
-                '確定清空 Excel 匯入資料嗎？\n\n' +
-                `將清除 Excel 來源快取：${cachedCount} 筆\n` +
-                `將移除尚未確認為正式考勤的 Excel 匯入紀錄：${excelRows.length} 筆\n\n` +
+                '確定清空 試算表 匯入資料嗎？\n\n' +
+                `將清除 試算表 來源快取：${cachedCount} 筆\n` +
+                `將移除尚未確認為正式考勤的 試算表 匯入紀錄：${excelRows.length} 筆\n\n` +
                 '原本系統刷卡、人工修改、已確認正式考勤不會刪除。'
             );
             if (!confirmed) return false;
@@ -21865,7 +21865,7 @@ function p79EmployeeDateEligible(emp,date) {
             }
 
             showToast(
-                `Excel 匯入已清空：來源 ${cachedCount} 筆｜移除 Excel 考勤 ${deleteIds.length} 筆；正式系統與人工考勤保留。`,
+                `試算表 匯入已清空：來源 ${cachedCount} 筆｜移除 試算表 考勤 ${deleteIds.length} 筆；正式系統與人工考勤保留。`,
                 'success'
             );
 
@@ -21882,7 +21882,7 @@ function p79EmployeeDateEligible(emp,date) {
                                 () => {}
                             ));
                         } catch (e) {
-                            console.warn('清空 Excel 匯入雲端刪除失敗：', id, e);
+                            console.warn('清空 試算表 匯入雲端刪除失敗：', id, e);
                         }
                         if (i % 10 === 9) {
                             await new Promise(resolve => setTimeout(resolve, 50));
@@ -22164,7 +22164,7 @@ function p79EmployeeDateEligible(emp,date) {
                 includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,readOptions):Promise.resolve(null),
                 window.p79LoadXlsxLibrary()
             ]);
-            if(!window.XLSX?.utils)throw Error('Excel 元件未成功載入，請再試一次');
+            if(!window.XLSX?.utils)throw Error('試算表 元件未成功載入，請再試一次');
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             update('正在整理原始考勤與選取欄位…');
             const identityPool=getAttendanceIdentityEmployeePool();
@@ -22182,7 +22182,7 @@ function p79EmployeeDateEligible(emp,date) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
-            if (!ensureExcelLibrary()) throw Error('Excel 元件尚未就緒');
+            if (!ensureExcelLibrary()) throw Error('試算表 元件尚未就緒');
             const sheetRows = [selectedFields.map(f => f.label)];
             visibleRecords.forEach(r => {
                 const currentEmployee = findEmployeeForAttendanceIdentity(r, identityPool);
@@ -22230,16 +22230,16 @@ function p79EmployeeDateEligible(emp,date) {
                 const rows=[['資料','月份','來源','資料保存時間（台北）'],...sources.map(item=>[item.action==='getScheduleDataSecure'?'排班':'考勤',item.month,item.source,new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'medium'}).format(new Date(item.savedAt))])];
                 const sheet=XLSX.utils.aoa_to_sheet(rows);sheet['!cols']=[12,12,16,24].map(wch=>({wch}));XLSX.utils.book_append_sheet(workbook,sheet,'資料來源與快取時間');
             }
-            update('正在產生 Excel 檔案…');
+            update('正在產生 試算表 檔案…');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${dateLabel}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
-            showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 Excel 匯出成功，共 ${visibleRecords.length} 筆`,missingPairs.length?'warning':'success');
+            showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 試算表 匯出成功，共 ${visibleRecords.length} 筆`,missingPairs.length?'warning':'success');
             } catch(error) {
                 const message='匯出失敗：'+(error?.message||String(error));
                 if(progress)progress.textContent=message;
                 showToast(message,'error');
-                console.error('考勤 Excel 匯出失敗',error);
+                console.error('考勤 試算表 匯出失敗',error);
             } finally {
                 if(button){button.disabled=false;button.textContent=originalLabel;}
             }
@@ -24362,7 +24362,7 @@ body.p79-audit-standalone-open #p79SevenTop{margin-bottom:0!important}
   <div class="p79as-head">
     <div>
       <div class="p79as-title">🔎 考勤異常核對表</div>
-      <div class="p79as-sub">顯示整份 Excel 的全部日期、全部人員、全部班次；正常與異常都保留供逐日核對</div>
+      <div class="p79as-sub">顯示整份 試算表 的全部日期、全部人員、全部班次；正常與異常都保留供逐日核對</div>
     </div>
     <div class="p79as-tools">
       <label class="p79as-filter">月份
@@ -24371,7 +24371,7 @@ body.p79-audit-standalone-open #p79SevenTop{margin-bottom:0!important}
         </select>
       </label>
       <button type="button" class="p79as-recheck" onclick="rebuildAttendanceImportAuditFromCurrentSystem()">🔄 重新比對</button>
-      <button type="button" class="p79as-export" onclick="exportAttendanceImportAuditExcel()">📊 匯出 Excel</button>
+      <button type="button" class="p79as-export" onclick="exportAttendanceImportAuditExcel()">📊 匯出考勤比對</button>
       <button type="button" class="p79as-finish" onclick="p79FinalizeConfirmedExcelAttendance()">✅ 完成核對，只保留系統考勤</button>
       <button type="button" class="p79as-back" onclick="closeAttendanceImportAuditModal()">← 返回考勤管理</button>
     </div>
@@ -24381,7 +24381,7 @@ body.p79-audit-standalone-open #p79SevenTop{margin-bottom:0!important}
     <table>
       <thead><tr>
         <th>#</th><th>考勤號</th><th>工號</th><th>姓名</th>
-        <th>Excel 上班</th><th>Excel 下班</th><th>系統上班</th><th>系統下班</th>
+        <th>試算表 上班</th><th>試算表 下班</th><th>系統上班</th><th>系統下班</th>
         <th>異常原因</th><th>處理</th>
       </tr></thead>
       <tbody id="attendanceAuditStandaloneBody"></tbody>
@@ -24398,16 +24398,16 @@ body.p79-audit-standalone-open #p79SevenTop{margin-bottom:0!important}
   <div class="p79-audit-panel mx-auto rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
     <div class="p79-audit-head sticky top-0 z-10 flex flex-wrap items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur rounded-t-2xl">
       <div>
-        <h3 class="font-black text-slate-800 dark:text-white">🔎 Excel ↔ 系統考勤逐班比對明細</h3>
+        <h3 class="font-black text-slate-800 dark:text-white">🔎 試算表 ↔ 系統考勤逐班比對明細</h3>
         <div class="mt-1 flex flex-wrap gap-2 text-[10px] font-bold">
-          <span class="px-2 py-1 rounded-lg bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">藍色＝Excel 原始資料</span>
+          <span class="px-2 py-1 rounded-lg bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">藍色＝試算表 原始資料</span>
           <span class="px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">紫色＝目前系統資料</span>
         </div>
         <div id="attendanceImportAuditSummary" class="mt-1 text-xs text-slate-500 dark:text-slate-400"></div>
       </div>
       <div class="flex flex-wrap gap-1.5 pr-24">
         <button type="button" onclick="rebuildAttendanceImportAuditFromCurrentSystem()" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold">🔄 重新比對</button>
-        <button type="button" onclick="exportAttendanceImportAuditExcel()" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">📊 匯出 Excel</button>
+        <button type="button" onclick="exportAttendanceImportAuditExcel()" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">📊 匯出考勤比對</button>
         <button type="button" onclick="p79FinalizeConfirmedExcelAttendance()" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black">✅ 完成核對，只保留系統考勤</button>
         <button type="button" onclick="closeAttendanceImportAuditModal()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-xs font-bold">✕ 關閉</button>
       </div>
@@ -24420,8 +24420,8 @@ body.p79-audit-standalone-open #p79SevenTop{margin-bottom:0!important}
             <th class="px-2 py-2">考勤號</th>
             <th class="px-2 py-2">工號</th>
             <th class="px-2 py-2">姓名</th>
-            <th class="px-2 py-2 bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">Excel 上班</th>
-            <th class="px-2 py-2 bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">Excel 下班</th>
+            <th class="px-2 py-2 bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">試算表 上班</th>
+            <th class="px-2 py-2 bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">試算表 下班</th>
             <th class="px-2 py-2 bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">系統上班</th>
             <th class="px-2 py-2 bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">系統下班</th>
             <th class="px-2 py-2">系統狀態</th>
