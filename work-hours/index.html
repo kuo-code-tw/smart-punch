@@ -1367,6 +1367,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <span aria-label="加班計算與時間提醒" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">💡</span>
                     <span id="overtimeFilterResultCount" class="text-[10px] text-slate-500"></span>
                     <button type="button" onclick="P79OvertimeStatus.open()" class="p79-overtime-history rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">申報／異動紀錄</button>
+                    <button type="button" onclick="P79OvertimeMail.open()" class="p79-overtime-history rounded-lg border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800">✉ 寄送會計 Email</button>
                   </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
@@ -15555,8 +15556,30 @@ window.p79OvertimeStatusContext={
   }finally{if(acquired)try{await rpc('scheduleReleaseEditLock',{});}catch(ignore){}}
  }
 };
+window.p79OvertimeMailContext={
+ canSend:()=>p79CanDeleteOvertime()&&p79CanExportOvertimeApplication(),
+ identity:()=>String(currentEmp?.empId||'')+'|'+String(currentPort79SsoToken()||'')+'|'+String(getActiveGasUrl()||''),
+ month:()=>window.p79MonthlyRestContext.month(),
+ snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
+ employees:()=>p79WorkhoursEligibleEmployees(),
+ request:async function(action,payload={}){
+  if(!this.canSend())throw Error('沒有寄送會計申報的管理權限');
+  const token=currentPort79SsoToken(),url=getActiveGasUrl();
+  if(!token||!url)throw Error('管理員登入資料不完整');
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+  try{
+   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({...payload,action,token,gcToken:token}),signal:ctl.signal,cache:'no-store'});
+   const data=await response.json();
+   if(!response.ok||data?.ok!==true||data?.queued===true)throw Error(data?.error||'寄送服務未確認完成');
+   if(token!==currentPort79SsoToken())throw Error('登入身分已變更');
+   return data;
+  }finally{clearTimeout(timer)}
+ }
+};
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
+<script src="../assets/port79-overtime-mail.js?v=20261025-accounting-mail-v1"></script>
 <script src="../assets/port79-overtime-application.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-actual-hours"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
