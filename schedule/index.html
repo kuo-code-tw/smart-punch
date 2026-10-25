@@ -5027,15 +5027,20 @@ function p79EmployeeDateEligible(emp,date) {
     function p79SubstituteShiftLabel(empId,dayStr,meta){
       const saved=typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[empId]?.[dayStr]:null;
       meta={...(saved||{}),...(meta&&typeof meta==='object'?meta:{})};
-      const savedReport=meta.overtimeReport,hasConfirmedReport=
-        !!String(savedReport?.id??'').trim()&&meta.overtimeExcluded!==true&&
-        !(meta.overtimeRevocations||[]).some(x=>
-          x?.confirmed===true&&String(x.reportId)===String(savedReport.id));
+      const savedReport=meta.overtimeReport;
+      const revokedReport=!!String(savedReport?.id??'').trim()&&
+        (meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
+          String(x.reportId)===String(savedReport.id));
+      const hasConfirmedReport=!!String(savedReport?.id??'').trim()&&
+        meta.overtimeExcluded!==true&&!revokedReport;
+      // An excluded/revoked overtime report must never reappear via a stale
+      // overtime flag, old saved time range, or an old raw overtime code.
+      const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
+      if(!cover&&(revokedReport||meta.overtimeExcluded===true))return '';
       const reportCode=p79CompactOvertimeCode(savedReport?.code);
       if(reportCode&&hasConfirmedReport)return p79OvertimePeriodLabel({...savedReport,code:reportCode});
       const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
       const ownCode=p79CompactOvertimeCode(own);if(ownCode)return p79OvertimePeriodLabel({category:meta.overtimeReport?.category||(meta.overtimeType==='extended'||(!meta.restCategory&&/^(08-20|20-08)$/.test(ownCode))?'延':''),code:ownCode,overtimeStart:meta.overtimeReport?.overtimeStart||meta.overtimeStart,overtimeEnd:meta.overtimeReport?.overtimeEnd||meta.overtimeEnd});
-      const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
       const validClock=value=>/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(String(value||''));
       const explicitTimedAssignment=!!(meta.overtime||meta.forEmpId||meta.type==='substitute')&&
         validClock(meta.overtimeStart)&&validClock(meta.overtimeEnd);
@@ -6396,7 +6401,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
     }
     function p79ScheduleConfirmedOvertime(empId,date,shift) {
-      const report=monthlyScheduleMeta[empId]?.[date]?.overtimeReport;
+      const meta=monthlyScheduleMeta[empId]?.[date]||{},report=meta.overtimeReport;
+      const revoked=!!String(report?.id??'').trim()&&
+        (meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
+          String(x.reportId)===String(report.id));
+      if(meta.overtimeExcluded===true||revoked)return '';
       const code=p79CompactOvertimeCode(report?.code);
       if(code&&p79ConfirmedOvertimeReport(monthlyScheduleMeta[empId]?.[date]))return p79OvertimePeriodLabel({...report,code});
       const own=p79CompactOvertimeCode(shift);
