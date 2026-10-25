@@ -29,7 +29,7 @@ const extract=n=>{
  assert(i>=0&&j>i,'missing function '+n);return html.slice(i,j+6);
 };
 for(const n of ['p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79VisibleRestKind',
- 'p79ConfirmedRestOvertime','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
+ 'p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
  'p79ScheduleExportDay','p79VisibleRestDayAudit','p79DailyRestCount'])
  vm.runInContext(extract(n),c);
 let confirmed=0,revoked=0,weak=0,timed=0,idless=0,typhoonCases=0;
