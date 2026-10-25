@@ -157,7 +157,7 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '@media(max-width:520px){#p79MonthlyMatrix .mm-header{padding:12px!important;min-height:0}#p79MonthlyMatrix .mm-brand-symbol{width:36px;height:36px;font-size:19px}#p79MonthlyMatrix .mm-brand-title{font-size:16px}#p79MonthlyMatrix .mm-brand-description{display:none}#p79MonthlyMatrix .mm-form-grid{grid-template-columns:1fr}#p79MonthlyMatrix .mm-body{padding:10px!important}#p79MonthlyMatrix .mm-filter-card{padding:12px}#p79MonthlyMatrix .mm-actions button{flex:1}#p79MonthlyMatrix .mm-actions-hint{width:100%}#p79MonthlyMatrix .mm-back{padding:7px!important;font-size:11px}}',
  '@media(prefers-reduced-motion:reduce){#p79MonthlyMatrix .mm-progress:before,#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:none}}'
  ].join('');
- dialog.insertAdjacentHTML('afterbegin','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
+ dialog.querySelector('style').insertAdjacentHTML('afterend','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
  const mmHeader=dialog.querySelector('.mm-header');
  mmHeader.innerHTML='<div class="mm-brand"><span class="mm-brand-symbol" aria-hidden="true">▦</span><div><div class="mm-brand-label">OVERTIME REPORT · 月度統計</div><strong class="mm-brand-title">加班時數統計表</strong><div class="mm-brand-description">整月申報、請假與各職稱時數一目了然</div></div></div><button id="mmClose" class="mm-back" type="button">← 返回加班管理</button>';
  const mmControls=dialog.querySelector('.mm-controls'),mmCard=document.createElement('section');
