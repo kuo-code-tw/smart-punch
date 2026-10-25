@@ -86,6 +86,10 @@ function open(){
  '#p79OvertimeMailDialog .om-recipient-editor label{flex:1 1 190px}'+
  '#p79OvertimeMailDialog .om-recipient-editor button{min-height:39px}'+
  '#p79OvertimeMailDialog .om-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;background:#f8fafc;border-radius:10px;margin:8px 0}'+
+ '#p79OvertimeMailDialog .om-day-links{display:flex;align-items:center;gap:6px;max-width:100%;overflow-x:auto;white-space:nowrap;padding:4px 2px 9px}'+
+ '#p79OvertimeMailDialog .om-day-links button{min-height:30px;padding:5px 9px;font-size:11px;background:#eff6ff;color:#075985;border:1px solid #bfdbfe}'+
+ '#p79OvertimeMailDialog .om-day-links button[aria-pressed="true"]{background:#075985;color:#fff;border-color:#075985}'+
+ '#p79OvertimeMailDialog .om-day-links small{font-size:11px;color:#64748b;flex:0 0 auto}'+
  '#p79OvertimeMailDialog .om-summary strong{font-size:15px}'+
  '#p79OvertimeMailDialog .om-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}'+
  '#p79OvertimeMailDialog .om-status.sent{background:#dbeafe;color:#1d4ed8}'+
@@ -116,7 +120,8 @@ function open(){
  '<label>Mail 信箱<input id="omRecipientEmail" type="email" placeholder="name@company.com"></label>'+
  '<button id="omSaveRecipient" class="om-green" type="button">儲存 Mail</button>'+
  '<button id="omCancelRecipient" class="om-muted" type="button">取消</button></div></div>'+
- '<div id="omSummary" class="om-summary"><strong>請先核對申報日期</strong></div>'+
+ '<div id="omSummary" class="om-summary"><strong>請先核對申報日期</strong></div>'+ 
+ '<div id="omDayLinks" class="om-day-links" aria-label="有加班申報的日期"></div>'+
  '<details id="omDetails" style="margin:8px 0"><summary style="cursor:pointer;color:#075985;font-size:13px;font-weight:750;padding:8px 0">查看當日加班申報明細（點擊展開）</summary>'+ 
  '<div class="om-list"><table><thead><tr><th>申報日期</th><th>姓名／工號</th><th>加班類型／時段</th><th>時數</th></tr></thead>'+
  '<tbody id="omRows"><tr><td colspan="4">載入中…</td></tr></tbody></table></div></details>'+
@@ -126,7 +131,7 @@ function open(){
  el.showModal();
  const q=id=>el.querySelector(id);
  const initialAccount=ctx.identity();
- let busy=false,ready=false,rows=[],receipts=[],recipients=[],lastMonth='',canManage=false;
+ let busy=false,ready=false,mailReady=false,snapshotFresh=false,rows=[],receipts=[],recipients=[],lastMonth='',canManage=false;
  const guard=()=>{if(initialAccount!==ctx.identity()||!ctx.canSend())throw Error('登入身分或發送權限已變更，請重新開啟')};
  const msg=text=>{q('#omMessage').textContent=text};
  const recipient=()=>recipients.find(r=>r.id===q('#omRecipient').value);
@@ -146,16 +151,20 @@ function open(){
   const sum=filtered.reduce((v,r)=>v+(Number(r.hours)||0),0);
   const people=new Set(filtered.map(r=>r.empId)).size;
   q('#omSummary').innerHTML='<strong>'+esc(date()||'尚未選擇日期')+'</strong>'+
-   '<span>'+people+' 人｜'+filtered.length+' 筆申報｜'+Number(sum.toFixed(2))+' 小時</span>'+
+   '<span>'+(ready?(people+' 人｜'+filtered.length+' 筆申報｜'+Number(sum.toFixed(2))+' 小時'):'申報明細尚未成功載入')+'</span>'+
    '<span class="om-status '+state.kind+'">'+statusLabel+'</span>'+
    (state.receipt?'<small>已記錄：'+esc(state.receipt.sentAt||'待核對')+'</small>':'');
+  const availableDates=ready?[...new Set(rows.map(r=>r.date))].sort().reverse():[];
+  q('#omDayLinks').innerHTML=availableDates.length?'<small>快速選日期：</small>'+availableDates.map(d=>
+   '<button type="button" data-mail-date="'+esc(d)+'" aria-pressed="'+(d===date())+'">'+esc(d.slice(5).replace('-','/'))+'</button>').join(''):
+   '<small>'+(ready?'本月份沒有有效申報日期':'待讀取班表資料')+'</small>';
   q('#omRows').innerHTML=filtered.length?filtered.map(r=>
    '<tr><td>'+esc(r.date)+'</td><td>'+esc(r.name)+
    '<div style="color:#64748b;font-size:11px">'+esc(r.empId)+'</div></td>'+
    '<td>'+esc(r.type)+'<div style="color:#64748b;font-size:11px">'+esc(r.code)+'</div></td>'+
    '<td>'+esc(r.hours)+' 小時</td></tr>').join(''):
-   '<tr><td colspan="4">'+(ready?'此日期沒有已確認的有效加班申報':'尚未核對雲端資料')+'</td></tr>';
-  q('#omSendDay').disabled=busy||!ready||!filtered.length||!target||state.kind==='sent'||state.kind==='pending';
+   '<tr><td colspan="4">'+(ready?'此日期沒有有效加班申報，請改選其他日期':'加班資料尚未載入成功，請查看下方提示')+'</td></tr>';
+  q('#omSendDay').disabled=busy||!ready||!mailReady||!snapshotFresh||!filtered.length||!target||state.kind==='sent'||state.kind==='pending';
   q('#omSendDay').textContent=state.kind==='stale'?'重新發送當日 Mail':'發送當日 Mail（'+filtered.length+'筆）';
   for(const id of ['omMonth','omDate','omRecipient','omReload','omAddRecipient','omRemoveRecipient',
                     'omSaveRecipient','omRecipientName','omRecipientEmail','omCancelRecipient'])q('#'+id).disabled=busy;
@@ -169,24 +178,57 @@ function open(){
   if(preferred&&recipients.some(r=>r.id===preferred))q('#omRecipient').value=preferred;
  }
  async function load(preferred){
-  guard();ready=false;rows=[];receipts=[];paint();
+  guard();
   const month=q('#omMonth').value,limits=range(month);
   if(!limits)throw Error('請選擇有效月份');
   const previousDate=date();
+  ready=false;mailReady=false;snapshotFresh=false;rows=[];receipts=[];recipients=[];canManage=false;
   q('#omDate').min=limits[0];q('#omDate').max=limits[1];
-  msg('正在核對當月有效申報與 Mail 收件名單…');
-  const config=await ctx.request('getOvertimeMailOptions',{month});guard();
-  if(config.overtimeMailVersion!==2||!Array.isArray(config.recipients)||!Array.isArray(config.receipts))
-    throw Error('雲端後端尚未支援「每日一封 Mail」，請先部署新版後端，已停止發送');
-  recipients=config.recipients;receipts=config.receipts;
-  canManage=config.canManageRecipients===true;
-  fillRecipients(preferred||q('#omRecipient').value);
-  const snapshot=await ctx.snapshot(month);guard();
-  rows=collect(snapshot,ctx.employees(),month);
+  paint();
+  msg('分別讀取正式加班申報與 Mail 服務狀態…');
+  // Mail RPC can be unimplemented while secure schedule reads still work.
+  // Never let an unavailable optional Mail action erase an authorized roster preview.
+  const [rosterResult,mailResult]=await Promise.allSettled([
+   ctx.snapshot(month),
+   ctx.request('getOvertimeMailOptions',{month})
+  ]);
+  guard();
+  let rosterError='',mailError='',cached=false;
+  if(rosterResult.status==='fulfilled'&&Array.isArray(rosterResult.value?.schedules)){
+   rows=collect(rosterResult.value,ctx.employees(),month);
+   ready=true;snapshotFresh=true;
+  }else{
+   rosterError=rosterResult.status==='rejected'?
+    String(rosterResult.reason?.message||rosterResult.reason):
+    '雲端沒有回傳可核實的申報班表';
+   // Display-only cached roster is permitted, but sending requires a fresh
+   // authoritative cloud read and comparison against full-day snapshots.
+   const cachedRoster=ctx.preview?.(month);
+   if(Array.isArray(cachedRoster?.schedules)){
+    rows=collect(cachedRoster,ctx.employees(),month);ready=true;cached=true;
+   }
+  }
+  if(mailResult.status==='fulfilled'){
+   const config=mailResult.value;
+   if(config?.overtimeMailVersion===2&&Array.isArray(config.recipients)&&Array.isArray(config.receipts)){
+    recipients=config.recipients;receipts=config.receipts;canManage=config.canManageRecipients===true;mailReady=true;
+   }else{
+    mailError='目前 Apps Script 不是「每日一封 Mail」第 2 版，需在原專案更新寄信路由';
+   }
+  }else{
+   const reason=String(mailResult.reason?.message||mailResult.reason);
+   mailError=reason.includes('未知操作')?
+    '目前 Apps Script 未辨識 getOvertimeMailOptions，需要更新原專案的 Mail 操作路由':
+    reason;
+  }
+  fillRecipients(preferred);
   const dates=[...new Set(rows.map(r=>r.date))].sort().reverse();
   q('#omDate').value=dates.includes(previousDate)?previousDate:(dates[0]||limits[0]);
-  ready=true;lastMonth=month;paint();
-  msg(dates.length?'可從日期選擇當天所有人的加班申報，確認後只會寄出一封 Mail。':'此月目前沒有可發送的有效加班申報。');
+  lastMonth=month;paint();
+  const result=ready?('已讀取 '+rows.length+' 筆有效申報'+(cached?'（來自已讀取的考勤班表快取，僅供預覽）':'（來自雲端班表）')+
+   '，可選日期查看當天明細。'):('加班申報讀取失敗：'+rosterError);
+  msg(result+(mailError?'\nMail 功能未就緒：'+mailError+'。可查看明細，但不能儲存信箱或發送 Mail。':
+     (mailReady&&snapshotFresh?'\n已確認 Mail 服務，可選擇核准收件信箱並發送。':'')));
  }
  function updateDateRange(){
   const limits=range(q('#omMonth').value);
@@ -194,9 +236,11 @@ function open(){
  }
  q('#omClose').onclick=()=>el.close();el.onclose=()=>el.remove();
  q('#omDate').onchange=paint;q('#omRecipient').onchange=paint;
- q('#omMonth').onchange=()=>{ready=false;rows=[];receipts=[];updateDateRange();paint();msg('已切換月份，請按「重新核對雲端」')};
+ q('#omDayLinks').onclick=event=>{const button=event.target.closest('button[data-mail-date]');if(!button||busy)return;
+  q('#omDate').value=button.dataset.mailDate;paint();};
+ q('#omMonth').onchange=()=>{ready=false;mailReady=false;snapshotFresh=false;rows=[];receipts=[];canManage=false;updateDateRange();paint();msg('已切換月份，請按「重新核對雲端」')};
  q('#omReload').onclick=async()=>{if(busy)return;busy=true;paint();try{await load(q('#omRecipient').value)}
-  catch(e){ready=false;rows=[];msg('雲端版本核對失敗：'+(e.message||e)+'。你仍可點「＋ 新增 Mail」輸入信箱，實際儲存要由雲端後端成功確認；目前不會發送郵件。')}
+  catch(e){mailReady=false;snapshotFresh=false;msg('讀取或權限驗證失敗：'+(e.message||e)+'。不會發送 Mail，請核對管理權限。')}
   finally{busy=false;paint()}};
  q('#omAddRecipient').onclick=()=>{const e=q('#omRecipientEditor');e.hidden=!e.hidden;if(!e.hidden)q('#omRecipientName').focus()};
  q('#omCancelRecipient').onclick=()=>{q('#omRecipientEditor').hidden=true};
@@ -235,7 +279,7 @@ function open(){
   finally{busy=false;paint()}
  };
  q('#omSendDay').onclick=async()=>{
-  if(busy||!ready||q('#omMonth').value!==lastMonth)return;
+  if(busy||!ready||!mailReady||!snapshotFresh||q('#omMonth').value!==lastMonth)return;
   const to=recipient(),selectedDate=date(),items=dailyItems(rows,selectedDate),status=to?dayStatus(selectedDate,items,receipts,to.id):{kind:'new'};
   if(!to||!items.length||['sent','pending'].includes(status.kind))return;
   const staff=new Set(items.map(r=>r.empId)).size;
