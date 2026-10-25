@@ -64,6 +64,15 @@ function collect(snapshot,people,month,balance){
  rows.sort((a,b)=>b.date.localeCompare(a.date)||a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));
  return {rows,issues};
 }
+function accountingCsv(rows){
+  const cols=['申報日期','姓名','工號','部門','職稱','申報編號','申報類型','加班時段','申報時數','備註','超額排除原因','會計狀態','修改日期','取代原編號','取消原因','取消人','取消時間'];
+  const values=rows.map(r=>[r.date,r.name,r.empId,r.dept,r.job,r.id,r.type,r.period,r.hours,
+   r.note,r.exemptionNote||'',status(r)==='revoked'?'已取消（請勿付款）':status(r)==='amended'?'已修改（依目前有效版本）':status(r)==='review'?'已申報待核對':status(r)==='unverified'?'核對未完成':'已申報有效',
+   r.amendment?.modifiedAt||'',r.amendment?.priorId||'',r.revocation?.reason||'',r.revocation?.actor||'',r.revocation?.at||'']);
+  const safe=v=>{const t=String(v??'');return '"'+(/^[=+@\-]/.test(t)?"'"+t:t).replace(/"/g,'""')+'"';};
+  return '\ufeff'+[cols,...values].map(line=>line.map(safe).join(',')).join('\r\n');
+ }
+
 function open(){
  const ctx=g.p79OvertimeStatusContext;if(!ctx?.canOpen())return alert('沒有加班申報查看權限');const existing=document.getElementById('p79OvertimeStatus');if(existing){existing.focus();return;}
  const el=document.createElement('dialog');el.id='p79OvertimeStatus';el.style.cssText='width:min(1320px,96vw);max-height:92vh;border:1px solid #d5dfeb;border-radius:14px;padding:20px;background:#fff;color:#18334e;';
@@ -120,14 +129,7 @@ function open(){
    ...(a?['取消原因：'+(a.reason||'未填'),'取消人：'+a.actor,'取消時間：'+a.at,'原始申報已作廢，不得重複請款']:[])
   ].filter(Boolean).join('\n'));
  };
- function accountingCsv(rows){
-  const cols=['申報日期','姓名','工號','部門','職稱','申報編號','申報類型','加班時段','申報時數','備註','超額排除原因','會計狀態','修改日期','取代原編號','取消原因','取消人','取消時間'];
-  const values=rows.map(r=>[r.date,r.name,r.empId,r.dept,r.job,r.id,r.type,r.period,r.hours,
-   r.note,r.exemptionNote||'',status(r)==='revoked'?'已取消（請勿付款）':status(r)==='amended'?'已修改（依目前有效版本）':status(r)==='review'?'已申報待核對':status(r)==='unverified'?'核對未完成':'已申報有效',
-   r.amendment?.modifiedAt||'',r.amendment?.priorId||'',r.revocation?.reason||'',r.revocation?.actor||'',r.revocation?.at||'']);
-  const safe=v=>{const t=String(v??'');return '"'+(/^[=+@\-]/.test(t)?"'"+t:t).replace(/"/g,'""')+'"';};
-  return '\ufeff'+[cols,...values].map(line=>line.map(safe).join(',')).join('\r\n');
- }
+
  q('#osAccountingExport').onclick=()=>{
   if(!data?.rows?.length||busy)return;
   const content=accountingCsv(data.rows);
