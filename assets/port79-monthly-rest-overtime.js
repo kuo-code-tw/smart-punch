@@ -3,6 +3,11 @@
 const KEY='port79_monthly_rest_overtime_v1',cats=['國','休','例'],esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // balance() receives the official cloud roster; idless annotations are not saved declarations.
 const storedReport=r=>!!String(r?.id??'').trim();
+const confirmedReport=(meta,report)=>{
+ if(!storedReport(report)||meta?.overtimeExcluded===true)return false;
+ return !(meta?.overtimeRevocations||[]).some(x=>
+   x?.confirmed===true&&String(x.reportId)===String(report.id));
+};
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
@@ -22,36 +27,41 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
   if(typhoonProtected.has(d)){ledger.push({date:d,kind:'typhoon',category:'',actual});continue;}
+  const verified=cats.includes(r?.category)&&confirmedReport(m,r);
+  const hasUnverifiedReport=cats.includes(r?.category)&&!verified&&r&&!storedReport(r);
   const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
   const leave=g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||false;
-  if(leave){ledger.push({date:d,kind:'leave',category:'',actual});if(r&&cats.includes(r.category)){if(storedReport(r))reported[r.category]++;ledger.push({date:d,kind:storedReport(r)?'reported':'unconfirmed',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與未休加班申報重疊，保留原申報額度待核對'});}continue;}
-  // One employee/date can consume the quota only once. A surviving report replaces
-  // that date's roster allocation, while a completed no-card shift is actual rest.
-  if(r&&cats.includes(r.category)&&actual!=='rest'){
-   if(storedReport(r))reported[r.category]++;
-   else conflicts.push({date:d,reason:'加班標記沒有儲存識別碼，未扣已申報額度，請核對雲端紀錄'});
-   ledger.push({date:d,kind:storedReport(r)?'reported':'unconfirmed',category:r.category,actual,reportId:r.id});
-   if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，原申報保留待核對'});
+  if(leave){
+   ledger.push({date:d,kind:'leave',category:'',actual});
+   if(verified){reported[r.category]++;ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與正式加班申報重疊，保留原申報供核對'});}
+   continue;
+  }
+  // Only a non-revoked cloud report ID proves a formal overtime report.
+  // Legacy overtime/restQuotaOvertime flags do not prove a pending report or reserve quota.
+  if(verified&&actual!=='rest'){
+   reported[r.category]++;
+   ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});
+   if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，正式申報保留待核對'});
   }else{
-   // A scheduled rest-day overtime assignment consumes one planned quota day even
-   // before the cloud has confirmed a report ID. Keep it reserved, never reported.
-   // This avoids showing 8 when the roster has 8 off-days + 1 pending rest overtime.
-   const pendingCategory=cats.includes(m.restCategory)?m.restCategory:(cats.includes(r?.category)?r.category:null);
-   // An automatically allocated, unreported workday is merely a suggestion, not an approved overtime day.
-   // Never consume rest quota for synthetic auto-v1 overtime; only explicit saved/manual
-   // assignments can reserve quota. Actual rest days are handled by scheduledRest above.
-   const explicitPending=!!r||!!m.overtime||(!!m.restQuotaOvertime&&m.restAllocationSource!=='auto-v1');
-   const pendingRestOvertime=!!pendingCategory&&explicitPending&&!storedReport(r)&&actual!=='rest';
-   if(pendingRestOvertime){
-    reserved[pendingCategory]++;
-    ledger.push({date:d,kind:'reservedOvertime',category:pendingCategory,actual});
-    conflicts.push({date:d,reason:'休假加班已排入班表，尚未核對正式申報；已列入待確認額度'});
-   }else if(scheduledRest){
-    const kind=actual==='open'?'reserved':'off';
+   if(hasUnverifiedReport&&actual!=='rest'){
+    ledger.push({date:d,kind:'unconfirmed',category:r.category,actual});
+    conflicts.push({date:d,reason:'加班註記缺少正式申報編號，未列入已申報或待確認額度；請核對雲端紀錄'});
+   }
+   // A complete explicit time assignment without a report ID is only a roster
+   // note, not evidence of an approved or queued leave-overtime declaration.
+   const datedAssignment=m.overtime===true&&m.overtimeType==='rest'&&
+     /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(m.overtimeStart||''))&&
+     /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(m.overtimeEnd||''));
+   if(!verified&&!hasUnverifiedReport&&datedAssignment&&actual!=='rest'){
+    ledger.push({date:d,kind:'unconfirmedAssignment',category:'',actual});
+    conflicts.push({date:d,reason:'班表有人工加班時段但無正式申報編號；未當成已申報或預留額度，請核對'});
+   }
+   if(scheduledRest&&actual!=='worked'&&actual!=='missing'){
+    const kind=actual==='rest'?'off':'reserved';
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest')extraRestDates.push(d);
-   if(r&&cats.includes(r.category)&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，原申報不列有效加班'});
+   if(verified&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，正式申報保留待核對，不列有效加班'});
   }
  }
  // Supplement the shared schedule allocation with actual, non-leave no-card days.
@@ -141,7 +151,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'休假加班待申報',reported:'既有申報',unconfirmed:'未確認標記（不扣已報）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+(x.actual==='rest'&&x.kind==='off'?'（整班無卡）':'')));
