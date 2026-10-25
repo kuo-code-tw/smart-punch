@@ -16,8 +16,8 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[]) {
-  const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates);
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[]) {
+  const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
@@ -27,6 +27,18 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   for(const date of dates) {
     const item=result[date];if(!item||item.restAllocationSource!=='auto-v1')continue;
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
+    if(!Object.keys(item).length)delete result[date];
+  }
+  // 颱風日不是例／休／國；清除舊的自動或人工休假額度註記，但不改原班別，
+  // 也不觸碰正式加班、代班、鎖定欄位。颱日不得藉舊標記消耗任何休假額度。
+  for(const date of dates) {
+    if(!typhoonProtected.has(date))continue;
+    const item=result[date];if(!item)continue;
+    const formalWork=item.overtimeReport||item.overtimeReports?.length||item.overtime||
+      item.forEmpId||item.type==='substitute'||item.restQuotaOvertime;
+    if(formalWork)continue;
+    for(const field of ['restCategory','restSourceDate','restHolidayName',
+      'restQuotaOvertime','restAllocationSource','restPreferredCategory'])delete item[field];
     if(!Object.keys(item).length)delete result[date];
   }
   // A substitute assignment can retain the rest label from the original roster.
@@ -81,7 +93,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   for(const date of dates){
     const item=result[date];
     if(!item?.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date))continue;
-    if(excluded.has(date)&&!item.restQuotaOvertime)continue;
+    if(typhoonProtected.has(date)||excluded.has(date)&&!item.restQuotaOvertime)continue;
     if(schedule[date]!=='休'&&!item.restQuotaOvertime)throw new Error(date+' 手動假別與班別不一致');
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
