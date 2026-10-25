@@ -38,11 +38,13 @@ for(const emp of people){
 }
 const before=JSON.stringify(monthlyScheduleData),reports=JSON.stringify(monthlyScheduleMeta);
 let plan=c.p79RestAutomaticPlan(people[0],month);
-const counts=kind=>Object.entries(plan.meta).filter(([date,m])=>date.startsWith(month)&&m?.restCategory===kind&&!m.restQuotaOvertime).length;
+const counts=kind=>Object.entries(plan.meta).filter(([date,m])=>date.startsWith(month)&&date!==typhoon&&m?.restCategory===kind&&!m.restQuotaOvertime).length;
 a.equal(counts('例'),4,'例 first: 4 visible allocations must not be on typhoon day');
 a.equal(counts('休'),5,'next 休=5');
-a.equal(counts('國'),2,'typhoon day originally 休 retains 例/休 allocation, freeing ordinary 休 to complete 國');
-a(['例','休'].includes(plan.meta[typhoon]?.restCategory),'the typhoon rest remains an assigned 例/休, never 國');
+a.equal(counts('國'),1,'颱不算例休國，只有 10 個可用休假日，國必須真實短缺 1 天');
+a.equal(plan.unresolved.length,1,'不得用颱風日虛補缺額');
+a.equal(plan.unresolved[0].category,'國','例休先補，剩餘缺額為國');
+a(!plan.meta[typhoon]?.restCategory,'颱風日必須移除舊配額標籤，不顯示例休國');
 a.equal(JSON.stringify(monthlyScheduleData),before,'do not rewrite underlying original 休 while reallocating its visible category');
 c.p79AutoAllocateRest();
 a.equal(writes,1,'single queued official cloud save for all 83');
@@ -59,4 +61,4 @@ a.equal(JSON.stringify(monthlyScheduleData),before);
 a(html.includes('p79RestAutomaticExcludedDates(emp,month)'));
 a(html.includes('p79RestAutomaticPlan(emp,month)'));
 a(html.includes('const visible=p79VisibleRestDayAudit(emp,month,result.meta)'));
-console.log('PASS 83-person typhoon rest retains 例/休, 國 is fully refilled from 休, cloud save once, no raw shift/report rewrite, rerun idempotent');
+console.log('PASS 83-person typhoon day excluded from 例休國; true 國 shortage reported, cloud save once, no raw shift/report rewrite, rerun idempotent');
