@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261025-zh-import-export"></script>
+<script src="../assets/port79-overtime-report.js?v=20261026-approved-leave-date-v1"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261025-special-audit-v1"></script>
@@ -15714,7 +15714,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null){
   p79OvertimeCalculationCache=null;if(!batch)renderOvertimeStats();return result;
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),approvedLeaves:()=>sanitizeLeaveRecords(leaveRecords),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 document.addEventListener('DOMContentLoaded',()=>{
   const params=new URLSearchParams(location.search);
   if(params.get('attendanceOvertimeReport')!=='1')return;
