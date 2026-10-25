@@ -5,9 +5,11 @@ const labels={reported:'已申報',amended:'已修改・有效',review:'休假�
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function status(row){
  if(row.revocation?.confirmed===true&&row.revocation.reportId===row.id)return 'revoked';
+ // A confirmed edit must remain visible when accounting filters "已修改",
+ // even when attendance/quota validation is separately incomplete.
+ if(row.amendment?.verified)return 'amended';
  if(row.issue)return 'unverified';
- if(!row.exempt&&row.excessDays>0)return 'review';
- return row.amendment?.verified?'amended':'reported';
+ return !row.exempt&&row.excessDays>0?'review':'reported';
 }
 function filter(rows,q={}){const term=String(q.name||'').trim().toLowerCase();return rows.filter(r=>(!q.status||status(r)===q.status)&&(!q.category||r.category===q.category)&&(!q.dept||r.dept===q.dept)&&(!q.job||r.job===q.job)&&(!term||[r.name,r.empId].some(v=>String(v).toLowerCase().includes(term))));}
 function collect(snapshot,people,month,balance){
@@ -166,7 +168,10 @@ function open(options={}){
    const st=status(r);
    const reviewText=st==='review'?r.category+' 超額 '+r.excessDays+' 天'+(r.linked?'；仍有請假代班連結':r.report.planned?'（含預排）':'')
     :st==='unverified'?r.issue:st==='revoked'?'已取消；不計有效申報'
-    :r.exempt?r.exemptionNote:st==='amended'?'修改已核實；仍有效':'無超額提醒';
+    :st==='amended'?(r.issue?'已修改；休假核對未完成：'+r.issue:
+     !r.exempt&&r.excessDays>0?'已修改；'+r.category+' 超額 '+r.excessDays+' 天，仍需核對':
+     '修改已核實；仍有效')
+    :r.exempt?r.exemptionNote:'無超額提醒';
    const checkbox=st==='review'&&!r.linked
     ?'<input type="checkbox" data-pick="'+i+'" aria-label="勾選 '+esc(r.name)+' '+r.date+'" '+(selected.has(r.id)?'checked':'')+(busy?' disabled':'')+'>':'';
    return '<tr><td>'+checkbox+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'<br><small>'+esc(r.empId)+'</small></td>'+
