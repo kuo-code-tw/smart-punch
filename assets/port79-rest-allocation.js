@@ -89,12 +89,23 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     !result[date]?.overtime&&!result[date]?.overtimeReport&&
     !result[date]?.overtimeReports?.length&&!result[date]?.forEmpId&&
     !result[date]?.restQuotaOvertime);
+  // Only a non-revoked formal report can consume an unworked rest quota
+  // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
+  const verifiedRestReport=item=>{
+    const r=item?.overtimeReport;
+    return !!String(r?.id??'').trim()&&['例','休','國'].includes(r?.category)&&
+      item.restCategory===r.category&&item.overtimeExcluded!==true&&
+      !(item.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
+        String(x.reportId)===String(r.id));
+  };
   // Consume genuinely protected manual categories, not movable 休 entries.
   for(const date of dates){
     const item=result[date];
     if(!item?.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date))continue;
-    if(typhoonProtected.has(date)||excluded.has(date)&&!item.restQuotaOvertime)continue;
-    if(schedule[date]!=='休'&&!item.restQuotaOvertime)throw new Error(date+' 手動假別與班別不一致');
+    if(typhoonProtected.has(date)||excluded.has(date)&&!verifiedRestReport(item))continue;
+    // No cloud report ID means the manual overtime note does not reserve quota.
+    if(item.restQuotaOvertime&&!verifiedRestReport(item))continue;
+    if(schedule[date]!=='休'&&!verifiedRestReport(item))continue;
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
     if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);
