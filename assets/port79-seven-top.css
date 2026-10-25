@@ -150,7 +150,17 @@ body{zoom:1!important;}
   font-weight:850;
   cursor:pointer;
 }
-#p79SevenMenuWrap button:hover{background:#f1f5f9}
+/* Only dropdown entries get a pale hover background. Keep the top "功能選單"
+   trigger teal with white text; otherwise it becomes white-on-white on hover. */
+#p79SevenMenuWrap :is(.p79v103-menu,#p79SystemMenu,#p79HrSystemMenu,.p79-seven-default-menu,.p79-seven-standard-menu) button:hover{
+  background:#e8f3f6;
+  color:#123e5c;
+}
+#p79SevenMenuWrap>#p79SevenMenuButton:hover{
+  background:#0e7490;
+  color:#fff;
+  filter:brightness(1.08);
+}
 #p79SevenMenuWrap .danger{color:#be123c!important}
 #p79SevenMenuWrap .p79v103-menu-sep,
 #p79SevenMenuWrap .sep{height:1px;background:#e2e8f0;margin:5px 0}
