@@ -3,7 +3,7 @@
 <head><script src="/smart-punch/integration-test/stage-navigation.js?v=20261017.2"></script><base href="/smart-punch/work-hours/"><script>window.P79ManagementTestMode=true;(function(){const original=window.fetch.bind(window);window.fetch=function(input,init){const method=String(init?.method||input?.method||'GET').toUpperCase();if(method!=='GET'&&method!=='HEAD')return Promise.reject(Error('隔離測試版禁止寫入正式資料'));return original(input,init);};})();</script>
 <script src="../assets/port79-overtime-report.js?v=20261015.60"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261015.58"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261015.66"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261026-rest-ledger-v1"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->

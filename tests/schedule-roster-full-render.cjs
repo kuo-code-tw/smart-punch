@@ -57,8 +57,8 @@ assert(main.innerHTML.includes('data-display-shift="選"'),'election no-punch ce
 assert(main.innerHTML.includes('颱風停班日：已核對整班無上下班紀錄'),'typhoon tooltip should not raise ReferenceError');
 assert(main.innerHTML.includes('選舉日：已核對整班無上下班紀錄'),'election tooltip should not raise ReferenceError');
 assert(main.innerHTML.includes('<span>3/1</span>'),'visible 3 例 must show 3/1 even if metadata claims 4');
-assert(main.innerHTML.includes('data-rest-date="2026-10-01" data-rest-visible="休" data-typhoon-count="off"'),'an originally scheduled 休 still counts as a typhoon event');
-assert(main.innerHTML.includes('颱日</span>'),'keep original rest label and add clear typhoon-day marker');
+assert(main.innerHTML.includes('data-rest-date="2026-10-01" data-rest-visible="" data-typhoon-count="off"'),'an originally scheduled 休 still counts as a typhoon event');
+assert(main.innerHTML.includes('data-display-shift="颱" data-rest-date="2026-10-01"'),'scheduled rest on a typhoon day displays 颱');
 assert(main.innerHTML.includes('>3 天</span>'),'event summary includes originally resting staff, typhoon leave and no-card shift');
 assert.equal((main.innerHTML.match(/data-rest-visible="例"/g)||[]).length,3);
 assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""'),'approved typhoon leave hides the fourth example');

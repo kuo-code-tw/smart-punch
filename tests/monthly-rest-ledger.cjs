@@ -33,6 +33,17 @@ for(const state of ['worked','missing','open','unknown','rest']){
  assert.equal(consumed,8,state+' consumes one quota per date');assert.equal(b.ledger.filter(x=>x.date===d).length,1);
  assert.equal(b.reported.休,state==='rest'?0:1);
 }
+// Attendance without a formal report cannot erase an allocated rest day or
+// silently create a reported overtime day. Unresolved attendance stays reserved.
+for(const state of ['worked','missing','open','unknown','rest']){
+ const t=fixture();for(const d of dates.slice(0,8)){t.schedule[d]='休';t.state(d,state);}
+ const before=JSON.stringify(t.schedule),b=t.balance();
+ const total=x=>Object.values(x).reduce((a,b)=>a+b,0);
+ assert.equal(total(b.off)+total(b.reserved),8,state+' keeps shared roster quota');
+ assert.equal(total(b.reported),0,state+' cannot create an overtime report');
+ assert.equal(total(b.reserved),['missing','open','unknown'].includes(state)?8:0);
+ assert.equal(b.ledger.length,8);assert.equal(JSON.stringify(t.schedule),before);
+}
 // A new no-card rest cannot use an already reported category a second time.
 {const t=fixture();for(const d of dates.slice(0,4))t.schedule.__meta[d]={overtimeReport:{id:'R'+d,category:'例'}};t.state(dates[4],'rest');const b=t.balance();assert.equal(b.off.例,0);assert.equal(b.off.休,1);assert.equal(b.conflicts.length,0);assert.equal(Object.values(b.remaining).reduce((a,b)=>a+b,0),6);}
 // Independent totals across every supported month and employee identity: all

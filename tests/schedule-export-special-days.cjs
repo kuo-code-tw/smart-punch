@@ -27,6 +27,8 @@ const c={
  p79SubstituteShiftLabel:(id,date)=>c.monthlyScheduleMeta.E[date]?.overtimeReport?.code||(/^颱\\d/.test(shifts[date]||'')?shifts[date]:''),
 };
 c.window=c;vm.createContext(c);
+vm.runInContext(body('p79ConfirmedOvertimeReport','    function p79VisibleRestKind('),c);
+vm.runInContext(body('p79OvertimePeriodLabel','    function p79SubstituteShiftLabel('),c);
 vm.runInContext(body('p79CompactOvertimeCode','    function p79SubstituteShiftLabel('),c);
 vm.runInContext(body('p79ScheduleConfirmedOvertime','    // 與排班畫面'),c);
 vm.runInContext(body('p79ScheduleSpecialNoPunchCode','    function p79ScheduleNoPunchRest('),c);
@@ -50,7 +52,7 @@ status.complete=true;status.state='rest';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'休','future absence must not be labeled election');
 now.value='2026-10-26';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'選','verified election-day absence must export 選');
-assert(html.includes('const shownShift=specialNoPunch||approvedLeaveCode||'),'web and export use one shared resolver');
+assert(html.includes("const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||"),'web and export use one shared resolver');
 assert(html.includes('return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;'));
 assert(html.includes('const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);'));
 assert(html.includes('await p79ScheduleRestClient().refreshIfStale(yearMonth)'),'export waits for missing attendance evidence when special days exist');
@@ -59,7 +61,7 @@ console.log('PASS: typhoon and election no-punch export, partial/full punches, a
 for(const state of ['rest','open','worked','missing']){
  status.state=state;
  for(const prefix of ['颱','選']){
-  c.monthlyScheduleMeta.E['2026-10-23']={overtimeReport:{code:prefix+'24-08',category:'國'}};
+  c.monthlyScheduleMeta.E['2026-10-23']={overtimeReport:{id:'SAVED-'+prefix,code:prefix+'24-08',category:'國'}};
   assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),prefix+'24-08');
   assert.equal(c.p79ScheduleSpecialNoPunchCode('E','2026-10-23','晚',null),'');
  }

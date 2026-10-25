@@ -3,7 +3,7 @@ const api=c.P79ScheduleRestSummary,emp={id:'FIXTURE',name:'測試'},month='2026-
 assert.equal(sum().remaining,null,'local cached roster does not prove cloud declarations');
 api.acceptRows([{empId:emp.id,schedule}]);assert.deepEqual(json(sum().remaining),{國:2,休:1,例:0},'all month including hidden 28th/29th is counted');
 schedule.__meta[dates[0]]={restCategory:'休',restQuotaOvertime:true,restAllocationSource:'manual',overtimeReport:{id:'DRAFT',category:'休',code:'休08-16'}};
-assert.equal(sum().reported.休,0,'unsaved local draft is not counted as a stored declaration');assert.equal(sum().reserved.休,1,'explicit pending rest overtime reserves its quota');assert.equal(sum().remaining.休,0);
+assert.equal(sum().reported.休,0,'unsaved local draft is not counted as a stored declaration');assert.equal(sum().reserved.休,0,'local overtime annotation without a cloud receipt does not reserve quota');assert.equal(sum().remaining.休,1);
 const saved=JSON.parse(JSON.stringify(schedule));api.acceptRows([{empId:emp.id,schedule:saved}],month);assert.equal(sum().reported.休,1);assert.equal(sum().remaining.休,0);assert.equal(sum().remaining.國,2);
 // Retrying a confirmed snapshot never deducts twice, and later local mutation does not alter receipt.
 api.acceptRows([{empId:emp.id,schedule:saved}],month);assert.equal(sum().reported.休,1);saved.__meta[dates[0]].overtimeReport.category='國';assert.equal(sum().reported.休,1,'accepted reports are immutable');
@@ -38,7 +38,7 @@ for(const marker of [{type:'substitute'},{overtimeReport:{id:'SUB',category:'代
 }
 const evidence={attendanceEvidence:{complete:true,days:{[emp.id+'|'+dates[23]]:{state:'rest'}}}};
 sub=api.summary(emp,substituteRoster,substituteRoster.__meta,month,evidence,'');
-assert.equal(sub.off.休,5,'whole no-card substitution still counts as actual rest');assert.equal(sub.remaining.休,0);
-assert.throws(()=>c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{restCategory:'例',restAllocationSource:'manual'}},month),/手動假別與班別不一致/,'unrelated inconsistencies remain visible');
-assert.throws(()=>c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{...stale,overtimeReport:{id:'REST',category:'例'}}},month),/手動假別與班別不一致/,'do not silently erase a real rest declaration');
+assert.equal(sub.off.休,1,'whole no-card substitution counts once as actual rest');assert.equal(sub.off.休+sub.reserved.休,5,'other scheduled rests retain quota while attendance is unknown');assert.equal(sub.remaining.休,0);
+assert.equal(c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{restCategory:'例',restAllocationSource:'manual'}},month).unresolved.length,3,'manual working-day category without a formal report does not consume quota');
+assert.equal(c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{...stale,overtimeReport:{id:'REST',category:'例'}}},month).meta[dates[23]].overtimeReport.id,'REST','preserve a real rest declaration');
 console.log('PASS legacy substitute rest metadata: numeric summary, no double deduction, immutable assignment, no-card rest, genuine conflicts retained');

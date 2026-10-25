@@ -16,7 +16,7 @@ const c={
  Map,Set,Date,Array,String,Object,Number,Math,JSON,
  monthlyScheduleData:{EMP:roster},monthlyScheduleMeta:{EMP:{}},
  p79RestQuota:()=>({days:31,counts:{例:4,休:5,國:2}}),
- p79AutomaticRestMetadata:()=>({}),p79EmploymentStartDate:()=>'',scheduleEscapeHtml:x=>String(x||'')
+ p79TyphoonDates:()=>[],p79AutomaticRestMetadata:()=>({}),p79EmploymentStartDate:()=>'',scheduleEscapeHtml:x=>String(x||'')
 };
 vm.createContext(c);
 vm.runInContext(extract('p79DailyRestCount'),c);
