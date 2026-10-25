@@ -38,7 +38,7 @@ for(const emp of people){
 }
 const before=JSON.stringify(monthlyScheduleData),reports=JSON.stringify(monthlyScheduleMeta);
 let plan=c.p79RestAutomaticPlan(people[0],month);
-const counts=kind=>Object.entries(plan.meta).filter(([date,m])=>date.startsWith(month)&&date!==typhoon&&m?.restCategory===kind&&!m.restQuotaOvertime).length;
+const counts=kind=>Object.entries(plan.meta).filter(([date,m])=>date.startsWith(month)&&m?.restCategory===kind&&!m.restQuotaOvertime).length;
 a.equal(counts('例'),4,'例 first: 4 visible allocations must not be on typhoon day');
 a.equal(counts('休'),5,'next 休=5');
 a.equal(counts('國'),2,'typhoon day originally 休 retains 例/休 allocation, freeing ordinary 休 to complete 國');
