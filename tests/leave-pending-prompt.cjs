@@ -13,5 +13,6 @@ const r=run({rows});assert.equal(r.shown,1);assert(r.dialog.innerHTML.includes('
 assert.equal(r.fields.filterStatus.value,'待審核','main list already shows pending before popup closes');r.controls['[data-close]'].onclick();assert.equal(r.fields.filterStatus.value,'待審核','later button leaves requests visible and pending');
 r.controls['[data-review]'].onclick();assert.equal(r.fields.filterDept.value,'');assert.equal(r.fields.filterJob.value,'');assert.equal(r.fields.filterStatus.value,'待審核');
 for(const opts of [{admin:false,rows},{access:'view',rows},{mode:'employee',rows},{}])assert.equal(run(opts).shown,0);
-assert(html.includes('renderAll();p79ShowPendingLeavePrompt();setStatus(adminSession?'));
+assert(html.includes('renderAll();p79ShowPendingLeavePrompt();'),'pending request reminder must still run after official cloud data loads');
+assert(html.includes('if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);'),'cloud refresh should also reconcile duplicate substitute prompts');
 console.log('PASS fresh-data admin pending dialog, once per entry, review filter, escaping, no employee/read-only/empty popup');
