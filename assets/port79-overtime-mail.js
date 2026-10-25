@@ -16,12 +16,13 @@ function collect(snapshot,people,month){
   const emp=allowed.get(uid(entry.empId));if(!emp)continue;
   for(const [date,m] of Object.entries(entry.schedule?.__meta||{})){
    if(!date.startsWith(month+'-')||!m||m.overtimeExcluded===true)continue;
-   const r=m.overtimeReport;
-   if(!r?.id||(m.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(r.id)))continue;
-   const key=uid(emp.empId)+'|'+date+'|'+r.id;if(seen.has(key))continue;seen.add(key);
-   rows.push({empId:uid(emp.empId),name:emp.name||emp.empId,date,id:String(r.id),
-    type:r.typeName||({國:'國定假日加班',休:'休息日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'}[r.category]||'加班'),
-    code:String(r.code||''),hours:r.declaredHours,report:JSON.parse(JSON.stringify(r))});
+   for(const r of [m.overtimeReport,...(Array.isArray(m.overtimeReports)?m.overtimeReports:[])].filter(Boolean)){
+    if(!r.id||(m.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(r.id)))continue;
+    const key=uid(emp.empId)+'|'+date+'|'+r.id;if(seen.has(key))continue;seen.add(key);
+    rows.push({empId:uid(emp.empId),name:emp.name||emp.empId,date,id:String(r.id),
+     type:r.typeName||({國:'國定假日加班',休:'休息日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'}[r.category]||'加班'),
+     code:String(r.code||''),hours:r.declaredHours,report:JSON.parse(JSON.stringify(r))});
+   }
   }
  }
  return rows.sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name,'zh-Hant'));
