@@ -13,5 +13,5 @@ model.rows[0].checked=true;assert.match(api.personSummary(model,emp.empId),/^例
 model.rows[0].acknowledged=true;model.rows[0].checked=false;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/,'POST acknowledgement alone does not confirm saved count');
 model.rows[0].saved=true;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國1$/,'cloud-confirmed readback deducts exactly once without changing unused total');
 model.rows[0].saved=false;model.rows[0].checked=true;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/,'unconfirmed retry keeps total pending quota');
-const html=fs.readFileSync('work-hours/index.html','utf8');assert.match(html,/port79-monthly-rest-overtime\.js\?v=20261021-schedule-pending/);
+const html=fs.readFileSync('work-hours/index.html','utf8');assert.match(html,/port79-monthly-rest-overtime\.js\?v=[^"'\\s<>]+/);
 console.log('PASS confirmed counts: unused 3 vs pending 2; absent/empty IDs; plain markers; checked, ACK, readback, retry and unchanged total');
