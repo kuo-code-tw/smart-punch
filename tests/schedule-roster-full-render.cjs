@@ -9,7 +9,7 @@ const day=n=>'2026-10-'+String(n).padStart(2,'0');
 const month=Object.fromEntries(Array.from({length:31},(_,i)=>[day(i+1),'早']));
 const allocatedDates=[2,13,19,27];
 allocatedDates.forEach(n=>month[day(n)]='休');
-month[day(23)]='晚';month[day(25)]='早';
+month[day(23)]='晚';month[day(25)]='早';month[day(1)]='休';
 const meta=Object.fromEntries(allocatedDates.map(n=>[day(n),{restCategory:'例',restAllocationSource:'auto-v1'}]));
 const main={innerHTML:'',firstElementChild:null};
 const picker={value:'2026-10'};
@@ -30,7 +30,7 @@ const c={
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}})}),
  p79UpdateTyphoonDayButton(){},getDaysInMonth:()=>31,
  scheduleMonthBounds:()=>['2026-10-01','2026-10-31'],updateScheduleDateRangeSummary(){},
- p79TyphoonDates:()=>['2026-10-23'],scheduleTaipeiTodayKey:()=> '2026-10-31',
+ p79TyphoonDates:()=>['2026-10-23','2026-10-01'],scheduleTaipeiTodayKey:()=> '2026-10-31',
  scheduleEmployeeEligibleForMonth:()=>true,getGroupPriority:()=>0,getRolePriority:()=>0,compareScheduleEmployeeOrder:()=>0,
  isScheduleRoleRosterCollapsed:()=>false,applyScheduleAccessUi(){},sortedScheduleGroups:()=>['A組'],
  p79ScheduleGroupStyle:()=>'',p79AutomaticRestMetadata:()=>meta,
@@ -57,6 +57,9 @@ assert(main.innerHTML.includes('data-display-shift="選"'),'election no-punch ce
 assert(main.innerHTML.includes('颱風停班日：已核對整班無上下班紀錄'),'typhoon tooltip should not raise ReferenceError');
 assert(main.innerHTML.includes('選舉日：已核對整班無上下班紀錄'),'election tooltip should not raise ReferenceError');
 assert(main.innerHTML.includes('<span>3/1</span>'),'visible 3 例 must show 3/1 even if metadata claims 4');
+assert(main.innerHTML.includes('data-rest-date="2026-10-01" data-rest-visible="休" data-typhoon-count="off"'),'an originally scheduled 休 still counts as a typhoon event');
+assert(main.innerHTML.includes('颱日</span>'),'keep original rest label and add clear typhoon-day marker');
+assert(main.innerHTML.includes('>3 天</span>'),'event summary includes originally resting staff, typhoon leave and no-card shift');
 assert.equal((main.innerHTML.match(/data-rest-visible="例"/g)||[]).length,3);
 assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""'),'approved typhoon leave hides the fourth example');
 
