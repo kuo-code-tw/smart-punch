@@ -36,7 +36,7 @@ assert.equal(markerReads,before,'known visible typhoon dates require no second m
 assert.equal(stateReads,initialStateReads,'known visible dates require no extra attendance scan');
 assert.match(cells,/data-rest-category="颱"/);
 assert.match(cells,/>4 天<\/span>/);
-assert.match(cells,/不占用國定假日、例假或休息日額度/);
+assert.match(cells,/不重複計入國定假日/);
 for(const category of ['例','休','國','颱'])assert(cells.includes('data-rest-category="'+category+'"'));
 assert.equal([...cells.matchAll(/<td\b/g)].length,4,'three quotas plus one separate typhoon counter');
 cells=c.p79ScheduleRestCountCells(emp,month,{});
