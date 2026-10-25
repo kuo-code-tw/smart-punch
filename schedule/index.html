@@ -6456,7 +6456,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         attendanceState,ctx.attendanceEvidence,{typhoon:ctx.typhoonDays,election:ctx.electionDays},ctx.typhoonToday);
       // 颱風日原本排休也必須固定顯示「颱」；不准被例／休／國配額覆蓋。
       // 只改顯示，不覆寫原始排班、加班申報、代班及人工鎖定資料。
-      const typhoonScheduledRest=ctx.typhoonDays.has(dayStr)&&rosterShift==='休'&&!ownApprovedLeave;
+      const typhoonScheduledRest=ctx.typhoonDays.has(dayStr)&&['休','例','國'].includes(String(rosterShift).trim())&&!ownApprovedLeave;
       const specialNoPunch=specialCandidate;
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
