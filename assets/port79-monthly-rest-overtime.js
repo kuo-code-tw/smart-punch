@@ -26,13 +26,25 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const typhoonProtected=new Set(dates.filter(d=>
    (Array.isArray(declaredTyphoon)&&declaredTyphoon.includes(d))||
    String(roster[d]||'').trim()==='颱'));
- const excluded=dates.filter(d=>typhoonProtected.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
+ const R=g.P79OvertimeReason;
+ const exemptReportDates=new Set(dates.filter(d=>{
+   const m=roster.__meta?.[d],report=m?.overtimeReport;
+   return !!String(report?.id??'').trim()&&
+     !(m?.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id))&&
+     R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot})?.exempt===true;
+ }));
+ const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
+ const excluded=dates.filter(d=>nonQuotaDates.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
-   [...typhoonProtected],[...typhoonProtected]).meta;
+   [...nonQuotaDates],[...nonQuotaDates]).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
   if(typhoonProtected.has(d)){ledger.push({date:d,kind:'typhoon',category:'',actual});continue;}
+  if(exemptReportDates.has(d)){
+   ledger.push({date:d,kind:'exemptOvertime',category:'',actual,reportId:r?.id});
+   continue;
+  }
   const verified=cats.includes(r?.category)&&confirmedReport(m,r);
   const hasUnverifiedReport=cats.includes(r?.category)&&!verified&&r&&!storedReport(r);
   const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
@@ -157,7 +169,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／代班加班（不計例休國額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+(x.actual==='rest'&&x.kind==='off'?'（整班無卡）':'')));
