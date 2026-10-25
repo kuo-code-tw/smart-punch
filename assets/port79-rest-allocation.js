@@ -46,6 +46,19 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // higher-priority quota. A 國 label on a typhoon day likewise must not
   // consume 國 quota invisibly. Explicit 例/國 manual declarations on ordinary
   // dates, actual overtime, substitutes and locked records remain protected.
+  // When a previously manually selected 休 has since become a working
+  // shift, remove only its stale rest classification. It must not block the
+  // entire 83-person batch or be treated as approved overtime.
+  for(const date of dates){
+    const item=result[date];
+    if(!item||item.restCategory!=='休'||schedule[date]==='休'||
+       item.restQuotaOvertime||item.restAllocationLocked||item.restCategoryLocked||
+       item.overtimeReport||item.overtimeReports?.length||item.overtime||
+       item.forEmpId||item.type==='substitute')continue;
+    for(const key of ['restCategory','restSourceDate','restHolidayName',
+      'restAllocationSource','restPreferredCategory'])delete item[key];
+    if(!Object.keys(item).length)delete result[date];
+  }
   const flexible=new Set();
   for(const date of dates){
     const item=result[date]||{};
