@@ -13097,7 +13097,7 @@ function p79OvertimePeriodLabel(report){
             const authorized=typeof p79CanExportOvertimeApplication==='function'&&p79CanExportOvertimeApplication();
             host.hidden=!authorized;
             if(!authorized)return;
-            if(!/^\\d{4}-\\d{2}$/.test(month)){
+            if(!/^[0-9]{4}-[0-9]{2}$/.test(month)){
                 ui.updateBanner(null,{message:'請先選擇單一月份，才能核對雲端異動'});
                 return;
             }
