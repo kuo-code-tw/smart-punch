@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync('work-hours/index.html','utf8');
-const start=html.indexOf('        function p79BuildOvertimeJobTitleSummary(rows) {');
+const start=html.indexOf('        function p79BuildOvertimeJobTitleSummary(rows,personnel=[]) {');
 const end=html.indexOf('        function renderOvertimeStats() {',start);
 assert(start>=0&&end>start,'job-title overtime calculation function must exist');
 const c={Map,Set,Number,String,Array,Math};

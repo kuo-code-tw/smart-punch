@@ -74,8 +74,11 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
     ledger.push({date:d,kind:'unconfirmedAssignment',category:'',actual});
     conflicts.push({date:d,reason:'班表有人工加班時段但無正式申報編號；未當成已申報或預留額度，請核對'});
    }
-   if(scheduledRest&&actual!=='worked'&&actual!=='missing'){
-    const kind=actual==='rest'?'off':'reserved';
+   // Keep the shared roster allocation authoritative. Attendance alone cannot
+   // turn an allocated rest day into an extra, unreported overtime entitlement;
+   // a confirmed report above replaces that allocation exactly once.
+   if(scheduledRest){
+    const kind=actual==='open'||actual==='missing'||actual==='unknown'&&snapshot?.attendanceEvidence?.complete===true?'reserved':'off';
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest')extraRestDates.push(d);
