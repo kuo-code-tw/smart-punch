@@ -153,7 +153,7 @@ function p79OvertimeMailSend_(ss,data){
       '申報時數：'+safe(report.declaredHours??'')+' 小時',
       '申報性質：'+(report.planned===true?'預排加班（尚須核對實際出勤）':'已申報加班'),
       '申報編號：'+reportId,
-      '申報備註：'+safe(report.note||meta.note||''),
+      '申報備註：'+safe(report.note||''),
       '寄送管理員：'+safe(actor),
       '重要：若此筆後續修改或取消，請依新通知或系統核對紀錄處理。'
     ].join('\n');
