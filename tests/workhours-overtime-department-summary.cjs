@@ -31,5 +31,5 @@ assert(html.includes('id="p79OvertimeDepartmentRows"'),'department table must be
 assert(html.includes('id="p79OvertimeDepartmentNotice"'),'abnormal report notice must be visible');
 assert(html.includes('換算加班時數</div><div id="overtimeTotalHours"'),'converted total card must use official conversions');
 assert(html.includes("if(!p79WorkOvertimeOfficialReport(meta.overtimeReport,meta)||shown.has"),'stored cloud report cannot disappear simply because no punch-based estimate exists');
-for(const m of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
+for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS department overtime: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
