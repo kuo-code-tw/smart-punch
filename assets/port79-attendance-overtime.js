@@ -84,7 +84,54 @@ function auditChanged(report,meta){
  const created=String(report?.reportedAt||report?.createdAt||'').trim();
  return verified||!!String(report?.replacesReportId||'').trim()||!!(modified&&created&&modified!==created);
 }
-function overtimeDayIndicator(date,monthState){
+function p79MailCanonical(x){
+ if(Array.isArray(x))return '['+x.map(p79MailCanonical).join(',')+']';
+ if(x&&typeof x==='object')return '{'+Object.keys(x).filter(k=>x[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+p79MailCanonical(x[k])).join(',')+'}';
+ return JSON.stringify(x===undefined?null:x);
+}
+const p79AttendanceMailMonths=new Map();
+function p79LoadAttendanceMailMonth(month){
+ if(!/^\d{4}-\d{2}$/.test(month))return;
+ if(typeof p79CanManageOvertime!=='function'||!p79CanManageOvertime())return;
+ const token=typeof getAttendanceEmployeeMasterToken==='function'?getAttendanceEmployeeMasterToken():'';
+ if(!token)return;
+ const prior=p79AttendanceMailMonths.get(month);
+ if(prior?.token===token&&(prior.pending||Date.now()-prior.at<60000))return;
+ const state={token,at:Date.now(),pending:true,receipts:[],ready:false};
+ p79AttendanceMailMonths.set(month,state);
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
+ fetch(getActiveGasUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+   body:JSON.stringify({action:'getOvertimeMailOptions',token,gcToken:token,month}),signal:ctl.signal,cache:'no-store'})
+ .then(r=>r.json()).then(data=>{
+  if(data?.ok!==true||data.overtimeMailVersion!==1||!Array.isArray(data.receipts))return;
+  if(p79AttendanceMailMonths.get(month)!==state||getAttendanceEmployeeMasterToken()!==token)return;
+  state.receipts=data.receipts.filter(r=>r.status==='sent'||r.status==='sending');
+  state.ready=true;
+ }).catch(()=>{}).finally(()=>{
+  clearTimeout(timer);state.pending=false;
+  if(p79AttendanceMailMonths.get(month)!==state)return;
+  try{
+   if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))
+    decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);
+  }catch(_){}
+ });
+}
+function p79MailState(report,empId,date,receipts){
+ const entries=(receipts||[]).filter(r=>id(r.empId)===id(empId)&&r.date===date);
+ const same=r=>{
+  if(r.reportId!==String(report.id)||!r.reportJson)return false;
+  try{return p79MailCanonical(JSON.parse(r.reportJson))===p79MailCanonical(report);}catch(_){return false;}
+ };
+ const accepted=entries.filter(r=>r.status==='sent');
+ const current=accepted.filter(same);
+ if(current.length)return {kind:'mailed',detail:'已寄出目前申報版本：'+current.map(r=>
+   (r.recipientName||r.recipientId||'會計')+' '+(r.sentAt||'')).join('／')+'（郵件服務已接受；不代表已閱讀）'};
+ const pending=entries.some(r=>r.status==='sending'&&same(r));
+ if(pending)return {kind:'pending',detail:'寄送結果尚未確認，請勿重複寄送'};
+ if(accepted.length)return {kind:'outdated',detail:'之前版本已寄送會計，現在申報內容不同，須重新寄送；舊信仍保留'};
+ return null;
+}
+function overtimeDayIndicator(date,monthState,mailReceipts=null){
  if(monthState?.ready!==true)return null;
  const people=new Map((monthState.people||[]).map(p=>[id(p.empId),p.name||p.empId]));
  const entries=[],seen=new Set();
@@ -106,19 +153,22 @@ function overtimeDayIndicator(date,monthState){
   for(const report of reports){
    if(!report?.id||meta.overtimeExcluded===true||
       (meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id)))continue;
-   const kind=auditChanged(report,meta)?'amended':'reported';
+   const mail=p79MailState(report,empId,date,mailReceipts);
+   const kind=mail?.kind|| (auditChanged(report,meta)?'amended':'reported');
    const key=empId+'|'+date+'|'+report.id+'|'+kind;
    if(seen.has(key))continue;seen.add(key);
    entries.push({kind,name,code:String(report.code||''),hours:report.declaredHours||'',
-     detail:kind==='amended'?'申報已修改，先前列印版本可能失效；請核對會計資料':'已申報；未登記列印／交會計完成狀態'});
+     detail:mail?.detail||(kind==='amended'?'申報已修改，舊版可能已交會計；請重新核對':'已申報，尚無可核實的寄送紀錄')});
   }
  }
  if(!entries.length)return null;
- const counts={reported:0,amended:0,revoked:0};
+ const counts={reported:0,mailed:0,amended:0,outdated:0,pending:0,revoked:0};
  for(const row of entries)counts[row.kind]++;
- const kind=counts.revoked?'revoked':counts.amended?'amended':'reported';
- const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜');
- const lines=entries.slice(0,24).map(row=>row.name+'：'+(row.kind==='revoked'?'已取消':row.kind==='amended'?'已修改':'已申報')+
+ const kind=counts.revoked?'revoked':counts.outdated?'outdated':counts.pending?'pending':counts.amended?'amended':counts.mailed?'mailed':'reported';
+ const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜')+
+  (counts.mailed||counts.outdated||counts.pending?'｜已寄 '+counts.mailed+'｜舊版待重寄 '+counts.outdated+'｜寄送待核 '+counts.pending:'');
+ const names={revoked:'已取消',outdated:'舊版已寄／須重寄',pending:'寄送待核對',amended:'已修改',mailed:'已寄送會計',reported:'已申報'};
+ const lines=entries.slice(0,24).map(row=>row.name+'：'+names[row.kind]+
   (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
  if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
  return {kind,count:entries.length,title:date+'\n'+summary+'\n'+lines.join('\n')+
@@ -133,7 +183,10 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
  const buttons=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')];
  for(let i=0;i<buttons.length;i++){
   const date=String(keys[i]||'').replaceAll('/','-'),state=months.get(date.slice(0,7));
-  const info=overtimeDayIndicator(date,state),button=buttons[i];
+  const month=date.slice(0,7);
+  if(state?.ready)p79LoadAttendanceMailMonth(month);
+  const mail=p79AttendanceMailMonths.get(month);
+  const info=overtimeDayIndicator(date,state,mail?.ready&&mail?.token===getAttendanceEmployeeMasterToken()?mail.receipts:null),button=buttons[i];
   button.removeAttribute('data-p79-overtime-audit');
   button.style.removeProperty('background-color');
   button.style.removeProperty('color');
@@ -142,7 +195,10 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   button.removeAttribute('title');
   if(!info)continue;
   const palette=info.kind==='revoked'?['#fee2e2','#991b1b','#f87171']:
+   info.kind==='outdated'?['#ffedd5','#9a3412','#fb923c']:
+   info.kind==='pending'?['#fae8ff','#86198f','#d946ef']:
    info.kind==='amended'?['#fef3c7','#92400e','#f59e0b']:
+   info.kind==='mailed'?['#dbeafe','#1e40af','#60a5fa']:
    ['#dcfce7','#166534','#4ade80'];
   button.style.setProperty('background-color',palette[0],'important');
   button.style.setProperty('color',palette[1],'important');
@@ -156,7 +212,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='綠：已申報｜黃：已修改｜紅：已取消｜列印狀態須另行確認';
+  legend.textContent='綠：已申報｜藍：已寄會計｜黃：已修改｜橘：舊版須重寄｜紅：已取消';
   host.appendChild(legend);
  }
 }
@@ -178,7 +234,18 @@ function installOvertimeDateIndicators(){
 if(g.document?.readyState==='loading')g.document.addEventListener('DOMContentLoaded',installOvertimeDateIndicators);
 else installOvertimeDateIndicators();
 g.addEventListener?.('load',installOvertimeDateIndicators);
-g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip};
+g.addEventListener?.('storage',event=>{
+ if(event.key==='p79_overtime_mail_updated_v1'){
+  try{const change=JSON.parse(event.newValue||'{}');if(change.month)p79AttendanceMailMonths.delete(change.month);}catch(_){p79AttendanceMailMonths.clear();}
+  p79QueueAttendanceOvertimeRepaint();
+ }
+});
+g.addEventListener?.('focus',()=>{
+ const now=Date.now();
+ for(const [month,state] of p79AttendanceMailMonths)if(now-state.at>60000)p79AttendanceMailMonths.delete(month);
+ try{if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);}catch(_){}
+});
+g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,p79MailState,p79MailCanonical,p79LoadAttendanceMailMonth};
 
 g.P79AttendanceOvertime={open,save};
 })(window);
