@@ -45,7 +45,7 @@ assert.doesNotMatch(cells,/停4／勤1|停\d+／勤\d+/);
 assert.equal(markerReads,before+1);
 const unsynced={...evidence,complete:false};evidence.complete=false;
 shifts[date(5)]='早';approved.delete(date(4));
-assert.deepEqual([...c.p79ScheduleTyphoonDays(emp,month)],[],'pending evidence must not fabricate a typhoon day');
+assert.deepEqual([...c.p79ScheduleTyphoonDays(emp,month)],[date(1),date(2),date(4),date(12)],'global typhoon calendar markers are counted without falsely asserting paid absence, even while punch evidence is pending');
 evidence.complete=true;
 // UI must use exactly the displayed shift instead of counting calendar typhoon markers alone.
 assert(html.includes('else if(typhoonCounted)typhoonShownDates.push(dayStr);'));
