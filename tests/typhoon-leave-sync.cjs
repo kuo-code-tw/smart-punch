@@ -10,7 +10,7 @@ async function test(){
  const p=buildPlan(rows,['2026-10-26']);
  assert.deepEqual(p.cancel.map(x=>x.id),['one']);
  assert.deepEqual(p.review.map(x=>x.id),['partial']);
- let data={leaveRecords:copy(rows),leaveCoverAssignments:[{leaveId:'one',workerIds:['W1']},{leaveId:'partial',workerIds:['W2']}]};
+ let data={employees:[],leaveRecords:copy(rows),leaveCoverAssignments:[{leaveId:'one',workerIds:['W1']},{leaveId:'partial',workerIds:['W2']}]};
  let deletes=0;
  const opts={dates:['2026-10-26'],read:async()=>copy(data),confirm:()=>true,remove:async(id,note)=>{
   assert.equal(note,NOTE);deletes++;
@@ -30,15 +30,23 @@ async function test(){
  const deny=await run({...opts,dates:['2026-10-25','2026-10-26','2026-10-27'],confirm:()=>false});
  assert.equal(deny.confirmed,false);
  assert.equal(deletes,1);
- let changed={leaveRecords:[leave('updated','2026-10-26','2026-10-26')],leaveCoverAssignments:[]};
+ let changed={employees:[],leaveRecords:[leave('updated','2026-10-26','2026-10-26')],leaveCoverAssignments:[]};
  const guarded=await run({dates:['2026-10-26'],read:async()=>copy(changed),confirm:()=>{
   changed.leaveRecords[0].endDate='2026-10-27';return true;
  },remove:async()=>{throw Error('must not delete changed request')}});
  assert.equal(guarded.deleted.length,0);
  assert.equal(guarded.skipped.length,1);
- const bad=await run({dates:['2026-10-26'],read:async()=>({leaveRecords:[leave('bad','2026-10-26','2026-10-26')],leaveCoverAssignments:[]}),confirm:()=>true,remove:async()=>({ok:true,linkedDelete:false})});
+ const bad=await run({dates:['2026-10-26'],read:async()=>({employees:[],leaveRecords:[leave('bad','2026-10-26','2026-10-26')],leaveCoverAssignments:[]}),confirm:()=>true,remove:async()=>({ok:true,linkedDelete:false})});
  assert.equal(bad.deleted.length,0);
  assert.equal(bad.errors.length,1);
+ const oldAnnual={...leave('annual','2026-10-26','2026-10-26'),leaveType:'特休假'};
+ const employee={empId:'annual',leaveBalance:{remaining:3,baselineApprovedLeaveIds:['annual']}};
+ const annualPlan=buildPlan([oldAnnual],['2026-10-26'],[employee]);
+ assert.equal(annualPlan.cancel.length,0);
+ assert.equal(annualPlan.balanceReview.length,1);
+ const hold=await run({dates:['2026-10-26'],read:async()=>({employees:[employee],leaveRecords:[oldAnnual],leaveCoverAssignments:[]}),confirm:()=>true,remove:async()=>{throw Error('must not delete imported annual leave')}});
+ assert.equal(hold.deleted.length,0);
+ assert.equal(hold.balanceReview.length,1);
  process.stdout.write('PASS typhoon leave sync\n');
 }
 test().catch(error=>{console.error(error);process.exitCode=1;});
