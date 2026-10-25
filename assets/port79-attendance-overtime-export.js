@@ -128,7 +128,7 @@ async function open(date,force=false){
   const done=currentRows.filter(row=>statusOf(row).done).length;
   const hint=auditAvailable?'雲端稽核已連線；每筆記錄含匯出者、時間及申報編號。':'後端匯出紀錄尚未啟用：仍可下載明細，但本次不會顯示為「已匯出」，請部署新版 GAS。';
   setStatus('正式申報 '+currentRows.length+' 筆｜已匯出 '+done+' 筆｜未匯出 '+(currentRows.length-done)+' 筆。'+hint);
-  showRows();refreshDateBadges(month);
+  showRows();void refreshDateBadges(month);
  }catch(error){currentRows=[];showRows();setStatus('讀取失敗：'+(error?.message||error));notify('加班明細讀取失敗：'+(error?.message||error),'warning');}
  finally{loading=false;d.querySelector('#p79OtExportSave').disabled=false;}
 }
@@ -170,7 +170,7 @@ async function exportSelected(){
  }catch(error){setStatus('匯出失敗：'+(error?.message||error));notify('匯出加班明細失敗：'+(error?.message||error),'warning');}
  finally{button.disabled=false;}
 }
-function refreshDateBadges(month){
+async function refreshDateBadges(month){
  if(!auditAvailable||!cache.has(month))return;
  const data=cache.get(month).data;
  const buttons=document.querySelectorAll('#p79AttendanceDateStrip button[data-p79-attendance-date]');
@@ -181,7 +181,8 @@ function refreshDateBadges(month){
   btn.querySelector('[data-p79-export-badge]')?.remove();
   const reports=sheetRows(data,date);
   if(!reports.length)continue;
-  const done=reports.filter(r=>latestAudit.some(a=>a.date===date&&id(a.empId)===r.empId&&String(a.reportId)===r.reportId)).length;
+  const versions=await Promise.all(reports.map(r=>digest(r.report)));
+  const done=reports.filter((r,i)=>latestAudit.some(a=>a.date===date&&id(a.empId)===r.empId&&String(a.reportId)===r.reportId&&!!versions[i]&&String(a.version)===versions[i])).length;
   if(done){
    const mark=document.createElement('small');
    mark.dataset.p79ExportBadge='1';
