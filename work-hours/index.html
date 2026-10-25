@@ -834,6 +834,33 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #p79OvertimeStatsTable th { font-weight: 700 !important; }
 </style>
 
+<style id="p79-overtime-accounting-change-style">
+#adminContentOvertime .p79-accounting-change-banner{
+ display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:13px 16px;border:1px solid #e6bc65;border-left:5px solid #d58d12;
+ border-radius:12px;background:#fff8e8;color:#743f00;
+}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="changed"]{background:#fff5e3}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="clear"]{
+ background:#f1f5f9;color:#334155;border-color:#cbd5e1;border-left-color:#94a3b8
+}
+#adminContentOvertime .p79-accounting-change-banner[data-p79-state="loading"]{
+ background:#f8fafc;color:#475569;border-color:#cbd5e1;border-left-color:#94a3b8
+}
+#adminContentOvertime .p79-change-copy{display:flex;flex-direction:column;gap:3px;min-width:230px;flex:1}
+#adminContentOvertime .p79-change-copy strong{font-size:15px;font-weight:800}
+#adminContentOvertime #p79OvertimeChangeText{font-size:14px;font-weight:700}
+#adminContentOvertime #p79ChangeHint{font-size:12px;line-height:1.5}
+#adminContentOvertime .p79-change-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+#adminContentOvertime .p79-change-actions button{
+ padding:9px 12px;border:1px solid #c78b20;border-radius:9px;background:#fff;
+ font-size:13px;font-weight:800;color:#8b4900;cursor:pointer
+}
+#adminContentOvertime #p79ChangeCancelled{background:#fff1f2;border-color:#ed9ca5;color:#b42332}
+#adminContentOvertime .p79-change-actions button:disabled{opacity:.55;cursor:default}
+@media(max-width:640px){#adminContentOvertime .p79-change-actions{width:100%}
+#adminContentOvertime .p79-change-actions button{flex:1 1 135px}}
+</style>
 <style id="p79-overtime-unified-design-20261022">
 /* One cohesive overtime workspace: actions, filters, and live summary. */
 #adminContentOvertime .p79-overtime-unified{max-width:100%;min-width:0}
@@ -1319,13 +1346,26 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
             <!-- 分頁 3：加班人員統計 -->
             <div id="adminContentOvertime" class="hidden space-y-3">
+                <!-- Accounting banner: count only cloud-verified saved modifications and cancellations. -->
+                <section id="p79OvertimeChangeNotice" data-p79-state="loading"
+                         class="p79-accounting-change-banner" aria-label="加班異動提醒" aria-live="polite">
+                    <div class="p79-change-copy">
+                        <strong>⚠️ 加班異動提醒</strong>
+                        <span id="p79OvertimeChangeText">雲端異動紀錄尚未核對</span>
+                        <small id="p79ChangeHint">請選擇月份並重新讀取加班紀錄</small>
+                    </div>
+                    <div class="p79-change-actions">
+                        <button id="p79ChangeModified" type="button" onclick="P79OvertimeStatus.open({state:'amended'})" disabled>查看已修改（—）</button>
+                        <button id="p79ChangeCancelled" type="button" onclick="P79OvertimeStatus.open({state:'revoked'})" disabled>查看已取消（—）</button>
+                    </div>
+                </section>
                 <div class="p79-overtime-unified rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4 shadow-sm">
                 <div class="p79-overtime-compact-first">
                   <div class="p79-overtime-compact-title" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">
                     <strong>每日加班人員統計</strong>
                     <span aria-label="加班計算與時間提醒" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">💡</span>
                     <span id="overtimeFilterResultCount" class="text-[10px] text-slate-500"></span>
-                    <button type="button" onclick="P79OvertimeStatus.open()" class="p79-overtime-history rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">已申報／撤銷</button>
+                    <button type="button" onclick="P79OvertimeStatus.open()" class="p79-overtime-history rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">申報／異動紀錄</button>
                   </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
@@ -13047,12 +13087,34 @@ function p79OvertimePeriodLabel(report){
  return ({'08-20':'16-20','20-08':'20-24'})[bare]||bare;
 }
 
+        function p79UpdateOvertimeChangeAlert(){
+            const ui=window.P79OvertimeStatus;
+            const month=document.getElementById('overtimeMonthFilter')?.value||'';
+            if(!ui?.updateBanner)return;
+            // This overview is permission-gated like the detailed accounting report.
+            const host=document.getElementById('p79OvertimeChangeNotice');
+            if(!host)return;
+            const authorized=typeof p79CanExportOvertimeApplication==='function'&&p79CanExportOvertimeApplication();
+            host.hidden=!authorized;
+            if(!authorized)return;
+            if(!/^\\d{4}-\\d{2}$/.test(month)){
+                ui.updateBanner(null,{message:'請先選擇單一月份，才能核對雲端異動'});
+                return;
+            }
+            const state=p79WorkOvertimeMonths.get(month);
+            if(!state?.ready||state.token!==currentPort79SsoToken()||state.error){
+                ui.updateBanner(null,{message:state?.error?'雲端異動核對未完成：'+state.error:'正在讀取 '+month+' 雲端申報／異動紀錄'});
+                return;
+            }
+            ui.updateBanner(ui.auditSummary(state.rows,p79WorkhoursEligibleEmployees(),month),{ready:true});
+        }
         function renderOvertimeStats() {
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
             // 同一輪畫面更新只做一次考勤配對與加班統計。
             const allOvertimeRows = buildOvertimeStatisticsRows();
             initOvertimeFilters(allOvertimeRows);
+            p79UpdateOvertimeChangeAlert();
             const month = document.getElementById('overtimeMonthFilter')?.value || 'ALL';
             const dept = document.getElementById('overtimeDeptFilter')?.value || 'ALL';
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
