@@ -134,7 +134,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // 未被休假日分配覆蓋的額度只能列為「尚未安排」。
   // 不可在工作日自動建立 restQuotaOvertime；只有明確申報／人工安排才有加班。
   const unresolved=remaining.slice();
-  const assigned=dates.map(d=>result[d]).filter(x=>x?.restCategory);
+  const assigned=dates.filter(d=>!typhoonProtected.has(d)).map(d=>result[d]).filter(x=>x?.restCategory);
   return {meta:result,quota:quota.counts,off:assigned.filter(x=>!x.restQuotaOvertime).length,
     overtime:assigned.filter(x=>x.restQuotaOvertime).length,unresolved};
 }
