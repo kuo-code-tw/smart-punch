@@ -467,7 +467,7 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
    if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
-   populateDepartments();renderAll();p79ShowPendingLeavePrompt();setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');window.Port79DataCache?.finishStartupPreview?.('leave');return true;
+   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');window.Port79DataCache?.finishStartupPreview?.('leave');return true;
   }catch(e){
    last=e;
    if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
@@ -1524,33 +1524,97 @@ function p79CanReportOvertime(){
  const fine=adminSession.finePermissions?.workhours||{};
  return Object.prototype.hasOwnProperty.call(fine,'overtime.report')?fine['overtime.report']===true:access==='manage';
 }
+
+const P79_HANDOFF_KEY='port79_leave_overtime_handoff_v1';
+let p79CurrentHandoff='',p79HandoffSync=null;
+function p79GetLeaveHandoff(){
+ try{
+  const h=JSON.parse(sessionStorage.getItem(P79_HANDOFF_KEY)||'null');
+  if(!h||!Array.isArray(h.entries)||!Number(h.createdAt)||Date.now()-Number(h.createdAt)>86400000){sessionStorage.removeItem(P79_HANDOFF_KEY);return null;}
+  return h;
+ }catch(ignore){sessionStorage.removeItem(P79_HANDOFF_KEY);return null;}
+}
+function p79ActivateLeaveHandoff(){
+ const h=p79GetLeaveHandoff();
+ p79CurrentHandoff=h?String(h.id)+'|'+h.createdAt:'';
+}
+function p79DiscardLeaveHandoff(leaveId){
+ const h=p79GetLeaveHandoff();
+ if(h&&String(h.id)===String(leaveId)){sessionStorage.removeItem(P79_HANDOFF_KEY);p79CurrentHandoff='';}
+ p79UpdateLeaveHandoffBanner();
+}
+function p79LeaveHandoffEntryState(h,e,cloud,active){
+ if(!Array.isArray(cloud?.leaveCoverAssignments)||!Array.isArray(cloud?.schedules))throw Error('雲端未提供完整代班與排班資料，暫不變更待核對清單');
+ const norm=v=>String(v||'').trim().toUpperCase(),date=String(e?.date||'');
+ if(date.length!==10||date[4]!=='-'||date[7]!=='-'||!norm(e.empId)||!norm(e.forEmpId))return 'invalid';
+ const validCover=cloud.leaveCoverAssignments.some(c=>String(c.leaveId)===String(h.id)&&(!c.leaveEmpId||norm(c.leaveEmpId)===norm(e.forEmpId))&&Array.isArray(c.workerIds)&&c.workerIds.some(id=>norm(id)===norm(e.empId))&&normalizeLeaveFilterDate(c.startDate)<=date&&normalizeLeaveFilterDate(c.endDate)>=date);
+ if(!validCover)return 'cancelled';
+ const row=cloud.schedules.find(r=>norm(r.empId)===norm(e.empId));
+ if(!row)return 'unverified';
+ const report=(row.schedule||{}).__meta?.[date]?.overtimeReport;
+ if(report&&(String(report.id||'').trim()||String(report.code||'').trim()))return 'reported';
+ // 排班已有代班的舊佇列不重複提示；僅當次新增代班允許連續申報。
+ return active?'pending':'arranged';
+}
+async function p79ReconcileLeaveHandoff(){
+ if(p79HandoffSync)return p79HandoffSync;
+ const sync=async()=>{
+  const h=p79GetLeaveHandoff();
+  if(!h?.entries?.length){p79UpdateLeaveHandoffBanner();return null;}
+  if(!adminSession||!p79CanReportOvertime()||!leaveRequestToken())return h;
+  const active=p79CurrentHandoff===String(h.id)+'|'+h.createdAt;
+  const contextByMonth=new Map(),remaining=[];
+  for(const e of h.entries){
+   const month=String(e.date||'').slice(0,7);
+   let data=contextByMonth.get(month);
+   const hasEmployee=d=>(d?.schedules||[]).some(r=>String(r.empId).trim().toUpperCase()===String(e.empId).trim().toUpperCase());
+   if(!data||!hasEmployee(data)){
+    const token=leaveRequestToken();
+    data=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+    if(!data?.ok)throw Error(data?.error||'雲端資料讀取失敗');
+    contextByMonth.set(month,data);
+   }
+   const state=p79LeaveHandoffEntryState(h,e,data,active);
+   if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
+   if(state==='pending')remaining.push(e);
+  }
+  const current=p79GetLeaveHandoff();
+  if(current&&String(current.id)===String(h.id)&&Number(current.createdAt)===Number(h.createdAt)&&JSON.stringify(current.entries)===JSON.stringify(h.entries)){
+   if(remaining.length)sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify({...h,entries:remaining,verifiedAt:Date.now()}));
+   else{sessionStorage.removeItem(P79_HANDOFF_KEY);p79CurrentHandoff='';}
+  }
+  p79UpdateLeaveHandoffBanner();
+  return p79GetLeaveHandoff();
+ };
+ p79HandoffSync=sync();
+ try{return await p79HandoffSync;}finally{p79HandoffSync=null;}
+}
 function p79UpdateLeaveHandoffBanner(){
  const banner=$('p79LeaveHandoffBanner');if(!banner)return;
- let handoff;try{handoff=JSON.parse(sessionStorage.getItem('port79_leave_overtime_handoff_v1')||'null');}catch(ignore){}
- const count=handoff?.entries?.length||0;
- banner.hidden=!adminSession||!count||Date.now()-handoff.createdAt>86400000;
+ const h=p79GetLeaveHandoff(),count=h?.entries?.length||0;
+ banner.hidden=!adminSession||!p79CanReportOvertime()||!count||!h.verifiedAt;
  if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對，可接續申報。';
 }
 async function p79OpenLeaveOvertimeHandoff(){
  if(p79LeaveHandoffBusy)return;
- p79UpdateLeaveHandoffBanner();
- const raw=sessionStorage.getItem('port79_leave_overtime_handoff_v1');if(!raw)return;
- let handoff;try{handoff=JSON.parse(raw);}catch(ignore){return;}
- if(Date.now()-handoff.createdAt>86400000||!Array.isArray(handoff.entries)||!handoff.entries.length)return;
  p79LeaveHandoffBusy=true;
  const loading=P79Overtime.showReportLoading();
  try{
-  if(!p79CanReportOvertime())throw Error('請假與代班已儲存；此帳號沒有申報加班權限，請由有權限的管理員接續。');
-  const entry=handoff.entries[0],token=leaveRequestToken();
-  const cached=p79LeaveHandoffContext,canUse=cached&&String(cached.leaveId)===String(handoff.id)&&cached.month===entry.date.slice(0,7)&&Date.now()-cached.at<60000&&(cached.schedules||[]).some(row=>String(row.empId)===String(entry.empId));
-  const data=canUse?cached:await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(entry.empId)+'&date='+encodeURIComponent(entry.date)+'&leaveHandoffId='+encodeURIComponent(handoff.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+  if(!p79CanReportOvertime())throw Error('請假與代班已儲存；此帳號沒有加班申報權限。');
+  const h=await p79ReconcileLeaveHandoff();
+  if(!loading.isConnected)return;
+  if(!h?.entries?.length){loading.close();setStatus('✅ 已安排或已申報的代班資料已核對，不再重複提醒','success');return;}
+  const e=h.entries[0],token=leaveRequestToken(),cached=p79LeaveHandoffContext;
+  const canUse=cached&&String(cached.leaveId)===String(h.id)&&cached.month===e.date.slice(0,7)&&Date.now()-cached.at<30000&&(cached.schedules||[]).some(row=>String(row.empId)===String(e.empId));
+  const data=canUse?cached:await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
   if(!loading.isConnected)return;
   if(!data?.ok)throw Error(data?.error||'無法核對代班班表');
-  p79LeaveHandoffContext={...data,leaveId:handoff.id,at:Date.now()};
+  if(p79LeaveHandoffEntryState(h,e,data,true)!=='pending'){loading.close();await p79ReconcileLeaveHandoff();return;}
+  p79LeaveHandoffContext={...data,leaveId:h.id,at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
-  const period=P79Overtime.resolveLeaveCoverReport(data,handoff,entry);
-  await P79Overtime.openReport({...entry,...period,preferredType:entry.preferredType||handoff.preferredType||'',category:'代',leaveHandoffId:handoff.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[entry.date]?.reportOriginalShift??row.schedule?.__meta?.[entry.date]?.overtimeOriginalShift??row.schedule?.[entry.date]])),allowedEmpIds:handoff.entries.filter(e=>e.date===entry.date&&String(e.forEmpId||'')===String(entry.forEmpId||'')).map(e=>e.empId)});
-  $('p79LeaveHandoffStatus').textContent='尚有 '+handoff.entries.length+' 筆｜目前：'+entry.date+' '+(entry.name||entry.empId)+'，儲存成功後接續下一筆。';
+  const period=P79Overtime.resolveLeaveCoverReport(data,h,e);
+  await P79Overtime.openReport({...e,...period,preferredType:e.preferredType||h.preferredType||'',category:'代',leaveHandoffId:h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
+  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+'，儲存成功後接續下一筆。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
   setStatus('加班明細尚未完成：'+error.message,'warn');
@@ -1562,8 +1626,8 @@ window.p79OvertimeContext={
  saveReport:p79SaveWorkOvertimeDraft,refreshAccess:async()=>{await restoreAdmin();if(adminSession&&!employees.length)await loadCloud(false,true);return !!adminSession;},
  canEditRules:()=>adminSession?.adminRole==='superadmin',persistConfig:()=>{}
 };
-window.addEventListener('p79-overtime-report-saved',()=>setTimeout(p79UpdateLeaveHandoffBanner,0));
-window.addEventListener('load',()=>{setTimeout(p79UpdateLeaveHandoffBanner,0);});
+window.addEventListener('p79-overtime-report-saved',()=>setTimeout(()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);},0));
+window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);});
 
 </script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
