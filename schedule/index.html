@@ -5565,7 +5565,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const url=GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now();
         const response=await scheduleLockFetch(url,{cache:'no-store',redirect:'follow'},22000);
         const data=await readScheduleSsoJson(response);
-        if(!data?.ok||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))
+        if(!data?.ok||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))
           throw new Error(data?.error||'雲端未傳回完整請假與代班資料');
         return data;
       };
@@ -5593,12 +5593,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(!updated)messages.push('排班畫面尚未重新核對，請按「重新讀取雲端」。');
         }
         if(result.review.length)messages.push('另有 '+result.review.length+' 筆跨日請假只部分遇到颱風假，已保留，請至「請假管理」調整非停班日期，避免錯刪。');
+        if(result.balanceReview.length)messages.push('另有 '+result.balanceReview.length+' 筆年假已列入匯入餘額基準或人員無法核對，已保留，請先核對年假回補方式再處理。');
         if(result.skipped.length)messages.push(result.skipped.length+' 筆請假資料在確認期間變更，本次未刪除。');
         if(result.errors.length)messages.push('連動刪除未完成／待核對：'+result.errors.join('；'));
         if(messages.length){
           const message=messages.join('\n');
           showScheduleNotice(message,result.errors.length?'error':'success',11000);
-          if(result.review.length||result.skipped.length||result.errors.length)alert(message);
+          if(result.review.length||result.balanceReview.length||result.skipped.length||result.errors.length)alert(message);
         }else if(result.confirmed){
           showScheduleNotice('沒有需要刪除的請假紀錄。','info');
         }
