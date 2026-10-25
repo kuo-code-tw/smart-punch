@@ -37,6 +37,10 @@ assert.equal(ar.raw,12);assert.equal(ar.count,2);assert.equal(ar.people,2);
 assert.equal(aq.raw,8);assert.equal(aq.count,1);assert.equal(aq.people,1);
 
 assert.equal(c.p79BuildOvertimeJobTitleSummary([{...a,reportVerified:false}]).totals.raw,0);
+const fold=html.match(/<details id="p79OvertimeJobTitleSummary"[^>]*>/);
+assert(fold&&!/\bopen\b/.test(fold[0]),'job-title summary must be collapsible and closed by default');
+assert(html.includes('<summary id="p79OvertimeJobTitleSummaryTitle"'),'job-title fold must have a clickable heading');
+assert(html.includes('點擊展開／收合'),'job-title fold must explain the interaction');
 assert(html.includes('id="p79OvertimeJobTitleRows"'),'job-title table must be visible');
 assert(html.includes('id="p79OvertimeJobTitleNotice"'),'abnormal report notice must be visible');
 assert(html.includes('換算加班時數</div><div id="overtimeTotalHours"'),'converted total card must use official conversions');
