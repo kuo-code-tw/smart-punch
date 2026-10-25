@@ -5027,12 +5027,21 @@ function p79EmployeeDateEligible(emp,date) {
     function p79SubstituteShiftLabel(empId,dayStr,meta){
       const saved=typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[empId]?.[dayStr]:null;
       meta={...(saved||{}),...(meta&&typeof meta==='object'?meta:{})};
-      const reportCode=p79CompactOvertimeCode(meta.overtimeReport?.code);
-      if(reportCode)return p79OvertimePeriodLabel({...meta.overtimeReport,code:reportCode});
+      const savedReport=meta.overtimeReport,hasConfirmedReport=
+        !!String(savedReport?.id??'').trim()&&meta.overtimeExcluded!==true&&
+        !(meta.overtimeRevocations||[]).some(x=>
+          x?.confirmed===true&&String(x.reportId)===String(savedReport.id));
+      const reportCode=p79CompactOvertimeCode(savedReport?.code);
+      if(reportCode&&hasConfirmedReport)return p79OvertimePeriodLabel({...savedReport,code:reportCode});
       const own=String(monthlyScheduleData?.[empId]?.[dayStr]||'').trim();
       const ownCode=p79CompactOvertimeCode(own);if(ownCode)return p79OvertimePeriodLabel({category:meta.overtimeReport?.category||(meta.overtimeType==='extended'||(!meta.restCategory&&/^(08-20|20-08)$/.test(ownCode))?'延':''),code:ownCode,overtimeStart:meta.overtimeReport?.overtimeStart||meta.overtimeStart,overtimeEnd:meta.overtimeReport?.overtimeEnd||meta.overtimeEnd});
       const cover=p79LeaveCoverOnDay(empId,dayStr).find(x=>x.kind==='worker');
-      if(!cover&&!meta.overtime&&!meta.overtimeReport&&meta.type!=='substitute')return '';
+      const validClock=value=>/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(value||''));
+      const explicitTimedAssignment=!!(meta.overtime||meta.forEmpId||meta.type==='substitute')&&
+        validClock(meta.overtimeStart)&&validClock(meta.overtimeEnd);
+      // Legacy boolean flags, without any formal report or actual assigned time,
+      // must not synthesize a fake 國08-16／休08-16 cell.
+      if(!cover&&!hasConfirmedReport&&!explicitTimedAssignment)return '';
       const ranges={早:'08-16',中:'16-24',晚:'24-08'};
       const substitute=!!cover||!!meta.forEmpId||meta.type==='substitute'||meta.overtimeReport?.category==='代';
       const prefix=substitute?'代':['休','國','例'].includes(meta.overtimeReport?.category)?meta.overtimeReport.category:['休','國','例'].includes(meta.restCategory)?meta.restCategory:meta.overtimeType==='extended'?'延':'休';
@@ -6389,7 +6398,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79ScheduleConfirmedOvertime(empId,date,shift) {
       const report=monthlyScheduleMeta[empId]?.[date]?.overtimeReport;
       const code=p79CompactOvertimeCode(report?.code);
-      if(code)return p79OvertimePeriodLabel({...report,code});
+      if(code&&p79ConfirmedRestOvertime(monthlyScheduleMeta[empId]?.[date]))return p79OvertimePeriodLabel({...report,code});
       const own=p79CompactOvertimeCode(shift);
       return own?(p79SubstituteShiftLabel(empId,date)||own):'';
     }
