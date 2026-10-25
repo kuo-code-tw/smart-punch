@@ -618,6 +618,7 @@ body[data-p79-system="schedule"] .badge,body[data-p79-system="schedule"] [class*
 #app-main-container .p79-month-schedule-table .p79-rest-example,
 #app-main-container .p79-month-schedule-table .p79-rest-break,
 #app-main-container .p79-month-schedule-table .p79-rest-national,
+#app-main-container .p79-month-schedule-table .p79-rest-typhoon,
 #app-main-container .p79-month-schedule-table .p79-attendance-total{
   width:64px!important;min-width:64px!important;max-width:64px!important;
 }
@@ -1394,6 +1395,7 @@ html.dark #app-main-container .p79-roster-frozen-label{background:#1e293b!import
 #app-main-container .p79-month-schedule-table .p79-rest-example{background:#f3e8ff!important;color:#b91c1c!important;font-weight:900!important}
 #app-main-container .p79-month-schedule-table .p79-rest-break{background:#dbeafe!important;color:#b91c1c!important;font-weight:900!important}
 #app-main-container .p79-month-schedule-table .p79-rest-national{background:#dcfce7!important;color:#b91c1c!important;font-weight:900!important}
+#app-main-container .p79-month-schedule-table .p79-rest-typhoon{background:#cffafe!important;color:#0e7490!important;font-weight:900!important}
 </style>
 
 <style id="p79-substitute-modal-viewport-fix">
@@ -5815,7 +5817,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：已排休＋已報／待報">例</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：已排休＋已報／待報">休</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：已排休＋已報／待報">國</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：已排休＋已報／待報；不包含颱風停班">國</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="颱風停班：獨立計算實際顯示颱的日期，不併入國定假日額度">颱</th>
       `;
 
       const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -5853,6 +5856,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const restBalance=p79ScheduleRestBalance(emp,yearMonth,automaticRestMeta);
         let workDays = 0;
         let offDays = 0;
+        const typhoonShownDates=[];
 
         let cellsHtml = '';
         for(const d of visibleDays) {
@@ -5899,6 +5903,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // 網頁和 Excel 使用同一項考勤／特殊日判定，避免颱字匯出後變回早中晚。
           const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,attendanceState,attendanceEvidence,{typhoon:typhoonDays,election:electionDays},typhoonToday);
           const shownShift = specialNoPunch || approvedLeaveCode || (shiftVal==='休' && dayMeta?.restCategory ? dayMeta.restCategory : displayShift);
+          if(shownShift==='颱')typhoonShownDates.push(dayStr);
           const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
           const shownShiftStyle = specialNoPunch ? 'bg-cyan-100 text-cyan-800 font-black' : ownApprovedLeave ? 'bg-rose-100 text-rose-800 font-black' :
             shownShift==='例'?'bg-purple-100 text-red-700 font-black':
@@ -5951,7 +5956,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           `;
         }
 
-        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta);
+        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates);
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
         html += `
@@ -6428,7 +6433,30 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
       return {counts,dates};
     }
-    function p79ScheduleRestCountCells(emp,month,knownAllocation=null) {
+    // Same visible shift precedence as the day grid: verified typhoon no-punch,
+    // approved typhoon leave, or an explicitly assigned 颱 shift. A holiday
+    // marker alone does not count as a completed typhoon absence.
+    function p79ScheduleTyphoonDays(emp,month) {
+      const result=[],quota=p79RestQuota(month);
+      const evidence=p79ScheduleRestClient().status(month).evidence;
+      const snapshot={attendanceEvidence:evidence};
+      const markers={typhoon:new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-'))),election:new Set()};
+      const today=scheduleTaipeiTodayKey();
+      const shifts=monthlyScheduleData[emp.id]||{},first=p79EmploymentStartDate(emp)||'';
+      for(let n=1;n<=quota.days;n++){
+        const date=month+'-'+String(n).padStart(2,'0');
+        if(first&&date<first)continue;
+        const shift=String(shifts[date]||'休').trim();
+        if(['離','離職'].includes(shift))break;
+        const approved=approvedLeaveForEmployee(emp.id,date);
+        const leaveCode=approved?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(approved)):'';
+        const state=window.P79RestAttendance.state(snapshot,emp.id,date);
+        const special=p79ScheduleSpecialNoPunchCode(emp.id,date,shift,approved,state,evidence,markers,today);
+        if((special||leaveCode||shift)==='颱')result.push(date);
+      }
+      return result;
+    }
+    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null) {
       const quota=p79RestQuota(month).counts;
       const audit=p79DailyRestCount(emp,month,knownAllocation);
       return ['例','休','國'].map(category=>{
@@ -6437,7 +6465,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const title=category+'：逐日計入 '+count+' 天（'+(audit.dates[category].join('、')||'無')+'）；額度 '+limit+' 天；剩餘 '+rest+' 天'+(extra?'；超額 '+extra+' 天':'');
         return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${rest}</span>${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
-      }).join('');
+      }).join('')+(()=>{
+        const typhoonDays=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month):[]))];
+        const label=typhoonDays.map(d=>d.slice(-2)).join('、')||'無';
+        return '<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
+          scheduleEscapeHtml('颱風停班：'+typhoonDays.length+' 天（'+label+'）；此欄獨立統計，不占用國定假日、例假或休息日額度')+
+          '"><span>'+typhoonDays.length+' 天</span></td>';
+      })();
     }
     function p79RefreshScheduleRestCounts(month) {
       if(currentScheduleMonthKey()!==month)return;
@@ -7778,12 +7812,13 @@ body[data-p79-system="schedule"] #p79SevenNav a.active{background:#2563eb!import
 #app-main-container .p79-day-cell:is([data-display-shift="例"],[data-display-shift="休"],[data-display-shift="國"]) .p79-shift-select{color:#b91c1c!important;font-weight:900!important}
 #app-main-container .p79-person-name{font-size:15px!important;color:#142b49!important}
 #app-main-container .p79-month-schedule-table :is(.p79-rest-example,.p79-rest-break,.p79-rest-national){background:#f4f7fc!important;color:#b91c1c!important;font-size:13px!important}
+#app-main-container .p79-month-schedule-table .p79-rest-typhoon{background:#ecfeff!important;color:#0e7490!important;font-size:13px!important}
 #app-main-container .p79-day-head>div:first-child{font-size:14px!important}#app-main-container .p79-day-head>div:nth-child(2){font-size:12px!important}
 html.dark body[data-p79-system="schedule"]{background:#0b1425!important;color:#e2e8f0}
 html.dark #p79ScheduleQuickBar,html.dark #p79QuickMonthHost #scheduleRangeControl{background:#111e33!important}
 html.dark #p79QuickMonthHost #month-picker{color:#e2e8f0!important}
 html.dark .p79-roster-action-heading{background:#172337!important}html.dark .p79-roster-action-heading h2,html.dark #app-main-container .p79-person-name{color:#e2e8f0!important}
-html.dark #app-main-container .p79-month-schedule-table :is(th,.p79-rest-example,.p79-rest-break,.p79-rest-national){background:#1e293b!important;color:#fda4af!important;border-color:#475569!important}
+html.dark #app-main-container .p79-month-schedule-table :is(th,.p79-rest-example,.p79-rest-break,.p79-rest-national,.p79-rest-typhoon){background:#1e293b!important;color:#fda4af!important;border-color:#475569!important}
 html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 @media(max-width:850px){#p79ScheduleQuickBar{padding:9px!important}#app-main-container{padding-left:8px!important;padding-right:8px!important}#scheduleActiveEditorBanner{margin-inline:8px!important}body[data-p79-system="schedule"] #p79SevenTop .top-row{padding:10px!important}#p79ScheduleQuickBar button{font-size:14px!important;padding:8px!important}}
 @media print{#app-main-container .p79-day-cell{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
