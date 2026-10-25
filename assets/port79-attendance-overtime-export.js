@@ -4,7 +4,7 @@
 if(!/\/attendance\/?/.test(location.pathname))return;
 const dialogId='p79OvertimeDateExportDialog';
 const cache=new Map();
-let currentDate='',currentRows=[],latestAudit=[],auditAvailable=false,loading=false;
+let currentDate='',currentRows=[],latestAudit=[],auditAvailable=false,loading=false,exporting=false;
 const h=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=x=>String(x||'').trim().toUpperCase();
 const dateValid=x=>/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(String(x||''));
@@ -108,7 +108,7 @@ async function fetchMonth(month,force){
 }
 async function open(date,force=false){
  if(!dateValid(date))return notify('請先選擇正確的考勤日期','warning');
- if(loading){notify('上一個日期的加班資料仍在載入，請核對完成後再選其他日期','warning');return;}
+ if(loading||exporting){notify('上一份加班報表仍在處理中，請完成後再切換日期','warning');return;}
  const d=ensureDialog();
  currentDate=date;
  d.querySelector('#p79OtExportTitle').textContent='匯出 '+date+' 加班明細';
@@ -141,11 +141,12 @@ async function ensureSheetLibrary(){
 }
 async function exportSelected(){
  const d=ensureDialog(),button=d.querySelector('#p79OtExportSave');
- if(button.disabled)return;
+ if(button.disabled||exporting)return;
  const indices=[...d.querySelectorAll('input[data-p79-export-index]:checked')].map(x=>Number(x.dataset.p79ExportIndex));
  const selected=indices.map(i=>currentRows[i]).filter(Boolean);
  if(!selected.length)return notify('請先勾選要匯出的加班明細','warning');
- button.disabled=true;
+ button.disabled=true;exporting=true;
+ const exportDate=currentDate;
  try{
   const sheet=await ensureSheetLibrary();
   const header=['日期','姓名','工號','部門','職稱','加班類型','加班時段','開始時間','結束時間','申報時數','申報狀態','申報編號','備註'];
@@ -153,22 +154,23 @@ async function exportSelected(){
   const book=sheet.utils.book_new(),tab=sheet.utils.aoa_to_sheet([header,...values]);
   tab['!cols']=[{wch:14},{wch:16},{wch:17},{wch:20},{wch:17},{wch:20},{wch:19},{wch:12},{wch:12},{wch:13},{wch:17},{wch:35},{wch:30}];
   sheet.utils.book_append_sheet(book,tab,'加班明細');
-  const fileName='加班明細_'+currentDate.replaceAll('-','')+'_'+stamp()+'.xlsx';
+  const fileName='加班明細_'+exportDate.replaceAll('-','')+'_'+stamp()+'.xlsx';
   sheet.writeFile(book,fileName);
   setStatus('已發起下載 '+selected.length+' 筆加班明細，正在寫入雲端匯出紀錄…');
   const requestId='OTEXPORT-'+Date.now()+'-'+Math.random().toString(36).slice(2,12);
   try{
-   const result=await api('recordOvertimeReportExport',{date:currentDate,requestId,fileName,
+   const result=await api('recordOvertimeReportExport',{date:exportDate,requestId,fileName,
      entries:selected.map(r=>({empId:r.empId,reportId:r.reportId,version:r.version}))},'POST');
    if(result.auditVersion!==1||Number(result.count)!==selected.length)throw Error('後端未回傳完整記錄');
    notify('加班明細已匯出，雲端已記錄 '+selected.length+' 筆','success');
-   await open(currentDate,true);
+   exporting=false;
+   await open(exportDate,true);
   }catch(error){
    setStatus('試算表已發起下載，但雲端未確認匯出紀錄：'+(error?.message||error)+'。請勿將這些人員標示為已匯出；需部署／檢查 GAS。');
    notify('匯出完成，但雲端稽核尚未確認','warning');
   }
  }catch(error){setStatus('匯出失敗：'+(error?.message||error));notify('匯出加班明細失敗：'+(error?.message||error),'warning');}
- finally{button.disabled=false;}
+ finally{exporting=false;button.disabled=false;}
 }
 async function refreshDateBadges(month){
  if(!auditAvailable||!cache.has(month))return;
