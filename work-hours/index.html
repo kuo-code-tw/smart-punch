@@ -3,10 +3,11 @@
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261024-special-auto"></script>
-<script src="../assets/port79-rest-allocation.js?v=20261025-rest-report-id-v4"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261025-rest-report-id-v4"></script>
-<script src="../assets/port79-overtime-status.js?v=20261022-live"></script>
+<script src="../assets/port79-overtime-reason.js?v=20261025-special-audit-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261025-special-audit-v1"></script>
+<script src="../assets/port79-overtime-status.js?v=20261025-special-audit-v1"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
@@ -15481,7 +15482,7 @@ window.p79OvertimeStatusContext={
 };
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
-<script src="../assets/port79-overtime-application.js?v=20261023-manual-special-day-report"></script>
+<script src="../assets/port79-overtime-application.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-actual-hours"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
