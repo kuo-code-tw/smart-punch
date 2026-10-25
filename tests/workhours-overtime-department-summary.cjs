@@ -1,12 +1,12 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync('work-hours/index.html','utf8');
-const start=html.indexOf('        function p79BuildOvertimeDepartmentSummary(rows) {');
+const start=html.indexOf('        function p79BuildOvertimeJobTitleSummary(rows) {');
 const end=html.indexOf('        function renderOvertimeStats() {',start);
-assert(start>=0&&end>start,'department overtime calculation function must exist');
+assert(start>=0&&end>start,'job-title overtime calculation function must exist');
 const c={Map,Set,Number,String,Array,Math};
 vm.createContext(c);
 vm.runInContext(html.slice(start,end),c);
-const report=(emp,dept,date,declared,converted,extra={})=>({empId:emp,dept,dateKey:date,rosterDate:date,reportVerified:true,overtimeMinutes:977,overtimeReport:{id:emp+'-'+date,declaredHours:declared,convertedHours:converted,...extra}});
+const report=(emp,dept,date,declared,converted,extra={})=>({empId:emp,dept,jobTitle:dept==='A'?'ARMG':'AQC',dateKey:date,rosterDate:date,reportVerified:true,overtimeMinutes:977,overtimeReport:{id:emp+'-'+date,declaredHours:declared,convertedHours:converted,...extra}});
 const a=report('E1','A','2026-10-01',4,6.02);
 const b=report('E1','A','2026-10-02',8,12.70);
 const x=report('E2','A','2026-10-03',4,null);
@@ -17,7 +17,7 @@ const planned=report('E6','B','2026-10-04',8,12.70,{planned:true});
 const unverified={...report('E7','B','2026-10-05',8,12.70),reportVerified:false};
 const incomplete=report('E8','B','2026-10-06',8,12.70,{attendanceReview:'待核'});
 const rows=[a,b,x,y,invalid,withdrawn,planned,unverified,incomplete,{...a}];
-const result=c.p79BuildOvertimeDepartmentSummary(rows),A=result.groups.find(g=>g.dept==='A'),B=result.groups.find(g=>g.dept==='B');
+const result=c.p79BuildOvertimeJobTitleSummary(rows),A=result.groups.find(g=>g.jobTitle==='ARMG'),B=result.groups.find(g=>g.jobTitle==='AQC');
 assert.equal(result.invalidHours,1,'unexpected non-4/8 report must be flagged, never silently rounded');
 assert.equal(result.missingConversion,1,'missing conversion must be counted as unknown, not estimated from punches');
 assert.equal(A.people,2);assert.equal(A.count,3);assert.equal(A.raw,16);
@@ -26,10 +26,20 @@ assert.equal(A.missing,1);
 assert.equal(B.people,1);assert.equal(B.count,1);assert.equal(B.raw,8);assert.equal(B.converted,12.7);assert.equal(B.invalid,1);
 assert.equal(result.totals.count,4);assert.equal(result.totals.people,3);assert.equal(result.totals.raw,24);assert.equal(result.totals.converted,31.42);
 assert.equal(result.totals.missing,1);assert.equal(result.totals.invalid,1);
-assert.equal(c.p79BuildOvertimeDepartmentSummary([{...a,reportVerified:false}]).totals.raw,0);
-assert(html.includes('id="p79OvertimeDepartmentRows"'),'department table must be visible');
-assert(html.includes('id="p79OvertimeDepartmentNotice"'),'abnormal report notice must be visible');
+const cross=c.p79BuildOvertimeJobTitleSummary([
+ {...a,dept:'甲單位',jobTitle:'ARMG'},
+ {...y,dept:'乙單位',jobTitle:'ARMG'},
+ {...b,dept:'甲單位',jobTitle:'AQC'}
+]);
+assert.equal(cross.groups.length,2,'same job title across departments must merge, different job title in same department must not');
+const ar=cross.groups.find(g=>g.jobTitle==='ARMG'),aq=cross.groups.find(g=>g.jobTitle==='AQC');
+assert.equal(ar.raw,12);assert.equal(ar.count,2);assert.equal(ar.people,2);
+assert.equal(aq.raw,8);assert.equal(aq.count,1);assert.equal(aq.people,1);
+
+assert.equal(c.p79BuildOvertimeJobTitleSummary([{...a,reportVerified:false}]).totals.raw,0);
+assert(html.includes('id="p79OvertimeJobTitleRows"'),'job-title table must be visible');
+assert(html.includes('id="p79OvertimeJobTitleNotice"'),'abnormal report notice must be visible');
 assert(html.includes('換算加班時數</div><div id="overtimeTotalHours"'),'converted total card must use official conversions');
 assert(html.includes("if(!p79WorkOvertimeOfficialReport(meta.overtimeReport,meta)||shown.has"),'stored cloud report cannot disappear simply because no punch-based estimate exists');
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
-console.log('PASS department overtime: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
+console.log('PASS job-title overtime: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
