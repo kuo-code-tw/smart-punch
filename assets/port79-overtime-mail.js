@@ -116,8 +116,9 @@ function open(){
  '<button id="omSaveRecipient" class="om-green" type="button">儲存 Mail</button>'+
  '<button id="omCancelRecipient" class="om-muted" type="button">取消</button></div></div>'+
  '<div id="omSummary" class="om-summary"><strong>請先核對申報日期</strong></div>'+
+ '<details id="omDetails" style="margin:8px 0"><summary style="cursor:pointer;color:#075985;font-size:13px;font-weight:750;padding:8px 0">查看當日加班申報明細（點擊展開）</summary>'+ 
  '<div class="om-list"><table><thead><tr><th>申報日期</th><th>姓名／工號</th><th>加班類型／時段</th><th>時數</th></tr></thead>'+
- '<tbody id="omRows"><tr><td colspan="4">載入中…</td></tr></tbody></table></div>'+
+ '<tbody id="omRows"><tr><td colspan="4">載入中…</td></tr></tbody></table></div></details>'+
  '<div class="om-bottom"><div id="omMessage" class="om-message" role="status"></div>'+
  '<button id="omSendDay" class="om-green" type="button" disabled>發送當日 Mail</button></div>';
  g.document.body.appendChild(el);
