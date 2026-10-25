@@ -1,82 +1,90 @@
-// Safe, fixture-only email integration tests; never sends real mail.
-const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
-const frontend={};frontend.window=frontend;vm.createContext(frontend);
-vm.runInContext(fs.readFileSync('assets/port79-overtime-mail.js','utf8'),frontend);
-const mail=frontend.P79OvertimeMail,day='2026-10-15';
-const report={id:'R1',category:'國',code:'國08-16',declaredHours:8,modifiedAt:'t1'};
-const records=[{empId:'E1',schedule:{__meta:{[day]:{overtimeReport:report}}}}];
-const people=[{empId:'E1',name:'測試員'}];
-const rows=mail.collect({schedules:records},people,'2026-10');
-a.equal(rows.length,1);
-a.equal(mail.receiptStatus(rows[0],[]).kind,'new');
-const older={...report,declaredHours:7};
-const receipt=(r,status='sent')=>({status,reportId:r.id,reportJson:mail.canonical(r),empId:'E1',date:day,recipientId:'acc',recipientName:'會計',sentAt:'2026-10-25'});
-a.equal(mail.receiptStatus(rows[0],[receipt(report)],'acc').kind,'sent');
-a.equal(mail.receiptStatus(rows[0],[receipt(older)],'acc').kind,'stale');
-a.equal(mail.receiptStatus(rows[0],[receipt(report,'sending')],'acc').kind,'pending');
-a.equal(mail.receiptStatus(rows[0],[receipt(report)],'other').kind,'new','other recipients must not appear as sent');
-
-const frontendDay={document:{readyState:'loading',addEventListener(){}},addEventListener(){}};
-frontendDay.window=frontendDay;vm.createContext(frontendDay);
-vm.runInContext(fs.readFileSync('assets/port79-attendance-overtime.js','utf8'),frontendDay);
-const dates=frontendDay.P79AttendanceOvertimeDayStatus;
-const state={ready:true,people,rows:records};
-a.equal(dates.overtimeDayIndicator(day,state,[receipt(report)]).kind,'mailed');
-a.equal(dates.overtimeDayIndicator(day,state,[receipt(older)]).kind,'outdated');
-a.equal(dates.overtimeDayIndicator(day,state).kind,'amended','without receipt never claim sent');
-records[0].schedule.__meta[day].overtimeRevocations=[{confirmed:true,reportId:'R1',report,empId:'E1',date:day,at:'2026-10-25',actor:'主管'}];
-a.equal(dates.overtimeDayIndicator(day,state,[receipt(report)]).kind,'revoked','cancellation overrides previous sent status');
-
-const header=['requestId','status','sentAt','createdAt','reportId','empId','date',
-'recipientId','recipientEmail','recipientName','actorEmpId','actorName','reportJson','error'];
-let grid=null,sent=0,denied=false,rosters=[{empId:'E1',schedule:{__meta:{[day]:{overtimeReport:{...report}}}}}];
-function fakeRange(row,col,h=1,w=1){
- return {
+// In-memory fixtures only. No real Google emails are sent.
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const day='2026-10-23';
+const rule1={id:'R1',code:'颱08-11',typeName:'颱風日加班',declaredHours:3};
+const rule2={id:'R2',code:'休08-16',typeName:'休息日加班',declaredHours:8};
+const rule3={id:'R3',code:'颱08-12',typeName:'颱風日加班',declaredHours:4};
+const people=[{empId:'E1',name:'甲'},{empId:'E2',name:'乙'}];
+const schedules=[
+ {empId:'E1',schedule:{__meta:{[day]:{overtimeReport:rule1,overtimeReports:[rule1,rule3]}}}},
+ {empId:'E2',schedule:{__meta:{[day]:{overtimeReport:rule2}}}}
+];
+const browser={};browser.window=browser;vm.createContext(browser);
+vm.runInContext(fs.readFileSync('assets/port79-overtime-mail.js','utf8'),browser);
+const ui=browser.P79OvertimeMail;
+const rows=ui.collect({schedules},people,'2026-10'),items=ui.dailyItems(rows,day);
+assert.equal(rows.length,3,'same person with two rules must be included without duplicates');
+assert.equal(items.length,3);
+assert(ui.dayStatus(day,items,[],'finance').kind==='new');
+const attendance={document:{readyState:'loading',addEventListener(){}},addEventListener(){}};
+attendance.window=attendance;vm.createContext(attendance);
+vm.runInContext(fs.readFileSync('assets/port79-attendance-overtime.js','utf8'),attendance);
+const dayUi=attendance.P79AttendanceOvertimeDayStatus;
+let props={P79_OVERTIME_MAIL_RECIPIENTS_V1:JSON.stringify([{id:'finance',name:'財務',email:'finance@company.example'}])};
+const sheets={},sent=[];
+function getSheet(name){
+ const grid=[];
+ return {grid,appendRow:r=>grid.push(r.slice()),getLastRow:()=>grid.length,getLastColumn:()=>grid[0]?.length||0,
+ getRange(row,col,h=1,w=1){return {
   setNumberFormat(){return this},
-  getValue(){return (grid[row-1]||[])[col-1]},
-  getValues(){return Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>(grid[row+i-1]||[])[col+j-1]??''))},
+  getValue(){return grid[row-1]?.[col-1]},
   setValue(v){while(grid.length<row)grid.push([]);grid[row-1][col-1]=v;return this},
-  setValues(rows){rows.forEach((a,i)=>a.forEach((value,j)=>{while(grid.length<row+i)grid.push([]);grid[row+i-1][col+j-1]=value}));return this}
+  getValues(){return Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>grid[row-1+i]?.[col-1+j]??''))},
+  setValues(m){m.forEach((r,i)=>r.forEach((v,j)=>{while(grid.length<row+i)grid.push([]);grid[row-1+i][col-1+j]=v}));return this}
+ }}
  };
 }
-const sheet={
- appendRow(row){grid.push([...row])},
- getLastRow(){return grid.length},
- getLastColumn(){return grid[0].length},
- getRange:fakeRange
-};
-const ss={getSheetByName(){return grid?sheet:null},insertSheet(){grid=[];return sheet}};
-const sandbox={
- PropertiesService:{getScriptProperties(){return {getProperty:()=>JSON.stringify([{id:'acc',name:'會計',email:'accounting@example.com'}])}}},
- gcRequireSystemPermission_(){if(denied)throw Error('no permission');return {empId:'M1',name:'主管'}},
- normalizeEmpId_:x=>String(x).toUpperCase(),
- p79GetEmployeeMasterCached_:()=>people,
- p79CanReadScopedEmployee_:()=>true,
- readScheduleMonthOnly_:()=>rosters,
+const ss={getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=getSheet(n))};
+let denied=false;
+const server={
+ PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>{props[k]=v}})},
+ Utilities:{getUuid:()=> 'test1234-test1234-test1234-test1234'},
+ gcRequireSystemPermission_(){if(denied)throw Error('no permission');return {empId:'ADMIN',name:'管理員'}},
+ p79GetEmployeeMasterCached_:()=>people,p79CanReadScopedEmployee_:()=>true,
+ readScheduleMonthOnly_:()=>schedules,
  LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},
- SpreadsheetApp:{flush(){}},MailApp:{getRemainingDailyQuota:()=>10,sendEmail(){sent++}}
+ SpreadsheetApp:{flush(){}},
+ MailApp:{getRemainingDailyQuota:()=>30,sendEmail:o=>sent.push(o)}
 };
-vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync('backend/overtime-accounting-email.gs','utf8'),sandbox);
-const send=(overrides={})=>({empId:'E1',date:day,reportId:'R1',recipientId:'acc',
- requestId:'otmail_request_1234',expectedReport:{...report},...overrides});
-a.equal(sandbox.p79OvertimeMailOptions_(ss,{month:'2026-10'}).receipts.length,0);
-let done=sandbox.p79OvertimeMailSend_(ss,send());
-a.equal(done.sent,true);a.equal(sent,1);
-a.equal(sandbox.p79OvertimeMailOptions_(ss,{month:'2026-10'}).receipts.length,1);
-done=sandbox.p79OvertimeMailSend_(ss,send());
-a.equal(done.duplicate,true);a.equal(sent,1,'no duplicate sends');
-a.throws(()=>sandbox.p79OvertimeMailSend_(ss,send({recipientId:'outside'})),/收件人/);
-a.throws(()=>sandbox.p79OvertimeMailSend_(ss,send({expectedReport:{...report,declaredHours:4}})),/版本已改變/);
-rosters[0].schedule.__meta[day].overtimeExcluded=true;
-a.throws(()=>sandbox.p79OvertimeMailSend_(ss,send({requestId:'otmail_other_12345'})),/加班已取消/);
-a.equal(sent,1);
+server.globalThis=server;vm.createContext(server);
+vm.runInContext(fs.readFileSync('backend/overtime-accounting-email.gs','utf8'),server);
+const options=server.p79OvertimeMailOptions_(ss,{month:'2026-10'});
+assert.equal(options.overtimeMailVersion,2);
+assert(options.canManageRecipients===true);
+const payload={date:day,recipientId:'finance',expectedReports:items,requestId:'otmailday_request_1234'};
+const once=server.p79OvertimeDayMailSend_(ss,payload);
+const twice=server.p79OvertimeDayMailSend_(ss,payload);
+assert.equal(once.sent,true);assert.equal(twice.duplicate,true);
+assert.equal(sent.length,1,'ONE email for every employee and report on the day');
+assert.match(sent[0].body,/甲/);assert.match(sent[0].body,/乙/);
+assert.match(sent[0].body,/3 筆/);
+const receipts=server.p79OvertimeMailOptions_(ss,{month:'2026-10'}).receipts;
+assert.equal(receipts.length,1);
+assert.equal(ui.dayStatus(day,items,receipts,'finance').kind,'sent');
+assert.equal(dayUi.overtimeDayIndicator(day,{ready:true,rows:schedules,people},receipts).kind,'mailed');
+const edited=items.map(x=>({...x,report:{...x.report}}));
+edited[0].report.declaredHours=6;
+assert.equal(ui.dayStatus(day,edited,receipts,'finance').kind,'stale');
+assert.throws(()=>server.p79OvertimeDayMailSend_(ss,{...payload,requestId:'otmailday_request_1235',expectedReports:edited}),/不一致/);
+assert.equal(sent.length,1);
+const changedSchedules=JSON.parse(JSON.stringify(schedules));
+changedSchedules[0].schedule.__meta[day].overtimeReport={...rule1,declaredHours:6};
+assert.equal(dayUi.overtimeDayIndicator(day,{ready:true,rows:changedSchedules,people},receipts).kind,'outdated');
+assert.throws(()=>server.p79OvertimeDayMailSend_(ss,{...payload,recipientId:'outside',requestId:'otmailday_request_1236'}),/名單/);
+const added=server.p79OvertimeMailManageRecipient_(ss,{operation:'add',name:'人資',email:'hr@company.example'});
+assert.equal(added.recipients.length,2);
+assert.equal(server.p79OvertimeMailOptions_(ss,{month:'2026-10'}).recipients.length,2);
+assert.throws(()=>server.p79OvertimeMailManageRecipient_(ss,{operation:'add',name:'人資',email:'hr@company.example'}),/已經在名單/);
+const removed=server.p79OvertimeMailManageRecipient_(ss,{operation:'remove',recipientId:added.recipients[1].id});
+assert.equal(removed.recipients.length,1);
+assert.equal(server.p79OvertimeMailOptions_(ss,{month:'2026-10'}).receipts.length,1,'historical email audit retained');
 denied=true;
-a.throws(()=>sandbox.p79OvertimeMailOptions_(ss,{month:'2026-10'}),/permission/);
-a.throws(()=>sandbox.p79OvertimeMailSend_(ss,send()),/permission/);
-a.equal(sent,1);
-const html=fs.readFileSync('work-hours/index.html','utf8');
-a(html.includes('P79OvertimeMail.open()'));
-a(html.includes('p79OvertimeMailContext'));
-a(fs.readFileSync('attendance/index.html','utf8').includes('email-sent-v3'));
-console.log('PASS restricted recipients, exact version, verified cloud audit, nonduplicate send, cancelled block, date color and UI wiring');
+assert.throws(()=>server.p79OvertimeMailManageRecipient_(ss,{operation:'add',name:'不允許',email:'bad@example.com'}),/permission/);
+assert.throws(()=>server.p79OvertimeDayMailSend_(ss,payload),/permission/);
+assert.equal(sent.length,1);
+const work=fs.readFileSync('work-hours/index.html','utf8');
+assert(work.includes('✉ 發送 Mail'));
+assert(work.includes('daily-mail-v3'));
+const attend=fs.readFileSync('attendance/index.html','utf8');
+assert(attend.includes('daily-mail-v4'));
+console.log('PASS one email per day, multi-person digest, canonical cloud version, idempotence, date status, add/remove Mail, authorization');
