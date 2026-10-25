@@ -25,31 +25,31 @@ for(let i=0;i<employees.length;i++){
  monthlyScheduleData[id]=roster;monthlyScheduleMeta[id]=old;
 }
 const saved=JSON.stringify(monthlyScheduleData),order=['例','休','國'];
-const counts=m=>Object.fromEntries(order.map(cat=>[cat,days.filter(d=>m[d]?.restCategory===cat&&!m[d]?.restQuotaOvertime).length]));
+const counts=m=>Object.fromEntries(order.map(cat=>[cat,days.filter(d=>d!==typhoon&&m[d]?.restCategory===cat&&!m[d]?.restQuotaOvertime).length]));
 for(const emp of employees){
  const plan=c.p79RestAutomaticPlan(emp,month);
  const actual=counts(plan.meta);
- a.deepEqual(actual,{例:4,休:5,國:2},emp.id+' must allocate all 11 days by priority, even when old 休 was manually tagged');
- a(!['國'].includes(plan.meta[typhoon]?.restCategory),emp.id+' typhoon rest must not consume 國');
- a.equal(plan.unresolved.length,0,emp.id+' no quota should be left with 11 eligible rest days');
+ a.deepEqual(actual,{例:4,休:5,國:1},emp.id+' 10 ordinary off days can fill 4例5休1國; typhoon is not a quota');
+ a(!plan.meta[typhoon]?.restCategory,emp.id+' typhoon must never retain a 例休國 restCategory');
+ a.equal(plan.unresolved.length,1,emp.id+' 國少 1 天，不可用颱補足');
  const repeated=c.p79RestAutomaticPlan(emp,month,plan.meta);
  a.deepEqual(repeated.meta,plan.meta,emp.id+' clicking twice must not reshuffle dates');
 }
 a.equal(JSON.stringify(monthlyScheduleData),saved,'allocator may reclassify rest quota but never overwrite formal shift cells');
 const emp=employees[2],base=monthlyScheduleData[emp.id],prior=monthlyScheduleMeta[emp.id];
 base[day(28)]='早';let shortage=c.p79RestAutomaticPlan(emp,month);
-a.deepEqual(counts(shortage.meta),{例:4,休:5,國:1},'when 10 rest days available, 國 really is short after protecting 例 and 休');
-a.equal(shortage.unresolved.length,1);
+a.deepEqual(counts(shortage.meta),{例:4,休:5,國:0},'9 valid rest days after excluding 颱 and work, 國 must remain unfilled');
+a.equal(shortage.unresolved.length,2);
 a.equal(shortage.unresolved[0].category,'國','shortage must be specifically 國, not fabricated on a work day');
 base[day(28)]='休';
 prior[day(7)]={overtimeReport:{id:'SAVED',code:'國08-16',category:'國'}};
 shortage=c.p79RestAutomaticPlan(emp,month);
-a.equal(shortage.unresolved.length,1,'formal overtime occupying a rest day remains protected');
+a.equal(shortage.unresolved.length,2,'formal overtime occupying a rest day remains protected');
 a.equal(shortage.meta[day(7)].overtimeReport.id,'SAVED','never delete confirmed overtime');
 delete prior[day(7)];
 const locked=day(22);prior[locked]={restAllocationLocked:true};
 shortage=c.p79RestAutomaticPlan(emp,month);
-a.equal(shortage.unresolved.length,1,'explicit locked rest day cannot be overwritten');
+a.equal(shortage.unresolved.length,2,'explicit locked rest day cannot be overwritten');
 a(!shortage.meta[locked].restCategory,'locked untouched');
 delete prior[locked];
 // Exercise real screen and export resolver with a typhoon-day originally marked 休.
@@ -63,10 +63,10 @@ for(const name of ['p79VisibleRestKind','p79ScheduleDisplayContext','p79Schedule
  vm.runInContext(extract(name),c);
 const planned=c.p79RestAutomaticPlan(emp,month),context=c.p79ScheduleDisplayContext(emp,month,planned.meta);
 const selected=c.p79ScheduleDisplayDay(emp,typhoon,context);
-a(['例','休'].includes(selected.visibleCode),'previously scheduled typhoon rest retains a rest classification');
-a.equal(selected.specialNoPunch,'','typhoon badge is separate; do not hide its scheduled rest');
+a.equal(selected.visibleCode,'颱','原本排休的颱風日只顯示颱，不能是例／休／國');
+a.equal(selected.specialNoPunch,'颱','颱風停班時顯示颱');
 a.equal(c.p79ScheduleExportDay(emp,typhoon,context),selected.visibleCode,'Excel and screen must agree on same typhoon rest day');
 const verified=order.reduce((o,k)=>(o[k]=0,o),{});
 for(const d of days){const v=c.p79ScheduleDisplayDay(emp,d,context);if(verified[v.visibleRestKind]!==undefined)verified[v.visibleRestKind]++;}
-a.deepEqual(verified,{例:4,休:5,國:2},'all visible rest labels count fully, including originally rested typhoon date');
-console.log('PASS 83 employees: manually tagged 休 flexes to 例→休→國 (4/5/2), typhoon-rest dual marker/no 國 duplicate, saved OT/locked respected, real screen=Excel, idempotent');
+a.deepEqual(verified,{例:4,休:5,國:1},'颱風日不計例／休／國，畫面數量要真實');
+console.log('PASS 83 employees: 颱 fixed; ordinary rests 4/5/1 and actual shortage reported, saved OT/locked respected, screen=Excel, idempotent');
