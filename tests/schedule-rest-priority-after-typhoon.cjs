@@ -28,7 +28,7 @@ c.p79VisibleRestDayAudit=(emp,m,meta)=>{
 };
 for(const emp of people){
  monthlyScheduleData[emp.id]=Object.fromEntries(Array.from({length:31},(_,i)=>[day(i+1),restDays.includes(i+1)?'休':'早']));
- // Reproduce 4 assigned 例, of which one is hidden by typhoon.
+ // Reproduce four existing 例 allocations with a previous typhoon-day label that can now be rebalanced.
  const old=c.p79AllocateRestMonth(monthlyScheduleData[emp.id],{},month);
  let item=Object.entries(old.meta).find(([date,x])=>x.restCategory==='例'&&date!==typhoon);
  old.meta[typhoon]={...old.meta[typhoon],restCategory:'例',restAllocationSource:'auto-v1',restSourceDate:item[1].restSourceDate,restQuotaOvertime:false};
@@ -41,8 +41,8 @@ let plan=c.p79RestAutomaticPlan(people[0],month);
 const counts=kind=>Object.entries(plan.meta).filter(([date,m])=>date.startsWith(month)&&date!==typhoon&&m?.restCategory===kind&&!m.restQuotaOvertime).length;
 a.equal(counts('例'),4,'例 first: 4 visible allocations must not be on typhoon day');
 a.equal(counts('休'),5,'next 休=5');
-a.equal(counts('國'),1,'when 1 typhoon consumes an off day, only 國 becomes short');
-a(!plan.meta[typhoon]?.restCategory,'typhoon-stopped 休 must not contain invisible fourth 例');
+a.equal(counts('國'),2,'typhoon day originally 休 retains 例/休 allocation, freeing ordinary 休 to complete 國');
+a(['例','休'].includes(plan.meta[typhoon]?.restCategory),'the typhoon rest remains an assigned 例/休, never 國');
 a.equal(JSON.stringify(monthlyScheduleData),before,'do not rewrite underlying original 休 while reallocating its visible category');
 c.p79AutoAllocateRest();
 a.equal(writes,1,'single queued official cloud save for all 83');
@@ -59,4 +59,4 @@ a.equal(JSON.stringify(monthlyScheduleData),before);
 a(html.includes('p79RestAutomaticExcludedDates(emp,month)'));
 a(html.includes('p79RestAutomaticPlan(emp,month)'));
 a(html.includes('const visible=p79VisibleRestDayAudit(emp,month,result.meta)'));
-console.log('PASS 83-person typhoon-hidden fourth example -> visible 4/0, next 休 then 國, cloud save once, no raw shift/report rewrite and rerun idempotent');
+console.log('PASS 83-person typhoon rest retains 例/休, 國 is fully refilled from 休, cloud save once, no raw shift/report rewrite, rerun idempotent');

@@ -6451,8 +6451,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const displayShift=coverageShift||shiftVal;
       const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
       const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
-      const specialNoPunch=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
+      const specialCandidate=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
         attendanceState,ctx.attendanceEvidence,{typhoon:ctx.typhoonDays,election:ctx.electionDays},ctx.typhoonToday);
+      // For a day already scheduled as 休, the day retains its 例/休 roster
+      // category AND gets the separate 颱日 event marker. A typhoon absence
+      // over a working shift still displays 颱; approved leave remains first.
+      const preservePlannedRest=rosterShift==='休'&&!ownApprovedLeave&&
+        ['例','休',''].includes(dayMeta?.restCategory||'');
+      const specialNoPunch=preservePlannedRest&&specialCandidate==='颱'?'':specialCandidate;
       const shownShift=specialNoPunch||approvedLeaveCode||
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
       const visibleSubstituteLabel=specialNoPunch?'':substituteLabel;
@@ -6605,16 +6611,24 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const date=month+'-'+String(n).padStart(2,'0');
         if(approvedLeaveForEmployee(emp.id,date)||
            p79LeaveCoverOnDay(emp.id,date).length||
-           typhoon.has(date)||elections.has(date))dates.push(date);
+           // A scheduled 休 on a typhoon day is still a planned rest.
+           // Preserve it and show a separate 颱日 marker; do not let that
+           // day consume 國 quota (national exclusion below).
+           (typhoon.has(date)||elections.has(date))&&
+           String(monthlyScheduleData[emp.id]?.[date]||'')!=='休')dates.push(date);
       }
       return dates;
     }
     function p79RestAutomaticPlan(emp,month,metadata=null) {
       const schedule=monthlyScheduleData[emp.id]||{};
       const end=String(emp.lastWorkDate||emp.terminationDate||'').replaceAll('/','-').slice(0,10);
+      const nationalBlocked=[...new Set([
+        ...p79TyphoonDates().filter(d=>d.startsWith(month+'-')),
+        ...(window.P79SpecialOvertime?.electionDates?.()||[]).filter(d=>d.startsWith(month+'-'))
+      ])];
       return p79AllocateRestMonth(schedule,metadata||monthlyScheduleMeta[emp.id]||{},month,
         p79RestAutomaticExcludedDates(emp,month),p79EmploymentStartDate(emp),
-        /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'');
+        /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'',nationalBlocked);
     }
     function p79AutomaticRestMetadata(empId, month) {
       const existing=monthlyScheduleMeta[empId]||{};
@@ -6720,7 +6734,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const missing=['例','休','國'].filter(kind=>counts[kind]<result.quota[kind])
             .map(kind=>kind+' '+counts[kind]+'/'+result.quota[kind]);
           if(missing.length)shortages.push(emp.name+'：'+missing.join('、')+
-            '（例優先；剩餘休假日不足或原指定、請假及加班不可覆蓋）');
+            '（已優先補例再補休，剩餘可調整的休假日不足或受正式加班、人工鎖定限制）');
         }catch(error){shortages.push(emp.name+'：無法核對實際班格 '+String(error.message||error));}
       }
       if(changed.length){
@@ -6730,7 +6744,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         buildRoleTabsAndRender();
       }
       alert(month+' 已重新核對 '+results.length+' 人；實際調整 '+changed.length+' 人。\n'+
-        '配對優先順序：例 → 休 → 國；颱風、選舉日和已核准請假不占用自動配對日期。\n'+
+        '配對優先順序：例 → 休 → 國；原排休的颱風日保留例／休並另外標示颱日，國不與颱重複計算；核准請假和代班不覆蓋。\n'+
         (shortages.length?'仍不足（請按全員檢查查看日期）：\n'+shortages.join('\n')+'\n':'全部可配日期已按優先順序處理。\n')+
         (changed.length?'修改已排入雲端儲存，請確認儲存狀態。':'資料沒有變化，未重複寫入雲端。'));
     }

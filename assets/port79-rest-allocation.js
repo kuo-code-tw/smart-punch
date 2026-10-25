@@ -16,8 +16,8 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='') {
-  const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates);
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[]) {
+  const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates);
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
@@ -41,25 +41,66 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     substitutionDates.add(date);
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
   }
-  const available=dates.filter(d=>schedule[d]==='休'&&!substitutionDates.has(d)&&!excluded.has(d)&&!result[d]?.restCategory&&!result[d]?.overtime&&!result[d]?.forEmpId);
-  const used=new Set(), slots=quota.slots.map(s=>({...s})), remaining=[];
-  // Keep manually assigned categories and consume corresponding quota first.
-  for(const date of dates) {
-    const item=result[date];if(!item?.restCategory||item.restAllocationSource==='auto-v1')continue;
+  // A bare "休" remains flexible even if old import/manual metadata labeled
+  // it as 休. It may become 例 or 國 only when that is needed to fill the
+  // higher-priority quota. A 國 label on a typhoon day likewise must not
+  // consume 國 quota invisibly. Explicit 例/國 manual declarations on ordinary
+  // dates, actual overtime, substitutes and locked records remain protected.
+  const flexible=new Set();
+  for(const date of dates){
+    const item=result[date]||{};
+    if(schedule[date]!=='休'||item.restQuotaOvertime||
+       item.restAllocationLocked||item.restCategoryLocked||
+       item.overtime||item.overtimeReport||item.overtimeReports?.length||
+       item.forEmpId||item.type==='substitute')continue;
+    if(item.restCategory==='休'||item.restPreferredCategory==='休'||
+       item.restCategory==='國'&&nationalBlocked.has(date))flexible.add(date);
+  }
+  const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[];
+  const available=dates.filter(date=>
+    schedule[date]==='休'&&!substitutionDates.has(date)&&!excluded.has(date)&&
+    (!result[date]?.restCategory||flexible.has(date))&&
+    !result[date]?.restAllocationLocked&&!result[date]?.restCategoryLocked&&
+    !result[date]?.overtime&&!result[date]?.overtimeReport&&
+    !result[date]?.overtimeReports?.length&&!result[date]?.forEmpId&&
+    !result[date]?.restQuotaOvertime);
+  // Consume genuinely protected manual categories, not movable 休 entries.
+  for(const date of dates){
+    const item=result[date];
+    if(!item?.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date))continue;
+    if(excluded.has(date)&&!item.restQuotaOvertime)continue;
     if(schedule[date]!=='休'&&!item.restQuotaOvertime)throw new Error(date+' 手動假別與班別不一致');
-    const index=slots.findIndex(s=>s.category===item.restCategory&&(!item.restSourceDate||s.sourceDate===item.restSourceDate));
-    if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符');
+    const index=slots.findIndex(s=>s.category===item.restCategory&&
+      (!item.restSourceDate||s.sourceDate===item.restSourceDate));
+    if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);
     slots.splice(index,1);used.add(date);
   }
-  const nearest=(list,source)=>list.filter(d=>!used.has(d)).sort((a,b)=>Math.abs(Number(a.slice(8))-Number(source.slice(8)))-Math.abs(Number(b.slice(8))-Number(source.slice(8)))||a.localeCompare(b))[0];
-  const assign=(date,slot,overtime)=>{
-    used.add(date);result[date]={...(result[date]||{}),restCategory:slot.category,restSourceDate:slot.sourceDate,
-      restHolidayName:slot.holidayName||'',restQuotaOvertime:overtime,restAllocationSource:'auto-v1'};
+  const assign=(date,slot)=>{
+    const prior=result[date]||{},hadManualRest=prior.restCategory==='休'&&prior.restAllocationSource==='manual';
+    const preference=prior.restPreferredCategory==='休'||hadManualRest?'休':'';
+    result[date]={...prior,restCategory:slot.category,restSourceDate:slot.sourceDate,
+      restHolidayName:slot.holidayName||'',restQuotaOvertime:false,restAllocationSource:'auto-v1',
+      ...(preference?{restPreferredCategory:preference}:{})};
+    used.add(date);
   };
-  // Fill actual days off before assigning any shortfall to an existing work day.
-  const offPriority={'例':0,'休':1,'國':2};
-  slots.sort((a,b)=>offPriority[a.category]-offPriority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
-  for(const slot of slots) {const date=nearest(available,slot.sourceDate);if(date)assign(date,slot,false);else remaining.push(slot);}
+  const priority={'例':0,'休':1,'國':2};
+  slots.sort((a,b)=>priority[a.category]-priority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
+  for(const slot of slots){
+    const pool=available.filter(date=>!used.has(date)&&
+      (slot.category!=='國'||!nationalBlocked.has(date)));
+    pool.sort((a,b)=>{
+      const pref=date=>result[date]?.restPreferredCategory==='休'||
+        result[date]?.restAllocationSource==='manual'&&result[date]?.restCategory==='休';
+      // Keep original manual 休 as 休 whenever possible. If 例/國
+      // cannot otherwise be filled, those 休 cells are still convertible.
+      const x=(slot.category==='休'?!pref(a):!!pref(a))?1:0;
+      const y=(slot.category==='休'?!pref(b):!!pref(b))?1:0;
+      return x-y||Math.abs(Number(a.slice(8))-Number(slot.sourceDate.slice(8)))-
+        Math.abs(Number(b.slice(8))-Number(slot.sourceDate.slice(8)))||a.localeCompare(b);
+    });
+    if(pool.length)assign(pool[0],slot);
+    else remaining.push(slot);
+  }
   // 未被休假日分配覆蓋的額度只能列為「尚未安排」。
   // 不可在工作日自動建立 restQuotaOvertime；只有明確申報／人工安排才有加班。
   const unresolved=remaining.slice();
