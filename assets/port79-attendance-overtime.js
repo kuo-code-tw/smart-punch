@@ -103,7 +103,7 @@ function p79LoadAttendanceMailMonth(month){
  fetch(getActiveGasUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
    body:JSON.stringify({action:'getOvertimeMailOptions',token,gcToken:token,month}),signal:ctl.signal,cache:'no-store'})
  .then(r=>r.json()).then(data=>{
-  if(data?.ok!==true||data.overtimeMailVersion!==1||!Array.isArray(data.receipts))return;
+  if(data?.ok!==true||data.overtimeMailVersion!==2||!Array.isArray(data.receipts))return;
   if(p79AttendanceMailMonths.get(month)!==state||getAttendanceEmployeeMasterToken()!==token)return;
   state.receipts=data.receipts.filter(r=>r.status==='sent'||r.status==='sending');
   state.ready=true;
@@ -131,10 +131,36 @@ function p79MailState(report,empId,date,receipts){
  if(accepted.length)return {kind:'outdated',detail:'之前版本已寄送會計，現在申報內容不同，須重新寄送；舊信仍保留'};
  return null;
 }
+function p79DayMailState(date,monthState,receipts){
+ const items=[],seen=new Set();
+ for(const row of monthState?.rows||[]){
+  const empId=id(row.empId),meta=row.schedule?.__meta?.[date];
+  if(!meta||meta.overtimeExcluded===true)continue;
+  for(const report of [meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(Boolean)){
+   const key=empId+'|'+String(report.id||'');
+   if(!report.id||seen.has(key)||(meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id)))continue;
+   seen.add(key);items.push({empId,id:String(report.id),report});
+  }
+ }
+ if(!items.length)return null;
+ items.sort((a,b)=>a.empId.localeCompare(b.empId)||a.id.localeCompare(b.id));
+ const json=p79MailCanonical(items);
+ const relevant=(receipts||[]).filter(r=>r.empId==='__DAY__'&&r.date===date);
+ const exact=r=>r.reportId==='DAY:'+date&&r.reportJson===json;
+ const sent=relevant.filter(r=>r.status==='sent'&&exact(r));
+ if(sent.length)return {kind:'mailed',detail:'當日全部加班申報已合併發送 Mail：'+sent.map(r=>(r.recipientName||r.recipientId||'收件人')+' '+(r.sentAt||'')).join('／')+'（不代表已閱讀）'};
+ if(relevant.some(r=>r.status==='sending'&&exact(r)))return {kind:'pending',detail:'當日合併 Mail 發送紀錄待核對，請勿重複發送'};
+ if(relevant.some(r=>r.status==='sent'))return {kind:'outdated',detail:'當日舊版合併 Mail 曾經寄出，但現在申報內容已變動；須重新發送'};
+ // Historical per-employee mail never counts as a complete daily digest.
+ if((receipts||[]).some(r=>r.date===date&&r.empId!=='__DAY__'&&r.status==='sent'))
+  return {kind:'outdated',detail:'有舊的逐人 Mail 紀錄，但尚未發送當日完整合併 Mail'};
+ return null;
+}
 function overtimeDayIndicator(date,monthState,mailReceipts=null){
  if(monthState?.ready!==true)return null;
  const people=new Map((monthState.people||[]).map(p=>[id(p.empId),p.name||p.empId]));
  const entries=[],seen=new Set();
+ const dayMail=p79DayMailState(date,monthState,mailReceipts);
  for(const item of monthState.rows||[]){
   const empId=id(item.empId),name=people.get(empId)||String(item.name||empId);
   const meta=item.schedule?.__meta?.[date];
@@ -153,7 +179,7 @@ function overtimeDayIndicator(date,monthState,mailReceipts=null){
   for(const report of reports){
    if(!report?.id||meta.overtimeExcluded===true||
       (meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id)))continue;
-   const mail=p79MailState(report,empId,date,mailReceipts);
+   const mail=dayMail;
    const kind=mail?.kind|| (auditChanged(report,meta)?'amended':'reported');
    const key=empId+'|'+date+'|'+report.id+'|'+kind;
    if(seen.has(key))continue;seen.add(key);
@@ -167,7 +193,7 @@ function overtimeDayIndicator(date,monthState,mailReceipts=null){
  const kind=counts.revoked?'revoked':counts.outdated?'outdated':counts.pending?'pending':counts.amended?'amended':counts.mailed?'mailed':'reported';
  const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜')+
   (counts.mailed||counts.outdated||counts.pending?'｜已寄 '+counts.mailed+'｜舊版待重寄 '+counts.outdated+'｜寄送待核 '+counts.pending:'');
- const names={revoked:'已取消',outdated:'舊版已寄／須重寄',pending:'寄送待核對',amended:'已修改',mailed:'已寄送會計',reported:'已申報'};
+ const names={revoked:'已取消',outdated:'舊版已寄／須重寄',pending:'寄送待核對',amended:'已修改',mailed:'當日 Mail 已發送',reported:'已申報'};
  const lines=entries.slice(0,24).map(row=>row.name+'：'+names[row.kind]+
   (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
  if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
@@ -212,7 +238,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='綠：已申報｜藍：已寄會計｜黃：已修改｜橘：舊版須重寄｜紅：已取消';
+  legend.textContent='綠：已申報｜藍：當日 Mail 已發送｜黃：已修改｜橘：須重寄｜紅：已取消';
   host.appendChild(legend);
  }
 }
@@ -245,7 +271,7 @@ g.addEventListener?.('focus',()=>{
  for(const [month,state] of p79AttendanceMailMonths)if(now-state.at>60000)p79AttendanceMailMonths.delete(month);
  try{if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);}catch(_){}
 });
-g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,p79MailState,p79MailCanonical,p79LoadAttendanceMailMonth};
+g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,p79MailState,p79DayMailState,p79MailCanonical,p79LoadAttendanceMailMonth};
 
 g.P79AttendanceOvertime={open,save};
 })(window);
