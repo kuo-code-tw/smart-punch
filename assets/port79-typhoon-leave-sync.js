@@ -15,9 +15,19 @@ function dateKey(value){
 function signature(row){
  return [row.id,row.empId,row.leaveType,row.startTime||row.startDate,row.endTime||row.endDate,row.status,row.days??row.hours??''].map(v=>String(v??'')).join('|');
 }
-function buildPlan(records,markedDates){
+function legacyAnnualBalance(row,employees){
+ if(!/特休|年假/.test(String(row.leaveType||'')))return false;
+ const id=String(row.empId||'').trim().toUpperCase(),attNo=String(row.attNo||'').trim();
+ const person=(Array.isArray(employees)?employees:[]).find(emp=>id&&String(emp.empId||'').trim().toUpperCase()===id)||(Array.isArray(employees)?employees:[]).find(emp=>attNo&&String(emp.attNo||'').trim()===attNo);
+ if(!person)return true; // Historical applicant cannot be verified against imported annual balance.
+ const balance=person.leaveBalance;
+ if(!balance||!Number.isFinite(Number(balance.remaining)))return false;
+ if(!Array.isArray(balance.baselineApprovedLeaveIds))return true;
+ return balance.baselineApprovedLeaveIds.map(String).includes(String(row.id));
+}
+function buildPlan(records,markedDates,employees=[]){
  const days=new Set((Array.isArray(markedDates)?markedDates:[]).map(dateKey).filter(Boolean));
- const cancel=[],review=[];
+ const cancel=[],review=[],balanceReview=[];
  for(const row of Array.isArray(records)?records:[]){
   if(!row||!row.id||String(row.status||'')==='已駁回')continue;
   const from=dateKey(row.startTime||row.startDate),to=dateKey(row.endTime||row.endDate||row.startTime||row.startDate);
@@ -35,31 +45,33 @@ function buildPlan(records,markedDates){
   }
   if(!affected)continue;
   const item={id:String(row.id),name:String(row.name||row.empId||'未命名'),from,to,affected,total,signature:signature(row)};
-  if(affected===total)cancel.push(item);
-  else review.push(item);
+  if(affected!==total)review.push(item);
+  else if(legacyAnnualBalance(row,employees))balanceReview.push(item);
+  else cancel.push(item);
  }
- return {cancel,review};
+ return {cancel,review,balanceReview};
 }
 async function run({dates,read,remove,confirm}){
  if(typeof read!=='function'||typeof remove!=='function'||typeof confirm!=='function')throw Error('缺少雲端讀寫或核准程序');
  const first=await read();
- if(!Array.isArray(first?.leaveRecords)||!Array.isArray(first?.leaveCoverAssignments))throw Error('雲端請假或代班資料不完整，禁止自動刪除');
- const initial=buildPlan(first.leaveRecords,dates);
- const outcome={note:NOTE,found:initial.cancel.length,review:initial.review,deleted:[],skipped:[],errors:[],confirmed:false};
+ if(!Array.isArray(first?.leaveRecords)||!Array.isArray(first?.leaveCoverAssignments)||!Array.isArray(first?.employees))throw Error('雲端人員、請假或代班資料不完整，禁止自動刪除');
+ const initial=buildPlan(first.leaveRecords,dates,first.employees);
+ const outcome={note:NOTE,found:initial.cancel.length,review:initial.review,balanceReview:initial.balanceReview,deleted:[],skipped:[],errors:[],confirmed:false};
  if(!initial.cancel.length)return outcome;
  const sample=initial.cancel.slice(0,8).map(row=>row.name+'（'+row.from+(row.from===row.to?'':'～'+row.to)+'）').join('、');
  const message='【'+NOTE+'】\n已核對 '+initial.cancel.length+' 筆請假完全落在颱風假日期。\n'
   +'確認後會從雲端刪除請假單，以及連動的一位／兩位代班安排和相關代班加班；不會刪除代班員工的人事資料。\n'
   +'名單：'+sample+(initial.cancel.length>8?' 等 '+initial.cancel.length+' 筆':'')
   +(initial.review.length?'\n另外 '+initial.review.length+' 筆跨日請假只有部分遇到颱風假，為避免誤刪其他日期，會保留並要求人工調整。':'')
+  +(initial.balanceReview.length?'\n另有 '+initial.balanceReview.length+' 筆年假涉及舊匯入餘額基準，需人工核對回補天數，本次不自動刪除。':'')
   +'\n是否執行連動取消？';
  if(!await confirm(message))return outcome;
  outcome.confirmed=true;
  // A second read protects against an earlier cached list or another editor
  // changing a request while the confirmation dialog was open.
  const current=await read();
- if(!Array.isArray(current?.leaveRecords)||!Array.isArray(current?.leaveCoverAssignments))throw Error('重新核對雲端失敗，取消本次刪除');
- const now=buildPlan(current.leaveRecords,dates);
+ if(!Array.isArray(current?.leaveRecords)||!Array.isArray(current?.leaveCoverAssignments)||!Array.isArray(current?.employees))throw Error('重新核對雲端失敗，取消本次刪除');
+ const now=buildPlan(current.leaveRecords,dates,current.employees);
  const safe=new Map(now.cancel.map(item=>[item.id,item]));
  for(const item of initial.cancel){
   if(safe.get(item.id)?.signature!==item.signature){
@@ -79,7 +91,7 @@ async function run({dates,read,remove,confirm}){
  if(outcome.deleted.length){
   try{
    const verified=await read();
-   if(!Array.isArray(verified?.leaveRecords)||!Array.isArray(verified?.leaveCoverAssignments))throw Error('雲端核對資料不完整');
+   if(!Array.isArray(verified?.leaveRecords)||!Array.isArray(verified?.leaveCoverAssignments)||!Array.isArray(verified?.employees))throw Error('雲端核對資料不完整');
    const residual=new Set([
     ...verified.leaveRecords.map(row=>String(row.id||'')),
     ...verified.leaveCoverAssignments.map(row=>String(row.leaveId||''))
