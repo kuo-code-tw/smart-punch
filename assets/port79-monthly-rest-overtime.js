@@ -50,8 +50,8 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    // A complete explicit time assignment without a report ID is only a roster
    // note, not evidence of an approved or queued leave-overtime declaration.
    const datedAssignment=m.overtime===true&&m.overtimeType==='rest'&&
-     /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(m.overtimeStart||''))&&
-     /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(m.overtimeEnd||''));
+     /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeStart||''))&&
+     /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeEnd||''));
    if(!verified&&!hasUnverifiedReport&&datedAssignment&&actual!=='rest'){
     ledger.push({date:d,kind:'unconfirmedAssignment',category:'',actual});
     conflicts.push({date:d,reason:'班表有人工加班時段但無正式申報編號；未當成已申報或預留額度，請核對'});
