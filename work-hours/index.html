@@ -937,6 +937,72 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  #adminContentOvertime .p79-overtime-compact-actions button{padding:7px 9px;font-size:11px}
 }
 </style>
+
+<style id="p79-overtime-toolbar-refresh-20261025">
+/* Two aligned rows: top heading + actions; below: five equal-height filters. */
+#adminContentOvertime .p79-overtime-compact-first{
+  display:grid!important;grid-template-columns:minmax(190px,1fr) auto!important;
+  grid-template-areas:"title actions" "filters filters";align-items:center!important;
+  column-gap:14px!important;row-gap:11px!important;padding-bottom:11px!important
+}
+#adminContentOvertime .p79-overtime-compact-title{
+  grid-area:title;display:flex!important;flex:unset!important;align-items:center!important;
+  flex-wrap:nowrap!important;width:auto!important;min-width:0!important;gap:6px!important;
+  font-size:13px!important;white-space:nowrap
+}
+#adminContentOvertime .p79-overtime-compact-title strong{font-size:14px}
+#adminContentOvertime .p79-overtime-compact-actions{
+  grid-area:actions;flex:unset!important;justify-self:end;min-width:0
+}
+#adminContentOvertime .p79-overtime-action-group{
+  display:flex!important;align-items:center!important;justify-content:flex-end;
+  flex-wrap:wrap!important;gap:7px!important
+}
+#adminContentOvertime .p79-overtime-action-group button{
+  display:inline-flex;align-items:center;justify-content:center;min-height:35px!important;
+  border-radius:9px!important;border:1px solid transparent!important;
+  padding:7px 11px!important;font-size:12px!important;font-weight:750!important;
+  line-height:1.25!important;white-space:nowrap!important;
+  transition:background-color .15s,color .15s,box-shadow .15s,transform .15s;
+}
+#adminContentOvertime .p79-overtime-action-group button:hover{box-shadow:0 2px 8px rgba(15,23,42,.12);transform:translateY(-1px)}
+#adminContentOvertime .p79-overtime-action-group button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+#adminContentOvertime .p79-ot-btn-history{background:#ede9fe!important;color:#5b21b6!important;border-color:#c4b5fd!important}
+#adminContentOvertime .p79-ot-btn-history:hover{background:#ddd6fe!important}
+#adminContentOvertime .p79-ot-btn-mail{background:#0891b2!important;color:#fff!important;border-color:#0e7490!important}
+#adminContentOvertime .p79-ot-btn-mail:hover{background:#0e7490!important}
+#adminContentOvertime .p79-ot-btn-monthly{background:#4338ca!important;color:#fff!important;border-color:#4338ca!important}
+#adminContentOvertime .p79-ot-btn-monthly:hover{background:#3730a3!important}
+#adminContentOvertime .p79-ot-btn-report{background:#0369a1!important;color:#fff!important;border-color:#0369a1!important}
+#adminContentOvertime .p79-ot-btn-report:hover{background:#075985!important}
+#adminContentOvertime .p79-ot-btn-reset{background:#f1f5f9!important;color:#475569!important;border-color:#cbd5e1!important}
+#adminContentOvertime .p79-ot-btn-reset:hover{background:#e2e8f0!important}
+#adminContentOvertime .p79-overtime-compact-filters{grid-area:filters;flex:unset!important;width:100%;min-width:0!important}
+#adminContentOvertime .p79-overtime-compact-filters>div{
+  display:grid!important;grid-template-columns:minmax(220px,1.8fr) repeat(4,minmax(125px,1fr));
+  gap:10px!important;overflow:visible!important
+}
+#adminContentOvertime .p79-overtime-compact-filters>div>div{min-width:0!important;flex:unset!important}
+#adminContentOvertime .p79-overtime-compact-filters label{font-size:11px!important;margin-bottom:4px!important}
+#adminContentOvertime .p79-overtime-compact-filters select{
+  width:100%!important;height:37px!important;min-height:37px!important;
+  border-radius:9px!important;border-color:#cbd5e1!important;font-size:12px!important;padding:7px 10px!important
+}
+@media(max-width:1179px){
+ #adminContentOvertime .p79-overtime-compact-first{
+  grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"title" "actions" "filters"
+ }
+ #adminContentOvertime .p79-overtime-compact-actions{justify-self:start}
+ #adminContentOvertime .p79-overtime-action-group{justify-content:flex-start}
+ #adminContentOvertime .p79-overtime-compact-filters>div{
+  grid-template-columns:minmax(210px,1.7fr) repeat(4,minmax(135px,1fr));
+  overflow-x:auto!important;padding-bottom:4px
+ }
+}
+@media(max-width:540px){
+ #adminContentOvertime .p79-overtime-action-group button{font-size:11px!important;padding:7px 9px!important}
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="p79-work-hours-page bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
@@ -1366,8 +1432,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <strong>每日加班人員統計</strong>
                     <span aria-label="加班計算與時間提醒" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">💡</span>
                     <span id="overtimeFilterResultCount" class="text-[10px] text-slate-500"></span>
-                    <button type="button" onclick="P79OvertimeStatus.open()" class="p79-overtime-history rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">申報／異動紀錄</button>
-                    <button type="button" onclick="P79OvertimeMail.open()" class="p79-overtime-history rounded-lg border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800">✉ 寄送會計 Email</button>
                   </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
@@ -1379,12 +1443,12 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                   </div>
                   <div class="p79-overtime-compact-actions">
-<div class="flex flex-wrap gap-2">
-                        
-                        <button type="button" onclick="P79MonthlyRest.open()" class="px-3 py-1.5 bg-indigo-700 text-white rounded-xl text-xs font-semibold">每月未休假加班</button>
-                        <button type="button" onclick="P79Overtime.openReport()" class="px-3 py-1.5 bg-sky-700 text-white rounded-xl text-xs font-semibold">＋ 申報加班</button>
-                        
-                        <button type="button" onclick="resetOvertimeFilters()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">↺ 清除篩選</button>
+                    <div class="p79-overtime-action-group">
+                      <button type="button" onclick="P79OvertimeStatus.open()" class="p79-ot-btn-history">申報／異動紀錄</button>
+                      <button type="button" onclick="P79OvertimeMail.open()" class="p79-ot-btn-mail">✉ 寄送 Mail</button>
+                      <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">每月未休假加班</button>
+                      <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
+                      <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
                     </div>
                   </div>
                 </div>
