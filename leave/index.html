@@ -350,7 +350,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
-        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出Excel</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
+        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
         <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
@@ -604,7 +604,7 @@ async function p79ComparisonOutput(title,rows,printMode){
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>'+escape(title)+'</title><style>body{font:12px sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:6px;text-align:center}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style><h2>'+escape(title)+'</h2><table>'+rows.map((r,i)=>'<tr>'+r.map(v=>'<'+(i?'td':'th')+'>'+escape(v)+'</'+(i?'td':'th')+'>').join('')+'</tr>').join('')+'</table></html>');popup.document.close();popup.focus();popup.print();return;
  }
- await window.p79EnsureXlsx();if(!window.XLSX)throw Error('Excel元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
+ await window.p79EnsureXlsx();if(!window.XLSX)throw Error('試算表元件未載入');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),title);XLSX.writeFile(wb,title+'.xlsx');
 }
 async function p79ExportLeaveComparison(printMode){
  if(!adminSession||leaveAccess==='none')return;
@@ -848,7 +848,7 @@ let leaveBalanceImportMonth='';
 function openLeaveBalanceImport(){
  if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
  let dialog=$('leaveBalanceMonthDialog');
- if(!dialog){dialog=document.createElement('dialog');dialog.id='leaveBalanceMonthDialog';dialog.style.cssText='width:360px;max-width:calc(100vw - 32px);height:fit-content;min-height:0;padding:20px;border:1px solid #cbd5e1;border-radius:14px;text-align:center';dialog.innerHTML='<h3>匯入未休假天數</h3><label style="display:block;margin:14px 0">本次基準月份<input id="leaveBalanceImportMonth" type="month" style="display:block;width:100%;padding:10px;margin-top:6px"></label><p class="note">以這裡選擇的月份為準，不沿用 Excel 的舊月份。</p><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button type="button" onclick="document.getElementById(\'leaveBalanceMonthDialog\').close()">取消</button><button type="button" class="btn btn-pri" onclick="confirmLeaveBalanceImportMonth()">選擇匯入檔案</button></div>';document.body.appendChild(dialog);}
+ if(!dialog){dialog=document.createElement('dialog');dialog.id='leaveBalanceMonthDialog';dialog.style.cssText='width:360px;max-width:calc(100vw - 32px);height:fit-content;min-height:0;padding:20px;border:1px solid #cbd5e1;border-radius:14px;text-align:center';dialog.innerHTML='<h3>匯入請假可休天數</h3><label style="display:block;margin:14px 0">本次基準月份<input id="leaveBalanceImportMonth" type="month" style="display:block;width:100%;padding:10px;margin-top:6px"></label><p class="note">以這裡選擇的月份為準，不沿用 試算表 的舊月份。</p><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button type="button" onclick="document.getElementById(\'leaveBalanceMonthDialog\').close()">取消</button><button type="button" class="btn btn-pri" onclick="confirmLeaveBalanceImportMonth()">選擇匯入檔案</button></div>';document.body.appendChild(dialog);}
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());const lastMonth=new Date(today.slice(0,7)+'-01T12:00:00Z');lastMonth.setUTCMonth(lastMonth.getUTCMonth()-1);
  $('leaveBalanceImportMonth').value=lastMonth.toISOString().slice(0,7);leaveBalanceImportMonth='';dialog.showModal();
 }
@@ -885,7 +885,7 @@ async function importLeaveBalanceFile(file) {
   await window.p79EnsureXlsx();
  if(!file)return;
  if(leaveAccess!=='manage')return alert('只有請假系統管理權限可以匯入可休天數');
- if(typeof XLSX==='undefined')return alert('Excel 元件尚未載入，請重新整理後再試');
+ if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入，請重新整理後再試');
  try{
    setStatus('📥 正在讀取可休天數檔案…','info');
    const buf=await file.arrayBuffer();
@@ -924,7 +924,7 @@ async function importLeaveBalanceFile(file) {
      const sourceName=String(leaveBalanceCell(row,map,['姓名','員工姓名','人員姓名','name'],[/姓名/,/name/])||'').trim();
      const sourceDept=String(leaveBalanceCell(row,map,['部門','單位','department','dept'],[/部門/,/單位/,/department/,/dept/])||'').trim();
      const asOf=selectedImportMonth||normalizeLeaveBalanceMonth(fileAsOf)||normalizeLeaveBalanceMonth(leaveBalanceCell(row,map,['基準月份','基準日','資料月份','月份','asof'],[/基準.*月/,/資料.*月/,/^月份$/, /asof/]));
-     if(!asOf)throw new Error('Excel 沒有基準月份欄位，檔名也沒有 YYYYMM 月份，已停止匯入以免沿用舊月份');
+     if(!asOf)throw new Error('試算表 沒有基準月份欄位，檔名也沒有 YYYYMM 月份，已停止匯入以免沿用舊月份');
      const carryOver=leaveBalanceNumber(leaveBalanceCell(row,map,['遞延','遞延天數','去年遞延','去年未休','carryover'],[/遞延/,/去年.*未休/,/carryover/]));
      const annual=leaveBalanceNumber(leaveBalanceCell(row,map,['今年年假','年假','年假天數','本年度年假','本年年假','特休','特休天數','annual'],[/今年.*年假/,/本年.*年假/,/^年假/,/^特休/,/annual/]));
      const used=leaveBalanceNumber(leaveBalanceCell(row,map,['已休','已休天數','已使用','使用天數','used'],[/已休/,/已使用/,/使用.*天數/,/used/]));
@@ -957,7 +957,7 @@ async function importLeaveBalanceFile(file) {
      }
    }
    if(mismatches.length){
-     setStatus('⚠️ 雲端讀回核對未通過：'+mismatches.length+' 人的基準月份或剩餘天數與 Excel 不一致，未確認匯入成功。','error');
+     setStatus('⚠️ 雲端讀回核對未通過：'+mismatches.length+' 人的基準月份或剩餘天數與 試算表 不一致，未確認匯入成功。','error');
      alert('匯入已送出，但雲端讀回不一致：'+mismatches.length+' 人。\n請不要連續重複匯入，先核對雲端資料。');
      return;
    }
@@ -1123,8 +1123,8 @@ function mount(){
    <div id="p79LeaveMenuWrap">
     <button id="p79LeaveMenuButton" type="button">☰ 功能選單</button>
     <div id="p79LeaveMenu">
-      <button type="button" data-action="import-balance">📥 匯入可休天數</button>
-       <button type="button" data-action="export-balance">📤 匯出可休天數</button>
+      <button type="button" data-action="import-balance">📥 匯入請假可休天數</button>
+       <button type="button" data-action="export-balance">📤 匯出請假可休天數</button>
       <button type="button" data-action="year">📆 年份顯示：<span id="p79LeaveYearLabel">西元</span></button>
       <div class="sep"></div>
       <button type="button" class="danger" data-action="logout">↪ 登出</button>
