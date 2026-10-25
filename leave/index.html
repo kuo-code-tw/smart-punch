@@ -1456,7 +1456,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261025-zh-import-export&rev=20261022-workflow"></script>
+<script src="../assets/port79-overtime-report.js?v=20261026-approved-leave-date-v1&rev=20261022-workflow"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1543,7 +1543,7 @@ async function p79OpenLeaveOvertimeHandoff(){
 }
 window.p79OvertimeContext={
  config:()=>p79LeaveOvertimeConfig,gasUrl:()=>GAS_URL,token:()=>leaveRequestToken(),
- employees:()=>employees.filter(leaveEmployeeIsActive),canReport:p79CanReportOvertime,
+ employees:()=>employees.filter(leaveEmployeeIsActive),approvedLeaves:()=>leaveRecords,canReport:p79CanReportOvertime,
  saveReport:p79SaveWorkOvertimeDraft,refreshAccess:async()=>{await restoreAdmin();if(adminSession&&!employees.length)await loadCloud(false,true);return !!adminSession;},
  canEditRules:()=>adminSession?.adminRole==='superadmin',persistConfig:()=>{}
 };
