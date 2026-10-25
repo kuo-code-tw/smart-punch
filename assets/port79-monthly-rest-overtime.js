@@ -9,11 +9,19 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
  quota.slots.filter(s=>(!start||s.sourceDate>=start)&&(!end||s.sourceDate<end)).forEach(s=>counts[s.category]++);
  if(dates.some(d=>!roster[d]))throw Error(emp.name+' 本月班表未排完整，請先補齊');
- const excluded=dates.filter(d=>g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
- const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end).meta;
+ // Typhoon is an independent schedule status, never a quota rest day or a
+ // suggested 例／休／國 overtime day. Keep raw roster and saved reports intact.
+ const declaredTyphoon=typeof g.p79TyphoonDates==='function'?g.p79TyphoonDates():[];
+ const typhoonProtected=new Set(dates.filter(d=>
+   (Array.isArray(declaredTyphoon)&&declaredTyphoon.includes(d))||
+   String(roster[d]||'').trim()==='颱'));
+ const excluded=dates.filter(d=>typhoonProtected.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
+ const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
+   [...typhoonProtected],[...typhoonProtected]).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
+  if(typhoonProtected.has(d)){ledger.push({date:d,kind:'typhoon',category:'',actual});continue;}
   const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
   const leave=g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||false;
   if(leave){ledger.push({date:d,kind:'leave',category:'',actual});if(r&&cats.includes(r.category)){if(storedReport(r))reported[r.category]++;ledger.push({date:d,kind:storedReport(r)?'reported':'unconfirmed',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與未休加班申報重疊，保留原申報額度待核對'});}continue;}
@@ -52,7 +60,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  for(const c of cats){const excess=off[c]+reported[c]+reserved[c]-counts[c];if(excess>0)conflicts.push({date:'',reason:c+'已休、預排休與已申報合計超出額度'+excess+'天，請核對既有申報或排休'});}
  const remaining=Object.fromEntries(cats.map(c=>[c,Math.max(0,counts[c]-off[c]-reported[c]-reserved[c])]));
  const unused=Object.fromEntries(cats.map(c=>[c,Math.max(0,counts[c]-off[c]-reserved[c])]));
- return {quota:counts,off,reported,reserved,unused,remaining,dates,conflicts,ledger:ledger.sort((a,b)=>a.date.localeCompare(b.date))};
+ return {quota:counts,off,reported,reserved,unused,remaining,dates,typhoonDates:[...typhoonProtected],conflicts,ledger:ledger.sort((a,b)=>a.date.localeCompare(b.date))};
 }
 function ruleFor(date,roster,pair,category,rules){
  const allowed=rules.filter(r=>r[0]===category);
@@ -78,7 +86,7 @@ function plan(snapshot,people,month,rules){
   const candidates=[];
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
-   if(Number(date.slice(8))<15||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
+   if((b.typhoonDates||[]).includes(date)||Number(date.slice(8))<15||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    if(!['早','中','晚'].includes(roster[date])&&!pairs.length)continue;
    if(pairs.length>1||!pairs.length&&date<currentDate)continue;
