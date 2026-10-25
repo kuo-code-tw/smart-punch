@@ -80,10 +80,180 @@ function screen(model,hide,names,hideRest=false){
 function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canExport())return alert('沒有統計表匯出權限');if(document.getElementById('p79MonthlyMatrix'))return;const people=context.employees(),companies=[...new Set(people.map(app().companyFor))],jobs=[...new Set(people.map(p=>p.jobTitle||p.deptDetail||'未設定'))],dialog=document.createElement('section');let loaded=null,busy=false,names=app().companyLabels();dialog.id='p79MonthlyMatrix';dialog.style.cssText='position:fixed;inset:0;z-index:2147483646;width:100vw;max-width:none;height:100dvh;margin:0;padding:0;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f7fb;color:#172e4b;font-family:Microsoft JhengHei,sans-serif';dialog.setAttribute('aria-label','加班時數統計表');const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
  const scopedCss=css.split('@page')[0].replace(/([^{}]+)\{/g,(_,ss)=>ss.split(',').map(s=>'#p79MonthlyMatrix .mm-preview'+(s.trim()==='body'?'':' '+s.trim())).join(',')+'{');
  dialog.innerHTML='<style>#p79MonthlyMatrix .mm-header,#p79MonthlyMatrix .mm-footer{position:relative;flex-shrink:0;padding:10px 12px;background:#eef2f6;display:flex;align-items:center;justify-content:space-between;gap:8px}#p79MonthlyMatrix .mm-body{padding:8px 12px;flex:1;min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column}#p79MonthlyMatrix .mm-controls{display:flex;flex-wrap:wrap;gap:9px;align-items:end}#p79MonthlyMatrix label{display:flex;flex-direction:column;gap:4px;font-size:12px}#p79MonthlyMatrix input,#p79MonthlyMatrix select{padding:7px;border:1px solid #cbd5e1;border-radius:7px;color:#172e4b;background:#fff}#p79MonthlyMatrix button{padding:8px 12px;border:0;border-radius:8px;cursor:pointer;background:#e2e8f0;color:#172e4b}#p79MonthlyMatrix button:disabled{opacity:.5;cursor:wait}#p79MonthlyMatrix .mm-primary{background:#0369a1;color:white}#p79MonthlyMatrix details{position:relative;font-size:12px}#p79MonthlyMatrix .mm-options{position:absolute;z-index:5;right:0;min-width:180px;max-width:calc(100vw - 32px);max-height:min(260px,50dvh);overflow:auto;padding:10px;background:white;border:1px solid #cbd5e1;box-shadow:0 5px 18px #0002}#p79MonthlyMatrix .mm-options label{padding:5px}#p79MonthlyMatrix .mm-preview{display:flex;flex-direction:column;flex:1;min-height:0}#p79MonthlyMatrix .mm-scroll{display:flex;flex-direction:column;flex:1;min-height:180px;margin-top:4px}#p79MonthlyMatrix .mm-table thead th{position:sticky;top:0;z-index:2}#p79MonthlyMatrix .mm-table thead tr:first-child th{height:30px;box-sizing:border-box;background:#172e4b;color:white}#p79MonthlyMatrix .mm-table thead tr:nth-child(2) th{top:30px;background:#e2e8f0}#p79MonthlyMatrix .mm-table thead tr:first-child th:nth-child(1){left:0;z-index:4}#p79MonthlyMatrix .mm-table thead tr:first-child th:nth-child(2){left:96px;z-index:4}#p79MonthlyMatrix .mm-table thead tr:first-child th:nth-child(3){left:174px;z-index:4}#p79MonthlyMatrix .mm-fixed{position:sticky;z-index:1;background:#fff}#p79MonthlyMatrix .mm-id{left:0}#p79MonthlyMatrix .mm-name{left:96px}#p79MonthlyMatrix .mm-job{left:174px}'+scopedCss+'#p79MonthlyMatrix .mm-grid{overflow:auto;flex:1;min-height:140px;min-width:0;scrollbar-gutter:stable;border:1px solid #cbd5e1;background:white;border-radius:8px}#p79MonthlyMatrix .mm-grid .mm-table{font-size:13px;border-collapse:separate;border-spacing:0}#p79MonthlyMatrix .mm-grid td{height:30px;white-space:nowrap;overflow-wrap:normal}#p79MonthlyMatrix .mm-grid th{white-space:nowrap}#p79MonthlyMatrix .mm-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}#p79MonthlyMatrix .mm-overview>div{padding:8px 12px;background:white;border:1px solid #dbe3ee;border-radius:8px}#p79MonthlyMatrix .mm-overview small{display:block;color:#64748b}#p79MonthlyMatrix .mm-overview strong{font-size:22px;display:block;margin-top:4px}#p79MonthlyMatrix .mm-role-cards{display:flex;gap:8px;flex-wrap:wrap}#p79MonthlyMatrix .mm-role-cards>div{display:flex;flex-direction:column;gap:3px;padding:8px 12px;background:#e8eef8;border-radius:7px;font-size:12px}#p79MonthlyMatrix .mm-caption{text-align:left;font-size:12px}@media(max-width:650px){#p79MonthlyMatrix .mm-overview{grid-template-columns:repeat(2,1fr)}#p79MonthlyMatrix .mm-overview strong{font-size:18px}#p79MonthlyMatrix .mm-role-cards{display:none}}#p79MonthlyMatrix .mm-grid{overflow-x:hidden}#p79MonthlyMatrix .mm-grid .mm-table{width:100%;min-width:0;font-size:clamp(8px,.72vw,13px)}#p79MonthlyMatrix .mm-grid .mm-table td{padding:4px 1px;overflow:hidden;text-overflow:ellipsis}#p79MonthlyMatrix .mm-grid .mm-table th{padding:4px 1px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;font-size:clamp(9px,.65vw,12px)!important;line-height:1.25!important}#p79MonthlyMatrix .mm-grid .mm-table td{padding:4px 1px!important;font-size:clamp(9px,.65vw,12px)!important;line-height:1.3!important;white-space:nowrap!important;overflow-wrap:normal!important}#p79MonthlyMatrix .mm-grid .mm-table .mm-id{overflow:visible;text-overflow:clip}#p79MonthlyMatrix .mm-grid .mm-table thead tr:first-child th{height:26px}#p79MonthlyMatrix .mm-grid .mm-table thead tr:nth-child(2) th{top:26px}#p79MonthlyMatrix .mm-grid .mm-fixed{position:static}#p79MonthlyMatrix .mm-grid .mm-table thead th{left:auto} </style><div class="mm-header"><b>加班時數統計表｜整月查看</b><button id="mmClose">返回加班管理</button></div><div class="mm-body"><div class="mm-controls"><label>統計月份<input type="month" id="mmMonth" value="'+esc(context.month()||new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()).slice(0,7))+'"></label><label>公司<select id="mmCompany"><option value="">全部公司</option>'+companies.map(c=>'<option value="'+esc(c)+'">'+esc(names[c]||c)+'</option>').join('')+'</select></label><details><summary>職稱（可複選）</summary><div class="mm-options">'+jobs.map(j=>'<label style="flex-direction:row"><input class="mm-job-filter" type="checkbox" value="'+esc(j)+'">'+esc(j)+'</label>').join('')+'<small>未勾選表示全部職稱</small></div></details><label>內容<select id="mmType"><option value="actual">已儲存申報</option><option value="planned">預排申報</option></select></label><label>製表人<input type="text" id="mmPreparer" maxlength="40" value="'+esc(context.preparer?.()||'')+'"></label><label style="flex-direction:row;align-items:center"><input type="checkbox" id="mmHide">隱藏換算合計</label><label style="flex-direction:row;align-items:center"><input type="checkbox" id="mmHideRest">隱藏每日文字（假別等）</label><details><summary>公司名稱設定</summary><div class="mm-options">'+companies.map(c=>'<label>'+esc(c)+'<input type="text" class="mm-company-name" data-company="'+esc(c)+'" maxlength="80" value="'+esc(names[c]||c)+'"></label>').join('')+'<button id="mmSaveNames">儲存公司名稱</button><small>記住此瀏覽器的報表公司名稱</small></div></details><button id="mmLoad" class="mm-primary">重新讀取</button></div><p id="mmStatus" role="status" style="font-size:12px;white-space:pre-line;max-height:64px;overflow:auto;flex-shrink:0;margin:6px 0">依範例顯示整月日期、假別、每日時數與各職稱平均。零加班人員也會列入統計。</p><div class="mm-scroll"><div class="mm-preview" id="mmPreview"></div></div></div><div class="mm-footer"><button id="mmCancel">返回加班管理</button><div><button id="mmPrint" disabled>列印／另存PDF</button> <button id="mmExcel" class="mm-primary" disabled>匯出加班月表</button></div></div>';
- document.body.appendChild(dialog);const q=s=>dialog.querySelector(s),status=t=>q('#mmStatus').textContent=t;const render=()=>{if(loaded)q('#mmPreview').innerHTML=screen(loaded,q('#mmHide').checked,names,q('#mmHideRest').checked);};function reset(){loaded=null;q('#mmPreview').innerHTML='';q('#mmPrint').disabled=q('#mmExcel').disabled=true;}function lock(on){busy=on;dialog.querySelectorAll('.mm-controls input,.mm-controls select,.mm-controls button').forEach(n=>n.disabled=on);q('#mmPrint').disabled=q('#mmExcel').disabled=on||!loaded;}
+
+ // 只更動統計視窗 UI，沿用現有欄位、權限檢查、讀取及匯出程式。
+ const mmStyles=[
+ '#p79MonthlyMatrix{background:#f4f7fb!important;color:#18314e!important}',
+ '#p79MonthlyMatrix .mm-header{background:linear-gradient(110deg,#fff 0%,#f3f8ff 100%);border-bottom:1px solid #dce6f2;padding:17px clamp(16px,2.2vw,38px);min-height:76px;box-shadow:0 1px 9px #17385b0d}',
+ '#p79MonthlyMatrix .mm-brand{display:flex;align-items:center;gap:13px;min-width:0}',
+ '#p79MonthlyMatrix .mm-brand-symbol{width:44px;height:44px;display:grid;place-items:center;background:#e0efff;border:1px solid #bbdbff;border-radius:14px;color:#075a9a;font-size:23px;flex-shrink:0}',
+ '#p79MonthlyMatrix .mm-brand-label{color:#5680a5;font-size:11px;font-weight:800;letter-spacing:1.4px}',
+ '#p79MonthlyMatrix .mm-brand-title{display:block;font-size:clamp(17px,1.6vw,24px);color:#173b5f;font-weight:900;letter-spacing:.5px;line-height:1.35}',
+ '#p79MonthlyMatrix .mm-brand-description{margin-top:4px;color:#667c94;font-size:12px}',
+ '#p79MonthlyMatrix .mm-back{background:#fff!important;border:1px solid #cbd9e9!important;color:#254c71!important;font-weight:700;white-space:nowrap}',
+ '#p79MonthlyMatrix .mm-back:hover{background:#ebf3fd!important}',
+ '#p79MonthlyMatrix .mm-body{padding:19px clamp(12px,2.2vw,34px) 22px!important;gap:14px;min-height:0;background:#f4f7fb}',
+ '#p79MonthlyMatrix .mm-controls{display:block!important;flex:0 0 auto;min-width:0}',
+ '#p79MonthlyMatrix .mm-filter-card{background:#fff;border:1px solid #dce6f0;box-shadow:0 4px 18px #1d3d6010;border-radius:17px;padding:clamp(14px,1.7vw,23px)}',
+ '#p79MonthlyMatrix .mm-filter-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:16px}',
+ '#p79MonthlyMatrix .mm-filter-heading strong{font-size:16px;font-weight:900;color:#1c4265}',
+ '#p79MonthlyMatrix .mm-filter-heading small{font-size:12px;color:#73869b}',
+ '#p79MonthlyMatrix .mm-form-grid{display:grid;grid-template-columns:minmax(165px,.8fr) minmax(175px,1fr) minmax(145px,.8fr) minmax(170px,1fr);gap:12px}',
+ '#p79MonthlyMatrix .mm-form-grid label{min-width:0;display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:800;color:#4e6680}',
+ '#p79MonthlyMatrix .mm-form-grid input,#p79MonthlyMatrix .mm-form-grid select{width:100%;min-width:0;height:46px;box-sizing:border-box;border:1px solid #cbd9e8;border-radius:11px;background:#fbfdff;color:#1f3c58;padding:9px 12px;font-size:14px;font-weight:700;transition:border-color .16s,box-shadow .16s}',
+ '#p79MonthlyMatrix input:focus-visible,#p79MonthlyMatrix select:focus-visible,#p79MonthlyMatrix button:focus-visible,#p79MonthlyMatrix summary:focus-visible{outline:3px solid #70b7f3;outline-offset:2px}',
+ '#p79MonthlyMatrix .mm-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}',
+ '#p79MonthlyMatrix .mm-actions button{min-height:42px;padding:10px 16px;font-weight:800;font-size:13px;transition:filter .15s,transform .15s}',
+ '#p79MonthlyMatrix .mm-actions button:not(:disabled):hover{filter:brightness(.95);transform:translateY(-1px)}',
+ '#p79MonthlyMatrix #mmLoad{background:linear-gradient(120deg,#0a75b6,#07588f)!important;color:#fff!important;box-shadow:0 4px 10px #006bb531}',
+ '#p79MonthlyMatrix #mmResetFilters{background:#f0f5fa!important;color:#375571!important;border:1px solid #d8e3ef!important}',
+ '#p79MonthlyMatrix .mm-actions-hint{color:#7b8b9e;font-size:12px}',
+ '#p79MonthlyMatrix .mm-advanced{margin-top:15px;border-top:1px solid #e7edf5;padding-top:12px;font-size:13px}',
+ '#p79MonthlyMatrix .mm-advanced>summary{cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#366084;padding:6px 2px}',
+ '#p79MonthlyMatrix .mm-advanced>summary::-webkit-details-marker{display:none}',
+ '#p79MonthlyMatrix .mm-advanced>summary:before{content:"▸";color:#1683c9;transition:transform .2s}',
+ '#p79MonthlyMatrix .mm-advanced[open]>summary:before{transform:rotate(90deg)}',
+ '#p79MonthlyMatrix .mm-advanced-content{margin-top:10px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:12px}',
+ '#p79MonthlyMatrix .mm-advanced-panel{background:#f8fbff;border:1px solid #e0e9f4;border-radius:11px;padding:12px 14px;min-width:0}',
+ '#p79MonthlyMatrix .mm-panel-label{font-size:12px;font-weight:900;color:#285779;margin-bottom:6px}',
+ '#p79MonthlyMatrix .mm-panel-help{font-size:11px;color:#7990a4;margin-bottom:9px}',
+ '#p79MonthlyMatrix .mm-job-options{display:flex;flex-wrap:wrap;gap:6px 12px}',
+ '#p79MonthlyMatrix .mm-job-options label,#p79MonthlyMatrix .mm-display-options label{display:inline-flex!important;flex-direction:row!important;gap:7px;align-items:center!important;padding:5px 7px;font-size:12px;font-weight:700;cursor:pointer;color:#385974}',
+ '#p79MonthlyMatrix .mm-job-options input,#p79MonthlyMatrix .mm-display-options input{width:16px;height:16px;accent-color:#087db9;margin:0}',
+ '#p79MonthlyMatrix .mm-display-options{display:flex;flex-direction:column;gap:5px}',
+ '#p79MonthlyMatrix .mm-company-settings{margin-top:12px;border-top:1px dashed #d4e1ef;padding-top:9px}',
+ '#p79MonthlyMatrix .mm-company-settings>summary{font-weight:800;color:#446581;cursor:pointer}',
+ '#p79MonthlyMatrix .mm-company-settings .mm-options{position:static!important;max-width:none!important;max-height:none!important;box-shadow:none!important;border:0!important;background:transparent!important;padding:6px 0!important;display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}',
+ '#p79MonthlyMatrix .mm-company-settings .mm-options label{padding:0!important}',
+ '#p79MonthlyMatrix .mm-company-settings .mm-options input{min-width:0;width:100%;box-sizing:border-box}',
+ '#p79MonthlyMatrix .mm-company-settings .mm-options button{background:#daeefc!important;font-weight:800;align-self:end}',
+ '#p79MonthlyMatrix .mm-company-settings .mm-options small{font-size:11px;color:#7a8da0;align-self:center}',
+ '#p79MonthlyMatrix .mm-feedback{display:flex;align-items:flex-start;gap:13px;padding:15px 17px;border-radius:14px;border:1px solid #cee1f3;background:#eef7ff;box-shadow:0 3px 13px #21455a0b;flex:0 0 auto}',
+ '#p79MonthlyMatrix .mm-feedback-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#dcecff;color:#1267a3;flex-shrink:0;font-size:19px;font-weight:900}',
+ '#p79MonthlyMatrix .mm-feedback-main{flex:1;min-width:0}',
+ '#p79MonthlyMatrix .mm-feedback-title{font-size:14px;font-weight:900;color:#205075}',
+ '#p79MonthlyMatrix #mmStatus{margin:5px 0 0!important;max-height:120px!important;overflow:auto;font-size:12px!important;line-height:1.6;color:#567087;white-space:pre-line}',
+ '#p79MonthlyMatrix .mm-feedback-loading{border-color:#afd5f8;background:#eff7ff}',
+ '#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:mmSpin 1.4s linear infinite}',
+ '#p79MonthlyMatrix .mm-feedback-success{border-color:#b6e1ce;background:#edfaf3}',
+ '#p79MonthlyMatrix .mm-feedback-success .mm-feedback-icon{background:#d4f5e4;color:#177549}',
+ '#p79MonthlyMatrix .mm-feedback-warning{border-color:#f1d5a5;background:#fffaf0}',
+ '#p79MonthlyMatrix .mm-feedback-warning .mm-feedback-icon{background:#ffefcf;color:#a36a0a}',
+ '#p79MonthlyMatrix .mm-feedback-error{border-color:#f1bec4;background:#fff2f2}',
+ '#p79MonthlyMatrix .mm-feedback-error .mm-feedback-icon{background:#ffe0e0;color:#b03540}',
+ '#p79MonthlyMatrix .mm-progress{height:4px;max-width:450px;background:#d8e8f7;border-radius:10px;overflow:hidden;margin-top:12px}',
+ '#p79MonthlyMatrix .mm-progress:before{content:"";display:block;width:33%;height:100%;border-radius:10px;background:#198aca;animation:mmMove 1.5s ease-in-out infinite}',
+ '#p79MonthlyMatrix .mm-progress[hidden]{display:none!important}',
+ '#p79MonthlyMatrix .mm-empty{min-height:205px;display:flex;justify-content:center;align-items:center;flex-direction:column;gap:9px;text-align:center;padding:22px;border:1px dashed #c9d8e9;background:#fff;border-radius:16px}',
+ '#p79MonthlyMatrix .mm-empty-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:#e9f5ff;font-size:26px;color:#1677b2}',
+ '#p79MonthlyMatrix .mm-empty strong{font-size:15px;color:#284967}',
+ '#p79MonthlyMatrix .mm-empty span{color:#788da2;font-size:12px}',
+ '#p79MonthlyMatrix .mm-scroll{flex:1;min-height:120px;margin-top:0!important}',
+ '#p79MonthlyMatrix .mm-footer{border-top:1px solid #dce6f2;background:#fff;padding:11px clamp(12px,2.2vw,34px);flex-wrap:wrap}',
+ '#p79MonthlyMatrix .mm-footer button{font-weight:800}',
+ '@keyframes mmSpin{to{transform:rotate(360deg)}}',
+ '@keyframes mmMove{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}',
+ '@media(max-width:850px){#p79MonthlyMatrix .mm-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyMatrix .mm-advanced-content{grid-template-columns:1fr}}',
+ '@media(max-width:520px){#p79MonthlyMatrix .mm-header{padding:12px!important;min-height:0}#p79MonthlyMatrix .mm-brand-symbol{width:36px;height:36px;font-size:19px}#p79MonthlyMatrix .mm-brand-title{font-size:16px}#p79MonthlyMatrix .mm-brand-description{display:none}#p79MonthlyMatrix .mm-form-grid{grid-template-columns:1fr}#p79MonthlyMatrix .mm-body{padding:10px!important}#p79MonthlyMatrix .mm-filter-card{padding:12px}#p79MonthlyMatrix .mm-actions button{flex:1}#p79MonthlyMatrix .mm-actions-hint{width:100%}#p79MonthlyMatrix .mm-back{padding:7px!important;font-size:11px}}',
+ '@media(prefers-reduced-motion:reduce){#p79MonthlyMatrix .mm-progress:before,#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:none}}'
+ ].join('');
+ dialog.insertAdjacentHTML('afterbegin','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
+ const mmHeader=dialog.querySelector('.mm-header');
+ mmHeader.innerHTML='<div class="mm-brand"><span class="mm-brand-symbol" aria-hidden="true">▦</span><div><div class="mm-brand-label">OVERTIME REPORT · 月度統計</div><strong class="mm-brand-title">加班時數統計表</strong><div class="mm-brand-description">整月申報、請假與各職稱時數一目了然</div></div></div><button id="mmClose" class="mm-back" type="button">← 返回加班管理</button>';
+ const mmControls=dialog.querySelector('.mm-controls'),mmCard=document.createElement('section');
+ mmCard.className='mm-filter-card';
+ mmCard.innerHTML='<div class="mm-filter-heading"><strong>篩選統計條件</strong><small>先選擇月份和範圍，再更新報表</small></div>';
+ const mmForm=document.createElement('div');mmForm.className='mm-form-grid';
+ for(const name of ['mmMonth','mmCompany','mmType','mmPreparer'])mmForm.appendChild(dialog.querySelector('#'+name).closest('label'));
+ mmCard.appendChild(mmForm);
+ const mmActions=document.createElement('div');mmActions.className='mm-actions';
+ const mmLoadButton=dialog.querySelector('#mmLoad');mmLoadButton.textContent='↻ 重新載入統計';
+ mmActions.appendChild(mmLoadButton);
+ const mmClearButton=document.createElement('button');mmClearButton.id='mmResetFilters';mmClearButton.type='button';mmClearButton.textContent='清除篩選';
+ mmActions.appendChild(mmClearButton);
+ const mmHint=document.createElement('span');mmHint.className='mm-actions-hint';mmHint.textContent='條件更動後，按「重新載入統計」取得最新資料';
+ mmActions.appendChild(mmHint);mmCard.appendChild(mmActions);
+ const mmAdvanced=document.createElement('details');mmAdvanced.className='mm-advanced';
+ mmAdvanced.innerHTML='<summary>進階篩選與顯示設定</summary>';
+ const mmAdvancedContent=document.createElement('div');mmAdvancedContent.className='mm-advanced-content';
+ const mmJobs=document.createElement('div');mmJobs.className='mm-advanced-panel';
+ mmJobs.innerHTML='<div class="mm-panel-label">職稱篩選（可複選）</div><div class="mm-panel-help">不勾選表示全部職稱</div>';
+ const mmJobOptions=document.createElement('div');mmJobOptions.className='mm-job-options';
+ const mmOldDetails=[...mmControls.children].filter(n=>n.tagName==='DETAILS');
+ const mmJobDropdown=mmOldDetails[0],mmCompanyDropdown=mmOldDetails[1];
+ for(const checkbox of mmJobDropdown.querySelectorAll('.mm-job-filter'))mmJobOptions.appendChild(checkbox.closest('label'));
+ mmJobs.appendChild(mmJobOptions);
+ const mmPreferences=document.createElement('div');mmPreferences.className='mm-advanced-panel';
+ mmPreferences.innerHTML='<div class="mm-panel-label">報表顯示</div><div class="mm-panel-help">依報表需求選擇要隱藏的欄位</div>';
+ const mmDisplay=document.createElement('div');mmDisplay.className='mm-display-options';
+ for(const name of ['mmHide','mmHideRest'])mmDisplay.appendChild(dialog.querySelector('#'+name).closest('label'));
+ mmPreferences.appendChild(mmDisplay);
+ mmAdvancedContent.appendChild(mmJobs);mmAdvancedContent.appendChild(mmPreferences);
+ mmCompanyDropdown.className='mm-company-settings';
+ mmAdvanced.appendChild(mmAdvancedContent);mmAdvanced.appendChild(mmCompanyDropdown);
+ mmCard.appendChild(mmAdvanced);mmControls.appendChild(mmCard);
+ mmJobDropdown.remove();
+ const mmStatusElement=dialog.querySelector('#mmStatus'),mmFeedback=document.createElement('div');
+ mmFeedback.id='mmFeedback';mmFeedback.className='mm-feedback mm-feedback-idle';
+ mmFeedback.innerHTML='<span id="mmFeedbackIcon" class="mm-feedback-icon" aria-hidden="true">ⓘ</span><div class="mm-feedback-main"><div id="mmFeedbackTitle" class="mm-feedback-title">準備產生加班月報</div><div id="mmFeedbackCopy"></div><div class="mm-progress" id="mmProgress" hidden></div></div>';
+ mmStatusElement.replaceWith(mmFeedback);
+ mmStatusElement.removeAttribute('style');mmStatusElement.removeAttribute('role');mmFeedback.querySelector('#mmFeedbackCopy').appendChild(mmStatusElement);
+ const mmEmptyMarkup='<div class="mm-empty"><div class="mm-empty-icon" aria-hidden="true">▦</div><strong>報表會顯示在這裡</strong><span>設定月份與篩選條件，系統將為你整理整月資料。</span></div>';
+ document.body.appendChild(dialog);
+ const q=s=>dialog.querySelector(s),status=t=>q('#mmStatus').textContent=t;
+ const feedback=(kind,title,detail)=>{
+   const node=q('#mmFeedback');node.className='mm-feedback mm-feedback-'+kind;
+   q('#mmFeedbackIcon').textContent=({loading:'↻',success:'✓',warning:'!',error:'!',empty:'ⓘ',idle:'ⓘ'})[kind]||'ⓘ';
+   q('#mmFeedbackTitle').textContent=title;
+   status(detail);
+   q('#mmProgress').hidden=kind!=='loading';
+ };
+ const render=()=>{if(loaded)q('#mmPreview').innerHTML=screen(loaded,q('#mmHide').checked,names,q('#mmHideRest').checked);};
+ function reset(){loaded=null;q('#mmPreview').innerHTML=mmEmptyMarkup;q('#mmPrint').disabled=q('#mmExcel').disabled=true;feedback('idle','條件已更新','按「重新載入統計」，即可重新整理月份與職稱資料。');}
+ function lock(on){busy=on;dialog.querySelectorAll('.mm-controls input,.mm-controls select,.mm-controls button').forEach(n=>n.disabled=on);q('#mmPrint').disabled=q('#mmExcel').disabled=on||!loaded;q('#mmLoad').textContent=on?'正在整理資料…':'↻ 重新載入統計';}
+ q('#mmPreview').innerHTML=mmEmptyMarkup;
  q('#mmClose').onclick=q('#mmCancel').onclick=()=>{document.body.style.overflow=previousOverflow;dialog.remove();};dialog.querySelectorAll('.mm-controls input,.mm-controls select').forEach(n=>{if(!String(n.className||'').includes('mm-company-name'))n.onchange=reset;});q('#mmHide').onchange=q('#mmHideRest').onchange=q('#mmPreparer').onchange=render;
+ q('#mmResetFilters').onclick=()=>{
+  if(busy)return;
+  q('#mmMonth').value=context.month()||new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()).slice(0,7);
+  q('#mmCompany').value='';q('#mmType').value='actual';
+  dialog.querySelectorAll('.mm-job-filter').forEach(el=>el.checked=false);
+  q('#mmHide').checked=false;q('#mmHideRest').checked=false;
+  mmAdvanced.open=false;
+  reset();
+  q('#mmLoad').click();
+ };
  q('#mmSaveNames').onclick=()=>{const next=Object.create(null);for(const field of dialog.querySelectorAll('.mm-company-name')){if(!field.value.trim())return status('公司名稱不可空白');next[field.dataset.company]=field.value.trim();}if(new Set(Object.values(next)).size!==Object.keys(next).length)return status('不同公司請使用不同名稱');names=next;for(const option of q('#mmCompany').options||[]){if(option.value)option.textContent=names[option.value]||option.value;}render();try{g.localStorage.setItem('port79_overtime_application_company_names_v1',JSON.stringify(names));status('公司名稱已儲存並套用。');}catch(_){status('公司名稱已套用本次視窗，瀏覽器無法記住設定。');}};
- q('#mmLoad').onclick=async()=>{if(busy)return;reset();lock(true);try{if(!context.canExport())throw Error('登入或匯出權限已失效');const month=q('#mmMonth').value;app().datesFor('month','','',month);status('正在讀取 '+month+' 的班表、核准請假與已申報加班…');const snapshot=await context.snapshot(month);if(!dialog.isConnected)return;if(!context.canExport())throw Error('登入或匯出權限已失效');loaded=build(snapshot,context.employees(),month,q('#mmCompany').value,[...dialog.querySelectorAll('.mm-job-filter:checked')].map(x=>x.value),q('#mmType').value,context);if(!loaded.rows.length){loaded=null;return status('所選條件沒有可統計人員。');}render();status(loaded.issues.join('\n'));}catch(e){loaded=null;status('統計表未完成：'+e.message);}finally{lock(false);}};
+ q('#mmLoad').onclick=async()=>{
+  if(busy)return;
+  reset();lock(true);
+  try{
+   if(!context.canExport())throw Error('登入或匯出權限已失效');
+   const month=q('#mmMonth').value;
+   app().datesFor('month','','',month);
+   const monthLabel=Number(month.slice(0,4))+' 年 '+Number(month.slice(5))+' 月';
+   feedback('loading','正在整理 '+monthLabel+' 的加班資料','正在取得雲端班表、已核准請假與正式加班申報。資料量較大時請以此狀態為準。');
+   const snapshot=await context.snapshot(month);
+   if(!dialog.isConnected)return;
+   if(!context.canExport())throw Error('登入或匯出權限已失效');
+   feedback('loading','資料已讀取，正在彙整月表','正在核對職稱、出勤日期、假別、正式申報與換算時數。');
+   loaded=build(snapshot,context.employees(),month,q('#mmCompany').value,[...dialog.querySelectorAll('.mm-job-filter:checked')].map(x=>x.value),q('#mmType').value,context);
+   if(!loaded.rows.length){
+    loaded=null;
+    feedback('empty','目前沒有符合條件的人員','請檢查公司、職稱與月份，或使用「清除篩選」重新查詢。');
+    q('#mmPreview').innerHTML='<div class="mm-empty"><div class="mm-empty-icon" aria-hidden="true">⌕</div><strong>找不到符合條件的統計資料</strong><span>可改選公司、職稱或月份，再重新載入。</span></div>';
+    return;
+   }
+   render();
+   if(loaded.issues.length)feedback('warning','統計表已產生，部分資料需核對','已整理 '+loaded.rows.length+' 名人員。以下事項請確認：\n'+loaded.issues.join('\n'));
+   else feedback('success','統計表已準備完成','已完成 '+monthLabel+' 共 '+loaded.rows.length+' 名人員的統計。你可以在下方查看月表、列印或匯出 Excel。');
+  }catch(e){
+   loaded=null;
+   const message=String(e?.message||e||'未知錯誤');
+   feedback('error','雲端資料尚未讀取完成',message+'\n沒有修改任何加班申報資料。請確認網路與權限後，按「重新載入統計」再試。');
+   q('#mmPreview').innerHTML='<div class="mm-empty"><div class="mm-empty-icon" aria-hidden="true">!</div><strong>本次沒有產生統計表</strong><span>上方保留詳細原因，核對後可重新讀取。</span></div>';
+  }finally{lock(false)}
+ };
  q('#mmPrint').onclick=()=>{if(busy||!loaded||!context.canExport())return;const popup=g.open('','_blank');if(!popup)return status('請允許開啟列印視窗');popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>加班時數統計表</title><style>'+css+'</style><body>'+html(loaded,q('#mmHide').checked,q('#mmPreparer').value,names)+'</body></html>');popup.document.close();popup.focus();popup.print();};
  q('#mmExcel').onclick=()=>{if(busy||!loaded||!context.canExport())return;try{const data=excel(loaded,q('#mmHide').checked,q('#mmPreparer').value,names),url=URL.createObjectURL(new Blob([data],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),link=document.createElement('a');link.href=url;link.download='加班時數統計表_'+loaded.month+(loaded.planned?'_預排':'')+'.xlsx';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);status('試算表 已產生，請查看瀏覽器下載項目。');}catch(e){status('匯出失敗：'+e.message);}};
  q('#mmLoad').onclick();
