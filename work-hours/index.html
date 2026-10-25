@@ -1526,7 +1526,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   <div class="p79-overtime-compact-actions">
                     <div class="p79-overtime-action-group">
                       <button type="button" onclick="P79OvertimeStatus.open()" class="p79-ot-btn-history">申報／異動紀錄</button>
-                      <button type="button" onclick="P79OvertimeMail.open()" class="p79-ot-btn-mail">✉ 寄送 Mail</button>
+                      <button type="button" onclick="P79OvertimeMail.open()" class="p79-ot-btn-mail">✉ 發送 Mail</button>
                       <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">每月未休假加班</button>
                       <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
@@ -15724,7 +15724,7 @@ window.p79OvertimeMailContext={
 };
 window.p79OvertimeApplicationContext={employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true)};
 </script>
-<script src="../assets/port79-overtime-mail.js?v=20261025-mail-layout-v2"></script>
+<script src="../assets/port79-overtime-mail.js?v=20261025-daily-mail-v3"></script>
 <script src="../assets/port79-overtime-application.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261019-actual-hours"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261023-dual-outbox-sync"></script>
