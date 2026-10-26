@@ -750,7 +750,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       <div id="cumulativeTitle" class="font-black text-lg mb-3">🚢 全部月份累計船舶統計</div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="cumShipCount" class="text-2xl font-black">0</div><div id="cumShipCountSub" class="text-[11px] text-slate-400 mt-1"></div></div>
-        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">船舶請款櫃數</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
+        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統總櫃數（請款＋翻艙）</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">艙蓋量</div><div id="cumHatches" class="text-2xl font-black">0</div><div id="cumHatchesSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">翻艙量</div><div id="cumShift" class="text-2xl font-black">0</div><div id="cumShiftSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">累計效率</div><div id="cumEfficiency" class="text-2xl font-black">0.00</div><div id="cumEfficiencySub" class="text-[11px] text-slate-400 mt-1"></div></div>
@@ -3106,7 +3106,7 @@ function renderDashboardMonthlyAudit(month,jobs){
   const sh=document.getElementById('cumHatchesSub');
   const ss=document.getElementById('cumShiftSub');
   if(sc)sc.textContent=`月報 ${monthly.count} 筆｜差 ${dashboardSignedDiff(dCount)}`;
-  if(sw)sw.textContent=`月報請款 ${monthly.containers}｜差 ${dashboardSignedDiff(dC)}`;
+  if(sw)sw.textContent=`月報總 Moves ${monthly.containers+monthly.shiftMoves}｜差 ${dashboardSignedDiff(dC+dS)}`;
   if(sh)sh.textContent=`月報 ${monthly.hatches}｜差 ${dashboardSignedDiff(dH)}`;
   if(ss)ss.textContent=`月報 ${monthly.shiftMoves}｜差 ${dashboardSignedDiff(dS)}`;
 
@@ -3685,6 +3685,9 @@ function renderDashboard(){
   const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);
   const hatchTotal=allShips.reduce((s,x)=>s+num(x.hatches),0);
   const shiftTotal=allShips.reduce((s,x)=>s+num(x.shiftMoves),0);
+  // 系統總 Moves 必須與員工作業 Moves 採相同口徑：請款櫃數 + SHIFT 翻艙量。
+  // 不以人員值回填系統；兩邊分別計算，差異時如實提出警示。
+  const systemTotalMoves=workload+shiftTotal;
 
   // 用篩選後各船 Productivity(GPH) 回推作業時數，再做加權效率。
   const gphHours=allShips.reduce((s,x)=>{
@@ -3695,7 +3698,7 @@ function renderDashboard(){
 
   const setCum=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
   setCum('cumShipCount',shipCount);
-  setCum('cumWorkload',workload);
+  setCum('cumWorkload',systemTotalMoves);
   setCum('cumHatches',hatchTotal);
   setCum('cumShift',shiftTotal);
   setCum('cumEfficiency',cumEff.toFixed(2));
@@ -3704,6 +3707,14 @@ function renderDashboard(){
   // 月份已載入月報時，直接告訴使用者「月報應有 vs 系統已匯入」與缺少哪幾筆。
   // 使用未套用表格欄位篩選前的完整月份資料，避免只篩某艘船時把缺漏判斷也縮小。
   renderDashboardMonthlyAudit(selectedMonth,allDashboardJobs);
+  const systemSub=document.getElementById('cumWorkloadSub');
+  if(systemSub){
+    const monthlySourceNote=String(systemSub.textContent||'').trim();
+    const comparableMonth=/^\d{4}-\d{2}$/.test(selectedMonth)&&!rangeActive&&jobs.length===allDashboardJobs.length;
+    const diff=round(c-systemTotalMoves,2);
+    const comparison=comparableMonth?(Math.abs(diff)<0.01?'✓ 與員工作業一致':`⚠ 與員工作業差 ${dashboardSignedDiff(diff)}`):'';
+    systemSub.textContent=[`請款 ${workload} ＋ SHIFT ${shiftTotal}`,comparison,monthlySourceNote].filter(Boolean).join('｜');
+  }
 }
 async function reloadEmployeeData(){
   try{
