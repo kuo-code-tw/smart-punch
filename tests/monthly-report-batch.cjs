@@ -13,7 +13,7 @@ async function run({failAt=-1,missingReadback=false,loseAck=false,unselectedInva
  vm.createContext(c);vm.runInContext(actual,c);await control.onclick();return {c,model,posts,reads,verifications,refreshes};
 }
 (async()=>{
- let r=await run({unselectedInvalid:true});assert.equal(r.posts,20,'unselected person without a roster must not block selected people');assert.equal(r.model.rows.filter(x=>x.saved).length,20);
+ let r=await run({unselectedInvalid:true});if(r.posts!==20)console.error('batch-first diagnostic',r.c.status,r.c.lastFailure,r.reads,r.posts);assert.equal(r.posts,20,'unselected person without a roster must not block selected people');assert.equal(r.model.rows.filter(x=>x.saved).length,20);
  r=await run();assert.equal(r.posts,20);assert.equal(r.reads,1);assert.equal(r.verifications,1,'20 people use one batch readback');assert.equal(r.refreshes,1,'main table renders once');assert(r.model.rows.every(x=>x.saved&&!x.checked));assert.match(r.c.status,/成功 20 筆/);
  r=await run({failAt:3});assert.equal(r.posts,4);assert.equal(r.verifications,1);assert.equal(r.model.rows.filter(x=>x.saved).length,3,'partial success still verified');assert(r.model.rows.slice(3).every(x=>!x.saved));assert.match(r.c.status,/後續停止/);
  r=await run({failAt:3,loseAck:true});assert.equal(r.posts,4);assert.equal(r.model.rows.filter(x=>x.saved).length,4,'batch readback resolves a lost write response without duplicate POST');
