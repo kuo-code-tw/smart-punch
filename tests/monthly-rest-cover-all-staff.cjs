@@ -68,6 +68,11 @@ const g2={window:null};g2.window=g2;vm.createContext(g2);
 vm.runInContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),g2);
 const app=fs.readFileSync('assets/port79-overtime-application.js','utf8');
 assert(app.includes("report.planned===true&&date>=today()"),'Past reported dates should not remain in the future-only application list');
+const hours=fs.readFileSync('work-hours/index.html','utf8');
+assert(hours.includes("planned:meta.overtimeReport.planned===true&&date>=todayTaipei"),
+ 'Past 10/22 stored report cannot still be displayed as a future-only planned claim');
+assert(hours.includes("已有正式申報；原預排標記未更新，出勤待核對"),
+ 'Past submitted report with no complete clock pair must explicitly say already filed, pending punch review');
 const main=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 assert(main.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId'),'Submission must not duplicate any existing recorded overtime or cover assignment');
 assert(main.includes("已申報；原預排旗標未更新"),'Past plans must be shown as submitted with pending attendance reconciliation');
