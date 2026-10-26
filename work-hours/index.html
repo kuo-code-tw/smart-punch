@@ -12912,7 +12912,13 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
                         const data=await response.json();if(response.ok===false||!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'班表申報資料讀取不完整');
                         if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
-                        if(p79WorkhoursIsEditing()){state.pending=false;state.error='編輯中，已延後套用更新';state.at=Date.now();return;}
+                        if(p79WorkhoursIsEditing()){
+                            // If an edit begins after the request starts, retain the previous verified snapshot.
+                            state.pending=false;
+                            if(previous?.token===token&&previous.ready)p79WorkOvertimeMonths.set(month,previous);
+                            else{state.error='編輯中，已延後套用更新';state.at=0;}
+                            return;
+                        }
                         state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.loadedCloudRevision=lastAttendanceCloudRevision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.error='';state.at=Date.now();
                         if(typeof window!=='undefined'&&window.P79RestAttendance){state.attendanceEvidence={complete:false,days:{}};state.restEvidencePromise=p79EnsureWorkRestEvidence(month,state);}
                         p79OvertimeCalculationCache=null;
