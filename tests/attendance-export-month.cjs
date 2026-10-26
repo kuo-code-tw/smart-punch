@@ -52,10 +52,10 @@ const mixed={leaveRecords:[{empId:'AP1',status:'已核准',leaveType:'特休假'
 const checked=c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],mixed);assert.deepEqual(Array.from(checked.scheduleRows[1].slice(5,8)),['例','代16-20','年']);assert.equal(checked.scheduleRows[1][4],'AQC');
 assert.throws(()=>c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],{schedules:[...mixed.schedules,{empId:'AP1',month:'2026-10',schedule:{'2026-10-01':'早'}}]}),/不同版本/);
 reader.fetchGasJsonWithRetry=async()=>({ok:true,month:'2026-11',schedules:mixed.schedules});await assert.rejects(reader.p79ReadAttendanceExportSource('getScheduleDataSecure','2026-10'),/其他月份/);
-// Cached exports label their source and Taipei timestamp in the actual workbook.
+// Cloud-only exports label their source and Taipei read timestamp in the actual workbook.
 elements.exportIncludeSchedule.checked=false;
-c.p79ReadAttendanceExportScope=async(month,options)=>{options.sources.push({action:'getAttendanceMonthRaw',month,source:'本機快取',savedAt:Date.parse('2026-10-24T08:00:00Z')});return{source:rows};};
-c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved.w.sheets.at(-1).name,'資料來源與快取時間');assert.equal(saved.w.sheets.at(-1).s.rows[1][2],'本機快取');assert(saved.w.sheets.at(-1).s.rows[1][3].includes('16:00:00'));
+c.p79ReadAttendanceExportScope=async(month,options)=>{options.sources.push({action:'getAttendanceMonthRaw',month,source:'雲端讀取',savedAt:Date.parse('2026-10-24T08:00:00Z')});return{source:rows};};
+c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved.w.sheets.at(-1).name,'雲端資料讀取時間');assert.equal(saved.w.sheets.at(-1).s.rows[1][2],'雲端讀取');assert(saved.w.sheets.at(-1).s.rows[1][3].includes('16:00:00'));
 elements.exportIncludeSchedule.checked=true;
 saved=null;c.p79ReadAttendanceExportSource=async()=>{throw Error('排班讀取失敗')};c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved,null,'no partially populated workbook on schedule failure');
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
