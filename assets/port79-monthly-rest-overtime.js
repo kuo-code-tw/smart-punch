@@ -195,7 +195,9 @@ function plan(snapshot,people,month,rules){
    if(!['早','中','晚'].includes(roster[date])&&!pairs.length)continue;
    if(pairs.length>1||!pairs.length&&date<currentDate)continue;
    const pair=pairs[0],byCategory=new Map();
-   for(const category of cats){const rule=ruleFor(date,roster,pair,category,rules);if(rule)byCategory.set(category,rule);}
+   // 休息日出勤只可認列「休」；不能拿同一日去填例假或國假缺額。
+   const fixed=String(roster[date]||'').trim(),categoryOptions=fixed==='休'?['休']:fixed==='例'?['例']:fixed==='國'?['國']:cats;
+   for(const category of categoryOptions){const rule=ruleFor(date,roster,pair,category,rules);if(rule)byCategory.set(category,rule);}
    candidates.push({date,pair,byCategory});
   }
   states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});
