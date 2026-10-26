@@ -12889,12 +12889,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(state.token===token&&state.ready&&!state.pending&&!state.restEvidencePending&&(!month||month==='ALL'||month===key)&&(!state.restEvidenceLoaded||(lastAttendanceCloudRevision&&state.restEvidenceRevision!==lastAttendanceCloudRevision)))p79EnsureWorkRestEvidence(key,state);
             });
         }
-        function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth=''){
+        function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth='',force=false){
             const token=currentPort79SsoToken();if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
             const selectedMonth=requestedMonth||(monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()));
             const months=selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
             months.forEach(month=>{
+                // A periodic read must not replace an in-use snapshot while a form is being edited.
+                if(!force&&p79WorkhoursIsEditing())return;
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token){
                     if(previous.pending)return;
@@ -13259,7 +13261,7 @@ async function p79ExportOvertimeComparison(printMode){
             if(button?.disabled)return;if(button){button.disabled=true;button.textContent='讀取中…';}
             try{
                 const old=p79WorkOvertimeMonths.get(month);if(old&&!old.pending)old.at=0;
-                p79LoadWorkOvertimeMonths(records,month);
+                p79LoadWorkOvertimeMonths(records,month,true);
                 const state=p79WorkOvertimeMonths.get(month);
                 // Start both reads together; never wait on unrelated historical months.
                 const [ok]=await Promise.all([loadAttendanceMonthFromCloud(month,false),state?.promise||Promise.resolve()]);
