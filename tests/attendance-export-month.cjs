@@ -55,7 +55,7 @@ reader.fetchGasJsonWithRetry=async()=>({ok:true,month:'2026-11',schedules:mixed.
 // Cached exports label their source and Taipei timestamp in the actual workbook.
 elements.exportIncludeSchedule.checked=false;
 c.p79ReadAttendanceExportScope=async(month,options)=>{options.sources.push({action:'getAttendanceMonthRaw',month,source:'本機快取',savedAt:Date.parse('2026-10-24T08:00:00Z')});return{source:rows};};
-c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved.w.sheets.at(-1).name,'資料來源與快取時間');assert.equal(saved.w.sheets.at(-1).s.rows[1][2],'本機快取');assert(saved.w.sheets.at(-1).s.rows[1][3].includes('16:00:00'));
+c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved.w.sheets.at(-1).name,'雲端資料讀取時間');assert.equal(saved.w.sheets.at(-1).s.rows[1][2],'本機快取');assert(saved.w.sheets.at(-1).s.rows[1][3].includes('16:00:00'));
 elements.exportIncludeSchedule.checked=true;
 saved=null;c.p79ReadAttendanceExportSource=async()=>{throw Error('排班讀取失敗')};c.p79ResetExportDateRange();await c.exportSelectedRecordsExcel();assert.equal(saved,null,'no partially populated workbook on schedule failure');
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
