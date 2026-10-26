@@ -161,11 +161,16 @@ function workflowStage(month,asOf=today()){
  return {key:'submit',label:'集中核對申報（25日起）',canSubmit:true,canSuggest:true,tip:'僅可申報已完成且有完整出勤證據的日期。'};
 }
 function workflowAudit(model){
- const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:model.rows.filter(r=>r.planned).length};
+ const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],checked:0,complete:0,verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:model.rows.filter(r=>r.planned).length};
  for(const b of model.balances){
   const progress=reportProgress(model,b.emp.empId),parts=[];
   for(const cat of ['例','休','國'])if(progress[cat].remaining>0){result.shortage[cat]+=progress[cat].remaining;parts.push(cat+progress[cat].remaining);}
-  if(parts.length)result.people.push(b.emp.name+'：'+parts.join('／'));
+  result.checked++;
+  if(!parts.length)result.complete++;
+  result.people.push(b.emp.name+'：'+(parts.length?'待核對 '+parts.join('／'):'例／休／國無缺額')+
+   '｜已休 例'+b.off.例+'／休'+b.off.休+'／國'+b.off.國+
+   '｜正式加班 例'+b.reported.例+'／休'+b.reported.休+'／國'+b.reported.國+
+   '｜出勤待核 例'+b.reserved.例+'／休'+b.reserved.休+'／國'+b.reserved.國);
   for(const item of b.conflicts||[])result.blocked.push(b.emp.name+' '+(item.date||'')+'：'+item.reason);
  }
  return result;
@@ -296,7 +301,7 @@ async function open(){
      :'加班與額度歸屬：'+loadedMonth;
    q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
    const audit=workflowAudit(model);
-   q('#mrAuditSummary').textContent='待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜有完整出勤建議 '+audit.verified+' 筆｜預排待核 '+audit.planned+' 筆';
+   q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜有完整出勤建議 '+audit.verified+' 筆｜預排待核 '+audit.planned+' 筆';
    q('#mrAuditDetails').textContent=[...audit.people,...audit.blocked,...(model.issues||[])].join('\n')||'本次核對沒有未補額度或衝突。';
    q('#mrSave').textContent=phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
   q('#mrResult').textContent='已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
@@ -314,15 +319,20 @@ async function open(){
  q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.rows.forEach(r=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
  q('#mrLoad').onclick=async()=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
-  try{loadedMonth=q('#mrMonth').value;g.p79RestQuota(loadedMonth);loadedPeople=filter().filter(e=>(!q('#mrJob').value||job(e)===q('#mrJob').value)&&(!q('#mrEmp').value||e.empId===q('#mrEmp').value));if(!loadedPeople.length)throw Error('沒有符合的人員');
+  try{loadedMonth=q('#mrMonth').value;
+    if(loadedMonth>today().slice(0,7))throw Error('不能對未來月份先建立跨月補報');
+    g.p79RestQuota(loadedMonth);loadedPeople=filter().filter(e=>(!q('#mrJob').value||job(e)===q('#mrJob').value)&&(!q('#mrEmp').value||e.empId===q('#mrEmp').value));if(!loadedPeople.length)throw Error('沒有符合的人員');
    const [data,options]=await Promise.all([a.snapshot(loadedMonth),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);paint();
    setStatus('已列出 '+model.rows.length+' 筆建議，請勾選要申報的日期。\n'+model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')).join('\n'));
   }catch(e){setStatus('讀取失敗：'+e.message);}finally{busy=false;controls(false);}
  };
+ q('#mrPrior').onclick=()=>{if(busy)return;q('#mrMonth').value=previousMonth(today().slice(0,7));q('#mrLoad').click();};
  q('#mrSave').onclick=async()=>{
   if(busy||!model)return;
   if(!workflowStage(loadedMonth).canSubmit){setStatus('尚未到集中申報期間：15日起提出建議，25日起核對正式送出。');return;}
   const selected=model.rows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
+  const context=backfillContext(loadedMonth);
+  if(context.historical&&!confirm('跨月補報 '+selected.length+' 筆：實際加班及額度仍歸 '+context.sourceMonth+'，只在 '+context.handlingMonth+' 辦理補報。系統將重新驗證原月份的完整出勤、既有加班與時數；確認繼續嗎？'))return;
   if(selected.some(r=>r.planned||r.date>today())){setStatus('含尚未完成出勤的預排日期，不得作為已發生的正式加班。');return;}
   if(selected.some(r=>r.category==='例')&&!confirm('例假出勤須符合法定天災、事變或突發事件等例外。請確認具備法定事由及證明，不能只為補滿未休額度。仍要進入正式核對嗎？'))return;
   const seen=new Set();for(const r of selected){const key=id(r.empId)+'|'+r.date;if(!r.date.startsWith(loadedMonth+'-')||seen.has(key)){setStatus('日期不符或同一人同日重複，請調整後再申報。');return;}seen.add(key);}
@@ -345,7 +355,7 @@ async function open(){
    }
    paint();controls(true);
    for(const r of selected){if(stop)break;if(r.saved)continue;setStatus('正在申報 '+(count+1)+'／'+selected.length+'：'+r.name+' '+r.date+' '+r.rule[1]);
-    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:'每月未休假加班 '+loadedMonth,preventReplace:true,createdAt:Date.now()};
+    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:backfillContext(loadedMonth).note,preventReplace:true,createdAt:Date.now()};
     sessionStorage.setItem(KEY,JSON.stringify(draft));r.attempted=true;r.status='送出中／待雲端讀回';paint();controls(true);
     let result;try{result=await a.saveReport(draft,batch);}catch(error){r.status='未確認成功：'+error.message;paint();controls(true);throw error;}
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('雲端尚未確認接收此筆申報');
