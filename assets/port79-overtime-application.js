@@ -35,7 +35,7 @@ function resolvedConvertedHours(report){
   const cat=String(row[0]||'').trim(),code=String(row[1]||'').trim();
   if(cat!==String(report.category||'').trim()||code!==String(report.code||'').trim())return false;
   if(Number(row[2])!==Number(report.declaredHours)||!sameTime(row[6],report.overtimeStart)||!sameTime(row[7],report.overtimeEnd))return false;
-  if(cat==='延'&&(!sameTime(row[4],report.normalStart)||!sameTime(row[5],report.normalEnd)||String(row[8]||'')!==String(report.position||'')))return false;
+  if(cat==='延'&&((report.normalStart!=null&&report.normalStart!==''&&!sameTime(row[4],report.normalStart))||(report.normalEnd!=null&&report.normalEnd!==''&&!sameTime(row[5],report.normalEnd))||(report.position!=null&&report.position!==''&&String(row[8]||'')!==String(report.position))))return false;
   return true;
  });
  if(matches.length!==1||matches[0][3]===''||matches[0][3]===null||matches[0][3]===undefined)return null;
