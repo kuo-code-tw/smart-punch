@@ -2205,22 +2205,44 @@ function summaryRows(){
   // 逐作業時段去重，不再用「整個區間只要有一筆 WORKING REPORT 就整批排除舊資料」的規則。
   // 這樣混合新舊資料的月份不會漏人，也不會把同一時段重複加總。
   const base=canonicalOperationalRecords((records||[]).filter(recordMatches));
-  const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]);
+  const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]),historicalRows=new Map();
   ps.forEach((p,i)=>{
     for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
       if(!index.has(key))index.set(key,[]);
       index.get(key).push(i);
     }
   });
-  // 每筆明細只分派一次；同時命中工號與姓名時仍只計一次，保留原始加總順序。
+  // 人資主檔只決定「現職人員」，不能拿來刪除歷史作業量：
+  // 已離職／已調任的人仍須按原 WORKING REPORT 計入實際作業櫃數與時數。
+  // 工號命中時優先採工號，避免同名/別名同時命中而重複計算。
   base.forEach(r=>{
-    const matches=new Set([...(byId.get(String(r.empId||''))||[]),...(byName.get(normalizePersonName(r.name))||[])]);
-    matches.forEach(i=>personRows[i].push(r));
+    const id=String(r.empId||'').trim();
+    const name=String(r.name||'').trim();
+    const nameKey=normalizePersonName(name);
+    const idMatches=byId.get(id)||[];
+    const nameMatches=byName.get(nameKey)||[];
+    const matches=idMatches.length?idMatches:nameMatches;
+    if(matches.length){
+      // 同名卻無足夠工號辨識時不重複分派；不確定身份仍保留歷史作業。
+      if(matches.length===1){personRows[matches[0]].push(r);return;}
+      if(idMatches.length===1){personRows[idMatches[0]].push(r);return;}
+    }
+    if(!nameKey)return;
+    const key=id&&!id.startsWith('NAME:')?`EMP:${id}`:`NAME:${nameKey}`;
+    if(!historicalRows.has(key)){
+      historicalRows.set(key,{person:{
+        empId:id||`NAME:${nameKey}`,name,groupId:'',historical:true
+      },rows:[]});
+    }
+    historicalRows.get(key).rows.push(r);
   });
 
-  let arr=ps.map((p,i)=>{
-    const gid=personGroupId(p);
-    const rs=personRows[i];
+  const allPersonRows=[
+    ...ps.map((person,i)=>({person,rows:personRows[i]})),
+    ...[...historicalRows.values()].map(x=>({person:x.person,rows:x.rows}))
+  ];
+  let arr=allPersonRows.map(({person:p,rows:rs})=>{
+    const gid=p.historical?'':personGroupId(p);
     const totalHours=rs.reduce((s,r)=>s+effectiveHours(r),0);
     const containers=rs.reduce((s,r)=>{
       if(['working-report','gc-driver-efficiency'].includes(String(r.source||''))){
@@ -3470,7 +3492,7 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
         ${line('船舶總 Moves',audit.moves)}
         ${line('減：非本月有效作業／尚未載入差額',-audit.otherMonthOrUnloaded,'可能包含跨月作業')}
         ${line('本月已連結有效 WORKING REPORT',audit.currentMoves)}
-        ${line('減：未列入現職人員 KPI／其他來源差額',-audit.staffOnlyDifference)}
+        ${line('減：人員作業資料其他差額（含歷史紀錄）',-audit.staffOnlyDifference)}
         ${line('首頁人員作業櫃數',audit.staffMoves)}
       </div>
       <p class="mt-2 text-xs text-slate-500">兩種 KPI 依不同日期與口徑計算；差額不代表遺失櫃數。本表按完整月份核對，不受船名／碼頭等列表欄位篩選影響。只讀核對，不會刪除資料。</p>
@@ -3570,8 +3592,8 @@ function renderDashboard(){
   renderSummaryPagination(jobs.length,totalPages);
 
   const arr=summaryRows();
-  const dashboardHasFilter=dashboardDateRange().active||!!(document.getElementById('filterMonth')?.value||'');
-  document.getElementById('kpiPeople').textContent=dashboardHasFilter?arr.length:people().length;
+  // 「現有人員」是即時人資在職名單；月份歷史作業人數不能讓離職員工復職。
+  document.getElementById('kpiPeople').textContent=people().length;
   const h=arr.reduce((s,x)=>s+x.totalHours,0);
   const c=arr.reduce((s,x)=>s+x.containers,0);
   const hc=arr.reduce((s,x)=>s+x.hatches,0);
