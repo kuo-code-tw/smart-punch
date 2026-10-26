@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('assets/port79-data-cache.js','utf8');
 const storage=()=>{const m=new Map();return{getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}};
-class Element{constructor(tag){this.tag=tag;this.children=[];this.style={};this.attrs={};this.textContent='';}appendChild(e){this.children.push(e);e.parent=this;return e;}prepend(e){this.children.unshift(e);e.parent=this;}setAttribute(k,v){this.attrs[k]=v;}remove(){this.parent.children=this.parent.children.filter(x=>x!==this);}}
+class Element{constructor(tag){this.tag=tag;this.children=[];this.style={};this.attrs={};this.textContent='';this.listeners={};}addEventListener(type,fn){this.listeners[type]=fn;}appendChild(e){this.children.push(e);e.parent=this;return e;}prepend(e){this.children.unshift(e);e.parent=this;}setAttribute(k,v){this.attrs[k]=v;}remove(){this.parent.children=this.parent.children.filter(x=>x!==this);}}
 function setup({hang=false}={}){
  const ss=storage();ss.setItem('port79_user_session',JSON.stringify({empId:'QA',adminRole:'admin'}));ss.setItem('port79_user_token','TOKEN');
  const host=new Element('main'),requests=[],opens=[];
@@ -15,7 +15,7 @@ const response=d=>new Response(JSON.stringify(d));
 const tick=()=>new Promise(r=>setImmediate(r));
 async function settle(){for(let i=0;i<10;i++)await tick();}
 async function seed(x,system,data,savedAt=Date.now()-86400000){await x.api.put({key:'QA@admin|system|'+system,kind:'system',system,savedAt,size:100,data}).catch(()=>{});}
-const options={system:'hr',actions:['hrGetEmployees'],host:'main',canShow:()=>true,select:d=>({columns:['姓名'],rows:d.employees.map(e=>[e.name]),label:'員工主檔'})};
+const options={system:'hr',actions:['hrGetEmployees'],host:'main',canShow:()=>true,select:d=>({columns:['工號','姓名','部門','職稱'],rows:d.employees.map(e=>[e.empId,e.name,e.dept,e.jobTitle]),label:'員工主檔'})};
 (async()=>{
  let x=setup({hang:true}),p=x.fetch(url('hrGetEmployees'),{cache:'no-store',signal:new AbortController().signal});
  x.requests[0].resolve(response({ok:true,employees:[{empId:'QA',name:'Fixture'}]}));
@@ -23,8 +23,21 @@ const options={system:'hr',actions:['hrGetEmployees'],host:'main',canShow:()=>tr
  assert(x.api.testMemory.has('QA@admin|system|hr'),'ordinary no-store read automatically saves preview');x.release();
  x=setup({hang:true});p=x.fetch(url('getLeaveData'));await new Promise(r=>setTimeout(r,80));assert.equal(x.requests.length,1,'blocked local cache cannot prevent cloud request');x.requests[0].resolve(response({ok:true,employees:[],leaveRecords:[]}));await p;x.release();
  x=setup();await seed(x,'hr',{ok:true,employees:[{name:'<img src=x onerror=alert(1)>'}]});
- assert(await x.api.showStartupPreview(options));const card=x.host.children[0];assert.equal(card.id,'p79StartupCacheStatus');const cells=card.children[2].children[0].children[1].children[0].children;
- assert.equal(cells[0].textContent,'<img src=x onerror=alert(1)>','data rendered as text, never executable HTML');assert.equal(cells[0].children.length,0);
+ assert(await x.api.showStartupPreview(options));const card=x.host.children[0];assert.equal(card.id,'p79StartupCacheStatus');
+ const toggle=card.children[0].children[0],content=card.children[1],table=content.children.find(e=>e.tag==='div').children[0];
+ assert.equal(content.hidden,true,'HR cache preview is initially collapsed');
+ assert.equal(toggle.attrs['aria-expanded'],'false','collapse control exposes state to assistive tech');
+ assert(toggle.textContent.includes('1 筆'),'collapsed preview still shows cached employee count');
+ assert(table.style.cssText.includes('min-width:0')&&table.style.cssText.includes('table-layout:fixed'),'HR preview overrides wide management table styles');
+ assert(table.parent.style.cssText.includes('overflow-x:hidden'),'HR preview disallows horizontal scrolling');
+ assert.equal(table.children[0].children[0].children.length,4,'all four employee columns stay available');
+ const cells=table.children[1].children[0].children;
+ assert.equal(cells[1].textContent,'<img src=x onerror=alert(1)>','data rendered as text, never executable HTML');
+ assert.equal(cells[1].children.length,0);
+ assert.equal(cells[1].attrs['data-label'],'姓名','mobile stacked view keeps column labels');
+ assert(card.children.some(e=>e.tag==='style'&&e.textContent.includes('@media(max-width:620px)')),'mobile layout adapts without horizontal scrolling');
+ toggle.listeners.click();assert.equal(content.hidden,false);assert.equal(toggle.attrs['aria-expanded'],'true');
+ toggle.listeners.click();assert.equal(content.hidden,true);assert.equal(toggle.attrs['aria-expanded'],'false');
  p=x.fetch(url('hrGetEmployees'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,employees:[]}));await p;await settle();assert(x.api.hasStartupPreview(),'preview survives until page has actually applied cloud data');x.api.finishStartupPreview('hr');assert.equal(x.host.children.length,0);
  x=setup({hang:true});let rendered=0;const pending=x.api.showStartupPreview({...options,select:()=>{rendered++;return{rows:[['old']],columns:['old']}}});
  p=x.fetch(url('hrGetEmployees'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,employees:[]}));await p;x.release();assert.equal(await pending,false);assert.equal(rendered,0,'late disk result cannot overwrite live view');
