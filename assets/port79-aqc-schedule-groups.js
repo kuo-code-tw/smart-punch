@@ -38,7 +38,8 @@ function createStore(normalizeName=v=>String(v||'').replace(/\s+/g,'')){
   if(!match&&(!id||id.startsWith('NAME:'))){const candidates=snapshot.byName.get(name)||[];if(candidates.length===1)match=candidates[0];else if(candidates.length>1)return {group:'姓名重複，待核對工號',status:'ambiguous'};}
   if(!match)return {group:'排班無此司機',status:'missing'};
   if(snapshot.conflicts.has(match.id))return {group:'排班分組重複，待核對',status:'conflict'};
-  if(match.role.toUpperCase()!=='AQC')return {group:'排班非 AQC',status:'not-aqc'};
+  const role=String(match.role||'').normalize('NFKC').trim().toUpperCase();
+  if(!/^AQC(?:$|[\s(（／/・·:\-]|司機|操作|人員)/.test(role))return {group:'排班非 AQC',status:'not-aqc'};
   return {group:match.group||'不分組',status:'ok',empId:match.id};
  }
  return {setOwner,apply,lookup,personnel:month=>[...(months.get(month)?.byId.values()||[])].filter(p=>p.role.toUpperCase()==='AQC').map(p=>({empId:p.id,name:p.name,group:lookup(month,{empId:p.id}).group})),has:month=>months.has(month),invalidate:month=>months.delete(month),clear:()=>months.clear()};
