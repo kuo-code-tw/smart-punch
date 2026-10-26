@@ -82,13 +82,14 @@ vm.createContext(ctx);vm.runInContext(html.slice(versionStart,versionEnd),ctx);
  await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
  assert.equal(refreshes,2,'actual cloud revision should trigger fresh read');
  editing=true;fixtures.lastAttendanceCloudRevision='r3';revision='r3';
+ const activeState=fixtures.p79WorkOvertimeMonths.get('2026-10');
  fixtures.p79LoadWorkOvertimeMonths([]);
- await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
- assert.equal(fixtures.p79WorkOvertimeMonths.get('2026-10').ready,false,'edit started during response must defer snapshot');
+ assert.equal(fixtures.p79WorkOvertimeMonths.get('2026-10'),activeState,'editing must preserve an existing snapshot');
+ assert.equal(refreshes,2,'background data read must be deferred while editing');
  editing=false;
  fixtures.p79LoadWorkOvertimeMonths([]);
  await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
- assert.equal(refreshes,4,'deferred change can reload safely');
+ assert.equal(refreshes,3,'deferred cloud revision should load after editing stops');
 
  let evidenceReads=0;
  const visible={Date,document:{visibilityState:'visible',getElementById:()=>({getClientRects:()=>[1],value:'2026-10'})},
