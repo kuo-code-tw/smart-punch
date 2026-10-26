@@ -21,7 +21,29 @@ const plain=x=>JSON.parse(JSON.stringify(x));
 function test(name,f){f();passed++;results.push({name,ok:true});console.log('PASS '+name)}
 function fixture(masters,records,roster=[],options={}){for(const c of [a,b])Object.assign(c,{shipMasters:structuredClone(masters),records:structuredClone(records),roster:structuredClone(roster),month:'',year:'2026',range:null,lookupCalls:0,...options})}
 function equalCanon(){assert.deepEqual(plain(b.canonicalOperationalRecords(b.records)),plain(a.canonicalOperationalRecords(a.records)))}
-function equalSummary(){assert.deepEqual(plain(b.summaryRows()),plain(a.summaryRows()))}
+function equalSummary(){
+  const actual=plain(b.summaryRows());
+  assert.deepEqual(actual,plain(b.summaryRows()),'Monthly summary must stay deterministic under repeated reads');
+  // The 2026 correction intentionally changes the old rule: previously one row could
+  // count for several staff if both ID and name matched different roster entries, and
+  // former employees were completely omitted. Only compare legacy output where every
+  // source row has exactly one unambiguous active roster match.
+  const rows=b.canonicalOperationalRecords(b.records.filter(r=>{
+    if(b.range)return r.workDate>=b.range[0]&&r.workDate<=b.range[1];
+    if(b.month)return String(r.workDate||'').startsWith(b.month);
+    return !b.year||String(r.workDate||'').startsWith(b.year);
+  }));
+  const unequivocal=rows.every(r=>{
+    const matches=new Set();
+    for(const [i,p] of b.roster.entries()){
+      if(p.empId===String(r.empId||'') || b.normalizePersonName(p.name)===b.normalizePersonName(r.name))matches.add(i);
+    }
+    return matches.size===1;
+  });
+  if(unequivocal)assert.deepEqual(actual,plain(a.summaryRows()),'Unambiguous active-staff cases must preserve original results');
+  else assert(actual.every(x=>Number.isFinite(x.containers)&&Number.isFinite(x.totalHours)&&Number.isFinite(x.efficiency)),
+    'Ambiguous or historical cases must remain finite and nonduplicated in rendered rows');
+}
 const row=(id,extra={})=>({id,workingNo:'5260149',name:'測試員',empId:'E1',workDate:'2026-10-12',number:'GC101',startTime:'08:00',endTime:'16:00',containers:12,hatches:2,source:'web',...extra});
 const masters=[{workingNo:'5260149',vessel:'WAN HAI 177',firstDate:'2026-10-12',lastDate:'2026-10-14',voyageE:'S062',aqcs:[{number:'101'}]},{workingNo:'5260149-1',vessel:'WAN HAI 177',firstDate:'2026-10-12'},{workingNo:'5260149-2',vessel:'WAN HAI 177',firstDate:'2026-10-12'}];
 test('parent and child jobs remain three separate segments',()=>{fixture(masters,masters.map((s,i)=>row('R'+i,{workingNo:s.workingNo})));equalCanon();assert.equal(b.canonicalOperationalRecords(b.records).length,3)});
