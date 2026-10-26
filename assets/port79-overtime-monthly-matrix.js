@@ -137,6 +137,11 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:mmSpin 1.4s linear infinite}',
  '#p79MonthlyMatrix .mm-feedback-success{border-color:#b6e1ce;background:#edfaf3}',
  '#p79MonthlyMatrix .mm-feedback-success .mm-feedback-icon{background:#d4f5e4;color:#177549}',
+ '#p79MonthlyMatrix .mm-feedback-success,#p79MonthlyMatrix .mm-feedback-warning{align-items:center;padding:6px 10px;gap:7px}',
+ '#p79MonthlyMatrix .mm-feedback-success .mm-feedback-icon,#p79MonthlyMatrix .mm-feedback-warning .mm-feedback-icon{width:24px;height:24px;border-radius:7px;font-size:12px}',
+ '#p79MonthlyMatrix .mm-feedback-success .mm-feedback-main,#p79MonthlyMatrix .mm-feedback-warning .mm-feedback-main{display:flex;align-items:center;gap:9px;flex-wrap:wrap}',
+ '#p79MonthlyMatrix .mm-feedback-success .mm-feedback-title,#p79MonthlyMatrix .mm-feedback-warning .mm-feedback-title{font-size:12px;white-space:nowrap}',
+ '#p79MonthlyMatrix .mm-feedback-success #mmStatus,#p79MonthlyMatrix .mm-feedback-warning #mmStatus{margin:0!important;max-height:none!important;overflow:visible;white-space:normal;font-size:11px!important}',
  '#p79MonthlyMatrix .mm-feedback-warning{border-color:#f1d5a5;background:#fffaf0}',
  '#p79MonthlyMatrix .mm-feedback-warning .mm-feedback-icon{background:#ffefcf;color:#a36a0a}',
  '#p79MonthlyMatrix .mm-feedback-error{border-color:#f1bec4;background:#fff2f2}',
@@ -277,7 +282,7 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
     return;
    }
    render();
-   if(loaded.issues.length)feedback('warning','統計表已產生，部分資料需核對','已整理 '+loaded.rows.length+' 名人員。以下事項請確認：\n'+loaded.issues.join('\n'));
+   if(loaded.issues.length)feedback('warning','統計完成 · '+loaded.rows.length+' 人','須核對：'+loaded.issues.join('；').replace(/\s*\n\s*/g,' '));
    else feedback('success','統計表已準備完成','已完成 '+monthLabel+' 共 '+loaded.rows.length+' 名人員的統計。你可以在下方查看月表、列印或匯出 Excel。');
   }catch(e){
    loaded=null;
