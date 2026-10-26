@@ -1144,8 +1144,8 @@ function buildSsoHref(base){
   const role=String(session.adminRole||'').trim().toLowerCase();
   const empId=String(session.empId||'').trim().toUpperCase();
   const name=String(session.name||'').trim();
-  const version='2026.09.27.7.8';
-  const versioned=clean+(clean.includes('?')?'&':'?')+'v='+encodeURIComponent(version);
+  // Preserve the selected subsystem's existing version; do not append a second v parameter.
+  const versioned=clean;
   const params=new URLSearchParams();
   params.set('port79sso',token);
   params.set('gasurl',GAS_URL);
@@ -1205,8 +1205,20 @@ restore();
 // v10.19：完整健康檢查仍讓位給登入；輕量 pingPost 已在頁面載入後先做一次 runtime 預熱。
 setTimeout(probeGasConnection,7000);
 setTimeout(refreshSystemVersions,15000);
-setInterval(refreshSystemVersions,10*60*1000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!loginBusy&&!String($('account')?.value||'').trim())setTimeout(refreshSystemVersions,2500);});
+// Version probes are advisory and should not repeatedly fetch all subsystem pages.
+// Recheck only when returning to the tab after the version information becomes stale.
+let port79LastVersionCheckAt=Date.now();
+const port79OriginalRefreshSystemVersions=refreshSystemVersions;
+refreshSystemVersions=async function(){
+  if(document.visibilityState==='hidden'||loginBusy)return;
+  await port79OriginalRefreshSystemVersions();
+  port79LastVersionCheckAt=Date.now();
+};
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&!loginBusy&&!String($('account')?.value||'').trim()&&Date.now()-port79LastVersionCheckAt>=10*60*1000){
+    setTimeout(refreshSystemVersions,2500);
+  }
+});
 window.addEventListener('online',()=>setTimeout(probeGasConnection,1200));
 </script>
 
