@@ -50,9 +50,9 @@ function equalSummary(){
     const expectedMonth=entry?.month||String(r.workDate||'').slice(0,7);
     return expectedMonth===String(r.workDate||'').slice(0,7);
   });
+  const completionIndex=b.shipCompletionIndex(b.shipMasters);
   const datesAligned=b.records.every(r=>{
-    const master=b.shipMasters.find(s=>String(s.workingNo||'')===String(r.workingNo||''));
-    const finish=master?b.shipCompletionMonth(master):String(r.workDate||'').slice(0,7);
+    const finish=completionIndex.get(String(r.workingNo||''))?.month||String(r.workDate||'').slice(0,7);
     return finish===String(r.workDate||'').slice(0,7);
   });
   if(unequivocal&&sameMonthScope&&datesAligned)assert.deepEqual(actual,plain(a.summaryRows()),'Same-completion-month unambiguous records preserve original totals');
