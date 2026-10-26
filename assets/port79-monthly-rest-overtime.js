@@ -206,29 +206,49 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">未休額度依排班系統配對結果；姓名後顯示尚待申報的例／休／國天數。</p><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。15日起產生建議，25日起可人工確認送出；例假需有法定例外事由，不能為了湊額度而申報。</p><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
- const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='';
+ const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
  function options(values,all){return '<option value="">'+all+'</option>'+values.map(v=>'<option>'+esc(v)+'</option>').join('');}
  const job=e=>e.jobTitle||e.deptDetail||'未設定';q('#mrDept').innerHTML=options([...new Set(people.map(e=>e.dept||'一般'))],'全部部門');
  function filter(){const dept=q('#mrDept').value;return people.filter(e=>!dept||(e.dept||'一般')===dept);}
  function jobs(){q('#mrJob').innerHTML=options([...new Set(filter().map(job))],'全部職稱');names();}
  function names(){q('#mrEmp').innerHTML='<option value="">全部人員</option>'+filter().filter(e=>!q('#mrJob').value||job(e)===q('#mrJob').value).map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name)+'</option>').join('');invalidate();}
- function invalidate(){lastFailure='';model=null;q('#mrRows').innerHTML='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
+ function invalidate(){lastFailure='';model=null;q('#mrRows').innerHTML='';q('#mrAuditSummary').textContent='';q('#mrAuditDetails').textContent='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=invalidate;q('#mrMonth').onchange=invalidate;jobs();
- function controls(disabled){el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select').forEach(e=>e.disabled=disabled);q('#mrSave').disabled=disabled||!model?.rows.some(r=>r.checked&&!r.saved);el.querySelectorAll('[data-close]').forEach(e=>{e.textContent=disabled?'完成目前這筆後停止':'關閉';});}
- el.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(busy){stop=true;setStatus('將在目前這筆完成後停止，已確認儲存的資料會保留。');}else el.close();});el.oncancel=e=>{if(busy){e.preventDefault();stop=true;}};el.onclose=()=>el.remove();
+ function controls(disabled){
+  el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select').forEach(e=>e.disabled=disabled);
+  const allowed=model?.workflow?.canSubmit===true;
+  q('#mrSave').disabled=disabled||!allowed||!model?.rows.some(r=>r.checked&&!r.saved&&!r.planned);
+  if(!disabled){
+   q('#mrAll').disabled=!allowed||!model?.rows.some(r=>!r.saved&&!r.planned);
+   el.querySelectorAll('#mrRows tr[data-row]').forEach(tr=>{
+    const r=model?.rows[Number(tr.dataset.row)],pick=tr.querySelector('input.pick');
+    if(pick)pick.disabled=!allowed||!!r?.planned;
+   });
+  }
+  el.querySelectorAll('[data-close]').forEach(e=>{e.textContent=disabled?'完成目前這筆後停止':'關閉';});
+ }
+ const checkDayChange=()=>{if(!busy&&loadedMonth&&today()!==lastCheckedDay&&el.open){lastCheckedDay=today();q('#mrLoad').click();}};
+  const checkInterval=g.setInterval?.(checkDayChange,30*60*1000);
+  g.addEventListener?.('focus',checkDayChange);
+  el.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(busy){stop=true;setStatus('將在目前這筆完成後停止，已確認儲存的資料會保留。');}else el.close();});el.oncancel=e=>{if(busy){e.preventDefault();stop=true;}};el.onclose=()=>{if(checkInterval)g.clearInterval?.(checkInterval);g.removeEventListener?.('focus',checkDayChange);el.remove();};
  function paint(){
   sortRows(model.rows);
   const progress=reportProgress(model),sum=key=>cats.reduce((n,c)=>n+progress[c][key],0);
   const personLabels=new Map(model.balances.map(b=>[id(b.emp.empId),personSummary(model,b.emp.empId)]));
-  const pendingRows=model.rows.filter(r=>!r.saved);
+  const pendingRows=model.rows.filter(r=>!r.saved&&!r.planned);
   q('#mrAll').checked=pendingRows.length>0&&pendingRows.every(r=>r.checked);q('#mrAll').indeterminate=pendingRows.some(r=>r.checked)&&!q('#mrAll').checked;
-  q('#mrSave').textContent='申報勾選項目（'+sum('selected')+' 天）';
+  const phase=workflowStage(loadedMonth);model.workflow=phase;
+   q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
+   const audit=workflowAudit(model);
+   q('#mrAuditSummary').textContent='待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜有完整出勤建議 '+audit.verified+' 筆｜預排待核 '+audit.planned+' 筆';
+   q('#mrAuditDetails').textContent=[...audit.people,...audit.blocked,...model.issues].join('\n')||'本次核對沒有未補額度或衝突。';
+   q('#mrSave').textContent=phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
   q('#mrResult').textContent='已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
-  q('#mrRows').innerHTML=model.rows.map((r,i)=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+(Number(r.rule[2])<8?'<span style="display:block;color:#b91c1c;font-weight:700">⚠ 未滿8小時</span>':'')+'</td><td>'+esc(r.status)+'</td></tr>').join('');
-  q('#mrSave').disabled=!model.rows.some(r=>r.checked&&!r.saved);
+  q('#mrRows').innerHTML=model.rows.map((r,i)=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+(Number(r.rule[2])<8?'<span style="display:block;color:#b91c1c;font-weight:700">⚠ 未滿8小時</span>':'')+'</td><td>'+esc(r.status)+'</td></tr>').join('');
+  q('#mrSave').disabled=!phase.canSubmit||!model.rows.some(r=>r.checked&&!r.saved&&!r.planned);
  }
  q('#mrRows').onclick=e=>{const button=e.target.closest('[data-audit]');if(button&&model)alert(auditText(model,button.dataset.audit));};
  q('#mrRows').onchange=e=>{const tr=e.target.closest('[data-row]');if(!tr)return;const r=model.rows[Number(tr.dataset.row)];if(r.saved)return;if(!e.target.classList.contains('pick'))r.id=crypto.randomUUID();
@@ -238,7 +258,7 @@ async function open(){
   if(e.target.classList.contains('rule')){r.rule=rules[Number(e.target.value)].slice();r.status='時段已改，儲存時重新核對出勤';}
   paint();
  };
- q('#mrAll').onchange=()=>{model?.rows.forEach(r=>{if(!r.saved)r.checked=q('#mrAll').checked;});if(model)paint();};
+ q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.rows.forEach(r=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
  q('#mrLoad').onclick=async()=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
   try{loadedMonth=q('#mrMonth').value;g.p79RestQuota(loadedMonth);loadedPeople=filter().filter(e=>(!q('#mrJob').value||job(e)===q('#mrJob').value)&&(!q('#mrEmp').value||e.empId===q('#mrEmp').value));if(!loadedPeople.length)throw Error('沒有符合的人員');
