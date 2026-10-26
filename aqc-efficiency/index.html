@@ -544,11 +544,12 @@ body[data-p79-system="efficiency"] main{
 .p79-section{min-width:0}.p79-section>div:first-child{font-weight:900;color:#334155;padding:12px 16px;background:#f1f5f9;border-radius:14px;margin-bottom:8px}
 </style>
 <style id="p79-personnel-group-readable-type">
-#personnelGroupCards table,#personnelUnassigned table{table-layout:fixed!important;min-width:560px;width:100%}
+#personnelGroupCards table,#personnelUnassigned table{table-layout:fixed!important;min-width:640px;width:100%}
 #personnelGroupCards th,#personnelGroupCards td,#personnelUnassigned th,#personnelUnassigned td{font-size:18px!important;text-align:center!important;vertical-align:middle!important;white-space:nowrap!important;word-break:keep-all!important;padding:14px!important;line-height:1.5!important;font-variant-numeric:tabular-nums}
-#personnelGroupCards th:nth-child(1),#personnelUnassigned th:nth-child(1){width:30%}
-#personnelGroupCards th:nth-child(2),#personnelUnassigned th:nth-child(2){width:22%}
-#personnelGroupCards th:nth-child(3),#personnelGroupCards th:nth-child(4),#personnelUnassigned th:nth-child(3),#personnelUnassigned th:nth-child(4){width:24%}
+#personnelGroupCards th:nth-child(1),#personnelUnassigned th:nth-child(1){width:13%}
+#personnelGroupCards th:nth-child(2),#personnelUnassigned th:nth-child(2){width:21%}
+#personnelGroupCards th:nth-child(3),#personnelUnassigned th:nth-child(3){width:18%}
+#personnelGroupCards th:nth-child(4),#personnelGroupCards th:nth-child(5),#personnelGroupCards th:nth-child(6),#personnelUnassigned th:nth-child(4),#personnelUnassigned th:nth-child(5),#personnelUnassigned th:nth-child(6){width:16%}
 </style>
 <style id="p79-vessel-workspace-design">
 body[data-p79-system="efficiency"]{font-family:"Microsoft JhengHei","PingFang TC",sans-serif!important;background:#edf3f8!important;color:#18324c}
@@ -1328,7 +1329,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
   <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-slate-100" onclick="switchTab('ranking')">每月績效排行</button></div>
     <div class="p79-section" data-section-key="personnel-groups"><div><span>人員作業量與效率</span></div>
 <div class="card p-4">
-      <p class="text-sm text-slate-500 mb-3">選日期及姓名，查看 A、B、C、D 組作業量。可選任意日期區間；本周以星期日至星期六計算。</p>
+      <p class="text-sm text-slate-500 mb-3">選日期及姓名，查看 A、B、C、D 組作業量與效率排名（效率高到低；同分並列）。可選任意日期區間；本周以星期日至星期六計算。</p>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="min-w-[260px] max-w-[360px] flex-1">
           <label class="text-xs font-bold">日期區間</label>
@@ -6812,12 +6813,40 @@ function personnelGroupCode(value){
   const match=String(value||'').normalize('NFKC').toUpperCase().replace(/\s+/g,'').match(/^([ABCD])(?:組|班|GROUP)?$/);
   return match?match[1]:'';
 }
+// 和畫面顯示的兩位小數採相同排名精度；同分並列、跳號，無有效時數不列名次。
+function rankedPersonnelEfficiencyPersons(list){
+  const score=p=>{
+    const hours=Number(p?.hours),eff=Number(p?.eff);
+    return hours>0&&Number.isFinite(eff)?Number(eff.toFixed(2)):null;
+  };
+  const ranked=[...(list||[])].sort((a,b)=>{
+    const av=score(a),bv=score(b);
+    if(av===null)return bv===null?compareDriverNames(a.name,b.name):1;
+    if(bv===null)return -1;
+    return bv-av||compareDriverNames(a.name,b.name);
+  });
+  let lastScore=null,lastRank=0;
+  return ranked.map((p,index)=>{
+    const value=score(p);
+    if(value===null)return {...p,effRank:null};
+    if(lastScore===null||value!==lastScore)lastRank=index+1;
+    lastScore=value;
+    return {...p,effRank:lastRank};
+  });
+}
 function renderPersonnelGroupCards(persons){
   const box=document.getElementById('personnelGroupCards');if(!box)return;
   const groups={A:[],B:[],C:[],D:[]},unassigned=[];
   for(const person of persons){const code=personnelGroupCode(person.group);if(code)groups[code].push(person);else unassigned.push(person);}
-  const rows=list=>[...list].sort((a,b)=>compareDriverNames(a.name,b.name)).map(p=>`<tr style="height:34px!important"><td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(p.empId||"未提供")}</td><td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(displayPersonName(p.name))}</td><td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours.toFixed(2)}</td><td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important" title="卸船 ${p.disc}｜裝船 ${p.load}｜H/C ${p.hc}｜${p.rows.length} 筆">${p.containers}</td><td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours>0?p.eff.toFixed(2):'—'}</td></tr>`).join('');
-  const table=list=>`<div class="p79-compact-efficiency"><table class="tbl w-full text-center" style="width:100%;table-layout:fixed;font-size:13px;line-height:1.35"><colgroup><col style="width:23%"><col style="width:23%"><col style="width:18%"><col style="width:18%"><col style="width:18%"></colgroup><thead><tr style="height:34px!important"><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">工號</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">姓名</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">時數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">櫃數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">效率</th></tr></thead><tbody>${rows(list)||'<tr><td colspan="5" class="p-2 text-slate-400">此期間沒有作業紀錄</td></tr>'}</tbody></table></div>`;
+  const rows=list=>rankedPersonnelEfficiencyPersons(list).map(p=>`<tr style="height:34px!important">
+    <td class="font-black text-indigo-700" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.effRank===null?'—':'第'+p.effRank+'名'}</td>
+    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(p.empId||"未提供")}</td>
+    <td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(displayPersonName(p.name))}</td>
+    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours.toFixed(2)}</td>
+    <td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important" title="卸船 ${p.disc}｜裝船 ${p.load}｜H/C ${p.hc}｜${p.rows.length} 筆">${p.containers}</td>
+    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours>0?p.eff.toFixed(2):'—'}</td>
+  </tr>`).join('');
+  const table=list=>`<div class="p79-compact-efficiency overflow-x-auto"><table class="tbl w-full text-center" style="width:100%;table-layout:fixed;font-size:13px;line-height:1.35"><colgroup><col style="width:13%"><col style="width:21%"><col style="width:18%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup><thead><tr style="height:34px!important"><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">效率排名</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">工號</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">姓名</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">時數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">櫃數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">效率</th></tr></thead><tbody>${rows(list)||'<tr><td colspan="6" class="p-2 text-slate-400">此期間沒有作業紀錄</td></tr>'}</tbody></table></div>`;
   const colors={A:'border-indigo-200 bg-indigo-50',B:'border-emerald-200 bg-emerald-50',C:'border-amber-200 bg-amber-50',D:'border-rose-200 bg-rose-50'};
   if(!document.getElementById('p79CompactEfficiencyStyle')){const style=document.createElement('style');style.id='p79CompactEfficiencyStyle';style.textContent='';document.head.appendChild(style);}
   box.innerHTML=Object.entries(groups).map(([code,list])=>{
@@ -6937,19 +6966,17 @@ function renderWeeklyEfficiency(){
   refreshWeeklyGroupFilter();
 
   const selectedGroup=document.getElementById('weeklyGroupFilter')?.value||'';
-  const filteredPersons=persons
-    .filter(p=>!selectedGroup || p.group===selectedGroup)
-    .sort((a,b)=>{
-      return compareDriverNames(a.name,b.name)||compareDriverNames(a.group,b.group);
-    });
+  const filteredPersons=rankedPersonnelEfficiencyPersons(
+    persons.filter(p=>!selectedGroup || p.group===selectedGroup)
+  );
 
   const personBody=document.getElementById('weeklyPersonBody');
   if(personBody){
     if(!filteredPersons.length){
       personBody.innerHTML='<tr><td colspan="10" class="text-center text-slate-400">此條件沒有符合的人員資料</td></tr>';
     }else{
-      personBody.innerHTML=filteredPersons.map((p,index)=>`<tr>
-        <td class="font-black text-indigo-700">${index+1}</td>
+      personBody.innerHTML=filteredPersons.map(p=>`<tr>
+        <td class="font-black text-indigo-700">${p.effRank===null?'—':p.effRank}</td>
         <td class="font-bold">${esc(displayPersonName(p.name))}</td>
         <td>
           <button type="button"
