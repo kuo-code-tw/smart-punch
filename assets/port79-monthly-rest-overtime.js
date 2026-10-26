@@ -9,6 +9,16 @@ const confirmedReport=(meta,report)=>{
    x?.confirmed===true&&String(x.reportId)===String(report.id));
 };
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+function previousMonth(month){
+ if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return '';
+ const year=Number(month.slice(0,4)),m=Number(month.slice(5,7));
+ return (m===1?year-1:year)+'-'+String(m===1?12:m-1).padStart(2,'0');
+}
+function backfillContext(sourceMonth,asOf=today()){
+ const handlingMonth=String(asOf).slice(0,7),historical=/^20\d{2}-(0[1-9]|1[0-2])$/.test(sourceMonth)&&sourceMonth<handlingMonth;
+ return {sourceMonth,handlingMonth,historical,
+  note:historical?'跨月補報（'+handlingMonth+'補報，原加班歸屬'+sourceMonth+'）':'每月未休假加班 '+sourceMonth};
+}
 // 有正式申報的本人「休」加班，即使有請假代班連結也必須算入休息日額度。
 function ownRestCoverReport(meta,roster,date){
  const report=meta?.overtimeReport;
@@ -36,11 +46,19 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const R=g.P79OvertimeReason;
  const exemptReportDates=new Set(dates.filter(d=>{
    const m=roster.__meta?.[d],report=m?.overtimeReport;
-   return confirmedReport(m,report)&&
+   return confirmedReport(m,report)&&!ownRestCoverReport(m,roster,d)&&
      R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot})?.exempt===true;
  }));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
+ // 班表寫休但本人確實在該日有唯一完整打卡，不能同時視為「已休」。
+ // 只改統計歸屬，不將打卡直接視為已核准的加班；正式申報仍須人工確認。
+ const workedRestEvidence=new Set(dates.filter(d=>{
+   if(String(roster[d]||'').trim()!=='休'||roster.__meta?.[d]?.overtimeReport)return false;
+   const pairs=(snapshot?.pairs||[]).filter(p=>id(p.empId)===id(emp.empId)&&p.date===d&&p.start&&p.end);
+   return pairs.length===1&&g.P79RestAttendance?.state(snapshot,emp.empId,d)==='worked';
+ }));
  const excluded=dates.filter(d=>{
+   if(workedRestEvidence.has(d))return true;
    if(nonQuotaDates.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d))return true;
    // 代別人的班不等於自己請假；有正式本人休加不可從額度中剔除。
    return (snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&
@@ -55,6 +73,12 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   if(typhoonProtected.has(d)){ledger.push({date:d,kind:'typhoon',category:'',actual});continue;}
   if(exemptReportDates.has(d)){
    ledger.push({date:d,kind:'exemptOvertime',category:'',actual,reportId:r?.id});
+   continue;
+  }
+  if(workedRestEvidence.has(d)){
+   ledger.push({date:d,kind:'workedRestUnreported',category:'休',actual,
+     statusNote:'休息日有完整打卡，未有正式申報；不得誤列已休或已報'});
+   conflicts.push({date:d,reason:'休息日實際出勤但尚未正式申報；需確認休假及加班性質'});
    continue;
   }
   const verified=cats.includes(r?.category)&&confirmedReport(m,r);
@@ -149,7 +173,7 @@ function workflowAudit(model){
 function plan(snapshot,people,month,rules){
  const workflow=workflowStage(month),rows=[],balances=[],issues=[],states=[],rosters=new Map((snapshot.schedules||[]).map(r=>[id(r.empId),r.schedule])),pairsByKey=new Map();
  for(const pair of snapshot.pairs||[]){const key=id(pair.empId)+'|'+pair.date;if(!pairsByKey.has(key))pairsByKey.set(key,[]);pairsByKey.get(key).push(pair);}
- const leaveDates=new Set(snapshot.leaveDates||[]),currentDate=today();
+ const leaveDates=new Set(snapshot.leaveDates||[]),currentDate=today(),historical=backfillContext(month,currentDate).historical;
  const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
  for(const emp of people){
   const roster=rosters.get(id(emp.empId));
@@ -161,7 +185,7 @@ function plan(snapshot,people,month,rules){
   if(!workflow.canSuggest){states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});continue;}
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
-   if((b.typhoonDates||[]).includes(date)||Number(date.slice(8))<15||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
+   if((b.typhoonDates||[]).includes(date)||!historical&&Number(date.slice(8))<15||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    if(!['早','中','晚'].includes(roster[date])&&!pairs.length)continue;
    if(pairs.length>1||!pairs.length&&date<currentDate)continue;
@@ -216,7 +240,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',workedRestUnreported:'休息日有出勤但尚未申報（需核對）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+
@@ -231,7 +255,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}"></label><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。15日起產生建議，25日起可人工確認送出；例假需有法定例外事由，不能為了湊額度而申報。</p><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。15日起產生建議，25日起可人工確認送出；例假需有法定例外事由，不能為了湊額度而申報。</p><div id="mrBackfill" role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
@@ -240,7 +264,7 @@ async function open(){
  function filter(){const dept=q('#mrDept').value;return people.filter(e=>!dept||(e.dept||'一般')===dept);}
  function jobs(){q('#mrJob').innerHTML=options([...new Set(filter().map(job))],'全部職稱');names();}
  function names(){q('#mrEmp').innerHTML='<option value="">全部人員</option>'+filter().filter(e=>!q('#mrJob').value||job(e)===q('#mrJob').value).map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name)+'</option>').join('');invalidate();}
- function invalidate(){lastFailure='';model=null;q('#mrRows').innerHTML='';q('#mrAuditSummary').textContent='';q('#mrAuditDetails').textContent='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
+ function invalidate(){lastFailure='';model=null;q('#mrRows').innerHTML='';q('#mrBackfill').textContent='';q('#mrAuditSummary').textContent='';q('#mrAuditDetails').textContent='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=invalidate;q('#mrMonth').onchange=invalidate;jobs();
  function controls(disabled){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select').forEach(e=>e.disabled=disabled);
@@ -266,6 +290,10 @@ async function open(){
   const pendingRows=model.rows.filter(r=>!r.saved&&!r.planned);
   q('#mrAll').checked=pendingRows.length>0&&pendingRows.every(r=>r.checked);q('#mrAll').indeterminate=pendingRows.some(r=>r.checked)&&!q('#mrAll').checked;
   const phase=workflowStage(loadedMonth);model.workflow=phase;
+   const backfill=backfillContext(loadedMonth);
+   q('#mrBackfill').textContent=backfill.historical
+     ?'跨月補報：'+backfill.sourceMonth+' 原始加班日期與額度不變｜'+backfill.handlingMonth+' 提交處理；不佔用本月額度'
+     :'加班與額度歸屬：'+loadedMonth;
    q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
    const audit=workflowAudit(model);
    q('#mrAuditSummary').textContent='待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜有完整出勤建議 '+audit.verified+' 筆｜預排待核 '+audit.planned+' 筆';
