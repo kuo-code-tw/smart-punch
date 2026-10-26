@@ -81,7 +81,11 @@ function run(){
   assert(!host.innerHTML.includes('<img onerror='),'Record IDs must be escaped in HTML');
   assert(host.innerHTML.includes('&lt;img'));
   assert(html.includes('>人員作業櫃數</div>'));
-  assert(html.includes('>船舶請款櫃數</div>'));
+  assert(html.includes('>系統總櫃數（請款＋翻艙）</div>'));
+  assert(html.includes("setCum('cumWorkload',systemTotalMoves);"),'System KPI must display billing plus SHIFT, not billing alone');
+  assert(html.includes('const systemTotalMoves=workload+shiftTotal;'),'System Moves derives only from ship billing and SHIFT');
+  assert(html.includes("'✓ 與員工作業一致'"),'Equal values should show a comparison confirmation');
+  assert(html.includes('⚠ 與員工作業差'),'Unequal staff and system values must be reported, never silently overwritten');
   assert(html.includes('renderDashboardQuantityReconciliation(selectedMonth,allDashboardJobs,records,shipMasters,c)'));
   assert(html.includes('const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);'));
   for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
