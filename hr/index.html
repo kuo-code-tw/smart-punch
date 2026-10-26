@@ -638,7 +638,7 @@ async function init(){
 
   const cached=p79CachedHrSession();
   const cachedOk=p79ApplyHrSession(cached);
-  if(cachedOk){$('status').textContent='☁️ 已取得登入權限｜正在確認雲端人資權限…';void p79TryLoadHrCache();}
+  if(cachedOk){$('status').textContent='☁️ 已取得登入權限｜正在確認雲端人資權限…';}
 
   let cloudOk=false;
   try{
@@ -678,17 +678,11 @@ function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
   $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
   if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
   $('orgSettingsBtn')?.classList.toggle('hidden',hrAccess!=='manage');
-  if(source==='cloud')window.Port79DataCache?.finishStartupPreview?.('hr');
   const sourceText=source==='cache'?'最近快取':'雲端';
   $('status').textContent=`✅ 人資主檔已載入｜${employees.length} 人｜來源：${sourceText}｜目前權限：${permLabel(hrAccess)}${show?'｜已重新整理':''}`;
   return true;
 }
 
-async function p79TryLoadHrCache(){
- return window.Port79DataCache?.showStartupPreview?.({system:'hr',actions:['hrGetEmployees'],host:'main',
-  canShow:()=>!!session&&hrAccess!=='none'&&!employees.length,
-  select:d=>Array.isArray(d.employees)?{label:'員工主檔',columns:['工號','姓名','部門','職稱'],rows:d.employees.filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN').map(e=>[e.empId,e.name,e.dept,e.jobTitle||e.deptDetail])}:null});
-}
 async function p79FetchHrEmployeesCloud(){
   // Shared fetch saves a snapshot in the background; displaying HR does not wait for disk writes.
   return await apiGet('hrGetEmployees',30000);
@@ -697,14 +691,9 @@ async function p79FetchHrEmployeesCloud(){
 async function loadEmployees(show){
   if(p79HrLoadPromise)return p79HrLoadPromise;
   p79HrLoadPromise=(async()=>{
-    let cacheShown=false;
     try{
       const cloudRead=p79FetchHrEmployeesCloud();cloudRead.catch(()=>{});
-      void p79TryLoadHrCache();
-      cacheShown=!!window.Port79DataCache?.hasStartupPreview?.();
-      $('status').textContent=cacheShown
-        ? '☁️ 已先顯示最近人資資料｜正在同步最新雲端主檔...'
-        : '☁️ 正在同步人資主檔...';
+      $('status').textContent='☁️ 正在同步人資主檔...';
 
       let d;
       try{
@@ -713,9 +702,7 @@ async function loadEmployees(show){
         const isTimeout=firstError?.name==='AbortError'||/abort|逾時|timeout/i.test(String(firstError?.message||firstError));
         if(!isTimeout)throw firstError;
 
-        $('status').textContent=cacheShown
-          ? '🟡 雲端回應較慢｜目前先顯示最近資料，正在自動重試最新主檔...'
-          : '🟡 雲端回應較慢｜正在自動重試人資主檔，請稍候...';
+        $('status').textContent='🟡 雲端回應較慢｜正在自動重試人資主檔，請稍候...';
 
         await new Promise(r=>setTimeout(r,700));
         d=await apiGet('hrGetEmployees',45000);
@@ -725,11 +712,7 @@ async function loadEmployees(show){
       p79ApplyHrEmployeesPayload(d,show,'cloud');
       return true;
     }catch(e){
-      if(cacheShown||window.Port79DataCache?.hasStartupPreview?.()){
-        $('status').textContent='🟡 雲端最新人資主檔暫時未同步完成｜目前顯示最近一次可用資料，可稍後再按重新同步';
-        console.warn('人資雲端同步失敗，保留最近快取：',e);
-        return true;
-      }
+
       $('status').textContent='❌ '+((e?.name==='AbortError'||/abort|逾時|timeout/i.test(String(e?.message||e)))
         ?'人資雲端回應逾時；系統已自動重試仍未完成，請稍後再按重新同步'
         :(e.message||e));

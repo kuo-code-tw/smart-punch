@@ -22,44 +22,24 @@ const options={system:'hr',actions:['hrGetEmployees'],host:'main',canShow:()=>tr
  assert((await Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(Error('network waited for disk')),150))])).ok);await settle();
  assert(x.api.testMemory.has('QA@admin|system|hr'),'ordinary no-store read automatically saves preview');x.release();
  x=setup({hang:true});p=x.fetch(url('getLeaveData'));await new Promise(r=>setTimeout(r,80));assert.equal(x.requests.length,1,'blocked local cache cannot prevent cloud request');x.requests[0].resolve(response({ok:true,employees:[],leaveRecords:[]}));await p;x.release();
- x=setup();await seed(x,'hr',{ok:true,employees:[{name:'<img src=x onerror=alert(1)>'}]});
- assert(await x.api.showStartupPreview(options));const card=x.host.children[0];assert.equal(card.id,'p79StartupCacheStatus');
- const toggle=card.children[0].children[0],content=card.children[1],table=content.children.find(e=>e.tag==='div').children[0];
- assert.equal(content.hidden,true,'HR cache preview is initially collapsed');
- assert.equal(toggle.attrs['aria-expanded'],'false','collapse control exposes state to assistive tech');
- assert(toggle.textContent.includes('1 筆'),'collapsed preview still shows cached employee count');
- assert(table.style.cssText.includes('min-width:0')&&table.style.cssText.includes('table-layout:fixed'),'HR preview overrides wide management table styles');
- assert(table.parent.style.cssText.includes('overflow-x:hidden'),'HR preview disallows horizontal scrolling');
- assert.equal(card.style.maxWidth,'600px','cache panel must stay small');
- assert(table.style.cssText.includes('font-size:11px!important'),'HR table must not inherit oversized global fonts');
- assert.equal(table.parent.style.cssText.includes('max-height:145px'),true,'expanded cache list stays short');
- assert(table.children[0].children[0].children[0].style.cssText.includes('font-size:10px!important'),'header letters are compact');
- assert(table.children[1].children[0].children[0].style.cssText.includes('font-size:11px!important'),'employee letters are compact');
- assert(card.children.some(e=>e.tag==='style'&&e.textContent.includes('max-width:600px!important')&&e.textContent.includes('font-size:11px!important')),'scoped overrides win over global HR CSS');
- assert.equal(table.children[0].children[0].children.length,4,'all four employee columns stay available');
- const cells=table.children[1].children[0].children;
- assert.equal(cells[1].textContent,'<img src=x onerror=alert(1)>','data rendered as text, never executable HTML');
- assert.equal(cells[1].children.length,0);
- assert.equal(cells[1].attrs['data-label'],'姓名','mobile stacked view keeps column labels');
- assert(card.children.some(e=>e.tag==='style'&&e.textContent.includes('@media(max-width:620px)')),'mobile layout adapts without horizontal scrolling');
- toggle.listeners.click();assert.equal(content.hidden,false);assert.equal(toggle.attrs['aria-expanded'],'true');
- toggle.listeners.click();assert.equal(content.hidden,true);assert.equal(toggle.attrs['aria-expanded'],'false');
- p=x.fetch(url('hrGetEmployees'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,employees:[]}));await p;await settle();assert(x.api.hasStartupPreview(),'preview survives until page has actually applied cloud data');x.api.finishStartupPreview('hr');assert.equal(x.host.children.length,0);
- x=setup({hang:true});let rendered=0;const pending=x.api.showStartupPreview({...options,select:()=>{rendered++;return{rows:[['old']],columns:['old']}}});
- p=x.fetch(url('hrGetEmployees'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,employees:[]}));await p;x.release();assert.equal(await pending,false);assert.equal(rendered,0,'late disk result cannot overwrite live view');
- x=setup();await seed(x,'hr',{ok:true,employees:[{name:'old'}]});x.ss.removeItem('port79_user_token');assert.equal(await x.api.showStartupPreview(options),false);
+ // The startup preview window and its DOM rendering code must be absent.
+ assert(!('showStartupPreview' in x.api));
+ assert(!('finishStartupPreview' in x.api));
+ assert(!('hasStartupPreview' in x.api));
+ assert(!source.includes('p79StartupCacheStatus'));
+ assert(!source.includes('p79-hr-cache-compact'));
  x=setup();p=x.fetch(url('hrGetEmployees'),{cache:'no-store'});x.ss.setItem('port79_user_token','NEW');x.requests[0].resolve(response({ok:true,employees:[{name:'old account'}]}));await p;await settle();assert.equal(x.api.testMemory.size,0);
  x=setup();p=x.fetch(url('hrGetEmployees').replace('TOKEN','OTHER'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,employees:[]}));await p;await settle();assert.equal(x.api.testMemory.size,0,'explicit foreign credentials never populate active viewer snapshot');
  x=setup();p=x.fetch(url('getAttendanceMonthData','&month=2026-10'),{cache:'no-store'});x.requests[0].resolve(response({ok:true,month:'2026-10',records:[{id:'R1'}]}));await p;await settle();for(const sys of ['attendance','workhours'])assert(x.api.testMemory.has('QA@admin|system|'+sys+'|2026-10'));
  const historyUrl=url('historyGetMonthData','&type=attendance&month=2026-10');await x.api.put({key:x.api.testKey(historyUrl),kind:'api',savedAt:Date.now()-86400000,size:100,data:{ok:true,month:'2026-10',records:[{id:'H1'}]}}).catch(()=>{});
  assert((await x.api.getHistoryPreview(historyUrl)).sourceLabel.includes('本機歷史快取'));assert.equal(await x.api.getHistoryPreview(url('historyGetMonthData','&type=attendance&month=2026-11')),null);
- // Execute production selectors; they must not mutate business arrays or invoke render/write routines.
- for(const [file,name,system] of [['attendance/index.html','p79PreviewAttendanceFolder','attendance'],['work-hours/index.html','p79PreviewAttendanceFolder','workhours'],['leave/index.html','p79PreviewLeave','leave'],['hr/index.html','p79TryLoadHrCache','hr'],['aqc-efficiency/index.html','p79PreviewEfficiencyFolder','efficiency']]){
-  const html=fs.readFileSync(file,'utf8'),a=html.indexOf('function '+name+'('),end=html.indexOf('\n}',a)+2,original=[];let captured;
-  const c={window:{Port79DataCache:{showStartupPreview:o=>{captured=o;return true}}},records:original,employees:original,shipMasters:original,adminSession:{},leaveAccess:'manage',session:{},hrAccess:'manage',gcToken:'TOKEN',getRequestedAttendanceCloudMonth:()=> '2026-10',canReadAdminCloudData:()=>true,canCurrentAdminViewDataRow:()=>true,attendanceRecordMonthKey:r=>r.month,requireEfficiencyAccess:()=>true};vm.createContext(c);vm.runInContext(html.slice(a,end),c);c[name]();assert.equal(captured.system,system);assert(captured.canShow());
-  const data={ok:true,records:[{month:'2026-10',name:'QA'},{month:'2026-11',name:'other'}],employees:[{empId:'QA',name:'QA'}],leaveRecords:[{name:'QA'}],shipMasters:[{workingNo:'W1',vesselName:'Fixture'}]};const serialized=JSON.stringify(data);const model=captured.select(data,{});assert(model.rows.length);if(['attendance','workhours'].includes(system))assert.equal(model.rows.length,1);assert.equal(JSON.stringify(data),serialized);assert.equal(c.records,original);assert.equal(c.employees,original);assert.equal(c.shipMasters,original);
+ // Every production page still loads the real shared cache, but has no startup preview renderer.
+ for(const file of ['attendance/index.html','work-hours/index.html','leave/index.html','hr/index.html','aqc-efficiency/index.html']){
+  const html=fs.readFileSync(file,'utf8');
+  assert(html.includes('port79-data-cache.js'),file+' must retain the real cache module');
+  assert(!/showStartupPreview|finishStartupPreview|hasStartupPreview|p79StartupCacheStatus|p79PreviewAttendanceFolder|p79PreviewLeave|p79PreviewEfficiencyFolder|p79TryLoadHrCache/.test(html),file+' must not contain startup preview UI');
  }
  assert(fs.readFileSync('work-hours/index.html','utf8').includes("document.addEventListener('DOMContentLoaded',async function(ev)"));
  assert(!fs.readFileSync('aqc-efficiency/index.html','utf8').includes("window.addEventListener('load',async()=>{"));
- console.log('PASS all-system preview selectors preserve business state; escaped read-only DOM; disk-independent fresh reads; monthly persistence; account/token/late-disk guards; old exact-month history cache; DOM-ready startup');
+ console.log('PASS startup preview UI removed while shared cache persistence, account guards, monthly snapshots and history cache remain intact');
 })().catch(e=>{console.error(e);process.exitCode=1});

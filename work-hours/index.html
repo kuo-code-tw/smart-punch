@@ -4851,7 +4851,7 @@ const now = new Date();
 
             // v7.37：新手機／清除瀏覽器資料後 sysConfig.gasUrl 可能還是空的，
             // 但 getActiveGasUrl() 仍可取得程式內建正式 GAS URL。不可因此跳過員工主檔同步。
-            void p79PreviewAttendanceFolder();
+            
             const startupGasUrl = getActiveGasUrl();
             if (isValidGasWebAppUrl(startupGasUrl)) {
                 sysConfig.gasUrl = startupGasUrl;
@@ -6389,7 +6389,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     }
                 }
 
-                window.Port79DataCache?.finishStartupPreview?.('workhours');
+
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
                 initDropdowns();
@@ -6455,7 +6455,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             cloudLoadPromise = fetchGasJsonWithRetry(requestUrl, '考勤資料', 3, 25000)
             .then(async data => {
                 if (!data?.ok) throw new Error(data?.error || '雲端回應失敗');
-                window.Port79DataCache?.finishStartupPreview?.('workhours');
+
+
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
 
@@ -16096,15 +16097,6 @@ document.addEventListener('visibilitychange',p79RefreshVisibleOvertimeEvidence);
 window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 </script>
 
-
-<script id="p79-folder-startup-preview">
-function p79PreviewAttendanceFolder(){
- const month=getRequestedAttendanceCloudMonth();
- return window.Port79DataCache?.showStartupPreview?.({system:'workhours',actions:['getAttendanceMonthData','getAttendanceMainDirect','getAttendanceCoreData','getData'],host:'#viewAdmin',month,
-  canShow:()=>canReadAdminCloudData()&&getRequestedAttendanceCloudMonth()===month&&!(records||[]).length,
-  select:d=>Array.isArray(d.records)?{label:month+' 考勤明細（工時、加班待最新班表核對）',columns:['工號','姓名','日期／時間','狀態'],rows:d.records.filter(r=>attendanceRecordMonthKey(r)===month&&canCurrentAdminViewDataRow(r)).map(r=>[r.empId||r.attNo,r.name,r.timeStr||r.datetime||r.dateTime,r.status||r.type||r.action])}:null});
-}
-</script>
 
 </body>
 </html>

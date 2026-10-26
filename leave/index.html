@@ -441,15 +441,9 @@ function p79ShowPendingLeavePrompt(){
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  document.body.appendChild(dialog);dialog.showModal();
 }
-function p79PreviewLeave(){
- return window.Port79DataCache?.showStartupPreview?.({system:'leave',actions:['getLeaveData'],host:'#adminMode',
-  canShow:()=>!!adminSession&&leaveAccess!=='none'&&!employees.length,
-  select:d=>Array.isArray(d.leaveRecords)?{label:'請假紀錄',columns:['姓名','假別','開始','結束','狀態'],rows:d.leaveRecords.map(r=>[r.name||r.empId,r.leaveType,r.startTime||r.startDate,r.endTime||r.endDate,r.status])}:null});
-}
 async function loadCloud(show=false,requireFresh=false,identityReady=null){
  let last,renewed=false;
  if(identityReady)await identityReady;
- if(!requireFresh)void p79PreviewLeave();
  for(let i=0;i<3;i++){
   try{
    if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
@@ -467,14 +461,13 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
    if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
-   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');window.Port79DataCache?.finishStartupPreview?.('leave');return true;
+   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假 '+leaveRecords.length):'☁️ 員工請假申請模式已就緒','');return true;
   }catch(e){
    last=e;
    if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
   }
  }
  if(requireFresh)throw last||new Error('無法讀回最新雲端資料，尚未確認匯入成功');
- if(window.Port79DataCache?.hasStartupPreview?.())return false;
  // getLeaveData 太慢時，先用最近一次本機快取，避免整頁變空白。
  try{
    const snap=await window.Port79DataCache?.getSystemSnapshot?.('leave');

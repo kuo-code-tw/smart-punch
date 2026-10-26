@@ -8572,7 +8572,6 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     restoreMonthlyCompareCache(true);
     renderEfficiencyTabFast();
     updateEmployeeDataState(employeeSource);
-    window.Port79DataCache?.finishStartupPreview?.('efficiency');
 
     // 最新人資名單改成背景補抓，不阻塞「船舶作業資料」的顯示。
     Promise.resolve().then(async()=>{
@@ -14247,18 +14246,12 @@ function startShipFullAutoSync(){
   });
 }
 
-function p79PreviewEfficiencyFolder(){
- return window.Port79DataCache?.showStartupPreview?.({system:'efficiency',actions:['gcGetData'],host:'#efficiencyPageMain',
-  canShow:()=>requireEfficiencyAccess()&&!!gcToken&&!(shipMasters||[]).length&&!(records||[]).length,
-  select:(d,scope)=>Array.isArray(d.shipMasters)?{label:(scope.month||d.month||'已保存範圍')+' 船舶資料',columns:['作業編號','船名','開始日期','結束日期'],rows:d.shipMasters.map(r=>[r.workingNo,r.vesselName||r.shipName||r.name,r.firstDate||r.workDate,r.lastDate])}:null});
-}
 async function initGcPage(){
   if(!requireEfficiencyAccess()){
     returnToPort79Home('此帳號沒有「效率系統」權限，請由超級管理員到人資管理系統設定。');
     return;
   }
 
-  void p79PreviewEfficiencyFolder();
 
   // 使用同一套 SSO 驗證與重試。只有「明確 Token/角色失效」才要求重新登入；
   // 純網路異常不清除登入狀態，避免首頁與船舶頁來回循環。
