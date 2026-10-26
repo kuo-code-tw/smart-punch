@@ -2191,7 +2191,7 @@ async function onDashboardMonthChange(){
 }
 
 // 月報以船舶完工日歸月，同一 WORKING NO 的司機作業不能拆月。
-function shipCompletionMonth(s){
+function shipCompletionMonth(s,latestByNo=null){
   if(!s)return '';
   const x=applyShipManualOverrides(s)||s,ws=x.workingSheetSource||{};
   const monthOf=v=>{
@@ -2203,9 +2203,14 @@ function shipCompletionMonth(s){
   }
   const no=String(s.workingNo||'').trim();
   if(no){
-    const dates=(records||[]).filter(r=>String(r?.workingNo||'').trim()===no)
-      .map(r=>String(r?.workDate||r?.date||'').slice(0,10)).filter(d=>/^20\d{2}-\d{2}-\d{2}$/.test(d)).sort();
-    if(dates.length)return dates[dates.length-1].slice(0,7);
+    const cached=latestByNo?.get(no);
+    if(cached)return cached.slice(0,7);
+    // 單艘船直接呼叫時仍保留舊資料備援；整月請由 shipCompletionIndex 預先索引，避免 O(船數×明細數)。
+    if(!latestByNo){
+      const dates=(records||[]).filter(r=>String(r?.workingNo||'').trim()===no)
+        .map(r=>String(r?.workDate||r?.date||'').slice(0,10)).filter(d=>/^20\d{2}-\d{2}-\d{2}$/.test(d)).sort();
+      if(dates.length)return dates[dates.length-1].slice(0,7);
+    }
   }
   for(const v of [x.compareMonth,x.compareDate,ws.compareMonth,ws.compareDate,x.firstDate,ws.firstDate,ws.startDate]){
     const month=monthOf(v);if(month)return month;
@@ -2213,8 +2218,14 @@ function shipCompletionMonth(s){
   return '';
 }
 function shipCompletionIndex(masters){
+  const latestByNo=new Map();
+  for(const r of (records||[])){
+    const no=String(r?.workingNo||'').trim();
+    const date=String(r?.workDate||r?.date||'').slice(0,10);
+    if(no&&/^20\d{2}-\d{2}-\d{2}$/.test(date) && date>(latestByNo.get(no)||''))latestByNo.set(no,date);
+  }
   return new Map((masters||[]).filter(s=>String(s?.workingNo||'').trim())
-    .map(s=>[String(s.workingNo).trim(),{master:s,month:shipCompletionMonth(s)}]));
+    .map(s=>[String(s.workingNo).trim(),{master:s,month:shipCompletionMonth(s,latestByNo)}]));
 }
 function recordCompletionMonth(r,index){
   const entry=index?.get(String(r?.workingNo||'').trim());
