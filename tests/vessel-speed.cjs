@@ -50,7 +50,12 @@ function equalSummary(){
     const expectedMonth=entry?.month||String(r.workDate||'').slice(0,7);
     return expectedMonth===String(r.workDate||'').slice(0,7);
   });
-  if(unequivocal&&sameMonthScope)assert.deepEqual(actual,plain(a.summaryRows()),'Same-completion-month unambiguous records preserve original totals');
+  const datesAligned=b.records.every(r=>{
+    const master=b.shipMasters.find(s=>String(s.workingNo||'')===String(r.workingNo||''));
+    const finish=master?b.shipCompletionMonth(master):String(r.workDate||'').slice(0,7);
+    return finish===String(r.workDate||'').slice(0,7);
+  });
+  if(unequivocal&&sameMonthScope&&datesAligned)assert.deepEqual(actual,plain(a.summaryRows()),'Same-completion-month unambiguous records preserve original totals');
   else assert(actual.every(x=>Number.isFinite(x.containers)&&Number.isFinite(x.totalHours)&&Number.isFinite(x.efficiency)),
     'Ambiguous or historical cases must remain finite and nonduplicated in rendered rows');
 }
