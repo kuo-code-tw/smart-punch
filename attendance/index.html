@@ -735,7 +735,6 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261025-zh-import-export"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -2129,8 +2128,6 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                 <p class="text-[11px] text-slate-500 mt-2">日期範圍包含起訖日，考勤、排班與每日考勤均套用。以上班日決定月份；跨月班次連同下月簽退一起匯出，原始打卡時間保留。</p>
             </div>
 
-            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportPreferCache" type="checkbox" checked class="w-4 h-4">優先使用本機快取（含已連接的電腦資料夾）</label>
-            <p class="text-[11px] text-slate-500">缺少的月份會向雲端讀取。使用快取時，試算表 會附上各月份保存時間；需要最新雲端資料時，請取消勾選。</p>
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 試算表）</label>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
@@ -5104,7 +5101,7 @@ const now = new Date();
 
             // v7.37：新手機／清除瀏覽器資料後 sysConfig.gasUrl 可能還是空的，
             // 但 getActiveGasUrl() 仍可取得程式內建正式 GAS URL。不可因此跳過員工主檔同步。
-            void p79PreviewAttendanceFolder();
+            // Cloud-only startup: do not render cached previews.
             const startupGasUrl = getActiveGasUrl();
             if (isValidGasWebAppUrl(startupGasUrl)) {
                 sysConfig.gasUrl = startupGasUrl;
@@ -7252,7 +7249,6 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     }
                 }
 
-                window.Port79DataCache?.finishStartupPreview?.('attendance');
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
                 initDropdowns();
@@ -7328,7 +7324,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             cloudLoadPromise = fetchGasJsonWithRetry(requestUrl, '考勤資料', 3, 25000)
             .then(async data => {
                 if (!data?.ok) throw new Error(data?.error || '雲端回應失敗');
-                window.Port79DataCache?.finishStartupPreview?.('attendance');
+
                 lastCloudLoadSuccessAt = Date.now();
                 cloudQuotaCooldownUntil = 0;
 
@@ -21996,16 +21992,8 @@ function p79EmployeeDateEligible(emp,date) {
             showToast('此帳號沒有查看排班的權限，請取消勾選一併匯出排班','warning');return false;
         }
         async function p79ReadAttendanceExportSource(action,month,options={}) {
-            const cache=typeof window!=='undefined'?window.Port79DataCache:null;
-            const viewer=cache?.viewerKey?.(),credential=getAttendanceEmployeeMasterToken(),readAt=Date.now();
-            if(options.preferCache&&cache?.getExportSnapshot){
-                const hit=await cache.getExportSnapshot(action,month);
-                if(hit){
-                    if(credential!==getAttendanceEmployeeMasterToken()||viewer!==cache.viewerKey())throw Error('登入狀態已變更，請重新匯出');
-                    options.sources?.push({action,month,source:'本機快取',savedAt:hit.savedAt});return hit.data;
-                }
-            }
-            const url=new URL(getActiveGasUrl());
+
+            const credential=getAttendanceEmployeeMasterToken(),readAt=Date.now();            const url=new URL(getActiveGasUrl());
             const token=getAttendanceEmployeeMasterToken();
             url.searchParams.set('action',action);url.searchParams.set('month',month);
             url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('t',String(Date.now()));
@@ -22021,9 +22009,9 @@ function p79EmployeeDateEligible(emp,date) {
                 if(!Array.isArray(data.schedules))throw Error('排班資料格式不符，未產生不完整報表');
                 if((data.month&&String(data.month)!==month)||!data.schedules.some(row=>String(row.month||'').trim()===month))throw Error('雲端未回傳 '+month+' 的正式排班，已停止匯出，避免混入其他月份');
             }
-            if(credential!==getAttendanceEmployeeMasterToken()||(cache&&viewer!==cache.viewerKey()))throw Error('登入狀態已變更，請重新匯出');
+            if(credential!==getAttendanceEmployeeMasterToken())throw Error('登入狀態已變更，請重新匯出');
             options.sources?.push({action,month,source:'雲端讀取',savedAt:readAt});
-            if(cache?.storeExportSnapshot)void cache.storeExportSnapshot(action,month,data,viewer,credential,readAt).catch(error=>console.warn('匯出快取保存失敗',error));
+
             return data;
         }
         async function p79ReadAttendanceExportMonth(month,options={}) {
@@ -22158,9 +22146,9 @@ function p79EmployeeDateEligible(emp,date) {
             const dateLabel=start+'_'+end;
             const includeSchedule=document.getElementById('exportIncludeSchedule')?.checked===true;
             if(includeSchedule&&!p79RequireScheduleExport())return;
-            const preferCache=document.getElementById('exportPreferCache')?.checked!==false,sources=[];
-            const readOptions={preferCache,sources,start,end};
-            update((preferCache?'正在優先讀取本機快取，缺少資料才讀取雲端：':'正在讀取雲端最新資料：')+exportMonth+' 考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
+            const sources=[];
+            const readOptions={sources,start,end};
+            update('正在讀取雲端最新資料：'+exportMonth+' 考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
             const [exportScope,roster]=await Promise.all([
                 p79ReadAttendanceExportScope(exportMonth,readOptions),
                 includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,readOptions):Promise.resolve(null),
@@ -22229,8 +22217,8 @@ function p79EmployeeDateEligible(emp,date) {
                 XLSX.utils.book_append_sheet(workbook,auditSheet,'考勤缺漏核對');
             }
             if(sources.some(item=>item.source==='本機快取')){
-                const rows=[['資料','月份','來源','資料保存時間（台北）'],...sources.map(item=>[item.action==='getScheduleDataSecure'?'排班':'考勤',item.month,item.source,new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'medium'}).format(new Date(item.savedAt))])];
-                const sheet=XLSX.utils.aoa_to_sheet(rows);sheet['!cols']=[12,12,16,24].map(wch=>({wch}));XLSX.utils.book_append_sheet(workbook,sheet,'資料來源與快取時間');
+                const rows=[['資料','月份','來源','雲端讀取時間（台北）'],...sources.map(item=>[item.action==='getScheduleDataSecure'?'排班':'考勤',item.month,item.source,new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'medium'}).format(new Date(item.savedAt))])];
+                const sheet=XLSX.utils.aoa_to_sheet(rows);sheet['!cols']=[12,12,16,24].map(wch=>({wch}));XLSX.utils.book_append_sheet(workbook,sheet,'雲端資料讀取時間');
             }
             update('正在產生 試算表 檔案…');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
@@ -22666,15 +22654,6 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   document.addEventListener('DOMContentLoaded',()=>{
     if(typeof navigator!=='undefined'&&navigator.onLine!==false)return;
     setTimeout(async()=>{
-      let fullCacheRow=null;
-      try{
-        fullCacheRow=await window.Port79DataCache?.getSystemSnapshot?.('attendance');
-        if(fullCacheRow?.data?.fullDatabase&&Array.isArray(fullCacheRow.data.records)){
-          await window.p79ApplyAttendanceFullCache?.(fullCacheRow.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true});
-          try{setCloudSyncStatus(`⚡ 已載入本機完整快取｜考勤 ${fullCacheRow.data.records.length} 筆`,'success')}catch(e){}
-        }
-      }catch(e){console.warn('本機完整快取啟動失敗',e)}
-      if(fullCacheRow)return;
       try{
         const snapshot=await p79LoadLocalDbSnapshot();
         if(snapshot)p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
@@ -23051,83 +23030,6 @@ if(document.readyState==='loading'){
 </script>
 
 
-<script id="p79-cache-center-hard-fallback-20261004-1320-cache-center-final">
-(function(){
-function add(){
- const menus=['#p79SystemMenu','#p79HrSystemMenu','#p79UnifiedMenu','#attendanceDrawer'];
- menus.forEach(sel=>{const m=document.querySelector(sel);if(!m||m.querySelector('[data-p79-cache-hard="1"]'))return;const b=document.createElement('button');b.type='button';b.dataset.p79CacheHard='1';b.textContent='☁️ 資料快取中心';b.onclick=()=>window.Port79DataCache?.openCenter?.();const th=[...m.querySelectorAll('button')].find(x=>/全系統顯示模式|深淺色|亮色|暗色/.test(x.textContent||''));if(th)m.insertBefore(b,th);else m.appendChild(b);});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{add();setTimeout(add,500);setTimeout(add,1800)},{once:true});else{add();setTimeout(add,500);setTimeout(add,1800)}
-})();
-</script>
-
-<script id="p79-attendance-full-cache-bridge-v20261004">
-(function(){
-'use strict';
-window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
- try{
-  if(!snapshot||!Array.isArray(snapshot.records))throw new Error('完整考勤快取格式不正確');
-  const cloudRows=snapshot.records.map(r=>typeof normalizeAttendanceRecordIdentifiers==='function'?normalizeAttendanceRecordIdentifiers(r):r);
-  if(typeof mergeAttendanceRecordCollections==='function') records=mergeAttendanceRecordCollections(cloudRows,Array.isArray(records)?records:[]);
-  else if(typeof deduplicateAttendanceRecordArray==='function') records=deduplicateAttendanceRecordArray([...(Array.isArray(records)?records:[]),...cloudRows]);
-  else records=cloudRows;
-
-  if(Array.isArray(snapshot.employees)&&snapshot.employees.length){
-   const cloudEmployees=snapshot.employees.map(e=>typeof normalizeEmployeeIdentifiers==='function'?normalizeEmployeeIdentifiers(e):e);
-   employees=typeof mergeCloudEmployees==='function'?mergeCloudEmployees(cloudEmployees):cloudEmployees;
-   try{ensureBuiltinAdminAccount()}catch(e){}
-   try{migrateLegacyDepartments()}catch(e){}
-   try{syncDepartmentsFromEmployees()}catch(e){}
-   try{syncJobTitlesFromEmployees()}catch(e){}
-   try{syncAdminIdsFromEmployeeRoles()}catch(e){}
-  }
-
-  try{localStorage.setItem('sp_records_v5',JSON.stringify(records))}catch(e){}
-  try{localStorage.setItem('sp_employees_v5',JSON.stringify(employees))}catch(e){}
-  try{if(typeof saveAttendanceSafetyBackup==='function')saveAttendanceSafetyBackup(records)}catch(e){}
-
-  if(Array.isArray(snapshot.months)&&typeof updateAttendanceMonthOptionsFromCloud==='function'){
-   updateAttendanceMonthOptionsFromCloud(snapshot.months);
-  }
-  const monthSelect=document.getElementById('filterMonthSelect');
-  const now=new Date();
-  const currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  if(monthSelect){
-   // 完整快取可以保存全部月份，但進入考勤時永遠先停在目前月份。
-   // 只有使用者親自操作月份選單選 ALL 時，才顯示全部月份。
-   if(options.forceCurrentMonth===true || options.showAll===false){
-    if(![...monthSelect.options].some(o=>o.value===currentMonth)){
-      const opt=document.createElement('option');opt.value=currentMonth;opt.textContent=currentMonth;monthSelect.appendChild(opt);
-    }
-    monthSelect.value=currentMonth;
-    monthSelect.dataset.p79MonthInitialized='1';
-    try{renderAttendanceMonthTabs([...monthSelect.options].map(o=>o.value),currentMonth)}catch(e){}
-   }else if(options.showAll===true){
-    // 保留相容，但不再由啟動/快取下載流程主動使用。
-    monthSelect.value='ALL';
-    try{renderAttendanceMonthTabs([...monthSelect.options].map(o=>o.value),'ALL')}catch(e){}
-   }
-  }
-  const from=document.getElementById('recordDateFilter'),to=document.getElementById('recordDateEndFilter');
-  if(options.forceCurrentMonth===true || options.showAll===false){
-    if(from)from.value='';if(to)to.value='';try{updateRecordDateRangeSummary()}catch(e){}
-  }else if(options.showAll===true){
-    if(from)from.value='';if(to)to.value='';try{updateRecordDateRangeSummary()}catch(e){}
-  }
-  try{recordsCurrentPage=1}catch(e){}
-  try{initDropdowns()}catch(e){}
-  try{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();else renderAdminRecordsTable()}catch(e){try{renderAdminRecordsTable()}catch(_) {}}
-  try{if(typeof renderAdminLiveTable==='function'&&!document.getElementById('adminContentLive')?.classList.contains('hidden'))renderAdminLiveTable()}catch(e){}
-  try{if(typeof renderAttendanceStatsTable==='function'&&!document.getElementById('adminContentStats')?.classList.contains('hidden'))renderAttendanceStatsTable(true)}catch(e){}
-  try{if(typeof renderOvertimeStats==='function'&&!document.getElementById('adminContentOvertime')?.classList.contains('hidden'))renderOvertimeStats()}catch(e){}
-  if(!options.silent){try{showToast(`完整考勤已載入：${records.length} 筆｜員工主檔 ${employees.length} 人`,'success')}catch(e){}}
-  return {ok:true,recordCount:records.length,employeeCount:employees.length};
- }catch(err){console.error('完整考勤快取套用失敗',err);try{showToast('完整考勤快取套用失敗：'+(err?.message||err),'warning')}catch(e){};return {ok:false,error:String(err?.message||err)}}
-};
-})();
-</script>
-
-
 <script id="p79-stale-snapshot-diagnostic-v20261004">
 window.p79AttendanceLiveMergeInfo = function(){
   try{
@@ -23349,7 +23251,6 @@ window.p79AttendanceRecordCounts = function(){
     // remote 沒有的 Delta / 本機新事件也會由 same 補回，絕不因快照缺漏而消失。
     const mergedMonth=losslessMerge([remoteRows,same]);
     records=losslessMerge([mergedMonth,other]);
-    window.Port79DataCache?.finishStartupPreview?.('attendance');
 
     // V5.10.10：四來源聯集完成後立刻補姓名/部門/職稱，
     // 姓名篩選與補卡下拉不再等待下一次 render 才出現。
@@ -24833,15 +24734,6 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <script src="../assets/port79-missing-punch-login-preview.js?v=20261022-toolbar"></script>
-
-<script id="p79-folder-startup-preview">
-function p79PreviewAttendanceFolder(){
- const month=getRequestedAttendanceCloudMonth();
- return window.Port79DataCache?.showStartupPreview?.({system:'attendance',actions:['getAttendanceMonthData','getAttendanceMainDirect','getAttendanceCoreData','getData'],host:'#viewAdmin',month,
-  canShow:()=>canReadAdminCloudData()&&getRequestedAttendanceCloudMonth()===month&&!(records||[]).length,
-  select:d=>Array.isArray(d.records)?{label:month+' 考勤明細',columns:['工號','姓名','日期／時間','狀態'],rows:d.records.filter(r=>attendanceRecordMonthKey(r)===month&&canCurrentAdminViewDataRow(r)).map(r=>[r.empId||r.attNo,r.name,r.timeStr||r.datetime||r.dateTime,r.status||r.type||r.action])}:null});
-}
-</script>
 
 <script src="../assets/port79-attendance-overtime-export.js?v=20261025-date-export-audit-v1"></script>
 <script src="../assets/port79-attendance-date-overtime-menu.js?v=20261025-date-export-audit"></script>

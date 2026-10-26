@@ -873,7 +873,6 @@ html.dark #todayScheduleLeaveSummary .today-leave-title{color:#fdba74}
 }
 </style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261025-zh-import-export"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 <link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261024-unified-status-icons&menuhover=20261026a">
 
@@ -2827,54 +2826,20 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const el=document.getElementById('p79ScheduleDataSource'),s=p79ScheduleSourceState;
       if(!el||s.month!==currentScheduleMonthKey())return;
       const time=s.savedAt?new Date(s.savedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'';
-      el.textContent=s.kind==='cache'?'本機快取｜'+time+'｜'+(s.error?'雲端更新未完成，暫供查看；請按重新讀取':'先供查看，正在核對雲端最新班表…'):
-        s.kind==='live'?'雲端班表已更新｜'+time+(s.error?'｜重新核對未完成，保留上次確認內容':''):
-        s.error?'班表尚未載入：'+s.error:s.kind==='missing'?'本機沒有此月份可用快取，正在讀取雲端…':'正在讀取本機快取與雲端班表…';
+      el.textContent=s.kind==='live'?'雲端班表已更新｜'+time+(s.error?'｜重新核對未完成':''):
+        s.error?'班表尚未載入：'+s.error:'正在讀取雲端班表…';
     }
-    function p79ConfirmScheduleSource(data,month,readAt=Date.now(),viewer=window.Port79DataCache?.viewerKey?.(),token=currentPort79SsoToken()){
+    function p79ConfirmScheduleSource(data,month,token=currentPort79SsoToken()){
       if(month!==currentScheduleMonthKey()||token!==currentPort79SsoToken()||!token)return;
       p79ScheduleOfficialMonth=month;p79ScheduleOfficialToken=token;
       p79ScheduleSourceState={month,kind:'live',savedAt:Date.now(),error:''};
       p79RenderScheduleDataSource();
-      window.Port79DataCache?.storeSchedulePreview?.(month,data,viewer,token,readAt).catch(error=>console.warn('排班快取保存失敗',error));
     }
     function p79StartSchedulePreview(month){
-      const epoch=++p79SchedulePreviewEpoch;
+      ++p79SchedulePreviewEpoch;
       p79ScheduleOfficialMonth='';p79ScheduleOfficialToken='';
       p79ScheduleSourceState={month,kind:'loading',savedAt:0,error:''};
       p79RenderScheduleDataSource();applyScheduleAccessUi();
-      // Do not await the disk: a slow or disconnected folder must not delay cloud reads.
-      p79RestoreSchedulePreview(month,epoch).catch(error=>console.warn('排班快取讀取失敗',error));
-    }
-    async function p79RestoreSchedulePreview(month,epoch){
-      const token=currentPort79SsoToken(),version=p79ScheduleLocalMutationVersion;
-      if(!token||!window.Port79DataCache?.getSchedulePreview)return false;
-      const row=await window.Port79DataCache.getSchedulePreview(month);
-      if(epoch!==p79SchedulePreviewEpoch||month!==currentScheduleMonthKey()||token!==currentPort79SsoToken()||p79ScheduleHasOfficialData()||version!==p79ScheduleLocalMutationVersion||port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight)return false;
-      if(!row){p79ScheduleSourceState.kind='missing';p79RenderScheduleDataSource();return false;}
-      p79ApplySchedulePayload(row.data,month);
-      p79ScheduleSourceState={...p79ScheduleSourceState,kind:'cache',savedAt:row.savedAt};
-      p79RenderScheduleDataSource();
-      // 先重繪班表，再讓其他摘要與頁籤更新。即使外圍面板失敗，
-      // 也不能讓已讀取成功的本機快取一直停留在「正在讀取班表」。
-      try {buildRoleTabsAndRender();}
-      catch(error){
-        console.warn('排班頁籤／摘要重繪失敗，使用快取直接顯示班表',error);
-        try {renderRoleScheduleView();}
-        catch(viewError){p79SchedulePreviewRenderError(viewError);}
-      }
-      const main=document.getElementById('app-main-container');
-      if(activeRoleTab&&main?.textContent?.includes('正在讀取班表')){
-        try {renderRoleScheduleView();}
-        catch(error){p79SchedulePreviewRenderError(error);}
-      }
-      return true;
-    }
-
-    function p79SchedulePreviewRenderError(error){
-      console.error('班表畫面渲染失敗',error);
-      const main=document.getElementById('app-main-container');
-      if(main)main.innerHTML='<div role="alert" class="p-6 text-amber-800 bg-amber-50 rounded-xl">已取得本機班表，但畫面渲染失敗，請按上方「重新讀取」重試。錯誤：'+scheduleEscapeHtml(String(error?.message||error))+'</div>';
     }
 
     let scheduleSaveTimer = null;
@@ -4033,7 +3998,6 @@ function p79EmployeeDateEligible(emp,date) {
       const requestMonth=currentScheduleMonthKey();
       const requestEpoch=p79SchedulePreviewEpoch;
       const requestToken=currentPort79SsoToken();
-      const requestViewer=window.Port79DataCache?.viewerKey?.();
       const requestMutationVersion = p79ScheduleLocalMutationVersion;
       const requestStartedAt = Date.now();
 
@@ -4090,7 +4054,7 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         p79ApplySchedulePayload(data,requestMonth);
-        p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);
+        p79ConfirmScheduleSource(data,requestMonth,token);
         p79ScheduleRestClient().refresh(requestMonth);
         cloudLoaded = true;
         saveAllDataToLocalStorage();
@@ -4099,11 +4063,6 @@ function p79EmployeeDateEligible(emp,date) {
       } catch (err) {
         if(requestEpoch===p79SchedulePreviewEpoch&&requestMonth===currentScheduleMonthKey()&&requestToken===currentPort79SsoToken()){p79ScheduleSourceState.error=String(err?.message||'雲端連線未完成');p79RenderScheduleDataSource();}
         console.error(err);
-        // 網路失敗後也必須結束「正在讀取班表」；若已有快取則繼續呈現可查看班表。
-        if(requestEpoch===p79SchedulePreviewEpoch&&requestMonth===currentScheduleMonthKey()){
-          try {renderRoleScheduleView();}
-          catch(error){p79SchedulePreviewRenderError(error);}
-        }
         if (showAlert) alert('❌ 無法讀取 Google 雲端：\n' + err.message + '\n\n請確認 GAS 網址、部署版本與存取權限。');
         return false;
       }
@@ -4755,8 +4714,7 @@ function p79EmployeeDateEligible(emp,date) {
         const ok=await loadScheduleCloudWithRetry('month',1);
         if(currentScheduleMonthKey()!==month)return;
         if(status)status.textContent=ok?'':month+' 雲端讀取未完成，請按重新讀取；目前內容尚未確認';
-        if(!ok&&p79ScheduleSourceState.kind==='cache'){buildRoleTabsAndRender();renderTodaySchedulePanel();}
-        else if(!ok&&workspace){workspace.innerHTML='<div role="status" class="p-6 text-slate-600">此月份尚無可用班表，請按重新讀取。</div>';}
+        if(!ok&&workspace){workspace.innerHTML='<div role="status" class="p-6 text-slate-600">此月份尚無可用班表，請按重新讀取。</div>';}
         if(scheduleCanShowLiveAttendance())refreshScheduleAttendanceState(false);
       }catch(e){if(currentScheduleMonthKey()===month&&monthRequestVersion===p79ScheduleAttendanceViewVersion&&status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
       finally{if(monthRequestVersion===p79ScheduleAttendanceViewVersion)workspace?.setAttribute('aria-busy','false');}
@@ -5645,7 +5603,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function renderRoleScheduleView() {
       p79DisposeRosterScroll();
-      if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&p79ScheduleSourceState.kind==='cache')){
+      if(!p79ScheduleHasOfficialData()){
         const target=document.getElementById('app-main-container');
         const failed=!!p79ScheduleSourceState.error;
         if(target)target.innerHTML=failed

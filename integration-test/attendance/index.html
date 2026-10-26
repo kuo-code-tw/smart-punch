@@ -759,7 +759,6 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/integration-test/data-cache.js?v=20261022-download-recovery"></script>
 <script src="../assets/port79-ui-trim.js"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -21728,23 +21727,11 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
   // 2. 有網路：雲端是唯一主資料；等雲端完成後只「覆寫保存」IndexedDB，不可再把舊快取合併回畫面。
   const oldOnload=window.onload;
   window.onload=async function(ev){
-    // PORT79 2026-10-04 IDB-FIRST：
-    // 已下載過「資料快取中心」後，開頁先用完整 IndexedDB 快取立即顯示，
-    // 雲端同步只在背景更新，不再阻塞畫面。
-    let fullCacheRow=null;
-    try{
-      fullCacheRow=await window.Port79DataCache?.getSystemSnapshot?.('attendance');
-      if(fullCacheRow?.data?.fullDatabase && Array.isArray(fullCacheRow.data.records)){
-        await window.p79ApplyAttendanceFullCache?.(fullCacheRow.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true});
-        try{setCloudSyncStatus(`⚡ 已載入本機完整快取｜考勤 ${fullCacheRow.data.records.length} 筆`,'success')}catch(e){}
-      }
-    }catch(e){console.warn('本機完整快取啟動失敗',e)}
-
-    // 保留原本 IndexedDB/離線快照，僅作舊版相容備援。
+    // Cloud-first, preserving independent offline safety backups.
     let snapshot=null;
     try{snapshot=await p79LoadLocalDbSnapshot()}catch(e){}
-    const online = typeof navigator==='undefined' ? true : navigator.onLine!==false;
-    if(!fullCacheRow && !online && snapshot){
+    const online=typeof navigator==='undefined'?true:navigator.onLine!==false;
+    if(!online&&snapshot){
       try{p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true})}catch(e){}
     }
 
@@ -21767,7 +21754,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
     // oldOnload 已會自己啟動背景雲端同步。
     // 這裡不再額外 await p79StartupAttendanceCurrentMonthSync()，
     // 避免開頁重複抓月份、造成「明明有快取還是等很久」。
-    if(!online && !fullCacheRow && snapshot){
+    if(!online && snapshot){
       try{p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true})}catch(e){}
     }
   };
@@ -22137,83 +22124,6 @@ if(document.readyState==='loading'){
 }else{
   setTimeout(p79OpenAttendanceAdminDirect,0);
 }
-})();
-</script>
-
-
-<script id="p79-cache-center-hard-fallback-20261004-1320-cache-center-final">
-(function(){
-function add(){
- const menus=['#p79SystemMenu','#p79HrSystemMenu','#p79UnifiedMenu','#attendanceDrawer'];
- menus.forEach(sel=>{const m=document.querySelector(sel);if(!m||m.querySelector('[data-p79-cache-hard="1"]'))return;const b=document.createElement('button');b.type='button';b.dataset.p79CacheHard='1';b.textContent='☁️ 資料快取中心';b.onclick=()=>window.Port79DataCache?.openCenter?.();const th=[...m.querySelectorAll('button')].find(x=>/全系統顯示模式|深淺色|亮色|暗色/.test(x.textContent||''));if(th)m.insertBefore(b,th);else m.appendChild(b);});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{add();setTimeout(add,500);setTimeout(add,1800)},{once:true});else{add();setTimeout(add,500);setTimeout(add,1800)}
-})();
-</script>
-
-<script id="p79-attendance-full-cache-bridge-v20261004">
-(function(){
-'use strict';
-window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
- try{
-  if(!snapshot||!Array.isArray(snapshot.records))throw new Error('完整考勤快取格式不正確');
-  const cloudRows=snapshot.records.map(r=>typeof normalizeAttendanceRecordIdentifiers==='function'?normalizeAttendanceRecordIdentifiers(r):r);
-  if(typeof mergeAttendanceRecordCollections==='function') records=mergeAttendanceRecordCollections(cloudRows,Array.isArray(records)?records:[]);
-  else if(typeof deduplicateAttendanceRecordArray==='function') records=deduplicateAttendanceRecordArray([...(Array.isArray(records)?records:[]),...cloudRows]);
-  else records=cloudRows;
-
-  if(Array.isArray(snapshot.employees)&&snapshot.employees.length){
-   const cloudEmployees=snapshot.employees.map(e=>typeof normalizeEmployeeIdentifiers==='function'?normalizeEmployeeIdentifiers(e):e);
-   employees=typeof mergeCloudEmployees==='function'?mergeCloudEmployees(cloudEmployees):cloudEmployees;
-   try{ensureBuiltinAdminAccount()}catch(e){}
-   try{migrateLegacyDepartments()}catch(e){}
-   try{syncDepartmentsFromEmployees()}catch(e){}
-   try{syncJobTitlesFromEmployees()}catch(e){}
-   try{syncAdminIdsFromEmployeeRoles()}catch(e){}
-  }
-
-  try{localStorage.setItem('sp_records_v5',JSON.stringify(records))}catch(e){}
-  try{localStorage.setItem('sp_employees_v5',JSON.stringify(employees))}catch(e){}
-  try{if(typeof saveAttendanceSafetyBackup==='function')saveAttendanceSafetyBackup(records)}catch(e){}
-
-  if(Array.isArray(snapshot.months)&&typeof updateAttendanceMonthOptionsFromCloud==='function'){
-   updateAttendanceMonthOptionsFromCloud(snapshot.months);
-  }
-  const monthSelect=document.getElementById('filterMonthSelect');
-  const now=new Date();
-  const currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  if(monthSelect){
-   // 完整快取可以保存全部月份，但進入考勤時永遠先停在目前月份。
-   // 只有使用者親自操作月份選單選 ALL 時，才顯示全部月份。
-   if(options.forceCurrentMonth===true || options.showAll===false){
-    if(![...monthSelect.options].some(o=>o.value===currentMonth)){
-      const opt=document.createElement('option');opt.value=currentMonth;opt.textContent=currentMonth;monthSelect.appendChild(opt);
-    }
-    monthSelect.value=currentMonth;
-    monthSelect.dataset.p79MonthInitialized='1';
-    try{renderAttendanceMonthTabs([...monthSelect.options].map(o=>o.value),currentMonth)}catch(e){}
-   }else if(options.showAll===true){
-    // 保留相容，但不再由啟動/快取下載流程主動使用。
-    monthSelect.value='ALL';
-    try{renderAttendanceMonthTabs([...monthSelect.options].map(o=>o.value),'ALL')}catch(e){}
-   }
-  }
-  const from=document.getElementById('recordDateFilter'),to=document.getElementById('recordDateEndFilter');
-  if(options.forceCurrentMonth===true || options.showAll===false){
-    if(from)from.value='';if(to)to.value='';try{updateRecordDateRangeSummary()}catch(e){}
-  }else if(options.showAll===true){
-    if(from)from.value='';if(to)to.value='';try{updateRecordDateRangeSummary()}catch(e){}
-  }
-  try{recordsCurrentPage=1}catch(e){}
-  try{initDropdowns()}catch(e){}
-  try{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();else renderAdminRecordsTable()}catch(e){try{renderAdminRecordsTable()}catch(_) {}}
-  try{if(typeof renderAdminLiveTable==='function'&&!document.getElementById('adminContentLive')?.classList.contains('hidden'))renderAdminLiveTable()}catch(e){}
-  try{if(typeof renderAttendanceStatsTable==='function'&&!document.getElementById('adminContentStats')?.classList.contains('hidden'))renderAttendanceStatsTable(true)}catch(e){}
-  try{if(typeof renderOvertimeStats==='function'&&!document.getElementById('adminContentOvertime')?.classList.contains('hidden'))renderOvertimeStats()}catch(e){}
-  if(!options.silent){try{showToast(`完整考勤已載入：${records.length} 筆｜員工主檔 ${employees.length} 人`,'success')}catch(e){}}
-  return {ok:true,recordCount:records.length,employeeCount:employees.length};
- }catch(err){console.error('完整考勤快取套用失敗',err);try{showToast('完整考勤快取套用失敗：'+(err?.message||err),'warning')}catch(e){};return {ok:false,error:String(err?.message||err)}}
-};
 })();
 </script>
 
