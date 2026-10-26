@@ -46,8 +46,11 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const R=g.P79OvertimeReason;
  const exemptReportDates=new Set(dates.filter(d=>{
    const m=roster.__meta?.[d],report=m?.overtimeReport;
-   return confirmedReport(m,report)&&!ownRestCoverReport(m,roster,d)&&
-     R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot})?.exempt===true;
+   if(!confirmedReport(m,report))return false;
+   const exception=R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot});
+   // 颱風仍按特殊日豁免；但本人正式的「休」加班不能因代班連結而豁免。
+   return exception?.exempt===true&&
+     (exception.kind==='typhoon'||!ownRestCoverReport(m,roster,d));
  }));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
  // 班表寫休但本人確實在該日有唯一完整打卡，不能同時視為「已休」。
