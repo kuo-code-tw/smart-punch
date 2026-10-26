@@ -2891,7 +2891,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             const active=document.activeElement;
             if(active?.matches?.('input:not([type="hidden"]):not([type="button"]),select,textarea,[contenteditable="true"]') &&
                active.getClientRects?.().length)return true;
-            if(document.querySelector('dialog[open], [aria-modal="true"]:not([hidden])'))return true;
+            if([...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(el=>el.getClientRects?.().length&&getComputedStyle(el).visibility!=='hidden'))return true;
             if(typeof activeEditingAttendanceRecord!=='undefined' && activeEditingAttendanceRecord &&
                document.getElementById('editRecordModal')?.getClientRects?.().length)return true;
             return Date.now()-p79LastUnsavedFormInteractionAt<90000;
