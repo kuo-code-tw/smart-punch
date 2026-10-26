@@ -5,6 +5,7 @@ on:
     branches: [main]
     # Publish only on production site changes; this workflow edit also verifies the test suite.
     # by other workflows (or the next site publish), not deployed to users.
+    # In Settings > Pages use Source: GitHub Actions to disable the legacy branch Pages publisher.
     paths:
       - 'index.html'
       - 'port79-attendance-core.js'
