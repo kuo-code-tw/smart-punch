@@ -69,8 +69,8 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   // Only a non-revoked cloud report ID proves a formal overtime report.
   // Legacy overtime/restQuotaOvertime flags do not prove a pending report or reserve quota.
   // 有報單但仍缺完整出勤，先保留唯一額度為待核對，絕不能重報同一天。
-  if(verified&&actual==='rest'){
-   reserved[r.category]++;
+  if(verified&&r.category==='休'&&actual==='rest'){
+   reserved.休++;
    ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,
      statusNote:'已申報但未核對到完整出勤；保留原申報、待核對'});
    conflicts.push({date:d,reportId:r.id,reason:'已有正式申報編號但尚無完整打卡；不得重報，請核對打卡與班表'});
@@ -105,7 +105,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest')extraRestDates.push(d);
-
+   if(verified&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡暫按休假分類，原申報待核對，不可直接認定實際出勤'});
   }
  }
  // Supplement the shared schedule allocation with actual, non-leave no-card days.
