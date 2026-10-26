@@ -2477,7 +2477,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.23.115';
+        const APP_VERSION='2026.10.26.116';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -2879,47 +2879,74 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
         const PRIMARY_IN_RANGE_LOCATION_LABEL = '高雄港萬海79號碼頭';
         let updateCheckInProgress = false;
+        let lastAppVersionCheckAt = 0;
 
-        async function checkForAppUpdate() {
-            if (updateCheckInProgress || !/^https?:$/.test(location.protocol)) return;
-            updateCheckInProgress = true;
-            try {
-                const checkUrl = new URL(location.href);
-                checkUrl.hash = '';
-                checkUrl.searchParams.set('_update_check', Date.now());
-                const response = await fetch(checkUrl.toString(), {
-                    method: 'GET',
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' }
-                });
-                if (!response.ok) return;
-                const latestHtml = await response.text();
-                const match = latestHtml.match(/const\s+APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
-                const latestVersion = match ? match[1] : '';
-                if (latestVersion && latestVersion !== APP_VERSION) {
-                    if (sessionStorage.getItem('app_update_attempted') === latestVersion) return;
-                    sessionStorage.setItem('app_update_attempted', latestVersion);
-                    const nextUrl = new URL(location.href);
-                    nextUrl.searchParams.delete('_update_check');
-                    nextUrl.searchParams.set('v', latestVersion);
-                    location.replace(nextUrl.toString());
-                } else if (latestVersion === APP_VERSION) {
-                    sessionStorage.removeItem('app_update_attempted');
-                }
-            } catch (err) {
-                console.log('版本檢查暫時無法連線：', err);
-            } finally {
-                updateCheckInProgress = false;
-            }
+        // Avoid background display updates while a person is typing, choosing fields or editing a modal.
+        // Form changes receive a brief grace period after blur so a cloud refresh cannot erase work.
+        let p79LastUnsavedFormInteractionAt = 0;
+        document.addEventListener('input', event => {
+            if(event.target?.matches?.('input,select,textarea,[contenteditable="true"]'))p79LastUnsavedFormInteractionAt=Date.now();
+        }, true);
+        function p79WorkhoursIsEditing(){
+            const active=document.activeElement;
+            if(active?.matches?.('input:not([type="hidden"]):not([type="button"]),select,textarea,[contenteditable="true"]') &&
+               active.getClientRects?.().length)return true;
+            if(document.querySelector('dialog[open], [aria-modal="true"]:not([hidden])'))return true;
+            if(typeof activeEditingAttendanceRecord!=='undefined' && activeEditingAttendanceRecord &&
+               document.getElementById('editRecordModal')?.getClientRects?.().length)return true;
+            return Date.now()-p79LastUnsavedFormInteractionAt<90000;
         }
-
-        function startAutoUpdateCheck() {
-            checkForAppUpdate();
-            setInterval(checkForAppUpdate, 2 * 60 * 1000);
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') checkForAppUpdate();
-            });
-            window.addEventListener('focus', checkForAppUpdate);
+        function p79ShowAppVersionNotice(latestVersion){
+            if(!latestVersion||latestVersion===APP_VERSION)return;
+            let notice=document.getElementById('p79AvailableVersionNotice');
+            if(!notice){
+                notice=document.createElement('div');
+                notice.id='p79AvailableVersionNotice';
+                notice.setAttribute('role','status');
+                notice.style.cssText='position:fixed;bottom:16px;right:16px;z-index:13000;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:min(520px,calc(100vw - 32px));padding:12px 14px;background:#eff6ff;color:#1e3a8a;border:1px solid #93c5fd;border-radius:12px;box-shadow:0 8px 25px #0002;font:700 13px system-ui';
+                const label=document.createElement('span');
+                label.textContent='網站有新版本，現有操作不會中斷。';
+                const button=document.createElement('button');
+                button.type='button';button.textContent='完成操作後更新';
+                button.style.cssText='background:#1d4ed8;color:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer;font:inherit';
+                button.onclick=()=>{
+                    if(p79WorkhoursIsEditing()){
+                        if(typeof showToast==='function')showToast('請先完成目前的編輯並移開輸入欄位，再更新網站','warning');
+                        return;
+                    }
+                    const target=new URL(location.href);
+                    target.searchParams.delete('_update_check');
+                    target.searchParams.set('v',notice.dataset.version);
+                    location.replace(target.toString());
+                };
+                notice.append(label,button);
+                document.body.appendChild(notice);
+            }
+            notice.dataset.version=latestVersion;
+        }
+        async function checkForAppUpdate(){
+            if(updateCheckInProgress||!/^https?:$/.test(location.protocol)||document.visibilityState==='hidden')return;
+            if(Date.now()-lastAppVersionCheckAt<120000)return;
+            lastAppVersionCheckAt=Date.now();
+            updateCheckInProgress=true;
+            try{
+                const checkUrl=new URL(location.href);
+                checkUrl.hash='';
+                checkUrl.searchParams.set('_update_check',Date.now());
+                const response=await fetch(checkUrl.toString(),{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+                if(!response.ok)return;
+                const match=(await response.text()).match(/const\\s+APP_VERSION\\s*=\\s*['"]([^'"]+)['"]/);
+                const latestVersion=match?match[1]:'';
+                if(latestVersion&&latestVersion!==APP_VERSION)p79ShowAppVersionNotice(latestVersion);
+                else if(latestVersion===APP_VERSION)document.getElementById('p79AvailableVersionNotice')?.remove();
+            }catch(error){console.debug('版本檢查暫時無法連線：',error);}
+            finally{updateCheckInProgress=false;}
+        }
+        function startAutoUpdateCheck(){
+            void checkForAppUpdate();
+            setInterval(checkForAppUpdate,5*60*1000);
+            document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkForAppUpdate();});
+            window.addEventListener('focus',()=>void checkForAppUpdate());
         }
 
         const DEFAULT_DEPARTMENTS = [
@@ -5047,6 +5074,7 @@ const now = new Date();
 
         async function pollAttendanceDelta(force = false) {
             if (attendanceDeltaPollBusy) return false;
+            if (p79WorkhoursIsEditing()) { scheduleAttendanceDeltaPoll(ATTENDANCE_DELTA_IDLE_MS); return false; }
             if (!p79AttendanceSyncAuthenticated()) { scheduleAttendanceDeltaPoll(60000); return false; }
             if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                 scheduleAttendanceDeltaPoll(ATTENDANCE_DELTA_HIDDEN_MS); return false;
@@ -5090,6 +5118,8 @@ const now = new Date();
 
                 const data = await fetchGasJsonWithRetry(url, '考勤即時增量', 1, 5500);
                 if (!data?.ok) throw new Error(data?.error || '考勤即時增量失敗');
+                // Do not advance the event cursor or apply cloud writes if editing started during the read.
+                if (p79WorkhoursIsEditing()) return false;
 
                 const revision = String(data.revision ?? '').trim();
                 if (revision) lastAttendanceCloudRevision = revision;
@@ -5163,7 +5193,7 @@ const now = new Date();
             }
             // 小流量檢查：只抓 ScriptProperties revision，不讀 Google Sheet。
             // 管理員與一般員工都必須檢查，否則手機管理頁與電腦管理頁會各自停在舊資料。
-            if (attendanceRevisionCheckBusy || cloudLoadPromise || cloudDirectWriteBusy > 0) return;
+            if (attendanceRevisionCheckBusy || cloudLoadPromise || cloudDirectWriteBusy > 0 || p79WorkhoursIsEditing()) return;
             if (!currentEmp) return;
             if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
             if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
@@ -5177,7 +5207,7 @@ const now = new Date();
                     + (gasUrl.includes('?') ? '&' : '?')
                     + 'action=getSyncMeta&t=' + Date.now();
                 const meta = await fetchGasJsonWithRetry(url, '同步版本', 1, 8000);
-                if (!meta?.ok) return;
+                if (!meta?.ok || p79WorkhoursIsEditing()) return;
 
                 const revision = String(meta.revision ?? '').trim();
                 if (!revision) return;
@@ -5222,7 +5252,7 @@ const now = new Date();
 
         async function handleAttendanceRevisionFromCloudStatus(revision) {
             const nextRevision = String(revision ?? '').trim();
-            if (!nextRevision || !currentEmp || cloudDirectWriteBusy > 0) return;
+            if (!nextRevision || !currentEmp || cloudDirectWriteBusy > 0 || p79WorkhoursIsEditing()) return;
             if (window.p79AttendanceDeltaEnabled) {
                 await pollAttendanceDelta(true);
                 return;
@@ -12827,27 +12857,36 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         async function p79EnsureWorkRestEvidence(month,state){
             if(state.restEvidencePending)return state.restEvidencePromise;
-            state.restEvidencePending=true;state.restEvidenceError='';
+            if(p79WorkhoursIsEditing())return;
+            state.restEvidencePending=true;
+            const evidenceRevision=lastAttendanceCloudRevision;state.restEvidenceError='';
             const token=state.token;
             try{
                 const batches=await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
                 if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
                 const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
                 state.attendanceEvidence=p79BuildWorkRestAttendance(month,{schedules:state.rows,leaveRecords:state.leaveRecords||[]},rows).attendanceEvidence;
+                state.restEvidenceRevision=evidenceRevision;state.restEvidenceLoaded=true;
                 p79OvertimeCalculationCache=null;
             }catch(error){
                 if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){state.attendanceEvidence={complete:false,days:{}};state.restEvidenceError=error?.name==='AbortError'?'無卡休假核對逾時，請重新讀取':String(error?.message||error);}
             }finally{
                 state.restEvidencePending=false;
-                if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);}
+                state.restEvidenceLoaded=true;
+                if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){
+                    if(p79WorkhoursIsEditing())p79DeferredOvertimeDisplay=true;
+                    else{clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);}
+                }
             }
         }
+        let p79DeferredOvertimeDisplay=false;
         function p79RefreshVisibleOvertimeEvidence(){
-            if(document.visibilityState!=='visible'||!document.getElementById('overtimeTableBody')?.getClientRects().length)return;
+            if(document.visibilityState!=='visible'||!document.getElementById('overtimeTableBody')?.getClientRects().length||p79WorkhoursIsEditing())return;
+            if(p79DeferredOvertimeDisplay){p79DeferredOvertimeDisplay=false;renderOvertimeStats();}
             const month=document.getElementById('overtimeMonthFilter')?.value,token=currentPort79SsoToken();
             if(!token)return;
             p79WorkOvertimeMonths.forEach((state,key)=>{
-                if(state.token===token&&state.ready&&!state.pending&&!state.restEvidencePending&&(!month||month==='ALL'||month===key)&&(!state.attendanceEvidence?.complete||Date.now()-state.attendanceEvidence.checkedAt>=60000))p79EnsureWorkRestEvidence(key,state);
+                if(state.token===token&&state.ready&&!state.pending&&!state.restEvidencePending&&(!month||month==='ALL'||month===key)&&(!state.restEvidenceLoaded||(lastAttendanceCloudRevision&&state.restEvidenceRevision!==lastAttendanceCloudRevision)))p79EnsureWorkRestEvidence(key,state);
             });
         }
         function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth=''){
@@ -12857,7 +12896,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const months=selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
             months.forEach(month=>{
                 const previous=p79WorkOvertimeMonths.get(month);
-                if(previous?.token===token&&(previous.pending||Date.now()-previous.at<(previous.ready?60000:10000)))return;
+                if(previous?.token===token){
+                    if(previous.pending)return;
+                    // A verified unchanged revision must never cause another timed full-sheet refresh.
+                    if(previous.ready&&previous.at>0&&(!lastAttendanceCloudRevision||previous.loadedCloudRevision===lastAttendanceCloudRevision))return;
+                    if(!previous.ready&&Date.now()-previous.at<10000)return;
+                }
                 const state={token,at:Date.now(),pending:true,ready:false,revision:null,rows:[],covers:[],leaveRecords:[],attendanceEvidence:null,error:'',restEvidenceError:''};p79WorkOvertimeMonths.set(month,state);
                 const load=async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
@@ -12866,7 +12910,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
                         const data=await response.json();if(response.ok===false||!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'班表申報資料讀取不完整');
                         if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
-                        state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.error='';state.at=Date.now();
+                        if(p79WorkhoursIsEditing()){state.pending=false;state.error='編輯中，已延後套用更新';state.at=Date.now();return;}
+                        state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.loadedCloudRevision=lastAttendanceCloudRevision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.error='';state.at=Date.now();
                         if(typeof window!=='undefined'&&window.P79RestAttendance){state.attendanceEvidence={complete:false,days:{}};state.restEvidencePromise=p79EnsureWorkRestEvidence(month,state);}
                         p79OvertimeCalculationCache=null;
                         clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
