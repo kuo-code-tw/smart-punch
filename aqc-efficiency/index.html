@@ -743,19 +743,20 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
     <div id="p79EfficiencyKpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <div class="card p-4"><div class="text-xs text-slate-500">現有人員</div><div id="kpiPeople" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">統計時數</div><div id="kpiHours" class="text-2xl font-black">0.0</div></div>
-      <div class="card p-4"><div class="text-xs text-slate-500">櫃數</div><div id="kpiContainers" class="text-2xl font-black">0</div></div>
+      <div class="card p-4"><div class="text-xs text-slate-500">人員作業櫃數</div><div id="kpiContainers" class="text-2xl font-black">0</div></div>
       <div class="card p-4"><div class="text-xs text-slate-500">整體效率</div><div id="kpiEfficiency" class="text-2xl font-black">0.0</div></div>
     </div>
     <div id="p79EfficiencyCumulative" class="card p-4">
       <div id="cumulativeTitle" class="font-black text-lg mb-3">🚢 全部月份累計船舶統計</div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="cumShipCount" class="text-2xl font-black">0</div><div id="cumShipCountSub" class="text-[11px] text-slate-400 mt-1"></div></div>
-        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統實際櫃數</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
+        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">船舶請款櫃數</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">艙蓋量</div><div id="cumHatches" class="text-2xl font-black">0</div><div id="cumHatchesSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">翻艙量</div><div id="cumShift" class="text-2xl font-black">0</div><div id="cumShiftSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">累計效率</div><div id="cumEfficiency" class="text-2xl font-black">0.00</div><div id="cumEfficiencySub" class="text-[11px] text-slate-400 mt-1"></div></div>
       </div>
     </div>
+    <div id="dashboardQuantityReconciliation" class="hidden card p-3"></div>
     <div id="dashboardMonthlyAudit" class="hidden rounded-2xl border p-4"></div>
 
     <div id="vesselSummaryCard" class="card p-4 hidden">
@@ -3400,6 +3401,87 @@ function renderVesselWorkingReportComparison(job){
   host.className='vessel-wr-detail audit-'+a.status;
   host.innerHTML=`<div class="vessel-wr-detail-title">${label}</div><div class="vessel-wr-values"><span>WORKING REPORT 全部司機 <b>${a.count?a.containers:'—'}</b> 櫃（${a.count} 筆）</span><span>WORKING SHEET <b>${value(a.moves)}</b> Moves</span><span>差額 <b>${a.count?signed(a.diff):'—'}</b> 櫃</span></div><div>WORKING SHEET：請款 ${value(a.bill)} ＋ SHIFT ${value(a.shift)} ＝ ${value(a.moves)}；司機櫃數依 Bundle 扣除後核對。H/C：司機 ${a.count?a.hc:'—'}／WORKING SHEET ${value(a.sheetHc)}。</div>${a.reasons.length?'<p>'+esc(a.reasons.join('；'))+'</p>':''}`;
 }
+function dashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves){
+  if(!/^\d{4}-\d{2}$/.test(String(month||'')))return null;
+  const mastersByNo=new Map((masters||[]).filter(x=>x&&String(x.workingNo||'').trim()).map(x=>[String(x.workingNo).trim(),x]));
+  const states=(jobs||[]).filter(Boolean).map(job=>{
+    const no=String(job.workingNo||'').trim();
+    const master=mastersByNo.get(no);
+    const ids=master?.workingSheetSource?.reportRecordIds;
+    const expectedIds=Array.isArray(ids)&&ids.length?new Set(ids.map(String)):null;
+    const bill=num(job.totalContainers),shift=num(job.shiftMoves);
+    const hasTotalMoves=job.totalMoves!==null&&job.totalMoves!==undefined&&String(job.totalMoves).trim()!=='';
+    return {no,vessel:String(job.vessel||'').trim(),bill,shift,moves:hasTotalMoves?num(job.totalMoves):bill+shift,
+      expectedIds,currentMoves:0,otherLoadedMoves:0,orphanMoves:0,orphanRows:[],validRows:0};
+  });
+  const stateMap=new Map(states.filter(x=>x.no).map(x=>[x.no,x]));
+  const source=canonicalOperationalRecords((sourceRows||[]).filter(x=>String(x?.source||'')==='working-report'));
+  const recordQty=r=>{const move=recordMoveValues(r);return num(move.disc)+num(move.load);};
+  source.forEach(r=>{
+    const state=stateMap.get(String(r?.workingNo||'').trim());
+    if(!state)return;
+    const qty=recordQty(r),id=String(r?.id||'');
+    const valid=!state.expectedIds||state.expectedIds.has(id);
+    const workMonth=String(r?.workDate||'').slice(0,7);
+    if(workMonth===month){
+      if(valid){state.currentMoves+=qty;state.validRows++;}
+      else{state.orphanMoves+=qty;state.orphanRows.push({id,qty});}
+    }else if(valid&&workMonth)state.otherLoadedMoves+=qty;
+  });
+  const sum=(key)=>states.reduce((value,x)=>value+num(x[key]),0);
+  const bill=sum('bill'),shift=sum('shift'),moves=sum('moves'),currentMoves=sum('currentMoves');
+  const otherMonthOrUnloaded=moves-currentMoves;
+  const staffOnlyDifference=currentMoves-num(staffMoves);
+  const orphans=states.flatMap(x=>x.orphanRows.map(r=>({no:x.no,vessel:x.vessel,...r})));
+  const shipDetails=states.map(x=>({
+    ...x,
+    missingOrUnloaded:x.moves-x.currentMoves-x.otherLoadedMoves
+  })).filter(x=>Math.abs(x.moves-x.currentMoves)>0.01||Math.abs(x.orphanMoves)>0.01||!x.expectedIds);
+  return {month,shipCount:states.length,bill,shift,moves,currentMoves,staffMoves:num(staffMoves),
+    otherMonthOrUnloaded,staffOnlyDifference,orphanMoves:sum('orphanMoves'),orphans,
+    missingIdLists:states.filter(x=>!x.expectedIds).length,otherLoadedMoves:sum('otherLoadedMoves'),
+    shipDetails};
+}
+function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves){
+  const host=document.getElementById('dashboardQuantityReconciliation');
+  if(!host)return;
+  const audit=dashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves);
+  if(!audit){host.classList.add('hidden');host.innerHTML='';return;}
+  const previouslyOpen=!!host.querySelector('details')?.open;
+  const diff=audit.staffMoves-audit.bill;
+  const fmt=v=>String(round(num(v),2));
+  const line=(label,value,note='')=>`<div class="flex flex-wrap justify-between items-baseline gap-2 py-1.5 border-b border-slate-100 last:border-0"><span>${esc(label)}${note?` <span class="text-[11px] text-slate-400">${esc(note)}</span>`:''}</span><b class="tabular-nums">${esc(fmt(value))}</b></div>`;
+  const needsReview=audit.orphans.length||audit.missingIdLists||audit.shipDetails.some(x=>Math.abs(x.missingOrUnloaded)>0.01);
+  const issueRows=audit.shipDetails.slice(0,50).map(x=>{
+    const status=!x.expectedIds?'主檔缺有效紀錄清單':Math.abs(x.missingOrUnloaded)>0.01?'跨月或未載入':'跨月已核對';
+    return `<tr class="border-t border-slate-100"><td class="p-2 whitespace-nowrap">${esc(x.no)}</td><td class="p-2">${esc(x.vessel)}</td><td class="p-2 text-right">${esc(fmt(x.moves))}</td><td class="p-2 text-right">${esc(fmt(x.currentMoves))}</td><td class="p-2 text-right">${esc(fmt(x.otherLoadedMoves))}</td><td class="p-2 text-right">${esc(fmt(x.orphanMoves))}</td><td class="p-2">${esc(status)}</td></tr>`;
+  }).join('');
+  const orphanRows=audit.orphans.slice(0,20).map(x=>`<li class="break-all">${esc(x.no)}｜${esc(x.vessel)}｜${esc(x.id)}｜${esc(fmt(x.qty))} 櫃</li>`).join('');
+  host.classList.remove('hidden');
+  host.innerHTML=`<details ${previouslyOpen?'open':''}>
+    <summary class="cursor-pointer flex flex-wrap items-center justify-between gap-2 text-sm font-black text-slate-700">
+      <span>🔍 ${esc(month)} 櫃數口徑核對（點擊展開）</span>
+      <span class="tabular-nums">人員 ${esc(fmt(audit.staffMoves))}／請款 ${esc(fmt(audit.bill))}｜差 ${esc(dashboardSignedDiff(diff))}</span>
+    </summary>
+    <div class="mt-3 text-sm text-slate-700">
+      <div class="rounded-lg bg-slate-50 p-3">
+        ${line('船舶請款櫃數',audit.bill)}
+        ${line('加：SHIFT 翻艙量',audit.shift)}
+        ${line('船舶總 Moves',audit.moves)}
+        ${line('減：非本月有效作業／尚未載入差額',-audit.otherMonthOrUnloaded,'可能包含跨月作業')}
+        ${line('本月已連結有效 WORKING REPORT',audit.currentMoves)}
+        ${line('減：未列入現職人員 KPI／其他來源差額',-audit.staffOnlyDifference)}
+        ${line('首頁人員作業櫃數',audit.staffMoves)}
+      </div>
+      <p class="mt-2 text-xs text-slate-500">兩種 KPI 依不同日期與口徑計算；差額不代表遺失櫃數。本表按完整月份核對，不受船名／碼頭等列表欄位篩選影響。只讀核對，不會刪除資料。</p>
+      ${needsReview?`<div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        待核對：${esc(audit.missingIdLists)} 艘缺有效 ID 清單，${esc(audit.orphans.length)} 筆不在船舶主檔有效 ID 清單（${esc(fmt(audit.orphanMoves))} 櫃）。跨月已讀取 ${esc(fmt(audit.otherLoadedMoves))} Moves；其他差額可能是未載入的相鄰月份資料，不可直接當成錯帳或刪除。
+      </div>`:''}
+      ${orphanRows?`<div class="mt-3 text-xs"><b>未列入主檔有效 ID 的紀錄（僅警示）</b><ul class="list-disc pl-5 mt-1 space-y-1">${orphanRows}</ul></div>`:''}
+      ${issueRows?`<div class="mt-3 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="bg-slate-100"><th class="p-2">WORKING NO</th><th class="p-2">船名</th><th class="p-2 text-right">船舶 Moves</th><th class="p-2 text-right">本月有效</th><th class="p-2 text-right">跨月已讀</th><th class="p-2 text-right">異常紀錄</th><th class="p-2">狀態</th></tr></thead><tbody>${issueRows}</tbody></table></div>`:''}
+    </div>
+  </details>`;
+}
 function renderDashboard(){
   updateDashboardRangeState();
   updateShipChangeToolbar();
@@ -3519,7 +3601,7 @@ function renderDashboard(){
   }
 
   const shipCount=allShips.length;
-  const workload=allShips.reduce((s,x)=>s+num(x.totalContainers||x.totalMoves),0);
+  const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);
   const hatchTotal=allShips.reduce((s,x)=>s+num(x.hatches),0);
   const shiftTotal=allShips.reduce((s,x)=>s+num(x.shiftMoves),0);
 
@@ -3536,6 +3618,7 @@ function renderDashboard(){
   setCum('cumHatches',hatchTotal);
   setCum('cumShift',shiftTotal);
   setCum('cumEfficiency',cumEff.toFixed(2));
+  renderDashboardQuantityReconciliation(selectedMonth,allDashboardJobs,records,shipMasters,c);
 
   // 月份已載入月報時，直接告訴使用者「月報應有 vs 系統已匯入」與缺少哪幾筆。
   // 使用未套用表格欄位篩選前的完整月份資料，避免只篩某艘船時把缺漏判斷也縮小。
