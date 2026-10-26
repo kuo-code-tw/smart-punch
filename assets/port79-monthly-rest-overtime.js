@@ -103,8 +103,28 @@ function sortRows(rows){
  const rank=r=>r.saved?2:(!r.planned&&r.status==='可申報'?0:1);
  return rows.sort((a,b)=>rank(a)-rank(b)||cats.indexOf(a.category)-cats.indexOf(b.category)||String(a.date).localeCompare(String(b.date))||String(a.name).localeCompare(String(b.name),'zh-Hant-u-co-stroke')||id(a.empId).localeCompare(id(b.empId)));
 }
+// 例／休／國只採用既有排班與雲端申報規則；不自造時數或申報紀錄。
+function workflowStage(month,asOf=today()){
+ const current=String(asOf||'').slice(0,7);
+ if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)||month>current)return {key:'audit',label:'每日盤點',canSubmit:false,canSuggest:false,tip:'尚未到該月份，只核對班表及已存資料。'};
+ if(month<current)return {key:'closing',label:'月底結算複核',canSubmit:true,canSuggest:true,tip:'重新核對全月實際出勤及已申報，未補額度須顯示原因。'};
+ const day=Number(asOf.slice(8));
+ if(day<15)return {key:'audit',label:'每日盤點（1～14日）',canSubmit:false,canSuggest:false,tip:'先核對例／休／國、請假與既有申報；15日起才產生建議。'};
+ if(day<25)return {key:'preview',label:'補報建議（15～24日）',canSubmit:false,canSuggest:true,tip:'自動建議適用日期與系統時數；25日起核對正式送出。'};
+ return {key:'submit',label:'集中核對申報（25日起）',canSubmit:true,canSuggest:true,tip:'僅可申報已完成且有完整出勤證據的日期。'};
+}
+function workflowAudit(model){
+ const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:model.rows.filter(r=>r.planned).length};
+ for(const b of model.balances){
+  const progress=reportProgress(model,b.emp.empId),parts=[];
+  for(const cat of ['例','休','國'])if(progress[cat].remaining>0){result.shortage[cat]+=progress[cat].remaining;parts.push(cat+progress[cat].remaining);}
+  if(parts.length)result.people.push(b.emp.name+'：'+parts.join('／'));
+  for(const item of b.conflicts||[])result.blocked.push(b.emp.name+' '+(item.date||'')+'：'+item.reason);
+ }
+ return result;
+}
 function plan(snapshot,people,month,rules){
- const rows=[],balances=[],issues=[],states=[],rosters=new Map((snapshot.schedules||[]).map(r=>[id(r.empId),r.schedule])),pairsByKey=new Map();
+ const workflow=workflowStage(month),rows=[],balances=[],issues=[],states=[],rosters=new Map((snapshot.schedules||[]).map(r=>[id(r.empId),r.schedule])),pairsByKey=new Map();
  for(const pair of snapshot.pairs||[]){const key=id(pair.empId)+'|'+pair.date;if(!pairsByKey.has(key))pairsByKey.set(key,[]);pairsByKey.get(key).push(pair);}
  const leaveDates=new Set(snapshot.leaveDates||[]),currentDate=today();
  const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
@@ -115,6 +135,7 @@ function plan(snapshot,people,month,rules){
   balances.push({emp,...b});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
   const candidates=[];
+  if(!workflow.canSuggest){states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});continue;}
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if((b.typhoonDates||[]).includes(date)||Number(date.slice(8))<15||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
@@ -153,8 +174,8 @@ function plan(snapshot,people,month,rules){
    }
   }
  }
- for(const state of states)for(const category of cats)for(let n=0;n<state.remaining[category];n++)issues.push(state.emp.name+'「'+category+'」尚有1天找不到可申報日期或相符時段');
- return {rows:sortRows(rows),balances,issues};
+ if(workflow.canSuggest)for(const state of states)for(const category of cats)for(let n=0;n<state.remaining[category];n++)issues.push(state.emp.name+'「'+category+'」尚有1天找不到可申報日期或相符時段');
+ return {rows:sortRows(rows),balances,issues,workflow};
 }
 function reportProgress(model,empId=null){
  const result=Object.fromEntries(cats.map(c=>[c,{remaining:0,selected:0,saved:0,after:0,over:0}]));
