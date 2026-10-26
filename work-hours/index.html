@@ -2935,7 +2935,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 checkUrl.searchParams.set('_update_check',Date.now());
                 const response=await fetch(checkUrl.toString(),{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache'}});
                 if(!response.ok)return;
-                const match=(await response.text()).match(/const\\s+APP_VERSION\\s*=\\s*['"]([^'"]+)['"]/);
+                const match=(await response.text()).match(/const\s+APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
                 const latestVersion=match?match[1]:'';
                 if(latestVersion&&latestVersion!==APP_VERSION)p79ShowAppVersionNotice(latestVersion);
                 else if(latestVersion===APP_VERSION)document.getElementById('p79AvailableVersionNotice')?.remove();
