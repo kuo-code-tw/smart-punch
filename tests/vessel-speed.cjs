@@ -43,14 +43,14 @@ function equalSummary(){
     }
     return matches.size===1;
   });
+  const completionIndex=b.shipCompletionIndex(b.shipMasters);
   const sameMonthScope=rows.every(r=>{
     if(b.range)return true;
     if(!b.month && !b.year)return true;
-    const entry=b.shipCompletionIndex(b.shipMasters).get(String(r.workingNo||'').trim());
+    const entry=completionIndex.get(String(r.workingNo||'').trim());
     const expectedMonth=entry?.month||String(r.workDate||'').slice(0,7);
     return expectedMonth===String(r.workDate||'').slice(0,7);
   });
-  const completionIndex=b.shipCompletionIndex(b.shipMasters);
   const datesAligned=b.records.every(r=>{
     const finish=completionIndex.get(String(r.workingNo||''))?.month||String(r.workDate||'').slice(0,7);
     return finish===String(r.workDate||'').slice(0,7);
