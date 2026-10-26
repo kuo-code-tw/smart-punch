@@ -544,12 +544,36 @@ body[data-p79-system="efficiency"] main{
 .p79-section{min-width:0}.p79-section>div:first-child{font-weight:900;color:#334155;padding:12px 16px;background:#f1f5f9;border-radius:14px;margin-bottom:8px}
 </style>
 <style id="p79-personnel-group-readable-type">
-#personnelGroupCards table,#personnelUnassigned table{table-layout:fixed!important;min-width:640px;width:100%}
-#personnelGroupCards th,#personnelGroupCards td,#personnelUnassigned th,#personnelUnassigned td{font-size:18px!important;text-align:center!important;vertical-align:middle!important;white-space:nowrap!important;word-break:keep-all!important;padding:14px!important;line-height:1.5!important;font-variant-numeric:tabular-nums}
-#personnelGroupCards th:nth-child(1),#personnelUnassigned th:nth-child(1){width:13%}
-#personnelGroupCards th:nth-child(2),#personnelUnassigned th:nth-child(2){width:21%}
-#personnelGroupCards th:nth-child(3),#personnelUnassigned th:nth-child(3){width:18%}
-#personnelGroupCards th:nth-child(4),#personnelGroupCards th:nth-child(5),#personnelGroupCards th:nth-child(6),#personnelUnassigned th:nth-child(4),#personnelUnassigned th:nth-child(5),#personnelUnassigned th:nth-child(6){width:16%}
+/* A~D 四組專用緊湊視圖：僅縮這四組，不影響其他系統及明細表。 */
+#personnelGroupCards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px!important;align-items:stretch}
+#personnelGroupCards>section{min-width:0}
+#personnelGroupCards .p79-group-head{padding:7px 10px!important}
+#personnelGroupCards .p79-group-head h3{font-size:15px!important;line-height:1.2!important}
+#personnelGroupCards .p79-group-head .p79-group-count{font-size:12px!important}
+#personnelGroupCards .p79-group-meta{font-size:12px!important;line-height:1.25!important;margin-top:3px!important}
+#personnelGroupCards .p79-compact-efficiency,#personnelUnassigned .p79-compact-efficiency{width:100%;min-width:0;overflow-x:auto}
+body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table,
+body[data-p79-system="efficiency"] #personnelUnassigned table.p79-group-table{width:100%!important;min-width:0!important;table-layout:fixed!important;border-spacing:0!important}
+body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table th,
+body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table td,
+body[data-p79-system="efficiency"] #personnelUnassigned table.p79-group-table th,
+body[data-p79-system="efficiency"] #personnelUnassigned table.p79-group-table td{
+  font-size:12px!important;text-align:center!important;vertical-align:middle!important;
+  white-space:nowrap!important;word-break:keep-all!important;padding:4px 2px!important;
+  line-height:1.2!important;height:27px!important;font-variant-numeric:tabular-nums
+}
+#personnelGroupCards .p79-group-table td:nth-child(1),
+#personnelUnassigned .p79-group-table td:nth-child(1){font-weight:800;color:#315d84}
+@media(min-width:980px){#personnelGroupCards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){
+  body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table,
+  body[data-p79-system="efficiency"] #personnelUnassigned table.p79-group-table{min-width:435px!important}
+}
+@media(min-width:980px) and (max-height:840px){
+  body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table th,
+  body[data-p79-system="efficiency"] #personnelGroupCards table.p79-group-table td{height:24px!important;padding:3px 2px!important;font-size:11px!important}
+  #personnelGroupCards .p79-group-head{padding:5px 9px!important}
+}
 </style>
 <style id="p79-vessel-workspace-design">
 body[data-p79-system="efficiency"]{font-family:"Microsoft JhengHei","PingFang TC",sans-serif!important;background:#edf3f8!important;color:#18324c}
@@ -6838,20 +6862,20 @@ function renderPersonnelGroupCards(persons){
   const box=document.getElementById('personnelGroupCards');if(!box)return;
   const groups={A:[],B:[],C:[],D:[]},unassigned=[];
   for(const person of persons){const code=personnelGroupCode(person.group);if(code)groups[code].push(person);else unassigned.push(person);}
-  const rows=list=>rankedPersonnelEfficiencyPersons(list).map(p=>`<tr style="height:34px!important">
-    <td class="font-black text-indigo-700" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.effRank===null?'—':'第'+p.effRank+'名'}</td>
-    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(p.empId||"未提供")}</td>
-    <td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${esc(displayPersonName(p.name))}</td>
-    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours.toFixed(2)}</td>
-    <td class="font-semibold" style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important" title="卸船 ${p.disc}｜裝船 ${p.load}｜H/C ${p.hc}｜${p.rows.length} 筆">${p.containers}</td>
-    <td style="padding:6px 8px!important;height:34px!important;font-size:13px!important;line-height:1.35!important">${p.hours>0?p.eff.toFixed(2):'—'}</td>
+  const rows=list=>rankedPersonnelEfficiencyPersons(list).map(p=>`<tr>
+    <td class="p79-rank" title="${p.effRank===null?'無有效時數':'效率第'+p.effRank+'名'}">${p.effRank===null?'—':'第'+p.effRank+'名'}</td>
+    <td>${esc(p.empId||"未提供")}</td>
+    <td class="font-semibold">${esc(displayPersonName(p.name))}</td>
+    <td>${p.hours.toFixed(2)}</td>
+    <td class="font-semibold" title="卸船 ${p.disc}｜裝船 ${p.load}｜H/C ${p.hc}｜${p.rows.length} 筆">${p.containers}</td>
+    <td>${p.hours>0?p.eff.toFixed(2):'—'}</td>
   </tr>`).join('');
-  const table=list=>`<div class="p79-compact-efficiency overflow-x-auto"><table class="tbl w-full text-center" style="width:100%;table-layout:fixed;font-size:13px;line-height:1.35"><colgroup><col style="width:13%"><col style="width:21%"><col style="width:18%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup><thead><tr style="height:34px!important"><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">效率排名</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">工號</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">姓名</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">時數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">櫃數</th><th style="padding:6px 8px!important;height:34px!important;font-size:13px!important">效率</th></tr></thead><tbody>${rows(list)||'<tr><td colspan="6" class="p-2 text-slate-400">此期間沒有作業紀錄</td></tr>'}</tbody></table></div>`;
+  const table=list=>`<div class="p79-compact-efficiency"><table class="tbl p79-group-table w-full text-center"><colgroup><col style="width:10%"><col style="width:24%"><col style="width:17%"><col style="width:15%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th title="效率排名">名次</th><th>工號</th><th>姓名</th><th>時數</th><th>櫃數</th><th>效率</th></tr></thead><tbody>${rows(list)||'<tr><td colspan="6" class="p-2 text-slate-400">此期間沒有作業紀錄</td></tr>'}</tbody></table></div>`;
   const colors={A:'border-indigo-200 bg-indigo-50',B:'border-emerald-200 bg-emerald-50',C:'border-amber-200 bg-amber-50',D:'border-rose-200 bg-rose-50'};
   if(!document.getElementById('p79CompactEfficiencyStyle')){const style=document.createElement('style');style.id='p79CompactEfficiencyStyle';style.textContent='';document.head.appendChild(style);}
   box.innerHTML=Object.entries(groups).map(([code,list])=>{
     const hours=list.reduce((v,p)=>v+p.hours,0),containers=list.reduce((v,p)=>v+p.containers,0),hc=list.reduce((v,p)=>v+p.hc,0),count=list.length;
-    return `<section class="rounded-2xl border ${colors[code]} overflow-hidden" aria-label="${code}組"><div class="p-3"><div class="flex justify-between items-center"><h3 class="font-black text-lg">${code}組</h3><span class="text-sm">${count} 人</span></div><div class="text-xs text-slate-600 mt-1">${containers} 櫃・${hours.toFixed(2)} 小時・效率 ${hours>0?((containers+hc)/hours).toFixed(2):'—'}</div></div>${table(list)}</section>`;
+    return `<section class="rounded-xl border ${colors[code]} overflow-hidden" aria-label="${code}組"><div class="p79-group-head"><div class="flex justify-between items-center"><h3 class="font-black">${code}組</h3><span class="p79-group-count">${count} 人</span></div><div class="p79-group-meta text-slate-600">${containers} 櫃・${hours.toFixed(2)} 小時・效率 ${hours>0?((containers+hc)/hours).toFixed(2):'—'}</div></div>${table(list)}</section>`;
   }).join('');
   const other=document.getElementById('personnelUnassigned');
   if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-2"><div class="font-bold text-amber-800 text-xs mb-2">組別待核對（${unassigned.length} 人，含未載入或未對應排班）</div>${table(unassigned)}</div>`:'';
