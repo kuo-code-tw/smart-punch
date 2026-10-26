@@ -16,7 +16,7 @@ assert(versionStart>=0&&versionEnd>versionStart);
 const handlers={},elements=new Map(),replaced=[],messages=[];
 let active=null,currentServerVersion='2026.10.26.117',requestCount=0;
 function element(tag){
- return {tag,dataset:{},style:{},children:[],getClientRects:()=>[1],matches:()=>false,
+ return {tag,dataset:{},style:{},children:[],getClientRects:()=>[1],matches:()=>false,setAttribute(){},
   append(...nodes){this.children.push(...nodes);if(this.id)elements.set(this.id,this);},
   remove(){elements.delete(this.id);}};
 }
