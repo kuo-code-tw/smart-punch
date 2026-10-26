@@ -90,6 +90,18 @@ vm.createContext(ctx);vm.runInContext(html.slice(versionStart,versionEnd),ctx);
  fixtures.p79LoadWorkOvertimeMonths([]);
  await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
  assert.equal(refreshes,3,'deferred cloud revision should load after editing stops');
+ // Editing can start after a fetch begins; its eventual response must not replace the last safe snapshot.
+ const verifiedState=fixtures.p79WorkOvertimeMonths.get('2026-10');
+ let resolveHeld;revision='r4';fixtures.lastAttendanceCloudRevision='r4';
+ fixtures.fetch=async()=>{refreshes++;await new Promise(resolve=>{resolveHeld=resolve});return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
+ fixtures.p79LoadWorkOvertimeMonths([]);
+ const heldState=fixtures.p79WorkOvertimeMonths.get('2026-10');
+ editing=true;resolveHeld();await heldState.promise;
+ assert.equal(fixtures.p79WorkOvertimeMonths.get('2026-10'),verifiedState,'edit started in flight should restore last verified snapshot');
+ editing=false;fixtures.fetch=async()=>{refreshes++;return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
+ fixtures.p79LoadWorkOvertimeMonths([]);
+ await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
+ assert.equal(refreshes,5,'deferred in-flight revision can be fetched after editor closes');
 
  let evidenceReads=0;
  const visible={Date,document:{visibilityState:'visible',getElementById:()=>({getClientRects:()=>[1],value:'2026-10'})},
