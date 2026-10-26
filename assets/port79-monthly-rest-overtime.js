@@ -68,6 +68,14 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   }
   // Only a non-revoked cloud report ID proves a formal overtime report.
   // Legacy overtime/restQuotaOvertime flags do not prove a pending report or reserve quota.
+  // 有報單但仍缺完整出勤，先保留唯一額度為待核對，絕不能重報同一天。
+  if(verified&&actual==='rest'){
+   reserved[r.category]++;
+   ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,
+     statusNote:'已申報但未核對到完整出勤；保留原申報、待核對'});
+   conflicts.push({date:d,reportId:r.id,reason:'已有正式申報編號但尚無完整打卡；不得重報，請核對打卡與班表'});
+   continue;
+  }
   if(verified&&actual!=='rest'){
    reported[r.category]++;
    const stalePlanned=r.planned===true&&d<today();
@@ -97,7 +105,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest')extraRestDates.push(d);
-   if(verified&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，正式申報保留待核對，不列有效加班'});
+
   }
  }
  // Supplement the shared schedule allocation with actual, non-leave no-card days.
@@ -208,7 +216,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／代班加班（不計例休國額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+
