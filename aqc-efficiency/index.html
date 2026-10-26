@@ -3458,7 +3458,7 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
   }).join('');
   const orphanRows=audit.orphans.slice(0,20).map(x=>`<li class="break-all">${esc(x.no)}｜${esc(x.vessel)}｜${esc(x.id)}｜${esc(fmt(x.qty))} 櫃</li>`).join('');
   host.classList.remove('hidden');
-  host.innerHTML=`<details ${previouslyOpen?'open':''}>
+  host.innerHTML=`<details id="dashboardQuantityReconciliationDetails" ${previouslyOpen?'open':''}>
     <summary class="cursor-pointer flex flex-wrap items-center justify-between gap-2 text-sm font-black text-slate-700">
       <span>🔍 ${esc(month)} 櫃數口徑核對（點擊展開）</span>
       <span class="tabular-nums">人員 ${esc(fmt(audit.staffMoves))}／請款 ${esc(fmt(audit.bill))}｜差 ${esc(dashboardSignedDiff(diff))}</span>
