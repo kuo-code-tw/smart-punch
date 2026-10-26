@@ -42,10 +42,13 @@ assert.equal(summary.unknown,1,'no exact per-day distribution for partial cross-
 assert.equal(summary.byTitle.get('AQC').unknown,true);
 const section=html.slice(html.indexOf('<details id="p79OvertimeJobTitleSummary"'),html.indexOf('</details>',html.indexOf('<details id="p79OvertimeJobTitleSummary"')));
 const headers=(section.match(/<th class="p-2[^"]*">/g)||[]).length;
-assert.equal(headers,7,'seven columns after removing both converted-hour columns and adding leave days');
+assert.equal(headers,5,'five columns: job title, staff, leave days, raw overtime hours, per-person average');
 assert(section.includes('>總人數</th>')&&section.includes('>請假天數</th>'));
+assert(section.includes('>未換算加班（小時）</th>')&&section.includes('>每人平均</th>'));
+assert(!section.includes('>已申報人數</th>')&&!section.includes('>有效筆數</th>'));
+assert(!section.includes('>每人平均分擔（小時）</th>'));
 assert(!section.includes('>換算合計（小時）</th>')&&!section.includes('>每人平均分擔換算（小時）</th>'));
 assert(html.includes('monthRosterState?.ready')&&html.includes('p79BuildOvertimeTitleLeaveDays('),'leave data must use verified cloud roster');
-assert(html.includes("'<td class=\"p-2 text-right\">'+(g.jobTitle==='全部職稱合計'"),'approved leave must display per role and in totals');
-assert(html.includes('colspan="7"'),'empty state column span must match');
-console.log('PASS job-title leave days: staff including non-overtime, approved only, duplicate id, month overlap, half day, unknown cloud/cross-month, table columns');
+assert(html.includes("'<td class=\"p-2 text-right p79-job-leave\">'+(g.jobTitle==='全部職稱合計'"),'approved leave must display per role and in totals');
+assert(html.includes('colspan="5"'),'empty state column span must match');
+console.log('PASS job-title leave days and five-column table: staff including non-overtime, approved only, duplicate id, month overlap, half day, unknown cloud/cross-month');
