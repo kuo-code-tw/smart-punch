@@ -4,8 +4,9 @@ const css=fs.readFileSync('assets/port79-seven-top.css','utf8');
 const keys=['attendance','workhours','leave','schedule','efficiency','hr','history'];
 assert(js.includes('<span class="p79-sys-icon" aria-hidden="true">${META[k]?.[0]'), 'all system status pills must show their own icon');
 assert(js.includes('<span class="p79-sys-state">● 待命</span>'),'status should have a dedicated element');
-assert(!js.includes('p79ComputerSync'),'removed computer cache center must not return');
-assert(!js.includes('Port79DataCache'),'obsolete cache API must not return');
+assert(js.includes("icon.className='p79-sys-icon'"),'computer status must use same icon layout');
+assert(js.includes("text.className='p79-sys-state'"),'computer text must use same state styling');
+assert.equal((js.match(/button.querySelector\('span'\)/g)||[]).length,0,'computer update must never overwrite the icon');
 assert.equal((js.match(/el.querySelector\('span'\)/g)||[]).length,0,'cloud updates must never overwrite the icon');
 for(const selector of ['#p79SevenStatus .sys .p79-sys-icon','#p79SevenStatus .sys .p79-sys-state','#p79SevenStatus .sys b'])assert(css.includes(selector),'common text/icon style missing: '+selector);
 const start=js.indexOf('function render(data){'),end=js.indexOf('async function poll()',start);
@@ -18,4 +19,4 @@ assert.equal(nodes.attendance.state.textContent,'● 讀取中');
 assert.equal(nodes.workhours.state.textContent,'● 被動待命');
 assert.equal(nodes.schedule.state.textContent,'● 工作完成');
 for(const key of keys){assert.equal(nodes[key].icon,'ICON-'+key,'icon unchanged for '+key);assert.equal(nodes[key].bold,'NAME-'+key,'name unchanged for '+key);assert(nodes[key].state.textContent.startsWith('● '));}
-console.log('PASS seven cloud-only status lights: icons remain intact during idle, busy, and done state changes');
+console.log('PASS seven status lights: matching computer style, icons remain intact during cloud-state changes, idle/busy/done behavior');

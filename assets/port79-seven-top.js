@@ -244,6 +244,7 @@ async function runAction(sys,a){closeMenu();try{
  if(a==='workflow')return openWorkflow(sys);
  if(a==='overtime-options')return await window.P79Overtime?.openRules?.();
  if(a==='global-theme')return toggleGlobalTheme();
+ if(a==='data-cache')return window.Port79DataCache?.openCenter?.();
  if(a==='year'){
    if(typeof window.p79ToggleYearModeFromMenu==='function')return window.p79ToggleYearModeFromMenu();
    const k='port79_year_mode';try{localStorage.setItem(k,localStorage.getItem(k)==='roc'?'gregorian':'roc')}catch(e){}location.reload();return;
@@ -317,7 +318,7 @@ function buildMenu(sys){
   ['權限管理',['permissions','leave-edit']],
   ['紀錄查詢',['stats','overtime-summary','overtime-application','project-bonus','overtime-print','overtime-policy','logs','attendance-compare','compare']],
   ['操作說明',['workflow']],
-  ['進階工具',['clearDeleted']],
+  ['進階工具',['clearDeleted','data-cache']],
   ['顯示設定',['year','global-theme']],
   ['登出系統',['logout-system']]
  ];
@@ -332,11 +333,12 @@ function buildMenu(sys){
    menu.appendChild(b);
  }
  GROUPS.forEach(([heading,actions])=>{
-   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['workflow','global-theme','logout-system'].includes(a)));
+   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['workflow','data-cache','global-theme','logout-system'].includes(a)));
    if(!included.length)return;
    const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
    included.forEach(a=>{
      if(a==='workflow')addAction(a,'📖 操作流程','common');
+     else if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
      else if(a==='global-theme')addAction(a,'🌙 全系統顯示模式','common theme');
      else if(a==='logout-system')addAction(a,'↪ 登出系統','danger');
      else {const [,label,cls]=items.get(a);addAction(a,sys==='schedule'&&a==='schedule-lock'?scheduleLockMenuLabel():label,cls)}
@@ -449,6 +451,7 @@ function mount(){
  if(existing){
    ensureStandardMenu(sys);
    applyGlobalTheme(savedGlobalTheme(),{save:false});
+   ensureCacheButtonInLegacyMenus();
    return;
  }
  const root=document.createElement('div');root.id='p79SevenTop';
@@ -460,6 +463,54 @@ function mount(){
  applyGlobalTheme(savedGlobalTheme(),{save:false});
 }
 
+function ensureCacheButtonInLegacyMenus(){
+ const selectors=['#p79SystemMenu','#p79HrSystemMenu','#p79UnifiedMenu','#attendanceDrawer','#p79UnifiedShell .p79u-actions','#p79HrShellV103 .p79v103-menu'];
+ selectors.forEach(sel=>{
+   const menu=document.querySelector(sel);
+   if(!menu)return;
+   if(menu.querySelector('[data-p79-cache-center-legacy="1"]'))return;
+   const btn=document.createElement('button');
+   btn.type='button';
+   btn.dataset.p79CacheCenterLegacy='1';
+   btn.className='p79-cache-center-legacy-btn';
+   btn.textContent='☁️ 資料快取中心';
+   btn.addEventListener('click',()=>{
+     try{window.Port79DataCache?.openCenter?.()}catch(e){console.error(e)}
+   });
+   const buttons=[...menu.querySelectorAll('button')];
+   const theme=buttons.find(b=>/全系統顯示模式|深淺色|亮色|暗色/.test(String(b.textContent||'')));
+   if(theme)menu.insertBefore(btn,theme); else menu.appendChild(btn);
+ });
+}
+
+function computerSyncModel(status={}){
+ const state=status.state||'idle',colors={done:'#86efac',busy:'#93c5fd',permission:'#fdba74',error:'#fca5a5',idle:'#cbd5e1'},dots={done:'●',busy:'●',permission:'●',error:'●',idle:'●'};
+ const saved=status.savedAt?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(status.savedAt)):'';
+ const label=(dots[state]||dots.idle)+' '+(status.label||'檢查中')+(state==='done'&&saved?' '+saved:'');
+ const detail=[status.folder?'資料夾：'+status.folder:'',status.savedAt?'最近成功保存：'+new Date(status.savedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'',status.error||'','點擊開啟資料快取中心'].filter(Boolean).join('｜');
+ return {state,label,color:colors[state]||colors.idle,detail};
+}
+let computerSyncBusy=false;
+async function refreshComputerSync(){
+ const host=document.getElementById('p79SevenStatus');if(!host||document.visibilityState==='hidden'||isAttendancePunchOnly()||computerSyncBusy)return;
+ let button=document.getElementById('p79ComputerSync');
+ if(!button){
+  button=document.createElement('button');button.id='p79ComputerSync';button.type='button';button.className='sys';
+  button.style.cssText='font:inherit;cursor:pointer;color:inherit';
+  const icon=document.createElement('span');icon.className='p79-sys-icon';icon.textContent='💻';icon.setAttribute('aria-hidden','true');
+  const name=document.createElement('b');name.textContent='電腦';const text=document.createElement('span');text.className='p79-sys-state';text.textContent='⚪ 檢查中';text.setAttribute('aria-live','polite');button.appendChild(icon);button.appendChild(name);button.appendChild(text);
+  button.addEventListener('click',()=>window.Port79DataCache?.openCenter?.());host.insertBefore(button,host.querySelector('[data-sys]'));
+ }
+ computerSyncBusy=true;
+ try{
+  const api=window.Port79DataCache;
+  const status=api?.getFolderSyncStatus?await api.getFolderSyncStatus():{state:'idle',label:'待載入資料夾狀態'};
+  const model=computerSyncModel(status),text=button.querySelector('.p79-sys-state');
+  button.dataset.state=model.state;button.title=model.detail;button.setAttribute('aria-label','電腦資料夾：'+model.label+'；'+model.detail);
+  if(text.textContent!==model.label)text.textContent=model.label;text.style.color=model.color;
+ }catch(_){const text=button.querySelector('.p79-sys-state');text.textContent='🔴 狀態讀取失敗';text.style.color='#fca5a5';button.dataset.state='error';}
+ finally{computerSyncBusy=false;}
+}
 function render(data){
  const systems={...(data?.systems||{})};
  if(!systems.workhours)systems.workhours={active:[],passive:true};
@@ -481,7 +532,7 @@ function render(data){
  });
 }
 async function poll(){if(isAttendancePunchOnly()||statusBusy||document.visibilityState==='hidden')return;const url=gasUrl();if(!url)return;statusBusy=true;let ctrl,to;try{ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),4500);const r=await fetch(url+(url.includes('?')?'&':'?')+'action=getCloudActivity&_='+Date.now(),{cache:'no-store',signal:ctrl.signal});const d=await r.json();if(d?.ok)render(d)}catch(e){}finally{if(to)clearTimeout(to);statusBusy=false}}
-function start(){mount();syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
+function start(){mount();refreshComputerSync();setInterval(refreshComputerSync,60000);window.addEventListener?.('p79-folder-sync-changed',refreshComputerSync);window.addEventListener?.('focus',refreshComputerSync);syncPermissionNavigation();setInterval(syncPermissionNavigation,1000);syncPunchOnlyNavigation();if(currentSystem()==='attendance')setInterval(syncPunchOnlyNavigation,1500);applyAttendanceMenuLayout();applyAttendanceAuditCompactLayout();setTimeout(applyAttendanceMenuLayout,300);setTimeout(applyAttendanceMenuLayout,1500);setTimeout(applyAttendanceAuditCompactLayout,300);setTimeout(applyAttendanceAuditCompactLayout,1500);ensureCacheButtonInLegacyMenus();setTimeout(ensureCacheButtonInLegacyMenus,300);setTimeout(ensureCacheButtonInLegacyMenus,1500);poll();statusTimer=setInterval(()=>{if(document.visibilityState==='visible')poll()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(start,20),{once:true});else setTimeout(start,20);
 })();
 

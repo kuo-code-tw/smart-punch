@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "cacheEnabled": true,
+  "storage": "IndexedDB",
+  "database": "port79-system-cache-v1",
+  "networkGraceMs": 900,
+  "fallbackMaxAgeMinutes": 10,
+  "systems": [
+    "attendance",
+    "workhours",
+    "leave",
+    "schedule",
+    "efficiency",
+    "hr",
+    "history"
+  ],
+  "note": "Do not store employee or attendance raw data in this public GitHub folder. Runtime cache is stored in each browser's IndexedDB."
+}

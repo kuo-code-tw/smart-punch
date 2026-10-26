@@ -12,6 +12,6 @@ const {createReader,createRunner}=require('../assets/port79-full-refresh.js');
  for(const run of [async()=>false,async()=>{throw Error('network');}]){events=[];fresh=[];assert.equal(await createRunner({check(){},run,notify:s=>events.push(s),setFresh:v=>fresh.push(v)})(),false);assert.ok(!events.includes('success'));assert.equal(fresh.at(-1),false);}
  let began=false;assert.equal(await createRunner({check(){throw Error('尚未儲存');},run:async()=>{began=true;return true;}})(),false);assert.equal(began,false);
  for(const page of ['attendance','work-hours','leave','schedule','aqc-efficiency','hr','history-data']){const html=fs.readFileSync(require('path').join(__dirname,'../'+page+'/index.html'),'utf8');assert.match(html,/port79-full-refresh\.js\?v=/);for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/\bsrc=|application\/ld\+json/.test(m[1]))new vm.Script(m[2]);}}
- assert(!fs.existsSync(require('path').join(__dirname,'../assets/port79-data-cache.js')));
+ const cache=fs.readFileSync(require('path').join(__dirname,'../assets/port79-data-cache.js'),'utf8');assert.match(cache,/P79FullRefreshRunning===true/);
  console.log('PASS seven live pages wired; real no-cache authenticated GET reads; rejects stale sessions, cached/error replies and wrong origins; timeout, repeated clicks, pending edits and false success handling');
 })().catch(e=>{console.error(e);process.exitCode=1;});

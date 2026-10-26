@@ -7,12 +7,16 @@ function invalidResponse(text,status){
  return failure('service','雲端暫時回傳錯誤網頁，未取得完整歷史資料；請稍後重新讀取。',true);
 }
 async function read(url,options){
- const opt=options||{},request=opt.fetch||g.fetch.bind(g),timeout=opt.timeoutMs||90000;
+ const opt=options||{},request=opt.fetch||g.fetch.bind(g),timeout=opt.timeoutMs||90000,forceCloud=opt.forceCloud===true;
+ if(!forceCloud&&g.Port79DataCache?.getHistoryPreview){
+  const cached=await Promise.race([g.Port79DataCache.getHistoryPreview(url).catch(()=>null),new Promise(resolve=>setTimeout(()=>resolve(null),150))]);
+  if(cached)return cached;
+ }
  for(let attempt=0;attempt<2;attempt++){
-  const controller=new AbortController();let timer=0;
+  const controller=forceCloud?new AbortController():null;let timer=0;
   try{
    const target=new URL(url);target.searchParams.set('_',Date.now()+'-'+attempt);
-   const init={method:'GET',cache:'no-store',redirect:'follow'};
+   const init={method:'GET',cache:forceCloud?'no-store':'default',redirect:'follow'};
    if(controller)init.signal=controller.signal;
    const operation=(async()=>{
     const response=await request(target.toString(),init);
