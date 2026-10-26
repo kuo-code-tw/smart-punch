@@ -4850,7 +4850,7 @@ const now = new Date();
 
             // v7.37：新手機／清除瀏覽器資料後 sysConfig.gasUrl 可能還是空的，
             // 但 getActiveGasUrl() 仍可取得程式內建正式 GAS URL。不可因此跳過員工主檔同步。
-            void 
+            // Shared startup cache preview removed; load cloud data directly.
             const startupGasUrl = getActiveGasUrl();
             if (isValidGasWebAppUrl(startupGasUrl)) {
                 sysConfig.gasUrl = startupGasUrl;
