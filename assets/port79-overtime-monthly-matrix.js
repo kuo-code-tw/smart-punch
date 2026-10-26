@@ -185,6 +185,16 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '@media(max-width:1100px){#p79MonthlyMatrix .mm-filter-card{grid-template-columns:1fr}#p79MonthlyMatrix .mm-form-grid{grid-column:1;grid-row:auto}#p79MonthlyMatrix .mm-actions{grid-column:1;grid-row:auto;justify-content:flex-start}#p79MonthlyMatrix .mm-advanced{grid-column:1}}',
  '@media(max-width:850px){#p79MonthlyMatrix .mm-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}',
  '@media(max-width:520px){#p79MonthlyMatrix .mm-form-grid{grid-template-columns:1fr}#p79MonthlyMatrix .mm-actions{flex-wrap:wrap}#p79MonthlyMatrix .mm-filter-card{padding:10px}#p79MonthlyMatrix .mm-body{padding:8px!important}}',
+ '#p79MonthlyMatrix .mm-advanced-inline{display:block;grid-column:1/-1;margin:0;padding:5px 0 0;border-top:1px solid #e7edf5}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-advanced-content{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-advanced-panel{display:flex;align-items:center;gap:8px;padding:3px 6px;background:transparent;border:0;flex-wrap:wrap}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-panel-label{margin:0;white-space:nowrap;font-size:11px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-panel-help{display:none}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options{gap:3px 9px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options label,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options label{padding:2px;font-size:11px;white-space:nowrap;gap:4px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options input,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options input{width:14px;height:14px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-display-options{flex-direction:row;flex-wrap:wrap;gap:6px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-company-settings{display:none}',
  '@media(prefers-reduced-motion:reduce){#p79MonthlyMatrix .mm-progress:before,#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:none}}'
  ].join('');
  dialog.querySelector('style').insertAdjacentHTML('afterend','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
@@ -203,8 +213,8 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  mmActions.appendChild(mmClearButton);
  const mmHint=document.createElement('span');mmHint.className='mm-actions-hint';mmHint.textContent='條件更動後，按「重新載入統計」取得最新資料';
  mmActions.appendChild(mmHint);mmCard.appendChild(mmActions);
- const mmAdvanced=document.createElement('details');mmAdvanced.className='mm-advanced';
- mmAdvanced.innerHTML='<summary>進階篩選與顯示設定</summary>';
+ const mmAdvanced=document.createElement('div');mmAdvanced.className='mm-advanced mm-advanced-inline';
+ mmAdvanced.setAttribute('aria-label','職稱篩選與報表顯示');
  const mmAdvancedContent=document.createElement('div');mmAdvancedContent.className='mm-advanced-content';
  const mmJobs=document.createElement('div');mmJobs.className='mm-advanced-panel';
  mmJobs.innerHTML='<div class="mm-panel-label">職稱篩選（可複選）</div><div class="mm-panel-help">不勾選表示全部職稱</div>';
