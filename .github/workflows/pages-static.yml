@@ -3,6 +3,21 @@ name: Publish static site to GitHub Pages
 on:
   push:
     branches: [main]
+    # Publish only when production site files change. Test/docs-only commits are checked
+    # by other workflows (or the next site publish), not deployed to users.
+    paths:
+      - 'index.html'
+      - 'port79-attendance-core.js'
+      - 'assets/**'
+      - 'attendance/**'
+      - 'leave/**'
+      - 'schedule/**'
+      - 'work-hours/**'
+      - 'aqc-efficiency/**'
+      - 'hr/**'
+      - 'history-data/**'
+      - 'data-cache/**'
+      - '.github/workflows/pages-static.yml'
   workflow_dispatch:
 
 permissions:
