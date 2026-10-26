@@ -58,7 +58,7 @@ function run(){
   assert.deepEqual(records.map(x=>x.disc),[116,381,61,710,102,19818],'Read-only reconciliation must never mutate data');
   ctx.renderDashboardQuantityReconciliation('2026-10',jobs,records,masters,21086);
   assert.equal(host.visible,true);
-  assert(host.innerHTML.includes('20')===false||host.innerHTML.includes('20909'));
+  assert(host.innerHTML.includes('21086'),'Overview must show 21086 driver and ship Moves');
   assert(host.innerHTML.includes('21086'));
   assert(host.innerHTML.includes('102'));
   assert(host.innerHTML.includes('b-stale'));
