@@ -13,7 +13,7 @@ const ctx={
   dashboardDateRange:()=>({active:false}),
   dateWithinDashboardRange:d=>d>='2026-10-01'&&d<='2026-10-31',
   people:()=>current,
-  normalizePersonName:s=>String(s||'').replace(/[（(]\\s*AQC\\s*[)）]/ig,'').replace(/\\s+/g,''),
+  normalizePersonName:s=>String(s||'').replace(/[（(]\s*AQC\s*[)）]/ig,'').replace(/\s+/g,''),
   canonicalOperationalRecords:rs=>rs,
   personGroupId:()=> 'A',
   effectiveHours:r=>r.timeHours,
@@ -47,6 +47,6 @@ nodes.filterMonth.value='2026-10';
 ctx.records=[...rows,mk('EMP-A','現職甲',5,'2026-10-23',{empId:'NAME:現職甲'})];
 assert.equal(ctx.summaryRows().find(x=>x.name==='現職甲').containers,48,'Pseudo-ID for present person must resolve by name');
 nodes.filterMonth.value='';
-assert.equal(ctx.summaryRows().reduce((n,x)=>n+x.containers,0),123,'Yearly record totals include former staff without prior-year leakage');
-for(const match of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
+assert.equal(ctx.summaryRows().reduce((n,x)=>n+x.containers,0),128,'Yearly record totals include former staff without prior-year leakage');
+for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
 console.log(JSON.stringify({passed:12,failed:0,scope:'Former AQC employee nine moves, current headcount isolation, de-dup identity matching, month/year scopes and no writes'}));
