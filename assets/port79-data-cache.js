@@ -569,20 +569,21 @@ async function showStartupPreview(options){
  heading.textContent=SYSTEM_LABELS[system]+' · 本機快取預覽';card.appendChild(heading);
  const content=document.createElement('div');
  if(compactPreview){
-  card.style.padding='10px 14px';
+  card.style.padding=hrCompact?'7px 10px':'10px 14px';
   card.style.boxSizing='border-box';
   if(hrCompact){
    card.className='p79-hr-cache-compact';
    card.style.width='100%';
-   card.style.maxWidth='840px';
+   card.style.maxWidth='600px';
   }
   heading.style.margin='0';
+  if(hrCompact){heading.style.fontSize='12px';heading.style.lineHeight='1.35';}
   const toggle=document.createElement('button');
   toggle.type='button';
   content.id='p79StartupCacheContent';
   toggle.setAttribute('aria-controls',content.id);
   toggle.setAttribute('aria-expanded','false');
-  toggle.style.cssText='border:0;background:transparent;color:inherit;font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;width:100%;padding:3px 0;white-space:normal;overflow-wrap:anywhere';
+  toggle.style.cssText='border:0;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:left;width:100%;padding:3px 0;white-space:normal;overflow-wrap:anywhere';
   const label=SYSTEM_LABELS[system]+'・本機快取預覽';
   const toggleLabel=collapsed=>hrCompact
    ?(collapsed?'▸ '+label+'（'+model.rows.length+' 筆・雲端同步中，點擊展開）':'▾ '+label+'（點擊收合）')
@@ -595,23 +596,35 @@ async function showStartupPreview(options){
    toggle.setAttribute('aria-expanded',String(!content.hidden));
    toggle.textContent=toggleLabel(content.hidden);
   });
-  if(hrCompact)content.style.paddingTop='10px';
+  if(hrCompact)content.style.paddingTop='6px';
  }
  card.appendChild(content);
  const previewBody=compactPreview?content:card;
- const status=document.createElement('p');status.setAttribute('role','status');status.style.cssText='font-size:12px;margin:0 0 10px';status.textContent=fmtTime(row.savedAt)+'｜'+(model.label||'')+'｜唯讀；正在讀取雲端最新資料。';previewBody.appendChild(status);
- const scroller=document.createElement('div');scroller.style.cssText=hrCompact?'max-height:220px;max-width:100%;overflow-y:auto;overflow-x:hidden':'max-height:320px;overflow:auto';
- const table=document.createElement('table');table.style.cssText=hrCompact?'width:100%;max-width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:12px;background:white;color:#0f172a':'width:100%;border-collapse:collapse;font-size:13px;background:white;color:#0f172a';
+ const status=document.createElement('p');status.setAttribute('role','status');status.style.cssText=hrCompact?'font-size:10px!important;line-height:1.4;margin:0 0 6px':'font-size:12px;margin:0 0 10px';status.textContent=fmtTime(row.savedAt)+'｜'+(model.label||'')+'｜唯讀；正在讀取雲端最新資料。';previewBody.appendChild(status);
+ const scroller=document.createElement('div');scroller.style.cssText=hrCompact?'max-height:145px;max-width:100%;overflow-y:auto;overflow-x:hidden':'max-height:320px;overflow:auto';
+ const table=document.createElement('table');table.style.cssText=hrCompact?'width:100%;max-width:100%;min-width:0!important;table-layout:fixed;border-collapse:collapse;font-size:11px!important;line-height:1.25;background:white;color:#0f172a':'width:100%;border-collapse:collapse;font-size:13px;background:white;color:#0f172a';
  const head=document.createElement('thead'),tr=document.createElement('tr');
- for(const title of model.columns){const cell=document.createElement('th');cell.textContent=title;cell.style.cssText=hrCompact?'text-align:left;padding:7px 6px;border-bottom:1px solid #cbd5e1;white-space:normal;overflow-wrap:anywhere;background:#dbeafe;color:#334155':'text-align:left;padding:8px;border-bottom:1px solid #cbd5e1;white-space:nowrap';tr.appendChild(cell);}head.appendChild(tr);table.appendChild(head);
+ for(const title of model.columns){const cell=document.createElement('th');cell.textContent=title;cell.style.cssText=hrCompact?'text-align:left!important;padding:4px 5px!important;border-bottom:1px solid #cbd5e1;white-space:normal;overflow-wrap:anywhere;font-size:10px!important;line-height:1.3!important;background:#dbeafe;color:#334155':'text-align:left;padding:8px;border-bottom:1px solid #cbd5e1;white-space:nowrap';tr.appendChild(cell);}head.appendChild(tr);table.appendChild(head);
  const body=document.createElement('tbody');
- for(const values of model.rows.slice(0,100)){const tr=document.createElement('tr');for(let i=0;i<values.length;i++){const cell=document.createElement('td');cell.textContent=String(values[i]??'');cell.style.cssText=hrCompact?'padding:6px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.4':'padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap';if(hrCompact)cell.setAttribute('data-label',String(model.columns[i]||''));tr.appendChild(cell);}body.appendChild(tr);}
+ for(const values of model.rows.slice(0,100)){const tr=document.createElement('tr');for(let i=0;i<values.length;i++){const cell=document.createElement('td');cell.textContent=String(values[i]??'');cell.style.cssText=hrCompact?'padding:4px 5px!important;border-bottom:1px solid #e2e8f0;text-align:left!important;font-size:11px!important;line-height:1.3!important;white-space:normal;overflow-wrap:anywhere;word-break:break-word':'padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap';if(hrCompact)cell.setAttribute('data-label',String(model.columns[i]||''));tr.appendChild(cell);}body.appendChild(tr);}
  table.appendChild(body);scroller.appendChild(table);previewBody.appendChild(scroller);
- const footer=document.createElement('p');footer.style.cssText='font-size:12px;margin:10px 0 0';footer.textContent='共 '+model.rows.length+' 筆'+(model.rows.length>100?'，預覽前 100 筆':'')+'；最新資料讀取完成後自動切回完整操作畫面。';previewBody.appendChild(footer);
- const retry=document.createElement('a');retry.href=location.href;retry.textContent='重新讀取';retry.style.cssText='display:inline-block;margin-top:8px;color:#1d4ed8;text-decoration:underline';previewBody.appendChild(retry);
+ const footer=document.createElement('p');footer.style.cssText=hrCompact?'font-size:10px!important;line-height:1.4;margin:6px 0 0':'font-size:12px;margin:10px 0 0';footer.textContent='共 '+model.rows.length+' 筆'+(model.rows.length>100?'，預覽前 100 筆':'')+'；最新資料讀取完成後自動切回完整操作畫面。';previewBody.appendChild(footer);
+ const retry=document.createElement('a');retry.href=location.href;retry.textContent='重新讀取';retry.style.cssText=hrCompact?'display:inline-block;margin-top:4px;font-size:10px!important;color:#1d4ed8;text-decoration:underline':'display:inline-block;margin-top:8px;color:#1d4ed8;text-decoration:underline';previewBody.appendChild(retry);
  if(hrCompact){
   const responsiveStyle=document.createElement('style');
-  responsiveStyle.textContent='@media(max-width:620px){#p79StartupCacheStatus.p79-hr-cache-compact table,#p79StartupCacheStatus.p79-hr-cache-compact tbody,#p79StartupCacheStatus.p79-hr-cache-compact tr{display:block;width:100%;min-width:0}#p79StartupCacheStatus.p79-hr-cache-compact thead{display:none}#p79StartupCacheStatus.p79-hr-cache-compact tr{padding:6px 4px;border-bottom:1px solid #cbd5e1}#p79StartupCacheStatus.p79-hr-cache-compact td{display:grid;grid-template-columns:65px minmax(0,1fr);gap:8px;width:100%;padding:3px 5px;border:0;text-align:left}#p79StartupCacheStatus.p79-hr-cache-compact td::before{content:attr(data-label);font-weight:700;color:#475569}}';
+  responsiveStyle.textContent=[
+   '#p79StartupCacheStatus.p79-hr-cache-compact{max-width:600px!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact h2{font-size:12px!important;line-height:1.35!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact button[aria-controls="p79StartupCacheContent"]{font-size:12px!important;line-height:1.35!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact table{min-width:0!important;width:100%!important;max-width:100%!important;table-layout:fixed!important;font-size:11px!important;line-height:1.25!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact th{font-size:10px!important;padding:4px 5px!important;text-align:left!important;line-height:1.3!important;position:static!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact td{font-size:11px!important;padding:4px 5px!important;text-align:left!important;line-height:1.3!important;white-space:normal!important;overflow-wrap:anywhere!important}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact th:nth-child(1),#p79StartupCacheStatus.p79-hr-cache-compact td:nth-child(1){width:25%}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact th:nth-child(2),#p79StartupCacheStatus.p79-hr-cache-compact td:nth-child(2){width:20%}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact th:nth-child(3),#p79StartupCacheStatus.p79-hr-cache-compact td:nth-child(3){width:35%}',
+   '#p79StartupCacheStatus.p79-hr-cache-compact th:nth-child(4),#p79StartupCacheStatus.p79-hr-cache-compact td:nth-child(4){width:20%}',
+   '@media(max-width:620px){#p79StartupCacheStatus.p79-hr-cache-compact table,#p79StartupCacheStatus.p79-hr-cache-compact tbody,#p79StartupCacheStatus.p79-hr-cache-compact tr{display:block;width:100%;min-width:0}#p79StartupCacheStatus.p79-hr-cache-compact thead{display:none}#p79StartupCacheStatus.p79-hr-cache-compact tr{padding:3px 2px;border-bottom:1px solid #cbd5e1}#p79StartupCacheStatus.p79-hr-cache-compact td{display:grid;grid-template-columns:52px minmax(0,1fr);gap:5px;width:100%!important;padding:2px 4px!important;border:0;text-align:left}#p79StartupCacheStatus.p79-hr-cache-compact td::before{content:attr(data-label);font-weight:700;color:#475569}}'
+  ].join('');
   card.appendChild(responsiveStyle);
  }
  parent.prepend(card);
