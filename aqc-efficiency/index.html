@@ -6863,7 +6863,7 @@ function renderPersonnelGroupCards(persons){
   const groups={A:[],B:[],C:[],D:[]},unassigned=[];
   for(const person of persons){const code=personnelGroupCode(person.group);if(code)groups[code].push(person);else unassigned.push(person);}
   const rows=list=>rankedPersonnelEfficiencyPersons(list).map(p=>`<tr>
-    <td class="p79-rank" title="${p.effRank===null?'無有效時數':'效率第'+p.effRank+'名'}">${p.effRank===null?'—':'第'+p.effRank+'名'}</td>
+    <td class="p79-rank" title="${p.effRank===null?'無有效時數':'效率排名：'+p.effRank}">${p.effRank===null?'—':'第'+p.effRank+'名'}</td>
     <td>${esc(p.empId||"未提供")}</td>
     <td class="font-semibold">${esc(displayPersonName(p.name))}</td>
     <td>${p.hours.toFixed(2)}</td>
