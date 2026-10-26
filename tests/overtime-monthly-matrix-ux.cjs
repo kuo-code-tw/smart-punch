@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const matrix=fs.readFileSync('assets/port79-overtime-monthly-matrix.js','utf8');
 const work=fs.readFileSync('work-hours/index.html','utf8');
 new vm.Script(matrix);
-assert(work.includes('../assets/port79-overtime-monthly-matrix.js?v=20261025-monthly-ux-404diagnostic'),'production URL must load refreshed UI instead of cached file');
+assert(work.includes('../assets/port79-overtime-monthly-matrix.js?v=20261026-conversion-diagnostics'),'production URL must load refreshed UI instead of cached file');
 const markers=[
  'p79MonthlyMatrixUx','mm-filter-card','mm-form-grid','mm-advanced','mm-advanced-content',
  'mm-job-options','mm-company-settings','mm-feedback','mmFeedbackTitle','mmProgress',
