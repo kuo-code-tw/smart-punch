@@ -30,6 +30,13 @@ function classify({empId,date,meta={},report={},roster={},snapshot=null}){
   /^颱/.test(norm(report.code))||typhoonDate(date,roster,snapshot);
  if(typhoon)return {exempt:true,kind:'typhoon',label:'颱風天加班',detail:'颱風天加班，不計例／休／國超額'};
  if(coverFor(empId,date,meta,report,snapshot)){
+  // 本人原排「休」，改在自己的休息日出勤代班且有休加正式申報，
+  // 即使連結其他員工的請假，仍應列入本人的「休」額度，而不是全部豁免。
+  const ownRestOvertime=report.category==='休' &&
+    (meta.restCategory==='休'||meta.overtimeOriginalShift==='休'||meta.restQuotaOvertime===true)&&
+    !!norm(report.id)&&meta.overtimeExcluded!==true&&
+    !(meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&norm(x.reportId)===norm(report.id));
+  if(ownRestOvertime)return {exempt:false,kind:'rest-cover',label:'休息日代班加班',detail:'使用本人休息日出勤；正式休加計入本人休息日額度'};
   const source=(snapshot?.approvedLeaves||[]).find(l=>
    norm(l.empId)===norm(meta.forEmpId)&&date>=norm(l.start)&&date<=norm(l.end));
   const annual=source&&/年|特|annual/i.test(norm(source.leaveType));
