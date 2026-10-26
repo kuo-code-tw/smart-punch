@@ -6644,11 +6644,11 @@ function renderPersonnelGroupCards(persons){
   const colors={A:'border-indigo-200 bg-indigo-50',B:'border-emerald-200 bg-emerald-50',C:'border-amber-200 bg-amber-50',D:'border-rose-200 bg-rose-50'};
   if(!document.getElementById('p79CompactEfficiencyStyle')){const style=document.createElement('style');style.id='p79CompactEfficiencyStyle';style.textContent='';document.head.appendChild(style);}
   box.innerHTML=Object.entries(groups).map(([code,list])=>{
-    const hours=list.reduce((v,p)=>v+p.hours,0),containers=list.reduce((v,p)=>v+p.containers,0),hc=list.reduce((v,p)=>v+p.hc,0),count=new Set(list.map(p=>String(p.rows[0]?.empId||'')||normalizePersonName(p.name))).size;
+    const hours=list.reduce((v,p)=>v+p.hours,0),containers=list.reduce((v,p)=>v+p.containers,0),hc=list.reduce((v,p)=>v+p.hc,0),count=list.length;
     return `<section class="rounded-2xl border ${colors[code]} overflow-hidden" aria-label="${code}組"><div class="p-3"><div class="flex justify-between items-center"><h3 class="font-black text-lg">${code}組</h3><span class="text-sm">${count} 人</span></div><div class="text-xs text-slate-600 mt-1">${containers} 櫃・${hours.toFixed(2)} 小時・效率 ${hours>0?((containers+hc)/hours).toFixed(2):'—'}</div></div>${table(list)}</section>`;
   }).join('');
   const other=document.getElementById('personnelUnassigned');
-  if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-2"><div class="font-bold text-amber-800 text-xs mb-2">未分組人員（${unassigned.length} 人）</div>${table(unassigned)}</div>`:'';
+  if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-2"><div class="font-bold text-amber-800 text-xs mb-2">組別待核對（${unassigned.length} 人，含未載入或未對應排班）</div>${table(unassigned)}</div>`:'';
 }
 
 function renderWeeklyEfficiency(){
@@ -6659,6 +6659,17 @@ function renderWeeklyEfficiency(){
   const rs=weeklyFilteredRecords();
 
   const peopleMap=new Map();
+  // The work report can contain NAME: placeholders even when the HR roster
+  // has a real employee ID. Resolve names only when the official roster has
+  // exactly one matching identity, so unrelated names are never merged.
+  const idsByName=new Map();
+  for(const employee of systemEmployees||[]){
+    const nameKey=normalizePersonName(displayPersonName(employee?.name||employee?.employeeName||employee?.['姓名']||''));
+    const employeeId=String(employee?.empId||employee?.employeeId||employee?.id||employee?.['工號']||employee?.attNo||employee?.attendanceNo||employee?.attendanceId||employee?.['考勤號碼']||'').trim().toUpperCase();
+    if(!nameKey||!employeeId)continue;
+    if(!idsByName.has(nameKey))idsByName.set(nameKey,new Set());
+    idsByName.get(nameKey).add(employeeId);
+  }
   let totalHours=0,totalContainers=0,totalHC=0;
 
   rs.forEach(r=>{
@@ -6671,20 +6682,27 @@ function renderWeeklyEfficiency(){
     totalHC+=hc;
 
     const name=String(r.name||'').trim()||'未命名';
-    const group=operationGroupForRecord(r);
-    // Group by employee identity, not by group: changing shifts/groups must not duplicate a person.
-    const employeeKey=String(r.empId||'').trim().toUpperCase()||'NAME:'+normalizePersonName(name);
-    const key=employeeKey||'NAME:'+name;
-    if(!peopleMap.has(key))peopleMap.set(key,{name,empId:String(r.empId||'').trim().toUpperCase(),group,groupDate:'',rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
-    const p=peopleMap.get(key);
-    if(!p.empId&&r.empId)p.empId=String(r.empId).trim().toUpperCase();
+    const nameKey=normalizePersonName(displayPersonName(name));
+    const rawId=String(r.empId||'').trim().toUpperCase();
+    const candidates=idsByName.get(nameKey);
+    const resolvedId=(!rawId||rawId.startsWith('NAME:'))&&candidates?.size===1?[...candidates][0]:rawId;
+    const personKey=resolvedId&&!resolvedId.startsWith('NAME:')?'EMP:'+resolvedId:'NAME:'+nameKey;
+    const lookupRow=resolvedId!==rawId?{...r,empId:resolvedId}:r;
+    const group=operationGroupForRecord(lookupRow);
+    if(!peopleMap.has(personKey))peopleMap.set(personKey,{name,empId:resolvedId&&!resolvedId.startsWith('NAME:')?resolvedId:'',group,groupDate:'',hasVerifiedGroup:false,rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
+    const p=peopleMap.get(personKey);
+    if(!p.empId&&resolvedId&&!resolvedId.startsWith('NAME:'))p.empId=resolvedId;
     const workDate=String(r.workDate||'');
-    if(workDate>=p.groupDate){p.groupDate=workDate;p.group=group;}
+    const verifiedGroup=!!personnelGroupCode(group);
+    // Do not let a newer network/loading/missing-state label replace a verified A-D assignment.
+    if((verifiedGroup&&(!p.hasVerifiedGroup||workDate>=p.groupDate))||(!p.hasVerifiedGroup&&workDate>=p.groupDate)){
+      p.groupDate=workDate;p.group=group;p.hasVerifiedGroup=verifiedGroup;
+    }
     p.rows.push(r);p.hours+=hours;p.disc+=mv.disc;p.load+=mv.load;p.hc+=hc;p.containers+=cont;
   });
 
   const wkPeople=document.getElementById('wkPeople');
-  if(wkPeople)wkPeople.textContent=new Set(rs.map(r=>String(r.empId||'')||normalizePersonName(r.name))).size;
+  if(wkPeople)wkPeople.textContent=peopleMap.size;
   const wkHours=document.getElementById('wkHours');
   if(wkHours)wkHours.textContent=totalHours.toFixed(1);
   const wkContainers=document.getElementById('wkContainers');
