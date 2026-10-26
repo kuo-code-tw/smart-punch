@@ -13,6 +13,8 @@ const ctx={
   dashboardDateRange:()=>({active:false}),
   dateWithinDashboardRange:d=>d>='2026-10-01'&&d<='2026-10-31',
   people:()=>current,
+  shipMasters:[],
+  applyShipManualOverrides:s=>s,
   normalizePersonName:s=>String(s||'').replace(/[（(]\s*AQC\s*[)）]/ig,'').replace(/\s+/g,''),
   canonicalOperationalRecords:rs=>rs,
   personGroupId:()=> 'A',
@@ -22,7 +24,7 @@ const ctx={
   round:(v,p=2)=>Number(Number(v).toFixed(p)),
   records:rows
 };
-vm.createContext(ctx);vm.runInContext(fn('summaryRows'),ctx);
+vm.createContext(ctx);for(const name of ['shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows'])vm.runInContext(fn(name),ctx);
 let actual=ctx.summaryRows();
 const get=name=>actual.find(x=>x.name===name);
 assert.equal(actual.length,3,'Two current staff and one former staff have October work');
