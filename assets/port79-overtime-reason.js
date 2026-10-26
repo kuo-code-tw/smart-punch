@@ -49,7 +49,7 @@ function reportNote(input){
  const kind=classify(input),report=input?.report||{},meta=input?.meta||{};
  const original=norm(report.note||meta.note);
  const notes=[];
- if(kind.exempt)notes.push(kind.label);
+ if(kind.exempt||kind.kind==='rest-cover')notes.push(kind.label);
  else if(/吊櫃/.test(norm(report.typeName)+' '+original))notes.push('吊櫃作業');
  else notes.push(norm(report.typeName)||'加班申報');
  if(original&&!notes.includes(original))notes.push(original);
