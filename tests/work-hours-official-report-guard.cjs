@@ -29,6 +29,6 @@ assert(html.includes('if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlr
   'delete action must refuse unsupported metadata');
 assert(html.includes('r.reportVerified?(r.overtimeReport?.declaredHours'),
   'export declared hours only from verified reports');
-assert(html.includes('port79-monthly-rest-overtime.js?v=20261026-staged-daily-audit-v1'),
+assert(html.includes('port79-monthly-rest-overtime.js?v=20261027-prior-month-backfill-v1'),
   'work-hours must load the new balance code');
 console.log('PASS 83 employees x 9 official/unverified/revoked cases; totals, labels, delete, reporting, export and asset version guarded');
