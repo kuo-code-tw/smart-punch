@@ -2190,21 +2190,62 @@ async function onDashboardMonthChange(){
   renderAll();
 }
 
+// 月報以船舶完工日歸月，同一 WORKING NO 的司機作業不能拆月。
+function shipCompletionMonth(s){
+  if(!s)return '';
+  const x=applyShipManualOverrides(s)||s,ws=x.workingSheetSource||{};
+  const monthOf=v=>{
+    const m=String(v||'').trim().match(/^(20\d{2})[-\/](\d{1,2})(?:[-\/]\d{1,2})?/);
+    return m&&+m[2]>=1&&+m[2]<=12?m[1]+'-'+String(+m[2]).padStart(2,'0'):'';
+  };
+  for(const v of [s._cloudLastDate,s.cloudLastDate,s._authoritativeLastDate,x.lastDate,s.lastDate,x.lashingDateTime,x.lashingDate,ws.lashingDateTime,ws.lashingDate,ws.endDate]){
+    const month=monthOf(v);if(month)return month;
+  }
+  const no=String(s.workingNo||'').trim();
+  if(no){
+    const dates=(records||[]).filter(r=>String(r?.workingNo||'').trim()===no)
+      .map(r=>String(r?.workDate||r?.date||'').slice(0,10)).filter(d=>/^20\d{2}-\d{2}-\d{2}$/.test(d)).sort();
+    if(dates.length)return dates[dates.length-1].slice(0,7);
+  }
+  for(const v of [x.compareMonth,x.compareDate,ws.compareMonth,ws.compareDate,x.firstDate,ws.firstDate,ws.startDate]){
+    const month=monthOf(v);if(month)return month;
+  }
+  return '';
+}
+function shipCompletionIndex(masters){
+  return new Map((masters||[]).filter(s=>String(s?.workingNo||'').trim())
+    .map(s=>[String(s.workingNo).trim(),{master:s,month:shipCompletionMonth(s)}]));
+}
+function recordCompletionMonth(r,index){
+  const entry=index?.get(String(r?.workingNo||'').trim());
+  if(entry?.month)return entry.month;
+  // 舊明細無主檔時僅取明確日期欄位；不覆寫原始作業日。
+  const raw=r?.sheetCompareDate||r?.compareDate||r?._cloudLastDate||'';
+  const m=String(raw).match(/^(20\d{2})[-\/](\d{1,2})/);
+  if(m&&+m[2]>=1&&+m[2]<=12)return m[1]+'-'+String(+m[2]).padStart(2,'0');
+  return String(r?.workDate||'').slice(0,7);
+}
+function recordIsCurrentShipDetail(r,index){
+  if(String(r?.source||'')!=='working-report')return true;
+  const ids=index?.get(String(r?.workingNo||'').trim())?.master?.workingSheetSource?.reportRecordIds;
+  return !Array.isArray(ids)||!ids.length||!String(r?.id||'')||ids.map(String).includes(String(r.id));
+}
+
 function summaryRows(){
   const month=document.getElementById('filterMonth')?.value||'';
   const selectedYear=getPort79Year();
   const rangeActive=dashboardDateRange().active;
   const ps=people();
-
+  const completionIndex=shipCompletionIndex(shipMasters||[]);
   const recordMatches=r=>{
+    // 日期區間保留逐日查詢；月份和年度月報改以整船完工月份歸類。
     if(rangeActive)return dateWithinDashboardRange(r.workDate);
-    if(month)return String(r.workDate||'').startsWith(month);
-    return !selectedYear||String(r.workDate||'').startsWith(selectedYear);
+    const finishMonth=recordCompletionMonth(r,completionIndex);
+    if(month)return finishMonth===month;
+    return !selectedYear||finishMonth.startsWith(selectedYear);
   };
-
-  // 逐作業時段去重，不再用「整個區間只要有一筆 WORKING REPORT 就整批排除舊資料」的規則。
-  // 這樣混合新舊資料的月份不會漏人，也不會把同一時段重複加總。
-  const base=canonicalOperationalRecords((records||[]).filter(recordMatches));
+  // 主檔有效 ID 清單會標示已被取代的舊作業紀錄，不能重算。
+  const base=canonicalOperationalRecords((records||[]).filter(r=>recordMatches(r)&&recordIsCurrentShipDetail(r,completionIndex)));
   const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]),historicalRows=new Map();
   ps.forEach((p,i)=>{
     for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
@@ -2481,11 +2522,16 @@ function vesselJobRows(){
   // 舊版只有 shipMasters 完全為 0 才從 records 重建，造成雲端主檔若只回 3 艘，
   // 即使明細中還有其他船，也會被硬縮成「3 / 3 艘」。
   const recordMap=new Map();
+  const completionIndex=shipCompletionIndex(shipMasters||[]);
   records.filter(r=>String(r.source||'')==='working-report').forEach(r=>{
+    if(!recordIsCurrentShipDetail(r,completionIndex))return;
     if(rangeActive){
       if(!dateWithinDashboardRange(r.workDate))return;
-    }else if(month&&!String(r.workDate||'').startsWith(month))return;
-    else if(!month && selectedYear && !String(r.workDate||'').startsWith(selectedYear))return;
+    }else{
+      const finishMonth=recordCompletionMonth(r,completionIndex);
+      if(month&&finishMonth!==month)return;
+      if(!month&&selectedYear&&!finishMonth.startsWith(selectedYear))return;
+    }
 
     const no=String(r.workingNo||'').trim();
     let vessel=String(r.shipName||r.vessel||'').trim();
@@ -6611,7 +6657,9 @@ function renderPersonStats(){
 const monthlyRankingReads=new Map();
 function monthlyRankingRecords(){
   const month=document.getElementById('rankingMonth')?.value||'';
-  return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&String(r.workDate||'').slice(0,7)===month));
+  const index=shipCompletionIndex(shipMasters||[]);
+  return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&recordCompletionMonth(r,index)===month&&recordIsCurrentShipDetail(r,index)))
+    .map(r=>({...r,originalWorkDate:r.workDate,workDate:month+'-01'}));
 }
 async function loadMonthlyRanking(force=false){
   const month=document.getElementById('rankingMonth')?.value||'',token=String(gcToken||'');
@@ -6632,7 +6680,7 @@ function renderMonthlyRanking(){
   const month=input.value,rows=monthlyRankingRecords();
   ensureOperationScheduleGroups(rows.length?rows:[{workDate:month+'-01'}]);
   const store=currentOperationScheduleStore(),roster=store?.has(month)?store.personnel(month):people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
-  const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:operationGroupForRecord,normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
+  const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:r=>operationGroupForRecord(r.originalWorkDate?{...r,workDate:r.originalWorkDate}:r),normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
   const group=document.getElementById('rankingGroup'),previous=group?.value||'',groups=[...new Set(ranked.flatMap(p=>p.groups))].sort(compareDriverNames);
   if(group){group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');group.value=groups.includes(previous)?previous:'';}
   const name=normalizePersonName(document.getElementById('rankingName')?.value||''),shown=ranked.filter(p=>(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
@@ -7948,9 +7996,18 @@ function mergeEfficiencyCloudData(d){
 async function loadEfficiencyCloudScope(params,showStatus=false){
   if(!requireEfficiencyAccess())return false;
   try{
-    if(showStatus)cloudStatus('讀取指定月份船舶資料...',false);
+    if(showStatus)cloudStatus('讀取船舶完工月份及跨月司機明細...',false);
     const requested=params||efficiencyCloudScopeParams();
-    let d=await apiGet('gcGetData',requested);
+    // 月份資料可能不含上月司機；先取得年度完整快照才可以整船歸月。
+    const year=String(requested?.month||'').slice(0,4);
+    let d=null;
+    if(/^20\d{2}$/.test(year)){
+      try{
+        const full=await apiGet('gcGetData',{year});
+        if(Array.isArray(full?.shipMasters)&&full.shipMasters.length&&Array.isArray(full?.records)&&full.records.length)d=full;
+      }catch(e){console.warn('年度船舶讀取失敗，降級為當月局部資料',e)}
+    }
+    if(!d)d=await apiGet('gcGetData',requested);
     if((requested?.month||requested?.year) &&
        (!Array.isArray(d?.shipMasters)||d.shipMasters.length===0)){
       try{
