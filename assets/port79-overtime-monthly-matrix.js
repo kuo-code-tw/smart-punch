@@ -194,7 +194,7 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options label,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options label{padding:2px;font-size:11px;white-space:nowrap;gap:4px}',
  '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options input,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options input{width:14px;height:14px}',
  '#p79MonthlyMatrix .mm-advanced-inline .mm-display-options{flex-direction:row;flex-wrap:wrap;gap:6px}',
- '#p79MonthlyMatrix .mm-advanced-inline .mm-company-settings{display:none}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-company-settings{width:100%;margin:0;padding-top:4px}',
  '@media(prefers-reduced-motion:reduce){#p79MonthlyMatrix .mm-progress:before,#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:none}}'
  ].join('');
  dialog.querySelector('style').insertAdjacentHTML('afterend','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
