@@ -9,11 +9,14 @@ function context(src){
     PERSON_NAME_ALIAS_GROUPS:[['張嘉誠','張家誠']],
     document:{getElementById:()=>({get value(){return c.month}})},getPort79Year:()=>c.year,
     dashboardDateRange:()=>({active:!!c.range}),dateWithinDashboardRange:d=>d>=c.range[0]&&d<=c.range[1],
-    people:()=>c.roster,personGroupId:p=>p.groupId||'',
+    people:()=>c.roster,personGroupId:p=>p.groupId||'',applyShipManualOverrides:s=>s,
     // Unchanged bundle move calculation is provided as a boundary dependency.
     recordMoveValues:r=>({disc:r.bundleDisc??r.disc,load:r.bundleLoad??r.load})};
   vm.createContext(c);vm.runInContext('const num=v=>Number(v)||0; const round=(v,n=2)=>Number.isFinite(v)?Number(v.toFixed(n)):0;',c);
-  for(const name of ['normalizePersonName','samePersonName','displayPersonName','normalizeAqcNo','normalizeMonthlySerial','monthlyShipNo','normalizeShipText','workingNoHasSuffix','recordMatchesMasterDate','timeDiffHours','effectiveHours','operationalSourceRank','vesselMasterForRecord','canonicalOperationalRecords','summaryRows'])vm.runInContext(fn(src,name),c);
+  for(const name of ['normalizePersonName','samePersonName','displayPersonName','normalizeAqcNo','normalizeMonthlySerial','monthlyShipNo','normalizeShipText','workingNoHasSuffix','recordMatchesMasterDate','timeDiffHours','effectiveHours','operationalSourceRank','vesselMasterForRecord','canonicalOperationalRecords','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows']){
+    if(src===before && ['shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail'].includes(name))continue;
+    vm.runInContext(fn(src,name),c);
+  }
   const resolve=c.vesselMasterForRecord;c.vesselMasterForRecord=r=>{c.lookupCalls++;return resolve(r)};return c;
 }
 const a=context(before),b=context(after),results=[];let passed=0;
@@ -40,7 +43,19 @@ function equalSummary(){
     }
     return matches.size===1;
   });
-  if(unequivocal)assert.deepEqual(actual,plain(a.summaryRows()),'Unambiguous active-staff cases must preserve original results');
+  const sameMonthScope=rows.every(r=>{
+    if(b.range)return true;
+    if(!b.month && !b.year)return true;
+    const entry=b.shipCompletionIndex(b.shipMasters).get(String(r.workingNo||'').trim());
+    const expectedMonth=entry?.month||String(r.workDate||'').slice(0,7);
+    return expectedMonth===String(r.workDate||'').slice(0,7);
+  });
+  const datesAligned=b.records.every(r=>{
+    const master=b.shipMasters.find(s=>String(s.workingNo||'')===String(r.workingNo||''));
+    const finish=master?b.shipCompletionMonth(master):String(r.workDate||'').slice(0,7);
+    return finish===String(r.workDate||'').slice(0,7);
+  });
+  if(unequivocal&&sameMonthScope&&datesAligned)assert.deepEqual(actual,plain(a.summaryRows()),'Same-completion-month unambiguous records preserve original totals');
   else assert(actual.every(x=>Number.isFinite(x.containers)&&Number.isFinite(x.totalHours)&&Number.isFinite(x.efficiency)),
     'Ambiguous or historical cases must remain finite and nonduplicated in rendered rows');
 }
