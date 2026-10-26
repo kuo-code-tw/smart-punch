@@ -9,6 +9,13 @@ const confirmedReport=(meta,report)=>{
    x?.confirmed===true&&String(x.reportId)===String(report.id));
 };
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+// 有正式申報的本人「休」加班，即使有請假代班連結也必須算入休息日額度。
+function ownRestCoverReport(meta,roster,date){
+ const report=meta?.overtimeReport;
+ return report?.category==='休'&&confirmedReport(meta,report)&&
+   (meta?.restCategory==='休'||meta?.overtimeOriginalShift==='休'||
+    meta?.restQuotaOvertime===true||String(roster?.[date]||'').trim()==='休');
+}
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
@@ -29,12 +36,17 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const R=g.P79OvertimeReason;
  const exemptReportDates=new Set(dates.filter(d=>{
    const m=roster.__meta?.[d],report=m?.overtimeReport;
-   return !!String(report?.id??'').trim()&&
-     !(m?.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id))&&
+   return confirmedReport(m,report)&&
      R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot})?.exempt===true;
  }));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
- const excluded=dates.filter(d=>nonQuotaDates.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d)||(snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&(id(a.leaveEmpId)===id(emp.empId)||(a.workerIds||[]).some(x=>id(x)===id(emp.empId)))));
+ const excluded=dates.filter(d=>{
+   if(nonQuotaDates.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d))return true;
+   // 代別人的班不等於自己請假；有正式本人休加不可從額度中剔除。
+   return (snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&
+      (id(a.leaveEmpId)===id(emp.empId)||
+       (a.workerIds||[]).some(x=>id(x)===id(emp.empId))&&!ownRestCoverReport(roster.__meta?.[d],roster,d)));
+ });
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
    [...nonQuotaDates],[...nonQuotaDates]).meta;
  const ledger=[],extraRestDates=[];
@@ -56,10 +68,21 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   }
   // Only a non-revoked cloud report ID proves a formal overtime report.
   // Legacy overtime/restQuotaOvertime flags do not prove a pending report or reserve quota.
+  // 有報單但仍缺完整出勤，先保留唯一額度為待核對，絕不能重報同一天。
+  if(verified&&r.category==='休'&&actual==='rest'){
+   reserved.休++;
+   ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,
+     statusNote:'已申報但未核對到完整出勤；保留原申報、待核對'});
+   conflicts.push({date:d,reportId:r.id,reason:'已有正式申報編號但尚無完整打卡；不得重報，請核對打卡與班表'});
+   continue;
+  }
   if(verified&&actual!=='rest'){
    reported[r.category]++;
-   ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});
-   if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，正式申報保留待核對'});
+   const stalePlanned=r.planned===true&&d<today();
+   ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id,
+     statusNote:stalePlanned?'已申報；原預排旗標未更新，請核對出勤':''});
+   if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，已申報但出勤待核對'});
+   if(stalePlanned)conflicts.push({date:d,reportId:r.id,reason:'已有正式申報；日期已過但原預排旗標未更新，請核對出勤，不得重報'});
   }else{
    if(hasUnverifiedReport&&actual!=='rest'){
     ledger.push({date:d,kind:'unconfirmed',category:r.category,actual});
@@ -82,7 +105,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest')extraRestDates.push(d);
-   if(verified&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡已按休假，正式申報保留待核對，不列有效加班'});
+   if(verified&&actual==='rest')conflicts.push({date:d,reportId:r.id,reason:'整班無卡暫按休假分類，原申報待核對，不可直接認定實際出勤'});
   }
  }
  // Supplement the shared schedule allocation with actual, non-leave no-card days.
@@ -193,10 +216,12 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／代班加班（不計例休國額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
- lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+(x.actual==='rest'&&x.kind==='off'?'（整班無卡）':'')));
+ lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+
+   (x.actual==='rest'&&x.kind==='off'?'（整班無卡）':'')+
+   (x.statusNote?'（'+x.statusNote+'）':'')));
  lines.push(...model.rows.filter(r=>id(r.empId)===id(empId)&&(r.saved||r.checked)).map(r=>r.date+' '+r.category+' '+(r.saved?'本次已核對成功':'本次勾選，尚未申報')));
  if(b.conflicts.length)lines.push('','需核對：',...b.conflicts.map(x=>(x.date?x.date+' ':'')+x.reason));
  return lines.join('\n');

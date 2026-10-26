@@ -13208,12 +13208,18 @@ async function p79ExportOvertimeComparison(printMode){
                 .filter(Boolean);
 
             const shown=new Set(rows.map(r=>String(r.empId).toUpperCase()+'|'+normalizeScheduleDateKey(r.rosterDate||r.dateKey)));
+            // 原申報可能保留 planned:true，但日期已過不能再顯示為未來預排。
+            // 單獨顯示「已申報、出勤待核對」並保留雲端原紀錄，不冒充已完成打卡。
+            const todayTaipei=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
             restMetaByEmp.forEach((map,id)=>{
                 const employee=employeeById.get(id);if(!employee)return;
                 Object.entries(map).forEach(([date,meta])=>{
                     if(!p79WorkOvertimeOfficialReport(meta.overtimeReport,meta)||shown.has(id+'|'+date)||!p79EmployeeDateEligible(employee,date))return;
                     const observed=attendanceByEmployeeDate.get(id+'|'+date);
-                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:!!meta.overtimeReport.planned,attendanceIssue:meta.overtimeReport.attendanceReview||'',timeCheckRequired:!!meta.overtimeReport.attendanceReview,overDailyLimit:false});
+                    const stalePlanned=meta.overtimeReport.planned===true&&date<todayTaipei;
+                    const attendanceIssue=meta.overtimeReport.attendanceReview||
+                      (stalePlanned&&!(observed?.clockIn&&observed?.clockOut)?'已有正式申報；原預排標記未更新，出勤待核對':'');
+                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
                 });
             });
             rows.sort((a, b) => b.sortTime - a.sortTime);
