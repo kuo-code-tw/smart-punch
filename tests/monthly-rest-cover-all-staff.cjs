@@ -37,6 +37,19 @@ for(let i=0;i<83;i++){
  }
  assert.equal(JSON.stringify(fixture),orig,key+' audit may not modify rosters or reports');
 }
+// 胡毓麒 10/22 類似情境：有正式編號、日期已過，但出勤讀取尚是整班無卡。
+// 不算成已出勤；應標示已申報待核、保留休額度且不得再次推薦該日期。
+{
+ const f=identity('HUMOCK','2026-10-22',true),d='2026-10-22';
+ f.snapshot.states['HUMOCK|'+d]='rest';
+ const b=g.P79MonthlyRest.balance(f.emp,f.roster,month,f.snapshot,'');
+ assert.equal(b.reported.休,0,'No punched work must not be claimed as verified attendance');
+ assert.equal(b.ledger.filter(x=>x.date===d&&x.kind==='reportedPendingAttendance').length,1,'File exists and is explicitly pending review');
+ assert(b.reserved.休>=1,'Keep already-filed rest overtime reserved so system cannot suggest duplicate');
+ assert(b.conflicts.some(x=>/已有正式申報編號/.test(x.reason)));
+ const detail=g.P79MonthlyRest.auditText({balances:[{emp:f.emp,...b}],rows:[]},f.emp.empId);
+ assert.match(detail,/已申報／出勤待核對/);
+}
 for(const scenario of ['revoked','excluded','idless','notOwnRest','typhoon','pureCover']){
  const fixture=identity('CHECK','2026-10-24'),meta=fixture.roster.__meta['2026-10-24'],r=meta.overtimeReport;
  if(scenario==='revoked')meta.overtimeRevocations=[{confirmed:true,reportId:r.id}];
