@@ -1,5 +1,12 @@
 name: Verify management synchronization
 on:
+  # Tests and backend-only changes should be verified without redeploying the live website.
+  push:
+    branches: [main]
+    paths:
+      - 'tests/**'
+      - 'backend/**'
+      - '.github/workflows/management-sync.yml'
   pull_request:
     paths:
       - 'integration-test/**'
