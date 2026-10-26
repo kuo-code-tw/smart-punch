@@ -3,7 +3,7 @@ name: Publish static site to GitHub Pages
 on:
   push:
     branches: [main]
-    # Publish only when production site files change. Test/docs-only commits are checked
+    # Publish only on production site changes; this workflow edit also verifies the test suite.
     # by other workflows (or the next site publish), not deployed to users.
     paths:
       - 'index.html'
