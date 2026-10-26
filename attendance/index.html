@@ -22216,7 +22216,7 @@ function p79EmployeeDateEligible(emp,date) {
                 auditSheet['!cols']=[10,15,14,22,14,22,30,40,24].map(wch=>({wch}));
                 XLSX.utils.book_append_sheet(workbook,auditSheet,'考勤缺漏核對');
             }
-            if(sources.some(item=>item.source==='本機快取')){
+            if(sources.length){
                 const rows=[['資料','月份','來源','雲端讀取時間（台北）'],...sources.map(item=>[item.action==='getScheduleDataSecure'?'排班':'考勤',item.month,item.source,new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'medium'}).format(new Date(item.savedAt))])];
                 const sheet=XLSX.utils.aoa_to_sheet(rows);sheet['!cols']=[12,12,16,24].map(wch=>({wch}));XLSX.utils.book_append_sheet(workbook,sheet,'雲端資料讀取時間');
             }
