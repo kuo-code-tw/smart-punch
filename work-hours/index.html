@@ -1540,22 +1540,57 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 </div>
                 </div>
 
+
+                <style id="p79-job-title-summary-color-v20261026">
+                /* Job-title burden table: five clear measures, with consistent category colors. */
+                #p79OvertimeJobTitleSummary{border:1px solid #a5b4fc!important;background:linear-gradient(135deg,#f5f8ff,#f0fdfa)!important;box-shadow:0 6px 24px rgba(37,99,235,.07)!important}
+                #p79OvertimeJobTitleSummary>summary{color:#1e40af!important;font-size:15px!important}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table{border-collapse:separate!important;border-spacing:0 4px!important;min-width:640px;table-layout:auto}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table thead th{background:#dbeafe!important;color:#1e3a8a!important;border-block:1px solid #bfdbfe!important;padding:11px 12px!important;font-weight:900!important;white-space:nowrap}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table thead th:first-child{border-radius:10px 0 0 10px}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table thead th:last-child{border-radius:0 10px 10px 0}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td{background:#fff!important;color:#334155!important;border-block:1px solid #e2e8f0!important;padding:11px 12px!important;font-variant-numeric:tabular-nums}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(even):not(.p79-job-total) td{background:#f8faff!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:hover:not(.p79-job-total) td{background:#eff6ff!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td:first-child{border-left:3px solid #93c5fd!important;border-radius:9px 0 0 9px}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td:last-child{border-right:1px solid #e2e8f0!important;border-radius:0 9px 9px 0}
+                #p79OvertimeJobTitleSummary .p79-job-role{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:999px;padding:4px 11px;font-weight:850}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(5n+2) .p79-job-role{background:#fef3c7;color:#92400e}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(5n+3) .p79-job-role{background:#dcfce7;color:#166534}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(5n+4) .p79-job-role{background:#f3e8ff;color:#6b21a8}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(5n+5) .p79-job-role{background:#ffe4e6;color:#9f1239}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-staff{color:#4338ca!important;font-weight:800!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-leave{color:#b45309!important;font-weight:800!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-hours{background:#e0f2fe!important;color:#075985!important;font-weight:900!important;font-size:15px!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-average{background:#dcfce7!important;color:#166534!important;font-weight:900!important;font-size:15px!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr.p79-job-total td{background:#ede9fe!important;color:#4c1d95!important;border-color:#c4b5fd!important;font-weight:900!important}
+                #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr.p79-job-total .p79-job-role{background:#6d28d9!important;color:white!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr.p79-job-total td.p79-job-hours{background:#c7d2fe!important;color:#312e81!important}
+                body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr.p79-job-total td.p79-job-average{background:#bbf7d0!important;color:#14532d!important}
+                html.dark #p79OvertimeJobTitleSummary,html[data-theme="dark"] #p79OvertimeJobTitleSummary{background:linear-gradient(135deg,#172554,#083344)!important;border-color:#475569!important}
+                html.dark #p79OvertimeJobTitleSummary>summary,html[data-theme="dark"] #p79OvertimeJobTitleSummary>summary{color:#bfdbfe!important}
+                html.dark body #p79OvertimeJobTitleSummary .p79-jobtitle-table thead th,html[data-theme="dark"] body #p79OvertimeJobTitleSummary .p79-jobtitle-table thead th{background:#1e3a8a!important;color:#eff6ff!important;border-color:#1d4ed8!important}
+                html.dark body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td,html[data-theme="dark"] body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td{background:#172554!important;color:#e2e8f0!important;border-color:#334155!important}
+                html.dark body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(even):not(.p79-job-total) td,html[data-theme="dark"] body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody tr:nth-child(even):not(.p79-job-total) td{background:#1e293b!important}
+                html.dark body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-hours,html[data-theme="dark"] body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-hours{background:#0c4a6e!important;color:#bae6fd!important}
+                html.dark body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-average,html[data-theme="dark"] body #p79OvertimeJobTitleSummary .p79-jobtitle-table tbody td.p79-job-average{background:#14532d!important;color:#bbf7d0!important}
+                </style>
                 <details id="p79OvertimeJobTitleSummary" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 my-3">
                     <summary id="p79OvertimeJobTitleSummaryTitle" class="cursor-pointer select-none font-bold text-slate-800 dark:text-slate-100">
                         各職稱加班時數與人均統計
                         <span class="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">點擊展開／收合</span>
                     </summary>
-                    <p class="text-xs text-slate-500 mt-2 mb-2">依目前月份、部門、職稱及紀錄來源統計｜請假天數為該職稱所有人員當月已核准請假合計；平均分擔＝未換算加班合計 ÷ 總人數</p>
+                    <p class="text-xs text-slate-500 mt-2 mb-2">依目前月份、部門、職稱及紀錄來源統計｜請假天數為該職稱所有人員當月已核准請假合計；每人平均＝未換算加班時數 ÷ 總人數</p>
                     <div id="p79OvertimeJobTitleNotice" class="text-xs text-amber-700 dark:text-amber-300 mb-2" role="status"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[780px] text-sm text-left" aria-label="各職稱總人數、請假天數、未換算加班與平均分擔">
+                        <table class="p79-jobtitle-table w-full text-sm text-left" aria-label="各職稱總人數、請假天數、未換算加班時數與每人平均">
                             <thead class="bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200">
-                                <tr><th class="p-2">職稱</th><th class="p-2 text-right">總人數</th><th class="p-2 text-right">請假天數</th><th class="p-2 text-right">已申報人數</th><th class="p-2 text-right">有效筆數</th><th class="p-2 text-right">未換算合計（小時）</th><th class="p-2 text-right">每人平均分擔（小時）</th></tr>
+                                <tr><th class="p-2">職稱</th><th class="p-2 text-right">總人數</th><th class="p-2 text-right">請假天數</th><th class="p-2 text-right">未換算加班（小時）</th><th class="p-2 text-right">每人平均</th></tr>
                             </thead>
                             <tbody id="p79OvertimeJobTitleRows"></tbody>
                         </table>
                     </div>
-                    <p class="mt-2 text-xs text-slate-500">總人數與請假天數皆按該職稱全部符合權限及到職日期的員工計算，包含沒有加班的人；即使上方篩選單一姓名，也不縮小這張職稱表。請假只計當月已核准的各類假別，跨月依實際落在當月的日期計算；資料未讀取或無法精確分攤時顯示「—」。加班時數只統計已核實、非撤銷的正式申報，未換算每筆限 4 或 8 小時；這張表已移除換算時數。</p>
+                    <p class="mt-2 text-xs text-slate-500">總人數與請假天數皆按該職稱全部符合權限及到職日期的員工計算，包含沒有加班的人；即使上方篩選單一姓名，也不縮小這張職稱表。請假只計當月已核准的各類假別，跨月依實際落在當月的日期計算；資料未讀取或無法精確分攤時顯示「—」。加班時數只統計已核實、非撤銷的正式申報，未換算每筆限 4 或 8 小時；這張表只顯示未換算加班時數與每人平均，不呈現申報人數、筆數及換算時數。</p>
                 </details>
                 <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
                     <table id="p79OvertimeStatsTable" class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-left text-base">
@@ -13424,16 +13459,15 @@ function p79OvertimePeriodLabel(report){
                 ?Number([...titleLeave.byTitle.values()].reduce((n,v)=>n+v.days,0).toFixed(2)):null;
             const jobBody=document.getElementById('p79OvertimeJobTitleRows');
             if(jobBody){
-                const cells=g=>'<td class="p-2 font-semibold">'+escapeHtml(g.jobTitle)+'</td>'+
-                    '<td class="p-2 text-right">'+g.staffCount+'</td>'+
-                    '<td class="p-2 text-right">'+(g.jobTitle==='全部職稱合計'?(totalLeave===null?'—':String(totalLeave)):showLeave(g.jobTitle))+'</td>'+
-                    '<td class="p-2 text-right">'+g.people+'</td><td class="p-2 text-right">'+g.count+'</td>'+
-                    '<td class="p-2 text-right">'+g.raw+'</td>'+
-                    '<td class="p-2 text-right">'+formatAverage(g.rawAverage)+'</td>';
+                const cells=g=>'<td class="p-2 font-semibold"><span class="p79-job-role">'+escapeHtml(g.jobTitle)+'</span></td>'+
+                    '<td class="p-2 text-right p79-job-staff">'+g.staffCount+'</td>'+
+                    '<td class="p-2 text-right p79-job-leave">'+(g.jobTitle==='全部職稱合計'?(totalLeave===null?'—':String(totalLeave)):showLeave(g.jobTitle))+'</td>'+
+                    '<td class="p-2 text-right p79-job-hours">'+g.raw+'</td>'+
+                    '<td class="p-2 text-right p79-job-average">'+formatAverage(g.rawAverage)+'</td>';
                 jobBody.innerHTML=overtimeSummary.groups.length
-                    ?overtimeSummary.groups.map(g=>'<tr class="border-b border-slate-100 dark:border-slate-700">'+cells(g)+'</tr>').join('')+
-                    '<tr class="bg-indigo-50 dark:bg-slate-900 font-bold">'+cells({...overtimeSummary.totals,jobTitle:'全部職稱合計'})+'</tr>'
-                    :'<tr><td colspan="7" class="p-3 text-center text-slate-500">目前篩選條件沒有可統計的職稱人員</td></tr>';
+                    ?overtimeSummary.groups.map(g=>'<tr class="p79-job-title-row">'+cells(g)+'</tr>').join('')+
+                    '<tr class="p79-job-total">'+cells({...overtimeSummary.totals,jobTitle:'全部職稱合計'})+'</tr>'
+                    :'<tr><td colspan="5" class="p-3 text-center text-slate-500">目前篩選條件沒有可統計的職稱人員</td></tr>';
             }
             const deptNotice=document.getElementById('p79OvertimeJobTitleNotice');
             if(deptNotice)deptNotice.textContent=[
