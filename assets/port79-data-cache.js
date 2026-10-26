@@ -563,17 +563,37 @@ async function showStartupPreview(options){
  const parent=document.querySelector(host);if(!parent)return false;
  const card=document.createElement('section');card.id='p79StartupCacheStatus';card.setAttribute('aria-label','本機快取預覽');
  card.style.cssText='margin:12px 0;padding:16px;border:1px solid #93c5fd;border-radius:14px;background:#eff6ff;color:#0f172a';
- const heading=document.createElement('h2');heading.style.cssText='font-size:16px;font-weight:700;margin:0 0 8px';heading.textContent=SYSTEM_LABELS[system]+' · 本機快取預覽';card.appendChild(heading);
- const status=document.createElement('p');status.setAttribute('role','status');status.style.cssText='font-size:12px;margin:0 0 10px';status.textContent=fmtTime(row.savedAt)+'｜'+(model.label||'')+'｜唯讀；正在讀取雲端最新資料。';card.appendChild(status);
+ const compactPreview=system==='efficiency';
+ const heading=document.createElement('h2');heading.style.cssText='font-size:16px;font-weight:700;margin:0 0 8px';
+ heading.textContent=SYSTEM_LABELS[system]+' · 本機快取預覽';card.appendChild(heading);
+ const content=document.createElement('div');
+ if(compactPreview){
+  card.style.padding='10px 16px';
+  heading.style.margin='0';
+  const toggle=document.createElement('button');
+  toggle.type='button';toggle.setAttribute('aria-expanded','false');
+  toggle.style.cssText='border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;text-align:left;width:100%;padding:3px 0';
+  toggle.textContent='▸ 效率・本機快取預覽（點擊展開）';
+  heading.textContent='';heading.appendChild(toggle);
+  content.hidden=true;
+  toggle.addEventListener('click',()=>{
+   content.hidden=!content.hidden;
+   toggle.setAttribute('aria-expanded',String(!content.hidden));
+   toggle.textContent=content.hidden?'▸ 效率・本機快取預覽（點擊展開）':'▾ 效率・本機快取預覽（點擊收合）';
+  });
+ }
+ card.appendChild(content);
+ const previewBody=compactPreview?content:card;
+ const status=document.createElement('p');status.setAttribute('role','status');status.style.cssText='font-size:12px;margin:0 0 10px';status.textContent=fmtTime(row.savedAt)+'｜'+(model.label||'')+'｜唯讀；正在讀取雲端最新資料。';previewBody.appendChild(status);
  const scroller=document.createElement('div');scroller.style.cssText='max-height:320px;overflow:auto';
  const table=document.createElement('table');table.style.cssText='width:100%;border-collapse:collapse;font-size:13px;background:white;color:#0f172a';
  const head=document.createElement('thead'),tr=document.createElement('tr');
  for(const title of model.columns){const cell=document.createElement('th');cell.textContent=title;cell.style.cssText='text-align:left;padding:8px;border-bottom:1px solid #cbd5e1;white-space:nowrap';tr.appendChild(cell);}head.appendChild(tr);table.appendChild(head);
  const body=document.createElement('tbody');
  for(const values of model.rows.slice(0,100)){const tr=document.createElement('tr');for(const value of values){const cell=document.createElement('td');cell.textContent=String(value??'');cell.style.cssText='padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap';tr.appendChild(cell);}body.appendChild(tr);}
- table.appendChild(body);scroller.appendChild(table);card.appendChild(scroller);
- const footer=document.createElement('p');footer.style.cssText='font-size:12px;margin:10px 0 0';footer.textContent='共 '+model.rows.length+' 筆'+(model.rows.length>100?'，預覽前 100 筆':'')+'；最新資料讀取完成後自動切回完整操作畫面。';card.appendChild(footer);
- const retry=document.createElement('a');retry.href=location.href;retry.textContent='重新讀取';retry.style.cssText='display:inline-block;margin-top:8px;color:#1d4ed8;text-decoration:underline';card.appendChild(retry);
+ table.appendChild(body);scroller.appendChild(table);previewBody.appendChild(scroller);
+ const footer=document.createElement('p');footer.style.cssText='font-size:12px;margin:10px 0 0';footer.textContent='共 '+model.rows.length+' 筆'+(model.rows.length>100?'，預覽前 100 筆':'')+'；最新資料讀取完成後自動切回完整操作畫面。';previewBody.appendChild(footer);
+ const retry=document.createElement('a');retry.href=location.href;retry.textContent='重新讀取';retry.style.cssText='display:inline-block;margin-top:8px;color:#1d4ed8;text-decoration:underline';previewBody.appendChild(retry);
  parent.prepend(card);
  startupPreview={system,actions,close(){card.remove();startupPreview=null;}};
  return true;
