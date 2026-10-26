@@ -195,6 +195,24 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options input,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options input{width:14px;height:14px}',
  '#p79MonthlyMatrix .mm-advanced-inline .mm-display-options{flex-direction:row;flex-wrap:wrap;gap:6px}',
  '#p79MonthlyMatrix .mm-advanced-inline .mm-company-settings{width:100%;margin:0;padding-top:4px}',
+ '#p79MonthlyMatrix .mm-filter-card{display:flex;flex-wrap:wrap;align-items:center;gap:7px 10px;padding:8px 10px}',
+ '#p79MonthlyMatrix .mm-filter-heading{flex:0 0 auto;margin:0;gap:0}',
+ '#p79MonthlyMatrix .mm-filter-heading strong{font-size:12px;white-space:nowrap}',
+ '#p79MonthlyMatrix .mm-filter-heading small{display:none}',
+ '#p79MonthlyMatrix .mm-form-grid{display:flex;flex:0 1 560px;min-width:0;gap:6px;grid-column:auto;grid-row:auto}',
+ '#p79MonthlyMatrix .mm-form-grid label{flex:1 1 110px;min-width:100px;gap:2px;font-size:10px}',
+ '#p79MonthlyMatrix .mm-form-grid input,#p79MonthlyMatrix .mm-form-grid select{height:30px;padding:3px 6px;font-size:11px}',
+ '#p79MonthlyMatrix .mm-advanced-inline{display:flex;flex:1 1 530px;align-items:center;flex-wrap:wrap;gap:4px;border:0;padding:0;margin:0;grid-column:auto}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-advanced-content{display:flex;flex:1 1 auto;gap:5px 9px;flex-wrap:wrap}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-advanced-panel{gap:5px;padding:0;flex-wrap:wrap}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-panel-label{font-size:10px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options{gap:2px 5px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-job-options label,#p79MonthlyMatrix .mm-advanced-inline .mm-display-options label{font-size:10px;padding:0 2px}',
+ '#p79MonthlyMatrix .mm-advanced-inline .mm-company-settings{flex:0 0 100%;margin:0;padding:0}',
+ '#p79MonthlyMatrix .mm-actions{flex:0 0 auto;grid-column:auto;grid-row:auto;gap:5px;margin:0}',
+ '#p79MonthlyMatrix .mm-actions button{min-height:30px;padding:4px 7px;font-size:10px}',
+ '@media(max-width:1200px){#p79MonthlyMatrix .mm-filter-heading{flex-basis:100%}#p79MonthlyMatrix .mm-form-grid{flex:1 1 520px}#p79MonthlyMatrix .mm-advanced-inline{flex:1 1 450px}}',
+ '@media(max-width:650px){#p79MonthlyMatrix .mm-form-grid{flex-wrap:wrap}#p79MonthlyMatrix .mm-form-grid label{flex:1 1 42%}#p79MonthlyMatrix .mm-actions{flex-wrap:wrap}}',
  '@media(prefers-reduced-motion:reduce){#p79MonthlyMatrix .mm-progress:before,#p79MonthlyMatrix .mm-feedback-loading .mm-feedback-icon{animation:none}}'
  ].join('');
  dialog.querySelector('style').insertAdjacentHTML('afterend','<style id="p79MonthlyMatrixUx">'+mmStyles+'</style>');
@@ -231,7 +249,7 @@ function open(){const context=g.p79OvertimeApplicationContext;if(!context?.canEx
  mmAdvancedContent.appendChild(mmJobs);mmAdvancedContent.appendChild(mmPreferences);
  mmCompanyDropdown.className='mm-company-settings';
  mmAdvanced.appendChild(mmAdvancedContent);mmAdvanced.appendChild(mmCompanyDropdown);
- mmCard.appendChild(mmAdvanced);mmControls.appendChild(mmCard);
+ mmCard.appendChild(mmAdvanced);mmCard.appendChild(mmActions);mmControls.appendChild(mmCard);
  mmJobDropdown.remove();
  const mmStatusElement=dialog.querySelector('#mmStatus'),mmFeedback=document.createElement('div');
  mmFeedback.id='mmFeedback';mmFeedback.className='mm-feedback mm-feedback-idle';
