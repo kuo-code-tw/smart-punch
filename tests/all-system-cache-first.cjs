@@ -30,6 +30,12 @@ const options={system:'hr',actions:['hrGetEmployees'],host:'main',canShow:()=>tr
  assert(toggle.textContent.includes('1 筆'),'collapsed preview still shows cached employee count');
  assert(table.style.cssText.includes('min-width:0')&&table.style.cssText.includes('table-layout:fixed'),'HR preview overrides wide management table styles');
  assert(table.parent.style.cssText.includes('overflow-x:hidden'),'HR preview disallows horizontal scrolling');
+ assert.equal(card.style.maxWidth,'600px','cache panel must stay small');
+ assert(table.style.cssText.includes('font-size:11px!important'),'HR table must not inherit oversized global fonts');
+ assert.equal(table.parent.style.cssText.includes('max-height:145px'),true,'expanded cache list stays short');
+ assert(table.children[0].children[0].children[0].style.cssText.includes('font-size:10px!important'),'header letters are compact');
+ assert(table.children[1].children[0].children[0].style.cssText.includes('font-size:11px!important'),'employee letters are compact');
+ assert(card.children.some(e=>e.tag==='style'&&e.textContent.includes('max-width:600px!important')&&e.textContent.includes('font-size:11px!important')),'scoped overrides win over global HR CSS');
  assert.equal(table.children[0].children[0].children.length,4,'all four employee columns stay available');
  const cells=table.children[1].children[0].children;
  assert.equal(cells[1].textContent,'<img src=x onerror=alert(1)>','data rendered as text, never executable HTML');
