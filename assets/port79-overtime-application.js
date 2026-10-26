@@ -18,6 +18,30 @@ function periodHours(report){
  const minutes=x=>{const m=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);if(!m||Number(m[1])>24||Number(m[2]||0)>59||(Number(m[1])===24&&Number(m[2]||0)))throw Error('申報時段無效');return (Number(m[1])%24)*60+Number(m[2]||0);};
  const start=minutes(report.overtimeStart),end=minutes(report.overtimeEnd),duration=(end-start+1440)%1440;if(!duration)throw Error('申報時段不得為零小時');return Math.round(duration/60*100)/100;
 }
+function resolvedConvertedHours(report){
+ const existing=report.convertedHours;
+ if(existing!==null&&existing!==undefined&&existing!==''){
+  const n=Number(existing);
+  if(!Number.isFinite(n)||n<0)throw Error('加班換算時數無效');
+  return n;
+ }
+ // Only recover a display value from one exact existing configuration rule.
+ // Never infer by actual hours alone or write inferred values back to cloud.
+ const rules=g.P79Overtime?.reportRules?.();
+ if(!Array.isArray(rules))return null;
+ const canonicalTime=v=>String(v??'').trim().replace(/:00$/,'').replace(/^0(?=\d$)/,'');
+ const sameTime=(a,b)=>canonicalTime(a)===canonicalTime(b);
+ const matches=rules.filter(row=>{
+  const cat=String(row[0]||'').trim(),code=String(row[1]||'').trim();
+  if(cat!==String(report.category||'').trim()||code!==String(report.code||'').trim())return false;
+  if(Number(row[2])!==Number(report.declaredHours)||!sameTime(row[6],report.overtimeStart)||!sameTime(row[7],report.overtimeEnd))return false;
+  if(cat==='延'&&(!sameTime(row[4],report.normalStart)||!sameTime(row[5],report.normalEnd)||String(row[8]||'')!==String(report.position||'')))return false;
+  return true;
+ });
+ if(matches.length!==1||matches[0][3]===''||matches[0][3]===null||matches[0][3]===undefined)return null;
+ const converted=Number(matches[0][3]);
+ return Number.isFinite(converted)&&converted>=0?converted:null;
+}
 function collect(snapshots,employees,dates,company,jobs,mode){
  const selected=new Set(dates),jobSet=new Set(jobs),people=new Map(employees.map(e=>[uid(e.empId),e])),rows=[],issues=[],seen=new Set();
  for(const snapshot of snapshots)for(const entry of snapshot.schedules||[]){const emp=people.get(uid(entry.empId));if(!emp)continue;const job=String(emp.jobTitle||emp.deptDetail||'未設定'),co=companyFor(emp);if(company&&company!==co||jobSet.size&&!jobSet.has(job))continue;
@@ -33,7 +57,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    const category=substitute?'休':['休','例','國'].includes(report.category)?report.category:'延';
    const spans=['','','',''];spans[{休:0,延:1,例:2,國:3}[category]]=period(report);
    const actual=periodHours(report);
-   const converted=report.convertedHours===null||report.convertedHours===undefined||report.convertedHours===''?null:Number(report.convertedHours);
+   const converted=resolvedConvertedHours(report);
    if(converted!==null&&(!Number.isFinite(converted)||converted<0))throw Error(emp.name+' 換算時數無效，請核對申報');
    const reasons=g.P79OvertimeReason;
     const note=reasons?.reportNote?.({empId:emp.empId,date,meta,report,roster:entry.schedule||{},snapshot})||
