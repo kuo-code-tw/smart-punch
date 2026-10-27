@@ -50,7 +50,7 @@ const c={
  activeRoleTab:'ARMG',activeGroupFilter:'ALL',employees:people,
  monthlyScheduleData:monthData,monthlyScheduleMeta:meta,leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
  p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
- p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:false,days:{}}}),refreshIfStale:async()=>{}}),
+ p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}}),refreshIfStale:async()=>{}}),
  p79UpdateTyphoonDayButton(){},getDaysInMonth:()=>31,
  scheduleMonthBounds:()=>[date(1),date(31)],updateScheduleDateRangeSummary(){},
  p79TyphoonDates:()=>[date(23)],scheduleTaipeiTodayKey:()=>date(31),
