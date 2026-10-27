@@ -44,6 +44,15 @@ assert.equal(plan({isProtected:(id,date)=>id==='E1'&&date==='2026-10-24'}).corre
 const hasManual={...metadata,E1:{'2026-10-24':{manualRosterShift:'休'},'2026-10-25':{overtimeReport:{id:'SAVE-1'}}}};
 assert(!plan({metadata:hasManual,allowUnmarked:true}).corrections.some(r=>r.empId==='E1'),'manual leave and formal overtime are protected');
 assert(!plan({today:'2026-10-25',allowUnmarked:true}).corrections.some(r=>r.date==='2026-10-25'),'current/future date not retroactively changed');
+const changedShift=plan({allowUnmarked:true,
+ employees:[...emp,{id:'E5',attNo:'0015',company:'公司丁',group:'D'}],
+ schedules:{...schedules,E5:{'2026-10-24':'早'}},
+ records:[...records,
+  event('E5','0015','2026/10/24 16:03:00','上班簽到'),
+  event('E5','0015','2026/10/25 00:03:00','下班簽退')
+ ]});
+assert(changedShift.corrections.some(r=>r.empId==='E5'&&r.date==='2026-10-24'&&r.shift==='中'),
+ 'actual middle shift replaces an incorrect scheduled early shift');
 assert.equal(restore.shiftFromClockIn(
  {timeStr:'2026/10/24 12:15:00'},{timeStr:'2026/10/24 16:15:00'}),null,'ambiguous start time never creates a work shift');
 assert(html.includes('p79ApplyNoPunchRestFromOfficial(yearMonth)'),'cloud reconciliation restores work shifts automatically');
