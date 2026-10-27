@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script><script src="../assets/port79-overtime-report.js?v=20261027-shift-matching-v2"></script><script src="../assets/port79-attendance-overtime.js?v=20261025-report-status-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script><script src="../assets/port79-overtime-report.js?v=20261027-shift-matching-v2"></script>
+<script src="../assets/port79-overtime-shift-match.js?v=20261027-attendance-report-display"></script><script src="../assets/port79-attendance-overtime.js?v=20261025-report-status-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -15090,12 +15091,28 @@ function getManualPairRecordAnchor(record) {
             const roster=p79AttendanceRosterRows(state,id,view)[0]?.schedule||{};
             const meta=roster.__meta?.[date]||{};
             const specialDates=p79AttendanceSpecialParts(row,view).map(part=>part.date);
+            const periodReview=(day,report)=>{
+                if(!report||!window.P79OvertimeShiftMatch?.resolve||!window.P79Overtime?.reportRules)return null;
+                const inTime=row.clockIn?getAttendanceTimestamp(row.clockIn):null;
+                const outTime=row.clockOut?getAttendanceTimestamp(row.clockOut):null;
+                return window.P79OvertimeShiftMatch.resolve({
+                    date:day,roster,report,
+                    start:Number.isFinite(inTime)?inTime:null,
+                    end:Number.isFinite(outTime)?outTime:null,
+                    attendanceIssue:row.pairingIssue||row.timeCheckRequired?'pairing':false,
+                    rules:window.P79Overtime.reportRules()
+                });
+            };
             const activeReport=day=>{
                 const m=roster.__meta?.[day],r=m?.overtimeReport;
                 if(!r?.id||m.overtimeExcluded||(m.overtimeRevocations||[]).some(a=>a.confirmed===true&&a.reportId===r.id))return false;
                 if(r.attendanceInId&&row.clockIn?.id&&String(r.attendanceInId)!==String(row.clockIn.id))return false;
                 if(r.attendanceOutId&&row.clockOut?.id&&String(r.attendanceOutId)!==String(row.clockOut.id))return false;
-                if(row.clockIn&&row.clockOut&&window.P79Overtime?.overtimeMinutes?.(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),day,{overtimeReport:r})===0)return false;
+                if(row.clockIn&&row.clockOut&&window.P79Overtime?.overtimeMinutes?.(getAttendanceTimestamp(row.clockIn),getAttendanceTimestamp(row.clockOut),day,{overtimeReport:r})===0){
+                    const review=periodReview(day,r);
+                    // 班別異動後，舊時段不重疊也仍是原申報；只有完整有效的打卡才能核對新時段。
+                    if(!(review?.confirmed&&review.mismatch))return false;
+                }
                 return true;
             };
             const candidates=[...new Set([date,...specialDates])].filter(activeReport);
@@ -15123,9 +15140,14 @@ function getManualPairRecordAnchor(record) {
             const start=minutes(times[0]),end=minutes(times[1]);
             if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null,report};
             const compact=(t,isEnd)=>t==='00:00'||t==='24:00'||String(t)==='24'?'24':String(t).replace(/:00$/,'');
-            const label=report?.code||category+compact(times[0],false)+'-'+compact(times[1],true);
+            const review=report?periodReview(reportDate,report):null;
+            const corrected=review?.mismatch&&review?.suggested&&['tentative','completed'].includes(review.state)
+                &&review.category===report.category;
+            const label=corrected?review.code:(report?.code||category+compact(times[0],false)+'-'+compact(times[1],true));
             const declared=Number(report?.declaredHours);
-            return {label,minutes:report&&Number.isFinite(declared)?declared*60:(end-start+1440)%1440,report,pending:!report};
+            return {label,minutes:report&&Number.isFinite(declared)?declared*60:(end-start+1440)%1440,
+                report,pending:!report,reviewState:corrected?(review.confirmed?'confirmed':'tentative'):'',
+                originalCode:corrected?report.code:''};
         }
         function attendanceRowAttendanceMinutes(row) {
             if (!row?.clockIn || !row?.clockOut) return null;
@@ -15150,8 +15172,11 @@ function getManualPairRecordAnchor(record) {
             const planned=plans.find(value=>value?.report)||plans.find(Boolean)||null;
             if(!planned)return formatDurationMinutes(actual);
             const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const changed=!!planned.reviewState;
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
-            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${declared}</div>${planned.minutes!==null?`<div class="text-xs">${planned.pending?'已安排／待申報':'申報'} ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
+            const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
+            const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+String(planned.originalCode).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'（尚未改寫）</div>':'';
+            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${reviewBadge}${declared}</div>${original}${planned.minutes!==null?`<div class="text-xs">${planned.pending?'已安排／待申報':'申報'} ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
         }
 
         function p79CanManageOvertime() {
