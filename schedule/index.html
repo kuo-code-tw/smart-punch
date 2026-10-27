@@ -28,6 +28,14 @@
 
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
+<script src="../assets/port79-schedule-attendance-display.js?v=20261027-allstaff-1"></script>
+<style id="p79-allstaff-attendance-evidence-20261027">
+#app-main-container .p79-attendance-evidence{display:block;margin:2px auto 0;padding:1px 3px;border-radius:5px;font-size:9px;line-height:1.3;font-weight:900;white-space:nowrap;width:max-content;max-width:100%}
+#app-main-container .p79-attendance-evidence-worked{background:#dcfce7;color:#166534;border:1px solid #86efac}
+#app-main-container .p79-attendance-evidence-pending{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+html.dark #app-main-container .p79-attendance-evidence-worked{background:#14532d;color:#dcfce7}
+html.dark #app-main-container .p79-attendance-evidence-pending{background:#78350f;color:#fef3c7}
+</style>
 <script src="../assets/port79-overtime-reason.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261026-rest-ledger-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
@@ -3523,6 +3531,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         port79ScheduleLastAutoSyncAt=0;
         const ok=await loadScheduleCloudWithRetry('manual',3);
         if(!ok) throw new Error('無法讀取 Google 雲端最新排班資料');
+        // A manual roster refresh must also verify the latest actual punches.
+        // Report failures instead of silently presenting stale attendance evidence.
+        const evidence=await p79ScheduleRestClient().refresh(currentScheduleMonthKey());
+        if(!evidence?.complete)showScheduleNotice('排班已同步，但實際考勤尚未完成核對：'+(p79ScheduleRestClient().status(currentScheduleMonthKey()).error||'請稍後重試'),'error',9000);
         await refreshOrAcquireScheduleEditLock();
         renderTodaySchedulePanel();
       } catch(e) {
@@ -5928,14 +5940,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const {rosterShift,ownApprovedLeave,attendanceState,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
-            visibleRestKind}=selected;
+            visibleRestKind,attendanceMarker}=selected;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
-          if(manualNoPunch || shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '颱' || shiftVal === '離') {
-            offDays++;
-          } else {
+          if(attendanceMarker.worked || !(manualNoPunch || shiftVal === '休' || shiftVal === '例' || shiftVal === '國' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '颱' || shiftVal === '離')) {
             workDays++;
+          } else {
+            offDays++;
           }
 
           let shiftStyle = 'bg-slate-100 text-slate-600';
@@ -5991,9 +6003,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
-          const cellTitle = [specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle = [attendanceMarker.tooltip,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'人工指定班別保留；整班無卡，休假統計仍按實際考勤核對':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
-            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
+            <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" data-attendance-state="${scheduleEscapeHtml(attendanceState)}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml(visibleSubstituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
@@ -6014,6 +6026,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="喪" ${!visibleSubstituteLabel && shownShift==='喪'?'selected':''}>喪</option>
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
+              ${attendanceMarker.label?'<span class="p79-attendance-evidence p79-attendance-evidence-'+attendanceMarker.level+'" title="'+scheduleEscapeHtml(attendanceMarker.tooltip)+'">'+scheduleEscapeHtml(attendanceMarker.label)+'</span>':''}
               ${combinedMarker}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
               ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="人工指定班別保留；整班無卡，休假統計仍按實際考勤核對">無卡待核</span>':''}
@@ -6431,7 +6444,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         token:currentPort79SsoToken,employees:()=>employees,schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
-        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次成功結果）…':'出勤核對中…'):state.error?'出勤未完成核對：'+state.error:'';if(!state.pending)renderRoleScheduleView();}
+        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status){status.textContent=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次成功結果）…':'出勤核對中…'):state.error?'出勤未完成核對：'+state.error:'';status.hidden=!(state.pending||state.error);}if(!state.pending)renderRoleScheduleView();}
       });return p79ScheduleRestEvidenceClient;
     }
     function p79RefreshScheduleRestEvidence() {
@@ -6513,6 +6526,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const rosterShift=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
       const ownApprovedLeave=approvedLeaveForEmployee(emp.id,dayStr);
       const attendanceState=window.P79RestAttendance.state(ctx.attendanceSnapshot,emp.id,dayStr);
+      // Some standalone export/test contexts deliberately omit external UI assets.
+      // Preserve a safe visible result rather than crashing roster/export rendering.
+      const attendanceMarker=window.P79ScheduleAttendanceDisplay?.resolve?.({state:attendanceState,shift:rosterShift,approvedLeave:!!ownApprovedLeave}) || {
+        worked:attendanceState==='worked',pending:attendanceState==='missing',
+        level:attendanceState==='worked'?'worked':attendanceState==='missing'?'pending':'',
+        label:attendanceState==='worked'?'已出勤':attendanceState==='missing'?'打卡待核':'',
+        tooltip:'依正式考勤核對，原排班不變',
+        excludeRestCount:attendanceState==='worked'&&['休','例','國'].includes(rosterShift)&&!ownApprovedLeave
+      };
       const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
         ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
@@ -6534,11 +6556,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
       const visibleSubstituteLabel=typhoonScheduledRest||specialNoPunch?'':substituteLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
-      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,noPunchRest,
+      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,attendanceMarker,noPunchRest,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,
         visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''
           :visibleSubstituteLabel&&!p79ConfirmedRestOvertime(dayMeta)?''
+          :attendanceMarker.excludeRestCount?''
           :p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
     }
     // On-demand full staff check uses the same precedence as the month grid.
@@ -6576,7 +6599,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // is an unverified annotation, not an approved rest-quota deduction.
         const category=reportType||(code?.[1]&&shift!=='休'?code[1]:'')||
           (['例','休','國'].includes(assigned.restCategory)&&shift==='休'?assigned.restCategory:'');
-        if(category){counts[category]++;dates[category].push(date.slice(8));}
+        const state=typeof window!=='undefined'&&window.P79RestAttendance?.state
+          ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(month).evidence},emp.id,date):'unknown';
+        const marker=(typeof window!=='undefined'?window.P79ScheduleAttendanceDisplay?.resolve?.({state,shift,approvedLeave:!!approvedLeaveForEmployee(emp.id,date)}):null)
+          || {excludeRestCount:state==='worked'&&['休','例','國'].includes(shift)};
+        if(category&&!marker.excludeRestCount){counts[category]++;dates[category].push(date.slice(8));}
       }
       return {counts,dates};
     }
