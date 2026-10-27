@@ -94,7 +94,7 @@ assert.equal(matches(yaanHtml,/<thead>/g),1);
 assert.equal(matches(yaanHtml,/合計（小時）/g),1);
 assert(yaanHtml.includes('<td>24.00</td>'),'Asia An three employees total 24 hours');
 assert.equal(matches(yaanHtml,/class="oa-sign"/g),1,'Asia An has one set of signatures');
-assert.equal(matches(page,/class="oa-sign"/g),1,'another company's two positions still have one set of signatures');
+assert.equal(matches(page,/class="oa-sign"/g),1,'other company with two positions has one set of signatures');
 assert.equal(matches(yaanHtml,/加班日期：/g),0);
 const asiaOne=api.reportHtml([mk(d1,'亞太國際物流','ARMG','王一',8)],false,true);
 assert.equal(matches(asiaOne,/<table>/g),1,'identical one-role template in the other company');
