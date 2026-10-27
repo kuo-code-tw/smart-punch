@@ -3621,6 +3621,31 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       startScheduleFullAutoSync();
       startScheduleAttendanceStateAutoSync();
 
+      // Overtime declarations are saved from work-hours into the official schedule metadata.
+      // On a separate schedule tab, explicitly refresh the cloud snapshot after the confirmed save.
+      let lastOvertimeNotification='';
+      const refreshChangedOvertime=()=>{
+        let raw='';
+        try{raw=localStorage.getItem('p79_schedule_overtime_changed_v1')||'';}catch(ignore){return;}
+        if(!raw||raw===lastOvertimeNotification)return;
+        let change;
+        try{change=JSON.parse(raw);}catch(ignore){return;}
+        if(!change||!/^\\d{4}-\\d{2}$/.test(String(change.month||''))||
+            change.month!==currentScheduleMonthKey()||!Number(change.at)||
+            Date.now()-Number(change.at)>3600000)return;
+        // Avoid discarding unsaved schedule edits. An unsuccessful read is retried on next focus.
+        loadScheduleCloudWithRetry('manual',2).then(ok=>{
+          if(ok)lastOvertimeNotification=raw;
+        }).catch(error=>console.warn('加班修改後排班讀回失敗：',error));
+      };
+      window.addEventListener('storage',event=>{
+        if(event.key==='p79_schedule_overtime_changed_v1')refreshChangedOvertime();
+      });
+      window.addEventListener('focus',refreshChangedOvertime);
+      document.addEventListener('visibilitychange',()=>{
+        if(document.visibilityState==='visible')refreshChangedOvertime();
+      });
+
       window.addEventListener('pagehide', (event) => {
         if(!event.persisted) releaseScheduleEditLockOnExit();
       });
