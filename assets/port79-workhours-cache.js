@@ -8,7 +8,7 @@ const copy=x=>JSON.parse(JSON.stringify(x));
 function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3)memory.delete(memory.keys().next().value);}
 const context=()=>g.P79WorkhoursCacheContext;
 function mutationStamp(){try{return String(g.sessionStorage?.getItem('port79_cache_mutated_at')||'');}catch(_){return '';}}
-function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCache?.viewerKey?.(),url=c?.url?.();if(!token||!viewer||!url||!c.canRead())throw Error('登入或加班查看權限已失效');const endpoint=new URL(url);if(endpoint.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(endpoint.pathname))throw Error('GAS 網址不正確');return {token,viewer,url,generation,stamp:mutationStamp()};}
+function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCache?.viewerKey?.(),url=c?.url?.();if(!token||!viewer||!url||!c.canRead()||c.cacheAccess?.()===false)throw Error('登入或加班查看權限已失效');const endpoint=new URL(url);if(endpoint.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(endpoint.pathname))throw Error('GAS 網址不正確');return {token,viewer,url,generation,stamp:mutationStamp()};}
 function assert(s){const n=identity();if(n.token!==s.token||n.viewer!==s.viewer||n.url!==s.url||n.generation!==s.generation||n.stamp!==s.stamp)throw Error('登入或資料版本已變更，請重新讀取');}
 function key(s,month){return s.viewer+'|system|workhours|verified-v1|'+encodeURIComponent(s.url)+'|'+month;}
 function monthsFor(month){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('月份格式不正確');const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()),offset=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);return [offset(-1),month,...(offset(1)<=current?[offset(1)]:[])];}
@@ -28,8 +28,8 @@ function valid(b,month,s){
  return b?.schema===1&&b.month===month&&b.viewer===s.viewer&&b.url===s.url&&typeof b.version==='string'&&b.version&&b.config?.ok===true&&b.config.config&&typeof b.config.config==='object'&&b.roster?.ok===true&&b.roster.month===month&&b.meta?.version===b.version&&Array.isArray(b.roster.employees)&&Array.isArray(b.roster.schedules)&&b.roster.schedules.every(r=>r&&String(r.month)===month&&r.schedule&&typeof r.schedule==='object'&&!Array.isArray(r.schedule))&&months.every(m=>b.raw?.[m]?.ok===true&&b.raw[m].month===m&&Array.isArray(b.raw[m].records));
 }
 async function saved(s,month){
- const k=key(s,month);if(valid(memory.get(k),month,s))return memory.get(k);
- let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),250);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt<=Date.now()+60000){remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+ const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>=stamp)return memory.get(k);
+ let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),250);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
 }
 function compatible(b,m){
  const r=m.revisions,revision=[r.schedule,r.leave,r.employees,b.month].join(':');
@@ -42,7 +42,7 @@ function load(month,options={}){
   const prior=await saved(s,month);assert(s);
   // Preview is explicitly marked unverified; no accounting/save operation gets
   // this result. UI still filters people through the current authenticated scope.
-  if(prior&&options.onPreview)options.onPreview({...copy(prior),preview:true,source:'本機快取，背景核對中'});
+  if(prior&&options.onPreview&&options.force!==true)options.onPreview({...copy(prior),preview:true,source:'本機快取，背景核對中'});
   let before=await meta(s,month,options.force===true);assert(s);
   if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);return hit;}
   // A scope/HR revision change must immediately stop showing old scoped data.
@@ -55,8 +55,8 @@ function load(month,options={}){
    if(!valid(b,month,s))throw Error('完整班表或跨月考勤尚未讀齊，未覆蓋原快取');
    const after=await meta(s,month,true);assert(s);
    if(before.version!==after.version||!compatible(b,after)){before=after;continue;}
-   b.meta=after;b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);
-   const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:Date.now(),size:JSON.stringify(b).length,data:copy(b)};
+   b.meta=after;b.savedAt=Date.now();b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);
+   const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:b.savedAt,size:JSON.stringify(b).length,data:copy(b)};
    // Cache/disk failures cannot hold the rendered result hostage. Account/scope
    // remain in the row key; a late write cannot validate a later version.
    void Promise.resolve(g.Port79DataCache?.put?.(row)).catch(()=>{});
