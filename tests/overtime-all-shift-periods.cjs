@@ -32,6 +32,12 @@ assert.equal(middle.mismatch,false);
 const night=resolve({start:t(date,23,50),end:t('2026-10-28',7,47),roster:rosters.night});
 assert.equal(night.code,'休24-08');
 assert(night.mismatch);
+const priorHoliday={id:'OT-CHEN',category:'國',code:'國24-08',overtimeStart:'24',overtimeEnd:'08',declaredHours:8,convertedHours:8};
+const henNight=api.resolve({date:'2026-10-15',rules:[...reports,['國','國24-07',7,7,'','','24','07','full']],report:priorHoliday,roster:{'2026-10-15':'晚'},start:Date.parse('2026-10-15T23:31:00+08:00'),end:Date.parse('2026-10-16T07:45:00+08:00'),attendanceIssue:false});
+assert.equal(henNight.code,'國24-08','07:45 clock-out must infer 24–08, never shorten to 24–07');
+assert.equal(henNight.mismatch,false,'do not propose changing a correct eight-hour formal declaration');
+assert.equal(henNight.confirmed,true);
+assert.equal(priorHoliday.code,'國24-08','original cloud record must remain unchanged');
 const variants=[['休10-18',t(date,9,49),t(date,17,49)],
  ['休08-14',t(date,7,53),t(date,13,48)],
  ['休20-01',t(date,19,52),t('2026-10-28',0,48)],
