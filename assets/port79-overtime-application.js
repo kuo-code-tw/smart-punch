@@ -85,28 +85,27 @@ function aggregate(rows,dates){
 const reportTitle=(rows,planned)=>rows[0]?.summary?(planned?'加班預排時數統計表':'加班時數統計表'):(planned?'加班預排申請表':'加班費明細表');
 const reportHeaders=rows=>rows[0]?.summary?headers.map((h,i)=>i>=4&&i<=7?h+'時數':i===8?'加班總時數':h):headers;
 const reportDate=rows=>rows[0]?.rangeLabel||dateLabel(rows[0].date);
+// 亞安企業管理原本的職稱分表版型作為全部公司的唯一範本：
+// 同家公司標題/日期/簽核一次；每個職稱一張完整表格，該表格最後自己合計一次。
 function reportHtml(rows,planned,hideConverted=false){
  const summary=!!rows[0]?.summary;
  return pages(rows).map(page=>'<section class="oa-page">'+page.companies.map(company=>{
   const companyRows=company.sections.flatMap(section=>section.rows);
-  let serial=0;
-  const companyBody=company.sections.map(section=>{
-   const sectionTotal='<tr class="oa-total"><td colspan="'+(summary?4:8)+'">'+esc(section.job)+' 合計（小時）</td>'+
-    (summary?[0,1,2,3].map(i=>'<td>'+number(section.rows.reduce((n,r)=>n+Number(r.periods[i]||0),0))+'</td>').join(''):'')+
-    '<td>'+number(total(section.rows,'actual'))+'</td>'+
-    (hideConverted?'':'<td>'+(total(section.rows,'converted')===null?'未完整設定':number(total(section.rows,'converted')))+'</td>')+
-    '<td></td></tr>';
-   return section.rows.map(r=>'<tr><td>'+(++serial)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.job)+'</td><td>'+esc(r.empId)+'</td>'+
-    r.periods.map((p,i)=>'<td class="'+['rest','work','regular','national'][i]+'">'+esc(p)+'</td>').join('')+
-    '<td>'+number(r.actual)+'</td>'+(hideConverted?'':'<td>'+(r.converted===null?'未設定':number(r.converted))+'</td>')+
-    '<td>'+esc(r.note)+'</td></tr>').join('')+sectionTotal;
-  }).join('');
   return '<article><h2>'+esc(company.name)+' 79W作業課'+reportTitle(rows,planned)+'</h2>'+
    '<p class="oa-date">'+esc(reportDate(summary?rows:companyRows))+'</p>'+
-   '<div class="oa-section"><h3>職稱：'+company.sections.map(section=>esc(section.job)).join('、')+'</h3>'+
-   '<table><colgroup>'+(hideConverted?[4,9,8,12,9,9,9,9,13,18]:[4,8,7,11,8,8,8,8,11,12,15]).map(w=>'<col style="width:'+w+'%">').join('')+
-   '</colgroup><thead><tr>'+reportHeaders(rows).filter((_,i)=>!hideConverted||i!==9).map(h=>'<th>'+esc(h)+'</th>').join('')+
-   '</tr></thead><tbody>'+companyBody+'</tbody></table></div>'+
+   company.sections.map(section=>{
+    const sectionTotal='<tr class="oa-total"><td colspan="'+(summary?4:8)+'">合計（小時）</td>'+
+     (summary?[0,1,2,3].map(i=>'<td>'+number(section.rows.reduce((n,r)=>n+Number(r.periods[i]||0),0))+'</td>').join(''):'')+
+     '<td>'+number(total(section.rows,'actual'))+'</td>'+
+     (hideConverted?'':'<td>'+(total(section.rows,'converted')===null?'未完整設定':number(total(section.rows,'converted')))+'</td>')+'<td></td></tr>';
+    return '<div class="oa-section"><h3>職稱：'+esc(section.job)+'</h3>'+
+     '<table><colgroup>'+(hideConverted?[4,9,8,12,9,9,9,9,13,18]:[4,8,7,11,8,8,8,8,11,12,15]).map(w=>'<col style="width:'+w+'%">').join('')+
+     '</colgroup><thead><tr>'+reportHeaders(rows).filter((_,i)=>!hideConverted||i!==9).map(h=>'<th>'+esc(h)+'</th>').join('')+
+     '</tr></thead><tbody>'+section.rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.job)+'</td><td>'+esc(r.empId)+'</td>'+
+     r.periods.map((p,i)=>'<td class="'+['rest','work','regular','national'][i]+'">'+esc(p)+'</td>').join('')+
+     '<td>'+number(r.actual)+'</td>'+(hideConverted?'':'<td>'+(r.converted===null?'未設定':number(r.converted))+'</td>')+
+     '<td>'+esc(r.note)+'</td></tr>').join('')+sectionTotal+'</tbody></table></div>';
+   }).join('')+
    '<div class="oa-sign"><span>經理：</span><span>課長：</span><span>製表：</span></div></article>';
  }).join('')+'</section>').join('');
 }
@@ -129,24 +128,22 @@ function excelBytes(rows,planned,hideConverted=false){
   const add=(values,styles,height=28)=>{body+=`<row r="${r}" ht="${height}" customHeight="1">`+Array.from({length:count},(_,i)=>cell(i,r,values[i],Array.isArray(styles)?styles[i]||0:styles||0)).join('')+'</row>';r++;};
   for(const company of page.companies){
    const companyRows=company.sections.flatMap(section=>section.rows);
-   const jobNames=company.sections.map(section=>section.job).join('、');
-   merges.push(`A${r}:${lastCol}${r}`);add([company.name+' 79W作業課'+reportTitle(rows,planned)],1,32);
+   merges.push(`A${r}:${lastCol}${r}`);
+   add([company.name+' 79W作業課'+reportTitle(rows,planned)],1,32);
    if(rows[0]?.summary){
     merges.push(`A${r}:${lastCol}${r}`);add([reportDate(rows)],10,36);
-    merges.push(`A${r}:${lastCol}${r}`);add(['職稱：'+jobNames],0,24);
    }else{
-    merges.push(`A${r}:D${r}`,`E${r}:${lastCol}${r}`);
-    add([reportDate(companyRows),'','','','職稱：'+jobNames],[10,0,0,0,0],36);
+    merges.push(`A${r}:${lastCol}${r}`);add([reportDate(companyRows)],10,36);
    }
-   // One table per company, each job gets its own subtotal. No company-wide grand total.
-   add(visible(reportHeaders(rows)),2,34);
-   let serial=0;
+   // 每個職稱完整套用亞安原先的一張表 + 表尾合計（不額外做公司總合計）。
    for(const section of company.sections){
+    merges.push(`A${r}:${lastCol}${r}`);add(['職稱：'+section.job],0,24);
+    add(visible(reportHeaders(rows)),2,34);
     const first=r;
-    section.rows.forEach(row=>add(visible([++serial,row.name,row.job,row.empId,...row.periods,row.actual,row.converted===null?'未設定':row.converted,row.note]),visible([3,3,3,3,4,3,5,6,7,7,3]),30));
+    section.rows.forEach((row,i)=>add(visible([i+1,row.name,row.job,row.empId,...row.periods,row.actual,row.converted===null?'未設定':row.converted,row.note]),visible([3,3,3,3,4,3,5,6,7,7,3]),30));
     const last=r-1;
     merges.push(rows[0]?.summary?`A${r}:D${r}`:`A${r}:H${r}`);
-    body+=`<row r="${r}" ht="28" customHeight="1">`+cell(0,r,section.job+' 合計（小時）',2)+
+    body+=`<row r="${r}" ht="28" customHeight="1">`+cell(0,r,'合計（小時）',2)+
      Array.from({length:rows[0]?.summary?3:7},(_,i)=>cell(i+1,r,'',2)).join('')+
      (rows[0]?.summary?[0,1,2,3].map(i=>cell(i+4,r,section.rows.reduce((n,row)=>n+Number(row.periods[i]||0),0),8,`SUM(${String.fromCharCode(69+i)}${first}:${String.fromCharCode(69+i)}${last})`)).join(''):'')+
      cell(8,r,total(section.rows,'actual'),8,`SUM(I${first}:I${last})`)+
