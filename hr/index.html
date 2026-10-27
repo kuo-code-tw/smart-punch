@@ -983,7 +983,7 @@ function buildPermGrid(e){
   const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=canHr('permissions.manage');
   const scopes=dataScopes(e||{}),selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
   // 指定職稱與目前雲端實際接受的範圍一致。
-  const availableJobs=['AQC','ARMG','領班','指揮手'];
+  const availableJobs=['AQC','ARMG','F/L','領班','指揮手'];
   const cards=SYS.map(k=>{
     const f=fineDefaults({...e,adminRole:role},k);
     let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
@@ -994,7 +994,7 @@ function buildPermGrid(e){
   if(superRole||employeeRole){
     ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍</b><p>${superRole?'超級管理員：全部系統固定可查看全部人員。':'一般員工：僅本人資料。'}</p>${SYS.map(k=>`<input type="hidden" id="scope_${k}" value="${superRole?'all':'self'}">`).join('')}</div>`;
   }else{
-    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、領班、指揮手。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${job}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].includes(job)?'checked':''} ${!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div></div>`).join('')}</div>`;
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、F/L、領班、指揮手。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${job}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].includes(job)?'checked':''} ${!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div></div>`).join('')}</div>`;
   }
   $('permGrid').innerHTML=cards+ranges;
   SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];});
