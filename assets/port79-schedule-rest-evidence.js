@@ -21,8 +21,14 @@ function create(ctx){
    const actualShifts={},duplicates=new Set();
    for(const row of pairedRows){
     if(!row.clockIn||!row.clockOut||row.timePrecisionIssue)continue;
-    const rec=row.clockIn,employee=people.find(e=>id(e.id)===id(row.empId||rec.empId))||
-      people.find(e=>att(rec.attNo)&&att(e.attNo||e.attendanceNo)===att(rec.attNo));
+    const rec=row.clockIn,claimed=id(row.empId||rec.empId);
+    const matchedById=claimed?people.find(e=>id(e.id)===claimed):null;
+    const candidates=att(rec.attNo)?people.filter(e=>att(e.attNo||e.attendanceNo)===att(rec.attNo)):[];
+    // Never attribute a punch to a different employee if identity numbers
+    // conflict or the attendance number identifies more than one person.
+    if(candidates.length>1||matchedById&&candidates.length===1&&
+       id(candidates[0].id)!==id(matchedById.id))continue;
+    const employee=matchedById||(candidates.length===1?candidates[0]:null);
     const paired=ctx.shiftForSession?.(row);
     if(!employee||!paired?.date?.startsWith(month+'-')||!['早','中','晚'].includes(paired.shift))continue;
     const key=id(employee.id)+'|'+paired.date;
