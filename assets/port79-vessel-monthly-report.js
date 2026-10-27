@@ -1,7 +1,22 @@
 /* Styled monthly vessel report. ExcelJS is loaded only when an export is requested. */
 (function(root){
 'use strict';
-const DEFAULT_COMPANY='亞安顧問管理',COMPANY_KEY='port79_vessel_monthly_company_v1',PAGE_SIZE=35;
+const DEFAULT_COMPANY='亞安顧問管理',COMPANY_KEY='port79_vessel_monthly_company_v1',SIGNATURE_KEY='port79_vessel_monthly_signature_labels_v1',PAGE_SIZE=35,PRINT_ROWS_PER_PAGE=45;
+const DEFAULT_SIGNATURES=['證明：','協理：','經理：','製表：'];
+function signatureLabels(values){
+ return DEFAULT_SIGNATURES.map((fallback,i)=>{
+  if(!Array.isArray(values)||values[i]===undefined||values[i]===null)return fallback;
+  return String(values[i]).replace(/[\r\n\t\x00-\x1f]/g,' ').trim().slice(0,40);
+ });
+}
+function savedSignatures(){
+ try{const saved=JSON.parse(root.localStorage.getItem(SIGNATURE_KEY)||'null');return signatureLabels(saved);}catch(_){return signatureLabels();}
+}
+function saveSignatures(values){
+ const names=signatureLabels(values);
+ try{root.localStorage.setItem(SIGNATURE_KEY,JSON.stringify(names));}catch(_){}
+ return names;
+}
 function companyName(value){return String(value||'').trim().slice(0,80)||DEFAULT_COMPANY;}
 function savedCompany(){try{return companyName(root.localStorage.getItem(COMPANY_KEY));}catch(_){return DEFAULT_COMPANY;}}
 function saveCompany(value){const name=companyName(value);try{root.localStorage.setItem(COMPANY_KEY,name);}catch(_){}return name;}
@@ -26,17 +41,18 @@ function ensureExcelJS(){
  })().catch(error=>{loading=null;throw error;});
  return loading;
 }
-function createWorkbook(ExcelJS,{month,company,rows}){
+function createWorkbook(ExcelJS,{month,company,rows,signatures}={}){
  const match=/^(20\d{2})-(0[1-9]|1[0-2])$/.exec(String(month||''));
  if(!match)throw Error('請選擇正確的匯出月份');
  if(!Array.isArray(rows)||!rows.length)throw Error('沒有可匯出的船舶資料');
  const wb=new ExcelJS.Workbook();wb.creator='79號碼頭';wb.calcProperties.fullCalcOnLoad=true;
  const sheet=wb.addWorksheet('船邊作業量表',{
   views:[{showGridLines:false}],
-  pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,verticalCentered:true,
+  pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,verticalCentered:false,
    margins:{left:0.25,right:0.25,top:0.25,bottom:0.25,header:0.1,footer:0.1}}
  });
  const widths=[5,7,7,8,9,9,9,10,9,8,12,12,15];
+ const signatureText=signatureLabels(signatures===undefined?savedSignatures():signatures);
  sheet.columns=widths.map(width=>({width}));
  const pages=Math.ceil(rows.length/PAGE_SIZE);
  const title=companyName(company),report=`79W ${Number(match[1])-1911}年${Number(match[2])}月份船邊作業量表`;
@@ -45,11 +61,11 @@ function createWorkbook(ExcelJS,{month,company,rows}){
  const baseFont={name:'Microsoft JhengHei',size:10,color:{argb:'FF111827'}};
  const totals=rows.reduce((t,x)=>t.map((v,i)=>v+Number([x.disc,x.load,x.bill,x.hc,x.shift][i]||0)),[0,0,0,0,0]);
  for(let page=0;page<pages;page++){
-  const first=page*42+1,start=page*PAGE_SIZE,chunk=rows.slice(start,start+PAGE_SIZE);
-  for(let r=first;r<first+42;r++){
+  const first=page*PRINT_ROWS_PER_PAGE+1,start=page*PAGE_SIZE,chunk=rows.slice(start,start+PAGE_SIZE);
+  for(let r=first;r<first+PRINT_ROWS_PER_PAGE;r++){
    const row=sheet.getRow(r);row.height=12;
    for(let col=1;col<=13;col++){
-    const cell=row.getCell(col);cell.font={...baseFont};cell.alignment={horizontal:'center',vertical:'middle'};
+    const cell=row.getCell(col);cell.font={...baseFont};cell.alignment={horizontal:'center',vertical:'middle'};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};
     if(r>=first+2&&r<=first+40)cell.border=border;
    }
   }
@@ -61,7 +77,7 @@ function createWorkbook(ExcelJS,{month,company,rows}){
   sheet.mergeCells(first+2,11,first+2,12);sheet.mergeCells(first+2,13,first+3,13);
   sheet.getCell(first+3,11).value='Productivity';sheet.getCell(first+3,12).value='(Include HC)';
   for(let r=first+2;r<=first+3;r++){
-   sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEF4'}};});
+   sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};});
   }
   for(let i=0;i<PAGE_SIZE;i++){
    const x=chunk[i],r=first+4+i;if(!x)continue;
@@ -82,12 +98,23 @@ function createWorkbook(ExcelJS,{month,company,rows}){
    sheet.getCell(grand,col).value={formula:Array.from({length:pages},(_,p)=>`${letter}${p*42+40}`).join('+'),result:totals[col-6]};
    sheet.getCell(subtotal,col).numFmt=sheet.getCell(grand,col).numFmt='#,##0';
   }
-  for(const r of [subtotal,grand]){sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:r===grand?'FFDBEAFE':'FFF1F5F9'}};});}
+  for(const r of [subtotal,grand]){sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};});}
   sheet.mergeCells(footer,1,footer,13);sheet.getCell(footer,1).value=`第 ${page+1} 頁／共 ${pages} 頁`;sheet.getRow(footer).height=18;
-  // Explicit page breaks keep each 35-record block together, with repeated titles.
-  if(page<pages-1)sheet.getRow(footer).addPageBreak();
+  // Editable four-position signature area, printed on every portrait page.
+  sheet.getRow(first+42).height=12;
+  const signatureRow=first+43;
+  [[1,3],[4,6],[7,9],[10,13]].forEach(([left,right],i)=>{
+   sheet.mergeCells(signatureRow,left,signatureRow,right);
+   const cell=sheet.getCell(signatureRow,left);cell.value=signatureText[i];
+   cell.font={...baseFont,size:12};
+   cell.alignment={horizontal:'center',vertical:'middle',shrinkToFit:true};
+  });
+  sheet.getRow(signatureRow).height=24;
+  sheet.getRow(first+44).height=32;
+  // Explicit page breaks keep each 35-record block and its stamp fields together.
+  if(page<pages-1)sheet.getRow(first+44).addPageBreak();
  }
- sheet.pageSetup.printArea=`A1:M${pages*42}`;
+ sheet.pageSetup.printArea=`A1:M${pages*PRINT_ROWS_PER_PAGE}`;
  return wb;
 }
 async function download(options){
@@ -95,6 +122,6 @@ async function download(options){
  const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=root.URL.createObjectURL(blob),link=root.document.createElement('a');
  link.href=url;link.download=options.filename;root.document.body.appendChild(link);link.click();link.remove();setTimeout(()=>root.URL.revokeObjectURL(url),1000);
 }
-const api={companyName,savedCompany,saveCompany,createWorkbook,download,PAGE_SIZE};
+const api={companyName,savedCompany,saveCompany,signatureLabels,savedSignatures,saveSignatures,createWorkbook,download,PAGE_SIZE,PRINT_ROWS_PER_PAGE};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.P79VesselMonthlyReport=api;
 })(typeof window!=='undefined'?window:globalThis);
