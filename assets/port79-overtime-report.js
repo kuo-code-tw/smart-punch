@@ -90,12 +90,15 @@
   // Respect the latest paired punch only when it starts near the selected rule;
   // a single punch or an unrelated early timestamp can never override a roster.
   const startAgrees=Math.abs(start-ot[0])<=45*60000;
+  const endAgrees=Math.abs(end-ot[1])<=45*60000;
   // A roster that was *actually changed* to a different shift can supersede
   // stale reportOriginalShift; arbitrary earlier periods cannot.
   const activeShift=String(roster?.[date]||'');
   const currentStart=({早:'08',中:'16',晚:'24'})[activeShift];
   const adjustedShiftStart=currentStart!=null&&hour(currentStart)===hour(r[6]);
-  if(r[0]!=='延'&&scheduled&&ot[0]<scheduled.start&&!(startAgrees&&adjustedShiftStart))
+  // 完整上下班打卡均與新時段吻合時，即使舊休班 meta 尚未改班，也允許原申報改時段。
+  // 僅上班一筆或任意較早打卡不得單獨推翻原班表。
+  if(r[0]!=='延'&&scheduled&&ot[0]<scheduled.start&&!(startAgrees&&(adjustedShiftStart||endAgrees)))
    return '申報起點早於排定班別，請依班別起算';
   if(ot[1]>declarationEnd(end))return '下班分鐘須超過45分才進位；此申報時段超過可計算的下班整點，請選較短時段';
   if(r[0]!=='延'&&!startAgrees)return '打卡上班時間與申報起點不符，請核對排定班別';
