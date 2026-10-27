@@ -6599,8 +6599,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // is an unverified annotation, not an approved rest-quota deduction.
         const category=reportType||(code?.[1]&&shift!=='休'?code[1]:'')||
           (['例','休','國'].includes(assigned.restCategory)&&shift==='休'?assigned.restCategory:'');
-        const state=window.P79RestAttendance?.state?.({attendanceEvidence:p79ScheduleRestClient().status(month).evidence},emp.id,date)||'unknown';
-        const marker=window.P79ScheduleAttendanceDisplay?.resolve?.({state,shift,approvedLeave:!!approvedLeaveForEmployee(emp.id,date)}) || {excludeRestCount:state==='worked'&&['休','例','國'].includes(shift)};
+        const state=typeof window!=='undefined'&&window.P79RestAttendance?.state
+          ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(month).evidence},emp.id,date):'unknown';
+        const marker=(typeof window!=='undefined'?window.P79ScheduleAttendanceDisplay?.resolve?.({state,shift,approvedLeave:!!approvedLeaveForEmployee(emp.id,date)}):null)
+          || {excludeRestCount:state==='worked'&&['休','例','國'].includes(shift)};
         if(category&&!marker.excludeRestCount){counts[category]++;dates[category].push(date.slice(8));}
       }
       return {counts,dates};
