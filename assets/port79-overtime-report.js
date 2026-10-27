@@ -101,7 +101,7 @@
   const movedFullShift=endAgrees&&Number(r[2])===8&&ot[1]-ot[0]===8*3600000&&scheduled&&scheduled.start-ot[0]>=4*3600000;
   if(r[0]!=='延'&&scheduled&&ot[0]<scheduled.start&&!(startAgrees&&(adjustedShiftStart||movedFullShift)))
    return '申報起點早於排定班別，請依班別起算';
-  if(ot[1]>declarationEnd(end))return '下班分鐘須超過45分才進位；此申報時段超過可計算的下班整點，請選較短時段';
+  if(ot[1]>declarationEnd(end))return '下班分鐘達45分（含）即進位；此申報時段超過可計算的下班整點，請選較短時段';
   if(r[0]!=='延'&&!startAgrees)return '打卡上班時間與申報起點不符，請核對排定班別';
   if(r[0]==='延'&&start>ot[0]+45*60000)return '打卡上班時間與申報起點不符，請核對排定班別';
   return '';
