@@ -28,8 +28,8 @@ const client=ctx.window.P79ScheduleRestEvidence.create({
  assert.equal(evidence.actualShifts['E1|2026-10-25'],'中','Sunday cross-midnight OUT yields Sunday work shift');
  assert.equal(evidence.actualShifts['E2|2026-10-24'],undefined,'lone punch never auto-assigns a shift');
  assert.equal(ctx.window.P79RestAttendance.state({attendanceEvidence:evidence},'E1','2026-10-24'),'worked');
- assert(html.includes('const shiftVal=noPunchRest?\'休\':actualShift||rosterShift;'),'monthly day shift uses actual punches');
- assert(html.includes('visibleRestKind:actualShift?\'\''),'actual worked day not counted as used rest');
+ assert(html.includes("const shiftVal=noPunchRest?'休':actualShift||(verifiedRestAttendance?'已出勤':rosterShift);"),'complete paired short work displays 已出勤');
+ assert(html.includes("visibleRestKind:(actualShift||verifiedRestAttendance)?''"),'actual worked day not counted as used rest');
  assert(html.includes('punchShifts?.[String(emp.id).trim().toUpperCase()+\'|\'+date]'),'summary skips proven work as taken rest');
  assert(html.includes('allowUnmarked:true'),'legacy incorrect roster fixed automatically, not by manual button');
  assert(!html.includes('補卡後修正排班'),'manual button removed');

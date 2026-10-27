@@ -13,7 +13,7 @@ const c={
  p79MonthlyRestContext:{employmentStart:()=>''},
  P79SpecialOvertime:{electionDates:()=>[]},
  P79RestAttendance:{
-   state:(snapshot,emp,date)=>snapshot?.states?.[emp+'|'+date]||'worked',
+   state:(snapshot,emp,date)=>snapshot?.states?.[emp+'|'+date]||snapshot?.attendanceEvidence?.days?.[emp+'|'+date]?.state||'unknown',
    isLeaveDay:()=>false
  },
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true}})}),
@@ -29,7 +29,7 @@ const extract=n=>{
 };
 for(const n of ['p79CompactOvertimeCode','p79OvertimePeriodLabel','p79SubstituteShiftLabel',
  'p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79ScheduleConfirmedOvertime',
- 'p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79VisibleRestKind',
+ 'p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79ScheduleHasVerifiedPunch','p79VisibleRestKind',
  'p79ScheduleDisplayContext','p79ScheduleDisplayDay',
  'p79ScheduleExportDay','p79VisibleRestDayAudit','p79DailyRestCount'])
  vm.runInContext(extract(n),c);
