@@ -70,7 +70,7 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   // A historic bare 休 with a real punch may have been lawful rest-day overtime.
   // Do not rewrite it silently on page load; require explicit preview/approval.
   if(!knownAuto&&!allowUnmarked)continue;
-  if((old==='例'||old==='國')&&!knownAuto)continue;
+  if((old==='例'||old==='國')&&!knownAuto&&!allowUnmarked)continue;
   const restored=String(meta.noPunchOriginalShift||'').trim();
   // A saved original shift is stronger evidence, but a mismatched paired punch
   // requires manual review rather than assuming one of them is correct.
