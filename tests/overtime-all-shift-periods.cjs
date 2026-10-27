@@ -64,6 +64,26 @@ assert.notEqual(reportApi.ruleAttendanceIssue(t(date,11),t(date,15,48),date,cand
 const hours=reportApi.report(candidate);
 assert.equal(hours.declaredHours,8);
 assert.equal(hours.convertedHours,12.7);
+// Additional configured categories and custom periods use the same matching engine.
+const addedRules=[
+ ['例','例10-18',8,8,'','','10','18','full'],
+ ['休','自訂18-02',8,12.7,'','','18','02','full','特殊班休息日加班']
+];
+const custom={...previous,category:'例',code:'例16-24'};
+assert.equal(api.resolve({date,rules:[...reports,...addedRules],roster:rosters.rest,report:custom,
+ start:t(date,9,48),end:t(date,17,49)}).code,'例10-18');
+const unusual={...previous,category:'休',typeName:'特殊班休息日加班',code:'自訂16-24'};
+assert.equal(api.resolve({date,rules:[...reports,...addedRules],roster:rosters.rest,report:unusual,
+ start:t(date,17,48),end:t('2026-10-28',1,51)}).code,'自訂18-02');
+const extended={...previous,category:'延',code:'代20-08',typeName:'平日延長加班',
+ overtimeStart:'20',overtimeEnd:'24',normalStart:'16',normalEnd:'24',position:'before'};
+const after=api.resolve({date,report:extended,rules:reports,roster:rosters.early,
+ start:t(date,7,41),end:t(date,19,48)});
+assert.equal(after.code,'代16-20','configured normal-shift and after-shift rule must be supported');
+assert.equal(after.state,'completed');
+assert.equal(after.confirmed,true);
+assert.equal(api.resolve({date,report:extended,rules:reports,roster:rosters.early,
+ start:t(date,7,41)}).state,'none','one punch cannot assert an extended overtime shift');
 const page=fs.readFileSync('work-hours/index.html','utf8');
 assert(page.includes('p79WorkOvertimePeriodReview(row)'),'period reconciliation must run for visible staff');
 assert(page.includes('port79-overtime-shift-match.js'),'new module must be loaded');
