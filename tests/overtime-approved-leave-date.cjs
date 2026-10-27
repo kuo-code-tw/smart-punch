@@ -26,5 +26,7 @@ assert(js.includes('approvedDates.length===1')&&js.includes('dateInput.value=app
 assert(js.includes("dateInput.value='';leaveDateSelect.value=''"),'multiple approved dates must not silently use today');
 assert(js.includes('validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,'),'save should reject date mismatch');
 assert(js.includes('請假日期（依核准紀錄）'));
-for(const html of [work,leave]){assert(html.includes('approvedLeaves:()=>'),'workhours and leave must feed real leave records');assert(html.includes('port79-overtime-report.js?v=20261026-approved-leave-date-v1'),'force reload repaired date code');}
+for(const html of [work,leave])assert(html.includes('approvedLeaves:()=>'),'workhours and leave must feed real leave records');
+assert(work.includes('port79-overtime-report.js?v=20261027-shift-matching-v2'),'workhours must load latest shift-aware rules');
+assert(leave.includes('port79-overtime-report.js?v=20261026-approved-leave-date-v1'),'leave handoff retains approved-date refresh marker');
 console.log('PASS approved leave dates: Oct 20 not 26, correct employee, status filtering, multi-day selection, save mismatch prevention, handoff lock, standalone overtime, both page contexts');
