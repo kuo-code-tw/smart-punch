@@ -24,9 +24,9 @@ const sorted=api.sortEmployeesByStroke([
  {empId:'E01',name:'王榮章'}, {empId:'E25',name:'單建誠'}]);
 a.deepEqual(Array.from(sorted,x=>x.empId),['E01','E05','E10','E20','E25','E30'],'names use Chinese stroke count with stable employee-ID tie-break');
 const sample=[
- {empId:'E01',name:'王榮章',category:'休',dept:'A',job:'ARMG',revocation:audit},
- {empId:'E10',name:'宋文豪',category:'休',dept:'A',job:'ARMG',revocation:audit},
- {empId:'E30',name:'蔡欣穎',category:'國',dept:'B',job:'F/L',revocation:audit}
+ {id:'R1',empId:'E01',name:'王榮章',category:'休',dept:'A',job:'ARMG',revocation:audit},
+ {id:'R1',empId:'E10',name:'宋文豪',category:'休',dept:'A',job:'ARMG',revocation:audit},
+ {id:'R1',empId:'E30',name:'蔡欣穎',category:'國',dept:'B',job:'F/L',revocation:audit}
 ];
 a.deepEqual(Array.from(api.filter(sample,{employee:'E10'}),x=>x.name),['宋文豪'],'selecting a name must return only that employee, not all');
 a.deepEqual(Array.from(api.filter(sample,{employee:'E10',name:'宋',category:'休',dept:'A',job:'ARMG',status:'revoked'}),x=>x.empId),['E10'],'name selection must combine with other filters');
