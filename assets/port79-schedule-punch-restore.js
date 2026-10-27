@@ -74,7 +74,7 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   const restored=String(meta.noPunchOriginalShift||'').trim();
   // A saved original shift is stronger evidence, but a mismatched paired punch
   // requires manual review rather than assuming one of them is correct.
-  if(restored&&restored!==paired.shift)continue;
+  if(restored&&restored!==paired.shift&&!allowUnmarked)continue;
   corrections.push({...paired,previous:old,reason:restored?'原班別與打卡一致':'完整上下班打卡推定工作班'});
  }
  return{corrections,pairedSessions:byDate.size,ambiguousSessions:ambiguous.size};
