@@ -57,4 +57,18 @@ assert(html.includes('id="p79OvertimeJobTitleNotice"'),'abnormal report notice m
 assert(html.includes('換算加班時數</div><div id="overtimeTotalHours"'),'converted total card must use official conversions');
 assert(html.includes("if(!p79WorkOvertimeOfficialReport(meta.overtimeReport,meta)||shown.has"),'stored cloud report cannot disappear simply because no punch-based estimate exists');
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
+const displayStart=html.indexOf('const pendingPunchOvertime='),displayEnd=html.indexOf('const clockInCell =',displayStart);
+assert(displayStart>=0&&displayEnd>displayStart,'pending overtime display must be computed for each visible row');
+const pendingLabel=new Function('row','formatDurationMinutes',html.slice(displayStart,displayEnd)+';return pendingPunchOvertime;');
+const duration=n=>Math.floor(n/60)+' 小時 '+n%60+' 分';
+const pending={reportVerified:false,planned:false,timeCheckRequired:false,overtimeMinutes:149,specialOvertimeMinutes:0};
+assert.match(pendingLabel(pending,duration),/打卡估算加班 2 小時 29 分（尚未申報，不計正式合計）/);
+assert.match(pendingLabel({...pending,overtimeMinutes:248},duration),/4 小時 8 分/);
+assert.match(pendingLabel({...pending,overtimeMinutes:267},duration),/4 小時 27 分/);
+assert.equal(pendingLabel({...pending,reportVerified:true},duration),'','verified declarations must not be relabeled as pending');
+assert.equal(pendingLabel({...pending,timeCheckRequired:true},duration),'','unverified punches must not become overtime estimates');
+assert.equal(pendingLabel({...pending,planned:true},duration),'','future planned shift must not show a completed estimate');
+assert.match(pendingLabel({...pending,specialOvertimeMinutes:120},duration),/一般時段估算加班/,'special overlap must stay distinct from normal overtime');
+assert(html.includes("row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)"),'special day overlap is shown as pending attendance, not a certified declaration');
+assert(html.includes('const pendingEstimateCount=rows.filter('),'count pending estimated overtime');
 console.log('PASS all-employee job-title burden sharing, including non-reporters and a zero-overtime title: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
