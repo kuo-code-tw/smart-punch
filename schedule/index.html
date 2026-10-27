@@ -4203,10 +4203,22 @@ function p79EmployeeDateEligible(emp,date) {
       const recover=window.P79SchedulePunchRestore?.plan({
         records:fetched.flat(),employees,schedules:monthlyScheduleData,
         metadata:monthlyScheduleMeta,month:yearMonth,today,
+        allowUnmarked:!allowNoPunch,
         isProtected:(empId,date)=>approvedLeaveForEmployee(empId,date)||
           p79LeaveCoverOnDay(empId,date).length>0
       });
       if(!recover)throw Error('考勤與排班反向核對模組未載入，本次不修改班表');
+      if(!allowNoPunch&&recover.corrections.length){
+        const preview=recover.corrections.map(row=>{
+          const emp=employees.find(e=>String(e.id||e.empId).trim().toUpperCase()===row.empId);
+          return (emp?.name||row.empId)+' '+row.date+'：'+row.previous+' → '+row.shift;
+        });
+        const cap=preview.slice(0,35);
+        if(!confirm('已由正式考勤核對完整上下班打卡：\n'+cap.join('\n')+
+          (preview.length>cap.length?'\n…另有 '+(preview.length-cap.length)+' 筆':'')+
+          '\n\n只修正上述工作班並寫入正式雲端，不修改人工請假／正式加班。'+
+          '\n若原本是休假日上班的加班，請先取消並保留原例／休分類。確認修正嗎？'))return -1;
+      }
       for(const row of recover.corrections){
         const emp=employees.find(e=>String(e.id||e.empId).trim().toUpperCase()===row.empId);
         if(!emp||!monthlyScheduleData[emp.id]||
@@ -4261,6 +4273,7 @@ function p79EmployeeDateEligible(emp,date) {
         // Manual repair only restores confirmed working days, it never makes
         // other employees' old workdays into 休 as a side effect.
         const changed=await p79ApplyNoPunchRestFromOfficial(month,false);
+        if(changed<0)return;
         if(!changed){
           return alert('正式考勤已核對：沒有找到可安全恢復的工作班。若仍顯示休／例，請檢查是否完整上下班打卡，或當天是否為人工指定休假／正式加班。');
         }
