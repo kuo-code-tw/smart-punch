@@ -4211,7 +4211,8 @@ function p79EmployeeDateEligible(emp,date) {
       for(const row of recover.corrections){
         const emp=employees.find(e=>String(e.id||e.empId).trim().toUpperCase()===row.empId);
         if(!emp||!monthlyScheduleData[emp.id]||
-           !['休','例','國'].includes(String(monthlyScheduleData[emp.id][row.date]||'')))continue;
+           !['休','例','國','早','中','晚'].includes(String(monthlyScheduleData[emp.id][row.date]||''))||
+           String(monthlyScheduleData[emp.id][row.date])===row.shift)continue;
         const old=monthlyScheduleData[emp.id][row.date];
         const prior={...(monthlyScheduleMeta[emp.id]?.[row.date]||{})};
         const safe={...prior};
