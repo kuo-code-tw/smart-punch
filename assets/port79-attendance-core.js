@@ -445,6 +445,85 @@ function p79RestoreWithdrawnAttendanceDraft(backupId){
  updateUi();return {ok:true};
 }
 
+// 只讀核對全部暫停修改：同月份的正式主表只抓取一次，避免重新開窗才核對下一筆。
+// Never POST an old draft here; unresolved identity/time conflicts stay paused.
+async function p79AuditPausedAttendanceQueue(reportProgress){
+ const candidates=readQueue()
+  .filter(x=>x?.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||'')))
+  .map(x=>({key:x.key,payload:JSON.parse(JSON.stringify(x.payload))}));
+ const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:''};
+ if(!candidates.length){try{reportProgress?.({...summary})}catch(_){ }return summary;}
+ const base=gasUrl(),access=token();
+ if(!base||!access){
+  summary.errors=candidates.length;summary.checked=candidates.length;
+  summary.lastError='登入已失效或尚未設定正式考勤來源，原修改全部保留';
+  try{reportProgress?.({...summary})}catch(_){ }
+  return summary;
+ }
+ const monthCache=new Map();
+ function officialMonth(month){
+  if(!monthCache.has(month)){
+   monthCache.set(month,(async()=>{
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+    try{
+     const url=base+(base.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(access)+'&t='+Date.now();
+     const response=await fetch(url,{cache:'no-store',signal:controller.signal});
+     const data=await response.json();
+     if(!response.ok||!data?.ok||String(data.month)!==month||!Array.isArray(data.records))
+      throw new Error(data?.error||month+' 正式月份主表核對失敗');
+     return data.records;
+    }finally{clearTimeout(timer);}
+   })());
+  }
+  return monthCache.get(month);
+ }
+ for(const candidate of candidates){
+  try{
+   const payload=candidate.payload,expected=payload.record||{},id=payloadRecordId(payload);
+   const months=[...new Set([payload.originalTimeStr,expected.timeStr]
+    .map(v=>String(v||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
+   if(!id||(expected.id!=null&&String(expected.id)!==id)||
+      !['empId','attNo'].some(k=>String(expected[k]??'').trim())||!months.length){
+    summary.needsReview++;continue;
+   }
+   const records=(await Promise.all(months.map(officialMonth))).flat();
+   const sameId=records.filter(row=>String(row.id)===id);
+   const matches=sameId.filter(row=>['empId','attNo'].every(k=>
+     !String(expected[k]??'').trim()||normalizeCompareValue(row[k])===normalizeCompareValue(expected[k]))&&
+     (typeof getAttendanceRecordType==='function'
+       ?getAttendanceRecordType(row)===getAttendanceRecordType(expected)
+       :String(row.status)===String(expected.status)));
+   const unique=[...new Map(matches.map(row=>[JSON.stringify(row),row])).values()];
+   if(!sameId.length){
+    const current=p79PausedReviewItem(candidate.key,payload);
+    if(p79ArchiveObsoleteAttendanceEdits([current],'official-main-month-verified-absent')!==1)
+      throw new Error('舊修改備份或佇列更新未確認，原資料保留');
+    summary.archived++;continue;
+   }
+   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
+      p79PausedReviewIdentity(payload,unique[0])&&p79AttendanceEditAlreadySaved(payload,unique[0])){
+    p79PausedReviewItem(candidate.key,payload);
+    if(typeof p79ConfirmWithdrawnAttendanceDrafts==='function')
+     p79ConfirmWithdrawnAttendanceDrafts(unique[0]);
+    if(!remove(candidate.key,payload))throw new Error('佇列已變更，請重新核對');
+    try{markRecentAttendanceMutationCloudConfirmed?.(unique[0].id)}catch(_){ }
+    lastDoneAt=Date.now();
+    summary.confirmed++;continue;
+   }
+   // Same ID but different person, multiple records, incomplete time or changed
+   // content must be shown to a human; do not rewrite or silently discard.
+   summary.needsReview++;
+  }catch(error){
+   summary.errors++;summary.lastError=String(error?.message||error||'雲端核對失敗');
+  }finally{
+   summary.checked++;
+   try{reportProgress?.({...summary})}catch(_){ }
+  }
+ }
+ updateUi();
+ return summary;
+}
+
 async function p79ReviewPausedAttendanceWrite(key){
  const item=p79PausedReviewItem(key),payload=JSON.parse(JSON.stringify(item.payload));
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
@@ -1033,6 +1112,7 @@ window.p79V5PollDelta=pollDelta;
 window.p79V5PendingForId=pendingForId;
 window.p79V5PrepareAttendanceEdit=p79PrepareAttendanceEdit;
 window.p79V5ReviewPausedWrite=p79ReviewPausedAttendanceWrite;
+window.p79V5AuditPausedQueue=p79AuditPausedAttendanceQueue;
 window.p79V5WithdrawPausedWrites=p79WithdrawPausedAttendanceWrites;
 window.p79V5ReadWithdrawnDrafts=p79ReadWithdrawnAttendanceDrafts;
 window.p79V5CheckWithdrawnDraft=p79CheckWithdrawnAttendanceDraft;
