@@ -983,7 +983,7 @@ function buildPermGrid(e){
   const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=canHr('permissions.manage');
   const scopes=dataScopes(e||{}),selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
   // 指定職稱與目前雲端實際接受的範圍一致。
-  const availableJobs=['AQC','ARMG','F/L','領班','指揮手'];
+  const availableJobs=[...new Set(['AQC','ARMG','F/L','領班','指揮手',...Object.values(selectedJobs).flatMap(value=>Array.isArray(value)?value:[])])];
   const cards=SYS.map(k=>{
     const f=fineDefaults({...e,adminRole:role},k);
     let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
@@ -1083,6 +1083,7 @@ async function saveCurrent(){
     const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
     if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
     if(result.employee&&SYS.some(k=>normalizePerms(result.employee)[k]!==p[k]))throw new Error('雲端回覆的後台權限與設定不一致，請保留視窗並重新核對');
+    if(result.employee?.dataScopeJobs&&SYS.some(k=>JSON.stringify([...(result.employee.dataScopeJobs[k]||[])].sort())!==JSON.stringify([...(dataScopeJobs[k]||[])].sort())))throw new Error('雲端回覆的指定職稱權限與設定不一致，請保留視窗並重新核對');
     const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
     const saved={...(index>=0?employees[index]:{}),...employee,...(result.employee||{})};
     if(index>=0)employees.splice(index,1,saved);else employees.push(saved);
