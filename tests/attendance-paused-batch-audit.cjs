@@ -12,7 +12,8 @@ const makeItem=(id,time='2026/09/05 09:00')=>({
   record:{id,empId:'E'+id,attNo:'N'+id,status:'上班簽到',timeStr:time}
  }});
 const cloudFor=(id,time='2026/09/05 09:00')=>({id,empId:'E'+id,attNo:'N'+id,status:'上班簽到',timeStr:time});
-const eq=(a,b)=>String(a??'').trim().replace(/-/g,'/');
+const normalize=a=>String(a??'').trim().replace(/-/g,'/');
+const eq=(a,b)=>normalize(a)===normalize(b);
 function setup(items,cloudRecords,{failRead=false,failArchive=false}={}){
  let queue=items.map(x=>JSON.parse(JSON.stringify(x))),reads=0,posts=0;
  const archives=[],progress=[];
@@ -21,7 +22,7 @@ function setup(items,cloudRecords,{failRead=false,failArchive=false}={}){
   lastDoneAt:0,updateUi(){},
   gasUrl:()=> 'https://example.invalid/exec',token:()=> 'ADMIN_TEST',
   readQueue:()=>queue,payloadRecordId:p=>String(p?.record?.id??p?.id??''),
-  normalizeCompareValue:eq,
+  normalizeCompareValue:normalize,
   p79PausedReviewItem(key,payload){
    const live=queue.find(x=>x.key===key&&x.paused&&JSON.stringify(x.payload)===JSON.stringify(payload));
    if(!live)throw Error('draft changed while auditing');
