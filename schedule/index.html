@@ -6603,6 +6603,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // 所有人員共用單一逐日分類器；不使用自動補配額度作為已休天數。
     function p79DailyRestCount(emp,month,knownAllocation=null) {
       const counts={例:0,休:0,國:0},dates={例:[],休:[],國:[]};
+      const punchShifts=typeof p79ScheduleRestClient==='function'
+        ?p79ScheduleRestClient().status(month).evidence?.actualShifts:null;
       const shifts=monthlyScheduleData[emp.id]||{},metadata=monthlyScheduleMeta[emp.id]||{};
       const protectedTyphoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
       // Each row's quota totals must use exactly the same fresh allocation that paints
@@ -6615,7 +6617,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if(first&&date<first)continue;
         const shift=String(shifts[date]||'').trim(),meta=metadata[date]||{},assigned=allocated[date]||{};
         if(['離','離職'].includes(shift))break;
-        if(p79ScheduleRestClient().status(month).evidence?.actualShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]&&
+        if(punchShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]&&
            !meta.overtimeReport&&!meta.overtime&&!approvedLeaveForEmployee(emp.id,date))continue;
         if(protectedTyphoon.has(date)||shift==='颱')continue;
         const code=/^(例|休|國)(?:$|[0-9]{1,2}(?::[0-9]{2})?[-–][0-9]{1,2}(?::[0-9]{2})?$)/.exec(shift);
@@ -6729,13 +6731,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // This is a calendar event exclusion, not a mutation of the original roster.
     function p79RestAutomaticExcludedDates(emp,month) {
       const quota=p79RestQuota(month),typhoon=new Set(p79TyphoonDates());
+      const punchShifts=typeof p79ScheduleRestClient==='function'
+        ?p79ScheduleRestClient().status(month).evidence?.actualShifts:null;
       const elections=new Set(window.P79SpecialOvertime?.electionDates?.()||[]);
       const dates=[];
       for(let n=1;n<=quota.days;n++){
         const date=month+'-'+String(n).padStart(2,'0');
         if(approvedLeaveForEmployee(emp.id,date)||
            p79LeaveCoverOnDay(emp.id,date).length||
-           !!p79ScheduleRestClient().status(month).evidence?.actualShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]||
+           !!punchShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]||
            // 颱風假完全獨立；即使原排休也不可拿去補例／休／國。
            typhoon.has(date)||elections.has(date)||
            String(monthlyScheduleData[emp.id]?.[date]||'').trim()==='颱')dates.push(date);
