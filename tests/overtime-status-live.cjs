@@ -8,7 +8,28 @@ roster.__meta[month+'-01'].overtimeReport={...report,id:'R2'};delete roster.__me
 const html=fs.readFileSync('work-hours/index.html','utf8');a(html.includes('每日加班人員統計'));a(html.includes('onclick="P79OvertimeStatus.open()"'));a(html.includes('>申報／異動紀錄</button>'));a(html.includes('overtimeRevocationVersion!==1'));a(html.includes("reason:'rest_quota_excess'"));a(html.includes('expectedReportId:row.id'));a(html.includes('P79OvertimeStatus.fetch'));a(html.includes("snapshot(month,true,true)"));a.equal(api.filter(result.rows,{employee:'TEST1'}).length,2,'employee picker matches the exact employee ID');
 a.equal(api.filter(result.rows,{employee:'TEST2'}).length,0,'employee picker never matches another employee');
 const statusUi=fs.readFileSync('assets/port79-overtime-status.js','utf8');
-a(statusUi.includes("new Intl.Collator('zh-Hant-u-co-stroke')"),'employee picker must sort names by Traditional Chinese stroke count');
-a(statusUi.includes('<label>姓名<select id="osEmployee"'),'employee picker must be clickable');
-a(statusUi.includes("q('#osEmployee').onchange"),'employee selection must trigger filtering');
+a(statusUi.includes("new Intl.Collator('zh-Hant-u-co-stroke'"),'employee picker must sort names by Traditional Chinese stroke count');
+a(statusUi.includes('<label>姓名（筆畫）<select id="osEmployee"'),'employee picker must be clickable');
+a(statusUi.includes("q('#osEmployee').onchange=employeeChanged"),'employee selection must trigger filtering');
+a(statusUi.includes("q('#osEmployee').oninput=employeeChanged"),'employee selection must work with mouse and keyboard');
+a(statusUi.includes('employee:selectedEmployee'),'selected employee remains active when other filters are changed');
+a(!statusUi.includes("q('#osName').value='';selected.clear();paint();"),'selecting employee must not clear search');
+a(!statusUi.includes("q('#osEmployee').value='';selected.clear();paint();"),'typing search must not silently reset the employee dropdown');
+a(statusUi.includes('display:grid;grid-template-columns:'),'all filter controls must stay in one row');
+a(statusUi.includes('1880px'),'dialog must be wider for desktop');
+a(html.includes('port79-overtime-status.js?v=20261027-stroke-filter-one-row-v2'),'browser must load updated script');
+const sorted=api.sortEmployeesByStroke([
+ {empId:'E30',name:'蔡欣穎'}, {empId:'E20',name:'陳小明'},
+ {empId:'E05',name:'王榮章'}, {empId:'E10',name:'宋文豪'},
+ {empId:'E01',name:'王榮章'}, {empId:'E25',name:'單建誠'}]);
+a.deepEqual(Array.from(sorted,x=>x.empId),['E01','E05','E10','E20','E25','E30'],'names use Chinese stroke count with stable employee-ID tie-break');
+const sample=[
+ {empId:'E01',name:'王榮章',category:'休',dept:'A',job:'ARMG',revocation:audit},
+ {empId:'E10',name:'宋文豪',category:'休',dept:'A',job:'ARMG',revocation:audit},
+ {empId:'E30',name:'蔡欣穎',category:'國',dept:'B',job:'F/L',revocation:audit}
+];
+a.deepEqual(Array.from(api.filter(sample,{employee:'E10'}),x=>x.name),['宋文豪'],'selecting a name must return only that employee, not all');
+a.deepEqual(Array.from(api.filter(sample,{employee:'E10',name:'宋',category:'休',dept:'A',job:'ARMG',status:'revoked'}),x=>x.empId),['E10'],'name selection must combine with other filters');
+a.equal(api.filter(sample,{employee:'E10',name:'王'}).length,0,'conflicting search must show zero, not reset to all');
+a.equal(api.filter(sample,{employee:''}).length,3,'all names returns the full eligible set');
 console.log('PASS live status uses shared quota/rest evidence including cross-day periods, actual rest priority, incomplete-data blocking, saved archive and new-report isolation, combined filters and capability-gated integration');
