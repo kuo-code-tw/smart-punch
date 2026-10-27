@@ -21,8 +21,10 @@ for(const id of ids){
 }
 assert(html.includes('if (!row.reportVerified || !report || report.planned === true'),
   'monthly raw reported-hours total must require verified ID');
-assert(html.includes('savedReport:row.reportVerified===true'),
-  'claim/report dialog must not treat proposals as saved');
+assert(html.includes("savedReport:editExisting,reportId:editExisting?row.overtimeReport?.id"),
+  'only explicit editing of a verified official declaration uses the saved-report path');
+assert(html.includes("if(editExisting&&(!row.reportVerified||!String(row.overtimeReport?.id||'').trim()))"),
+  'unverified proposals must never enter the formal amendment editor');
 assert(html.includes('未核實註記／非申報'),
   'unverified rows must be labeled as non-reports');
 assert(html.includes('if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged)'),
