@@ -13333,7 +13333,13 @@ async function p79ExportOvertimeComparison(printMode){
             if (jobEl.value !== 'ALL') scopedRows = scopedRows.filter(row => row.jobTitle === jobEl.value);
             const nameMap = new Map();
             scopedRows.forEach(row => nameMap.set(String(row.empId), row.name));
-            replaceOvertimeOptions(employeeEl, '全部姓名', [...nameMap.keys()], nameMap);
+            // 姓名下拉選單依繁體中文姓名筆畫排序；相同姓名以工號穩定排序。
+            const strokeCollator = new Intl.Collator('zh-Hant-u-co-stroke');
+            const employeeIdsByStroke = [...nameMap.keys()].sort((a, b) =>
+                strokeCollator.compare(String(nameMap.get(a) || ''), String(nameMap.get(b) || '')) ||
+                a.localeCompare(b)
+            );
+            replaceOvertimeOptions(employeeEl, '全部姓名', employeeIdsByStroke, nameMap);
         }
 
         async function p79ReloadOvertimeMonth(button){
