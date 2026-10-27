@@ -62,7 +62,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    const reasons=g.P79OvertimeReason;
     const note=reasons?.reportNote?.({empId:emp.empId,date,meta,report,roster:entry.schedule||{},snapshot})||
       String(report.note||report.typeName||'加班申報');
-    rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note,planned,reportId:report.id});
+    rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note,planned,reportId:report.id,reportSource:JSON.stringify(report)});
   }
  }
  // 特殊日工時只供考勤頁人工申報；未建立正式申報前不產生加班申報匯出列。
@@ -159,26 +159,84 @@ const reportUsabilityCss=String.raw`
  #p79OvertimeApplication footer>div{width:100%;display:grid;grid-template-columns:1fr 1fr}
 }
 `;
-// 讀取同帳號、同月份且仍有效的正式排班快取；不以考勤打卡快取冒充申報資料。
+// Rebuild attendance from cached raw inputs after a small authenticated version
+// check. Never reuse derived "open/rest" states across a day boundary.
 async function loadReportPreviewSnapshot(api,month,cache=g.Port79DataCache){
- if(cache?.getExportSnapshot){
-  try{
-   const hit=await cache.getExportSnapshot('getScheduleDataSecure',month);
-   const age=Date.now()-Number(hit?.savedAt||0);
-   const maxAge=month===today().slice(0,7)?10000:60000;
-   if(age>=0&&age<=maxAge&&hit?.data?.ok===true&&Array.isArray(hit.data.schedules)&&hit.data.schedules.length>0&&hit.data.schedules.every(row=>row&&String(row.month)===month&&row.schedule&&typeof row.schedule==='object'))
-    return {data:hit.data,source:'本機有效快取',savedAt:hit.savedAt};
-  }catch(_){/* 快取損壞或不可用時，仍以雲端正式申報為準。 */}
+ const token=api.session?.(),viewer=cache?.viewerKey?.(),deployment=api.deploymentUrl?.()||'';
+ const guard=()=>{
+  if(api.canExport&& !api.canExport()||api.session&&api.session()!==token||
+    viewer&&cache.viewerKey()!==viewer||api.deploymentUrl&&(api.deploymentUrl()||'')!==deployment)
+   throw Error('登入、權限或資料來源已變更，請重新產生預覽');
+ };
+ guard();
+ const key=viewer+'|overtime-report-v1|'+deployment+'|'+month;
+ let timer;
+ const local=viewer&&cache?.get?Promise.race([
+  Promise.resolve().then(()=>cache.get(key)).catch(()=>null),
+  new Promise(resolve=>{timer=setTimeout(()=>resolve(null),250);})
+ ]).finally(()=>clearTimeout(timer)):Promise.resolve(null);
+ const [hit,meta]=await Promise.all([local,api.cacheMeta?api.cacheMeta(month):null]);guard();
+ if(meta?.cacheSchemaVersion===1&&/^[a-f0-9]{64}$/.test(String(meta.version||''))){
+  const raw=hit?.data,valid=hit?.key===key&&hit.savedAt>0&&hit.savedAt<=Date.now()+60000&&
+   raw?.version===meta.version&&raw.month===month&&raw.ok===true&&Array.isArray(raw.records)&&
+   Array.isArray(raw.schedules)&&raw.schedules.every(row=>String(row?.month)===month&&row.schedule&&typeof row.schedule==='object');
+  if(valid&&api.buildPreviewSnapshot){
+   const data=await api.buildPreviewSnapshot(month,raw);guard();
+   return {data,source:'本機有效快取（雲端版本一致）',savedAt:hit.savedAt,auditBatchVersion:meta.auditBatchVersion};
+  }
+  const data=await api.snapshot(month);guard();
+  const after=await api.cacheMeta(month);guard();
+  if(after?.version!==meta.version)throw Error('讀取期間班表、考勤或人員資料已更新，請重新產生預覽');
+  if(viewer&&cache?.put&&api.previewCachePayload){
+   const payload=api.previewCachePayload(month,data);
+   if(payload){
+    const snapshot=JSON.parse(JSON.stringify({...payload,ok:true,month,version:meta.version}));
+    // Only raw source fields are persisted; no session token or save context.
+    const row={key,kind:'system',system:'workhours',month,savedAt:Date.now(),data:snapshot,size:JSON.stringify(snapshot).length*2};
+    void Promise.resolve().then(()=>{guard();return cache.put(row);}).catch(()=>{});
+   }
+  }
+  return {data,source:'雲端正式資料（已核對版本）',savedAt:Date.now(),auditBatchVersion:meta.auditBatchVersion};
  }
- return {data:await api.snapshot(month),source:'雲端正式資料',savedAt:Date.now()};
+ // Older GAS keeps the existing bounded-age, fully rebuilt attendance path.
+ const data=await (typeof api.previewSnapshot==='function'?api.previewSnapshot(month):api.snapshot(month));guard();
+ return {data,source:data.previewSource||'雲端正式資料',savedAt:Date.now(),auditBatchVersion:0};
 }
-// 每個日期維持獨立且冪等的正式匯出紀錄；限制同時連線數，避免18天逐筆串行等待。
+async function prepareExportAuditEntries(items){
+ return Promise.all(items.map(async item=>{
+  const entry={empId:item.empId,reportId:item.reportId};
+  if(item.reportSource){
+   if(!g.crypto?.subtle)throw Error('此瀏覽器無法核對申報版本，未啟動正式匯出');
+   const bytes=await g.crypto.subtle.digest('SHA-256',new TextEncoder().encode(item.reportSource));
+   entry.version=[...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join('');
+  }else if(item.version)entry.version=item.version;
+  return entry;
+ }));
+}
 async function writeExportAuditBatches(byDate,api,fileName,prefix,onProgress=()=>{}){
- const days=[...byDate],width=3;let complete=0;
+ const days=await Promise.all([...byDate].map(async ([date,items])=>[date,await prepareExportAuditEntries(items)]));
+ if(api.batchExportSupported?.()===true&&typeof api.auditBatchWrite==='function'){
+  const batches=days.map(([date,entries])=>({date,entries}));
+  const ack=await api.auditBatchWrite({batches,fileName,requestId:prefix});
+  const count=days.reduce((n,[,entries])=>n+entries.length,0),receipts=ack?.receipts;
+  if(ack?.ok!==true||ack.auditBatchVersion!==1||ack.count!==count||ack.days!==days.length||!Array.isArray(receipts)||receipts.length!==days.length)
+   throw Error('雲端批次匯出記錄尚未完整確認');
+  const seen=new Set();
+  for(const receipt of receipts){
+   const group=days.find(([date])=>date===receipt.date);
+   if(!group||seen.has(receipt.date)||receipt.count!==group[1].length||receipt.requestId!==prefix+'-'+receipt.date.replace(/-/g,''))
+    throw Error('雲端批次匯出讀回日期或筆數不符');
+   seen.add(receipt.date);
+  }
+  onProgress(days.length,days.length);return days.length;
+ }
+ // Old GAS still confirms each date, at most three in flight. Never fall back
+ // from an uncertain batch write and resend the same export with different IDs.
+ const width=3;let complete=0;
  for(let offset=0;offset<days.length;offset+=width){
   const outcomes=await Promise.allSettled(days.slice(offset,offset+width).map(async ([date,entries])=>{
    const ack=await api.auditWrite({date,entries,fileName,requestId:prefix+'-'+date.replace(/-/g,'')});
-   if(!ack?.ok||(ack.count!==entries.length&&ack.duplicate!==true))throw Error((ack?.error||'雲端匯出記錄尚未確認')+'（'+date+'）');
+   if(ack?.ok!==true||ack.count!==entries.length)throw Error((ack?.error||'雲端匯出記錄尚未確認')+'（'+date+'）');
    complete++;onProgress(complete,days.length);
   }));
   const failed=outcomes.filter(item=>item.status==='rejected');
@@ -219,10 +277,10 @@ function open(options={}){
  if(options.date&&validDate(options.date)){q('#oaMode').value='single';q('#oaStart').value=options.date;mode();}
  function lock(on){busy=on;el.querySelectorAll('.oa-filters input,.oa-filters select,.oa-filters button,.oa-filters summary,#oaDates button').forEach(n=>{if('disabled'in n)n.disabled=on;});q('#oaPrint').disabled=q('#oaExcel').disabled=on||!loaded;}
  q('#oaLoad').onclick=async()=>{
-  if(busy)return;reset();rowRemarks.clear();lock(true);try{if(!a.canExport())throw Error('登入或匯出權限已失效');const dates=datesFor(q('#oaMode').value,q('#oaStart').value,q('#oaEnd').value,q('#oaMonth').value,selectedDates);if(dates.length>366)throw Error('一次最多選366天');const months=[...new Set(dates.map(d=>d.slice(0,7)))],snapshots=[],sources=[];
-   for(let i=0;i<months.length;i++){status('正在讀取 '+months[i]+' 的已申報資料（'+(i+1)+'／'+months.length+'）…');const item=await loadReportPreviewSnapshot(a,months[i]);snapshots.push(item.data);sources.push(months[i]+'：'+item.source);if(!el.isConnected)return;}
+  if(busy)return;reset();rowRemarks.clear();lock(true);try{if(!a.canExport())throw Error('登入或匯出權限已失效');const dates=datesFor(q('#oaMode').value,q('#oaStart').value,q('#oaEnd').value,q('#oaMonth').value,selectedDates);if(dates.length>366)throw Error('一次最多選366天');const months=[...new Set(dates.map(d=>d.slice(0,7)))],snapshots=[],sources=[];let batchReady=true;
+   for(let i=0;i<months.length;i++){status('正在讀取 '+months[i]+' 的已申報資料（'+(i+1)+'／'+months.length+'）…');const item=await loadReportPreviewSnapshot(a,months[i]);snapshots.push(item.data);batchReady=batchReady&&item.auditBatchVersion===1;sources.push(months[i]+'：'+item.source);if(!el.isConnected)return;}
    const result=collect(snapshots,a.employees(),dates,q('#oaCompany').value,[...el.querySelectorAll('.oa-job:checked')].map(n=>n.value),q('#oaType').value);if(!result.rows.length){status('所選條件沒有可列印的'+(q('#oaType').value==='actual'?'已儲存申報':'預排申請')+'。\n'+result.issues.join('\n'));return;}
-   loaded={rows:[],sourceRows:result.rows,dates,summary:q('#oaView').value==='summary',planned:q('#oaType').value==='planned',hideConverted:q('#oaHideConverted').checked};updateReportRemarkPreview();q('#oaRowRemarks').hidden=false;void showAudit();status((q('#oaView').value==='summary'?'已彙總 '+dates.length+' 個日期、'+loaded.rows.length+' 位人員。':'已產生 '+pages(loaded.rows).length+' 個日期、'+loaded.rows.length+' 筆明細。')+'\n資料來源：'+sources.join('、')+'\n'+result.issues.join('\n'));
+   loaded={rows:[],batchReady,sourceRows:result.rows,dates,summary:q('#oaView').value==='summary',planned:q('#oaType').value==='planned',hideConverted:q('#oaHideConverted').checked};updateReportRemarkPreview();q('#oaRowRemarks').hidden=false;void showAudit();status((q('#oaView').value==='summary'?'已彙總 '+dates.length+' 個日期、'+loaded.rows.length+' 位人員。':'已產生 '+pages(loaded.rows).length+' 個日期、'+loaded.rows.length+' 筆明細。')+'\n資料來源：'+sources.join('、')+'\n'+result.issues.join('\n'));
   }catch(e){status('預覽未完成：'+e.message);}finally{lock(false);}
  };
  q('#oaPrint').onclick=()=>{if(!loaded||busy||!a.canExport())return;const popup=g.open('','_blank');if(!popup)return status('請允許開啟列印視窗');popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>加班申報表</title><style>'+printCss+'</style><body>'+reportHtml(loaded.rows,loaded.planned,loaded.hideConverted)+'</body></html>');popup.document.close();popup.focus();popup.print();};
@@ -250,16 +308,21 @@ function open(options={}){
      if(!row.reportId)continue;
      const key=String(row.date);
      if(!byDate.has(key))byDate.set(key,[]);
-     byDate.get(key).push({empId:row.empId,reportId:row.reportId});
+     byDate.get(key).push({empId:row.empId,reportId:row.reportId,reportSource:row.reportSource});
    }
    if(!byDate.size)throw Error('沒有可記錄的正式申報明細，不能標記已匯出');
    if(typeof a.auditWrite!=='function')throw Error('目前系統尚未連接加班匯出紀錄 API，請更新 GAS 後重試');
-   const prefix='OTEXP'+Date.now().toString(36)+Math.random().toString(36).slice(2,12);
+   const exportSignature=JSON.stringify([fileName,loaded.rows,loaded.planned,loaded.hideConverted]);
+   if(loaded.exportAuditRequest?.signature!==exportSignature)
+    loaded.exportAuditRequest={signature:exportSignature,prefix:'OTEXP'+Date.now().toString(36)+Math.random().toString(36).slice(2,12)};
+   const prefix=loaded.exportAuditRequest.prefix; // uncertain writes retry with the same IDs
+
    status('正在確認雲端正式匯出紀錄：0／'+byDate.size+' 個日期…');
-   await writeExportAuditBatches(byDate,a,fileName,prefix,(done,total)=>status('正在確認雲端正式匯出紀錄：'+done+'／'+total+' 個日期…'));
+   await writeExportAuditBatches(byDate,{...a,batchExportSupported:()=>loaded.batchReady===true},fileName,prefix,(done,total)=>status('正在確認雲端正式匯出紀錄：'+done+'／'+total+' 個日期…'));
    const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),link=document.createElement('a');
    link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
    status('已將 '+(loaded.sourceRows||[]).length+' 筆加班明細記錄為「已啟動匯出」，並開始下載。若瀏覽器阻擋下載，請確認後再操作。');
+   delete loaded.exportAuditRequest;
    void showAudit(); // 下載已啟動，查詢稽核清單不再阻塞匯出按鈕。
   }catch(e){status('匯出未完成：'+e.message);}finally{lock(false);}
  };
