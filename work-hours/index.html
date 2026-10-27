@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261026-approved-leave-date-v1&role20261026=1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261027-shift-matching-v1&role20261026=1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v1"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
@@ -13201,7 +13201,9 @@ async function p79ExportOvertimeComparison(printMode){
                         const ordinaryWorkMinutes=Math.max(0,totalMinutes-specialOvertimeMinutes);
                         overtimeMinutes=ordinaryWorkMinutes>480+MIN_OVERTIME_MINUTES?ordinaryWorkMinutes-480:0;
                     }
-                    if(!overtimeMinutes&&!specialOvertimeMinutes&&!attendanceIssue)return null;
+                    // A saved report whose old interval no longer overlaps a moved shift must stay visible for correction.
+                    // Never turn the unmatched interval into paid hours or silently recreate the report.
+                    if(!overtimeMinutes&&!specialOvertimeMinutes&&!attendanceIssue&&!restMeta?.overtimeReport)return null;
                     const monthKey = String(session.dateKey || '').slice(0, 7);
                     return {
                         ...session,
