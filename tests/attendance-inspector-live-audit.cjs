@@ -41,7 +41,7 @@ const window={
 const document={
  body:{},
  hidden:false,
- getElementById:node,
+ getElementById:id=>nodes.get(id)||null,
  createElement(tag){return{id:'',tag,style:{},type:'',addEventListener(k,f){this.events??={};this.events[k]=f;}};},
  addEventListener(name,fn){events['doc:'+name]=fn;}
 };
