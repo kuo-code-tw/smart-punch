@@ -3630,7 +3630,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         if(!raw||raw===lastOvertimeNotification)return;
         let change;
         try{change=JSON.parse(raw);}catch(ignore){return;}
-        if(!change||!/^\\d{4}-\\d{2}$/.test(String(change.month||''))||
+        if(!change||!/^\d{4}-\d{2}$/.test(String(change.month||''))||
             change.month!==currentScheduleMonthKey()||!Number(change.at)||
             Date.now()-Number(change.at)>3600000)return;
         // Avoid discarding unsaved schedule edits. An unsuccessful read is retried on next focus.
