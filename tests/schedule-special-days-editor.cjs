@@ -25,7 +25,7 @@ function setup(existing=[]){
  assert.equal(a.stored.get('p79-manual-typhoon-days-v1'),'[]','old local date is not silently submitted to cloud');
  assert.equal(a.stored.get('p79-special-days-precloud-backup-v1')!==null,true);
  const local=JSON.parse(a.stored.get('p79-special-days-precloud-backup-v1'));
- assert.deepEqual(local.rows.map(x=>x.date),['2026-10-23']);
+ assert.deepEqual(local.rows.map(x=>x.date),['2026-10-23','2026-11-28'],'backup also retains the old default election day');
  assert.equal(a.app.signature(),'0');
  const next=[{date:'2026-11-28',kind:'election'},{date:'2026-10-23',kind:'typhoon'}];
  await a.app.save(next,a.app.signature());
