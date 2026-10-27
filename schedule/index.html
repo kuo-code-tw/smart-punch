@@ -6526,7 +6526,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const rosterShift=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
       const ownApprovedLeave=approvedLeaveForEmployee(emp.id,dayStr);
       const attendanceState=window.P79RestAttendance.state(ctx.attendanceSnapshot,emp.id,dayStr);
-      const attendanceMarker=window.P79ScheduleAttendanceDisplay.resolve({state:attendanceState,shift:rosterShift,approvedLeave:!!ownApprovedLeave});
+      // Some standalone export/test contexts deliberately omit external UI assets.
+      // Preserve a safe visible result rather than crashing roster/export rendering.
+      const attendanceMarker=window.P79ScheduleAttendanceDisplay?.resolve?.({state:attendanceState,shift:rosterShift,approvedLeave:!!ownApprovedLeave}) || {
+        worked:attendanceState==='worked',pending:attendanceState==='missing',
+        level:attendanceState==='worked'?'worked':attendanceState==='missing'?'pending':'',
+        label:attendanceState==='worked'?'已出勤':attendanceState==='missing'?'打卡待核':'',
+        tooltip:'依正式考勤核對，原排班不變',
+        excludeRestCount:attendanceState==='worked'&&['休','例','國'].includes(rosterShift)&&!ownApprovedLeave
+      };
       const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
         ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
@@ -6592,7 +6600,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const category=reportType||(code?.[1]&&shift!=='休'?code[1]:'')||
           (['例','休','國'].includes(assigned.restCategory)&&shift==='休'?assigned.restCategory:'');
         const state=window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(month).evidence},emp.id,date);
-        const marker=window.P79ScheduleAttendanceDisplay.resolve({state,shift,approvedLeave:!!approvedLeaveForEmployee(emp.id,date)});
+        const marker=window.P79ScheduleAttendanceDisplay?.resolve?.({state,shift,approvedLeave:!!approvedLeaveForEmployee(emp.id,date)}) || {excludeRestCount:state==='worked'&&['休','例','國'].includes(shift)};
         if(category&&!marker.excludeRestCount){counts[category]++;dates[category].push(date.slice(8));}
       }
       return {counts,dates};
