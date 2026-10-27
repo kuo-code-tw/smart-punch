@@ -13,7 +13,7 @@ const c={
  p79MonthlyRestContext:{employmentStart:()=>''},
  P79SpecialOvertime:{electionDates:()=>[]},
  P79RestAttendance:{
-   state:(snapshot,emp,date)=>snapshot?.states?.[emp+'|'+date]||'worked',
+   state:(snapshot,emp,date)=>snapshot?.states?.[emp+'|'+date]||snapshot?.attendanceEvidence?.days?.[emp+'|'+date]?.state||'unknown',
    isLeaveDay:()=>false
  },
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true}})}),
