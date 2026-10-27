@@ -65,11 +65,11 @@
   if(!Number.isFinite(base)||!Number.isFinite(duration))throw Error('日期或時段無效');
   const x=base+(a+offset*1440)*60000;return [x,x+duration*60000];
  }
- // Declaration hours use the scheduled start and the clock-out minute, not elapsed-time rounding.
+ // Declaration hours use the scheduled start and the clock-out minute; minute 45 is inclusive for hour advance.
  function declarationEnd(end){
   if(end===null||end===undefined||end===''||!Number.isFinite(Number(end)))return NaN;
   const value=Number(end),hour=Math.floor(value/3600000)*3600000;
-  return hour+(new Date(value).getUTCMinutes()>45?3600000:0);
+  return hour+(new Date(value).getUTCMinutes()>=45?3600000:0);
  }
  function declarationWindow(start,end,date,roster){
   if(!(Number.isFinite(start)&&end>start))return null;
