@@ -60,7 +60,11 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   const person=peopleById.get(paired.empId),roster=schedules[paired.empId]||schedules[person?.id]||{};
   const old=String(roster[paired.date]||'').trim();
   const meta=metadata[paired.empId]?.[paired.date]||metadata[person?.id]?.[paired.date]||{};
-  if(old!=='休'&&old!=='例'&&old!=='國')continue;
+  // Actual attendance also corrects a wrong early/middle/night assignment,
+  // not only old 休/例/國. Explicitly protected manual shifts remain untouched.
+  const wasRest=['休','例','國'].includes(old);
+  if(!wasRest&&!['早','中','晚'].includes(old))continue;
+  if(old===paired.shift)continue;
   // Manual/legal leave, formally reported overtime and substitutes are never
   // silently rewritten into ordinary shifts.
   if(meta.manualRosterShift||meta.restAllocationLocked||meta.restCategoryLocked||
@@ -69,12 +73,11 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   const knownAuto=meta.restAllocationSource==='auto-v1'||!!meta.noPunchOriginalShift;
   // A historic bare 休 with a real punch may have been lawful rest-day overtime.
   // Do not rewrite it silently on page load; require explicit preview/approval.
-  if(!knownAuto&&!allowUnmarked)continue;
-  if((old==='例'||old==='國')&&!knownAuto&&!allowUnmarked)continue;
+  if(wasRest&&!knownAuto&&!allowUnmarked)continue;
   const restored=String(meta.noPunchOriginalShift||'').trim();
   // A saved original shift is stronger evidence, but a mismatched paired punch
   // requires manual review rather than assuming one of them is correct.
-  if(restored&&restored!==paired.shift&&!allowUnmarked)continue;
+  if(wasRest&&restored&&restored!==paired.shift&&!allowUnmarked)continue;
   corrections.push({...paired,previous:old,reason:restored?'原班別與打卡一致':'完整上下班打卡推定工作班'});
  }
  return{corrections,pairedSessions:byDate.size,ambiguousSessions:ambiguous.size};

@@ -15,11 +15,34 @@ function create(ctx){
   state.promise=(async()=>{try{
    const batches=await Promise.all(months(month).map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
    const records=new Map();for(const batch of batches)for(const r of batch){if(!Number.isFinite(ctx.timestamp(r)))throw Error('出勤時間無效，不能判定整班無卡');const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);records.set(key,r);}
-   const people=ctx.employees(),schedules=ctx.schedules(),sessions=ctx.buildShifts([...records.values()]).map(row=>{
+   const people=ctx.employees(),schedules=ctx.schedules(),pairedRows=ctx.buildShifts([...records.values()]);
+   // Only validated paired punches can supply the ACTUAL shift displayed in
+   // the monthly roster. This does not rewrite statutory roster history.
+   const actualShifts={},duplicates=new Set();
+   for(const row of pairedRows){
+    if(!row.clockIn||!row.clockOut||row.timePrecisionIssue)continue;
+    const rec=row.clockIn,claimed=id(row.empId||rec.empId);
+    const matchedById=claimed?people.find(e=>id(e.id)===claimed):null;
+    const candidates=att(rec.attNo)?people.filter(e=>att(e.attNo||e.attendanceNo)===att(rec.attNo)):[];
+    // Never attribute a punch to a different employee if identity numbers
+    // conflict or the attendance number identifies more than one person.
+    if(candidates.length>1||matchedById&&candidates.length===1&&
+       id(candidates[0].id)!==id(matchedById.id))continue;
+    const employee=matchedById||(candidates.length===1?candidates[0]:null);
+    const paired=ctx.shiftForSession?.(row);
+    if(!employee||!paired?.date?.startsWith(month+'-')||!['早','中','晚'].includes(paired.shift))continue;
+    const key=id(employee.id)+'|'+paired.date;
+    if(duplicates.has(key))continue;
+    if(actualShifts[key]){delete actualShifts[key];duplicates.add(key);}
+    else actualShifts[key]=paired.shift;
+   }
+   const sessions=pairedRows.map(row=>{
     const record=row.clockIn||row.clockOut||row.records?.[0]||row,emp=people.find(e=>id(e.id)===id(row.empId||record.empId))||people.find(e=>att(record.attNo)&&att(e.attNo||e.attendanceNo)===att(record.attNo));
     return{empId:emp?.id||'',start:row.clockIn?ctx.timestamp(row.clockIn):null,end:row.clockOut?ctx.timestamp(row.clockOut):null,time:ctx.timestamp(record)};
    }).filter(s=>s.empId);
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
+   // Expose shift codes, not the employees' raw punch records or credentials.
+   state.evidence.actualShifts=actualShifts;
    return state.evidence;
   }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence={complete:false,days:{}};return null;}
   finally{state.pending=false;if(ctx.token()===token&&states.get(month)===state)ctx.update?.(month,state);}})();return state.promise;
