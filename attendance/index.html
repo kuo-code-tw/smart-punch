@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW" class="light">
-<head><script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script><script src="../assets/port79-overtime-report.js?v=20261027-shift-matching-v2"></script>
-<script src="../assets/port79-overtime-shift-match.js?v=20261027-attendance-report-display"></script><script src="../assets/port79-attendance-overtime.js?v=20261025-report-status-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
+<head><script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script><script src="../assets/port79-overtime-report.js?v=20261027-confirmed-shift-v3"></script>
+<script src="../assets/port79-overtime-shift-match.js?v=20261027-attendance-report-display"></script>
+<script src="../assets/port79-overtime-period-sync.js?v=20261027-original-id-v1"></script><script src="../assets/port79-attendance-overtime.js?v=20261025-report-status-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <style id="p79-employee-management-chrome-guard">html:not(.p79-attendance-management-chrome) #p79SevenTop{display:none!important}</style>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- PORT79 V6.0.22 GPS-PRECISE-RETRY：快速定位在範圍外時等待精確定位；裝置驗證例外釋放打卡狀態。 -->
@@ -15043,6 +15044,16 @@ function getManualPairRecordAnchor(record) {
             }
         }
         window.addEventListener('focus',p79RevalidateAttendanceOvertimeOnReturn);
+        // Other tabs may amend an existing report with its original ID; invalidate this month's old report.
+        window.addEventListener('storage',event=>{
+            if(event.key!=='p79_schedule_overtime_changed_v1'||!event.newValue)return;
+            try{
+                const info=JSON.parse(event.newValue),month=String(info.month||'');
+                if(!/^\d{4}-\d{2}$/.test(month))return;
+                p79AttendanceOvertimeMonths.delete(month);
+                p79LoadAttendanceOvertimeMonth(month);
+            }catch(_){}
+        });
         window.addEventListener('p79:schedule-overtime-changed',event=>{
             const month=String(event?.detail?.month||'').trim();
             const targets=/^\d{4}-\d{2}$/.test(month)?[month]:Array.from(p79AttendanceOvertimeMonths.keys());
@@ -15141,6 +15152,15 @@ function getManualPairRecordAnchor(record) {
             if(!Number.isFinite(start)||!Number.isFinite(end)||start===end)return {label:category+'班',minutes:null,report};
             const compact=(t,isEnd)=>t==='00:00'||t==='24:00'||String(t)==='24'?'24':String(t).replace(/:00$/,'');
             const review=report?periodReview(reportDate,report):null;
+            if(review?.confirmed&&review?.mismatch&&report?.id&&row.clockIn?.id&&row.clockOut?.id&&
+                p79CanReportOvertime()&&window.P79OvertimePeriodSync?.sync){
+                window.P79OvertimePeriodSync.sync({
+                    empId:id,date:reportDate,report,review,
+                    rules:window.P79Overtime.reportRules(),inId:row.clockIn.id,outId:row.clockOut.id,
+                    pairingIssue:row.pairingIssue||row.timeCheckRequired,
+                    token:view?.token||getAttendanceEmployeeMasterToken(),url:getActiveGasUrl
+                });
+            }
             const corrected=review?.mismatch&&review?.suggested&&['tentative','completed'].includes(review.state)
                 &&review.category===report.category;
             const label=corrected?review.code:(report?.code||category+compact(times[0],false)+'-'+compact(times[1],true));
