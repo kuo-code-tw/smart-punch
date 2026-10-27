@@ -13277,7 +13277,7 @@ async function p79ExportOvertimeComparison(printMode){
                         specialOvertimeMinutes,specialReportMinutes,
                         specialOvertimeLabels:[...new Set(specialParts.flatMap(part=>part.kinds.map(kind=>kind.code)))],
                         overtimeReport:restMeta?.overtimeReport||null,
-                        amendment:window.P79OvertimeReason?.amended?.(restMeta?.overtimeReport,restMeta)||null,
+                        amendment:globalThis.P79OvertimeReason?.amended?.(restMeta?.overtimeReport,restMeta)||null,
                         reportVerified:p79WorkOvertimeOfficialReport(restMeta?.overtimeReport,restMeta),
                         rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,coverAlreadyArranged:!!restMeta?.coverAlreadyArranged,
                         overDailyLimit: totalMinutes > 720
@@ -13297,7 +13297,7 @@ async function p79ExportOvertimeComparison(printMode){
                     const stalePlanned=meta.overtimeReport.planned===true&&date<todayTaipei;
                     const attendanceIssue=meta.overtimeReport.attendanceReview||
                       (stalePlanned&&!(observed?.clockIn&&observed?.clockOut)?'已有正式申報；原預排標記未更新，出勤待核對':'');
-                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,amendment:window.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
+                    rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
                 });
             });
             rows.sort((a, b) => b.sortTime - a.sortTime);
