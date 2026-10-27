@@ -48,7 +48,7 @@ function extract(name){
  const a=html.indexOf('    function '+name+'('),b=html.indexOf('\n    }',a);
  assert(a>=0&&b>a,name+' missing');return html.slice(a,b+6);
 }
-for(const name of ['p79VisibleRestKind','p79ScheduleDisplayDay','p79ScheduleRestCountCells'])vm.runInContext(extract(name),c);
+for(const name of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleDisplayDay','p79ScheduleRestCountCells'])vm.runInContext(extract(name),c);
 vm.runInContext(source,c);
 c.renderRoleScheduleView();
 assert(main.innerHTML.includes('測試員工'),'a populated roster must render, not just its header');
