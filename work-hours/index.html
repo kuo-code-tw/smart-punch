@@ -12813,6 +12813,43 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         const p79WorkOvertimeMonths=new Map();
+        // Re-read the official schedule when the schedule system CONFIRMS a save.
+        // Attendance cloud revision does not change on a roster-only edit.
+        // Never reuse a cached former shift after this notice.
+        const p79PendingScheduleRechecks=new Set();
+        let p79ScheduleRecheckTimer=null;
+        function p79QueueConfirmedRosterRecheck(month){
+            if(!/^\d{4}-\d{2}$/.test(String(month||'')))return false;
+            p79PendingScheduleRechecks.add(month);
+            if(p79ScheduleRecheckTimer)return true;
+            const run=()=>{
+                p79ScheduleRecheckTimer=null;
+                if(p79WorkhoursIsEditing()){
+                    p79ScheduleRecheckTimer=setTimeout(run,1200);return;
+                }
+                for(const key of [...p79PendingScheduleRechecks]){
+                    const previous=p79WorkOvertimeMonths.get(key);
+                    if(previous?.pending){
+                        previous.promise?.finally(()=>{if(p79PendingScheduleRechecks.has(key)&&!p79ScheduleRecheckTimer)p79ScheduleRecheckTimer=setTimeout(run,100);});
+                        continue;
+                    }
+                    p79PendingScheduleRechecks.delete(key);
+                    p79WorkOvertimeMonths.delete(key);
+                    p79OvertimeCalculationCache=null;
+                    p79LoadWorkOvertimeMonths(records,key,true);
+                }
+            };
+            p79ScheduleRecheckTimer=setTimeout(run,80);
+            return true;
+        }
+        window.addEventListener('storage',event=>{
+            if(event.key!=='port79_schedule_month_saved_v1'||!event.newValue)return;
+            try{
+                const notice=JSON.parse(event.newValue);
+                if(Number(notice.at)>0&&Date.now()-Number(notice.at)<3600000)
+                    p79QueueConfirmedRosterRecheck(notice.month);
+            }catch(_){}
+        });
         let p79WorkOvertimeLoadQueue=Promise.resolve();
         const p79WorkOvertimeLoadLanes=[Promise.resolve(),Promise.resolve(),Promise.resolve()];
         let p79WorkOvertimeNextLane=0,p79WorkOvertimeRenderTimer=null;
