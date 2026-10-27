@@ -50,7 +50,7 @@ const c={
  activeRoleTab:'ARMG',activeGroupFilter:'ALL',employees:people,
  monthlyScheduleData:monthData,monthlyScheduleMeta:meta,leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
  p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
- p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}}),refreshIfStale:async()=>{}}),
+ p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:false,days:{}}}),refreshIfStale:async()=>{}}),
  p79UpdateTyphoonDayButton(){},getDaysInMonth:()=>31,
  scheduleMonthBounds:()=>[date(1),date(31)],updateScheduleDateRangeSummary(){},
  p79TyphoonDates:()=>[date(23)],scheduleTaipeiTodayKey:()=>date(31),
@@ -77,7 +77,7 @@ const c={
  p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){}
 };
 vm.createContext(c);
-for(const n of ['p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
+for(const n of ['p79ScheduleHasVerifiedPunch','p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
  'p79ScheduleRestCountCells','p79ScheduleExportDay'])vm.runInContext(extract(n),c);
 const renderStart=html.indexOf('    function renderRoleScheduleView()');
 const renderEnd=html.indexOf('\n    function p79SetScheduleSaving(',renderStart);
