@@ -42,7 +42,7 @@ const statusSource=fs.readFileSync('assets/port79-overtime-status.js','utf8');
 assert(html.includes('amendment:globalThis.P79OvertimeReason?.amended?.(restMeta?.overtimeReport,restMeta)'), 'punch rows use cloud verified amendment metadata');
 assert(html.includes('amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)'), 'report-only rows also retain audited amendment metadata');
 assert(html.includes('row.reportVerified&&row.amendment?.verified'), 'never display edited badge without verified cloud history');
-assert(html.includes('✎ 已修改・查看紀錄'), 'clearly expose saved amendment in main overtime table');
+assert(html.includes('>已修改</button>')&&!html.includes('✎ 已修改・查看紀錄'), 'show only 已修改 while retaining click-to-view history');
 assert(html.includes("P79OvertimeStatus.open({state:'amended',month:date.slice(0,7),employee:row.empId})"), 'row edit history opens correct month and employee');
 assert(statusSource.includes('const preferredEmployee=uid(options.employee)'), 'history dialog accepts employee deep-link');
 assert(statusSource.includes('preferredMonth||ctx.month()'), 'history dialog accepts row month');
