@@ -95,7 +95,7 @@ function createWorkbook(ExcelJS,{month,company,rows,signatures}={}){
   for(let col=6;col<=10;col++){
    const letter=String.fromCharCode(64+col),sum=chunk.reduce((v,x)=>v+Number([x.disc,x.load,x.bill,x.hc,x.shift][col-6]||0),0);
    sheet.getCell(subtotal,col).value={formula:`SUM(${letter}${first+4}:${letter}${first+38})`,result:sum};
-   sheet.getCell(grand,col).value={formula:Array.from({length:pages},(_,p)=>`${letter}${p*42+40}`).join('+'),result:totals[col-6]};
+   sheet.getCell(grand,col).value={formula:Array.from({length:pages},(_,p)=>`${letter}${p*PRINT_ROWS_PER_PAGE+40}`).join('+'),result:totals[col-6]};
    sheet.getCell(subtotal,col).numFmt=sheet.getCell(grand,col).numFmt='#,##0';
   }
   for(const r of [subtotal,grand]){sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};});}
