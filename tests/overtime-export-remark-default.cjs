@@ -40,5 +40,5 @@ assert.equal(original[0].note,'加班申報 / 每月未休假加班','original c
 assert.equal(original[0].actual,8);assert.equal(changed[0].actual,8);assert.equal(changed[0].converted,12.7);
 assert(source.includes('id="oaRemark"')&&source.includes('id="oaRowRemarks"')&&source.includes('data-oa-note-row'));
 assert(source.includes("q('#oaRemark').oninput=")&&source.includes("loaded.rows=loaded.summary?aggregate("));
-assert(frontend.includes('port79-overtime-application.js?v=20261026-legacy-unique-rule-v2'),'production should load revised asset');
+assert(frontend.includes('port79-overtime-application.js?v=20261027-single-grand-total-v1'),'production should load revised asset');
 console.log('PASS overtime report notes: blank defaults to 吊櫃作業, custom/global/individual overrides, preview/print and Excel, summary, source and hour preservation');
