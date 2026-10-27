@@ -1453,6 +1453,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-group-select{grid-column:1 / -1!important;grid-row:2!important}
 </style>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
+<script src="../assets/port79-schedule-punch-restore.js?v=20261027-workday-recovery-1"></script>
 
 <style id="p79-rest-overtime-visible-v1037">
 /* Compact shift cell: keep exception / un-rested overtime tags visible without adding blank rows. */
@@ -4147,7 +4148,7 @@ function p79EmployeeDateEligible(emp,date) {
 
     // 只在持有排班編輯鎖且正式考勤全月讀取成功時，自動把無任何打卡的已過日期改為「休」。
     // 考勤歸屬以原上班日為準；隔日凌晨的 OUT 同時計入前一日，避免跨日班誤判。
-    async function p79ApplyNoPunchRestFromOfficial(yearMonth) {
+    async function p79ApplyNoPunchRestFromOfficial(yearMonth,allowNoPunch=true) {
       const requestMutationVersion=p79ScheduleLocalMutationVersion;
       const requestViewVersion=p79ScheduleAttendanceViewVersion;
       if(!scheduleEditLockState.mine||port79ScheduleDirty||!p79ScheduleHasOfficialData())return 0;
@@ -4195,8 +4196,37 @@ function p79EmployeeDateEligible(emp,date) {
           presence.add(id+'|'+p);
         }
       });
-      let changed=0;
-      employees.forEach(emp=>{
+      let changed=0,restored=0;
+      // Official full IN+OUT pairs can reverse an earlier automated 休, including
+      // dates that an auto-v1 quota subsequently displayed as 例 or 國.
+      // No guessing from an IN-only record, a payroll declaration or a bare date.
+      const recover=window.P79SchedulePunchRestore?.plan({
+        records:fetched.flat(),employees,schedules:monthlyScheduleData,
+        metadata:monthlyScheduleMeta,month:yearMonth,today,
+        isProtected:(empId,date)=>approvedLeaveForEmployee(empId,date)||
+          p79LeaveCoverOnDay(empId,date).length>0
+      });
+      if(!recover)throw Error('考勤與排班反向核對模組未載入，本次不修改班表');
+      for(const row of recover.corrections){
+        const emp=employees.find(e=>String(e.id||e.empId).trim().toUpperCase()===row.empId);
+        if(!emp||!monthlyScheduleData[emp.id]||
+           !['休','例','國'].includes(String(monthlyScheduleData[emp.id][row.date]||'')))continue;
+        const old=monthlyScheduleData[emp.id][row.date];
+        const prior={...(monthlyScheduleMeta[emp.id]?.[row.date]||{})};
+        const safe={...prior};
+        if(safe.restAllocationSource==='auto-v1'){
+          for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime',
+            'restAllocationSource','restPreferredCategory'])delete safe[field];
+        }
+        delete safe.noPunchOriginalShift;
+        safe.punchRestoredOriginalShift=String(prior.noPunchOriginalShift||old);
+        if(!monthlyScheduleMeta[emp.id])monthlyScheduleMeta[emp.id]={};
+        monthlyScheduleMeta[emp.id][row.date]=safe;
+        monthlyScheduleData[emp.id][row.date]=row.shift;
+        restored++;changed++;
+      }
+      if(restored)console.info('正式考勤已恢復 '+restored+' 個原本誤判為休假的工作班（不含人工休假／正式加班）');
+      if(allowNoPunch)employees.forEach(emp=>{
         const id=String(emp.id||emp.empId||'').trim().toUpperCase();
         if(!id||!monthlyScheduleData[emp.id])return;
         Object.keys(monthlyScheduleData[emp.id]).forEach(date=>{
@@ -4207,12 +4237,40 @@ function p79EmployeeDateEligible(emp,date) {
           const meta=monthlyScheduleMeta[emp.id]?.[date];
           if(meta&&(meta.manualRosterShift===shift||meta.forEmpId||meta.overtime||meta.overtimeReport||meta.note))return;
           if(approvedLeaveForEmployee(emp.id,date)||p79LeaveCoverOnDay(emp.id,date).length)return;
+          if(!monthlyScheduleMeta[emp.id])monthlyScheduleMeta[emp.id]={};
+          const original={...(monthlyScheduleMeta[emp.id][date]||{})};
+          // Persist the original shift so a later cloud punch can restore it.
+          if(!original.noPunchOriginalShift)original.noPunchOriginalShift=String(shift);
+          monthlyScheduleMeta[emp.id][date]=original;
           monthlyScheduleData[emp.id][date]='休';
           changed++;
         });
       });
       if(changed){p79MarkScheduleLocalMutation();try{buildRoleTabsAndRender();}catch(ignore){}}
       return changed;
+    }
+
+    async function p79RecheckCorrectedAttendance(){
+      const month=currentScheduleMonthKey();
+      if(!requireScheduleEditLock(false)){
+        const acquired=await manualAcquireScheduleEditLock();
+        if(!acquired)return alert('尚未取得排班編輯權，無法安全核對補卡或寫入雲端。');
+      }
+      if(!await flushSchedulePendingWrites())return alert('有尚未儲存的排班異動，請先完成雲端儲存。');
+      try{
+        // Manual repair only restores confirmed working days, it never makes
+        // other employees' old workdays into 休 as a side effect.
+        const changed=await p79ApplyNoPunchRestFromOfficial(month,false);
+        if(!changed){
+          return alert('正式考勤已核對：沒有找到可安全恢復的工作班。若仍顯示休／例，請檢查是否完整上下班打卡，或當天是否為人工指定休假／正式加班。');
+        }
+        const saved=await saveScheduleMonthToCloud(false);
+        if(!saved)return alert('已在目前畫面恢復 '+changed+' 個班別，但雲端儲存尚未確認；請勿關閉本頁，重新按「儲存排班」。');
+        await p79ScheduleRestClient().refresh(month);
+        alert('已依正式上下班打卡恢復 '+changed+' 個工作班，並儲存到 Google 雲端。人工指定休假、請假和正式加班未被改動。');
+      }catch(error){
+        alert('考勤補卡核對未完成，原排班未被視為成功：'+String(error.message||error));
+      }
     }
 
     async function saveScheduleMonthToCloud(showAlert = true) {
@@ -5845,6 +5903,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                   <button onclick="saveCurrentTabSchedule()" class="px-4 py-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
                     <i class="fa-solid fa-floppy-disk"></i> 儲存排班
                   </button>
+                  <button onclick="p79RecheckCorrectedAttendance()" class="px-4 py-2.5 text-xs bg-emerald-700 text-white font-bold rounded-xl" title="依正式上下班打卡修正錯誤排休；自動恢復可確認的早中晚班並儲存雲端">補卡後修正排班</button>
                   <button onclick="p79AuditAllRestQuota()" class="px-4 py-2.5 text-xs bg-white text-sky-800 font-bold rounded-xl border border-sky-400" title="只核對本月所有員工，不修改班表">全員例／休／國檢查</button>
                   <button onclick="p79AutoAllocateRest()" class="px-4 py-2.5 text-xs bg-sky-700 text-white font-bold rounded-xl" title="依例→休→國順序重新配對所有員工；保留手動指定、請假及正式申報">全員自動配對例／休／國</button>
                   <button onclick="autoScheduleCurrentTab()" class="px-4 py-2.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
