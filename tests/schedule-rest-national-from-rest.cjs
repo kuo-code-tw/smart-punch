@@ -13,9 +13,10 @@ const c={window:null,Date,Set,Map,Array,Math,Object,String,Number,JSON,
  p79TyphoonDates:()=>[typhoon],p79EmploymentStartDate:()=>'',p79EmployeeDateEligible:()=>true,
  approvedLeaveForEmployee:()=>null,p79LeaveCoverOnDay:()=>[]};
 c.window=c;c.P79SpecialOvertime={electionDates:()=>[]};
+c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:false,days:{}}})});
 vm.createContext(c);
 vm.runInContext(fs.readFileSync('assets/port79-rest-allocation.js','utf8'),c);
-for(const name of ['p79RestAutomaticExcludedDates','p79RestAutomaticPlan'])vm.runInContext(extract(name),c);
+for(const name of ['p79ScheduleHasVerifiedPunch','p79RestAutomaticExcludedDates','p79RestAutomaticPlan'])vm.runInContext(extract(name),c);
 for(let i=0;i<employees.length;i++){
  const id=employees[i].id;
  const roster=Object.fromEntries(days.map((d,j)=>[d,restDays.includes(j+1)?'休':'早']));
