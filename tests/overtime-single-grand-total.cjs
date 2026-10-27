@@ -1,4 +1,4 @@
-// Regression: each company/date renders one table with separate job totals, never a combined company grand total,
+// Regression: preserve Yaan's approved one-complete-table-per-role layout for every company,
 // with matching XLSX, readable larger date and unchanged source data.
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
@@ -30,13 +30,13 @@ const parseZip=b=>{
 };
 const page=api.reportHtml(first,false);
 assert.equal(matches(page,/合計（小時）/g),2,'ARMG and F/L each have exactly one own subtotal');
-assert(page.includes('ARMG 合計（小時）</td><td>16.00</td>'),'ARMG total 16.00');
-assert(page.includes('F/L 合計（小時）</td><td>8.00</td>'),'F/L total 8.00');
+assert(page.includes('合計（小時）</td><td>16.00</td>'),'ARMG total 16.00');
+assert(page.includes('合計（小時）</td><td>8.00</td>'),'F/L total 8.00');
 assert(!page.includes('<td>24.00</td>'),'must not add a company-wide 24.00 grand total');
-assert(page.indexOf('職稱：ARMG、F/L')<page.indexOf('ARMG 合計（小時）'),'every job shares one company table');
-assert.equal(matches(page,/<table>/g),1,'one company and date must use a single table');
-assert.equal(matches(page,/<thead>/g),1,'column headings are not repeated per job');
-assert(page.includes('<td>1</td>')&&page.includes('<td>2</td>')&&page.includes('<td>3</td>'),'row numbers run across jobs');
+assert(page.indexOf('職稱：ARMG')<page.indexOf('職稱：F/L'),'each job has its own Yaan-style section');
+assert.equal(matches(page,/<table>/g),2,'each role must have its own Yaan-style complete table');
+assert.equal(matches(page,/<thead>/g),2,'every role has its own identical column headings');
+assert(page.includes('<td>1</td>')&&page.includes('<td>2</td>'),'row numbering starts again for each job');
 assert(page.includes('115/10/25（星期日）'),'date keeps ROC year and weekday');
 assert(!page.includes('加班日期：'),'date must not have prefix');
 assert(source.includes('.oa-date{text-align:center;margin:5px 0;font-size:16px;font-weight:800'),'date must be bigger/bold');
@@ -44,11 +44,11 @@ assert(source.includes('@media print{')&&source.includes('.oa-date{font-size:15p
 const both=splitPages(api.reportHtml(multi,false));
 assert.equal(both.length,2,'each date retains separate report');
 assert.equal(matches(both[0],/合計（小時）/g),3,'ARMG and F/L subtotal plus second company ARMG subtotal');
-assert.equal(matches(both[0],/<table>/g),2,'two companies must have one table each');
-assert.equal(matches(both[0],/<thead>/g),2,'two companies must have one header each');
+assert.equal(matches(both[0],/<table>/g),3,'ARMG/F-L in first company and ARMG in second each use their own tables');
+assert.equal(matches(both[0],/<thead>/g),3,'one repeated identical header per role');
 assert.equal(matches(both[1],/合計（小時）/g),1,'second date also has one total');
-assert(both[0].includes('ARMG 合計（小時）</td><td>16.00</td>'),'ARMG own subtotal');
-assert(both[0].includes('F/L 合計（小時）</td><td>8.00</td>'),'F/L own subtotal');
+assert(both[0].includes('合計（小時）</td><td>16.00</td>'),'ARMG own subtotal');
+assert(both[0].includes('合計（小時）</td><td>8.00</td>'),'F/L own subtotal');
 assert(both[0].includes('<td>8.00</td>'),'second company totals separately');
 assert(!both[0].includes('<td>32.00</td>')&&!both[0].includes('<td>24.00</td>'),'no company or cross-company grand totals');
 assert(both[1].includes('<td>6.00</td>'));
@@ -60,9 +60,9 @@ assert.equal(zip.size>=2,true,'XLSX created');
 const sh1=zip.get('xl/worksheets/sheet1.xml'),sh2=zip.get('xl/worksheets/sheet2.xml');
 assert(sh1&&sh2);
 assert.equal(matches(sh1,/合計（小時）/g),3,'one total per job in every company');
-assert.equal(matches(sh1,/員工編號/g),2,'Excel header once for each company, not each job');
+assert.equal(matches(sh1,/員工編號/g),3,'Excel reuses same full header for every role');
 assert.equal(matches(sh2,/合計（小時）/g),1);
-assert(sh1.includes('ARMG 合計（小時）')&&sh1.includes('F/L 合計（小時）'),'Excel retains distinct job subtotals');
+assert.equal(matches(sh1,/合計（小時）/g),3,'Excel retains separate per-role totals');
 assert(sh1.includes('<v>16</v>'),'ARMG hours 16');
 assert(sh1.includes('<v>8</v>'),'second company Excel total is distinct');
 assert(!sh1.includes('<v>32</v>')&&!sh1.includes('<v>24</v>'),'Excel must not create extra grand totals');
@@ -83,4 +83,22 @@ assert.equal(matches(api.reportHtml(missing,false),/合計（小時）/g),2);
 assert(/<input type="checkbox" id="oaHideConverted" checked>隱藏換算加班時數/.test(source),'hide converted-hours checkbox must be checked on open');
 assert(!api.reportHtml(first,false,true).includes('換算加班時數'),'hidden column must not render in detail headers');
 assert.equal(matches(hidden,/合計（小時）/g),2,'hidden converted-hours view must retain job totals');
-console.log('PASS overtime job subtotals only: per-company shared table, ARMG/F-L independent totals, no grand total, Excel, preview/PDF, checked hide-converted default');
+
+// 亞安標準樣本：三名 ARMG 必須只出現一張表及最後 24 小時合計。
+// 其他公司的同職稱樣本必須產生相同表頭、合計與簽名排列。
+const yaan=[mk(d1,'亞安企業管理','ARMG','宋文豪',8),mk(d1,'亞安企業管理','ARMG','林十文',8),mk(d1,'亞安企業管理','ARMG','蔡欣穎',8)];
+const yaanHtml=api.reportHtml(yaan,false,true);
+assert.equal(matches(yaanHtml,/<article>/g),1);
+assert.equal(matches(yaanHtml,/<table>/g),1);
+assert.equal(matches(yaanHtml,/<thead>/g),1);
+assert.equal(matches(yaanHtml,/合計（小時）/g),1);
+assert(yaanHtml.includes('<td>24.00</td>'),'Asia An three employees total 24 hours');
+assert.equal(matches(yaanHtml,/class="oa-sign"/g),1,'Asia An has one set of signatures');
+assert.equal(matches(page,/class="oa-sign"/g),1,'another company's two positions still have one set of signatures');
+assert.equal(matches(yaanHtml,/加班日期：/g),0);
+const asiaOne=api.reportHtml([mk(d1,'亞太國際物流','ARMG','王一',8)],false,true);
+assert.equal(matches(asiaOne,/<table>/g),1,'identical one-role template in the other company');
+assert.equal(matches(asiaOne,/<thead>/g),matches(yaanHtml,/<thead>/g));
+assert.equal(matches(asiaOne,/合計（小時）/g),matches(yaanHtml,/合計（小時）/g));
+
+console.log('PASS overtime Yaan template: identical full table for every company/job, independent job totals, no company grand total, Excel/print/date, checked hidden-converted default');
