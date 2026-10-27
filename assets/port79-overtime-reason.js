@@ -56,6 +56,7 @@ function reportNote(input){
  return notes.join('／');
 }
 function amended(report,meta={}){
+ meta=meta&&typeof meta==='object'?meta:{};
  const history=Array.isArray(meta.overtimeAmendments)?meta.overtimeAmendments:
   Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
   Array.isArray(report?.amendments)?report.amendments:[];
