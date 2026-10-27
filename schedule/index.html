@@ -4295,6 +4295,9 @@ function p79EmployeeDateEligible(emp,date) {
         }
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
+        // Notify other open systems only after GAS confirmed this month's schedule save.
+        // A single notification covers every employee / shift, not just overtime edits.
+        try{localStorage.setItem('port79_schedule_month_saved_v1',JSON.stringify({month:yearMonth,at:Date.now(),version:snapshotVersion}));}catch(error){console.warn('跨系統排班更新通知未送出',error)}
         window.P79ScheduleRestSummary.acceptRows(confirmedRestRows,yearMonth);
         p79RefreshScheduleRestCounts(yearMonth);
         p79ScheduleRestClient().refresh(yearMonth);
