@@ -6262,6 +6262,7 @@ function p79IsMobileOrTabletForAttendanceSync() {
             return !!String(sessionStorage.getItem('port79_user_token') || sessionStorage.getItem('port79_admin_token') || sessionStorage.getItem('port79_gc_superadmin_token') || '').trim();
         }
         function p79StartupAttendanceCurrentMonthSync(showMessage = false) {
+            if(window.P79WorkhoursCache?.enabled()&&hasValidHomepageAdminSession())return window.P79WorkhoursCache.startup();
             if (!p79AttendanceSyncAuthenticated()) return Promise.resolve(false);
             const month = getRequestedAttendanceCloudMonth();
             if (p79StartupSyncFlight?.month === month) return p79StartupSyncFlight.promise;
@@ -12903,7 +12904,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const evidenceRevision=lastAttendanceCloudRevision;state.restEvidenceError='';
             const token=state.token;
             try{
-                const batches=await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
+                const shared=typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
+                if(shared&&currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.applyBundle(shared,state);
+                const batches=shared?p79WorkRestMonths(month).map(m=>shared.raw[m]):await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
                 if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
                 const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
                 state.attendanceEvidence=p79BuildWorkRestAttendance(month,{schedules:state.rows,leaveRecords:state.leaveRecords||[]},rows).attendanceEvidence;
@@ -12945,11 +12948,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     if(previous.ready&&previous.at>0&&(!lastAttendanceCloudRevision||previous.loadedCloudRevision===lastAttendanceCloudRevision))return;
                     if(!previous.ready&&Date.now()-previous.at<10000)return;
                 }
-                const state={token,at:Date.now(),pending:true,ready:false,revision:null,rows:[],covers:[],leaveRecords:[],attendanceEvidence:null,error:'',restEvidenceError:''};p79WorkOvertimeMonths.set(month,state);
+                const state={...(previous?.token===token&&previous.ready?previous:{}),token,at:Date.now(),pending:true,ready:previous?.token===token&&previous.ready===true,revision:previous?.revision||null,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[],leaveRecords:previous?.token===token?previous.leaveRecords||[]:[],attendanceEvidence:previous?.token===token?previous.attendanceEvidence:null,error:'',restEvidenceError:''};p79WorkOvertimeMonths.set(month,state);
                 const load=async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
                     try{
+                        if(typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()){
+                            const bundle=await window.P79WorkhoursCache.load(month,{force,onPreview:b=>window.P79WorkhoursCacheContext.applyBundle(b,state),onInvalidate:()=>window.P79WorkhoursCacheContext.invalidatePreview(month)});
+                            if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
+                            window.P79WorkhoursCacheContext.applyBundle(bundle,state);return;
+                        }
                         const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
                         const data=await response.json();if(response.ok===false||!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'班表申報資料讀取不完整');
                         if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
@@ -13175,7 +13183,11 @@ async function p79ExportOvertimeComparison(printMode){
             employees.forEach(employee=>{const id=String(employee.empId||'').trim().toUpperCase();if(!rowVisibility.has(id))rowVisibility.set(id,canCurrentAdminViewEmployee(employee));});
             const hiddenAdminIds=new Set(normalizeAdminIds(sysConfig.adminIds));
             const unrestricted=!isAdminLoggedIn||isCurrentViewerSuperAdmin();
+            const selectedMonth=typeof document!=='undefined'?document.getElementById('overtimeMonthFilter')?.value:'';
+            const visibleMonths=/^\d{4}-\d{2}$/.test(selectedMonth||'')?new Set(p79WorkRestMonths(selectedMonth)):null;
+            const scopedSchedules=(schedules||[]).filter(r=>!visibleMonths||visibleMonths.has(String(r.month||'')));
             const sourceRecords = records.filter(record => {
+                if(visibleMonths&&!visibleMonths.has(attendanceRecordMonthKey(record)))return false;
                 const rowId=String(record.empId||'').trim().toUpperCase();
                 if(!unrestricted&&!(rowVisibility.has(rowId)?rowVisibility.get(rowId):!hiddenAdminIds.has(rowId)))return false;
                 const empId = String(record.empId || '').trim().toUpperCase();
@@ -13186,7 +13198,7 @@ async function p79ExportOvertimeComparison(printMode){
             p79LoadWorkOvertimeMonths(sourceRecords);
             // 一次掃描可見員工的加班 metadata；不逐位重掃全部月份班表。
             const restMetaByEmp=new Map(visibleEmployees.map(emp=>[String(emp.empId).trim().toUpperCase(),{}]));
-            (schedules||[]).forEach(row=>{
+            scopedSchedules.forEach(row=>{
                 const map=restMetaByEmp.get(String(row?.empId||'').trim().toUpperCase());if(!map)return;
                 const source=row?.schedule?.__meta||{};
                 Object.entries(source).forEach(([date,value])=>{
@@ -13203,7 +13215,7 @@ async function p79ExportOvertimeComparison(printMode){
                 restMetaByEmp.forEach(map=>Object.keys(map).forEach(date=>{if(date.startsWith(month+'-'))delete map[date];}));
                 p79MergeWorkOvertimeSnapshot(state,restMetaByEmp);
             });
-            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp],(schedules||[]).map(r=>[r.empId,r.month,r.schedule]),[...p79WorkOvertimeMonths].map(([m,s])=>[m,s.ready?s.rows:null]),globalThis.P79SpecialOvertime?.signature?.()||'']);
+            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp],scopedSchedules.map(r=>[r.empId,r.month,r.schedule]),[...p79WorkOvertimeMonths].map(([m,s])=>[m,s.ready?s.rows:null]),globalThis.P79SpecialOvertime?.signature?.()||'']);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
             const employeeById = new Map(), employeeByAtt = new Map(), employeeByName = new Map();
@@ -13451,6 +13463,7 @@ function p79OvertimePeriodLabel(report){
                 ui.updateBanner(null,{message:state?.error?'雲端異動核對未完成：'+state.error:'正在讀取 '+month+' 雲端申報／異動紀錄'});
                 return;
             }
+            if(state.cachePreview){ui.updateBanner(null,{message:state.source||'本機快取已顯示，背景核對中'});return;}
             ui.updateBanner(ui.auditSummary(state.rows,p79WorkhoursEligibleEmployees(),month),{ready:true});
         }
         // 此彙總只讀取正式加班申報，不將出勤推算分鐘混入換算時數。
@@ -13584,11 +13597,13 @@ function p79OvertimePeriodLabel(report){
             const formatAverage=number=>number===null?'—':Number(number).toFixed(2);
             const totals=cardTotals;
             const over12Count = rows.filter(row => row.overDailyLimit).length;
+            const loadingWithoutRows=rows.length===0&&!p79WorkOvertimeMonths.get(month)?.ready;
             document.getElementById('overtimeEmployeeCount').textContent = uniqueEmployees;
             document.getElementById('overtimeShiftCount').textContent = rows.length;
             document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)+' 小時'+(totals.missing?'（'+totals.missing+'筆待換算）':'');
             document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時';
             document.getElementById('overtimeOver12Count').textContent = over12Count;
+            if(loadingWithoutRows){for(const id of ['overtimeEmployeeCount','overtimeShiftCount','overtimeTotalHours','overtimeRawReportedHours','overtimeOver12Count'])document.getElementById(id).textContent='載入中…';}
             const monthRosterState=p79WorkOvertimeMonths.get(month);
             const titleLeave=p79BuildOvertimeTitleLeaveDays(
                 staff,monthRosterState?.ready&&!monthRosterState.error&&Array.isArray(monthRosterState.leaveRecords)?monthRosterState.leaveRecords:null,month
@@ -13674,11 +13689,11 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
                     <td data-label="估算加班" class="px-3 py-3"><div class="p79-overtime-inline">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'🔴 疑似多報｜整班無卡，請核對後刪除':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.specialOvertimeMinutes>0?`<span class="font-black text-red-700 dark:text-red-300">特殊日待申報｜${row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)+'（待確認）':(row.specialReportMinutes/60)+' 小時'}（${escapeHtml((row.specialOvertimeLabels||[]).join('／'))}）</span>`:''}${pendingPunchOvertime}${periodSuggestion}${amendmentBadge}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.reportVerified?(row.overtimeReport.attendanceReview?'正式申報（待核）':'申報'):row.coverAlreadyArranged||row.coverCandidate?'已安排／未申報':'未核實註記／非申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.reportVerified?(noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)):'尚未申報'}</span>` : ''}${p79CanReportOvertime()?(row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改申報</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報加班</button>`):''}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${(row.reportVerified||row.coverCandidate||row.coverAlreadyArranged)&&p79WorkOvertimeMonths.get((row.rosterDate||normalizeScheduleDateKey(row.dateKey)).slice(0,7))?.canDelete?'':'disabled title="沒有可確認的正式申報或代班安排，不能刪除"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:''}</div></td>
                 </tr>`;
-            }).join('') : '<tr><td colspan="8" class="p-8 text-center text-slate-400">目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」</td></tr>';
+            }).join('') : `<tr><td colspan="8" class="p-8 text-center text-slate-400">${loadingWithoutRows?'正在讀取本機快取並核對雲端版本，請稍候…':'目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」'}</td></tr>`;
 
             if(tbody.p79OvertimeRowsHtml!==overtimeRowsHtml){tbody.innerHTML=overtimeRowsHtml;tbody.p79OvertimeRowsHtml=overtimeRowsHtml;}
             const pagination = document.getElementById('overtimePagination');
-            if (pagination) pagination.innerHTML = `<span class="text-[11px] text-slate-500 dark:text-slate-400">共 ${rows.length} 筆｜第 ${overtimeCurrentPage} / ${totalPages} 頁｜每頁 50 筆</span><div class="flex gap-2"><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage - 1})" ${overtimeCurrentPage <= 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">上一頁</button><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage + 1})" ${overtimeCurrentPage >= totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">下一頁</button></div>`;
+            if (pagination) pagination.innerHTML = `<span class="text-[11px] text-slate-500 dark:text-slate-400">${loadingWithoutRows?'資料載入中…':('共 '+rows.length+' 筆｜第 '+overtimeCurrentPage+' / '+totalPages+' 頁｜每頁 50 筆')}</span><div class="flex gap-2"><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage - 1})" ${overtimeCurrentPage <= 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">上一頁</button><button type="button" onclick="goToOvertimePage(${overtimeCurrentPage + 1})" ${overtimeCurrentPage >= totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40">下一頁</button></div>`;
         }
 
         function openOvertimePolicyModal() {
@@ -15700,8 +15715,9 @@ function p79ShowWorkHoursImmediately(){
 async function activateWorkHours(){
   // 權限確認完成後才初始化預設加班統計。
   p79ShowWorkHoursImmediately();
-  const peopleReady=typeof preloadAttendanceEmployeeMaster==='function'&&hasValidHomepageAdminSession()
-    ? preloadAttendanceEmployeeMaster(false,false):Promise.resolve(false);
+  const peopleReady=window.P79WorkhoursCache?.enabled()&&hasValidHomepageAdminSession()
+    ? window.P79WorkhoursCache.startup()
+    :typeof preloadAttendanceEmployeeMaster==='function'&&hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,false):Promise.resolve(false);
   try{
     await peopleReady;
     if(typeof window.p79CheckWorkHoursPermission==='function'){
@@ -15994,7 +16010,64 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="../attendance/v6-engine.js?v=20261019-corrected-lineage"></script>
 
+<script src="../assets/port79-workhours-cache.js?v=20261027-versioned-month-cache-v1"></script>
 <script>
+// One read service for main table, monthly report and amendment/accounting views.
+window.P79WorkhoursCacheContext={
+ token:()=>currentPort79SsoToken(),url:()=>getActiveGasUrl(),
+ scopeRecords:(rows,people)=>{const ids=new Set(people.map(e=>String(e.empId||'').trim().toUpperCase())),nums=new Set(people.map(e=>normalizeAttendanceStatsAttNo(e.attNo)).filter(Boolean));return rows.filter(r=>ids.has(String(r.empId||'').trim().toUpperCase())||!r.empId&&nums.has(normalizeAttendanceStatsAttNo(r.attNo)));},
+ canRead:()=>hasValidHomepageAdminSession(),
+ cacheAccess:()=>isVerifiedSuperAdminSession()||['workhours','attendance','schedule'].every(k=>['view','manage'].includes(String(currentEmp?.systemPermissions?.[k]||''))),
+ month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());},
+ applyFull:snapshot=>{
+  if(!hasValidHomepageAdminSession()||!currentPort79SsoToken()||p79WorkhoursIsEditing()||Number(lastCloudLoadSuccessAt||0)>0||!Array.isArray(snapshot?.records))return {ok:false,skipped:true};
+  // Preserve current scope and all pending local edits; never update currentEmp's
+  // authenticated permissions from a disk profile.
+  const people=Array.isArray(snapshot.employees)?snapshot.employees.filter(e=>canCurrentAdminViewEmployee(e)):[];
+  if(people.length)employees=mergeCloudEmployees(people.map(normalizeEmployeeIdentifiers));
+  const allowed=p79WorkhoursEligibleEmployees(),ids=new Set(allowed.map(e=>String(e.empId).toUpperCase())),numbers=new Set(allowed.map(e=>normalizeAttendanceStatsAttNo(e.attNo)).filter(Boolean));
+  const visibleMonths=new Set(window.P79WorkhoursCache.monthsFor(window.P79WorkhoursCacheContext.month()));
+  const incoming=snapshot.records.filter(r=>visibleMonths.has(attendanceRecordMonthKey(r))&&(ids.has(String(r.empId||'').toUpperCase())||!r.empId&&numbers.has(normalizeAttendanceStatsAttNo(r.attNo)))).map(normalizeAttendanceRecordIdentifiers).filter(r=>!isLocallyDeletedAttendanceRecord(r));
+  records=mergeAttendanceRecordCollections(incoming,Array.isArray(records)?records:[]);
+  initDropdowns();p79OvertimeCalculationCache=null;renderOvertimeStats();return {ok:true,preview:true,recordCount:incoming.length};
+ },
+ applyBundle:(bundle,target=null)=>{
+  if(!hasValidHomepageAdminSession()||!currentPort79SsoToken())return;
+  const token=currentPort79SsoToken(),month=bundle.month;
+  const state=target||p79WorkOvertimeMonths.get(month)||{token,rows:[],covers:[],leaveRecords:[]};
+  if(state.token!==token||target&&p79WorkOvertimeMonths.get(month)!==target)return;
+  if(p79WorkhoursIsEditing()){state.pending=false;state.at=0;p79DeferredOvertimeDisplay=true;return;}
+  const roster=bundle.roster;
+  if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
+  const raw=Object.values(bundle.raw||{}),loadedMonths=new Set(raw.map(x=>x.month));
+  const incoming=raw.reduce((all,b)=>mergeAttendanceRecordCollections(all,b.records),[]).map(normalizeAttendanceRecordIdentifiers).filter(r=>!isLocallyDeletedAttendanceRecord(r));
+  const normalized=applyPendingOperationsToCloudData({records:incoming,employees});
+  const kept=(Array.isArray(records)?records:[]).filter(r=>!loadedMonths.has(attendanceRecordMonthKey(r)));
+  records=bundle.preview?mergeAttendanceRecordCollections(normalized.records,records):mergeAttendanceRecordCollections(kept,normalized.records);
+  if(bundle.config?.config)Object.assign(sysConfig,bundle.config.config);
+  if(!bundle.preview){
+   lastAttendanceCloudRevision=String(bundle.meta.revisions.attendance||'');lastCloudLoadSuccessAt=Date.now();
+   leaveRecords=Array.isArray(roster.leaveRecords)?roster.leaveRecords:leaveRecords;
+   schedules=[...(Array.isArray(schedules)?schedules:[]).filter(r=>String(r.month)!==month),...roster.schedules];
+  }
+  Object.assign(state,{token,at:Date.now(),ready:true,pending:bundle.preview===true,cachePreview:bundle.preview===true,source:bundle.source,revision:roster.revision,loadedCloudRevision:lastAttendanceCloudRevision,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:!bundle.preview&&roster.overtimeLinkedDelete===true,error:'',restEvidenceError:'',restEvidencePending:false,restEvidenceLoaded:!bundle.preview,restEvidenceRevision:lastAttendanceCloudRevision});
+  p79WorkOvertimeMonths.set(month,state);
+  state.attendanceEvidence=p79BuildWorkRestAttendance(month,roster,incoming,!bundle.preview).attendanceEvidence;
+  p79OvertimeCalculationCache=null;initDropdowns();
+  clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
+ },
+ invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.canDelete=false;}p79OvertimeCalculationCache=null;},
+ failed:(month,error)=>{const state=p79WorkOvertimeMonths.get(month)||{token:currentPort79SsoToken(),rows:[]};state.at=Date.now();state.pending=false;state.error=String(error?.message||error);state.canDelete=false;p79WorkOvertimeMonths.set(month,state);renderOvertimeStats();}
+};
+window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
+ const result=window.P79WorkhoursCacheContext.applyFull(snapshot);
+ if(options.fromIndexedDb!==true&&window.P79WorkhoursCache?.enabled()){
+  const month=window.P79WorkhoursCacheContext.month();
+  const bundle=await window.P79WorkhoursCache.load(month,{force:true});window.P79WorkhoursCacheContext.applyBundle(bundle);
+ }
+ return result;
+};
+
 function p79CanExportOvertimeApplication(){
  if(!hasValidHomepageAdminSession()||!currentEmp)return false;
  const fine=currentEmp.finePermissions?.workhours||{};
@@ -16028,7 +16101,9 @@ window.p79MonthlyRestContext={
   const readRoster=()=>read('getScheduleDataSecure');
   const needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
-  const [roster,batches]=await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
+  const shared=window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
+  const [roster,batches]=shared?[shared.roster,needAttendance?months.map(m=>shared.raw[m]):[]]:await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
+  if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
   if(!Array.isArray(roster.schedules))throw Error('班表資料未讀齊，不能判定無卡休假');
   if(needAttendance&&batches.some((data,i)=>!Array.isArray(data.records)||(data.month!=null&&String(data.month)!==months[i])))throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
   const attendanceRows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
