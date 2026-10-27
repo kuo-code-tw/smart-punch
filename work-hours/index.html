@@ -13143,7 +13143,7 @@ async function p79ExportOvertimeComparison(printMode){
             const periodReview=p79WorkOvertimePeriodReview(row);
             // Only a complete, validated pair can prefill an amendment; saving is always explicit.
             const amendment=periodReview?.mismatch&&periodReview.state==='completed'&&periodReview.confirmed?periodReview.suggested:null;
-            P79Overtime.openReport({empId:row.empId,date,roster,savedReport:row.reportVerified===true,attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:amendment?.code||row.overtimeReport?.code||inferred?.[1]||'',category:amendment?.category||row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!amendment&&!row.overtimeReport&&!inferred});
+            P79Overtime.openReport({empId:row.empId,date,roster,savedReport:row.reportVerified===true,reportId:row.reportVerified?row.overtimeReport?.id||'':'',note:row.overtimeReport?.note||'',attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:amendment?.code||row.overtimeReport?.code||inferred?.[1]||'',category:amendment?.category||row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!amendment&&!row.overtimeReport&&!inferred});
         }
         function p79OvertimeAttendanceIssue(session,start,end) {
             if(session?.pairingIssue)return '班次配對待核對';
