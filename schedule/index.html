@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-1"></script><script>window.P79ManagementOptimizationMode=true;</script>
-<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261023-1"></script><script src="../assets/port79-typhoon-leave-sync.js?v=20261025-1"></script>
+<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261027-cloud-v60"></script><script src="../assets/port79-typhoon-leave-sync.js?v=20261025-1"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261025-zh-import-export&role20261026=1"></script>
 <!-- PORT79 Schedule V10.30 LIVE-ATTENDANCE-STATUS：即時燈號錯誤顯示、更新時間與出勤人數。 -->
@@ -5547,10 +5547,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // Dates remain browser-local because the official calendar has no write API.
     const P79_TYPHOON_DATES_KEY='p79-manual-typhoon-days-v1';
     function p79TyphoonDates(){
-      try{
-        const values=JSON.parse(localStorage.getItem(P79_TYPHOON_DATES_KEY)||'[]');
-        return Array.isArray(values)?values.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)):[];
-      }catch(e){return [];}
+      // GAS cloud is authoritative: do not interpret a browser-only date as an official shared date.
+      const synced=window.P79SpecialDaysEditor?.state?.();
+      if(!synced)return [];
+      return synced.rows.filter(row=>row.kind==='typhoon').map(row=>row.date);
     }
     function p79UpdateTyphoonDayButton(month,evidenceReady=false){
       const button=document.getElementById('p79TyphoonDayButton');
@@ -5627,6 +5627,46 @@ async function p79SaveScheduleOvertimeDraft(draft){
         showScheduleNotice('颱風停班免計假：雲端請假資料未能核對，未繼續自動刪除。'+String(error?.message||error),'error',12000);
       }finally{p79TyphoonLeaveCancelBusy=false;}
     }
+    // V60: shared cloud calendar; never re-download the full roster just to refresh date markers.
+    let p79SpecialDayLastRefresh=0,p79SpecialDayLastError=0;
+    window.P79SpecialDaysEditor.configure({
+      read:async()=>{
+        const token=currentPort79SsoToken();
+        if(!token)throw Error('排班登入已過期');
+        const url=GAS_URL+'?action=getScheduleSpecialDays&gcToken='+encodeURIComponent(token)+'&_='+Date.now();
+        const res=await scheduleLockFetch(url,{cache:'no-store',redirect:'follow'},18000);
+        const data=await readScheduleSsoJson(res);
+        if(data?.ok!==true)throw Error(data?.error||'雲端特殊日期讀取失敗');
+        return data;
+      },
+      write:async({rows,expectedRevision})=>{
+        if(!canManageSchedule())throw Error('沒有排班管理權限');
+        const result=await cloudPost({action:'saveScheduleSpecialDays',rows,expectedRevision});
+        if(result?.ok!==true&&!result?.conflict)throw Error(result?.error||'雲端儲存失敗');
+        return result;
+      },
+      onChange:()=>{
+        if(!document.getElementById('month-picker'))return;
+        p79UpdateTyphoonDayButton(currentScheduleMonthKey());
+        renderRoleScheduleView();
+        p79RefreshScheduleRestEvidence();
+      }
+    });
+    async function p79RefreshSpecialDayMarkers(){
+      if(!currentPort79SsoToken()||document.visibilityState==='hidden')return;
+      p79SpecialDayLastRefresh=Date.now();
+      try{await window.P79SpecialDaysEditor.refresh()}
+      catch(error){
+        if(Date.now()-p79SpecialDayLastError>120000){
+          p79SpecialDayLastError=Date.now();
+          showScheduleNotice('雲端颱風日／選舉日尚未同步，不能以本機日期作為正式資料：'+error.message,'error',9500);
+        }
+      }
+    }
+    window.addEventListener('load',()=>{void p79RefreshSpecialDayMarkers()},{once:true});
+    window.addEventListener('focus',()=>{if(Date.now()-p79SpecialDayLastRefresh>10000)void p79RefreshSpecialDayMarkers()});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-p79SpecialDayLastRefresh>10000)void p79RefreshSpecialDayMarkers()});
+    setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()-p79SpecialDayLastRefresh>60000)void p79RefreshSpecialDayMarkers()},65000);
     function p79ToggleTyphoonDay(){
       window.P79SpecialDaysEditor.open({month:currentScheduleMonthKey(),onSave:()=>{
         renderRoleScheduleView();
