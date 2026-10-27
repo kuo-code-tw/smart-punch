@@ -8,6 +8,6 @@ function setup(){const requests=[],posts=[],record={id:'R1',empId:'FIXTURE-E1',a
  t=setup();t.setRows([{...t.record,empId:'OTHER'}]);await assert.rejects(t.c.p79PrepareAttendanceEdit('R1',{record:t.record}),/找不到身分/);assert.equal(t.posts.length,0);
  t=setup();t.setRows([{...t.record},{...t.record,timeStr:'2026/10/20 22:00:00'}]);await assert.rejects(t.c.p79PrepareAttendanceEdit('R1',{record:t.record}),/無法唯一確認/);
  t=setup();t.setRows([]);await assert.rejects(t.c.p79PrepareAttendanceEdit('R1',{record:t.record}),e=>e.recordAbsent===true);
- for(const p of ['attendance/index.html','work-hours/index.html']){const h=fs.readFileSync(p,'utf8');assert(h.includes('port79-attendance-core.js?v=20261023-dual-outbox-sync'));}
+ for(const p of ['attendance/index.html','work-hours/index.html']){const h=fs.readFileSync(p,'utf8');assert(h.includes('port79-attendance-core.js?v=20261027-live-paused-audit'));}
  console.log('PASS shared official-month edit route: unavailable status index bypassed; open/save same source; cross-midnight/month, conflict, wrong person, ambiguity and deleted record guarded');
 })().catch(e=>{console.error(e);process.exit(1)});
