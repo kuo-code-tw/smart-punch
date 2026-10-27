@@ -468,7 +468,8 @@
    if(loading.isConnected===false)return;
    if(!global.p79OvertimeContext?.canReport?.()){loading.remove?.();return alert('沒有申報加班權限');}
   }catch(error){loading.querySelector('#p79OtStatus').textContent='人員載入失敗：'+error.message;return;}
-  const el=dialog('申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
+  const editingOriginal=Boolean(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);
+  const el=dialog(editingOriginal?'修改加班申報':'申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
    if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
@@ -558,6 +559,13 @@
     else{select.selectedIndex=-1;select.value='';preview();el.querySelector('#p79OtStatus').textContent='已帶入「'+requested+'」，請選擇本位人員的出勤時段。';}
    }
    applyPreferredType();
+   if(editingOriginal){
+    // A saved report can change its hours/note, but not its original employee or date.
+    dateInput.readOnly=true;
+    empSelect.disabled=true;
+    roleSelect.disabled=true;
+    el.querySelector('#p79OtStatus').textContent='修改原正式申報：保留員工與日期，請選擇正確時段或修改備註後儲存。';
+   }
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
     const previous=select.selectedIndex>=0?rows[Number(select.value)]:null;
@@ -578,7 +586,7 @@
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
-   if(prefill.savedReport&&prefill.reportId)el.querySelector('#p79OtStage').textContent='儲存原申報時段修改';
+   if(prefill.savedReport&&prefill.reportId)el.querySelector('#p79OtStage').textContent='儲存原申報修改';
    if(prefill.note)el.querySelector('#p79OtNote').value=String(prefill.note);
    el.querySelector('#p79OtStage').onclick=async()=>{
     try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
@@ -587,9 +595,10 @@
      validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?prefill.date:'');
      if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,rows[Number(select.value)]);if(issue)throw Error(issue);}
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
+     if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
      if(editingExisting&&!(prefill.attendance?.end>prefill.attendance?.start))throw Error('原申報需完成上下班打卡才能確認修改時段；目前只顯示暫估');
      const draft={id:editingExisting?String(prefill.reportId):crypto.randomUUID(),preventReplace:editingExisting,empId,date,rule:report(rows[Number(select.value)]),...reportPair(prefill.leaveHandoffId?'代':rows[Number(select.value)][0],empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people),note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
-     try{const pending=JSON.parse(sessionStorage.getItem(KEY)||'null');
+     try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}
      sessionStorage.setItem(KEY,JSON.stringify(draft));
