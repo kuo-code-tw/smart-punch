@@ -37,7 +37,7 @@ assert.equal(one.state,'tentative');
 assert.equal(one.confirmed,false,'one punch cannot approve formal correction');
 assert(schedule.includes("localStorage.setItem('port79_schedule_month_saved_v1'"),'confirmed roster save must broadcast');
 assert(schedule.includes('p79MarkScheduleCloudWriteConfirmed(snapshotVersion);'),'broadcast follows an acknowledged GAS save');
-assert(html.includes("event.key!=='port79_schedule_month_saved_v1'"),'work-hours listens for roster changes');
+assert(html.includes("'port79_schedule_month_saved_v1','p79_schedule_overtime_changed_v1'"),'work-hours listens for both saved rosters and corrected report notifications');
 assert(html.includes('p79WorkOvertimeMonths.delete(key)'),'old roster month is invalidated');
 assert(html.includes('p79LoadWorkOvertimeMonths(records,key,true)'),'new official schedule is fetched');
 assert(html.includes('if(p79WorkhoursIsEditing())'),'edits must not be overwritten by refresh');
