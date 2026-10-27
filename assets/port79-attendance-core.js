@@ -91,6 +91,8 @@ function saveQueue(q){
     catch(backupError){queueStorage='memory';console.error('考勤待傳資料只能暫留目前頁面，請勿關閉，正在持續重試雲端',backupError);}
   }
   updateUi();
+  // Same-tab storage events do not fire; notify the open inspector immediately.
+  try{window.dispatchEvent?.(new Event('p79-attendance-outbox-updated'));}catch(_){ }
   return queueStorage!=='memory';
 }
 function opKey(payload){
