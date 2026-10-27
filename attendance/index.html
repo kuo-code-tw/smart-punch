@@ -24481,7 +24481,7 @@ html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!i
 </style>
 <div id="p79OutboxInspectPanel" role="dialog" aria-modal="true" aria-label="待同步明細">
 <div id="p79OutboxInspectCard">
-<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div>
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="p79OutboxInspectRefresh" style="padding:7px 12px;border-radius:8px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;font-weight:700">重新核對全部</button><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div></div>
 <p style="color:#64748b;margin:10px 0">此處只列尚未完成的待傳修改。撤回後即結束處理，保留雲端考勤，不再要求核對撤回草稿。</p>
 <div id="p79OutboxInspectBody"></div><div id="p79OutboxReview" role="status" aria-live="polite"></div>
 </div></div>
@@ -24523,17 +24523,27 @@ function show(autoReview=true){
  if(shownDrafts.size)html+='<p class="p79-outbox-actions"><button type="button" data-withdraw-all>撤回全部暫停修改（保留草稿）</button></p>';
  // Withdrawn edits are finished user decisions, not outstanding sync work.
  body.innerHTML=html;root.classList.add('p79-show');
- if(autoReview){const first=body.querySelector('[data-review-key]');if(first)reviewEntry(decodeURIComponent(first.dataset.reviewKey));}
+ inspectorQueueSnapshot=queueSnapshot();
+ if(autoReview!==false)void auditAllPaused();
 }
 let inspectorQueueSnapshot='';
-setInterval(()=>{
+function queueSnapshot(){return JSON.stringify(keys.map(([key])=>entries(key)));}
+function refreshInspectorIfChanged(){
  const panel=document.getElementById('p79OutboxInspectPanel');
- if(!panel?.classList.contains('p79-show')||reviewBusy)return;
- const snapshot=JSON.stringify(keys.map(([key])=>entries(key)));
- if(snapshot!==inspectorQueueSnapshot){inspectorQueueSnapshot=snapshot;show(false);}
-},1000);
+ if(!panel?.classList.contains('p79-show')||reviewBusy||auditBusy)return;
+ const snapshot=queueSnapshot();
+ if(snapshot!==inspectorQueueSnapshot){
+  const card=document.getElementById('p79OutboxInspectCard'),scroll=card?.scrollTop||0;
+  show(false);
+  if(card)card.scrollTop=scroll;
+ }
+}
+setInterval(refreshInspectorIfChanged,1000);
+window.addEventListener('p79-attendance-outbox-updated',refreshInspectorIfChanged);
 window.addEventListener('storage',event=>{
- if(!event.key||keys.some(([key])=>key===event.key))window.p79RefreshAttendanceSyncCompactStatus?.();
+ if(!event.key||keys.some(([key])=>key===event.key)){
+  window.p79RefreshAttendanceSyncCompactStatus?.();refreshInspectorIfChanged();
+ }
 });
 document.addEventListener('visibilitychange',()=>{
  if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
@@ -24541,8 +24551,47 @@ document.addEventListener('visibilitychange',()=>{
 setInterval(()=>{
  if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
 },2000);
-let reviewBusy=false;
+let reviewBusy=false,auditBusy=false;
+// The former opening action checked only the first paused item. Audit the whole
+// queue with one official read per month, and repaint without closing this dialog.
+async function auditAllPaused(){
+ if(auditBusy||reviewBusy)return;
+ const el=document.getElementById('p79OutboxReview');
+ const button=document.getElementById('p79OutboxInspectRefresh');
+ if(!el)return;
+ if(typeof window.p79V5AuditPausedQueue!=='function'){
+  el.textContent='同步核對功能尚未載入，請強制重新整理此頁。';return;
+ }
+ auditBusy=true;if(button)button.disabled=true;
+ el.textContent='正在查詢正式月份主表，逐筆核對暫停修改；不會強制寫入。';
+ let resolved=0;
+ try{
+  const result=await window.p79V5AuditPausedQueue(progress=>{
+   const finished=Number(progress.confirmed||0)+Number(progress.archived||0);
+   if(finished!==resolved){
+    resolved=finished;
+    const card=document.getElementById('p79OutboxInspectCard'),scroll=card?.scrollTop||0;
+    show(false);
+    if(card)card.scrollTop=scroll;
+   }
+   el.textContent='雲端核對 '+progress.checked+'/'+progress.total+' 筆｜已確認 '+progress.confirmed+
+    '｜舊修改已備份 '+progress.archived+'｜需要人工核對 '+progress.needsReview+
+    '｜核對失敗 '+progress.errors;
+  });
+  show(false);
+  el.textContent='核對完成：已確認同步 '+result.confirmed+' 筆；正式紀錄不存在、已安全備份 '+result.archived+
+   ' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+
+   ' 筆。未確認的修改全部保留，不會強制送出。'+(result.lastError?' 最近錯誤：'+result.lastError:'');
+ }catch(error){
+  el.textContent='自動核對未完成：'+String(error?.message||error)+'。原始修改仍保留，可按上方重新核對。';
+ }finally{
+  auditBusy=false;if(button)button.disabled=false;
+  inspectorQueueSnapshot=queueSnapshot();
+ }
+}
+document.getElementById('p79OutboxInspectRefresh')?.addEventListener('click',()=>{void auditAllPaused();});
 async function reviewEntry(key){
+ if(auditBusy)return;
  if(reviewBusy)return;reviewBusy=true;
  const el=document.getElementById('p79OutboxReview');el.textContent='正在讀取雲端正式時間並核對舊修改…';
  try{
@@ -24568,8 +24617,8 @@ async function reviewEntry(key){
 }
 async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
- if(button.dataset.reviewKey){reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
- if(reviewBusy)return;
+ if(button.dataset.reviewKey){if(!auditBusy)void reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
+ if(reviewBusy||auditBusy)return;
  const status=document.getElementById('p79OutboxReview');
  try{
   if(button.hasAttribute('data-withdraw-key')||button.hasAttribute('data-withdraw-all')){
