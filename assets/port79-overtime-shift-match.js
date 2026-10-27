@@ -22,7 +22,9 @@
  function sameReport(report,row){
   if(!report||!row)return false;
   return String(report.category||'')===String(row[0]||'')&&
-   minute(report.overtimeStart)===minute(row[6])&&minute(report.overtimeEnd)===minute(row[7]);
+   minute(report.overtimeStart)===minute(row[6])&&minute(report.overtimeEnd)===minute(row[7])&&
+   (row[0]!=='延'||(minute(report.normalStart)===minute(row[4])&&
+     minute(report.normalEnd)===minute(row[5])&&String(report.position||'')===String(row[8]||'')));
  }
  function ruleLabel(row){return String(row?.[1]||row?.[0]||'');}
  function typeAllowed(row,report){
@@ -39,8 +41,7 @@
   const category=String(report?.category||(['休','例','國'].includes(roster[date])?roster[date]:''));
   const rows=Array.isArray(input?.rules)?input.rules:[];
   const eligible=rows.map((r,i)=>({row:r,index:i,span:datespan(date,r)}))
-   .filter(x=>x.span&&x.row?.[0]===category&&categories.has(category)&&typeAllowed(x.row,report)&&
-    (category!=='延'||x.row[8]!=='before'&&x.row[8]!=='after'));
+   .filter(x=>x.span&&x.row?.[0]===category&&categories.has(category)&&typeAllowed(x.row,report));
   const result={state:'none',code:'',category,oldCode:String(report?.code||''),suggested:null,mismatch:false,reason:'',confirmed:false};
   if(!eligible.length)return result;
   const start=Number(input?.start),end=Number(input?.end);
@@ -56,7 +57,10 @@
    if(category==='延'&&typeof g.P79Overtime?.inferRule==='function'){
     // Extended-day rules include normal-shift anchors. Reuse their validator.
     const chosen=g.P79Overtime.inferRule(start,end,date,rows.filter(r=>r?.[0]==='延'),category);
-    if(chosen)ranked=eligible.filter(x=>x.row===chosen).map(x=>({...x,diff:0}));
+    if(chosen)ranked=eligible.filter(x=>x.row[0]===chosen[0]&&x.row[1]===chosen[1]&&
+     String(x.row[8])===String(chosen[8])&&
+     minute(x.row[6])===minute(chosen[6])&&minute(x.row[7])===minute(chosen[7]))
+      .map(x=>({...x,diff:0}));
    }
   }else if(hasIn&&!hasOut&&input?.attendanceIssue!=='pairing'){
    ranked=eligible.map(x=>({...x,diff:Math.abs(start-x.span.start)}))
