@@ -87,27 +87,23 @@ const reportHeaders=rows=>rows[0]?.summary?headers.map((h,i)=>i>=4&&i<=7?h+'時�
 const reportDate=rows=>rows[0]?.rangeLabel||dateLabel(rows[0].date);
 function reportHtml(rows,planned,hideConverted=false){
  const summary=!!rows[0]?.summary;
- return pages(rows).map(page=>{
-  const pageRows=page.companies.flatMap(company=>company.sections.flatMap(section=>section.rows));
+ return pages(rows).map(page=>'<section class="oa-page">'+page.companies.map(company=>{
+  const companyRows=company.sections.flatMap(section=>section.rows);
   const grandTotal='<tr class="oa-total"><td colspan="'+(summary?4:8)+'">合計（小時）</td>'+
-   (summary?[0,1,2,3].map(i=>'<td>'+number(pageRows.reduce((n,r)=>n+Number(r.periods[i]||0),0))+'</td>').join(''):'')+
-   '<td>'+number(total(pageRows,'actual'))+'</td>'+
-   (hideConverted?'':'<td>'+(total(pageRows,'converted')===null?'未完整設定':number(total(pageRows,'converted')))+'</td>')+'<td></td></tr>';
-  return '<section class="oa-page">'+page.companies.map((company,companyIndex)=>
-   '<article><h2>'+esc(company.name)+' 79W作業課'+reportTitle(rows,planned)+'</h2>'+
-   '<p class="oa-date">'+esc(reportDate(summary?rows:company.sections.flatMap(section=>section.rows)))+'</p>'+
-   company.sections.map((section,sectionIndex)=>
-    '<div class="oa-section"><h3>職稱：'+esc(section.job)+'</h3><table><colgroup>'+
-    (hideConverted?[4,9,8,12,9,9,9,9,13,18]:[4,8,7,11,8,8,8,8,11,12,15]).map(w=>'<col style="width:'+w+'%">').join('')+
-    '</colgroup><thead><tr>'+reportHeaders(rows).filter((_,i)=>!hideConverted||i!==9).map(h=>'<th>'+esc(h)+'</th>').join('')+
-    '</tr></thead><tbody>'+section.rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.job)+'</td><td>'+esc(r.empId)+'</td>'+
-    r.periods.map((p,i)=>'<td class="'+['rest','work','regular','national'][i]+'">'+esc(p)+'</td>').join('')+
-    '<td>'+number(r.actual)+'</td>'+(hideConverted?'':'<td>'+(r.converted===null?'未設定':number(r.converted))+'</td>')+
-    '<td>'+esc(r.note)+'</td></tr>').join('')+
-    (companyIndex===page.companies.length-1&&sectionIndex===company.sections.length-1?grandTotal:'')+
-    '</tbody></table></div>').join('')+
-   '<div class="oa-sign"><span>經理：</span><span>課長：</span><span>製表：</span></div></article>').join('')+'</section>';
- }).join('');
+   (summary?[0,1,2,3].map(i=>'<td>'+number(companyRows.reduce((n,r)=>n+Number(r.periods[i]||0),0))+'</td>').join(''):'')+
+   '<td>'+number(total(companyRows,'actual'))+'</td>'+
+   (hideConverted?'':'<td>'+(total(companyRows,'converted')===null?'未完整設定':number(total(companyRows,'converted')))+'</td>')+'<td></td></tr>';
+  return '<article><h2>'+esc(company.name)+' 79W作業課'+reportTitle(rows,planned)+'</h2>'+
+   '<p class="oa-date">'+esc(reportDate(summary?rows:companyRows))+'</p>'+
+   '<div class="oa-section"><h3>職稱：'+company.sections.map(section=>esc(section.job)).join('、')+'</h3>'+
+   '<table><colgroup>'+(hideConverted?[4,9,8,12,9,9,9,9,13,18]:[4,8,7,11,8,8,8,8,11,12,15]).map(w=>'<col style="width:'+w+'%">').join('')+
+   '</colgroup><thead><tr>'+reportHeaders(rows).filter((_,i)=>!hideConverted||i!==9).map(h=>'<th>'+esc(h)+'</th>').join('')+
+   '</tr></thead><tbody>'+companyRows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.job)+'</td><td>'+esc(r.empId)+'</td>'+
+   r.periods.map((p,i)=>'<td class="'+['rest','work','regular','national'][i]+'">'+esc(p)+'</td>').join('')+
+   '<td>'+number(r.actual)+'</td>'+(hideConverted?'':'<td>'+(r.converted===null?'未設定':number(r.converted))+'</td>')+
+   '<td>'+esc(r.note)+'</td></tr>').join('')+grandTotal+'</tbody></table></div>'+
+   '<div class="oa-sign"><span>經理：</span><span>課長：</span><span>製表：</span></div></article>';
+ }).join('')+'</section>').join('');
 }
 const printCss=`body{font:11px "Microsoft JhengHei",sans-serif;color:#17202b;margin:0}.oa-page{padding:10px 6px;break-after:page}.oa-page:last-child{break-after:auto}h2{text-align:center;font-size:17px;margin:4px 0 8px}h3{font-size:12px;margin:7px 0}.oa-date{text-align:center;margin:5px 0;font-size:16px;font-weight:800;line-height:1.45}article{margin-bottom:20px}.oa-section{margin-bottom:8px}table{width:100%;table-layout:fixed;border-collapse:collapse}th,td{padding:7px 4px;border:1px solid #8795a7;text-align:center;overflow-wrap:anywhere}th{background:#e8eef5;color:#172e4b;font-weight:bold}.rest{background:#eff6ff}.regular{background:#fff1f2}.national{background:#fffbeb}.oa-total{background:#f1f5f9;font-weight:bold}.oa-sign{display:flex;justify-content:space-between;margin:12px 0 18px}.oa-sign span{width:31%;min-height:22px}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 portrait;margin:9mm 7mm}@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-size:9px}.oa-page{padding:0}h2{font-size:14px}.oa-date{font-size:15px}h3{font-size:11px}th,td{padding:5px 2px;font-size:9px;line-height:1.3}table{width:100%;table-layout:fixed}.oa-sign{margin:9px 0 12px}}`;
 const previewCss=printCss.split('@page')[0].replace(/([^{}]+)\{/g,(_,selectors)=>selectors.split(',').map(s=>'#p79OvertimeApplication .oa-preview-inner'+(s.trim()==='body'?'':' '+s.trim())).join(',')+'{');
@@ -124,24 +120,33 @@ function excelBytes(rows,planned,hideConverted=false){
  const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main',xml=s=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+s,files={},allPages=pages(rows),sheetNames=allPages.map((p,i)=>rows[0]?.summary?'時數統計'+(i+1):p.date),style=(n,s)=>` s="${s}"`;
  const styles=xml(`<styleSheet xmlns="${ns}"><numFmts count="2"><numFmt numFmtId="164" formatCode="0.00"/><numFmt numFmtId="165" formatCode="yyyy/mm/dd"/></numFmts><fonts count="4"><font><sz val="11"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><name val="Microsoft JhengHei"/><color rgb="FF172E4B"/></font><font><b/><sz val="15"/><name val="Microsoft JhengHei"/><color rgb="FF172E4B"/></font><font><b/><sz val="16"/><name val="Microsoft JhengHei"/><color rgb="FF172E4B"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['E8EEF5','EFF6FF','FFF1F2','FFFBEB','F1F5F9'].map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills><borders count="2"><border/><border>${['left','right','top','bottom'].map(e=>`<${e} style="thin"><color rgb="FF8795A7"/></${e}>`).join('')}<diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="11">${[[0,0,0,0],[0,2,0,0],[0,1,2,1],[0,0,0,1],[0,0,3,1],[0,0,4,1],[0,0,5,1],[164,0,0,1],[164,1,6,1],[165,0,0,0],[0,3,0,0]].map(([num,font,fill,border])=>`<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyAlignment="1" applyNumberFormat="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
  const areas=[];files['xl/styles.xml']=styles;
- allPages.forEach((page,index)=>{let r=1,body='',merges=[],firstDataRow=0,lastDataRow=0;const pageRows=page.companies.flatMap(company=>company.sections.flatMap(section=>section.rows));const cell=(col,row,value,s=0,formula='')=>{const a=String.fromCharCode(65+col)+row;if(formula)return `<c r="${a}"${style(0,s)}><f>${esc(formula)}</f><v>${Number(value)||0}</v></c>`;if(value===null||value===undefined||value==='')return `<c r="${a}"${style(0,s)}/>`;if(typeof value==='number')return `<c r="${a}"${style(0,s)}><v>${value}</v></c>`;return `<c r="${a}" t="inlineStr"${style(0,s)}><is><t xml:space="preserve">${esc(value)}</t></is></c>`;};
+ allPages.forEach((page,index)=>{let r=1,body='',merges=[];const cell=(col,row,value,s=0,formula='')=>{const a=String.fromCharCode(65+col)+row;if(formula)return `<c r="${a}"${style(0,s)}><f>${esc(formula)}</f><v>${Number(value)||0}</v></c>`;if(value===null||value===undefined||value==='')return `<c r="${a}"${style(0,s)}/>`;if(typeof value==='number')return `<c r="${a}"${style(0,s)}><v>${value}</v></c>`;return `<c r="${a}" t="inlineStr"${style(0,s)}><is><t xml:space="preserve">${esc(value)}</t></is></c>`;};
   const add=(values,styles,height=28)=>{body+=`<row r="${r}" ht="${height}" customHeight="1">`+Array.from({length:count},(_,i)=>cell(i,r,values[i],Array.isArray(styles)?styles[i]||0:styles||0)).join('')+'</row>';r++;};
-  for(const company of page.companies){merges.push(`A${r}:${lastCol}${r}`);add([company.name+' 79W作業課'+reportTitle(rows,planned)],1,32);if(rows[0]?.summary){merges.push(`A${r}:${lastCol}${r}`);add([reportDate(rows)],10,36);merges.push(`A${r}:${lastCol}${r}`);add(['職稱：'+company.sections.map(s=>s.job).join('、')],0,24);}else{merges.push(`A${r}:D${r}`,`E${r}:${lastCol}${r}`);add([reportDate(company.sections.flatMap(s=>s.rows)),'','','','職稱：'+company.sections.map(s=>s.job).join('、')], [10,0,0,0,0],36);}
-   for(const section of company.sections){if(company.sections.length>1){merges.push(`A${r}:${lastCol}${r}`);add(['職稱：'+section.job],2,24);}add(visible(reportHeaders(rows)),2,34);
-    section.rows.forEach((row,i)=>{if(!firstDataRow)firstDataRow=r;add(visible([i+1,row.name,row.job,row.empId,...row.periods,row.actual,row.converted===null?'未設定':row.converted,row.note]),visible([3,3,3,3,4,3,5,6,7,7,3]),30);lastDataRow=r-1;});
-    // One grand total for the whole date/sheet, after the final job and company.
-    if(company===page.companies[page.companies.length-1]&&section===company.sections[company.sections.length-1]){
-     const first=firstDataRow,last=lastDataRow;
-     merges.push(rows[0]?.summary?`A${r}:D${r}`:`A${r}:H${r}`);
-     body+=`<row r="${r}" ht="28" customHeight="1">`+cell(0,r,'合計（小時）',2)+
-      Array.from({length:rows[0]?.summary?3:7},(_,i)=>cell(i+1,r,'',2)).join('')+
-      (rows[0]?.summary?[0,1,2,3].map(i=>cell(i+4,r,pageRows.reduce((n,row)=>n+Number(row.periods[i]||0),0),8,`SUM(${String.fromCharCode(69+i)}${first}:${String.fromCharCode(69+i)}${last})`)).join(''):'')+
-      cell(8,r,total(pageRows,'actual'),8,`SUM(I${first}:I${last})`)+
-      (hideConverted?'':(total(pageRows,'converted')===null?cell(9,r,'未完整設定',2):cell(9,r,total(pageRows,'converted'),8,`ROUND(SUM(J${first}:J${last}),2)`)))+
-      cell(count-1,r,'',2)+'</row>';r++;
-    }
+  for(const company of page.companies){
+   const companyRows=company.sections.flatMap(section=>section.rows);
+   const jobNames=company.sections.map(section=>section.job).join('、');
+   merges.push(`A${r}:${lastCol}${r}`);add([company.name+' 79W作業課'+reportTitle(rows,planned)],1,32);
+   if(rows[0]?.summary){
+    merges.push(`A${r}:${lastCol}${r}`);add([reportDate(rows)],10,36);
+    merges.push(`A${r}:${lastCol}${r}`);add(['職稱：'+jobNames],0,24);
+   }else{
+    merges.push(`A${r}:D${r}`,`E${r}:${lastCol}${r}`);
+    add([reportDate(companyRows),'','','','職稱：'+jobNames],[10,0,0,0,0],36);
    }
-   merges.push(`A${r}:D${r}`,`E${r}:H${r}`,`I${r}:${lastCol}${r}`);add(['經理：','','','','課長：','','','','製表：'],0,36);add([],0,12);
+   // Every company has one header, one uninterrupted list of employees and one grand total.
+   add(visible(reportHeaders(rows)),2,34);
+   const first=r;
+   companyRows.forEach((row,i)=>add(visible([i+1,row.name,row.job,row.empId,...row.periods,row.actual,row.converted===null?'未設定':row.converted,row.note]),visible([3,3,3,3,4,3,5,6,7,7,3]),30));
+   const last=r-1;
+   merges.push(rows[0]?.summary?`A${r}:D${r}`:`A${r}:H${r}`);
+   body+=`<row r="${r}" ht="28" customHeight="1">`+cell(0,r,'合計（小時）',2)+
+    Array.from({length:rows[0]?.summary?3:7},(_,i)=>cell(i+1,r,'',2)).join('')+
+    (rows[0]?.summary?[0,1,2,3].map(i=>cell(i+4,r,companyRows.reduce((n,row)=>n+Number(row.periods[i]||0),0),8,`SUM(${String.fromCharCode(69+i)}${first}:${String.fromCharCode(69+i)}${last})`)).join(''):'')+
+    cell(8,r,total(companyRows,'actual'),8,`SUM(I${first}:I${last})`)+
+    (hideConverted?'':(total(companyRows,'converted')===null?cell(9,r,'未完整設定',2):cell(9,r,total(companyRows,'converted'),8,`ROUND(SUM(J${first}:J${last}),2)`)))+
+    cell(count-1,r,'',2)+'</row>';r++;
+   merges.push(`A${r}:D${r}`,`E${r}:H${r}`,`I${r}:${lastCol}${r}`);
+   add(['經理：','','','','課長：','','','','製表：'],0,36);add([],0,12);
   }
   const end=r-2;const cols=visible([44,80,66,108,85,85,85,85,100,108,130]).map((px,i)=>`<col min="${i+1}" max="${i+1}" width="${((px-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
   files[`xl/worksheets/sheet${index+1}.xml`]=xml(`<worksheet xmlns="${ns}"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${lastCol}${end}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="28"/><cols>${cols}</cols><sheetData>${body}</sheetData><mergeCells count="${merges.length}">${merges.map(a=>`<mergeCell ref="${a}"/>`).join('')}</mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${end>30?0:1}"/><headerFooter><oddHeader></oddHeader><oddFooter></oddFooter></headerFooter></worksheet>`);areas[index]=`<definedName name="_xlnm.Print_Area" localSheetId="${index}">'${sheetNames[index]}'!$A$1:$${lastCol}$${end}</definedName>`;

@@ -1,4 +1,4 @@
-// Regression: a daily report has one grand total after all job/company sections,
+// Regression: each company/date renders one table and one grand total across all job sections,
 // with matching XLSX, readable larger date and unchanged source data.
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
@@ -31,16 +31,23 @@ const parseZip=b=>{
 const page=api.reportHtml(first,false);
 assert.equal(matches(page,/合計（小時）/g),1,'one total across ARMG + F/L');
 assert(page.includes('<td>24.00</td>'),'all three employees total 24.00');
-assert(page.indexOf('職稱：F/L')<page.indexOf('合計（小時）'),'grand total after last job');
+assert(page.indexOf('職稱：ARMG、F/L')<page.indexOf('合計（小時）'),'every job shares one company table');
+assert.equal(matches(page,/<table>/g),1,'one company and date must use a single table');
+assert.equal(matches(page,/<thead>/g),1,'column headings are not repeated per job');
+assert(page.includes('<td>1</td>')&&page.includes('<td>2</td>')&&page.includes('<td>3</td>'),'row numbers run across jobs');
 assert(page.includes('115/10/25（星期日）'),'date keeps ROC year and weekday');
 assert(!page.includes('加班日期：'),'date must not have prefix');
 assert(source.includes('.oa-date{text-align:center;margin:5px 0;font-size:16px;font-weight:800'),'date must be bigger/bold');
 assert(source.includes('@media print{')&&source.includes('.oa-date{font-size:15px}'),'printed date must be prominent');
 const both=splitPages(api.reportHtml(multi,false));
 assert.equal(both.length,2,'each date retains separate report');
-assert.equal(matches(both[0],/合計（小時）/g),1,'only one total across companies');
+assert.equal(matches(both[0],/合計（小時）/g),2,'each company totals only its own employees');
+assert.equal(matches(both[0],/<table>/g),2,'two companies must have one table each');
+assert.equal(matches(both[0],/<thead>/g),2,'two companies must have one header each');
 assert.equal(matches(both[1],/合計（小時）/g),1,'second date also has one total');
-assert(both[0].includes('<td>32.00</td>'));
+assert(both[0].includes('<td>24.00</td>'),'first company totals all jobs');
+assert(both[0].includes('<td>8.00</td>'),'second company totals separately');
+assert(!both[0].includes('<td>32.00</td>'),'must not merge different companies into one total');
 assert(both[1].includes('<td>6.00</td>'));
 assert.equal(matches(both[0],/class="oa-sign"/g),2,'existing company signatures remain');
 const hidden=api.reportHtml(first,false,true);
@@ -49,9 +56,13 @@ const zip=parseZip(api.excelBytes(multi,false));
 assert.equal(zip.size>=2,true,'XLSX created');
 const sh1=zip.get('xl/worksheets/sheet1.xml'),sh2=zip.get('xl/worksheets/sheet2.xml');
 assert(sh1&&sh2);
-assert.equal(matches(sh1,/合計（小時）/g),1,'one total per Excel date sheet');
+assert.equal(matches(sh1,/合計（小時）/g),2,'one total per company in the date sheet');
+assert.equal(matches(sh1,/員工編號/g),2,'Excel header once for each company, not each job');
 assert.equal(matches(sh2,/合計（小時）/g),1);
-assert(sh1.includes('<v>32</v>'),'Excel cached total sums all jobs and companies');
+assert(sh1.includes('<v>24</v>'),'first company Excel total includes all roles');
+assert(sh1.includes('<v>8</v>'),'second company Excel total is distinct');
+assert(!sh1.includes('<v>32</v>'),'Excel totals must not combine companies');
+assert.equal(matches(sh1,/SUM\(I/g),2,'each company gets one matching Excel formula');
 assert(sh2.includes('<v>6</v>'),'another date has its own total');
 assert(sh1.includes('115/10/25（星期日）'),'Excel date has no prefix');
 assert(!sh1.includes('加班日期：'));
@@ -65,4 +76,4 @@ assert(agg.includes('<td>8.00</td>'),'summary hours remain aggregated across job
 const missing=[...first.slice(0,2),{...first[2],converted:null}];
 assert(api.reportHtml(missing,false).includes('未完整設定'),'missing converted hours remains visible');
 assert.equal(matches(api.reportHtml(missing,false),/合計（小時）/g),1);
-console.log('PASS overtime daily total: one per day after all companies/jobs, both dates and summary, font, PDF preview, Excel formula and missing converted hours');
+console.log('PASS overtime one table per company/day: combined jobs, separate companies, one total each, dates, preview/PDF, Excel, summary and missing converted hours');
