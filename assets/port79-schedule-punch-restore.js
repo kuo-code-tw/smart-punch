@@ -29,7 +29,7 @@ function shiftFromClockIn(inRec,outRec){
  if(!shift)return null;
  return{date,shift,start:start.ts,end:end.ts};
 }
-function plan({records=[],employees=[],schedules={},metadata={},month='',today='',isProtected=()=>false}={}){
+function plan({records=[],employees=[],schedules={},metadata={},month='',today='',allowUnmarked=false,isProtected=()=>false}={}){
  if(!engine?.buildShifts)throw Error('正式考勤配對引擎尚未載入，排班不修改');
  const peopleById=new Map(),peopleByAtt=new Map();
  for(const employee of employees){
@@ -66,7 +66,11 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   if(meta.manualRosterShift||meta.restAllocationLocked||meta.restCategoryLocked||
      meta.overtime||meta.overtimeReport||meta.overtimeReports?.length||
      meta.forEmpId||meta.note||isProtected(paired.empId,paired.date))continue;
-  if((old==='例'||old==='國')&&meta.restAllocationSource!=='auto-v1'&&!meta.noPunchOriginalShift)continue;
+  const knownAuto=meta.restAllocationSource==='auto-v1'||!!meta.noPunchOriginalShift;
+  // A historic bare 休 with a real punch may have been lawful rest-day overtime.
+  // Do not rewrite it silently on page load; require explicit preview/approval.
+  if(!knownAuto&&!allowUnmarked)continue;
+  if((old==='例'||old==='國')&&!knownAuto)continue;
   const restored=String(meta.noPunchOriginalShift||'').trim();
   // A saved original shift is stronger evidence, but a mismatched paired punch
   // requires manual review rather than assuming one of them is correct.
