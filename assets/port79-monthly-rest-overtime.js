@@ -53,10 +53,11 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
      (exception.kind==='typhoon'||!ownRestCoverReport(m,roster,d));
  }));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
- // 班表寫休但本人確實在該日有唯一完整打卡，不能同時視為「已休」。
+ // Any 休/例/國 roster day with one complete IN/OUT pair is an actual attended day.
+ // A short pair counts as attendance without inventing a full shift or approved overtime.
  // 只改統計歸屬，不將打卡直接視為已核准的加班；正式申報仍須人工確認。
  const workedRestEvidence=new Set(dates.filter(d=>{
-   if(String(roster[d]||'').trim()!=='休'||roster.__meta?.[d]?.overtimeReport)return false;
+   if(!cats.includes(String(roster[d]||'').trim())||roster.__meta?.[d]?.overtimeReport)return false;
    const pairs=(snapshot?.pairs||[]).filter(p=>id(p.empId)===id(emp.empId)&&p.date===d&&p.start&&p.end);
    return pairs.length===1&&g.P79RestAttendance?.state(snapshot,emp.empId,d)==='worked';
  }));
@@ -79,9 +80,10 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    continue;
   }
   if(workedRestEvidence.has(d)){
-   ledger.push({date:d,kind:'workedRestUnreported',category:'休',actual,
-     statusNote:'休息日有完整打卡，未有正式申報；不得誤列已休或已報'});
-   conflicts.push({date:d,reason:'休息日實際出勤但尚未正式申報；需確認休假及加班性質'});
+   const restKind=cats.includes(m.restCategory)?m.restCategory:String(roster[d]||'').trim();
+   ledger.push({date:d,kind:'workedRestUnreported',category:restKind,actual,
+     statusNote:'排休日有完整打卡，未有正式申報；不得誤列已休或已報'});
+   conflicts.push({date:d,reason:'排休日（原排'+restKind+'）有完整上下班打卡，已計出勤但尚未正式申報；需核對原排假別及加班性質'});
    continue;
   }
   const verified=cats.includes(r?.category)&&confirmedReport(m,r);
