@@ -13122,7 +13122,7 @@ async function p79ExportOvertimeComparison(printMode){
             });
             // Only complete punch pairs can amend an existing cloud report; keep the same report ID.
             if(review.confirmed&&review.mismatch&&row.reportVerified&&row.overtimeReport?.id&&
-                row.clockIn?.id&&row.clockOut?.id&&!row.timeCheckRequired&&p79CanReportOvertime()&&
+                row.clockIn?.id&&row.clockOut?.id&&!row.timeCheckRequired&&!p79WorkhoursIsEditing()&&p79CanReportOvertime()&&
                 window.P79OvertimePeriodSync?.sync){
                 window.P79OvertimePeriodSync.sync({
                     empId:row.empId,date,report:row.overtimeReport,review,rules,
