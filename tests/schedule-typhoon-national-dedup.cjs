@@ -18,7 +18,9 @@ const c={
  p79RestQuota:()=>({days:31,counts:{例:4,休:5,國:2}}),
  p79TyphoonDates:()=>[],p79AutomaticRestMetadata:()=>({}),p79EmploymentStartDate:()=>'',scheduleEscapeHtml:x=>String(x||'')
 };
+c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:false}})});
 vm.createContext(c);
+vm.runInContext(extract('p79ScheduleHasVerifiedPunch'),c);
 vm.runInContext(extract('p79DailyRestCount'),c);
 vm.runInContext(extract('p79ScheduleRestCountCells'),c);
 const compute=(off,work)=>c.p79ScheduleRestCountCells(emp,month,{},off,work);
