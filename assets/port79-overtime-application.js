@@ -159,6 +159,33 @@ const reportUsabilityCss=String.raw`
  #p79OvertimeApplication footer>div{width:100%;display:grid;grid-template-columns:1fr 1fr}
 }
 `;
+// 讀取同帳號、同月份且仍有效的正式排班快取；不以考勤打卡快取冒充申報資料。
+async function loadReportPreviewSnapshot(api,month,cache=g.Port79DataCache){
+ if(cache?.getExportSnapshot){
+  try{
+   const hit=await cache.getExportSnapshot('getScheduleDataSecure',month);
+   const age=Date.now()-Number(hit?.savedAt||0);
+   const maxAge=month===today().slice(0,7)?10000:60000;
+   if(age>=0&&age<=maxAge&&hit?.data?.ok===true&&Array.isArray(hit.data.schedules)&&hit.data.schedules.length>0&&hit.data.schedules.every(row=>row&&String(row.month)===month&&row.schedule&&typeof row.schedule==='object'))
+    return {data:hit.data,source:'本機有效快取',savedAt:hit.savedAt};
+  }catch(_){/* 快取損壞或不可用時，仍以雲端正式申報為準。 */}
+ }
+ return {data:await api.snapshot(month),source:'雲端正式資料',savedAt:Date.now()};
+}
+// 每個日期維持獨立且冪等的正式匯出紀錄；限制同時連線數，避免18天逐筆串行等待。
+async function writeExportAuditBatches(byDate,api,fileName,prefix,onProgress=()=>{}){
+ const days=[...byDate],width=3;let complete=0;
+ for(let offset=0;offset<days.length;offset+=width){
+  const outcomes=await Promise.allSettled(days.slice(offset,offset+width).map(async ([date,entries])=>{
+   const ack=await api.auditWrite({date,entries,fileName,requestId:prefix+'-'+date.replace(/-/g,'')});
+   if(!ack?.ok||(ack.count!==entries.length&&ack.duplicate!==true))throw Error((ack?.error||'雲端匯出記錄尚未確認')+'（'+date+'）');
+   complete++;onProgress(complete,days.length);
+  }));
+  const failed=outcomes.filter(item=>item.status==='rejected');
+  if(failed.length)throw Error(failed.map(item=>String(item.reason?.message||item.reason)).join('；'));
+ }
+ return complete;
+}
 function open(options={}){
  const a=g.p79OvertimeApplicationContext;if(!a?.canExport())return alert('沒有加班申報表匯出權限');if(document.getElementById('p79OvertimeApplication'))return;
  const el=document.createElement('dialog');el.id='p79OvertimeApplication';el.style.cssText='width:min(1150px,calc(100vw - 24px));max-height:92dvh;border:0;border-radius:14px;padding:0;color:#17202b;background:#fff';
@@ -192,10 +219,10 @@ function open(options={}){
  if(options.date&&validDate(options.date)){q('#oaMode').value='single';q('#oaStart').value=options.date;mode();}
  function lock(on){busy=on;el.querySelectorAll('.oa-filters input,.oa-filters select,.oa-filters button,.oa-filters summary,#oaDates button').forEach(n=>{if('disabled'in n)n.disabled=on;});q('#oaPrint').disabled=q('#oaExcel').disabled=on||!loaded;}
  q('#oaLoad').onclick=async()=>{
-  if(busy)return;reset();rowRemarks.clear();lock(true);try{if(!a.canExport())throw Error('登入或匯出權限已失效');const dates=datesFor(q('#oaMode').value,q('#oaStart').value,q('#oaEnd').value,q('#oaMonth').value,selectedDates);if(dates.length>366)throw Error('一次最多選366天');const months=[...new Set(dates.map(d=>d.slice(0,7)))],snapshots=[];
-   for(let i=0;i<months.length;i++){status('正在讀取 '+months[i]+' 的已申報資料（'+(i+1)+'／'+months.length+'）…');snapshots.push(await a.snapshot(months[i]));if(!el.isConnected)return;}
+  if(busy)return;reset();rowRemarks.clear();lock(true);try{if(!a.canExport())throw Error('登入或匯出權限已失效');const dates=datesFor(q('#oaMode').value,q('#oaStart').value,q('#oaEnd').value,q('#oaMonth').value,selectedDates);if(dates.length>366)throw Error('一次最多選366天');const months=[...new Set(dates.map(d=>d.slice(0,7)))],snapshots=[],sources=[];
+   for(let i=0;i<months.length;i++){status('正在讀取 '+months[i]+' 的已申報資料（'+(i+1)+'／'+months.length+'）…');const item=await loadReportPreviewSnapshot(a,months[i]);snapshots.push(item.data);sources.push(months[i]+'：'+item.source);if(!el.isConnected)return;}
    const result=collect(snapshots,a.employees(),dates,q('#oaCompany').value,[...el.querySelectorAll('.oa-job:checked')].map(n=>n.value),q('#oaType').value);if(!result.rows.length){status('所選條件沒有可列印的'+(q('#oaType').value==='actual'?'已儲存申報':'預排申請')+'。\n'+result.issues.join('\n'));return;}
-   loaded={rows:[],sourceRows:result.rows,dates,summary:q('#oaView').value==='summary',planned:q('#oaType').value==='planned',hideConverted:q('#oaHideConverted').checked};updateReportRemarkPreview();q('#oaRowRemarks').hidden=false;void showAudit();status((q('#oaView').value==='summary'?'已彙總 '+dates.length+' 個日期、'+loaded.rows.length+' 位人員。':'已產生 '+pages(loaded.rows).length+' 個日期、'+loaded.rows.length+' 筆明細。')+'\n'+result.issues.join('\n'));
+   loaded={rows:[],sourceRows:result.rows,dates,summary:q('#oaView').value==='summary',planned:q('#oaType').value==='planned',hideConverted:q('#oaHideConverted').checked};updateReportRemarkPreview();q('#oaRowRemarks').hidden=false;void showAudit();status((q('#oaView').value==='summary'?'已彙總 '+dates.length+' 個日期、'+loaded.rows.length+' 位人員。':'已產生 '+pages(loaded.rows).length+' 個日期、'+loaded.rows.length+' 筆明細。')+'\n資料來源：'+sources.join('、')+'\n'+result.issues.join('\n'));
   }catch(e){status('預覽未完成：'+e.message);}finally{lock(false);}
  };
  q('#oaPrint').onclick=()=>{if(!loaded||busy||!a.canExport())return;const popup=g.open('','_blank');if(!popup)return status('請允許開啟列印視窗');popup.document.write('<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>加班申報表</title><style>'+printCss+'</style><body>'+reportHtml(loaded.rows,loaded.planned,loaded.hideConverted)+'</body></html>');popup.document.close();popup.focus();popup.print();};
@@ -228,16 +255,14 @@ function open(options={}){
    if(!byDate.size)throw Error('沒有可記錄的正式申報明細，不能標記已匯出');
    if(typeof a.auditWrite!=='function')throw Error('目前系統尚未連接加班匯出紀錄 API，請更新 GAS 後重試');
    const prefix='OTEXP'+Date.now().toString(36)+Math.random().toString(36).slice(2,12);
-   for(const [date,entries] of byDate){
-     const ack=await a.auditWrite({date,entries,fileName,requestId:prefix+'-'+date.replace(/-/g,'')});
-     if(!ack?.ok||ack.count!==entries.length&&ack.duplicate!==true)throw Error(ack?.error||'雲端匯出記錄尚未確認');
-   }
+   status('正在確認雲端正式匯出紀錄：0／'+byDate.size+' 個日期…');
+   await writeExportAuditBatches(byDate,a,fileName,prefix,(done,total)=>status('正在確認雲端正式匯出紀錄：'+done+'／'+total+' 個日期…'));
    const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),link=document.createElement('a');
    link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
    status('已將 '+(loaded.sourceRows||[]).length+' 筆加班明細記錄為「已啟動匯出」，並開始下載。若瀏覽器阻擋下載，請確認後再操作。');
-   await showAudit();
+   void showAudit(); // 下載已啟動，查詢稽核清單不再阻塞匯出按鈕。
   }catch(e){status('匯出未完成：'+e.message);}finally{lock(false);}
  };
 }
-g.P79OvertimeApplication={zip,companyLabels,open,aggregate,datesFor,dateLabel,renameCompanies,applyExportRemarks,companyFor,period,periodHours,collect,pages,reportHtml,excelBytes};
+g.P79OvertimeApplication={zip,companyLabels,open,aggregate,datesFor,dateLabel,renameCompanies,applyExportRemarks,companyFor,period,periodHours,collect,pages,reportHtml,excelBytes,loadReportPreviewSnapshot,writeExportAuditBatches};
 })(window);
