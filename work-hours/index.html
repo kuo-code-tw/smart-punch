@@ -15969,9 +15969,21 @@ window.p79MonthlyRestContext={
  canReport:p79CanReportOvertime,employees:()=>p79WorkhoursEligibleEmployees(),employmentStart:p79EmploymentStartDate,
  month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:'';},
  saveReport:p79SaveWorkOvertimeDraft,refresh:()=>{p79OvertimeCalculationCache=null;renderOvertimeStats();},
- snapshot:async function(month,rosterOnly=false,reportView=false){
+ snapshot:async function(month,rosterOnly=false,reportView=false,options={}){
   const token=currentPort79SsoToken();if(!token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('沒有操作權限');
+  const cache=window.Port79DataCache,viewer=cache?.viewerKey?.(),sources={cache:0,cloud:0};
+  const assertSession=()=>{if(currentPort79SsoToken()!==token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('登入或操作權限已變更，請重新讀取');};
   const read=async (action,readMonth=month)=>{
+   assertSession();
+   if(reportView&&options.preferCache===true&&cache?.getExportSnapshot){
+    let hit;try{hit=await cache.getExportSnapshot(action,readMonth);}catch(ignore){}
+    assertSession();
+    const age=Date.now()-Number(hit?.savedAt||0),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());
+    const valid=hit?.data?.ok===true&&String(hit.data.month||'')===readMonth&&
+     (action==='getAttendanceMonthRaw'?Array.isArray(hit.data.records):Array.isArray(hit.data.schedules)&&hit.data.schedules.every(row=>String(row?.month||'')===readMonth&&row.schedule&&typeof row.schedule==='object'));
+    if(valid&&age>=0&&age<=(readMonth===current?10000:60000)){sources.cache++;return hit.data;}
+   }
+   sources.cloud++;const readAt=Date.now();
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',readMonth);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
    // 月報屬唯讀操作：避免大量跨月考勤資料在 45 秒自動中止時整張表空白。
    // 僅月報使用有逾時中文訊息與重試的讀取；一般申報流程維持原本機制。
@@ -15979,7 +15991,9 @@ window.p79MonthlyRestContext={
     const label=(action==='getScheduleDataSecure'?'加班月報班表 ':'加班月報考勤 ')+readMonth;
     const data=await fetchGasJsonWithRetry(url.toString(),label,2,75000);
     if(data?.ok!==true)throw Error(data?.error||label+' 雲端讀取失敗');
-    if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
+    assertSession();
+    if(options.preferCache===true&&viewer&&cache?.storeExportSnapshot)
+     void Promise.resolve().then(()=>cache.storeExportSnapshot(action,readMonth,data,viewer,token,readAt)).catch(()=>{});
     return data;
    }
    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
@@ -15994,6 +16008,7 @@ window.p79MonthlyRestContext={
   const needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
   const [roster,batches]=await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
+  assertSession();
   if(!Array.isArray(roster.schedules))throw Error('班表資料未讀齊，不能判定無卡休假');
   if(needAttendance&&batches.some((data,i)=>!Array.isArray(data.records)||(data.month!=null&&String(data.month)!==months[i])))throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
   const attendanceRows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
@@ -16003,7 +16018,7 @@ window.p79MonthlyRestContext={
   p79OvertimeCalculationCache=null;
 
   const leaveDates=p79WorkRestLeaveDates(month,roster,employees);
-  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,saveContext:needAttendance?{token,month,ready:roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
+  return {previewSource:sources.cache?(sources.cloud?'本機快取＋雲端補齊':'本機有效快取'):'雲端正式資料',schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,saveContext:needAttendance?{token,month,ready:roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
 </script>
@@ -16037,10 +16052,54 @@ window.p79OvertimeStatusContext={
  }
 };
 window.p79OvertimeApplicationContext={
+ session:()=>currentPort79SsoToken(),
+ cacheMeta:async month=>{
+  const token=currentPort79SsoToken();if(!token||!p79CanExportOvertimeApplication())throw Error('登入或匯出權限已失效');
+  const url=new URL(getActiveGasUrl());url.searchParams.set('action','getOvertimeReportCacheMeta');url.searchParams.set('month',month);url.searchParams.set('token',token);url.searchParams.set('_',Date.now());
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+  try{
+   const response=await fetch(url.toString(),{cache:'no-store',signal:ctl.signal}),data=await response.json();
+   if(currentPort79SsoToken()!==token||!p79CanExportOvertimeApplication())throw Error('登入或匯出權限已變更');
+   if(response.ok&&data?.ok===false&&/未知操作|不支援.*操作/.test(String(data.error||'')))return null;
+   if(!response.ok||data?.ok!==true||data.cacheSchemaVersion!==1||data.month!==month)throw Error(data?.error||'快取版本尚未核對成功');
+   return data;
+  }finally{clearTimeout(timer)}
+ },
+ buildPreviewSnapshot:(month,raw)=>{
+  if(!currentPort79SsoToken()||!p79CanExportOvertimeApplication())throw Error('登入或匯出權限已失效');
+  const result=p79BuildWorkRestAttendance(month,raw,raw.records,true);
+  return {schedules:raw.schedules.filter(row=>result.allowed.has(String(row.empId).trim().toUpperCase())),
+   pairs:result.pairs,attendanceEvidence:result.attendanceEvidence,
+   leaveDates:p79WorkRestLeaveDates(month,raw,result.employees),leaveCoverAssignments:raw.leaveCoverAssignments||[]};
+ },
+ previewCachePayload:(month,data)=>{
+  const cloud=data.saveContext?.cloud;if(!cloud||!Array.isArray(cloud.records))return null;
+  const people=p79WorkhoursEligibleEmployees(),ids=new Set(people.map(e=>String(e.empId).trim().toUpperCase()));
+  const nums=new Set(people.map(e=>normalizeAttendanceStatsAttNo(e.attNo)).filter(Boolean));
+  return {month,schedules:data.schedules,
+   records:cloud.records.filter(r=>ids.has(String(r.empId||'').trim().toUpperCase())||!r.empId&&nums.has(normalizeAttendanceStatsAttNo(r.attNo))),
+   leaveRecords:(cloud.leaveRecords||[]).filter(l=>people.some(e=>leaveBelongsToEmployee(l,e))),
+   leaveCoverAssignments:(cloud.leaveCoverAssignments||[]).filter(c=>ids.has(String(c.leaveEmpId||'').toUpperCase())||(c.workerIds||[]).some(id=>ids.has(String(id).toUpperCase())))};
+ },
+ auditBatchWrite:async payload=>{
+  const token=currentPort79SsoToken();if(!token||!p79CanExportOvertimeApplication())throw Error('登入或匯出權限已失效');
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),75000);
+  try{
+   const transport=window.P79OvertimeStatus?.fetch||fetch;
+   const response=await transport(getActiveGasUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},signal:ctl.signal,
+    body:JSON.stringify({...payload,action:'recordOvertimeReportExportBatch',token,gcToken:token})});
+   const data=await response.json();
+   if(currentPort79SsoToken()!==token||!p79CanExportOvertimeApplication())throw Error('登入或匯出權限已變更，請重新核對原批次');
+   if(!response.ok||data?.ok!==true||data.queued===true)throw Error(data?.error||'批次匯出記錄尚未確認');
+   return data;
+  }finally{clearTimeout(timer)}
+ },
+
  employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,
  deploymentUrl:()=>getActiveGasUrl(),
  employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),
  snapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true),
+ previewSnapshot:month=>window.p79MonthlyRestContext.snapshot(month,true,true,{preferCache:true}),
  auditRead:async month=>{
   const token=String(typeof currentPort79SsoToken==='function'?currentPort79SsoToken():sessionStorage.getItem('port79_user_token')||'').trim();
   if(!token)throw Error('尚未登入，不能查看雲端匯出紀錄');
@@ -16058,7 +16117,7 @@ window.p79OvertimeApplicationContext={
  }
 };
 </script>
-<script src="../assets/port79-overtime-application.js?v=20261026-legacy-unique-rule-v2"></script>
+<script src="../assets/port79-overtime-application.js?v=20261027-evidence-cache-v1"></script>
 <script>
 (function(){
  const date=new URLSearchParams(location.search).get('overtimeExportDate');
