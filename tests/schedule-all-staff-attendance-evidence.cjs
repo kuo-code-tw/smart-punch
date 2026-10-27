@@ -34,7 +34,7 @@ assert.equal(incomplete.excludeRestCount,false,'unpaired punch cannot change sta
 const noPunch=resolve({state:'rest',shift:'休'});
 assert.equal(noPunch.label,'');assert.equal(noPunch.excludeRestCount,false);
 assert(html.includes('port79-schedule-attendance-display.js'),'shared script loaded in roster');
-assert(html.includes('attendanceMarker=window.P79ScheduleAttendanceDisplay.resolve('),'all daily cells use same attendance mapper');
+assert(html.includes('attendanceMarker=window.P79ScheduleAttendanceDisplay?.resolve?.('),'all daily cells use same attendance mapper');
 assert(html.includes('attendanceMarker.excludeRestCount'),'actual work removed from used rest quota');
 assert(html.includes('attendanceMarker.worked ||'),'actual work included in workday count');
 assert(html.includes('data-attendance-state="${scheduleEscapeHtml(attendanceState)}"'),'evidence state visible for diagnosis');
