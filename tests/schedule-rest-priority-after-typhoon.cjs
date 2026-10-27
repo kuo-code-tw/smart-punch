@@ -15,9 +15,10 @@ const c={window:null,Date,Map,Set,Array,Math,JSON,String,Number,Object,console,
  p79MarkScheduleLocalMutation:()=>{mutations++},buildRoleTabsAndRender:()=>{renders++},
  alert:x=>messages.push(x)};
 c.window=c;c.P79SpecialOvertime={electionDates:()=>[]};
+c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:false,days:{}}})});
 vm.createContext(c);
 vm.runInContext(fs.readFileSync('assets/port79-rest-allocation.js','utf8'),c);
-for(const n of ['p79RestAutomaticExcludedDates','p79RestAutomaticPlan',
+for(const n of ['p79ScheduleHasVerifiedPunch','p79RestAutomaticExcludedDates','p79RestAutomaticPlan',
  'p79AutomaticRestMetadata','p79AutoAllocateRest'])vm.runInContext(extract(n),c);
 c.p79VisibleRestDayAudit=(emp,m,meta)=>{
  const dates={例:[],休:[],國:[]};
