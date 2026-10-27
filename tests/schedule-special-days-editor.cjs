@@ -1,26 +1,44 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const stored=new Map([['p79-manual-typhoon-days-v1','["2026-10-23"]']]);
-const c={Date,Intl,Map,Set,localStorage:{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)}};c.window=c;vm.createContext(c);
-for(const file of ['port79-special-overtime.js','port79-special-days-editor.js'])vm.runInContext(fs.readFileSync('assets/'+file,'utf8'),c);
-const editor=c.P79SpecialDaysEditor;
-assert(editor.read().some(r=>r.date==='2026-10-23'&&r.kind==='typhoon'),'existing typhoon dates retained');
-assert(editor.read().some(r=>r.date==='2026-11-28'&&r.kind==='election'),'existing reference election date visible in editor');
-assert.equal(editor.valid('2026-02-30'),false);assert.equal(editor.valid('2028-02-29'),true);
-assert.throws(()=>editor.range('2026-10-24','2026-10-23','typhoon'));
-const draft=editor.normalize([...editor.read(),...editor.range('2026-10-23','2026-10-25','typhoon'),{kind:'election',date:'2026-10-30'}]);
-assert.equal(draft.filter(r=>r.kind==='typhoon').length,3,'overlapping dates deduplicated');
-assert.equal(stored.get('p79-manual-typhoon-days-v1'),'["2026-10-23"]','draft does not save until submitted');
-const signature=editor.signature();editor.save(draft,signature);
-for(const date of ['2026-10-23','2026-10-24','2026-10-25'])assert(c.P79SpecialOvertime.kindsForDate(date).some(k=>k.code==='颱'));
-assert(c.P79SpecialOvertime.kindsForDate('2026-10-30').some(k=>k.code==='選'));
-assert.throws(()=>editor.save([],signature),/另一個視窗/,'concurrent edits rejected');
-editor.save([{date:'2026-10-31',kind:'election'},{date:'2026-10-24',kind:'typhoon'}]);
-assert.equal(c.P79SpecialOvertime.kindsForDate('2026-11-28').length,0,'deleting reference election date persists');
-assert.equal(c.P79SpecialOvertime.kindsForDate('2026-10-30').length,0,'removed manual date no longer applied');
-assert(c.P79SpecialOvertime.kindsForDate('2026-10-31').some(k=>k.code==='選'));
-const before=editor.signature(),nativeSet=c.localStorage.setItem;let writes=0;
-c.localStorage.setItem=(...args)=>{if(++writes===2)throw Error('storage full');return nativeSet(...args)};
-assert.throws(()=>editor.save([]),/無法儲存/);assert.equal(editor.signature(),before,'partial save rolls back');
-const html=fs.readFileSync('schedule/index.html','utf8');
-assert(html.includes('port79-special-days-editor.js?v='));assert(html.includes("electionDay?'選舉'"));assert(html.includes('P79SpecialDaysEditor.open('));
-console.log('PASS date editor preserves existing settings, validates leap dates/ranges, deduplicates, drafts/cancel, multi-day typhoon and election edits/deletes, concurrency and storage rollback');
+const source=fs.readFileSync('assets/port79-special-days-editor.js','utf8');
+let cloud={revision:'0',rows:[{kind:'election',date:'2026-11-28'}]},reads=0,writes=0;
+function setup(existing=[]){
+ const stored=new Map([['p79-manual-typhoon-days-v1',JSON.stringify(existing)]]);
+ const c={Date,Intl,Map,Set,Promise,console,localStorage:{
+  getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,String(v)),removeItem:k=>stored.delete(k)
+ },P79SpecialOvertime:{electionDates:()=>['2026-11-28']}};
+ c.window=c;vm.createContext(c);vm.runInContext(source,c);
+ const app=c.P79SpecialDaysEditor;
+ app.configure({
+  read:async()=>{reads++;return {ok:true,source:'cloud',schemaVersion:1,...structuredClone(cloud)}},
+  write:async({rows,expectedRevision})=>{
+   writes++;if(expectedRevision!==cloud.revision)return {ok:false,conflict:true,error:'版本衝突'};
+   cloud={revision:'v'+String(writes).padStart(32,'0'),rows:structuredClone(rows)};
+   return {ok:true,source:'cloud',schemaVersion:1,...structuredClone(cloud)};
+  }
+ });
+ return {app,stored};
+}
+(async()=>{
+ const a=setup(['2026-10-23']),b=setup();
+ await a.app.refresh();await b.app.refresh();
+ assert.deepEqual(Array.from(a.app.pendingLegacy(),x=>x.date),['2026-10-23'],'old home date backed up');
+ assert.equal(a.stored.get('p79-manual-typhoon-days-v1'),'[]','old local date is not silently submitted to cloud');
+ assert.equal(a.stored.get('p79-special-days-precloud-backup-v1')!==null,true);
+ const local=JSON.parse(a.stored.get('p79-special-days-precloud-backup-v1'));
+ assert.deepEqual(local.rows.map(x=>x.date),['2026-10-23','2026-11-28'],'backup also retains the old default election day');
+ assert.equal(a.app.signature(),'0');
+ const next=[{date:'2026-11-28',kind:'election'},{date:'2026-10-23',kind:'typhoon'}];
+ await a.app.save(next,a.app.signature());
+ await b.app.refresh();
+ assert.equal(b.stored.get('p79-manual-typhoon-days-v1'),'["2026-10-23"]','office computer receives home changes');
+ assert.equal(b.app.read().length,2);
+ assert.equal(a.app.pendingLegacy().length,0,'after explicit migration, no pending legacy');
+ await assert.rejects(()=>b.app.save([{date:'2026-10-24',kind:'typhoon'}],'0'),/版本已變更/);
+ assert.throws(()=>a.app.normalize([{date:'2026-02-30',kind:'typhoon'}]),/有效日期/);
+ const days=a.app.range('2026-10-23','2026-10-25','typhoon');
+ assert.equal(days.length,3);
+ assert.equal(writes,1,'only explicit save writes to cloud');
+ assert(reads>=3);
+ assert(source.includes("const BACKUP_KEY=")&&source.includes("if(!service)throw Error('未連接 GAS"));
+ console.log('PASS special days cloud: cross-computer sync, optimistic revision, legacy backup, explicit upload, invalid dates');
+})().catch(e=>{console.error(e);process.exitCode=1});
