@@ -42,7 +42,23 @@ assert(html.includes('p79WorkOvertimeMonths.delete(key)'),'old roster month is i
 assert(html.includes('p79LoadWorkOvertimeMonths(records,key,true)'),'new official schedule is fetched');
 assert(html.includes('if(p79WorkhoursIsEditing())'),'edits must not be overwritten by refresh');
 assert(html.includes('依最新打卡與班表比對：'),'all employee overtime rows show their inferred period');
-assert(html.includes('原正式申報（待核對）'),'old report is clearly labeled until cloud amendment confirmed');
+assert(html.includes('原正式申報：'),'original report remains available on anomaly hover');
+assert(!html.includes('正在同步原申報時段'),'misleading automatic-sync display removed');
+const warningStart=html.indexOf('const changingPeriod=!!(row.reportVerified&&periodReview?.mismatch&&periodReview.suggested);');
+const warningEnd=html.indexOf('// Punch-derived overtime is available immediately.',warningStart);
+assert(warningStart>=0&&warningEnd>warningStart);
+const warning=new Function('row','periodReview','escapeHtml','p79OvertimePeriodLabel',html.slice(warningStart,warningEnd)+'return periodSuggestion;');
+const row={reportVerified:true,overtimeReport:{category:'休',code:'休16-24'}};
+const review={mismatch:true,confirmed:true,state:'completed',suggested:{code:'休08-16'},code:'休08-16',reason:'需核對'};
+const resultBadge=warning(row,review,x=>String(x),r=>r.code);
+assert.match(resultBadge,/⚠ 時段待核對/,'confirmed mismatch displays only compact warning');
+assert.match(resultBadge,/title="依最新打卡與班表比對：休08-16/,'long explanation lives in native hover tooltip');
+assert.match(resultBadge,/原正式申報：休16-24/,'original report is available in hover');
+assert(!resultBadge.includes('<small')&&!resultBadge.includes('rounded-lg border'),'long warning card removed');
+assert.equal(warning(row,{...review,mismatch:false},x=>String(x),r=>r.code),'','matched periods produce no warning');
+assert.match(warning(row,{...review,state:'tentative',confirmed:false},x=>String(x),r=>r.code),/時段暫估/,'incomplete punch uses tentative color');
+assert(html.includes('escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))'),'the original cloud declaration stays in the visible summary');
+
 assert(html.includes('尚未簽退，不代表已完成'),'incomplete punch cannot create fake full-day hours');
 const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
 for(const m of scripts)if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
