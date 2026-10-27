@@ -5944,7 +5944,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
-          if(attendanceMarker.worked || !(manualNoPunch || shiftVal === '休' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '颱' || shiftVal === '離')) {
+          if(attendanceMarker.worked || !(manualNoPunch || shiftVal === '休' || shiftVal === '例' || shiftVal === '國' || shiftVal === '特' || shiftVal === '年' || shiftVal === '事' || shiftVal === '病' || shiftVal === '公' || shiftVal === '喪' || shiftVal === '颱' || shiftVal === '離')) {
             workDays++;
           } else {
             offDays++;
