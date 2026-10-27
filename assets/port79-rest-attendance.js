@@ -8,7 +8,10 @@ function isLeaveDay(snapshot,emp,date,roster={}){
  return snapshot?.attendanceEvidence?.days?.[key]?.leave===true||leaveCodes.has(String(roster[date]||'').trim())||(snapshot?.leaveDates||[]).some(k=>String(k).toUpperCase()===key)||(snapshot?.approvedLeaves||[]).some(l=>id(l.empId)===id(emp)&&date>=l.start&&date<=l.end);
 }
 function period(date,roster){
- const meta=roster.__meta?.[date]||{},report=meta.overtimeReport||{},shift=meta.reportOriginalShift??meta.overtimeOriginalShift??roster[date];
+ const meta=roster.__meta?.[date]||{},report=meta.overtimeReport||{};
+ // 班表已改班時以最新有效班別為主；休假日仍可使用原班別作加班區間依據。
+ const current=String(roster[date]||'').trim();
+ const shift=['早','中','晚'].includes(current)?current:(meta.reportOriginalShift??meta.overtimeOriginalShift??current);
  let hours=({早:[8,16],中:[16,24],晚:[24,32]})[shift];
  if(!hours&&report.overtimeStart!=null&&report.overtimeEnd!=null){
   const minute=x=>{const m=String(x).match(/^(\d{1,2})(?::(\d{2}))?$/);return m?Number(m[1])+Number(m[2]||0)/60:NaN};
