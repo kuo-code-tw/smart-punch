@@ -128,7 +128,7 @@ function applyExportRemarks(rows,remark='',individual=new Map()){
  return rows.map((row,i)=>({...row,note:String(individual.get(i)??'').trim().slice(0,80)||fallback}));
 }
 
-const reportUsabilityCss=String.raw\`
+const reportUsabilityCss=String.raw`
 #p79OvertimeApplication{box-shadow:0 22px 56px #0f172a30}
 #p79OvertimeApplication header{align-items:center;border-bottom:1px solid #dbe3ed}
 #p79OvertimeApplication header b{font-size:18px;letter-spacing:.02em}
@@ -158,7 +158,7 @@ const reportUsabilityCss=String.raw\`
  #p79OvertimeApplication .oa-filters>label:has(#oaRemark){grid-column:auto}
  #p79OvertimeApplication footer>div{width:100%;display:grid;grid-template-columns:1fr 1fr}
 }
-\`;
+`;
 function open(options={}){
  const a=g.p79OvertimeApplicationContext;if(!a?.canExport())return alert('沒有加班申報表匯出權限');if(document.getElementById('p79OvertimeApplication'))return;
  const el=document.createElement('dialog');el.id='p79OvertimeApplication';el.style.cssText='width:min(1150px,calc(100vw - 24px));max-height:92dvh;border:0;border-radius:14px;padding:0;color:#17202b;background:#fff';
