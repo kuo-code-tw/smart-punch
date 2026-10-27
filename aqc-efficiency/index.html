@@ -1537,7 +1537,16 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
   <input id="vesselMonthlyExportMonth" type="month" class="border rounded-xl px-3 py-2 mt-1">
   <label for="vesselMonthlyExportCompany" class="block text-sm font-bold mt-4">公司名稱抬頭</label>
   <input id="vesselMonthlyExportCompany" type="text" maxlength="80" class="border rounded-xl px-3 py-2 mt-1 w-full" placeholder="請輸入公司名稱">
-  <p class="text-xs text-slate-500 mt-2">公司名稱會記在此瀏覽器。A4 橫向列印，每頁最多 35 筆；各頁重複抬頭、表頭並置中。備註留白。</p>
+  <div class="mt-4">
+    <p class="text-sm font-bold">頁尾簽核／蓋章欄位（可修改文字）</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+      <label class="text-sm">證明欄<input id="vesselMonthlySignProof" type="text" maxlength="40" class="border rounded-lg px-2 py-2 w-full mt-1" oninput="saveVesselMonthlySignatureFields()"></label>
+      <label class="text-sm">協理欄<input id="vesselMonthlySignAssistant" type="text" maxlength="40" class="border rounded-lg px-2 py-2 w-full mt-1" oninput="saveVesselMonthlySignatureFields()"></label>
+      <label class="text-sm">經理欄<input id="vesselMonthlySignManager" type="text" maxlength="40" class="border rounded-lg px-2 py-2 w-full mt-1" oninput="saveVesselMonthlySignatureFields()"></label>
+      <label class="text-sm">製表欄<input id="vesselMonthlySignPrepared" type="text" maxlength="40" class="border rounded-lg px-2 py-2 w-full mt-1" oninput="saveVesselMonthlySignatureFields()"></label>
+    </div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">公司名稱和簽核文字會記在此瀏覽器。A4 直式、微軟正黑體、白底；每頁最多 35 筆，頁尾保留四個簽章欄。下載 Excel 後也可以直接修改簽核文字。</p>
   <div class="flex gap-2 mt-4">
     <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出船舶月作業量表</button>
     <button type="button" onclick="document.getElementById('vesselMonthlyExportDialog').close()" class="btn bg-slate-100">關閉</button>
@@ -13845,7 +13854,14 @@ function openVesselMonthlyExportDialog(){
   if(!requireSuperAdminAccess())return;
   document.getElementById('vesselMonthlyExportMonth').value=document.getElementById('filterMonth')?.value||isoTodayLocal().slice(0,7);
   document.getElementById('vesselMonthlyExportCompany').value=window.P79VesselMonthlyReport.savedCompany();
+  const signatures=window.P79VesselMonthlyReport.savedSignatures();
+  ['vesselMonthlySignProof','vesselMonthlySignAssistant','vesselMonthlySignManager','vesselMonthlySignPrepared']
+   .forEach((id,i)=>{document.getElementById(id).value=signatures[i];});
   document.getElementById('vesselMonthlyExportDialog').showModal();
+}
+function saveVesselMonthlySignatureFields(){
+  const ids=['vesselMonthlySignProof','vesselMonthlySignAssistant','vesselMonthlySignManager','vesselMonthlySignPrepared'];
+  return window.P79VesselMonthlyReport.saveSignatures(ids.map(id=>document.getElementById(id)?.value??''));
 }
 async function exportVesselMonthlyExcel(month=document.getElementById('filterMonth')?.value||'',company=window.P79VesselMonthlyReport.savedCompany()){
   if(!requireSuperAdminAccess())return;
@@ -13862,7 +13878,8 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     }
     const rows=vesselMonthlyExportRows(month);
     if(!rows.length)return toast(`${month} 沒有可匯出的船舶資料`);
-    await window.P79VesselMonthlyReport.download({month,company:companyName,rows,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
+    const signatures=saveVesselMonthlySignatureFields();
+    await window.P79VesselMonthlyReport.download({month,company:companyName,rows,signatures,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
     document.getElementById('vesselMonthlyExportDialog')?.close();
     toast(`已匯出 ${month} 船邊作業量表，共 ${rows.length} 艘`);
   }catch(error){
@@ -14888,7 +14905,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 });
 </script>
 <script src="../assets/port79-aqc-schedule-groups.js?v=20261026-group-identity-v2"></script>
-<script src="../assets/port79-vessel-monthly-report.js?v=20261025-zh-import-export"></script>
+<script src="../assets/port79-vessel-monthly-report.js?v=20261027-portrait-editable-signatures-v1"></script>
 <script src="../assets/port79-seven-top.js?v=20261025-zh-import-export"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 船舶作業明細滿版寬度 + 年份選單防空白 -->

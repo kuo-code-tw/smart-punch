@@ -1,14 +1,18 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'utf8');
 function fn(name){let a=html.indexOf('function '+name+'(');assert(a>=0,name);if(html.slice(a-6,a)==='async ')a-=6;return html.slice(a,html.indexOf('\n}',a)+2);}
-const elements={filterMonth:{value:'2026-10'},vesselMonthlyExportBtn:{disabled:false}},messages=[],writes=[];
+const elements={filterMonth:{value:'2026-10'},vesselMonthlyExportBtn:{disabled:false},
+ vesselMonthlySignProof:{value:'證明：測試'},vesselMonthlySignAssistant:{value:'協理：'},
+ vesselMonthlySignManager:{value:'經理：'},vesselMonthlySignPrepared:{value:'製表：'}},messages=[],writes=[];
 const c={console,Date,document:{getElementById:id=>elements[id]},shipMasters:[],records:[],
   num:v=>Number(v)||0,round:(v,n)=>Number(v.toFixed(n)),canonicalShipMasters:list=>list,
   applyShipManualOverrides:s=>({...s,...s.manualOverrides}),monthlySerialFromWorkingNo:no=>String(no).slice(-4),
   recordsForVessel:no=>c.records.filter(r=>r.workingNo===no),recoveredMoveSplit:r=>r,
   requireSuperAdminAccess:()=>true,toast:m=>messages.push(m),loadEfficiencyCloudScope:async()=>true};
-c.window=c;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,download:async({month,rows,filename,company})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company})};vm.createContext(c);
-for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','vesselMonthlyExportRows','buildMonthlyOperationSheet','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
+c.window=c;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,
+ saveSignatures:values=>values,
+ download:async({month,rows,filename,company,signatures})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company,signatures})};vm.createContext(c);
+for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
 let passed=0;function test(name,f){f();passed++;console.log('PASS '+name);}
 const master={workingNo:'5260159',vessel:'WAN HAI 292 N073',voyageE:'N073',firstDate:'2026-09-30',lastDate:'2026-10-01',totalContainers:497,hatches:8,shiftMoves:0,gph:23.06,gphHC:23.43,workingSheetSource:{disc:189,load:308}};
 c.shipMasters=[master,{...master,workingNo:'5260160',lastDate:'2026-11-01'}];
@@ -23,10 +27,10 @@ test('template headers, ROC month, leading-zero serial and subtotal use the sele
  elements.filterMonth.value='';await c.exportVesselMonthlyExcel();assert.equal(writes.length,0);passed++;
  elements.filterMonth.value='2026-10';c.loadEfficiencyCloudScope=async()=>false;await c.exportVesselMonthlyExcel();assert.equal(writes.length,0);assert.equal(elements.vesselMonthlyExportBtn.disabled,false);passed++;
  c.loadEfficiencyCloudScope=async({month})=>{assert.equal(month,'2026-10');elements.filterMonth.value='2026-11';return true;};
- await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert(writes[0].name.includes('115年10月份'));assert(writes[0].wb.sheet.A1.v.includes('115年10月份'));passed++;
+ await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert(writes[0].name.includes('115年10月份'));assert(writes[0].wb.sheet.A1.v.includes('115年10月份'));assert.equal(writes[0].signatures[0],'證明：測試');passed++;
  elements.filterMonth.value='2026-12';c.loadEfficiencyCloudScope=async()=>true;await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);passed++;
  elements.filterMonth.value='2026-10';c.P79VesselMonthlyReport.download=async()=>{throw Error('load failed');};await c.exportVesselMonthlyExcel();assert.equal(writes.length,1);assert.equal(elements.vesselMonthlyExportBtn.disabled,false);passed++;
- assert(html.includes('id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()"'));passed++;
+ assert(html.includes('id="vesselMonthlyExportBtn" type="button" onclick="exportVesselMonthlyExcel()"'));assert(html.includes('id="vesselMonthlySignProof"'));assert(html.includes('A4 直式、微軟正黑體'));passed++;
  if(process.env.P79_XLSX_PATH){
    c.XLSX=require(process.env.P79_XLSX_PATH);
    const wb=c.XLSX.utils.book_new();c.XLSX.utils.book_append_sheet(wb,c.buildMonthlyOperationSheet('2026-10'),'船邊作業量表');
