@@ -6,7 +6,7 @@ const month='2026-10',date=n=>month+'-'+String(n).padStart(2,'0');
 const dates=Array.from({length:31},(_,i)=>date(i+1));
 const plannedRest=[1,4,7,10,13,16,19,22,25,28],extraOff=date(24);
 const people=Array.from({length:83},(_,i)=>({
- id:'E'+i,empId:'E'+i,name:'測試人員'+i,
+ id:'E'+i,empId:'E'+i,name:i===0?'郭昇龍':'測試人員'+i,
  role:['F/L','AQC','ARMG','領班','指揮手'][i%5],
  group:['A組','B組','C組'][i%3]
 }));
@@ -67,6 +67,8 @@ for(const emp of people){
  a.deepEqual(Object.fromEntries(categories.map(k=>[k,selected[k].length])),expected,
   emp.id+' date grid must not show 休6 / 國1');
  a(['例','休','國'].includes(c.p79ScheduleExportDay(emp,extraOff,context)),'no-card rest appears on export');
+ const exported=Object.fromEntries(categories.map(cat=>[cat,dates.filter(d=>c.p79ScheduleExportDay(emp,d,context)===cat).length]));
+ a.deepEqual(exported,expected,'every exported date matches the same category totals');
  const row=c.p79ScheduleRestCountCells(emp,month,plan.meta,[],[],selected);
  a.match(row,/<span>4\/0<\/span>/);
  a.match(row,/<span>5\/0<\/span>/);
@@ -77,6 +79,16 @@ for(const emp of people){
 }
 a.equal(JSON.stringify({monthlyScheduleData,monthlyScheduleMeta}),original,
  'read-only reconciliation never changes official roster, report or payroll records');
+// Imported explicit 國/例 cells without metadata must reserve their visible
+// category, rather than leaving the allocator/ledger to count only raw 休.
+for(const category of ['國','例']){
+ monthlyScheduleData.E0[extraOff]=category;
+ const fixed=c.p79RestAutomaticPlan(people[0],month);
+ a.deepEqual(count(fixed.meta),expected,'explicit '+category+' and flexible 休 share quota');
+ a.deepEqual(json(c.p79ScheduleRestBalance(people[0],month,fixed.meta).off),expected);
+ a.deepEqual(json(fixed.meta),json(c.p79RestAutomaticPlan(people[0],month,fixed.meta).meta));
+}
+monthlyScheduleData.E0[extraOff]='早';
 // A verified punch must reverse the inferred no-punch off day.
 evidence.days['E0|'+extraOff].state='worked';
 let recheck=c.p79RestAutomaticPlan(people[0],month);
@@ -87,6 +99,7 @@ evidence.days['E0|'+extraOff].state='rest';
 monthlyScheduleMeta.E0[extraOff]={manualRosterShift:'早'};
 recheck=c.p79RestAutomaticPlan(people[0],month);
 a.deepEqual(count(recheck.meta),{例:4,休:5,國:1},'manual work shift not rewritten');
+a.deepEqual(json(c.p79ScheduleRestBalance(people[0],month,recheck.meta).off),{例:4,休:5,國:1},'manual work day must not reenter the monthly ledger as an extra rest');
 monthlyScheduleMeta.E0[extraOff]={overtimeReport:{id:'CLOUD-REPORT',category:'休',code:'休08-16'}};
 recheck=c.p79RestAutomaticPlan(people[0],month);
 a.deepEqual(count(recheck.meta),{例:4,休:4,國:2},'confirmed 休 report reserves its own day; other ten rest days fill the remaining quota once');

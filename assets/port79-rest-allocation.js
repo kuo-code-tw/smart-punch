@@ -33,7 +33,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   if(dates.some(d=>!schedule[d]))throw new Error('本月有未排班日期，請補齊班表後再配對');
   // Remove only fields owned by this allocator; preserve manual overtime and substitutions.
   for(const date of dates) {
-    const item=result[date];if(!item||item.restAllocationSource!=='auto-v1')continue;
+    const item=result[date];if(!item||!['auto-v1','roster'].includes(item.restAllocationSource))continue;
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
     if(!Object.keys(item).length)delete result[date];
   }
@@ -78,6 +78,18 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     for(const key of ['restCategory','restSourceDate','restHolidayName',
       'restAllocationSource','restPreferredCategory'])delete item[key];
     if(!Object.keys(item).length)delete result[date];
+  }
+  // Explicit 例/國 cells are already visible rest categories. Reserve their
+  // own quota before allocating flexible 休 days, including imported cells
+  // without metadata. Otherwise the grid and monthly ledger count different days.
+  for(const date of dates){
+    const category=String(schedule[date]||'').trim(),item=result[date]||{};
+    if(!['例','國'].includes(category)||excluded.has(date)||typhoonProtected.has(date)||
+       category==='國'&&nationalBlocked.has(date)||item.restCategory||
+       item.restAllocationLocked||item.restCategoryLocked||item.restQuotaOvertime||
+       item.overtime||item.overtimeReport||item.overtimeReports?.length||
+       item.forEmpId||item.type==='substitute'||item.manualRosterShift)continue;
+    result[date]={...item,restCategory:category,restAllocationSource:'roster'};
   }
   const flexible=new Set();
   for(const date of dates){
@@ -125,7 +137,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       continue;
     }
     if(!item.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date)||
-       excluded.has(date)||item.restQuotaOvertime||!isRestCandidate(date))continue;
+       excluded.has(date)||item.restQuotaOvertime||!(isRestCandidate(date)||['例','國'].includes(String(schedule[date]||'').trim())))continue;
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
     if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);

@@ -51,7 +51,7 @@ ctx.p79MonthlyRestDraftsByMonth.set('2026-10',[
  {empId:'E',name:'過去不應補',dateKey:'2026-10-25',monthKey:'2026-10',rosterDate:'2026-10-25',dept:'第一事業處',jobTitle:'ARMG',planned:true,p79RestDraft:true,overtimeReport:{code:'國08-16',planned:true,declaredHours:8}}
 ]);
 ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','ALL');
-assert(nodes.p79OvertimePlannedBody.innerHTML.includes('測試丁')&&nodes.p79OvertimePlannedBody.innerHTML.includes('尚未申報'),'new suggestions appear in the separate section');
+assert(nodes.p79OvertimePlannedBody.innerHTML.includes('測試丁')&&nodes.p79OvertimePlannedBody.innerHTML.includes('月底預排｜待出勤'),'new month-end drafts appear in separate section as pending rather than formally submitted');
 assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('過去不應補'),'past Oct 25 proposals never appear when today is Oct 28');
 assert(nodes.p79OvertimePlannedCount.textContent.includes('3 筆'),'actual saved plans and new future suggestions are combined');
 const punched={...planned,reportVerified:true,

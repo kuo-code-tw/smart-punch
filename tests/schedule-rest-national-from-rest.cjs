@@ -45,7 +45,8 @@ a.equal(shortage.unresolved[0].category,'國','shortage must be specifically 國
 base[day(28)]='休';
 prior[day(7)]={overtimeReport:{id:'SAVED',code:'國08-16',category:'國'}};
 shortage=c.p79RestAutomaticPlan(emp,month);
-a.equal(shortage.unresolved.length,2,'formal overtime occupying a rest day remains protected');
+a.equal(shortage.unresolved.length,1,'formal 國 report consumes exactly one quota and its rest day remains protected');
+a.equal(Object.values(shortage.meta).filter(x=>x.restCategory==='國'&&!x.restQuotaOvertime).length,0,'the same 國 quota is not allocated twice');
 a.equal(shortage.meta[day(7)].overtimeReport.id,'SAVED','never delete confirmed overtime');
 delete prior[day(7)];
 const locked=day(22);prior[locked]={restAllocationLocked:true};
@@ -54,7 +55,7 @@ a.equal(shortage.unresolved.length,2,'explicit locked rest day cannot be overwri
 a(!shortage.meta[locked].restCategory,'locked untouched');
 delete prior[locked];
 // Exercise real screen and export resolver with a typhoon-day originally marked 休.
-c.P79RestAttendance={state:()=> 'rest'};
+c.P79RestAttendance={state:(snapshot,id,date)=>base[date]==='休'?'rest':'worked'};
 c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:true,days:{}}})});
 c.p79ScheduleRestBalance=()=>({ledger:[]});
 c.p79CoverageShift=()=>'';c.p79SubstituteShiftLabel=()=>'';c.p79ScheduleNoPunchRest=()=>false;
