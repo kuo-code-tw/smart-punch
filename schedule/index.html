@@ -6662,9 +6662,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const pairedWork=p79ScheduleHasVerifiedPunch(emp.id,dayStr,ctx.attendanceEvidence);
       const candidate=pairedWork
         ?ctx.attendanceEvidence.actualShifts?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]:'';
+      // Full, identity-verified attendance determines the visible shift even when
+      // this date also carries an overtime declaration. Keep legal declaration
+      // metadata intact: it is NOT a reason to discard the actual punch shift.
+      // Approved leave, covering another employee, and manual locked assignments
+      // remain protected against automatic presentation changes.
       const actualShift=['早','中','晚'].includes(candidate)&&!ownApprovedLeave&&
-        !originalMeta.overtimeReport&&!originalMeta.overtimeReports?.length&&
-        !originalMeta.overtime&&!originalMeta.forEmpId&&!originalMeta.manualRosterShift&&
+        !originalMeta.forEmpId&&!originalMeta.manualRosterShift&&
         !p79LeaveCoverOnDay(emp.id,dayStr).length?candidate:'';
       const shortWorkMinutes=actualShift&&ctx.attendanceEvidence.actualWorkedMinutes?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]<180
         ?ctx.attendanceEvidence.actualWorkedMinutes[String(emp.id).trim().toUpperCase()+'|'+dayStr]:0;
