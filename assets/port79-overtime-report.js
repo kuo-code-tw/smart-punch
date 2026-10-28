@@ -489,7 +489,7 @@
    if(!global.p79OvertimeContext?.canReport?.()){loading.remove?.();return alert('沒有申報加班權限');}
   }catch(error){loading.querySelector('#p79OtStatus').textContent='人員載入失敗：'+error.message;return;}
   const editingOriginal=Boolean(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);
-  const el=dialog(editingOriginal?'修改加班申報':'申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
+  const el=dialog(editingOriginal?'修改加班申報':prefill.manualPlan===true?'新增預排（未正式申報）':'申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
    if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
@@ -625,6 +625,7 @@
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
+   if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());}
    if(prefill.savedReport&&prefill.reportId)el.querySelector('#p79OtStage').textContent=prefill.plannedReview===true?'確認正式申報':'儲存原申報修改';
    if(prefill.note)el.querySelector('#p79OtNote').value=String(prefill.note);
    // 正式核對只能用與完整上/下班打卡一致的規則；不接受預排快取的舊班別。
@@ -659,7 +660,7 @@
      const pair=editingOriginal&&!['代','延'].includes(selectedCategory)
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
-     const draft={id:editingExisting?String(prefill.reportId):crypto.randomUUID(),preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(rows[Number(select.value)]),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
+     const draft={id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(rows[Number(select.value)]),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
      try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}

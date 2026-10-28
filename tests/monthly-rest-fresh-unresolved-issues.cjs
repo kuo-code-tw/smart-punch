@@ -25,6 +25,6 @@ assert(workhours.includes('snapshot:async function(month,rosterOnly=false,report
 assert(workhours.includes('const shared=!forceFresh&&'),'fresh month fetch must bypass cached roster and punch');
 assert(src.includes('a.snapshot(loadedMonth,false,false,true)'),'click to read suggestions uses actual current cloud');
 assert(src.includes('pendingIssues.length')&&src.includes('逐人缺額及待核對原因'),'unresolved details moved to expandable audit');
-assert(src.includes('model=plan(latest,loadedPeople,loadedMonth,rules)'),'successful saved corrections recompute suggestions immediately');
+assert(src.includes('model=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan})'),'successful saved corrections recompute suggestions immediately');
 assert(!src.includes("setStatus('已列出 '+model.rows.length+' 筆建議，請勾選要申報的日期。\\n'"),'old long stale alert must be removed');
 console.log('PASS: fresh cloud review hides completed stale flags, keeps actual missing punches, auto refreshes successful submissions');

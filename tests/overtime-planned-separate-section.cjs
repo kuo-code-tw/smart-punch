@@ -28,9 +28,9 @@ const ctx={console,Number,String,Array,Set,Map,Math,Date,
 vm.createContext(ctx);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows','p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])vm.runInContext(extract(name),ctx);
 const report={id:'P123',planned:true,code:'休24-08',declaredHours:8};
-const planned={empId:'A',name:'測試甲',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'ARMG',overtimeReport:report,planned:true};
+const planned={empId:'A',name:'測試甲',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'ARMG',overtimeReport:report,planned:true,reportVerified:true};
 const official={empId:'B',name:'測試乙',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'F/L',overtimeReport:{id:'R123',planned:false,code:'休08-16',declaredHours:8}};
-const another={empId:'C',name:'測試丙',dateKey:'2026-10-30',monthKey:'2026-10',dept:'第二事業處',jobTitle:'ARMG',overtimeReport:{id:'P124',planned:true,code:'休16-24',declaredHours:8}};
+const another={empId:'C',name:'測試丙',dateKey:'2026-10-30',monthKey:'2026-10',dept:'第二事業處',jobTitle:'ARMG',reportVerified:true,overtimeReport:{id:'P124',planned:true,code:'休16-24',declaredHours:8}};
 const rows=[planned,official,another];
 const visible=(month='ALL',dept='ALL',title='ALL',emp='ALL')=>Array.from(ctx.p79OvertimePlannedVisibleRows(rows,month,dept,title,emp),x=>x.empId);
 assert.deepEqual(visible(),['A','C'],'only planned records belong to planned section');
@@ -38,7 +38,7 @@ assert.deepEqual(visible('2026-10','第一事業處','ARMG'),['A'],'filters appl
 assert.deepEqual(visible('2026-11'),[],'a different month has no planned entries');
 assert.deepEqual(visible('2026-10','ALL','ALL','C'),['C'],'employee filtering works');
 assert.deepEqual(visible('2026-10','ALL','F/L'),[],'confirmed F/L report does not leak into planned');
-ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','ALL');
+ctx.p79CanDeleteOvertime=()=>true;ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','ALL');
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('測試甲')&&nodes.p79OvertimePlannedBody.innerHTML.includes('測試丙'));
 assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('測試乙'));
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('休24-08'),'planned period remains visible');
@@ -46,14 +46,16 @@ assert(nodes.p79OvertimePlannedBody.innerHTML.includes('無打卡'),'past/date-t
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('補登上班')&&nodes.p79OvertimePlannedBody.innerHTML.includes('補登下班'),'missing punches have explicit add actions');
 assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('核對申報</button>'),'rows without completed punches must not have confirmation actions');
 assert(nodes.p79OvertimePlannedCount.textContent.includes('2 筆'),'only the planned count appears');
+assert(nodes.p79OvertimePlannedBody.innerHTML.includes('p79DeletePlannedOvertimeRow(0,this)'),'saved plans have a delete action mapped to the displayed row');
+assert.deepEqual(Array.from(ctx.p79OvertimePlannedVisibleRows([{...planned,reportVerified:false},{...planned,p79RestDraft:true},{...planned,overtimeReport:{planned:true}}],'ALL','ALL','ALL','ALL')),[],'unverified and unsaved entries never become scheduled plans');
 ctx.p79MonthlyRestDraftsByMonth.set('2026-10',[
  {empId:'D',name:'測試丁',dateKey:'2026-10-29',monthKey:'2026-10',rosterDate:'2026-10-29',dept:'第一事業處',jobTitle:'ARMG',planned:true,p79RestDraft:true,overtimeReport:{code:'國08-16',planned:true,declaredHours:8}},
  {empId:'E',name:'過去不應補',dateKey:'2026-10-25',monthKey:'2026-10',rosterDate:'2026-10-25',dept:'第一事業處',jobTitle:'ARMG',planned:true,p79RestDraft:true,overtimeReport:{code:'國08-16',planned:true,declaredHours:8}}
 ]);
 ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','ALL');
-assert(nodes.p79OvertimePlannedBody.innerHTML.includes('測試丁')&&nodes.p79OvertimePlannedBody.innerHTML.includes('月底預排｜待出勤'),'new month-end drafts appear in separate section as pending rather than formally submitted');
+assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('測試丁'),'automatic unsaved suggestions must not appear as user-created plans');
 assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('過去不應補'),'past Oct 25 proposals never appear when today is Oct 28');
-assert(nodes.p79OvertimePlannedCount.textContent.includes('3 筆'),'actual saved plans and new future suggestions are combined');
+assert(nodes.p79OvertimePlannedCount.textContent.includes('2 筆'),'only cloud-confirmed user-created plans appear');
 const punched={...planned,reportVerified:true,
  clockIn:{timeStr:'2026/10/28 08:00:00',id:'IN1'},
  clockOut:{timeStr:'2026/10/28 16:00:00',id:'OUT1'}};
