@@ -19,6 +19,6 @@ async function run({failAt=-1,missingReadback=false,loseAck=false,unselectedInva
  r=await run({failAt:3,loseAck:true});assert.equal(r.posts,4);assert.equal(r.model.rows.filter(x=>x.saved).length,4,'batch readback resolves a lost write response without duplicate POST');
  r=await run({sameIdWrongCategory:true});assert.equal(r.posts,0,'same ID with a different rule is not successful readback');assert(r.model.rows.every(x=>!x.saved));
  r=await run({missingReadback:true});assert.equal(r.model.rows.filter(x=>x.saved).length,0,'write ACK alone cannot mark confirmed success');assert(r.model.rows.every(x=>x.checked&&x.acknowledged));assert.match(r.c.status,/20 筆待核對/);
- assert(source.includes("model.rows.map((r,i)=>r.saved?'':'<tr"),'confirmed rows removed without changing event indexes');
+ assert(source.includes("visibleRows().map(({r,i})=>r.saved?'':'<tr"),'confirmed rows removed while preserving underlying model row indexes');
  console.log('PASS actual batch handler: 20 reports, one readback, one refresh, partial failure and unconfirmed readback retained');
 })().catch(e=>{console.error(e);process.exit(1)});
