@@ -78,14 +78,14 @@ function statusOf(row){
 }
 function showRows(){
  const body=ensureDialog().querySelector('#p79OtExportRows');
- if(!currentRows.length){body.innerHTML='<tr><td colspan="'+(viewOnly?'6':'7')+'" style="text-align:center;padding:24px;color:#64748b">當日沒有有效的正式加班申報；此日期不能標記為「已申報」。</td></tr>';return;}
+ if(!currentRows.length){body.innerHTML='<tr><td colspan="'+(viewOnly?'5':'7')+'" style="text-align:center;padding:24px;color:#64748b">當日沒有有效的正式加班申報；此日期不能標記為「已申報」。</td></tr>';return;}
  body.innerHTML=currentRows.map((r,i)=>{
-  const stat=statusOf(r),cls=stat.done?'color:#047857':'color:#a16207';
+  const stat=viewOnly?{done:false,label:''}:statusOf(r),cls=stat.done?'color:#047857':'color:#a16207';
   return '<tr style="border-bottom:1px solid #e2e8f0">'
    +(viewOnly?'':'<td style="text-align:center;padding:9px"><input type="checkbox" data-p79-export-index="'+i+'" '+(stat.done?'':'checked')+'></td>')
    +'<td style="padding:9px">'+h(r.employeeName)+'</td><td>'+h(r.empId)+'</td><td>'+h(r.report.typeName||r.report.category||'加班')+'</td>'
    +'<td>'+h(r.report.code||[r.report.overtimeStart,r.report.overtimeEnd].filter(Boolean).join('–'))+'</td><td>'+h(r.report.declaredHours??'')+'</td>'
-   +'<td style="'+cls+';font-weight:700">'+h(stat.label)+'</td></tr>';
+   +(viewOnly?'':'<td style="'+cls+';font-weight:700">'+h(stat.label)+'</td>')+'</tr>';
  }).join('');
 }
 async function digest(report){
@@ -113,7 +113,8 @@ async function open(date,force=false,reportedOnly=false){
  currentDate=date;viewOnly=reportedOnly===true;
  d.querySelector('#p79OtExportTitle').textContent=viewOnly?date+'｜已申報加班紀錄':'匯出 '+date+' 加班明細';
  d.querySelector('#p79OtExportSave').style.display=viewOnly?'none':'';
- d.querySelector('thead th:first-child').style.display=viewOnly?'none':'';
+d.querySelector('thead th:first-child').style.display=viewOnly?'none':'';
+ d.querySelector('thead th:last-child').style.display=viewOnly?'none':'';
  if(!d.open)d.showModal();
  loading=true;d.querySelector('#p79OtExportSave').disabled=true;setStatus('正在核對正式班表與雲端匯出紀錄…');
  d.querySelector('#p79OtExportRows').innerHTML='';
