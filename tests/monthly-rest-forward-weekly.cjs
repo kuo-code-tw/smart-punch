@@ -22,7 +22,7 @@ assert.equal(api.monthEndWindowDate('2026-10','2026-10-28'),'2026-10-25');
 const dates=Array.from({length:31},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0'));
 const roster=Object.fromEntries(dates.map(d=>[d,'早']));roster.__meta={};
 for(const d of ['2026-10-04','2026-10-11','2026-10-18','2026-10-25'])roster[d]='例';
-for(const d of ['2026-10-03','2026-10-10','2026-10-17','2026-10-31'])roster[d]='休';
+for(const d of ['2026-10-03','2026-10-10','2026-10-17','2026-10-24','2026-10-31'])roster[d]='休';
 assert.equal(api.weeklyRestReview(roster,'2026-10').length,0,'reference weeks include a rest and regular rest');
 const broken={...roster,'2026-10-31':'早'};
 assert(api.weeklyRestReview(broken,'2026-10').some(w=>w.start==='2026-10-25'&&w.rest===0),'missing weekly rest must be highlighted');
