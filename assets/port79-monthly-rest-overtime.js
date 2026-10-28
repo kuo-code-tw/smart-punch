@@ -392,6 +392,20 @@ async function open(){
    const confirmed=model.rows.filter(r=>r.saved).length,unverified=model.rows.filter(r=>r.attempted&&!r.saved).length;
    setStatus('本次已核對成功 '+confirmed+' 筆。'+(unverified?'另有 '+unverified+' 筆待核對。':'')+(stop?'已停止，其餘未送出。':'')+(failure?'後續停止：'+failure:'成功項目已移出待報清單。'));
    lastFailure=failure;busy=false;paint();controls(false);a.refresh?.();
+   // 成功申報後立即用最新雲端重新建立建議，已完成項目直接消失，不需關閉重開。
+   if(confirmed&&!failure&&!stop){
+    try{
+     const latest=await a.snapshot(loadedMonth,false,false,true);
+     if(!el.open||q('#mrMonth').value!==loadedMonth)return;
+     snapshot=latest;model=plan(latest,loadedPeople,loadedMonth,rules);
+     paint();controls(false);
+     q('#mrResult').textContent='本次雲端已確認 '+confirmed+' 筆，已從建議清單移除。';
+     setStatus('雲端申報已核對 '+confirmed+' 筆；已完成項目不再顯示。'+
+       (model.rows.length?'目前仍有 '+model.rows.length+' 筆可核對建議。':'目前沒有其他可申報建議。'));
+    }catch(error){
+     setStatus('本次已確認 '+confirmed+' 筆；重新讀取剩餘建議失敗：'+String(error?.message||error)+'。請點「讀取未休／建議日期」重新核對。');
+    }
+   }
   }
  };
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
