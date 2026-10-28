@@ -6671,7 +6671,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
-        restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
+        restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};
       const coverageShift=noPunchRest?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
       const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
