@@ -108,6 +108,21 @@ function compute(indexed,manual,query={}){
    if(!boats.has(k))boats.set(k,{key:k,ship:a.ship,voyage:a.voyage,no:a.no,manual:[],auto:[]});
    boats.get(k)[a.kind==='manual'?'manual':'auto'].push(a);
   }
+  // A manual vessel entry may omit WORKING NO while the imported report has it.
+  // Merge it with that vessel's cached crane group before applying manual priority.
+  const manualGroups=[...boats.values()].filter(b=>b.manual.length);
+  for(const target of manualGroups){
+   for(const other of [...boats.values()]){
+    if(other.key===target.key||!other.auto.length)continue;
+    const sameNo=target.no&&other.no&&target.no===other.no;
+    const sameVessel=String(target.ship).trim().toUpperCase()===String(other.ship).trim().toUpperCase()&&
+     (!target.voyage||!other.voyage||String(target.voyage).trim().toUpperCase()===String(other.voyage).trim().toUpperCase());
+    if(sameNo||sameVessel){
+     target.auto.push(...other.auto);target.manual.push(...other.manual);
+     boats.delete(other.key);
+    }
+   }
+  }
   const chosen=new Map(),units=new Map();
   for(const boat of [...boats.values()].sort((a,b)=>a.key.localeCompare(b.key))){
    if(boat.manual.length){
