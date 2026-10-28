@@ -52,7 +52,7 @@
   section.innerHTML=[
   '<div class="card p-4 sm:p-5 space-y-4">',
   '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">找出整個碼頭同一時段使用 4 隻以上 AQC 的作業，包含多艘船合計；先讀快取立即顯示。</p></div>',
-  '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button></div>',
+  '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">人工修正（選用）</button></div>',
   '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">依 WORKING SHEET 的 AQC 起訖時間及 WORKING REPORT 作業時段，計算全碼頭同時動桿總數。例如 A 船 2 桿、B 船 2 桿同時作業，即顯示 4 桿。快取優先、不重複下載；手動紀錄由 GAS 儲存，原船舶請款資料不變。</p>',
   '<div class="flex flex-wrap gap-3 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
@@ -67,7 +67,7 @@
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">資料來源</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
   '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div>',
   '<details class="bg-slate-50 border rounded-xl p-3"><summary class="cursor-pointer font-bold text-sm text-slate-700">🔎 檢查資料日期與各船桿數（包含未達 4 桿）</summary><div id="multiRodSourceAudit" class="mt-3 text-sm text-slate-700"></div><div id="multiRodSourcePreview" class="mt-3 text-xs space-y-1"></div></details>',
-  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[850px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>同時作業船舶／各船桿數</th><th>總桿數</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
+  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[780px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>同時作業船舶／各船桿數</th><th>總桿數</th><th>來源／AQC 起訖核對</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
   '<div id="multiRodNotice" role="status" aria-live="polite" class="text-sm text-slate-600"></div></div>',
   '<div id="multiRodEditor" class="card p-4 sm:p-5 space-y-4 hidden">',
   '<h3 id="multiRodFormTitle" class="text-lg font-black">新增 AQC 作業紀錄</h3>',
@@ -95,7 +95,7 @@
   $('multiRodExport').addEventListener('click',exportExcel);
   $('multiRodRefresh').addEventListener('click',()=>{void sync(true);void syncSource(true)});
   $('multiRodImport').addEventListener('click',importLegacy);
-  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='prefill'){const hit=concurrentResult().rows.find(r=>r.id===id),ship=hit?.ships?.[0];if(hit&&ship)openEditor({source:'overlap',ship:ship.ship,voyage:ship.voyage,workingNo:ship.workingNo,rods:ship.rods,start:hit.start,end:hit.end,containers:0,hatches:0,shiftMoves:0})}if(btn.dataset.action==='delete')remove(id)});
+
  }
  function candidates(){
   const raw=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
@@ -235,10 +235,10 @@
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
   $('multiRodShips').textContent=allShips.size+' 艘';
   $('multiRodEvents').textContent=list.length+' 段';
-  $('multiRodContainers').textContent=result.peak+' 桿';
+  $('multiRodContainers').textContent=list.some(r=>r.needsReview)?'含待核對時段':result.peak+' 桿';
   $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆快取明細';
   const sourceStatus=$('multiRodSourceState');
-  if(sourceStatus)sourceStatus.textContent='由目前瀏覽器已載入的船舶資料直接判斷｜WORKING REPORT '+result.sourceReportCount+' 筆、有效 AQC 作業區間 '+result.intervalCount+' 段。按同時刻跨船合計去重，最高 '+result.peak+' 桿；符合門檻 '+list.length+' 段。未有明確起訖時間的「配置桿數」不會當成同時作業。';
+  if(sourceStatus)sourceStatus.textContent='由目前瀏覽器已載入的船舶資料直接判斷｜WORKING REPORT '+result.sourceReportCount+' 筆、有效 AQC 作業區間 '+result.intervalCount+' 段。按同時刻跨船合計去重；符合門檻 '+list.length+' 段。超過4桿但缺少 AQC 完工時間證據的段落只標示待核對，不當成已確認桿數。未有明確起訖時間的「配置桿數」不會當成同時作業。';
   const audit=$('multiRodSourceAudit'),preview=$('multiRodSourcePreview');
   if(audit){
    const period=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
@@ -256,11 +256,15 @@
   }
   $('multiRodBody').innerHTML=list.map(r=>{
    const ships=r.ships.map(s=>'<div class="text-left py-0.5">'+esc(s.ship)+(s.voyage?' <span class="text-xs text-slate-500">'+esc(s.voyage)+'</span>':'')+'：<b>'+esc(s.rods)+' 桿</b>'+(s.aqcNumbers?.length?' <span class="text-xs text-slate-500">AQC '+esc(s.aqcNumbers.join('、'))+'</span>':'')+'</div>').join('');
-   const btn=editAllowed('records.create')?'<button type="button" class="btn bg-amber-50 text-amber-900 text-xs" data-action="prefill" data-id="'+esc(r.id)+'">補登船舶資料</button>':'—';
-   return '<tr><td>'+esc(r.start.replace('T',' '))+'</td><td>'+esc(r.end.replace('T',' '))+'</td><td>'+ships+'</td><td class="font-black">'+esc(r.totalRods)+' 桿</td>'+
-    
-    '<td class="text-xs text-sky-800">快取重疊判讀</td><td>'+btn+'</td></tr>';
-  }).join('')||'<tr><td colspan="6" class="p-6 text-slate-500">'+
+   const evidence=r.ships.flatMap(s=>(s.evidence||[]).map(e=>({ship:s.ship,unit:e.unit,source:e.source,start:e.start,end:e.end})));
+   const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對</summary>'+
+    '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+'</div></details>';
+   const sourceLabel=r.needsReview?'報表推估，超過4桿待核對':'AQC 時段比對';
+   const totalText=r.needsReview?'待核對':esc(r.totalRods)+' 桿';
+   const totalHint=r.needsReview?'<div class="text-xs text-amber-800">報表推估 '+esc(r.totalRods)+' 桿，尚未以每支桿完工時間證實</div>':'';
+   return '<tr><td>'+esc(r.start.replace('T',' '))+'</td><td>'+esc(r.end.replace('T',' '))+'</td><td>'+ships+'</td><td class="font-black">'+totalText+totalHint+'</td>'+
+    '<td><div class="text-xs '+(r.needsReview?'text-amber-800':'text-sky-800')+'">'+sourceLabel+'</div>'+detail+'</td></tr>';
+  }).join('')||'<tr><td colspan="5" class="p-6 text-slate-500">'+
    (result.rawIntervals?'查詢期間內有 AQC 作業，但沒有同一時間合計達到 '+esc(val('multiRodMin')||4)+' 桿的時段。':'此日期沒有足夠的 AQC 起訖資料可判讀；先顯示快取，可按「重新核對雲端」補讀資料。')+'</td></tr>';
  }
  async function exportExcel(){
