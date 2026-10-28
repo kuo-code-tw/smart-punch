@@ -280,8 +280,9 @@ function plan(snapshot,people,month,rules){
    const scheduledWork=['早','中','晚'].includes(roster[date]);
    // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
-   const todayPending=!historical&&date===currentDate&&scheduledWork&&!pairs.length&&
-     g.P79RestAttendance?.state(snapshot,emp.empId,date)==='open';
+   const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
+   const todayPending=!historical&&date===currentDate&&scheduledWork&&!verified&&
+     ['open','missing'].includes(todayState);
    const upcoming=!historical&&date>currentDate&&scheduledWork&&!pairs.length;
    if(!verified&&!todayPending&&!upcoming)continue;
    if(!verified&&date<currentDate)continue;
