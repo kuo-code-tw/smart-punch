@@ -126,7 +126,12 @@ function openDb(){
  });
  return dbPromise;
 }
+function displayScope(){
+ try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
+ return JSON.stringify([s?.systemPermissions||{},s?.dataScope||{},s?.dataScopeJobs||{}]);}catch(_){return '';}
+}
 async function put(row){
+ if(currentViewerRow(row))row={...row,displayScope:row.displayScope??displayScope(),cacheEndpoint:row.cacheEndpoint??gasUrl()};
  rememberMemory(row);
  const disk=mirrorSnapshot(row);
  try{await putLocal(row);return true}catch(error){
@@ -305,7 +310,7 @@ function writeFolderSnapshot(row){
 }
 // 離頁時僅嘗試排空已待寫快取；真正原始資料已在 IndexedDB／正式雲端。
 document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushFolder()});
-async function readFolderSnapshot(key){
+async function readFolderSnapshot(key,options={}){
  if(!token()||!key.startsWith(viewerKey()+'|'))return null;
  try{
   const handle=await allowedFolder();if(!handle)return null;
@@ -313,8 +318,28 @@ async function readFolderSnapshot(key){
   if(file.size>64*1024*1024)return null;
   const doc=JSON.parse(await file.text()),row=doc?.row;
   if(doc.format!=='port79-cache'||doc.version!==1||row?.key!==key||!currentViewerRow(row)||row.savedAt>Date.now()+60000)return null;
-  await putLocal(row).catch(()=>{});return row;
+  if(options.expectedViewer&&options.expectedViewer!==viewerKey()||options.expectedToken&&options.expectedToken!==token())return null;
+  if(options.hydrate!==false)await putLocal(row).catch(()=>{});return row;
  }catch(_){return null}
+}
+// Read the seven known account keys directly; never scan another account's files.
+async function restoreFolderSystems(){
+ const viewer=viewerKey(),credential=token();if(!credential)return [];
+ const restored=[];
+ for(const sys of Object.keys(SYSTEM_LABELS)){
+  const key=viewer+'|system|'+sys;
+  const disk=await readFolderSnapshot(key,{hydrate:false,expectedViewer:viewer,expectedToken:credential});
+  if(viewer!==viewerKey()||credential!==token())return [];
+  if(!disk)continue;
+  const local=await get(key).catch(()=>null);
+  if(viewer!==viewerKey()||credential!==token())return [];
+  const row=local?.savedAt>disk.savedAt?local:disk;
+  rememberMemory(row);await putLocal(row).catch(()=>{});restored.push(sys);
+ }
+ return restored;
+}
+function announceFolderRestore(systems){
+ try{if(typeof window.CustomEvent==='function')window.dispatchEvent?.(new window.CustomEvent('p79-folder-cache-restored',{detail:{systems}}));}catch(_){}
 }
 async function connectFolder(){
  if(!token())throw new Error('請先登入系統');
@@ -325,17 +350,18 @@ async function connectFolder(){
  // Finish any pre-connection browser writes once, before enumerating the complete cache.
  await flushFolder();
  let remembered=true;try{await folderSetting(selected)}catch(_){remembered=false}
+ const restored=await restoreFolderSystems();
  const rows=await all().catch(()=>[]);let saved=0,failed=0;
  for(const row of rows)if(currentViewerRow(row)){if(await writeFolderSnapshot(row))saved++;else failed++}
  const writable=await allowedFolder();if(!writable)throw new Error(folderMessage);
  if(failed)throw new Error('已連接資料夾，但有 '+failed+' 份快取保存失敗；請確認硬碟空間與權限');
- folderMessage='已連接：'+selected.name+'；已保存 '+saved+' 份快取'+(remembered?'':'；此分頁關閉後需重新選擇');
- return folderMessage;
+ folderMessage='已連接：'+selected.name+'；已找回 '+restored.length+' 個系統快取；已保存 '+saved+' 份快取'+(remembered?'':'；此分頁關閉後需重新選擇');
+ announceFolderRestore(restored);return folderMessage;
 }
 async function reconnectFolder(){
  const h=await loadFolder();if(!h)return connectFolder();
  if(await h.requestPermission({mode:'readwrite'})!=='granted')throw new Error('尚未授權資料夾，仍使用瀏覽器快取');
- folderMessage='已重新連接：'+h.name;emitFolderSync();return folderMessage;
+ const restored=await restoreFolderSystems();folderMessage='已重新連接：'+h.name+'；已找回 '+restored.length+' 個系統快取';emitFolderSync();announceFolderRestore(restored);return folderMessage;
 }
 async function disconnectFolder(){
  await flushFolder();await folderWrites;folderHandle=null;folderLoaded=true;
@@ -445,6 +471,20 @@ async function getSystemSnapshot(sys){
  const row=await get(systemKey(sys));
  return viewer===viewerKey()&&credential===token()&&row&&currentViewerRow(row)&&row.data?row:null;
 }
+// Display-only data: current account/scope, no intervening edit, no permission from payload.
+async function getDisplaySnapshot(sys,options={}){
+ const scope=displayScope(),viewer=viewerKey(),credential=token();
+ const row=await getSystemSnapshot(sys);
+ if(!row||!credential||viewer!==viewerKey()||credential!==token()||scope!==displayScope()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
+ if(row.displayScope!==undefined&&row.displayScope!==scope)return null;
+ if(row.cacheEndpoint&&row.cacheEndpoint!==gasUrl())return null;
+ // Legacy snapshots predate scope metadata. Only the same superadmin has unrestricted scope.
+ if(row.displayScope===undefined&&!viewer.endsWith('@superadmin'))return null;
+ if(options.month&&row.scope?.month&&row.scope.month!==options.month)return null;
+ if(options.month&&/^\d{4}-\d{2}$/.test(String(row.data.month||''))&&row.data.month!==options.month)return null;
+ if(options.month&&row.scope?.year&&String(row.scope.year)!==options.month.slice(0,4))return null;
+ return row;
+}
 // Explicit read-only roster previews: ordinary authoritative fetches still bypass cache.
 function schedulePreviewData(data,month,scoped=false){
  if(!data||data.ok!==true||!Array.isArray(data.employees)||!Array.isArray(data.schedules))return null;
@@ -539,7 +579,7 @@ async function storeApi(url,data,sys='',savedAt=Date.now()){
  const key=actionKey(url);
  const row={key,kind:'api',system:sys||currentSystem(),savedAt,size:safeSize(data),data};
  if(key)await put(row);
- if(sys)await put({key:systemKey(sys),kind:'system',system:sys,savedAt:Date.now(),size:safeSize(data),data});
+ if(sys){const u=urlInfo(url).u,scope=Object.fromEntries(['month','year','scope','type'].filter(k=>u?.searchParams.has(k)).map(k=>[k,u.searchParams.get(k)]));await put({key:systemKey(sys),kind:'system',system:sys,scope,savedAt:Date.now(),size:safeSize(data),data});}
 }
 function jsonResponse(data,cacheState='1'){
  return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json;charset=UTF-8','X-PORT79-CACHE':cacheState}});
@@ -558,7 +598,7 @@ function nativeFetch(input,init){
  const url=typeof input==='string'?input:input?.url||String(input);
  const method=String(init?.method||input?.method||'GET').toUpperCase(),info=urlInfo(url);
  const key=method==='GET'?actionKey(url):null;
- const viewer=viewerKey(),credential=token(),generation=mutationGeneration,startedAt=Date.now();
+ const viewer=viewerKey(),credential=token(),generation=mutationGeneration,startedAt=Date.now(),scope=displayScope();
  const requestCredentials=['token','userToken','gcToken','adminToken'].map(k=>info.u?.searchParams.get(k)).filter(Boolean);
  return rawFetch(input,init).then(response=>{
   if(key){
@@ -566,7 +606,7 @@ function nativeFetch(input,init){
    if(response.ok){
     // Parsing and both disk stores run in the background, never on the response path.
     void response.clone().json().then(async data=>{
-     if(data?.ok!==true||data.retryable||!requestCredentials.length||requestCredentials.some(t=>t!==credential)||viewer!==viewerKey()||credential!==token()||!credential||generation!==mutationGeneration)return;
+     if(data?.ok!==true||data.retryable||!requestCredentials.length||requestCredentials.some(t=>t!==credential)||viewer!==viewerKey()||credential!==token()||!credential||generation!==mutationGeneration||scope!==displayScope())return;
      const writes=[storeApi(url,data,'',startedAt)];
      const sys={getLeaveData:'leave',hrGetEmployees:'hr',gcGetData:'efficiency',getHistoricalDataCatalog:'history'}[info.action];
      // Preserve the request scope so a downloaded month cannot masquerade as all data.
@@ -755,9 +795,18 @@ async function applyAttendanceSnapshotToPage(snapshot,showAll=true){
  }catch(e){console.warn('套用考勤完整快取失敗',e)}
  return null;
 }
-async function downloadAttendanceDatabase(targetSys='attendance',onProgress){
- const t=token();
+const attendanceDownloads=new Map();
+function downloadAttendanceDatabase(targetSys='attendance',onProgress){
+ const key=viewerKey()+'|'+token()+'|'+gasUrl();
+ if(attendanceDownloads.has(key))return attendanceDownloads.get(key);
+ const pending=readAttendanceDatabase(targetSys,onProgress).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
+ attendanceDownloads.set(key,pending);return pending;
+}
+async function readAttendanceDatabase(targetSys='attendance',onProgress){
+ const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
+ const previous=await getDisplaySnapshot('attendance').catch(()=>null);
+ const before=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
  onProgress?.('attendance',0,1,'catalog','讀取月份清單');
  const catalog=await fetchJson('getAttendanceMonths',{token:t},'');
  if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
@@ -768,6 +817,22 @@ async function downloadAttendanceDatabase(targetSys='attendance',onProgress){
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'');
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
+ // The catalog alone has no revision. Compare an explicit cloud revision and the
+ // authenticated scoped master, never a timestamp or another viewer's folder.
+ const old=previous?.data;
+ if(before?.revision&&old?.sourceRevision===String(before.revision)&&old.fullDatabase===true&&
+    previous.cacheEndpoint===gasUrl()&&previous.displayScope===scope&&
+    JSON.stringify(old.months)===JSON.stringify(months)&&JSON.stringify(old.employees)===JSON.stringify(employees)&&
+    months.every(month=>old.monthStats?.some(m=>m.month===month&&m.ok===true))&&Array.isArray(old.records)){
+   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未套用舊帳號資料'),{code:'P79_AUTH'});
+   const confirmed=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入或本機資料已變更，請重新核對'),{code:'P79_AUTH'});
+   if(String(confirmed?.revision||'')===String(before.revision)){
+   onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
+   if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(old,true);
+   return {...old,reusedCache:true};
+   }
+ }
 
  let allRecords=[];const monthStats=[];
  for(let i=0;i<months.length;i++){
@@ -789,7 +854,10 @@ async function downloadAttendanceDatabase(targetSys='attendance',onProgress){
  }
  const failedMonths=monthStats.filter(x=>!x.ok);
  if(failedMonths.length)throw new Error('考勤／工時未完整下載：'+failedMonths.map(x=>x.month+'（'+x.error+'）').join('、')+'；已保留原有完整快取，請重試');
+ const after=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+ if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未保存舊帳號資料'),{code:'P79_AUTH'});
  const snapshot={
+  sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
   generatedAt:Date.now(),months,monthStats,records:allRecords,employees,
   recordCount:allRecords.length,employeeCount:employees.length,
@@ -841,7 +909,7 @@ function ensureStyle(){if(document.getElementById('p79CacheStyle'))return;const 
 `;document.head.appendChild(s)}
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
- b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載七大系統完整快取</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div id="p79CacheProgress" class="p79-cache-note">考勤／工時按「下載」會讀取全部考勤月份＋員工主檔，完成後直接套用畫面；其他系統依各自雲端資料建立本機快取。</div></div>`;
+ b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載七大系統快取</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
  document.body.appendChild(b);b.querySelector('.p79-cache-close').onclick=()=>b.classList.remove('open');b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')});
  b.addEventListener('click',async e=>{const btn=e.target.closest('[data-cache-action]');if(!btn)return;const act=btn.dataset.cacheAction;const buttons=[...b.querySelectorAll('[data-cache-action]')];buttons.forEach(x=>x.disabled=true);try{
    if(act==='folder'){setProgress(await connectFolder());await refreshModal()}
@@ -855,15 +923,23 @@ function ensureModal(){
  return b;
 }
 function setProgress(t){const e=document.getElementById('p79CacheProgress');if(e)e.textContent=t}
+function cacheCoverage(row){
+ if(!row)return '--';
+ if(row.data?.fullDatabase)return '完整考勤 '+Number(row.data.months?.length||0)+' 個月';
+ const month=String(row.scope?.month||row.month||row.data?.month||'');if(/^\d{4}-\d{2}$/.test(month))return month+' 月份';
+ const year=String(row.scope?.year||'');if(/^\d{4}$/.test(year))return year+' 年';
+ if(row.system==='history')return '歷史月份目錄；內容依月份另存';
+ return '此系統最近一次讀取範圍';
+}
 async function refreshModal(){
  const status=await deviceStatus(),el=document.getElementById('p79DeviceStatus');
  if(el)el.textContent=(status.folderSupported?status.folder:'此裝置使用手機／瀏覽器內部快取')+'｜本機保留：'+(status.retained?'已獲准':'尚未獲准');
  const folderButton=document.querySelector('[data-cache-action=folder]');if(folderButton)folderButton.hidden=!status.folderSupported;
  const reconnectButton=document.querySelector('[data-cache-action=reconnect]');if(reconnectButton)reconnectButton.hidden=!status.folderSupported;
- const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=boundedManagementMemory()?await managementSystemMetadata():await all();const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
+ const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=(await Promise.all(Object.keys(SYSTEM_LABELS).map(sys=>getSystemSnapshot(sys).catch(()=>null)))).filter(Boolean);const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}<br>保存範圍：${cacheCoverage(r)}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
-window.Port79DataCache={getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 

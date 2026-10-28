@@ -137,5 +137,36 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   x.folder.setPermission('granted');x.ss.setItem('port79_user_session',JSON.stringify({empId:'B',adminRole:'admin'}));assert.equal((await x.api.getFolderSyncStatus()).savedAt,0);
   x.ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));const other=directory('另一個資料夾');x.window.showDirectoryPicker=async()=>other;await x.api.clear();await x.api.connectFolder();assert.equal((await x.api.getFolderSyncStatus()).savedAt,0);
  });
+ await test('selecting an existing folder restores all seven account cards without a cloud request',async()=>{
+  const a=setup();await a.api.connectFolder();
+  for(const sys of ['attendance','workhours','leave','schedule','efficiency','hr','history'])await a.api.put({...row(),key:'A@admin|system|'+sys,system:sys});
+  await a.api.flushFolder();const b=setup({folder:a.folder});let calls=0;b.window.fetch=()=>{calls++;throw Error('unexpected cloud request')};
+  const message=await b.api.connectFolder();assert(message.includes('已找回 7 個系統快取'));
+  for(const sys of ['attendance','workhours','leave','schedule','efficiency','hr','history'])assert(await b.api.getDisplaySnapshot(sys));
+  assert.equal(calls,0);assert.equal(b.stores.get('snapshots').size,7);
+ });
+ await test('switching back to a previously cached account reuses its own files',async()=>{
+  const x=setup();await x.api.connectFolder();await x.api.put(row(7));await x.api.flushFolder();
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'B',adminRole:'admin'}));
+  assert.equal((await x.api.restoreFolderSystems()).length,0);assert.equal(await x.api.getDisplaySnapshot('hr'),null);
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));x.ss.setItem('port79_user_token','NEW-LOGIN');
+  assert.equal((await x.api.getDisplaySnapshot('hr')).data.version,7);
+ });
+ await test('display snapshots reject changed scope, an intervening mutation and another deployment',async()=>{
+  const x=setup();await x.api.put(row());assert(await x.api.getDisplaySnapshot('hr'));
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin',dataScope:{hr:['D']}}));assert.equal(await x.api.getDisplaySnapshot('hr'),null);
+  x.ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));x.ss.setItem('port79_cache_mutated_at',String(Date.now()+10));assert.equal(await x.api.getDisplaySnapshot('hr'),null);
+  x.ss.removeItem('port79_cache_mutated_at');await x.api.put({...row(),cacheEndpoint:'https://script.google.com/macros/s/OTHER/exec'});assert.equal(await x.api.getDisplaySnapshot('hr'),null);
+ });
+ await test('reconnecting prefers newer disk data, but never replaces newer browser data',async()=>{
+  const a=setup();await a.api.connectFolder();await a.api.put(row(20));await a.api.flushFolder();
+  const b=setup({folder:a.folder});await b.api.put({...row(1),savedAt:Date.now()-1000});await b.api.connectFolder();assert.equal((await b.api.getDisplaySnapshot('hr')).data.version,20);
+  await b.api.put({...row(30),savedAt:Date.now()+100});await b.api.restoreFolderSystems();assert.equal((await b.api.getDisplaySnapshot('hr')).data.version,30);
+ });
+ await test('month-scoped efficiency cache cannot preview a different month or year',async()=>{
+  const x=setup();await x.api.put({...row(),key:'A@admin|system|efficiency',system:'efficiency',scope:{month:'2026-10'}});
+  assert(await x.api.getDisplaySnapshot('efficiency',{month:'2026-10'}));assert.equal(await x.api.getDisplaySnapshot('efficiency',{month:'2026-11'}),null);
+  await x.api.put({...row(),key:'A@admin|system|efficiency',system:'efficiency',scope:{year:'2025'}});assert.equal(await x.api.getDisplaySnapshot('efficiency',{month:'2026-10'}),null);
+ });
  console.log(JSON.stringify({passed,scope:'Simulated folder permissions, IndexedDB resets and disk failures; no cloud data'}));
 })().catch(e=>{console.error(e);process.exitCode=1});

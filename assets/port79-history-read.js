@@ -9,7 +9,7 @@ function invalidResponse(text,status){
 async function read(url,options){
  const opt=options||{},request=opt.fetch||g.fetch.bind(g),timeout=opt.timeoutMs||90000,forceCloud=opt.forceCloud===true;
  if(!forceCloud&&g.Port79DataCache?.getHistoryPreview){
-  const cached=await Promise.race([g.Port79DataCache.getHistoryPreview(url).catch(()=>null),new Promise(resolve=>setTimeout(()=>resolve(null),150))]);
+  const cached=await Promise.race([g.Port79DataCache.getHistoryPreview(url).catch(()=>null),new Promise(resolve=>setTimeout(()=>resolve(null),1500))]);
   if(cached)return cached;
  }
  for(let attempt=0;attempt<2;attempt++){
