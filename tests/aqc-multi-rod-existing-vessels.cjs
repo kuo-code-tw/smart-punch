@@ -87,4 +87,30 @@ assert.equal(reconciled.rows.length,1);
 assert.equal(reconciled.rows[0].totalRods,4,'name+voyage match should beat stale WORKING NO and exclude finished AQC');
 console.log('PASS: AQC finish vs next-vessel start, false-five prevention, and verified future five-rod support');
 
+// Verified 2026-10-13/14 screenshot: 7905 finishes at 03:01, so five rods
+// exist up to but NOT after the finish boundary.
+const octoberMasters=[
+ {vessel:'WAN HAI 316',workingNo:'M316',aqcs:[
+  {number:8002,commence:'2026-10-13T11:23:00+08:00',complete:'2026-10-14T08:42:00+08:00'},
+  {number:8003,commence:'2026-10-13T11:27:00+08:00',complete:'2026-10-14T10:30:00+08:00'}]},
+ {vessel:'WAN HAI 292',workingNo:'M292',aqcs:[
+  {number:7902,commence:'2026-10-13T13:54:00+08:00',complete:'2026-10-14T08:10:00+08:00'},
+  {number:7903,commence:'2026-10-13T13:56:00+08:00',complete:'2026-10-14T08:04:00+08:00'},
+  {number:7905,commence:'2026-10-13T16:36:00+08:00',complete:'2026-10-14T03:01:00+08:00'}]}
+];
+const octoberIndex=calc.index([],octoberMasters,at);
+const day13=calc.compute(octoberIndex,[],{date:'2026-10-13',mode:'day',min:4});
+const day14=calc.compute(octoberIndex,[],{date:'2026-10-14',mode:'day',min:4});
+assert.deepEqual(day13.rows.map(x=>[x.start,x.end,x.totalRods]),[
+ ['2026-10-13T13:56','2026-10-13T16:36',4],
+ ['2026-10-13T16:36','2026-10-14T00:00',5]
+],'10/13: five begins only when AQC 7905 starts at 16:36');
+assert.deepEqual(day14.rows.map(x=>[x.start,x.end,x.totalRods]),[
+ ['2026-10-14T00:00','2026-10-14T03:01',5],
+ ['2026-10-14T03:01','2026-10-14T08:04',4]
+],'10/14: once 7905 finishes at 03:01 count MUST drop from five to four');
+assert(!day14.rows.some(x=>x.totalRods===5&&x._end>Date.parse('2026-10-14T03:01:00+08:00')),
+ 'five-rod segment must never extend past 7905 completion');
+console.log('PASS: Oct13-14 five-to-four transition at 03:01 exactly');
+
 console.log('PASS: cross-vessel 2+2 overlap, cache-only computation, midnight, manual priority, duplicate equipment, quantity caution, export UI');
