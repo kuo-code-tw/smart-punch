@@ -64,6 +64,10 @@ assert.match(ui,/時段變化核對/,'export includes traceable original interva
 assert.match(ui,/group\.segments/,'export traceability requires original intervals');
 assert.match(ui,/同組船舶作業的桿數變化/,'detail provides original change timeline');
 assert.match(ui,/期間來源最多/,'per-vessel peak is labeled as historical source evidence');
+assert.ok(ui.includes("const totalText='來源峰值 '+esc(r.totalRods)+' 桿'"),'main AQC peak count uses 桿');
+assert.ok(ui.includes("'來源峰值 '+esc(x.totalRods)+' 桿'"),'source preview uses 桿');
+assert.ok(ui.includes("'來源該船桿數','來源合計桿數'"),'audit Excel column names use 桿');
+assert.ok(!ui.includes('支'),'all AQC quantity unit text uses 桿 rather than 支');
 assert.match(html,/20261028-ship-pair-groups-v8/,'browser loads new UI and engine');
 assert.match(html,/p79-aqc-multi-rod-table-compact-20261028/,'previous compact/centered layout retained');
 console.log('PASS AQC real Oct 13 ship pair: 5 source intervals -> 1 job; peak/evidence, gaps, voyages and Excel accounting');
