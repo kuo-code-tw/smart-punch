@@ -180,12 +180,11 @@
  }
  function cachedPeriod(month){
   const idx=concurrencyIndex();if(!idx)return false;
-  if(idx.raw.some(x=>g.P79AqcConcurrent.normalizeDate(x.start&&new Date(x.start).toISOString())?.slice(0,7)===month
-   ||g.P79AqcConcurrent.normalizeDate(x.end&&new Date(x.end).toISOString())?.slice(0,7)===month))return true;
-  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
-  return masters.some(s=>{const start=g.P79AqcConcurrent.normalizeDate(s.firstDate||s._cloudFirstDate||s.compareDate||'');
-   const end=g.P79AqcConcurrent.normalizeDate(s.lastDate||s._cloudLastDate||start);
-   return start&&start.slice(0,7)<=month&&(end||start).slice(0,7)>=month});
+  const start=Date.parse(month+'-01T00:00:00+08:00');
+  const [y,m]=month.split('-').map(Number),end=Date.parse(new Date(Date.UTC(y,m,1)).toISOString().slice(0,10)+'T00:00:00+08:00');
+  // Existing, timed records are evidence for local cache coverage. A vessel's
+  // overall configuration alone must not prevent a one-time scoped fetch.
+  return idx.raw.some(x=>x.start<end&&x.end>start);
  }
  async function syncSource(force=false){
   if(!canView())return;
