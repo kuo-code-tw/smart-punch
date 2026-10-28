@@ -12,6 +12,8 @@ ctx.p79ChoosePlanningMode('manual');a.equal(modes.p79PlanModeManual.checked,true
 ctx.p79OpenManualOvertimePlan();a.equal(opened.length,1);a.equal(opened[0].manualPlan,true,'only the explicit add button starts manual planning');
 a(monthly.includes('plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan})'));
 a(monthly.includes('plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan})'),'post-save refresh cannot repopulate automatic plans');
+const openParameter=/async function open\((\w+)=\{\}\)/.exec(monthly)[1];
+a(!new RegExp('function '+openParameter+'\\(').test(monthly.slice(monthly.indexOf('async function open('))),'mode parameter must not be shadowed by the options helper');
 const save=html.slice(html.indexOf('async function p79SaveWorkOvertimeDraft('),html.indexOf('window.p79OvertimeContext='));
 async function attempt({date='2026-10-29',existing=null,ack=true}={}){
  const posts=[],roster={empId:'E1',schedule:{[date]:'早',__meta:existing?{[date]:{overtimeReport:existing}}:{}}};
