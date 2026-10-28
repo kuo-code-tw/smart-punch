@@ -1541,6 +1541,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3"><div class="text-xs font-semibold text-amber-700 dark:text-amber-400">換算加班時數</div><div id="overtimeTotalHours" class="mt-1 text-xl font-bold text-amber-800 dark:text-amber-300">0.00 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
+                <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
                 </div>
 
 
@@ -13565,6 +13566,69 @@ function p79OvertimePeriodLabel(report){
             return {byTitle:result,loaded:true,unknown};
         }
 
+        // 和「換算加班時數」統計使用相同的正式申報、時數與去重條件。
+        // 僅列出缺少／無效換算值的現有有效申報，不自行寫入任何換算或會計資料。
+        let p79OvertimePendingConversionRows=[];
+        function p79OvertimeMissingConversionRows(rows){
+            const seen=new Set(),items=[];
+            for(const row of rows||[]){
+                const report=row.overtimeReport;
+                if(!row.reportVerified||!report||report.planned===true||report.attendanceReview||report.attendanceState==='rest')continue;
+                const empId=String(row.empId||'').trim().toUpperCase();
+                const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-').slice(0,10);
+                const id=String(report.id||'').trim();
+                if(!empId||!id||!date)continue;
+                const key=empId+'|'+date+'|'+id;
+                if(seen.has(key))continue;
+                seen.add(key);
+                if(![4,8].includes(Number(report.declaredHours)))continue;
+                const raw=report.convertedHours;
+                const absent=raw===null||raw===undefined||String(raw).trim()==='';
+                if(!absent&&Number.isFinite(Number(raw))&&Number(raw)>=0)continue;
+                items.push({empId,date,id,name:String(row.name||empId),code:String(report.code||''),declared:Number(report.declaredHours),
+                    reason:absent?'換算時數未設定':'換算數值異常'});
+            }
+            return items;
+        }
+        function p79ShowOvertimeMissingConversion(index){
+            const target=p79OvertimePendingConversionRows[Number(index)];
+            if(!target)return;
+            const rows=p79WorkOvertimeFilteredRows||[];
+            const position=rows.findIndex(row=>String(row.empId||'').trim().toUpperCase()===target.empId&&
+                String(row.rosterDate||row.dateKey||'').replaceAll('/','-').slice(0,10)===target.date&&
+                String(row.overtimeReport?.id||'').trim()===target.id);
+            if(position<0){
+                alert('這筆申報已不在目前篩選清單，請重新讀取當月資料後查看。');
+                return;
+            }
+            overtimeCurrentPage=Math.floor(position/OVERTIME_PAGE_SIZE)+1;
+            renderOvertimeStats();
+            const table=document.getElementById('overtimeTableBody');
+            const tr=table?.querySelectorAll('tr')?.[position%OVERTIME_PAGE_SIZE];
+            if(tr){
+                tr.style.outline='3px solid #f59e0b';
+                tr.style.outlineOffset='-3px';
+                tr.setAttribute('tabindex','-1');
+                tr.scrollIntoView?.({behavior:'smooth',block:'center'});
+                tr.focus?.({preventScroll:true});
+            }
+        }
+        function p79RenderOvertimeMissingConversion(rows,loading){
+            const panel=document.getElementById('p79OvertimeMissingConversionPanel');
+            if(!panel)return;
+            p79OvertimePendingConversionRows=loading?[]:p79OvertimeMissingConversionRows(rows);
+            panel.classList.toggle('hidden',p79OvertimePendingConversionRows.length===0);
+            if(!p79OvertimePendingConversionRows.length){panel.innerHTML='';return;}
+            panel.innerHTML='<strong class="block mb-1">⚠ 待換算申報 '+p79OvertimePendingConversionRows.length+' 筆｜點選查看該筆加班明細</strong>'+
+                '<div class="flex flex-wrap gap-2">'+p79OvertimePendingConversionRows.map((item,index)=>
+                    '<button type="button" onclick="p79ShowOvertimeMissingConversion('+index+')"'+
+                    ' class="rounded-lg border border-amber-500 bg-white px-3 py-1.5 text-left text-sm font-semibold text-amber-900 dark:bg-slate-900 dark:text-amber-100"'+
+                    ' title="定位原本的正式申報紀錄，不會自動修改換算時數">'+
+                    escapeHtml(item.name)+'（'+escapeHtml(item.empId)+'）｜'+escapeHtml(item.date)+
+                    '｜'+escapeHtml(item.code)+'｜申報 '+item.declared+' 小時｜'+escapeHtml(item.reason)+'　查看該筆</button>'
+                ).join('')+'</div>';
+        }
+
         function renderOvertimeStats() {
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
@@ -13607,6 +13671,7 @@ function p79OvertimePeriodLabel(report){
             document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)+' 小時'+(totals.missing?'（'+totals.missing+'筆待換算）':'');
             document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時';
             document.getElementById('overtimeOver12Count').textContent = over12Count;
+            p79RenderOvertimeMissingConversion(rows,loadingWithoutRows);
             if(loadingWithoutRows){for(const id of ['overtimeEmployeeCount','overtimeShiftCount','overtimeTotalHours','overtimeRawReportedHours','overtimeOver12Count'])document.getElementById(id).textContent='載入中…';}
             const monthRosterState=p79WorkOvertimeMonths.get(month);
             const titleLeave=p79BuildOvertimeTitleLeaveDays(
