@@ -909,8 +909,25 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
 <style id="p79-overtime-planned-matched-font-20261028">
 /* 預排／待核對使用與已確定加班一致的桌面字級及緊湊行距；不影響資料或核對邏輯。 */
-#adminContentOvertime #p79OvertimePlannedSection[hidden]{display:none!important}
-#adminContentOvertime #p79OvertimePlannedSection{font-size:13px!important;line-height:1.4!important;scroll-margin-top:90px}
+/* 原清單改為獨立置中視窗，不佔主頁高度，也不捲動主頁。 */
+#adminContentOvertime #p79OvertimePlannedDialog:not([open]){display:none!important}
+#adminContentOvertime #p79OvertimePlannedDialog[open]{
+ position:fixed!important;inset:0!important;margin:auto!important;
+ display:block!important;box-sizing:border-box!important;
+ width:min(1650px,calc(100vw - 24px))!important;
+ max-width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px)!important;
+ padding:0!important;overflow:auto!important;
+ background:#f8faff!important;color:#172554!important;
+ border:1px solid #a5b4fc!important;border-radius:16px!important;
+ box-shadow:0 24px 80px rgba(15,23,42,.35)!important;
+}
+#adminContentOvertime #p79OvertimePlannedDialog::backdrop{background:rgba(15,23,42,.64)}
+#adminContentOvertime #p79OvertimePlannedDialog #p79OvertimePlannedSection{
+ margin:0!important;padding:14px!important;border:0!important;border-radius:0!important;
+ background:#f8faff!important;min-width:0!important;
+}
+#adminContentOvertime #p79OvertimePlannedDialog #p79OvertimePlannedSection table{min-width:1120px}
+#adminContentOvertime #p79OvertimePlannedSection{font-size:13px!important;line-height:1.4!important}
 #adminContentOvertime #p79OvertimePlannedHeading{font-size:14px!important;line-height:1.4!important}
 #adminContentOvertime #p79OvertimePlannedCount,
 #adminContentOvertime #p79OvertimePlannedSection>p,
@@ -1568,7 +1585,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                       <button type="button" onclick="P79OvertimeStatus.open()" class="p79-ot-btn-history">申報／異動紀錄</button>
                       <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">每月未休假加班</button>
                       <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
-                      <button id="p79OvertimePlannedToggle" type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-btn-planned" aria-controls="p79OvertimePlannedSection" aria-expanded="false" title="展開預排與待核對清單">預排／待核對</button>
+                      <button id="p79OvertimePlannedToggle" type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-btn-planned" aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false" title="開啟預排／待核對視窗">預排／待核對</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
                     </div>
                   </div>
@@ -1645,10 +1662,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </table>
                 </div>
                 <div id="overtimePagination" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"></div>
-                <section id="p79OvertimePlannedSection" hidden class="mt-5 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3" aria-labelledby="p79OvertimePlannedHeading">
+                <dialog id="p79OvertimePlannedDialog" class="p79-planned-overtime-dialog" aria-labelledby="p79OvertimePlannedHeading" onclose="p79SyncOvertimePlannedDialogState()">
+                <section id="p79OvertimePlannedSection" class="mt-5 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3" aria-labelledby="p79OvertimePlannedHeading">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對</h4>
-                        <div class="flex flex-wrap items-center gap-2"><span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span><button type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-planned-close rounded-lg border border-indigo-200 px-2 py-1 text-xs text-indigo-800 dark:text-indigo-200" aria-label="收合預排待核對清單">收合</button></div>
+                        <div class="flex flex-wrap items-center gap-2"><span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span><button type="button" onclick="p79CloseOvertimePlannedDialog()" class="p79-ot-planned-close rounded-lg border border-indigo-200 px-3 py-1 text-xs text-indigo-800 dark:text-indigo-200" aria-label="關閉預排待核對視窗">✕ 關閉</button></div>
                     </div>
                     <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">上、下班為實際打卡，可修改或補登；待核對資料不計入正式加班。</p>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
@@ -1661,6 +1679,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                     <div id="p79OvertimePlannedPagination" class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs text-slate-500"></div>
                 </section>
+                </dialog>
             </div>
 
             <!-- 分頁 4：請假預約審核 -->
@@ -13697,21 +13716,24 @@ function p79OvertimePeriodLabel(report){
 
         // 預排另外呈現在加班頁下方，沿用相同人員權限和篩選，不混入正式申報統計。
         let p79OvertimePlannedPage=1;
-        function p79ToggleOvertimePlanned(){
-            const section=document.getElementById('p79OvertimePlannedSection');
+        function p79SyncOvertimePlannedDialogState(){
+            const dialog=document.getElementById('p79OvertimePlannedDialog');
             const toggle=document.getElementById('p79OvertimePlannedToggle');
-            if(!section||!toggle)return;
-            const opening=section.hasAttribute('hidden');
-            if(opening){
-                section.removeAttribute('hidden');
-                toggle.setAttribute('aria-expanded','true');
-                toggle.title='收合預排與待核對清單';
-                if(typeof section.scrollIntoView==='function')section.scrollIntoView({behavior:'smooth',block:'start'});
-            }else{
-                section.setAttribute('hidden','');
-                toggle.setAttribute('aria-expanded','false');
-                toggle.title='展開預排與待核對清單';
-            }
+            if(!dialog||!toggle)return;
+            toggle.setAttribute('aria-expanded',dialog.open?'true':'false');
+            toggle.title=dialog.open?'關閉預排／待核對視窗':'開啟預排／待核對視窗';
+        }
+        function p79CloseOvertimePlannedDialog(){
+            const dialog=document.getElementById('p79OvertimePlannedDialog');
+            if(dialog?.open)dialog.close();
+            p79SyncOvertimePlannedDialogState();
+        }
+        function p79ToggleOvertimePlanned(){
+            const dialog=document.getElementById('p79OvertimePlannedDialog');
+            if(!dialog)return;
+            if(dialog.open)dialog.close();
+            else if(typeof dialog.showModal==='function')dialog.showModal();
+            p79SyncOvertimePlannedDialogState();
         }
         // 每月未休加班讀取後，把尚未申報的「往後預排」只保存在頁面記憶體。
         // 舊的雲端預排紀錄仍照常顯示；臨時建議不能被當成正式申報或儲存到雲端。
@@ -13793,7 +13815,10 @@ function p79OvertimePeriodLabel(report){
                     )):[];
                 const canEdit=typeof canPerformAdminAction==='function'&&
                     canPerformAdminAction(currentEmp,'attendanceEdit')&&matches.length===1;
-                return formatEditableAttendanceTimeCell(record,type,canEdit)+(canEdit?'':record.id?' <span class="text-xs text-slate-500">（要修改請先同步考勤）</span>':'');
+                const editableCell=formatEditableAttendanceTimeCell(record,type,canEdit);
+                // 打卡編輯採用原本的考勤視窗；先關閉清單的原生 modal 以免遮住它。
+                const cell=canEdit?editableCell.replace('onclick="openAttendanceTimeEditor(','onclick="p79CloseOvertimePlannedDialog();openAttendanceTimeEditor('):editableCell;
+                return cell+(canEdit?'':record.id?' <span class="text-xs text-slate-500">（要修改請先同步考勤）</span>':'');
             }
             const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
             if(row.p79RestDraft||date>todayKey)return '<span class="text-slate-400">尚未出勤</span>';
@@ -13803,7 +13828,7 @@ function p79OvertimePeriodLabel(report){
             const encodedOther=encodeURIComponent(String(other?.id??''));
             const label=type==='IN'?'上班簽到':'下班簽退';
             return '<span class="inline-flex gap-1.5 items-center"><span class="text-rose-700 dark:text-rose-300 font-semibold">缺卡</span>'+
-                '<button type="button" onclick="openRowManualAdd(\''+encodedEmp+'\',\''+encodedDate+'\',\''+label+'\',\''+encodedOther+'\')"'+
+                '<button type="button" onclick="p79CloseOvertimePlannedDialog();openRowManualAdd(\''+encodedEmp+'\',\''+encodedDate+'\',\''+label+'\',\''+encodedOther+'\')"'+
                 ' class="px-2 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200">補登'+(type==='IN'?'上班':'下班')+'</button></span>';
         }
         function p79RenderOvertimePlannedRows(sourceRows,month,dept,jobTitle,employeeId){
