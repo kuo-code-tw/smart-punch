@@ -13801,24 +13801,76 @@ function p79OvertimePeriodLabel(report){
             if(row?.reportVerified!==true)return {code:'report-issue',label:'申報待確認',detail:'請核對原申報。'};
             return {code:'review',label:'待核對',detail:''};
         }
-        function p79OvertimePendingPunchCell(row,type,todayKey){
+        // 待核對視窗與考勤管理共用原始打卡 ID；不得僅憑人名、日期或顯示文字猜測編輯目標。
+        function p79FindPlannedAttendanceEditRecord(row,source,type){
+            const id=String(source?.id??'').trim();
+            const empId=String(row?.empId||'').trim().toUpperCase();
+            const sourceTime=p79DirectAttendanceTimestamp(source);
+            if(!id||!empId||!['IN','OUT'].includes(type)||!Number.isFinite(sourceTime))return null;
+            const sameId=(Array.isArray(records)?records:[]).filter(item=>String(item?.id??'').trim()===id);
+            // 雲端同編號有多筆、身份不符或時刻已改動時，一律停止，避免修改別人的打卡。
+            if(sameId.length!==1)return null;
+            const found=sameId[0],actualEmp=String(found.empId||'').trim().toUpperCase();
+            const actualAtt=typeof normalizeAttendanceStatsAttNo==='function'?normalizeAttendanceStatsAttNo(found.attNo):String(found.attNo||'').trim();
+            const expectedAtt=typeof normalizeAttendanceStatsAttNo==='function'?normalizeAttendanceStatsAttNo(row.attNo):String(row.attNo||'').trim();
+            const samePerson=actualEmp?actualEmp===empId:!!actualAtt&&!!expectedAtt&&actualAtt===expectedAtt;
+            return samePerson&&getAttendanceRecordType(found)===type&&
+                p79DirectAttendanceTimestamp(found)===sourceTime?found:null;
+        }
+        async function p79OpenPlannedAttendanceEditor(index,type){
+            const row=p79OvertimePlannedDisplayedRows[Number(index)];
+            if(!row||row.p79RestDraft||!['IN','OUT'].includes(type))return;
+            if(typeof canPerformAdminAction!=='function'||!canPerformAdminAction(currentEmp,'attendanceEdit')){
+                showToast('沒有修改考勤權限','warning');return;
+            }
+            const source=type==='IN'?row.clockIn:row.clockOut;
+            const id=String(source?.id??'').trim();
+            if(!id){showToast('找不到原始打卡編號，無法安全修改','warning');return;}
+            if(window.p79V5QueueInfoForId?.(id)){
+                showToast('這筆打卡仍在同步，請確認同步完成後再修改','warning');return;
+            }
+            const expectedEmp=String(row.empId||'').trim().toUpperCase();
+            if(!expectedEmp){showToast('無法確認員工身分，已停止修改','warning');return;}
+            const token=currentPort79SsoToken();
+            let found=p79FindPlannedAttendanceEditRecord(row,source,type);
+            if(!found){
+                const date=normalizeScheduleDateKey(getAttendanceDateKey(String(source.timeStr||'')));
+                const month=String(date||'').slice(0,7);
+                if(!/^\d{4}-\d{2}$/.test(month)){
+                    showToast('打卡日期不完整，無法讀取正式考勤','warning');return;
+                }
+                showToast('正在同步該月正式考勤，核對原始打卡…','info');
+                const loaded=await loadAttendanceMonthFromCloud(month,false);
+                if(currentPort79SsoToken()!==token){showToast('登入身分已變更，請重新開啟','warning');return;}
+                if(!loaded){showToast('考勤同步失敗，未修改任何紀錄，請重新點擊','warning');return;}
+                p79OvertimeCalculationCache=null;
+                renderOvertimeStats();
+                found=p79FindPlannedAttendanceEditRecord(row,source,type);
+                if(!found){showToast('雲端打卡已異動或紀錄不唯一，請核對最新考勤資料','warning');return;}
+            }
+            if(window.p79V5QueueInfoForId?.(id)){
+                showToast('這筆打卡仍在同步，請完成同步後再修改','warning');return;
+            }
+            p79CloseOvertimePlannedDialog();
+            // 原生考勤編輯器具備身分/時間校驗、雲端寫入與待同步重試，不另建第二套資料。
+            return openEditRecordModal(found.id,type,found.timeStr,
+                {empId:row.empId,attNo:row.attNo,name:row.name},null,true);
+        }
+        function p79OvertimePendingPunchCell(row,type,todayKey,index=-1){
             const record=type==='IN'?row.clockIn:row.clockOut,other=type==='IN'?row.clockOut:row.clockIn;
             if(record){
-                // 只能編輯本機唯一可定位的原始打卡；雲端尚未載入時只顯示時間，不能誤改其他人。
-                const matches=Array.isArray(records)?records.filter(r=>
-                    String(r.id??'')===String(record.id??'')&&
-                    String(r.timeStr||'')===String(record.timeStr||'')&&(
-                      String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase()||
-                      (!String(r.empId||'').trim()&&String(row.attNo||'').trim()&&
-                       typeof normalizeAttendanceStatsAttNo==='function'&&
-                       normalizeAttendanceStatsAttNo(r.attNo)===normalizeAttendanceStatsAttNo(row.attNo))
-                    )):[];
-                const canEdit=typeof canPerformAdminAction==='function'&&
-                    canPerformAdminAction(currentEmp,'attendanceEdit')&&matches.length===1;
-                const editableCell=formatEditableAttendanceTimeCell(record,type,canEdit);
-                // 打卡編輯採用原本的考勤視窗；先關閉清單的原生 modal 以免遮住它。
-                const cell=canEdit?editableCell.replace('onclick="openAttendanceTimeEditor(','onclick="p79CloseOvertimePlannedDialog();openAttendanceTimeEditor('):editableCell;
-                return cell+(canEdit?'':record.id?' <span class="text-xs text-slate-500">（要修改請先同步考勤）</span>':'');
+                const canEdit=!!String(record.id??'').trim()&&typeof canPerformAdminAction==='function'&&
+                    canPerformAdminAction(currentEmp,'attendanceEdit')&&!row.p79RestDraft;
+                const display=formatEditableAttendanceTimeCell(record,type,false);
+                if(canEdit&&Number.isInteger(index)&&index>=0){
+                    return '<button type="button" onclick="p79OpenPlannedAttendanceEditor('+index+',\''+type+'\')"'+
+                      ' class="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"'+
+                      ' title="同步正式考勤後修改'+(type==='IN'?'上班':'下班')+'打卡" aria-label="修改'+(type==='IN'?'上班':'下班')+'打卡時間">'+
+                      display+' <span class="text-indigo-600 dark:text-indigo-300 font-semibold whitespace-nowrap">✎ 修改</span></button>';
+                }
+                // 非清單編輯入口維持原有的考勤編輯行為與權限，不會跳過原始紀錄檢查。
+                const local=p79FindPlannedAttendanceEditRecord(row,record,type);
+                return formatEditableAttendanceTimeCell(record,type,canEdit&&!!local);
             }
             const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
             if(row.p79RestDraft||date>todayKey)return '<span class="text-slate-400">尚未出勤</span>';
@@ -13868,8 +13920,8 @@ function p79OvertimePeriodLabel(report){
                 const period=String(report.code||'尚未設定');
                 const hours=Number(report.declaredHours);
                 const reason=p79OvertimePendingReason(row,todayKey);
-                const inCell=p79OvertimePendingPunchCell(row,'IN',todayKey);
-                const outCell=p79OvertimePendingPunchCell(row,'OUT',todayKey);
+                const inCell=p79OvertimePendingPunchCell(row,'IN',todayKey,index);
+                const outCell=p79OvertimePendingPunchCell(row,'OUT',todayKey,index);
                 const warning=['both-missing','in-missing','out-missing','not-out-yet','abnormal'].includes(reason.code);
                 const reasonTone=warning?'text-rose-800 dark:text-rose-300':reason.code==='unsent'?
                     'text-amber-800 dark:text-amber-300':'text-indigo-900 dark:text-indigo-200';
