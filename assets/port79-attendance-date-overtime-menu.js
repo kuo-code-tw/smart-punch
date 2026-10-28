@@ -64,10 +64,20 @@
   menu=document.createElement('div');menu.id='p79AttendanceDateOvertimeMenu';
   menu.style.cssText='position:fixed;z-index:2147483000;min-width:230px;padding:6px;background:white;color:#0f172a;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 32px #0003;font:600 13px system-ui,sans-serif';
   const header=document.createElement('div');header.textContent=date+'　考勤日期';header.style.cssText='padding:8px 10px;color:#64748b;font-size:12px';
+  const reported=document.createElement('button');reported.type='button';
+  reported.textContent='✅ 已申報｜查看當日正式紀錄';
+  reported.style.cssText='width:100%;padding:10px;text-align:left;background:#dcfce7;border:0;border-radius:8px;color:#166534;font:inherit;cursor:pointer;margin-bottom:5px';
+  reported.title='只讀取雲端正式有效申報；不是手動變更此日狀態';
+  reported.addEventListener('click',function(){
+   close();
+   if(typeof window.P79AttendanceOvertimeExport?.openReported==='function')
+    void window.P79AttendanceOvertimeExport.openReported(date);
+   else alert('正式申報查詢功能尚未載入，請重新整理考勤頁。');
+  });
   const item=document.createElement('button');item.type='button';item.textContent='🖨️ 列印／匯出當日加班申報表';
   item.style.cssText='width:100%;padding:10px;text-align:left;background:#e0f2fe;border:0;border-radius:8px;color:#075985;font:inherit;cursor:pointer';
   item.addEventListener('click',function(){close();openReportHere(date);});
-  menu.append(header,item);document.body.appendChild(menu);
+  menu.append(header,reported,item);document.body.appendChild(menu);
   menu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-menu.offsetWidth-8))+'px';
   menu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-menu.offsetHeight-8))+'px';
  },true);
