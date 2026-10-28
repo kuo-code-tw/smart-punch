@@ -13181,6 +13181,11 @@ async function p79ExportOvertimeComparison(printMode){
             return '';
         }
         let p79OvertimeCalculationCache = null;
+        // 「預排」即使已建立雲端申報 ID，也不代表已確定出勤或可計薪。
+        // 保留原雲端資料供班表與申報異動稽核，但不進正式加班頁的明細、統計或匯出。
+        function p79WorkOvertimeIsUnconfirmedPlan(row) {
+            return row?.planned === true || row?.overtimeReport?.planned === true;
+        }
         function buildOvertimeStatisticsRows() {
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
@@ -13317,9 +13322,10 @@ async function p79ExportOvertimeComparison(printMode){
                     rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,monthKey:date.slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
                 });
             });
-            rows.sort((a, b) => b.sortTime - a.sortTime);
-            p79OvertimeCalculationCache = {signature, rows};
-            return rows;
+            const confirmedPageRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row));
+            confirmedPageRows.sort((a, b) => b.sortTime - a.sortTime);
+            p79OvertimeCalculationCache = {signature, rows:confirmedPageRows};
+            return confirmedPageRows;
         }
 
         function replaceOvertimeOptions(element, allLabel, values, labelMap = null) {
@@ -13633,7 +13639,7 @@ function p79OvertimePeriodLabel(report){
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
             // 同一輪畫面更新只做一次考勤配對與加班統計。
-            const allOvertimeRows = buildOvertimeStatisticsRows();
+            const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row));
             initOvertimeFilters(allOvertimeRows);
             p79UpdateOvertimeChangeAlert();
             const month = document.getElementById('overtimeMonthFilter')?.value || 'ALL';

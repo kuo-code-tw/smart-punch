@@ -1,0 +1,27 @@
+name: Verify confirmed overtime visibility
+on:
+  pull_request:
+    paths:
+      - 'work-hours/index.html'
+      - 'tests/overtime-pending-attendance.cjs'
+      - '.github/workflows/confirmed-overtime-visibility.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'work-hours/index.html'
+      - 'tests/overtime-pending-attendance.cjs'
+      - '.github/workflows/confirmed-overtime-visibility.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify planned vs official reports
+        run: |
+          node tests/overtime-pending-attendance.cjs
+          node tests/overtime-status-live.cjs
