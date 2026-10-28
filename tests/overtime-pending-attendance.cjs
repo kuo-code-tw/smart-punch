@@ -9,6 +9,8 @@ vm.runInContext(fn('p79WorkOvertimeIsUnconfirmedPlan'),ctx);vm.runInContext(fn('
 assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({overtimeReport:report}),true,'cloud report ID does not turn a planned shift into confirmed overtime');
 const plannedRows=ctx.buildOvertimeStatisticsRows();
 assert.equal(plannedRows.length,0,'planned / pending attendance never appears in confirmed overtime list, totals or export');
+assert.equal(ctx.p79OvertimeCalculationCache.plannedRows.length,1,'planned overtime stays available for separate in-page presentation');
+assert.equal(ctx.p79OvertimeCalculationCache.plannedRows[0].overtimeReport.id,'OT1','preserve original planned report ID');
 report.planned=false;ctx.p79OvertimeCalculationCache=null;
 const rows=ctx.buildOvertimeStatisticsRows();
 assert.equal(rows.length,1,'existing non-planned formal report remains visible for pending punch audit');
