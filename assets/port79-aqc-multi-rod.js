@@ -53,20 +53,21 @@
   if($(ID)||!$('view-dashboard'))return;
   const section=document.createElement('section');section.id=ID;section.className='hidden space-y-2';
   section.innerHTML=[
-  '<div class="card p-3 sm:p-4 space-y-2">',
-  '<div class="flex flex-wrap gap-2 items-center justify-between"><h2 class="text-base font-bold text-slate-900">⚓ AQC 多桿作業管理</h2>',
-  '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">人工修正（選用）</button></div>',
-  '<div class="flex flex-wrap gap-2 items-end">',
-  '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
-  '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
-  '<label class="text-sm font-bold">顯示<select id="multiRodMode" class="block border rounded-xl px-3 py-2 mt-1"><option value="day">指定日期</option><option value="month">整個月份</option><option value="all">全部紀錄</option></select></label>',
-  '<button type="button" id="multiRodRefresh" class="btn bg-slate-100">重新核對雲端</button><button type="button" id="multiRodImport" class="btn bg-amber-50">匯入此帳號舊本機紀錄</button>',
-  '<button type="button" id="multiRodExport" class="btn bg-emerald-600 text-white">📥 匯出 Excel（明細＋彙總）</button></div>',
-  '<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">',
-  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">顯示船舶</span><span id="multiRodShips" class="text-sm font-bold text-slate-900">0 艘</span></div>',
-  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">作業組數</span><span id="multiRodEvents" class="text-sm font-bold text-slate-900">0 筆</span></div>',
-  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">現場上限／來源峰值</span><span id="multiRodContainers" class="text-sm font-bold text-slate-900">0</span></div>',
-  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">資料來源</span><span id="multiRodHatches" class="text-sm font-bold text-slate-900">0／0</span></div></div>',
+  '<div class="card p-2 space-y-2">',
+  '<div id="multiRodToolbarScroll" class="overflow-x-auto" role="region" aria-label="AQC 單行工具列" tabindex="0"><div id="multiRodToolbar" class="flex w-full min-w-max items-center gap-2 whitespace-nowrap">',
+  '<h2 class="shrink-0 text-sm font-bold text-slate-900">⚓ AQC 多桿作業管理</h2>',
+  '<label class="flex shrink-0 items-center gap-1 text-xs font-medium">日期<input id="multiRodDate" type="date" class="border rounded-md px-1.5 py-1 text-xs w-[128px] h-8"></label>',
+  '<label class="flex shrink-0 items-center gap-1 text-xs font-medium">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="border rounded-md px-1.5 py-1 text-xs w-[48px] h-8"></label>',
+  '<label class="flex shrink-0 items-center gap-1 text-xs font-medium">顯示<select id="multiRodMode" class="border rounded-md px-1.5 py-1 text-xs w-[98px] h-8"><option value="day">指定日期</option><option value="month">整個月份</option><option value="all">全部紀錄</option></select></label>',
+  '<button type="button" id="multiRodRefresh" class="btn bg-slate-100">核對雲端</button>',
+  '<button type="button" id="multiRodImport" class="btn bg-amber-50">匯入舊紀錄</button>',
+  '<button type="button" id="multiRodExport" class="btn bg-emerald-600 text-white">匯出 Excel</button>',
+  '<div class="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-2 text-xs"><span class="text-slate-500">船舶</span><b id="multiRodShips" class="font-semibold">0 艘</b></div>',
+  '<div class="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-2 text-xs"><span class="text-slate-500">作業</span><b id="multiRodEvents" class="font-semibold">0 組</b></div>',
+  '<div class="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-2 text-xs"><span class="text-slate-500">上限／來源</span><b id="multiRodContainers" class="font-semibold">0 桿</b></div>',
+  '<div class="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-2 text-xs"><span class="text-slate-500">快取</span><b id="multiRodHatches" class="font-semibold">0 筆</b></div>',
+  '<button type="button" id="multiRodAdd" class="btn ml-auto bg-indigo-600 text-white">人工修正</button>',
+  '</div></div>',
   '<div id="multiRodSourceState" class="hidden" role="status" aria-hidden="true"></div>',
   '<details class="bg-white border border-slate-200 rounded-lg px-3 py-2"><summary class="cursor-pointer font-semibold text-xs text-slate-600">🔎 核對來源時段與各船桿數</summary><div id="multiRodSourceAudit" class="mt-2 text-xs text-slate-600"></div><div id="multiRodSourcePreview" class="mt-2 text-xs space-y-1"></div></details>',
   '<div class="overflow-x-auto"><table class="tbl w-full min-w-[780px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>同時作業船舶／期間各船來源峰值</th><th>期間來源最高桿數</th><th>來源／AQC 起訖核對</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
@@ -236,9 +237,9 @@
   $('multiRodAdd').disabled=!editAllowed('records.create');
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
   $('multiRodShips').textContent=allShips.size+' 艘';
-  $('multiRodEvents').textContent=list.filter(r=>!r.capacityConflict).length+' 組未超限／'+list.filter(r=>r.capacityConflict).length+' 組待核';
-  $('multiRodContainers').textContent='上限 '+result.physicalCapacity+' 桿'+(result.sourcePeak>result.physicalCapacity?'／來源最高 '+result.sourcePeak+' 桿':'');
-  $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆快取明細';
+  $('multiRodEvents').textContent=list.length+' 組／'+list.filter(r=>r.capacityConflict).length+' 待核';
+  $('multiRodContainers').textContent=result.physicalCapacity+' 桿／'+(result.sourcePeak||0)+' 桿';
+  $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆';
   const sourceStatus=$('multiRodSourceState');
   if(sourceStatus)sourceStatus.textContent='快取工作明細 '+result.sourceReportCount+' 筆、可辨識 AQC 區間 '+result.intervalCount+' 段；現場同時作業上限 '+result.physicalCapacity+' 桿。來源時間重疊超過上限 '+result.capacityConflictCount+' 段；同一組船舶連續作業合併成 '+list.length+' 組，增減桿不重複計筆。超額來源仍待核對。WORKING SHEET 的起訖時間不代表該桿在整段都持續動作。';
   const audit=$('multiRodSourceAudit'),preview=$('multiRodSourcePreview');
