@@ -29,9 +29,10 @@ const refreshStart=html.indexOf('    async function manualRefreshSchedule()'),re
 assert(refreshStart>=0&&refreshEnd>refreshStart);
 const run=async(fail)=>{
  let calls=[],notice=[],alertMessages=[],lock=0,redraw=0;
- const button={disabled:false,innerHTML:'重新讀取'};
+ const button={disabled:false,innerHTML:'重新讀取'},quick={disabled:false,innerHTML:'重新讀取',textContent:'重新讀取'};
  const c={Date,Promise,Error,console,port79ScheduleLastAutoSyncAt:123,
-  document:{getElementById:id=>id==='schedule-refresh-btn'?button:null},
+  document:{getElementById:id=>id==='schedule-refresh-btn'?button:id==='schedule-quick-refresh-btn'?quick:null},
+  currentScheduleMonthKey:()=> '2026-11',
   flushSchedulePendingWrites:async()=>true,
   loadScheduleCloudWithRetry:async()=>{calls.push('cloud');return true},
   buildRoleTabsAndRender:()=>{redraw++;if(fail)throw new TypeError("Cannot read properties of null (reading 'overtimeReport')")},
@@ -44,7 +45,7 @@ const run=async(fail)=>{
  };
  vm.createContext(c);vm.runInContext(html.slice(refreshStart,refreshEnd),c);
  await c.manualRefreshSchedule();
- return{calls,notice,lock,redraw,button,alertMessages};
+ return{calls,notice,lock,redraw,button,quick,alertMessages};
 };
 (async()=>{
  const fail=await run(true);
@@ -52,8 +53,11 @@ const run=async(fail)=>{
  assert.equal(fail.notice.length,1,'manual refresh must surface render-specific failure');
  assert.match(fail.notice[0][0],/雲端資料已讀取，但正式班表渲染失敗/);
  assert.equal(fail.button.disabled,false,'button must be usable after an error');
+ assert.equal(fail.quick.disabled,false,'visible quick refresh must re-enable after render error');
  const ok=await run(false);
- assert.equal(ok.lock,1);assert.equal(ok.notice.length,0);assert.equal(ok.button.disabled,false);
+ assert.equal(ok.lock,1);assert.equal(ok.notice.length,1);assert.match(ok.notice[0][0],/已重新讀取並完成畫面更新/);
+ assert.equal(ok.button.disabled,false);assert.equal(ok.quick.disabled,false);
+ assert(html.includes('id="schedule-quick-refresh-btn"'),'visible quick button must have a progress target');
  const ed=fs.readFileSync('assets/port79-special-days-editor.js','utf8');
  const store=new Map();
  const browser={console,Date,Promise,JSON,Array,Set,
