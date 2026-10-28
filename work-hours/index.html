@@ -12326,6 +12326,19 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
         }
 
+        // 只在考勤正式雲端儲存成功後，更新同月份的加班／班表快取，不擅自核定加班。
+        function p79RefreshLinkedOvertimeAfterAttendanceCloudSave(...timeStrings){
+            const months=new Set();
+            for(const timeStr of timeStrings){
+                const date=normalizeScheduleDateKey(getAttendanceDateKey(String(timeStr||'')));
+                const month=String(date||'').slice(0,7);
+                if(/^\d{4}-\d{2}$/.test(month))months.add(month);
+            }
+            p79OvertimeCalculationCache=null;
+            for(const month of months)p79QueueConfirmedRosterRecheck(month);
+            p79RenderOnlyVisibleAttendanceView();
+        }
+
         function saveModalEdit() {
             const saveBtn = document.getElementById('saveModalEditBtn');
             if (saveBtn?.disabled || !p79AttendanceEditCloudReady) return;
@@ -12437,7 +12450,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     originalPunchType
                 }, '考勤紀錄已成功更新並同步雲端！',
                 () => {
-                    p79RenderOnlyVisibleAttendanceView();
+                    p79RefreshLinkedOvertimeAfterAttendanceCloudSave(originalTimeStr,r.timeStr);
                 },
                 errorText => {
                     console.warn('考勤修改已保留於待同步清單：', errorText);
@@ -12795,7 +12808,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             postToCloud(
                 { action: cloudAction, record: newRecord },
                 '已成功儲存補打卡紀錄！',
-                () => {renderAdminRecordsTable();p79RenderOnlyVisibleAttendanceView();}
+                () => {renderAdminRecordsTable();p79RefreshLinkedOvertimeAfterAttendanceCloudSave(newRecord.timeStr);}
             );
         }
 
