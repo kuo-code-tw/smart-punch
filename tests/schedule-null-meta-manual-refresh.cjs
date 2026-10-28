@@ -58,7 +58,7 @@ const run=async(fail)=>{
  const browser={console,Date,Promise,JSON,Array,Set,
   localStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)},
   P79SpecialOvertime:{electionDates:()=>[]},addEventListener(){}};
- vm.createContext(browser);vm.runInContext(ed,browser);
+ browser.window=browser;vm.createContext(browser);vm.runInContext(ed,browser);
  browser.P79SpecialDaysEditor.configure({
   read:async()=>({ok:true,source:'cloud',schemaVersion:1,revision:'REV-1',rows:[{date:'2026-11-04',kind:'election'}]}),
   write:async()=>({ok:true,source:'cloud',schemaVersion:1,revision:'REV-2',rows:[]}),
