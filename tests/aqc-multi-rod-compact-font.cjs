@@ -9,9 +9,9 @@ assert.ok(found,'compact style block exists in the published efficiency entrypoi
 const css=found[1];
 assert.match(css,/#view-multi-rod \.tbl th\{font-size:13px!important;/);
 assert.match(css,/#view-multi-rod \.tbl td\{font-size:14px!important;/);
-assert.match(css,/#view-multi-rod #multiRodBody td:nth-child\(1\)/);
-assert.match(css,/#view-multi-rod #multiRodBody td:nth-child\(5\)/);
-assert.match(css,/#view-multi-rod #multiRodBody td:nth-child\(5\) summary\{font-size:13px!important;/);
+assert.ok(css.includes('#view-multi-rod #multiRodBody td:nth-child(1)'),'date column compact');
+assert.ok(css.includes('#view-multi-rod #multiRodBody td:nth-child(5)'),'audit column compact');
+assert.ok(css.includes('#view-multi-rod #multiRodBody td:nth-child(5) summary{font-size:13px!important}'),'review link stays readable');
 assert.match(css,/padding:8px 10px!important/,'rows more compact without removing vertical space');
 assert.match(css,/#view-multi-rod #multiRodSourceAudit/,'source audit compact as shown in screenshot');
 const cssRules=css.split('\n').filter(x=>x.trim()&&!x.trim().startsWith('/*'));
