@@ -45,7 +45,9 @@ function receive(reply){
  if(reply?.ok!==true||reply.source!=='cloud'||reply.schemaVersion!==1||!Array.isArray(reply.rows)||!reply.revision)throw Error('GAS 未傳回有效特殊日期資料');
  const state={revision:String(reply.revision),rows:normalize(reply.rows)};
  mirror(state);const changed=!cloud||JSON.stringify(state.rows)!==JSON.stringify(cloud.rows);cloud=state;
- if(changed)service?.onChange?.(state.rows);
+ // A successful GAS read must not be mislabeled as a cloud sync failure merely
+ // because the consuming schedule UI throws while refreshing its own display.
+ if(changed)try{service?.onChange?.(state.rows)}catch(error){g.console?.error?.('特殊日期已核對雲端，但排班畫面更新失敗',error)}
  return cloud;
 }
 async function refresh(){
