@@ -584,7 +584,8 @@ async function open(settings={}){
  q('#mrAutoMode').onchange=()=>choosePlanningMode(q('#mrAutoMode').checked);
  q('#mrNewPlan').onclick=async()=>{
   if(busy)return;
-  const form=await g.P79Overtime.openReport({manualPlan:true});
+  await g.P79Overtime.openReport({manualPlan:true});
+  const form=document.querySelector('#p79OtClose')?.closest('dialog');
   if(form)form.addEventListener('close',()=>{if(el.isConnected&&!busy)q('#mrLoad').click();},{once:true});
  };
  choosePlanningMode(autoPlan);
