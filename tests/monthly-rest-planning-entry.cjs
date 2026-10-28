@@ -1,0 +1,18 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
+for(const id of ['mrPlanningModes','mrManualMode','mrAutoMode','mrNewPlan'])assert(source.includes('id="'+id+'"'));
+const start=source.indexOf(' function choosePlanningMode('),end=source.indexOf(" q('#mrPrior').onclick=",start);
+const nodes=new Map(),q=s=>{if(!nodes.has(s))nodes.set(s,{});return nodes.get(s);};
+let requests=0,refreshes=0,close;
+const original=[{checked:true,id:'formal-original'}];
+const c={document:{querySelector:()=>({closest:()=>({addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}})})},busy:false,autoPlan:false,model:{rows:original},snapshot:{},loadedPeople:[],loadedMonth:'2026-10',rules:[],el:{isConnected:true},q,paint(){},controls(){},plan:(s,p,m,r,o)=>({rows:[],plannedRows:o.manualOnly?[]:[{checked:false,id:'suggestion'}]}),g:{P79Overtime:{openReport:async options=>{assert.equal(options.manualPlan,true);requests++;return {addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}};}}}};
+q('#mrLoad').click=()=>refreshes++;
+vm.createContext(c);vm.runInContext(source.slice(start,end),c);
+assert.equal(q('#mrManualMode').checked,true);assert.equal(q('#mrAutoMode').checked,false);
+q('#mrAutoMode').checked=true;q('#mrAutoMode').onchange();
+assert.equal(q('#mrPlannedSection').hidden,false);assert.equal(q('#mrNewPlan').hidden,true);
+assert.equal(c.model.plannedRows.length,1);assert.equal(c.model.plannedRows[0].checked,false);assert.equal(requests,0);
+assert.equal(c.model.rows,original,'formal selections survive mode changes');
+q('#mrManualMode').onchange();assert.equal(q('#mrNewPlan').hidden,false);assert.equal(q('#mrPlannedSection').hidden,true);assert.equal(c.model.plannedRows.length,0);
+(async()=>{await q('#mrNewPlan').onclick();assert.equal(requests,1);close();assert.equal(refreshes,1);c.busy=true;await q('#mrNewPlan').onclick();assert.equal(requests,1);console.log('PASS monthly window manual/automatic controls, unchecked suggestions, nested manual form and refresh');})().catch(e=>{console.error(e);process.exitCode=1;});
