@@ -23,7 +23,9 @@ jobs:
           node-version: '22'
       - name: Verify all monthly rest regression tests
         run: |
+          failed=0
           for test_file in tests/monthly-rest-*.cjs; do
             echo "TEST $test_file"
-            node "$test_file" || exit 1
+            node "$test_file" || failed=1
           done
+          exit "$failed"
