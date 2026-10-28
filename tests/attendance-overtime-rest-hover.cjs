@@ -18,7 +18,7 @@ const render=new Function('attendanceRowOvertimeMinutes','p79AttendanceOvertimeD
  minutes=>String(Math.floor((minutes||0)/60))+' 小時'
 );
 function parts(result) {
- const at=result.indexOf('class="p79-overtime-hidden-detail"');
+ const at=result.indexOf('<div class="p79-overtime-hidden-detail"');
  assert.ok(at>=0,'non-rest information is in one hidden container');
  return {rest:result.slice(0,at),details:result.slice(at)};
 }
