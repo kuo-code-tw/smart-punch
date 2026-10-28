@@ -102,18 +102,30 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const verifiedRestReport=item=>{
     const r=item?.overtimeReport;
     return !!String(r?.id??'').trim()&&['例','休','國'].includes(r?.category)&&
-      item.restCategory===r.category&&item.overtimeExcluded!==true&&
+      item.overtimeExcluded!==true&&
       !(item.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
         String(x.reportId)===String(r.id));
   };
-  // Consume genuinely protected manual categories, not movable 休 entries.
+  // Confirmed cloud reports reserve their category ONCE, even when a previous
+  // roster edit did not carry a matching restCategory annotation. Otherwise
+  // newly included no-punch days can fill the same quota twice.
+  // Ordinary manual categories still take precedence and cannot be moved.
   for(const date of dates){
     const item=result[date];
-    if(!item?.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date))continue;
-    if(typhoonProtected.has(date)||excluded.has(date)&&!verifiedRestReport(item))continue;
-    // No cloud report ID means the manual overtime note does not reserve quota.
-    if(item.restQuotaOvertime&&!verifiedRestReport(item))continue;
-    if(!isRestCandidate(date)&&!verifiedRestReport(item))continue;
+    if(!item||typhoonProtected.has(date))continue;
+    if(verifiedRestReport(item)){
+      const category=item.overtimeReport.category;
+      let index=slots.findIndex(s=>s.category===category&&
+        (!item.restSourceDate||s.sourceDate===item.restSourceDate));
+      if(index<0)index=slots.findIndex(s=>s.category===category);
+      // Existing over-quota reports are audited by balance(); never invent
+      // another slot and never overwrite or silently revoke the report.
+      if(index>=0)slots.splice(index,1);
+      used.add(date);
+      continue;
+    }
+    if(!item.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date)||
+       excluded.has(date)||item.restQuotaOvertime||!isRestCandidate(date))continue;
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
     if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);
