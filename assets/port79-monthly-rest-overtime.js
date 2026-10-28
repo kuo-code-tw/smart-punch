@@ -172,7 +172,9 @@ function workflowAudit(model){
   for(const cat of ['例','休','國'])if(progress[cat].remaining>0){result.shortage[cat]+=progress[cat].remaining;parts.push(cat+progress[cat].remaining);}
   result.checked++;
   if(!parts.length)result.complete++;
-  result.people.push(b.emp.name+'：'+(parts.length?'待核對 '+parts.join('／'):'例／休／國無缺額')+
+  // Completed employees remain in aggregate counts, but the actionable
+  // audit list only shows unresolved quotas. Conflicts are listed separately.
+  if(parts.length)result.people.push(b.emp.name+'：待核對 '+parts.join('／')+
    '｜已休 例'+b.off.例+'／休'+b.off.休+'／國'+b.off.國+
    '｜正式加班 例'+b.reported.例+'／休'+b.reported.休+'／國'+b.reported.國+
    '｜出勤待核 例'+b.reserved.例+'／休'+b.reserved.休+'／國'+b.reserved.國);
