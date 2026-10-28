@@ -13591,7 +13591,7 @@ function p79OvertimePeriodLabel(report){
                 // never guess from attendance hours, mutate cloud or hide invalid data.
                 if(absent&&window.P79Overtime?.reportRules){
                     const rules=window.P79Overtime.reportRules();
-                    const canonical=v=>String(v??'').trim().replace(/:00$/,'').replace(/^0(?=\\d$)/,'');
+                    const canonical=v=>String(v??'').trim().replace(/:00$/,'').replace(/^0(?=\d$)/,'');
                     const same=(a,b)=>canonical(a)===canonical(b);
                     const matched=(Array.isArray(rules)?rules:[]).filter(rule=>
                         String(rule[0]||'').trim()===String(report.category||'').trim()&&
