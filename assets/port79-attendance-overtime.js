@@ -182,6 +182,38 @@ function markReviewed(date,checked){
 g.addEventListener?.('storage',event=>{
  if(event.key===reviewVersionKey)refreshCurrentStrip();
 });
+// List what the attendance schedule snapshot actually contained. This is NOT
+// an authoritative check that the user never filed a report in work-hours.
+function attendanceReviewEvidence(date,state){
+ const found=new Set();
+ const counts={candidate:0,revoked:0,matchedCancelId:0,excluded:0,missingId:0,staff:0};
+ for(const row of state?.rows||[]){
+  const meta=row?.schedule?.__meta?.[date];
+  if(!meta)continue;
+  counts.staff++;
+  const person=id(row.empId);
+  const cancellations=Array.isArray(meta.overtimeRevocations)?meta.overtimeRevocations:[];
+  const revokedIds=new Set(cancellations.filter(a=>a?.confirmed===true).map(a=>String(a.reportId||'').trim()));
+  for(const audit of cancellations){
+   if(audit?.confirmed!==true||!audit?.reportId)continue;
+   const key=person+'|'+String(audit.reportId)+'|'+String(audit.at||'');
+   if(found.has('revoked|'+key))continue;
+   found.add('revoked|'+key);counts.revoked++;
+  }
+  const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(Boolean);
+  for(const report of reports){
+   const reportId=String(report?.id||'').trim();
+   const key=person+'|'+(reportId||'unknown');
+   if(found.has('candidate|'+key))continue;
+   found.add('candidate|'+key);counts.candidate++;
+   if(!reportId)counts.missingId++;
+   else if(meta.overtimeExcluded===true)counts.excluded++;
+   else if(revokedIds.has(reportId))counts.matchedCancelId++;
+  }
+ }
+ return counts;
+}
+
 // Right-click review always performs a fresh authorized GAS read, rather than trusting
 // a 60-second month cache or a previous revocation state.
 const activeReviewRequests=new Map();
@@ -226,18 +258,20 @@ async function recheckAndMarkReviewed(date,checked=true){
    refreshCurrentStrip();
    const info=overtimeDayIndicator(date,state);
    if(!info?.activeCount){
-    let excluded=0,other=0;
-    for(const row of state.rows){
-     const meta=row.schedule?.__meta?.[date];
-     if(meta?.overtimeExcluded===true&&
-      (meta.overtimeReport?.id||(meta.overtimeReports||[]).some(r=>r?.id)))excluded++;
-     if(meta?.overtimeReport?.id)other++;
-    }
-    const detail=info?.revokedCount
-     ?'目前讀到 '+info.revokedCount+' 筆取消紀錄'
-     :excluded?'雲端有 '+excluded+' 筆申報被標記為排除'
-     :other?'目前申報無有效紀錄':'目前沒有正式加班申報';
-    return {ok:false,kind:info?.kind||'none',message:date+' 已重新讀取雲端，但沒有有效正式申報（'+detail+'）；不能標綠。請在加班管理核實已儲存的申報。'};
+    const evidence=attendanceReviewEvidence(date,state);
+    const details=[
+     '本次班表回傳 '+evidence.candidate+' 筆申報候選資料',
+     evidence.revoked+' 筆已確認取消歷史',
+     ...(evidence.matchedCancelId?['其中 '+evidence.matchedCancelId+' 筆申報編號與取消紀錄相同']:[]),
+     ...(evidence.excluded?['有 '+evidence.excluded+' 筆標記為排除']:[]),
+     ...(evidence.missingId?['有 '+evidence.missingId+' 筆缺少申報編號']:[])
+    ].join('、');
+    // A schedule snapshot is only one source. It cannot prove that a filing
+    // wasn't saved elsewhere or that cloud schedule replication has completed.
+    return {ok:false,kind:'unverified',evidence,
+     message:date+' 目前無法從考勤班表快照確認有效申報（'+details+'）。'
+      +'這不代表你沒有正式申報，也不能只因取消歷史就否定後續申報。'
+      +'如果加班管理已顯示「正常已申報」，代表兩邊資料需要核對；目前不會自行改動正式申報或強制標綠。'};
    }
    if(!markReviewed(date,true))
     return {ok:false,message:date+' 雲端確認 '+info.activeCount+' 筆有效申報，但查核狀態未能儲存在此瀏覽器，請確認網站儲存權限'};
