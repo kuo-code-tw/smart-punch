@@ -33,7 +33,7 @@ assert.equal(model.workflow.key,'audit');
 now='2026-10-20';
 model=api.plan(snapshot,[emp],month,rules);
 assert.equal(model.workflow.key,'preview');
-assert(model.rows.length>0,'From the 15th suggest real dated attendance using loaded overtime options');
+assert.equal(model.rows.length,0,'Before the 25th no formal month-end overtime should be offered');
 assert(model.rows.every(x=>x.rule[2]===8),'Suggested hours originate from configured overtime rules');
 assert(model.rows.every(x=>!x.planned&&x.date<='2026-10-20'),'Future work cannot appear in actual eight-hour suggestions');
 const audit=api.workflowAudit(model);
@@ -41,7 +41,7 @@ assert(audit.people.length===1 && audit.shortage.例>=0 && audit.shortage.休>=0
 now='2026-10-26';
 const active=api.plan(snapshot,[emp],month,rules);
 assert.equal(active.workflow.key,'submit');
-assert(active.rows.some(x=>x.planned===false),'Actual attendance proposals are preserved for review');
+assert(active.rows.every(x=>!x.planned&&x.date>='2026-10-25'),'Only completed actual month-end work appears as formal overtime');
 assert(active.rows.every(x=>!x.planned&&x.date<='2026-10-26'),'Future or unworked dates cannot be listed');
 assert.equal(JSON.stringify(snapshot),before,'Reading and planning may never mutate original roster, punches or reports');
 const source=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
