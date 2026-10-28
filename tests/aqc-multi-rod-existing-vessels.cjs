@@ -8,9 +8,10 @@ assert(html.includes('data-tab="multi-rod"'));
 assert(html.indexOf('port79-aqc-concurrent.js')<html.indexOf('port79-aqc-multi-rod.js'));
 assert(app.includes('function concurrentResult()'));
 assert(app.includes("const result=concurrentResult()"));
-assert(app.includes('補登船舶資料'));
+assert(!app.includes('>補登船舶資料</button>'),'no redundant add-vessel button');
+assert(app.includes('同桿跨船接桿核對'),'audit per-unit finish/start transitions');
 assert(app.includes("const scope=identity(),result=concurrentResult(),rows=result.rows;"));
-assert(app.includes("result.peak+' 桿'"));
+assert(app.includes('待核對'),'unverified 5+ cannot be labeled confirmed');
 const win={};new Function('window',lib)(win);const calc=win.P79AqcConcurrent;
 const at=Date.parse('2026-10-28T17:00:00+08:00');
 const record=(number,ship,start,end,date='2026-10-28',workingNo=ship)=>({
@@ -54,4 +55,30 @@ assert.equal(out.rows[0].ships.length,2);
 assert.equal(out.rows[0].containers,null,'manual vessel-wide count must not be attributed to partial concurrent window');
 out=compute(a,[],[],5);
 assert.equal(out.rows.length,0,'custom threshold 5 suppresses 4 concurrent cranes');
+// A screenshot-like three-vessel case: four overlapping cranes plus one older
+// crane whose WORKING SHEET actually ended BEFORE 00:23.
+const oldCrane=[record(8003,'WAN HAI 277','00:23','01:56','2026-10-06','W277'),
+ record(8005,'WAN HAI 277','00:23','01:56','2026-10-06','W277'),
+ record(7903,'WAN HAI 288','00:23','01:56','2026-10-06','W288'),
+ record(7905,'WAN HAI 288','00:23','01:56','2026-10-06','W288'),
+ record(7902,'WAN HAI 271','00:23','01:56','2026-10-06','W271')];
+const olderMaster=[{vessel:'WAN HAI 271',workingNo:'W271',aqcs:[{number:7902,
+ commence:'2026-10-06T00:00:00+08:00',complete:'2026-10-06T00:20:00+08:00'}]}];
+let oldResult=calc.compute(calc.index(oldCrane,olderMaster,at),[],{date:'2026-10-06',min:4});
+assert.equal(oldResult.rows.length,1);
+assert.equal(oldResult.rows[0].totalRods,4,'finished previous-vessel crane must not become phantom fifth');
+assert.equal(oldResult.rows[0].shipCount,2);
+assert.deepEqual(oldResult.rows[0].ships.map(s=>s.ship),['WAN HAI 277','WAN HAI 288']);
+let incomplete=calc.compute(calc.index(oldCrane,[],at),[],{date:'2026-10-06',min:4});
+assert.equal(incomplete.rows.length,1);
+assert.equal(incomplete.rows[0].totalRods,5);
+assert.equal(incomplete.rows[0].needsReview,true,'report-only five rods must be marked unverified');
+// A genuine 5-crane overlap supported by 5 WORKING SHEET timestamps remains valid.
+const verified=[{workingNo:'V1',vessel:'CONFIRMED',aqcs:[101,102,103,104,105].map(number=>({
+ number,commence:'2026-10-06T08:00:00+08:00',complete:'2026-10-06T11:00:00+08:00'}))}];
+const real5=calc.compute(calc.index([],verified,at),[],{date:'2026-10-06',min:4});
+assert.equal(real5.rows[0].totalRods,5);
+assert.equal(real5.rows[0].needsReview,false,'genuine five from authoritative crane times is not arbitrarily capped');
+console.log('PASS: AQC finish vs next-vessel start, false-five prevention, and verified future five-rod support');
+
 console.log('PASS: cross-vessel 2+2 overlap, cache-only computation, midnight, manual priority, duplicate equipment, quantity caution, export UI');
