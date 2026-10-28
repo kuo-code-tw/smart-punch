@@ -6687,8 +6687,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
         ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
       const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
+      // Prefer the checked monthly ledger; if it is not ready yet, retain the
+      // shared automatic allocation instead of resetting a valid 國 to 休.
+      const verifiedOffKind=ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category;
+      const allocatedOffKind=automaticRestMeta[dayStr]?.restCategory;
+      const noPunchRestKind=verifiedOffKind||
+        (['例','休','國'].includes(allocatedOffKind)?allocatedOffKind:'休');
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
-        restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
+        restCategory:noPunchRestKind,
         restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};
       const coverageShift=noPunchRest?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
