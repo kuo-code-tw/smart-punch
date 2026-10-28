@@ -1,42 +1,47 @@
 'use strict';
 const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const vm=require('node:vm');
+const fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('work-hours/index.html','utf8');
 
-assert.match(html,/＋ 申報加班<\/button>\s*<button id="p79OvertimePlannedToggle"/,'toolbar button follows 申報加班');
-assert.match(html,/<button id="p79OvertimePlannedToggle"[^>]+aria-controls="p79OvertimePlannedSection" aria-expanded="false"/,'accessible default collapsed state');
-assert.match(html,/<section id="p79OvertimePlannedSection" hidden/,'original planned section is initially hidden');
-assert.match(html,/#adminContentOvertime #p79OvertimePlannedSection\[hidden\]\{display:none!important\}/,'hidden visibility enforced');
-assert(html.includes("toggle.textContent='預排／待核對（'+rows.length+'）'"),'button shows filtered count');
-assert.match(html,/onclick="p79ToggleOvertimePlanned\(\)"[^>]*>收合<\/button>/,'panel can be closed');
-assert(html.includes("p79OpenPlannedOvertimeReview('+index+')"),'review action preserved');
+assert.match(html,/＋ 申報加班<\/button>\s*<button id="p79OvertimePlannedToggle"/,'top toolbar modal button follows 申報加班');
+assert.match(html,/<button id="p79OvertimePlannedToggle"[^>]+aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false"/,'modal button is accessible');
+assert.match(html,/<dialog id="p79OvertimePlannedDialog"[^>]+onclose="p79SyncOvertimePlannedDialogState\(\)"/,'native modal synchronizes closing state (including Escape)');
+assert.match(html,/<section id="p79OvertimePlannedSection"/,'same original planned list remains inside modal');
+assert.match(html,/#adminContentOvertime #p79OvertimePlannedDialog:not\(\[open\]\)\{display:none!important\}/,'modal is hidden until opened');
+assert.match(html,/id="p79OvertimePlannedPagination"/,'list retains original pagination');
+assert(html.includes("toggle.textContent='預排／待核對（'+rows.length+'）'"),'top button uses filtered count');
+assert.match(html,/onclick="p79CloseOvertimePlannedDialog\(\)"[^>]+>✕ 關閉<\/button>/,'modal has a close button');
+assert(html.includes("p79CloseOvertimePlannedDialog();openAttendanceTimeEditor("),'attendance editing closes modal before opening its editor');
+assert(html.includes("p79CloseOvertimePlannedDialog();openRowManualAdd("),'attendance add closes modal before opening its editor');
+assert(html.includes("p79OpenPlannedOvertimeReview('+index+')"),'review action remains available');
 
-const start=html.indexOf('function p79ToggleOvertimePlanned(){');
-const end=html.indexOf('\n        }',start);
-assert(start>0&&end>start,'toggle handler exists');
-const code=html.slice(start,end+10);
-const attrs=new Map([['hidden','']]);
-const scrollCalls=[];
-const section={
- hasAttribute:name=>attrs.has(name),
- removeAttribute:name=>attrs.delete(name),
- setAttribute:(name,value)=>attrs.set(name,value),
- scrollIntoView:options=>scrollCalls.push(options)
+const start=html.indexOf('function p79SyncOvertimePlannedDialogState(){');
+const end=html.indexOf('// 每月未休加班讀取後',start);
+assert(start>0&&end>start,'modal functions exist');
+const code=html.slice(start,end);
+assert(!code.includes('scrollIntoView'),'modal must never scroll the page');
+const attrs=new Map([['aria-expanded','false']]);
+const button={setAttribute:(key,val)=>attrs.set(key,val),title:''};
+let showCount=0,closeCount=0;
+const dialog={
+ open:false,
+ showModal(){if(this.open)throw Error('already open');this.open=true;showCount++;},
+ close(){if(!this.open)throw Error('already closed');this.open=false;closeCount++;}
 };
-const buttonAttrs=new Map([['aria-expanded','false']]);
-const button={setAttribute:(name,value)=>buttonAttrs.set(name,value),title:''};
-const ctx={
- document:{getElementById:id=>id==='p79OvertimePlannedSection'?section:id==='p79OvertimePlannedToggle'?button:null}
-};
-vm.createContext(ctx);
-vm.runInContext(code,ctx);
+const ctx={document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
+vm.createContext(ctx);vm.runInContext(code,ctx);
 ctx.p79ToggleOvertimePlanned();
-assert.equal(attrs.has('hidden'),false,'click reveals original panel');
-assert.equal(buttonAttrs.get('aria-expanded'),'true','button reflects expanded state');
-assert.equal(scrollCalls.length,1,'opening scrolls to panel');
+assert.equal(dialog.open,true,'toolbar opens centered native modal');
+assert.equal(attrs.get('aria-expanded'),'true','button shows modal-open state');
 ctx.p79ToggleOvertimePlanned();
-assert.equal(attrs.has('hidden'),true,'second click collapses panel');
-assert.equal(buttonAttrs.get('aria-expanded'),'false','button reflects collapsed state');
-assert.equal(scrollCalls.length,1,'closing does not scroll back unexpectedly');
-console.log('PASS planned review toolbar opens and closes original panel without changing report flow');
+assert.equal(dialog.open,false,'toolbar can close native modal');
+assert.equal(attrs.get('aria-expanded'),'false','button shows modal-closed state');
+ctx.p79ToggleOvertimePlanned();
+ctx.p79CloseOvertimePlannedDialog();
+assert.equal(dialog.open,false,'modal close button closes it');
+ctx.p79ToggleOvertimePlanned();dialog.close();
+ctx.p79SyncOvertimePlannedDialogState();
+assert.equal(attrs.get('aria-expanded'),'false','native Escape/close event resets toolbar');
+assert.equal(showCount,3);
+assert.equal(closeCount,3);
+console.log('PASS planned review opens in independent modal, closes via button/Escape, and retains attendance/report actions');
