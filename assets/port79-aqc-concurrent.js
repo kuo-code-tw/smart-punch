@@ -199,7 +199,7 @@ function compute(indexed,manual,query={}){
   const total=ships.reduce((a,s)=>a+s.rods,0);
   const sheetVerified=ships.reduce((n,s)=>n+s.evidence.filter(x=>x.source==='WORKING SHEET').length,0);
   peak=Math.max(peak,total);seen++;
-  if(total<threshold)continue;
+  if(total<threshold||threshold>physicalCapacity)continue;
   const capacityConflict=total>physicalCapacity;
  const signature=JSON.stringify([total,capacityConflict,ships.map(s=>[s.ship,s.voyage,s.workingNo,s.rods,s.aqcNumbers.join(',')])]);
   const prev=segments.at(-1);
