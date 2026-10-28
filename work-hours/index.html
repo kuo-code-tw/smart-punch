@@ -13879,7 +13879,7 @@ function p79OvertimePeriodLabel(report){
                     return '<button type="button" onclick="p79OpenPlannedAttendanceEditor('+index+',\''+type+'\')"'+
                       ' class="inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"'+
                       ' title="同步正式考勤後修改'+(type==='IN'?'上班':'下班')+'打卡" aria-label="修改'+(type==='IN'?'上班':'下班')+'打卡時間">'+
-                      display+' <span class="text-indigo-600 dark:text-indigo-300 font-semibold whitespace-nowrap">✎ 修改</span></button>';
+                      display+' <span class="text-[10px] text-indigo-500 dark:text-indigo-300 opacity-80" aria-hidden="true">✎</span></button>';
                 }
                 // 非清單編輯入口維持原有的考勤編輯行為與權限，不會跳過原始紀錄檢查。
                 const local=p79FindPlannedAttendanceEditRecord(row,record,type);
