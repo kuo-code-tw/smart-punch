@@ -276,7 +276,7 @@ function plan(snapshot,people,month,rules){
    const m=roster.__meta?.[date]||{};
    if((b.typhoonDates||[]).includes(date)||date<monthEndWindowDate(month,currentDate)||date<=lastReported||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
-   const verified=pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
+   const verified=date<=currentDate&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
    const scheduledWork=['早','中','晚'].includes(roster[date]);
    // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
