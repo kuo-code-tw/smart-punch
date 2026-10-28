@@ -112,14 +112,72 @@ function overtimeDayIndicator(date,monthState){
  if(!entries.length)return null;
  const counts={reported:0,amended:0,revoked:0};
  for(const row of entries)counts[row.kind]++;
- const kind=counts.revoked?'revoked':counts.amended?'amended':'reported';
+ // 日期顏色以「目前有效」申報為主：歷史撤銷不能蓋掉同日重新申報。
+ // 有效申報仍有待核的修改才呈黃；只有不存在有效申報時，歷史取消才呈紅。
+ const activeCount=counts.reported+counts.amended;
+ const kind=activeCount>0?(counts.amended?'amended':'reported'):'revoked';
  const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜');
  const names={revoked:'已取消',amended:'已修改',reported:'已申報'};
  const lines=entries.slice(0,24).map(row=>row.name+'：'+names[row.kind]+
   (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
  if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
- return {kind,count:entries.length,title:date+'\n'+summary+'\n'+lines.join('\n')};
+ return {kind,count:entries.length,activeCount,amendedCount:counts.amended,revokedCount:counts.revoked,title:date+'\n'+summary+'\n'+lines.join('\n')};
 }
+// 查核只確認「當下讀到的正式申報版本」，不會修改 GAS 申報或歷史稽核。
+// 只存 hash，避免舊日期一旦查核就永遠把後續新修改誤標為綠色。
+const reviewVersionKey='p79.attendance.date.reviewed.confirmed.v2';
+function cloudMonth(date){
+ try{
+  return typeof p79AttendanceOvertimeMonths!=='undefined'
+   ?p79AttendanceOvertimeMonths.get(String(date).slice(0,7)):null;
+ }catch(_){return null;}
+}
+function reviewFingerprint(date,state){
+ if(state?.ready!==true)return '';
+ const list=(state.rows||[]).map(row=>{
+  const meta=row.schedule?.__meta?.[date];
+  return meta?[id(row.empId),meta.overtimeReport||null,meta.overtimeReports||null,
+   meta.overtimeAmendments||null,meta.overtimeRevisions||null,
+   meta.overtimeRevocations||null,meta.overtimeExcluded===true]:null;
+ }).filter(Boolean).sort((a,b)=>a[0].localeCompare(b[0]));
+ const value=JSON.stringify(list);
+ let hash=2166136261;
+ for(let i=0;i<value.length;i++)hash=Math.imul(hash^value.charCodeAt(i),16777619);
+ return list.length+'-'+(hash>>>0).toString(36);
+}
+function reviewMarks(){
+ try{
+  const data=JSON.parse(g.localStorage?.getItem(reviewVersionKey)||'{}');
+  return data&&typeof data==='object'&&!Array.isArray(data)?data:{};
+ }catch(_){return {};}
+}
+function isReviewed(date){
+ const signature=reviewFingerprint(date,cloudMonth(date));
+ return !!signature&&reviewMarks()[date]===signature;
+}
+function refreshCurrentStrip(){
+ const host=g.document?.getElementById?.('p79AttendanceDateStrip');
+ if(!host)return;
+ const dates=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')]
+  .map(button=>button.getAttribute?.('data-p79-attendance-date')||button.dataset?.p79AttendanceDate).filter(Boolean);
+ const selected=typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey;
+ decorateOvertimeDateStrip(dates,selected);
+}
+function markReviewed(date,checked){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return false;
+ const signature=reviewFingerprint(date,cloudMonth(date));
+ if(!signature)return false; // 不可在正式資料未確認時假稱已查核。
+ const marks=reviewMarks();
+ if(checked)marks[date]=signature;
+ else delete marks[date];
+ try{g.localStorage?.setItem(reviewVersionKey,JSON.stringify(marks));}
+ catch(_){return false;}
+ refreshCurrentStrip();
+ return true;
+}
+g.addEventListener?.('storage',event=>{
+ if(event.key===reviewVersionKey)refreshCurrentStrip();
+});
 function decorateOvertimeDateStrip(keys,selectedDate=''){
  const host=g.document?.getElementById?.('p79AttendanceDateStrip');
  if(!host||!Array.isArray(keys))return;
@@ -139,17 +197,22 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   // 白色只代表「正式雲端月份已讀取、當日沒有申報或撤銷紀錄」。
   // 尚未讀到完整月份時不可誤當作無申報；查核標記不參與顏色判斷。
   const ready=state?.ready===true;
+  // 修改經人工核對且申報版本未再變動，恢復綠色；新的修改仍須重新核對。
+  const reviewed=ready&&isReviewed(date);
+  const effectiveKind=info?.kind==='amended'&&reviewed?'reported':info?.kind;
   const palette=!ready?['#f1f5f9','#64748b','#94a3b8']:
    !info?['#ffffff','#334155','#cbd5e1']:
-   info.kind==='revoked'?['#fee2e2','#991b1b','#f87171']:
-   info.kind==='amended'?['#fef3c7','#92400e','#f59e0b']:
+   effectiveKind==='revoked'?['#fee2e2','#991b1b','#f87171']:
+   effectiveKind==='amended'?['#fef3c7','#92400e','#f59e0b']:
    ['#dcfce7','#166534','#4ade80'];
   button.style.setProperty('background-color',palette[0],'important');
   button.style.setProperty('color',palette[1],'important');
   button.style.setProperty('border-color',palette[2],'important');
   if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px #4f46e5','important');
-  button.dataset.p79OvertimeAudit=info?.kind||(ready?'none':'unknown');
-  button.title=info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認'));
+  button.dataset.p79OvertimeAudit=effectiveKind||(ready?'none':'unknown');
+  button.dataset.p79OvertimeReview=reviewed?'reviewed':'not-reviewed';
+  button.title=(info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認')))
+   +(reviewed&&info?.activeCount?'\n此版本已人工查核；修改歷史保留':'');
   button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
  }
  if(!host.querySelector('#p79OvertimeDateLegend')){
@@ -181,7 +244,7 @@ g.addEventListener?.('load',installOvertimeDateIndicators);
 g.addEventListener?.('focus',()=>{
  try{if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);}catch(_){}
 });
-g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip};
+g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,isReviewed,markReviewed,reviewFingerprint};
 
 g.P79AttendanceOvertime={open,save};
 })(window);
