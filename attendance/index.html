@@ -737,7 +737,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261025-zh-import-export"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261028-folder-native-display-v1"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -22704,29 +22704,26 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
     };
   }catch(e){console.warn('無法掛接本機裝置驗證：',e)}
 
-  // 頁面啟動規則：
-  // 1. 真正離線：先用 IndexedDB 備援。
-  // 2. 有網路：雲端是唯一主資料；等雲端完成後只「覆寫保存」IndexedDB，不可再把舊快取合併回畫面。
-  // 本機 IndexedDB 是離線備援；有網路時讓首頁既有的瀏覽器快取先立即顯示，
-  // 雲端同步再於背景更新。不要為了讀完整快取而擋住首屏，也避免舊快照晚到覆蓋新資料。
-  document.addEventListener('DOMContentLoaded',()=>{
-    if(typeof navigator!=='undefined'&&navigator.onLine!==false)return;
+  // Show the signed-in account's computer cache before cloud data; a late disk read
+  // must never overwrite a completed cloud read or an edit made during startup.
+  const p79AttendancePreviewStartedAt=Date.now();
+  function p79HydrateAttendanceComputerCache(){
+    const startedAt=p79AttendancePreviewStartedAt;
     setTimeout(async()=>{
-      let fullCacheRow=null;
       try{
-        fullCacheRow=await window.Port79DataCache?.getSystemSnapshot?.('attendance');
-        if(fullCacheRow?.data?.fullDatabase&&Array.isArray(fullCacheRow.data.records)){
-          await window.p79ApplyAttendanceFullCache?.(fullCacheRow.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true});
-          try{setCloudSyncStatus(`⚡ 已載入本機完整快取｜考勤 ${fullCacheRow.data.records.length} 筆`,'success')}catch(e){}
+        const row=await window.Port79DataCache?.getDisplaySnapshot?.('attendance');
+        if(Number(typeof lastCloudLoadSuccessAt!=='undefined'?lastCloudLoadSuccessAt:0)>=startedAt)return;
+        if(row?.data?.fullDatabase&&Array.isArray(row.data.records)){
+          await window.p79ApplyAttendanceFullCache?.(row.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true,previewOnly:true});
+          try{setCloudSyncStatus('⚡ 本機考勤快取已顯示｜背景核對雲端中','info')}catch(_){}
+        }else if(typeof navigator!=='undefined'&&navigator.onLine===false){
+          const snapshot=await p79LoadLocalDbSnapshot();if(snapshot)p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
         }
-      }catch(e){console.warn('本機完整快取啟動失敗',e)}
-      if(fullCacheRow)return;
-      try{
-        const snapshot=await p79LoadLocalDbSnapshot();
-        if(snapshot)p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
-      }catch(e){}
+      }catch(e){console.warn('本機考勤快取啟動失敗',e)}
     },0);
-  },{once:true});
+  }
+  document.addEventListener('DOMContentLoaded',p79HydrateAttendanceComputerCache,{once:true});
+  window.addEventListener('p79-folder-cache-restored',p79HydrateAttendanceComputerCache);
 
   window.addEventListener('online',()=>{
     setTimeout(()=>{
@@ -23113,12 +23110,17 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
  try{
   if(!snapshot||!Array.isArray(snapshot.records))throw new Error('完整考勤快取格式不正確');
-  const cloudRows=snapshot.records.map(r=>typeof normalizeAttendanceRecordIdentifiers==='function'?normalizeAttendanceRecordIdentifiers(r):r);
+  const nowForPreview=new Date(),previewMonths=new Set([-1,0,1].map(offset=>{
+   const d=new Date(nowForPreview.getFullYear(),nowForPreview.getMonth()+offset,1);
+   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }));
+  const selected=options.previewOnly?snapshot.records.filter(r=>previewMonths.has(attendanceRecordMonthKey(r))):snapshot.records;
+  const cloudRows=selected.filter(r=>typeof isLocallyDeletedAttendanceRecord!=='function'||!isLocallyDeletedAttendanceRecord(r)).map(r=>typeof normalizeAttendanceRecordIdentifiers==='function'?normalizeAttendanceRecordIdentifiers(r):r);
   if(typeof mergeAttendanceRecordCollections==='function') records=mergeAttendanceRecordCollections(cloudRows,Array.isArray(records)?records:[]);
   else if(typeof deduplicateAttendanceRecordArray==='function') records=deduplicateAttendanceRecordArray([...(Array.isArray(records)?records:[]),...cloudRows]);
   else records=cloudRows;
 
-  if(Array.isArray(snapshot.employees)&&snapshot.employees.length){
+  if(!options.previewOnly&&Array.isArray(snapshot.employees)&&snapshot.employees.length){
    const cloudEmployees=snapshot.employees.map(e=>typeof normalizeEmployeeIdentifiers==='function'?normalizeEmployeeIdentifiers(e):e);
    employees=typeof mergeCloudEmployees==='function'?mergeCloudEmployees(cloudEmployees):cloudEmployees;
    try{ensureBuiltinAdminAccount()}catch(e){}
@@ -23128,10 +23130,12 @@ window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
    try{syncAdminIdsFromEmployeeRoles()}catch(e){}
   }
 
+  if(!options.previewOnly){
   try{localStorage.setItem('sp_records_v5',JSON.stringify(records))}catch(e){}
   try{localStorage.setItem('sp_employees_v5',JSON.stringify(employees))}catch(e){}
   try{if(typeof saveAttendanceSafetyBackup==='function')saveAttendanceSafetyBackup(records)}catch(e){}
 
+  }
   if(Array.isArray(snapshot.months)&&typeof updateAttendanceMonthOptionsFromCloud==='function'){
    updateAttendanceMonthOptionsFromCloud(snapshot.months);
   }

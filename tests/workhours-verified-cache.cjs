@@ -34,5 +34,16 @@ await test('explicit refresh skips stale previews and restricted readers use the
 await test('denied viewers cannot read memory or disk through the service',async()=>{const t=setup();t.deny(true);assert.throws(()=>t.api.load(month),/權限/);assert.equal(t.calls.length,0);});
 await test('multiple startup paths apply one shared verified load',async()=>{const t=setup();assert.deepEqual(await Promise.all([t.api.startup(),t.api.startup()]),[true,true]);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,1);assert.equal(t.applied.filter(x=>!x.preview&&!x.error).length,1);});
 await test('page integrates full-cache hydration, shared reads and truthful loading without weakening writes',async()=>{assert(html.includes('window.p79ApplyAttendanceFullCache=async function'));assert(html.includes('window.P79WorkhoursCache.load(month)'));assert(html.includes('loadingWithoutRows'));assert(html.includes("textContent='載入中…'"));assert(html.includes("action:'saveOvertimeReportDirect'"));assert(html.includes("const latest=await rpc('getScheduleDataSecure')"));assert(!source.includes("searchParams.set('action','delete"));assert(!source.includes("method:'POST'"));});
+await test('a folder read taking over 250ms still reuses the bundle while metadata starts in parallel',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),read=n.win.Port79DataCache.get;
+ n.win.Port79DataCache.get=async key=>{await new Promise(r=>setTimeout(r,350));return read(key)};
+ const pending=n.api.load(month);await new Promise(r=>setImmediate(r));
+ assert.equal(n.calls[0].action,'getOvertimeReportCacheMeta');const b=await pending;
+ assert.equal(b.source,'本機有效快取');assert.equal(n.calls.length,1,'slow local disk must not trigger raw-month downloads');
+});
+await test('a late full database preview cannot repaint a completed verified month',async()=>{
+ const n=setup(),disk=deferred();let full=0;n.win.Port79DataCache.getSystemSnapshot=()=>disk.promise;n.win.P79WorkhoursCacheContext.applyFull=()=>full++;
+ assert(await n.api.startup());disk.resolve({data:{fullDatabase:true,records:[{id:'obsolete'}]}});await new Promise(r=>setImmediate(r));assert.equal(full,0);
+});
 console.log('VERIFIED WORKHOURS CACHE: '+passed+' scenarios passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

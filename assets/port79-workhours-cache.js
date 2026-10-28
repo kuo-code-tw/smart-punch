@@ -29,7 +29,7 @@ function valid(b,month,s){
 }
 async function saved(s,month){
  const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>=stamp)return memory.get(k);
- let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),250);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+ let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),1500);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
 }
 function compatible(b,m){
  const r=m.revisions,revision=[r.schedule,r.leave,r.employees,b.month].join(':');
@@ -39,11 +39,12 @@ function load(month,options={}){
  const s=identity(),k=key(s,month)+'|'+s.token+'|'+s.stamp+'|'+s.generation;
  if(flights.has(k))return flights.get(k).then(b=>{assert(s);return copy(b);});
  const p=(async()=>{
+  const metaRead=meta(s,month,options.force===true);metaRead.catch(()=>{});
   const prior=await saved(s,month);assert(s);
   // Preview is explicitly marked unverified; no accounting/save operation gets
   // this result. UI still filters people through the current authenticated scope.
   if(prior&&options.onPreview&&options.force!==true)options.onPreview({...copy(prior),preview:true,source:'本機快取，背景核對中'});
-  let before=await meta(s,month,options.force===true);assert(s);
+  let before=await metaRead;assert(s);
   if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);return hit;}
   // A scope/HR revision change must immediately stop showing old scoped data.
   if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)options.onInvalidate?.();
@@ -73,8 +74,9 @@ function startup(){
  flight.promise=(async()=>{
   // The existing full download is a read-only preview, never a verified raw
   // month or a write source. The versioned bundle supplies authoritative data.
-  void Promise.resolve(g.Port79DataCache?.getSystemSnapshot?.('workhours')).then(row=>{assert(s);if(row?.data?.fullDatabase)context().applyFull?.(row.data);}).catch(()=>{});
-  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);context().applyBundle(b);return true;}catch(e){context().failed?.(month,e);return false;}
+  let finished=false;
+  void Promise.resolve((g.Port79DataCache?.getDisplaySnapshot||g.Port79DataCache?.getSystemSnapshot)?.('workhours')).then(row=>{assert(s);if(!finished&&row?.data?.fullDatabase)context().applyFull?.(row.data);}).catch(()=>{});
+  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
  })().finally(()=>{if(startupFlight===flight)startupFlight=null;});return flight.promise;
 }
 g.P79WorkhoursCache={load,startup,invalidate,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};

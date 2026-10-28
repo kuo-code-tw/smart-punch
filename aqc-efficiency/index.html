@@ -14422,6 +14422,17 @@ async function initGcPage(){
   }
 
   loadLocal();
+  try{
+    const row=await window.Port79DataCache?.getDisplaySnapshot?.('efficiency',{month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')});
+    const d=row?.data;
+    if(d){
+      if(Array.isArray(d.groups)&&!groups.length)groups=d.groups;
+      if(Array.isArray(d.assignments))assignments=mergeAssignmentsKeepLocal(assignments,d.assignments);
+      if(Array.isArray(d.shipMasters))shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,d.shipMasters));
+      if(Array.isArray(d.records))records=mergeCloudRecordsWithLocal(d.records,records);
+      if(Array.isArray(d.systemEmployees))systemEmployees=d.systemEmployees;
+    }
+  }catch(e){console.warn('效率本機快取讀取失敗',e)}
   // 每次進入效率系統都回到「本年／本月」，不沿用上次停留的舊月份。
   try{localStorage.setItem(PORT79_YEAR_KEY,String(new Date().getFullYear()))}catch(e){}
   const startupMonth=document.getElementById('filterMonth');
@@ -14890,7 +14901,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261025-zh-import-export"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261028-folder-native-display-v1"></script>
 <script src="../assets/port79-calendar-range.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
