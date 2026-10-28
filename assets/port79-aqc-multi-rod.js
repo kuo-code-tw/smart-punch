@@ -56,7 +56,7 @@
   '<div class="card p-4 sm:p-5 space-y-4">',
   '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">找出整個碼頭同一時段使用 4 隻以上 AQC 的作業，包含多艘船合計；先讀快取立即顯示。</p></div>',
   '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">人工修正（選用）</button></div>',
-  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">目前現場同時作業上限為 <b>4 桿</b>。WORKING SHEET 開工至完工是作業涵蓋區間，不代表全程連續動桿。若來源出現 5 桿以上重疊，標為「上限 4 桿／待核對」，不能當成已確認五桿；每支 AQC 與各船分配仍可展開核對。日後現場設備增加時可更新實際上限。原船舶請款資料不變。</p>',
+  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">目前現場同時作業上限為 <b>4 桿</b>。WORKING SHEET 開工至完工是作業涵蓋區間，不代表全程連續動桿。若來源出現 5 桿以上重疊，標為「上限 4 桿／待核對」，不能當成已確認五桿；每桿 AQC 與各船分配仍可展開核對。日後現場設備增加時可更新實際上限。原船舶請款資料不變。</p>',
   '<div class="flex flex-wrap gap-3 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
   '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
@@ -238,7 +238,7 @@
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
   $('multiRodShips').textContent=allShips.size+' 艘';
   $('multiRodEvents').textContent=list.filter(r=>!r.capacityConflict).length+' 組未超限／'+list.filter(r=>r.capacityConflict).length+' 組待核';
-  $('multiRodContainers').textContent='上限 '+result.physicalCapacity+' 桿'+(result.sourcePeak>result.physicalCapacity?'／來源最高 '+result.sourcePeak+' 支':'');
+  $('multiRodContainers').textContent='上限 '+result.physicalCapacity+' 桿'+(result.sourcePeak>result.physicalCapacity?'／來源最高 '+result.sourcePeak+' 桿':'');
   $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆快取明細';
   const sourceStatus=$('multiRodSourceState');
   if(sourceStatus)sourceStatus.textContent='快取工作明細 '+result.sourceReportCount+' 筆、可辨識 AQC 區間 '+result.intervalCount+' 段；現場同時作業上限 '+result.physicalCapacity+' 桿。來源時間重疊超過上限 '+result.capacityConflictCount+' 段；同一組船舶連續作業合併成 '+list.length+' 組，增減桿不重複計筆。超額來源仍待核對。WORKING SHEET 的起訖時間不代表該桿在整段都持續動作。';
@@ -246,7 +246,7 @@
   if(audit){
    const period=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
    const label=mode==='all'?'全部快取期間':mode==='month'?period.slice(0,7):period;
-   audit.textContent='查詢範圍：'+label+'。可辨識時間區間 '+result.rawIntervals+' 筆；現場最大 '+result.physicalCapacity+' 桿，來源重疊最高 '+result.sourcePeak+' 支（非已證實同時作業）。符合篩選 '+result.rows.length+' 個增減桿時段，合併為 '+list.length+' 組船舶作業；其中 '+list.filter(x=>x.capacityConflict).length+' 組來源超額待核。'+
+   audit.textContent='查詢範圍：'+label+'。可辨識時間區間 '+result.rawIntervals+' 筆；現場最大 '+result.physicalCapacity+' 桿，來源重疊最高 '+result.sourcePeak+' 桿（非已證實同時作業）。符合篩選 '+result.rows.length+' 個增減桿時段，合併為 '+list.length+' 組船舶作業；其中 '+list.filter(x=>x.capacityConflict).length+' 組來源超額待核。'+
     (result.pending.length?'另有 '+result.pending.length+' 艘船的主檔只有配置桿數、缺少各 AQC 起訖時間，不能當成同時作業。':'')+
     (result.duplicateCraneConflicts?'偵測到重疊時段重複 AQC 編號，已按設備編號去重。':'')+
     (!result.rawIntervals?'所選期間未找到可計算的起訖時間；請確認快取所含月份或重新核對雲端。':'');
@@ -255,7 +255,7 @@
    preview.innerHTML=list.slice(0,30).map(x=>
     '<div class="flex flex-wrap justify-between border-b py-1 gap-2"><span>'+esc(x.start.replace('T',' '))+'～'+esc(x.end.replace('T',' '))+'｜'+
     esc(x.ships.map(s=>s.ship+' 來源最高'+s.rods+'桿').join('、'))+'｜'+esc(x.segments?.length||1)+' 個變化時段</span><span class="font-bold">'+
-    (x.capacityConflict?'來源峰值 '+esc(x.totalRods)+' 支（超過上限 '+esc(x.physicalCapacity)+'，待核）':'來源峰值 '+esc(x.totalRods)+' 支')+'</span></div>').join('')||
+    (x.capacityConflict?'來源峰值 '+esc(x.totalRods)+' 桿（超過上限 '+esc(x.physicalCapacity)+'，待核）':'來源峰值 '+esc(x.totalRods)+' 桿')+'</span></div>').join('')||
     '<div class="text-amber-800">所選期間尚無可確認符合最低桿數的時段；不代表沒有船舶作業。</div>';
   }
   $('multiRodBody').innerHTML=list.map(r=>{
@@ -264,14 +264,14 @@
    const handoffs=(result.transfers||[]).filter(x=>x.finished>=r._start-3600000&&x.started<=r._end+3600000&&evidence.some(e=>e.unit===x.unit));
    const periodDetail=(r.segments||[r]).map((part,i)=>
     '<div class="border-b py-1">變化 '+(i+1)+'：'+esc(part.start.replace('T',' '))+'～'+esc(part.end.replace('T',' '))+
-    '｜來源合計 '+esc(part.totalRods)+' 支'+(part.capacityConflict?'（超過上限，待核）':'')+
-    '｜'+part.ships.map(item=>esc(item.ship)+' '+esc(item.rods)+' 支（AQC '+esc((item.aqcNumbers||[]).join('、'))+'）').join('；')+'</div>').join('');
+    '｜來源合計 '+esc(part.totalRods)+' 桿'+(part.capacityConflict?'（超過上限，待核）':'')+
+    '｜'+part.ships.map(item=>esc(item.ship)+' '+esc(item.rods)+' 桿（AQC '+esc((item.aqcNumbers||[]).join('、'))+'）').join('；')+'</div>').join('');
    const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對（'+esc(r.segments?.length||1)+' 段變化）</summary>'+
     '<div class="mt-2 text-xs space-y-1"><div class="font-semibold">同組船舶作業的桿數變化（不是獨立作業筆數）</div>'+periodDetail+'</div>'+
-    '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+(handoffs.length?'<div class="mt-2 font-semibold">同桿跨船接桿核對</div>'+handoffs.map(x=>'<div class="border-b py-1">AQC '+esc(x.unit)+'：'+esc(x.fromShip)+' 完工 '+esc(utcLocalTime(new Date(x.finished)).replace('T',' '))+' → '+esc(x.toShip)+' 開工 '+esc(utcLocalTime(new Date(x.started)).replace('T',' '))+'｜'+(x.gapMinutes>=0?'間隔 '+esc(x.gapMinutes)+' 分鐘':'⚠ 時間重疊 '+esc(Math.abs(x.gapMinutes))+' 分鐘')+'</div>').join(''):'')+'</div></details>';
+    '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各桿 AQC 起訖時間')+(handoffs.length?'<div class="mt-2 font-semibold">同桿跨船接桿核對</div>'+handoffs.map(x=>'<div class="border-b py-1">AQC '+esc(x.unit)+'：'+esc(x.fromShip)+' 完工 '+esc(utcLocalTime(new Date(x.finished)).replace('T',' '))+' → '+esc(x.toShip)+' 開工 '+esc(utcLocalTime(new Date(x.started)).replace('T',' '))+'｜'+(x.gapMinutes>=0?'間隔 '+esc(x.gapMinutes)+' 分鐘':'⚠ 時間重疊 '+esc(Math.abs(x.gapMinutes))+' 分鐘')+'</div>').join(''):'')+'</div></details>';
    const sourceLabel=r.capacityConflict?'期間來源峰值超過現場4桿上限，待核對':r.needsReview?'部分時間待核對':r.verifiedRods===r.totalRods?'WORKING SHEET 起訖時間比對':'部分由 WORKING REPORT 時段推估';
-   const totalText='來源峰值 '+esc(r.totalRods)+' 支'+(r.needsReview?'（待核）':'');
-   const totalHint=r.capacityConflict?'<div class="text-xs text-amber-800">來源 '+esc(r.totalRods)+' 支區間重疊，不能證明同時作業；實際各船使用桿數待核對</div>':r.needsReview?'<div class="text-xs text-amber-800">來源時間仍待確認</div>':'';
+   const totalText='來源峰值 '+esc(r.totalRods)+' 桿'+(r.needsReview?'（待核）':'');
+   const totalHint=r.capacityConflict?'<div class="text-xs text-amber-800">來源 '+esc(r.totalRods)+' 桿區間重疊，不能證明同時作業；實際各船使用桿數待核對</div>':r.needsReview?'<div class="text-xs text-amber-800">來源時間仍待確認</div>':'';
    return '<tr><td>'+esc(r.start.replace('T',' '))+'</td><td>'+esc(r.end.replace('T',' '))+'</td><td>'+ships+'</td><td class="font-black">'+totalText+totalHint+'</td>'+
     '<td><div class="text-xs '+(r.needsReview?'text-amber-800':'text-sky-800')+'">'+sourceLabel+'</div>'+detail+'</td></tr>';
   }).join('')||'<tr><td colspan="5" class="p-6 text-slate-500">'+
@@ -300,7 +300,7 @@
      ship.source,'同組船舶 '+(r.segments?.length||1)+' 段增減桿時段；'+(r.capacityConflict?'來源超限，實際桿數待核':exact?'人工區間有數量記錄':'期間櫃數與艙蓋不能依起訖分攤')]);
    }
    // Main sheet: ONE ship-pair job. Audit sheet: ALL original crane-change intervals.
-   const auditDetail=[['主紀錄開始','主紀錄結束','變化時段開始','變化時段結束','船名','航次','WORKING NO.','來源該船支數','來源合計支數','AQC 設備','是否來源超限待核','實際動桿數（無證據留空）']];
+   const auditDetail=[['主紀錄開始','主紀錄結束','變化時段開始','變化時段結束','船名','航次','WORKING NO.','來源該船桿數','來源合計桿數','AQC 設備','是否來源超限待核','實際動桿數（無證據留空）']];
    const groupOfSegment=new Map();
    for(const group of rows)for(const part of group.segments||[group]){
     groupOfSegment.set(part,group.id);
@@ -322,7 +322,7 @@
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(summary),'每日船舶彙總');
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(auditDetail),'時段變化核對');
    XLSX.writeFile(book,'AQC同時多桿作業_'+(val('multiRodMode')==='all'?'全部':val('multiRodMode')==='month'?(val('multiRodDate')||today()).slice(0,7):val('multiRodDate')||today())+'.xlsx');
-   notice('已匯出 '+rows.length+' 組船舶作業，附 '+result.rows.length+' 段增減桿時段供核對；不將來源五支視為實際五桿。');
+   notice('已匯出 '+rows.length+' 組船舶作業，附 '+result.rows.length+' 段增減桿時段供核對；不將來源五桿視為實際五桿。');
   }catch(err){notice('Excel 匯出失敗：'+(err.message||err),true)}
  }
  function activate(){render();void sync();void syncSource();}
