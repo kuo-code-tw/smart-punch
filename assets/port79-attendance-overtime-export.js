@@ -4,7 +4,7 @@
 if(!/\/attendance\/?/.test(location.pathname))return;
 const dialogId='p79OvertimeDateExportDialog';
 const cache=new Map();
-let currentDate='',currentRows=[],latestAudit=[],auditAvailable=false,loading=false,exporting=false;
+let currentDate='',currentRows=[],latestAudit=[],auditAvailable=false,loading=false,exporting=false,viewOnly=false;
 const h=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=x=>String(x||'').trim().toUpperCase();
 const dateValid=x=>/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(String(x||''));
@@ -61,7 +61,7 @@ function ensureDialog(){
  d.innerHTML='<div style="padding:16px 18px 12px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div id="p79OtExportTitle" style="font-weight:800;font-size:19px">匯出加班明細</div><small style="color:#64748b">考勤日期右鍵開啟。只有正式申報且未撤銷的加班才列入匯出。</small></div><button type="button" id="p79OtExportClose" style="background:#e2e8f0;border-radius:9px;padding:8px 11px;font-weight:700">✕ 關閉</button></div><div id="p79OtExportStatus" role="status" style="margin:12px 18px;color:#475569;font-size:13px"></div><div style="max-height:55vh;overflow:auto;margin:0 18px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#eff6ff"><th style="padding:9px">選擇</th><th>姓名</th><th>工號</th><th>加班類型</th><th>時段</th><th>申報時數</th><th>匯出狀態</th></tr></thead><tbody id="p79OtExportRows"></tbody></table></div><div style="padding:14px 18px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button type="button" id="p79OtExportReload" style="padding:9px 14px;border-radius:9px;background:#e0f2fe;color:#075985;font-weight:700">重新核對</button><button type="button" id="p79OtExportSave" style="padding:9px 16px;border-radius:9px;background:#047857;color:white;font-weight:800">匯出所選加班明細</button></div>';
  document.body.appendChild(d);
  d.querySelector('#p79OtExportClose').addEventListener('click',()=>d.close());
- d.querySelector('#p79OtExportReload').addEventListener('click',()=>open(currentDate,true));
+ d.querySelector('#p79OtExportReload').addEventListener('click',()=>open(currentDate,true,viewOnly));
  d.querySelector('#p79OtExportSave').addEventListener('click',exportSelected);
  d.addEventListener('click',e=>{if(e.target===d)d.close();});
  return d;
@@ -78,11 +78,11 @@ function statusOf(row){
 }
 function showRows(){
  const body=ensureDialog().querySelector('#p79OtExportRows');
- if(!currentRows.length){body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:#64748b">當日沒有有效的正式加班申報，不能產生空白匯出紀錄。</td></tr>';return;}
+ if(!currentRows.length){body.innerHTML='<tr><td colspan="'+(viewOnly?'6':'7')+'" style="text-align:center;padding:24px;color:#64748b">當日沒有有效的正式加班申報；此日期不能標記為「已申報」。</td></tr>';return;}
  body.innerHTML=currentRows.map((r,i)=>{
   const stat=statusOf(r),cls=stat.done?'color:#047857':'color:#a16207';
   return '<tr style="border-bottom:1px solid #e2e8f0">'
-   +'<td style="text-align:center;padding:9px"><input type="checkbox" data-p79-export-index="'+i+'" '+(stat.done?'':'checked')+'></td>'
+   +(viewOnly?'':'<td style="text-align:center;padding:9px"><input type="checkbox" data-p79-export-index="'+i+'" '+(stat.done?'':'checked')+'></td>')
    +'<td style="padding:9px">'+h(r.employeeName)+'</td><td>'+h(r.empId)+'</td><td>'+h(r.report.typeName||r.report.category||'加班')+'</td>'
    +'<td>'+h(r.report.code||[r.report.overtimeStart,r.report.overtimeEnd].filter(Boolean).join('–'))+'</td><td>'+h(r.report.declaredHours??'')+'</td>'
    +'<td style="'+cls+';font-weight:700">'+h(stat.label)+'</td></tr>';
@@ -106,12 +106,14 @@ async function fetchMonth(month,force){
  cache.set(month,{at:Date.now(),token:key,data});
  return data;
 }
-async function open(date,force=false){
+async function open(date,force=false,reportedOnly=false){
  if(!dateValid(date))return notify('請先選擇正確的考勤日期','warning');
  if(loading||exporting){notify('上一份加班報表仍在處理中，請完成後再切換日期','warning');return;}
  const d=ensureDialog();
- currentDate=date;
- d.querySelector('#p79OtExportTitle').textContent='匯出 '+date+' 加班明細';
+ currentDate=date;viewOnly=reportedOnly===true;
+ d.querySelector('#p79OtExportTitle').textContent=viewOnly?date+'｜已申報加班紀錄':'匯出 '+date+' 加班明細';
+ d.querySelector('#p79OtExportSave').style.display=viewOnly?'none':'';
+ d.querySelector('thead th:first-child').style.display=viewOnly?'none':'';
  if(!d.open)d.showModal();
  loading=true;d.querySelector('#p79OtExportSave').disabled=true;setStatus('正在核對正式班表與雲端匯出紀錄…');
  d.querySelector('#p79OtExportRows').innerHTML='';
@@ -119,7 +121,7 @@ async function open(date,force=false){
   const month=date.slice(0,7);
   const [schedule,auditResult]=await Promise.all([
     fetchMonth(month,force),
-    api('getOvertimeExportAudit',{month}).then(x=>({ok:true,data:x})).catch(e=>({ok:false,error:e}))
+    viewOnly?Promise.resolve({ok:false}):api('getOvertimeExportAudit',{month}).then(x=>({ok:true,data:x})).catch(e=>({ok:false,error:e}))
   ]);
   currentRows=sheetRows(schedule,date);
   await Promise.all(currentRows.map(async r=>{r.version=await digest(r.report);}));
@@ -127,8 +129,8 @@ async function open(date,force=false){
   latestAudit=auditAvailable?(auditResult.data.entries||[]):[];
   const done=currentRows.filter(row=>statusOf(row).done).length;
   const hint=auditAvailable?'雲端稽核已連線；每筆記錄含匯出者、時間及申報編號。':'後端匯出紀錄尚未啟用：仍可下載明細，但本次不會顯示為「已匯出」，請部署新版 GAS。';
-  setStatus('正式申報 '+currentRows.length+' 筆｜已匯出 '+done+' 筆｜未匯出 '+(currentRows.length-done)+' 筆。'+hint);
-  showRows();void refreshDateBadges(month);
+  setStatus(viewOnly?'雲端正式有效申報 '+currentRows.length+' 筆（已撤銷紀錄排除）；僅供查看，不會新增、取消或修改申報。':'正式申報 '+currentRows.length+' 筆｜已匯出 '+done+' 筆｜未匯出 '+(currentRows.length-done)+' 筆。'+hint);
+  showRows();if(!viewOnly)void refreshDateBadges(month);
  }catch(error){currentRows=[];showRows();setStatus('讀取失敗：'+(error?.message||error));notify('加班明細讀取失敗：'+(error?.message||error),'warning');}
  finally{loading=false;d.querySelector('#p79OtExportSave').disabled=false;}
 }
@@ -209,5 +211,5 @@ document.addEventListener('keydown',e=>{
  if(!target)return;
  e.preventDefault();void open(target.dataset.p79AttendanceDate);
 });
-window.P79AttendanceOvertimeExport={open};
+window.P79AttendanceOvertimeExport={open,openReported:date=>open(date,true,true)};
 })();
