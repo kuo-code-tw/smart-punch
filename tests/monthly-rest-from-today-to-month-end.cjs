@@ -18,11 +18,11 @@ const employees=Array.from({length:16},(_,i)=>({empId:'E'+(i+1),name:'測試'+(i
  companyName:i%2?'乙公司':'甲公司',groupName:i%3?'A組':'B組'}));
 const start=Date.parse('2026-10-28T08:00:00+08:00');
 const snap={schedules:employees.map(emp=>({empId:emp.empId,schedule:Object.fromEntries(days.map(d=>[d,'早']))})),
- pairs:employees.slice(0,3).map(emp=>({empId:emp.empId,date:now,start,end:start+8*3600000})),
+ pairs:[...employees.slice(0,3).map(emp=>({empId:emp.empId,date:now,start,end:start+8*3600000})),{empId:'E5',date:now,start,end:null}],
  states:{},leaveDates:[],attendanceEvidence:{complete:true,days:{}}};
 const realPairs=new Set(snap.pairs.map(p=>p.empId));
 for(const emp of employees)for(const date of days){
- snap.states[emp.empId+'|'+date]=date>now?'open':date===now&&emp.empId==='E4'?'open':'worked';
+ snap.states[emp.empId+'|'+date]=date>now?'open':date===now&&emp.empId==='E4'?'open':date===now&&emp.empId==='E5'?'missing':'worked';
  if(realPairs.has(emp.empId)&&date===now)snap.attendanceEvidence.days[emp.empId+'|'+date]={state:'worked'};
 }
 const original=JSON.stringify(snap);
@@ -33,7 +33,8 @@ assert.equal(result.rows.filter(x=>x.empId.startsWith('E')).length,3);
 assert.equal(new Set([...result.rows,...result.plannedRows].map(r=>r.empId)).size,16,'All 16 staff across both companies and every role are covered');
 assert.equal(result.plannedRows.filter(x=>Number(x.empId.slice(1))<=11).length,8,'All eleven F/L are accounted for: three formal, eight draft');
 assert.equal(result.plannedRows.find(x=>x.empId==='E4').date,'2026-10-28','An ongoing shift may be tentatively scheduled today');
-assert(result.plannedRows.filter(x=>x.empId!=='E4').every(x=>x.date==='2026-10-29'),'Unfinished staff start on the next possible day, not last day of month');
+assert.equal(result.plannedRows.find(x=>x.empId==='E5').date,'2026-10-28','Clocked-in without clock-out is kept pending instead of disappearing or becoming formal');
+assert(result.plannedRows.filter(x=>!['E4','E5'].includes(x.empId)).every(x=>x.date==='2026-10-29'),'Other staff start on the next possible day, not the last day of month');
 assert(result.plannedRows.every(x=>x.planned&&!x.saved&&x.status.includes('預排草案')),'Drafts never masquerade as formal reports');
 assert(result.plannedRows.every(x=>x.needsWeeklyReview),'Missing weekly rest is a visible warning, not silent deletion');
 assert(result.plannedRows.every(x=>x.rule[2]===8),'Uses configured 8 hour rules, does not manufacture durations');
