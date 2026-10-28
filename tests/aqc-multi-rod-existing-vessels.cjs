@@ -12,7 +12,7 @@ assert(!app.includes('>補登船舶資料</button>'),'no redundant add-vessel bu
 assert(app.includes('同桿跨船接桿核對'),'audit per-unit finish/start transitions');
 assert(app.includes("const scope=identity(),result=concurrentResult(),rows=g.P79AqcConcurrent?.groupSegments(result.rows)||result.rows;"),"Excel must consolidate by ship pair, not duplicate source segments");
 assert(app.includes('不能證明同時作業'),'source overlaps must not be claimed as actual concurrency');
-assert(app.includes('現場上限／來源峰值'),'physical limit remains visible in the compact statistic strip');
+assert(app.includes('上限／來源'),'physical limit remains visible in the compact single-line toolbar');
 assert(app.includes('來源時間重疊桿數（非已確認）'),'Excel must differentiate source overlaps from actual activity');
 const win={};new Function('window',lib)(win);const calc=win.P79AqcConcurrent;
 const at=Date.parse('2026-10-28T17:00:00+08:00');
