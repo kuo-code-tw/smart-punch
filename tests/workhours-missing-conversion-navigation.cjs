@@ -32,7 +32,7 @@ const ctx={
  p79WorkOvertimeFilteredRows:rows
 };
 const api=new Function('ctx',
- 'let overtimeCurrentPage=1;const {document,escapeHtml,alert,OVERTIME_PAGE_SIZE,renderOvertimeStats,p79WorkOvertimeFilteredRows}=ctx;'+
+ 'let overtimeCurrentPage=1;const {document,escapeHtml,alert,OVERTIME_PAGE_SIZE,renderOvertimeStats,p79WorkOvertimeFilteredRows}=ctx;const window=ctx.window||{};'+
  script+
  ';return {getPage:()=>overtimeCurrentPage,getItems:()=>p79OvertimePendingConversionRows,list:p79OvertimeMissingConversionRows,render:p79RenderOvertimeMissingConversion,jump:p79ShowOvertimeMissingConversion};')(ctx);
 assert.equal(api.list(rows).length,2,'only one null and one invalid, no duplicate or planned items');
@@ -49,4 +49,15 @@ assert(scroll&&focused,'scroll and focus matched row');
 api.render(other,false);
 assert(!active,'hide panel when no conversion issue exists');
 assert.equal(output,'');
+
+// A saved conversion option matching the amendment editor must suppress the
+// false warning for a legacy null convertedHours, without altering the report.
+ctx.window={P79Overtime:{reportRules:()=>[['代','代16-20',4,6.02,'','','16','20','full','休假代班加班']]}};
+const resolved=new Function('ctx',
+ 'let overtimeCurrentPage=1;const {document,escapeHtml,alert,OVERTIME_PAGE_SIZE,renderOvertimeStats,p79WorkOvertimeFilteredRows}=ctx;const window=ctx.window;'+
+ script+';return p79OvertimeMissingConversionRows;')(ctx);
+assert.equal(resolved([target]).length,0,'matching rule 6.02 must hide false missing-conversion warning');
+assert.equal(target.overtimeReport.convertedHours,null,'rule lookup must not change stored declaration');
+assert.equal(resolved([invalid]).length,1,'invalid conversion must still be flagged');
+
 console.log('PASS: pending conversion shows name/date/period, deduplicates, stays read-only and jumps to highlighted row');
