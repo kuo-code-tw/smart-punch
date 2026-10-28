@@ -191,6 +191,23 @@ function weeklyRestReview(roster,month,cycleStart=''){
  return [...groups.values()].filter(w=>w.days.length===7&&(!w.regular||!w.rest))
   .map(w=>({start:w.start,regular:w.regular,rest:w.rest,confirmedCycle:!!anchor}));
 }
+// 未來加班預排不能佔用仍缺「一例一休」的完整排班週期。
+// 未設定約定週期時，以週日至週六做保守預排參考，不作法定合規結論。
+function futureWeekRestProtected(roster,date,cycleStart=''){
+ const ms=d=>Date.parse(d+'T00:00:00+08:00'),start=ms(date);
+ if(!Number.isFinite(start))return false;
+ const anchor=/^\d{4}-\d{2}-\d{2}$/.test(String(cycleStart))?ms(cycleStart):
+  start-new Date(start+8*3600000).getUTCDay()*86400000;
+ const weekStart=anchor+Math.floor((start-anchor)/604800000)*604800000;
+ let regular=0,rest=0;
+ for(let i=0;i<7;i++){
+  const d=new Date(weekStart+i*86400000+8*3600000).toISOString().slice(0,10);
+  if(!Object.prototype.hasOwnProperty.call(roster,d))return false;
+  const code=String(roster[d]||'').trim();
+  if(code==='例')regular++;if(code==='休')rest++;
+ }
+ return regular>=1&&rest>=1;
+}
 function ruleFor(date,roster,pair,category,rules){
  const allowed=rules.filter(r=>r[0]===category&&fullDayRule(r));
  if(pair){const found=g.P79Overtime.inferRule(pair.start,pair.end,date,allowed,category);return found||null;}
@@ -244,7 +261,9 @@ function plan(snapshot,people,month,rules){
   let b;try{b=balance(emp,roster,month,snapshot)}catch(e){issues.push(e.message);continue;}
   balances.push({emp,...b});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
-  const restIssues=weeklyRestReview(roster,month,g.p79MonthlyRestContext?.weeklyCycleStart?.(emp)||'');
+  const setting=g.p79MonthlyRestContext?.weeklyCycleStart;
+  const cycleStart=typeof setting==='function'?setting(emp):String(setting||'');
+  const restIssues=weeklyRestReview(roster,month,cycleStart);
   for(const week of restIssues)issues.push(emp.name+' 週期起點 '+week.start+'：'+
    (week.confirmedCycle?'約定週期':'暫以週日為起點預覽')+
    ' 例假'+week.regular+'日、休息日'+week.rest+'日；請先核對原排班，勿用加班申報補足休假');
@@ -259,7 +278,8 @@ function plan(snapshot,people,month,rules){
    const future=!historical&&date>currentDate;
    if(future){
     if(!['早','中','晚'].includes(roster[date])||pairs.length||
-      g.P79RestAttendance?.state(snapshot,emp.empId,date)!=='open')continue;
+      g.P79RestAttendance?.state(snapshot,emp.empId,date)!=='open'||
+      !futureWeekRestProtected(roster,date,cycleStart))continue;
    }else if(pairs.length!==1||!fullDayEvidence(snapshot,emp.empId,date,pairs[0]))continue;
    const pair=future?null:pairs[0],byCategory=new Map();
    // 休息日出勤只可認列「休」；不能拿同一日去填例假或國假缺額。
@@ -471,5 +491,5 @@ async function open(){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview};
+g.P79MonthlyRest={open,plan,balance,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected};
 })(window);
