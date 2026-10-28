@@ -252,7 +252,7 @@ function compute(indexed,manual,query={}){
  return {rows,peak:Math.min(peak,physicalCapacity),sourcePeak:peak,physicalCapacity,
   capacityConflictCount:rows.filter(x=>x.capacityConflict).length,
   timeConflictCount:rows.filter(x=>x.timeConflicts.length>0).length,
-  clockConflicts:indexed.clockConflicts||[],
+  clockConflicts:(indexed.clockConflicts||[]).filter(x=>source.some(s=>s.source==='WORKING SHEET'&&s.key===x.key&&s.unit===x.unit)),
   rawIntervals:source.length,sourceReportCount:indexed.reportCount,
   pending: indexed.pending.filter(x=>mode==='all'||(mode==='month'?(x.from||'').slice(0,7)<=date.slice(0,7)&&(x.to||x.from||'').slice(0,7)>=date.slice(0,7):x.from<=date&&(x.to||x.from)>=date)),
   duplicateCraneConflicts:conflict,slotsChecked:seen,
