@@ -257,9 +257,10 @@
   $('multiRodBody').innerHTML=list.map(r=>{
    const ships=r.ships.map(s=>'<div class="text-left py-0.5">'+esc(s.ship)+(s.voyage?' <span class="text-xs text-slate-500">'+esc(s.voyage)+'</span>':'')+'：<b>'+esc(s.rods)+' 桿</b>'+(s.aqcNumbers?.length?' <span class="text-xs text-slate-500">AQC '+esc(s.aqcNumbers.join('、'))+'</span>':'')+'</div>').join('');
    const evidence=r.ships.flatMap(s=>(s.evidence||[]).map(e=>({ship:s.ship,unit:e.unit,source:e.source,start:e.start,end:e.end})));
+   const handoffs=(result.transfers||[]).filter(x=>x.finished>=r._start-3600000&&x.started<=r._end+3600000&&evidence.some(e=>e.unit===x.unit));
    const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對</summary>'+
-    '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+'</div></details>';
-   const sourceLabel=r.needsReview?'報表推估，超過4桿待核對':'AQC 時段比對';
+    '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+(handoffs.length?'<div class="mt-2 font-semibold">同桿跨船接桿核對</div>'+handoffs.map(x=>'<div class="border-b py-1">AQC '+esc(x.unit)+'：'+esc(x.fromShip)+' 完工 '+esc(utcLocalTime(new Date(x.finished)).replace('T',' '))+' → '+esc(x.toShip)+' 開工 '+esc(utcLocalTime(new Date(x.started)).replace('T',' '))+'｜'+(x.gapMinutes>=0?'間隔 '+esc(x.gapMinutes)+' 分鐘':'⚠ 時間重疊 '+esc(Math.abs(x.gapMinutes))+' 分鐘')+'</div>').join(''):'')+'</div></details>';
+   const sourceLabel=r.needsReview?'報表推估，超過4桿待核對':r.verifiedRods===r.totalRods?'WORKING SHEET 完工時間核對':'部分由 WORKING REPORT 時段推估';
    const totalText=r.needsReview?'待核對':esc(r.totalRods)+' 桿';
    const totalHint=r.needsReview?'<div class="text-xs text-amber-800">報表推估 '+esc(r.totalRods)+' 桿，尚未以每支桿完工時間證實</div>':'';
    return '<tr><td>'+esc(r.start.replace('T',' '))+'</td><td>'+esc(r.end.replace('T',' '))+'</td><td>'+ships+'</td><td class="font-black">'+totalText+totalHint+'</td>'+
