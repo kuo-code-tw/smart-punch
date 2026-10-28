@@ -52,5 +52,5 @@ assert(source.includes("attendance.length!==1"),'Save must re-read and require o
 assert(source.includes("JSON.stringify(latestRule)!==JSON.stringify(r.rule)"),'Save must match existing system overtime rule exactly');
 assert(source.includes("selected.some(r=>r.category==='例')&&!confirm"),'Rest-day legal-exception review must be explicit');
 assert(!/q\('#mrLoad'\)\.click\(\);\s*q\('#mrSave'\)\.click/.test(source),'Daily auto audit may never auto-submit');
-assert(fs.readFileSync('work-hours/index.html','utf8').includes('port79-monthly-rest-overtime.js?v=20261027-prior-month-backfill-v1'));
+assert(fs.readFileSync('work-hours/index.html','utf8').includes('port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2'));
 console.log(JSON.stringify({passed:21,failed:0,scope:'Monthly rest workflow boundaries, open-only read, real configured overtime hours, actual vs planned, legal review, readback and source record integrity'}));

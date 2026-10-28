@@ -14,11 +14,11 @@ function timed(record){
  const date=m[1]+'-'+m[2]+'-'+m[3],hour=+m[4]+(+m[5])/60+(+m[6])/3600;
  return{date,hour,ts:Date.parse(date+'T'+m[4]+':'+m[5]+':'+m[6]+'+08:00')};
 }
-function shiftFromClockIn(inRec,outRec){
+function shiftFromClockIn(inRec,outRec,{displayOnly=false}={}){
  const start=timed(inRec),end=timed(outRec);
  if(!start||!end||!Number.isFinite(start.ts)||!Number.isFinite(end.ts))return null;
  const elapsed=(end.ts-start.ts)/3600000;
- if(elapsed<3||elapsed>16)return null;
+ if(elapsed<=0||elapsed>16||(!displayOnly&&elapsed<3))return null;
  // The formal night shift is 24:00–08:00 of its roster date.
  // A clock-in shortly after midnight belongs to the previous roster date.
  let shift='',date=start.date;
@@ -82,5 +82,7 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
  }
  return{corrections,pairedSessions:byDate.size,ambiguousSessions:ambiguous.size};
 }
-return{plan,shiftFromClockIn};
+return{plan,shiftFromClockIn,
+ // 只用完整配對打卡顯示實際班別；短時出勤不得自動當成完整班別寫回正式班表。
+ displayShiftFromClockIn:(inRec,outRec)=>shiftFromClockIn(inRec,outRec,{displayOnly:true})};
 });

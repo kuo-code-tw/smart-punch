@@ -18,7 +18,7 @@ function create(ctx){
    const people=ctx.employees(),schedules=ctx.schedules(),pairedRows=ctx.buildShifts([...records.values()]);
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
-   const actualShifts={},duplicates=new Set();
+   const actualShifts={},actualWorkedMinutes={},duplicates=new Set();
    for(const row of pairedRows){
     if(!row.clockIn||!row.clockOut||row.timePrecisionIssue)continue;
     const rec=row.clockIn,claimed=id(row.empId||rec.empId);
@@ -33,8 +33,8 @@ function create(ctx){
     if(!employee||!paired?.date?.startsWith(month+'-')||!['早','中','晚'].includes(paired.shift))continue;
     const key=id(employee.id)+'|'+paired.date;
     if(duplicates.has(key))continue;
-    if(actualShifts[key]){delete actualShifts[key];duplicates.add(key);}
-    else actualShifts[key]=paired.shift;
+    if(actualShifts[key]){delete actualShifts[key];delete actualWorkedMinutes[key];duplicates.add(key);}
+    else {actualShifts[key]=paired.shift;actualWorkedMinutes[key]=Math.round((paired.end-paired.start)/60000);}
    }
    const sessions=pairedRows.map(row=>{
     const record=row.clockIn||row.clockOut||row.records?.[0]||row,emp=people.find(e=>id(e.id)===id(row.empId||record.empId))||people.find(e=>att(record.attNo)&&att(e.attNo||e.attendanceNo)===att(record.attNo));
@@ -43,6 +43,7 @@ function create(ctx){
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
    // Expose shift codes, not the employees' raw punch records or credentials.
    state.evidence.actualShifts=actualShifts;
+   state.evidence.actualWorkedMinutes=actualWorkedMinutes;
    return state.evidence;
   }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence={complete:false,days:{}};return null;}
   finally{state.pending=false;if(ctx.token()===token&&states.get(month)===state)ctx.update?.(month,state);}})();return state.promise;

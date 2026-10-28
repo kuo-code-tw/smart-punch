@@ -109,9 +109,9 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    reported[r.category]++;
    const stalePlanned=r.planned===true&&d<today();
    ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id,
-     statusNote:stalePlanned?'已申報；原預排旗標未更新，請核對出勤':''});
+     statusNote:stalePlanned&&actual!=='worked'?'已申報；原預排旗標待核對出勤':''});
    if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'單邊缺卡，已申報但出勤待核對'});
-   if(stalePlanned)conflicts.push({date:d,reportId:r.id,reason:'已有正式申報；日期已過但原預排旗標未更新，請核對出勤，不得重報'});
+   if(stalePlanned&&actual!=='worked')conflicts.push({date:d,reportId:r.id,reason:'已有正式申報但尚未核對完整出勤；原預排旗標待核，不得重報'});
   }else{
    if(hasUnverifiedReport&&actual!=='rest'){
     ledger.push({date:d,kind:'unconfirmed',category:r.category,actual});
@@ -187,7 +187,12 @@ function plan(snapshot,people,month,rules){
  const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
  for(const emp of people){
   const roster=rosters.get(id(emp.empId));
-  if(!roster){issues.push(emp.name+' 沒有本月班表');continue;}
+  if(!roster){
+   const start=String(g.p79MonthlyRestContext?.employmentStart?.(emp)||'').slice(0,10);
+   const monthEnd=month+'-'+String(g.p79RestQuota(month).days).padStart(2,'0');
+   if(start&&start>monthEnd)continue; // 尚未到職不應列「缺本月班表」。
+   issues.push(emp.name+' 沒有本月班表');continue;
+  }
   let b;try{b=balance(emp,roster,month,snapshot)}catch(e){issues.push(e.message);continue;}
   balances.push({emp,...b});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
@@ -309,7 +314,7 @@ async function open(){
    q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
    const audit=workflowAudit(model);
    q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜有完整出勤建議 '+audit.verified+' 筆｜預排待核 '+audit.planned+' 筆';
-   q('#mrAuditDetails').textContent=[...audit.people,...audit.blocked,...(model.issues||[])].join('\n')||'本次核對沒有未補額度或衝突。';
+   q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
    q('#mrSave').textContent=phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
   q('#mrResult').textContent='已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
   q('#mrRows').innerHTML=model.rows.map((r,i)=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c)).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+(Number(r.rule[2])<8?'<span style="display:block;color:#b91c1c;font-weight:700">⚠ 未滿8小時</span>':'')+'</td><td>'+esc(r.status)+'</td></tr>').join('');
@@ -329,8 +334,10 @@ async function open(){
   try{loadedMonth=q('#mrMonth').value;
     if(loadedMonth>today().slice(0,7))throw Error('不能對未來月份先建立跨月補報');
     g.p79RestQuota(loadedMonth);loadedPeople=filter().filter(e=>(!q('#mrJob').value||job(e)===q('#mrJob').value)&&(!q('#mrEmp').value||e.empId===q('#mrEmp').value));if(!loadedPeople.length)throw Error('沒有符合的人員');
-   const [data,options]=await Promise.all([a.snapshot(loadedMonth),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);paint();
-   setStatus('已列出 '+model.rows.length+' 筆建議，請勾選要申報的日期。\n'+model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')).join('\n'));
+   const [data,options]=await Promise.all([a.snapshot(loadedMonth,false,false,true),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);paint();
+   const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
+   setStatus('已列出 '+model.rows.length+' 筆可申報建議，請勾選要申報的日期。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
+
   }catch(e){setStatus('讀取失敗：'+e.message);}finally{busy=false;controls(false);}
  };
  q('#mrPrior').onclick=()=>{if(busy)return;q('#mrMonth').value=previousMonth(today().slice(0,7));q('#mrLoad').click();};
@@ -348,7 +355,7 @@ async function open(){
   busy=true;stop=false;controls(true);lastFailure='';let count=0,failure='',batch=null;
   try{
    setStatus('正在重新核對未休額度與已申報紀錄…');
-   const fresh=await a.snapshot(loadedMonth),available=new Map(),usage=new Map();batch=fresh.saveContext;
+   const fresh=await a.snapshot(loadedMonth,false,false,true),available=new Map(),usage=new Map();batch=fresh.saveContext;
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
    for(const r of selected){const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
     if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
@@ -374,7 +381,7 @@ async function open(){
    if(pending.length){
     setStatus('正在一次核對 '+pending.length+' 筆雲端申報…');
     try{
-     const verified=await a.snapshot(loadedMonth,true);
+     const verified=await a.snapshot(loadedMonth,true,false,true);
      for(const r of pending){const report=verified.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
       if(report?.id===r.id&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.acknowledged=true;r.checked=false;r.status='雲端讀回已確認';}
       else{r.checked=true;r.status='讀回未確認；保留原編號重試核對';}
@@ -385,6 +392,20 @@ async function open(){
    const confirmed=model.rows.filter(r=>r.saved).length,unverified=model.rows.filter(r=>r.attempted&&!r.saved).length;
    setStatus('本次已核對成功 '+confirmed+' 筆。'+(unverified?'另有 '+unverified+' 筆待核對。':'')+(stop?'已停止，其餘未送出。':'')+(failure?'後續停止：'+failure:'成功項目已移出待報清單。'));
    lastFailure=failure;busy=false;paint();controls(false);a.refresh?.();
+   // 成功申報後立即用最新雲端重新建立建議，已完成項目直接消失，不需關閉重開。
+   if(confirmed&&!failure&&!stop){
+    try{
+     const latest=await a.snapshot(loadedMonth,false,false,true);
+     if(!el.open||q('#mrMonth').value!==loadedMonth)return;
+     snapshot=latest;model=plan(latest,loadedPeople,loadedMonth,rules);
+     paint();controls(false);
+     q('#mrResult').textContent='本次雲端已確認 '+confirmed+' 筆，已從建議清單移除。';
+     setStatus('雲端申報已核對 '+confirmed+' 筆；已完成項目不再顯示。'+
+       (model.rows.length?'目前仍有 '+model.rows.length+' 筆可核對建議。':'目前沒有其他可申報建議。'));
+    }catch(error){
+     setStatus('本次已確認 '+confirmed+' 筆；重新讀取剩餘建議失敗：'+String(error?.message||error)+'。請點「讀取未休／建議日期」重新核對。');
+    }
+   }
   }
  };
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
