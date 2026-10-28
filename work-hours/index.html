@@ -13790,12 +13790,27 @@ function p79OvertimePeriodLabel(report){
             if(issue)return alert('打卡資料尚需更正：'+issue+'。請先到考勤頁核對，再執行加班申報。');
             if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return alert('原始打卡時段無效，不能核定。');
             if(typeof window.P79Overtime?.openReport!=='function')return alert('加班申報模組尚未載入，請重新整理後重試。');
-            // 原預排申報有 ID，必須沿用同一 ID 修改，不建立第二筆。
+            // 待核對也必須與正式清單一樣，依完整實際打卡推導時段。
+            // 舊預排的 16-24 不可在員工已改為 08-16 後再次帶回申報。
+            const roster=p79WorkOvertimeRoster(row.empId,date);
+            const periodReview=window.P79OvertimeShiftMatch?.resolve?.({
+                date,roster,report,rules:window.P79Overtime.reportRules(),
+                start,end,attendanceIssue:false
+            });
+            const suggested=periodReview?.state==='completed'&&periodReview.confirmed
+                ?periodReview.suggested:null;
+            // 匹配失敗時不猜班別、不沿用衝突中的舊時段，必須由管理員核對。
+            const code=suggested?.code||'';
+            const category=suggested?.category||report.category||'';
+            const preferredType=report.typeName||'';
             return window.P79Overtime.openReport({
-                empId:row.empId,date,roster:p79WorkOvertimeRoster(row.empId,date),
+                empId:row.empId,date,roster,
                 savedReport:true,reportId:String(report.id),lockOriginal:true,plannedReview:true,
-                attendance:{start,end},code:report.code||'',category:report.category||'',
-                preferredType:report.typeName||'',note:report.note||'',forEmpId:row.forEmpId||''
+                originalReportCode:String(report.code||''),originalReportCategory:String(report.category||''),
+                attendance:{start,end},code,category,
+                preferredType,note:report.note||'',forEmpId:row.forEmpId||'',
+                requirePeriodSelection:!suggested,
+                periodHint:!suggested?'實際打卡與原預排時段不符，請先核對正確出勤時段；不得直接沿用舊班別。':''
             });
         }
         // 每一筆待處理項目都要說明「缺的是申報還是考勤」，不能只顯示籠統的待核對。
