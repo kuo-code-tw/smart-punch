@@ -65,7 +65,9 @@
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">動桿事件</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">櫃數</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">艙蓋／翻艙</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
-  '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div><div class="overflow-x-auto"><table class="tbl w-full min-w-[1100px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>船名／航次</th><th>桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
+  '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div>',
+  '<details class="bg-slate-50 border rounded-xl p-3"><summary class="cursor-pointer font-bold text-sm text-slate-700">🔎 檢查資料日期與各船桿數（包含未達 4 桿）</summary><div id="multiRodSourceAudit" class="mt-3 text-sm text-slate-700"></div><div id="multiRodSourcePreview" class="mt-3 text-xs space-y-1"></div></details>',
+  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[1100px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>船名／航次</th><th>桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
   '<div id="multiRodNotice" role="status" aria-live="polite" class="text-sm text-slate-600"></div></div>',
   '<div id="multiRodEditor" class="card p-4 sm:p-5 space-y-4 hidden">',
   '<h3 id="multiRodFormTitle" class="text-lg font-black">新增 AQC 作業紀錄</h3>',
@@ -403,6 +405,21 @@
   $('multiRodHatches').textContent=sum('hatches').toLocaleString('zh-TW')+'／'+sum('shiftMoves').toLocaleString('zh-TW');
   const sourceStatus=$('multiRodSourceState');
   if(sourceStatus)sourceStatus.textContent='目前船舶 WORKING REPORT 明細已讀入 '+sourceTotal+' 筆；符合本篩選的自動判讀 '+auto.length+' 筆，主檔待確認 '+masters.length+' 筆，另有人工雲端紀錄 '+manual+' 筆。WORKING REPORT 推算桿數代表當日不同 AQC 編號數，不等於同時作業。主檔待確認只代表該船日期範圍與配置 AQC 數達門檻，尚不能證明當天實際用了這些桿；需核對作業時間與數量。';
+  const scopeDate=val('multiRodDate')||today(),scopeMode=val('multiRodMode')||'day',scopeMonth=scopeDate.slice(0,7);
+  const raw=sourceRows(),dates=raw.map(r=>normalizeDate(r.workDate)).filter(Boolean).sort();
+  const scopeSource=raw.filter(r=>{const d=normalizeDate(r.workDate);return scopeMode==='all'||(scopeMode==='month'?d.slice(0,7)===scopeMonth:d===scopeDate)});
+  const allActual=actualCandidates(),scopeActual=allActual.filter(r=>scopeMode==='all'||(scopeMode==='month'?r.date.slice(0,7)===scopeMonth:r.date===scopeDate));
+  const maximum=Math.max(0,...scopeActual.map(r=>Number(r.rods)||0));
+  const audit=$('multiRodSourceAudit'),preview=$('multiRodSourcePreview');
+  if(audit){
+   const coverage=dates.length?dates[0]+' ～ '+dates[dates.length-1]:'無可辨識日期';
+   const reason=scopeSource.length===0&&scopeActual.length===0?'所選期間沒有已讀入的 AQC 作業明細；全系統累計數不代表這個月份有資料。':maximum<Number(val('multiRodMin')||4)?'這段期間按現有明細辨識到的最高桿數低於門檻；如實際有更多桿，請確認 WORKING SHEET 的 AQC 起訖時間是否已匯入。':'本期間已有符合桿數條件的船舶。';
+   audit.textContent='已讀入 WORKING REPORT '+raw.length+' 筆（日期涵蓋 '+coverage+'）；目前所選期間 '+scopeSource.length+' 筆，從 AQC 作業起訖時間辨識的船舶日期 '+scopeActual.length+' 筆，最高 '+maximum+' 桿。'+reason;
+  }
+  if(preview){
+   const selected=scopeActual.sort((a,b)=>Number(b.rods)-Number(a.rods)||String(b.date).localeCompare(String(a.date))).slice(0,20);
+   preview.innerHTML=selected.map(x=>'<div class="flex flex-wrap justify-between border-b py-1 gap-2"><span>'+esc(x.date)+'｜'+esc(x.ship)+' '+esc(x.voyage||'')+'</span><span class="font-bold">'+esc(x.rods)+' 桿｜'+(x.source==='sheet'?'WORKING SHEET 起訖':'WORKING REPORT')+'</span></div>').join('')||'<div class="text-amber-800">沒有可判讀的船舶作業時間；請檢查原船舶明細匯入日期及 AQC 編號。</div>';
+  }
   $('multiRodBody').innerHTML=list.map(r=>{
    const derived=['auto','sheet','master'].includes(r.source),editButton=derived?'<button type="button" class="btn bg-amber-50 text-amber-900 text-xs" data-action="confirm" data-id="'+esc(r.id)+'">確認並登錄</button>':(editAllowed('records.edit')?'<button type="button" class="btn bg-slate-100 text-xs" data-action="edit" data-id="'+esc(r.id)+'">編輯</button> ':'')+(editAllowed('records.delete')?'<button type="button" class="btn bg-rose-50 text-rose-800 text-xs" data-action="delete" data-id="'+esc(r.id)+'">刪除</button>':'');
    const from=r.hasActualTimes===false?'時間待確認':String(r.start||'').replace('T',' '),to=r.hasActualTimes===false?'時間待確認':r.end?String(r.end).replace('T',' '):'進行中';
