@@ -63,7 +63,7 @@ assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('確認完成'),'render 
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('待核對'),'complete punch shows exact required review');
 ctx.records=[punched.clockIn,punched.clockOut].map(p=>({...p,empId:'A'}));
 ctx.p79RenderOvertimePlannedRows([punched,official,another],'2026-10','ALL','ALL','ALL');
-assert(nodes.p79OvertimePlannedBody.innerHTML.includes('編輯上班時間')&&nodes.p79OvertimePlannedBody.innerHTML.includes('編輯下班時間'),'both actual times allow editing via existing attendance editor');
+assert(nodes.p79OvertimePlannedBody.innerHTML.includes('修改上班打卡時間')&&nodes.p79OvertimePlannedBody.innerHTML.includes('修改下班打卡時間'),'both actual times open the shared attendance editor directly');
 ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','B');
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('沒有預排'),'empty state remains clear');
 for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
