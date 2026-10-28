@@ -23,7 +23,7 @@ const model={
 const out=rosterReviewRows(model,staff);
 assert.equal(out.length,6,'All roster deficits and incomplete roster staff must be shown, not only 1 eligible row');
 assert.equal(out.filter(x=>x.isFL).length,5,'All five F/L are present including role variant');
-assert.equal(out[0].isFL,true,'F/L first, never silently excluded behind other roles');
+assert.equal(out.some(x=>x.isFL&&x.emp.empId==='FL04'),true,'F/L variants are visible without prioritizing one job over other units');
 assert.equal(out.find(x=>x.emp.empId==='FL01').eligible,1,'Only the genuine 8h eligible candidate is counted');
 assert.equal(out.find(x=>x.emp.empId==='FL02').eligible,0,'Other F/L remain listed even when not eligible today');
 assert.equal(out.find(x=>x.emp.empId==='FL05').missing,true,'Missing roster must be reported instead of treated as zero entitlement');
