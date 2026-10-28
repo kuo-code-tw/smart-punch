@@ -237,7 +237,7 @@
   $('multiRodAdd').disabled=!editAllowed('records.create');
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
   $('multiRodShips').textContent=allShips.size+' 艘';
-  $('multiRodEvents').textContent=list.filter(r=>!r.capacityConflict).length+' 已核／'+list.filter(r=>r.capacityConflict).length+' 待核';
+  $('multiRodEvents').textContent=list.filter(r=>!r.capacityConflict).length+' 未超限／'+list.filter(r=>r.capacityConflict).length+' 待核';
   $('multiRodContainers').textContent=result.peak+' 桿'+(result.capacityConflictCount?'（來源超額待核）':'');
   $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆快取明細';
   const sourceStatus=$('multiRodSourceState');
@@ -283,28 +283,30 @@
    if(identity()!==scope)throw Error('登入身分已變更，已停止匯出');
    if(!g.XLSX?.utils)throw Error('Excel 元件載入失敗');
    const book=XLSX.utils.book_new();
-   const detail=[['作業日期','同時時段開始（台灣）','同時時段結束（台灣）','同時總桿數','船舶總數','船名','航次','WORKING NO.','該船桿數','AQC 編號','櫃數','艙蓋','翻艙','資料來源','備註']];
+   const detail=[['作業日期','時段開始（台灣）','時段結束（台灣）','實際同時桿數（待核留空）','現場上限桿數','來源時間重疊桿數（非已確認）','核對狀態','船舶總數','船名','航次','WORKING NO.','來源各船重疊桿數','AQC 編號','櫃數','艙蓋','翻艙','資料來源','備註']];
    for(const r of rows)for(const ship of r.ships){
     // Quantities can only be attributed to the overlap when a confirmed manual
     // record exactly matches its start/end, not from vessel-wide totals.
     const exact=ship.manualStart===r._start&&ship.manualEnd===r._end;
-    detail.push([r.date,r.start.replace('T',' '),r.end.replace('T',' '),r.totalRods,r.shipCount,
+    detail.push([r.date,r.start.replace('T',' '),r.end.replace('T',' '),r.capacityConflict?'':r.totalRods,r.physicalCapacity,r.sourceOverlapRods,
+     r.capacityConflict?'來源區間超過現場上限，實際桿數待核對':'來源重疊未超過現場上限',r.shipCount,
      ship.ship,ship.voyage||'',ship.workingNo||'',ship.rods,(ship.aqcNumbers||[]).join('、'),
      exact?ship.containers:'',exact?ship.hatches:'',exact?ship.shiftMoves:'',
-     ship.source,exact?'人工區間數量已核對':'櫃數、艙蓋、翻艙無法由重疊時間精確拆分，待核對']);
+     ship.source,r.capacityConflict?'實際哪幾支作業及各船分配未確認；來源區間不能證明超出現場桿數上限':exact?'人工區間數量已核對':'櫃數、艙蓋、翻艙無法由重疊時間精確拆分，待核對']);
    }
    const daily=new Map();
    for(const r of rows)for(const ship of r.ships){
     const key=r.date+'|'+(ship.workingNo||ship.ship+'|'+ship.voyage);
-    if(!daily.has(key))daily.set(key,{date:r.date,ship:ship.ship,voyage:ship.voyage||'',peak:0,minutes:0,segments:0});
-    const d=daily.get(key);d.peak=Math.max(d.peak,ship.rods);d.minutes+=r.durationMinutes;d.segments++;
+    if(!daily.has(key))daily.set(key,{date:r.date,ship:ship.ship,voyage:ship.voyage||'',peak:0,sourcePeak:0,conflicts:0,minutes:0,segments:0});
+    const d=daily.get(key);if(!r.capacityConflict)d.peak=Math.max(d.peak,ship.rods);else d.conflicts++;
+    d.sourcePeak=Math.max(d.sourcePeak,ship.rods);d.minutes+=r.durationMinutes;d.segments++;
    }
-   const summary=[['日期','船名','航次','符合門檻時段數','該船最高同時桿數','參與達標時段分鐘數','說明'],
-    ...[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.ship.localeCompare(b.ship)).map(x=>[x.date,x.ship,x.voyage,x.segments,x.peak,x.minutes,'門檻依全部船舶同時總桿數判斷，櫃數/艙蓋/翻艙須依實際時段核對'])];
+   const summary=[['日期','船名','航次','來源達門檻時段數','來源未超限最高各船桿數','來源各船最高重疊桿數','超額待核時段數','參與來源達標時段分鐘數','說明'],
+    ...[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.ship.localeCompare(b.ship)).map(x=>[x.date,x.ship,x.voyage,x.segments,x.peak||'',x.sourcePeak,x.conflicts,x.minutes,'現場同時上限 '+CURRENT_AQC_CAPACITY+' 桿；區間重疊不等於持續實際動桿，超額時段不能認列實際桿數'])];
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(detail),'AQC作業明細');
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(summary),'每日船舶彙總');
    XLSX.writeFile(book,'AQC同時多桿作業_'+(val('multiRodMode')==='all'?'全部':val('multiRodMode')==='month'?(val('multiRodDate')||today()).slice(0,7):val('multiRodDate')||today())+'.xlsx');
-   notice('已由目前快取匯出 '+rows.length+' 段同時達標作業，不必等雲端重新下載。');
+   notice('已匯出 '+rows.length+' 段來源作業（含 '+rows.filter(r=>r.capacityConflict).length+' 段超過現場上限待核）；不會將超額來源推算寫成已證實桿數。');
   }catch(err){notice('Excel 匯出失敗：'+(err.message||err),true)}
  }
  function activate(){render();void sync();void syncSource();}
