@@ -43,5 +43,5 @@ assert.equal(button.dataset.p79OvertimeAudit,'amended');
 assert(context.renderRecordsPagination.p79OvertimeDecorated);
 const work=fs.readFileSync('work-hours/index.html','utf8'),attendance=fs.readFileSync('attendance/index.html','utf8');
 assert(work.includes('P79Overtime.displayPeriodCode'));
-assert(attendance.includes('port79-attendance-overtime.js?v=20261028-cloud-readback-v3'));
+assert(attendance.includes('port79-attendance-overtime.js?v=20261028-evidence-reconciliation-v4'));
 console.log('PASS overtime type grouping, audited attendance dates, and report-only date status');
