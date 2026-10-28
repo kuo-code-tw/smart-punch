@@ -262,7 +262,12 @@
    const ships=r.ships.map(s=>'<div class="text-left py-0.5">'+esc(s.ship)+(s.voyage?' <span class="text-xs text-slate-500">'+esc(s.voyage)+'</span>':'')+'：<b>期間來源最多 '+esc(s.rods)+' 桿'+(r.capacityConflict?'（實際分配待核）':'')+'</b>'+(s.aqcNumbers?.length?' <span class="text-xs text-slate-500">曾記錄 AQC '+esc(s.aqcNumbers.join('、'))+'</span>':'')+'</div>').join('');
    const evidence=r.ships.flatMap(s=>(s.evidence||[]).map(e=>({ship:s.ship,unit:e.unit,source:e.source,start:e.start,end:e.end})));
    const handoffs=(result.transfers||[]).filter(x=>x.finished>=r._start-3600000&&x.started<=r._end+3600000&&evidence.some(e=>e.unit===x.unit));
-   const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對</summary>'+
+   const periodDetail=(r.segments||[r]).map((part,i)=>
+    '<div class="border-b py-1">變化 '+(i+1)+'：'+esc(part.start.replace('T',' '))+'～'+esc(part.end.replace('T',' '))+
+    '｜來源合計 '+esc(part.totalRods)+' 支'+(part.capacityConflict?'（超過上限，待核）':'')+
+    '｜'+part.ships.map(item=>esc(item.ship)+' '+esc(item.rods)+' 支（AQC '+esc((item.aqcNumbers||[]).join('、'))+'）').join('；')+'</div>').join('');
+   const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對（'+esc(r.segments?.length||1)+' 段變化）</summary>'+
+    '<div class="mt-2 text-xs space-y-1"><div class="font-semibold">同組船舶作業的桿數變化（不是獨立作業筆數）</div>'+periodDetail+'</div>'+
     '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+(handoffs.length?'<div class="mt-2 font-semibold">同桿跨船接桿核對</div>'+handoffs.map(x=>'<div class="border-b py-1">AQC '+esc(x.unit)+'：'+esc(x.fromShip)+' 完工 '+esc(utcLocalTime(new Date(x.finished)).replace('T',' '))+' → '+esc(x.toShip)+' 開工 '+esc(utcLocalTime(new Date(x.started)).replace('T',' '))+'｜'+(x.gapMinutes>=0?'間隔 '+esc(x.gapMinutes)+' 分鐘':'⚠ 時間重疊 '+esc(Math.abs(x.gapMinutes))+' 分鐘')+'</div>').join(''):'')+'</div></details>';
    const sourceLabel=r.capacityConflict?'期間來源峰值超過現場4桿上限，待核對':r.needsReview?'部分時間待核對':r.verifiedRods===r.totalRods?'WORKING SHEET 起訖時間比對':'部分由 WORKING REPORT 時段推估';
    const totalText='來源峰值 '+esc(r.totalRods)+' 支'+(r.needsReview?'（待核）':'');
