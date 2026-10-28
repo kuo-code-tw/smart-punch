@@ -12,13 +12,13 @@
  let state={scope:'',rows:[],revision:'',checked:0,epoch:0},loading=null,busy=false,pending=null;
  const identity=()=>{const s=session();return canView()?JSON.stringify([key(),s?.adminRole||'',s?.unit||'',s?.department||'',typeof getGasUrl==='function'?getGasUrl():'',s?.systemPermissions||{},s?.finePermissions||{},s?.dataScope||{},s?.jobScopes||{}]):''};
  const cacheKey=scope=>'p79-aqc-cloud-v1:'+scope;
- function current(){const scope=identity();if(scope!==state.scope){state={scope,rows:[],revision:'',checked:0,epoch:0};pending=null;if(scope)try{const v=JSON.parse(localStorage.getItem(cacheKey(scope))||'null');if(v&&Array.isArray(v.rows)&&v.revision){state.rows=v.rows;state.revision=v.revision;}}catch(_){} }return state;}
+ function current(){const scope=identity();if(scope!==state.scope){state={scope,rows:[],revision:'',checked:0,epoch:0};pending=null;if(scope)try{const v=JSON.parse(localStorage.getItem(cacheKey(scope))||'null');if(v&&Array.isArray(v.rows)&&v.revision){state.rows=v.rows;state.revision=v.revision;state.checked=Date.now();}}catch(_){} }return state;}
  const getRows=()=>current().rows;
  const legacyRows=()=>{try{const rows=JSON.parse(localStorage.getItem(key())||'[]');return Array.isArray(rows)?rows:[]}catch(_){return []}};
  function persist(){try{if(state.scope)localStorage.setItem(cacheKey(state.scope),JSON.stringify({rows:state.rows,revision:state.revision}));}catch(_){notice('雲端已確認，本機快取空間不足；下次將重新讀取。',true);}}
  async function sync(force=false){
   const st=current();if(!st.scope)return;if(loading?.scope===st.scope)return loading.promise;
-  if(!force&&Date.now()-st.checked<30000)return;
+  if(!force&&Date.now()-st.checked<600000)return;
   const scope=st.scope,epoch=st.epoch,token=typeof gcToken!=='undefined'?gcToken:'';
   const promise=(async()=>{try{
    notice(st.revision?'先顯示本機快取，正在核對雲端版本…':'正在讀取 AQC 雲端紀錄…');
@@ -260,34 +260,42 @@
  }
  async function exportExcel(){
   if(!canView()){notice('沒有查看效率資料的權限',true);return}
-  const s=session();if(String(s?.adminRole||'').toLowerCase()!=='superadmin'&&s?.finePermissions?.efficiency?.['records.export']===false){notice('沒有匯出權限',true);return;}
-  const scope=identity();
+  const sess=session();if(String(sess?.adminRole||'').toLowerCase()!=='superadmin'&&sess?.finePermissions?.efficiency?.['records.export']===false){notice('沒有匯出權限',true);return}
+  const scope=identity(),result=concurrentResult(),rows=result.rows;
+  if(!rows.length){notice('此日期沒有符合同時桿數門檻的時段可匯出。',true);return}
   try{
-   const st=current(),epoch=st.epoch;
-   const remote=await apiGetQuick('gcGetAqcMultiRod',{export:'1',...(st.revision?{revision:st.revision}:{})},25000);
-   if(identity()!==scope||state.epoch!==epoch)throw Error('資料或登入身分已變更，請重新匯出');
-   if(!remote.unchanged){if(!Array.isArray(remote.records))throw Error('未取得完整雲端紀錄');state.rows=remote.records;}
-   state.epoch++;state.revision=String(remote.revision);state.checked=Date.now();persist();render();
-   const rows=combinedFiltered();if(!rows.length){notice('沒有符合條件的資料可匯出',true);return;}
    if(typeof g.p79EnsureXlsx!=='function')throw Error('Excel 元件未載入');
    await g.p79EnsureXlsx();
    if(identity()!==scope)throw Error('登入身分已變更，已停止匯出');
    if(!g.XLSX?.utils)throw Error('Excel 元件載入失敗');
-   const wb=XLSX.utils.book_new();
-   const detail=[['作業日期','船名','航次','WORKING NO.','開始時間（台灣）','結束時間（台灣）','AQC桿數','櫃數','艙蓋','翻艙','來源','AQC編號','備註','修改時間','修改人員']];
-   rows.forEach(r=>detail.push([String(r.start).slice(0,10),r.ship,r.voyage||'',r.workingNo||'',r.start.replace('T',' '),r.end?r.end.replace('T',' '):'',r.rods,r.containers??'',r.hatches??'',r.shiftMoves??'',r.source==='master'?'WORKING SHEET主檔待核對':r.source==='sheet'?'WORKING SHEET AQC起訖時間':r.source==='auto'?'WORKING REPORT自動推算':'GAS人工登錄',(r.aqcNumbers||[]).join('、'),r.note||'',r.updatedAt||'',r.updatedBy||'']));
-   const grouped=new Map();
-   rows.forEach(r=>{const k=r.start.slice(0,10)+'|'+r.ship+'|'+(r.voyage||'');let x=grouped.get(k);if(!x){x={date:r.start.slice(0,10),ship:r.ship,voyage:r.voyage||'',events:0,maxRods:0,containers:0,hatches:0,shiftMoves:0};grouped.set(k,x)}x.events++;x.maxRods=Math.max(x.maxRods,Number(r.rods)||0);x.containers+=Number(r.containers)||0;x.hatches+=Number(r.hatches)||0;x.shiftMoves+=Number(r.shiftMoves)||0});
-   const summary=[['作業日期','船名','航次','作業次數','最高桿數（自動為當日不同AQC編號）','櫃數合計','艙蓋合計','翻艙合計'],...[...grouped.values()].map(x=>[x.date,x.ship,x.voyage,x.events,x.maxRods,x.containers,x.hatches,x.shiftMoves])];
-   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(detail),'AQC作業明細');
-   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summary),'每日船舶彙總');
-   XLSX.writeFile(wb,'AQC多桿作業_'+(val('multiRodMode')==='all'?'全部':val('multiRodDate')||today())+'.xlsx');
-   notice('已匯出 '+rows.length+' 筆作業與每日船舶彙總');
+   const book=XLSX.utils.book_new();
+   const detail=[['作業日期','同時時段開始（台灣）','同時時段結束（台灣）','同時總桿數','船舶總數','船名','航次','WORKING NO.','該船桿數','AQC 編號','櫃數','艙蓋','翻艙','資料來源','備註']];
+   for(const r of rows)for(const ship of r.ships){
+    // Quantities can only be attributed to the overlap when a confirmed manual
+    // record exactly matches its start/end, not from vessel-wide totals.
+    const exact=ship.manualStart===r._start&&ship.manualEnd===r._end;
+    detail.push([r.date,r.start.replace('T',' '),r.end.replace('T',' '),r.totalRods,r.shipCount,
+     ship.ship,ship.voyage||'',ship.workingNo||'',ship.rods,(ship.aqcNumbers||[]).join('、'),
+     exact?ship.containers:'',exact?ship.hatches:'',exact?ship.shiftMoves:'',
+     ship.source,exact?'人工區間數量已核對':'櫃數、艙蓋、翻艙無法由重疊時間精確拆分，待核對']);
+   }
+   const daily=new Map();
+   for(const r of rows)for(const ship of r.ships){
+    const key=r.date+'|'+(ship.workingNo||ship.ship+'|'+ship.voyage);
+    if(!daily.has(key))daily.set(key,{date:r.date,ship:ship.ship,voyage:ship.voyage||'',peak:0,minutes:0,segments:0});
+    const d=daily.get(key);d.peak=Math.max(d.peak,ship.rods);d.minutes+=r.durationMinutes;d.segments++;
+   }
+   const summary=[['日期','船名','航次','符合門檻時段數','該船最高同時桿數','參與達標時段分鐘數','說明'],
+    ...[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.ship.localeCompare(b.ship)).map(x=>[x.date,x.ship,x.voyage,x.segments,x.peak,x.minutes,'門檻依全部船舶同時總桿數判斷，櫃數/艙蓋/翻艙須依實際時段核對'])];
+   XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(detail),'AQC作業明細');
+   XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(summary),'每日船舶彙總');
+   XLSX.writeFile(book,'AQC同時多桿作業_'+(val('multiRodMode')==='all'?'全部':val('multiRodMode')==='month'?(val('multiRodDate')||today()).slice(0,7):val('multiRodDate')||today())+'.xlsx');
+   notice('已由目前快取匯出 '+rows.length+' 段同時達標作業，不必等雲端重新下載。');
   }catch(err){notice('Excel 匯出失敗：'+(err.message||err),true)}
  }
  function activate(){render();void sync();void syncSource();}
- g.P79AqcMultiRod={mount,render:activate,filtered,openEditor,exportExcel,sync};
+ g.P79AqcMultiRod={mount,render:activate,filtered:()=>concurrentResult().rows,openEditor,exportExcel,sync};
  g.addEventListener('focus',()=>{if($(ID)&&!$(ID).classList.contains('hidden'))activate();});
- g.addEventListener('storage',()=>{if($(ID)&&!$(ID).classList.contains('hidden')){current();render();void sync(true);}});
+ g.addEventListener('storage',()=>{if($(ID)&&!$(ID).classList.contains('hidden')){current();g.P79AqcConcurrent?.invalidate();render();void sync();}});
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })(window);
