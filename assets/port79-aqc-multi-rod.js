@@ -61,7 +61,7 @@
   '<button type="button" id="multiRodRefresh" class="btn bg-slate-100">重新核對雲端</button><button type="button" id="multiRodImport" class="btn bg-amber-50">匯入此帳號舊本機紀錄</button>',
   '<button type="button" id="multiRodExport" class="btn bg-emerald-600 text-white">📥 匯出 Excel（明細＋彙總）</button></div>',
   '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">符合船舶</div><div id="multiRodShips" class="text-xl font-black">0 艘</div></div>',
+  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">顯示船舶</div><div id="multiRodShips" class="text-xl font-black">0 艘</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">動桿事件</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">櫃數</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">艙蓋／翻艙</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
@@ -93,7 +93,7 @@
   $('multiRodExport').addEventListener('click',exportExcel);
   $('multiRodRefresh').addEventListener('click',()=>{void sync(true);void syncSource(true)});
   $('multiRodImport').addEventListener('click',importLegacy);
-  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='confirm')openEditor(autoCandidates().find(r=>r.id===id));if(btn.dataset.action==='delete')remove(id)});
+  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='confirm')openEditor([...autoCandidates(),...masterCandidates(val('multiRodDate')||today(),1)].find(r=>r.id===id));if(btn.dataset.action==='delete')remove(id)});
  }
  function candidates(){
   const raw=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
@@ -218,6 +218,24 @@
     containers:g.containers,hatches:g.hatches,shiftMoves:null,sourceCount:g.sourceCount};
   });
  }
+
+ // WORKING SHEET master fallback: a vessel spanning the selected date with >=min listed AQC units
+ // is only a review candidate, NOT proof those units worked that date.
+ function masterCandidates(date,min){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return [];
+  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
+  return masters.filter(s=>{
+   const from=String(s.firstDate||s.compareDate||s.workingSheetSource?.compareDate||'').replace(/\//g,'-').slice(0,10);
+   const to=String(s.lastDate||from).replace(/\//g,'-').slice(0,10);
+   const n=Number(s.aqcCount)||((Array.isArray(s.aqcs)?s.aqcs:[]).length);
+   return from&&from<=date&&date<=to&&Number.isFinite(n)&&n>=min;
+  }).map(s=>({
+   source:'master',id:'MASTER:'+date+'|'+String(s.workingNo||'')+'|'+String(s.vessel||''),
+   ship:String(s.vessel||'').trim(),voyage:String(s.voyageE||s.voyageI||'').trim(),
+   workingNo:String(s.workingNo||'').trim(),date,rods:Number(s.aqcCount)||((s.aqcs||[]).length),
+   start:date+'T00:00',end:'',hasActualTimes:false,containers:null,hatches:null,shiftMoves:null
+  })).filter(s=>s.ship);
+ }
  function sameVesselDay(a,b){
   const sameDate=String(a.start||'').slice(0,10)===String(b.date||b.start||'').slice(0,10);
   const aNo=String(a.workingNo||'').trim(),bNo=String(b.workingNo||'').trim();
@@ -226,11 +244,13 @@
  function combinedFiltered(){
   const manual=filtered(), date=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
   const min=Math.max(1,Math.floor(Number(val('multiRodMin'))||4));
-  const automatically=autoCandidates().filter(r=>r.rods>=min&&(mode==='all'||(mode==='month'?r.date.slice(0,7)===date.slice(0,7):r.date===date)));
+  const dailyAuto=autoCandidates();
+  const automatically=dailyAuto.filter(r=>r.rods>=min&&(mode==='all'||(mode==='month'?r.date.slice(0,7)===date.slice(0,7):r.date===date)));
   // Official manual events supersede a derived full-day candidate; never add both to KPIs/Excel.
   const recorded=getRows();
   const inferred=automatically.filter(a=>!recorded.some(r=>sameVesselDay(r,a)));
-  return [...manual,...inferred].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
+  const masterFallback=mode==='day'?masterCandidates(date,min).filter(a=>!recorded.some(r=>sameVesselDay(r,a))&&!dailyAuto.some(r=>sameVesselDay(r,a))):[];
+  return [...manual,...inferred,...masterFallback].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
  }
  let sourceBusy=null,sourceLoaded=new Set();
  async function syncSource(force=false){
@@ -273,7 +293,7 @@
   mount();if(!$(ID))return;current();
   if(!canView()){$('multiRodBody').innerHTML='';return;}
   const list=combinedFiltered(),sum=k=>list.reduce((s,r)=>s+(Number(r[k])||0),0);
-  const auto=list.filter(r=>r.source==='auto'),manual=list.length-auto.length;
+  const auto=list.filter(r=>r.source==='auto'),masters=list.filter(r=>r.source==='master'),manual=list.length-auto.length-masters.length;
   const sourceTotal=sourceRows().length;
   $('multiRodAdd').disabled=!editAllowed('records.create');
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
@@ -282,11 +302,11 @@
   $('multiRodContainers').textContent=sum('containers').toLocaleString('zh-TW');
   $('multiRodHatches').textContent=sum('hatches').toLocaleString('zh-TW')+'／'+sum('shiftMoves').toLocaleString('zh-TW');
   const sourceStatus=$('multiRodSourceState');
-  if(sourceStatus)sourceStatus.textContent='目前船舶 WORKING REPORT 明細已讀入 '+sourceTotal+' 筆；符合本篩選的自動判讀 '+auto.length+' 筆，另有人工雲端紀錄 '+manual+' 筆。自動來源的桿數是「當日不同 AQC 編號數」，不是同時作業桿數；起訖為當日作業紀錄範圍，請視需要核對。';
+  if(sourceStatus)sourceStatus.textContent='目前船舶 WORKING REPORT 明細已讀入 '+sourceTotal+' 筆；符合本篩選的自動判讀 '+auto.length+' 筆，主檔待確認 '+masters.length+' 筆，另有人工雲端紀錄 '+manual+' 筆。自動來源的桿數是「當日不同 AQC 編號數」，不是同時作業桿數；起訖為當日作業紀錄範圍，請視需要核對。';
   $('multiRodBody').innerHTML=list.map(r=>{
-   const derived=r.source==='auto',editButton=derived?'<button type="button" class="btn bg-amber-50 text-amber-900 text-xs" data-action="confirm" data-id="'+esc(r.id)+'">確認並登錄</button>':(editAllowed('records.edit')?'<button type="button" class="btn bg-slate-100 text-xs" data-action="edit" data-id="'+esc(r.id)+'">編輯</button> ':'')+(editAllowed('records.delete')?'<button type="button" class="btn bg-rose-50 text-rose-800 text-xs" data-action="delete" data-id="'+esc(r.id)+'">刪除</button>':'');
+   const derived=r.source==='auto'||r.source==='master',editButton=derived?'<button type="button" class="btn bg-amber-50 text-amber-900 text-xs" data-action="confirm" data-id="'+esc(r.id)+'">確認並登錄</button>':(editAllowed('records.edit')?'<button type="button" class="btn bg-slate-100 text-xs" data-action="edit" data-id="'+esc(r.id)+'">編輯</button> ':'')+(editAllowed('records.delete')?'<button type="button" class="btn bg-rose-50 text-rose-800 text-xs" data-action="delete" data-id="'+esc(r.id)+'">刪除</button>':'');
    const from=r.hasActualTimes===false?'時間待確認':String(r.start||'').replace('T',' '),to=r.hasActualTimes===false?'時間待確認':r.end?String(r.end).replace('T',' '):'進行中';
-   return '<tr><td>'+esc(from)+'</td><td>'+esc(to)+'</td><td class="font-bold">'+esc(r.ship)+(r.voyage?' <span class="text-xs text-slate-500">'+esc(r.voyage)+'</span>':'')+'</td><td class="font-black">'+esc(r.rods)+'</td><td>'+esc(r.containers)+'</td><td>'+esc(r.hatches)+'</td><td>'+esc(r.shiftMoves??'—')+'</td><td><span class="text-xs font-bold '+(derived?'text-amber-800':'text-emerald-700')+'">'+(derived?'船舶資料推算':'雲端人工登錄')+'</span></td><td>'+editButton+'</td></tr>';
+   return '<tr><td>'+esc(from)+'</td><td>'+esc(to)+'</td><td class="font-bold">'+esc(r.ship)+(r.voyage?' <span class="text-xs text-slate-500">'+esc(r.voyage)+'</span>':'')+'</td><td class="font-black">'+esc(r.rods)+'</td><td>'+esc(r.containers)+'</td><td>'+esc(r.hatches)+'</td><td>'+esc(r.shiftMoves??'—')+'</td><td><span class="text-xs font-bold '+(derived?'text-amber-800':'text-emerald-700')+'">'+(r.source==='master'?'主檔待確認':derived?'船舶資料推算':'雲端人工登錄')+'</span></td><td>'+editButton+'</td></tr>';
   }).join('')||'<tr><td colspan="9" class="p-6 text-slate-500">'+(sourceTotal?'這個日期沒有達到指定桿數門檻的船舶紀錄。':'尚未載入 WORKING REPORT 船舶作業明細；請按「重新核對雲端」，或確認原船舶作業明細是否已匯入。')+'</td></tr>';
  }
  async function exportExcel(){
@@ -306,7 +326,7 @@
    if(!g.XLSX?.utils)throw Error('Excel 元件載入失敗');
    const wb=XLSX.utils.book_new();
    const detail=[['作業日期','船名','航次','WORKING NO.','開始時間（台灣）','結束時間（台灣）','AQC桿數','櫃數','艙蓋','翻艙','來源','AQC編號','備註','修改時間','修改人員']];
-   rows.forEach(r=>detail.push([String(r.start).slice(0,10),r.ship,r.voyage||'',r.workingNo||'',r.start.replace('T',' '),r.end?r.end.replace('T',' '):'',r.rods,r.containers,r.hatches,r.shiftMoves??'',r.source==='auto'?'WORKING REPORT自動推算':'GAS人工登錄',(r.aqcNumbers||[]).join('、'),r.note||'',r.updatedAt||'',r.updatedBy||'']));
+   rows.forEach(r=>detail.push([String(r.start).slice(0,10),r.ship,r.voyage||'',r.workingNo||'',r.start.replace('T',' '),r.end?r.end.replace('T',' '):'',r.rods,r.containers??'',r.hatches??'',r.shiftMoves??'',r.source==='master'?'WORKING SHEET主檔待核對':r.source==='auto'?'WORKING REPORT自動推算':'GAS人工登錄',(r.aqcNumbers||[]).join('、'),r.note||'',r.updatedAt||'',r.updatedBy||'']));
    const grouped=new Map();
    rows.forEach(r=>{const k=r.start.slice(0,10)+'|'+r.ship+'|'+(r.voyage||'');let x=grouped.get(k);if(!x){x={date:r.start.slice(0,10),ship:r.ship,voyage:r.voyage||'',events:0,maxRods:0,containers:0,hatches:0,shiftMoves:0};grouped.set(k,x)}x.events++;x.maxRods=Math.max(x.maxRods,Number(r.rods)||0);x.containers+=Number(r.containers)||0;x.hatches+=Number(r.hatches)||0;x.shiftMoves+=Number(r.shiftMoves)||0});
    const summary=[['作業日期','船名','航次','作業次數','最高桿數（自動為當日不同AQC編號）','櫃數合計','艙蓋合計','翻艙合計'],...[...grouped.values()].map(x=>[x.date,x.ship,x.voyage,x.events,x.maxRods,x.containers,x.hatches,x.shiftMoves])];
