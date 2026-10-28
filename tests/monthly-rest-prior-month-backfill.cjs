@@ -41,8 +41,8 @@ assert.equal(plan.balances.length,83,'All active in-scope workers must be indivi
 assert.equal(summary.checked,83);
 assert.equal(summary.people.length,83,'All employees appear in the audit, not just staff with quota shortage');
 assert(summary.people.some(s=>s.includes('胡毓麒')&&s.includes('正式加班 例0／休1')),'Employee existing 休 report shown in ledger');
-assert(plan.rows.some(r=>r.date===date&&r.category==='休'&&r.planned===false),'An unreported actual rest-day shift before the 15th is a historical 休 suggestion');
-assert(!plan.rows.some(r=>r.date===date&&r.category!=='休'),'A 休 day must not be used as 例 or 國 make-up');
+assert(!plan.rows.some(r=>r.date===date),'Already reported later in September: earlier dates cannot be automatically backfilled');
+assert(!plan.rows.some(r=>r.planned),'Historical preview never auto-generates future overtime');
 assert(plan.rows.every(r=>r.date.startsWith(month)),'Original overtime date always belongs to September');
 assert.equal(JSON.stringify(snapshot),before,'Audit leaves all rosters, attendance and official reports untouched');
 assert(src.includes('q(\x27#mrPrior\x27).onclick'),'One-click last-month backfill button must be wired');
