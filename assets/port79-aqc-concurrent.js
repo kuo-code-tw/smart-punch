@@ -25,6 +25,11 @@ const physical=v=>{
  const m=s.match(/^0*(\d{1,6})$/);return m?String(Number(m[1])):'';
 };
 const baseKey=(ship,voyage,no)=>no?'NO:'+no:'SHIP:'+String(ship).trim().toUpperCase()+'|'+String(voyage).trim().toUpperCase();
+const vesselKey=(ship,voyage)=>{
+ const v=String(voyage||'').trim().toUpperCase(),raw=String(ship||'').trim().toUpperCase();
+ const name=v&&raw.endsWith(' '+v)?raw.slice(0,-v.length-1).trim():raw;
+ return name.replace(/\s+/g,' ')+'|'+v;
+};
 let memo=null;
 function invalidate(){memo=null}
 function index(records,masters,now=Date.now()){
@@ -39,6 +44,7 @@ function index(records,masters,now=Date.now()){
   raw.push({ship,voyage,no,unit,start,end,source,key:baseKey(ship,voyage,no)});
   if(source==='WORKING SHEET'){
    sheetUnitKeys.add(baseKey(ship,voyage,no)+'|'+unit);
+   sheetUnitKeys.add('VESSEL:'+vesselKey(ship,voyage)+'|'+unit);
    if(!sheetByPhysical.has(unit))sheetByPhysical.set(unit,[]);
    sheetByPhysical.get(unit).push({ship,voyage,no,start,end});
   }
@@ -69,7 +75,7 @@ function index(records,masters,now=Date.now()){
   const end=dayStart(date)+(b<a?86400000:0)+b*60000;
   // WORKING SHEET's AQC commence/complete are authoritative. WORKING REPORT
   // operator segments may continue after the crane has actually completed.
-  if(sheetUnitKeys.has(baseKey(ship,voyage,no)+'|'+unit))continue;
+  if(sheetUnitKeys.has(baseKey(ship,voyage,no)+'|'+unit)||sheetUnitKeys.has('VESSEL:'+vesselKey(ship,voyage)+'|'+unit))continue;
   const cuts=(sheetByPhysical.get(unit)||[]).filter(s=>baseKey(s.ship,s.voyage,s.no)!==baseKey(ship,voyage,no));
   let pieces=[[begin,end]];
   for(const s of cuts){
