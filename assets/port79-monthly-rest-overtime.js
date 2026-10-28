@@ -182,7 +182,7 @@ function weeklyRestReview(roster,month,cycleStart=''){
  for(const date of days){
   if(!date.startsWith(month+'-'))continue;
   // 無週期起點時，只按週日至週六提供非法律結論的參考預警。
-  const base=anchor?ms(anchor):ms(date)-new Date(ms(date)).getUTCDay()*86400000;
+  const base=anchor?ms(anchor):ms(date)-new Date(ms(date)+8*3600000).getUTCDay()*86400000;
   const cycle=Math.floor((ms(date)-base)/604800000),key=new Date(base+cycle*604800000+8*3600000).toISOString().slice(0,10);
   if(!groups.has(key))groups.set(key,{start:key,days:[],regular:0,rest:0});
   const week=groups.get(key),code=String(roster[date]||'').trim();
@@ -272,7 +272,7 @@ function plan(snapshot,people,month,rules){
  // Schedule the whole group together rather than finishing one person first.
  // Actual eligible attendance always precedes future plans; distribute each person's
  // dates across weeks before maximizing the number sharing each eligible date.
- for(const category of cats)for(const planned of (historical?[false]:[true,false])){
+ for(const category of cats)for(const planned of (historical?[false]:[false,true])){
   while(true){
    const byDate=new Map();
    for(const state of states){
