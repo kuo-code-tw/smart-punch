@@ -136,23 +136,27 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   button.style.removeProperty('border-color');
   button.style.removeProperty('box-shadow');
   button.removeAttribute('title');
-  if(!info)continue;
-  const palette=info.kind==='revoked'?['#fee2e2','#991b1b','#f87171']:
+  // 白色只代表「正式雲端月份已讀取、當日沒有申報或撤銷紀錄」。
+  // 尚未讀到完整月份時不可誤當作無申報；查核標記不參與顏色判斷。
+  const ready=state?.ready===true;
+  const palette=!ready?['#f1f5f9','#64748b','#94a3b8']:
+   !info?['#ffffff','#334155','#cbd5e1']:
+   info.kind==='revoked'?['#fee2e2','#991b1b','#f87171']:
    info.kind==='amended'?['#fef3c7','#92400e','#f59e0b']:
    ['#dcfce7','#166534','#4ade80'];
   button.style.setProperty('background-color',palette[0],'important');
   button.style.setProperty('color',palette[1],'important');
   button.style.setProperty('border-color',palette[2],'important');
-  if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px '+palette[1],'important');
-  button.dataset.p79OvertimeAudit=info.kind;
-  button.title=info.title;
-  button.setAttribute('aria-label',date+'｜'+info.title.replaceAll('\n','；'));
+  if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px #4f46e5','important');
+  button.dataset.p79OvertimeAudit=info?.kind||(ready?'none':'unknown');
+  button.title=info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認'));
+  button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
  }
  if(!host.querySelector('#p79OvertimeDateLegend')){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='綠：已申報｜黃：已修改｜紅：已取消';
+  legend.textContent='白：無申報｜綠：已申報｜黃：已修改｜紅：已取消｜灰：未確認';
   host.appendChild(legend);
  }
 }
