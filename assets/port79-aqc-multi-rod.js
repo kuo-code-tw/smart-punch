@@ -51,25 +51,24 @@
  function utcLocalTime(date){const d=new Date(date);if(!Number.isFinite(d.getTime()))return '';const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(d);const v=Object.fromEntries(p.map(x=>[x.type,x.value]));return v.year+'-'+v.month+'-'+v.day+'T'+v.hour+':'+v.minute}
  function mount(){
   if($(ID)||!$('view-dashboard'))return;
-  const section=document.createElement('section');section.id=ID;section.className='hidden space-y-4';
+  const section=document.createElement('section');section.id=ID;section.className='hidden space-y-2';
   section.innerHTML=[
-  '<div class="card p-4 sm:p-5 space-y-4">',
-  '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">找出整個碼頭同一時段使用 4 隻以上 AQC 的作業，包含多艘船合計；先讀快取立即顯示。</p></div>',
+  '<div class="card p-3 sm:p-4 space-y-2">',
+  '<div class="flex flex-wrap gap-2 items-center justify-between"><h2 class="text-base font-bold text-slate-900">⚓ AQC 多桿作業管理</h2>',
   '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">人工修正（選用）</button></div>',
-  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">目前現場同時作業上限為 <b>4 桿</b>。WORKING SHEET 開工至完工是作業涵蓋區間，不代表全程連續動桿。若來源出現 5 桿以上重疊，標為「上限 4 桿／待核對」，不能當成已確認五桿；每桿 AQC 與各船分配仍可展開核對。日後現場設備增加時可更新實際上限。原船舶請款資料不變。</p>',
-  '<div class="flex flex-wrap gap-3 items-end">',
+  '<div class="flex flex-wrap gap-2 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
   '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
   '<label class="text-sm font-bold">顯示<select id="multiRodMode" class="block border rounded-xl px-3 py-2 mt-1"><option value="day">指定日期</option><option value="month">整個月份</option><option value="all">全部紀錄</option></select></label>',
   '<button type="button" id="multiRodRefresh" class="btn bg-slate-100">重新核對雲端</button><button type="button" id="multiRodImport" class="btn bg-amber-50">匯入此帳號舊本機紀錄</button>',
   '<button type="button" id="multiRodExport" class="btn bg-emerald-600 text-white">📥 匯出 Excel（明細＋彙總）</button></div>',
-  '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">顯示船舶</div><div id="multiRodShips" class="text-xl font-black">0 艘</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">作業組數</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">現場上限／來源峰值</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">資料來源</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
-  '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div>',
-  '<details class="bg-slate-50 border rounded-xl p-3"><summary class="cursor-pointer font-bold text-sm text-slate-700">🔎 檢查資料日期與各船桿數（包含未達 4 桿）</summary><div id="multiRodSourceAudit" class="mt-3 text-sm text-slate-700"></div><div id="multiRodSourcePreview" class="mt-3 text-xs space-y-1"></div></details>',
+  '<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">',
+  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">顯示船舶</span><span id="multiRodShips" class="text-sm font-bold text-slate-900">0 艘</span></div>',
+  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">作業組數</span><span id="multiRodEvents" class="text-sm font-bold text-slate-900">0 筆</span></div>',
+  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">現場上限／來源峰值</span><span id="multiRodContainers" class="text-sm font-bold text-slate-900">0</span></div>',
+  '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white border border-slate-200 rounded-lg px-3 py-2"><span class="text-xs text-slate-500">資料來源</span><span id="multiRodHatches" class="text-sm font-bold text-slate-900">0／0</span></div></div>',
+  '<div id="multiRodSourceState" class="hidden" role="status" aria-hidden="true"></div>',
+  '<details class="bg-white border border-slate-200 rounded-lg px-3 py-2"><summary class="cursor-pointer font-semibold text-xs text-slate-600">🔎 核對來源時段與各船桿數</summary><div id="multiRodSourceAudit" class="mt-2 text-xs text-slate-600"></div><div id="multiRodSourcePreview" class="mt-2 text-xs space-y-1"></div></details>',
   '<div class="overflow-x-auto"><table class="tbl w-full min-w-[780px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>同時作業船舶／期間各船來源峰值</th><th>期間來源最高桿數</th><th>來源／AQC 起訖核對</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
   '<div id="multiRodNotice" role="status" aria-live="polite" class="text-sm text-slate-600"></div></div>',
   '<div id="multiRodEditor" class="card p-4 sm:p-5 space-y-4 hidden">',
@@ -246,10 +245,7 @@
   if(audit){
    const period=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
    const label=mode==='all'?'全部快取期間':mode==='month'?period.slice(0,7):period;
-   audit.textContent='查詢範圍：'+label+'。可辨識時間區間 '+result.rawIntervals+' 筆；現場最大 '+result.physicalCapacity+' 桿，來源重疊最高 '+result.sourcePeak+' 桿（非已證實同時作業）。符合篩選 '+result.rows.length+' 個增減桿時段，合併為 '+list.length+' 組船舶作業；其中 '+list.filter(x=>x.capacityConflict).length+' 組來源超額待核。'+
-    (result.pending.length?'另有 '+result.pending.length+' 艘船的主檔只有配置桿數、缺少各 AQC 起訖時間，不能當成同時作業。':'')+
-    (result.duplicateCraneConflicts?'偵測到重疊時段重複 AQC 編號，已按設備編號去重。':'')+
-    (!result.rawIntervals?'所選期間未找到可計算的起訖時間；請確認快取所含月份或重新核對雲端。':'');
+   audit.textContent='查詢 '+label+'｜來源變化 '+result.rows.length+' 段｜作業 '+list.length+' 組｜超限待核 '+list.filter(x=>x.capacityConflict).length+' 組'+(result.pending.length?'｜起訖時間不足 '+result.pending.length+' 艘':'')+(result.duplicateCraneConflicts?'｜設備重疊已去重':'');
   }
   if(preview){
    preview.innerHTML=list.slice(0,30).map(x=>
