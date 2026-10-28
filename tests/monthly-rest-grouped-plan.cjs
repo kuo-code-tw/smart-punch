@@ -22,7 +22,7 @@ let plan=api.plan(s,people,'2026-10',rules);
 assert.equal(plan.rows.length,3,'only the current completed date appears (one per employee)');
 assert(plan.rows.every(r=>r.date==='2026-10-25'&&r.category==='國'&&!r.planned));
 assert.equal(new Set(plan.rows.map(r=>r.date)).size,1,'same-category employees share a confirmed date');
-assert.equal(plan.plannedRows.length,0,'no future overtime without guaranteed weekly rest');
+assert(plan.plannedRows.length>0&&plan.plannedRows.every(r=>r.planned&&r.needsWeeklyReview&&r.date>now),'Unprotected future work dates are visible as weekly-review drafts, never as formal overtime');
 now='2026-10-28';
 plan=api.plan(s,people,'2026-10',rules);
 assert.equal(plan.rows.length,3,'each eligible employee may only appear on todays completed date');
