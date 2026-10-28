@@ -6,6 +6,7 @@ on:
       - 'tests/overtime-pending-attendance.cjs'
       - 'tests/overtime-planned-separate-section.cjs'
       - 'tests/overtime-planned-review-action.cjs'
+      - 'tests/overtime-pending-reasons-punch-edit.cjs'
       - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
   push:
@@ -15,6 +16,7 @@ on:
       - 'tests/overtime-pending-attendance.cjs'
       - 'tests/overtime-planned-separate-section.cjs'
       - 'tests/overtime-planned-review-action.cjs'
+      - 'tests/overtime-pending-reasons-punch-edit.cjs'
       - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
 permissions:
@@ -32,6 +34,7 @@ jobs:
           node tests/overtime-pending-attendance.cjs
           node tests/overtime-planned-separate-section.cjs
           node tests/overtime-planned-review-action.cjs
+          node tests/overtime-pending-reasons-punch-edit.cjs
           node tests/overtime-edit-action.cjs
           node tests/overtime-original-id-sync.cjs
           node tests/overtime-batch-save-context.cjs
