@@ -754,6 +754,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
   <section id="efficiencyMainTabs" class="card p-3 sm:p-4">
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
+      <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🔎 月報核對</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
@@ -2010,6 +2011,7 @@ function activeEfficiencyTabName(){const tab=document.querySelector('.tab.active
 function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
+  if(name==='multi-rod'){window.P79AqcMultiRod?.render();return;}
   if(name==='compare'){
     populateSelects();
     const month=document.getElementById('monthlyCompareMonth')?.value||'';
@@ -2032,7 +2034,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='weekly'){renderWeeklyEfficiency();return;}
 }
 function switchTab(name,btn){if(name==='workload'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','compare','groups','personstats','weekly','ranking','dispatch'].forEach(x=>{
+  ['dashboard','multi-rod','compare','groups','personstats','weekly','ranking','dispatch'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name);
   });
@@ -15023,5 +15025,6 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
  }
 }
 </style>
+<script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-v1"></script>
 </body></html>
 
