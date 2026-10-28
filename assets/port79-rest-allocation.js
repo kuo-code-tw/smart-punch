@@ -16,8 +16,16 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[]) {
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[]) {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
+  // A fully checked no-punch work shift is shown as 休 in the roster. Reconcile it
+  // with the SAME quota allocator instead of letting the UI count an extra 休
+  // while the shared monthly ledger still has an unfilled 國 day.
+  // Caller supplies only evidence-verified no-punch dates; never infer from a
+  // blank or pending attendance record inside this pure allocator.
+  const observedOff=new Set(observedOffDates);
+  const isRestCandidate=date=>schedule[date]==='休'||
+    (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
@@ -63,7 +71,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // entire 83-person batch or be treated as approved overtime.
   for(const date of dates){
     const item=result[date];
-    if(!item||item.restCategory!=='休'||schedule[date]==='休'||
+    if(!item||item.restCategory!=='休'||isRestCandidate(date)||
        item.restQuotaOvertime||item.restAllocationLocked||item.restCategoryLocked||
        item.overtimeReport||item.overtimeReports?.length||item.overtime||
        item.forEmpId||item.type==='substitute')continue;
@@ -74,7 +82,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const flexible=new Set();
   for(const date of dates){
     const item=result[date]||{};
-    if(schedule[date]!=='休'||item.restQuotaOvertime||
+    if(!isRestCandidate(date)||item.restQuotaOvertime||
        item.restAllocationLocked||item.restCategoryLocked||
        item.overtime||item.overtimeReport||item.overtimeReports?.length||
        item.forEmpId||item.type==='substitute')continue;
@@ -83,12 +91,12 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   }
   const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[];
   const available=dates.filter(date=>
-    schedule[date]==='休'&&!substitutionDates.has(date)&&!excluded.has(date)&&
+    isRestCandidate(date)&&!substitutionDates.has(date)&&!excluded.has(date)&&
     (!result[date]?.restCategory||flexible.has(date))&&
     !result[date]?.restAllocationLocked&&!result[date]?.restCategoryLocked&&
     !result[date]?.overtime&&!result[date]?.overtimeReport&&
     !result[date]?.overtimeReports?.length&&!result[date]?.forEmpId&&
-    !result[date]?.restQuotaOvertime);
+    !result[date]?.manualRosterShift&&!result[date]?.restQuotaOvertime);
   // Only a non-revoked formal report can consume an unworked rest quota
   // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
   const verifiedRestReport=item=>{
@@ -105,7 +113,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     if(typhoonProtected.has(date)||excluded.has(date)&&!verifiedRestReport(item))continue;
     // No cloud report ID means the manual overtime note does not reserve quota.
     if(item.restQuotaOvertime&&!verifiedRestReport(item))continue;
-    if(schedule[date]!=='休'&&!verifiedRestReport(item))continue;
+    if(!isRestCandidate(date)&&!verifiedRestReport(item))continue;
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
     if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);
