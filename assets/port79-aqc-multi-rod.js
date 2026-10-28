@@ -2,6 +2,9 @@
 (function(g){
  'use strict';
  const ID='view-multi-rod';
+ // Current site-wide operating limit; not an inferred total from overlapping service windows.
+ // Raise this only when physical equipment capacity actually increases.
+ const CURRENT_AQC_CAPACITY=4;
  const $=id=>document.getElementById(id);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -53,7 +56,7 @@
   '<div class="card p-4 sm:p-5 space-y-4">',
   '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">找出整個碼頭同一時段使用 4 隻以上 AQC 的作業，包含多艘船合計；先讀快取立即顯示。</p></div>',
   '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">人工修正（選用）</button></div>',
-  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">依 WORKING SHEET 的 AQC 起訖時間及 WORKING REPORT 作業時段，計算全碼頭同時動桿總數。例如 A 船 2 桿、B 船 2 桿同時作業，即顯示 4 桿。快取優先、不重複下載；手動紀錄由 GAS 儲存，原船舶請款資料不變。</p>',
+  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">目前現場同時作業上限為 <b>4 桿</b>。WORKING SHEET 開工至完工是作業涵蓋區間，不代表全程連續動桿。若來源出現 5 桿以上重疊，標為「上限 4 桿／待核對」，不能當成已確認五桿；每支 AQC 與各船分配仍可展開核對。日後現場設備增加時可更新實際上限。原船舶請款資料不變。</p>',
   '<div class="flex flex-wrap gap-3 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
   '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
@@ -175,7 +178,7 @@
   const idx=concurrencyIndex();
   return idx?g.P79AqcConcurrent.compute(idx,getRows(),{
    date:val('multiRodDate')||today(),mode:val('multiRodMode')||'day',
-   min:Math.max(1,Math.floor(Number(val('multiRodMin'))||4))
+   min:Math.max(1,Math.floor(Number(val('multiRodMin'))||4)),capacity:CURRENT_AQC_CAPACITY
   }):{rows:[],peak:0,rawIntervals:0,sourceReportCount:0,pending:[],duplicateCraneConflicts:0,slotsChecked:0,intervalCount:0};
  }
  function cachedPeriod(month){
@@ -234,16 +237,16 @@
   $('multiRodAdd').disabled=!editAllowed('records.create');
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
   $('multiRodShips').textContent=allShips.size+' 艘';
-  $('multiRodEvents').textContent=list.length+' 段';
-  $('multiRodContainers').textContent=list.some(r=>r.needsReview)?'含待核對時段':result.peak+' 桿';
+  $('multiRodEvents').textContent=list.filter(r=>!r.capacityConflict).length+' 已核／'+list.filter(r=>r.capacityConflict).length+' 待核';
+  $('multiRodContainers').textContent=result.peak+' 桿'+(result.capacityConflictCount?'（來源超額待核）':'');
   $('multiRodHatches').textContent=result.sourceReportCount.toLocaleString('zh-TW')+' 筆快取明細';
   const sourceStatus=$('multiRodSourceState');
-  if(sourceStatus)sourceStatus.textContent='由目前瀏覽器已載入的船舶資料直接判斷｜WORKING REPORT '+result.sourceReportCount+' 筆、有效 AQC 作業區間 '+result.intervalCount+' 段。按同時刻跨船合計去重；符合門檻 '+list.length+' 段。超過4桿但缺少 AQC 完工時間證據的段落只標示待核對，不當成已確認桿數。未有明確起訖時間的「配置桿數」不會當成同時作業。';
+  if(sourceStatus)sourceStatus.textContent='快取工作明細 '+result.sourceReportCount+' 筆、可辨識 AQC 區間 '+result.intervalCount+' 段；現場同時作業上限 '+result.physicalCapacity+' 桿。來源時間重疊超過上限 '+result.capacityConflictCount+' 段，均待實際核對，不能認列為超過上限的作業。WORKING SHEET 的起訖時間不代表該桿在整段都持續動作。';
   const audit=$('multiRodSourceAudit'),preview=$('multiRodSourcePreview');
   if(audit){
    const period=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
    const label=mode==='all'?'全部快取期間':mode==='month'?period.slice(0,7):period;
-   audit.textContent='查詢範圍：'+label+'。可辨識時間區間 '+result.rawIntervals+' 筆；最高同時作業 '+result.peak+' 桿；符合門檻 '+result.rows.length+' 段。'+
+   audit.textContent='查詢範圍：'+label+'。可辨識時間區間 '+result.rawIntervals+' 筆；現場最大 '+result.physicalCapacity+' 桿，來源重疊最高 '+result.sourcePeak+' 支（非已證實同時作業）。符合篩選 '+result.rows.length+' 段，超額待核 '+result.capacityConflictCount+' 段。'+
     (result.pending.length?'另有 '+result.pending.length+' 艘船的主檔只有配置桿數、缺少各 AQC 起訖時間，不能當成同時作業。':'')+
     (result.duplicateCraneConflicts?'偵測到重疊時段重複 AQC 編號，已按設備編號去重。':'')+
     (!result.rawIntervals?'所選期間未找到可計算的起訖時間；請確認快取所含月份或重新核對雲端。':'');
@@ -251,18 +254,19 @@
   if(preview){
    preview.innerHTML=result.rows.slice(0,30).map(x=>
     '<div class="flex flex-wrap justify-between border-b py-1 gap-2"><span>'+esc(x.start.replace('T',' '))+'～'+esc(x.end.replace('T',' '))+'｜'+
-    esc(x.ships.map(s=>s.ship+' '+s.rods+'桿').join('、'))+'</span><span class="font-bold">合計 '+esc(x.totalRods)+' 桿</span></div>').join('')||
-    '<div class="text-amber-800">所選期間尚無同時達到最低桿數的作業時段；不代表沒有船舶作業。</div>';
+    esc(x.ships.map(s=>s.ship+' 來源'+s.rods+'桿').join('、'))+'</span><span class="font-bold">'+
+    (x.capacityConflict?'現場最多 '+esc(x.physicalCapacity)+' 桿（來源'+esc(x.totalRods)+'支重疊，待核）':'合計 '+esc(x.totalRods)+' 桿')+'</span></div>').join('')||
+    '<div class="text-amber-800">所選期間尚無可確認符合最低桿數的時段；不代表沒有船舶作業。</div>';
   }
   $('multiRodBody').innerHTML=list.map(r=>{
-   const ships=r.ships.map(s=>'<div class="text-left py-0.5">'+esc(s.ship)+(s.voyage?' <span class="text-xs text-slate-500">'+esc(s.voyage)+'</span>':'')+'：<b>'+esc(s.rods)+' 桿</b>'+(s.aqcNumbers?.length?' <span class="text-xs text-slate-500">AQC '+esc(s.aqcNumbers.join('、'))+'</span>':'')+'</div>').join('');
+   const ships=r.ships.map(s=>'<div class="text-left py-0.5">'+esc(s.ship)+(s.voyage?' <span class="text-xs text-slate-500">'+esc(s.voyage)+'</span>':'')+'：<b>'+(r.capacityConflict?'來源時段 '+esc(s.rods)+' 桿（實際分配待核）':esc(s.rods)+' 桿')+'</b>'+(s.aqcNumbers?.length?' <span class="text-xs text-slate-500">AQC '+esc(s.aqcNumbers.join('、'))+'</span>':'')+'</div>').join('');
    const evidence=r.ships.flatMap(s=>(s.evidence||[]).map(e=>({ship:s.ship,unit:e.unit,source:e.source,start:e.start,end:e.end})));
    const handoffs=(result.transfers||[]).filter(x=>x.finished>=r._start-3600000&&x.started<=r._end+3600000&&evidence.some(e=>e.unit===x.unit));
    const detail='<details class="text-left max-w-[380px]"><summary class="cursor-pointer font-semibold text-sky-800">查看 AQC 開工／完工比對</summary>'+
     '<div class="mt-2 text-xs space-y-1">'+(evidence.length?evidence.map(e=>'<div class="border-b pb-1">'+esc(e.ship)+'｜AQC '+esc(e.unit)+'｜'+esc(utcLocalTime(new Date(e.start)).replace('T',' '))+' → '+esc(utcLocalTime(new Date(e.end)).replace('T',' '))+' <span class="text-slate-500">('+esc(e.source)+')</span></div>').join(''):'此時段僅有人工作業紀錄，無各支 AQC 起訖時間')+(handoffs.length?'<div class="mt-2 font-semibold">同桿跨船接桿核對</div>'+handoffs.map(x=>'<div class="border-b py-1">AQC '+esc(x.unit)+'：'+esc(x.fromShip)+' 完工 '+esc(utcLocalTime(new Date(x.finished)).replace('T',' '))+' → '+esc(x.toShip)+' 開工 '+esc(utcLocalTime(new Date(x.started)).replace('T',' '))+'｜'+(x.gapMinutes>=0?'間隔 '+esc(x.gapMinutes)+' 分鐘':'⚠ 時間重疊 '+esc(Math.abs(x.gapMinutes))+' 分鐘')+'</div>').join(''):'')+'</div></details>';
-   const sourceLabel=r.needsReview?'報表推估，超過4桿待核對':r.verifiedRods===r.totalRods?'WORKING SHEET 完工時間核對':'部分由 WORKING REPORT 時段推估';
-   const totalText=r.needsReview?'待核對':esc(r.totalRods)+' 桿';
-   const totalHint=r.needsReview?'<div class="text-xs text-amber-800">報表推估 '+esc(r.totalRods)+' 桿，尚未以每支桿完工時間證實</div>':'';
+   const sourceLabel=r.capacityConflict?'來源起訖重疊超過現場4桿上限，待核對':r.needsReview?'部分時間待核對':r.verifiedRods===r.totalRods?'WORKING SHEET 起訖時間比對':'部分由 WORKING REPORT 時段推估';
+   const totalText=r.capacityConflict?'最多 '+esc(r.physicalCapacity)+' 桿（待核）':r.needsReview?'待核對':esc(r.totalRods)+' 桿';
+   const totalHint=r.capacityConflict?'<div class="text-xs text-amber-800">來源 '+esc(r.totalRods)+' 支區間重疊，不能證明同時作業；實際各船使用桿數待核對</div>':r.needsReview?'<div class="text-xs text-amber-800">來源時間仍待確認</div>':'';
    return '<tr><td>'+esc(r.start.replace('T',' '))+'</td><td>'+esc(r.end.replace('T',' '))+'</td><td>'+ships+'</td><td class="font-black">'+totalText+totalHint+'</td>'+
     '<td><div class="text-xs '+(r.needsReview?'text-amber-800':'text-sky-800')+'">'+sourceLabel+'</div>'+detail+'</td></tr>';
   }).join('')||'<tr><td colspan="5" class="p-6 text-slate-500">'+
