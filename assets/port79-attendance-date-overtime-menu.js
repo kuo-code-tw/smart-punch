@@ -3,7 +3,7 @@
  'use strict';
  let menu;
 
- // 「已查核」只表示人工看過此日期，不代表正式申報；不寫入考勤、班表或加班資料。
+ // 人工查核標記不更動日期顏色；白色只代表雲端已確認無申報，其餘依正式申報狀態顯色。
  // 目前使用同一瀏覽器的 localStorage 保存，避免用正式雲端申報欄位假冒查核紀錄。
  const reviewKey='p79.attendance.date.reviewed.v1';
  const dateValid=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
@@ -21,22 +21,6 @@
    return true;
   }catch(_){return false;}
  }
- function paintReviews(){
-  if(!document.head?.appendChild)return;
-  let style=document.getElementById?.('p79AttendanceReviewedDateStyle');
-  if(!style){
-   style=document.createElement('style');
-   style.id='p79AttendanceReviewedDateStyle';
-   document.head.appendChild(style);
-  }
-  // 用日期選擇器套用白色，不依賴按鈕是否被重新渲染，亦不反覆掃描考勤表。
-  style.textContent=[...reviewed].filter(dateValid).map(date=>
-   '#p79AttendanceDateStrip [data-p79-attendance-date="'+date+'"]'+
-   '{background-color:#fff!important;color:#334155!important;border-color:#64748b!important;box-shadow:inset 0 0 0 1px #64748b!important;}'+
-   '#p79AttendanceDateStrip [data-p79-attendance-date="'+date+'"]::after'+
-   '{content:" ✓";color:#166534;font-weight:900;}'
-  ).join('\n');
- }
  function changeReviewed(date,wantReviewed){
   if(!dateValid(date))return false;
   const next=new Set(reviewed);
@@ -45,12 +29,11 @@
    alert('無法儲存已查核日期：請確認瀏覽器允許本站使用本機儲存空間。');
    return false;
   }
-  reviewed=next;paintReviews();
+  reviewed=next;
   return true;
  }
- paintReviews();
  window.addEventListener('storage',function(event){
-  if(event.key===reviewKey){reviewed=loadReviews();paintReviews();}
+  if(event.key===reviewKey){reviewed=loadReviews();}
  });
  function close(){if(menu){menu.remove();menu=null;}}
  function openReportHere(date){
@@ -116,9 +99,9 @@
   const header=document.createElement('div');header.textContent=date+'　考勤日期';header.style.cssText='padding:8px 10px;color:#64748b;font-size:12px';
   const review=document.createElement('button');review.type='button';
   const isReviewed=reviewed.has(date);
-  review.textContent=isReviewed?'↩ 取消已查核｜恢復日期原色':'☑ 已查核｜日期變白色';
+  review.textContent=isReviewed?'取消已查核｜保留正式申報顏色':'標記已查核｜保留正式申報顏色';
   review.style.cssText='width:100%;padding:10px;text-align:left;background:#f1f5f9;border:0;border-radius:8px;color:#334155;font:inherit;cursor:pointer;margin-bottom:5px';
-  review.title='人工查核標記，只存在本瀏覽器，不會修改正式雲端申報或考勤';
+  review.title='僅儲存本機查核狀態；日期顏色只由正式加班申報決定';
   review.addEventListener('click',function(){
    close();
    changeReviewed(date,!isReviewed);
