@@ -57,8 +57,28 @@
   await loader();if(!global.XLSX)throw Error('試算表元件載入失敗');return global.XLSX;
  }
  function normalizeStored(value){return value===undefined?defaults():validate(value);}
+ function resolvedRule(row){
+  var r=row.slice(),value=r[3];
+  if(value===null||value===undefined||String(value).trim()===''){
+    r[3]='';
+    var time=function(x){return String(x==null?'':x).trim().replace(/:00$/,'').padStart(2,'0');};
+    if(r[0]==='延'&&r[8]==='after'&&Number(r[2])===4&&
+       time(r[4])==='08'&&time(r[5])==='16'&&time(r[6])==='16'&&time(r[7])==='20'&&
+       /^(?:代|延)?(?:08-20|16-20)$/.test(String(r[1]||'').trim()))r[3]=6.02;
+  }
+  return r;
+}
  function report(row){
-  const r=validate([row])[0];return {version:1,category:r[0],typeName:ruleType(r),code:r[1],declaredHours:Number(r[2]),convertedHours:r[3]===''?(r[0]==='延'&&r[4]==='08'&&r[5]==='16'&&r[6]==='16'&&r[7]==='20'&&Number(r[2])===4?6.02:null):Number(r[3]),normalStart:r[4],normalEnd:r[5],overtimeStart:r[6],overtimeEnd:r[7],position:r[8]};
+  const r=resolvedRule(validate([row])[0]);return {version:1,category:r[0],typeName:ruleType(r),code:r[1],declaredHours:Number(r[2]),convertedHours:r[3]===''?null:Number(r[3]),normalStart:r[4],normalEnd:r[5],overtimeStart:r[6],overtimeEnd:r[7],position:r[8]};
+ }
+ function verifySavedReport(draft,result){
+  const actual=result?.report,expected=draft.rule;
+  if(!actual||actual.id!==draft.id||actual.category!==expected.category||actual.code!==expected.code||Number(actual.declaredHours)!==Number(expected.declaredHours))throw Error('雲端回覆的申報身分或時數與修改內容不一致，已保留編輯內容');
+  const absent=v=>v===null||v===undefined||String(v).trim()==='';
+  if(absent(actual.convertedHours)!==absent(expected.convertedHours)||!absent(expected.convertedHours)&&Number(actual.convertedHours)!==Number(expected.convertedHours))throw Error('雲端沒有保留換算時數（預期 '+(absent(expected.convertedHours)?'空白':expected.convertedHours)+'，實際 '+(absent(actual.convertedHours)?'空白':actual.convertedHours)+'）；GAS 儲存規則尚未一致，已保留修改內容');
+  const time=v=>String(v??'').trim().replace(/:00$/,'').padStart(2,'0');
+  if(['normalStart','normalEnd','overtimeStart','overtimeEnd'].some(k=>time(actual[k])!==time(expected[k]))||String(actual.position||'full')!==String(expected.position||'full'))throw Error('雲端沒有保留所選出勤時段，已保留修改內容');
+  return true;
  }
  function interval(date,start,end,offset=0){
   const base=Date.parse(date+'T00:00:00+08:00'),a=hour(start),duration=span(start,end);
@@ -607,6 +627,7 @@
       try{
        await ensureSpecialRule(rows[Number(select.value)]);
        const result=await global.p79OvertimeContext.saveReport(draft);
+       verifySavedReport(draft,result);
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
        sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent=editingExisting?'✅ 原申報時段已核對修改，沿用同一申報 ID。':result.report?.planned?'✅ 預排加班已儲存；待實際出勤完成後核算，不會先填入打卡時間。':'✅ 加班申報已儲存，已更新加班管理。';
        global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));
@@ -626,7 +647,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 

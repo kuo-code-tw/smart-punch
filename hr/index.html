@@ -3,7 +3,7 @@
 <head><script>window.P79ManagementOptimizationMode=true;</script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-hr-import.js?v=20261025-zh-import-export"></script>
-<script src="../assets/port79-overtime-report.js?v=20261025-zh-import-export&role20261026=1&rev=20261022-workflow"></script>
+<script src="../assets/port79-overtime-report.js?v=20261028-conversion-receipt-v2&role20261026=1"></script>
 <!-- PORT79 V5.10.3：人資主檔載入改為本機快取先顯示＋30秒雲端同步＋逾時自動45秒重試，避免 12 秒 AbortError 導致整頁 0 人。 -->
 <!-- PORT79 V5.10.2：取消「綁定打卡」時同步清除雲端 deviceId；避免人資顯示免綁但雲端殘留舊手機。 -->
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜hr -->
@@ -439,9 +439,15 @@ const FINE_CATALOG={
  hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人資名冊'],['employment.edit','在職/離職/留停'],['org.view','查看部門/單位/職稱'],['org.manage','管理部門/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
  history:[['attendance.view','查看考勤歷史'],['schedule.view','查看排班歷史'],['vessel.view','查看船舶歷史']]
 };
+function p79AssignedJobTitle(value){
+ if(typeof value!=='string')return '';
+ const title=value.normalize('NFKC').trim();
+ if(!title||title.length>64||/[\u0000-\u001f]/.test(title))return '';
+ return /^F\s*\/?\s*L$/i.test(title)?'F/L':title;
+}
 function p79AvailableJobScopes(){
   const values=[...(orgSettings.jobTitles||[]),...employees.map(e=>e.jobTitle||e.deptDetail||'')];
-  const unique=[...new Set(values.map(x=>String(x||'').trim()).filter(Boolean))];
+  const unique=[...new Set(values.map(p79AssignedJobTitle).filter(Boolean))];
   return unique.sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
 }
 const SCOPE_OPTIONS=[['self','僅本人'],['unit','本單位'],['department','本部門'],['assigned','指定職稱（逐項勾選）'],['all','全部人員']];
@@ -993,8 +999,8 @@ function p79UpdateOvertimeManagementDisplay(){
 function buildPermGrid(e){
   const p=normalizePerms(e||{adminRole:'employee'}),role=$('adminRole').value||'employee',superRole=role==='superadmin',employeeRole=role==='employee',canGrant=canHr('permissions.manage');
   const scopes=dataScopes(e||{}),selectedJobs=e?.dataScopeJobs&&typeof e.dataScopeJobs==='object'?e.dataScopeJobs:{};
-  // 指定職稱與目前雲端實際接受的範圍一致。
-  const availableJobs=[...new Set(['AQC','ARMG','F/L','領班','指揮手',...Object.values(selectedJobs).flatMap(value=>Array.isArray(value)?value:[])])];
+  // 保留已勾選職稱，並提供目前人資主檔／組織設定的職稱。
+  const availableJobs=[...new Set(['AQC','ARMG','F/L','領班','指揮手',...p79AvailableJobScopes(),...Object.values(selectedJobs).flatMap(value=>Array.isArray(value)?value:[])].map(p79AssignedJobTitle).filter(Boolean))];
   const cards=SYS.map(k=>{
     const f=fineDefaults({...e,adminRole:role},k);
     let actions=(FINE_CATALOG[k]||[]).map(([key,label])=>`<label class="perm-action"><input type="checkbox" data-fine="${k}" data-action="${key}" ${f[key]?'checked':''} ${superRole||employeeRole||!canGrant?'disabled':''}><span>${label}</span></label>`).join('');
@@ -1005,7 +1011,7 @@ function buildPermGrid(e){
   if(superRole||employeeRole){
     ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍</b><p>${superRole?'超級管理員：全部系統固定可查看全部人員。':'一般員工：僅本人資料。'}</p>${SYS.map(k=>`<input type="hidden" id="scope_${k}" value="${superRole?'all':'self'}">`).join('')}</div>`;
   }else{
-    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、F/L、領班、指揮手。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${job}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].includes(job)?'checked':''} ${!canGrant?'disabled':''}>${job}</label>`).join('')}</div></div></div>`).join('')}</div>`;
+    ranges=`<div class="permitem" style="grid-column:1/-1"><b>資料可見範圍（各系統分開設定）</b><p class="muted">只影響可看哪些人員；管理功能由上方系統權限決定。指定職稱可選 AQC、ARMG、F/L、領班、指揮手及人資主檔中的其他職稱。</p>${SYS.map(k=>`<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;border-top:1px solid #e2e8f0;padding:10px 0"><label for="scope_${k}">${LABEL[k]}</label><div><select id="scope_${k}" onchange="p79ToggleJobScopes('${k}')" ${!canGrant?'disabled':''}>${SCOPE_OPTIONS.map(([v,label])=>`<option value="${v}" ${scopes[k]===v?'selected':''}>${label}</option>`).join('')}</select><div id="scope_jobs_${k}" style="display:${scopes[k]==='assigned'?'flex':'none'};flex-wrap:wrap;gap:8px;margin-top:8px">${availableJobs.map(job=>`<label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px"><input type="checkbox" data-job-scope="${k}" value="${esc(job)}" ${Array.isArray(selectedJobs[k])&&selectedJobs[k].map(p79AssignedJobTitle).includes(job)?'checked':''} ${!canGrant?'disabled':''}>${esc(job)}</label>`).join('')}</div></div></div>`).join('')}</div>`;
   }
   $('permGrid').innerHTML=cards+ranges;
   SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];});
@@ -1070,7 +1076,7 @@ async function saveCurrent(){
   if(!editing&&!canHr('people.create'))return alert('沒有新增人員權限');
   const empId=$('empId').value.trim().toUpperCase(),name=$('name').value.trim();
   if(!empId||!name){alert('工號與姓名不可空白');return}
-  const role=$('adminRole').value,p={},finePermissions={},dataScope={},dataScopeJobs={};SYS.forEach(k=>{p[k]=role==='superadmin'?'manage':role==='employee'?'none':$('perm_'+k).value;finePermissions[k]={};document.querySelectorAll(`[data-fine="${k}"]`).forEach(cb=>finePermissions[k][cb.dataset.action]=!!cb.checked);if(role==='employee'){Object.keys(finePermissions[k]).forEach(a=>finePermissions[k][a]=false);if(k==='attendance')finePermissions[k].punch=true;if(k==='leave')finePermissions[k].apply=true}dataScope[k]=role==='superadmin'?'all':role==='employee'?'self':$('scope_'+k).value;dataScopeJobs[k]=dataScope[k]==='assigned'?[...document.querySelectorAll('[data-job-scope="'+k+'"]:checked')].map(el=>el.value):[]});
+  const role=$('adminRole').value,p={},finePermissions={},dataScope={},dataScopeJobs={};SYS.forEach(k=>{p[k]=role==='superadmin'?'manage':role==='employee'?'none':$('perm_'+k).value;finePermissions[k]={};document.querySelectorAll(`[data-fine="${k}"]`).forEach(cb=>finePermissions[k][cb.dataset.action]=!!cb.checked);if(role==='employee'){Object.keys(finePermissions[k]).forEach(a=>finePermissions[k][a]=false);if(k==='attendance')finePermissions[k].punch=true;if(k==='leave')finePermissions[k].apply=true}dataScope[k]=role==='superadmin'?'all':role==='employee'?'self':$('scope_'+k).value;dataScopeJobs[k]=dataScope[k]==='assigned'?[...document.querySelectorAll('[data-job-scope="'+k+'"]:checked')].map(el=>p79AssignedJobTitle(el.value)).filter(Boolean):[]});
   if(SYS.some(k=>dataScope[k]==='assigned'&&!dataScopeJobs[k].length))return alert('指定範圍至少需要選一個職稱');
   const old=editing||{},lb=old.leaveBalance&&typeof old.leaveBalance==='object'?{...old.leaveBalance}:{};
   if($('leaveRemaining').value!=='')lb.remaining=Number($('leaveRemaining').value);
@@ -1094,13 +1100,13 @@ async function saveCurrent(){
     const result=await apiPost({action:'hrUpsertEmployee',originalEmpId,employee});
     if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
     if(result.employee&&SYS.some(k=>normalizePerms(result.employee)[k]!==p[k]))throw new Error('雲端回覆的後台權限與設定不一致，請保留視窗並重新核對');
-    if(result.employee?.dataScopeJobs&&SYS.some(k=>JSON.stringify([...(result.employee.dataScopeJobs[k]||[])].sort())!==JSON.stringify([...(dataScopeJobs[k]||[])].sort())))throw new Error('雲端回覆的指定職稱權限與設定不一致，請保留視窗並重新核對');
+    if(result.employee?.dataScopeJobs&&SYS.some(k=>JSON.stringify([...(result.employee.dataScopeJobs[k]||[])].map(p79AssignedJobTitle).filter(Boolean).sort())!==JSON.stringify([...(dataScopeJobs[k]||[])].sort())))throw new Error('雲端回覆的指定職稱權限與設定不一致，請保留視窗並重新核對');
     // 正式雲端主檔讀回一致才可關閉編輯器；不可只依 POST 回覆或本機合併值宣告成功。
     const data=await apiGet('hrGetEmployees',20000);
     const cloudEmployee=(data.employees||[]).find(item=>String(item.empId||'').trim().toUpperCase()===empId);
     if(!cloudEmployee)throw new Error('儲存回應成功，但雲端主檔尚未讀到此員工；視窗已保留，請核對後再重試');
     if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k]))throw new Error('雲端讀回的後台權限與設定不一致；視窗已保留');
-    const sortedJobs=jobs=>[...(Array.isArray(jobs)?jobs:[])].map(x=>String(x).trim()).sort();
+    const sortedJobs=jobs=>[...(Array.isArray(jobs)?jobs:[])].map(p79AssignedJobTitle).filter(Boolean).sort();
     if(SYS.some(k=>JSON.stringify(sortedJobs(cloudEmployee.dataScopeJobs?.[k]))!==JSON.stringify(sortedJobs(dataScopeJobs[k]))))
       throw new Error('雲端沒有保留指定職稱（例如 F/L）；請確認 GAS 人資權限儲存欄位與部署版本，視窗已保留');
     if(SYS.some(k=>String(cloudEmployee.dataScope?.[k]||'')!==String(dataScope[k]||'')))
