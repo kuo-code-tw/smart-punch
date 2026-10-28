@@ -13778,6 +13778,21 @@ function p79OvertimePeriodLabel(report){
             renderOvertimeStats();
         }
         let p79OvertimePlannedDisplayedRows=[];
+        // 清單與申報視窗共用唯一的「實際打卡 → 預排時段」比對，不再各自沿用舊報單 code。
+        function p79ResolvePlannedOvertimePeriod(row){
+            if(!row?.clockIn||!row?.clockOut||!window.P79OvertimeShiftMatch?.resolve||
+               !window.P79Overtime?.reportRules)return null;
+            const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
+            if(!date)return null;
+            const start=p79DirectAttendanceTimestamp(row.clockIn),end=p79DirectAttendanceTimestamp(row.clockOut);
+            if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||
+               p79OvertimeAttendanceIssue(row,start,end))return null;
+            return window.P79OvertimeShiftMatch.resolve({
+                date,roster:p79WorkOvertimeRoster(row.empId,date),
+                report:row.overtimeReport||null,rules:window.P79Overtime.reportRules(),
+                start,end,attendanceIssue:false
+            });
+        }
         function p79OpenPlannedOvertimeReview(index){
             const row=p79OvertimePlannedDisplayedRows[Number(index)];
             if(!row||row.p79RestDraft)return alert('此筆仍是未來預排建議，不能在尚未出勤時核定加班。');
@@ -13793,10 +13808,7 @@ function p79OvertimePeriodLabel(report){
             // 待核對也必須與正式清單一樣，依完整實際打卡推導時段。
             // 舊預排的 16-24 不可在員工已改為 08-16 後再次帶回申報。
             const roster=p79WorkOvertimeRoster(row.empId,date);
-            const periodReview=window.P79OvertimeShiftMatch?.resolve?.({
-                date,roster,report,rules:window.P79Overtime.reportRules(),
-                start,end,attendanceIssue:false
-            });
+            const periodReview=p79ResolvePlannedOvertimePeriod(row);
             const suggested=periodReview?.state==='completed'&&periodReview.confirmed
                 ?periodReview.suggested:null;
             // 匹配失敗時不猜班別、不沿用衝突中的舊時段，必須由管理員核對。
@@ -13945,7 +13957,12 @@ function p79OvertimePeriodLabel(report){
             if(toggle)toggle.textContent='預排／待核對（'+rows.length+'）';
             body.innerHTML=visible.length?visible.map((row,index)=>{
                 const report=row.overtimeReport||{},date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
-                const period=String(report.code||'尚未設定');
+                const matched=p79ResolvePlannedOvertimePeriod(row);
+                const corrected=matched?.confirmed&&matched?.state==='completed'&&matched?.suggested;
+                const period=String(corrected?.code||report.code||'尚未設定');
+                const previousPeriod=String(report.code||'');
+                const periodHint=corrected&&previousPeriod&&previousPeriod!==period
+                    ?'<span class="block text-xs text-amber-700 dark:text-amber-300" title="原預排：'+escapeHtml(previousPeriod)+'；尚待正式核對">依打卡修正（待核對）</span>':'';
                 const hours=Number(report.declaredHours);
                 const reason=p79OvertimePendingReason(row,todayKey);
                 const inCell=p79OvertimePendingPunchCell(row,'IN',todayKey,index);
@@ -13958,7 +13975,7 @@ function p79OvertimePeriodLabel(report){
                     '<td class="p-3 font-semibold whitespace-nowrap">'+escapeHtml(row.name||'')+'</td>'+
                     '<td class="p-3">'+escapeHtml(row.dept||'')+'</td>'+
                     '<td class="p-3">'+escapeHtml(row.jobTitle||'')+'</td>'+
-                    '<td class="p-3 font-mono whitespace-nowrap">'+escapeHtml(period)+'</td>'+
+                    '<td class="p-3 font-mono whitespace-nowrap">'+escapeHtml(period)+periodHint+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+(Number.isFinite(hours)&&hours>0?hours+' 小時':'待核對')+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+inCell+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+outCell+'</td>'+
