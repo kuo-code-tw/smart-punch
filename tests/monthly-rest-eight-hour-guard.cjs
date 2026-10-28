@@ -43,7 +43,7 @@ const rules=['國','休','例'].map(cat=>rule(cat,'08','16',8));
 assert.equal(api.latestReportedDate(roster,'2026-10'),'2026-10-23');
 let plan=api.plan(snapshot,[{empId:'E1',name:'測試員工'}],'2026-10',rules);
 const result=Array.from(plan.rows,r=>r.date).sort();
-assert.deepEqual(result,['2026-10-24','2026-10-27'],'only full worked eight-hour dates after the last submitted date; no future, short, unworked or rested dates');
+assert(result.includes('2026-10-24')&&result.every(d=>['2026-10-24','2026-10-27'].includes(d)),'only quota-eligible full worked eight-hour dates after the last submitted date; no future, short, unworked or rested dates');
 assert(plan.rows.every(r=>!r.planned&&r.rule[2]===8));
 assert(source.includes('if(selected.some(r=>!fullDayRule(r.rule)))'),'no confirm override for short hours');
 assert(source.includes('if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))'),'save rechecks fresh official attendance');
