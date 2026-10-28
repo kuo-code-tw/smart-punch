@@ -280,7 +280,7 @@
  async function exportExcel(){
   if(!canView()){notice('沒有查看效率資料的權限',true);return}
   const sess=session();if(String(sess?.adminRole||'').toLowerCase()!=='superadmin'&&sess?.finePermissions?.efficiency?.['records.export']===false){notice('沒有匯出權限',true);return}
-  const scope=identity(),result=concurrentResult(),rows=result.rows;
+  const scope=identity(),result=concurrentResult(),rows=g.P79AqcConcurrent?.groupSegments(result.rows)||result.rows;
   if(!rows.length){notice('此日期沒有符合同時桿數門檻的時段可匯出。',true);return}
   try{
    if(typeof g.p79EnsureXlsx!=='function')throw Error('Excel 元件未載入');
@@ -288,30 +288,41 @@
    if(identity()!==scope)throw Error('登入身分已變更，已停止匯出');
    if(!g.XLSX?.utils)throw Error('Excel 元件載入失敗');
    const book=XLSX.utils.book_new();
-   const detail=[['作業日期','時段開始（台灣）','時段結束（台灣）','實際同時桿數（待核留空）','現場上限桿數','來源時間重疊桿數（非已確認）','核對狀態','船舶總數','船名','航次','WORKING NO.','來源各船重疊桿數','AQC 編號','櫃數','艙蓋','翻艙','資料來源','備註']];
+   const detail=[['作業日期','時段開始（台灣）','時段結束（台灣）','實際同時桿數（待核留空）','現場上限桿數','來源時間重疊桿數（非已確認）','核對狀態','船舶總數','船名','航次','WORKING NO.','期間各船來源最高桿數','期間曾記錄 AQC 編號','櫃數','艙蓋','翻艙','資料來源','備註']];
    for(const r of rows)for(const ship of r.ships){
     // Quantities can only be attributed to the overlap when a confirmed manual
     // record exactly matches its start/end, not from vessel-wide totals.
-    const exact=ship.manualStart===r._start&&ship.manualEnd===r._end;
-    detail.push([r.date,r.start.replace('T',' '),r.end.replace('T',' '),r.capacityConflict?'':r.totalRods,r.physicalCapacity,r.sourceOverlapRods,
-     r.capacityConflict?'來源區間超過現場上限，實際桿數待核對':'來源重疊未超過現場上限',r.shipCount,
+    const exact=(r.segments?.length||1)===1&&ship.manualStart===r._start&&ship.manualEnd===r._end;
+    detail.push([r.date,r.start.replace('T',' '),r.end.replace('T',' '),'',r.physicalCapacity,r.sourceOverlapRods,
+     r.capacityConflict?'連續作業期間來源峰值超過上限，實際桿數待核對':'連續作業期間來源峰值未超限，實際動桿仍未確認',r.shipCount,
      ship.ship,ship.voyage||'',ship.workingNo||'',ship.rods,(ship.aqcNumbers||[]).join('、'),
      exact?ship.containers:'',exact?ship.hatches:'',exact?ship.shiftMoves:'',
-     ship.source,r.capacityConflict?'實際哪幾支作業及各船分配未確認；來源區間不能證明超出現場桿數上限':exact?'人工區間數量已核對':'櫃數、艙蓋、翻艙無法由重疊時間精確拆分，待核對']);
+     ship.source,'同組船舶 '+(r.segments?.length||1)+' 段增減桿時段；'+(r.capacityConflict?'來源超限，實際桿數待核':exact?'人工區間有數量記錄':'期間櫃數與艙蓋不能依起訖分攤')]);
+   }
+   // Main sheet: ONE ship-pair job. Audit sheet: ALL original crane-change intervals.
+   const auditDetail=[['主紀錄開始','主紀錄結束','變化時段開始','變化時段結束','船名','航次','WORKING NO.','來源該船支數','來源合計支數','AQC 設備','是否來源超限待核','實際動桿數（無證據留空）']];
+   const groupOfSegment=new Map();
+   for(const group of rows)for(const part of group.segments||[group]){
+    groupOfSegment.set(part,group.id);
+    for(const ship of part.ships)auditDetail.push([group.start.replace('T',' '),group.end.replace('T',' '),
+     part.start.replace('T',' '),part.end.replace('T',' '),ship.ship,ship.voyage||'',ship.workingNo||'',
+     ship.rods,part.totalRods,(ship.aqcNumbers||[]).join('、'),part.capacityConflict?'待核對':'','']);
    }
    const daily=new Map();
-   for(const r of rows)for(const ship of r.ships){
+   for(const r of result.rows)for(const ship of r.ships){
     const key=r.date+'|'+(ship.workingNo||ship.ship+'|'+ship.voyage);
-    if(!daily.has(key))daily.set(key,{date:r.date,ship:ship.ship,voyage:ship.voyage||'',peak:0,sourcePeak:0,conflicts:0,minutes:0,segments:0});
-    const d=daily.get(key);if(!r.capacityConflict)d.peak=Math.max(d.peak,ship.rods);else d.conflicts++;
-    d.sourcePeak=Math.max(d.sourcePeak,ship.rods);d.minutes+=r.durationMinutes;d.segments++;
+    if(!daily.has(key))daily.set(key,{date:r.date,ship:ship.ship,voyage:ship.voyage||'',peak:0,sourcePeak:0,conflicts:new Set(),minutes:0,groups:new Set()});
+    const d=daily.get(key),groupKey=groupOfSegment.get(r)||r.id;
+    d.groups.add(groupKey);if(!r.capacityConflict)d.peak=Math.max(d.peak,ship.rods);else d.conflicts.add(groupKey);
+    d.sourcePeak=Math.max(d.sourcePeak,ship.rods);d.minutes+=r.durationMinutes;
    }
-   const summary=[['日期','船名','航次','來源達門檻時段數','來源未超限最高各船桿數','來源各船最高重疊桿數','超額待核時段數','參與來源達標時段分鐘數','說明'],
-    ...[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.ship.localeCompare(b.ship)).map(x=>[x.date,x.ship,x.voyage,x.segments,x.peak||'',x.sourcePeak,x.conflicts,x.minutes,'現場同時上限 '+CURRENT_AQC_CAPACITY+' 桿；區間重疊不等於持續實際動桿，超額時段不能認列實際桿數'])];
+   const summary=[['日期','船名','航次','連續作業組數','來源未超限最高各船桿數','來源各船最高重疊桿數','來源超限待核組數','參與來源達標時段分鐘數','說明'],
+    ...[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.ship.localeCompare(b.ship)).map(x=>[x.date,x.ship,x.voyage,x.groups.size,x.peak||'',x.sourcePeak,x.conflicts.size,x.minutes,'現場同時上限 '+CURRENT_AQC_CAPACITY+' 桿；區間重疊不等於持續實際動桿，超額時段不能認列實際桿數'])];
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(detail),'AQC作業明細');
    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(summary),'每日船舶彙總');
+   XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(auditDetail),'時段變化核對');
    XLSX.writeFile(book,'AQC同時多桿作業_'+(val('multiRodMode')==='all'?'全部':val('multiRodMode')==='month'?(val('multiRodDate')||today()).slice(0,7):val('multiRodDate')||today())+'.xlsx');
-   notice('已匯出 '+rows.length+' 段來源作業（含 '+rows.filter(r=>r.capacityConflict).length+' 段超過現場上限待核）；不會將超額來源推算寫成已證實桿數。');
+   notice('已匯出 '+rows.length+' 組船舶作業，附 '+result.rows.length+' 段增減桿時段供核對；不將來源五支視為實際五桿。');
   }catch(err){notice('Excel 匯出失敗：'+(err.message||err),true)}
  }
  function activate(){render();void sync();void syncSource();}
