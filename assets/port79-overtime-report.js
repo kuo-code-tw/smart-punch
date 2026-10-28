@@ -532,7 +532,7 @@
     const forId=String(forSelect.value||'');
     approvedDates=approvedLeaveDateChoices(leaveRecords,forId);
     const selectedRule=select.selectedIndex>=0?rows[Number(select.value)]:null;
-    const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&selectedRule?.[0]==='延';
+    const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&selectedRule?.[0]==='延';
     leaveDateWrap.style.display=forId&&!originalExtensionReview?'flex':'none';
     leaveDateSelect.innerHTML='<option value="">'+(approvedDates.length?'請選核准請假日期':'沒有可核對的已核准請假日期')+'</option>'+approvedDates.map(d=>'<option value="'+d+'">'+d.replaceAll('-','/')+'</option>').join('');
     // 原申報的日期由已儲存申報鎖定；不得因另一人的核准請假資料未讀入而清空。
@@ -632,7 +632,7 @@
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
      // 已存在的平日延長加班預排，只核對同一張申報、同一員工、日期與原代班關聯；
      // 請假資料缺漏不可抹去原申報日期。新申報及真正請假代班仍須核對核准請假日。
-     const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&rows[Number(select.value)]?.[0]==='延'&&
+     const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&rows[Number(select.value)]?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
      if(!originalExtensionReview)validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?prefill.date:'');
