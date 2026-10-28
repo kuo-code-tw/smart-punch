@@ -105,10 +105,10 @@
   const el=$('multiRodShipOptions');if(el)el.innerHTML=candidates().map(s=>'<option value="'+esc(s.vessel)+'"></option>').join('');
  }
  function openEditor(row){
-  if(busy)return;if(!editAllowed(row?'records.edit':'records.create')){alert('目前帳號沒有此項效率管理權限');return}
-  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=row?.source==='auto'?'':(row?.id||'');$('multiRodEditId').dataset.version=String(row?.version||0);
+  if(busy)return;if(!editAllowed(row&&row.source!=='auto'&&row.source!=='master'?'records.edit':'records.create')){alert('目前帳號沒有此項效率管理權限');return}
+  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=['auto','master'].includes(row?.source)?'':(row?.id||'');$('multiRodEditId').dataset.version=String(row?.version||0);
   $('multiRodEditor').dataset.scope=identity();
-  $('multiRodFormTitle').textContent=row?.source==='auto'?'確認現有船舶多桿作業':row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
+  $('multiRodFormTitle').textContent=['auto','master'].includes(row?.source)?'確認現有船舶多桿作業':row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
   $('multiRodShip').value=row?.ship||'';$('multiRodVoyage').value=row?.voyage||'';
   $('multiRodRods').value=row?.rods??4;$('multiRodStart').value=row?.hasActualTimes===false?'':row?.start||utcLocalTime(new Date());
   $('multiRodEnd').value=row?.end||'';$('multiRodBoxes').value=row?.containers??0;
