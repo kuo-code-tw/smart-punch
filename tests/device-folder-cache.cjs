@@ -8,11 +8,11 @@ function directory(name='79號碼頭雲端資料庫'){
  async getFileHandle(n,{create=false}={}){if(!files.has(n)){if(!create)throw Error('NotFound');files.set(n,'')}return {getFile:async()=>({size:Buffer.byteLength(files.get(n)),text:async()=>{reads++;return files.get(n)}}),createWritable:async()=>{let pending;return {write:async s=>{if(fail)throw Error('disk full');pending=s},close:async()=>{files.set(n,pending);writes++},abort:async()=>{}}}}}
  };
 }
-function setup({folder=directory(),stores=new Map(),persistent=false,dbFails=false,doc={},timer=setTimeout}={}){
+function setup({folder=directory(),stores=new Map(),persistent=false,dbFails=false,dbHangs=false,doc={},timer=setTimeout}={}){
  const ss=storage(),ls=storage();ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));ss.setItem('port79_user_token','TOKEN');
  const db={objectStoreNames:{contains:k=>stores.has(k)},createObjectStore:k=>stores.set(k,new Map()),close(){},transaction(name){const tx={},map=stores.get(name)||new Map();stores.set(name,map);tx.objectStore=()=>({get(key){const req={};queueMicrotask(()=>{req.result=map.get(key);req.onsuccess?.();tx.oncomplete?.()});return req},put(row){map.set(row.key,row);queueMicrotask(()=>tx.oncomplete?.())},getAll(){const req={};queueMicrotask(()=>{req.result=[...map.values()];req.onsuccess?.()});return req},clear(){map.clear();queueMicrotask(()=>tx.oncomplete?.())}});return tx}};
  const window={crypto:webcrypto,navigator:{storage:{persist:async()=>persistent,persisted:async()=>persistent}},fetch:async()=>{throw Error('unexpected cloud write')},showDirectoryPicker:async()=>folder};
- const ctx={window,sessionStorage:ss,localStorage:ls,URL,URLSearchParams,Request,Response,Blob,TextEncoder,Uint8Array,Date,JSON,Map,Set,Promise,console,setTimeout:timer,clearTimeout,document:doc,location:{pathname:'/smart-punch/hr/',href:'https://example.com/smart-punch/hr/'},indexedDB:{open(){const req={};queueMicrotask(()=>{if(dbFails){req.error=Error('quota');req.onerror?.();return}req.result=db;if(!stores.has('settings'))req.onupgradeneeded?.();req.onsuccess?.()});return req}}};
+ const ctx={window,sessionStorage:ss,localStorage:ls,URL,URLSearchParams,Request,Response,Blob,TextEncoder,Uint8Array,Date,JSON,Map,Set,Promise,console,setTimeout:timer,clearTimeout,document:doc,location:{pathname:'/smart-punch/hr/',href:'https://example.com/smart-punch/hr/'},indexedDB:{open(){const req={};if(dbHangs)return req;queueMicrotask(()=>{if(dbFails){req.error=Error('quota');req.onerror?.();return}req.result=db;if(!stores.has('settings'))req.onupgradeneeded?.();req.onsuccess?.()});return req}}};
  vm.createContext(ctx);vm.runInContext(source,ctx);return {api:window.Port79DataCache,stores,folder,ss,window};
 }
 function noticeDom(){
@@ -167,6 +167,9 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   const x=setup();await x.api.put({...row(),key:'A@admin|system|efficiency',system:'efficiency',scope:{month:'2026-10'}});
   assert(await x.api.getDisplaySnapshot('efficiency',{month:'2026-10'}));assert.equal(await x.api.getDisplaySnapshot('efficiency',{month:'2026-11'}),null);
   await x.api.put({...row(),key:'A@admin|system|efficiency',system:'efficiency',scope:{year:'2025'}});assert.equal(await x.api.getDisplaySnapshot('efficiency',{month:'2026-10'}),null);
+ });
+ await test('a blocked browser database cannot stall native display initialization indefinitely',async()=>{
+  const x=setup({dbHangs:true});assert.equal(await x.api.getDisplaySnapshot('hr'),null);
  });
  console.log(JSON.stringify({passed,scope:'Simulated folder permissions, IndexedDB resets and disk failures; no cloud data'}));
 })().catch(e=>{console.error(e);process.exitCode=1});

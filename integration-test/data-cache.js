@@ -474,7 +474,8 @@ async function getSystemSnapshot(sys){
 // Display-only data: current account/scope, no intervening edit, no permission from payload.
 async function getDisplaySnapshot(sys,options={}){
  const scope=displayScope(),viewer=viewerKey(),credential=token();
- const row=await getSystemSnapshot(sys);
+ let timer,row;
+ try{row=await Promise.race([getSystemSnapshot(sys),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1500)})]);}finally{clearTimeout(timer)}
  if(!row||!credential||viewer!==viewerKey()||credential!==token()||scope!==displayScope()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
  if(row.displayScope!==undefined&&row.displayScope!==scope)return null;
  if(row.cacheEndpoint&&row.cacheEndpoint!==gasUrl())return null;
