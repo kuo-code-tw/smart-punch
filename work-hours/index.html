@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261027-original-id-edit-v4&role20261026=1&clockout45=20261027"></script>
+<script src="../assets/port79-overtime-report.js?v=20261028-conversion-receipt-v2&role20261026=1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
 <script src="../assets/port79-overtime-period-sync.js?v=20261027-original-id-v1"></script>
@@ -13430,7 +13430,7 @@ function p79DisplayedOvertimeConversion(report){
  const code=String(report?.code||'').trim();
  const standardNormal=norm(report?.normalStart)==='08'&&norm(report?.normalEnd)==='16';
  const standardOvertime=norm(report?.overtimeStart)==='16'&&norm(report?.overtimeEnd)==='20';
- if((report?.category==='延'||report?.position==='after')&&standardNormal&&standardOvertime&&Number(report?.declaredHours)===4&&/^(?:代|延)?(?:08-20|16-20)$/.test(code))return '6.02小時';
+ if((report?.category==='延'||report?.position==='after')&&standardNormal&&standardOvertime&&Number(report?.declaredHours)===4&&/^(?:代|延)?(?:08-20|16-20)$/.test(code))return '6.02小時（規則值，尚未寫入雲端）';
  return '未設定';
 }
 function p79OvertimePeriodLabel(report){
@@ -16057,6 +16057,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
    return p79SaveWorkOvertimeDraft(draft,null,lockRetry+1);
   }
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id||(draft.preventReplace&&result.report?.id!==draft.id))throw Error(result.error||'原申報身分或加班寫入尚未確認');
+  window.P79Overtime?.verifySavedReport?.(draft,result);
   const prior=p79WorkOvertimeMonths.get(month),merged=new Map((prior?.rows||[]).map(row=>[String(row.empId).toUpperCase(),row]));
   (cloud.schedules||[]).forEach(row=>merged.set(String(row.empId).toUpperCase(),row));
   p79WorkOvertimeMonths.set(month,{...prior,token,ready:true,pending:false,at:Date.now(),rows:[...merged.values()],covers:[...(prior?.covers||[]).filter(c=>!(c.workerIds||[]).some(id=>String(id).toUpperCase()===employeeId)),...(cloud.leaveCoverAssignments||[])]});

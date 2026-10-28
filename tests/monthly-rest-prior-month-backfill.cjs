@@ -47,8 +47,8 @@ assert(plan.rows.every(r=>r.date.startsWith(month)),'Original overtime date alwa
 assert.equal(JSON.stringify(snapshot),before,'Audit leaves all rosters, attendance and official reports untouched');
 assert(src.includes('q(\x27#mrPrior\x27).onclick'),'One-click last-month backfill button must be wired');
 assert(src.includes("note:backfillContext(loadedMonth).note"),'Original/handling months must be stored in the report note');
-assert(src.includes("a.snapshot(loadedMonth)"),'Read and reconcile original work month');
-assert(src.includes("const fresh=await a.snapshot(loadedMonth)"),'Immediately before save, re-fetch original month');
+assert(src.includes("a.snapshot(loadedMonth,false,false,true)"),'Read and reconcile original work month');
+assert(src.includes("const fresh=await a.snapshot(loadedMonth,false,false,true)"),'Immediately before save, re-fetch original month');
 assert(src.includes("if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId"),'Do not duplicate already saved reports');
 assert(src.includes("attendance.length!==1"),'Requires exactly one complete attendance evidence pair');
 assert(src.includes("context.historical&&!confirm"),'Historical backfill needs explicit operator confirmation');

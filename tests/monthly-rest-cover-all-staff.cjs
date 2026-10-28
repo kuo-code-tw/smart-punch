@@ -32,8 +32,10 @@ for(let i=0;i<83;i++){
  assert(b.remaining.休>=0,key+' no negative quota');
  if(i%2===0){
   const row=b.ledger.find(x=>x.date===d&&x.kind==='reported');
-  assert.match(row.statusNote,/已申報/,'Past planned flag is not absence of a saved report');
-  assert(b.conflicts.some(x=>x.date===d&&/已有正式申報/.test(x.reason)),'Past planned marker must prompt attendance review, never a duplicate report');
+  // The latest merged attendance reconciliation clears stale planned warnings
+  // when complete worked evidence already confirms the saved declaration.
+  assert.equal(row.statusNote,'');
+  assert(!b.conflicts.some(x=>x.date===d&&/原預排旗標/.test(x.reason)),'complete worked evidence must not keep an obsolete planned warning');
  }
  assert.equal(JSON.stringify(fixture),orig,key+' audit may not modify rosters or reports');
 }
@@ -75,6 +77,6 @@ assert(hours.includes("已有正式申報；原預排標記未更新，出勤待
  'Past submitted report with no complete clock pair must explicitly say already filed, pending punch review');
 const main=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 assert(main.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId'),'Submission must not duplicate any existing recorded overtime or cover assignment');
-assert(main.includes("已申報；原預排旗標未更新"),'Past plans must be shown as submitted with pending attendance reconciliation');
+assert(main.includes("已申報；原預排旗標待核對出勤"),'Past plans must be shown as submitted with pending attendance reconciliation');
 console.log(JSON.stringify({passed:89,staffReviewed:83,failed:0,
  scope:'all staff rest-day cover, saved vs attendance-flag separation, explicit no-double-count, typhoon/pure-cover exemptions, revocations and audit read-only'}));
