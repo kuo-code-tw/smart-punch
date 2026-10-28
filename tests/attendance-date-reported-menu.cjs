@@ -5,8 +5,8 @@ const menuCode=fs.readFileSync('assets/port79-attendance-date-overtime-menu.js',
 const exportCode=fs.readFileSync('assets/port79-attendance-overtime-export.js','utf8');
 new vm.Script(menuCode);new vm.Script(exportCode);
 assert(page.includes('日期按右鍵可查看「已申報」或匯出加班明細'));
-assert(page.includes('port79-attendance-date-overtime-menu.js?v=20261028-current-active-reviewed-v2'));
-assert(menuCode.includes("reported.textContent='✅ 已申報｜查看當日正式紀錄'"));
+assert(page.includes('port79-attendance-date-overtime-menu.js?v=20261028-cloud-readback-v3'));
+assert(menuCode.includes("reported.textContent='📄 查看已申報紀錄（唯讀，不變色）'"));
 assert(menuCode.includes('P79AttendanceOvertimeExport.openReported(date)'));
 assert(exportCode.includes('openReported:date=>open(date,true,true)'));
 assert(exportCode.includes("d.querySelector('#p79OtExportSave').style.display=viewOnly?'none':''"));

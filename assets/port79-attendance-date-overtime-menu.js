@@ -4,13 +4,40 @@
  let menu;
 
  // 查核狀態綁定當下正式雲端申報版本，避免舊查核掩蓋新修改。
- function changeReviewed(date,wantReviewed){
+ function showReviewResult(result,date){
+  const message=String(result?.message||date+' 查核結果不明，請重新確認正式雲端申報');
+  const host=document.getElementById('p79AttendanceDateStrip');
+  if(host?.appendChild){
+   let status=document.getElementById('p79AttendanceReviewFeedback');
+   if(!status){
+    status=document.createElement('span');
+    status.id='p79AttendanceReviewFeedback';
+    status.setAttribute('role','status');
+    status.style.cssText='display:inline-flex;align-items:center;white-space:normal;max-width:600px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;font-weight:700';
+    host.appendChild(status);
+   }
+   status.style.backgroundColor=result?.ok?'#dcfce7':'#fff7ed';
+   status.style.color=result?.ok?'#166534':'#9a3412';
+   status.textContent=message;
+   status.title=message;
+  }
+  if(typeof showToast==='function')showToast(message,result?.ok?'success':'warning');
+  else if(!result?.ok)alert(message);
+ }
+ async function changeReviewed(date,wantReviewed,button){
   const api=window.P79AttendanceOvertimeDayStatus;
-  if(typeof api?.markReviewed!=='function'||!api.markReviewed(date,wantReviewed)){
-   alert('這一天的正式申報資料尚未確認，或無法儲存查核狀態。請重新整理／從雲端拉取後再試。');
+  if(typeof api?.recheckAndMarkReviewed!=='function'){
+   showReviewResult({ok:false,message:'考勤查核程式尚未完整載入，請重新整理網頁再試'},date);
    return false;
   }
-  return true;
+  button.disabled=true;
+  button.textContent=wantReviewed?'正在向雲端核對 '+date+' 正式申報…':'正在取消查核…';
+  let result;
+  try{result=await api.recheckAndMarkReviewed(date,wantReviewed);}
+  catch(error){result={ok:false,message:date+' 查核失敗：'+String(error?.message||error)};}
+  close();
+  showReviewResult(result,date);
+  return result?.ok===true;
  }
  function close(){if(menu){menu.remove();menu=null;}}
  function openReportHere(date){
@@ -76,15 +103,15 @@
   const header=document.createElement('div');header.textContent=date+'　考勤日期';header.style.cssText='padding:8px 10px;color:#64748b;font-size:12px';
   const review=document.createElement('button');review.type='button';
   const isReviewed=window.P79AttendanceOvertimeDayStatus?.isReviewed?.(date)===true;
-  review.textContent=isReviewed?'取消已查核｜恢復待核狀態':'已查核｜有效申報顯示綠色';
+  review.textContent=isReviewed?'取消已查核｜恢復待核狀態':'查核完成｜重新核對雲端並更新顏色';
   review.style.cssText='width:100%;padding:10px;text-align:left;background:#f1f5f9;border:0;border-radius:8px;color:#334155;font:inherit;cursor:pointer;margin-bottom:5px';
   review.title='有正式有效申報才會呈綠色；未申報維持白色。若已有修改，查核後綁定當前版本；後續再修改會恢復黃色。';
   review.addEventListener('click',function(){
-   close();
-   changeReviewed(date,!isReviewed);
+   if(review.disabled)return;
+   void changeReviewed(date,!isReviewed,review);
   });
   const reported=document.createElement('button');reported.type='button';
-  reported.textContent='✅ 已申報｜查看當日正式紀錄';
+  reported.textContent='📄 查看已申報紀錄（唯讀，不變色）';
   reported.style.cssText='width:100%;padding:10px;text-align:left;background:#dcfce7;border:0;border-radius:8px;color:#166534;font:inherit;cursor:pointer;margin-bottom:5px';
   reported.title='只讀取雲端正式有效申報；不是手動變更此日狀態';
   reported.addEventListener('click',function(){

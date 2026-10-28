@@ -165,8 +165,10 @@ function refreshCurrentStrip(){
 }
 function markReviewed(date,checked){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return false;
- const signature=reviewFingerprint(date,cloudMonth(date));
+ const current=cloudMonth(date);
+ const signature=reviewFingerprint(date,current);
  if(!signature)return false; // 不可在正式資料未確認時假稱已查核。
+ if(checked&&!overtimeDayIndicator(date,current)?.activeCount)return false; // 無有效申報不得偽裝成綠色。
  const marks=reviewMarks();
  if(checked)marks[date]=signature;
  else delete marks[date];
@@ -180,6 +182,75 @@ function markReviewed(date,checked){
 g.addEventListener?.('storage',event=>{
  if(event.key===reviewVersionKey)refreshCurrentStrip();
 });
+// Right-click review always performs a fresh authorized GAS read, rather than trusting
+// a 60-second month cache or a previous revocation state.
+const activeReviewRequests=new Map();
+async function recheckAndMarkReviewed(date,checked=true){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))
+  return {ok:false,message:'日期格式不正確，無法核對申報'};
+ if(!checked){
+  const changed=markReviewed(date,false);
+  return {ok:changed,message:changed?date+' 已取消查核；目前有效的修改申報恢復黃色':date+' 取消查核失敗：請確認雲端資料與瀏覽器儲存權限'};
+ }
+ const month=date.slice(0,7);
+ if(activeReviewRequests.has(month))return activeReviewRequests.get(month);
+ const run=(async()=>{
+  const token=typeof getAttendanceEmployeeMasterToken==='function'
+   ?String(getAttendanceEmployeeMasterToken()||'').trim():'';
+  const base=typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||'').trim():'';
+  if(!token||!base)return {ok:false,message:date+' 雲端登入或連線資訊不足，請重新登入後核對'};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),30000);
+  try{
+   const url=new URL(base,g.location?.href||location.href);
+   url.searchParams.set('action','getScheduleDataSecure');
+   url.searchParams.set('gcToken',token);
+   url.searchParams.set('month',month);
+   url.searchParams.set('_',String(Date.now()));
+   const response=await g.fetch(url.toString(),{cache:'no-store',signal:controller.signal});
+   const data=await response.json();
+   if(!response.ok||data?.ok!==true)throw Error(data?.error||'雲端未完成正式資料核對');
+   if(!Array.isArray(data.schedules))throw Error('雲端未提供可查核的正式班表');
+   if(String(getAttendanceEmployeeMasterToken()||'').trim()!==token)
+    throw Error('登入狀態已變更，請重新操作');
+   const state={
+    token,at:Date.now(),ready:true,pending:false,rows:data.schedules,
+    people:Array.isArray(data.employees)?data.employees:[],
+    covers:Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[]
+   };
+   // Old asynchronous month fetches check identity before writing; replacing this
+   // cache state prevents a stale in-flight response from reverting the audit view.
+   const months=typeof p79AttendanceOvertimeMonths!=='undefined'?p79AttendanceOvertimeMonths:null;
+   if(!months)throw Error('考勤月份資料尚未初始化，請重新開啟考勤頁');
+   months.set(month,state);
+   refreshCurrentStrip();
+   const info=overtimeDayIndicator(date,state);
+   if(!info?.activeCount){
+    let excluded=0,other=0;
+    for(const row of state.rows){
+     const meta=row.schedule?.__meta?.[date];
+     if(meta?.overtimeExcluded===true&&
+      (meta.overtimeReport?.id||(meta.overtimeReports||[]).some(r=>r?.id)))excluded++;
+     if(meta?.overtimeReport?.id)other++;
+    }
+    const detail=info?.revokedCount
+     ?'目前讀到 '+info.revokedCount+' 筆取消紀錄'
+     :excluded?'雲端有 '+excluded+' 筆申報被標記為排除'
+     :other?'目前申報無有效紀錄':'目前沒有正式加班申報';
+    return {ok:false,kind:info?.kind||'none',message:date+' 已重新讀取雲端，但沒有有效正式申報（'+detail+'）；不能標綠。請在加班管理核實已儲存的申報。'};
+   }
+   if(!markReviewed(date,true))
+    return {ok:false,message:date+' 雲端確認 '+info.activeCount+' 筆有效申報，但查核狀態未能儲存在此瀏覽器，請確認網站儲存權限'};
+   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核完成並顯示綠色；修改／取消歷史仍保留'};
+  }catch(error){
+   const reason=error?.name==='AbortError'?'雲端讀取逾時':String(error?.message||error||'未知錯誤');
+   return {ok:false,message:date+' 查核失敗：'+reason+'。不會修改正式申報或強制變綠。'};
+  }finally{clearTimeout(timer);}
+ })();
+ activeReviewRequests.set(month,run);
+ try{return await run;}finally{if(activeReviewRequests.get(month)===run)activeReviewRequests.delete(month);}
+}
+
 function decorateOvertimeDateStrip(keys,selectedDate=''){
  const host=g.document?.getElementById?.('p79AttendanceDateStrip');
  if(!host||!Array.isArray(keys))return;
@@ -246,7 +317,7 @@ g.addEventListener?.('load',installOvertimeDateIndicators);
 g.addEventListener?.('focus',()=>{
  try{if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);}catch(_){}
 });
-g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,isReviewed,markReviewed,reviewFingerprint};
+g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,isReviewed,markReviewed,recheckAndMarkReviewed,reviewFingerprint};
 
 g.P79AttendanceOvertime={open,save};
 })(window);
