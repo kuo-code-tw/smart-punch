@@ -51,9 +51,9 @@
   const section=document.createElement('section');section.id=ID;section.className='hidden space-y-4';
   section.innerHTML=[
   '<div class="card p-4 sm:p-5 space-y-4">',
-  '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">自動整理現有船舶 WORKING REPORT 的當日 AQC 動桿資料；可另行確認並登錄桿數。</p></div>',
+  '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">找出整個碼頭同一時段使用 4 隻以上 AQC 的作業，包含多艘船合計；先讀快取立即顯示。</p></div>',
   '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button></div>',
-  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">自動推算資料來自現有船舶 WORKING REPORT（按同船同日不同 AQC 編號計算，不代表同時開動）；手動確認紀錄儲存在正式 GAS。兩種來源會標示並去重，不改動原船舶櫃數或請款統計。</p>',
+  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">依 WORKING SHEET 的 AQC 起訖時間及 WORKING REPORT 作業時段，計算全碼頭同時動桿總數。例如 A 船 2 桿、B 船 2 桿同時作業，即顯示 4 桿。快取優先、不重複下載；手動紀錄由 GAS 儲存，原船舶請款資料不變。</p>',
   '<div class="flex flex-wrap gap-3 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
   '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
@@ -62,12 +62,12 @@
   '<button type="button" id="multiRodExport" class="btn bg-emerald-600 text-white">📥 匯出 Excel（明細＋彙總）</button></div>',
   '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">顯示船舶</div><div id="multiRodShips" class="text-xl font-black">0 艘</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">動桿事件</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">櫃數</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
-  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">艙蓋／翻艙</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
+  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">達標時段</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
+  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">最高同時桿數</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
+  '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">資料來源</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
   '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div>',
   '<details class="bg-slate-50 border rounded-xl p-3"><summary class="cursor-pointer font-bold text-sm text-slate-700">🔎 檢查資料日期與各船桿數（包含未達 4 桿）</summary><div id="multiRodSourceAudit" class="mt-3 text-sm text-slate-700"></div><div id="multiRodSourcePreview" class="mt-3 text-xs space-y-1"></div></details>',
-  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[1100px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>船名／航次</th><th>桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
+  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[1100px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>同時作業船舶／各船桿數</th><th>總桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
   '<div id="multiRodNotice" role="status" aria-live="polite" class="text-sm text-slate-600"></div></div>',
   '<div id="multiRodEditor" class="card p-4 sm:p-5 space-y-4 hidden">',
   '<h3 id="multiRodFormTitle" class="text-lg font-black">新增 AQC 作業紀錄</h3>',
@@ -95,7 +95,7 @@
   $('multiRodExport').addEventListener('click',exportExcel);
   $('multiRodRefresh').addEventListener('click',()=>{void sync(true);void syncSource(true)});
   $('multiRodImport').addEventListener('click',importLegacy);
-  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='confirm')openEditor([...actualCandidates(),...masterCandidates(val('multiRodDate')||today(),1),...monthMasterCandidates((val('multiRodDate')||today()).slice(0,7),1)].find(r=>r.id===id));if(btn.dataset.action==='delete')remove(id)});
+  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='prefill'){const hit=concurrentResult().rows.find(r=>r.id===id),ship=hit?.ships?.[0];if(hit&&ship)openEditor({source:'overlap',ship:ship.ship,voyage:ship.voyage,workingNo:ship.workingNo,rods:ship.rods,start:hit.start,end:hit.end,containers:0,hatches:0,shiftMoves:0})}if(btn.dataset.action==='delete')remove(id)});
  }
  function candidates(){
   const raw=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
@@ -107,10 +107,10 @@
   const el=$('multiRodShipOptions');if(el)el.innerHTML=candidates().map(s=>'<option value="'+esc(s.vessel)+'"></option>').join('');
  }
  function openEditor(row){
-  if(busy)return;if(!editAllowed(row&&!['auto','sheet','master'].includes(row.source)?'records.edit':'records.create')){alert('目前帳號沒有此項效率管理權限');return}
-  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=['auto','sheet','master'].includes(row?.source)?'':(row?.id||'');$('multiRodEditId').dataset.version=String(row?.version||0);
+  if(busy)return;if(!editAllowed(row&&!['auto','sheet','master','overlap'].includes(row.source)?'records.edit':'records.create')){alert('目前帳號沒有此項效率管理權限');return}
+  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=['auto','sheet','master','overlap'].includes(row?.source)?'':(row?.id||'');$('multiRodEditId').dataset.version=String(row?.version||0);
   $('multiRodEditor').dataset.scope=identity();
-  $('multiRodFormTitle').textContent=['auto','master'].includes(row?.source)?'確認現有船舶多桿作業':row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
+  $('multiRodFormTitle').textContent=['auto','sheet','master','overlap'].includes(row?.source)?'確認現有船舶多桿作業':row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
   $('multiRodShip').value=row?.ship||'';$('multiRodVoyage').value=row?.voyage||'';
   $('multiRodRods').value=row?.rods??4;$('multiRodStart').value=row?.hasActualTimes===false?'':row?.start||utcLocalTime(new Date());
   $('multiRodEnd').value=row?.end||'';$('multiRodBoxes').value=row?.containers??0;
@@ -166,222 +166,53 @@
 
  // Automatically derive distinct AQC equipment used on a ship from official WORKING REPORT.
  // This is a daily vessel-level usage count, not an assertion that all cranes ran simultaneously.
- function sourceRows(){
-  const raw=typeof records!=='undefined'&&Array.isArray(records)?records:[];
-  const wr=raw.filter(r=>String(r?.source||'')==='working-report');
-  return typeof canonicalOperationalRecords==='function'?canonicalOperationalRecords(wr):wr;
- }
- const normShip=v=>String(v||'').trim().toUpperCase().replace(/\s+/g,' ');
- function autoCandidates(){
-  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
-  const byNo=new Map(masters.filter(s=>String(s.workingNo||'').trim()).map(s=>[String(s.workingNo).trim(),s]));
-  const groups=new Map();
-  const nextDate=date=>{const [y,m,d]=date.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+1)).toISOString().slice(0,10)};
-  for(const r of sourceRows()){
-   const date=normalizeDate(r.workDate);
-   if(!date)continue;
-   const aqc=typeof normalizeAqcNo==='function'?normalizeAqcNo(r.number||r.gcNo):String(r.number||r.gcNo||'').trim();
-   if(!/^\d{1,6}$/.test(String(aqc)))continue;
-   const no=String(r.workingNo||r.workNo||'').trim(),master=byNo.get(no);
-   const ship=String(r.shipName||master?.vessel||r.vessel||'').trim();
-   if(!ship)continue;
-   const voyage=String(r.voyageE||r.voyageI||r.voyage||master?.voyageE||master?.voyageI||'').trim();
-   const matchTime=t=>String(t||'').match(/^(\d{1,2}):(\d{2})/);
-   const s=matchTime(r.startTime),e=matchTime(r.endTime);
-   const sm=s?Number(s[1])*60+Number(s[2]):null,em=e?Number(e[1])*60+Number(e[2]):null;
-   const next=nextDate(date),crosses=sm!==null&&em!==null&&sm<1440&&em<1440&&em<sm;
-   const startDateTime=s?date+'T'+s[1].padStart(2,'0')+':'+s[2]:'';
-   const endDateTime=e?(crosses?next:date)+'T'+e[1].padStart(2,'0')+':'+e[2]:'';
-   const segments=[{date,start:startDateTime,end:endDateTime,quantity:true}];
-   if(crosses&&em>0){
-    segments[0].end=next+'T00:00';
-    segments.push({date:next,start:next+'T00:00',end:endDateTime,quantity:false});
-   }
-   for(const seg of segments){
-    const key=JSON.stringify([seg.date,no?'NO:'+no:'SHIP:'+normShip(ship)+'|'+voyage]);
-    if(!groups.has(key))groups.set(key,{date:seg.date,ship,voyage,workingNo:no,aqcs:new Set(),segments:[],containers:0,hatches:0,sourceCount:0,quantityCount:0});
-    const g=groups.get(key);g.aqcs.add(String(aqc));
-    if(seg.start&&seg.end)g.segments.push({start:seg.start,end:seg.end});
-    if(seg.quantity){
-     const disc=Number(r.disc),load=Number(r.load),boxes=Number(r.containers);
-     const quantity=Number.isFinite(disc)&&Number.isFinite(load)?disc+load:Number.isFinite(boxes)?boxes:0;
-     g.containers+=Math.max(0,quantity);
-     g.hatches+=Math.max(0,Number(r.hatches)||0);
-     g.quantityCount++;
-    }
-    g.sourceCount++;
-   }
-  }
-  return [...groups.values()].map(g=>{
-   const starts=g.segments.map(x=>x.start).sort(),ends=g.segments.map(x=>x.end).sort();
-   const m=byNo.get(g.workingNo),first=normalizeDate(m?.firstDate),last=normalizeDate(m?.lastDate);
-   const dailyShift=first===g.date&&last===g.date&&m?.shiftMoves!==undefined&&m?.shiftMoves!==null&&Number.isFinite(Number(m.shiftMoves))?Number(m.shiftMoves):null;
-   return {source:'auto',id:'AUTO:'+g.date+'|'+g.workingNo+'|'+g.ship+'|'+g.voyage,
-    ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,date:g.date,
-    rods:g.aqcs.size,aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
-    start:starts[0]||g.date+'T00:00',end:ends.at(-1)||'',hasActualTimes:starts.length>0,
-    containers:g.quantityCount?g.containers:null,hatches:g.quantityCount?g.hatches:null,
-    shiftMoves:dailyShift,sourceCount:g.sourceCount};
-  });
- }
-
- const normalizeDate=v=>{
-  const m=String(v||'').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';
- };
- const tzDate=ts=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts));
- const tzDateTime=ts=>{
-  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(ts));
-  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-  return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
- };
- const taipeiDateStart=date=>Date.parse(date+'T00:00:00+08:00');
- function instant(value){
-  if(value instanceof Date)return Number.isFinite(value.getTime())?value.getTime():NaN;
-  if(typeof value==='number')return value>100000000000?value:NaN;
-  const s=String(value||'').trim();if(!s)return NaN;
-  if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}[ T]\d{1,2}:\d{2}(?::\d{2})?$/.test(s))return Date.parse(s.replace(/\//g,'-').replace(' ','T')+'+08:00');
-  return Date.parse(s);
- }
- // WORKING SHEET contains per-AQC commence/complete timestamps. They are operational
- // evidence; an overall aqcCount alone is NOT evidence of activity on a given date.
- function sheetActivityCandidates(){
-  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
-  const groups=new Map();
-  for(const s of masters){
-   const aqcs=Array.isArray(s.aqcs)&&s.aqcs.length?s.aqcs:Array.isArray(s.workingSheetSource?.aqcs)?s.workingSheetSource.aqcs:[];
-   const ship=String(s.vessel||'').trim(),workingNo=String(s.workingNo||'').trim();
-   if(!ship||!aqcs.length)continue;
-   const voyage=String(s.voyageE||s.voyageI||'').trim();
-   for(const a of aqcs){
-    const number=typeof normalizeAqcNo==='function'?String(normalizeAqcNo(a.number||a.gcNo||'')):String(a.number||a.gcNo||'').trim();
-    if(!number||!/^\d{1,6}$/.test(number))continue;
-    const begin=instant(a.commence||a.start),finish=instant(a.complete||a.end);
-    if(!Number.isFinite(begin))continue;
-    const closed=Number.isFinite(finish)&&finish>=begin;
-    const end=closed?finish:begin+60000;
-    let cursor=tzDate(begin),last=tzDate(Math.max(begin,end-1));
-    for(let i=0;i<35&&cursor<=last;i++){
-     const dayStart=taipeiDateStart(cursor),dayEnd=dayStart+86400000;
-     const intervalStart=Math.max(begin,dayStart),intervalEnd=Math.min(end,dayEnd);
-     if(intervalStart<intervalEnd){
-      const key=JSON.stringify([cursor,workingNo?'NO:'+workingNo:'SHIP:'+normShip(ship)+'|'+voyage]);
-      if(!groups.has(key))groups.set(key,{date:cursor,ship,voyage,workingNo,aqcs:new Set(),starts:[],ends:[],unclosed:false,master:s});
-      const g=groups.get(key);g.aqcs.add(number);g.starts.push(tzDateTime(intervalStart));
-      if(closed)g.ends.push(tzDateTime(intervalEnd));else g.unclosed=true;
-     }
-     const next=new Date(dayEnd+12*3600000);cursor=tzDate(next.getTime());
-    }
-   }
-  }
-  return [...groups.values()].map(g=>{
-   const sameDay=normalizeDate(g.master.firstDate)===g.date&&normalizeDate(g.master.lastDate)===g.date;
-   return {id:'SHEET:'+g.date+'|'+g.workingNo+'|'+g.ship,source:'sheet',date:g.date,
-    ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,rods:g.aqcs.size,
-    aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
-    start:g.starts.sort()[0],end:g.unclosed?'':g.ends.sort().at(-1)||'',
-    hasActualTimes:true,containers:sameDay?Number(g.master.totalContainers??0):null,
-    hatches:sameDay?Number(g.master.hatches??0):null,shiftMoves:sameDay?Number(g.master.shiftMoves??0):null,
-    note:'船舶 WORKING SHEET AQC 起訖時間推算（每日去重）'};
-  });
- }
-
- // WORKING SHEET master fallback: a vessel spanning the selected date with >=min listed AQC units
- // is only a review candidate, NOT proof those units worked that date.
- function masterCandidates(date,min){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return [];
-  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
-  return masters.filter(s=>{
-   const from=normalizeDate(s.firstDate||s._cloudFirstDate||s.compareDate||s.workingSheetSource?.compareDate||'');
-   const to=normalizeDate(s.lastDate||s._cloudLastDate||from);
-   const n=Number(s.aqcCount)||((Array.isArray(s.aqcs)?s.aqcs:[]).length);
-   return from&&from<=date&&date<=to&&Number.isFinite(n)&&n>=min;
-  }).map(s=>({
-   source:'master',id:'MASTER:'+date+'|'+String(s.workingNo||'')+'|'+String(s.vessel||''),
-   ship:String(s.vessel||'').trim(),voyage:String(s.voyageE||s.voyageI||'').trim(),
-   workingNo:String(s.workingNo||'').trim(),date,rods:Number(s.aqcCount)||((s.aqcs||[]).length),
-   start:date+'T00:00',end:'',hasActualTimes:false,containers:null,hatches:null,shiftMoves:null
-  })).filter(s=>s.ship);
- }
- function sameVesselDay(a,b){
-  const sameDate=String(a.start||'').slice(0,10)===String(b.date||b.start||'').slice(0,10);
-  const aNo=String(a.workingNo||'').trim(),bNo=String(b.workingNo||'').trim();
-  return sameDate&&(aNo&&bNo?aNo===bNo:normShip(a.ship)===normShip(b.ship)&&String(a.voyage||'')===String(b.voyage||''));
- }
-
- function monthMasterCandidates(month,min){
-  if(!/^\d{4}-\d{2}$/.test(month))return [];
-  const first=month+'-01',last=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0,12)).toISOString().slice(0,10);
-  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
-  const output=[];
-  for(const s of masters){
-   const from=normalizeDate(s.firstDate||s._cloudFirstDate||s.compareDate||s.workingSheetSource?.compareDate),to=normalizeDate(s.lastDate||s._cloudLastDate||from);
-   const count=Number(s.aqcCount)||((Array.isArray(s.aqcs)?s.aqcs:[]).length);
-   if(!from||from>last||to<first||count<min)continue;
-   const date=from>first?from:first;
-   output.push({source:'master',id:'MASTER:'+date+'|'+String(s.workingNo||'')+'|'+String(s.vessel||''),date,
-    ship:String(s.vessel||'').trim(),voyage:String(s.voyageE||s.voyageI||'').trim(),
-    workingNo:String(s.workingNo||'').trim(),rods:count,
-    start:date+'T00:00',end:'',hasActualTimes:false,containers:null,hatches:null,shiftMoves:null});
-  }
-  return output.filter(s=>s.ship);
- }
- function actualCandidates(){
-  const report=autoCandidates(),sheet=sheetActivityCandidates(),merged=[...report];
-  for(const s of sheet){
-   const index=merged.findIndex(r=>sameVesselDay(r,s));
-   if(index<0){merged.push(s);continue;}
-   const r=merged[index];
-   const numbers=[...new Set([...(r.aqcNumbers||[]),...(s.aqcNumbers||[])])].sort((a,b)=>Number(a)-Number(b));
-   merged[index]={...r,source:'sheet',rods:numbers.length,aqcNumbers:numbers,
-    start:[r.start,s.start].filter(Boolean).sort()[0]||'',end:[r.end,s.end].filter(Boolean).sort().at(-1)||'',
-    hasActualTimes:true,containers:r.containers??s.containers,hatches:r.hatches??s.hatches,
-    shiftMoves:r.shiftMoves??s.shiftMoves,
-    note:'WORKING SHEET AQC 起訖時間＋WORKING REPORT 作業明細'};
-  }
-  return merged;
- }
- function combinedFiltered(){
-  const manual=filtered(),date=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
-  const min=Math.max(1,Math.floor(Number(val('multiRodMin'))||4));
-  const allActual=actualCandidates();
-  const qualified=allActual.filter(r=>r.rods>=min&&(mode==='all'||(mode==='month'?r.date.slice(0,7)===date.slice(0,7):r.date===date)));
-  const recorded=getRows();
-  const inferred=qualified.filter(a=>!recorded.some(r=>sameVesselDay(r,a)));
-  const candidates=mode==='day'?masterCandidates(date,min):mode==='month'?monthMasterCandidates(date.slice(0,7),min):[];
-  const sameMonthVessel=(r,a)=>String(r.start||r.date||'').slice(0,7)===a.date.slice(0,7)&&(r.workingNo&&a.workingNo?String(r.workingNo)===String(a.workingNo):normShip(r.ship)===normShip(a.ship)&&String(r.voyage||'')===String(a.voyage||''));
-  const masterFallback=candidates.filter(a=>!recorded.some(r=>mode==='month'?sameMonthVessel(r,a):sameVesselDay(r,a))&&!allActual.some(r=>r.rods>=min&&(mode==='month'?sameMonthVessel(r,a):sameVesselDay(r,a))));
-  return [...manual,...inferred,...masterFallback].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
- }
  let sourceBusy=null,sourceLoaded=new Set();
+ function concurrencyIndex(){
+  return g.P79AqcConcurrent?.index(typeof records!=='undefined'?records:[],
+   typeof shipMasters!=='undefined'?shipMasters:[])||null;
+ }
+ function concurrentResult(){
+  const idx=concurrencyIndex();
+  return idx?g.P79AqcConcurrent.compute(idx,getRows(),{
+   date:val('multiRodDate')||today(),mode:val('multiRodMode')||'day',
+   min:Math.max(1,Math.floor(Number(val('multiRodMin'))||4))
+  }):{rows:[],peak:0,rawIntervals:0,sourceReportCount:0,pending:[],duplicateCraneConflicts:0,slotsChecked:0,intervalCount:0};
+ }
+ function cachedPeriod(month){
+  const idx=concurrencyIndex();if(!idx)return false;
+  if(idx.raw.some(x=>g.P79AqcConcurrent.normalizeDate(x.start&&new Date(x.start).toISOString())?.slice(0,7)===month
+   ||g.P79AqcConcurrent.normalizeDate(x.end&&new Date(x.end).toISOString())?.slice(0,7)===month))return true;
+  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
+  return masters.some(s=>{const start=g.P79AqcConcurrent.normalizeDate(s.firstDate||s._cloudFirstDate||s.compareDate||'');
+   const end=g.P79AqcConcurrent.normalizeDate(s.lastDate||s._cloudLastDate||start);
+   return start&&start.slice(0,7)<=month&&(end||start).slice(0,7)>=month});
+ }
  async function syncSource(force=false){
   if(!canView())return;
   const month=String(val('multiRodDate')||today()).slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(month))return;
+  if(!force&&(cachedPeriod(month)||sourceLoaded.has(month)))return; // Use existing app cache immediately.
   if(sourceBusy)return sourceBusy;
-  const selectedDate=String(val('multiRodDate')||today()),mode=val('multiRodMode')||'day';
-  const existing=sourceRows().some(r=>{const d=normalizeDate(r.workDate);return mode==='day'?d===selectedDate:d.slice(0,7)===month;});
-  if(!force&&(existing||sourceLoaded.has(month)))return;
   const scope=identity(),token=typeof gcToken!=='undefined'?String(gcToken):'';
   sourceBusy=(async()=>{
    try{
+    if(force)notice('正在重新核對船舶資料，不會清除現有快取…');
     const result=await apiGetQuick('gcGetData',{month},25000);
     if(identity()!==scope||(typeof gcToken!=='undefined'&&String(gcToken)!==token))return;
-    if(Array.isArray(result?.records)||Array.isArray(result?.shipMasters)){
-     if(typeof mergeEfficiencyCloudData==='function')mergeEfficiencyCloudData(result);
-     if(typeof saveLocal==='function')saveLocal();
+    if((Array.isArray(result?.records)||Array.isArray(result?.shipMasters))&&typeof mergeEfficiencyCloudData==='function'){
+     mergeEfficiencyCloudData(result);if(typeof saveLocal==='function')saveLocal();
     }
-    if(!sourceRows().some(r=>{const d=normalizeDate(r.workDate);return mode==='day'?d===selectedDate:d.slice(0,7)===month;})){
+    if(!cachedPeriod(month)){
      const fallback=await apiGetQuick('historyGetMonthData',{type:'vessel',month},25000);
      if(identity()!==scope||(typeof gcToken!=='undefined'&&String(gcToken)!==token))return;
-     if(Array.isArray(fallback?.records)||Array.isArray(fallback?.shipMasters)){
-      if(typeof mergeEfficiencyCloudData==='function')mergeEfficiencyCloudData(fallback);
-      if(typeof saveLocal==='function')saveLocal();
+     if((Array.isArray(fallback?.records)||Array.isArray(fallback?.shipMasters))&&typeof mergeEfficiencyCloudData==='function'){
+      mergeEfficiencyCloudData(fallback);if(typeof saveLocal==='function')saveLocal();
      }
     }
-    sourceLoaded.add(month);render();
-   }catch(err){notice('船舶作業來源更新失敗：'+(err?.message||err)+'；仍顯示本機已讀入的 WORKING REPORT。',true)}
-   finally{sourceBusy=null;if(identity()===scope&&String(val('multiRodDate')||today()).slice(0,7)!==month)void syncSource()}
+    sourceLoaded.add(month);g.P79AqcConcurrent?.invalidate();render();
+    notice('已核對船舶資料；多桿作業先由快取計算，只有手動重新核對才下載。');
+   }catch(err){notice('船舶雲端核對失敗，仍保留快取結果：'+(err?.message||err),true)}
+   finally{sourceBusy=null}
   })();
   return sourceBusy;
  }
