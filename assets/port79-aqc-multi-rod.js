@@ -25,7 +25,7 @@
    const result=await apiGetQuick('gcGetAqcMultiRod',st.revision?{revision:st.revision}:{},25000);
    if(identity()!==scope||state.epoch!==epoch||(typeof gcToken!=='undefined'&&gcToken!==token))return;
    if(!result.unchanged){if(!Array.isArray(result.records))throw Error('GAS 未回傳完整 AQC 紀錄，請確認後端部署');state.rows=result.records;}
-   state.revision=String(result.revision);state.checked=Date.now();persist();render();notice('雲端版本已核對，共 '+state.rows.length+' 筆。');
+   state.revision=String(result.revision);state.checked=Date.now();persist();render();notice('人工登錄雲端已核對，共 '+state.rows.length+' 筆；既有船舶作業會另外自動判讀。');
   }catch(err){if(identity()===scope&&state.epoch===epoch)notice('雲端核對失敗：'+err.message+'。目前顯示本機快取，尚未確認最新資料。',true);}
   finally{if(loading?.scope===scope){loading=null;if(identity()===scope&&state.epoch!==epoch)void sync(true);}}})();loading={scope,promise};return promise;
  }
@@ -211,11 +211,14 @@
   }
   return [...groups.values()].map(g=>{
    const starts=g.segments.map(x=>x.start).sort(),ends=g.segments.map(x=>x.end).sort();
+   const m=byNo.get(g.workingNo),first=String(m?.firstDate||'').slice(0,10),last=String(m?.lastDate||'').slice(0,10);
+   // A ship-wide SHIFT figure may be used for a daily row only when the vessel job spans exactly this one day.
+   const dailyShift=(first===g.date&&last===g.date&&m?.shiftMoves!==undefined&&m?.shiftMoves!==null&&Number.isFinite(Number(m.shiftMoves)))?Number(m.shiftMoves):null;
    return {source:'auto',id:'AUTO:'+g.date+'|'+g.workingNo+'|'+g.ship+'|'+g.voyage,
     ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,date:g.date,
     rods:g.aqcs.size,aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
     start:starts[0]||g.date+'T00:00',end:ends.at(-1)||'',hasActualTimes:starts.length>0,
-    containers:g.containers,hatches:g.hatches,shiftMoves:null,sourceCount:g.sourceCount};
+    containers:g.containers,hatches:g.hatches,shiftMoves:dailyShift,sourceCount:g.sourceCount};
   });
  }
 
@@ -249,7 +252,7 @@
   // Official manual events supersede a derived full-day candidate; never add both to KPIs/Excel.
   const recorded=getRows();
   const inferred=automatically.filter(a=>!recorded.some(r=>sameVesselDay(r,a)));
-  const masterFallback=mode==='day'?masterCandidates(date,min).filter(a=>!recorded.some(r=>sameVesselDay(r,a))&&!dailyAuto.some(r=>sameVesselDay(r,a))):[];
+  const masterFallback=mode==='day'?masterCandidates(date,min).filter(a=>!recorded.some(r=>sameVesselDay(r,a))&&!automatically.some(r=>sameVesselDay(r,a))):[];
   return [...manual,...inferred,...masterFallback].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
  }
  let sourceBusy=null,sourceLoaded=new Set();
@@ -279,7 +282,7 @@
     }
     sourceLoaded.add(month);render();
    }catch(err){notice('船舶作業來源更新失敗：'+(err?.message||err)+'；仍顯示本機已讀入的 WORKING REPORT。',true)}
-   finally{sourceBusy=null}
+   finally{sourceBusy=null;if(identity()===scope&&String(val('multiRodDate')||today()).slice(0,7)!==month)void syncSource()}
   })();
   return sourceBusy;
  }
