@@ -15,7 +15,10 @@ assert(html.includes('p79RenderOvertimePlannedRows(p79OvertimeCalculationCache?.
 assert(html.includes("const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'official rows stay unplanned');
 const element={innerHTML:'',textContent:''},nodes={
  p79OvertimePlannedBody:{...element},p79OvertimePlannedCount:{...element},p79OvertimePlannedPagination:{...element}};
-const ctx={console,Number,String,Array,Set,Map,Math,Date,document:{getElementById:x=>nodes[x]||null},
+const ctx={console,Number,String,Array,Set,Map,Math,Date,
+ Intl:{DateTimeFormat:function(){return{format:()=> '2026-10-28'}}},
+ p79OvertimeCalculationCache:null,p79WorkOvertimeMonths:new Map(),p79MonthlyRestDraftsByMonth:new Map(),
+ document:{getElementById:x=>nodes[x]||null},
  escapeHtml:s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])),
  p79OvertimePlannedPage:1};
 vm.createContext(ctx);
@@ -37,6 +40,14 @@ assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('測試乙'));
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('休24-08'),'planned period remains visible');
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('預排／待出勤'),'unworked planned period is explicitly unconfirmed');
 assert(nodes.p79OvertimePlannedCount.textContent.includes('2 筆'),'only the planned count appears');
+ctx.p79MonthlyRestDraftsByMonth.set('2026-10',[
+ {empId:'D',name:'測試丁',dateKey:'2026-10-29',monthKey:'2026-10',rosterDate:'2026-10-29',dept:'第一事業處',jobTitle:'ARMG',planned:true,p79RestDraft:true,overtimeReport:{code:'國08-16',planned:true,declaredHours:8}},
+ {empId:'E',name:'過去不應補',dateKey:'2026-10-25',monthKey:'2026-10',rosterDate:'2026-10-25',dept:'第一事業處',jobTitle:'ARMG',planned:true,p79RestDraft:true,overtimeReport:{code:'國08-16',planned:true,declaredHours:8}}
+]);
+ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','ALL');
+assert(nodes.p79OvertimePlannedBody.innerHTML.includes('測試丁')&&nodes.p79OvertimePlannedBody.innerHTML.includes('未來建議預排／未申報'),'new suggestions appear in the separate section');
+assert(!nodes.p79OvertimePlannedBody.innerHTML.includes('過去不應補'),'past Oct 25 proposals never appear when today is Oct 28');
+assert(nodes.p79OvertimePlannedCount.textContent.includes('3 筆'),'actual saved plans and new future suggestions are combined');
 ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','B');
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('沒有預排'),'empty state remains clear');
 for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
