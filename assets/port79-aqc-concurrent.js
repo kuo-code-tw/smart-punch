@@ -31,12 +31,17 @@ function index(records,masters,now=Date.now()){
  const r=Array.isArray(records)?records:[],m=Array.isArray(masters)?masters:[];
  const tick=Math.floor(now/60000);
  if(memo&&memo.records===r&&memo.masters===m&&memo.rlen===r.length&&memo.mlen===m.length&&memo.tick===tick)return memo;
- const raw=[],byNo=new Map(),pending=[];
+ const raw=[],byNo=new Map(),pending=[],sheetUnitKeys=new Set(),sheetByPhysical=new Map();
  m.forEach(s=>{const no=String(s.workingNo||'').trim();if(no)byNo.set(no,s)});
  function add(ship,voyage,no,unit,start,end,source){
   if(!ship||!unit||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
   if(end-start>21*86400000)return; // suspicious timestamp: never infer weeks of operation.
   raw.push({ship,voyage,no,unit,start,end,source,key:baseKey(ship,voyage,no)});
+  if(source==='WORKING SHEET'){
+   sheetUnitKeys.add(baseKey(ship,voyage,no)+'|'+unit);
+   if(!sheetByPhysical.has(unit))sheetByPhysical.set(unit,[]);
+   sheetByPhysical.get(unit).push({ship,voyage,no,start,end});
+  }
  }
  for(const s of m){
   const ship=String(s.vessel||'').trim(),no=String(s.workingNo||'').trim(),voyage=String(s.voyageE||s.voyageI||'').trim();
@@ -62,9 +67,37 @@ function index(records,masters,now=Date.now()){
   if(!date||a===null||b===null)continue;
   const begin=dayStart(date)+a*60000;
   const end=dayStart(date)+(b<a?86400000:0)+b*60000;
-  add(ship,voyage,no,unit,begin,end,'WORKING REPORT');
+  // WORKING SHEET's AQC commence/complete are authoritative. WORKING REPORT
+  // operator segments may continue after the crane has actually completed.
+  if(sheetUnitKeys.has(baseKey(ship,voyage,no)+'|'+unit))continue;
+  const cuts=(sheetByPhysical.get(unit)||[]).filter(s=>baseKey(s.ship,s.voyage,s.no)!==baseKey(ship,voyage,no));
+  let pieces=[[begin,end]];
+  for(const s of cuts){
+   const next=[];
+   for(const [from,to] of pieces){
+    if(s.end<=from||s.start>=to){next.push([from,to]);continue}
+    if(from<s.start)next.push([from,s.start]);
+    if(s.end<to)next.push([s.end,to]);
+   }
+   pieces=next;
+  }
+  pieces.forEach(([from,to])=>add(ship,voyage,no,unit,from,to,'WORKING REPORT'));
  }
- const result={records:r,masters:m,rlen:r.length,mlen:m.length,tick,raw,pending,reportCount:r.filter(x=>String(x?.source||'')==='working-report').length};
+ // Build audit of same physical AQC's departure and next-vessel start.
+ const transfers=[];
+ const byPhysical=new Map();
+ raw.forEach(x=>{if(!byPhysical.has(x.unit))byPhysical.set(x.unit,[]);byPhysical.get(x.unit).push(x)});
+ for(const [unit,list] of byPhysical){
+  const events=[...list].sort((a,b)=>a.start-b.start||a.end-b.end);
+  for(let i=1;i<events.length;i++){
+   const previous=events[i-1],next=events[i];
+   if(previous.key===next.key)continue;
+   transfers.push({unit,fromShip:previous.ship,toShip:next.ship,
+    finished:previous.end,started:next.start,gapMinutes:Math.round((next.start-previous.end)/60000),
+    previousSource:previous.source,nextSource:next.source});
+  }
+ }
+ const result={records:r,masters:m,rlen:r.length,mlen:m.length,tick,raw,pending,transfers,reportCount:r.filter(x=>String(x?.source||'')==='working-report').length};
  memo=result;return result;
 }
 function compute(indexed,manual,query={}){
@@ -170,7 +203,9 @@ function compute(indexed,manual,query={}){
  return {rows,peak,rawIntervals:source.length,sourceReportCount:indexed.reportCount,
   pending: indexed.pending.filter(x=>mode==='all'||(mode==='month'?(x.from||'').slice(0,7)<=date.slice(0,7)&&(x.to||x.from||'').slice(0,7)>=date.slice(0,7):x.from<=date&&(x.to||x.from)>=date)),
   duplicateCraneConflicts:conflict,slotsChecked:seen,
-  intervalCount:indexed.raw.length};
+  intervalCount:indexed.raw.length,
+  sourceIntervals:indexed.raw,
+  transfers:(indexed.transfers||[]).filter(x=>x.finished>=first&&x.started<last)};
 }
 g.P79AqcConcurrent={index,compute,invalidate,normalizeDate,instant};
 })(window);
