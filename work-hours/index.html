@@ -13184,21 +13184,19 @@ async function p79ExportOvertimeComparison(printMode){
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
             const visibleAttendanceNumbers = new Set(visibleEmployees.map(emp => normalizeAttendanceStatsAttNo(emp.attNo)).filter(Boolean));
-            // 先建立一次權限索引，避免每筆出勤都搜尋所有員工。
-            const rowVisibility=new Map();
-            employees.forEach(employee=>{const id=String(employee.empId||'').trim().toUpperCase();if(!rowVisibility.has(id))rowVisibility.set(id,canCurrentAdminViewEmployee(employee));});
-            const hiddenAdminIds=new Set(normalizeAdminIds(sysConfig.adminIds));
-            const unrestricted=!isAdminLoggedIn||isCurrentViewerSuperAdmin();
+            // The overtime roster already has the validated workhours dataScope.
+            // Do not apply the unrelated attendance-admin "employee only" filter:
+            // a 領班 may also be an admin account and still be explicitly authorized.
             const selectedMonth=typeof document!=='undefined'?document.getElementById('overtimeMonthFilter')?.value:'';
             const visibleMonths=/^\d{4}-\d{2}$/.test(selectedMonth||'')?new Set(p79WorkRestMonths(selectedMonth)):null;
             const scopedSchedules=(schedules||[]).filter(r=>!visibleMonths||visibleMonths.has(String(r.month||'')));
             const sourceRecords = records.filter(record => {
                 if(visibleMonths&&!visibleMonths.has(attendanceRecordMonthKey(record)))return false;
                 const rowId=String(record.empId||'').trim().toUpperCase();
-                if(!unrestricted&&!(rowVisibility.has(rowId)?rowVisibility.get(rowId):!hiddenAdminIds.has(rowId)))return false;
-                const empId = String(record.empId || '').trim().toUpperCase();
                 const attNo = normalizeAttendanceStatsAttNo(record.attNo);
-                return (empId && visibleEmployeeIds.has(empId)) || (attNo && visibleAttendanceNumbers.has(attNo));
+                // A known but disallowed employee ID must never be rescued by
+                // another person's attendance number or an unverified name match.
+                return rowId ? visibleEmployeeIds.has(rowId) : !!attNo&&visibleAttendanceNumbers.has(attNo);
             });
 
             p79LoadWorkOvertimeMonths(sourceRecords);
@@ -13721,12 +13719,54 @@ function p79OvertimePeriodLabel(report){
             return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         }
 
-        // 加班管理僅統計主任以下人員；保留主管原始人資與考勤紀錄。
+        // HR's authoritative workhours data scope applies to overtime/personnel
+        // statistics independently of the attendance admin account-list filter.
+        function p79WorkhoursScopePrincipal() {
+            const live=typeof currentEmp!=='undefined'&&currentEmp?currentEmp:{};
+            const viewerId=String(live.empId||sessionStorage.getItem('aqc_admin_id')||'').trim().toUpperCase();
+            for(const key of ['port79_user_session','admin_session']){
+                try {
+                    const candidate=JSON.parse(sessionStorage.getItem(key)||'null');
+                    if(candidate&&String(candidate.empId||'').trim().toUpperCase()===viewerId&&viewerId){
+                        return {...live,...candidate,
+                            systemPermissions:candidate.systemPermissions||live.systemPermissions||{},
+                            finePermissions:candidate.finePermissions||live.finePermissions||{},
+                            dataScope:candidate.dataScope||live.dataScope||{},
+                            dataScopeJobs:candidate.dataScopeJobs||live.dataScopeJobs||{}};
+                    }
+                }catch(_){}
+            }
+            return live;
+        }
+        function p79WorkhoursScopeAllowsEmployee(emp,principal=p79WorkhoursScopePrincipal()) {
+            if(!emp||!String(emp.empId||'').trim()||String(emp.empId).trim().toUpperCase()==='ADMIN')return false;
+            if(isCurrentViewerSuperAdmin())return true;
+            const role=getAuthoritativeAdminSessionRole();
+            if(role!=='admin')return false;
+            if(!['view','manage'].includes(String(principal?.systemPermissions?.workhours||'').toLowerCase()))return false;
+            const fine=principal.finePermissions?.workhours||{};
+            if(Object.prototype.hasOwnProperty.call(fine,'overtime.view')&&fine['overtime.view']!==true)return false;
+            const scope=String(principal.dataScope?.workhours||'department').toLowerCase();
+            const viewerId=String(principal.empId||'').trim().toUpperCase();
+            const title=String(emp.jobTitle||emp.deptDetail||'').trim().toUpperCase();
+            if(scope==='all')return true;
+            if(scope==='self')return String(emp.empId).trim().toUpperCase()===viewerId;
+            if(scope==='department')return !!String(principal.dept||'').trim()&&
+                String(emp.dept||'').trim().toUpperCase()===String(principal.dept).trim().toUpperCase();
+            if(scope==='assigned'){
+                const jobs=principal.dataScopeJobs?.workhours;
+                return Array.isArray(jobs)&&jobs.some(v=>String(v||'').trim().toUpperCase()===title);
+            }
+            return false;
+        }
+        // Only 主任以上職稱 are excluded from overtime management by policy.
+        // 領班 remains eligible even if their account also has adminRole='admin'.
         function p79WorkhoursEligibleEmployees() {
             const supervisorTitle = /主任|副主任|課長|副課長|襄理|副理|經理|協理|處長|副處長|部長|副部長|總監|副總|總經理|董事長|執行長|廠長|副廠長/;
-            return getAdminVisibleEmployees().filter(emp =>
-                String(emp.empId || '').toUpperCase() !== 'ADMIN' &&
-                !supervisorTitle.test(String(emp.jobTitle || emp.deptDetail || '').replace(/\s+/g,''))
+            const principal=p79WorkhoursScopePrincipal();
+            return employees.filter(emp =>
+                !supervisorTitle.test(String(emp.jobTitle||emp.deptDetail||'').replace(/\s+/g,''))&&
+                p79WorkhoursScopeAllowsEmployee(emp,principal)
             );
         }
 
