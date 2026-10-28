@@ -108,6 +108,9 @@ function index(records,masters,now=Date.now()){
 }
 function compute(indexed,manual,query={}){
  const threshold=Math.max(1,Math.floor(Number(query.min)||4));
+ // Operational concurrency capacity: set explicitly, never infer it from
+ // overlapping worksheet service windows. Default today is four AQC cranes.
+ const physicalCapacity=Math.max(1,Math.floor(Number(query.capacity)||4));
  const date=validDate(query.date)?query.date:taiwanDate(Date.now()),mode=query.mode||'day';
  const first=mode==='all'?-Infinity:mode==='month'?dayStart(date.slice(0,7)+'-01'):dayStart(date);
  const last=mode==='all'?Infinity:mode==='month'?Date.parse(new Date(Date.UTC(Number(date.slice(0,4)),Number(date.slice(5,7)),1)).toISOString().slice(0,10)+'T00:00:00+08:00'):first+86400000;
@@ -197,12 +200,15 @@ function compute(indexed,manual,query={}){
   const sheetVerified=ships.reduce((n,s)=>n+s.evidence.filter(x=>x.source==='WORKING SHEET').length,0);
   peak=Math.max(peak,total);seen++;
   if(total<threshold)continue;
-  const signature=JSON.stringify([total,ships.map(s=>[s.ship,s.voyage,s.workingNo,s.rods,s.aqcNumbers.join(',')])]);
+  const capacityConflict=total>physicalCapacity;
+ const signature=JSON.stringify([total,capacityConflict,ships.map(s=>[s.ship,s.voyage,s.workingNo,s.rods,s.aqcNumbers.join(',')])]);
   const prev=segments.at(-1);
   if(prev&&prev._end===t&&prev.signature===signature){prev._end=following;prev.end=taiwanStamp(following);continue}
   segments.push({_start:t,_end:following,start:taiwanStamp(t),end:taiwanStamp(following),
-   date:taiwanDate(t),ships,totalRods:total,verifiedRods:sheetVerified,
-   needsReview:total>4&&sheetVerified<total,shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
+   date:taiwanDate(t),ships,totalRods:total,sourceOverlapRods:total,
+   physicalCapacity,displayRods:capacityConflict?null:total,capacityConflict,
+   verifiedRods:sheetVerified,
+   needsReview:capacityConflict||(total>4&&sheetVerified<total),shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
  }
  const rows=segments.map(x=>{
   const known= x.ships.length>0&&x.ships.every(s=>s.manualStart===x._start&&s.manualEnd===x._end&&s.containers!==null);
@@ -211,7 +217,9 @@ function compute(indexed,manual,query={}){
    shiftMoves:known?x.ships.reduce((v,s)=>v+s.shiftMoves,0):null,
    durationMinutes:Math.round((x._end-x._start)/60000)};
  });
- return {rows,peak,rawIntervals:source.length,sourceReportCount:indexed.reportCount,
+ return {rows,peak:Math.min(peak,physicalCapacity),sourcePeak:peak,physicalCapacity,
+  capacityConflictCount:rows.filter(x=>x.capacityConflict).length,
+  rawIntervals:source.length,sourceReportCount:indexed.reportCount,
   pending: indexed.pending.filter(x=>mode==='all'||(mode==='month'?(x.from||'').slice(0,7)<=date.slice(0,7)&&(x.to||x.from||'').slice(0,7)>=date.slice(0,7):x.from<=date&&(x.to||x.from)>=date)),
   duplicateCraneConflicts:conflict,slotsChecked:seen,
   intervalCount:indexed.raw.length,
