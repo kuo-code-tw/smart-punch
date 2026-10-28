@@ -26,6 +26,17 @@ function ownRestCoverReport(meta,roster,date){
    (meta?.restCategory==='休'||meta?.overtimeOriginalShift==='休'||
     meta?.restQuotaOvertime===true||String(roster?.[date]||'').trim()==='休');
 }
+// Shared by the schedule allocator and monthly ledger. A historical report's
+// stored category does not override its verified typhoon/cover classification.
+function restQuotaExemptDates(emp,roster,dates,snapshot=null){
+ const R=g.P79OvertimeReason;
+ return dates.filter(date=>{
+  const meta=roster.__meta?.[date],report=meta?.overtimeReport;
+  if(!confirmedReport(meta,report))return false;
+  const reason=R?.classify?.({empId:emp.empId,date,meta,report,roster,snapshot});
+  return reason?.exempt===true&&(reason.kind==='typhoon'||!ownRestCoverReport(meta,roster,date));
+ });
+}
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
@@ -43,15 +54,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const typhoonProtected=new Set(dates.filter(d=>
    (Array.isArray(declaredTyphoon)&&declaredTyphoon.includes(d))||
    String(roster[d]||'').trim()==='颱'));
- const R=g.P79OvertimeReason;
- const exemptReportDates=new Set(dates.filter(d=>{
-   const m=roster.__meta?.[d],report=m?.overtimeReport;
-   if(!confirmedReport(m,report))return false;
-   const exception=R?.classify?.({empId:emp.empId,date:d,meta:m,report,roster,snapshot});
-   // 颱風仍按特殊日豁免；但本人正式的「休」加班不能因代班連結而豁免。
-   return exception?.exempt===true&&
-     (exception.kind==='typhoon'||!ownRestCoverReport(m,roster,d));
- }));
+ const exemptReportDates=new Set(restQuotaExemptDates(emp,roster,dates,snapshot));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
  // Any 休/例/國 roster day with one complete IN/OUT pair is an actual attended day.
  // A short pair counts as attendance without inventing a full shift or approved overtime.
@@ -80,7 +83,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
      !m.overtimeReport&&!m.overtimeReports?.length&&!m.forEmpId&&m.type!=='substitute';
  }):[];
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
-   [...nonQuotaDates],[...nonQuotaDates],observedOffDates).meta;
+   [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...exemptReportDates]).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
@@ -632,5 +635,5 @@ async function open(){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected};
+g.P79MonthlyRest={open,plan,balance,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected};
 })(window);

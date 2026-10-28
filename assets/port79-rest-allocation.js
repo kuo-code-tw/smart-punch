@@ -16,14 +16,14 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[]) {
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[],quotaExemptReportDates=[]) {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
   // A fully checked no-punch work shift is shown as 休 in the roster. Reconcile it
   // with the SAME quota allocator instead of letting the UI count an extra 休
   // while the shared monthly ledger still has an unfilled 國 day.
   // Caller supplies only evidence-verified no-punch dates; never infer from a
   // blank or pending attendance record inside this pure allocator.
-  const observedOff=new Set(observedOffDates);
+  const observedOff=new Set(observedOffDates),quotaExempt=new Set(quotaExemptReportDates);
   const isRestCandidate=date=>schedule[date]==='休'||
     (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
@@ -124,7 +124,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // Ordinary manual categories still take precedence and cannot be moved.
   for(const date of dates){
     const item=result[date];
-    if(!item||typhoonProtected.has(date))continue;
+    if(!item||typhoonProtected.has(date)||quotaExempt.has(date))continue;
     if(verifiedRestReport(item)){
       const category=item.overtimeReport.category;
       let index=slots.findIndex(s=>s.category===category&&
@@ -177,7 +177,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // 未被休假日分配覆蓋的額度只能列為「尚未安排」。
   // 不可在工作日自動建立 restQuotaOvertime；只有明確申報／人工安排才有加班。
   const unresolved=remaining.slice();
-  const assigned=dates.filter(d=>!typhoonProtected.has(d)).map(d=>result[d]).filter(x=>x?.restCategory);
+  const assigned=dates.filter(d=>!typhoonProtected.has(d)&&!quotaExempt.has(d)).map(d=>result[d]).filter(x=>x?.restCategory);
   return {meta:result,quota:quota.counts,off:assigned.filter(x=>!x.restQuotaOvertime).length,
     overtime:assigned.filter(x=>x.restQuotaOvertime).length,unresolved};
 }

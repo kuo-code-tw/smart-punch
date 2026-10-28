@@ -31,7 +31,7 @@ const c={window:null,Date,Intl,Set,Map,Array,Math,Object,String,Number,JSON,cons
 };
 c.window=c;c.P79SpecialOvertime={electionDates:()=>[]};
 vm.createContext(c);
-for(const file of ['port79-rest-allocation.js','port79-rest-attendance.js','port79-monthly-rest-overtime.js'])
+for(const file of ['port79-rest-allocation.js','port79-rest-attendance.js','port79-overtime-reason.js','port79-monthly-rest-overtime.js'])
  vm.runInContext(fs.readFileSync('assets/'+file,'utf8'),c);
 const html=fs.readFileSync('schedule/index.html','utf8');
 const extract=name=>{
@@ -79,6 +79,20 @@ for(const emp of people){
 }
 a.equal(JSON.stringify({monthlyScheduleData,monthlyScheduleMeta}),original,
  'read-only reconciliation never changes official roster, report or payroll records');
+// Production reproduction: a confirmed 颱24-08 report still carries category 國.
+// It must remain intact but cannot reserve a 國 quota and strand a sixth 休.
+for(const emp of people){
+ const saved={id:'TYPHOON-'+emp.id,category:'國',code:'颱24-08',typeName:'颱風天加班'};
+ monthlyScheduleMeta[emp.id][date(20)]={overtimeReport:saved,restCategory:'國',restQuotaOvertime:true};
+ const fixed=c.p79RestAutomaticPlan(emp,month);
+ a.deepEqual(count(fixed.meta),expected,emp.name+' historical typhoon report must not block 休→國');
+ const ledger=c.p79ScheduleRestBalance(emp,month,fixed.meta);
+ a.deepEqual(json(ledger.off),expected,'schedule and monthly ledger use the same exemption');
+ a.equal(Object.values(ledger.remaining).reduce((x,y)=>x+y,0),0);
+ a.equal(ledger.ledger.find(x=>x.date===date(20)).kind,'exemptOvertime');
+ a.deepEqual(json(fixed.meta[date(20)].overtimeReport),saved,'never change or revoke the old report');
+ delete monthlyScheduleMeta[emp.id][date(20)];
+}
 // Imported explicit 國/例 cells without metadata must reserve their visible
 // category, rather than leaving the allocator/ledger to count only raw 休.
 for(const category of ['國','例']){
