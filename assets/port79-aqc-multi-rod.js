@@ -176,7 +176,7 @@
   const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
   const byNo=new Map(masters.filter(s=>String(s.workingNo||'').trim()).map(s=>[String(s.workingNo).trim(),s]));
   const groups=new Map();
-  const nextDate=date=>new Date(taipeiDateStart(date)+86400000).toISOString().slice(0,10);
+  const nextDate=date=>{const [y,m,d]=date.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+1)).toISOString().slice(0,10)};
   for(const r of sourceRows()){
    const date=normalizeDate(r.workDate);
    if(!date)continue;
