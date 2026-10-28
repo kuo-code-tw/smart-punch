@@ -51,9 +51,9 @@
   const section=document.createElement('section');section.id=ID;section.className='hidden space-y-4';
   section.innerHTML=[
   '<div class="card p-4 sm:p-5 space-y-4">',
-  '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">手動記錄實際動桿事件；4 桿為預設門檻，不限制可輸入的最大桿數。</p></div>',
+  '<div class="flex flex-wrap gap-3 items-center justify-between"><div><h2 class="text-xl font-black text-slate-900">⚓ AQC 多桿作業管理</h2><p class="text-sm text-slate-500 mt-1">自動整理現有船舶 WORKING REPORT 的當日 AQC 動桿資料；可另行確認並登錄桿數。</p></div>',
   '<button type="button" id="multiRodAdd" class="btn bg-indigo-600 text-white">＋ 新增作業紀錄</button></div>',
-  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">紀錄由正式 GAS 儲存，授權人員可跨電腦查看；先顯示本機快取，再核對雲端版本。儲存成功須通過雲端讀回確認，不影響原船舶櫃數與請款統計。</p>',
+  '<p class="rounded-xl bg-sky-50 text-sky-900 border border-sky-200 p-3 text-sm">自動推算資料來自現有船舶 WORKING REPORT（按同船同日不同 AQC 編號計算，不代表同時開動）；手動確認紀錄儲存在正式 GAS。兩種來源會標示並去重，不改動原船舶櫃數或請款統計。</p>',
   '<div class="flex flex-wrap gap-3 items-end">',
   '<label class="text-sm font-bold">查詢日期<input id="multiRodDate" type="date" class="block border rounded-xl px-3 py-2 mt-1"></label>',
   '<label class="text-sm font-bold">最低桿數<input id="multiRodMin" type="number" min="1" step="1" value="4" class="block border rounded-xl px-3 py-2 mt-1 w-28"></label>',
@@ -65,7 +65,7 @@
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">動桿事件</div><div id="multiRodEvents" class="text-xl font-black">0 筆</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">櫃數</div><div id="multiRodContainers" class="text-xl font-black">0</div></div>',
   '<div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">艙蓋／翻艙</div><div id="multiRodHatches" class="text-xl font-black">0／0</div></div></div>',
-  '<div class="overflow-x-auto"><table class="tbl w-full min-w-[960px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>船名／航次</th><th>桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
+  '<div id="multiRodSourceState" class="text-sm text-slate-600" role="status"></div><div class="overflow-x-auto"><table class="tbl w-full min-w-[1100px] text-center"><thead><tr><th>作業開始</th><th>作業結束</th><th>船名／航次</th><th>桿數</th><th>櫃數</th><th>艙蓋</th><th>翻艙</th><th>來源</th><th>操作</th></tr></thead><tbody id="multiRodBody"></tbody></table></div>',
   '<div id="multiRodNotice" role="status" aria-live="polite" class="text-sm text-slate-600"></div></div>',
   '<div id="multiRodEditor" class="card p-4 sm:p-5 space-y-4 hidden">',
   '<h3 id="multiRodFormTitle" class="text-lg font-black">新增 AQC 作業紀錄</h3>',
@@ -84,16 +84,16 @@
   ].join('');
   $('view-dashboard').parentNode.insertBefore(section,$('view-dashboard'));
   $('multiRodDate').value=today();
-  $('multiRodDate').addEventListener('change',render);
+  $('multiRodDate').addEventListener('change',()=>{render();void syncSource()});
   $('multiRodMin').addEventListener('input',render);
   $('multiRodMode').addEventListener('change',render);
   $('multiRodAdd').addEventListener('click',()=>openEditor());
   $('multiRodCancel').addEventListener('click',()=>{$('multiRodEditor').classList.add('hidden')});
   $('multiRodForm').addEventListener('submit',save);
   $('multiRodExport').addEventListener('click',exportExcel);
-  $('multiRodRefresh').addEventListener('click',()=>sync(true));
+  $('multiRodRefresh').addEventListener('click',()=>{void sync(true);void syncSource(true)});
   $('multiRodImport').addEventListener('click',importLegacy);
-  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='delete')remove(id)});
+  $('multiRodBody').addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;if(btn.dataset.action==='edit')openEditor(getRows().find(r=>r.id===id));if(btn.dataset.action==='confirm')openEditor(autoCandidates().find(r=>r.id===id));if(btn.dataset.action==='delete')remove(id)});
  }
  function candidates(){
   const raw=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
@@ -106,11 +106,11 @@
  }
  function openEditor(row){
   if(busy)return;if(!editAllowed(row?'records.edit':'records.create')){alert('目前帳號沒有此項效率管理權限');return}
-  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=row?.id||'';$('multiRodEditId').dataset.version=String(row?.version||0);
+  options();$('multiRodForm').reset();pending=null;$('multiRodEditId').value=row?.source==='auto'?'':(row?.id||'');$('multiRodEditId').dataset.version=String(row?.version||0);
   $('multiRodEditor').dataset.scope=identity();
-  $('multiRodFormTitle').textContent=row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
+  $('multiRodFormTitle').textContent=row?.source==='auto'?'確認現有船舶多桿作業':row?'編輯 AQC 作業紀錄':'新增 AQC 作業紀錄';
   $('multiRodShip').value=row?.ship||'';$('multiRodVoyage').value=row?.voyage||'';
-  $('multiRodRods').value=row?.rods??4;$('multiRodStart').value=row?.start||utcLocalTime(new Date());
+  $('multiRodRods').value=row?.rods??4;$('multiRodStart').value=row?.hasActualTimes===false?utcLocalTime(new Date()):row?.start||utcLocalTime(new Date());
   $('multiRodEnd').value=row?.end||'';$('multiRodBoxes').value=row?.containers??0;
   $('multiRodHC').value=row?.hatches??0;$('multiRodShift').value=row?.shiftMoves??0;
   $('multiRodNote').value=row?.note||'';
@@ -160,6 +160,108 @@
    for(const row of rows){if(identity()!==scope)throw Error('登入身分已變更');if(state.rows.some(r=>r.id===row.id)){skipped++;continue;}await write(payload(row),'save',0);count++;notice('匯入雲端 '+count+'／'+rows.length+' 筆…');}
    render();notice('雲端匯入完成 '+count+' 筆；'+skipped+' 筆同ID紀錄未覆寫。原本機資料已保留。');void sync(true);
   }catch(err){notice('已匯入 '+count+' 筆後停止：'+err.message+'。原本機資料保留，可再次匯入。',true);}finally{busy=false;}
+ }
+
+ // Automatically derive distinct AQC equipment used on a ship from official WORKING REPORT.
+ // This is a daily vessel-level usage count, not an assertion that all cranes ran simultaneously.
+ function sourceRows(){
+  const raw=typeof records!=='undefined'&&Array.isArray(records)?records:[];
+  const wr=raw.filter(r=>String(r?.source||'')==='working-report');
+  return typeof canonicalOperationalRecords==='function'?canonicalOperationalRecords(wr):wr;
+ }
+ const normShip=v=>String(v||'').trim().toUpperCase().replace(/\s+/g,' ');
+ function autoCandidates(){
+  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
+  const byNo=new Map(masters.filter(s=>String(s.workingNo||'').trim()).map(s=>[String(s.workingNo).trim(),s]));
+  const groups=new Map();
+  for(const r of sourceRows()){
+   const date=String(r.workDate||'').replace(/\//g,'-').slice(0,10);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
+   const aqc=typeof normalizeAqcNo==='function'?normalizeAqcNo(r.number||r.gcNo):String(r.number||r.gcNo||'').trim();
+   if(!/^\d{1,6}$/.test(String(aqc)))continue;
+   const no=String(r.workingNo||r.workNo||'').trim();
+   const master=byNo.get(no);
+   const ship=String(r.shipName||master?.vessel||r.vessel||'').trim();
+   if(!ship)continue;
+   const voyage=String(r.voyageE||r.voyageI||r.voyage||master?.voyageE||master?.voyageI||'').trim();
+   // Parent/child WORKING NO.s are distinct operational jobs; never coalesce by ship name.
+   const groupKey=JSON.stringify([date,no?'NO:'+no:'SHIP:'+normShip(ship)+'|'+voyage]);
+   let g=groups.get(groupKey);
+   if(!g){g={date,ship,voyage,workingNo:no,aqcs:new Set(),segments:[],containers:0,hatches:0,sourceCount:0};groups.set(groupKey,g);}
+   g.aqcs.add(String(aqc));
+   const times=[r.startTime,r.endTime].map(x=>String(x||'').match(/^(\d{1,2}):(\d{2})/));
+   if(times[0]&&times[1]){
+    const from=Number(times[0][1])*60+Number(times[0][2]),until=Number(times[1][1])*60+Number(times[1][2]);
+    if(from<1440&&until<1440){
+     const start=date+'T'+String(times[0][1]).padStart(2,'0')+':'+times[0][2];
+     let endDate=date;
+     if(until<from){
+      const d=new Date(date+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()+1);
+      endDate=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+     }
+     const end=endDate+'T'+String(times[1][1]).padStart(2,'0')+':'+times[1][2];
+     g.segments.push({start,end});
+    }
+   }
+   const disc=Number(r.disc),load=Number(r.load),boxes=Number(r.containers);
+   const quantity=Number.isFinite(disc)&&Number.isFinite(load)?disc+load:Number.isFinite(boxes)?boxes:0;
+   g.containers+=Math.max(0,quantity);
+   g.hatches+=Math.max(0,Number(r.hatches)||0);
+   g.sourceCount++;
+  }
+  return [...groups.values()].map(g=>{
+   const starts=g.segments.map(x=>x.start).sort(),ends=g.segments.map(x=>x.end).sort();
+   return {source:'auto',id:'AUTO:'+g.date+'|'+g.workingNo+'|'+g.ship+'|'+g.voyage,
+    ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,date:g.date,
+    rods:g.aqcs.size,aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
+    start:starts[0]||g.date+'T00:00',end:ends.at(-1)||'',hasActualTimes:starts.length>0,
+    containers:g.containers,hatches:g.hatches,shiftMoves:null,sourceCount:g.sourceCount};
+  });
+ }
+ function sameVesselDay(a,b){
+  const sameDate=String(a.start||'').slice(0,10)===String(b.date||b.start||'').slice(0,10);
+  const aNo=String(a.workingNo||'').trim(),bNo=String(b.workingNo||'').trim();
+  return sameDate&&(aNo&&bNo?aNo===bNo:normShip(a.ship)===normShip(b.ship)&&String(a.voyage||'')===String(b.voyage||''));
+ }
+ function combinedFiltered(){
+  const manual=filtered(), date=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
+  const min=Math.max(1,Math.floor(Number(val('multiRodMin'))||4));
+  const automatically=autoCandidates().filter(r=>r.rods>=min&&(mode==='all'||(mode==='month'?r.date.slice(0,7)===date.slice(0,7):r.date===date)));
+  // Official manual events supersede a derived full-day candidate; never add both to KPIs/Excel.
+  const recorded=getRows();
+  const inferred=automatically.filter(a=>!recorded.some(r=>sameVesselDay(r,a)));
+  return [...manual,...inferred].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
+ }
+ let sourceBusy=null,sourceLoaded=new Set();
+ async function syncSource(force=false){
+  if(!canView())return;
+  const month=String(val('multiRodDate')||today()).slice(0,7);
+  if(!/^\d{4}-\d{2}$/.test(month))return;
+  if(sourceBusy)return sourceBusy;
+  const existing=sourceRows().some(r=>String(r.workDate||'').slice(0,7)===month);
+  if(!force&&(existing||sourceLoaded.has(month)))return;
+  const scope=identity(),token=typeof gcToken!=='undefined'?String(gcToken):'';
+  sourceBusy=(async()=>{
+   try{
+    const result=await apiGetQuick('gcGetData',{month},25000);
+    if(identity()!==scope||(typeof gcToken!=='undefined'&&String(gcToken)!==token))return;
+    if(Array.isArray(result?.records)||Array.isArray(result?.shipMasters)){
+     if(typeof mergeEfficiencyCloudData==='function')mergeEfficiencyCloudData(result);
+     if(typeof saveLocal==='function')saveLocal();
+    }
+    if(!sourceRows().some(r=>String(r.workDate||'').startsWith(month))){
+     const fallback=await apiGetQuick('historyGetMonthData',{type:'vessel',month},25000);
+     if(identity()!==scope||(typeof gcToken!=='undefined'&&String(gcToken)!==token))return;
+     if(Array.isArray(fallback?.records)||Array.isArray(fallback?.shipMasters)){
+      if(typeof mergeEfficiencyCloudData==='function')mergeEfficiencyCloudData(fallback);
+      if(typeof saveLocal==='function')saveLocal();
+     }
+    }
+    sourceLoaded.add(month);render();
+   }catch(err){notice('船舶作業來源更新失敗：'+(err?.message||err)+'；仍顯示本機已讀入的 WORKING REPORT。',true)}
+   finally{sourceBusy=null}
+  })();
+  return sourceBusy;
  }
  function filtered(){
   const date=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
