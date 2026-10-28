@@ -46,7 +46,7 @@ assert.equal(stats.planned,13);
 assert.equal(stats.groups.filter(x=>x.role==='F/L').reduce((n,x)=>n+x.planned,0),8);
 assert(source.includes('visiblePlannedRows()'),'Drafts must appear inside the same monthly-rest dialog');
 assert(source.includes("g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople)"),'Drafts are passed to the overtime page');
-assert(html.includes('if(date<todayKey||savedKeys.has('),'Overtime page includes today's pending drafts');
+assert(html.includes('if(date<todayKey||savedKeys.has('),'Overtime page includes today pending drafts');
 assert(html.includes('needsWeeklyReview:row.needsWeeklyReview===true'),'Weekly review status crosses the page boundary');
 assert(html.includes('preview=20261028-month-end-all-roles-v6'),'Updated script invalidates old browser cache');
 now='2026-10-29';const nextDay=g.P79MonthlyRest.plan(snap,employees,'2026-10',rules);
