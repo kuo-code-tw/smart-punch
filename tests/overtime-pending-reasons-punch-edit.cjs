@@ -8,12 +8,15 @@ function extract(name){
 const c={console,Number,String,Array,Date,Map,Set,
  records:[],currentEmp:{empId:'ADMIN'},canPerformAdminAction:()=>true,
  encodeURIComponent,
- formatEditableAttendanceTimeCell:(record,type,canEdit)=>canEdit?'EDIT_'+type+'_'+record.timeStr:record.timeStr};
+ formatEditableAttendanceTimeCell:(record,type,canEdit)=>canEdit?'EDIT_'+type+'_'+record.timeStr:record.timeStr,
+ getAttendanceRecordType:r=>String(r.status||'').includes('上班')?'IN':'OUT',
+ p79DirectAttendanceTimestamp:r=>Date.parse(String(r.timeStr||'').replaceAll('/','-').replace(' ','T').replace(/^(.*:\\d\\d)$/, '$1:00')+'+08:00')};
 vm.createContext(c);
+vm.runInContext(extract('p79FindPlannedAttendanceEditRecord'),c);
 vm.runInContext(extract('p79OvertimePendingReason'),c);
 vm.runInContext(extract('p79OvertimePendingPunchCell'),c);
 const now='2026-10-28',base={empId:'E1',dateKey:'2026-10-28',overtimeReport:{planned:true,id:'P123'},reportVerified:true};
-const IN={id:'IN123',empId:'E1',timeStr:'2026/10/28 08:05:00'},OUT={id:'OUT123',empId:'E1',timeStr:'2026/10/28 16:02:00'};
+const IN={id:'IN123',empId:'E1',status:'上班簽到',timeStr:'2026/10/28 08:05:00'},OUT={id:'OUT123',empId:'E1',status:'下班簽退',timeStr:'2026/10/28 16:02:00'};
 const reason=row=>c.p79OvertimePendingReason(row,now);
 assert.equal(reason({...base,p79RestDraft:true}).code,'unsent','an unsent future suggestion must not be called an abnormal punch');
 assert.equal(reason({...base,dateKey:'2026-10-29'}).code,'scheduled','future saved preplan has ID but no work evidence');
