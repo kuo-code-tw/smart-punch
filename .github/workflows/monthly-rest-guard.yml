@@ -1,0 +1,29 @@
+name: Verify monthly rest overtime
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-monthly-rest-overtime.js'
+      - 'tests/monthly-rest-*.cjs'
+      - '.github/workflows/monthly-rest-guard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-monthly-rest-overtime.js'
+      - 'tests/monthly-rest-*.cjs'
+      - '.github/workflows/monthly-rest-guard.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify all monthly rest regression tests
+        run: |
+          for test_file in tests/monthly-rest-*.cjs; do
+            echo "TEST $test_file"
+            node "$test_file" || exit 1
+          done
