@@ -36,7 +36,7 @@ const run=async(fail)=>{
   loadScheduleCloudWithRetry:async()=>{calls.push('cloud');return true},
   buildRoleTabsAndRender:()=>{redraw++;if(fail)throw new TypeError("Cannot read properties of null (reading 'overtimeReport')")},
   p79ScheduleLastRenderError:'',
-  p79SchedulePreviewRenderError:function(error){this.p79ScheduleLastRenderError=error.message;calls.push('render-error')},
+  p79SchedulePreviewRenderError:error=>{c.p79ScheduleLastRenderError=error.message;calls.push('render-error')},
   showScheduleNotice:(...p)=>notice.push(p),
   refreshOrAcquireScheduleEditLock:async()=>{lock++;},
   renderTodaySchedulePanel:()=>{},
