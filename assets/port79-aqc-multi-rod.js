@@ -180,17 +180,23 @@
  }
  function cachedPeriod(month){
   const idx=concurrencyIndex();if(!idx)return false;
-  const start=Date.parse(month+'-01T00:00:00+08:00');
-  const [y,m]=month.split('-').map(Number),end=Date.parse(new Date(Date.UTC(y,m,1)).toISOString().slice(0,10)+'T00:00:00+08:00');
-  // Existing, timed records are evidence for local cache coverage. A vessel's
-  // overall configuration alone must not prevent a one-time scoped fetch.
-  return idx.raw.some(x=>x.start<end&&x.end>start);
+  const selected=val('multiRodDate')||today(),mode=val('multiRodMode')||'day';
+  let first=Date.parse(month+'-01T00:00:00+08:00');
+  const [y,m]=month.split('-').map(Number);
+  let last=Date.parse(new Date(Date.UTC(y,m,1)).toISOString().slice(0,10)+'T00:00:00+08:00');
+  // The month may have older reports while today's operations are still missing.
+  // Check the day itself for day mode or the current month selected on today's date.
+  if(mode==='day'||(mode==='month'&&selected===today())){
+   first=Date.parse(selected+'T00:00:00+08:00');last=first+86400000;
+  }
+  return idx.raw.some(x=>x.start<last&&x.end>first);
  }
+ function sourceCheckKey(month){return 'p79-aqc-source-check:'+key()+':'+month}
  async function syncSource(force=false){
   if(!canView())return;
   const month=String(val('multiRodDate')||today()).slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(month))return;
-  if(!force&&(cachedPeriod(month)||sourceLoaded.has(month)))return; // Use existing app cache immediately.
+  if(!force&&(cachedPeriod(month)||sourceLoaded.has(month)||Date.now()-Number(sessionStorage.getItem(sourceCheckKey(month))||0)<600000))return; // Cache-first; missing periods checked at most once per 10 minutes per session.
   if(sourceBusy)return sourceBusy;
   const scope=identity(),token=typeof gcToken!=='undefined'?String(gcToken):'';
   sourceBusy=(async()=>{
@@ -208,7 +214,7 @@
       mergeEfficiencyCloudData(fallback);if(typeof saveLocal==='function')saveLocal();
      }
     }
-    sourceLoaded.add(month);g.P79AqcConcurrent?.invalidate();render();
+    sourceLoaded.add(month);try{sessionStorage.setItem(sourceCheckKey(month),String(Date.now()))}catch(_){}g.P79AqcConcurrent?.invalidate();render();
     notice('已核對船舶資料；多桿作業先由快取計算，只有手動重新核對才下載。');
    }catch(err){notice('船舶雲端核對失敗，仍保留快取結果：'+(err?.message||err),true)}
    finally{sourceBusy=null}
