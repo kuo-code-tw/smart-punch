@@ -16155,7 +16155,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
  const sameNote=String(existingReport?.note??'').trim()===String(draft.note??'').trim();
  // 同一張預排報單完成打卡後，時數/時段不變也必須真的寫回解除 planned。
-  if(existingReport?.id===draft.id&&existingReport.planned!==true&&existingReport.category===draft.rule.category&&existingReport.code===draft.rule.code&&sameHours&&sameNote)return {ok:true,directOvertimeSaved:true,id:draft.id,report:existingReport,cloudReadbackConfirmed:true};
+  if(existingReport?.id===draft.id&&(!draft.plannedReview||existingReport.planned!==true)&&existingReport.category===draft.rule.category&&existingReport.code===draft.rule.code&&sameHours&&sameNote)return {ok:true,directOvertimeSaved:true,id:draft.id,report:existingReport,cloudReadbackConfirmed:true};
  if(draft.preventReplace&&['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(key=>existingReport[key]!=null&&existingReport[key]!==''))throw Error('這筆申報已有審核紀錄，為避免覆蓋審核資料，請先完成正式審核變更程序。');
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
