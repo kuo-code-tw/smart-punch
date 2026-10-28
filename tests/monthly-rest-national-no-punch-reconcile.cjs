@@ -89,7 +89,7 @@ recheck=c.p79RestAutomaticPlan(people[0],month);
 a.deepEqual(count(recheck.meta),{例:4,休:5,國:1},'manual work shift not rewritten');
 monthlyScheduleMeta.E0[extraOff]={overtimeReport:{id:'CLOUD-REPORT',category:'休',code:'休08-16'}};
 recheck=c.p79RestAutomaticPlan(people[0],month);
-a.deepEqual(count(recheck.meta),{例:4,休:5,國:1},'official report not converted to national rest');
+a.deepEqual(count(recheck.meta),{例:4,休:4,國:2},'confirmed 休 report reserves its own day; other ten rest days fill the remaining quota once');
 a.equal(recheck.meta[extraOff].overtimeReport.id,'CLOUD-REPORT');
 monthlyScheduleMeta.E0={};
 evidence.complete=false;
