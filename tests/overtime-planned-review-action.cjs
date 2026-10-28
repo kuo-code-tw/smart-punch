@@ -27,6 +27,10 @@ const ctx={console,Date,Number,Math,String,Array,
 ctx.window=ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('assets/port79-overtime-shift-match.js','utf8'),ctx);
+const helperStart=html.indexOf('function p79ResolvePlannedOvertimePeriod(');
+const helperEnd=html.indexOf('\n        }',helperStart);
+assert(helperStart>=0&&helperEnd>helperStart,'shared planned-period resolver exists');
+vm.runInContext(html.slice(helperStart,helperEnd+10),ctx);
 vm.runInContext(html.slice(start,end+10),ctx);
 const outcome=ctx.p79OpenPlannedOvertimeReview(0);
 assert.equal(opened.length,1,'click opens one review form');
