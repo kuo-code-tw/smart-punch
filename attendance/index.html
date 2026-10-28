@@ -1039,6 +1039,18 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 }
 </style>
 
+<style id="p79-overtime-rest-visible-hover-v2">
+/* Attendance "加班時數": retain only 休08-16 (or equivalent 休HH-HH) at rest.
+   Explicitly hide the OTHER values, instead of opacity-hiding their parent. */
+#adminRecordsTableBody td[data-p79-overtime-hours] { cursor: help; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-rest-visible { display: block; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-hidden-detail { display: none !important; }
+#adminRecordsTableBody td[data-p79-overtime-hours]:hover .p79-overtime-hidden-detail,
+#adminRecordsTableBody td[data-p79-overtime-hours]:focus .p79-overtime-hidden-detail,
+#adminRecordsTableBody td[data-p79-overtime-hours]:focus-within .p79-overtime-hidden-detail {
+  display: block !important;
+}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="port79-employee-only bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="attendance">
@@ -10122,8 +10134,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         const p79ImmediatePunchRecords = new Map();
         window.p79HandleRejectedPunch=function(id,reason){
-            p79ImmediatePunchRecords.delete(String(id));
+            const key=String(id??'').trim();
+            p79ImmediatePunchRecords.delete(key);
+            // A definite cloud duplicate rejection cannot stay as an accepted local punch.
+            const cloudHasId=p79MobileOfficial.rows.some(row=>String(row?.id??'')===key);
+            const rejected=(Array.isArray(records)?records:[]).find(row=>
+                String(row?.id??'')===key&&String(row?.source||'')==='employee-punch');
+            if(rejected&&!cloudHasId){
+                records=records.filter(row=>String(row?.id??'')!==key);
+                removeAttendanceRecordsFromArchive([key]);
+                forgetRecentAttendanceMutation(key);
+                saveRecords();
+            }
             updatePunchSuccessCloudStatus(false,reason);
+            try{updateHomeClockInButtonState()}catch(ignore){}
+            Promise.resolve(p79MobileRefreshOfficial(true)).catch(()=>{});
         };
         function getEmployeePunchRecords(emp = currentEmp, channel = 'REGULAR') {
             if (!emp) return [];
@@ -15190,13 +15215,27 @@ function getManualPairRecordAnchor(record) {
             const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===token);
             const plans=states.map(state=>p79AttendanceReportedOvertime(row,state,view));
             const planned=plans.find(value=>value?.report)||plans.find(Boolean)||null;
-            if(!planned)return formatDurationMinutes(actual);
-            const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            // Only the 休HH-HH marker remains visible without hover.
+            // "0 小時", 已申報, 申報時數 and every other value stay within
+            // a separate, genuinely hidden detail container.
+            if(!planned)return '<div class="p79-overtime-hidden-detail">'+formatDurationMinutes(actual)+'</div>';
+            const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const rawLabel=String(planned.label||'');
+            const restMatch=rawLabel.match(/休\d{2}-\d{2}/);
+            const restText=restMatch?escapeText(restMatch[0]):'';
+            const otherLabel=escapeText(restMatch?rawLabel.replace(restMatch[0],'').trim():rawLabel);
             const changed=!!planned.reviewState;
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
             const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
-            const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+String(planned.originalCode).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'（尚未改寫）</div>':'';
-            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${reviewBadge}${declared}</div>${original}${planned.minutes!==null?`<div class="text-xs">${planned.pending?'已安排／待申報':'申報'} ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
+            const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+escapeText(planned.originalCode)+'（尚未改寫）</div>':'';
+            const visible=restText?'<div class="p79-overtime-rest-visible text-cyan-700 dark:text-cyan-300">'+restText+'</div>':'';
+            const detail='<div class="p79-overtime-hidden-detail">'+
+                ((otherLabel||reviewBadge||declared)?'<div class="text-cyan-700 dark:text-cyan-300">'+otherLabel+reviewBadge+declared+'</div>':'')+
+                original+
+                (planned.minutes!==null?'<div class="text-xs">'+(planned.pending?'已安排／待申報':'申報')+' '+formatDurationMinutes(planned.minutes)+'</div>':'')+
+                (actual?'<div class="text-[10px] text-slate-500">打卡估算 '+formatDurationMinutes(actual)+'</div>':'')+
+                '</div>';
+            return visible+detail;
         }
 
         function p79CanManageOvertime() {
@@ -15995,7 +16034,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${p79TyphoonCheckInBadge}${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
-                        <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row,overtimeView)}</td>
+                        <td data-p79-overtime-hours tabindex="0" onclick="this.focus()" title="滑鼠移入或點選顯示其他加班資訊" class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row,overtimeView)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${overtimeSubmissionState === 'none' ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button>` : ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
@@ -16032,62 +16071,54 @@ function getManualPairRecordAnchor(record) {
             if (id) openEditRecordModal(id, expectedType, expectedTime);
         }
 
-        function deleteDailyAttendance(ids) {
-            if (!requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
-            const validIds = Array.isArray(ids) ? ids.filter(id => id !== null && id !== undefined && String(id) !== '') : [];
-            if (!validIds.length) return;
-
-            if (!confirm(`確定要刪除這一天的考勤紀錄嗎？\n將刪除 ${validIds.length} 筆原始打卡資料。`)) return;
-
-            const idSet = new Set(validIds.map(String));
-            const deletedSnapshots = (Array.isArray(records) ? records : [])
-                .filter(r => idSet.has(String(r?.id ?? '')))
-                .map(r => ({ ...r }));
-
-            // V6.0.14：先建立 tombstone 並清掉所有本機快取。
-            // 否則 deleteRecord 還沒被雲端確認前，舊 GET / Delta 會把同一筆再塞回畫面。
-            deletedSnapshots.forEach(record => {
-                try { purgeDeletedAttendanceRecordFromAllLocalCaches(record); } catch (e) {}
-            });
-
-            records = (Array.isArray(records) ? records : []).filter(r => !idSet.has(String(r?.id ?? '')));
-            saveRecords();
-            removeAttendanceRecordsFromArchive(validIds);
-            validIds.forEach(id => forgetRecentAttendanceMutation(id));
-
-            validIds.forEach(id => {
-                postToCloud({ action: 'deleteRecord', id: id });
-            });
-
-            showToast('已刪除該日考勤紀錄', 'success');
-            renderAdminRecordsTable();
-            renderAdminLiveTable();
+        async function deleteDailyAttendance(ids) {
+            if(!requireAdminAction('attendanceDelete','刪除打卡紀錄'))return;
+            const validIds=Array.isArray(ids)?[...new Set(ids.map(id=>String(id??'').trim()).filter(Boolean))]:[];
+            if(!validIds.length||!confirm('確定要刪除這一天的考勤紀錄嗎？\n將刪除 '+validIds.length+' 筆原始打卡資料。'))return;
+            let confirmed=0;
+            showToast('正在逐筆確認雲端刪除，未確認的原始紀錄會保留','warning');
+            for(const id of validIds){
+                try{
+                    const reply=await postToCloud({action:'deleteRecord',id});
+                    if(reply?.ok!==true||reply?.queued||reply?.localOnly){
+                        showToast('已確認刪除 '+confirmed+' 筆；其餘雲端尚未確認，已停止後續刪除','warning');
+                        break;
+                    }
+                    if(p79ApplyConfirmedAttendanceDelete(id,{skipRender:true}))confirmed++;
+                    else{
+                        showToast('雲端已回覆，但本機刪除核對未完成，請重新讀取考勤','warning');
+                        break;
+                    }
+                }catch(error){
+                    showToast('雲端刪除異常，後續紀錄已保留：'+String(error?.message||error),'warning');
+                    break;
+                }
+            }
+            if(confirmed){
+                renderAdminRecordsTable();
+                try{renderAdminLiveTable()}catch(ignore){}
+                if(confirmed===validIds.length)showToast('雲端已確認刪除 '+confirmed+' 筆考勤紀錄','success');
+            }
         }
 
-        function deleteRecord(id) {
-            if (!requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
-            if (confirm("確定要刪除這筆打卡紀錄嗎？")) {
-                const targetId = String(id ?? '').trim();
-                const deletedSnapshot = (Array.isArray(records) ? records : []).find(
-                    r => String(r?.id ?? '').trim() === targetId
-                ) || { id:targetId };
-
-                // V6.0.14：右側垃圾桶也必須走完整刪除保護。
-                // 先留下 tombstone，再移除本機/匯入保護快取，等待雲端 delete 確認期間禁止復活。
-                try { purgeDeletedAttendanceRecordFromAllLocalCaches(deletedSnapshot); } catch (e) {}
-
-                records = (Array.isArray(records) ? records : []).filter(
-                    r => String(r?.id ?? '').trim() !== targetId
-                );
-                saveRecords();
-                removeAttendanceRecordsFromArchive(targetId);
-                forgetRecentAttendanceMutation(targetId);
-                postToCloud({ action: 'deleteRecord', id: targetId }, "已刪除打卡紀錄");
-                renderAdminRecordsTable();
-                try { renderAdminLiveTable(); } catch (e) {}
-                return true;
+        async function deleteRecord(id) {
+            if(!requireAdminAction('attendanceDelete','刪除打卡紀錄'))return false;
+            const targetId=String(id??'').trim();
+            if(!targetId||!confirm('確定要刪除這筆打卡紀錄嗎？'))return false;
+            showToast('正在等待雲端確認刪除，原紀錄暫時保留','warning');
+            try{
+                const response=await postToCloud({action:'deleteRecord',id:targetId});
+                if(response?.ok!==true||response?.queued||response?.localOnly){
+                    showToast('雲端刪除未確認，保留原始打卡；請核對待同步狀態','warning');
+                    return false;
+                }
+                const removed=p79ApplyConfirmedAttendanceDelete(targetId);
+                if(removed)showToast('雲端已確認刪除這筆打卡紀錄','success');
+                return removed;
+            }catch(error){
+                showToast('雲端刪除失敗，原紀錄保留：'+String(error?.message||error),'warning');
+                return false;
             }
-            return false;
         }
 
         function p79ApplyConfirmedAttendanceDelete(id, options = {}) {
@@ -16570,81 +16601,53 @@ function getManualPairRecordAnchor(record) {
         }
 
         async function deleteCurrentModalAttendanceRecord() {
-            if(!await p79VerifyAttendanceDeleteBaseline())return;
+            if (!await p79VerifyAttendanceDeleteBaseline()) return;
             if(!p79AttendanceEditCloudReady){showToast('雲端原始紀錄尚未核對完成，暫時不能刪除','warning');return;}
-            if (!requireAdminAction('attendanceDelete', '刪除打卡紀錄')) return;
-
-            const id = String(document.getElementById('modalRecordId')?.value || '').trim();
-            const snapshot = activeEditingAttendanceRecordSnapshot || activeEditingAttendanceRecord || null;
-
-            let record = activeEditingAttendanceRecord && records.includes(activeEditingAttendanceRecord)
+            if(!requireAdminAction('attendanceDelete','刪除打卡紀錄'))return;
+            const id=String(document.getElementById('modalRecordId')?.value||'').trim();
+            const snapshot=activeEditingAttendanceRecordSnapshot||activeEditingAttendanceRecord||null;
+            let record=activeEditingAttendanceRecord&&records.includes(activeEditingAttendanceRecord)
                 ? activeEditingAttendanceRecord
-                : records.find(item => String(item?.id ?? '').trim() === id);
-
-            if (!record && snapshot) {
-                const snapshotEventKey = getAttendanceImportEventKey(snapshot);
-                if (snapshotEventKey) {
-                    record = records.find(item => getAttendanceImportEventKey(item) === snapshotEventKey);
+                : records.find(item=>String(item?.id??'').trim()===id);
+            if(!record&&snapshot){
+                const key=getAttendanceImportEventKey(snapshot);
+                if(key)record=records.find(item=>getAttendanceImportEventKey(item)===key);
+            }
+            if(!record&&snapshot)record=snapshot;
+            if(!record){showToast('找不到要刪除的打卡紀錄，請重新開啟該筆資料','warning');return;}
+            const recordId=String(record.id??id).trim();
+            if(!recordId){showToast('這筆打卡缺少紀錄 ID，無法安全刪除','warning');return;}
+            const label=getAttendanceDeleteLabel(record),who=String(record.name||'').trim(),when=String(record.timeStr||'').trim();
+            if(!confirm('確定只刪除'+(who?'「'+who+'」的':'')+label+'嗎？\n\n'+when+
+                '\n\n另一筆上下班紀錄不會一起刪除。'))return;
+            const btn=document.getElementById('deleteModalRecordBtn');
+            if(btn?.disabled)return;
+            if(btn){btn.disabled=true;btn.textContent='⏳ 雲端確認刪除中…';}
+            try{
+                // A visually deleted punch is NOT a cloud-confirmed deletion.
+                // Preserve original data and avoid tombstones until the exact ID is acknowledged.
+                showToast('正在雲端刪除'+label+'，確認前保留原紀錄','warning');
+                const result=await postToCloud({action:'deleteRecord',id:recordId});
+                if(result?.ok!==true||result?.queued||result?.localOnly){
+                    showToast('雲端尚未確認刪除'+label+'；原紀錄保留。'+
+                        String(result?.error||result?.warning||'請稍後核對待同步狀態'),'warning');
+                    return;
                 }
-            }
-            if (!record && snapshot) record = snapshot;
-
-            if (!record) {
-                showToast('找不到要刪除的打卡紀錄，請重新開啟該筆資料', 'warning');
-                return;
-            }
-
-            const recordId = String(record?.id ?? id).trim();
-            if (!recordId) {
-                showToast('這筆打卡缺少紀錄 ID，無法安全刪除', 'warning');
-                return;
-            }
-
-            const label = getAttendanceDeleteLabel(record);
-            const who = String(record?.name || '').trim();
-            const when = String(record?.timeStr || '').trim();
-
-            if (!confirm(`確定只刪除${who ? '「' + who + '」的' : ''}${label}嗎？\n\n${when || ''}\n\n另一筆上下班紀錄不會一起刪除。`)) {
-                return;
-            }
-
-            const btn = document.getElementById('deleteModalRecordBtn');
-            if (btn?.disabled) return;
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⏳ 刪除中…';
-            }
-
-            try {
-                purgeDeletedAttendanceRecordFromAllLocalCaches(record);
-                records = records.filter(item => String(item?.id ?? '').trim() !== recordId);
-                p79ScheduleAttendanceMutationPersist([], [recordId]);
-                forgetRecentAttendanceMutation(recordId);
-
+                if(!p79ApplyConfirmedAttendanceDelete(recordId,{skipRender:true})){
+                    showToast('雲端已回覆刪除，但本機核對未完成，請重新讀取考勤','warning');
+                    return;
+                }
                 closeEditModal();
-
                 p79ScheduleAttendanceMutationRender();
-                try { updateHomeClockInButtonState(); } catch (ignore) {}
-
-                showToast(`已刪除${label}，正在同步雲端…`, 'success');
-
-                postToCloud(
-                    { action: 'deleteRecord', id: recordId },
-                    `已刪除${label}`,
-                    () => {
-                        // 本機刪除時畫面已更新；雲端成功只更新按鈕狀態，不再整表重繪兩次。
-                        try { updateHomeClockInButtonState(); } catch (ignore) {}
-                    },
-                    errorText => {
-                        console.warn(`刪除${label}雲端同步失敗：`, errorText);
-                        showToast(`本機已刪除${label}，雲端將自動重試同步`, 'warning');
-                    }
-                );
-            } catch (error) {
-                console.error('刪除目前考勤紀錄失敗：', error);
-                showToast('刪除失敗：' + String(error?.message || error || '未知錯誤'), 'warning');
-                if (btn) {
-                    btn.disabled = false;
+                try{updateHomeClockInButtonState()}catch(ignore){}
+                showToast('雲端已確認刪除'+label+'；手機請重新核對雲端後再打卡','success');
+            }catch(error){
+                console.error('刪除目前考勤紀錄失敗：',error);
+                showToast('雲端刪除尚未完成，原紀錄保留：'+String(error?.message||error),'warning');
+            }finally{
+                const modal=document.getElementById('editRecordModal');
+                if(btn&&modal&&!modal.classList.contains('hidden')){
+                    btn.disabled=false;
                     updateEditModalDeleteButton(record);
                 }
             }

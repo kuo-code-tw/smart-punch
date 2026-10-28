@@ -12,7 +12,7 @@ function extract(name){
 const IN={id:'IN-1',empId:'E1',attNo:'11',timeStr:'2026/10/28 07:45:00',status:'上班簽到'};
 const OUT={id:'OUT-1',empId:'E1',attNo:'11',timeStr:'2026/10/28 15:48:00',status:'下班簽退'};
 const base={empId:'E1',attNo:'11',name:'測試員',dateKey:'2026-10-28',clockIn:IN,clockOut:OUT};
-const stamp=r=>Date.parse(String(r?.timeStr||'').replaceAll('/','-').replace(' ','T').replace(/(\d\d:\d\d)$/,'$1:00')+'+08:00');
+const stamp=r=>Date.parse(String(r?.timeStr||'').replaceAll('/','-').replace(' ','T').replace(/T(\d\d:\d\d)$/,'T$1:00')+'+08:00');
 function setup(){
  const opened=[],notices=[],months=[],rowsRendered=[],closed=[];
  let canEdit=true,queued=false,loaded=true,nextRows=[];

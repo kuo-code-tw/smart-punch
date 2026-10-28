@@ -298,8 +298,8 @@ function plan(snapshot,people,month,rules){
   states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});
  }
  // Schedule the whole group together rather than finishing one person first.
- // Actual eligible attendance always precedes future plans; distribute each person's
- // dates across weeks before maximizing the number sharing each eligible date.
+ // Consume every available quota in one pass, taking dates from today forward.
+ // Actual eligible attendance precedes drafts; one person can use each date once.
  for(const category of cats)for(const planned of (historical?[false]:[false,true])){
   while(true){
    const byDate=new Map();
@@ -307,9 +307,7 @@ function plan(snapshot,people,month,rules){
     if(!state.remaining[category])continue;
     const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category));
     if(!available.length)continue;
-    const minWeek=Math.min(...available.map(c=>state.weekCount[weekOf(c.date)]));
     for(const candidate of available){
-     if(state.weekCount[weekOf(candidate.date)]!==minWeek)continue;
      if(!byDate.has(candidate.date))byDate.set(candidate.date,[]);
      byDate.get(candidate.date).push({state,candidate});
     }
@@ -327,7 +325,8 @@ function plan(snapshot,people,month,rules){
   }
  }
  if(workflow.canSuggest)for(const state of states)for(const category of cats)for(let n=0;n<state.remaining[category];n++)issues.push(state.emp.name+'「'+category+'」仍有1天尚未確認休假或實際8小時工作，不向月初補報');
- return {rows:sortRows(rows),plannedRows:sortRows(plannedRows),balances,issues,unavailable,workflow};
+ const unfilled=states.map(state=>({empId:state.emp.empId,name:state.emp.name,remaining:{...state.remaining}}));
+ return {rows:sortRows(rows),plannedRows:sortRows(plannedRows),balances,issues,unavailable,unfilled,workflow};
 }
 // 與正式申報候選分開：未休假盤點必須保留全員、所有職稱及排班缺漏，
  // 不因當天沒有8小時打卡或已過月末候選窗口就把 F/L 等職稱隱藏。
@@ -484,8 +483,10 @@ async function open(){
    q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
     const upcoming=visiblePlannedRows();
     const weeklyReview=upcoming.filter(r=>r.needsWeeklyReview).length;
-    q('#mrPlannedSummary').textContent='今天起至月底的未休加班預排草案：'+upcoming.length+
-      ' 筆'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
+    const scopedIds=new Set(chosenPeople().map(emp=>id(emp.empId)));
+    const unfilled=(model.unfilled||[]).filter(x=>scopedIds.has(id(x.empId))).reduce((n,x)=>n+cats.reduce((t,c)=>t+x.remaining[c],0),0);
+    q('#mrPlannedSummary').textContent='今天起至月底一次排滿未休額度：預排草案 '+upcoming.length+
+      ' 筆｜尚無可排日期或時段 '+unfilled+' 天'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
     q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
       const emp=loadedPeople.find(e=>id(e.empId)===id(r.empId))||{};
       return '<tr><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+

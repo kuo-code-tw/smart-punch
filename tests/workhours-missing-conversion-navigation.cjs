@@ -32,7 +32,7 @@ const ctx={
  p79WorkOvertimeFilteredRows:rows
 };
 const api=new Function('ctx',
- 'let overtimeCurrentPage=1;const {document,escapeHtml,alert,OVERTIME_PAGE_SIZE,renderOvertimeStats,p79WorkOvertimeFilteredRows}=ctx;'+
+ 'const window=ctx;let overtimeCurrentPage=1;const {document,escapeHtml,alert,OVERTIME_PAGE_SIZE,renderOvertimeStats,p79WorkOvertimeFilteredRows}=ctx;'+
  script+
  ';return {getPage:()=>overtimeCurrentPage,getItems:()=>p79OvertimePendingConversionRows,list:p79OvertimeMissingConversionRows,render:p79RenderOvertimeMissingConversion,jump:p79ShowOvertimeMissingConversion};')(ctx);
 assert.equal(api.list(rows).length,2,'only one null and one invalid, no duplicate or planned items');

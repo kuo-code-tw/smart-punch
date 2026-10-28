@@ -50,6 +50,24 @@ assert(source.includes("g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedR
 assert(html.includes('if(date<todayKey||savedKeys.has('),'Overtime page includes today pending drafts');
 assert(html.includes('needsWeeklyReview:row.needsWeeklyReview===true'),'Weekly review status crosses the page boundary');
 assert(html.includes('preview=20261028-month-end-all-roles-v6'),'Updated script invalidates old browser cache');
+// Multiple days per person must be filled in one call, across every unit and role.
+g.p79RestQuota=()=>({days:31,slots:['例','休','國'].flatMap(category=>
+ Array.from({length:category==='例'?2:1},()=>({category,sourceDate:'2026-10-10'})))});
+for(const emp of employees)snap.states[emp.empId+'|'+now]='open';
+const filled=g.P79MonthlyRest.plan(snap,employees,'2026-10',rules);
+for(const emp of employees){
+ const all=[...filled.rows,...filled.plannedRows].filter(x=>x.empId===emp.empId);
+ assert.equal(all.length,4,'One call must fill all four unused days for '+emp.empId);
+ assert.equal(new Set(all.map(x=>x.date)).size,4,'No same-day double booking');
+ for(const category of ['例','休','國'])assert.equal(all.filter(x=>x.category===category).length,category==='例'?2:1);
+ assert.equal(Object.values(filled.unfilled.find(x=>x.empId===emp.empId).remaining).reduce((a,b)=>a+b,0),0);
+}
+now='2026-10-30';
+const limited=g.P79MonthlyRest.plan(snap,employees,'2026-10',rules);
+for(const emp of employees){
+ assert.equal(limited.plannedRows.filter(x=>x.empId===emp.empId).length,2,'Fill both remaining dates');
+ assert.equal(Object.values(limited.unfilled.find(x=>x.empId===emp.empId).remaining).reduce((a,b)=>a+b,0),2,'Expose quota that cannot fit before month end');
+}
 now='2026-10-29';const nextDay=g.P79MonthlyRest.plan(snap,employees,'2026-10',rules);
 assert(nextDay.plannedRows.every(x=>x.date>=now),'Yesterday cannot persist as a new future plan');
 console.log('PASS month-end: 16 staff across companies and roles incl. 11 F/L (3 formal + 8 draft), Oct28-31, no false declarations, verified cross-page binding and latest cache');

@@ -4,7 +4,7 @@ const start=html.indexOf('        function p79BuildOvertimeJobTitleSummary(rows,
 const end=html.indexOf('        function renderOvertimeStats() {',start);
 assert(start>=0&&end>start,'job-title overtime calculation function must exist');
 const c={Map,Set,Number,String,Array,Math};
-vm.createContext(c);
+c.window=c;vm.createContext(c);
 vm.runInContext(html.slice(start,end),c);
 const report=(emp,dept,date,declared,converted,extra={})=>({empId:emp,dept,jobTitle:dept==='A'?'ARMG':'AQC',dateKey:date,rosterDate:date,reportVerified:true,overtimeMinutes:977,overtimeReport:{id:emp+'-'+date,declaredHours:declared,convertedHours:converted,...extra}});
 const a=report('E1','A','2026-10-01',4,6.02);
