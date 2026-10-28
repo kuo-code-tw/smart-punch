@@ -176,54 +176,54 @@
   const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
   const byNo=new Map(masters.filter(s=>String(s.workingNo||'').trim()).map(s=>[String(s.workingNo).trim(),s]));
   const groups=new Map();
+  const nextDate=date=>new Date(taipeiDateStart(date)+86400000).toISOString().slice(0,10);
   for(const r of sourceRows()){
    const date=normalizeDate(r.workDate);
-   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
+   if(!date)continue;
    const aqc=typeof normalizeAqcNo==='function'?normalizeAqcNo(r.number||r.gcNo):String(r.number||r.gcNo||'').trim();
    if(!/^\d{1,6}$/.test(String(aqc)))continue;
-   const no=String(r.workingNo||r.workNo||'').trim();
-   const master=byNo.get(no);
+   const no=String(r.workingNo||r.workNo||'').trim(),master=byNo.get(no);
    const ship=String(r.shipName||master?.vessel||r.vessel||'').trim();
    if(!ship)continue;
    const voyage=String(r.voyageE||r.voyageI||r.voyage||master?.voyageE||master?.voyageI||'').trim();
-   // Parent/child WORKING NO.s are distinct operational jobs; never coalesce by ship name.
-   const groupKey=JSON.stringify([date,no?'NO:'+no:'SHIP:'+normShip(ship)+'|'+voyage]);
-   let g=groups.get(groupKey);
-   if(!g){g={date,ship,voyage,workingNo:no,aqcs:new Set(),segments:[],containers:0,hatches:0,sourceCount:0};groups.set(groupKey,g);}
-   g.aqcs.add(String(aqc));
-   const times=[r.startTime,r.endTime].map(x=>String(x||'').match(/^(\d{1,2}):(\d{2})/));
-   if(times[0]&&times[1]){
-    const from=Number(times[0][1])*60+Number(times[0][2]),until=Number(times[1][1])*60+Number(times[1][2]);
-    if(from<1440&&until<1440){
-     const start=date+'T'+String(times[0][1]).padStart(2,'0')+':'+times[0][2];
-     let endDate=date;
-     if(until<from){
-      const d=new Date(date+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()+1);
-      endDate=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-     }
-     const end=endDate+'T'+String(times[1][1]).padStart(2,'0')+':'+times[1][2];
-     g.segments.push({start,end});
-    }
+   const matchTime=t=>String(t||'').match(/^(\d{1,2}):(\d{2})/);
+   const s=matchTime(r.startTime),e=matchTime(r.endTime);
+   const sm=s?Number(s[1])*60+Number(s[2]):null,em=e?Number(e[1])*60+Number(e[2]):null;
+   const next=nextDate(date),crosses=sm!==null&&em!==null&&sm<1440&&em<1440&&em<sm;
+   const startDateTime=s?date+'T'+s[1].padStart(2,'0')+':'+s[2]:'';
+   const endDateTime=e?(crosses?next:date)+'T'+e[1].padStart(2,'0')+':'+e[2]:'';
+   const segments=[{date,start:startDateTime,end:endDateTime,quantity:true}];
+   if(crosses&&em>0){
+    segments[0].end=next+'T00:00';
+    segments.push({date:next,start:next+'T00:00',end:endDateTime,quantity:false});
    }
-   const disc=Number(r.disc),load=Number(r.load),boxes=Number(r.containers);
-   const quantity=Number.isFinite(disc)&&Number.isFinite(load)?disc+load:Number.isFinite(boxes)?boxes:0;
-   g.containers+=Math.max(0,quantity);
-   g.hatches+=Math.max(0,Number(r.hatches)||0);
-   g.sourceCount++;
+   for(const seg of segments){
+    const key=JSON.stringify([seg.date,no?'NO:'+no:'SHIP:'+normShip(ship)+'|'+voyage]);
+    if(!groups.has(key))groups.set(key,{date:seg.date,ship,voyage,workingNo:no,aqcs:new Set(),segments:[],containers:0,hatches:0,sourceCount:0,quantityCount:0});
+    const g=groups.get(key);g.aqcs.add(String(aqc));
+    if(seg.start&&seg.end)g.segments.push({start:seg.start,end:seg.end});
+    if(seg.quantity){
+     const disc=Number(r.disc),load=Number(r.load),boxes=Number(r.containers);
+     const quantity=Number.isFinite(disc)&&Number.isFinite(load)?disc+load:Number.isFinite(boxes)?boxes:0;
+     g.containers+=Math.max(0,quantity);
+     g.hatches+=Math.max(0,Number(r.hatches)||0);
+     g.quantityCount++;
+    }
+    g.sourceCount++;
+   }
   }
   return [...groups.values()].map(g=>{
    const starts=g.segments.map(x=>x.start).sort(),ends=g.segments.map(x=>x.end).sort();
-   const m=byNo.get(g.workingNo),first=String(m?.firstDate||'').slice(0,10),last=String(m?.lastDate||'').slice(0,10);
-   // A ship-wide SHIFT figure may be used for a daily row only when the vessel job spans exactly this one day.
-   const dailyShift=(first===g.date&&last===g.date&&m?.shiftMoves!==undefined&&m?.shiftMoves!==null&&Number.isFinite(Number(m.shiftMoves)))?Number(m.shiftMoves):null;
+   const m=byNo.get(g.workingNo),first=normalizeDate(m?.firstDate),last=normalizeDate(m?.lastDate);
+   const dailyShift=first===g.date&&last===g.date&&m?.shiftMoves!==undefined&&m?.shiftMoves!==null&&Number.isFinite(Number(m.shiftMoves))?Number(m.shiftMoves):null;
    return {source:'auto',id:'AUTO:'+g.date+'|'+g.workingNo+'|'+g.ship+'|'+g.voyage,
     ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,date:g.date,
     rods:g.aqcs.size,aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
     start:starts[0]||g.date+'T00:00',end:ends.at(-1)||'',hasActualTimes:starts.length>0,
-    containers:g.containers,hatches:g.hatches,shiftMoves:dailyShift,sourceCount:g.sourceCount};
+    containers:g.quantityCount?g.containers:null,hatches:g.quantityCount?g.hatches:null,
+    shiftMoves:dailyShift,sourceCount:g.sourceCount};
   });
  }
-
 
  const normalizeDate=v=>{
   const m=String(v||'').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
