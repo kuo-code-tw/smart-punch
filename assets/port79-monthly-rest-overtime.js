@@ -276,19 +276,23 @@ function plan(snapshot,people,month,rules){
    const m=roster.__meta?.[date]||{};
    if((b.typhoonDates||[]).includes(date)||date<monthEndWindowDate(month,currentDate)||date<=lastReported||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
-   // 未來排班只可列內部「預排參考」，不能進入已確定加班／正式申報清單。
-   // 若當日改排休息、沒完成打卡或實際工作不足8小時，下次核對即不生成正式候選。
-   const future=!historical&&date>currentDate;
-   if(future){
-    if(!['早','中','晚'].includes(roster[date])||pairs.length||
-      g.P79RestAttendance?.state(snapshot,emp.empId,date)!=='open'||
-      !futureWeekRestProtected(roster,date,cycleStart))continue;
-   }else if(pairs.length!==1||!fullDayEvidence(snapshot,emp.empId,date,pairs[0]))continue;
-   const pair=future?null:pairs[0],byCategory=new Map();
-   // 休息日出勤只可認列「休」；不能拿同一日去填例假或國假缺額。
+   const verified=pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
+   const scheduledWork=['早','中','晚'].includes(roster[date]);
+   // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
+   // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
+   const todayPending=!historical&&date===currentDate&&scheduledWork&&!pairs.length&&
+     g.P79RestAttendance?.state(snapshot,emp.empId,date)==='open';
+   const upcoming=!historical&&date>currentDate&&scheduledWork&&!pairs.length;
+   if(!verified&&!todayPending&&!upcoming)continue;
+   if(!verified&&date<currentDate)continue;
+   const pair=verified?pairs[0]:null,byCategory=new Map();
+   // 有正式班表的例／休／國只能保留原假別；未來預排不擅自把休假日轉成上班。
    const fixed=String(roster[date]||'').trim(),categoryOptions=fixed==='休'?['休']:fixed==='例'?['例']:fixed==='國'?['國']:cats;
    for(const category of categoryOptions){const rule=ruleFor(date,roster,pair,category,rules);if(rule)byCategory.set(category,rule);}
-   if(byCategory.size)candidates.push({date,pair,byCategory});
+   if(byCategory.size){
+    const restProtected=!!pair||futureWeekRestProtected(roster,date,cycleStart);
+    candidates.push({date,pair,byCategory,restProtected});
+   }
   }
   states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});
  }
@@ -310,10 +314,13 @@ function plan(snapshot,people,month,rules){
     }
    }
    if(!byDate.size)break;
-   const [date,group]=[...byDate].sort((a,b)=>b[1].length-a[1].length||b[0].localeCompare(a[0]))[0];
+   const [date,group]=[...byDate].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]))[0];
    for(const {state,candidate} of group){
     const rule=candidate.byCategory.get(category);
-    (planned?plannedRows:rows).push({id:crypto.randomUUID(),empId:state.emp.empId,name:state.emp.name,date,category,rule:rule.slice(),checked:false,status:planned?'僅供排班預排（未申報）':'可申報',planned});
+    (planned?plannedRows:rows).push({id:crypto.randomUUID(),empId:state.emp.empId,name:state.emp.name,date,category,rule:rule.slice(),checked:false,
+      status:planned?(candidate.restProtected?'預排草案（未申報）':'預排草案｜例休週期待核（未申報）'):'可申報',
+      needsWeeklyReview:planned&&!candidate.restProtected,planned});
+     if(planned&&!candidate.restProtected)issues.push(state.emp.name+' '+date+'：預排草案有原排例休週期待核，不得直接視為可加班或正式申報');
     state.used.add(date);state.weekCount[weekOf(date)]++;state.remaining[category]--;
    }
   }
@@ -335,7 +342,8 @@ function rosterReviewRows(model,staff){
   const pending=(b.ledger||[]).filter(x=>x.kind==='reportedPendingAttendance').length;
   if(!due&&!unreported&&!pending)return null;
   const eligible=(model.rows||[]).filter(r=>id(r.empId)===key&&!r.saved&&!r.planned).length;
-  return {emp,role,isFL,missing:false,remaining,eligible,unreported,pending};
+  const planned=(model.plannedRows||[]).filter(r=>id(r.empId)===key).length;
+  return {emp,role,isFL,missing:false,remaining,eligible,planned,unreported,pending};
  }).filter(Boolean).sort((a,b)=>
    String(a.emp.companyName||a.emp.company||a.emp.companyId||'').localeCompare(String(b.emp.companyName||b.emp.company||b.emp.companyId||''),'zh-Hant')||
    String(a.emp.dept||a.emp.department||'').localeCompare(String(b.emp.dept||b.emp.department||''),'zh-Hant')||
@@ -352,6 +360,10 @@ function reviewAllUnits(model,staff){
   if(r.saved||r.planned)continue;
   const key=id(r.empId);eligibleById.set(key,(eligibleById.get(key)||0)+1);
  }
+ const plannedById=new Map();
+ for(const r of model?.plannedRows||[]){
+  const key=id(r.empId);plannedById.set(key,(plannedById.get(key)||0)+1);
+ }
  const units=new Map(),seen=new Set(),duplicateIds=[];
  let counted=0;
  for(const emp of staff||[]){
@@ -367,19 +379,20 @@ function reviewAllUnits(model,staff){
   const group=String(emp.groupName||emp.group||emp.teamName||'未標示組別').trim();
   const role=String(emp.jobTitle||emp.deptDetail||'未設定職稱').trim();
   const key=JSON.stringify([company,dept,group,role]);
-  if(!units.has(key))units.set(key,{company,dept,group,role,staff:0,reviewed:0,missing:0,completed:0,outstanding:0,ready:0,pending:0});
+  if(!units.has(key))units.set(key,{company,dept,group,role,staff:0,reviewed:0,missing:0,completed:0,outstanding:0,ready:0,planned:0,pending:0});
   const unit=units.get(key),item=openById.get(empId);
   unit.staff++;unit.reviewed++;
   if(unavailable.has(empId))unit.missing++;
   else if(item)unit.outstanding++;
   else unit.completed++;
   unit.ready+=eligibleById.get(empId)||0;
+  unit.planned+=plannedById.get(empId)||0;
   if(item)unit.pending+=item.unreported+item.pending;
  }
  const groups=[...units.values()].sort((a,b)=>[a.company,a.dept,a.group,a.role].join('|').localeCompare([b.company,b.dept,b.group,b.role].join('|'),'zh-Hant'));
  return {staffCount:counted,groupCount:groups.length,missing:groups.reduce((n,u)=>n+u.missing,0),
   outstanding:groups.reduce((n,u)=>n+u.outstanding,0),ready:groups.reduce((n,u)=>n+u.ready,0),
-  completed:groups.reduce((n,u)=>n+u.completed,0),groups,duplicateIds};
+  planned:groups.reduce((n,u)=>n+u.planned,0),completed:groups.reduce((n,u)=>n+u.completed,0),groups,duplicateIds};
 }
 function reportProgress(model,empId=null){
  const result=Object.fromEntries(cats.map(c=>[c,{remaining:0,selected:0,saved:0,after:0,over:0}]));
@@ -412,7 +425,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。25日起可以申報，但不是從25日回補：當月只看今天已完成且核對8小時的出勤；明天起的預排獨立呈現在加班頁，不算正式申報。若實際休息則不申報。原排例假與休息日不得為湊額度擅自變更，應先核對約定七日週期（特殊彈性工時例外）。</p><div id="mrBackfill" role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><section id="mrNeedSection"><b id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div id="mrScopeSummary" role="status"></div><div class="scroll"><table><thead><tr><th>公司</th><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>可申報筆數</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div><div class="scroll"><table><thead><tr><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><b>符合正式申報條件（當日完整8小時出勤）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。25日起可以申報，但不是從25日回補：當月只看今天已完成且核對8小時的出勤；明天起的預排獨立呈現在加班頁，不算正式申報。若實際休息則不申報。原排例假與休息日不得為湊額度擅自變更，應先核對約定七日週期（特殊彈性工時例外）。</p><div id="mrBackfill" role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><section id="mrNeedSection"><b id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div id="mrScopeSummary" role="status"></div><div class="scroll"><table><thead><tr><th>公司</th><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>月底預排</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div><div class="scroll"><table><thead><tr><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div></section><section id="mrPlannedSection"><b id="mrPlannedSummary">今天至月底預排核對中…</b><div class="scroll"><table><thead><tr><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><b>已完成出勤・符合正式8小時申報條件</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
@@ -425,6 +438,9 @@ async function open(){
  }
  function visibleRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
   return (model?.rows||[]).map((r,i)=>({r,i})).filter(({r})=>ids.has(id(r.empId)));
+ }
+ function visiblePlannedRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
+  return (model?.plannedRows||[]).filter(r=>ids.has(id(r.empId)));
  }
  function jobs(){q('#mrJob').innerHTML=options([...new Set(filter().map(job))],'全部職稱');names();}
  function names(){q('#mrEmp').innerHTML='<option value="">全部人員</option>'+filter().filter(e=>!q('#mrJob').value||job(e)===q('#mrJob').value).map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name)+'</option>').join('');
@@ -463,22 +479,31 @@ async function open(){
      :'加班與額度歸屬：'+loadedMonth;
    q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
    const audit=workflowAudit(model);
-   q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜已確認8小時且可申報 '+audit.verified+' 筆｜目前篩選 '+chosenPeople().length+' 人、'+visibleRows().length+' 筆（切換職稱不須重新讀取）';
+   q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜正式可申報 '+audit.verified+' 筆／月底預排 '+audit.planned+' 筆｜目前篩選 '+chosenPeople().length+' 人、'+visibleRows().length+' 筆（切換職稱不須重新讀取）';
    q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
+    const upcoming=visiblePlannedRows();
+    const weeklyReview=upcoming.filter(r=>r.needsWeeklyReview).length;
+    q('#mrPlannedSummary').textContent='今天起至月底的未休加班預排草案：'+upcoming.length+
+      ' 筆'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
+    q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
+      const emp=loadedPeople.find(e=>id(e.empId)===id(r.empId))||{};
+      return '<tr><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
+        esc(r.category)+'</td><td>'+esc(r.rule?.[1])+'</td><td>'+esc(r.status)+'</td></tr>';
+    }).join('')||'<tr><td colspan="6">目前沒有可產生的月底預排草案；請查看各單位缺額和班表限制</td></tr>';
     const review=rosterReviewRows(model,chosenPeople());
     const scope=reviewAllUnits(model,chosenPeople());
     const allScope=reviewAllUnits(model,loadedPeople);
     q('#mrScopeSummary').textContent='本帳號可檢視的全範圍：'+
       allScope.staffCount+' 人／'+allScope.groupCount+' 個單位職稱分組；目前篩選 '+
       scope.staffCount+' 人、未休待核 '+scope.outstanding+' 人、班表缺漏 '+scope.missing+
-      ' 人、符合申報 '+scope.ready+' 筆'+
+      ' 人、正式可申報 '+scope.ready+' 筆、月底預排草案 '+scope.planned+' 筆'+
       (snapshot?.attendanceEvidence?.complete!==true?'｜考勤未完整讀取，不能認定無卡或完成':'')+
       (scope.duplicateIds.length?'｜人員編號有重複或缺漏 '+scope.duplicateIds.length+' 項，須先處理':'');
     q('#mrScopeRows').innerHTML=scope.groups.map(u=>
        '<tr><td>'+esc(u.company)+'</td><td>'+esc(u.dept)+'</td><td>'+esc(u.group)+'</td><td>'+
        esc(u.role)+'</td><td>'+u.staff+'</td><td>'+u.completed+'</td><td>'+u.outstanding+
-       '</td><td>'+u.missing+'</td><td>'+u.ready+'</td></tr>').join('')||
-       '<tr><td colspan="9">目前篩選沒有需要核對的在職名冊</td></tr>';
+       '</td><td>'+u.missing+'</td><td>'+u.ready+'</td><td>'+u.planned+'</td></tr>').join('')||
+       '<tr><td colspan="10">目前篩選沒有需要核對的在職名冊</td></tr>';
     const fl=review.filter(x=>x.isFL),missing=review.filter(x=>x.missing).length;
     const flStaff=chosenPeople().filter(e=>/F\s*[\/／]\s*L/i.test(String(e.jobTitle||e.deptDetail||'')));
     const rosterIds=new Set((snapshot?.schedules||[]).filter(x=>x.schedule).map(x=>id(x.empId)));
@@ -490,7 +515,8 @@ async function open(){
      const status=x.missing?'班表缺漏：'+x.reason:
        (x.unreported?'排休日有出勤未申報 '+x.unreported+' 天；':'')+
        (x.pending?'既有申報待核打卡 '+x.pending+' 天；':'')+
-       (x.eligible?'本次可申報 '+x.eligible+' 筆':'本次無符合8小時及日期條件的申報');
+       (x.eligible?'正式可申報 '+x.eligible+' 筆；':'')+
+       (x.planned?'月底預排 '+x.planned+' 筆':'本次無其他月底預排');
      return '<tr><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
     }).join('')||'<tr><td colspan="4">目前篩選內無未休額度或待核人員</td></tr>';
    q('#mrSave').textContent=phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
@@ -514,7 +540,7 @@ async function open(){
     g.p79RestQuota(loadedMonth);loadedPeople=people.slice();if(!loadedPeople.length)throw Error('沒有可檢視的人員');
    const [data,options]=await Promise.all([a.snapshot(loadedMonth,false,false,true),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);paint();
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
-   setStatus('已讀取 '+loadedPeople.length+' 位人員；切換部門、職稱或姓名會立即篩選，不會重新抓雲端資料；先前勾選的項目也會保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
+   setStatus('已核對 '+loadedPeople.length+' 位授權人員，今天起至月底預排 '+(model.plannedRows||[]).length+' 筆、正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
 
   }catch(e){setStatus('讀取失敗：'+e.message);}finally{busy=false;controls(false);}
  };
