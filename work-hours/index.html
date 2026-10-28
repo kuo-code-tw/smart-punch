@@ -13657,7 +13657,7 @@ function p79OvertimePeriodLabel(report){
         let p79OvertimePlannedPage=1;
         function p79OvertimePlannedVisibleRows(rows,month,dept,jobTitle,employeeId){
             return (rows||[]).filter(row=>p79WorkOvertimeIsUnconfirmedPlan(row)&&
-                (month==='ALL'||String(row.monthKey||'').replace(/\\//g,'-')===month)&&
+                (month==='ALL'||String(row.monthKey||'').replaceAll('/','-')===month)&&
                 (dept==='ALL'||row.dept===dept)&&
                 (jobTitle==='ALL'||row.jobTitle===jobTitle)&&
                 (employeeId==='ALL'||String(row.empId)===employeeId));
