@@ -187,7 +187,7 @@
    const remote=await apiGetQuick('gcGetAqcMultiRod',{export:'1',...(st.revision?{revision:st.revision}:{})},25000);
    if(identity()!==scope||state.epoch!==epoch)throw Error('資料或登入身分已變更，請重新匯出');
    if(!remote.unchanged){if(!Array.isArray(remote.records))throw Error('未取得完整雲端紀錄');state.rows=remote.records;}
-   state.revision=String(remote.revision);state.checked=Date.now();persist();render();
+   state.epoch++;state.revision=String(remote.revision);state.checked=Date.now();persist();render();
    const rows=filtered();if(!rows.length){notice('沒有符合條件的資料可匯出',true);return;}
    if(typeof g.p79EnsureXlsx!=='function')throw Error('Excel 元件未載入');
    await g.p79EnsureXlsx();
