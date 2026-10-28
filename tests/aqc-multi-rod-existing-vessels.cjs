@@ -10,7 +10,7 @@ assert(app.includes('function concurrentResult()'));
 assert(app.includes("const result=concurrentResult()"));
 assert(!app.includes('>補登船舶資料</button>'),'no redundant add-vessel button');
 assert(app.includes('同桿跨船接桿核對'),'audit per-unit finish/start transitions');
-assert(app.includes("const scope=identity(),result=concurrentResult(),rows=result.rows;"));
+assert(app.includes("const scope=identity(),result=concurrentResult(),rows=g.P79AqcConcurrent?.groupSegments(result.rows)||result.rows;"),"Excel must consolidate by ship pair, not duplicate source segments");
 assert(app.includes('不能證明同時作業'),'source overlaps must not be claimed as actual concurrency');
 assert(app.includes('現場同時作業上限為'),'visible current physical capacity');
 assert(app.includes('來源時間重疊桿數（非已確認）'),'Excel must differentiate source overlaps from actual activity');

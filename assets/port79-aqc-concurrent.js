@@ -226,5 +226,46 @@ function compute(indexed,manual,query={}){
   sourceIntervals:indexed.raw,
   transfers:(indexed.transfers||[]).filter(x=>x.finished>=first&&x.started<last)};
 }
-g.P79AqcConcurrent={index,compute,invalidate,normalizeDate,instant};
+// Keep the sweep-line intervals as audit evidence, but present uninterrupted
+// periods involving the same exact set of vessel jobs as ONE operation.
+function groupSegments(rows){
+ const ordered=(Array.isArray(rows)?rows:[]).slice().sort((a,b)=>a._start-b._start||a._end-b._end);
+ const identity=s=>JSON.stringify([String(s.workingNo||'').trim().toUpperCase(),
+  String(s.ship||'').trim().toUpperCase(),String(s.voyage||'').trim().toUpperCase()]);
+ const pairKey=r=>JSON.stringify((r.ships||[]).map(identity).sort());
+ const grouped=[];
+ for(const r of ordered){
+  if(!Number.isFinite(r._start)||!Number.isFinite(r._end)||r._end<=r._start||!(r.ships||[]).length)continue;
+  const key=pairKey(r),prev=grouped.at(-1);
+  // Same ships and no real gap: a changed AQC number does NOT create a new job.
+  if(!prev||prev._pairKey!==key||r._start>prev._end+1000){
+   grouped.push({...r,_pairKey:key,id:'SHIP-PAIR:'+r._start+':'+key,
+    segments:[r],ships:r.ships.map(s=>({...s,aqcNumbers:[...(s.aqcNumbers||[])],
+     evidence:[...(s.evidence||[])]}))});
+   continue;
+  }
+  prev.segments.push(r);
+  prev._end=Math.max(prev._end,r._end);
+  prev.end=r.end;prev.durationMinutes+=r.durationMinutes;
+  prev.totalRods=Math.max(prev.totalRods,r.totalRods);
+  prev.sourceOverlapRods=Math.max(prev.sourceOverlapRods,r.sourceOverlapRods);
+  prev.verifiedRods=Math.max(prev.verifiedRods,r.verifiedRods);
+  prev.capacityConflict=prev.capacityConflict||r.capacityConflict;
+  prev.needsReview=prev.needsReview||r.needsReview;
+  prev.displayRods=prev.needsReview?null:prev.totalRods;
+  for(const ship of r.ships){
+   const existing=prev.ships.find(s=>identity(s)===identity(ship));
+   if(!existing){prev.ships.push({...ship,aqcNumbers:[...(ship.aqcNumbers||[])],
+     evidence:[...(ship.evidence||[])]});continue}
+   existing.rods=Math.max(existing.rods,ship.rods);
+   for(const unit of ship.aqcNumbers||[])if(!existing.aqcNumbers.includes(unit))existing.aqcNumbers.push(unit);
+   for(const evidence of ship.evidence||[]){
+    if(!existing.evidence.some(e=>e.unit===evidence.unit&&e.start===evidence.start&&e.end===evidence.end&&e.source===evidence.source))
+     existing.evidence.push(evidence);
+   }
+  }
+ }
+ return grouped;
+}
+g.P79AqcConcurrent={index,compute,groupSegments,invalidate,normalizeDate,instant};
 })(window);
