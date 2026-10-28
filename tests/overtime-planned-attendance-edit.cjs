@@ -40,7 +40,7 @@ function setup(){
 (async()=>{
  let t=setup();t.ctx.records=[IN,OUT];
  assert.match(t.ctx.p79OvertimePendingPunchCell(base,'IN','2026-10-28',0),/p79OpenPlannedAttendanceEditor\(0,'IN'\)/,'displayed timestamp is directly clickable');
- assert.match(t.ctx.p79OvertimePendingPunchCell(base,'OUT','2026-10-28',0),/✎ 修改/,'OUT also directly editable');
+ assert.match(t.ctx.p79OvertimePendingPunchCell(base,'OUT','2026-10-28',0),/aria-hidden="true">✎<\/span>/,'OUT shows compact same-style pencil edit icon');
  await t.ctx.p79OpenPlannedAttendanceEditor(0,'IN');
  assert.equal(t.opened.length,1,'same original attendance editor opens');
  assert.equal(t.months.length,0,'already loaded official punch need not fetch entire month');
