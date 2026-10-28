@@ -11,7 +11,7 @@ assert.match(html,/#adminContentOvertime #p79OvertimePlannedDialog:not\(\[open\]
 assert.match(html,/id="p79OvertimePlannedPagination"/,'list retains original pagination');
 assert(html.includes("toggle.textContent='預排／待核對（'+rows.length+'）'"),'top button uses filtered count');
 assert.match(html,/onclick="p79CloseOvertimePlannedDialog\(\)"[^>]+>✕ 關閉<\/button>/,'modal has a close button');
-assert(html.includes("p79CloseOvertimePlannedDialog();openAttendanceTimeEditor("),'attendance editing closes modal before opening its editor');
+assert.match(html,/p79CloseOvertimePlannedDialog\(\);\s*\/\/[^\n]*\n\s*return openEditRecordModal\(/,'attendance editing closes modal before opening its editor');
 assert(html.includes("p79CloseOvertimePlannedDialog();openRowManualAdd("),'attendance add closes modal before opening its editor');
 assert(html.includes("p79OpenPlannedOvertimeReview('+index+')"),'review action remains available');
 

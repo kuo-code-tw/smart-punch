@@ -42,7 +42,7 @@ c.records=[IN,OUT];c.canPerformAdminAction=()=>false;
 assert.doesNotMatch(punch({...base,clockIn:IN},'IN'),/EDIT_IN/,'no edit permission');
 assert.doesNotMatch(punch(base,'IN'),/openRowManualAdd/,'no punch add permission');
 assert(html.includes('上班時間（實際打卡）')&&html.includes('下班時間（實際打卡）'),'clearly labeled actual timestamps');
-assert(html.includes('p79OvertimePendingPunchCell(row,\'IN\',todayKey)')&&html.includes('p79OvertimePendingPunchCell(row,\'OUT\',todayKey)'),'both times rendered');
+assert(html.includes('p79OvertimePendingPunchCell(row,\'IN\',todayKey,index)')&&html.includes('p79OvertimePendingPunchCell(row,\'OUT\',todayKey,index)'),'both time columns reference the visible row index for safe editing');
 assert(html.includes('p79OvertimePendingReason(row,todayKey)'),'cause displayed per row');
 for(const tag of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(tag[1].trim())new vm.Script(tag[1]);
 console.log('PASS precise pending causes, no fake future punches, correction via existing edit/add workflows and permission checks');

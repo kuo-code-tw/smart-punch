@@ -16,8 +16,16 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[]) {
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[]) {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
+  // A fully checked no-punch work shift is shown as 休 in the roster. Reconcile it
+  // with the SAME quota allocator instead of letting the UI count an extra 休
+  // while the shared monthly ledger still has an unfilled 國 day.
+  // Caller supplies only evidence-verified no-punch dates; never infer from a
+  // blank or pending attendance record inside this pure allocator.
+  const observedOff=new Set(observedOffDates);
+  const isRestCandidate=date=>schedule[date]==='休'||
+    (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
@@ -25,7 +33,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   if(dates.some(d=>!schedule[d]))throw new Error('本月有未排班日期，請補齊班表後再配對');
   // Remove only fields owned by this allocator; preserve manual overtime and substitutions.
   for(const date of dates) {
-    const item=result[date];if(!item||item.restAllocationSource!=='auto-v1')continue;
+    const item=result[date];if(!item||!['auto-v1','roster'].includes(item.restAllocationSource))continue;
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
     if(!Object.keys(item).length)delete result[date];
   }
@@ -63,7 +71,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // entire 83-person batch or be treated as approved overtime.
   for(const date of dates){
     const item=result[date];
-    if(!item||item.restCategory!=='休'||schedule[date]==='休'||
+    if(!item||item.restCategory!=='休'||isRestCandidate(date)||
        item.restQuotaOvertime||item.restAllocationLocked||item.restCategoryLocked||
        item.overtimeReport||item.overtimeReports?.length||item.overtime||
        item.forEmpId||item.type==='substitute')continue;
@@ -71,10 +79,22 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       'restAllocationSource','restPreferredCategory'])delete item[key];
     if(!Object.keys(item).length)delete result[date];
   }
+  // Explicit 例/國 cells are already visible rest categories. Reserve their
+  // own quota before allocating flexible 休 days, including imported cells
+  // without metadata. Otherwise the grid and monthly ledger count different days.
+  for(const date of dates){
+    const category=String(schedule[date]||'').trim(),item=result[date]||{};
+    if(!['例','國'].includes(category)||excluded.has(date)||typhoonProtected.has(date)||
+       category==='國'&&nationalBlocked.has(date)||item.restCategory||
+       item.restAllocationLocked||item.restCategoryLocked||item.restQuotaOvertime||
+       item.overtime||item.overtimeReport||item.overtimeReports?.length||
+       item.forEmpId||item.type==='substitute'||item.manualRosterShift)continue;
+    result[date]={...item,restCategory:category,restAllocationSource:'roster'};
+  }
   const flexible=new Set();
   for(const date of dates){
     const item=result[date]||{};
-    if(schedule[date]!=='休'||item.restQuotaOvertime||
+    if(!isRestCandidate(date)||item.restQuotaOvertime||
        item.restAllocationLocked||item.restCategoryLocked||
        item.overtime||item.overtimeReport||item.overtimeReports?.length||
        item.forEmpId||item.type==='substitute')continue;
@@ -83,29 +103,41 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   }
   const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[];
   const available=dates.filter(date=>
-    schedule[date]==='休'&&!substitutionDates.has(date)&&!excluded.has(date)&&
+    isRestCandidate(date)&&!substitutionDates.has(date)&&!excluded.has(date)&&
     (!result[date]?.restCategory||flexible.has(date))&&
     !result[date]?.restAllocationLocked&&!result[date]?.restCategoryLocked&&
     !result[date]?.overtime&&!result[date]?.overtimeReport&&
     !result[date]?.overtimeReports?.length&&!result[date]?.forEmpId&&
-    !result[date]?.restQuotaOvertime);
+    !result[date]?.manualRosterShift&&!result[date]?.restQuotaOvertime);
   // Only a non-revoked formal report can consume an unworked rest quota
   // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
   const verifiedRestReport=item=>{
     const r=item?.overtimeReport;
     return !!String(r?.id??'').trim()&&['例','休','國'].includes(r?.category)&&
-      item.restCategory===r.category&&item.overtimeExcluded!==true&&
+      item.overtimeExcluded!==true&&
       !(item.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
         String(x.reportId)===String(r.id));
   };
-  // Consume genuinely protected manual categories, not movable 休 entries.
+  // Confirmed cloud reports reserve their category ONCE, even when a previous
+  // roster edit did not carry a matching restCategory annotation. Otherwise
+  // newly included no-punch days can fill the same quota twice.
+  // Ordinary manual categories still take precedence and cannot be moved.
   for(const date of dates){
     const item=result[date];
-    if(!item?.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date))continue;
-    if(typhoonProtected.has(date)||excluded.has(date)&&!verifiedRestReport(item))continue;
-    // No cloud report ID means the manual overtime note does not reserve quota.
-    if(item.restQuotaOvertime&&!verifiedRestReport(item))continue;
-    if(schedule[date]!=='休'&&!verifiedRestReport(item))continue;
+    if(!item||typhoonProtected.has(date))continue;
+    if(verifiedRestReport(item)){
+      const category=item.overtimeReport.category;
+      let index=slots.findIndex(s=>s.category===category&&
+        (!item.restSourceDate||s.sourceDate===item.restSourceDate));
+      if(index<0)index=slots.findIndex(s=>s.category===category);
+      // Existing over-quota reports are audited by balance(); never invent
+      // another slot and never overwrite or silently revoke the report.
+      if(index>=0)slots.splice(index,1);
+      used.add(date);
+      continue;
+    }
+    if(!item.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date)||
+       excluded.has(date)||item.restQuotaOvertime||!(isRestCandidate(date)||['例','國'].includes(String(schedule[date]||'').trim())))continue;
     const index=slots.findIndex(s=>s.category===item.restCategory&&
       (!item.restSourceDate||s.sourceDate===item.restSourceDate));
     if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);

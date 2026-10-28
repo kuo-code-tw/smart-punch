@@ -3,7 +3,7 @@ const html=fs.readFileSync('work-hours/index.html','utf8');
 const a=html.indexOf('        function p79BuildOvertimeTitleLeaveDays(');
 const b=html.indexOf('        function renderOvertimeStats() {',a);
 assert(a>=0&&b>a,'approved leave aggregation must be defined before render');
-const ctx={Map,Set,Date,Math,Number,String,Array};
+const ctx={Map,Set,Date,Math,Number,String,Array};ctx.window=ctx;
 const normal=x=>String(x||'').trim().toUpperCase();
 ctx.leaveBelongsToEmployee=(l,e)=>normal(l.empId)===normal(e.empId);
 ctx.toDateInputValue=v=>{const m=String(v||'').match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):''};

@@ -26,10 +26,10 @@
 <!-- PORT79 2026-10-04 SCHEDULE-COLOR-RESTORE：恢復原班別顏色＋放大字體/格子＋交錯列辨識。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
-<script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261028-rest-national-reconcile-v1&reconcile=20261028-shared-v2"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261028-restored-report-id-v3"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2&reconcile=20261028-shared-v2"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261028-short-attendance-shift-v2"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
@@ -6687,8 +6687,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
         ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
       const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
+      // Prefer the checked monthly ledger; if it is not ready yet, retain the
+      // shared automatic allocation instead of resetting a valid 國 to 休.
+      const verifiedOffKind=ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category;
+      const allocatedOffKind=automaticRestMeta[dayStr]?.restCategory;
+      const noPunchRestKind=verifiedOffKind||
+        (['例','休','國'].includes(allocatedOffKind)?allocatedOffKind:'休');
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
-        restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
+        restCategory:noPunchRestKind,
         restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};
       const coverageShift=noPunchRest?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
@@ -6883,9 +6889,23 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ...typhoonProtected,
         ...(window.P79SpecialOvertime?.electionDates?.()||[]).filter(d=>d.startsWith(month+'-'))
       ])];
-      return p79AllocateRestMonth(schedule,metadata||monthlyScheduleMeta[emp.id]||{},month,
+      // The day grid already turns a completed, cloud-checked work shift with
+      // no punch into 休. Feed those SAME dates into the shared allocator so
+      // the 6th 休 can fill an outstanding 國 instead of becoming "休超額".
+      const evidence=p79ScheduleRestClient().status(month).evidence;
+      const existing=metadata||monthlyScheduleMeta[emp.id]||{};
+      const observedOffDates=evidence?.complete===true?Object.keys(schedule).filter(date=>{
+        const shift=String(schedule[date]||'').trim(),item=existing[date]||{};
+        return date.startsWith(month+'-')&&['早','中','晚'].includes(shift)&&
+          window.P79RestAttendance.state({attendanceEvidence:evidence},emp.id,date)==='rest'&&
+          !item.manualRosterShift&&!item.overtime&&!item.overtimeReport&&!item.overtimeReports?.length&&
+          !item.forEmpId&&item.type!=='substitute'&&
+          !approvedLeaveForEmployee(emp.id,date)&&!p79LeaveCoverOnDay(emp.id,date).length&&
+          !nationalBlocked.includes(date);
+      }):[];
+      return p79AllocateRestMonth(schedule,existing,month,
         p79RestAutomaticExcludedDates(emp,month),p79EmploymentStartDate(emp),
-        /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'',nationalBlocked,typhoonProtected);
+        /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'',nationalBlocked,typhoonProtected,observedOffDates);
     }
     function p79AutomaticRestMetadata(empId, month) {
       const existing=monthlyScheduleMeta[empId]||{};
