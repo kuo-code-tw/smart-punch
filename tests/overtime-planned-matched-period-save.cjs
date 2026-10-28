@@ -29,6 +29,11 @@ prefill.attendance={start:Date.parse('2026-10-28T15:35:00+08:00'),end:Date.parse
 assert.doesNotThrow(()=>context.verifyPlannedReviewSelection(middle),'real 16-24 is still supported');
 assert.throws(()=>context.verifyPlannedReviewSelection(early),/實際打卡不符/,'early rule cannot overwrite a real late shift');
 assert(work.includes("const code=suggested?.code||''"),'planned editor must prefer resolved actual period');
+assert(work.includes('function p79ResolvePlannedOvertimePeriod(row)'),'planned list and dialog share one period matcher');
+assert(work.includes('const periodReview=p79ResolvePlannedOvertimePeriod(row)'),'dialog uses the shared matcher');
+assert(work.includes('const matched=p79ResolvePlannedOvertimePeriod(row)'),'list uses the shared matcher');
+assert(work.includes("const period=String(corrected?.code||report.code||'尚未設定')"),'list displays confirmed actual period, not old planned code');
+assert(work.includes('依打卡修正（待核對）'),'list distinguishes suggested correction from cloud confirmation');
 assert(work.includes("originalReportCode:String(report.code||'')"),'original report code retained for cloud conflict prevention');
 assert(work.includes('原加班申報時段已由別處更新，已停止舊資料回寫'),'server checks concurrent edits');
 assert(work.includes('if(pairs.length!==1)throw Error('),'server requires complete pair, never recreates planned entry');
