@@ -314,7 +314,7 @@ function plan(snapshot,people,month,rules){
     }
    }
    if(!byDate.size)break;
-   const [date,group]=[...byDate].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]))[0];
+   const [date,group]=[...byDate].sort((a,b)=>a[0].localeCompare(b[0])||b[1].length-a[1].length)[0];
    for(const {state,candidate} of group){
     const rule=candidate.byCategory.get(category);
     (planned?plannedRows:rows).push({id:crypto.randomUUID(),empId:state.emp.empId,name:state.emp.name,date,category,rule:rule.slice(),checked:false,
