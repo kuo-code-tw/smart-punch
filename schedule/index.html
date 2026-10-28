@@ -1644,7 +1644,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       </div>
       <div class="p79-quick-actions">
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
-        <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
+        <button type="button" id="schedule-quick-refresh-btn" onclick="manualRefreshSchedule()">重新讀取</button>
 <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
         <button type="button" id="p79TyphoonDayButton" onclick="p79ToggleTyphoonDay()" title="編輯多筆颱風假及選舉日">颱風假／選舉日</button>
         <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
@@ -3562,8 +3562,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     async function manualRefreshSchedule() {
       const btn=document.getElementById('schedule-refresh-btn');
-      const old=btn?.innerHTML||'';
+      const quickBtn=document.getElementById('schedule-quick-refresh-btn');
+      const old=btn?.innerHTML||'',quickOld=quickBtn?.innerHTML||'';
       if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-arrows-rotate fa-spin"></i> 更新中';}
+      if(quickBtn){quickBtn.disabled=true;quickBtn.textContent='更新中…';}
       try {
         const writeOk=await flushSchedulePendingWrites();
         if(!writeOk) throw new Error('目前有尚未成功儲存的修改，為避免資料被覆蓋，已停止重新整理');
@@ -3581,10 +3583,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         }
         await refreshOrAcquireScheduleEditLock();
         renderTodaySchedulePanel();
+        showScheduleNotice(currentScheduleMonthKey()+' 雲端班表已重新讀取並完成畫面更新','success',4500);
       } catch(e) {
         alert('❌ 重新整理失敗：\n'+(e?.message||e));
       } finally {
         if(btn){btn.disabled=false;btn.innerHTML=old||'<i class="fa-solid fa-arrows-rotate"></i> 重新整理';}
+        if(quickBtn){quickBtn.disabled=false;quickBtn.innerHTML=quickOld||'重新讀取';}
       }
     }
 
