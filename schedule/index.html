@@ -1644,7 +1644,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       </div>
       <div class="p79-quick-actions">
         <button type="button" data-schedule-edit="1" onclick="saveCurrentTabSchedule()" class="primary">儲存排班</button>
-        <button type="button" onclick="manualRefreshSchedule()">重新讀取</button>
+        <button type="button" id="schedule-quick-refresh-btn" onclick="manualRefreshSchedule()">重新讀取</button>
 <button type="button" id="p79PullOfficialHolidays" onclick="p79PullOfficialHolidays()" class="p79-official-action">↻ 拉取官方假日</button>
         <button type="button" id="p79TyphoonDayButton" onclick="p79ToggleTyphoonDay()" title="編輯多筆颱風假及選舉日">颱風假／選舉日</button>
         <details class="p79-quick-more"><summary>更多功能 ▾</summary><div><button type="button" data-schedule-edit="1" onclick="P79ScheduleContinuation.open()">延續到下個月</button><button type="button" onclick="p79OpenScheduleModeModal()">輪班規則</button><a href="https://kpd.kcg.gov.tw/Content_List.aspx?n=413120497DC2AD9C" target="_blank" rel="noopener noreferrer">高雄停班公告 ↗</a></div></details>
@@ -2914,7 +2914,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         return true;
       }catch(fallbackError){console.error('唯讀班表救援畫面失敗',fallbackError);return false;}
     }
+    let p79ScheduleLastRenderError='';
     function p79SchedulePreviewRenderError(error){
+      p79ScheduleLastRenderError=String(error?.message||error||'未知錯誤');
       console.error('班表畫面渲染失敗',error);
       if(p79ScheduleRenderReadOnlyFallback(error))return;
       const main=document.getElementById('app-main-container');
@@ -3083,7 +3085,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             const yearMonth = document.getElementById('month-picker')?.value;
             if (yearMonth) initDefaultScheduleData(yearMonth, false);
             // 先顯示已讀到的班表；整月考勤核對及寫入不阻擋首次顯示。
-            try { buildRoleTabsAndRender(); } catch(ignore) {}
+            try { buildRoleTabsAndRender(); }
+            catch(error) { p79SchedulePreviewRenderError(error); }
             // 雲端班表成功載入後也核對缺打卡；先前只在手動存檔觸發，畫面一直顯示舊班別。
             // 沒有排班編輯權、考勤資料不完整或月份已切換時不變更。
             if(yearMonth && scheduleEditLockState.mine && !port79ScheduleDirty){
@@ -3559,20 +3562,33 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     async function manualRefreshSchedule() {
       const btn=document.getElementById('schedule-refresh-btn');
-      const old=btn?.innerHTML||'';
+      const quickBtn=document.getElementById('schedule-quick-refresh-btn');
+      const old=btn?.innerHTML||'',quickOld=quickBtn?.innerHTML||'';
       if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-arrows-rotate fa-spin"></i> 更新中';}
+      if(quickBtn){quickBtn.disabled=true;quickBtn.textContent='更新中…';}
       try {
         const writeOk=await flushSchedulePendingWrites();
         if(!writeOk) throw new Error('目前有尚未成功儲存的修改，為避免資料被覆蓋，已停止重新整理');
         port79ScheduleLastAutoSyncAt=0;
         const ok=await loadScheduleCloudWithRetry('manual',3);
         if(!ok) throw new Error('無法讀取 Google 雲端最新排班資料');
+        // A successful GET is not a successful refresh if the real roster failed
+        // to render. Retry the view after the cloud read instead of silently
+        // treating the read-only rescue table as a finished refresh.
+        try { buildRoleTabsAndRender(); }
+        catch(error) { p79SchedulePreviewRenderError(error); }
+        if(p79ScheduleLastRenderError){
+          showScheduleNotice('雲端資料已讀取，但正式班表渲染失敗：'+p79ScheduleLastRenderError+'；已保留唯讀資料，未修改雲端。','error',12000);
+          return false;
+        }
         await refreshOrAcquireScheduleEditLock();
         renderTodaySchedulePanel();
+        showScheduleNotice(currentScheduleMonthKey()+' 雲端班表已重新讀取並完成畫面更新','success',4500);
       } catch(e) {
         alert('❌ 重新整理失敗：\n'+(e?.message||e));
       } finally {
         if(btn){btn.disabled=false;btn.innerHTML=old||'<i class="fa-solid fa-arrows-rotate"></i> 重新整理';}
+        if(quickBtn){quickBtn.disabled=false;quickBtn.innerHTML=quickOld||'重新讀取';}
       }
     }
 
@@ -4074,7 +4090,15 @@ function p79EmployeeDateEligible(emp,date) {
           const meta = schedule.__meta && typeof schedule.__meta === 'object' ? schedule.__meta : {};
           delete schedule.__meta;
           Object.assign(monthlyScheduleData[empId], schedule);
-          Object.assign(monthlyScheduleMeta[empId], meta);
+          // GAS may legitimately return null for an unannotated day. Keep the
+          // actual roster unchanged, but normalize nullable day metadata in the
+          // in-memory presentation model so rendering can safely read overtimeReport.
+          const safeMeta={};
+          for(const [date,entry] of Object.entries(meta)){
+            safeMeta[date]=/^\d{4}-\d{2}-\d{2}$/.test(date)&&
+              (!entry||typeof entry!=='object'||Array.isArray(entry))?{}:entry;
+          }
+          Object.assign(monthlyScheduleMeta[empId], safeMeta);
         });
 
         window.P79ScheduleRestSummary.acceptRows(data.schedules||[]);
@@ -5755,7 +5779,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       onChange:()=>{
         if(!document.getElementById('month-picker'))return;
         p79UpdateTyphoonDayButton(currentScheduleMonthKey());
-        renderRoleScheduleView();
+        try{renderRoleScheduleView();}
+        catch(error){p79SchedulePreviewRenderError(error);}
         p79RefreshScheduleRestEvidence();
       }
     });
@@ -6177,6 +6202,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
       if(Math.abs(window.scrollY-savedPageY)>2)window.scrollTo({top:savedPageY,behavior:'instant'});
       applyScheduleAccessUi();
+      p79ScheduleLastRenderError='';
     }
 
     let p79ManualScheduleSaveBusy=false;
@@ -6649,7 +6675,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
-        restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
+        restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};
       const coverageShift=noPunchRest?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
       const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
