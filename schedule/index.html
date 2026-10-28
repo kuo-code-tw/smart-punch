@@ -6057,7 +6057,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
           const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
-          const {rosterShift,ownApprovedLeave,attendanceState,noPunchRest,manualNoPunch,
+          const {rosterShift,ownApprovedLeave,attendanceState,actualShift,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
             visibleRestKind,verifiedRestAttendance,shortWorkMinutes}=selected;
