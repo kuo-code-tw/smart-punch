@@ -175,23 +175,28 @@ function compute(indexed,manual,query={}){
    for(const [unit,row] of s.byUnit){
     if(units.has(unit)){conflict++;continue;} // A physical crane cannot be on two ships simultaneously.
     units.set(unit,s.boat.key);s.rods++;s.aqcs.push(unit);
+    if(!s.evidence)s.evidence=[];
+    s.evidence.push({unit,source:row.source,start:row.start,end:row.end});
    }
   }
   const ships=sorted.filter(s=>s.rods>0).map(s=>({
    ship:s.boat.ship,voyage:s.boat.voyage,workingNo:s.boat.no,rods:s.rods,
-   aqcNumbers:s.aqcs,source:s.source,
+   aqcNumbers:s.aqcs,source:s.source,evidence:s.evidence||[],
    containers:s.manual?Number(s.manual.containers??0):null,
    hatches:s.manual?Number(s.manual.hatches??0):null,
    shiftMoves:s.manual?Number(s.manual.shiftMoves??0):null,
    manualStart:s.manual?instant(s.manual.start):null,manualEnd:s.manual?instant(s.manual.end):null
   }));
-  const total=ships.reduce((a,s)=>a+s.rods,0);peak=Math.max(peak,total);seen++;
+  const total=ships.reduce((a,s)=>a+s.rods,0);
+  const sheetVerified=ships.reduce((n,s)=>n+s.evidence.filter(x=>x.source==='WORKING SHEET').length,0);
+  peak=Math.max(peak,total);seen++;
   if(total<threshold)continue;
   const signature=JSON.stringify([total,ships.map(s=>[s.ship,s.voyage,s.workingNo,s.rods,s.aqcNumbers.join(',')])]);
   const prev=segments.at(-1);
   if(prev&&prev._end===t&&prev.signature===signature){prev._end=following;prev.end=taiwanStamp(following);continue}
   segments.push({_start:t,_end:following,start:taiwanStamp(t),end:taiwanStamp(following),
-   date:taiwanDate(t),ships,totalRods:total,shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
+   date:taiwanDate(t),ships,totalRods:total,verifiedRods:sheetVerified,
+   needsReview:total>4&&sheetVerified<total,shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
  }
  const rows=segments.map(x=>{
   const known= x.ships.length>0&&x.ships.every(s=>s.manualStart===x._start&&s.manualEnd===x._end&&s.containers!==null);
