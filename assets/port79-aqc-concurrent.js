@@ -37,6 +37,7 @@ function index(records,masters,now=Date.now()){
  const tick=Math.floor(now/60000);
  if(memo&&memo.records===r&&memo.masters===m&&memo.rlen===r.length&&memo.mlen===m.length&&memo.tick===tick)return memo;
  const raw=[],byNo=new Map(),pending=[],sheetUnitKeys=new Set(),sheetByPhysical=new Map();
+ const firstReports=new Map(),clockConflicts=[];
  m.forEach(s=>{const no=String(s.workingNo||'').trim();if(no)byNo.set(no,s)});
  function add(ship,voyage,no,unit,start,end,source){
   if(!ship||!unit||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
@@ -62,6 +63,34 @@ function index(records,masters,now=Date.now()){
      Number.isFinite(start)&&start<=now&&start>=now-86400000?now:NaN;
    add(ship,voyage,no,unit,start,end,'WORKING SHEET');
   }
+ }
+
+ // Detect systematic clock offsets from original REPORT row and SHEET start times.
+ // Never shift or overwrite the imported source timestamps based on this heuristic.
+ for(const x of r){
+  if(String(x?.source||'')!=='working-report')continue;
+  const no=String(x.workingNo||x.workNo||'').trim(),master=byNo.get(no);
+  const ship=String(x.shipName||master?.vessel||x.vessel||'').trim();
+  const voyage=String(x.voyageE||x.voyageI||x.voyage||master?.voyageE||master?.voyageI||'').trim();
+  const unit=physical(x.number||x.gcNo),match=String(x.startTime||'').match(/^(\d{1,2}):(\d{2})/);
+  if(!unit||!ship||!match||Number(match[1])>23||Number(match[2])>59)continue;
+  const key=baseKey(ship,voyage,no)+'|'+unit,row=Number(x.sourceRow),rank=Number.isFinite(row)&&row>0?row:1000000;
+  const prev=firstReports.get(key);
+  if(!prev||rank<prev.rank)firstReports.set(key,{clock:Number(match[1])*60+Number(match[2]),rank,
+   workDate:normalizeDate(x.workDate),sourceRow:Number.isFinite(row)?row:null});
+ }
+ for(const x of raw){
+  if(x.source!=='WORKING SHEET')continue;
+  const report=firstReports.get(x.key+'|'+x.unit);
+  if(!report)continue;
+  const sheetDay=taiwanDate(x.start);
+  if(report.workDate&&Math.abs((dayStart(report.workDate)-dayStart(sheetDay))/86400000)>1)continue;
+  const stamp=taiwanStamp(x.start),sheetClock=Number(stamp.slice(11,13))*60+Number(stamp.slice(14,16));
+  const delta=((report.clock-sheetClock+2160)%1440)-720;
+  if(Math.abs(Math.abs(delta)-480)>5)continue;
+  clockConflicts.push({key:x.key,unit:x.unit,ship:x.ship,voyage:x.voyage,workingNo:x.no,
+   sheetStart:x.start,reportClock:String(Math.floor(report.clock/60)).padStart(2,'0')+':'+String(report.clock%60).padStart(2,'0'),
+   offsetMinutes:delta,reportSourceRow:report.sourceRow});
  }
  for(const x of r){
   if(String(x?.source||'')!=='working-report')continue;
@@ -103,7 +132,7 @@ function index(records,masters,now=Date.now()){
     previousSource:previous.source,nextSource:next.source});
   }
  }
- const result={records:r,masters:m,rlen:r.length,mlen:m.length,tick,raw,pending,transfers,reportCount:r.filter(x=>String(x?.source||'')==='working-report').length};
+ const result={records:r,masters:m,rlen:r.length,mlen:m.length,tick,raw,pending,transfers,clockConflicts,reportCount:r.filter(x=>String(x?.source||'')==='working-report').length};
  memo=result;return result;
 }
 function compute(indexed,manual,query={}){
@@ -115,6 +144,7 @@ function compute(indexed,manual,query={}){
  const first=mode==='all'?-Infinity:mode==='month'?dayStart(date.slice(0,7)+'-01'):dayStart(date);
  const last=mode==='all'?Infinity:mode==='month'?Date.parse(new Date(Date.UTC(Number(date.slice(0,4)),Number(date.slice(5,7)),1)).toISOString().slice(0,10)+'T00:00:00+08:00'):first+86400000;
  const source=[],unmatched=[];
+ const clockConflictMap=new Map((indexed.clockConflicts||[]).map(x=>[x.key+'|'+x.unit,x]));
  for(const x of indexed.raw){
   if(x.end<=first||x.start>=last)continue;
   source.push({...x,start:Math.max(first,x.start),end:Math.min(last,x.end),kind:'auto'});
@@ -185,7 +215,7 @@ function compute(indexed,manual,query={}){
     if(units.has(unit)){conflict++;continue;} // A physical crane cannot be on two ships simultaneously.
     units.set(unit,s.boat.key);s.rods++;s.aqcs.push(unit);
     if(!s.evidence)s.evidence=[];
-    s.evidence.push({unit,source:row.source,start:row.start,end:row.end});
+    s.evidence.push({unit,source:row.source,start:row.start,end:row.end,clockConflict:clockConflictMap.get(row.key+'|'+unit)||null});
    }
   }
   const ships=sorted.filter(s=>s.rods>0).map(s=>({
@@ -197,18 +227,20 @@ function compute(indexed,manual,query={}){
    manualStart:s.manual?instant(s.manual.start):null,manualEnd:s.manual?instant(s.manual.end):null
   }));
   const total=ships.reduce((a,s)=>a+s.rods,0);
+  const timeConflicts=ships.flatMap(s=>s.evidence||[]).filter(e=>e.clockConflict).map(e=>e.clockConflict);
   const sheetVerified=ships.reduce((n,s)=>n+s.evidence.filter(x=>x.source==='WORKING SHEET').length,0);
   peak=Math.max(peak,total);seen++;
   if(total<threshold||threshold>physicalCapacity)continue;
   const capacityConflict=total>physicalCapacity;
+  const needsReview=capacityConflict||timeConflicts.length>0||(total>4&&sheetVerified<total);
  const signature=JSON.stringify([total,capacityConflict,ships.map(s=>[s.ship,s.voyage,s.workingNo,s.rods,s.aqcNumbers.join(',')])]);
   const prev=segments.at(-1);
   if(prev&&prev._end===t&&prev.signature===signature){prev._end=following;prev.end=taiwanStamp(following);continue}
   segments.push({_start:t,_end:following,start:taiwanStamp(t),end:taiwanStamp(following),
    date:taiwanDate(t),ships,totalRods:total,sourceOverlapRods:total,
-   physicalCapacity,displayRods:capacityConflict?null:total,capacityConflict,
+   physicalCapacity,displayRods:needsReview?null:total,capacityConflict,timeConflicts,
    verifiedRods:sheetVerified,
-   needsReview:capacityConflict||(total>4&&sheetVerified<total),shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
+   needsReview,shipCount:ships.length,signature,source:'同時作業判讀',id:'OVERLAP:'+t+'-'+following});
  }
  const rows=segments.map(x=>{
   const known= x.ships.length>0&&x.ships.every(s=>s.manualStart===x._start&&s.manualEnd===x._end&&s.containers!==null);
@@ -219,6 +251,8 @@ function compute(indexed,manual,query={}){
  });
  return {rows,peak:Math.min(peak,physicalCapacity),sourcePeak:peak,physicalCapacity,
   capacityConflictCount:rows.filter(x=>x.capacityConflict).length,
+  timeConflictCount:rows.filter(x=>x.timeConflicts.length>0).length,
+  clockConflicts:(indexed.clockConflicts||[]).filter(x=>source.some(s=>s.source==='WORKING SHEET'&&s.key===x.key&&s.unit===x.unit)),
   rawIntervals:source.length,sourceReportCount:indexed.reportCount,
   pending: indexed.pending.filter(x=>mode==='all'||(mode==='month'?(x.from||'').slice(0,7)<=date.slice(0,7)&&(x.to||x.from||'').slice(0,7)>=date.slice(0,7):x.from<=date&&(x.to||x.from)>=date)),
   duplicateCraneConflicts:conflict,slotsChecked:seen,
