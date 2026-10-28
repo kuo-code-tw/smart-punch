@@ -424,7 +424,7 @@ async function open(){
   try{loadedMonth=q('#mrMonth').value;
     if(loadedMonth>today().slice(0,7))throw Error('不能對未來月份先建立跨月補報');
     g.p79RestQuota(loadedMonth);loadedPeople=people.slice();if(!loadedPeople.length)throw Error('沒有可檢視的人員');
-   const [data,options]=await Promise.all([a.snapshot(loadedMonth,false,false,true),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);paint();
+   const [data,options]=await Promise.all([a.snapshot(loadedMonth,false,false,true),g.P79Overtime.loadRules()]);snapshot=data;rules=options.rows;model=plan(snapshot,loadedPeople,loadedMonth,rules);g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);paint();
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
    setStatus('已讀取 '+loadedPeople.length+' 位人員；切換部門、職稱或姓名會立即篩選，不會重新抓雲端資料；先前勾選的項目也會保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
 
@@ -491,6 +491,7 @@ async function open(){
      const latest=await a.snapshot(loadedMonth,false,false,true);
      if(!el.open||q('#mrMonth').value!==loadedMonth)return;
      snapshot=latest;model=plan(latest,loadedPeople,loadedMonth,rules);
+     g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);
      paint();controls(false);
      q('#mrResult').textContent='本次雲端已確認 '+confirmed+' 筆，已從建議清單移除。';
      setStatus('雲端申報已核對 '+confirmed+' 筆；已完成項目不再顯示。'+
