@@ -5,7 +5,7 @@ const js=fs.readFileSync('assets/port79-aqc-multi-rod.js','utf8');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 new Function(js);
 assert(html.includes('data-tab="multi-rod"'),'multi-rod feature must be in efficiency menu');
-assert(html.includes('existing-vessels-v4'),'browser must fetch refreshed script');
+assert(html.includes('existing-vessels-v5'),'browser must fetch refreshed script');
 assert(js.includes("WORKING REPORT自動推算"));
 assert(js.includes("WORKING SHEET主檔待核對"));
 assert(js.includes("'AQC作業明細'")&&js.includes("'每日船舶彙總'"));
