@@ -8,7 +8,7 @@ new Function('window',ui);
 const mount=ui.slice(ui.indexOf('function mount(){'),ui.indexOf("  $('view-dashboard').parentNode.insertBefore(section,"));
 assert.ok(mount.startsWith('function mount(){'),'find AQC mount');
 assert.ok(mount.includes('hidden space-y-2'),'AQC section spacing compact');
-assert.ok(mount.includes('card p-3 sm:p-4 space-y-2'),'AQC main content padding compact');
+assert.ok(mount.includes('card p-2 space-y-2'),'AQC main content padding compressed to one-line toolbar');
 assert.ok(mount.includes('id="multiRodToolbarScroll" class="overflow-x-auto"'),'toolbar scrolls horizontally on narrow screens');
 assert.ok(mount.includes('id="multiRodToolbar" class="flex w-full min-w-max items-center gap-2 whitespace-nowrap"'),'one unwrapped AQC toolbar');
 assert.ok(!mount.includes('grid grid-cols-2 lg:grid-cols-4'),'old multi-row grid removed');
