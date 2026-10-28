@@ -12724,8 +12724,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             closeAddModal();
             renderAdminRecordsTable();
+            // 由加班「預排／待核對」補登考勤，也要立即更新同頁的上下班時間與問題原因。
+            p79RenderOnlyVisibleAttendanceView();
             if (typeof requestAnimationFrame === 'function') {
-                requestAnimationFrame(() => renderAdminRecordsTable());
+                requestAnimationFrame(() => p79RenderOnlyVisibleAttendanceView());
             }
 
             saveRecords();
@@ -12734,7 +12736,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             postToCloud(
                 { action: cloudAction, record: newRecord },
                 '已成功儲存補打卡紀錄！',
-                () => renderAdminRecordsTable()
+                () => {renderAdminRecordsTable();p79RenderOnlyVisibleAttendanceView();}
             );
         }
 
