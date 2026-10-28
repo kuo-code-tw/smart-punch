@@ -426,7 +426,10 @@ async function open(){
    q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
     const review=rosterReviewRows(model,chosenPeople());
     const fl=review.filter(x=>x.isFL),missing=review.filter(x=>x.missing).length;
-    q('#mrNeedSummary').textContent='正式班表逐人核對：未休／待核 '+review.length+' 人（F/L '+fl.length+' 人）'+
+    const flStaff=chosenPeople().filter(e=>/F\s*[\/／]\s*L/i.test(String(e.jobTitle||e.deptDetail||'')));
+    const rosterIds=new Set((snapshot?.schedules||[]).filter(x=>x.schedule).map(x=>id(x.empId)));
+    const flMatched=flStaff.filter(e=>rosterIds.has(id(e.empId))).length;
+    q('#mrNeedSummary').textContent='正式班表逐人核對：未休／待核 '+review.length+' 人（F/L待核 '+fl.length+'／F/L名冊 '+flStaff.length+'／班表匹配 '+flMatched+'）'+
       (missing?'｜班表不完整 '+missing+' 人':'')+'｜下表不等於可直接申報';
     q('#mrNeedRows').innerHTML=review.map(x=>{
      const quota=x.missing?'尚無法計算':'例'+x.remaining.例+'／休'+x.remaining.休+'／國'+x.remaining.國;
