@@ -75,7 +75,7 @@ function auditChanged(report,meta){
  const history=Array.isArray(meta.overtimeAmendments)?meta.overtimeAmendments:
   Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
   Array.isArray(report?.amendments)?report.amendments:[];
- const verified=history.some(a=>a?.confirmed===true&&String(a.at||'').trim()&&String(a.actor||'').trim());
+ const verified=history.some(a=>a?.confirmed===true&&String(a.at||'').trim()&&String(a.actor||'').trim()&&(!a.reportId||String(a.reportId)===String(report?.id||'')));
  const modified=String(report?.modifiedAt||report?.updatedAt||'').trim();
  const created=String(report?.reportedAt||report?.createdAt||'').trim();
  return verified||!!String(report?.replacesReportId||'').trim()||!!(modified&&created&&modified!==created);

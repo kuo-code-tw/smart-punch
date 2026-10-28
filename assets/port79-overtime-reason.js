@@ -60,7 +60,7 @@ function amended(report,meta={}){
  const history=Array.isArray(meta.overtimeAmendments)?meta.overtimeAmendments:
   Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
   Array.isArray(report?.amendments)?report.amendments:[];
- const prior=history.filter(x=>x?.confirmed===true&&norm(x.at)&&norm(x.actor));
+ const prior=history.filter(x=>x?.confirmed===true&&norm(x.at)&&norm(x.actor)&&(!norm(x.reportId)||norm(x.reportId)===norm(report?.id)));
  const modifiedAt=norm(report?.modifiedAt||report?.updatedAt||prior.at(-1)?.at);
  // reportedAt may be different; do not infer a change from initial creation.
  const createdAt=norm(report?.reportedAt||report?.createdAt);
