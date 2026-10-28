@@ -50,7 +50,7 @@ assert.equal(opened.length,1,'invalid punch must be corrected first');
 issue='';permitted=false;ctx.p79OpenPlannedOvertimeReview(0);
 assert.equal(opened.length,1,'insufficient permission must not open form');
 assert(alerts.length>=4,'blocked actions show a reason');
-assert(html.includes('existingReport.planned!==true&&existingReport.category'),'planned same-hour report must not short-circuit save');
+assert(html.includes('(!draft.plannedReview||existingReport.planned!==true)&&existingReport.category'),'actual review must re-save unchanged planned report, but future draft retry stays idempotent');
 assert(html.includes("if(draft.plannedReview===true&&result.report?.planned!==false)"),'final save checks unplanned result from cloud');
 assert(reportScript.includes("prefill.plannedReview===true?'確認正式申報'"),'original editor shows explicit confirmation button');
 assert(reportScript.includes('plannedReview:editingExisting&&prefill.plannedReview===true'),'save carries review intent');
