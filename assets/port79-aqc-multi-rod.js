@@ -175,7 +175,7 @@
   const byNo=new Map(masters.filter(s=>String(s.workingNo||'').trim()).map(s=>[String(s.workingNo).trim(),s]));
   const groups=new Map();
   for(const r of sourceRows()){
-   const date=String(r.workDate||'').replace(/\//g,'-').slice(0,10);
+   const date=normalizeDate(r.workDate);
    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
    const aqc=typeof normalizeAqcNo==='function'?normalizeAqcNo(r.number||r.gcNo):String(r.number||r.gcNo||'').trim();
    if(!/^\d{1,6}$/.test(String(aqc)))continue;
@@ -347,7 +347,8 @@
   const recorded=getRows();
   const inferred=qualified.filter(a=>!recorded.some(r=>sameVesselDay(r,a)));
   const candidates=mode==='day'?masterCandidates(date,min):mode==='month'?monthMasterCandidates(date.slice(0,7),min):[];
-  const masterFallback=candidates.filter(a=>!recorded.some(r=>sameVesselDay(r,a))&&!allActual.some(r=>sameVesselDay(r,a)&&r.rods>=min));
+  const sameMonthVessel=(r,a)=>String(r.start||r.date||'').slice(0,7)===a.date.slice(0,7)&&(r.workingNo&&a.workingNo?String(r.workingNo)===String(a.workingNo):normShip(r.ship)===normShip(a.ship)&&String(r.voyage||'')===String(a.voyage||''));
+  const masterFallback=candidates.filter(a=>!recorded.some(r=>mode==='month'?sameMonthVessel(r,a):sameVesselDay(r,a))&&!allActual.some(r=>r.rods>=min&&(mode==='month'?sameMonthVessel(r,a):sameVesselDay(r,a))));
   return [...manual,...inferred,...masterFallback].sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))||String(a.ship||'').localeCompare(String(b.ship||'')));
  }
  let sourceBusy=null,sourceLoaded=new Set();
@@ -356,8 +357,8 @@
   const month=String(val('multiRodDate')||today()).slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(month))return;
   if(sourceBusy)return sourceBusy;
-  const selectedDate=String(val('multiRodDate')||today());
-  const existing=sourceRows().some(r=>String(r.workDate||'').replace(/\//g,'-').slice(0,10)===selectedDate);
+  const selectedDate=String(val('multiRodDate')||today()),mode=val('multiRodMode')||'day';
+  const existing=sourceRows().some(r=>{const d=normalizeDate(r.workDate);return mode==='day'?d===selectedDate:d.slice(0,7)===month;});
   if(!force&&(existing||sourceLoaded.has(month)))return;
   const scope=identity(),token=typeof gcToken!=='undefined'?String(gcToken):'';
   sourceBusy=(async()=>{
@@ -368,7 +369,7 @@
      if(typeof mergeEfficiencyCloudData==='function')mergeEfficiencyCloudData(result);
      if(typeof saveLocal==='function')saveLocal();
     }
-    if(!sourceRows().some(r=>String(r.workDate||'').startsWith(month))){
+    if(!sourceRows().some(r=>{const d=normalizeDate(r.workDate);return mode==='day'?d===selectedDate:d.slice(0,7)===month;})){
      const fallback=await apiGetQuick('historyGetMonthData',{type:'vessel',month},25000);
      if(identity()!==scope||(typeof gcToken!=='undefined'&&String(gcToken)!==token))return;
      if(Array.isArray(fallback?.records)||Array.isArray(fallback?.shipMasters)){
@@ -425,7 +426,7 @@
    if(!g.XLSX?.utils)throw Error('Excel 元件載入失敗');
    const wb=XLSX.utils.book_new();
    const detail=[['作業日期','船名','航次','WORKING NO.','開始時間（台灣）','結束時間（台灣）','AQC桿數','櫃數','艙蓋','翻艙','來源','AQC編號','備註','修改時間','修改人員']];
-   rows.forEach(r=>detail.push([String(r.start).slice(0,10),r.ship,r.voyage||'',r.workingNo||'',r.start.replace('T',' '),r.end?r.end.replace('T',' '):'',r.rods,r.containers??'',r.hatches??'',r.shiftMoves??'',r.source==='master'?'WORKING SHEET主檔待核對':r.source==='sheet'?'WORKING SHEET AQC起訖時間':'WORKING REPORT自動推算',(r.aqcNumbers||[]).join('、'),r.note||'',r.updatedAt||'',r.updatedBy||'']));
+   rows.forEach(r=>detail.push([String(r.start).slice(0,10),r.ship,r.voyage||'',r.workingNo||'',r.start.replace('T',' '),r.end?r.end.replace('T',' '):'',r.rods,r.containers??'',r.hatches??'',r.shiftMoves??'',r.source==='master'?'WORKING SHEET主檔待核對':r.source==='sheet'?'WORKING SHEET AQC起訖時間':r.source==='auto'?'WORKING REPORT自動推算':'GAS人工登錄',(r.aqcNumbers||[]).join('、'),r.note||'',r.updatedAt||'',r.updatedBy||'']));
    const grouped=new Map();
    rows.forEach(r=>{const k=r.start.slice(0,10)+'|'+r.ship+'|'+(r.voyage||'');let x=grouped.get(k);if(!x){x={date:r.start.slice(0,10),ship:r.ship,voyage:r.voyage||'',events:0,maxRods:0,containers:0,hatches:0,shiftMoves:0};grouped.set(k,x)}x.events++;x.maxRods=Math.max(x.maxRods,Number(r.rods)||0);x.containers+=Number(r.containers)||0;x.hatches+=Number(r.hatches)||0;x.shiftMoves+=Number(r.shiftMoves)||0});
    const summary=[['作業日期','船名','航次','作業次數','最高桿數（自動為當日不同AQC編號）','櫃數合計','艙蓋合計','翻艙合計'],...[...grouped.values()].map(x=>[x.date,x.ship,x.voyage,x.events,x.maxRods,x.containers,x.hatches,x.shiftMoves])];
