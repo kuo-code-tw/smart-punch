@@ -46,7 +46,8 @@ async function run(){
  let release;
  const pending=setup(()=>new Promise(resolve=>release=resolve));
  const operation=pending.c.deleteCurrentModalAttendanceRecord();
- await Promise.resolve();await Promise.resolve();
+ for(let i=0;i<12&&typeof release!=='function';i++)await Promise.resolve();
+ assert.equal(typeof release,'function','cloud deletion request must be reached');
  assert.equal(pending.c.records.length,1,'record stays visible while cloud is pending');
  release({ok:true});await operation;
  assert.equal(pending.c.records.length,0,'record removed only after authoritative response');
