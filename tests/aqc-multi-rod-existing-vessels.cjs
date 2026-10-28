@@ -79,6 +79,12 @@ const verified=[{workingNo:'V1',vessel:'CONFIRMED',aqcs:[101,102,103,104,105].ma
 const real5=calc.compute(calc.index([],verified,at),[],{date:'2026-10-06',min:4});
 assert.equal(real5.rows[0].totalRods,5);
 assert.equal(real5.rows[0].needsReview,false,'genuine five from authoritative crane times is not arbitrarily capped');
+// Matching must still work when cloud WORKING NO differs but name + voyage + AQC match.
+const mismatchedNo=oldCrane.map(x=>x.shipName==='WAN HAI 271'?{...x,workingNo:'LEGACY-OTHER',voyageE:'S268',shipName:'WAN HAI 271 S268'}:x);
+const matchingMaster=[{...olderMaster[0],voyageE:'S268'}];
+const reconciled=calc.compute(calc.index(mismatchedNo,matchingMaster,at),[],{date:'2026-10-06',min:4});
+assert.equal(reconciled.rows.length,1);
+assert.equal(reconciled.rows[0].totalRods,4,'name+voyage match should beat stale WORKING NO and exclude finished AQC');
 console.log('PASS: AQC finish vs next-vessel start, false-five prevention, and verified future five-rod support');
 
 console.log('PASS: cross-vessel 2+2 overlap, cache-only computation, midnight, manual priority, duplicate equipment, quantity caution, export UI');
