@@ -9,7 +9,7 @@
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261028-restored-report-id-v3"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5&preview=20261028-month-end-all-roles-v6"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -13760,7 +13760,7 @@ function p79OvertimePeriodLabel(report){
                 return {empId:row.empId,name:person.name||row.name,dept:person.dept||'一般',
                     jobTitle:person.jobTitle||person.deptDetail||'未設定',dateKey:row.date,
                     monthKey:String(row.date||'').slice(0,7),rosterDate:row.date,sortTime:Date.parse(row.date+'T00:00:00+08:00'),
-                    planned:true,p79RestDraft:true,overtimeReport:{
+                    planned:true,p79RestDraft:true,needsWeeklyReview:row.needsWeeklyReview===true,overtimeReport:{
                         planned:true,code:row.rule?.[1]||'',declaredHours:row.rule?.[2]||0}};
             }).filter(Boolean);
             p79MonthlyRestDraftsByMonth.set(month,proposed);
@@ -13831,7 +13831,7 @@ function p79OvertimePeriodLabel(report){
             const future=date>todayKey,report=row?.overtimeReport||{},hasId=!!String(report.id||'').trim();
             const clockIn=!!row?.clockIn,clockOut=!!row?.clockOut;
             const anomaly=String(row?.attendanceIssue||row?.pairingIssue||'').trim();
-            if(row?.p79RestDraft)return {code:'unsent',label:'尚未申報',detail:'出勤後再確認。'};
+            if(row?.p79RestDraft)return {code:'unsent',label:row.needsWeeklyReview?'預排｜週期待核':'月底預排｜待出勤',detail:row.needsWeeklyReview?'請先核對原排例休與班別，出勤後再確認，未正式申報。':'僅為今天至月底的預排草案；出勤後須重新核對，未正式申報。'};
             if(future&&!clockIn&&!clockOut)return {code:hasId?'scheduled':'unsent',label:hasId?'尚未出勤':'未來預排',detail:''};
             if(!clockIn&&!clockOut)return {code:'both-missing',label:'無打卡',detail:'有出勤請補登，未出勤不申報。'};
             if(!clockIn)return {code:'in-missing',label:'缺上班卡',detail:'請補登或核對打卡。'};
@@ -13933,7 +13933,7 @@ function p79OvertimePeriodLabel(report){
             const savedKeys=new Set((sourceRows||[]).map(row=>String(row.empId||'').trim().toUpperCase()+'|'+String(row.rosterDate||row.dateKey||'').replaceAll('/','-')));
             const eligibleDrafts=restDrafts.filter(row=>{
                 const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
-                if(date<=todayKey||savedKeys.has(String(row.empId||'').trim().toUpperCase()+'|'+date))return false;
+                if(date<todayKey||savedKeys.has(String(row.empId||'').trim().toUpperCase()+'|'+date))return false;
                 const cloud=p79WorkOvertimeMonths.get(date.slice(0,7));
                 if(cloud?.ready){
                     const schedule=cloud.rows?.find(x=>String(x.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase())?.schedule;
