@@ -69,8 +69,18 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
       (id(a.leaveEmpId)===id(emp.empId)||
        (a.workerIds||[]).some(x=>id(x)===id(emp.empId))&&!ownRestCoverReport(roster.__meta?.[d],roster,d)));
  });
+ // The schedule screen already counts a confirmed no-punch work shift as a rest.
+ // Use the same classification here so 國 quota and the monthly overtime balance
+ // agree with the day-grid; never create a report or change an original shift.
+ const observedOffDates=snapshot?.attendanceEvidence?.complete===true?dates.filter(d=>{
+   const shift=String(roster[d]||'').trim(),m=roster.__meta?.[d]||{};
+   return ['早','中','晚'].includes(shift)&&
+     g.P79RestAttendance?.state(snapshot,emp.empId,d)==='rest'&&
+     !excluded.includes(d)&&!m.manualRosterShift&&!m.overtime&&
+     !m.overtimeReport&&!m.overtimeReports?.length&&!m.forEmpId&&m.type!=='substitute';
+ }):[];
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
-   [...nonQuotaDates],[...nonQuotaDates]).meta;
+   [...nonQuotaDates],[...nonQuotaDates],observedOffDates).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
