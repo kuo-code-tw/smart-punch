@@ -1095,23 +1095,20 @@ async function saveCurrent(){
     if(result?.ok!==true)throw new Error(result?.error||'雲端未確認儲存');
     if(result.employee&&SYS.some(k=>normalizePerms(result.employee)[k]!==p[k]))throw new Error('雲端回覆的後台權限與設定不一致，請保留視窗並重新核對');
     if(result.employee?.dataScopeJobs&&SYS.some(k=>JSON.stringify([...(result.employee.dataScopeJobs[k]||[])].sort())!==JSON.stringify([...(dataScopeJobs[k]||[])].sort())))throw new Error('雲端回覆的指定職稱權限與設定不一致，請保留視窗並重新核對');
-    const index=employees.findIndex(item=>String(item.empId).toUpperCase()===String(originalEmpId).toUpperCase());
-    const saved={...(index>=0?employees[index]:{}),...employee,...(result.employee||{})};
-    if(index>=0)employees.splice(index,1,saved);else employees.push(saved);
-    populateFilters();render();editor.close();
-    $('status').textContent='✅ 雲端已確認儲存｜正在背景更新人員清單…';
-    const revision=++p79HrSaveRevision;
-    // 只讀人資主檔；不再等完整 getData 與組織設定才結束儲存。
-    Promise.resolve(p79HrLoadPromise).catch(()=>{}).then(()=>apiGet('hrGetEmployees',20000)).then(data=>{
-      if(revision!==p79HrSaveRevision)return;
-      const cloudEmployee=(data.employees||[]).find(item=>String(item.empId).toUpperCase()===empId);
-      const normalizeDate=v=>String(v||'').slice(0,10).replace(/\//g,'-');
-      const textMatches=['name','dept','unit'].every(key=>String(cloudEmployee?.[key]||'').trim()===String(employee[key]||'').trim());
-      if(!cloudEmployee||!textMatches||String(cloudEmployee.jobTitle||cloudEmployee.deptDetail||'')!==employee.jobTitle||normalizePhone(cloudEmployee.phone||'')!==employee.phone||normalizeDate(cloudEmployee.startDate)!==employee.startDate||normalizeDate(cloudEmployee.reportingDate)!==employee.reportingDate||normalizeDate(cloudEmployee.birthday)!==employee.birthday||normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==employee.employmentStatus)throw new Error('雲端清單尚未讀到本次更新，已保留確認寫入的內容');
-      if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k])){ $('status').textContent='⚠️ 雲端讀回的後台權限與設定不一致，尚未確認權限儲存成功，請重新開啟該人員核對';return; }
-      p79ApplyHrEmployeesPayload(data,false,'cloud');
-      $('status').textContent='✅ 人資資料已儲存，雲端人員清單已更新';
-    }).catch(error=>{if(revision===p79HrSaveRevision)$('status').textContent='✅ 員工已儲存｜清單背景更新未完成，可稍後重新同步';console.warn('已儲存人員的背景同步失敗',error);});
+    // 正式雲端主檔讀回一致才可關閉編輯器；不可只依 POST 回覆或本機合併值宣告成功。
+    const data=await apiGet('hrGetEmployees',20000);
+    const cloudEmployee=(data.employees||[]).find(item=>String(item.empId||'').trim().toUpperCase()===empId);
+    if(!cloudEmployee)throw new Error('儲存回應成功，但雲端主檔尚未讀到此員工；視窗已保留，請核對後再重試');
+    if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k]))throw new Error('雲端讀回的後台權限與設定不一致；視窗已保留');
+    const sortedJobs=jobs=>[...(Array.isArray(jobs)?jobs:[])].map(x=>String(x).trim()).sort();
+    if(SYS.some(k=>JSON.stringify(sortedJobs(cloudEmployee.dataScopeJobs?.[k]))!==JSON.stringify(sortedJobs(dataScopeJobs[k]))))
+      throw new Error('雲端沒有保留指定職稱（例如 F/L）；請確認 GAS 人資權限儲存欄位與部署版本，視窗已保留');
+    if(SYS.some(k=>String(cloudEmployee.dataScope?.[k]||'')!==String(dataScope[k]||'')))
+      throw new Error('雲端讀回的資料可見範圍與設定不一致；視窗已保留');
+    p79ApplyHrEmployeesPayload(data,false,'cloud');
+    ++p79HrSaveRevision;
+    editor.close();
+    $('status').textContent='✅ 人資權限與指定職稱已經雲端讀回確認儲存';
   }catch(e){alert('儲存失敗：'+(e.message||e))}
   finally{$('saveTopBtn').disabled=false;button.disabled=false;button.textContent=originalLabel||'儲存'}
 }
