@@ -232,7 +232,7 @@ function workflowStage(month,asOf=today()){
  return {key:'submit',label:'集中核對申報（25日起）',canSubmit:true,canSuggest:true,tip:'只列今天已完成且核對8小時的實際工作；明天起的日期另外預排，不往回補25日至昨天。'};
 }
 function workflowAudit(model){
- const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],checked:0,complete:0,verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:model.rows.filter(r=>r.planned).length};
+ const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],checked:0,complete:0,verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:(model.plannedRows||[]).length};
  for(const b of model.balances){
   const progress=reportProgress(model,b.emp.empId),parts=[];
   for(const cat of ['例','休','國'])if(progress[cat].remaining>0){result.shortage[cat]+=progress[cat].remaining;parts.push(cat+progress[cat].remaining);}

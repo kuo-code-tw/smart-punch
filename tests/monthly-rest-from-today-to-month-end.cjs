@@ -44,6 +44,7 @@ const stats=g.P79MonthlyRest.reviewAllUnits(result,employees);
 assert.equal(stats.staffCount,16);
 assert.equal(stats.ready,3);
 assert.equal(stats.planned,13);
+assert.equal(g.P79MonthlyRest.workflowAudit(result).planned,13,'Audit summary includes all planned drafts');
 assert.equal(stats.groups.filter(x=>x.role==='F/L').reduce((n,x)=>n+x.planned,0),8);
 assert(source.includes('visiblePlannedRows()'),'Drafts must appear inside the same monthly-rest dialog');
 assert(source.includes("g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople)"),'Drafts are passed to the overtime page');
