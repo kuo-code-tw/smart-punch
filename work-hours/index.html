@@ -16368,6 +16368,11 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const employeeId=String(draft.empId).trim().toUpperCase();
  const existingReport=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  if(draft.preventReplace&&(!existingReport?.id||String(existingReport.id)!==String(draft.id)))throw Error('原申報已變更或不存在，未新增另一筆；請重新讀取核對。');
+ // 原申報在開窗後若已被別處更新，不可用本機舊 16-24 蓋掉雲端新 08-16。
+ if(draft.plannedReview&&draft.expectedOriginalCode&&
+     (String(existingReport?.code||'')!==String(draft.expectedOriginalCode)||
+      String(existingReport?.category||'')!==String(draft.expectedOriginalCategory||'')))
+     throw Error('原加班申報時段已由別處更新，已停止舊資料回寫。請重新讀取核對。');
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
  const sameNote=String(existingReport?.note??'').trim()===String(draft.note??'').trim();
  // 同一張預排報單完成打卡後，時數/時段不變也必須真的寫回解除 planned。
@@ -16378,6 +16383,25 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()),planned=!pairs.length&&draft.date>=today;
  if(!pairs.length&&!planned)throw Error('過去日期須有包含所選時段的完整出勤；未生成實際加班');
  if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
+ if(draft.plannedReview){
+  // 原預排轉正式申報必須當下已從雲端取回且只有一組完整打卡，不能再次回存 planned:true。
+  if(pairs.length!==1)throw Error('原預排時段未與正式打卡配對，不能確認；請改選與實際上下班相符的班別。');
+  const pair=pairs[0],originalStart=Number(draft.expectedPunchStart),originalEnd=Number(draft.expectedPunchEnd);
+  if(!Number.isFinite(originalStart)||!Number.isFinite(originalEnd)||
+      originalStart!==pair.start||originalEnd!==pair.end)
+      throw Error('打卡時間在核對期間已變更，請重新開啟申報，避免使用舊出勤資料。');
+  const picked=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',
+    draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,
+    draft.rule.position||'full',draft.rule.typeName||''];
+  const freshRoster=cloud.schedules?.find(x=>String(x.empId).trim().toUpperCase()===employeeId)?.schedule||{};
+  const matched=window.P79OvertimeShiftMatch?.resolve?.({
+   date:draft.date,roster:freshRoster,report:{category:draft.rule.category,typeName:draft.rule.typeName},
+   rules:[picked],start:pair.start,end:pair.end,attendanceIssue:false
+  });
+  if(matched?.state!=='completed'||!matched.confirmed||
+     matched?.suggested?.code!==draft.rule.code||matched?.suggested?.category!==draft.rule.category)
+     throw Error('申報時段與最新完整打卡不符，請核對正確的 08-16、16-24 等時段，不能沿用舊預排班別。');
+ }
  if(!planned){const issue=P79Overtime.ruleAttendanceIssue(pairs[0].start,pairs[0].end,draft.date,[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''],cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule);if(issue)throw Error(issue);}
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
