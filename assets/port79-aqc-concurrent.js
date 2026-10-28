@@ -21,7 +21,7 @@ const instant=v=>{
  const ms=Date.parse(s);return Number.isFinite(ms)?ms:NaN;
 };
 const physical=v=>{
- const s=String(v??'').trim().toUpperCase().replace(/^(?:AQC|GC)\s*[#:\-]?\s*/,'');
+ const s=String(v??'').trim().toUpperCase().replace(/^(?:AQC|GC)\s*[.#:\-]?\s*/,'');
  const m=s.match(/^0*(\d{1,6})$/);return m?String(Number(m[1])):'';
 };
 const baseKey=(ship,voyage,no)=>no?'NO:'+no:'SHIP:'+String(ship).trim().toUpperCase()+'|'+String(voyage).trim().toUpperCase();
