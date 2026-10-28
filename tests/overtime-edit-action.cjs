@@ -31,7 +31,7 @@ assert.match(alerts.join(' / '),/已正式加班申報|沒有可修改/);
 assert(html.includes('>修改申報</button>'),'reported rows need a visible edit button');
 assert(html.includes('>申報加班</button>'),'unreported rows still need the create button');
 assert(html.includes('>刪除加班</button>'),'delete remains distinct');
-assert(report.includes("dialog(editingOriginal?'修改加班申報':'申報加班'"),'dialog title identifies amendment');
+assert(report.includes("dialog(editingOriginal?'修改加班申報':prefill.manualPlan===true?'新增預排（未正式申報）':'申報加班'"),'dialog title identifies amendment');
 assert(report.includes('dateInput.readOnly=true')&&report.includes('empSelect.disabled=true'),'original employee/date controls locked');
 assert(report.includes('if(editingOriginal&&!editingExisting)throw Error('),'changed employee or date cannot turn amendment into a new report');
 assert(report.includes('const pending=editingExisting?null:'),'cached unsent new declaration cannot hijack original report ID');
