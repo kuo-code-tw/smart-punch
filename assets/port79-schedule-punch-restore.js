@@ -69,7 +69,7 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
   // silently rewritten into ordinary shifts.
   if(meta.manualRosterShift||meta.restAllocationLocked||meta.restCategoryLocked||
      meta.overtime||meta.overtimeReport||meta.overtimeReports?.length||
-     meta.forEmpId||meta.note||isProtected(paired.empId,paired.date))continue;
+     meta.forEmpId||isProtected(paired.empId,paired.date))continue;
   const knownAuto=meta.restAllocationSource==='auto-v1'||!!meta.noPunchOriginalShift;
   // A historic bare 休 with a real punch may have been lawful rest-day overtime.
   // Do not rewrite it silently on page load; require explicit preview/approval.
