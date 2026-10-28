@@ -13729,8 +13729,12 @@ function p79OvertimePeriodLabel(report){
                 // 只能編輯本機唯一可定位的原始打卡；雲端尚未載入時只顯示時間，不能誤改其他人。
                 const matches=Array.isArray(records)?records.filter(r=>
                     String(r.id??'')===String(record.id??'')&&
-                    String(r.timeStr||'')===String(record.timeStr||'')&&
-                    String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase()):[];
+                    String(r.timeStr||'')===String(record.timeStr||'')&&(
+                      String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase()||
+                      (!String(r.empId||'').trim()&&String(row.attNo||'').trim()&&
+                       typeof normalizeAttendanceStatsAttNo==='function'&&
+                       normalizeAttendanceStatsAttNo(r.attNo)===normalizeAttendanceStatsAttNo(row.attNo))
+                    )):[];
                 const canEdit=typeof canPerformAdminAction==='function'&&
                     canPerformAdminAction(currentEmp,'attendanceEdit')&&matches.length===1;
                 return formatEditableAttendanceTimeCell(record,type,canEdit)+(canEdit?'':record.id?' <span class="text-xs text-slate-500">（要修改請先同步考勤）</span>':'');
@@ -13783,6 +13787,9 @@ function p79OvertimePeriodLabel(report){
                 const reason=p79OvertimePendingReason(row,todayKey);
                 const inCell=p79OvertimePendingPunchCell(row,'IN',todayKey);
                 const outCell=p79OvertimePendingPunchCell(row,'OUT',todayKey);
+                const warning=['both-missing','in-missing','out-missing','not-out-yet','abnormal'].includes(reason.code);
+                const reasonTone=warning?'text-rose-800 dark:text-rose-300':reason.code==='unsent'?
+                    'text-amber-800 dark:text-amber-300':'text-indigo-900 dark:text-indigo-200';
                 return '<tr>'+
                     '<td class="p-3 whitespace-nowrap">'+escapeHtml(date.replaceAll('-','/'))+'</td>'+
                     '<td class="p-3 font-semibold whitespace-nowrap">'+escapeHtml(row.name||'')+'</td>'+
@@ -13792,7 +13799,7 @@ function p79OvertimePeriodLabel(report){
                     '<td class="p-3 whitespace-nowrap">'+(Number.isFinite(hours)&&hours>0?hours+' 小時':'待核對')+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+inCell+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+outCell+'</td>'+
-                    '<td class="p-3 min-w-[235px]"><strong class="text-indigo-900 dark:text-indigo-200">'+escapeHtml(reason.label)+'</strong>'+
+                    '<td class="p-3 min-w-[235px]"><strong class="'+reasonTone+'">'+escapeHtml(reason.label)+'</strong>'+
                     '<span class="block text-xs text-slate-600 dark:text-slate-300 mt-1">'+escapeHtml(reason.detail)+'</span>'+
                     (reason.code==='review'&&!row.p79RestDraft&&row.overtimeReport?.id
                         ?' <button type="button" onclick="p79OpenPlannedOvertimeReview('+index+')" class="mt-1 inline-flex rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">核對申報</button>'
