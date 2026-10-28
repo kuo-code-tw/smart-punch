@@ -35,5 +35,5 @@ assert(s.includes("q('#mrMonth').onchange=()=>{if(!busy)q('#mrLoad').click();}")
 assert(s.includes("loadedPeople=people.slice()"),'first cloud read includes all authorized employees');
 assert(s.includes("visibleRows().map(({r,i})=>r.saved?''"),'render only selected staff but preserve model indices');
 assert(s.includes("visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;}"),'select all only applies to visible staff');
-assert(html.includes('port79-monthly-rest-overtime.js?v=20261028-filter-local-v4'),'browser must load updated dialog script');
+assert(html.includes('port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5'),'browser must load updated dialog script');
 console.log('PASS job/dept/person filters are local, preserve cross-filter checked reports and original indexes, reload only on month change/explicit refresh');
