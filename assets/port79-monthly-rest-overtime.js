@@ -172,7 +172,10 @@ function latestReportedDate(roster,month){
 }
 // 本月月底未休假只找 25 日以後，歷史月份另用跨月核對。
 function monthEndWindowDate(month,asOf=today()){
- return month===String(asOf).slice(0,7)?month+'-25':month+'-01';
+ // 25日只代表功能開放日，不是要回補25日以前的出勤。
+ // 當月自今天起判斷已完成出勤；明天以後只能預排，不能提早當成正式加班。
+ const date=String(asOf||today()).slice(0,10),start=month+'-25';
+ return month===date.slice(0,7)?(date>start?date:start):month+'-01';
 }
 // 只提供參考預警；法定七日週期必須採勞雇已約定的起點，不能擅自以每月一日重算。
 function weeklyRestReview(roster,month,cycleStart=''){
@@ -226,7 +229,7 @@ function workflowStage(month,asOf=today()){
  const day=Number(asOf.slice(8));
  if(day<15)return {key:'audit',label:'每日盤點（1～14日）',canSubmit:false,canSuggest:false,tip:'先核對例／休／國、請假與既有申報；15日起才產生建議。'};
  if(day<25)return {key:'preview',label:'未休加班預覽（15～24日）',canSubmit:false,canSuggest:true,tip:'25日以前只核對排班與出勤，不顯示月底預排於正式申報。'};
- return {key:'submit',label:'集中核對申報（25日起）',canSubmit:true,canSuggest:true,tip:'只列25日起已完成8小時實際工作；未來僅供排班內部預排，與正式申報分開。'};
+ return {key:'submit',label:'集中核對申報（25日起）',canSubmit:true,canSuggest:true,tip:'只列今天已完成且核對8小時的實際工作；明天起的日期另外預排，不往回補25日至昨天。'};
 }
 function workflowAudit(model){
  const result={shortage:{例:0,休:0,國:0},people:[],blocked:[],checked:0,complete:0,verified:model.rows.filter(r=>!r.planned&&r.status==='可申報').length,planned:model.rows.filter(r=>r.planned).length};
@@ -349,7 +352,7 @@ async function open(){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。月底25日起只列正式考勤證明的實際8小時加班，不回補月初。後續上班日可做內部預排，但不顯示在正式申報清單；若實際休息則取消候選。原排例假與休息日不得為湊額度擅自變更，應先核對約定七日週期（特殊彈性工時例外）。</p><div id="mrBackfill" role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休／建議日期</button></div><p style="font-size:12px;color:#64748b">開啟時會自動核對班表、出勤、申報與系統時數設定。25日起可以申報，但不是從25日回補：當月只看今天已完成且核對8小時的出勤；明天起的預排獨立呈現在加班頁，不算正式申報。若實際休息則不申報。原排例假與休息日不得為湊額度擅自變更，應先核對約定七日週期（特殊彈性工時例外）。</p><div id="mrBackfill" role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  document.body.appendChild(el);el.showModal();
  const q=s=>el.querySelector(s),setStatus=x=>q('#mrStatus').textContent=x;let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
  const people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
@@ -445,7 +448,7 @@ async function open(){
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
    for(const r of selected){const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
     if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
-    if(r.date<monthEndWindowDate(loadedMonth))throw Error(r.name+' '+r.date+' 當月只允許25日起的實際工作申報，不能向前補');
+    if(r.date<monthEndWindowDate(loadedMonth))throw Error(r.name+' '+r.date+' 當月不回補今天之前的日期，請改從今日以後核對');
     if(r.date<=latestReportedDate(roster,loadedMonth))throw Error(r.name+' '+r.date+' 已早於或等於上次已申報日期，不得月底往前補');
     if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId||(fresh.leaveDates||[]).includes(id(r.empId)+'|'+r.date)||g.P79RestAttendance?.isLeaveDay(fresh,r.empId,r.date,roster))throw Error(r.name+' '+r.date+' 已有加班、代班或請假，請重新讀取');
     const attendance=(fresh.pairs||[]).filter(p=>id(p.empId)===id(r.empId)&&p.date===r.date);
