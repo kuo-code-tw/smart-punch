@@ -5,6 +5,8 @@ on:
       - 'work-hours/index.html'
       - 'tests/overtime-pending-attendance.cjs'
       - 'tests/overtime-planned-separate-section.cjs'
+      - 'tests/overtime-planned-review-action.cjs'
+      - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
   push:
     branches: [main]
@@ -12,6 +14,8 @@ on:
       - 'work-hours/index.html'
       - 'tests/overtime-pending-attendance.cjs'
       - 'tests/overtime-planned-separate-section.cjs'
+      - 'tests/overtime-planned-review-action.cjs'
+      - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
 permissions:
   contents: read
@@ -27,4 +31,8 @@ jobs:
         run: |
           node tests/overtime-pending-attendance.cjs
           node tests/overtime-planned-separate-section.cjs
+          node tests/overtime-planned-review-action.cjs
+          node tests/overtime-edit-action.cjs
+          node tests/overtime-original-id-sync.cjs
+          node tests/overtime-batch-save-context.cjs
           node tests/overtime-status-live.cjs
