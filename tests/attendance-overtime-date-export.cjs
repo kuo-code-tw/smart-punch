@@ -6,7 +6,7 @@ const page=fs.readFileSync('attendance/index.html','utf8');
 const moduleCode=fs.readFileSync('assets/port79-attendance-overtime-export.js','utf8');
 assert.match(page,/data-p79-attendance-date="\$\{dateKey\}"/,'考勤每個日期必須帶有完整日期識別');
 assert.match(page,/port79-attendance-overtime-export\.js/,'考勤頁必須載入右鍵匯出模組');
-assert.match(page,/日期按右鍵可匯出加班明細/,'日期右鍵說明必須可見');
+assert.match(page,/日期按右鍵可查看「已申報」或匯出加班明細/,'日期右鍵說明必須可見且保留匯出');
 new vm.Script(moduleCode,{filename:'attendance-overtime-date-export.js'});
 for(const action of ['getScheduleDataSecure','getOvertimeExportAudit','recordOvertimeReportExport']){
  assert(moduleCode.includes(action),'缺少必要雲端動作：'+action);

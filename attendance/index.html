@@ -14877,7 +14877,7 @@ function getManualPairRecordAnchor(record) {
                 return `<button type="button"
                     onclick="goToRecordsPage(${index + 1})"
                     data-p79-attendance-date="${dateKey}"
-                    title="左鍵查看考勤；按右鍵匯出當日加班明細"
+                    title="左鍵查看考勤；右鍵可選擇已申報或匯出加班明細"
                     class="shrink-0 px-2 py-1.5 rounded-lg border text-xs font-black transition ${active
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-800'}">${label}</button>`;
@@ -14895,7 +14895,7 @@ function getManualPairRecordAnchor(record) {
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">
-                                📅 ${selectedDate ? String(selectedDate).replaceAll('-', '/') : '整段期間'}｜${selectedDate ? '當日' : '期間'}班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天｜日期按右鍵可匯出加班明細
+                                📅 ${selectedDate ? String(selectedDate).replaceAll('-', '/') : '整段期間'}｜${selectedDate ? '當日' : '期間'}班次 ${rowCount} 列${rawPunchCount == null ? '' : `｜原始打卡 ${rawPunchCount} 筆`}｜共 ${keys.length} 天｜日期按右鍵可查看「已申報」或匯出加班明細
                             </span>
                             <button type="button" id="btnAttendanceAdd" onclick="openManualAddModal()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow hover:bg-indigo-700" title="新增補打卡">＋ 新增補打卡</button>
                             <button id="p79PullCloudMonthBtn" type="button" onclick="p79PullSelectedMonthFromCloud()" class="px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 disabled:opacity-50" title="只從雲端讀取目前選擇的月份，不會上傳或清除待同步資料">☁ 從雲端拉取</button>
@@ -24929,8 +24929,8 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <script src="../assets/port79-missing-punch-login-preview.js?v=20261022-toolbar"></script>
 
-<script src="../assets/port79-attendance-overtime-export.js?v=20261025-date-export-audit-v1"></script>
-<script src="../assets/port79-attendance-date-overtime-menu.js?v=20261025-date-export-audit"></script>
+<script src="../assets/port79-attendance-overtime-export.js?v=20261028-reported-rightclick-v1"></script>
+<script src="../assets/port79-attendance-date-overtime-menu.js?v=20261028-reported-rightclick-v1"></script>
 </body>
 </html>
 

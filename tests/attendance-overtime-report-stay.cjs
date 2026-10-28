@@ -47,7 +47,9 @@ listeners.contextmenu({target:{closest:s=>s.includes('p79AttendanceDateStrip')?b
 assert(prevented,'right-click should open the local menu');
 const dateMenu=document.getElementById('p79AttendanceDateOvertimeMenu');
 assert(dateMenu,'report menu is displayed');
-dateMenu.children[1].listeners.click();
+const printItem=dateMenu.children.find(item=>String(item.textContent||'').includes('列印／匯出'));
+assert(printItem,'既有列印／匯出選項必須保留');
+printItem.listeners.click();
 assert(host?.open,'report opens as a dialog on the attendance page');
 assert.equal(location.href,'https://example.test/smart-punch/attendance/?unit=A','attendance URL/filters should not change');
 assert.equal(new URL(iframe.src).searchParams.get('overtimeExportDate'),'2026-10-27');
