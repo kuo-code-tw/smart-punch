@@ -6567,7 +6567,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
         read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
-        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次成功結果）…':'出勤核對中…'):state.error?'出勤未完成核對：'+state.error:'';if(!state.pending)renderRoleScheduleView();}
+        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次成功結果）…':'出勤核對中…'):state.error?'出勤未完成核對：'+state.error:'';if(!state.pending){
+          renderRoleScheduleView();
+          // A completed official attendance refresh must also reconcile the
+          // saved roster, not merely repaint a temporary attendance label.
+          // The reconciliation itself rechecks edit lock, pending writes, month,
+          // identity and complete punches before making any cloud change.
+          if(!state.error&&state.evidence?.complete===true&&
+             scheduleEditLockState.mine&&!port79ScheduleDirty){
+            void p79QueueScheduleNoPunchReconcile(month);
+          }
+        }}
       });return p79ScheduleRestEvidenceClient;
     }
     function p79RefreshScheduleRestEvidence() {
