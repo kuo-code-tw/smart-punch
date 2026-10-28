@@ -13585,6 +13585,26 @@ function p79OvertimePeriodLabel(report){
                 const raw=report.convertedHours;
                 const absent=raw===null||raw===undefined||String(raw).trim()==='';
                 if(!absent&&Number.isFinite(Number(raw))&&Number(raw)>=0)continue;
+                // The amendment editor can show a valid conversion resolved from
+                // the saved overtime option even when the legacy cloud report
+                // omits convertedHours. Match the exact unique current rule;
+                // never guess from attendance hours, mutate cloud or hide invalid data.
+                if(absent&&window.P79Overtime?.reportRules){
+                    const rules=window.P79Overtime.reportRules();
+                    const canonical=v=>String(v??'').trim().replace(/:00$/,'').replace(/^0(?=\d$)/,'');
+                    const same=(a,b)=>canonical(a)===canonical(b);
+                    const matched=(Array.isArray(rules)?rules:[]).filter(rule=>
+                        String(rule[0]||'').trim()===String(report.category||'').trim()&&
+                        String(rule[1]||'').trim()===String(report.code||'').trim()&&
+                        Number(rule[2])===Number(report.declaredHours)&&
+                        same(rule[6],report.overtimeStart)&&same(rule[7],report.overtimeEnd)&&
+                        (report.category!=='延'||(
+                            (report.normalStart==null||report.normalStart===''||same(rule[4],report.normalStart))&&
+                            (report.normalEnd==null||report.normalEnd===''||same(rule[5],report.normalEnd))&&
+                            (report.position==null||report.position===''||String(rule[8]||'')===String(report.position)))));
+                    if(matched.length===1&&matched[0][3]!==''&&matched[0][3]!=null&&
+                        Number.isFinite(Number(matched[0][3]))&&Number(matched[0][3])>=0)continue;
+                }
                 items.push({empId,date,id,name:String(row.name||empId),code:String(report.code||''),declared:Number(report.declaredHours),
                     reason:absent?'換算時數未設定':'換算數值異常'});
             }
