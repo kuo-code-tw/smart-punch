@@ -327,7 +327,7 @@ function rosterReviewRows(model,staff){
  const balances=new Map((model?.balances||[]).map(b=>[id(b.emp.empId),b]));
  const unavailable=new Map((model?.unavailable||[]).map(b=>[id(b.emp.empId),b.reason]));
  return (staff||[]).map(emp=>{
-  const key=id(emp.empId),b=balances.get(key),role=String(emp.jobTitle||emp.deptDetail||'未設定'),isFL=/F\\s*[\\/／]\\s*L/i.test(role);
+  const key=id(emp.empId),b=balances.get(key),role=String(emp.jobTitle||emp.deptDetail||'未設定'),isFL=/F\s*[\/／]\s*L/i.test(role);
   if(!b)return unavailable.has(key)?{emp,role,isFL,missing:true,reason:unavailable.get(key),remaining:{例:0,休:0,國:0},eligible:0,unreported:0,pending:0}:null;
   const remaining=Object.fromEntries(cats.map(c=>[c,Math.max(0,Number(b.remaining?.[c])||0)]));
   const due=cats.reduce((n,c)=>n+remaining[c],0);
