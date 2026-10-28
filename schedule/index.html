@@ -4981,7 +4981,8 @@ function p79EmployeeDateEligible(emp,date) {
       if(activeRoleTab === 'EMP_MGMT') {
         renderEmployeeManagementView();
       } else {
-        renderRoleScheduleView();
+        try { renderRoleScheduleView(); }
+        catch(error) { p79SchedulePreviewRenderError(error); }
       }
     }
 
@@ -5005,7 +5006,8 @@ function p79EmployeeDateEligible(emp,date) {
 
     function setGroupFilter(groupName) {
       activeGroupFilter = activeGroupFilter===groupName?'ALL':groupName;
-      renderRoleScheduleView();
+      try { renderRoleScheduleView(); }
+      catch(error) { p79SchedulePreviewRenderError(error); }
     }
 
     async function updateEmpGroupAndResort(empId, newGroup) {
