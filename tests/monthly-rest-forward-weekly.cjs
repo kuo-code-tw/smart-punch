@@ -26,6 +26,8 @@ for(const d of ['2026-10-03','2026-10-10','2026-10-17','2026-10-24','2026-10-31'
 assert.equal(api.weeklyRestReview(roster,'2026-10').length,0,'reference weeks include a rest and regular rest');
 const broken={...roster,'2026-10-31':'早'};
 assert(api.weeklyRestReview(broken,'2026-10').some(w=>w.start==='2026-10-25'&&w.rest===0),'missing weekly rest must be highlighted');
+assert.equal(api.futureWeekRestProtected(roster,'2026-10-29'),true,'future provisional date only if one 例 and one 休 are reserved');
+assert.equal(api.futureWeekRestProtected(broken,'2026-10-29'),false,'future plan must not consume week with missing rest');
 const emp={empId:'A',name:'員工'},start=d=>Date.parse(d+'T08:00:00+08:00');
 const pair=(d,h)=>({empId:'A',date:d,start:start(d),end:start(d)+h*3600000});
 const snapshot={schedules:[{empId:'A',schedule:roster}],pairs:[
