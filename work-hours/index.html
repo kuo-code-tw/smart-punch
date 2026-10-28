@@ -1642,14 +1642,14 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 <div id="overtimePagination" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"></div>
                 <section id="p79OvertimePlannedSection" class="mt-5 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3" aria-labelledby="p79OvertimePlannedHeading">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對（與已確定加班分開）</h4>
+                        <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對</h4>
                         <span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span>
                     </div>
-                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">這裡分開顯示「未來預排」、「未申報加班」、「缺上班卡／缺下班卡」、「打卡異常」與「已有預排單、待正式確認」。上、下班欄為實際考勤；點時間可修改，缺卡可補登（需考勤權限）。預排時段不是實際打卡；修正考勤後仍須正式核對申報，所有待核對資料不計入正式加班統計。</p>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">上、下班為實際打卡，可修改或補登；待核對資料不計入正式加班。</p>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100">
-                                <tr><th class="p-3">預排日期</th><th class="p-3">姓名</th><th class="p-3">部門</th><th class="p-3">職稱</th><th class="p-3">預排時段</th><th class="p-3">預排時數</th><th class="p-3">上班時間（實際打卡）</th><th class="p-3">下班時間（實際打卡）</th><th class="p-3">待核對原因／處理</th></tr>
+                                <tr><th class="p-3">預排日期</th><th class="p-3">姓名</th><th class="p-3">部門</th><th class="p-3">職稱</th><th class="p-3">預排時段</th><th class="p-3">預排時數</th><th class="p-3">上班時間（實際打卡）</th><th class="p-3">下班時間（實際打卡）</th><th class="p-3">狀態／操作</th></tr>
                             </thead>
                             <tbody id="p79OvertimePlannedBody" class="divide-y divide-indigo-100 dark:divide-indigo-900/50"></tbody>
                         </table>
@@ -13748,15 +13748,15 @@ function p79OvertimePeriodLabel(report){
             const future=date>todayKey,report=row?.overtimeReport||{},hasId=!!String(report.id||'').trim();
             const clockIn=!!row?.clockIn,clockOut=!!row?.clockOut;
             const anomaly=String(row?.attendanceIssue||row?.pairingIssue||'').trim();
-            if(row?.p79RestDraft)return {code:'unsent',label:'加班尚未申報',detail:'僅為未來建議，沒有正式申報編號；到實際工作且確認出勤後才決定是否申報。'};
-            if(future&&!clockIn&&!clockOut)return {code:hasId?'scheduled':'unsent',label:hasId?'已有預排單／尚未出勤':'未來預排／尚未申報',detail:hasId?'已有預排申報編號，尚無實際出勤，不能直接核定。':'僅有預排日期，尚未建立正式加班申報。'};
-            if(!clockIn&&!clockOut)return {code:'both-missing',label:'上下班都沒有打卡',detail:'請先確認當日是否真的工作；有工作才補登，休息沒工作就不申報。'};
-            if(!clockIn)return {code:'in-missing',label:'缺上班卡',detail:'已有下班打卡，但沒有匹配的上班打卡；先補登或核對配對。'};
-            if(!clockOut)return {code:future||date===todayKey?'not-out-yet':'out-missing',label:future||date===todayKey?'尚未簽退／核對是否漏卡':'缺下班卡',detail:'只有上班打卡，請確認是否尚未下班；若已下班但漏卡，請補登下班時間。'};
-            if(anomaly||row?.timeCheckRequired)return {code:'abnormal',label:'打卡異常／時段待修正',detail:anomaly||'打卡時間或班次配對異常，請先修正出勤再核對申報。'};
-            if(!hasId)return {code:'unsent',label:'有打卡、尚未申報加班',detail:'出勤已存在，但沒有可確認的原加班申報編號；須先依工作事實和規則核對。'};
-            if(row?.reportVerified!==true)return {code:'report-issue',label:'申報紀錄未確認',detail:'找到加班註記但無法驗證原申報，請先核對雲端紀錄，避免重複申報。'};
-            return {code:'review',label:'打卡完整／待正式核對',detail:'已有原預排申報，請核對實際工作與休息時間，再按「核對申報」轉正式。'};
+            if(row?.p79RestDraft)return {code:'unsent',label:'尚未申報',detail:'出勤後再確認。'};
+            if(future&&!clockIn&&!clockOut)return {code:hasId?'scheduled':'unsent',label:hasId?'尚未出勤':'未來預排',detail:''};
+            if(!clockIn&&!clockOut)return {code:'both-missing',label:'無打卡',detail:'有出勤請補登，未出勤不申報。'};
+            if(!clockIn)return {code:'in-missing',label:'缺上班卡',detail:'請補登或核對打卡。'};
+            if(!clockOut)return {code:future||date===todayKey?'not-out-yet':'out-missing',label:future||date===todayKey?'尚未簽退':'缺下班卡',detail:'如已下班，請補登。'};
+            if(anomaly||row?.timeCheckRequired)return {code:'abnormal',label:'打卡異常',detail:anomaly||'請核對打卡時間。'};
+            if(!hasId)return {code:'unsent',label:'尚未申報',detail:'請確認是否需要申報。'};
+            if(row?.reportVerified!==true)return {code:'report-issue',label:'申報待確認',detail:'請核對原申報。'};
+            return {code:'review',label:'待核對',detail:''};
         }
         function p79OvertimePendingPunchCell(row,type,todayKey){
             const record=type==='IN'?row.clockIn:row.clockOut,other=type==='IN'?row.clockOut:row.clockIn;
@@ -13814,7 +13814,7 @@ function p79OvertimePeriodLabel(report){
             const problems=rows.map(row=>p79OvertimePendingReason(row,todayKey));
             const attendanceProblems=problems.filter(r=>['both-missing','in-missing','out-missing','not-out-yet','abnormal'].includes(r.code)).length;
             const unsent=problems.filter(r=>r.code==='unsent').length;
-            count.textContent='目前 '+rows.length+' 筆｜考勤待核 '+attendanceProblems+'｜尚未申報 '+unsent+'｜其餘為原預排申報待確認';
+            count.textContent='共 '+rows.length+' 筆｜缺卡／異常 '+attendanceProblems+'｜未申報 '+unsent;
             body.innerHTML=visible.length?visible.map((row,index)=>{
                 const report=row.overtimeReport||{},date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
                 const period=String(report.code||'尚未設定');
@@ -13834,11 +13834,11 @@ function p79OvertimePeriodLabel(report){
                     '<td class="p-3 whitespace-nowrap">'+(Number.isFinite(hours)&&hours>0?hours+' 小時':'待核對')+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+inCell+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+outCell+'</td>'+
-                    '<td class="p-3 min-w-[235px]"><strong class="'+reasonTone+'">'+escapeHtml(reason.label)+'</strong>'+
-                    '<span class="block text-xs text-slate-600 dark:text-slate-300 mt-1">'+escapeHtml(reason.detail)+'</span>'+
+                    '<td class="p-3 min-w-[235px]"><div class="flex flex-wrap items-center justify-center gap-2"><strong class="'+reasonTone+'">'+escapeHtml(reason.label)+'</strong>'+
                     (reason.code==='review'&&!row.p79RestDraft&&row.overtimeReport?.id
-                        ?' <button type="button" onclick="p79OpenPlannedOvertimeReview('+index+')" class="mt-1 inline-flex rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">核對申報</button>'
-                        :'')+'</td></tr>';
+                        ?' <button type="button" onclick="p79OpenPlannedOvertimeReview('+index+')" class="inline-flex rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">核對申報</button>'
+                        :'')+'</div>'+
+                    (reason.detail?'<span class="block text-xs text-slate-600 dark:text-slate-300 mt-1">'+escapeHtml(reason.detail)+'</span>':'')+'</td></tr>';
             }).join(''):'<tr><td colspan="9" class="p-5 text-center text-slate-500">目前篩選條件沒有預排／待核對紀錄</td></tr>';
             pages.innerHTML='<span>第 '+p79OvertimePlannedPage+' / '+pageCount+' 頁（每頁50筆）</span>'+
                 '<div class="flex gap-2"><button type="button" onclick="goToPlannedOvertimePage('+(p79OvertimePlannedPage-1)+')" '+(p79OvertimePlannedPage<=1?'disabled':'')+' class="rounded-md border px-3 py-1 disabled:opacity-40">上一頁</button>'+
