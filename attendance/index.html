@@ -1039,16 +1039,16 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 }
 </style>
 
-<style id="p79-overtime-hours-hover-only-20261028">
-/* Only the overtime-hours cells in the main attendance management table. */
-#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-hover-value {
-  opacity: 0 !important;
-  transition: opacity .12s ease;
-  cursor: help;
-}
-#adminRecordsTableBody td[data-p79-overtime-hours]:hover .p79-overtime-hover-value,
-#adminRecordsTableBody td[data-p79-overtime-hours]:focus-within .p79-overtime-hover-value {
-  opacity: 1 !important;
+<style id="p79-overtime-rest-visible-hover-v2">
+/* Attendance "加班時數": retain only 休08-16 (or equivalent 休HH-HH) at rest.
+   Explicitly hide the OTHER values, instead of opacity-hiding their parent. */
+#adminRecordsTableBody td[data-p79-overtime-hours] { cursor: help; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-rest-visible { display: block; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-hidden-detail { display: none !important; }
+#adminRecordsTableBody td[data-p79-overtime-hours]:hover .p79-overtime-hidden-detail,
+#adminRecordsTableBody td[data-p79-overtime-hours]:focus .p79-overtime-hidden-detail,
+#adminRecordsTableBody td[data-p79-overtime-hours]:focus-within .p79-overtime-hidden-detail {
+  display: block !important;
 }
 </style>
 </head>
@@ -15215,13 +15215,27 @@ function getManualPairRecordAnchor(record) {
             const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===token);
             const plans=states.map(state=>p79AttendanceReportedOvertime(row,state,view));
             const planned=plans.find(value=>value?.report)||plans.find(Boolean)||null;
-            if(!planned)return formatDurationMinutes(actual);
-            const label=String(planned.label).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            // Only the 休HH-HH marker remains visible without hover.
+            // "0 小時", 已申報, 申報時數 and every other value stay within
+            // a separate, genuinely hidden detail container.
+            if(!planned)return '<div class="p79-overtime-hidden-detail">'+formatDurationMinutes(actual)+'</div>';
+            const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const rawLabel=String(planned.label||'');
+            const restMatch=rawLabel.match(/休\d{2}-\d{2}/);
+            const restText=restMatch?escapeText(restMatch[0]):'';
+            const otherLabel=escapeText(restMatch?rawLabel.replace(restMatch[0],'').trim():rawLabel);
             const changed=!!planned.reviewState;
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
             const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
-            const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+String(planned.originalCode).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'（尚未改寫）</div>':'';
-            return `<div class="text-cyan-700 dark:text-cyan-300">${label}${reviewBadge}${declared}</div>${original}${planned.minutes!==null?`<div class="text-xs">${planned.pending?'已安排／待申報':'申報'} ${formatDurationMinutes(planned.minutes)}</div>`:''}${actual?`<div class="text-[10px] text-slate-500">打卡估算 ${formatDurationMinutes(actual)}</div>`:''}`;
+            const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+escapeText(planned.originalCode)+'（尚未改寫）</div>':'';
+            const visible=restText?'<div class="p79-overtime-rest-visible text-cyan-700 dark:text-cyan-300">'+restText+'</div>':'';
+            const detail='<div class="p79-overtime-hidden-detail">'+
+                ((otherLabel||reviewBadge||declared)?'<div class="text-cyan-700 dark:text-cyan-300">'+otherLabel+reviewBadge+declared+'</div>':'')+
+                original+
+                (planned.minutes!==null?'<div class="text-xs">'+(planned.pending?'已安排／待申報':'申報')+' '+formatDurationMinutes(planned.minutes)+'</div>':'')+
+                (actual?'<div class="text-[10px] text-slate-500">打卡估算 '+formatDurationMinutes(actual)+'</div>':'')+
+                '</div>';
+            return visible+detail;
         }
 
         function p79CanManageOvertime() {
@@ -16020,7 +16034,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-side="IN" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${p79TyphoonCheckInBadge}${inTime}</td>
                         <td data-p79-side="OUT" class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td data-p79-attendance-hours class="px-2 py-3 text-center font-semibold text-teal-700 dark:text-teal-300 whitespace-nowrap">${attendanceRowAttendanceText(row)}</td>
-                        <td data-p79-overtime-hours class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap"><span class="p79-overtime-hover-value" tabindex="0" title="滑鼠移入或點選顯示加班時數">${attendanceRowOvertimeText(row,overtimeView)}</span></td>
+                        <td data-p79-overtime-hours tabindex="0" onclick="this.focus()" title="滑鼠移入或點選顯示其他加班資訊" class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row,overtimeView)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${overtimeSubmissionState === 'none' ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button>` : ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${crossMonthBadge}${extraChecks}</td>
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
