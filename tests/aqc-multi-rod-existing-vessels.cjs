@@ -11,7 +11,9 @@ assert(app.includes("const result=concurrentResult()"));
 assert(!app.includes('>補登船舶資料</button>'),'no redundant add-vessel button');
 assert(app.includes('同桿跨船接桿核對'),'audit per-unit finish/start transitions');
 assert(app.includes("const scope=identity(),result=concurrentResult(),rows=result.rows;"));
-assert(app.includes('待核對'),'unverified 5+ cannot be labeled confirmed');
+assert(app.includes('來源時段重疊，不能證明同時作業'),'source overlaps must not be claimed as actual concurrency');
+assert(app.includes('現場同時作業上限為'),'visible current physical capacity');
+assert(app.includes('來源時間重疊桿數（非已確認）'),'Excel must differentiate source overlaps from actual activity');
 const win={};new Function('window',lib)(win);const calc=win.P79AqcConcurrent;
 const at=Date.parse('2026-10-28T17:00:00+08:00');
 const record=(number,ship,start,end,date='2026-10-28',workingNo=ship)=>({
@@ -73,19 +75,27 @@ let incomplete=calc.compute(calc.index(oldCrane,[],at),[],{date:'2026-10-06',min
 assert.equal(incomplete.rows.length,1);
 assert.equal(incomplete.rows[0].totalRods,5);
 assert.equal(incomplete.rows[0].needsReview,true,'report-only five rods must be marked unverified');
-// A genuine 5-crane overlap supported by 5 WORKING SHEET timestamps remains valid.
+assert.equal(incomplete.rows[0].displayRods,null,'must not display five as actual work at a four-crane port');
+assert.equal(incomplete.rows[0].physicalCapacity,4);
+// Five overlapping WORKING SHEET service intervals do NOT prove five cranes ran
+// concurrently when the confirmed physical capacity is four.
 const verified=[{workingNo:'V1',vessel:'CONFIRMED',aqcs:[101,102,103,104,105].map(number=>({
  number,commence:'2026-10-06T08:00:00+08:00',complete:'2026-10-06T11:00:00+08:00'}))}];
 const real5=calc.compute(calc.index([],verified,at),[],{date:'2026-10-06',min:4});
-assert.equal(real5.rows[0].totalRods,5);
-assert.equal(real5.rows[0].needsReview,false,'genuine five from authoritative crane times is not arbitrarily capped');
+assert.equal(real5.rows[0].totalRods,5,'source intervals may show five overlapping');
+assert.equal(real5.rows[0].displayRods,null,'physical four-crane limit must flag even five sheet intervals');
+assert.equal(real5.rows[0].capacityConflict,true);
+assert.equal(real5.peak,4);
+const future5=calc.compute(calc.index([],verified,at),[],{date:'2026-10-06',min:4,capacity:5});
+assert.equal(future5.rows[0].displayRods,5,'new physical capacity can be configured when equipment expands');
+assert.equal(future5.rows[0].capacityConflict,false);
 // Matching must still work when cloud WORKING NO differs but name + voyage + AQC match.
 const mismatchedNo=oldCrane.map(x=>x.shipName==='WAN HAI 271'?{...x,workingNo:'LEGACY-OTHER',voyageE:'S268',shipName:'WAN HAI 271 S268'}:x);
 const matchingMaster=[{...olderMaster[0],voyageE:'S268'}];
 const reconciled=calc.compute(calc.index(mismatchedNo,matchingMaster,at),[],{date:'2026-10-06',min:4});
 assert.equal(reconciled.rows.length,1);
 assert.equal(reconciled.rows[0].totalRods,4,'name+voyage match should beat stale WORKING NO and exclude finished AQC');
-console.log('PASS: AQC finish vs next-vessel start, false-five prevention, and verified future five-rod support');
+console.log('PASS: AQC cross-ship handoff and physical capacity enforced; future capacity changes tested');
 
 // Verified 2026-10-13/14 screenshot: 7905 finishes at 03:01, so five rods
 // exist up to but NOT after the finish boundary.
@@ -110,7 +120,14 @@ assert.deepEqual(day14.rows.map(x=>[x.start,x.end,x.totalRods]),[
  ['2026-10-14T03:01','2026-10-14T08:04',4]
 ],'10/14: once 7905 finishes at 03:01 count MUST drop from five to four');
 assert(!day14.rows.some(x=>x.totalRods===5&&x._end>Date.parse('2026-10-14T03:01:00+08:00')),
- 'five-rod segment must never extend past 7905 completion');
-console.log('PASS: Oct13-14 five-to-four transition at 03:01 exactly');
+ 'source 5-interval segment must never extend past 7905 completion');
+assert(day13.rows[1].capacityConflict&&day14.rows[0].capacityConflict,
+ 'both source five-overlap portions require review under four-crane limit');
+assert.equal(day13.rows[1].displayRods,null);
+assert.equal(day14.rows[0].displayRods,null);
+assert.equal(day14.rows[1].displayRods,4);
+assert.equal(day13.peak,4);
+assert.equal(day14.peak,4);
+console.log('PASS: Oct13-14 source intervals change at 03:01; actual five is never confirmed with four-crane limit');
 
 console.log('PASS: cross-vessel 2+2 overlap, cache-only computation, midnight, manual priority, duplicate equipment, quantity caution, export UI');
