@@ -353,6 +353,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
         <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假比對</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
+        <div class="field"><label for="filterMonth">請假月份</label><select id="filterMonth" onchange="renderAdmin()"><option value="">全部月份</option></select></div>
         <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
         <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
@@ -580,6 +581,48 @@ async function submitLeave(){
 }
 function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=ds.includes(cur)?cur:'';populateLeaveAdminJobs()}
 function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
+// 管理員請假審核按請假的實際日期月份顯示，不使用送件日或資料建立時間。
+function p79LeaveCurrentTaiwanMonth(){
+ return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()).slice(0,7);
+}
+function p79LeaveRecordMonthRange(record){
+ const start=normalizeLeaveFilterDate(record?.startTime||record?.startDate);
+ const end=normalizeLeaveFilterDate(record?.endTime||record?.endDate||record?.startTime||record?.startDate);
+ if(!start)return null;
+ const first=start.slice(0,7),last=(end||start).slice(0,7);
+ return {from:first<=last?first:last,to:first<=last?last:first};
+}
+function p79LeaveMatchesMonth(record,month){
+ if(!month)return true;
+ const range=p79LeaveRecordMonthRange(record);
+ return !!range&&range.from<=month&&range.to>=month;
+}
+function populateLeaveAdminMonths(){
+ const select=$('filterMonth');if(!select)return;
+ const now=p79LeaveCurrentTaiwanMonth();
+ // 選過「全部月份」後，雲端重新整理不得擅自切回當月。
+ const selected=select.dataset.p79MonthReady==='1'?select.value:now;
+ const months=new Set([now]);
+ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(selected))months.add(selected);
+ for(const leave of leaveRecords){
+  const period=p79LeaveRecordMonthRange(leave);
+  if(!period)continue;
+  months.add(period.from);months.add(period.to);
+  // 跨月請假要出現在涵蓋的每個月份，不只開始／結束月份。
+  let year=Number(period.from.slice(0,4)),m=Number(period.from.slice(5,7));
+  for(let n=0;n<60;n++){
+   const key=String(year).padStart(4,'0')+'-'+String(m).padStart(2,'0');
+   if(key>period.to)break;
+   months.add(key);
+   if(++m>12){m=1;year++;}
+  }
+ }
+ select.innerHTML='<option value="">全部月份</option>'+
+  [...months].sort((a,b)=>b.localeCompare(a)).map(month=>
+   '<option value="'+month+'">'+month.slice(0,4)+'年'+Number(month.slice(5,7))+'月</option>').join('');
+ select.value=selected;
+ select.dataset.p79MonthReady='1';
+}
 function p79LeaveJobForRecord(record){
  const id=String(record.empId||'').trim().toUpperCase(),attNo=String(record.attNo||'').trim();
  const employee=employees.find(e=>id&&String(e.empId||'').trim().toUpperCase()===id)||employees.find(e=>attNo&&String(e.attNo||'').trim()===attNo);
@@ -612,8 +655,9 @@ function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
  $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
- const dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
- let rows=leaveRecords.filter(l=>(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'待審核').trim()===status));
+ populateLeaveAdminMonths();
+ const month=$('filterMonth').value,dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
+ let rows=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,month)&&(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'待審核').trim()===status));
  p79LeaveComparisonRows=rows;
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
