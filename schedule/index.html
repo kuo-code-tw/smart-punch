@@ -2872,10 +2872,53 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       return true;
     }
 
+    // If a month has been authenticated but a widget fails while rendering, keep
+    // the actual cloud/cache roster visible as READ-ONLY rows. Never synthesize
+    // shifts, silently unlock editing, or replace another month's data.
+    function p79ScheduleRenderReadOnlyFallback(error){
+      try{
+        const month=currentScheduleMonthKey(),source=p79ScheduleSourceState;
+        const authorized=p79ScheduleHasOfficialData()||
+          source?.month===month&&source.kind==='cache'&&!!currentPort79SsoToken();
+        if(!authorized||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)||!Array.isArray(employees))return false;
+        const main=document.getElementById('app-main-container');if(!main)return false;
+        const people=employees.filter(e=>e&&e.id&&
+          (activeRoleTab==='ALL'||String(e.role||'')===activeRoleTab)&&
+          (activeGroupFilter==='ALL'||String(e.group||'')===activeGroupFilter));
+        if(!activeRoleTab||!people.length)return false;
+        const days=getDaysInMonth(...month.split('-').map(Number));
+        const dates=Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
+        let missing=0,known=0;
+        const rows=people.map(person=>{
+          const roster=monthlyScheduleData?.[person.id]||{};
+          const cells=dates.map(date=>{
+            const code=String(roster[date]??'').trim();
+            if(code)known++;else missing++;
+            return '<td class="border px-2 py-2 text-center whitespace-nowrap '+(code?'text-slate-800':'text-amber-700 bg-amber-50')+'">'+
+              scheduleEscapeHtml(code||'待排班')+'</td>';
+          }).join('');
+          return '<tr><th class="sticky left-0 z-10 bg-white border px-3 py-2 whitespace-nowrap text-left">'+
+            scheduleEscapeHtml(String(person.name||person.id))+'</th>'+cells+'</tr>';
+        }).join('');
+        const detail=scheduleEscapeHtml(String(error?.message||error||'畫面未完成渲染'));
+        main.innerHTML='<section class="p-3 bg-white rounded-xl border border-amber-200">'+
+          '<div role="alert" class="mb-3 p-3 bg-amber-50 text-amber-900 rounded-lg">'+
+          '已讀取'+scheduleEscapeHtml(month)+'月'+people.length+'人班表；完整畫面渲染失敗，暫以唯讀方式顯示正式來源資料。'+
+          '已排'+known+'格、待排'+missing+'格；不會自動補成「休」，也不會修改雲端。請使用上方「重新讀取」恢復完整操作。'+
+          '<div class="text-xs mt-1">渲染錯誤：'+detail+'</div></div>'+
+          '<div class="overflow-auto max-h-[70vh]"><table class="border-collapse text-xs"><thead><tr>'+
+          '<th class="sticky left-0 z-20 bg-slate-100 border px-3 py-2">姓名</th>'+
+          dates.map(d=>'<th class="border bg-slate-100 px-2 py-2">'+d.slice(-2)+'</th>').join('')+
+          '</tr></thead><tbody>'+rows+'</tbody></table></div></section>';
+        applyScheduleAccessUi?.();
+        return true;
+      }catch(fallbackError){console.error('唯讀班表救援畫面失敗',fallbackError);return false;}
+    }
     function p79SchedulePreviewRenderError(error){
       console.error('班表畫面渲染失敗',error);
+      if(p79ScheduleRenderReadOnlyFallback(error))return;
       const main=document.getElementById('app-main-container');
-      if(main)main.innerHTML='<div role="alert" class="p-6 text-amber-800 bg-amber-50 rounded-xl">已取得本機班表，但畫面渲染失敗，請按上方「重新讀取」重試。錯誤：'+scheduleEscapeHtml(String(error?.message||error))+'</div>';
+      if(main)main.innerHTML='<div role="alert" class="p-6 text-amber-800 bg-amber-50 rounded-xl">班表尚未可安全顯示；請按上方「重新讀取」。錯誤：'+scheduleEscapeHtml(String(error?.message||error))+'</div>';
     }
 
     let scheduleSaveTimer = null;
@@ -4938,7 +4981,8 @@ function p79EmployeeDateEligible(emp,date) {
       if(activeRoleTab === 'EMP_MGMT') {
         renderEmployeeManagementView();
       } else {
-        renderRoleScheduleView();
+        try { renderRoleScheduleView(); }
+        catch(error) { p79SchedulePreviewRenderError(error); }
       }
     }
 
@@ -4962,7 +5006,8 @@ function p79EmployeeDateEligible(emp,date) {
 
     function setGroupFilter(groupName) {
       activeGroupFilter = activeGroupFilter===groupName?'ALL':groupName;
-      renderRoleScheduleView();
+      try { renderRoleScheduleView(); }
+      catch(error) { p79SchedulePreviewRenderError(error); }
     }
 
     async function updateEmpGroupAndResort(empId, newGroup) {
@@ -5994,7 +6039,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
-          if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
+          if(shiftVal==='待排班') { /* Future/partial month is neither an off day nor a work day. */ } else if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
             offDays++;
           } else {
             workDays++;
@@ -6581,7 +6626,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(!p79EmployeeDateEligible(emp,dayStr))return {eligible:false,visibleCode:''};
       const ctx=context||p79ScheduleDisplayContext(emp,dayStr.slice(0,7));
       const automaticRestMeta=ctx.automaticRestMeta;
-      const rosterShift=(monthlyScheduleData[emp.id]&&monthlyScheduleData[emp.id][dayStr])||'休';
+      const rosterShift=String(monthlyScheduleData[emp.id]?.[dayStr]??'').trim()||'待排班';
       const ownApprovedLeave=approvedLeaveForEmployee(emp.id,dayStr);
       const attendanceState=window.P79RestAttendance.state(ctx.attendanceSnapshot,emp.id,dayStr);
       // The actual early/middle/night shift from complete paired cloud punches
@@ -6601,7 +6646,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=automaticRestMeta[dayStr]?.manualRosterShift===rosterShift&&
         ['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
-      const shiftVal=noPunchRest?'休':actualShift||(verifiedRestAttendance?'已出勤':rosterShift);
+      const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category||'休',
         restQuotaOvertime:false}:automaticRestMeta[dayStr]||null;
