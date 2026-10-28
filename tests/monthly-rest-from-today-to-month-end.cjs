@@ -4,7 +4,7 @@ const source=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 const html=fs.readFileSync('work-hours/index.html','utf8');
 let now='2026-10-28',next=0;
 const g={window:null,console,Date,crypto:{randomUUID:()=>String(++next)},
- Intl:{DateTimeFormat:()=>({format:()=>now})}};g.window=g;
+ Intl:{DateTimeFormat:function(){return{format:()=>now}}}};g.window=g;
 g.p79RestQuota=()=>({days:31,slots:[{category:'國',sourceDate:'2026-10-10'}]});
 g.p79AllocateRestMonth=()=>({meta:{}});
 g.p79MonthlyRestContext={employmentStart:()=>''};
