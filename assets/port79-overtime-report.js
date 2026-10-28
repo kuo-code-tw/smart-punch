@@ -594,7 +594,8 @@
     const start=prefill.attendance?.start,end=prefill.attendance?.end;
     el.querySelector('#p79OtPreview').insertAdjacentHTML('afterend',
      '<div class="p79-planned-review-evidence" style="margin:8px 0;padding:10px;border:1px solid #a5b4fc;border-radius:8px;background:#eef2ff;color:#312e81;font-weight:700">'+
-     '原預排正式核對｜打卡 '+time(start)+' ～ '+time(end)+'｜請核對實際工作、休息時間與申報時段，再按「確認正式申報」沿用原 ID 解除預排。'+
+     '原預排 '+esc(prefill.originalReportCode||prefill.code||'')+'｜依完整打卡選擇 '+esc(prefill.code||'待選時段')+
+     '｜打卡 '+time(start)+' ～ '+time(end)+'｜確認後沿用原 ID 正式儲存。'+
      '</div>');
    }
    if(editingOriginal){
