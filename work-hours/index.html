@@ -1610,7 +1610,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對（與已確定加班分開）</h4>
                         <span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span>
                     </div>
-                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">僅顯示預排資料供排班核對；不計入正式加班人數、班次、申報或換算時數。沿用上方月份、部門、職稱、姓名篩選，不用另外讀取。</p>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">另列原有預排紀錄與「每月未休假加班」讀取後產生的未來建議（如 10/29 起）；只供排班核對，不是正式申報，不計入加班人數、班次、申報或換算時數。沿用上方篩選。</p>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100">
@@ -13655,6 +13655,24 @@ function p79OvertimePeriodLabel(report){
 
         // 預排另外呈現在加班頁下方，沿用相同人員權限和篩選，不混入正式申報統計。
         let p79OvertimePlannedPage=1;
+        // 每月未休加班讀取後，把尚未申報的「往後預排」只保存在頁面記憶體。
+        // 舊的雲端預排紀錄仍照常顯示；臨時建議不能被當成正式申報或儲存到雲端。
+        const p79MonthlyRestDraftsByMonth=new Map();
+        window.p79UpdateMonthlyRestPlans=function(month,proposals,people){
+            if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(String(month)))return;
+            const byId=new Map((people||[]).map(emp=>[String(emp.empId||'').trim().toUpperCase(),emp]));
+            const proposed=(proposals||[]).filter(row=>row?.planned===true).map(row=>{
+                const person=byId.get(String(row.empId||'').trim().toUpperCase());
+                if(!person)return null;
+                return {empId:row.empId,name:person.name||row.name,dept:person.dept||'一般',
+                    jobTitle:person.jobTitle||person.deptDetail||'未設定',dateKey:row.date,
+                    monthKey:String(row.date||'').slice(0,7),rosterDate:row.date,sortTime:Date.parse(row.date+'T00:00:00+08:00'),
+                    planned:true,p79RestDraft:true,overtimeReport:{
+                        planned:true,code:row.rule?.[1]||'',declaredHours:row.rule?.[2]||0}};
+            }).filter(Boolean);
+            p79MonthlyRestDraftsByMonth.set(month,proposed);
+            renderOvertimeStats();
+        };
         function p79OvertimePlannedVisibleRows(rows,month,dept,jobTitle,employeeId){
             return (rows||[]).filter(row=>p79WorkOvertimeIsUnconfirmedPlan(row)&&
                 (month==='ALL'||String(row.monthKey||'').replaceAll('/','-')===month)&&
@@ -13670,7 +13688,24 @@ function p79OvertimePeriodLabel(report){
             const body=document.getElementById('p79OvertimePlannedBody'),count=document.getElementById('p79OvertimePlannedCount'),
                 pages=document.getElementById('p79OvertimePlannedPagination');
             if(!body||!count||!pages)return;
-            const rows=p79OvertimePlannedVisibleRows(sourceRows,month,dept,jobTitle,employeeId);
+            const todayKey=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            const draftMonths=month==='ALL'?[...p79MonthlyRestDraftsByMonth.keys()]:[month];
+            const restDrafts=draftMonths.flatMap(m=>p79MonthlyRestDraftsByMonth.get(m)||[]);
+            const savedKeys=new Set((sourceRows||[]).map(row=>String(row.empId||'').trim().toUpperCase()+'|'+String(row.rosterDate||row.dateKey||'').replaceAll('/','-')));
+            const eligibleDrafts=restDrafts.filter(row=>{
+                const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
+                if(date<=todayKey||savedKeys.has(String(row.empId||'').trim().toUpperCase()+'|'+date))return false;
+                const cloud=p79WorkOvertimeMonths.get(date.slice(0,7));
+                if(cloud?.ready){
+                    const schedule=cloud.rows?.find(x=>String(x.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase())?.schedule;
+                    if(schedule){
+                        if(!['早','中','晚'].includes(String(schedule[date]||'').trim()))return false;
+                        if(schedule.__meta?.[date]?.overtimeReport||schedule.__meta?.[date]?.overtimeExcluded)return false;
+                    }
+                }
+                return true;
+            });
+            const rows=p79OvertimePlannedVisibleRows([...(sourceRows||[]),...eligibleDrafts],month,dept,jobTitle,employeeId);
             const pageSize=50,pageCount=Math.max(1,Math.ceil(rows.length/pageSize));
             p79OvertimePlannedPage=Math.min(p79OvertimePlannedPage,pageCount);
             const visible=rows.slice((p79OvertimePlannedPage-1)*pageSize,p79OvertimePlannedPage*pageSize);
@@ -13679,7 +13714,9 @@ function p79OvertimePeriodLabel(report){
                 const report=row.overtimeReport||{},date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-');
                 const period=String(report.code||'尚未設定');
                 const hours=Number(report.declaredHours);
-                const status=row.clockIn&&!row.clockOut?'已簽到／待簽退':row.clockIn&&row.clockOut?'已有打卡／待正式核對':'預排／待出勤';
+                const status=row.p79RestDraft?'未來建議預排／未申報':
+                    row.clockIn&&!row.clockOut?'已簽到／待簽退':
+                    row.clockIn&&row.clockOut?'已有打卡／待正式核對':'預排／待出勤';
                 return '<tr>'+
                     '<td class="p-3 whitespace-nowrap">'+escapeHtml(date.replaceAll('-','/'))+'</td>'+
                     '<td class="p-3 font-semibold whitespace-nowrap">'+escapeHtml(row.name||'')+'</td>'+
