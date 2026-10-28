@@ -907,6 +907,41 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 }
 </style>
 
+<style id="p79-overtime-planned-matched-font-20261028">
+/* 預排／待核對使用與已確定加班一致的桌面字級及緊湊行距；不影響資料或核對邏輯。 */
+#adminContentOvertime #p79OvertimePlannedSection{font-size:13px!important;line-height:1.4!important}
+#adminContentOvertime #p79OvertimePlannedHeading{font-size:14px!important;line-height:1.4!important}
+#adminContentOvertime #p79OvertimePlannedCount,
+#adminContentOvertime #p79OvertimePlannedSection>p,
+#adminContentOvertime #p79OvertimePlannedPagination{font-size:12px!important;line-height:1.35!important}
+#adminContentOvertime #p79OvertimePlannedSection table,
+#adminContentOvertime #p79OvertimePlannedSection table th,
+#adminContentOvertime #p79OvertimePlannedSection table td{
+ font-size:13px!important;line-height:1.4!important;
+}
+#adminContentOvertime #p79OvertimePlannedSection table :is(th,td){
+ padding:8px 9px!important;vertical-align:middle!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody td:nth-child(2){
+ font-size:14px!important;font-weight:700!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody td:last-child :is(strong,span),
+#adminContentOvertime #p79OvertimePlannedBody td :is(.text-xs,.text-sm){
+ font-size:12px!important;line-height:1.35!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody button,
+#adminContentOvertime #p79OvertimePlannedPagination button{
+ font-size:12px!important;line-height:1.35!important;
+ padding:5px 8px!important;
+}
+@media(max-width:640px){
+ #adminContentOvertime #p79OvertimePlannedSection table,
+ #adminContentOvertime #p79OvertimePlannedSection table th,
+ #adminContentOvertime #p79OvertimePlannedSection table td{font-size:12px!important}
+ #adminContentOvertime #p79OvertimePlannedBody td:nth-child(2){font-size:13px!important}
+}
+</style>
+
 <style id="p79-overtime-two-row-toolbar-20261022">
 /* Desktop: first toolbar row + second summary row. Preserve every existing control. */
 @media(min-width:1180px){
