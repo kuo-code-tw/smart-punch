@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const source=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 let current='2026-10-28',seq=0;
 const c={window:null,console,Date,crypto:{randomUUID:()=>String(++seq)},
- Intl:{DateTimeFormat:()=>({format:()=>current})}};
+ Intl:{DateTimeFormat:function(){return{format:()=>current}}}};
 c.window=c;
 c.p79RestQuota=()=>({days:31,slots:[
  {category:'休',sourceDate:'2026-10-02'},
