@@ -222,14 +222,76 @@
   });
  }
 
+
+ const normalizeDate=v=>{
+  const m=String(v||'').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';
+ };
+ const tzDate=ts=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts));
+ const tzDateTime=ts=>{
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(ts));
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+  return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
+ };
+ const taipeiDateStart=date=>Date.parse(date+'T00:00:00+08:00');
+ function instant(value){
+  if(value instanceof Date)return Number.isFinite(value.getTime())?value.getTime():NaN;
+  if(typeof value==='number')return value>100000000000?value:NaN;
+  const s=String(value||'').trim();if(!s)return NaN;
+  if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}[ T]\d{1,2}:\d{2}(?::\d{2})?$/.test(s))return Date.parse(s.replace(/\//g,'-').replace(' ','T')+'+08:00');
+  return Date.parse(s);
+ }
+ // WORKING SHEET contains per-AQC commence/complete timestamps. They are operational
+ // evidence; an overall aqcCount alone is NOT evidence of activity on a given date.
+ function sheetActivityCandidates(){
+  const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
+  const groups=new Map();
+  for(const s of masters){
+   const aqcs=Array.isArray(s.aqcs)&&s.aqcs.length?s.aqcs:Array.isArray(s.workingSheetSource?.aqcs)?s.workingSheetSource.aqcs:[];
+   const ship=String(s.vessel||'').trim(),workingNo=String(s.workingNo||'').trim();
+   if(!ship||!aqcs.length)continue;
+   const voyage=String(s.voyageE||s.voyageI||'').trim();
+   for(const a of aqcs){
+    const number=typeof normalizeAqcNo==='function'?String(normalizeAqcNo(a.number||a.gcNo||'')):String(a.number||a.gcNo||'').trim();
+    if(!number||!/^\d{1,6}$/.test(number))continue;
+    const begin=instant(a.commence||a.start),finish=instant(a.complete||a.end);
+    if(!Number.isFinite(begin))continue;
+    const closed=Number.isFinite(finish)&&finish>=begin;
+    const end=closed?finish:begin+60000;
+    let cursor=tzDate(begin),last=tzDate(Math.max(begin,end-1));
+    for(let i=0;i<35&&cursor<=last;i++){
+     const dayStart=taipeiDateStart(cursor),dayEnd=dayStart+86400000;
+     const intervalStart=Math.max(begin,dayStart),intervalEnd=Math.min(end,dayEnd);
+     if(intervalStart<intervalEnd){
+      const key=JSON.stringify([cursor,workingNo?'NO:'+workingNo:'SHIP:'+normShip(ship)+'|'+voyage]);
+      if(!groups.has(key))groups.set(key,{date:cursor,ship,voyage,workingNo,aqcs:new Set(),starts:[],ends:[],unclosed:false,master:s});
+      const g=groups.get(key);g.aqcs.add(number);g.starts.push(tzDateTime(intervalStart));
+      if(closed)g.ends.push(tzDateTime(intervalEnd));else g.unclosed=true;
+     }
+     const next=new Date(dayEnd+12*3600000);cursor=tzDate(next.getTime());
+    }
+   }
+  }
+  return [...groups.values()].map(g=>{
+   const sameDay=normalizeDate(g.master.firstDate)===g.date&&normalizeDate(g.master.lastDate)===g.date;
+   return {id:'SHEET:'+g.date+'|'+g.workingNo+'|'+g.ship,source:'sheet',date:g.date,
+    ship:g.ship,voyage:g.voyage,workingNo:g.workingNo,rods:g.aqcs.size,
+    aqcNumbers:[...g.aqcs].sort((a,b)=>Number(a)-Number(b)),
+    start:g.starts.sort()[0],end:g.unclosed?'':g.ends.sort().at(-1)||'',
+    hasActualTimes:true,containers:sameDay?Number(g.master.totalContainers??0):null,
+    hatches:sameDay?Number(g.master.hatches??0):null,shiftMoves:sameDay?Number(g.master.shiftMoves??0):null,
+    note:'船舶 WORKING SHEET AQC 起訖時間推算（每日去重）'};
+  });
+ }
+
  // WORKING SHEET master fallback: a vessel spanning the selected date with >=min listed AQC units
  // is only a review candidate, NOT proof those units worked that date.
  function masterCandidates(date,min){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return [];
   const masters=typeof shipMasters!=='undefined'&&Array.isArray(shipMasters)?shipMasters:[];
   return masters.filter(s=>{
-   const from=String(s.firstDate||s.compareDate||s.workingSheetSource?.compareDate||'').replace(/\//g,'-').slice(0,10);
-   const to=String(s.lastDate||from).replace(/\//g,'-').slice(0,10);
+   const from=normalizeDate(s.firstDate||s._cloudFirstDate||s.compareDate||s.workingSheetSource?.compareDate||'');
+   const to=normalizeDate(s.lastDate||s._cloudLastDate||from);
    const n=Number(s.aqcCount)||((Array.isArray(s.aqcs)?s.aqcs:[]).length);
    return from&&from<=date&&date<=to&&Number.isFinite(n)&&n>=min;
   }).map(s=>({
