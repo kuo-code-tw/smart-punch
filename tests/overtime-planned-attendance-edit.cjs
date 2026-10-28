@@ -78,6 +78,17 @@ function setup(){
  assert(html.includes('p79RefreshLinkedOvertimeAfterAttendanceCloudSave(originalTimeStr,r.timeStr)'),'updated time triggers linked cache refresh after cloud ACK');
  assert(html.includes('p79RefreshLinkedOvertimeAfterAttendanceCloudSave(newRecord.timeStr)'),'missing-punch creation triggers linked cache refresh after cloud ACK');
  assert(html.includes('for(const month of months)p79QueueConfirmedRosterRecheck(month)'),'changed months re-read official roster and overtime');
+ const syncCtx={months:[],repaint:0,p79OvertimeCalculationCache:{old:true},
+   normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),
+   getAttendanceDateKey:x=>String(x||'').slice(0,10)};
+ syncCtx.p79QueueConfirmedRosterRecheck=month=>syncCtx.months.push(month);
+ syncCtx.p79RenderOnlyVisibleAttendanceView=()=>syncCtx.repaint++;
+ vm.createContext(syncCtx);
+ vm.runInContext(extract('p79RefreshLinkedOvertimeAfterAttendanceCloudSave'),syncCtx);
+ syncCtx.p79RefreshLinkedOvertimeAfterAttendanceCloudSave('2026/09/30 23:59','2026/10/01 00:02');
+ assert.deepEqual(syncCtx.months,['2026-09','2026-10'],'cross-month edit refreshes original and revised month');
+ assert.equal(syncCtx.repaint,1,'one repaint for each confirmed write');
+ assert.equal(syncCtx.p79OvertimeCalculationCache,null,'overtime cache invalidated');
  assert(html.includes("p79OvertimePendingPunchCell(row,'IN',todayKey,index)")&&html.includes("p79OvertimePendingPunchCell(row,'OUT',todayKey,index)"));
  for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
  console.log('PASS planned overtime attendance editor: auto month sync, IN/OUT edit, identity/type/time protection, no fake IDs, permissions, original editor, cloud-confirmed cache refresh');
