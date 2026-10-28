@@ -170,8 +170,10 @@ function markReviewed(date,checked){
  const marks=reviewMarks();
  if(checked)marks[date]=signature;
  else delete marks[date];
- try{g.localStorage?.setItem(reviewVersionKey,JSON.stringify(marks));}
- catch(_){return false;}
+ try{
+  if(typeof g.localStorage?.setItem!=='function')return false;
+  g.localStorage.setItem(reviewVersionKey,JSON.stringify(marks));
+ }catch(_){return false;}
  refreshCurrentStrip();
  return true;
 }
