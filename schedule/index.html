@@ -5818,7 +5818,39 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }catch(error){if(status)status.textContent='拉取失敗：'+error.message;}
       finally{button.disabled=false;}
     }
+    // Preserve the last correctly rendered roster when a background sync invokes
+    // a renderer whose optional modules have temporarily failed to initialize.
+    // This is a UI-only guard: do not change, save or fabricate roster values.
+    let p79LastSuccessfulRosterView=null;
     function renderRoleScheduleView() {
+      const main=document.getElementById('app-main-container');
+      const month=currentScheduleMonthKey();
+      const role=activeRoleTab,group=activeGroupFilter;
+      const previous=p79LastSuccessfulRosterView;
+      try {
+        p79RenderRoleScheduleViewUnsafe();
+        const output=main?.innerHTML||'';
+        if(main&&output&&!output.includes('正在讀取班表')&&!output.includes('無法載入此月份班表')&&
+           !output.includes('完整畫面渲染失敗')&&role&&
+           (p79ScheduleHasOfficialData()||p79ScheduleSourceState.month===month&&p79ScheduleSourceState.kind==='cache')) {
+          p79LastSuccessfulRosterView={month,role,group,html:output};
+          p79ScheduleLastRenderError='';
+        }
+      } catch(error) {
+        p79ScheduleLastRenderError=String(error?.message||error||'未知錯誤');
+        console.error('排班背景重繪失敗；保留最後成功畫面',error);
+        if(previous&&previous.month===month&&previous.role===role&&previous.group===group&&
+           main&&!port79ScheduleDirty&&!scheduleSaveTimer&&!personnelSaveTimer) {
+          main.innerHTML=previous.html;
+          try {applyScheduleAccessUi();} catch(ignore) {}
+          const notice=document.getElementById('scheduleRestEvidenceStatus');
+          if(notice)notice.textContent='背景重繪失敗，暫保留上次正常班表；請核對雲端更新狀態';
+          return;
+        }
+        throw error;
+      }
+    }
+    function p79RenderRoleScheduleViewUnsafe() {
       p79DisposeRosterScroll();
       if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&p79ScheduleSourceState.kind==='cache')){
         const target=document.getElementById('app-main-container');
