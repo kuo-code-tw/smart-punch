@@ -140,7 +140,7 @@ function reviewFingerprint(date,state){
    meta.overtimeAmendments||null,meta.overtimeRevisions||null,
    meta.overtimeRevocations||null,meta.overtimeExcluded===true]:null;
  }).filter(Boolean).sort((a,b)=>a[0].localeCompare(b[0]));
- const value=JSON.stringify(list);
+ const value=JSON.stringify([String(state.token||''),list]);
  let hash=2166136261;
  for(let i=0;i<value.length;i++)hash=Math.imul(hash^value.charCodeAt(i),16777619);
  return list.length+'-'+(hash>>>0).toString(36);
