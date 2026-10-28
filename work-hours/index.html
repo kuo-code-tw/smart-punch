@@ -9,7 +9,7 @@
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261028-restored-report-id-v3"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261027-prior-month-backfill-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -16202,7 +16202,7 @@ window.p79MonthlyRestContext={
  canReport:p79CanReportOvertime,employees:()=>p79WorkhoursEligibleEmployees(),employmentStart:p79EmploymentStartDate,
  month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:'';},
  saveReport:p79SaveWorkOvertimeDraft,refresh:()=>{p79OvertimeCalculationCache=null;renderOvertimeStats();},
- snapshot:async function(month,rosterOnly=false,reportView=false){
+ snapshot:async function(month,rosterOnly=false,reportView=false,forceFresh=false){
   const token=currentPort79SsoToken();if(!token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('沒有操作權限');
   const read=async (action,readMonth=month)=>{
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',readMonth);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
@@ -16226,7 +16226,7 @@ window.p79MonthlyRestContext={
   const readRoster=()=>read('getScheduleDataSecure');
   const needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
-  const shared=window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
+  const shared=!forceFresh&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
   const [roster,batches]=shared?[shared.roster,needAttendance?months.map(m=>shared.raw[m]):[]]:await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
   if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
   if(!Array.isArray(roster.schedules))throw Error('班表資料未讀齊，不能判定無卡休假');
