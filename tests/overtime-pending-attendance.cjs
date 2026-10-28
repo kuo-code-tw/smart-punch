@@ -4,8 +4,19 @@ function fn(name){const a=hours.indexOf('function '+name+'('),b=hours.indexOf('\
 const emp={empId:'AP1',attNo:'01',name:'林家奕',dept:'第二事業處',jobTitle:'F/L'},punch={empId:'AP1',attNo:'01',timeStr:'2026/10/19 15:35:00',status:'上班'};
 const report={id:'OT1',planned:true,code:'休16-20',declaredHours:4};
 const ctx={console,Date,Map,Set,JSON,Math,Number,String,Array,records:[punch],employees:[emp],p79WorkhoursEligibleEmployees:()=>[emp],canCurrentAdminViewEmployee:()=>true,normalizeAdminIds:()=>[],sysConfig:{adminIds:[]},isAdminLoggedIn:true,isCurrentViewerSuperAdmin:()=>true,normalizeAttendanceStatsAttNo:x=>String(x||''),normalizeEmployeeLookupName:x=>x,normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),p79LoadWorkOvertimeMonths(){},p79WorkOvertimeMonths:new Map(),p79MergeWorkOvertimeSnapshot(){},p79EmployeeDateEligible:()=>true,p79OvertimeCalculationCache:null,schedules:[{empId:'AP1',schedule:{__meta:{'2026-10-19':{overtimeReport:report}}}}],buildDailyAttendanceRows:()=>[{empId:'AP1',dateKey:'2026/10/19',clockIn:punch,clockOut:null,sortTime:1}]};
-vm.createContext(ctx);vm.runInContext(fn('p79WorkOvertimeOfficialReport'),ctx);vm.runInContext(fn('buildOvertimeStatisticsRows'),ctx);
-const rows=ctx.buildOvertimeStatisticsRows();assert.equal(rows.length,1);assert.equal(rows[0].clockIn.timeStr,punch.timeStr);assert.equal(rows[0].clockOut,null);assert.equal(rows[0].overtimeMinutes,0,'no fabricated hours before clock-out');
+vm.createContext(ctx);vm.runInContext(fn('p79WorkOvertimeOfficialReport'),ctx);
+vm.runInContext(fn('p79WorkOvertimeIsUnconfirmedPlan'),ctx);vm.runInContext(fn('buildOvertimeStatisticsRows'),ctx);
+assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({overtimeReport:report}),true,'cloud report ID does not turn a planned shift into confirmed overtime');
+const plannedRows=ctx.buildOvertimeStatisticsRows();
+assert.equal(plannedRows.length,0,'planned / pending attendance never appears in confirmed overtime list, totals or export');
+report.planned=false;ctx.p79OvertimeCalculationCache=null;
+const rows=ctx.buildOvertimeStatisticsRows();
+assert.equal(rows.length,1,'existing non-planned formal report remains visible for pending punch audit');
+assert.equal(rows[0].clockIn.timeStr,punch.timeStr);
+assert.equal(rows[0].clockOut,null);assert.equal(rows[0].overtimeMinutes,0,'no fabricated hours before clock-out');
+assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({planned:true,overtimeReport:{id:'x'}}),true,'explicit planned row stays excluded');
+assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({planned:false,overtimeReport:{id:'x',planned:false}}),false,'confirmed cloud report is eligible');
+assert(hours.includes('const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'formal table applies independent planned guard');
 assert(hours.includes("row.planned&&!row.clockIn?'待出勤'"));assert(hours.includes("row.clockIn?'尚未下班':'待出勤'"));
 const app={};app.window=app;vm.runInNewContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),app);vm.runInNewContext(fs.readFileSync('assets/port79-overtime-monthly-matrix.js','utf8'),app);
 const snap={schedules:[{empId:'AP1',schedule:{'2026-10-01':'例','2026-10-02':'休','2026-10-03':'國',__meta:{}}}]};
@@ -14,7 +25,7 @@ const model=app.P79OvertimeMonthlyMatrix.build(snap,[emp],'2026-10');assert(!mod
 const screen=app.P79OvertimeMonthlyMatrix.screen(model,false,{});for(const color of ['FFE4E6','DBEAFE','FEF3C7'])assert(screen.includes('background:#'+color+'!important'));assert(screen.includes('mm-rest-legend'));
 assert(!fs.readFileSync('assets/port79-overtime-application.js','utf8').includes('為預排資料，請切換預排申請表'));
 for(const m of hours.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
-console.log('PASS pending clock-in shown without invented duration, distinct rest colors and legend, quiet planned/missing-schedule notices, scripts parse');
+console.log('PASS planned overtime hidden from confirmed list; true official pending-punch audit retained without invented duration; rest colors, scripts parse');
 // 每日格固定實際時數，換算合計仍獨立使用來源換算欄。
 assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('普通傷病假'),'病');
 const actualModel=app.P79OvertimeMonthlyMatrix.build({schedules:[{empId:'AP1',schedule:{'2026-10-04':'普通傷病假',__meta:{'2026-10-11':{overtimeReport:{id:'A',category:'休',overtimeStart:'08',overtimeEnd:'16',convertedHours:12.7,planned:false}}}}}]},[emp],'2026-10');
