@@ -261,7 +261,8 @@
   const month=String(val('multiRodDate')||today()).slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(month))return;
   if(sourceBusy)return sourceBusy;
-  const existing=sourceRows().some(r=>String(r.workDate||'').slice(0,7)===month);
+  const selectedDate=String(val('multiRodDate')||today());
+  const existing=sourceRows().some(r=>String(r.workDate||'').replace(/\//g,'-').slice(0,10)===selectedDate);
   if(!force&&(existing||sourceLoaded.has(month)))return;
   const scope=identity(),token=typeof gcToken!=='undefined'?String(gcToken):'';
   sourceBusy=(async()=>{
@@ -305,7 +306,7 @@
   $('multiRodContainers').textContent=sum('containers').toLocaleString('zh-TW');
   $('multiRodHatches').textContent=sum('hatches').toLocaleString('zh-TW')+'／'+sum('shiftMoves').toLocaleString('zh-TW');
   const sourceStatus=$('multiRodSourceState');
-  if(sourceStatus)sourceStatus.textContent='目前船舶 WORKING REPORT 明細已讀入 '+sourceTotal+' 筆；符合本篩選的自動判讀 '+auto.length+' 筆，主檔待確認 '+masters.length+' 筆，另有人工雲端紀錄 '+manual+' 筆。自動來源的桿數是「當日不同 AQC 編號數」，不是同時作業桿數；起訖為當日作業紀錄範圍，請視需要核對。';
+  if(sourceStatus)sourceStatus.textContent='目前船舶 WORKING REPORT 明細已讀入 '+sourceTotal+' 筆；符合本篩選的自動判讀 '+auto.length+' 筆，主檔待確認 '+masters.length+' 筆，另有人工雲端紀錄 '+manual+' 筆。WORKING REPORT 推算桿數代表當日不同 AQC 編號數，不等於同時作業。主檔待確認只代表該船日期範圍與配置 AQC 數達門檻，尚不能證明當天實際用了這些桿；需核對作業時間與數量。';
   $('multiRodBody').innerHTML=list.map(r=>{
    const derived=r.source==='auto'||r.source==='master',editButton=derived?'<button type="button" class="btn bg-amber-50 text-amber-900 text-xs" data-action="confirm" data-id="'+esc(r.id)+'">確認並登錄</button>':(editAllowed('records.edit')?'<button type="button" class="btn bg-slate-100 text-xs" data-action="edit" data-id="'+esc(r.id)+'">編輯</button> ':'')+(editAllowed('records.delete')?'<button type="button" class="btn bg-rose-50 text-rose-800 text-xs" data-action="delete" data-id="'+esc(r.id)+'">刪除</button>':'');
    const from=r.hasActualTimes===false?'時間待確認':String(r.start||'').replace('T',' '),to=r.hasActualTimes===false?'時間待確認':r.end?String(r.end).replace('T',' '):'進行中';
