@@ -1,0 +1,5 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),s=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
+const start=s.indexOf('    if(!people.length){'),end=s.indexOf('    g.p79RestQuota(loadedMonth)',start);assert(start>=0&&end>start);let directory=[],reads=0,jobs=0;
+const c={people:[],a:{employees:()=>directory},g:{p79OvertimeContext:{refreshAccess:async()=>{reads++;directory=[{empId:'001',name:'測試人員',dept:'第二事業處'}];}}},setStatus(){},q:()=>({}),options:()=>'',jobs:()=>jobs++,String};vm.createContext(c);
+(async()=>{await vm.runInContext('(async()=>{'+s.slice(start,end)+'})()',c);assert.equal(reads,1);assert.equal(c.people.length,1);assert.equal(c.people[0].empId,'001');assert.equal(jobs,1);await vm.runInContext('(async()=>{'+s.slice(start,end)+'})()',c);assert.equal(reads,1,'loaded roster does not repeat startup permission read');console.log('PASS monthly planner recovers when opened before employee master arrives');})().catch(e=>{console.error(e);process.exitCode=1;});
