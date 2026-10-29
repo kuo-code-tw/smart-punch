@@ -12122,6 +12122,23 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             updateEditModalDeleteButton(r);
             setupMobileDateInputs();
         }
+        // A planned overtime punch must always belong to the same person as
+        // the original cloud record before the shared editor is opened.
+        // The attendance page has this helper; work-hours must define its own
+        // copy instead of calling an undefined attendance-page-only function.
+        function p79AuditRecordIdentityMatches(expected, record) {
+            if (!expected || !record) return false;
+            const normalizeId=value=>String(value??'').trim().toUpperCase();
+            const expectedEmp=normalizeId(expected.empId),actualEmp=normalizeId(record.empId);
+            const normalizeAtt=value=>typeof normalizeAttendanceStatsAttNo==='function'
+                ? normalizeAttendanceStatsAttNo(value):String(value??'').trim();
+            const expectedAtt=normalizeAtt(expected.attNo),actualAtt=normalizeAtt(record.attNo);
+            // An explicitly conflicting employee number or attendance number
+            // must NEVER be overruled by a matching name.
+            if(expectedEmp&&actualEmp&&expectedEmp!==actualEmp)return false;
+            if(expectedAtt&&actualAtt&&expectedAtt!==actualAtt)return false;
+            return !!((expectedEmp&&actualEmp)||(expectedAtt&&actualAtt));
+        }
         async function openEditRecordModal(id, expectedType = '', expectedTime = '', expectedIdentity = null, preservedDraft = null, verifyCloud = false) {
             if (!requireAdminAction('attendanceEdit', '編輯打卡紀錄')) return;
             const generation=++p79AttendanceEditOpenGeneration;
