@@ -11,8 +11,8 @@ function extract(name){
 const time='2026/10/29 07:32:00',id='PUNCH-IN-1';
 const record={id,empId:'E1',attNo:'0007',name:'測試人員',status:'上班簽到',timeStr:time,note:''};
 const clone=r=>({...r});
-function setup({rowEmp='E1',rowAtt='0007',cloudRecord=record,missingModule=false}={}){
- const opened=[],messages=[],notices=[],statuses=[],mounts=[],restores=[],syncs=[];
+function setup({rowEmp='E1',rowAtt='0007',cloudRecord=record,missingModule=false,userDraftChanged=false}={}){
+ const opened=[],messages=[],notices=[],statuses=[],mounts=[],restores=[],syncs=[];let fingerprintReads=0;
  const hidden=new Set(['hidden']);
  const modal={classList:{contains:v=>hidden.has(v),remove:v=>hidden.delete(v),add:v=>hidden.add(v)}};
  const dom={editRecordModal:modal};
@@ -30,7 +30,7 @@ function setup({rowEmp='E1',rowAtt='0007',cloudRecord=record,missingModule=false
   p79RestoreAttendanceModalFromPlannedDialog:id=>restores.push(id),
   p79FillAttendanceEditForm:r=>opened.push(r.id),
   p79SetAttendanceEditCloudState:(ready,message)=>statuses.push({ready,message}),
-  p79AttendanceEditFormFingerprint:()=> 'unchanged',
+  p79AttendanceEditFormFingerprint:()=>userDraftChanged&&fingerprintReads++>0?'edited':'unchanged',
   p79PrepareWorkhoursEdit:async()=>{if(missingModule)throw Error('模組尚未載入');return clone(cloudRecord);},
   p79WorkhoursEditEquivalent:(a,b)=>a.id===b.id&&a.empId===b.empId&&a.attNo===b.attNo&&a.status===b.status&&a.timeStr===b.timeStr,
   p79OvertimeCalculationCache:{},loadAttendanceMonthFromCloud:async()=>{syncs.push(1);return true;},
@@ -70,7 +70,11 @@ function setup({rowEmp='E1',rowAtt='0007',cloudRecord=record,missingModule=false
  t=setup({cloudRecord:{...record,timeStr:'2026/10/29 07:34:00'}});
  await t.c.p79OpenPlannedAttendanceEditor(0,'IN');
  a.equal(t.modal.classList.contains('hidden'),false,'form remains open for a cloud edit conflict');
- a.equal(t.statuses.at(-1).ready,false,'changed cloud baseline disables save');
+ a.equal(t.statuses.at(-1).ready,true,'without user edits, verified newer cloud baseline is safely adopted');
+ a.equal(t.c.activeEditingAttendanceRecordSnapshot.timeStr,'2026/10/29 07:34:00');
+ t=setup({cloudRecord:{...record,timeStr:'2026/10/29 07:34:00'},userDraftChanged:true});
+ await t.c.p79OpenPlannedAttendanceEditor(0,'IN');
+ a.equal(t.statuses.at(-1).ready,false,'changed cloud baseline with unsaved user edits must disable save');
  t=setup({missingModule:true});
  await t.c.p79OpenPlannedAttendanceEditor(0,'IN');
  a.equal(t.statuses.at(-1).ready,false,'unavailable module never silently grants save');
