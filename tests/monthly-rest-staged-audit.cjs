@@ -46,7 +46,7 @@ assert(active.rows.every(x=>!x.planned&&x.date<='2026-10-26'),'Future or unworke
 assert.equal(JSON.stringify(snapshot),before,'Reading and planning may never mutate original roster, punches or reports');
 const source=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 assert(source.includes("q('#mrLoad').click()"),'Opening monthly-rest dialog should automatically refresh read-only audit');
-assert(source.includes("q('#mrSave').disabled=!phase.canSubmit"),'The save control is unavailable until the 25th');
+assert(source.includes("autoPlan?!selectedPlans.length:!phase.canSubmit||"),'The save control is unavailable until the 25th');
 assert(source.includes("if(selected.some(r=>r.planned||r.date>today()))"),'No future or planned dates can be submitted');
 assert(source.includes("attendance.length!==1"),'Save must re-read and require one complete attendance pair');
 assert(source.includes("JSON.stringify(latestRule)!==JSON.stringify(r.rule)"),'Save must match existing system overtime rule exactly');

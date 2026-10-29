@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),s=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
+assert(s.includes("el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'))"),'suggestions appear before summary');
+assert(s.includes('<th>員工編號</th>'));assert(!s.includes('<th>公司</th>'));
+let called=0;const button={},context={autoPlan:true,busy:false,model:{},q:selector=>selector==='#mrSave'?button:{onclick:async()=>called++}};
+const start=s.indexOf(" q('#mrSave').onclick=async()=>{"),end=s.indexOf("  if(!workflowStage",start);
+vm.createContext(context);vm.runInContext(s.slice(start,end)+' };',context);
+const pickStart=s.indexOf(" q('#mrNeedRows').onchange="),pickEnd=s.indexOf(" q('#mrPlannedRows').onchange=",pickStart);
+const nodes={},c={busy:false,autoPlan:true,model:{plannedRows:[{empId:'A',checked:false},{empId:'B',checked:false},{empId:'A',saved:true,checked:false}]},id:x=>String(x),q:x=>nodes[x]??=({}),paint(){}};
+vm.createContext(c);vm.runInContext(s.slice(pickStart,pickEnd),c);nodes['#mrNeedRows'].onchange({target:{classList:{contains:x=>x==='need-plan'},dataset:{emp:'A'},checked:true}});assert.equal(c.model.plannedRows[0].checked,true);assert.equal(c.model.plannedRows[1].checked,false);assert.equal(c.model.plannedRows[2].checked,false);
+(async()=>{await button.onclick();assert.equal(called,1,'footer delegates to verified plan save, not formal submission');context.busy=true;await button.onclick();assert.equal(called,1);console.log('PASS monthly plan footer, employee checkbox selection and visible employee IDs');})().catch(e=>{console.error(e);process.exitCode=1;});
