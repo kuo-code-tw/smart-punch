@@ -24,7 +24,7 @@ const c={console,JSON,Set,Object,Array,String,Date,Promise,Error,
  currentScheduleMonthKey:()=>month,currentPort79SsoToken:()=> 'test',
  requireScheduleEditLock:()=>true,p79EnsureGroupEdit:async()=>true,
  scheduleEditLockState:{mine:true},p79ScheduleGroupHistoryUnverifiedMonth:'',
- p79ApplyNoPunchRestFromOfficial:async()=>{},p79ApplyAutomaticRestMetadata(){},
+ p79ApplyNoPunchRestFromOfficial:async()=>{},p79ApplyAutomaticRestMetadata(){},approvedLeaveForEmployee:()=>null,p79LeaveCoverOnDay:()=>[],
  p79ScheduleLocalMutationVersion:7,scheduleRoleGroupList:()=>['B組','不分組'],scheduleOrderNumber:x=>x,
  nextScheduleOrder:()=>20,saveAllDataToLocalStorage(){},queuePersonnelCloudSave(){queued++;},buildRoleTabsAndRender(){},
  p79CreateScheduleSaveRequestId:()=> 'request123',cloudPost:async payload=>{posted=plain(payload);return {ok:true};},
@@ -38,6 +38,7 @@ for(const [a,b] of [
  ['    function savePersonnelOverrideForCurrentMonth(','    function scheduleGroupIsMeaningful('],
  ['    async function updateEmpGroupAndResort(','    async function updateEmpRoleAndResort('],
  ['    function p79PreserveHiddenScheduleRows(','    function p79ApplySchedulePayload('],
+ ['    function p79PreserveLinkedScheduleDays(','    function p79PreserveHiddenScheduleRows('],
  ['    async function saveScheduleMonthToCloud(','    async function saveScheduleEmployeesToCloud(']
 ])vm.runInContext(block(a,b),c);
 (async()=>{

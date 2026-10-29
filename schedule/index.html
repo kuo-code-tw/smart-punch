@@ -58,7 +58,7 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script>
-    const APP_VERSION='2026.10.16.121';
+    const APP_VERSION='2026.10.29.124';
     tailwind.config = { darkMode: 'class' };
     (function(){
       try {
@@ -4145,6 +4145,31 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     let p79ScheduleCloudRows=[];
+    function p79PreserveLinkedScheduleDays(rows,cloudRows,month,isProtected){
+      const originals=new Map((cloudRows||[]).filter(row=>String(row.month||'')===month)
+        .map(row=>[String(row.empId||'').trim().toUpperCase(),row.schedule||{}]));
+      return rows.map(row=>{
+        const original=originals.get(String(row.empId||'').trim().toUpperCase());
+        if(!original)return row;
+        const next=JSON.parse(JSON.stringify(row)),schedule=next.schedule;
+        const dates=new Set([...Object.keys(original),...Object.keys(original.__meta||{}),...Object.keys(schedule)]);
+        for(const date of dates){
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(month+'-'))continue;
+          const meta=original.__meta?.[date];
+          if(!meta?.forEmpId&&!meta?.overtimeReport?.leaveId&&!isProtected(row.empId,date,row.name))continue;
+          // Daily editing already forbids linked leave/cover dates. A monthly
+          // save must not turn a display/automatic overlay into an edit to them.
+          if(Object.prototype.hasOwnProperty.call(original,date))schedule[date]=original[date];
+          else delete schedule[date];
+          if(Object.prototype.hasOwnProperty.call(original.__meta||{},date)){
+            if(!schedule.__meta)schedule.__meta={};
+            schedule.__meta[date]=JSON.parse(JSON.stringify(original.__meta[date]));
+          }else if(schedule.__meta)delete schedule.__meta[date];
+        }
+        return next;
+      });
+    }
+
     function p79PreserveHiddenScheduleRows(editedRows,cloudRows,month){
       const result=JSON.parse(JSON.stringify(editedRows));
       const ids=new Set(result.map(row=>String(row.empId||'').trim().toUpperCase()));
@@ -4539,8 +4564,10 @@ function p79EmployeeDateEligible(emp,date) {
       try {
         const editedIds=new Set(schedules.map(row=>String(row.empId).trim().toUpperCase()));
         schedules=p79PreserveHiddenScheduleRows(schedules,p79ScheduleCloudRows,yearMonth);
+        schedules=p79PreserveLinkedScheduleDays(schedules,p79ScheduleCloudRows,yearMonth,
+          (id,date,name)=>!!approvedLeaveForEmployee(id,date,name)||p79LeaveCoverOnDay(id,date).length>0);
         schedules.filter(row=>editedIds.has(String(row.empId).trim().toUpperCase())).forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
-          if(!meta.overtimeType)return;
+          if(!meta?.overtimeType)return;
           try {
             p79BuildScheduleOvertimeMeta(meta,meta.type==='substitute'?'substitute':meta.overtimeType,
               String(row.schedule[date]||''),String(row.schedule[date]||''),
