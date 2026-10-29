@@ -836,8 +836,8 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime table:has(#overtimeTableBody) th:last-child{text-align:center!important} #adminContentOvertime table:has(#overtimeTableBody) td:last-child{text-align:left!important}
 #adminContentOvertime .p79-overtime-inline{display:flex;align-items:center;justify-content:flex-start;gap:6px;white-space:normal;font-size:14px;width:100%;min-width:0;flex-wrap:wrap}
 #adminContentOvertime .p79-overtime-inline button:first-of-type{margin-left:0!important}
-/* Stable three-column action row: the amended-history slot never moves its neighbors. */
-#adminContentOvertime .p79-overtime-row-actions{display:grid!important;grid-template-columns:82px 82px 60px!important;gap:6px!important;align-items:center!important;justify-content:start!important;flex:0 0 100%!important;width:100%!important;min-width:0!important;margin-top:3px!important}
+/* Keep all action buttons in a fixed order at the far right of each overtime record. */
+#adminContentOvertime .p79-overtime-row-actions{display:grid!important;grid-template-columns:82px 82px 60px!important;gap:6px!important;align-items:center!important;justify-content:end!important;flex:0 0 100%!important;width:100%!important;min-width:0!important;margin:3px 0 0 auto!important}
 #adminContentOvertime .p79-overtime-row-actions>button{width:100%!important;margin:0!important;min-width:0!important;padding:3px 4px!important;text-align:center!important;white-space:nowrap!important;box-sizing:border-box!important}
 #adminContentOvertime .p79-overtime-row-actions>.p79-overtime-action-placeholder{display:block;visibility:hidden;min-height:28px}
 
