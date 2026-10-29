@@ -27,7 +27,7 @@ a.equal(choose('國定假日加班',out('07:48'),{[date]:'晚'},custom)?.[1],'�
 a.equal(choose('國定假日加班',null),null);
 a.equal(api.matchingReportPeriod(date,{[date]:'晚'},{start,end:undefined},rows,'國定假日加班'),null);
 a.equal(choose('國定假日加班',out('07:48'),{[date]:'晚'},[]),null);
-a.equal(choose('國定假日加班',out('07:48'),{[date]:'早'}),null,'conflicting roster guard');
+a.equal(choose('國定假日加班',out('07:48'),{[date]:'早'})?.[1],'國24-08','verified complete punches outrank stale roster');
 a(source.includes('autoSelectPeriodForCurrentType();'),'kind change must auto match');
 a(source.includes('dateInput.value!==prefill.date'),'no cross-date punch reuse');
 a(source.includes('String(empSelect.value)!==String(prefill.empId'),'no cross-staff punch reuse');
