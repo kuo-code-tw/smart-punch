@@ -356,6 +356,17 @@ window.p79LoadXlsxLibrary = function(){
 <style id="port79-calendar-mode-style">#port79CalendarModeBox{position:fixed;right:10px;bottom:10px;z-index:99998;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.94);border:1px solid rgba(148,163,184,.55);box-shadow:0 6px 20px rgba(15,23,42,.14);backdrop-filter:blur(8px);font:700 11px/1.2 system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#475569} #port79CalendarModeBox select{border:0;background:transparent;color:inherit;font-weight:800;font-size:11px;line-height:1.2;font-family:inherit;outline:none;cursor:pointer;padding:2px 3px} html.dark #port79CalendarModeBox,html[data-theme="dark"] #port79CalendarModeBox{background:rgba(15,23,42,.94);border-color:#475569;color:#e2e8f0} @media(max-width:640px){#port79CalendarModeBox{right:6px;bottom:6px;padding:5px 6px;font-size:10px}#port79CalendarModeBox select{font-size:10px}}</style>
 
 <style id="port79-employee-simple-v20260927-74">body.port79-employee-only #navAdmin,body.port79-employee-only #navAdminLogout,body.port79-employee-only #cloudSyncStatus,body.port79-employee-only #btnCloudRefresh,body.port79-employee-only #btnCloudSyncAll,body.port79-employee-only #birthdayBanner,body.port79-employee-only #empExtraInfoDisplay,body.port79-employee-only #empRoleBadge,body.port79-employee-only #punchNoteInput,body.port79-employee-only #btnOvertimeIn,body.port79-employee-only #btnOvertimeOut,body.port79-employee-only #empScheduleSummaryStats,body.port79-employee-only #empScheduleAlert{display:none !important;} body.port79-employee-only #viewEmployee>.grid{display:grid !important;grid-template-columns:minmax(0,420px) minmax(0,1fr) !important;gap:20px !important;} body.port79-employee-only #viewEmployee [class~="lg:col-span-5"],body.port79-employee-only #viewEmployee [class~="lg:col-span-7"]{width:auto !important;max-width:none !important;margin:0 !important;grid-column:auto !important;} body.port79-employee-only #viewAdmin{display:none !important;} body.port79-employee-only #btnClockIn,body.port79-employee-only #btnClockOut{min-height:58px;font-size:16px !important;} body.port79-employee-only #employeeAnnualLeaveCard{display:block !important;} body.port79-employee-only #employeeIdentityCard{display:none !important;} body.port79-employee-only #viewEmployee [class~="lg:col-span-7"]>:not(#empScheduleCard){display:none !important;} body.port79-employee-only #adminContentRecords,body.port79-employee-only #adminContentLive,body.port79-employee-only #adminContentOvertime,body.port79-employee-only #adminContentStats,body.port79-employee-only #adminContentSettings,body.port79-employee-only #adminTabRecords,body.port79-employee-only #adminTabLive,body.port79-employee-only #adminTabOvertime,body.port79-employee-only #adminTabStats,body.port79-employee-only #adminTabSettings,body.port79-employee-only #filterMonthSelect,body.port79-employee-only #attendanceMonthTabs,body.port79-employee-only #btnAttendanceImport,body.port79-employee-only #btnAttendanceCloudSync,body.port79-employee-only #btnAttendanceImportAudit,body.port79-employee-only #btnAttendanceExport,body.port79-employee-only #btnAttendanceAdd,body.port79-employee-only #attendanceExcelInput,body.port79-employee-only #recordFilterResultCount,body.port79-employee-only #recordsPagination,body.port79-employee-only #adminRecordsTableBody{display:none !important;} body.port79-employee-only #empScheduleCard~*{display:none !important;} @media(max-width:900px){body.port79-employee-only #viewEmployee>.grid{grid-template-columns:1fr !important} body.port79-employee-only #viewEmployee [class~="lg:col-span-5"]{max-width:680px !important;margin:0 auto !important;width:100% !important} body.port79-employee-only #viewEmployee [class~="lg:col-span-7"]{width:100% !important}}</style>
+<style id="p79-punch-my-schedule-visible-20261029">
+/* Employee-only punch mode must not hide the personal roster overview. */
+body.port79-employee-only #viewEmployee #empScheduleSummaryStats{
+ display:grid!important;
+ grid-template-columns:repeat(auto-fit,minmax(145px,1fr))!important;
+ gap:10px!important;
+}
+body.port79-employee-only #viewEmployee #empScheduleCard{display:block!important}
+body.port79-employee-only #viewEmployee #empScheduleMonthGrid{display:grid!important}
+body.port79-employee-only #viewEmployee #empScheduleCloudStatus{display:block!important}
+</style>
 
 <style id="port79-desktop-split-v79">@media (min-width:1024px){#viewEmployee,#viewAdmin{max-width:1500px !important;} .employee-desktop-shell,.admin-desktop-shell{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:start;} .desktop-side-rail{position:sticky;top:88px;border:1px solid rgb(51 65 85 / .75);border-radius:22px;padding:14px;background:rgb(15 23 42 / .78);box-shadow:0 18px 45px rgb(2 6 23 / .22);} .desktop-side-rail .rail-title{font-size:11px;color:#94a3b8;font-weight:800;padding:4px 8px 10px;} .desktop-side-rail button,.desktop-side-rail a{width:100%;display:flex;align-items:center;gap:9px;padding:11px 12px;margin:5px 0;border-radius:13px;font-size:12px;font-weight:800;color:#cbd5e1;text-align:left;} .desktop-side-rail button:hover,.desktop-side-rail a:hover{background:rgb(30 41 59 / .9);color:#fff;} .desktop-side-rail .active{background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;box-shadow:0 9px 22px rgb(37 99 235 / .24);} .employee-desktop-content,.admin-desktop-content{min-width:0;} body.port79-employee-only #viewEmployee>.employee-desktop-shell>.employee-desktop-content>.grid{grid-template-columns:minmax(0,47%) minmax(0,53%) !important;gap:18px !important;} #viewAdmin .admin-desktop-content{background:rgb(15 23 42 / .28);border:1px solid rgb(51 65 85 / .55);border-radius:24px;padding:18px;} #viewAdmin .admin-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;} #viewAdmin .admin-page-head h1,#viewAdmin .admin-page-head h2{font-size:24px;font-weight:900;color:#f8fafc;} #viewAdmin .admin-page-head p{font-size:11px;color:#94a3b8;margin-top:4px;} #adminContentRecords,#adminContentLive,#adminContentOvertime,#adminContentStats,#adminContentSettings{background:transparent !important;}} @media (max-width:1023px){.desktop-side-rail{display:none !important;} .employee-desktop-shell,.admin-desktop-shell{display:block;} #viewAdmin .admin-desktop-content{min-width:0;} #viewAdmin .admin-page-head{margin-bottom:12px;} #viewAdmin .admin-page-head h1,#viewAdmin .admin-page-head h2{font-size:18px;font-weight:900;} #viewAdmin .admin-page-head p{font-size:10px;color:#94a3b8;}} body.port79-admin-mode #viewEmployee{display:none !important;} body.port79-admin-mode #viewAdmin{display:block !important;} body.port79-employee-only #viewAdmin{display:none !important;}</style>
 <link rel="stylesheet" href="../assets/port79-ui.css?v=20260927711">
@@ -1234,7 +1245,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                         <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 p-4">
                             <div class="text-[10px] font-bold text-amber-600 dark:text-amber-300">本月休假天數</div>
                             <div id="empScheduleOffDays" class="mt-1 text-xl font-black text-amber-700 dark:text-amber-200">--</div>
-                            <div class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">休／特／事／病／公／喪</div>
+                            <div class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">例／休／國／特／事／病／公／喪</div>
                         </div>
                     </div>
 
@@ -8894,7 +8905,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 '早': ['早班', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300', '☀️'],
                 '中': ['中班', 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300', '🌤️'],
                 '晚': ['晚班', 'bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-300', '🌙'],
-                '休': ['休假', 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200', '🏠'],
+                '休': ['休息日', 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200', '🏠'],
+                '例': ['例假日', 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200', '🏠'],
+                '國': ['國定假日', 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300', '📅'],
                 '特': ['特休', 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300', '🌴'],
                 '事': ['事假', 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300', '📝'],
                 '病': ['病假', 'bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300', '🏥'],
@@ -9004,7 +9017,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 .sort((a, b) => a[0].localeCompare(b[0]));
 
             const workSet = new Set(['早', '中', '晚']);
-            const offSet = new Set(['休', '特', '事', '病', '公', '喪']);
+            const offSet = new Set(['休', '例', '國', '特', '事', '病', '公', '喪']);
             workDaysEl.textContent = String(monthEntries.filter(([,shift]) => workSet.has(String(shift))).length);
             offDaysEl.textContent = String(monthEntries.filter(([,shift]) => offSet.has(String(shift))).length);
 
@@ -9511,6 +9524,15 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 scheduleEmployeeSessionLogin(found);
                 renderEmployeeLeaveBalance(currentEmp);
                 renderEmployeeSchedule(currentEmp);
+                // In punch-only mode the employee must actually see their own full roster.
+                if(p79IsPunchEntryMode()){
+                    const panel=document.getElementById('empScheduleMonthPanel');
+                    const toggle=document.getElementById('empScheduleToggleBtn');
+                    if(panel&&panel.classList.contains('hidden')){
+                        panel.classList.remove('hidden');
+                        if(toggle)toggle.textContent='收合整月班表';
+                    }
+                }
                 p79LoadMyScheduleFromCloud(currentEmp,scheduleDateKey(new Date()).slice(0,7)).catch(()=>{});
                 document.getElementById('empNameDisplay').textContent = currentEmp.name;
                 document.getElementById('empAttNoDisplay').textContent = currentEmp.attNo;
