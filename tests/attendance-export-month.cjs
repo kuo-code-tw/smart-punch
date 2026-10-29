@@ -67,6 +67,20 @@ const mixed={leaveRecords:[{empId:'AP1',status:'已核准',leaveType:'特休假'
 const checked=c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],mixed);
 assert.deepEqual(Array.from(checked.scheduleRows[1].slice(5,8)),['例','代16-20','年']);
 assert.equal(checked.scheduleRows[1][2],'AQC');
+// The same shared 例／休／國 allocation used by the schedule system is applied
+// only to an export copy, without modifying the official cloud schedule.
+let allocationCalls=0;
+c.p79EmploymentStartDate=()=> '';
+c.p79AllocateRestMonth=(schedule,metadata,exportMonth)=>{
+ allocationCalls++;assert.equal(exportMonth,'2026-10');
+ return {meta:{...metadata,'2026-10-01':{restCategory:'國'}}};
+};
+const before=JSON.stringify(mixed);
+const allocated=c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],mixed);
+assert.equal(allocated.scheduleRows[1][5],'國');
+assert.equal(allocationCalls,1,'shared schedule allocator invoked once per staff');
+assert.equal(JSON.stringify(mixed),before,'export allocation does not modify official roster');
+delete c.p79AllocateRestMonth;
 assert.throws(()=>c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],
  {schedules:[...mixed.schedules,{empId:'AP1',month:'2026-10',schedule:{'2026-10-01':'早'}}]}),/不同版本/);
 reader.fetchGasJsonWithRetry=async()=>({ok:true,month:'2026-11',schedules:mixed.schedules});
