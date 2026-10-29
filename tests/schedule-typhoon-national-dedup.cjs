@@ -33,7 +33,7 @@ vm.runInContext(extract('p79DailyRestCount'),c);
 vm.runInContext(extract('p79ScheduleRestCountCells'),c);
 const compute=(off,work)=>c.p79ScheduleRestCountCells(emp,month,{},off,work);
 const cell=(html,category)=>html.match(new RegExp('<td data-rest-category="'+category+'"[\\s\\S]*?<\\/td>'))?.[0]||'';
-assert.deepEqual(JSON.parse(JSON.stringify(c.p79DailyRestCount(emp,month,{}).counts)),{例:0,休:0,國:3},'start with three national days');
+assert.deepEqual(JSON.parse(JSON.stringify(c.p79DailyRestCount(emp,month,{}).counts)),{例:0,休:1,國:3},'start with three national days and one separately visible rest day');
 let result=compute([day(3)],[day(4)]);
 assert.match(cell(result,'國'),/<span>1\/1<\/span>/,'two typhoon dates are subtracted from 國');
 assert.match(cell(result,'颱'),/<span>2 天<\/span>/,'two typhoon days count once each');
