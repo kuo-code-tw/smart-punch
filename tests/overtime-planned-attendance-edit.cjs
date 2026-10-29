@@ -16,7 +16,7 @@ const stamp=r=>Date.parse(String(r?.timeStr||'').replaceAll('/','-').replace(' '
 function setup(){
  const opened=[],notices=[],months=[],rowsRendered=[],closed=[];
  let canEdit=true,queued=false,loaded=true,nextRows=[];
- const ctx={Number,Date,Math,JSON,Array,String,Set,Map,console,records:[],currentEmp:{empId:'ADMIN'},
+ const ctx={Number,Date,Math,JSON,Array,String,Set,Map,console,document:{getElementById:()=>null},p79PlannedPunchNotice:()=>{},records:[],currentEmp:{empId:'ADMIN'},
  p79OvertimePlannedDisplayedRows:[base],p79OvertimeCalculationCache:{signature:'OLD'},
  canPerformAdminAction:()=>canEdit,currentPort79SsoToken:()=> 'token',
  window:{p79V5QueueInfoForId:()=>queued?{pending:true}:null},
@@ -50,7 +50,7 @@ function setup(){
  t=setup();t.setCloudRows([IN,OUT]);
  await t.ctx.p79OpenPlannedAttendanceEditor(0,'IN');
  assert.deepEqual(t.months,['2026-10'],'missing local attendance automatically reads official month');
- assert.equal(t.opened.length,1);assert.equal(t.rowsRendered.length,1,'overtime UI refreshes from official attendance');
+ assert.equal(t.opened.length,1);assert.equal(t.rowsRendered.length,0,'opening the editor must not redraw the underlying overtime page');
  t=setup();t.setCloudRows([{...IN,empId:'OTHER'},OUT]);
  await t.ctx.p79OpenPlannedAttendanceEditor(0,'IN');
  assert.equal(t.opened.length,0,'wrong employee ID is never edited');
@@ -79,7 +79,7 @@ function setup(){
  assert(html.includes('p79RefreshLinkedOvertimeAfterAttendanceCloudSave(originalTimeStr,r.timeStr)'),'updated time triggers linked cache refresh after cloud ACK');
  assert(html.includes('p79RefreshLinkedOvertimeAfterAttendanceCloudSave(newRecord.timeStr)'),'missing-punch creation triggers linked cache refresh after cloud ACK');
  assert(html.includes('for(const month of months)p79QueueConfirmedRosterRecheck(month)'),'changed months re-read official roster and overtime');
- const syncCtx={months:[],repaint:0,p79OvertimeCalculationCache:{old:true},
+ const syncCtx={months:[],repaint:0,document:{getElementById:()=>null},p79OvertimeCalculationCache:{old:true},
    normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),
    getAttendanceDateKey:x=>String(x||'').slice(0,10)};
  syncCtx.p79QueueConfirmedRosterRecheck=month=>syncCtx.months.push(month);
