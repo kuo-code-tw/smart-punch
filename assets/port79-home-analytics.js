@@ -23,5 +23,29 @@ function aggregate({engine,records,employees,schedules=[],leaves=[],covers=[],to
  const missing=monthShifts.filter(s=>day(s.dateKey)<today&&(!s.clockIn||!s.clockOut||s.timePrecisionIssue));const long=monthShifts.filter(s=>s.clockIn&&s.clockOut&&(s.clockOut.__ts-s.clockIn.__ts)>12*3600000);
  return {today,month,attendanceReady,rosterReady,leaveReady,boundariesReady,scopeCount:people.length,present:present.size,onDuty,todayHours,monthHours,attendanceDays:unique.size,hours,departmentHours:[...deptHours].sort((a,b)=>b[1]-a[1]),declaredHours,declaredByWeek,pending:pending.sort((a,b)=>b.date.localeCompare(a.date)),distribution:{present:present.size,leave:approvedOff.length,waiting:waiting.length,total:expected.size},alerts:[{label:'歷史班次缺卡／時間待核',count:missing.length,target:'attendance',detail:'僅統計今日以前的本月班次'},{label:'刷卡區間超過 12 小時',count:long.length,target:'workhours',detail:'需核對班次、休息及申報明細'},{label:'核准請假與工作班別重疊',count:conflicts,target:'schedule',detail:'核對請假與排班連動狀態'}],missingSchedule};
 }
-return {aggregate,day};
+// Read-only vessel snapshot aggregation. Counts use dated detail rows; billing uses completed jobs.
+function vesselAggregate(data,{today,month}){
+ const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0&&n<1e8?n:0;};
+ const iso=v=>{const m=String(v||'').match(/^(20\d{2})[-/](\d{1,2})[-/](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';};
+ const active=r=>r&&!r.deleted&&!r.isDeleted&&!r.deletedAt&&!r.tombstone;
+ const unique=(list,master=false)=>{const m=new Map();(list||[]).filter(active).forEach((r,i)=>m.set(String(master?(r.workingNo||r.id||'row:'+i):(r.id||[r.workingNo,r.empId||r.name,r.workDate,r.startTime,r.endTime,r.source].join('|'))),r));return [...m.values()];};
+ const masters=unique(data.shipMasters,true).map(raw=>({...raw,...Object.fromEntries(Object.entries(raw.manualOverrides||{}).filter(([k])=>!k.startsWith('_')))}));
+ const rows=unique(data.records),key=r=>String(r.workingNo||[r.shipName||r.vessel,r.voyageE||r.voyage].join('|'));
+ const finish=s=>iso(s._cloudLastDate||s.cloudLastDate||s._authoritativeLastDate)||iso(s.lastDate)||iso(s.lashingDateTime||s.lashingDate||s.workingSheetSource?.lashingDateTime||s.workingSheetSource?.endDate)||iso(s.compareDate||s.workingSheetSource?.compareDate)||iso(s.firstDate);
+ const byNo=new Map(masters.map(s=>[key(s),s]));
+ const dated=rows.map(r=>({...r,date:iso(r.workDate)})).filter(r=>r.date);
+ const moves=r=>['working-report','gc-driver-efficiency'].includes(r.source)?num(r.disc)+num(r.load):num(r.containers);
+ const hours=r=>{if(num(r.timeHours))return num(r.timeHours);const min=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):null;};const a=min(r.startTime),b=min(r.endTime);return a===null||b===null?0:((b-a+1440)%1440)/60;};
+ const monthRows=dated.filter(r=>r.date.startsWith(month)),todayRows=dated.filter(r=>r.date===today);
+ const todayKeys=new Set(todayRows.map(key));masters.filter(s=>iso(s.firstDate)&&iso(s.firstDate)<=today&&iso(s.lastDate)&&iso(s.lastDate)>=today).forEach(s=>todayKeys.add(key(s)));
+ const jobs=[...todayKeys].map(k=>{const rs=todayRows.filter(r=>key(r)===k),m=byNo.get(k)||rs[0]||{},hs=rs.reduce((s,r)=>s+hours(r),0),qty=rs.reduce((s,r)=>s+moves(r),0);return {shipGph:num(m.gph)||null,vessel:m.shipName||m.vessel||'未命名',voyage:m.voyageE||m.voyageI||m.voyage||'—',volume:rs.length,containers:qty,people:new Set(rs.map(r=>String(r.empId||r.name||'')).filter(Boolean)).size,efficiency:hs?qty/hs:null,status:m.status||'已載入'};});
+ const weeks=Array.from({length:Math.ceil(new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()/7)},()=>({volume:0,containers:0,hours:0,moves:0,shipGph:[]}));
+ monthRows.forEach(r=>{const w=weeks[Math.floor((Number(r.date.slice(8))-1)/7)];w.volume++;w.containers+=moves(r);w.hours+=hours(r);w.moves+=moves(r)+num(r.hatches);});
+ const sum=k=>weeks.reduce((s,w)=>s+w[k],0),monthJobs=masters.filter(s=>finish(s).startsWith(month));
+ monthJobs.forEach(s=>{const date=finish(s),gph=num(s.gph),w=weeks[Math.floor((Number(date.slice(8))-1)/7)];if(w&&gph>0)w.shipGph.push(gph);});
+ const eff=monthJobs.filter(s=>num(s.gph)>0),personalHours=sum('hours');
+ const pending=monthJobs.filter(s=>/待審|待核|pending/i.test(String(s.status||''))).map(s=>({name:s.vessel||s.shipName||'未命名船舶',voyage:s.voyageE||s.voyageI||'—',description:s.reviewReason||s.note||'船舶作業待核對',date:finish(s),status:s.status,kind:'vessel'}));
+ return {pending,jobs,todayShips:todayKeys.size,todayVolume:todayRows.length,todayContainers:todayRows.reduce((s,r)=>s+moves(r),0),monthVolume:monthRows.length,monthContainers:sum('containers'),billingContainers:monthJobs.reduce((s,r)=>s+num(r.totalContainers),0),shipEfficiency:eff.length?eff.reduce((s,r)=>s+num(r.gph),0)/eff.length:null,personEfficiency:personalHours?sum('moves')/personalHours:null,weeks,recordCount:rows.length,masterCount:masters.length};
+}
+return {aggregate,day,vesselAggregate};
 });

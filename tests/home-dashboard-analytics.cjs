@@ -11,5 +11,5 @@ const current=aggregate({...input,records:[record('E1','2026/10/29 23:00:00','�
 const absent=aggregate({...input,attendanceReady:false,boundariesReady:false});assert.equal(absent.attendanceReady,false);assert.equal(absent.boundariesReady,false);
 const source=fs.readFileSync('assets/port79-home-dashboard.js','utf8');assert(source.includes("method:'GET'"));assert(!/method:\s*['"]POST|setItem\(|approveLeave|saveSchedule|syncRecords|addRecord/.test(source),'home dashboard never writes records or approvals');
 assert(source.includes('identity()!==startIdentity'));assert(source.includes('signal=localController.signal'));assert(source.includes('localController.abort()'));
-for(const label of ['今日出勤概況','排班與考勤異常提醒','待審核項目','本月工時統計','人資快捷作業','系統公告與資料狀態','本日作業流程'])assert(source.includes(label));
+for(const label of ['今日船邊作業總覽','今日出勤與作業概況','船舶 × 人力對照提醒','待審核項目','本月船邊作業量與效率統計','管理快捷作業','系統公告','本日作業流程'])assert(source.includes(label));
 console.log('PASS dashboard: canonical cross-month/multi-shift hours, unique staff-days, deleted/scope filtering, leave/revoked overtime, active shifts, immutable snapshots and read-only API guard');
