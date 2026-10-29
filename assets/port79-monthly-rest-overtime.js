@@ -263,6 +263,7 @@ function canAutoSuggestFuture(roster,date,month,emp,category){
  const anchor=weeklyCycleAnchor(emp);
  // No invented workday-to-holiday conversion; do not auto-plan mandatory regular days.
  if(!anchor||category==='例'||!['休','國'].includes(category)||m.restQuotaOvertime!==true)return false;
+ if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return false;
  if(!futureWeekRestProtected(roster,date,anchor))return false;
  if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return false;
  // A future rest day needs an explicitly recorded 8-hour working period.
@@ -308,9 +309,12 @@ function ruleFor(date,roster,pair,category,rules){
  const allowed=rules.filter(r=>r[0]===category&&fullDayRule(r));
  if(pair){const found=g.P79Overtime.inferRule(pair.start,pair.end,date,allowed,category);return found||null;}
  const m=roster.__meta?.[date]||{};
- const range={早:'08-16',中:'16-24',晚:'24-08'}[roster[date]]||(m.restQuotaOvertime===true&&m.overtimeStart&&m.overtimeEnd?String(m.overtimeStart).replace(':','')+'-'+String(m.overtimeEnd).replace(':',''):'');
- const normalized=range.replace(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/,'$1:$2-$3:$4');
- return allowed.find(r=>r[6]+'-'+r[7]===range||r[6]+'-'+r[7]===normalized)||null;
+ const shift={早:['08','16'],中:['16','24'],晚:['24','08']}[roster[date]];
+ const period=shift||(m.restQuotaOvertime===true&&m.overtimeStart&&m.overtimeEnd?[m.overtimeStart,m.overtimeEnd]:null);
+ if(!period)return null;
+ const minute=x=>{const v=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return v?Number(v[1])*60+Number(v[2]||0):NaN;};
+ const start=minute(period[0]),end=minute(period[1]);
+ return allowed.find(r=>minute(r[6])===start&&minute(r[7])===end)||null;
 }
 function sortRows(rows){
  const rank=r=>r.saved?2:(!r.planned&&r.status==='可申報'?0:1);
@@ -373,7 +377,6 @@ function plan(snapshot,people,month,rules,options={}){
    if(!originalCategory)continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    const verified=date<=currentDate&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
-   const scheduledWork=['早','中','晚'].includes(roster[date]);
    // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
    const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
