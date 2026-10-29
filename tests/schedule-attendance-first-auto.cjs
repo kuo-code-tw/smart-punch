@@ -29,7 +29,10 @@ const client=ctx.window.P79ScheduleRestEvidence.create({
  assert.equal(evidence.actualShifts['E2|2026-10-24'],undefined,'lone punch never auto-assigns a shift');
  assert.equal(ctx.window.P79RestAttendance.state({attendanceEvidence:evidence},'E1','2026-10-24'),'worked');
  assert(html.includes("const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);"),'complete paired short work displays 已出勤');
- assert(html.includes("visibleRestKind:(actualShift||verifiedRestAttendance)?''"),'actual worked day not counted as used rest');
+ assert(html.includes("visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''")&&
+  html.includes(':p79VisibleRestKind(shownShift,visibleSubstituteLabel)};')&&
+  html.includes("return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';"),
+  'actual early/middle/night display is not classified as used 例休國');
  assert(html.includes('punchShifts?.[String(emp.id).trim().toUpperCase()+\'|\'+date]'),'summary skips proven work as taken rest');
  assert(html.includes('allowUnmarked:true'),'legacy incorrect roster fixed automatically, not by manual button');
  assert(!html.includes('補卡後修正排班'),'manual button removed');
