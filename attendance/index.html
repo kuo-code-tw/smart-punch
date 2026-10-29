@@ -22117,7 +22117,11 @@ function p79EmployeeDateEligible(emp,date) {
             const compact=p79AttendanceLeaveReportCode(raw);
             if(compact!==raw)return compact;
             const report=meta?.overtimeReport;
-            if(report?.code){
+            const confirmed=!!String(report?.id||'').trim()&&report.planned!==true&&
+                meta?.overtimeExcluded!==true&&
+                !(meta?.overtimeRevocations||[]).some(v=>v?.confirmed===true&&
+                    String(v.reportId)===String(report.id));
+            if(confirmed&&report?.code){
                 if((report.category==='延'||['before','after'].includes(report.position))&&report.overtimeStart&&report.overtimeEnd)return report.overtimeStart+'-'+report.overtimeEnd;
                 return String(report.code);
             }
