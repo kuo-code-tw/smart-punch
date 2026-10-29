@@ -22132,6 +22132,19 @@ function p79EmployeeDateEligible(emp,date) {
             if(meta?.restQuotaOvertime&&meta.restCategory&&meta?.overtimeExcluded!==true)return raw+'（'+meta.restCategory+'加）';
             return raw==='休'&&meta?.restCategory?meta.restCategory:raw;
         }
+        async function p79ReadAttendanceExportSpecialDays() {
+            const token=getAttendanceEmployeeMasterToken();
+            if(!token)throw Error('排班登入已過期，未產生可能與排班系統不一致的班表');
+            const url=new URL(getActiveGasUrl());
+            for(const [k,v] of Object.entries({action:'getScheduleSpecialDays',gcToken:token,_:Date.now()}))
+                url.searchParams.set(k,String(v));
+            const result=await fetchGasJsonWithRetry(url.toString(),'正式排班特殊日期讀取',1,20000);
+            if(result?.ok!==true||result.source!=='cloud'||result.schemaVersion!==1||
+                !Array.isArray(result.rows)||!result.revision)
+                throw Error(result?.error||'颱風／選舉日期未完成雲端核對，已停止匯出以免與排班系統不同');
+            if(token!==getAttendanceEmployeeMasterToken())throw Error('登入狀態已變更，請重新匯出');
+            return result.rows;
+        }
         function p79BuildScheduleAttendanceExport(month,people,source,roster) {
             // Match 排班系統 → 匯出排班: one employee per row, A~E are
             // 工號、姓名、職稱、組別、排班屬性; F onward are day 1..month end.
@@ -22194,9 +22207,11 @@ function p79EmployeeDateEligible(emp,date) {
             });
             const observed=(empId,date)=>evidence?.complete===true
                 ?window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date):'unknown';
+            const specialRows=roster.specialDays||[];
             const specialDates={
-                typhoon:new Set((window.P79OfficialCalendar?.typhoonDates?.()||[]).filter(d=>d.startsWith(month+'-'))),
-                election:new Set(window.P79SpecialOvertime?.electionDates?.()||[])
+                typhoon:new Set(specialRows.filter(r=>r.kind==='typhoon'&&String(r.date).startsWith(month+'-')).map(r=>r.date)),
+                election:new Set([...specialRows.filter(r=>r.kind==='election').map(r=>r.date),
+                    ...(window.P79SpecialOvertime?.electionDates?.()||[])])
             };
             const today=getTodayAttendanceIso();
             for(const emp of people){
@@ -22346,6 +22361,9 @@ function p79EmployeeDateEligible(emp,date) {
                 includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,{...readOptions,preferCache:false}):Promise.resolve(null),
                 window.p79LoadXlsxLibrary()
             ]);
+            // The special-day cloud version is part of the roster display
+            // semantics. Fail closed rather than exporting stale 颱／選 cells.
+            const specialDays=includeSchedule?await p79ReadAttendanceExportSpecialDays():[];
             if(!window.XLSX?.utils)throw Error('試算表 元件未成功載入，請再試一次');
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
             update('正在整理原始考勤與選取欄位…');
@@ -22392,7 +22410,7 @@ function p79EmployeeDateEligible(emp,date) {
                 const people=getAdminAttendanceEmployees().filter(emp=>companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter));
                 const pairedSource=exportScope.source.filter(canCurrentAdminViewDataRow);
                 if(!requireAdminAction('attendanceExport','匯出考勤')||!p79RequireScheduleExport())return;
-                const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,roster);
+                const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,{...roster,specialDays});
                 const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows);
                 scheduleSheet['!cols']=[16,12,12,10,14,...Array(report.scheduleRows[0].length-5).fill(6)].map(wch=>({wch}));
                 XLSX.utils.book_append_sheet(workbook,scheduleSheet,exportMonth+'職稱班表');
