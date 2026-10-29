@@ -64,3 +64,25 @@ assert.equal((main.innerHTML.match(/data-rest-visible="例"/g)||[]).length,3);
 assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""'),'approved typhoon leave hides the fourth example');
 
 console.log('PASS 31-day full roster: allocated 4 例, one approved typhoon overlay gives exactly 3 visible 例 and counter 3/1; full special day tooltips');
+
+// Empty groups still need their transfer selector. Its candidates must include
+// people already assigned elsewhere, not only currently unassigned personnel.
+c.employees=[
+ {id:'E',name:'甲',role:'ARMG',group:'A組'},
+ {id:'C',name:'乙',role:'AQC',group:'C組'},
+ {id:'U',name:'丙',role:'ARMG',group:'不分組'},
+ {id:'LEFT',name:'離職',role:'ARMG',group:'A組',employmentStatus:'resigned'}
+];
+c.scheduleEmployeeEligibleForMonth=e=>e.employmentStatus!=='resigned';
+c.sortedScheduleGroups=()=>['A組','B組','C組','不分組','不輪班'];
+for(const target of ['B組','不分組','不輪班']){
+ c.activeGroupFilter=target;c.renderRoleScheduleView();
+ const select=main.innerHTML.split('id="quick-select-'+target+'"')[1]?.split('</select>')[0];
+ assert(select,'transfer selector remains available for '+target);
+ assert(select.includes('value="E"'),'already assigned A-group worker is selectable');
+ assert(select.includes('value="C"'),'C-group worker remains selectable with their role');
+ assert(!select.includes('value="LEFT"'),'inactive worker is not an operational transfer candidate');
+ assert.equal(select.includes('value="U"'),target!=='不分組','current target-group members are excluded');
+ assert(select.includes('ARMG｜A組'),'candidate label shows current role and group');
+}
+console.log('PASS transfer lists: empty groups, already assigned staff, all eligible roles, explicit ungrouping and inactive exclusion');

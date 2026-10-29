@@ -4144,7 +4144,25 @@ function p79EmployeeDateEligible(emp,date) {
       availableGroups=[...groups,'不輪班'];
     }
 
+    let p79ScheduleCloudRows=[];
+    function p79PreserveHiddenScheduleRows(editedRows,cloudRows,month){
+      const result=JSON.parse(JSON.stringify(editedRows));
+      const ids=new Set(result.map(row=>String(row.empId||'').trim().toUpperCase()));
+      for(const row of cloudRows||[]){
+        if(String(row.month||'')!==month)continue;
+        const id=String(row.empId||'').trim().toUpperCase();
+        if(!id||ids.has(id))continue;
+        if(!row.schedule||typeof row.schedule!=='object'||Array.isArray(row.schedule))throw Error('雲端保留班表格式不完整，已停止儲存：'+id);
+        // Hidden/inactive staff are not a deletion request. Preserve the exact
+        // official row, including personnel, declarations and amendment history.
+        result.push(JSON.parse(JSON.stringify(row)));
+        ids.add(id);
+      }
+      return result;
+    }
+
     function p79ApplySchedulePayload(data,requestMonth){
+        p79ScheduleCloudRows=JSON.parse(JSON.stringify(data.schedules||[])).map(row=>({...row,month:row.month||requestMonth}));
         const cloudEmployees = (data.employees || [])
           .filter(emp => String(emp.empId || '').toUpperCase() !== 'ADMIN' && (emp.empId || emp.name))
           .map(emp => ({
@@ -4493,7 +4511,7 @@ function p79EmployeeDateEligible(emp,date) {
       if(scheduleEditLockState.mine)await p79ApplyNoPunchRestFromOfficial(yearMonth);
       if (scheduleEditLockState.mine) p79ApplyAutomaticRestMetadata();
       const snapshotVersion=p79ScheduleLocalMutationVersion;
-      const schedules = employees.map(emp => {
+      let schedules = employees.map(emp => {
         const monthData = {};
         const allEmp = monthlyScheduleData[emp.id] || {};
         Object.keys(allEmp).forEach(dateKey => {
@@ -4519,7 +4537,9 @@ function p79EmployeeDateEligible(emp,date) {
         return { empId: emp.id, name: emp.name, role: emp.role, group: emp.group, month: yearMonth, schedule: monthData };
       });
       try {
-        schedules.forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
+        const editedIds=new Set(schedules.map(row=>String(row.empId).trim().toUpperCase()));
+        schedules=p79PreserveHiddenScheduleRows(schedules,p79ScheduleCloudRows,yearMonth);
+        schedules.filter(row=>editedIds.has(String(row.empId).trim().toUpperCase())).forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
           if(!meta.overtimeType)return;
           try {
             p79BuildScheduleOvertimeMeta(meta,meta.type==='substitute'?'substitute':meta.overtimeType,
@@ -4927,8 +4947,8 @@ function p79EmployeeDateEligible(emp,date) {
         alert("請先在下拉選單中選擇要加入的同仁！");
         return;
       }
-      await updateEmpGroupAndResort(empId, groupName);
-      alert(`✅ 成功將同仁加入【${groupName}】！`);
+      const changed=await updateEmpGroupAndResort(empId, groupName);
+      if(changed)showScheduleNotice(`已將同仁調至【${groupName}】，正在同步雲端；請留意儲存狀態。`,'info',5000);
     }
 
     function calculateShiftForDay(emp, empIndexInRole, dayNum, dayOfWeek) {
@@ -5179,7 +5199,7 @@ function p79EmployeeDateEligible(emp,date) {
 
     async function updateEmpGroupAndResort(empId, newGroup) {
       const editMonth=currentScheduleMonthKey();
-      if (!await p79EnsureGroupEdit()||currentScheduleMonthKey()!==editMonth) {buildRoleTabsAndRender();return;}
+      if (!await p79EnsureGroupEdit()||currentScheduleMonthKey()!==editMonth) {buildRoleTabsAndRender();return false;}
       const emp = employees.find(e => e.id === empId);
       if(emp) {
         emp.group = newGroup;
@@ -5190,7 +5210,9 @@ function p79EmployeeDateEligible(emp,date) {
         saveAllDataToLocalStorage();
         queuePersonnelCloudSave();
         buildRoleTabsAndRender();
+        return true;
       }
+      return false;
     }
 
     async function updateEmpRoleAndResort(empId, newRole) {
@@ -6026,7 +6048,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       });
 
       const container = document.getElementById('app-main-container');
-      if(roleEmps.length === 0) {
+      if(roleEmps.length === 0 && activeGroupFilter === 'ALL') {
         container.innerHTML = `<div class="bg-white p-12 text-center rounded-2xl text-slate-400 font-bold">該單位下暫無人員或支援人員</div>`;
         return;
       }
@@ -6080,11 +6102,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       `;
 
       let quickAssignPanelHtml = '';
-      if (activeGroupFilter !== 'ALL' && activeGroupFilter !== '不分組' && activeGroupFilter !== '不輪班') {
-        const unassignedEmps = employees.filter(e => e.group === '不分組');
+      if (activeGroupFilter !== 'ALL') {
+        const unassignedEmps = employees.filter(e => e.group !== activeGroupFilter && scheduleEmployeeEligibleForMonth(e,yearMonth));
         let optionsHtml = `<option value="">-- 請選擇要加入【${activeGroupFilter}】的同仁 --</option>`;
         unassignedEmps.forEach(uEmp => {
-          optionsHtml += `<option value="${uEmp.id}">[${uEmp.role}] ${uEmp.name} (${uEmp.id})</option>`;
+          optionsHtml += `<option value="${scheduleEscapeHtml(uEmp.id)}">[${scheduleEscapeHtml(uEmp.role)}｜${scheduleEscapeHtml(uEmp.group||'不分組')}] ${scheduleEscapeHtml(uEmp.name)} (${scheduleEscapeHtml(uEmp.id)})</option>`;
         });
 
         quickAssignPanelHtml = `
