@@ -13778,7 +13778,7 @@ function p79OvertimePeriodLabel(report){
             return ['editRecordModal','addRecordModal'].some(id=>{
                 const el=document.getElementById(id);
                 return p79PlannedAttendanceModalAnchors.has(id)&&el&&!el.classList.contains('hidden');
-            })||!!document.getElementById('p79OvertimePlannedDialog')?.querySelector('#p79OvertimeDialog[open]');
+            })||!!document.getElementById('p79OvertimePlannedDialog')?.querySelector?.('#p79OvertimeDialog[open]');
         }
         function p79PlannedDialogCancel(event){
             if(p79PlannedAttendanceModalIsOpen())event.preventDefault();
