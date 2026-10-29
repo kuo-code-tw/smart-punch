@@ -1214,10 +1214,10 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                                 </div>
                             </div>
                         </div>
-                        <select id="empScheduleMonthSelect" onchange="p79LoadMyScheduleFromCloud(currentEmp,this.value).catch(()=>{});renderEmployeeSchedule(currentEmp)" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200">
+                        <select id="empScheduleMonthSelect" onchange="p79LoadMyScheduleFromCloud(currentEmp,this.value,true).catch(()=>{})" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200">
                             <option value="">本月</option>
                         </select>
-                        <div id="empScheduleCloudStatus" role="status" aria-live="polite" class="text-xs text-slate-500 mt-2">登入後會讀取你的當月班表</div>
+                        <button type="button" id="empScheduleRefreshBtn" onclick="p79LoadMyScheduleFromCloud(currentEmp,document.getElementById('empScheduleMonthSelect')?.value||scheduleDateKey(new Date()).slice(0,7),true).catch(()=>{})" class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100">重新讀取班表</button><div id="empScheduleCloudStatus" role="status" aria-live="polite" class="text-xs text-slate-500 mt-2">登入後會讀取你的當月班表</div>
                     </div>
 
                     <div id="empScheduleSummaryStats" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -8730,53 +8730,110 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         // Use the existing authenticated schedule endpoint and keep only this employee.
         const p79EmployeeRosterPending = new Map();
         const p79EmployeeRosterCheckedAt = new Map();
-        async function p79LoadMyScheduleFromCloud(emp,month) {
+        async function p79LoadMyScheduleFromCloud(emp,month,force=false) {
             const empId=String(emp?.empId||'').trim().toUpperCase();
-            if(!empId||!/^\d{4}-\d{2}$/.test(month))return false;
-            const token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
             const status=document.getElementById('empScheduleCloudStatus');
+            const refreshButton=document.getElementById('empScheduleRefreshBtn');
             const reportStatus=(message,type='info')=>{
                 if(!status)return;
                 status.textContent=message;
                 status.classList.remove('hidden','text-rose-700','text-emerald-700','text-slate-500');
                 status.classList.add(type==='error'?'text-rose-700':type==='ok'?'text-emerald-700':'text-slate-500');
             };
-            if(!token){
-                reportStatus('尚未取得雲端登入憑證，請從首頁重新登入後再讀取班表。','error');
+            if(!empId||!/^\d{4}-\d{2}$/.test(String(month||''))){
+                reportStatus('員工身分或班表月份不正確，無法查詢。','error');
                 return false;
+            }
+            // Punch-only identities may read only their authenticated employee id.
+            // This does not replace server-side authorization; GAS must enforce it too.
+            const punchMode=p79IsPunchEntryMode();
+            if(punchMode){
+                let session=null;
+                try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
+                if(!session||String(session.empId||'').trim().toUpperCase()!==empId||
+                    String(session.adminRole||'').toLowerCase()!=='employee'){
+                    reportStatus('目前打卡登入身分與班表工號不一致，請從首頁使用本人帳號重新登入。','error');
+                    return false;
+                }
             }
             const key=empId+'|'+month;
             if(p79EmployeeRosterPending.has(key))return p79EmployeeRosterPending.get(key);
-            if(Date.now()-(p79EmployeeRosterCheckedAt.get(key)||0)<60000)return !!(schedules||[]).some(row=>String(row?.empId||'').trim().toUpperCase()===empId && Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')));
+            const ownMonthRows=()=>Array.isArray(schedules)&&(schedules||[]).some(row=>
+                String(row?.empId||'').trim().toUpperCase()===empId &&
+                Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')));
+            if(!force&&Date.now()-(p79EmployeeRosterCheckedAt.get(key)||0)<60000&&ownMonthRows()){
+                return true;
+            }
             p79EmployeeRosterCheckedAt.set(key,Date.now());
-            reportStatus('正在讀取 '+month+' 班表…');
+            reportStatus('正在讀取 '+month+' 的正式班表…');
+            if(refreshButton)refreshButton.disabled=true;
             const job=(async()=>{
-                const controller=new AbortController();
-                const timer=setTimeout(()=>controller.abort(),15000);
-                try {
-                    const url=getActiveGasUrl()+'?action=getScheduleDataSecure&month='+encodeURIComponent(month)+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now();
-                    const res=await fetch(url,{cache:'no-store',signal:controller.signal,redirect:'follow'});
-                    const data=await res.json();
-                    if(!data?.ok||!Array.isArray(data.schedules))throw Error(data?.error||'雲端未回傳班表資料');
-                    // Never cache other employees' schedules inside a punch-only session.
-                    const own=data.schedules.filter(row=>String(row?.empId||'').trim().toUpperCase()===empId);
-                    if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId){
-                        schedules=(schedules||[]).filter(row=>!(String(row?.empId||'').trim().toUpperCase()===empId && (String(row?.month||'').slice(0,7)===month || Object.keys(row?.schedule||{}).some(d=>d.startsWith(month+'-')))));
-                        schedules.push(...own);
-                        renderEmployeeSchedule(currentEmp);
-                        const note=document.getElementById('empScheduleTodayNote');
-                        if(!own.length&&note)note.textContent='雲端尚無此月份班表，請管理員核對排班是否已儲存';
+                let token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
+                const sameIdentity=()=>String(currentEmp?.empId||'').trim().toUpperCase()===empId &&
+                    (!punchMode||p79IsPunchEntryMode());
+                try{
+                    if(!token&&punchMode)token=await p79MobileRenewPunchSession(emp);
+                    if(!token)throw Error('尚未取得有效的員工登入憑證，請重新登入');
+                    const read=async(value)=>{
+                        const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);
+                        try{
+                            const base=getActiveGasUrl();
+                            const url=new URL(base);
+                            url.searchParams.set('action','getScheduleDataSecure');
+                            url.searchParams.set('month',month);
+                            url.searchParams.set('empId',empId);
+                            url.searchParams.set('gcToken',value);
+                            url.searchParams.set('token',value);
+                            url.searchParams.set('_',Date.now());
+                            const response=await fetch(url.toString(),{cache:'no-store',signal:ctl.signal,redirect:'follow'});
+                            if(!response.ok)throw Error('雲端班表 HTTP '+response.status);
+                            return await response.json();
+                        }finally{clearTimeout(timer);}
+                    };
+                    let data=await read(token);
+                    const authError=/登入驗證|Token.*逾時|登入.*逾時|身分.*失效/i;
+                    if(punchMode&&data?.ok===false&&authError.test(String(data.error||''))){
+                        token=await p79MobileRenewPunchSession(emp);
+                        data=await read(token);
                     }
-                    reportStatus(own.length?('已載入 '+month+' 我的班表'):'雲端未找到此員工該月份班表，請核對排班系統是否已儲存。',own.length?'ok':'error');
+                    if(data?.ok!==true||!Array.isArray(data.schedules))
+                        throw Error(data?.error||'雲端未回傳正式班表資料，請確認員工查詢權限');
+                    if(data.month&&normalizeScheduleMonthKey(data.month)!==month)
+                        throw Error('雲端班表月份不一致，未套用舊月份資料');
+                    if(!sameIdentity())throw Error('員工登入身分已變更，本次班表讀取已取消');
+                    // Only the logged-in employee's own row may enter memory/UI.
+                    const own=data.schedules.filter(row=>
+                        String(row?.empId||'').trim().toUpperCase()===empId &&
+                        (!row.month||normalizeScheduleMonthKey(row.month)===month));
+                    schedules=(Array.isArray(schedules)?schedules:[]).filter(row=>
+                        !(String(row?.empId||'').trim().toUpperCase()===empId &&
+                          (normalizeScheduleMonthKey(row?.month)===month||
+                           Object.keys(row?.schedule||{}).some(d=>normalizeScheduleDateKey(d).startsWith(month+'-')))));
+                    schedules.push(...own);
+                    p79EmployeeRosterCheckedAt.set(key,own.length?Date.now():0);
+                    const selector=document.getElementById('empScheduleMonthSelect');
+                    if(selector&&selector.value!==month)selector.value=month;
+                    renderEmployeeSchedule(currentEmp);
+                    if(own.length){
+                        reportStatus('已同步 '+month+' 本人的正式班表','ok');
+                    }else{
+                        reportStatus('正式雲端尚無 '+month+' 這位員工的班表；請管理員確認已儲存及工號一致。','error');
+                    }
                     return own.length>0;
-                } catch(e) {
+                }catch(error){
                     p79EmployeeRosterCheckedAt.delete(key);
-                    reportStatus('班表讀取失敗：'+String(e?.message||e||'未知錯誤').slice(0,110),'error');
-                    const note=document.getElementById('empScheduleTodayNote');
-                    if(currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===empId&&note&&!employeeScheduleMap(emp)[scheduleDateKey(new Date())])
-                        note.textContent='班表讀取失敗，請檢查網路或班表存取權限';
+                    const message=String(error?.message||error||'未知錯誤');
+                    const display=/AbortError|aborted/i.test(String(error?.name||'')+' '+message)
+                        ? '讀取逾時，請按「重新讀取班表」'
+                        : /沒有權限|無權限|權限不足|禁止存取|HTTP 403|HTTP 401/i.test(message)
+                        ? '員工帳號尚未取得本人班表的雲端查閱權限，請管理員檢查 GAS 讀取權限'
+                        : message;
+                    if(sameIdentity()){
+                        reportStatus('班表讀取失敗：'+display.slice(0,130),'error');
+                        if(ownMonthRows())renderEmployeeSchedule(currentEmp);
+                    }
                     return false;
-                } finally {clearTimeout(timer);}
+                }finally{if(refreshButton)refreshButton.disabled=false;}
             })().finally(()=>p79EmployeeRosterPending.delete(key));
             p79EmployeeRosterPending.set(key,job);
             return job;
@@ -8914,6 +8971,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const todayKey = scheduleDateKey(new Date());
             const defaultMonth = todayKey.slice(0, 7);
             const previousSelected = normalizeScheduleMonthKey(monthSelect.value);
+            // Preserve a newly requested month while its cloud read is still pending.
+            if(previousSelected&&!months.includes(previousSelected))months.unshift(previousSelected);
             monthSelect.innerHTML = months.map(month => {
                 const [year, mon] = month.split('-');
                 return `<option value="${month}">${year} 年 ${Number(mon)} 月</option>`;
