@@ -23,6 +23,287 @@ function aggregate({engine,records,employees,schedules=[],leaves=[],covers=[],to
  const missing=monthShifts.filter(s=>day(s.dateKey)<today&&(!s.clockIn||!s.clockOut||s.timePrecisionIssue));const long=monthShifts.filter(s=>s.clockIn&&s.clockOut&&(s.clockOut.__ts-s.clockIn.__ts)>12*3600000);
  return {today,month,attendanceReady,rosterReady,leaveReady,boundariesReady,scopeCount:people.length,present:present.size,onDuty,todayHours,monthHours,attendanceDays:unique.size,hours,departmentHours:[...deptHours].sort((a,b)=>b[1]-a[1]),declaredHours,declaredByWeek,pending:pending.sort((a,b)=>b.date.localeCompare(a.date)),distribution:{present:present.size,leave:approvedOff.length,waiting:waiting.length,total:expected.size},alerts:[{label:'歷史班次缺卡／時間待核',count:missing.length,target:'attendance',detail:'僅統計今日以前的本月班次'},{label:'刷卡區間超過 12 小時',count:long.length,target:'workhours',detail:'需核對班次、休息及申報明細'},{label:'核准請假與工作班別重疊',count:conflicts,target:'schedule',detail:'核對請假與排班連動狀態'}],missingSchedule};
 }
+// These pure Bundle rules are copied verbatim from the existing vessel module.
+// A regression guard below compares their source to prevent calculation drift.
+const num=v=>Number(v)||0;
+function parseBundleRemark(text){
+  const s=String(text||'')
+    .toUpperCase()
+    .replace(/[’′]/g,"'")
+    .replace(/\u00A0/g,' ')
+    .replace(/[ \t]+/g,' ')
+    .trim();
+
+  const items=[];
+  const seenOccurrence=new Set();
+  const pushItem=(size,bn,fl,unit,raw,key)=>{
+    bn=num(bn);fl=num(fl);
+    if(!(bn>=0&&fl>=0))return;
+
+    // v9.3：
+    // 「相同 BN/FR 數值」不代表同一筆 Bundle。
+    // 實際 WORKING REPORT 會出現：
+    //   D7 1BN/3FR,1BN/4FR
+    //   D4 1BN/4FR
+    // 其中兩個 1BN/4FR 是不同艙位、都必須扣除。
+    //
+    // 舊版用 size/unit/bn/fl 當內容簽章去重，會把第二個 1BN/4FR 吃掉，
+    // 導致 WAN HAI 292 N073：WORKING REPORT/WORKING SHEET 應扣 12，
+    // 但人員明細只扣到 9。
+    //
+    // 現在只對「同一文字位置、同一 parser 命中」去重；
+    // 不同位置即使內容相同，也視為不同 Bundle。
+    const normalizedUnit=String(unit||'FR').toUpperCase();
+    const occurrenceKey=String(key||'').trim();
+    if(occurrenceKey && seenOccurrence.has(occurrenceKey))return;
+    if(occurrenceKey)seenOccurrence.add(occurrenceKey);
+
+    items.push({
+      size:String(size||''),bn,fl,unit:normalizedUnit,
+      deduct:Math.max(0,fl-bn),raw:String(raw||'').replace(/^[^0-9]+/,'').trim(),
+      occurrence:occurrenceKey
+    });
+  };
+
+  // 格式 1：2BN/7FR、5BN/20FL（舊有格式）
+  const normal=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*BN\s*\/\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi;
+  let m;
+  while((m=normal.exec(s))){
+    pushItem(m[1],m[2],m[3],m[4],m[0],`N:${m.index}:${m[0]}`);
+  }
+
+  // 格式 2：7FR/2BN、20FL/5BN（WAN HAI 272 N229 實際使用格式）
+  const reverse=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*(FR|FL)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi;
+  while((m=reverse.exec(s))){
+    pushItem(m[1],m[4],m[2],m[3],m[0],`R:${m.index}:${m[0]}`);
+  }
+
+  // 格式 3：40FR*4/1BN、FR40*4/1BN、20FL*5/2BN
+  // WAN HAI 292 N072 實際使用「D2 FR40*4/1BN」；代表 4 櫃組成 1 Bundle，應扣 3。
+  const sizeTimes=/(?:^|[^0-9])(?:(?:(20|40|45)\s*'?\s*(FR|FL))|(?:(FR|FL)\s*(20|40|45)\s*'?))\s*\*\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi;
+  while((m=sizeTimes.exec(s))){
+    const size=m[1]||m[4]||'';
+    const unit=m[2]||m[3]||'FR';
+    const fl=m[5],bn=m[6];
+    pushItem(size,bn,fl,unit,m[0],`X:${m.index}:${m[0]}`);
+  }
+
+  // v8.6 格式 4：BN2/FL8、BN1/FR4（實際 WORKING REPORT 會使用「D7甲 BN2/FL8」）
+  // 數字位於 BN / FL 標籤後方；先讀 BN，再讀 FL/FR。
+  const labelFirst=/\bBN\s*(\d+(?:\.\d+)?)\s*\/\s*(FR|FL)\s*(\d+(?:\.\d+)?)/gi;
+  while((m=labelFirst.exec(s))){
+    pushItem('',m[1],m[3],m[2],m[0],`LF:${m.index}:${m[0]}`);
+  }
+
+  // v8.6 格式 5：FL8/BN2、FR4/BN1（反向標籤在前）
+  const labelFirstReverse=/\b(FR|FL)\s*(\d+(?:\.\d+)?)\s*\/\s*BN\s*(\d+(?:\.\d+)?)/gi;
+  while((m=labelFirstReverse.exec(s))){
+    pushItem('',m[3],m[2],m[1],m[0],`LFR:${m.index}:${m[0]}`);
+  }
+
+  const deduct=items.reduce((a,x)=>a+num(x.deduct),0);
+  const fl=items.reduce((a,x)=>a+num(x.fl),0);
+  const bn=items.reduce((a,x)=>a+num(x.bn),0);
+
+  return {items,deduct,fl,bn};
+}
+
+function applyBundleDeductionToWorkingReport(discValue,loadValue,remarkText){
+  const rawDisc=Math.max(0,num(discValue));
+  const rawLoad=Math.max(0,num(loadValue));
+  const info=parseBundleRemark(remarkText);
+
+  if(!info.deduct){
+    return {
+      disc:rawDisc,load:rawLoad,
+      rawDisc,rawLoad,
+      bundleDeduct:0,bundleInfo:info
+    };
+  }
+
+  let disc=rawDisc,load=rawLoad;
+  const deduction=Math.max(0,info.deduct);
+
+  // Remark 通常只屬於該列的一種作業（DISC 或 LOAD）。
+  // 若只有其中一邊有數字，直接從該邊扣除。
+  if(rawDisc>0 && rawLoad<=0){
+    disc=Math.max(0,rawDisc-deduction);
+  }else if(rawLoad>0 && rawDisc<=0){
+    load=Math.max(0,rawLoad-deduction);
+  }else if(rawDisc>0 || rawLoad>0){
+    // 少數範本同列同時有 DISC / LOAD：
+    // Remark 中 FL 總數通常會接近其中一邊的原始櫃數，
+    // 因此扣在與 FL 最接近的一側，避免任意拆分。
+    const dDiff=Math.abs(rawDisc-info.fl);
+    const lDiff=Math.abs(rawLoad-info.fl);
+    if(dDiff<=lDiff)disc=Math.max(0,rawDisc-deduction);
+    else load=Math.max(0,rawLoad-deduction);
+  }
+
+  return {
+    disc,load,rawDisc,rawLoad,
+    bundleDeduct:deduction,bundleInfo:info
+  };
+}
+
+function bundleRemarkTextFromRecord(r){
+  // v7.40：
+  // bundleRemark 是匯入時已鎖定的 Bundle 原始來源，存在時直接使用。
+  // 不再把 note / stopRemark 再拼回 bundleRemark，避免同一個 Bundle
+  // 在多個欄位各出現一次後被重複計算。
+  const primary=String(r?.bundleRemark||'').trim();
+  if(primary)return primary;
+
+  // 舊資料若沒有 bundleRemark，才從其他備註欄位補找；
+  // 只保留真的含有 Bundle 的欄位，且文字完全相同時只取一次。
+  const parts=[
+    r?.note,
+    r?.stopRemark1,
+    r?.stopRemark2,
+    r?.stopRemark3
+  ]
+    .map(v=>String(v||'').trim())
+    .filter(Boolean)
+    .filter(v=>parseBundleRemark(v).deduct>0);
+
+  return [...new Set(parts)].join('｜');
+}
+
+function canonicalBundleRemark(bundleInfo){
+  const items=Array.isArray(bundleInfo)?bundleInfo:[];
+  const out=[];
+  items.forEach(x=>{
+    const bn=num(x?.bn),fl=num(x?.fl);
+    const unit=String(x?.unit||'FR').toUpperCase();
+    const size=String(x?.size||'').trim();
+    if(!(fl>0||bn>0))return;
+    // v9.3：保留相同數值 Bundle 的「筆數」。
+    // 不再以 bn/fl 內容去重，避免不同艙位的 1BN/4FR 被合併成一筆。
+    out.push(`${bn}BN/${fl}${unit}${size?`(${size}')`:''}`);
+  });
+  return out.join('；');
+}
+
+function effectiveBundleRecord(r){
+  const currentDisc=num(r?.disc);
+  const currentLoad=num(r?.load);
+  const currentSum=currentDisc+currentLoad;
+  const remark=bundleRemarkTextFromRecord(r);
+  const parsed=parseBundleRemark(remark);
+
+  const hasRawDisc=Object.prototype.hasOwnProperty.call(r||{},'rawDisc');
+  const hasRawLoad=Object.prototype.hasOwnProperty.call(r||{},'rawLoad');
+
+  let rawDisc=hasRawDisc?num(r.rawDisc):currentDisc;
+  let rawLoad=hasRawLoad?num(r.rawLoad):currentLoad;
+
+  // raw 不可能比已計算後數字更少。
+  // v20 部分雲端舊資料 raw 欄位為 0，這裡自動以目前 DISC/LOAD 回復原始值。
+  if(rawDisc+rawLoad < currentSum){
+    rawDisc=currentDisc;
+    rawLoad=currentLoad;
+  }
+
+  // v8.7：同一位司機的連續時段可能各自都有完全相同的 Bundle 文字。
+  // mergeWorkingReportRecords 會把數值正確相加（例如 6 + 6 = 12），但顯示用 bundleRemark
+  // 會把相同文字收斂成一份；若這裡只重新解析文字，就會把 12 又錯算回 6。
+  // 因此：當原始 DISC/LOAD 與目前 DISC/LOAD 的實際差額，能精確證明 existing bundleDeduct
+  // 已經是「多個時段的累加值」時，必須優先保留結構化 Bundle 明細，不可被去重後的文字覆蓋。
+  const existingDeduct=num(r?.bundleDeduct);
+  const existingInfo=Array.isArray(r?.bundleInfo)?r.bundleInfo:[];
+  const rawSum=rawDisc+rawLoad;
+  const currentDeduct=Math.max(0,rawSum-currentSum);
+  const existingBn=num(r?.bundleBn);
+  const existingFl=num(r?.bundleFl);
+  const structuralBundleIsStronger = existingDeduct>0
+    && existingDeduct>num(parsed.deduct)+0.01
+    && Math.abs(currentDeduct-existingDeduct)<=0.01
+    && (existingInfo.length>0 || existingBn>0 || existingFl>0);
+
+  if(structuralBundleIsStronger){
+    return {
+      detected:true,
+      remark:remark||canonicalBundleRemark(existingInfo),
+      rawDisc,
+      rawLoad,
+      disc:currentDisc,
+      load:currentLoad,
+      bundleDeduct:existingDeduct,
+      bundleBn:existingBn,
+      bundleFl:existingFl,
+      bundleInfo:existingInfo
+    };
+  }
+
+  if(parsed.items.length>0){
+    const adjusted=applyBundleDeductionToWorkingReport(rawDisc,rawLoad,remark);
+    return {
+      detected:true,
+      remark,
+      rawDisc:num(adjusted.rawDisc),
+      rawLoad:num(adjusted.rawLoad),
+      disc:num(adjusted.disc),
+      load:num(adjusted.load),
+      bundleDeduct:num(adjusted.bundleDeduct),
+      bundleBn:num(adjusted.bundleInfo?.bn),
+      bundleFl:num(adjusted.bundleInfo?.fl),
+      bundleInfo:Array.isArray(adjusted.bundleInfo?.items)
+        ? adjusted.bundleInfo.items
+        : []
+    };
+  }
+
+  // 若舊紀錄本身已有 Bundle 欄位，但備註不存在，不能只保留 bundleDeduct 卻不真正扣 DISC/LOAD。
+  // v7.48 的舊資料可能出現：raw 551、bundleDeduct 13，但調整後只剩 547（只扣到 4）。
+  // v7.49 會用既有 BN/FL/bundleInfo 重建一次扣除；若目前數字早已完整扣除則保持原值，避免二次扣除。
+  if(existingDeduct>0){
+    let synthRemark=canonicalBundleRemark(existingInfo);
+    if(!synthRemark){
+      const bn=num(r?.bundleBn), fl=num(r?.bundleFl);
+      if(fl>0 || bn>0) synthRemark=`${bn}BN/${fl}FR`;
+    }
+
+    let fixedDisc=currentDisc, fixedLoad=currentLoad;
+
+    if(Math.abs(currentDeduct-existingDeduct)>0.01){
+      if(synthRemark){
+        const fixed=applyBundleDeductionToWorkingReport(rawDisc,rawLoad,synthRemark);
+        fixedDisc=num(fixed.disc);
+        fixedLoad=num(fixed.load);
+      }else{
+        fixedDisc=rawDisc; fixedLoad=rawLoad;
+        if(rawLoad>=existingDeduct) fixedLoad=Math.max(0,rawLoad-existingDeduct);
+        else fixedDisc=Math.max(0,rawDisc-existingDeduct);
+      }
+    }
+
+    return {
+      detected:true,
+      remark:synthRemark||remark,
+      rawDisc,
+      rawLoad,
+      disc:fixedDisc,
+      load:fixedLoad,
+      bundleDeduct:existingDeduct,
+      bundleBn:num(r?.bundleBn),
+      bundleFl:num(r?.bundleFl),
+      bundleInfo:existingInfo
+    };
+  }
+
+  return {
+    detected:false,
+    remark,
+    rawDisc:currentDisc,
+    rawLoad:currentLoad,
+    disc:currentDisc,
+    load:currentLoad,
+    bundleDeduct:0,
+    bundleBn:0,
+    bundleFl:0,
+    bundleInfo:[]
+  };
+}
 // Read-only vessel snapshot aggregation. Counts use dated detail rows; billing uses completed jobs.
 function vesselAggregate(data,{today,month}){
  const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0&&n<1e8?n:0;};
@@ -34,8 +315,8 @@ function vesselAggregate(data,{today,month}){
  const finish=s=>iso(s._cloudLastDate||s.cloudLastDate||s._authoritativeLastDate)||iso(s.lastDate)||iso(s.lashingDateTime||s.lashingDate||s.workingSheetSource?.lashingDateTime||s.workingSheetSource?.endDate)||iso(s.compareDate||s.workingSheetSource?.compareDate)||iso(s.firstDate);
  const byNo=new Map(masters.map(s=>[key(s),s]));
  const dated=rows.map(r=>({...r,date:iso(r.workDate)})).filter(r=>r.date);
- const moves=r=>['working-report','gc-driver-efficiency'].includes(r.source)?num(r.disc)+num(r.load):num(r.containers);
- const hours=r=>{if(num(r.timeHours))return num(r.timeHours);const min=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):null;};const a=min(r.startTime),b=min(r.endTime);return a===null||b===null?0:((b-a+1440)%1440)/60;};
+ const moves=r=>{if(r.source==='working-report'){const b=effectiveBundleRecord(r);return num(b.disc)+num(b.load);}return r.source==='gc-driver-efficiency'?num(r.disc)+num(r.load):num(r.containers);};
+ const hours=r=>{if(['working-report','gc-driver-efficiency'].includes(r.source)&&num(r.timeHours))return Math.round(num(r.timeHours)*100)/100;const min=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):null;};const a=min(r.startTime),b=min(r.endTime);const h=a===null||b===null?0:((b-a+1440)%1440)/60;const adjusted=['working-report','gc-driver-efficiency'].includes(r.source)?h:Math.max(0,h-[r.deduct1,r.deduct2,r.deduct3,r.deduct4].reduce((s,v)=>s+num(v),0)/60);return Math.round(adjusted*100)/100;};
  const monthRows=dated.filter(r=>r.date.startsWith(month)),todayRows=dated.filter(r=>r.date===today);
  const todayKeys=new Set(todayRows.map(key));masters.filter(s=>iso(s.firstDate)&&iso(s.firstDate)<=today&&iso(s.lastDate)&&iso(s.lastDate)>=today).forEach(s=>todayKeys.add(key(s)));
  const jobs=[...todayKeys].map(k=>{const rs=todayRows.filter(r=>key(r)===k),m=byNo.get(k)||rs[0]||{},hs=rs.reduce((s,r)=>s+hours(r),0),qty=rs.reduce((s,r)=>s+moves(r),0);return {shipGph:num(m.gph)||null,vessel:m.shipName||m.vessel||'未命名',voyage:m.voyageE||m.voyageI||m.voyage||'—',volume:rs.length,containers:qty,people:new Set(rs.map(r=>String(r.empId||r.name||'')).filter(Boolean)).size,efficiency:hs?qty/hs:null,status:m.status||'已載入'};});

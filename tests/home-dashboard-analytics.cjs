@@ -1,3 +1,5 @@
+// These fixtures represent Taiwan punch wall times, matching the deployed system.
+process.env.TZ='Asia/Taipei';
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const engine=require('../attendance/v6-engine.js'),{aggregate}=require('../assets/port79-home-analytics.js');
 const employees=[{empId:'E1',attNo:'1',name:'甲',dept:'A'},{empId:'E2',attNo:'2',name:'乙',dept:'B'}];let seq=0;
