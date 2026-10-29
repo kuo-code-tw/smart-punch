@@ -219,6 +219,7 @@ function reviewFingerprint(date,state){
 }
 // Keep existing users' verified marks if the saved legacy hash still exactly
 // matches the official cloud snapshot. A mismatched legacy mark is not trusted.
+// Read-only rest-quota inspection must never silently promote an unmatched old hash.
 function p79LegacyReviewFingerprint(date,state){
  if(state?.ready!==true)return '';
  const list=(state.rows||[]).map(row=>{
