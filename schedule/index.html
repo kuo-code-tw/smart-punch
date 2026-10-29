@@ -4299,7 +4299,8 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         p79ApplySchedulePayload(data,requestMonth);
-        const missingRoles=p79ScheduleRolesWithoutGroups(requestMonth);
+        const missingRoles=typeof p79ScheduleRolesWithoutGroups==='function'
+          ?p79ScheduleRolesWithoutGroups(requestMonth):[];
         if(missingRoles.length){
           // No save while history is unverified: an ungrouped snapshot could
           // otherwise permanently overwrite the previous group's assignments.
@@ -4310,7 +4311,8 @@ function p79EmployeeDateEligible(emp,date) {
              port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight)return false;
           p79ScheduleRestorePreviousGroups(requestMonth,history);
           if(verified)p79ScheduleGroupHistoryUnverifiedMonth='';
-        }else if(p79ScheduleGroupHistoryUnverifiedMonth===requestMonth){
+        }else if(typeof p79ScheduleGroupHistoryUnverifiedMonth!=='undefined'&&
+                 p79ScheduleGroupHistoryUnverifiedMonth===requestMonth){
           p79ScheduleGroupHistoryUnverifiedMonth='';
         }
         p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);
