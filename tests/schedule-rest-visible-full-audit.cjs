@@ -43,7 +43,7 @@ a.equal(JSON.stringify(monthlyScheduleMeta),initial,'audit must be read-only');
 // Regression: 宋文豪 had 國16-24 plus another visible 國, but old code showed 1/0.
 // The same omission affected timed 例 and 休, including verified working shifts.
 const first=monthlyScheduleData.E0;
-first[day(1)]='國16-24';first[day(8)]='休08-16';first[day(13)]='例08-16';
+first[day(1)]='國16-24';first[day(8)]='休08-16';first[day(13)]='例08-16';first[day(28)]='早';
 let selected=c.p79VisibleRestDayAudit(employees[0],month,monthlyScheduleMeta.E0);
 a.deepEqual([...selected.國].map(d=>d.slice(-2)),['01','07'],'a timed 國 plus ordinary 國 must both count');
 a(selected.休.includes(day(8)),'timed 休 must count');

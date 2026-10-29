@@ -7086,7 +7086,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const extra=Object.entries(result.quota).filter(([kind,n])=>after[kind]>n)
             .map(([kind,n])=>kind+'超額'+(after[kind]-n)+'天');
           const refreshed=['例','休','國'].some(kind=>before[kind]!==after[kind]);
-          if(refreshed||mismatch.length||extra.length)totals.needsUpdate++;
+          if(refreshed||mismatch.length||extra.length||missing.length)totals.needsUpdate++;
           if(missing.length)totals.unresolved++;
           if(refreshed||missing.length||mismatch.length||extra.length)findings.push(emp.name+'：'+
             '目前 '+['例','休','國'].map(c=>c+before[c]+'天('+((current[c]||[]).map(d=>d.slice(-2)).join('、')||'無')+')').join('／')+
