@@ -2148,7 +2148,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             </div>
 
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportPreferCache" type="checkbox" checked class="w-4 h-4">優先使用本機快取（含已連接的電腦資料夾）</label>
-            <p class="text-[11px] text-slate-500">缺少的月份會向雲端讀取。使用快取時，試算表 會附上各月份保存時間；需要最新雲端資料時，請取消勾選。</p>
+            <p class="text-[11px] text-slate-500">單獨匯出考勤時可使用快取；如一併匯出正式排班表，排班與相關考勤一律讀取最新雲端資料，避免與排班系統不一致。</p>
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出正式排班表（比照排班系統匯出格式）</label>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
@@ -22356,7 +22356,7 @@ function p79EmployeeDateEligible(emp,date) {
             const readOptions={preferCache,sources,start,end};
             update((preferCache?'正在優先讀取本機快取，缺少資料才讀取雲端：':'正在讀取雲端最新資料：')+exportMonth+' 考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
             const [exportScope,roster]=await Promise.all([
-                p79ReadAttendanceExportScope(exportMonth,readOptions),
+                p79ReadAttendanceExportScope(exportMonth,includeSchedule?{...readOptions,preferCache:false}:readOptions),
                 // 排班必須讀當下正式雲端版本，不能把舊的本機快取當成排班系統現況。
                 includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,{...readOptions,preferCache:false}):Promise.resolve(null),
                 window.p79LoadXlsxLibrary()
