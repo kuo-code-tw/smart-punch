@@ -1040,10 +1040,13 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 </style>
 
 <style id="p79-overtime-rest-visible-hover-v2">
-/* Attendance "加班時數": retain only 休08-16 (or equivalent 休HH-HH) at rest.
-   Explicitly hide the OTHER values, instead of opacity-hiding their parent. */
+/* Attendance "加班時數": positive reported/estimated hours and real
+   休/國/例/代/延 codes are visible; only secondary audit details use hover. */
 #adminRecordsTableBody td[data-p79-overtime-hours] { cursor: help; }
 #adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-rest-visible { display: block; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-primary-visible { display: block; font-weight: 800; }
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-code-visible,
+#adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-pending-visible { display: block; }
 #adminRecordsTableBody td[data-p79-overtime-hours] .p79-overtime-hidden-detail { display: none !important; }
 #adminRecordsTableBody td[data-p79-overtime-hours]:hover .p79-overtime-hidden-detail,
 #adminRecordsTableBody td[data-p79-overtime-hours]:focus .p79-overtime-hidden-detail,
@@ -15215,10 +15218,15 @@ function getManualPairRecordAnchor(record) {
             const states=months.map(key=>p79AttendanceOvertimeMonths.get(key)).filter(state=>state?.ready&&state.token===token);
             const plans=states.map(state=>p79AttendanceReportedOvertime(row,state,view));
             const planned=plans.find(value=>value?.report)||plans.find(Boolean)||null;
-            // Only the 休HH-HH marker remains visible without hover.
-            // "0 小時", 已申報, 申報時數 and every other value stay within
-            // a separate, genuinely hidden detail container.
-            if(!planned)return '<div class="p79-overtime-hidden-detail">'+formatDurationMinutes(actual)+'</div>';
+            const estimate=Number.isFinite(actual)&&actual>0?actual:0;
+            // Only a real cloud report may be called "申報"; a completed punch
+            // beyond the daily threshold is marked "估算". Never hide either.
+            const reported=planned?.report&&Number.isFinite(Number(planned.minutes))&&Number(planned.minutes)>0
+                ?Number(planned.minutes):0;
+            const primary=reported||estimate;
+            const visibleHours=primary>0
+                ?'<div class="p79-overtime-primary-visible">'+(reported?'申報 ':'估算 ')+formatDurationMinutes(primary)+'</div>':'';
+            if(!planned)return visibleHours;
             const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const rawLabel=String(planned.label||'');
             const restMatch=rawLabel.match(/休\d{2}-\d{2}/);
@@ -15228,12 +15236,20 @@ function getManualPairRecordAnchor(record) {
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
             const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
             const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+escapeText(planned.originalCode)+'（尚未改寫）</div>':'';
-            const visible=restText?'<div class="p79-overtime-rest-visible text-cyan-700 dark:text-cyan-300">'+restText+'</div>':'';
+            // Show actual positive overtime by default for 國／休／例／代／延,
+            // not only the 休HH-HH label. No zero-hour rows are displayed.
+            const visible=(restText?'<div class="p79-overtime-rest-visible text-cyan-700 dark:text-cyan-300">'+restText+'</div>':'')+
+                (otherLabel?'<div class="p79-overtime-code-visible text-cyan-700 dark:text-cyan-300">'+otherLabel+'</div>':'')+
+                visibleHours+
+                (!primary&&planned.pending&&Number(planned.minutes)>0
+                    ?'<div class="p79-overtime-pending-visible">已安排／待申報 '+formatDurationMinutes(planned.minutes)+'</div>':'')+
+                (declared||reviewBadge?'<div>'+declared+reviewBadge+'</div>':'');
+            // Keep source/review evidence reachable without letting this secondary
+            // hover layer hide a positive primary overtime value.
             const detail='<div class="p79-overtime-hidden-detail">'+
-                ((otherLabel||reviewBadge||declared)?'<div class="text-cyan-700 dark:text-cyan-300">'+otherLabel+reviewBadge+declared+'</div>':'')+
                 original+
                 (planned.minutes!==null?'<div class="text-xs">'+(planned.pending?'已安排／待申報':'申報')+' '+formatDurationMinutes(planned.minutes)+'</div>':'')+
-                (actual?'<div class="text-[10px] text-slate-500">打卡估算 '+formatDurationMinutes(actual)+'</div>':'')+
+                (estimate?'<div class="text-[10px] text-slate-500">打卡估算 '+formatDurationMinutes(estimate)+'</div>':'')+
                 '</div>';
             return visible+detail;
         }
