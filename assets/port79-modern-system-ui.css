@@ -1,0 +1,118 @@
+/* 79號碼頭安全視覺改版 2026-10-29
+ * 只改管理介面呈現。所有權限、資料、事件、打卡流程保持原狀。
+ * 不套用在員工打卡模式。勿在此新增隱藏/改寫業務欄位的規則。
+ */
+@charset "UTF-8";
+:root{--p79m-blue:#1673ec;--p79m-navy:#12315c;--p79m-muted:#67809f;--p79m-edge:#dce8f5;--p79m-bg:#f2f7fd;--p79m-panel:#ffffff;--p79m-shadow:0 10px 35px rgba(23,67,113,.07)}
+/* 適用已登入的管理功能頁面，不涵蓋員工刷卡與上下班按鈕。 */
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]){background:radial-gradient(circle at 80% -15%,rgba(45,156,248,.12),transparent 34%),var(--p79m-bg)!important;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;line-height:1.55}
+html.p79-attendance-management-chrome body[data-p79-system="attendance"]{background:var(--p79m-bg)!important}
+/* 共用七系統導覽，保留所有既有 href 與權限過濾。 */
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenTop{
+ background:linear-gradient(160deg,#ffffff,#f7fbff)!important;color:#14345f!important;
+ box-shadow:0 6px 30px rgba(28,66,120,.08)!important;border-color:var(--p79m-edge)!important;
+}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenTop .brand-name{color:#102e58!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenTop .brand-sub{color:#7086a1!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenNav{background:#edf5ff!important;border-color:#dbe9fa!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenNav a{color:#25476b!important;transition:background .15s,color .15s,transform .15s}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenNav a.active{background:#dcebff!important;color:#0862db!important;box-shadow:none!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenNav a:hover{background:#e4efff!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenMenuButton{background:#1673ec!important;border:1px solid #247bea!important;border-radius:12px!important;box-shadow:0 5px 14px rgba(25,101,218,.17)}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenStatus{background:#f8fbff!important;color:#385e82!important;border-color:var(--p79m-edge)!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) #p79SevenStatus .sys{border-radius:10px!important}
+/* 電腦版固定左側功能選單，與設計圖一致；小尺寸保留原版頂部導覽避免遮住業務內容。 */
+@media(min-width:1440px){
+ body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]{padding-left:246px!important}
+ body[data-p79-system="leave"] #p79SevenTop,body[data-p79-system="schedule"] #p79SevenTop,body[data-p79-system="efficiency"] #p79SevenTop,body[data-p79-system="hr"] #p79SevenTop,body[data-p79-system="history"] #p79SevenTop{
+  position:fixed!important;left:0!important;top:0!important;bottom:0!important;right:auto!important;
+  width:246px!important;height:100vh!important;overflow-y:auto!important;overflow-x:hidden!important;z-index:11000!important;
+  border-right:1px solid #e0ebf6!important;border-bottom:0!important;
+  display:flex!important;flex-direction:column!important;
+ }
+ body[data-p79-system="leave"] #p79SevenTop .top-row,body[data-p79-system="schedule"] #p79SevenTop .top-row,body[data-p79-system="efficiency"] #p79SevenTop .top-row,body[data-p79-system="hr"] #p79SevenTop .top-row,body[data-p79-system="history"] #p79SevenTop .top-row{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-items:stretch!important;gap:15px!important;
+  padding:20px 12px 12px!important;height:auto!important;min-height:0!important;
+ }
+ body[data-p79-system="leave"] #p79SevenNav,body[data-p79-system="schedule"] #p79SevenNav,body[data-p79-system="efficiency"] #p79SevenNav,body[data-p79-system="hr"] #p79SevenNav,body[data-p79-system="history"] #p79SevenNav{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;
+  grid-template-columns:none!important;width:100%!important;max-width:100%!important;overflow:visible!important;
+  border:0!important;background:transparent!important;gap:6px!important;padding:2px!important;
+ }
+ body[data-p79-system="leave"] #p79SevenNav a,body[data-p79-system="schedule"] #p79SevenNav a,body[data-p79-system="efficiency"] #p79SevenNav a,body[data-p79-system="hr"] #p79SevenNav a,body[data-p79-system="history"] #p79SevenNav a{
+  display:flex!important;justify-content:flex-start!important;min-width:0!important;width:100%!important;min-height:44px!important;
+  font-size:14px!important;text-align:left!important;padding:11px 13px!important;
+ }
+ body[data-p79-system="leave"] #p79SevenTop .action,body[data-p79-system="schedule"] #p79SevenTop .action,body[data-p79-system="efficiency"] #p79SevenTop .action,body[data-p79-system="hr"] #p79SevenTop .action,body[data-p79-system="history"] #p79SevenTop .action{
+  display:flex!important;justify-content:stretch!important;margin-top:3px!important
+ }
+ body[data-p79-system="leave"] #p79SevenMenuWrap,body[data-p79-system="schedule"] #p79SevenMenuWrap,body[data-p79-system="efficiency"] #p79SevenMenuWrap,body[data-p79-system="hr"] #p79SevenMenuWrap,body[data-p79-system="history"] #p79SevenMenuWrap{width:100%!important}
+ body[data-p79-system="leave"] #p79SevenMenuButton,body[data-p79-system="schedule"] #p79SevenMenuButton,body[data-p79-system="efficiency"] #p79SevenMenuButton,body[data-p79-system="hr"] #p79SevenMenuButton,body[data-p79-system="history"] #p79SevenMenuButton{width:100%!important}
+ body[data-p79-system="leave"] #p79SevenStatus,body[data-p79-system="schedule"] #p79SevenStatus,body[data-p79-system="efficiency"] #p79SevenStatus,body[data-p79-system="hr"] #p79SevenStatus,body[data-p79-system="history"] #p79SevenStatus{
+  margin-top:auto!important;display:flex!important;flex-wrap:wrap!important;justify-content:flex-start!important;gap:4px!important;
+  padding:12px!important;border-top:1px solid var(--p79m-edge)!important;max-height:27vh!important;overflow-y:auto!important
+ }
+ body[data-p79-system="leave"] #p79SevenStatus .sys,body[data-p79-system="schedule"] #p79SevenStatus .sys,body[data-p79-system="efficiency"] #p79SevenStatus .sys,body[data-p79-system="hr"] #p79SevenStatus .sys,body[data-p79-system="history"] #p79SevenStatus .sys{font-size:10px!important;min-height:25px!important;padding:4px 5px!important}
+ body[data-p79-system="leave"] #p79SevenStandardMenu,body[data-p79-system="schedule"] #p79SevenStandardMenu,body[data-p79-system="efficiency"] #p79SevenStandardMenu,body[data-p79-system="hr"] #p79SevenStandardMenu,body[data-p79-system="history"] #p79SevenStandardMenu{position:fixed!important;left:240px!important;top:72px!important;right:auto!important;max-height:78vh!important;overflow:auto!important}
+}
+/* 以下僅修改元件外觀，不隱藏欄位、不重新排序、不改日期或資料值。 */
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(main,.wrap,#efficiencyPageMain,#app-main-container){scroll-margin-top:12px}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.card,.panel,.hero,.today-schedule-card){
+ border-radius:17px!important;border-color:#dae7f5!important;box-shadow:var(--p79m-shadow)!important;
+}
+body[data-p79-system="schedule"] :is(.today-schedule-card,#app-main-container > section,#app-main-container > .bg-white){border-radius:17px!important;box-shadow:var(--p79m-shadow)}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(main h1,main h2,main h3,.panelhead strong){letter-spacing:.01em;color:#193b66}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.table-wrap,.tablewrap,.overflow-auto){scrollbar-color:#b7d5f4 #f6faff}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.table-wrap,.tablewrap){border:1px solid #e2edf9;border-radius:13px}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.table-wrap,.tablewrap) table{width:100%;border-collapse:separate;border-spacing:0}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.table-wrap,.tablewrap) thead th{background:#eff5fe;color:#254870;border-bottom:1px solid #d3e5f8;font-weight:850}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.table-wrap,.tablewrap) tbody tr:hover{background:rgba(229,241,254,.55)}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),select,textarea){
+ border-color:#cbdcf0;border-radius:11px;min-height:35px;transition:border-color .17s,box-shadow .17s
+}
+:where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(input,select,textarea):focus-visible{outline:2px solid #9dc6fb;outline-offset:1px}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(button,.btn){transition:box-shadow .18s,filter .18s,transform .18s}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(button,.btn):focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) dialog{border-radius:20px!important;max-width:min(95vw,1100px);box-shadow:0 26px 90px rgba(11,45,87,.24)!important;border:1px solid #d7e6f7!important}
+:where(body[data-p79-system="leave"],body[data-p79-system="schedule"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) dialog::backdrop{background:rgba(12,34,66,.46);backdrop-filter:blur(3px)}
+/* 各模組內部細項：不是只改總覽頁。 */
+body[data-p79-system="efficiency"] #efficiencyPageMain > .card,body[data-p79-system="efficiency"] #efficiencyMainTabs,
+body[data-p79-system="efficiency"] #vesselSummaryCard,
+body[data-p79-system="efficiency"] #p79EfficiencyCumulative{background:#fff!important}
+body[data-p79-system="efficiency"] #efficiencyMainTabs .tab{border-radius:11px!important;white-space:nowrap}
+body[data-p79-system="efficiency"] #efficiencyMainTabs .tab.active{background:#dcebff!important;color:#075fcf!important;box-shadow:inset 0 -2px 0 #2b83ef}
+body[data-p79-system="efficiency"] #view-dashboard .card,body[data-p79-system="efficiency"] #view-personstats .card,
+body[data-p79-system="efficiency"] #view-weekly .card,body[data-p79-system="efficiency"] #view-compare .card,
+body[data-p79-system="efficiency"] #view-multi-rod .card,body[data-p79-system="efficiency"] #view-dispatch .card{border-radius:18px!important;border:1px solid #dae7f5!important;box-shadow:var(--p79m-shadow)!important}
+body[data-p79-system="efficiency"] #vesselMonthlyExportDialog{width:min(96vw,980px);padding:26px!important}
+body[data-p79-system="efficiency"] #vesselMonthlyExportDialog h3{font-size:24px;color:#144377}
+body[data-p79-system="efficiency"] #vesselMonthlyExportDialog .grid{gap:10px!important}
+body[data-p79-system="efficiency"] #vesselMonthlyExportDialog input{min-height:42px!important;background:#fbfdff}
+body[data-p79-system="efficiency"] #vesselMonthlyExportDialog .bg-emerald-600{background:#0c9474!important;border-radius:11px}
+body[data-p79-system="efficiency"] :is(#summaryDashboardTable,.tbl) thead th{background:#edf5ff!important;color:#234e78}
+body[data-p79-system="efficiency"] :is(#summaryDashboardTable,.tbl) tbody tr:hover{filter:brightness(.985)}
+body[data-p79-system="schedule"] #p79ScheduleQuickBar,body[data-p79-system="schedule"] #todaySchedulePanel{border-radius:15px;box-shadow:var(--p79m-shadow)}
+body[data-p79-system="schedule"] #app-main-container input:focus-visible,
+body[data-p79-system="schedule"] #app-main-container select:focus-visible{outline:2px solid #93c5fd;outline-offset:1px}
+body[data-p79-system="schedule"] .p79-month-schedule-table{border:1px solid #d7e5f6}
+/* 班別底色與考勤狀態顏色不可覆寫，避免把休假/出勤誤判。 */
+body[data-p79-system="leave"] #leaveStickyTabs,body[data-p79-system="leave"] .toolbar,
+body[data-p79-system="leave"] #adminMode .filters{background:#f9fcff;border-radius:13px}
+body[data-p79-system="leave"] #leaveStickyTabs .active{box-shadow:inset 0 -3px 0 #2b83ef}
+body[data-p79-system="hr"] .filters{background:#f8fbff;border:1px solid #e2ecf8;border-radius:14px}
+body[data-p79-system="hr"] .modalhead{background:#f4f8ff;border-bottom:1px solid #e1e9f6}
+body[data-p79-system="hr"] #editor .modal,body[data-p79-system="hr"] #permissionDialog .modal{background:#fff}
+body[data-p79-system="history"] .hero{background:linear-gradient(125deg,#e8f3ff,#f7fbff)!important}
+body[data-p79-system="history"] .hero h1{font-size:clamp(22px,2.4vw,30px)!important;color:#0e3a70!important}
+body[data-p79-system="history"] .tabs{gap:11px}
+body[data-p79-system="history"] .tabs .tab{background:#fff!important;border-radius:15px!important;min-height:86px;box-shadow:var(--p79m-shadow)}
+body[data-p79-system="history"] .tabs .tab.active{background:#e7f2ff!important;border-color:#7bb8ff!important;outline:2px solid rgba(34,123,239,.17)}
+body[data-p79-system="history"] .history-excel-bar{background:#fff;border:1px solid #e2edf9;border-radius:15px;padding:12px!important;margin-block:14px!important;box-shadow:var(--p79m-shadow)}
+body[data-p79-system="history"] .progressbar{background:#dfeaff}
+body[data-p79-system="history"] .progressfill{background:linear-gradient(90deg,#18b3bd,#1376ed)}
+/* 暗色主題不破壞系統既有語意色：只改安全的卡片外框。 */
+html[data-theme="dark"] :where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.card,.panel){box-shadow:0 8px 25px rgba(0,0,0,.18)!important}
+@media(max-width:767px){
+ :where(body[data-p79-system="leave"],body[data-p79-system="efficiency"],body[data-p79-system="hr"],body[data-p79-system="history"]) :is(.card,.panel,.hero){border-radius:13px!important}
+ body[data-p79-system="efficiency"] #vesselMonthlyExportDialog{padding:16px!important}
+}
