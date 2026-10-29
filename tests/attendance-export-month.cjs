@@ -27,6 +27,7 @@ elements.exportIncludeSchedule={checked:true};elements.exportAttendanceMonth.val
 const people=[{empId:'AP1',attNo:'1',name:'甲',jobTitle:'ARMG',group:'A組'},
  {empId:'AN2',attNo:'2',name:'乙',jobTitle:'F/L'}];
 c.getAdminAttendanceEmployees=()=>people;c.p79RequireScheduleExport=()=>true;
+c.p79ReadAttendanceExportSpecialDays=async()=>[];
 c.p79ReadAttendanceExportSource=async()=>({schedules:[{empId:'AP1',month:'2026-10',role:'ARMG',
  schedule:{'2026-10-01':'晚','2026-10-02':'休',__personnel:{role:'ARMG',group:'A組',lockType:'FIXED_LOCKED'},
  __meta:{'2026-10-02':{restCategory:'例'}}}}],leaveRecords:[]});
