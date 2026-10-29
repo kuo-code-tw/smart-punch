@@ -5350,7 +5350,10 @@ function p79EmployeeDateEligible(emp,date) {
       return approvedLeaveRecordsOnDate(dayStr).find(item => {
         const leaveId = String(item?.empId || item?.employeeId || '').trim().toUpperCase();
         const leaveName = String(item?.name || item?.employeeName || '').replace(/\s+/g,'').trim();
-        return (id && leaveId === id) || (name && leaveName === name);
+        // 有明確工號時只能以工號配對，避免同名員工互相觸發請假鎖定。
+        // 舊請假紀錄缺少工號才允許使用姓名回退配對。
+        if (id && leaveId) return leaveId === id;
+        return !!(name && leaveName === name);
       }) || null;
     }
 
