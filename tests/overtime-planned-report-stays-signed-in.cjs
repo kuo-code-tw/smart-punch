@@ -28,7 +28,7 @@ const document={
    if(id==='p79PlanModeAuto')return this.nodes.auto;
    return [...this.nodes.planned.children,...this.body.children].find(e=>e.id===id)||null;},
  createElement(tag){assert.equal(tag,'dialog');return{
-  id:'',tagName:'DIALOG',isConnected:false,open:false,innerHTML:'',
+  id:'',tagName:'DIALOG',isConnected:false,open:false,innerHTML:'',style:{},
   querySelector:()=>({onclick:null}),
   remove(){this.isConnected=false;const a=this.parentNode?.children;if(a){const i=a.indexOf(this);if(i>=0)a.splice(i,1)}},
   showModal(){this.open=true;},
