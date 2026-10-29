@@ -419,7 +419,7 @@ function plan(snapshot,people,month,rules,options={}){
       status:planned?(candidate.restProtected?'預排草案（未申報）':'預排草案｜例休週期待核（未申報）'):'可申報',
       needsWeeklyReview:planned&&!candidate.restProtected,planned});
      if(planned&&!candidate.restProtected)issues.push(state.emp.name+' '+date+'：預排草案有原排例休週期待核，不得直接視為可加班或正式申報');
-    state.used.add(date);state.weekCount[weekOf(date)]++;if(planned)state.weeklyPlanned.add(candidate.week+'|'+category);state.remaining[category]--;
+    state.used.add(date);state.weekCount[weekOf(date)]++;state.weeklyPlanned.add(candidate.week+'|'+category);state.remaining[category]--;
    }
   }
  }
