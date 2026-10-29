@@ -192,6 +192,85 @@ function monthEndWindowDate(month,asOf=today()){
  return month===date.slice(0,7)?(date>start?date:start):month+'-01';
 }
 // 只提供參考預警；法定七日週期必須採勞雇已約定的起點，不能擅自以每月一日重算。
+
+/* A legal seven-day cycle is continuous across months and must be explicitly agreed.
+   Unknown anchors are a reference-only Sunday week, never permission to auto-plan. */
+function weeklyCycleAnchor(emp){
+ const source=g.p79MonthlyRestContext?.weeklyCycleStart;
+ const configured=typeof source==='function'?source(emp):source;
+ const raw=String(configured||emp?.weeklyCycleStart||emp?.restCycleStart||emp?.workWeekStart||'').slice(0,10);
+ return /^\d{4}-\d{2}-\d{2}$/.test(raw)&&Number.isFinite(Date.parse(raw+'T00:00:00Z'))?raw:'';
+}
+function weeklyCycleWindow(date,anchor=''){
+ const day=Date.parse(String(date)+'T00:00:00Z');
+ if(!Number.isFinite(day))return null;
+ const base=anchor?Date.parse(anchor+'T00:00:00Z'):day-new Date(day).getUTCDay()*86400000;
+ const start=base+Math.floor((day-base)/604800000)*604800000;
+ const iso=ms=>new Date(ms).toISOString().slice(0,10);
+ return {start:iso(start),end:iso(start+6*86400000),confirmed:!!anchor};
+}
+function weeklyReviewSummary(snapshot,people,month,plannedRows=[]){
+ const rosters=new Map((snapshot?.schedules||[]).map(x=>[id(x.empId),x.schedule]));
+ const picked=new Set(people.map(x=>id(x.empId))),groups=new Map();
+ for(const emp of people){
+  const roster=rosters.get(id(emp.empId));
+  if(!roster)continue;
+  const anchor=weeklyCycleAnchor(emp),seen=new Set();
+  for(const date of Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&d.startsWith(month+'-')).sort()){
+   const w=weeklyCycleWindow(date,anchor);if(!w)continue;
+   const k=w.start+'|'+(anchor?'confirmed':'reference');
+   if(!groups.has(k))groups.set(k,{start:w.start,end:w.end,confirmed:w.confirmed,people:new Set(),regular:0,rest:0,holiday:0,planned:0,missing:0,uncertain:0});
+   const group=groups.get(k),personKey=id(emp.empId)+'|'+w.start;
+   if(!seen.has(personKey)){group.people.add(id(emp.empId));seen.add(personKey);}
+   const code=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
+   if(code==='例')group.regular++;
+   if(code==='休')group.rest++;
+   if(code==='國')group.holiday++;
+   if(!code)group.uncertain++;
+  }
+  const keys=[...seen];
+  for(const key of keys){
+   const weekStart=key.split('|')[1],group=groups.get(weekStart+'|'+(anchor?'confirmed':'reference'));
+   const full=weeklyCycleWindow(weekStart,anchor);
+   const days=Array.from({length:7},(_,i)=>new Date(Date.parse(full.start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10));
+   const complete=days.every(d=>Object.prototype.hasOwnProperty.call(roster,d));
+   const regular=days.filter(d=>roster[d]==='例').length,rest=days.filter(d=>roster[d]==='休').length;
+   if(!anchor||!complete||regular<1||rest<1)group.missing++;
+  }
+ }
+ for(const row of plannedRows||[]){
+  if(!picked.has(id(row.empId)))continue;
+  const emp=people.find(e=>id(e.empId)===id(row.empId));
+  const w=weeklyCycleWindow(row.date,weeklyCycleAnchor(emp));if(!w)continue;
+  const group=groups.get(w.start+'|'+(w.confirmed?'confirmed':'reference'));
+  if(group)group.planned++;
+ }
+ return [...groups.values()].sort((a,b)=>a.start.localeCompare(b.start)||Number(b.confirmed)-Number(a.confirmed));
+}
+function automaticRestCategory(roster,date,month){
+ const original=String(roster?.[date]||'').trim(),meta=roster?.__meta?.[date]||{};
+ const marked=cats.includes(meta.restCategory)?meta.restCategory:'';
+ const category=cats.includes(original)?original:marked;
+ if(!category)return '';
+ if(category==='國'){
+  const sources=new Set(g.p79RestQuota(month).slots.filter(x=>x.category==='國').map(x=>x.sourceDate));
+  if(!sources.has(date)&&!(meta.restSourceDate&&sources.has(meta.restSourceDate)&&meta.restCategoryLocked===true))return '';
+ }
+ return category;
+}
+function canAutoSuggestFuture(roster,date,month,emp,category){
+ const m=roster?.__meta?.[date]||{};
+ const anchor=weeklyCycleAnchor(emp);
+ // No invented workday-to-holiday conversion; do not auto-plan mandatory regular days.
+ if(!anchor||category==='例'||!['休','國'].includes(category)||m.restQuotaOvertime!==true)return false;
+ if(!futureWeekRestProtected(roster,date,anchor))return false;
+ if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return false;
+ // A future rest day needs an explicitly recorded 8-hour working period.
+ return ['早','中','晚'].includes(String(roster[date]||''))||
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeStart||''))&&
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeEnd||''));
+}
+
 function weeklyRestReview(roster,month,cycleStart=''){
  const anchor=/^\d{4}-\d{2}-\d{2}$/.test(String(cycleStart))?cycleStart:'';
  const days=Object.keys(roster||{}).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort(),groups=new Map();
@@ -228,8 +307,10 @@ function futureWeekRestProtected(roster,date,cycleStart=''){
 function ruleFor(date,roster,pair,category,rules){
  const allowed=rules.filter(r=>r[0]===category&&fullDayRule(r));
  if(pair){const found=g.P79Overtime.inferRule(pair.start,pair.end,date,allowed,category);return found||null;}
- const range={早:'08-16',中:'16-24',晚:'24-08'}[roster[date]];
- return allowed.find(r=>r[6]+'-'+r[7]===range)||null;
+ const m=roster.__meta?.[date]||{};
+ const range={早:'08-16',中:'16-24',晚:'24-08'}[roster[date]]||(m.restQuotaOvertime===true&&m.overtimeStart&&m.overtimeEnd?String(m.overtimeStart).replace(':','')+'-'+String(m.overtimeEnd).replace(':',''):'');
+ const normalized=range.replace(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/,'$1:$2-$3:$4');
+ return allowed.find(r=>r[6]+'-'+r[7]===range||r[6]+'-'+r[7]===normalized)||null;
 }
 function sortRows(rows){
  const rank=r=>r.saved?2:(!r.planned&&r.status==='可申報'?0:1);
@@ -278,8 +359,7 @@ function plan(snapshot,people,month,rules,options={}){
   let b;try{b=balance(emp,roster,month,snapshot)}catch(e){issues.push(e.message);unavailable.push({emp,reason:String(e.message||'班表不完整')});continue;}
   balances.push({emp,...b});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
-  const setting=g.p79MonthlyRestContext?.weeklyCycleStart;
-  const cycleStart=typeof setting==='function'?setting(emp):String(setting||'');
+  const cycleStart=weeklyCycleAnchor(emp);
   const restIssues=weeklyRestReview(roster,month,cycleStart);
   for(const week of restIssues)issues.push(emp.name+' 週期起點 '+week.start+'：'+
    (week.confirmedCycle?'約定週期':'暫以週日為起點預覽')+
@@ -289,27 +369,30 @@ function plan(snapshot,people,month,rules,options={}){
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if((b.typhoonDates||[]).includes(date)||date<monthEndWindowDate(month,currentDate)||date<=lastReported||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
+   const originalCategory=automaticRestCategory(roster,date,month);
+   if(!originalCategory)continue;
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    const verified=date<=currentDate&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
    const scheduledWork=['早','中','晚'].includes(roster[date]);
    // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
    const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
-   const todayPending=!historical&&date===currentDate&&scheduledWork&&!verified&&
-     ['open','missing'].includes(todayState);
-   const upcoming=!historical&&date>currentDate&&scheduledWork&&!pairs.length;
+   const todayPending=!historical&&date===currentDate&&!verified&&
+     ['open','missing'].includes(todayState)&&canAutoSuggestFuture(roster,date,month,emp,originalCategory);
+   const upcoming=!historical&&date>currentDate&&!pairs.length&&canAutoSuggestFuture(roster,date,month,emp,originalCategory);
    if(!verified&&!todayPending&&!upcoming)continue;
    if(!verified&&date<currentDate)continue;
    const pair=verified?pairs[0]:null,byCategory=new Map();
    // 有正式班表的例／休／國只能保留原假別；未來預排不擅自把休假日轉成上班。
-   const fixed=String(roster[date]||'').trim(),categoryOptions=fixed==='休'?['休']:fixed==='例'?['例']:fixed==='國'?['國']:cats;
+   const categoryOptions=[originalCategory];
    for(const category of categoryOptions){const rule=ruleFor(date,roster,pair,category,rules);if(rule)byCategory.set(category,rule);}
    if(byCategory.size){
     const restProtected=!!pair||futureWeekRestProtected(roster,date,cycleStart);
-    candidates.push({date,pair,byCategory,restProtected});
+    if(!pair&&!restProtected)continue;
+    candidates.push({date,pair,byCategory,restProtected,week:weeklyCycleWindow(date,cycleStart)?.start||''});
    }
   }
-  states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});
+  states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],weeklyPlanned:new Set(),remaining:{...b.remaining}});
  }
  // Schedule the whole group together rather than finishing one person first.
  // Consume every available quota in one pass, taking dates from today forward.
@@ -319,7 +402,7 @@ function plan(snapshot,people,month,rules,options={}){
    const byDate=new Map();
    for(const state of states){
     if(!state.remaining[category])continue;
-    const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category));
+    const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category)&&(!planned||category!=='休'||!state.weeklyPlanned.has(c.week+'|休')));
     if(!available.length)continue;
     for(const candidate of available){
      if(!byDate.has(candidate.date))byDate.set(candidate.date,[]);
@@ -334,7 +417,7 @@ function plan(snapshot,people,month,rules,options={}){
       status:planned?(candidate.restProtected?'預排草案（未申報）':'預排草案｜例休週期待核（未申報）'):'可申報',
       needsWeeklyReview:planned&&!candidate.restProtected,planned});
      if(planned&&!candidate.restProtected)issues.push(state.emp.name+' '+date+'：預排草案有原排例休週期待核，不得直接視為可加班或正式申報');
-    state.used.add(date);state.weekCount[weekOf(date)]++;state.remaining[category]--;
+    state.used.add(date);state.weekCount[weekOf(date)]++;if(planned)state.weeklyPlanned.add(candidate.week+'|'+category);state.remaining[category]--;
    }
   }
  }
@@ -446,7 +529,7 @@ async function open(settings={}){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><details id="mrWeeklyDetails" style="margin:8px 0 12px;border:1px solid #dbe4ee;border-radius:10px;padding:10px" open><summary style="cursor:pointer;font-weight:800">逐週例／休／國核對（依原班表）</summary><div class="scroll" style="max-height:230px"><table><thead><tr><th>週期</th><th>人數</th><th>例假</th><th>休息日</th><th>國定假日</th><th>預排建議</th><th>待確認</th></tr></thead><tbody id="mrWeeklyRows"></tbody></table></div><small style="display:block;color:#64748b;margin-top:6px">未設定員工約定七日週期或跨月班表不足時，只做參考核對，不會自行把普通工作日改為休假加班。</small></details><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'));
  document.body.appendChild(el);el.showModal();
  let autoPlan=settings.autoPlan===true;
@@ -508,6 +591,8 @@ async function open(settings={}){
      :'加班與額度歸屬：'+loadedMonth;
    q('#mrPhase').textContent=phase.label+'｜'+phase.tip;
    const audit=workflowAudit(model);
+   const weeks=weeklyReviewSummary(snapshot,chosenPeople(),loadedMonth,model.plannedRows);
+   q('#mrWeeklyRows').innerHTML=weeks.map(w=>'<tr><td>'+esc(w.start)+'～'+esc(w.end)+(w.confirmed?'':'（參考）')+'</td><td>'+w.people.size+'</td><td>'+w.regular+'</td><td>'+w.rest+'</td><td>'+w.holiday+'</td><td>'+w.planned+'</td><td>'+(w.missing?w.missing+' 人需核對':'—')+'</td></tr>').join('')||'<tr><td colspan="7">目前無可核對的週期資料</td></tr>';
    q('#mrCompactStats').textContent='月份：'+loadedMonth+'　｜　已核對：'+audit.checked+' 人　｜　預排建議：'+visiblePlannedRows().length+' 筆　｜　正式可申報：'+audit.verified+' 筆';
    q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜正式可申報 '+audit.verified+' 筆｜預排由你自行建立｜目前篩選 '+chosenPeople().length+' 人、'+visibleRows().length+' 筆（切換職稱不須重新讀取）';
    q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
@@ -798,5 +883,5 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected};
+g.P79MonthlyRest={open,plan,balance,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 })(window);
