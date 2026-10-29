@@ -11,7 +11,7 @@ function state({order=false,empty=false,edit=false,newReport=false}={}){
    reportedAt:report.reportedAt,declaredHours:report.declaredHours,
    category:report.category,code:report.code,id:report.id
   }:{...report,modifiedAt:edit?'2026-10-29T11:00':report.modifiedAt},
-  overtimeAmendments:order?[{reason:rev.reason,kind:rev.kind,at:rev.at,actor:rev.actor,reportId:rev.reportId}]:[{...rev}]
+  overtimeAmendments:order?[{reason:rev.reason,kind:rev.kind,at:rev.at,actor:rev.actor,reportId:rev.reportId,confirmed:rev.confirmed}]:[{...rev}]
  };
  const a={empId:'E1',schedule:{__meta:{[date]:details}}};
  const b={empId:'E2',schedule:{__meta:empty?{[date]:{restEvidence:'重新核算'}}:{}}};
