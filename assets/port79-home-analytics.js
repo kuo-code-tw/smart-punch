@@ -549,5 +549,14 @@ function recordIsCurrentShipDetail(r,index){
  const pending=monthJobs.filter(s=>/待審|待核|pending/i.test(String(s.status||''))).map(s=>({name:s.vessel||s.shipName||'未命名船舶',voyage:s.voyageE||s.voyageI||'—',description:s.reviewReason||s.note||'船舶作業待核對',date:finish(s),status:s.status,kind:'vessel'}));
  return {pending,jobs,todayShips:todayKeys.size,todayVolume:todayRows.length,todayContainers:todayRows.reduce((s,r)=>s+moves(r),0),monthVolume:monthRows.length,monthContainers:sum('containers'),billingContainers:monthJobs.reduce((s,r)=>s+num(r.totalContainers),0),shipEfficiency:shipHours?shipQuantity/shipHours:null,personEfficiency:personalHours?sum('moves')/personalHours:null,weeks,recordCount:rows.length,masterCount:masters.length};
 }
-return {aggregate,day,vesselAggregate};
+// GAS snapshot routes share a server lock. Read them one at a time and publish each result.
+async function readSnapshots(jobs,{signal,onResult,onError,onProgress}={}){
+ for(const job of jobs){
+  if(signal?.aborted)break;
+  try{const value=await job.run();if(!signal?.aborted)onResult?.(job.key,value);}
+  catch(error){if(!signal?.aborted)onError?.(job.key,error);}
+  finally{if(!signal?.aborted)onProgress?.();}
+ }
+}
+return {aggregate,day,vesselAggregate,readSnapshots};
 });
