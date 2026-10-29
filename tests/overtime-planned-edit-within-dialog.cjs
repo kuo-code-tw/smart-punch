@@ -32,7 +32,7 @@ const c={window:null,document:{getElementById:id=>nodes[id]||null,createComment:
  openEditRecordModal:async(...args)=>{shown.push({kind:'edit',args});edit.classList.remove('hidden');return true},
  openRowManualAdd:async(...args)=>{shown.push({kind:'add',args});add.classList.remove('hidden');return true}};
 c.window=c;vm.createContext(c);
-for(const name of ['p79SyncOvertimePlannedDialogState','p79MountAttendanceModalInPlannedDialog',
+for(const name of ['p79PlannedPunchNotice','p79SyncOvertimePlannedDialogState','p79MountAttendanceModalInPlannedDialog',
  'p79RestoreAttendanceModalFromPlannedDialog','p79PlannedAttendanceModalIsOpen',
  'p79PlannedDialogCancel','p79PlannedDialogClosed','p79CloseOvertimePlannedDialog',
  'p79ToggleOvertimePlanned','p79FindPlannedAttendanceEditRecord',
