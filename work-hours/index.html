@@ -1026,6 +1026,46 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  font-size:10px!important;line-height:1!important;padding:2px 5px!important;
  border-radius:5px!important;white-space:nowrap!important;
 }
+/* 2026-10-29 預排明細列：日期、姓名、部門、職稱、班別、時數、打卡及操作，
+   每筆固定同一視覺高度、水平／垂直置中。只影響預排視窗的表格，不更改資料。 */
+#adminContentOvertime #p79OvertimePlannedSection table thead tr{
+ height:40px!important;
+}
+#adminContentOvertime #p79OvertimePlannedSection table thead th{
+ height:40px!important;padding:6px 8px!important;
+ font-size:13px!important;line-height:1.25!important;
+ text-align:center!important;vertical-align:middle!important;white-space:nowrap!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody tr{
+ height:48px!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody tr td{
+ box-sizing:border-box!important;height:48px!important;
+ padding:0 8px!important;font-size:13px!important;line-height:1.25!important;
+ text-align:center!important;vertical-align:middle!important;white-space:nowrap!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody tr td:nth-child(2){
+ font-size:13px!important;font-weight:700!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody tr td.p79-planned-action-cell{
+ padding:0 6px!important;min-width:175px!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody .p79-planned-actions strong,
+#adminContentOvertime #p79OvertimePlannedBody .p79-planned-punch-entry .p79-planned-missing-label{
+ font-size:12px!important;line-height:1.2!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody .p79-planned-actions button,
+#adminContentOvertime #p79OvertimePlannedBody .p79-planned-punch-entry .p79-planned-punch-add,
+#adminContentOvertime #p79OvertimePlannedBody td:nth-child(7) button,
+#adminContentOvertime #p79OvertimePlannedBody td:nth-child(8) button{
+ box-sizing:border-box!important;height:26px!important;min-height:0!important;
+ padding:3px 7px!important;font-size:12px!important;line-height:1.15!important;
+ vertical-align:middle!important;white-space:nowrap!important;
+}
+#adminContentOvertime #p79OvertimePlannedBody td:nth-child(5) .block{
+ display:inline!important;margin-inline-start:4px!important;font-size:11px!important;
+}
+
 @media(max-width:640px){
  #adminContentOvertime #p79OvertimePlannedSection table,
  #adminContentOvertime #p79OvertimePlannedSection table th,
