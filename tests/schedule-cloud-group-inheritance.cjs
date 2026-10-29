@@ -54,7 +54,7 @@ assert.deepEqual(Array.from(c.p79ScheduleRolesWithoutGroups('2026-11')),['ARMG']
   assert.equal(result.verified,true);
   assert.deepEqual(reads,['2026-10']);
   c.p79ScheduleRestorePreviousGroups('2026-11',result.history);
-  assert.deepEqual(c.employees.map(e=>e.group),['C組','C組','A組']);
+  assert.deepEqual(Array.from(c.employees,e=>e.group),['C組','C組','A組']);
   assert.equal(c.schedulePersonnelOverrides['2026-11'].E1.group,'不分組','November cloud record retained');
   assert.equal(c.schedulePersonnelOverrides['2026-10'].E1.group,'C組','October cloud record retained');
   assert.deepEqual(Array.from(c.p79ScheduleRolesWithoutGroups('2026-11')),[]);
@@ -67,9 +67,9 @@ assert.deepEqual(Array.from(c.p79ScheduleRolesWithoutGroups('2026-11')),['ARMG']
     [e.id,{role:'ARMG',group:'不分組',groupExplicit:false}]));
   const december=await c.p79ScheduleLoadPreviousGroups('2026-12','TOKEN-A',['ARMG']);
   assert.deepEqual(reads,['2026-10','2026-11'],'October reused from verified in-session cache');
-  assert.deepEqual(december.history.map(h=>h.month),['2026-10','2026-11']);
+  assert.deepEqual(Array.from(december.history,h=>h.month),['2026-10','2026-11']);
   c.p79ScheduleRestorePreviousGroups('2026-12',december.history);
-  assert.deepEqual(c.employees.map(e=>e.group),['C組','C組','A組'],'intermediate untouched month must not mask October');
+  assert.deepEqual(Array.from(c.employees,e=>e.group),['C組','C組','A組'],'intermediate untouched month must not mask October');
   c.schedulePersonnelOverrides['2026-11'].E2.groupExplicit=true;
   c.applySchedulePersonnelOverrides('2026-12');
   assert.equal(c.employees[1].group,'不分組','latest explicit historical unassignment takes priority');
