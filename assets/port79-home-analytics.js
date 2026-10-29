@@ -311,22 +311,243 @@ function vesselAggregate(data,{today,month}){
  const active=r=>r&&!r.deleted&&!r.isDeleted&&!r.deletedAt&&!r.tombstone;
  const unique=(list,master=false)=>{const m=new Map();(list||[]).filter(active).forEach((r,i)=>m.set(String(master?(r.workingNo||r.id||'row:'+i):(r.id||[r.workingNo,r.empId||r.name,r.workDate,r.startTime,r.endTime,r.source].join('|'))),r));return [...m.values()];};
  const masters=unique(data.shipMasters,true).map(raw=>({...raw,...Object.fromEntries(Object.entries(raw.manualOverrides||{}).filter(([k])=>!k.startsWith('_')))}));
- const rows=unique(data.records),key=r=>String(r.workingNo||[r.shipName||r.vessel,r.voyageE||r.voyage].join('|'));
+ const shipMasters=masters,records=unique(data.records),PERSON_NAME_ALIAS_GROUPS=[['張嘉誠','張家誠']];
+ const applyShipManualOverrides=s=>s;
+function normalizePersonName(v){
+  let name=String(v||'')
+    .replace(/[（(]\s*AQC\s*[)）]/gi,'')
+    .replace(/\s+/g,'')
+    .trim();
+
+  // 工作報表 / 月效率資料曾出現同一人不同用字：
+  // 張嘉誠 <-> 張家誠。
+  // 只針對明確已知的別名做合併，不做模糊猜測，避免誤配其他員工。
+  for(const group of PERSON_NAME_ALIAS_GROUPS){
+    if(group.includes(name))return group[0];
+  }
+
+  return name;
+}
+function displayPersonName(v){
+  return String(v||'')
+    .replace(/\s*[（(]\s*(?:AQC|ARMG|F\s*\/\s*L|FL|GC|QC|RTG|RMG|領班|指揮手)\s*[）)]\s*/g,'')
+    .trim();
+}
+function normalizeAqcNo(v){
+  const s=String(v||'').trim().toUpperCase().replace(/\s+/g,'');
+  const m=s.match(/(?:GC|AQC)?0*(\d{3,6})$/);
+  return m?String(Number(m[1])):s.replace(/^(GC|AQC)[#:\-]?/,'');
+}
+function normalizeMonthlySerial(v){
+  const raw=String(v??'').trim();
+  if(!raw)return '';
+
+  // 支援：
+  // 0142      -> 0142
+  // 142       -> 0142
+  // 0142-2    -> 0142-2
+  // 5260142   -> 0142
+  // 5260142-2 -> 0142-2
+  //
+  // 注意："-2" 是同一月報序號的子序號，必須保留，不能併到 0142。
+  const m=raw.match(/(\d+)\s*(?:-\s*(\d+))?\s*$/);
+  if(!m)return raw.toUpperCase().replace(/\s+/g,'');
+
+  const main=String(m[1]||'');
+  const suffix=String(m[2]||'').replace(/^0+(?=\d)/,'');
+  const base=main.slice(-4).padStart(4,'0');
+
+  return suffix ? `${base}-${suffix}` : base;
+}
+function monthlyShipNo(v){
+  const s=String(v||'').trim();
+  if(!s)return '';
+  // 船名可能帶航次，例如「WAN HAI 177 S062」；不能抓字串最後的 062 當船號。
+  const wh=s.match(/WAN\s*HAI\s*(\d+)/i);
+  if(wh)return String(Number(wh[1]));
+  const lead=s.match(/^0*(\d+)\b/);
+  if(lead)return String(Number(lead[1]));
+  return s.replace(/^WAN\s*HAI\s*/i,'').trim();
+}
+
+// v2026.10.02：月報航次可能只有數字 618，系統則保存 N618 / S619。
+// 比對身份時只抽取航次的數字主體；N/S/I/E 等方向前綴不應把同一 WORKING NO 拆成缺漏。
+function normalizeShipText(v){
+  return String(v||'').trim().toUpperCase().replace(/\s+/g,' ');
+}
+function workingNoHasSuffix(v){
+  return /-\d+$/.test(String(v||'').trim());
+}
+function recordMatchesMasterDate(r,master){
+  const firstDate=String(master?.firstDate||'').slice(0,10);
+  const lastDate=String(master?.lastDate||'').slice(0,10);
+  const d=String(r?.workDate||'').slice(0,10);
+  if(!d || (!firstDate&&!lastDate))return true;
+  if(firstDate && d<firstDate)return false;
+  if(lastDate && d>lastDate)return false;
+  return true;
+}
+function vesselMasterForRecord(r){
+  const no=String(r?.workingNo||r?.workNo||r?.workingNumber||'').trim();
+  if(no){
+    const exact=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no);
+    if(exact)return exact;
+
+    // 舊資料可能只存 0151，而主檔是 5260151；只有「唯一標準序號」才允許補綁。
+    // 一旦 NO. 帶 -1/-2 子序號，就絕對不能退回同船名的父作業。
+    const serial=normalizeMonthlySerial(no);
+    if(serial){
+      const bySerial=(shipMasters||[]).filter(s=>normalizeMonthlySerial(s?.workingNo)===serial);
+      if(bySerial.length===1)return bySerial[0];
+    }
+    if(workingNoHasSuffix(no))return null;
+  }
+
+  const d=String(r?.workDate||'').slice(0,10);
+  const aqc=normalizeAqcNo(r?.number||r?.gcNo);
+  const rawVessel=normalizeShipText(r?.shipName||r?.vessel||'');
+  const explicitVoyages=[r?.voyageI,r?.voyageE,r?.voyage,r?.voyageIE]
+    .map(v=>normalizeShipText(v)).filter(Boolean);
+
+  if(rawVessel){
+    let candidates=(shipMasters||[]).filter(s=>{
+      const name=normalizeShipText(s?.vessel||'');
+      if(!name)return false;
+      return rawVessel===name || rawVessel.startsWith(name+' ');
+    });
+
+    if(candidates.length>1){
+      const fromLabel=[];
+      candidates.forEach(s=>{
+        const name=normalizeShipText(s?.vessel||'');
+        const suffix=rawVessel.startsWith(name+' ')?rawVessel.slice(name.length+1).trim():'';
+        if(suffix)fromLabel.push(suffix);
+      });
+      const voyages=[...new Set([...explicitVoyages,...fromLabel])].filter(Boolean);
+      if(voyages.length){
+        const matched=candidates.filter(s=>{
+          const sv=[s?.voyageI,s?.voyageE].map(v=>normalizeShipText(v)).filter(Boolean);
+          return voyages.some(v=>sv.includes(v) || sv.some(x=>v.includes(x)||x.includes(v)));
+        });
+        if(matched.length)candidates=matched;
+      }
+    }
+    if(candidates.length>1 && d){
+      const matched=candidates.filter(s=>recordMatchesMasterDate(r,s));
+      if(matched.length)candidates=matched;
+    }
+    if(candidates.length===1)return candidates[0];
+  }
+
+  const candidates=(shipMasters||[]).filter(s=>{
+    const first=String(s.firstDate||'').slice(0,10),last=String(s.lastDate||'').slice(0,10);
+    const inDate=!d || ((!first||d>=first)&&(!last||d<=last));
+    const aqcs=Array.isArray(s.aqcs)?s.aqcs:[];
+    const hasAqc=!aqc || !aqcs.length || aqcs.some(a=>normalizeAqcNo(a.number)===aqc);
+    return inDate&&hasAqc;
+  });
+  return candidates.length===1?candidates[0]:null;
+}
+function operationalSourceRank(r){
+  const src=String(r?.source||'');
+  if(src==='working-report')return 50;
+  if(src==='gc-driver-efficiency')return 40;
+  if(src==='web')return 30;
+  if(!src)return 20;
+  if(src==='excel-import')return 0;
+  return 10;
+}
+function canonicalOperationalRecords(list){
+  const map=new Map();
+  (list||[]).filter(r=>String(r?.source||'')!=='excel-import').forEach(r=>{
+    const person=normalizePersonName(displayPersonName(r?.name));
+    const date=String(r?.workDate||'').slice(0,10);
+    const aqc=normalizeAqcNo(r?.number||r?.gcNo);
+    const st=String(r?.startTime||'').slice(0,5);
+    const et=String(r?.endTime||'').slice(0,5);
+    const directNo=String(r?.workingNo||r?.workNo||r?.workingNumber||'').trim();
+    const directSerial=normalizeMonthlySerial(directNo);
+    const master=directSerial?null:vesselMasterForRecord(r);
+    // 5260151 / 0151 是同一月報序號；日期已在 key 內，因此用標準序號可安全去重。
+    const vesselKey=directSerial?`SER:${directSerial}`:(master?.workingNo?`SER:${normalizeMonthlySerial(master.workingNo)}`:`SHIP:${monthlyShipNo(r?.shipName||r?.vessel||'')}`);
+    const rawMoves=(num(r?.disc)+num(r?.load))||num(r?.containers);
+    // 同一人、同船、同日、同 AQC、同起訖時間就是同一作業段；班別文字不同不能讓同一筆重複計算。
+    const segment=(st||et)?`${st}|${et}`:`NO_TIME|${rawMoves}|${num(r?.hatches)}|${String(r?.note||'').trim()}`;
+    const key=[vesselKey,person,date,aqc,segment].join('|');
+    const completeness=(directNo?3:0)+(r?.shipName||r?.vessel?2:0)+(st?1:0)+(et?1:0)+(rawMoves>0?2:0)+(num(r?.hatches)>0?1:0);
+    const rank=operationalSourceRank(r)*100+completeness;
+    const prev=map.get(key);
+    if(!prev || rank>prev.rank)map.set(key,{r,rank});
+  });
+  return [...map.values()].map(x=>x.r);
+}
+function shipCompletionMonth(s,latestByNo=null){
+  if(!s)return '';
+  const x=applyShipManualOverrides(s)||s,ws=x.workingSheetSource||{};
+  const monthOf=v=>{
+    const m=String(v||'').trim().match(/^(20\d{2})[-\/](\d{1,2})(?:[-\/]\d{1,2})?/);
+    return m&&+m[2]>=1&&+m[2]<=12?m[1]+'-'+String(+m[2]).padStart(2,'0'):'';
+  };
+  for(const v of [s._cloudLastDate,s.cloudLastDate,s._authoritativeLastDate,x.lastDate,s.lastDate,x.lashingDateTime,x.lashingDate,ws.lashingDateTime,ws.lashingDate,ws.endDate]){
+    const month=monthOf(v);if(month)return month;
+  }
+  const no=String(s.workingNo||'').trim();
+  if(no){
+    const cached=latestByNo?.get(no);
+    if(cached)return cached.slice(0,7);
+    // 單艘船直接呼叫時仍保留舊資料備援；整月請由 shipCompletionIndex 預先索引，避免 O(船數×明細數)。
+    if(!latestByNo){
+      const dates=(records||[]).filter(r=>String(r?.workingNo||'').trim()===no)
+        .map(r=>String(r?.workDate||r?.date||'').slice(0,10)).filter(d=>/^20\d{2}-\d{2}-\d{2}$/.test(d)).sort();
+      if(dates.length)return dates[dates.length-1].slice(0,7);
+    }
+  }
+  for(const v of [x.compareMonth,x.compareDate,ws.compareMonth,ws.compareDate,x.firstDate,ws.firstDate,ws.startDate]){
+    const month=monthOf(v);if(month)return month;
+  }
+  return '';
+}
+function shipCompletionIndex(masters){
+  const latestByNo=new Map();
+  for(const r of (records||[])){
+    const no=String(r?.workingNo||'').trim();
+    const date=String(r?.workDate||r?.date||'').slice(0,10);
+    if(no&&/^20\d{2}-\d{2}-\d{2}$/.test(date) && date>(latestByNo.get(no)||''))latestByNo.set(no,date);
+  }
+  return new Map((masters||[]).filter(s=>String(s?.workingNo||'').trim())
+    .map(s=>[String(s.workingNo).trim(),{master:s,month:shipCompletionMonth(s,latestByNo)}]));
+}
+function recordCompletionMonth(r,index){
+  const entry=index?.get(String(r?.workingNo||'').trim());
+  if(entry?.month)return entry.month;
+  // 舊明細無主檔時僅取明確日期欄位；不覆寫原始作業日。
+  const raw=r?.sheetCompareDate||r?.compareDate||r?._cloudLastDate||'';
+  const m=String(raw).match(/^(20\d{2})[-\/](\d{1,2})/);
+  if(m&&+m[2]>=1&&+m[2]<=12)return m[1]+'-'+String(+m[2]).padStart(2,'0');
+  return String(r?.workDate||'').slice(0,7);
+}
+function recordIsCurrentShipDetail(r,index){
+  if(String(r?.source||'')!=='working-report')return true;
+  const ids=index?.get(String(r?.workingNo||'').trim())?.master?.workingSheetSource?.reportRecordIds;
+  return !Array.isArray(ids)||!ids.length||!String(r?.id||'')||ids.map(String).includes(String(r.id));
+}
+ const completionIndex=shipCompletionIndex(masters);
+ const rows=canonicalOperationalRecords(records.filter(r=>recordIsCurrentShipDetail(r,completionIndex))),key=r=>String(r.workingNo||[r.shipName||r.vessel,r.voyageE||r.voyage].join('|'));
  const finish=s=>iso(s._cloudLastDate||s.cloudLastDate||s._authoritativeLastDate)||iso(s.lastDate)||iso(s.lashingDateTime||s.lashingDate||s.workingSheetSource?.lashingDateTime||s.workingSheetSource?.endDate)||iso(s.compareDate||s.workingSheetSource?.compareDate)||iso(s.firstDate);
  const byNo=new Map(masters.map(s=>[key(s),s]));
  const dated=rows.map(r=>({...r,date:iso(r.workDate)})).filter(r=>r.date);
  const moves=r=>{if(r.source==='working-report'){const b=effectiveBundleRecord(r);return num(b.disc)+num(b.load);}return r.source==='gc-driver-efficiency'?num(r.disc)+num(r.load):num(r.containers);};
  const hours=r=>{if(['working-report','gc-driver-efficiency'].includes(r.source)&&num(r.timeHours))return Math.round(num(r.timeHours)*100)/100;const min=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):null;};const a=min(r.startTime),b=min(r.endTime);const h=a===null||b===null?0:((b-a+1440)%1440)/60;const adjusted=['working-report','gc-driver-efficiency'].includes(r.source)?h:Math.max(0,h-[r.deduct1,r.deduct2,r.deduct3,r.deduct4].reduce((s,v)=>s+num(v),0)/60);return Math.round(adjusted*100)/100;};
- const monthRows=dated.filter(r=>r.date.startsWith(month)),todayRows=dated.filter(r=>r.date===today);
+ const monthRows=dated.filter(r=>recordCompletionMonth(r,completionIndex)===month),todayRows=dated.filter(r=>r.date===today);
  const todayKeys=new Set(todayRows.map(key));masters.filter(s=>iso(s.firstDate)&&iso(s.firstDate)<=today&&iso(s.lastDate)&&iso(s.lastDate)>=today).forEach(s=>todayKeys.add(key(s)));
  const jobs=[...todayKeys].map(k=>{const rs=todayRows.filter(r=>key(r)===k),m=byNo.get(k)||rs[0]||{},hs=rs.reduce((s,r)=>s+hours(r),0),qty=rs.reduce((s,r)=>s+moves(r),0);return {shipGph:num(m.gph)||null,vessel:m.shipName||m.vessel||'未命名',voyage:m.voyageE||m.voyageI||m.voyage||'—',volume:rs.length,containers:qty,people:new Set(rs.map(r=>String(r.empId||r.name||'')).filter(Boolean)).size,efficiency:hs?qty/hs:null,status:m.status||'已載入'};});
  const weeks=Array.from({length:Math.ceil(new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate()/7)},()=>({volume:0,containers:0,hours:0,moves:0,shipGph:[]}));
- monthRows.forEach(r=>{const w=weeks[Math.floor((Number(r.date.slice(8))-1)/7)];w.volume++;w.containers+=moves(r);w.hours+=hours(r);w.moves+=moves(r)+num(r.hatches);});
- const sum=k=>weeks.reduce((s,w)=>s+w[k],0),monthJobs=masters.filter(s=>finish(s).startsWith(month));
- monthJobs.forEach(s=>{const date=finish(s),gph=num(s.gph),w=weeks[Math.floor((Number(date.slice(8))-1)/7)];if(w&&gph>0)w.shipGph.push(gph);});
- const eff=monthJobs.filter(s=>num(s.gph)>0),personalHours=sum('hours');
+ monthRows.forEach(r=>{const w=weeks[r.date<month+'-01'?0:Math.min(weeks.length-1,Math.floor((Number(r.date.slice(8))-1)/7))];w.volume++;w.containers+=moves(r);w.hours+=hours(r);w.moves+=moves(r)+num(r.hatches);});
+ const sum=k=>weeks.reduce((s,w)=>s+w[k],0),monthJobs=masters.filter(s=>(completionIndex.get(String(s.workingNo||'').trim())?.month||finish(s).slice(0,7))===month);
+ monthJobs.forEach(s=>{const date=finish(s),gph=num(s.gph),w=weeks[Math.floor((Number(date.slice(8))-1)/7)];if(w&&gph>0&&num(s.totalContainers||s.totalMoves)>0)w.shipGph.push({gph,quantity:num(s.totalContainers||s.totalMoves)});});
+ const eff=monthJobs.filter(s=>num(s.gph)>0&&num(s.totalContainers||s.totalMoves)>0),personalHours=sum('hours');const shipQuantity=eff.reduce((s,r)=>s+num(r.totalContainers||r.totalMoves),0),shipHours=eff.reduce((s,r)=>s+num(r.totalContainers||r.totalMoves)/num(r.gph),0);
  const pending=monthJobs.filter(s=>/待審|待核|pending/i.test(String(s.status||''))).map(s=>({name:s.vessel||s.shipName||'未命名船舶',voyage:s.voyageE||s.voyageI||'—',description:s.reviewReason||s.note||'船舶作業待核對',date:finish(s),status:s.status,kind:'vessel'}));
- return {pending,jobs,todayShips:todayKeys.size,todayVolume:todayRows.length,todayContainers:todayRows.reduce((s,r)=>s+moves(r),0),monthVolume:monthRows.length,monthContainers:sum('containers'),billingContainers:monthJobs.reduce((s,r)=>s+num(r.totalContainers),0),shipEfficiency:eff.length?eff.reduce((s,r)=>s+num(r.gph),0)/eff.length:null,personEfficiency:personalHours?sum('moves')/personalHours:null,weeks,recordCount:rows.length,masterCount:masters.length};
+ return {pending,jobs,todayShips:todayKeys.size,todayVolume:todayRows.length,todayContainers:todayRows.reduce((s,r)=>s+moves(r),0),monthVolume:monthRows.length,monthContainers:sum('containers'),billingContainers:monthJobs.reduce((s,r)=>s+num(r.totalContainers),0),shipEfficiency:shipHours?shipQuantity/shipHours:null,personEfficiency:personalHours?sum('moves')/personalHours:null,weeks,recordCount:rows.length,masterCount:masters.length};
 }
 return {aggregate,day,vesselAggregate};
 });
