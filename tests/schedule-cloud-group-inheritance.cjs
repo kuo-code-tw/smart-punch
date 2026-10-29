@@ -79,7 +79,7 @@ assert.deepEqual(Array.from(c.p79ScheduleRolesWithoutGroups('2026-11')),['ARMG']
   const altered=c.p79ScheduleGroupHistorySnapshot(
     {ok:true,month:'2026-10',schedules:[{empId:'E1',month:'2026-11',group:'WRONG'}]},'2026-10');
   assert.deepEqual(Object.keys(altered.overrides),[],'other-month row ignored');
-  for(const script of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)){
+  for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){
     if(script[1].trim())new vm.Script(script[1]);
   }
   console.log('PASS cloud history group continuity for Nov/Dec, explicit unassignment, authentication cache, immutable monthly roster, scripts parse');
