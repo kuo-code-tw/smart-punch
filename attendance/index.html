@@ -359,9 +359,7 @@ window.p79LoadXlsxLibrary = function(){
 <style id="p79-punch-my-schedule-visible-20261029">
 /* Employee-only punch mode must not hide the personal roster overview. */
 body.port79-employee-only #viewEmployee #empScheduleSummaryStats{
- display:grid!important;
- grid-template-columns:repeat(auto-fit,minmax(145px,1fr))!important;
- gap:10px!important;
+ display:none!important;
 }
 body.port79-employee-only #viewEmployee #empScheduleCard{display:block!important}
 body.port79-employee-only #viewEmployee #empScheduleMonthGrid{display:grid!important}
