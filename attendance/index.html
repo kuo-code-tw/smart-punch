@@ -8757,6 +8757,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }
             }
             const key=empId+'|'+month;
+            const monthInput=document.getElementById('empScheduleMonthSelect');
+            if(monthInput)monthInput.dataset.requestedMonth=month;
             if(p79EmployeeRosterPending.has(key))return p79EmployeeRosterPending.get(key);
             const ownMonthRows=()=>Array.isArray(schedules)&&(schedules||[]).some(row=>
                 String(row?.empId||'').trim().toUpperCase()===empId &&
@@ -8812,12 +8814,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     schedules.push(...own);
                     p79EmployeeRosterCheckedAt.set(key,own.length?Date.now():0);
                     const selector=document.getElementById('empScheduleMonthSelect');
-                    if(selector&&selector.value!==month)selector.value=month;
-                    renderEmployeeSchedule(currentEmp);
-                    if(own.length){
-                        reportStatus('已同步 '+month+' 本人的正式班表','ok');
-                    }else{
-                        reportStatus('正式雲端尚無 '+month+' 這位員工的班表；請管理員確認已儲存及工號一致。','error');
+                    if(selector&&selector.dataset.requestedMonth===month){
+                        renderEmployeeSchedule(currentEmp);
+                    }
+                    if(!selector||selector.dataset.requestedMonth===month){
+                        if(own.length)reportStatus('已同步 '+month+' 本人的正式班表','ok');
+                        else reportStatus('正式雲端尚無 '+month+' 這位員工的班表；請管理員確認已儲存及工號一致。','error');
                     }
                     return own.length>0;
                 }catch(error){
@@ -8828,7 +8830,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         : /沒有權限|無權限|權限不足|禁止存取|HTTP 403|HTTP 401/i.test(message)
                         ? '員工帳號尚未取得本人班表的雲端查閱權限，請管理員檢查 GAS 讀取權限'
                         : message;
-                    if(sameIdentity()){
+                    if(sameIdentity()&&(!monthInput||monthInput.dataset.requestedMonth===month)){
                         reportStatus('班表讀取失敗：'+display.slice(0,130),'error');
                         if(ownMonthRows())renderEmployeeSchedule(currentEmp);
                     }
@@ -8955,6 +8957,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (!todayShiftEl || !upcomingEl || !monthSelect) return;
 
             if (!emp) {
+                monthSelect.dataset.requestedMonth='';
                 todayShiftEl.textContent = '--';
                 todayNoteEl.textContent = '請先登入員工';
                 workDaysEl.textContent = '--';
@@ -8970,7 +8973,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const months = employeeScheduleMonths(emp);
             const todayKey = scheduleDateKey(new Date());
             const defaultMonth = todayKey.slice(0, 7);
-            const previousSelected = normalizeScheduleMonthKey(monthSelect.value);
+            const previousSelected = normalizeScheduleMonthKey(monthSelect.dataset.requestedMonth||monthSelect.value);
             // Preserve a newly requested month while its cloud read is still pending.
             if(previousSelected&&!months.includes(previousSelected))months.unshift(previousSelected);
             monthSelect.innerHTML = months.map(month => {
