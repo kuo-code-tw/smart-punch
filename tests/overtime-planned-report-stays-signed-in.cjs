@@ -8,7 +8,7 @@ function extract(source,start,end,label){
  return source.slice(from,to);
 }
 const open=extract(html,'        function p79OpenManualOvertimePlan(){','        async function p79DeletePlannedOvertimeRow','manual plan button');
-const core=extract(report,"  function dialog(title,content,id='p79OvertimeDialog'){",'  const inputStyle=','original shared report dialog');
+const core=extract(report,"function dialog(title,content,id='p79OvertimeDialog'){",'const inputStyle=','original shared report dialog');
 assert(html.includes('onclick="p79OpenManualOvertimePlan()"'),'actual add-plan button uses same-page function');
 assert(!open.includes('p79CloseOvertimePlannedDialog()'),'opening manual plan must not close list and jump to main page');
 assert(!open.includes('location.')&&!open.includes('logout')&&!open.includes('sessionStorage'),'never modify login on plan open');
