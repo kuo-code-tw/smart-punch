@@ -173,7 +173,53 @@ function cloudMonth(date){
    ?p79AttendanceOvertimeMonths.get(String(date).slice(0,7)):null;
  }catch(_){return null;}
 }
+// A date review tracks the actual overtime audit payload, not incidental
+// schedule day metadata. Opening the monthly-rest dialog is read-only and may
+// cause a fresh cloud snapshot with different row/property ordering.
+function p79ReviewStableObject(value){
+ if(Array.isArray(value))return value.map(p79ReviewStableObject);
+ if(value&&typeof value==='object'){
+  const out={};
+  for(const key of Object.keys(value).sort())out[key]=p79ReviewStableObject(value[key]);
+  return out;
+ }
+ return value;
+}
+function p79ReviewStableAuditRows(date,state){
+ const list=[];
+ for(const row of state.rows||[]){
+  const meta=row.schedule?.__meta?.[date];
+  if(!meta)continue;
+  const report=meta.overtimeReport||null;
+  const reports=Array.isArray(meta.overtimeReports)?meta.overtimeReports.filter(Boolean):[];
+  const amendments=Array.isArray(meta.overtimeAmendments)?meta.overtimeAmendments.filter(Boolean):[];
+  const revisions=Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions.filter(Boolean):[];
+  const revocations=Array.isArray(meta.overtimeRevocations)?meta.overtimeRevocations.filter(Boolean):[];
+  // Rest-day evidence, scheduling notes and newly present empty __meta entries
+  // must never invalidate a previously confirmed overtime review.
+  if(!report&&!reports.length&&!amendments.length&&!revisions.length&&!revocations.length&&meta.overtimeExcluded!==true)continue;
+  const normalized=collections=>collections.map(p79ReviewStableObject)
+   .sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  list.push([id(row.empId),p79ReviewStableObject(report),
+    normalized(reports),normalized(amendments),normalized(revisions),
+    normalized(revocations),meta.overtimeExcluded===true]);
+ }
+ return list.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+function p79ReviewHash(value){
+ const json=JSON.stringify(value);
+ let hash=2166136261;
+ for(let i=0;i<json.length;i++)hash=Math.imul(hash^json.charCodeAt(i),16777619);
+ return (hash>>>0).toString(36);
+}
 function reviewFingerprint(date,state){
+ if(state?.ready!==true)return '';
+ const list=p79ReviewStableAuditRows(date,state);
+ return 'v3-'+list.length+'-'+p79ReviewHash([String(state.token||''),list]);
+}
+// Keep existing users' verified marks if the saved legacy hash still exactly
+// matches the official cloud snapshot. A mismatched legacy mark is not trusted.
+function p79LegacyReviewFingerprint(date,state){
  if(state?.ready!==true)return '';
  const list=(state.rows||[]).map(row=>{
   const meta=row.schedule?.__meta?.[date];
@@ -181,11 +227,9 @@ function reviewFingerprint(date,state){
    meta.overtimeAmendments||null,meta.overtimeRevisions||null,
    meta.overtimeRevocations||null,meta.overtimeExcluded===true]:null;
  }).filter(Boolean).sort((a,b)=>a[0].localeCompare(b[0]));
- const value=JSON.stringify([String(state.token||''),list]);
- let hash=2166136261;
- for(let i=0;i<value.length;i++)hash=Math.imul(hash^value.charCodeAt(i),16777619);
- return list.length+'-'+(hash>>>0).toString(36);
+ return list.length+'-'+p79ReviewHash([String(state.token||''),list]);
 }
+
 function reviewMarks(){
  try{
   const data=JSON.parse(g.localStorage?.getItem(reviewVersionKey)||'{}');
@@ -193,8 +237,18 @@ function reviewMarks(){
  }catch(_){return {};}
 }
 function isReviewed(date){
- const signature=reviewFingerprint(date,cloudMonth(date));
- return !!signature&&reviewMarks()[date]===signature;
+ const state=cloudMonth(date);
+ const signature=reviewFingerprint(date,state);
+ if(!signature)return false;
+ const marks=reviewMarks();
+ if(marks[date]===signature)return true;
+ if(marks[date]&&marks[date]===p79LegacyReviewFingerprint(date,state)){
+  // One-time conservative migration: the legacy hash must match exactly.
+  marks[date]=signature;
+  try{g.localStorage?.setItem(reviewVersionKey,JSON.stringify(marks));}catch(_){}
+  return true;
+ }
+ return false;
 }
 function refreshCurrentStrip(){
  const host=g.document?.getElementById?.('p79AttendanceDateStrip');
