@@ -19,6 +19,14 @@ const c={
  p79TyphoonDates:()=>[],p79AutomaticRestMetadata:()=>({}),p79EmploymentStartDate:()=>'',scheduleEscapeHtml:x=>String(x||'')
 };
 c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:false}})});
+// Synthetic display-day evidence for this standalone typhoon-column test.
+// The production day classifier is covered separately by schedule visibility tests.
+c.p79VisibleRestDayAudit=()=>{
+ const dates={例:[],休:[],國:[]};
+ for(const [dayCode,value] of Object.entries(roster))
+  if(dates[value])dates[value].push(dayCode);
+ return dates;
+};
 vm.createContext(c);
 vm.runInContext(extract('p79ScheduleHasVerifiedPunch'),c);
 vm.runInContext(extract('p79DailyRestCount'),c);
