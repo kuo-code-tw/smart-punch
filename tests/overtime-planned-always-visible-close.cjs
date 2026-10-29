@@ -32,7 +32,7 @@ assert(begin>=0&&end>begin);
 const code=html.slice(begin,end);
 const attrs=new Map(),toggle={setAttribute:(k,v)=>attrs.set(k,v),title:''};
 const dialog={open:false,showModal(){this.open=true},close(){this.open=false}};
-const ctx={document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?toggle:null}};
+const ctx={p79PlannedAttendanceModalAnchors:new Map(),document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?toggle:null}};
 vm.createContext(ctx);vm.runInContext(code,ctx);
 ctx.p79ToggleOvertimePlanned();
 assert.equal(dialog.open,true);
