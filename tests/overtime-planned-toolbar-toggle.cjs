@@ -5,14 +5,14 @@ const html=fs.readFileSync('work-hours/index.html','utf8');
 
 assert.match(html,/＋ 申報加班<\/button>\s*<button id="p79OvertimePlannedToggle"/,'top toolbar modal button follows 申報加班');
 assert.match(html,/<button id="p79OvertimePlannedToggle"[^>]+aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false"/,'modal button is accessible');
-assert.match(html,/<dialog id="p79OvertimePlannedDialog"[^>]+onclose="p79SyncOvertimePlannedDialogState\(\)"/,'native modal synchronizes closing state (including Escape)');
+assert.match(html,/<dialog id="p79OvertimePlannedDialog"[^>]+oncancel="p79PlannedDialogCancel\(event\)" onclose="p79PlannedDialogClosed\(\)"/,'native dialog protects in-progress edits and restores toolbar on close');
 assert.match(html,/<section id="p79OvertimePlannedSection"/,'same original planned list remains inside modal');
 assert.match(html,/#adminContentOvertime #p79OvertimePlannedDialog:not\(\[open\]\)\{display:none!important\}/,'modal is hidden until opened');
 assert.match(html,/id="p79OvertimePlannedPagination"/,'list retains original pagination');
 assert(html.includes("toggle.textContent='預排／待核對（'+rows.length+'）'"),'top button uses filtered count');
 assert.match(html,/onclick="p79CloseOvertimePlannedDialog\(\)"[^>]+>✕ 關閉<\/button>/,'modal has a close button');
-assert.match(html,/p79CloseOvertimePlannedDialog\(\);\s*\/\/[^\n]*\n\s*return openEditRecordModal\(/,'attendance editing closes modal before opening its editor');
-assert(html.includes("p79CloseOvertimePlannedDialog();openRowManualAdd("),'attendance add closes modal before opening its editor');
+assert(!html.includes("p79CloseOvertimePlannedDialog();\n            // 原生考勤編輯器"),'editing must not jump back to main page');
+assert(html.includes("p79OpenPlannedMissingPunchEditor('+index+"),'missing punch edit stays inside planned dialog');
 assert(html.includes("p79OpenPlannedOvertimeReview('+index+')"),'review action remains available');
 
 const start=html.indexOf('function p79SyncOvertimePlannedDialogState(){');
@@ -40,7 +40,7 @@ ctx.p79ToggleOvertimePlanned();
 ctx.p79CloseOvertimePlannedDialog();
 assert.equal(dialog.open,false,'modal close button closes it');
 ctx.p79ToggleOvertimePlanned();dialog.close();
-ctx.p79SyncOvertimePlannedDialogState();
+ctx.p79PlannedDialogClosed();
 assert.equal(attrs.get('aria-expanded'),'false','native Escape/close event resets toolbar');
 assert.equal(showCount,3);
 assert.equal(closeCount,3);

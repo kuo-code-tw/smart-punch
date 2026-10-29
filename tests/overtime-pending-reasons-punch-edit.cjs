@@ -31,7 +31,7 @@ assert.equal(reason({...base,clockIn:IN,clockOut:OUT,reportVerified:false}).code
 const punch=(row,type)=>c.p79OvertimePendingPunchCell(row,type,now);
 assert.match(punch(base,'IN'),/補登上班/,'past missing IN should offer attendance creation');
 assert.match(punch(base,'OUT'),/補登下班/,'past missing OUT should offer attendance creation');
-assert.match(punch(base,'IN'),/openRowManualAdd/,'missing punch goes to established manual card add form');
+assert.match(punch(base,'IN'),/p79OpenPlannedMissingPunchEditor/,'missing punch stays in the planned dialog while using the established manual card add form');
 assert(!punch({...base,dateKey:'2026-10-29'},'IN').includes('補登'),'future planning must never create imaginary attendance');
 c.records=[IN,OUT];
 assert.match(punch({...base,clockIn:IN},'IN'),/EDIT_IN/,'existing unique IN is editable');
@@ -40,7 +40,7 @@ c.records=[IN,{...IN}];
 assert.doesNotMatch(punch({...base,clockIn:IN},'IN'),/EDIT_IN/,'ambiguous local duplicate IDs are not editable');
 c.records=[IN,OUT];c.canPerformAdminAction=()=>false;
 assert.doesNotMatch(punch({...base,clockIn:IN},'IN'),/EDIT_IN/,'no edit permission');
-assert.doesNotMatch(punch(base,'IN'),/openRowManualAdd/,'no punch add permission');
+assert.doesNotMatch(punch(base,'IN'),/p79OpenPlannedMissingPunchEditor/,'no punch add permission');
 assert(html.includes('上班時間（實際打卡）')&&html.includes('下班時間（實際打卡）'),'clearly labeled actual timestamps');
 assert(html.includes('p79OvertimePendingPunchCell(row,\'IN\',todayKey,index)')&&html.includes('p79OvertimePendingPunchCell(row,\'OUT\',todayKey,index)'),'both time columns reference the visible row index for safe editing');
 assert(html.includes('p79OvertimePendingReason(row,todayKey)'),'cause displayed per row');

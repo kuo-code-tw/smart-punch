@@ -29,6 +29,7 @@ function setup(){
  loadAttendanceMonthFromCloud:async(month)=>{months.push(month);ctx.records=nextRows;return loaded},
  renderOvertimeStats:()=>rowsRendered.push(1),
  p79CloseOvertimePlannedDialog:()=>closed.push(1),
+ p79MountAttendanceModalInPlannedDialog:id=>{closed.push('mounted:'+id);return true}, 
  openEditRecordModal:(...args)=>{opened.push(args);return 'OPENED'},
  formatEditableAttendanceTimeCell:(record,type,editable)=>editable?'EDIT '+type:record.timeStr,
  encodeURIComponent,escapeHtml:x=>String(x||'')};
@@ -45,7 +46,7 @@ function setup(){
  assert.equal(t.opened.length,1,'same original attendance editor opens');
  assert.equal(t.months.length,0,'already loaded official punch need not fetch entire month');
  assert.equal(t.opened[0][0],IN.id);assert.equal(t.opened[0][1],'IN');assert.equal(t.opened[0][5],true,'force cloud baseline check before save');
- assert.equal(t.closed.length,1,'close planned dialog before native attendance editor');
+ assert.deepEqual(t.closed,['mounted:editRecordModal'],'mount same editor inside planned dialog without closing it');
  t=setup();t.setCloudRows([IN,OUT]);
  await t.ctx.p79OpenPlannedAttendanceEditor(0,'IN');
  assert.deepEqual(t.months,['2026-10'],'missing local attendance automatically reads official month');

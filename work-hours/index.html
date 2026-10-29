@@ -922,6 +922,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  box-shadow:0 24px 80px rgba(15,23,42,.35)!important;
 }
 #adminContentOvertime #p79OvertimePlannedDialog::backdrop{background:rgba(15,23,42,.64)}
+/* Edit/add forms live in this top-layer dialog, above its table, never on the main page. */
+#p79OvertimePlannedDialog > #editRecordModal,
+#p79OvertimePlannedDialog > #addRecordModal{position:fixed!important;inset:0!important;z-index:150!important;overflow-y:auto}
+#p79OvertimePlannedDialog > #editRecordModal > div,
+#p79OvertimePlannedDialog > #addRecordModal > div{max-height:calc(100dvh - 32px);overflow-y:auto}
 #adminContentOvertime #p79OvertimePlannedDialog #p79OvertimePlannedSection{
  margin:0!important;padding:14px!important;border:0!important;border-radius:0!important;
  background:#f8faff!important;min-width:0!important;
@@ -1662,7 +1667,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </table>
                 </div>
                 <div id="overtimePagination" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"></div>
-                <dialog id="p79OvertimePlannedDialog" class="p79-planned-overtime-dialog" aria-labelledby="p79OvertimePlannedHeading" onclose="p79SyncOvertimePlannedDialogState()">
+                <dialog id="p79OvertimePlannedDialog" class="p79-planned-overtime-dialog" aria-labelledby="p79OvertimePlannedHeading" oncancel="p79PlannedDialogCancel(event)" onclose="p79PlannedDialogClosed()">
                 <section id="p79OvertimePlannedSection" class="mt-5 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3" aria-labelledby="p79OvertimePlannedHeading">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對</h4>
@@ -12309,6 +12314,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             p79AttendanceEditCloudReady=false;
             p79WorkhoursEditConflict=null;
             document.getElementById('editRecordModal').classList.add('hidden');
+            p79RestoreAttendanceModalFromPlannedDialog('editRecordModal');
             activeEditingAttendanceRecord = null;
             activeEditingAttendanceRecordSnapshot = null;
         }
@@ -12613,6 +12619,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
         function closeAddModal() {
             document.getElementById('addRecordModal').classList.add('hidden');
+            p79RestoreAttendanceModalFromPlannedDialog('addRecordModal');
             pendingManualPairClockInId = '';
             pendingManualPairClockOutId = '';
             pendingManualPairClockInKey = '';
@@ -13742,15 +13749,63 @@ function p79OvertimePeriodLabel(report){
             toggle.setAttribute('aria-expanded',dialog.open?'true':'false');
             toggle.title=dialog.open?'關閉預排／待核對視窗':'開啟預排／待核對視窗';
         }
+        // Reuse the existing verified attendance edit/add forms INSIDE the
+        // top-layer planned dialog. Moving (not cloning) preserves all cloud
+        // checks, record identity, pairing, save handlers and permissions.
+        const p79PlannedAttendanceModalAnchors=new Map();
+        function p79MountAttendanceModalInPlannedDialog(modalId){
+            if(!['editRecordModal','addRecordModal'].includes(modalId))return false;
+            const dialog=document.getElementById('p79OvertimePlannedDialog');
+            const modal=document.getElementById(modalId);
+            if(!dialog?.open||!modal)return false;
+            if(!p79PlannedAttendanceModalAnchors.has(modalId)){
+                const anchor=document.createComment('original '+modalId+' position');
+                modal.parentNode.insertBefore(anchor,modal);
+                p79PlannedAttendanceModalAnchors.set(modalId,anchor);
+            }
+            dialog.appendChild(modal);
+            return true;
+        }
+        function p79RestoreAttendanceModalFromPlannedDialog(modalId){
+            const anchor=p79PlannedAttendanceModalAnchors.get(modalId);
+            if(!anchor)return;
+            const modal=document.getElementById(modalId);
+            if(modal&&anchor.parentNode)anchor.parentNode.replaceChild(modal,anchor);
+            else anchor.remove();
+            p79PlannedAttendanceModalAnchors.delete(modalId);
+        }
+        function p79PlannedAttendanceModalIsOpen(){
+            return ['editRecordModal','addRecordModal'].some(id=>{
+                const el=document.getElementById(id);
+                return p79PlannedAttendanceModalAnchors.has(id)&&el&&!el.classList.contains('hidden');
+            });
+        }
+        function p79PlannedDialogCancel(event){
+            if(p79PlannedAttendanceModalIsOpen())event.preventDefault();
+        }
+        function p79PlannedDialogClosed(){
+            // Covers external dialog.close(): no form can remain stranded in
+            // the closed dialog, and no partially entered data is submitted.
+            for(const id of ['editRecordModal','addRecordModal']){
+                if(!p79PlannedAttendanceModalAnchors.has(id))continue;
+                if(id==='editRecordModal')closeEditModal();
+                else closeAddModal();
+            }
+            p79SyncOvertimePlannedDialogState();
+        }
         function p79CloseOvertimePlannedDialog(){
             const dialog=document.getElementById('p79OvertimePlannedDialog');
+            if(p79PlannedAttendanceModalIsOpen()){
+                showToast('請先儲存或取消目前的打卡修改，再關閉預排清單','warning');
+                return;
+            }
             if(dialog?.open)dialog.close();
             p79SyncOvertimePlannedDialogState();
         }
         function p79ToggleOvertimePlanned(){
             const dialog=document.getElementById('p79OvertimePlannedDialog');
             if(!dialog)return;
-            if(dialog.open)dialog.close();
+            if(dialog.open)p79CloseOvertimePlannedDialog();
             else if(typeof dialog.showModal==='function')dialog.showModal();
             p79SyncOvertimePlannedDialogState();
         }
@@ -13907,10 +13962,39 @@ function p79OvertimePeriodLabel(report){
             if(window.p79V5QueueInfoForId?.(id)){
                 showToast('這筆打卡仍在同步，請完成同步後再修改','warning');return;
             }
-            p79CloseOvertimePlannedDialog();
-            // 原生考勤編輯器具備身分/時間校驗、雲端寫入與待同步重試，不另建第二套資料。
+            // Keep this list visible; display the SAME official editor as a
+            // child of the native dialog, not on the underlying main page.
+            p79MountAttendanceModalInPlannedDialog('editRecordModal');
             return openEditRecordModal(found.id,type,found.timeStr,
                 {empId:row.empId,attNo:row.attNo,name:row.name},null,true);
+        }
+        async function p79OpenPlannedMissingPunchEditor(index,type){
+            const row=p79OvertimePlannedDisplayedRows[Number(index)];
+            if(!row||row.p79RestDraft||!['IN','OUT'].includes(type)||
+               row[type==='IN'?'clockIn':'clockOut'])return;
+            if(typeof canPerformAdminAction!=='function'||
+               !canPerformAdminAction(currentEmp,'attendanceCreate')){
+                showToast('沒有補登考勤權限','warning');return;
+            }
+            const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today){
+                showToast('未來日期不能提前補登考勤','warning');return;
+            }
+            const other=type==='IN'?row.clockOut:row.clockIn;
+            const mounted=p79MountAttendanceModalInPlannedDialog('addRecordModal');
+            try{
+                await openRowManualAdd(encodeURIComponent(String(row.empId||'')),
+                    encodeURIComponent(date.replaceAll('-','/')),
+                    type==='IN'?'上班簽到':'下班簽退',
+                    encodeURIComponent(String(other?.id??'')));
+            }catch(error){
+                showToast('補登視窗無法開啟：'+String(error?.message||error),'warning');
+            }finally{
+                // A failed employee-master lookup leaves the form hidden.
+                if(mounted&&document.getElementById('addRecordModal')?.classList.contains('hidden'))
+                    p79RestoreAttendanceModalFromPlannedDialog('addRecordModal');
+            }
         }
         function p79OvertimePendingPunchCell(row,type,todayKey,index=-1){
             const record=type==='IN'?row.clockIn:row.clockOut,other=type==='IN'?row.clockOut:row.clockIn;
@@ -13932,11 +14016,8 @@ function p79OvertimePeriodLabel(report){
             if(row.p79RestDraft||date>todayKey)return '<span class="text-slate-400">尚未出勤</span>';
             const canAdd=typeof canPerformAdminAction==='function'&&canPerformAdminAction(currentEmp,'attendanceCreate');
             if(!canAdd)return '<span class="text-rose-700 dark:text-rose-300 font-semibold">缺卡（無補登權限）</span>';
-            const encodedEmp=encodeURIComponent(String(row.empId||'')),encodedDate=encodeURIComponent(date.replaceAll('-','/'));
-            const encodedOther=encodeURIComponent(String(other?.id??''));
-            const label=type==='IN'?'上班簽到':'下班簽退';
             return '<span class="inline-flex gap-1.5 items-center"><span class="text-rose-700 dark:text-rose-300 font-semibold">缺卡</span>'+
-                '<button type="button" onclick="p79CloseOvertimePlannedDialog();openRowManualAdd(\''+encodedEmp+'\',\''+encodedDate+'\',\''+label+'\',\''+encodedOther+'\')"'+
+                '<button type="button" onclick="p79OpenPlannedMissingPunchEditor('+index+',\''+type+'\')"'+
                 ' class="px-2 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200">補登'+(type==='IN'?'上班':'下班')+'</button></span>';
         }
         function p79RenderOvertimePlannedRows(sourceRows,month,dept,jobTitle,employeeId){
