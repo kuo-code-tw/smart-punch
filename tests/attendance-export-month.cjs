@@ -28,6 +28,11 @@ const people=[{empId:'AP1',attNo:'1',name:'甲',jobTitle:'ARMG',group:'A組'},
  {empId:'AN2',attNo:'2',name:'乙',jobTitle:'F/L'}];
 c.getAdminAttendanceEmployees=()=>people;c.p79RequireScheduleExport=()=>true;
 c.p79ReadAttendanceExportSpecialDays=async()=>[];
+const originalScopeRead=c.p79ReadAttendanceExportScope;
+c.p79ReadAttendanceExportScope=async(month,options)=>{
+ if(elements.exportIncludeSchedule?.checked)assert.equal(options.preferCache,false,'combined roster must use fresh official attendance');
+ return originalScopeRead(month,options);
+};
 c.p79ReadAttendanceExportSource=async()=>({schedules:[{empId:'AP1',month:'2026-10',role:'ARMG',
  schedule:{'2026-10-01':'晚','2026-10-02':'休',__personnel:{role:'ARMG',group:'A組',lockType:'FIXED_LOCKED'},
  __meta:{'2026-10-02':{restCategory:'例'}}}}],leaveRecords:[]});
@@ -45,6 +50,8 @@ assert.equal(saved.w.sheets[1].s.rows.length,2);
 assert.deepEqual(Array.from(saved.w.sheets[1].s.rows[0].slice(0,8)),['工號','姓名','職稱','組別','排班屬性','1','2','3']);
 assert.deepEqual(Array.from(saved.w.sheets[1].s.rows[1].slice(0,7)),['AP1','甲','ARMG','A組','固定鎖定','晚','例']);
 assert.equal(saved.w.sheets[1].s.rows[0].length,36,'complete 31-day schedule uses same day 1..31 layout');
+assert(!saved.w.sheets.some(x=>x.name==='排班與每日考勤'));
+
 assert(!JSON.stringify(saved.w).includes('AN2'),'company scope applies to schedule');
 // Filtering attendance dates must not silently truncate the official month roster.
 elements.exportAttendanceStart.value='2026-10-02';elements.exportAttendanceEnd.value='2026-10-02';
@@ -84,6 +91,13 @@ assert.equal(JSON.stringify(mixed),before,'export allocation does not modify off
 delete c.p79AllocateRestMonth;
 assert.throws(()=>c.p79BuildScheduleAttendanceExport('2026-10',[people[0]],[],
  {schedules:[...mixed.schedules,{empId:'AP1',month:'2026-10',schedule:{'2026-10-01':'早'}}]}),/不同版本/);
+// The same cloud special-day endpoint used by schedule is authoritative.
+vm.runInContext(fn('p79ReadAttendanceExportSpecialDays'),reader);
+reader.fetchGasJsonWithRetry=async url=>{
+ assert.equal(new URL(url).searchParams.get('action'),'getScheduleSpecialDays');
+ return {ok:true,source:'cloud',schemaVersion:1,revision:'REV',rows:[{date:'2026-10-29',kind:'typhoon'}]};
+};
+assert.equal((await reader.p79ReadAttendanceExportSpecialDays())[0].kind,'typhoon');
 reader.fetchGasJsonWithRetry=async()=>({ok:true,month:'2026-11',schedules:mixed.schedules});
 await assert.rejects(reader.p79ReadAttendanceExportSource('getScheduleDataSecure','2026-10'),/其他月份/);
 // Cached exports label their source and Taipei timestamp in the actual workbook.
