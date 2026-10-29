@@ -486,12 +486,12 @@ async function open(settings={}){
     if(pick)pick.disabled=!allowed||!!r?.planned;
    });
   }
-  el.querySelectorAll('[data-close]').forEach(e=>{e.textContent=disabled?'完成目前這筆後停止':'關閉';});
+  el.querySelectorAll('[data-close]').forEach(e=>{e.textContent='關閉';e.disabled=false;});
  }
  const checkDayChange=()=>{if(!busy&&loadedMonth&&today()!==lastCheckedDay&&el.open){lastCheckedDay=today();q('#mrLoad').click();}};
   const checkInterval=g.setInterval?.(checkDayChange,30*60*1000);
   g.addEventListener?.('focus',checkDayChange);
-  el.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(busy){stop=true;setStatus('將在目前這筆完成後停止，已確認儲存的資料會保留。');}else el.close();});el.oncancel=e=>{if(busy){e.preventDefault();stop=true;}};el.onclose=()=>{if(checkInterval)g.clearInterval?.(checkInterval);g.removeEventListener?.('focus',checkDayChange);el.remove();};
+  el.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(busy)stop=true;el.close();});el.oncancel=()=>{if(busy)stop=true;};el.onclose=()=>{if(checkInterval)g.clearInterval?.(checkInterval);g.removeEventListener?.('focus',checkDayChange);el.remove();};
  function paint(){
   q('#mrPlannedSection').hidden=!autoPlan;
   q('#mrManualSelected').hidden=autoPlan||manualPeople.size===0;
