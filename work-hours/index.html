@@ -1691,19 +1691,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             <!-- 分頁 3：加班人員統計 -->
             <div id="adminContentOvertime" class="hidden space-y-3">
                 <div class="p79-overtime-unified rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4 shadow-sm">
-                <!-- Compact cloud-verified accounting alert in the same panel as overtime controls. -->
-                <section id="p79OvertimeChangeNotice" data-p79-state="loading"
-                         class="p79-accounting-change-banner" aria-label="加班異動提醒" aria-live="polite">
-                    <div class="p79-change-copy">
-                        <strong>⚠️ 加班異動提醒</strong>
-                        <span id="p79OvertimeChangeText">雲端異動紀錄尚未核對</span>
-                        <small id="p79ChangeHint">請選擇月份並重新讀取加班紀錄</small>
-                    </div>
-                    <div class="p79-change-actions">
-                        <button id="p79ChangeModified" type="button" onclick="P79OvertimeStatus.open({state:'amended'})" disabled>查看已修改（—）</button>
-                        <button id="p79ChangeCancelled" type="button" onclick="P79OvertimeStatus.open({state:'revoked'})" disabled>查看已取消（—）</button>
-                    </div>
-                </section>
                 <div class="p79-overtime-compact-first">
                   <div class="p79-overtime-compact-title" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。跨日歸入上班日期。上班分鐘01–30，下班分鐘不在45–60須核對。">
                     <strong>每日加班人員統計</strong>
