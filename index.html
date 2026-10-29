@@ -509,7 +509,7 @@ function getWeatherCoords(){
   return Promise.resolve({
     lat:PORT79_WEATHER.fallbackLat,
     lon:PORT79_WEATHER.fallbackLon,
-    label:'高雄港79號碼頭'
+    label:'79號碼頭'
   });
 }
 
@@ -542,7 +542,7 @@ async function refreshTodayWeather(){
     iconEl.textContent=icon;
     textEl.textContent=label;
     tempEl.textContent=Number.isFinite(temp)?temp.toFixed(1)+'°C':'--°C';
-    subEl.textContent=(loc.label||'高雄港79號碼頭')
+    subEl.textContent=(loc.label||'79號碼頭')
       +(Number.isFinite(feel)?'｜體感 '+feel.toFixed(1)+'°C':'')
       +'｜更新 '+new Intl.DateTimeFormat('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Taipei'}).format(new Date());
   }catch(e){
