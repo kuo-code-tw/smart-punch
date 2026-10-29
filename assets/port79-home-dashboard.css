@@ -1,4 +1,13 @@
 @media screen{
+html body.p79-workspace:has(#p79HomeDashboard) #sessionBar{display:none!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting #todayWeather{margin:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;display:block!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting #weatherSub{display:none!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting .weather-date{font-size:11px!important;color:#42648b!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting .weather-line{font-size:13px!important;color:#234c78!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting .weather-temp{font-size:17px!important}
+html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting .weather-refresh{min-height:25px!important;font-size:10px!important;padding:4px 8px!important;margin-top:8px!important;background:#e4efff!important;color:#3974ba!important;box-shadow:none!important}
+html body.p79-workspace:has(#p79HomeDashboard) #p79WorkspaceTopbar #logoutBtn{min-height:34px!important;padding:7px 10px!important;margin:0!important;border:1px solid #d4e3f5!important;background:var(--p79-w-panel)!important;color:var(--p79-w-muted)!important;font-size:11px!important}
+
 html body.p79-workspace #systems:has(#p79HomeDashboard){display:block!important}
 html body.p79-workspace #systems:has(#p79HomeDashboard)>.p79-modern-home-intro{margin-bottom:16px!important}
 html body.p79-workspace #systems:has(#p79HomeDashboard)>.p79-modern-section-heading{margin:22px 0 12px!important}
