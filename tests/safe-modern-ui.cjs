@@ -22,6 +22,9 @@ for(const [system,id,handler] of expected){
 }
 assert(home.includes('id="cardHistory"')&&home.includes("onclick=\"location.href='./history-data/'\""),'original history destination preserved');
 assert(home.includes('歷史資料庫／歷史資料中心'),'history is prominent on the dashboard');
+assert(home.includes('id="p79ModernModuleSearch"'),'management module search exists');
+assert(home.includes('p79-modern-search-dim'),'search changes only visual classes and does not change navigation');
+assert(dashboard.includes('.p79-modern-search-row'),'search is styled only inside management dashboard');
 assert(home.includes('id="punchLoginBtn"')&&home.includes('id="manageLoginBtn"'),'login and punch entry points unchanged');
 assert(home.includes('assets/port79-modern-home.css'),'dashboard stylesheet is linked');
 assert(shared.startsWith('@import url("./port79-modern-system-ui.css'),'internal UI loaded by original shared system stylesheet');
