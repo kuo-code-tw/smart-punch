@@ -474,9 +474,10 @@ async function open(settings={}){
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=()=>{if(model&&!busy)paint();};
  q('#mrMonth').onchange=()=>{if(!busy)q('#mrLoad').click();};jobs();
  function controls(disabled){
-  el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
+  el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
   const allowed=model?.workflow?.canSubmit===true;
-  q('#mrSave').disabled=disabled||(autoPlan?!model?.plannedRows?.some(r=>r.checked&&!r.saved):!allowed||!model?.rows.some(r=>r.checked&&!r.saved&&!r.planned));
+  q('#mrSave').disabled=disabled||(autoPlan?!model?.plannedRows?.some(r=>r.checked&&!r.saved):
+   !(manualPeople.size||(allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
   if(!disabled){
    q('#mrSavePlans').disabled=!autoPlan||!model?.plannedRows?.some(r=>r.checked&&!r.saved);
    q('#mrAll').disabled=!allowed||!visibleRows().some(({r})=>!r.saved&&!r.planned);
@@ -565,11 +566,14 @@ async function open(settings={}){
     '<span>'+esc(emp.name)+'（'+esc(emp.empId)+'）</span>'+
     '<span><button type="button" class="manual-set-date" data-emp="'+esc(emp.empId)+'">設定日期與時段</button> '+
     '<button type="button" class="manual-remove-person" data-emp="'+esc(emp.empId)+'">取消勾選</button></span></div>').join('');
-   q('#mrSave').textContent=autoPlan?'儲存勾選預排（'+selectedPlans.length+' 筆）':phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
+   q('#mrSave').textContent=autoPlan?'儲存勾選預排（'+selectedPlans.length+' 筆）':
+   manualPeople.size?'設定勾選預排（'+manualPeople.size+' 人）':
+   phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
   q('#mrResult').textContent=autoPlan?'預排已儲存 '+model.plannedRows.filter(r=>r.saved).length+' 筆／已勾選 '+selectedPlans.length+' 筆（未正式申報）':'已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
   q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+monthEndWindowDate(loadedMonth)+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   if(busy)q('#mrResult').textContent=q('#mrStatus').textContent;
-  q('#mrSave').disabled=busy||(autoPlan?!selectedPlans.length:!phase.canSubmit||!model.rows.some(r=>r.checked&&!r.saved&&!r.planned));
+  q('#mrSave').disabled=busy||(autoPlan?!selectedPlans.length:
+    !(manualPeople.size||(phase.canSubmit&&model.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
  }
  q('#mrRows').onclick=e=>{const button=e.target.closest('[data-audit]');if(button&&model)alert(auditText(model,button.dataset.audit));};
  q('#mrRows').onchange=e=>{const tr=e.target.closest('[data-row]');if(!tr)return;const r=model.rows[Number(tr.dataset.row)];if(r.saved)return;if(!e.target.classList.contains('pick'))r.id=crypto.randomUUID();
@@ -582,7 +586,9 @@ async function open(settings={}){
  q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
  q('#mrLoad').onclick=async()=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
-  try{loadedMonth=q('#mrMonth').value;
+  try{const requestedMonth=q('#mrMonth').value;
+   if(loadedMonth&&loadedMonth!==requestedMonth)manualPeople.clear();
+   loadedMonth=requestedMonth;
     if(loadedMonth>today().slice(0,7))throw Error('不能對未來月份先建立跨月補報');
     if(!people.length){
      setStatus('正在載入人資名冊與操作權限，完成後繼續核對…');
@@ -611,17 +617,58 @@ async function open(settings={}){
  }
  q('#mrManualMode').onchange=()=>choosePlanningMode(false);
  q('#mrAutoMode').onchange=()=>choosePlanningMode(q('#mrAutoMode').checked);
- q('#mrNewPlan').onclick=async()=>{
+ q('#mrNewPlan').onclick=async(employeeId='')=>{
   if(busy)return;
-  await g.P79Overtime.openReport({manualPlan:true});
+  const selected=id(typeof employeeId==='string'?employeeId:'')||
+    (manualPeople.size?[...manualPeople.keys()][0]:'');
+  const chosen=manualPeople.get(selected);
+  if(selected&&!chosen){setStatus('找不到勾選人員，請重新勾選');return;}
+  const detail=chosen?rosterReviewRows(model,loadedPeople).find(x=>id(x.emp.empId)===selected):null;
+  if(chosen&&!manualPlanSelectable(detail,loadedMonth)){
+   setStatus('這位人員沒有可用未休額度或可預排日期，請重新核對');return;
+  }
+  const prefill=chosen?
+   {manualPlan:true,empId:chosen.empId,allowedEmpIds:[chosen.empId],requirePeriodSelection:true,pickDateExplicitly:true}:
+   {manualPlan:true};
+  await g.P79Overtime.openReport(prefill);
   const form=document.querySelector('#p79OtClose')?.closest('dialog');
-  if(form)form.addEventListener('close',()=>{if(el.isConnected&&!busy)q('#mrLoad').click();},{once:true});
+  if(form){
+   let acknowledged=false;
+   const saved=event=>{
+    const draft=event?.detail?.draft,result=event?.detail?.result;
+    if(chosen&&draft?.manualPlan===true&&id(draft.empId)===selected&&
+       result?.ok===true&&result?.directOvertimeSaved===true&&result?.report?.planned===true)
+     acknowledged=true;
+   };
+   g.addEventListener?.('p79-overtime-report-saved',saved);
+   form.addEventListener('close',()=>{
+    g.removeEventListener?.('p79-overtime-report-saved',saved);
+    if(acknowledged)manualPeople.delete(selected);
+    if(el.isConnected&&!busy)q('#mrLoad').click();
+   },{once:true});
+  }
  };
  choosePlanningMode(autoPlan);
  q('#mrPrior').onclick=()=>{if(busy)return;q('#mrMonth').value=previousMonth(today().slice(0,7));q('#mrLoad').click();};
  q('#mrNeedRows').onchange=e=>{
-  if(busy||!autoPlan||!e.target.classList.contains('need-plan'))return;
-  (model?.plannedRows||[]).filter(r=>id(r.empId)===id(e.target.dataset.emp)&&!r.saved).forEach(r=>{r.checked=e.target.checked;});paint();
+  if(busy||!e.target.classList.contains('need-plan'))return;
+  const employeeId=id(e.target.dataset.emp);
+  if(!autoPlan){
+   const person=loadedPeople.find(x=>id(x.empId)===employeeId);
+   const eligible=rosterReviewRows(model,loadedPeople).find(x=>id(x.emp.empId)===employeeId);
+   if(!person||!manualPlanSelectable(eligible,loadedMonth)){paint();return;}
+   if(e.target.checked)manualPeople.set(employeeId,{empId:person.empId,name:person.name});
+   else manualPeople.delete(employeeId);
+  }else{
+   (model?.plannedRows||[]).filter(r=>id(r.empId)===employeeId&&!r.saved).forEach(r=>{r.checked=e.target.checked;});
+  }
+  paint();
+ };
+ q('#mrManualRows').onclick=e=>{
+  const button=e.target.closest('[data-emp]');if(!button||busy||autoPlan)return;
+  const employeeId=id(button.dataset.emp);
+  if(button.classList.contains('manual-remove-person')){manualPeople.delete(employeeId);paint();return;}
+  if(button.classList.contains('manual-set-date'))q('#mrNewPlan').onclick(employeeId);
  };
  q('#mrPlannedRows').onchange=e=>{
   if(busy||!autoPlan||!e.target.classList.contains('plan-pick'))return;
@@ -677,6 +724,7 @@ async function open(settings={}){
  q('#mrSave').onclick=async()=>{
   if(busy||!model)return;
   if(autoPlan)return q('#mrSavePlans').onclick();
+  if(manualPeople.size)return q('#mrNewPlan').onclick();
   if(!workflowStage(loadedMonth).canSubmit){setStatus('尚未到集中申報期間：15日起提出建議，25日起核對正式送出。');return;}
   const selected=model.rows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   const context=backfillContext(loadedMonth);
