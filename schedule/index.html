@@ -4347,9 +4347,11 @@ function p79EmployeeDateEligible(emp,date) {
       const token=currentPort79SsoToken();
       const clientId=getScheduleClientId();
       if(!token||!clientId||!requestId)return null;
-      for(let attempt=0;attempt<3;attempt++){
+      // GAS 排隊或 Google 暫時回傳 5xx 時，仍只查同一筆回條，不重送班表。
+      for(let attempt=0;attempt<4;attempt++){
+        if(currentPort79SsoToken()!==token||getScheduleClientId()!==clientId)return null;
         const controller=new AbortController();
-        const timeout=setTimeout(()=>controller.abort(),8000);
+        const timeout=setTimeout(()=>controller.abort(),20000);
         try{
           const u=new URL(GAS_URL);
           u.searchParams.set('action','scheduleGetSaveReceipt');
@@ -4359,13 +4361,18 @@ function p79EmployeeDateEligible(emp,date) {
           u.searchParams.set('_',String(Date.now()));
           const response=await fetch(u.toString(),{method:'GET',cache:'no-store',redirect:'follow',signal:controller.signal});
           const data=await response.json();
-          if(!response.ok||data?.ok!==true)return null; // Old GAS does not expose this endpoint.
+          if(!response.ok||data?.ok!==true){
+            // A failed lookup is not proof of an old deployment or a failed save.
+            if(response.status===401||response.status===403)return null;
+            throw new Error('存檔回條暫時無法讀取');
+          }
           if(data.found && data.completed && data.saveRequestId===requestId &&
-             data.month===yearMonth)return data;
+             data.month===yearMonth && currentPort79SsoToken()===token &&
+             getScheduleClientId()===clientId)return data;
         }catch(e){
           console.warn('查詢排班存檔回條暫時失敗：',String(e?.name||'連線異常'));
         }finally{clearTimeout(timeout);}
-        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,[1500,3000][attempt]));
+        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,[1500,3000,5000][attempt]));
       }
       return null;
     }
@@ -4544,7 +4551,7 @@ function p79EmployeeDateEligible(emp,date) {
                   message:'已向 GAS 查到這筆排班的成功存檔回條'};
                 break;
               }
-              const unknown=new Error('存檔請求已發出，但雲端結果尚未確認。請保留目前畫面；如果 GAS V5 尚未部署，需先更新後端才能查詢存檔回條。');
+              const unknown=new Error('存檔請求已發出，但目前仍無法確認雲端結果，不能判定儲存成功或失敗。請保留目前畫面，暫勿重新整理或重複儲存；需核對這筆存檔回條與雲端班表。');
               unknown.code='SCHEDULE_SAVE_RESULT_UNKNOWN';
               throw unknown;
             }

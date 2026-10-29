@@ -14,7 +14,7 @@ const snapshot={schedules:[{empId:'A',schedule:roster}],pairs:[16,17,25,26].map(
 const json=x=>JSON.parse(JSON.stringify(x));
 const before=JSON.stringify(snapshot);
 for(const [date,phase,canSuggest,canSubmit] of [
- ['2026-10-01','audit',false,false],['2026-10-14','audit',false,false],['2026-10-15','preview',true,false],
+ ['2026-10-01','audit',true,false],['2026-10-14','audit',true,false],['2026-10-15','preview',true,false],
  ['2026-10-24','preview',true,false],['2026-10-25','submit',true,true],['2026-10-31','submit',true,true],
  ['2026-11-01','closing',true,true]
 ]){

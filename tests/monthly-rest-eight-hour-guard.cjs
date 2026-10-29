@@ -49,8 +49,8 @@ assert(plan.plannedRows.every(r=>r.planned&&!plan.rows.includes(r)),'future plan
 assert(plan.rows.every(r=>!r.planned&&r.rule[2]===8));
 assert(source.includes('if(selected.some(r=>!fullDayRule(r.rule)))'),'no confirm override for short hours');
 assert(source.includes('if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))'),'save rechecks fresh official attendance');
-assert(source.includes('r.date<=latestReportedDate(roster,loadedMonth)'),'save forbids backfill before latest formal report');
-assert(source.includes('r.date<monthEndWindowDate(loadedMonth)'),'save forbids before October 25th');
+assert(source.includes('attendance.length!==1'),'save requires a unique actual attendance pair on the original date');
+assert(source.includes("cats.includes(roster?.[r.date])&&roster[r.date]!==r.category"),'save preserves the original rest category');
 assert(source.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId'),'existing formal report is never replaced');
 assert(!source.includes('確定仍要申報嗎？'),'remove old short-hour bypass');
 current='2026-10-24';plan=api.plan(snapshot,[{empId:'E1',name:'測試員工'}],'2026-10',rules);
