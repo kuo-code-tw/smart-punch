@@ -6,13 +6,13 @@ const elements={filterMonth:{value:'2026-10'},vesselMonthlyExportBtn:{disabled:f
  vesselMonthlySignManager:{value:'經理：'},vesselMonthlySignPrepared:{value:'製表：'}},messages=[],writes=[];
 const c={console,Date,document:{getElementById:id=>elements[id]},shipMasters:[],records:[],
   num:v=>Number(v)||0,round:(v,n)=>Number(v.toFixed(n)),canonicalShipMasters:list=>list,
-  applyShipManualOverrides:s=>({...s,...s.manualOverrides}),monthlySerialFromWorkingNo:no=>String(no).slice(-4),
+  applyShipManualOverrides:s=>({...s,...s.manualOverrides}),monthlySerialFromWorkingNo:no=>{const m=String(no).match(/(\d+)(?:-(\d+))?$/);return m?m[1].slice(-4).padStart(4,'0')+(m[2]?'-'+m[2]:''):String(no);},
   recordsForVessel:no=>c.records.filter(r=>r.workingNo===no),recoveredMoveSplit:r=>r,
   requireSuperAdminAccess:()=>true,toast:m=>messages.push(m),loadEfficiencyCloudScope:async()=>true};
 c.window=c;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,
  saveSignatures:values=>values,
  download:async({month,rows,filename,company,signatures})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company,signatures})};vm.createContext(c);
-for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
+for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','compareVesselMonthlySerial','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
 let passed=0;function test(name,f){f();passed++;console.log('PASS '+name);}
 const master={workingNo:'5260159',vessel:'WAN HAI 292 N073',voyageE:'N073',firstDate:'2026-09-30',lastDate:'2026-10-01',totalContainers:497,hatches:8,shiftMoves:0,gph:23.06,gphHC:23.43,workingSheetSource:{disc:189,load:308}};
 c.shipMasters=[master,{...master,workingNo:'5260160',lastDate:'2026-11-01'}];
@@ -20,6 +20,17 @@ c.records=[{workingNo:'5260159',source:'working-report',workDate:'2026-09-30',di
 test('completion month includes cross-month ship and excludes next month',()=>{assert.equal(c.vesselMonthlyExportRows('2026-10').length,1);assert.equal(c.vesselMonthlyExportRows('2026-09').length,0);});
 test('sheet totals beat an incomplete detail cache and vessel suffix is not mistaken for ship number',()=>{const r=c.vesselMonthlyExportRows('2026-10')[0];assert.equal(r.disc,189);assert.equal(r.load,308);assert.equal(r.shipName,'292');assert.equal(r.serial,'0159');assert.equal(r.bill,497);});
 test('manual zero overrides remain zero',()=>{master.manualOverrides={disc:0,totalContainers:0,hatches:0};const r=c.vesselMonthlyExportRows('2026-10')[0];assert.equal(r.disc,0);assert.equal(r.bill,0);assert.equal(r.hc,0);delete master.manualOverrides;});
+test('monthly report sorts serial 0196 before 0196-2 regardless of dates',()=>{
+ const extra=[
+  {...master,workingNo:'5260196-2',firstDate:'2026-10-01',lastDate:'2026-10-26'},
+  {...master,workingNo:'5260196',firstDate:'2026-10-30',lastDate:'2026-10-30'},
+  {...master,workingNo:'5260195',firstDate:'2026-10-29',lastDate:'2026-10-29'}
+ ];
+ c.shipMasters.push(...extra);
+ const sorted=c.vesselMonthlyExportRows('2026-10').map(r=>r.serial);
+ assert.deepEqual(Array.from(sorted),['0159','0195','0196','0196-2']);
+ c.shipMasters.splice(2);
+});
 // Use a minimal SheetJS contract for offline CI; optionally verify the real writer locally.
 c.XLSX={utils:{aoa_to_sheet(rows){const out={};rows.forEach((row,r)=>row.forEach((v,col)=>{out[String.fromCharCode(65+col)+(r+1)]={v,t:typeof v==='number'?'n':'s'};}));return out;},decode_range:s=>s,book_new:()=>({}),book_append_sheet:(wb,ws)=>{wb.sheet=ws;}},writeFile:(wb,name)=>writes.push({wb,name})};
 test('template headers, ROC month, leading-zero serial and subtotal use the selected month',()=>{const ws=c.buildMonthlyOperationSheet('2026-10');assert(ws.A1.v.includes('115年10月份'));assert.equal(ws.B5.v,'0159');assert.equal(ws.K4.v,'Productivity');assert.equal(ws.F6.f,'SUM(F5:F5)');assert.equal(ws.K6.v,'');assert.equal(ws['!ref'],'A1:N6');});

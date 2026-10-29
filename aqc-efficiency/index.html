@@ -1547,9 +1547,10 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       <label class="text-sm">製表欄<input id="vesselMonthlySignPrepared" type="text" maxlength="40" class="border rounded-lg px-2 py-2 w-full mt-1" oninput="saveVesselMonthlySignatureFields()"></label>
     </div>
   </div>
-  <p class="text-xs text-slate-500 mt-2">公司名稱和簽核文字會記在此瀏覽器。A4 直式、微軟正黑體、白底；每頁最多 35 筆，頁尾保留四個簽章欄。下載 Excel 後也可以直接修改簽核文字。</p>
+  <p class="text-xs text-slate-500 mt-2">公司名稱和簽核文字會記在此瀏覽器。A4 直式、微軟正黑體、白底；優先單頁（最多 45 筆），資料較多才分頁，頁尾固定保留四個簽核／蓋章欄。下載 Excel 後仍可修改簽核文字。</p>
+  <p id="vesselMonthlyExportStatus" role="status" aria-live="polite" class="text-sm text-slate-600 mt-2"></p>
   <div class="flex gap-2 mt-4">
-    <button type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出船舶月作業量表</button>
+    <button id="vesselMonthlyDialogExportBtn" type="button" onclick="exportVesselMonthlyExcel(document.getElementById('vesselMonthlyExportMonth').value,document.getElementById('vesselMonthlyExportCompany').value)" class="btn bg-emerald-600 text-white">匯出船舶月作業量表</button>
     <button type="button" onclick="document.getElementById('vesselMonthlyExportDialog').close()" class="btn bg-slate-100">關閉</button>
   </div>
 </dialog>
@@ -13794,6 +13795,19 @@ function operationExportRows(list){return list.map(r=>{
     num(mv.disc)+num(mv.load),num(gph),num(r.deduct1)+num(r.deduct2)+num(r.deduct3)+num(r.deduct4),r.note||''
   ];
 });}
+function compareVesselMonthlySerial(a,b){
+ const serial=v=>String(v||'').trim().toUpperCase();
+ const left=serial(a),right=serial(b);
+ const ma=left.match(/^(\d+)(?:-(\d+))?$/),mb=right.match(/^(\d+)(?:-(\d+))?$/);
+ if(ma&&mb){
+  const base=Number(ma[1])-Number(mb[1]);
+  if(base)return base;
+  // The original number precedes any suffix: 0196, 0196-1, 0196-2.
+  const sa=ma[2]===undefined?-1:Number(ma[2]),sb=mb[2]===undefined?-1:Number(mb[2]);
+  if(sa!==sb)return sa-sb;
+ }
+ return left.localeCompare(right,'zh-Hant',{numeric:true,sensitivity:'base'});
+}
 function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.value||''){
   // Use the same completion-month rule as the vessel list, independent of table filters.
   const masters=canonicalShipMasters(shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month));
@@ -13818,7 +13832,7 @@ function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.v
       productivity:round(num(s.gph),2),includeHC:round(num(s.gphHC),2),note:String(s.note||'')
     };
   });
-  return rows.sort((a,b)=>`${a.date}|${a.serial}`.localeCompare(`${b.date}|${b.serial}`,undefined,{numeric:true}));
+  return rows.sort((a,b)=>compareVesselMonthlySerial(a.serial,b.serial)||String(a.date||'').localeCompare(String(b.date||'')));
 }
 function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')?.value||'',rows=vesselMonthlyExportRows(month)){
   const valid=/^(20\d{2})-(0[1-9]|1[0-2])$/.exec(month);
@@ -13868,30 +13882,40 @@ function saveVesselMonthlySignatureFields(){
 async function exportVesselMonthlyExcel(month=document.getElementById('filterMonth')?.value||'',company=window.P79VesselMonthlyReport.savedCompany()){
   if(!requireSuperAdminAccess())return;
   if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return toast('請先選擇要匯出的月份');
-  const btn=document.getElementById('vesselMonthlyExportBtn');
-  if(btn?.disabled)return;
-  if(btn){btn.disabled=true;btn.textContent='讀取月份資料中…';}
+  const buttons=['vesselMonthlyExportBtn','vesselMonthlyDialogExportBtn'].map(id=>document.getElementById(id)).filter(Boolean);
+  if(buttons.some(btn=>btn.disabled))return;
+  const status=document.getElementById('vesselMonthlyExportStatus');
+  const setStatus=text=>{if(status)status.textContent=text;};
+  buttons.forEach(btn=>{btn.disabled=true;btn.textContent='讀取月份資料中…';});
+  setStatus('正在讀取月份資料，完成後會自動下載 Excel。');
   try{
     const companyName=window.P79VesselMonthlyReport.saveCompany(company);
-    // Load the captured month before export, even if another month is selected during the request.
+    // The selected completion month remains stable even if the filters change while loading.
     if(!await loadEfficiencyCloudScope({month},true)){
+      setStatus('無法取得該月份雲端資料，請同步成功後再匯出。');
       toast('無法取得該月份雲端資料，請同步成功後再匯出');
       return;
     }
     const rows=vesselMonthlyExportRows(month);
-    if(!rows.length)return toast(`${month} 沒有可匯出的船舶資料`);
+    if(!rows.length){
+      setStatus('這個月份沒有可匯出的船舶資料。');
+      return toast(`${month} 沒有可匯出的船舶資料`);
+    }
     const signatures=saveVesselMonthlySignatureFields();
+    buttons.forEach(btn=>{btn.textContent='產生 Excel 中…';});
+    setStatus(`已讀取 ${rows.length} 艘，正在產生 A4 直式 Excel…`);
     await window.P79VesselMonthlyReport.download({month,company:companyName,rows,signatures,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
+    setStatus('Excel 已產生，請查看瀏覽器下載紀錄。');
     document.getElementById('vesselMonthlyExportDialog')?.close();
     toast(`已匯出 ${month} 船邊作業量表，共 ${rows.length} 艘`);
   }catch(error){
     console.error('每月船邊作業量表匯出失敗',error);
+    setStatus(`匯出失敗：${error.message||'未知錯誤'}`);
     toast(error.message||'匯出失敗，請稍後再試');
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='📥 匯出船舶月作業量表';}
+    buttons.forEach(btn=>{btn.disabled=false;btn.textContent=btn.id==='vesselMonthlyExportBtn'?'📥 匯出船舶月作業量表':'匯出船舶月作業量表';});
   }
 }
-
 const EXPORT_FIELDS = {
   ship: [
     ['no','編號'],['serial','序號'],['date','日期'],['ship','船名'],['voyage','航次'],
@@ -14918,7 +14942,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 });
 </script>
 <script src="../assets/port79-aqc-schedule-groups.js?v=20261026-group-identity-v2"></script>
-<script src="../assets/port79-vessel-monthly-report.js?v=20261027-portrait-editable-signatures-v1"></script>
+<script src="../assets/port79-vessel-monthly-report.js?v=20261029-portrait-onepage-serial-v2"></script>
 <script src="../assets/port79-seven-top.js?v=20261025-zh-import-export"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 船舶作業明細滿版寬度 + 年份選單防空白 -->
