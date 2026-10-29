@@ -10,7 +10,7 @@ const cut=name=>{
 assert(html.includes('id="p79PlannedPunchNotice" role="status"'),'cloud status is visible inside native planned dialog');
 assert(html.includes('class="p79-planned-actions"'),'planned operation buttons render in their own action row');
 assert(html.includes('flex-wrap:nowrap!important'),'planned action row must stay on one line');
-assert(html.includes('#p79OvertimePlannedBody .p79-planned-actions button'),'buttons have compact targeted styling');
+assert(html.includes('#p79OvertimePlannedBody td.p79-planned-action-cell .p79-planned-actions button'),'buttons have narrower per-cell compact targeted styling');
 assert(html.includes('font-size:11px!important;'),'action text is compact');
 assert(!html.includes('p-3 min-w-[235px]"><div class="flex flex-wrap items-center justify-center gap-2"'),'old wrapped large action buttons removed');
 assert(html.includes('p79OvertimeCalculationCache=null;\n                if(fromPlanned'),'locally edited punch refreshes planned cache BEFORE painting');
