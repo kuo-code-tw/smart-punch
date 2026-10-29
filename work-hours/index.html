@@ -2,7 +2,7 @@
 <html data-p79-design="vessel" lang="zh-TW" class="light">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261028-punch-authority-v1&role20261026=1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261029-planned-stay-in-dialog-v1&role20261026=1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
 <script src="../assets/port79-overtime-period-sync.js?v=20261027-original-id-v1"></script>
@@ -13778,7 +13778,7 @@ function p79OvertimePeriodLabel(report){
             return ['editRecordModal','addRecordModal'].some(id=>{
                 const el=document.getElementById(id);
                 return p79PlannedAttendanceModalAnchors.has(id)&&el&&!el.classList.contains('hidden');
-            });
+            })||!!document.getElementById('p79OvertimePlannedDialog')?.querySelector?.('#p79OvertimeDialog[open]');
         }
         function p79PlannedDialogCancel(event){
             if(p79PlannedAttendanceModalIsOpen())event.preventDefault();
@@ -13823,9 +13823,18 @@ function p79OvertimePeriodLabel(report){
             if(auto){p79CloseOvertimePlannedDialog();return window.P79MonthlyRest.open({autoPlan:true});}
         }
         function p79OpenManualOvertimePlan(){
-            if(!p79CanReportOvertime())return alert('沒有新增預排權限');
-            if(typeof document!=='undefined'){const manual=document.getElementById('p79PlanModeManual'),automatic=document.getElementById('p79PlanModeAuto');if(manual)manual.checked=true;if(automatic)automatic.checked=false;}
-            p79CloseOvertimePlannedDialog();
+            // This is the current logged-in page; do not navigate to homepage,
+            // close the planned list, clear session keys or force a new SSO.
+            // P79Overtime.dialog mounts its *existing* authenticated report form
+            // inside the currently open planned dialog. The same cloud save and
+            // permission checks still apply.
+            if(!p79CanReportOvertime())return alert('沒有新增預排權限；請核對此帳號的申報權限');
+            if(typeof document!=='undefined'){
+                const manual=document.getElementById('p79PlanModeManual');
+                const automatic=document.getElementById('p79PlanModeAuto');
+                if(manual)manual.checked=true;
+                if(automatic)automatic.checked=false;
+            }
             return window.P79Overtime.openReport({manualPlan:true});
         }
         async function p79DeletePlannedOvertimeRow(index,button){
