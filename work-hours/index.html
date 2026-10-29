@@ -560,40 +560,83 @@ body.p79-work-hours-page .desktop-side-rail .rail-title::after {
 </style>
 
 
-<script id="p79-workhours-permission-gate-v20261004">
+<script id="p79-workhours-permission-gate-v20261029-session-safe">
 (function(){
 'use strict';
+// A work-hours permission read never logs out a valid administrator.
+// Only a confirmed response for the SAME admin account can change access.
 window.p79CheckWorkHoursPermission=async function(){
+  const ss=sessionStorage;
+  const adminRole=String(ss.getItem('aqc_admin_role')||'').trim().toLowerCase();
+  if(adminRole==='superadmin')return true;
+  const adminId=String(ss.getItem('aqc_admin_id')||'').trim().toUpperCase();
+  const adminToken=String(ss.getItem('port79_admin_token')||
+    ss.getItem('port79_gc_superadmin_token')||ss.getItem('port79_gc_token')||
+    ss.getItem('port79_user_token')||'').trim();
+  const gas=typeof getActiveGasUrl==='function'?getActiveGasUrl():(typeof GAS_URL!=='undefined'?String(GAS_URL):'');
+  // Incomplete startup data is not proof of a revoked admin login.
+  if(!adminId||!adminToken||!gas){
+    console.warn('工時權限尚待入口登入資料，保留現有管理員登入狀態');
+    return true;
+  }
   try{
-    const role=String(sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
-    if(role==='superadmin')return true;
-    const token=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
-    const gas=(typeof getActiveGasUrl==='function'?getActiveGasUrl():(typeof GAS_URL!=='undefined'?String(GAS_URL):''));
-    if(!token||!gas)return true;
-    const res=await fetch(gas+(gas.includes('?')?'&':'?')+'action=getSessionMeta&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store'});
+    const url=new URL(gas);
+    url.searchParams.set('action','getSessionMeta');
+    url.searchParams.set('token',adminToken);
+    url.searchParams.set('t',String(Date.now()));
+    const res=await fetch(url.toString(),{cache:'no-store'});
+    if(!res.ok)return true;
     const data=await res.json();
-    if(!data?.ok)return true;
-    if(String(data.adminRole||data.role||data.actualAdminRole||'').toLowerCase()==='superadmin')return true;
-    const level=String(data.systemPermissions?.workhours||'none').toLowerCase();
+    if(data?.ok!==true||data.retryable===true)return true;
+    const verifiedId=String(data.empId||'').trim().toUpperCase();
+    const verifiedRole=String(data.adminRole||data.role||data.actualAdminRole||'').trim().toLowerCase();
+    if(!verifiedId||verifiedId!==adminId||!['admin','superadmin'].includes(verifiedRole)){
+      // A stale employee-token response must NEVER revoke/overwrite the admin.
+      console.warn('工時驗證回應與目前管理員身分不符，已保留原登入狀態');
+      return true;
+    }
+    if(verifiedRole==='superadmin'){
+      ss.setItem('p79_workhours_permission','manage');
+      return true;
+    }
+    const access=data.systemPermissions?.workhours;
+    if(access==null){
+      // Partial/busy cloud responses are unconfirmed, not an explicit denial.
+      console.warn('雲端尚未提供完整工時權限，使用原有已驗證權限');
+      return true;
+    }
+    const level=String(access).trim().toLowerCase();
+    const fields=['adminRole','systemPermissions','finePermissions','dataScope','dataScopeJobs'];
+    // Update only the verified administrator, never another employee profile.
+    for(const key of ['admin_session','port79_user_session']){
+      try{
+        const saved=JSON.parse(ss.getItem(key)||'null');
+        if(saved&&String(saved.empId||'').trim().toUpperCase()===verifiedId){
+          for(const field of fields)if(Object.prototype.hasOwnProperty.call(data,field))saved[field]=data[field];
+          ss.setItem(key,JSON.stringify(saved));
+        }
+      }catch(error){console.warn('工時權限摘要更新失敗',error);}
+    }
+    if(typeof currentEmp!=='undefined'&&currentEmp&&
+       String(currentEmp.empId||'').trim().toUpperCase()===verifiedId){
+      for(const field of fields)if(Object.prototype.hasOwnProperty.call(data,field))currentEmp[field]=data[field];
+    }
     if(level!=='view'&&level!=='manage'){
-      alert('此帳號沒有「工時統計」查看權限');
-      location.href='../';
+      ss.setItem('p79_workhours_permission','none');
+      const message='此帳號沒有「工時統計」查看權限；已保留管理員登入，請由權限管理員確認授權。';
+      const admin=document.getElementById('adminContentOvertime'),stats=document.getElementById('adminContentStats');
+      admin?.classList.add('hidden');stats?.classList.add('hidden');
+      if(typeof showToast==='function')showToast(message,'warning');
+      else console.warn(message);
       return false;
     }
-    // 用雲端驗證回覆更新同一位登入者，不沿用舊員工快取中的權限。
-    const authFields=['adminRole','systemPermissions','finePermissions','dataScope','dataScopeJobs'];
-    const verifiedId=String(data.empId||'').trim().toUpperCase();
-    for(const key of ['port79_user_session','admin_session']){
-      try{const saved=JSON.parse(sessionStorage.getItem(key)||'null');
-        if(saved&&String(saved.empId||'').trim().toUpperCase()===verifiedId){authFields.forEach(k=>{if(Object.prototype.hasOwnProperty.call(data,k))saved[k]=data[k]});sessionStorage.setItem(key,JSON.stringify(saved));}
-      }catch(e){}
-    }
-    if(typeof currentEmp!=='undefined'&&currentEmp&&String(currentEmp.empId||'').trim().toUpperCase()===verifiedId){
-      authFields.forEach(k=>{if(Object.prototype.hasOwnProperty.call(data,k))currentEmp[k]=data[k]});
-    }
-    sessionStorage.setItem('p79_workhours_permission',level);
+    ss.setItem('p79_workhours_permission',level);
     return true;
-  }catch(e){console.warn('工時統計權限檢查失敗，交由既有登入流程處理',e);return true}
+  }catch(error){
+    // Network timeout, rate limit, server contention and JSON errors do not revoke SSO.
+    console.warn('工時權限讀取暫時未完成，已保留既有管理員登入狀態',error);
+    return true;
+  }
 };
 })();
 </script>
@@ -2613,13 +2656,19 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             // 一般員工從首頁「進入打卡」只會建立 port79_user_token。
             // 這裡若漏掉 user token，手機打卡前的 getAttendanceEmployeeMaster
             // 就會誤判成沒有登入，最後出現「無法取得完整員工主檔」。
+            // Work-hours is an admin module. Once the HOME admin SSO exists,
+            // use its token before any leftover employee-punch token.
+            const adminToken=sessionStorage.getItem('port79_admin_token') ||
+                sessionStorage.getItem('port79_gc_superadmin_token') ||
+                sessionStorage.getItem('port79_gc_token') || '';
+            const adminRole=String(sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
+            const signedInAdmin=['admin','superadmin'].includes(adminRole) &&
+                !!String(sessionStorage.getItem('aqc_admin_id')||'').trim();
             return String(
                 readPort79SsoTokenFromHash() ||
+                (signedInAdmin ? adminToken : '') ||
                 sessionStorage.getItem('port79_user_token') ||
-                sessionStorage.getItem('port79_admin_token') ||
-                sessionStorage.getItem('port79_gc_superadmin_token') ||
-                sessionStorage.getItem('port79_gc_token') ||
-                ''
+                adminToken || ''
             ).trim();
         }
 
