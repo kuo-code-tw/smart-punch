@@ -1688,6 +1688,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <div class="flex flex-wrap items-center gap-2"><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeManual" type="checkbox" checked onchange="p79ChoosePlanningMode('manual')">手動預排</label><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeAuto" type="checkbox" onchange="p79ChoosePlanningMode('auto')">自動預排</label><button type="button" onclick="p79OpenManualOvertimePlan()" class="rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold">＋ 新增預排</button><span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span><button type="button" onclick="p79CloseOvertimePlannedDialog()" class="p79-ot-planned-close rounded-lg border border-indigo-200 px-3 py-1 text-xs text-indigo-800 dark:text-indigo-200" aria-label="關閉預排待核對視窗">✕ 關閉</button></div>
                     </div>
                     <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">預設手動預排；勾選自動預排只產生建議，需再勾選並儲存才會加入清單。讀取未休額度不會自動安排；預排不計入正式加班。</p>
+                    <p id="p79PlannedPunchNotice" role="status" aria-live="polite" hidden class="text-xs font-semibold px-2 py-1 mb-2 rounded bg-indigo-50 text-indigo-900"></p>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100">
@@ -12367,9 +12368,15 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         if(!dialog.open||currentPort79SsoToken()!==token)return;
                         p79OvertimeCalculationCache=null;
                         renderOvertimeStats();
-                        if(loaded.some(ok=>!ok))showToast('已送出修改，但預排清單雲端重新核對未完成，請重新讀取考勤資料','warning');
+                        if(loaded.some(ok=>!ok)){
+                            p79PlannedPunchNotice('修改已送出，但雲端重新讀取未完成，請稍後重新核對','warning');
+                            showToast('已送出修改，但預排清單雲端重新核對未完成，請重新讀取考勤資料','warning');
+                        }else p79PlannedPunchNotice('打卡時間已經雲端核對，預排清單已更新。','success');
                     }).catch(error=>{
-                        if(dialog.open)showToast('預排打卡重新核對未完成：'+String(error?.message||error),'warning');
+                        if(dialog.open){
+                            p79PlannedPunchNotice('預排打卡重新核對未完成：'+String(error?.message||error),'warning');
+                            showToast('預排打卡重新核對未完成：'+String(error?.message||error),'warning');
+                        }
                     });
             }
         }
@@ -12474,9 +12481,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     document.getElementById('p79OvertimePlannedDialog')?.open===true;
                 closeEditModal();
                 p79OvertimeCalculationCache=null;
-                if(fromPlanned&&document.getElementById('p79OvertimePlannedDialog')?.open)
+                if(fromPlanned&&document.getElementById('p79OvertimePlannedDialog')?.open){
                     renderOvertimeStats();
-                else p79RenderOnlyVisibleAttendanceView();
+                    p79PlannedPunchNotice('修改時間已暫存並顯示；雲端尚在同步，確認後會在這張預排清單重新讀取。');
+                }else p79RenderOnlyVisibleAttendanceView();
                 if (currentEmp && !isAdminLoggedIn) renderEmpHistoryTable();
 
                 showToast(
@@ -13956,6 +13964,15 @@ function p79OvertimePeriodLabel(report){
             if(row?.reportVerified!==true)return {code:'report-issue',label:'申報待確認',detail:'請核對原申報。'};
             return {code:'review',label:'待核對',detail:''};
         }
+        function p79PlannedPunchNotice(message,tone='info'){
+            const node=document.getElementById('p79PlannedPunchNotice');
+            if(!node)return;
+            node.textContent=String(message||'');
+            node.hidden=!message;
+            node.className='text-xs font-semibold px-2 py-1 mb-2 rounded '+
+                (tone==='warning'?'bg-amber-100 text-amber-900':
+                 tone==='success'?'bg-emerald-100 text-emerald-900':'bg-indigo-50 text-indigo-900');
+        }
         // 待核對視窗與考勤管理共用原始打卡 ID；不得僅憑人名、日期或顯示文字猜測編輯目標。
         function p79FindPlannedAttendanceEditRecord(row,source,type){
             const id=String(source?.id??'').trim();
@@ -13987,6 +14004,7 @@ function p79OvertimePeriodLabel(report){
             const expectedEmp=String(row.empId||'').trim().toUpperCase();
             if(!expectedEmp){showToast('無法確認員工身分，已停止修改','warning');return;}
             const token=currentPort79SsoToken();
+            p79PlannedPunchNotice('正在核對 '+String(row.name||'人員')+' 的原始打卡，核對後將直接在此視窗編輯…');
             let found=p79FindPlannedAttendanceEditRecord(row,source,type);
             if(!found){
                 const date=normalizeScheduleDateKey(getAttendanceDateKey(String(source.timeStr||'')));
@@ -13997,12 +14015,12 @@ function p79OvertimePeriodLabel(report){
                 showToast('正在同步該月正式考勤，核對原始打卡…','info');
                 const loaded=await loadAttendanceMonthFromCloud(month,false);
                 if(currentPort79SsoToken()!==token){showToast('登入身分已變更，請重新開啟','warning');return;}
-                if(!loaded){showToast('考勤同步失敗，未修改任何紀錄，請重新點擊','warning');return;}
+                if(!loaded){p79PlannedPunchNotice('考勤同步失敗，尚未修改打卡，請重新點擊','warning');showToast('考勤同步失敗，未修改任何紀錄，請重新點擊','warning');return;}
                 // Do not redraw the main page while opening an editor inside
                 // the planned dialog; its cloud record will be checked by ID.
                 p79OvertimeCalculationCache=null;
                 found=p79FindPlannedAttendanceEditRecord(row,source,type);
-                if(!found){showToast('雲端打卡已異動或紀錄不唯一，請核對最新考勤資料','warning');return;}
+                if(!found){p79PlannedPunchNotice('正式打卡已變更或原始編號不唯一；已停止修改以免改錯員工','warning');showToast('雲端打卡已異動或紀錄不唯一，請核對最新考勤資料','warning');return;}
             }
             if(window.p79V5QueueInfoForId?.(id)){
                 showToast('這筆打卡仍在同步，請完成同步後再修改','warning');return;
@@ -14010,11 +14028,15 @@ function p79OvertimePeriodLabel(report){
             // Keep this list visible; display the SAME official editor as a
             // child of the native dialog, not on the underlying main page.
             if(!p79MountAttendanceModalInPlannedDialog('editRecordModal')){
-                showToast('預排視窗未就緒，無法在此修改；請重新開啟預排清單','warning');return;
+                p79PlannedPunchNotice('預排視窗未就緒，尚未開啟修改表單','warning');showToast('預排視窗未就緒，無法在此修改；請重新開啟預排清單','warning');return;
             }
             try{
                 await openEditRecordModal(found.id,type,found.timeStr,
                     {empId:row.empId,attNo:row.attNo,name:row.name},null,true);
+                if(!document.getElementById('editRecordModal')?.classList.contains('hidden'))
+                    p79PlannedPunchNotice('正在此視窗修改 '+String(row.name||'員工')+' 的'+(type==='IN'?'上班':'下班')+'時間；儲存後將重新核對雲端。');
+            }catch(error){
+                p79PlannedPunchNotice('打卡編輯表單無法開啟：'+String(error?.message||error),'warning');
             }finally{
                 if(document.getElementById('editRecordModal')?.classList.contains('hidden'))
                     p79RestoreAttendanceModalFromPlannedDialog('editRecordModal');
@@ -14035,12 +14057,14 @@ function p79OvertimePeriodLabel(report){
             }
             const other=type==='IN'?row.clockOut:row.clockIn;
             const mounted=p79MountAttendanceModalInPlannedDialog('addRecordModal');
+            if(!mounted){p79PlannedPunchNotice('目前無法在預排視窗補登，已停止避免跳回主頁','warning');return;}
             try{
                 await openRowManualAdd(encodeURIComponent(String(row.empId||'')),
                     encodeURIComponent(date.replaceAll('-','/')),
                     type==='IN'?'上班簽到':'下班簽退',
                     encodeURIComponent(String(other?.id??'')));
             }catch(error){
+                p79PlannedPunchNotice('補登視窗無法開啟：'+String(error?.message||error),'warning');
                 showToast('補登視窗無法開啟：'+String(error?.message||error),'warning');
             }finally{
                 // A failed employee-master lookup leaves the form hidden.
