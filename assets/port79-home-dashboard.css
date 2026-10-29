@@ -161,3 +161,5 @@ html body.p79-workspace:has(#p79HomeDashboard) #p79IntegratedBell{border:0!impor
 #p79HomeDashboard .p79-review-status{color:#f44258;background:#fff0f2;border-radius:5px;padding:3px 5px;font-size:9px}
 #p79HomeDashboard #p79DashPending .p79-vessel-table td:nth-child(2){max-width:95px;overflow:hidden;text-overflow:ellipsis}
 }
+
+@media screen{#p79HomeDashboard .p79-dash-heading h2:before{content:none}#p79HomeDashboard .p79-dash-heading h2{display:flex;align-items:center;gap:8px}#p79HomeDashboard .p79-dash-heading h2>svg{width:23px;height:23px;color:#087aff;flex:none}#p79DashAlerts .p79-dash-heading h2>svg{color:#f83e53}#p79HomeDashboard .p79-dash-hr-grid button svg{width:28px;height:28px}#p79HomeDashboard .p79-dash-kpi:nth-child(4)>span{color:#009df5;background:#edf9ff}}
