@@ -93,13 +93,16 @@ for(let i=0;i<people.length;i++){
    typhoonCases++;
    assert.equal(plan.meta[typhoon]?.restCategory,undefined);
  }
- // Only confirmed workday rest OT (or an actual off day) appears in the display audit.
+ // The monthly audit counts the same visible category as the calendar.
+ // Do not invent a second official report merely from incomplete old flags.
  const audit=c.p79DailyRestCount(emp,month,plan.meta);
- if(scenario===0||scenario===1)assert.equal(audit.dates.國.includes('22'),false);
  const view=c.p79ScheduleDisplayContext(emp,month,plan.meta);
  if(scenario===0||scenario===1){
    const cell=c.p79ScheduleDisplayDay(emp,day(22),view);
-   assert.equal(cell.visibleRestKind,'','an unverified time-label must not count as 例/休/國');
+   assert.equal(audit.dates.國.includes('22'),cell.visibleRestKind==='國',
+     'calendar and monthly audit must agree on the visible day classification');
+   assert.equal(cell.visibleRestKind,c.p79VisibleRestKind(cell.shownShift,cell.visibleSubstituteLabel),
+     'only the visible day label determines 例休國 classification');
  }
  assert.equal(c.p79ScheduleExportDay(emp,typhoon,view),'颱');
 }

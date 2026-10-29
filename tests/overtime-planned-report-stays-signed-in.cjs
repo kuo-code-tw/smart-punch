@@ -17,7 +17,7 @@ assert(html.includes('p79PlannedAttendanceModalIsOpen'),'planned close protectio
 assert(html.includes("querySelector?.('#p79OvertimeDialog[open]')"),'planned dialog cannot be closed while new plan form is active');
 assert(report.includes("id==='p79OvertimeDialog'&&planned?.open?planned:document.body"),
   'new plan report mounts inside the open planned review, but the standalone form keeps body host');
-assert(html.includes('port79-overtime-report.js?v=20261029-explicit-monthly-plan-date-v2'),
+assert(html.includes('port79-overtime-report.js?v=20261029-auto-match-shift-all-staff-v1'),
   'new auth-safe report module cache version is required in production');
 const session=new Map([['port79_user_token','live-token'],['admin_session','{"empId":"ADMIN","role":"superadmin"}'],['aqc_admin_logged_in','1']]);
 const document={
