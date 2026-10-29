@@ -52,6 +52,41 @@ async function save(draft){
  const table=document.getElementById('adminRecordsTableContainer'),scrollTop=table?.scrollTop,scrollLeft=table?.scrollLeft;
  renderAdminRecordsTable();if(table){table.scrollTop=scrollTop;table.scrollLeft=scrollLeft;}return result;
 }
+// A cached table cell may retain the old clock-out after manual correction.
+// Always prefll from the authoritative complete pair returned by cloud context.
+function p79OfficialOvertimePair(cloud,empId,date,visible,roster,saved){
+ const records=(cloud?.records||[]).filter(r=>id(r.empId)===id(empId));
+ const base=Date.parse(date+'T00:00:00+08:00');
+ if(!Number.isFinite(base))throw Error('加班工作日期無效，已停止申報');
+ const next=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+ const sessions=buildDailyAttendanceRows(records)
+  .filter(p=>p.clockIn&&p.clockOut&&!p.pairingIssue)
+  .map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)}))
+  .filter(p=>{
+   if(!Number.isFinite(p.start)||!Number.isFinite(p.end)||p.end<=p.start||p.end-p.start>18*3600000)return false;
+   const local=new Date(p.start+8*3600000),day=local.toISOString().slice(0,10);
+   return day===date||(day===next&&local.getUTCHours()<8);
+  });
+ const inId=String(visible?.clockIn?.id||'').trim(),outId=String(visible?.clockOut?.id||'').trim();
+ const same=sessions.filter(p=>(inId&&String(p.row.clockIn.id||'').trim()===inId)||
+                              (outId&&String(p.row.clockOut.id||'').trim()===outId));
+ if(same.length===1)return same[0];
+ if(same.length>1)throw Error('正式上下班打卡配對與目前顯示不同，請先核對原始打卡 ID');
+ // Replaced IDs must be resolved against a known shift, never against just a name or date.
+ let slot=null;
+ try{
+  if(saved?.overtimeStart&&saved?.overtimeEnd){
+   const [start,end]=P79Overtime.interval(date,saved.overtimeStart,saved.overtimeEnd);
+   slot={start,end};
+  }else{
+   const scheduled=g.P79RestAttendance?.period(date,roster||{});
+   if(scheduled?.known)slot=scheduled;
+  }
+ }catch(_){}
+ const choices=slot?sessions.filter(p=>p.start<slot.end&&p.end>slot.start):[];
+ if(choices.length!==1)throw Error(choices.length?'正式考勤有多組可能的上下班配對，請先核對原始打卡':'找不到這個工作日唯一、完整的正式上下班打卡；請先重新讀取考勤');
+ return choices[0];
+}
 async function open({row,employee,date}){
  if(opening)return;opening=true;
  try{
@@ -63,7 +98,9 @@ async function open({row,employee,date}){
   finally{loading.close?.();loading.remove?.();}
   Object.assign(sysConfig,options.config);
   const roster=cloud.schedules?.find(r=>id(r.empId)===id(employee.empId))?.schedule||{},saved=roster.__meta?.[date]?.overtimeReport;
-  const start=getAttendanceTimestamp(row.clockIn),end=getAttendanceTimestamp(row.clockOut),parts=P79SpecialOvertime.forShift(start,end,row.clockIn.timeStr),kinds=parts.flatMap(p=>p.kinds);
+  const official=p79OfficialOvertimePair(cloud,employee.empId,date,row,roster,saved);
+  const start=official.start,end=official.end;
+  const parts=P79SpecialOvertime.forShift(start,end,official.row.clockIn.timeStr),kinds=parts.flatMap(p=>p.kinds);
   const inferred=saved?null:P79Overtime.suggestRule(start,end,date,roster,options.rows,kinds);
   await P79Overtime.openReport({empId:String(employee.empId),date,roster,savedReport:!!saved,attendance:{start,end},code:saved?.code||inferred?.[1]||'',category:saved?.category||inferred?.[0]||(parts.length?'國':'延'),preferredType:saved?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!saved&&!inferred,periodHint:'依排定班別起算，下班分鐘達45分（含）即進位。尚無相符時段，請新增或核對出勤時段。'});
  }catch(error){showToast('申報未開啟：'+String(error.message||error),'warning');}
