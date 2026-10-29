@@ -22,14 +22,14 @@ const c={window:null,Map,Set,Array,Number,Object,Date,Math,JSON,String,console,
  p79LeaveCoverOnDay:()=>[],p79ScheduleRestBalance:()=>({ledger:[]}),
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:false,days:{}}})}),
  p79TyphoonDates:()=>[],scheduleTaipeiTodayKey:()=>day(25),
- p79ScheduleNoPunchRest:()=>false,p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=>'',p79ScheduleSpecialNoPunchCode:()=> '',
+ p79ScheduleNoPunchRest:()=>false,p79CoverageShift:()=>'',p79SubstituteShiftLabel:(id,date)=>/^[例休國]\d/.test(String(monthlyScheduleData[id]?.[date]||''))?monthlyScheduleData[id][date]:'',p79ScheduleSpecialNoPunchCode:()=> '',
  p79ScheduleLeaveExportCode:x=>x==='颱風假'?'颱':'',scheduleLeaveTypeText:x=>x.leaveType||''};
 c.window=c;c.P79RestAttendance={state:()=> 'unknown'};
 c.P79SpecialOvertime={electionDates:()=>[]};
 vm.createContext(c);
-for(const n of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79VisibleRestDayAudit','p79DailyRestCount','p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79RestQuotaAuditSnapshot'])vm.runInContext(extract(n),c);
+for(const n of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79VisibleRestDayAudit','p79DailyRestCount','p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79RestQuotaAuditSnapshot','p79ScheduleRestCountCells'])vm.runInContext(extract(n),c);
 let raw=c.p79DailyRestCount(employees[0],month,monthlyScheduleMeta.E0);
-a.equal(raw.counts.例,4,'reproduce faulty four examples in metadata');
+a.equal(raw.counts.例,3,'daily counter must follow the displayed typhoon-leave override, not four hidden markers');
 let visible=c.p79VisibleRestDayAudit(employees[0],month,monthlyScheduleMeta.E0);
 a.equal(visible.例.length,3,'approved typhoon covers one of four assigned examples');
 a.deepEqual([...visible.例].map(d=>d.slice(-2)),['02','13','19']);
@@ -40,4 +40,25 @@ a.equal(result.totals.needsUpdate,1);
 a.equal(result.totals.complete,82);
 a(result.findings.some(line=>line.includes('測試員工0')&&line.includes('例3天(02、13、19)')&&line.includes('例少1天')),'audit must explain whose example was hidden, dates and shortage');
 a.equal(JSON.stringify(monthlyScheduleMeta),initial,'audit must be read-only');
-console.log('PASS all 83 people checked: hidden fourth 例 from approved typhoon is flagged 例3/1, exact dates, no underlying schedule mutation');
+// Regression: 宋文豪 had 國16-24 plus another visible 國, but old code showed 1/0.
+// The same omission affected timed 例 and 休, including verified working shifts.
+const first=monthlyScheduleData.E0;
+first[day(1)]='國16-24';first[day(8)]='休08-16';first[day(13)]='例08-16';
+let selected=c.p79VisibleRestDayAudit(employees[0],month,monthlyScheduleMeta.E0);
+a.deepEqual([...selected.國].map(d=>d.slice(-2)),['01','07'],'a timed 國 plus ordinary 國 must both count');
+a(selected.休.includes(day(8)),'timed 休 must count');
+a(selected.例.includes(day(13)),'timed 例 must count');
+let totals=c.p79DailyRestCount(employees[0],month,monthlyScheduleMeta.E0);
+for(const kind of ['例','休','國'])a.equal(totals.counts[kind],selected[kind].length,'full-month '+kind+' must equal selected cells');
+c.scheduleEscapeHtml=x=>String(x||'');
+let cells=c.p79ScheduleRestCountCells(employees[0],month,monthlyScheduleMeta.E0,[],[],selected);
+a.match(cells,/<span>2\/0<\/span>/,'國 should show 2/0, not 1/0');
+const normalRest=selected.休.length;
+cells=c.p79ScheduleRestCountCells(employees[0],month,monthlyScheduleMeta.E0,[day(8)],[],selected);
+a(cells.includes('<span>'+(normalRest-1)+'/'),'a 颱 day must not count again as 休');
+// Verify actual clock-in evidence cannot hide a timed visible holiday label.
+c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:true,actualShifts:{['E0|'+day(1)]:'中'},days:{}}})});
+c.P79RestAttendance.state=(_snapshot,id,date)=>id==='E0'&&date===day(1)?'worked':'unknown';
+selected=c.p79VisibleRestDayAudit(employees[0],month,monthlyScheduleMeta.E0);
+a(selected.國.includes(day(1)),'paired attendance does not erase the selected 國16-24');
+console.log('PASS all 83 people + timed 例/休/國, verified attendance, typhoon dedupe, month-wide category parity');

@@ -6849,9 +6849,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,shortWorkMinutes,verifiedRestAttendance,noPunchRest,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,
-        visibleRestKind:(actualShift||verifiedRestAttendance)?''
-          :(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''
-          :visibleSubstituteLabel&&!p79ConfirmedRestOvertime(dayMeta)?''
+        // Count the category visibly selected in each cell, including timed labels.
+        // Cloud-confirmed overtime remains a separate quota deduction.
+        visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''
           :p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
     }
     // On-demand full staff check uses the same precedence as the month grid.
@@ -6867,36 +6867,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     // 所有人員共用單一逐日分類器；不使用自動補配額度作為已休天數。
     function p79DailyRestCount(emp,month,knownAllocation=null) {
-      const counts={例:0,休:0,國:0},dates={例:[],休:[],國:[]};
-      const punchShifts=typeof p79ScheduleRestClient==='function'
-        ?p79ScheduleRestClient().status(month).evidence?.actualShifts:null;
-      const shifts=monthlyScheduleData[emp.id]||{},metadata=monthlyScheduleMeta[emp.id]||{};
-      const protectedTyphoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
-      // Each row's quota totals must use exactly the same fresh allocation that paints
-      // its 31 day cells. Old auto-v1 metadata can lag behind an edited roster.
-      const allocated=knownAllocation||p79AutomaticRestMetadata(emp.id,month);
-      const first=p79EmploymentStartDate(emp)||'';
-      const days=p79RestQuota(month).days;
-      for(let d=1;d<=days;d++){
-        const date=month+'-'+String(d).padStart(2,'0');
-        if(first&&date<first)continue;
-        const shift=String(shifts[date]||'').trim(),meta=metadata[date]||{},assigned=allocated[date]||{};
-        if(['離','離職'].includes(shift))break;
-        if((punchShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]||
-            ['休','例','國'].includes(shift)&&p79ScheduleHasVerifiedPunch(emp.id,date))&&
-            !meta.overtimeReport&&!meta.overtime&&!approvedLeaveForEmployee(emp.id,date))continue;
-        if(protectedTyphoon.has(date)||shift==='颱')continue;
-        const code=/^(例|休|國)(?:$|[0-9]{1,2}(?::[0-9]{2})?[-–][0-9]{1,2}(?::[0-9]{2})?$)/.exec(shift);
-        const report=meta.overtimeReport||{};
-        const revoked=!!meta.overtimeExcluded||(meta.overtimeRevocations||[]).some(x=>x.confirmed===true&&String(x.reportId)===String(report.id));
-        const reportType=!revoked&&String(report.id||'').trim()&&['例','休','國'].includes(report.category)?report.category:'';
-        // A working-day manual restCategory/restQuotaOvertime without a cloud report
-        // is an unverified annotation, not an approved rest-quota deduction.
-        const category=reportType||(code?.[1]&&shift!=='休'?code[1]:'')||
-          (['例','休','國'].includes(assigned.restCategory)&&shift==='休'?assigned.restCategory:'');
-        if(category){counts[category]++;dates[category].push(date.slice(8));}
-      }
-      return {counts,dates};
+      // Reuse the actual 31/30/28-day selected codes shown in the roster/export.
+      // Hidden metadata or a verified working shift may not erase a visible
+      // 國16-24, 休08-16 or 例08-16 label from the day-category total.
+      const shown=p79VisibleRestDayAudit(emp,month,knownAllocation);
+      const dates=Object.fromEntries(['例','休','國'].map(kind=>
+        [kind,[...new Set(shown[kind])].map(date=>date.slice(-2))]));
+      return {counts:Object.fromEntries(['例','休','國'].map(kind=>
+        [kind,dates[kind].length])),dates};
     }
     // Same visible shift precedence as the day grid: verified typhoon no-punch,
     // approved typhoon leave, or an explicitly assigned 颱 shift. A holiday
@@ -6946,7 +6924,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null,visibleRestDates=null) {
       const quota=p79RestQuota(month).counts;
-      const audit=p79DailyRestCount(emp,month,knownAllocation);
+      const audit=visibleRestDates?null:p79DailyRestCount(emp,month,knownAllocation);
       // The visible day count and the unreported balance are different values.
       // Confirmed overtime already consumes quota; do not show it as missing again.
       let ledger=null;
@@ -6960,14 +6938,16 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
       const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
       const typhoonSet=new Set([...offDates,...workedDates]);
-      const dates=kind=>visibleRestDates?visibleRestDates[kind]||[]:audit.dates[kind].map(d=>month+'-'+d);
-      const nationalDates=dates('國').filter(day=>!typhoonSet.has(day));
-      const nationalDuplicates=dates('國').length-nationalDates.length;
+      const dates=kind=>[...new Set(visibleRestDates?(visibleRestDates[kind]||[]):audit.dates[kind].map(d=>month+'-'+d))];
+      const nationalDuplicates=dates('國').filter(day=>typhoonSet.has(day)).length;
       const total=typhoonSet.size;
       const quotaCells=['例','休','國'].map(category=>{
-        const count=category==='國'?nationalDates.length:visibleRestDates?dates(category).length:audit.counts[category];
-        const displayDates=(category==='國'?nationalDates:dates(category)).map(day=>day.slice(-2));
-        const limit=quota[category],verified=Number.isFinite(ledger?.remaining?.[category]);
+        // A day reported under 颱 must not also count under 例/休/國.
+        const categoryDates=dates(category).filter(day=>!typhoonSet.has(day));
+        const count=categoryDates.length;
+        const displayDates=categoryDates.map(day=>day.slice(-2));
+        const limit=Number.isFinite(ledger?.quota?.[category])?ledger.quota[category]:quota[category];
+        const verified=Number.isFinite(ledger?.remaining?.[category]);
         const rest=verified?Math.max(0,ledger.remaining[category]):Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const title=category+'：逐日計入 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；剩餘未報 '+rest+' 天'+
@@ -7103,14 +7083,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
             .map(([kind,n])=>kind+'少'+(n-after[kind])+'天');
           const hidden=p79DailyRestCount(emp,month,result.meta).counts;
           const mismatch=['例','休','國'].filter(kind=>hidden[kind]!==after[kind]);
+          const extra=Object.entries(result.quota).filter(([kind,n])=>after[kind]>n)
+            .map(([kind,n])=>kind+'超額'+(after[kind]-n)+'天');
           const refreshed=['例','休','國'].some(kind=>before[kind]!==after[kind]);
-          if(refreshed||mismatch.length)totals.needsUpdate++;
+          if(refreshed||mismatch.length||extra.length)totals.needsUpdate++;
           if(missing.length)totals.unresolved++;
-          if(refreshed||missing.length||mismatch.length)findings.push(emp.name+'：'+
+          if(refreshed||missing.length||mismatch.length||extra.length)findings.push(emp.name+'：'+
             '目前 '+['例','休','國'].map(c=>c+before[c]+'天('+((current[c]||[]).map(d=>d.slice(-2)).join('、')||'無')+')').join('／')+
             ' → 重新配對預覽 '+['例','休','國'].map(c=>c+after[c]).join('／')+
             (mismatch.length?'｜配對註記與實際畫面不符：'+mismatch.join('、'):'')+
-            (missing.length?'｜'+missing.join('、')+'（未自動建立加班）':''));
+            (missing.length?'｜'+missing.join('、')+'（未自動建立加班）':'')+
+            (extra.length?'｜'+extra.join('、')+'（須人工確認，不會刪改班別）':''));
           else totals.complete++;
         }catch(error){totals.blocked++;findings.push(emp.name+'：無法安全配對－'+String(error.message||error));}
       }
