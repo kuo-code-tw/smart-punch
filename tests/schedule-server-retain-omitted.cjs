@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const c={normalizeEmpId_:s=>String(s||'').trim().toUpperCase(),p79OtHistoryCopy_:x=>JSON.parse(JSON.stringify(x))};
+vm.createContext(c);vm.runInContext(fs.readFileSync('backend/schedule-retain-omitted.gs','utf8'),c);
+const date='2026-10-09',existing=[{empId:'ARMG',month:'2026-10',schedule:{[date]:'早'}},{empId:'HIDDEN',month:'2026-10',schedule:{[date]:'休',__personnel:{group:'C組'},__meta:{[date]:{overtimeReport:{id:'REPORT'},overtimeAmendments:[{eventId:'AUDIT'}],overtimeRevocations:[{reportId:'OLD'}]}}}}];
+const submitted=[{...existing[0],schedule:{[date]:'晚'}}],original=JSON.stringify(existing);
+const rejectsMissing=rows=>{if(!rows.some(r=>r.empId==='HIDDEN'))throw Error('不可省略含加班申報或異動紀錄的員工');};
+assert.throws(()=>rejectsMissing(submitted),/不可省略/);
+let rows=c.p79ScheduleRetainOmittedRows_(existing,submitted);rejectsMissing(rows);
+assert.equal(rows.length,2);assert.equal(rows[0].schedule[date],'晚');assert.equal(JSON.stringify(rows[1]),JSON.stringify(existing[1]));
+assert.equal(JSON.stringify(existing),original);rows[1].schedule.__meta[date].overtimeReport.id='LOCAL';assert.equal(existing[1].schedule.__meta[date].overtimeReport.id,'REPORT');
+const fresh=[...existing,{empId:'NEW-SINCE-CLIENT-READ',schedule:{[date]:'中'}}];
+assert.equal(c.p79ScheduleRetainOmittedRows_(fresh,submitted).length,3,'fresh server-only rows survive stale/scoped clients');
+assert.equal(c.p79ScheduleRetainOmittedRows_(existing,[submitted[0],submitted[0]]).length,3,'duplicates remain available for the existing duplicate guard to reject');
+assert.equal(c.p79ScheduleRetainOmittedRows_(existing,[{empId:' armg ',schedule:{[date]:'中'}}]).length,2);
+assert.throws(()=>c.p79ScheduleRetainOmittedRows_([{empId:''}],submitted),/無工號/);
+console.log('PASS server-side omission rejection reproduced and prevented; hidden reports/audits preserved, active edit retained, fresh-only staff retained, duplicates still rejected and source immutable');
