@@ -1,0 +1,59 @@
+/* 79號碼頭管理首頁安全改版：只有在七系統入口顯示時才啟用，不碰登入/員工刷卡模式。 */
+@charset "UTF-8";
+body:has(#systems.show){background:linear-gradient(130deg,#e9f3ff 0%,#f5f9ff 44%,#edf5fd 100%)!important;align-items:flex-start!important;justify-content:center!important;padding:18px!important}
+body:has(#systems.show)>.card{width:min(1600px,100%)!important;max-width:1600px!important;min-height:calc(100vh - 36px);border:1px solid #dbe7f4!important;border-radius:24px!important;background:#f5f9ff!important;box-shadow:0 16px 55px rgba(29,72,126,.12)!important;overflow:hidden}
+body:has(#systems.show)>.card>.header{background:linear-gradient(125deg,#123d70,#2369b0 62%,#59a5e3)!important;color:#fff!important;padding:23px 72px 23px 34px!important;text-align:left!important;border-bottom:0!important}
+body:has(#systems.show)>.card>.header .cloud-title{font-size:clamp(22px,2.6vw,33px)!important;letter-spacing:.025em!important}
+body:has(#systems.show)>.card>.header .cloud-sub{color:#d0e9ff!important;letter-spacing:.08em!important;font-size:12px!important}
+body:has(#systems.show)>.card>.body{padding:22px 30px 28px!important}
+body:has(#systems.show) .weather-strip{margin-bottom:20px!important;background:#fff!important;border:1px solid #dbe8f7!important;box-shadow:0 5px 20px rgba(30,73,120,.06)!important;border-radius:16px!important;padding:12px 20px!important}
+body:has(#systems.show) #sessionBar{background:#fff!important;border-color:#dbe8f6!important;border-radius:16px!important;box-shadow:0 5px 20px rgba(30,73,120,.06)!important}
+#systems .p79-modern-home-intro{position:relative;isolation:isolate;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(150px,.55fr);align-items:center;gap:25px;min-height:192px;background:linear-gradient(110deg,#164f8a 0%,#2079b4 49%,#9fd6e7 100%);border-radius:21px;padding:28px 34px;color:#fff;box-shadow:0 12px 35px rgba(30,95,164,.17)}
+#systems .p79-modern-home-intro::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.48;background:repeating-linear-gradient(95deg,transparent 0 95px,rgba(255,255,255,.09) 96px,transparent 97px),radial-gradient(circle at 75% 20%,#fff7ce 0 2%,transparent 20%)}
+#systems .p79-modern-home-intro::after{content:"";position:absolute;right:0;bottom:-20px;width:48%;height:88px;z-index:-1;background:linear-gradient(transparent 40%,rgba(10,76,133,.36) 40%),linear-gradient(170deg,transparent 35%,rgba(8,45,91,.31) 36%);border-radius:70% 0 0 0;opacity:.7}
+#systems .p79-modern-home-eyebrow{font-size:12px;font-weight:800;letter-spacing:.18em;color:#bce5ff}
+#systems .p79-modern-home-intro h2{margin:7px 0 10px;color:#fff;font-weight:1000;font-size:clamp(23px,2.8vw,36px);line-height:1.2}
+#systems .p79-modern-home-intro p{margin:0;color:#e6f6ff;font-size:14px;font-weight:700;line-height:1.8}
+#systems .p79-modern-home-ship{display:grid;place-content:center;gap:6px;text-align:center;color:#fff;opacity:.92;font-size:65px;filter:drop-shadow(0 12px 16px rgba(6,39,82,.25))}
+#systems .p79-modern-home-ship small{font-size:12px;font-weight:850;letter-spacing:.1em}
+#systems .p79-modern-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 3px 12px;margin-top:10px}
+#systems .p79-modern-section-heading strong{font-size:20px;font-weight:1000;color:#123962}
+#systems .p79-modern-section-heading small{font-size:12px;color:#6e86a5;font-weight:750}
+#systems .system-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:15px!important}
+#systems .system-card{min-height:148px!important;padding:20px!important;border:1px solid #deebf9!important;border-radius:17px!important;background:#fff!important;box-shadow:0 8px 25px rgba(32,82,134,.07)!important;transition:transform .18s,border-color .18s,box-shadow .18s}
+#systems .system-card:hover:not(:disabled){border-color:#92bdf5!important;box-shadow:0 14px 30px rgba(31,88,153,.14)!important;transform:translateY(-2px)!important}
+#systems .system-card .icon{width:52px;height:52px;display:grid;place-items:center;border-radius:17px;margin-bottom:10px!important;font-size:25px}
+#systems .system-card .name{font-size:17px!important;color:#1c3d63!important;font-weight:950!important}
+#systems .system-card .desc{font-size:12px!important;line-height:1.65!important;color:#6b83a0!important;max-width:90%!important}
+#systems .system-card.attendance .icon{background:#e9f3ff}
+#systems .system-card.workhours .icon{background:#e9f6ff}
+#systems .system-card.leave .icon{background:#e8faf2}
+#systems .system-card.schedule .icon{background:#f0edff}
+#systems .system-card.efficiency .icon{background:#e8fbf8}
+#systems .system-card.hr .icon{background:#fff0f3}
+#systems #cardHistory{grid-column:1/-1!important;min-height:112px!important;background:linear-gradient(108deg,#eef6ff,#f5fcff)!important;border-color:#c1ddf7!important}
+#systems #cardHistory .icon{display:inline-grid;vertical-align:middle;margin:0 15px 0 0!important}
+#systems #cardHistory .name{display:inline-block;vertical-align:middle;font-size:18px!important}
+#systems #cardHistory .desc{margin-top:5px!important;max-width:none!important;font-size:12px!important}
+#systems #cardHistory .badge{background:#dceeff!important;color:#1167cc!important}
+#systems .p79-modern-home-preserve{display:flex;align-items:flex-start;gap:12px;margin-top:17px;padding:15px 18px;background:#f0f5fb;border:1px solid #d9e7f6;border-radius:15px;color:#456a91}
+#systems .p79-modern-home-preserve .p79-modern-lock{font-size:23px;flex:0 0 auto}
+#systems .p79-modern-home-preserve strong{display:block;color:#26466a;font-size:14px}
+#systems .p79-modern-home-preserve small{display:block;color:#6782a0;margin-top:3px;line-height:1.6}
+#systems .note{font-size:12px!important;line-height:1.65!important;padding:15px!important;border:0!important;background:#fff!important;border-radius:12px!important;text-align:left!important}
+body:has(#systems.show) .system-version-footer{color:#8b9caf!important}
+@media(max-width:1000px){#systems .system-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:650px){
+ body:has(#systems.show){padding:8px!important}
+ body:has(#systems.show)>.card{border-radius:17px!important;min-height:calc(100vh - 16px)}
+ body:has(#systems.show)>.card>.body{padding:14px!important}
+ body:has(#systems.show)>.card>.header{padding:20px 68px 18px 18px!important}
+ #systems .p79-modern-home-intro{grid-template-columns:1fr;padding:20px;min-height:150px}
+ #systems .p79-modern-home-ship{display:none}
+ #systems .system-grid{grid-template-columns:1fr!important;gap:10px!important}
+ #systems .system-card{min-height:116px!important;padding:16px!important}
+ #systems #cardHistory{grid-column:auto!important}
+ #systems .p79-modern-section-heading{flex-direction:column;align-items:flex-start}
+}
+html[data-theme="dark"] body:has(#systems.show) #systems :is(.system-card,.note){background:#132b47!important;color:#e4eefb!important}
+html[data-theme="dark"] body:has(#systems.show) #systems .system-card .name{color:#eff8ff!important}
