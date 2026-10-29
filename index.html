@@ -273,6 +273,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
   }
 }
 </style>
+<link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -331,6 +332,22 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     </div>
 
     <div id="systems" class="system-wrap">
+      <!-- 純展示區：保留全部原有系統卡片、事件綁定、權限檢查與資料連線。 -->
+      <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
+        <div>
+          <div class="p79-modern-home-eyebrow">79 PORT · SMART OPERATIONS</div>
+          <h2>智慧碼頭管理工作台</h2>
+          <p>考勤、請假、排班、船舶、工時、人資與歷史資料集中管理。<br>沿用原有功能與權限，選擇下方模組即可進入工作。</p>
+        </div>
+        <div class="p79-modern-home-ship" aria-hidden="true">🚢<small>人性化 · 科技化 · 更好操作</small></div>
+      </section>
+      <div class="p79-modern-section-heading"><strong>▦ 功能模組與歷史資料庫</strong><small>依原有帳號權限顯示可用的系統</small></div>
+      <div class="p79-modern-search-row">
+        <label for="p79ModernModuleSearch">🔎 搜尋管理功能</label>
+        <input id="p79ModernModuleSearch" type="search" placeholder="輸入「歷史資料」「排班」「船舶」快速找到模組"
+          autocomplete="off" oninput="const q=this.value.trim().toLocaleLowerCase();document.querySelectorAll('#systems .system-card').forEach(card=>{const matching=!q||card.textContent.toLocaleLowerCase().includes(q);card.classList.toggle('p79-modern-search-dim',!matching);card.classList.toggle('p79-modern-search-hit',!!q&&matching);});">
+        <small>只標示搜尋結果；原本的操作、權限與資料來源不變。</small>
+      </div>
       <div class="system-grid">
         <button id="cardAttendance" class="system-card attendance" type="button" onclick="launchSystem('attendance')"><span class="icon">🕒</span><span class="name">考勤系統</span><span class="desc">上下班打卡、考勤紀錄與管理</span><span class="badge"></span></button>
         <button id="cardWorkhours" class="system-card workhours" type="button" onclick="launchSystem('workhours')"><span class="icon">📊</span><span class="name">加班管理</span><span class="desc">出勤天數、加班時數與月結統計</span><span class="badge"></span></button>
@@ -338,8 +355,9 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <button id="cardSchedule" class="system-card schedule" type="button" onclick="launchSystem('schedule')"><span class="icon">🗓️</span><span class="name">排班系統</span><span class="desc">班表查看與排班管理</span><span class="badge"></span></button>
         <button id="cardEfficiency" class="system-card efficiency" type="button" onclick="launchSystem('efficiency')"><span class="icon">📊</span><span class="name">效率系統</span><span class="desc">船舶、AQC、月報與效率資料</span><span class="badge"></span></button>
         <button id="cardHr" class="system-card hr" type="button" onclick="launchSystem('hr')"><span class="icon">👥</span><span class="name">人資管理系統</span><span class="desc">唯一人員主檔、部門職稱、特休、裝置綁定與五大系統權限</span><span class="badge"></span></button>
-        <button id="cardHistory" class="system-card history" type="button" onclick="location.href='./history-data/'"><span class="icon">🗄️</span><span class="name">歷史資料中心</span><span class="desc">集中查詢考勤、排班、船舶歷史月份；讀過的月份保存在本機</span><span class="badge">歷史</span></button>
+        <button id="cardHistory" class="system-card history" type="button" onclick="location.href='./history-data/'"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
       </div>
+      <div class="p79-modern-home-preserve"><span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班維持現行介面與流程</strong><small>本次只調整管理畫面外觀。登入、刷卡、權限、資料連結及雲端資料均保持原狀。</small></div></div>
       <div class="note">所有系統的人員資料與權限統一由「人資管理系統」維護；歷史月份集中由「歷史資料中心」查詢，避免平常切換系統重複下載大量舊資料。</div>
 
       <div class="system-version-footer" aria-label="系統版本資訊">
