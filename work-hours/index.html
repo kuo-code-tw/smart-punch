@@ -568,7 +568,7 @@ body.p79-work-hours-page .desktop-side-rail .rail-title::after {
 window.p79CheckWorkHoursPermission=async function(){
   const ss=sessionStorage;
   const adminRole=String(ss.getItem('aqc_admin_role')||'').trim().toLowerCase();
-  if(adminRole==='superadmin')return true;
+  if(adminRole==='superadmin'){ss.setItem('p79_workhours_permission','manage');return true;}
   const adminId=String(ss.getItem('aqc_admin_id')||'').trim().toUpperCase();
   const adminToken=String(ss.getItem('port79_admin_token')||
     ss.getItem('port79_gc_superadmin_token')||ss.getItem('port79_gc_token')||
@@ -14393,6 +14393,7 @@ function p79OvertimePeriodLabel(report){
         function p79WorkhoursScopeAllowsEmployee(emp,principal=p79WorkhoursScopePrincipal()) {
             if(!emp||!String(emp.empId||'').trim()||String(emp.empId).trim().toUpperCase()==='ADMIN')return false;
             if(isCurrentViewerSuperAdmin())return true;
+            if(sessionStorage.getItem('p79_workhours_permission')==='none')return false;
             const role=getAuthoritativeAdminSessionRole();
             if(role!=='admin')return false;
             if(!['view','manage'].includes(String(principal?.systemPermissions?.workhours||'').toLowerCase()))return false;
@@ -16367,6 +16368,13 @@ function p79ShowWorkHoursImmediately(){
     document.body.classList.add('p79-work-hours-page');
     document.body.dataset.p79System='workhours';
 
+    // A confirmed access denial hides this module but never logs out the user.
+    // Other administrator systems continue using their own permissions.
+    if(sessionStorage.getItem('p79_workhours_permission')==='none'){
+      document.getElementById('adminContentOvertime')?.classList.add('hidden');
+      document.getElementById('adminContentStats')?.classList.add('hidden');
+      return;
+    }
     const emp=document.getElementById('viewEmployee');
     const admin=document.getElementById('viewAdmin');
     if(emp){emp.classList.add('hidden');emp.style.display='none'}
