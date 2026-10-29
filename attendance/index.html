@@ -2144,12 +2144,12 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     <label class="text-xs">結束日期<input type="date" id="exportAttendanceEnd" required aria-label="匯出結束日期" class="w-full mt-1 px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm"></label>
                 </div>
                 <button type="button" onclick="p79ResetExportDateRange()" class="mt-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 text-xs">整月</button>
-                <p class="text-[11px] text-slate-500 mt-2">日期範圍包含起訖日，考勤、排班與每日考勤均套用。以上班日決定月份；跨月班次連同下月簽退一起匯出，原始打卡時間保留。</p>
+                <p class="text-[11px] text-slate-500 mt-2">日期範圍套用考勤紀錄；排班表使用與排班系統相同的整月欄位（工號、姓名、職稱、組別、排班屬性及當月每日班別）。跨月班次保留原始打卡時間。</p>
             </div>
 
             <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportPreferCache" type="checkbox" checked class="w-4 h-4">優先使用本機快取（含已連接的電腦資料夾）</label>
             <p class="text-[11px] text-slate-500">缺少的月份會向雲端讀取。使用快取時，試算表 會附上各月份保存時間；需要最新雲端資料時，請取消勾選。</p>
-            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出排班與每日考勤（同一 試算表）</label>
+            <label class="flex items-center gap-3 rounded-xl border border-indigo-100 p-3 text-sm"><input id="exportIncludeSchedule" type="checkbox" class="w-4 h-4">一併匯出正式排班表（比照排班系統匯出格式）</label>
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="selectAllExportFields(true)" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-xl text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50">☑️ 全部選取</button>
@@ -22129,39 +22129,124 @@ function p79EmployeeDateEligible(emp,date) {
             return raw==='休'&&meta?.restCategory?meta.restCategory:raw;
         }
         function p79BuildScheduleAttendanceExport(month,people,source,roster) {
+            // Match 排班系統 → 匯出排班: one employee per row, A~E are
+            // 工號、姓名、職稱、組別、排班屬性; F onward are day 1..month end.
+            // Never export the unrelated "排班與每日考勤" sheet.
             const days=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
-            const scheduleRows=[['考勤號','工號','姓名','部門','職稱',...Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'))]];
-            const dailyRows=[['日期','考勤號','工號','姓名','部門','職稱','排班','上班簽到','下班簽退','出勤時數','狀態']];
-            const byPersonDay=new Map();
-            buildDailyAttendanceRows(source).forEach(shift=>{
-                const day=String(shift.accountingDateKey||shift.dateKey||'').replaceAll('/','-');
-                if(day.slice(0,7)!==month)return;
-                const emp=findEmployeeForAttendanceIdentity(shift,people);if(!emp)return;
-                const key=String(emp.empId).toUpperCase()+'|'+day;
-                if(!byPersonDay.has(key))byPersonDay.set(key,[]);byPersonDay.get(key).push(shift);
+            const headers=['工號','姓名','職稱','組別','排班屬性',
+                ...Array.from({length:days},(_,i)=>String(i+1))];
+            const scheduleRows=[headers];
+            const official=(roster?.schedules||[]).filter(r=>String(r.month||'').trim()===month);
+            const id=x=>String(x||'').trim().toUpperCase();
+            const peopleById=new Map(people.map(emp=>[id(emp.empId),emp]));
+            const groups=new Map();
+            for(const row of official){
+                const key=id(row.empId);
+                if(!key||!peopleById.has(key))continue;
+                if(!groups.has(key))groups.set(key,[]);
+                groups.get(key).push(row);
+            }
+            // The official schedule grid derives actual 早／中／晚 from complete
+            // paired punches. Reuse its exact recognition helper when available.
+            const shifts=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(source);
+            const actual=new Map(),ambiguous=new Set(),sessions=[];
+            for(const shift of shifts){
+                const emp=findEmployeeForAttendanceIdentity(shift,people);
+                if(!emp)continue;
+                const keyId=id(emp.empId),start=shift.clockIn,end=shift.clockOut;
+                const paired=start&&end&&!shift.timePrecisionIssue&&!shift.pairingIssue;
+                const first=paired?getAttendanceTimestamp(start):NaN;
+                const last=paired?getAttendanceTimestamp(end):NaN;
+                if(paired&&Number.isFinite(first)&&Number.isFinite(last)&&last>first){
+                    const restored=window.P79SchedulePunchRestore?.displayShiftFromClockIn?.(start,end);
+                    if(restored&&restored.date?.startsWith(month+'-')&&['早','中','晚'].includes(restored.shift)){
+                        const key=keyId+'|'+restored.date;
+                        if(actual.has(key)){actual.delete(key);ambiguous.add(key);}
+                        else if(!ambiguous.has(key))actual.set(key,restored.shift);
+                    }
+                }
+                const stamp=getAttendanceTimestamp(start||end||shift.records?.[0]||{});
+                if(Number.isFinite(stamp))sessions.push({empId:keyId,
+                    start:paired&&Number.isFinite(first)?first:start?getAttendanceTimestamp(start):null,
+                    end:paired&&Number.isFinite(last)?last:end?getAttendanceTimestamp(end):null,
+                    time:stamp});
+            }
+            // A full, authenticated export month is used for the same no-punch
+            // / statutory rest classification as the schedule's day display.
+            const evidence=window.P79RestAttendance?.build?.({
+                complete:true,month,now:Date.now(),schedules:official,sessions,
+                leaveDates:(roster.leaveRecords||[]).flatMap(leave=>{
+                    if(!['已核准','已核準'].includes(String(leave.status||'')))return [];
+                    const start=normalizeScheduleDateKey(leave.startTime||leave.startDate||'');
+                    const end=normalizeScheduleDateKey(leave.endTime||leave.endDate||'');
+                    if(!start||!end||end<start)return [];
+                    const keys=[];
+                    for(let i=0;i<days;i++){
+                        const date=month+'-'+String(i+1).padStart(2,'0');
+                        if(date>=start&&date<=end)keys.push(id(leave.empId)+'|'+date);
+                    }
+                    return keys;
+                })
             });
-            people.forEach(emp=>{
-                const plan={};
-                const monthRows=roster.schedules.filter(row=>String(row.month||'').trim()===month&&String(row.empId||'').trim().toUpperCase()===String(emp.empId).trim().toUpperCase());
-                monthRows.forEach(row=>Object.entries(row.schedule||{}).forEach(([day,value])=>{
-                    const key=normalizeScheduleDateKey(day);if(!key||key.slice(0,7)!==month)return;
-                    const label=p79AttendanceExportScheduleLabel(String(value??'').trim(),row.schedule?.__meta?.[day]||row.schedule?.__meta?.[key]||{},emp,key,roster);
-                    if(Object.prototype.hasOwnProperty.call(plan,key)&&plan[key]!==label)throw Error(emp.empId+' '+key+' 存在不同版本班表，已停止匯出，請先核對排班');
-                    plan[key]=label;
-                }));
-                const labels=Array.from({length:days},(_,i)=>plan[month+'-'+String(i+1).padStart(2,'0')]||'');
-                const personnel=monthRows[0]?.schedule?.__personnel||{};
-                const role=personnel.role||monthRows[0]?.role||emp.jobTitle||emp.deptDetail||'';
-                if(monthRows.length)scheduleRows.push([emp.attNo||'',emp.empId,emp.name||'',emp.dept||'',role,...labels]);
-                labels.forEach((label,i)=>{
-                    const date=month+'-'+String(i+1).padStart(2,'0');if(!p79EmployeeDateEligible(emp,date))return;
-                    const shifts=byPersonDay.get(String(emp.empId).toUpperCase()+'|'+date)||[];
-                    if(!label&&!shifts.length)return;
-                    (shifts.length?shifts:[null]).forEach(shift=>dailyRows.push([date,emp.attNo||'',emp.empId,emp.name||'',emp.dept||'',role,label,shift?.clockIn?.timeStr||'',shift?.clockOut?.timeStr||'',shift?attendanceRowAttendanceText(shift):'',shift?(shift.clockIn&&shift.clockOut?'上下班完整':(shift.clockIn?'缺少簽退':'缺少簽到')):'無打卡']));
-                });
-            });
-            return {scheduleRows,dailyRows};
+            const observed=(empId,date)=>evidence?.complete===true
+                ?window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date):'unknown';
+            const specialDates={
+                typhoon:new Set((window.P79OfficialCalendar?.typhoonDates?.()||[]).filter(d=>d.startsWith(month+'-'))),
+                election:new Set(window.P79SpecialOvertime?.electionDates?.()||[])
+            };
+            const today=getTodayAttendanceIso();
+            for(const emp of people){
+                const entries=groups.get(id(emp.empId))||[];
+                if(!entries.length)continue;
+                const sourceRow=entries[0],personnel=sourceRow.schedule?.__personnel||{};
+                const role=String(personnel.role||sourceRow.role||emp.jobTitle||emp.deptDetail||'').trim();
+                const group=String(personnel.group??sourceRow.group??emp.group??'').trim();
+                const lock=String(personnel.lockType||sourceRow.lockType||emp.lockType||'');
+                const line=[String(emp.empId||''),String(emp.name||''),
+                    role,group,lock==='FIXED_LOCKED'?'固定鎖定':'自動輪班'];
+                for(let i=1;i<=days;i++){
+                    const date=month+'-'+String(i).padStart(2,'0');
+                    const entriesForDay=entries.filter(r=>Object.prototype.hasOwnProperty.call(r.schedule||{},date));
+                    const versions=[...new Set(entriesForDay.map(r=>String(r.schedule[date]??'').trim()))];
+                    if(versions.length>1)throw Error(emp.empId+' '+date+' 存在不同版本班表，已停止匯出，請先核對排班');
+                    const record=entriesForDay[0]||sourceRow;
+                    const raw=String(record.schedule?.[date]??'').trim();
+                    const meta=record.schedule?.__meta?.[date]||{};
+                    let label=p79AttendanceExportScheduleLabel(raw,meta,emp,date,roster);
+                    const leave=(roster.leaveRecords||[]).some(r=>
+                        id(r.empId)===id(emp.empId)&&['已核准','已核準'].includes(String(r.status||''))&&
+                        normalizeScheduleDateKey(r.startTime||r.startDate||'')<=date&&
+                        normalizeScheduleDateKey(r.endTime||r.endDate||'')>=date);
+                    const state=observed(emp.empId,date);
+                    const worked=state==='worked';
+                    const hasOvertime=!!String(meta.overtimeReport?.id||'').trim()&&
+                        meta.overtimeExcluded!==true&&
+                        !(meta.overtimeRevocations||[]).some(v=>v.confirmed===true&&
+                            String(v.reportId)===String(meta.overtimeReport.id));
+                    const hasCover=(roster.leaveCoverAssignments||[]).some(v=>
+                        id(v.workerEmpId||v.coverEmpId||v.empId)===id(emp.empId)&&
+                        String(v.date||v.workDate||'')===date);
+                    if(!leave&&!hasOvertime&&!hasCover&&!meta.forEmpId&&!meta.manualRosterShift){
+                        const actualShift=actual.get(id(emp.empId)+'|'+date);
+                        if(actualShift)label=actualShift;
+                        else if(state==='rest'&&['早','中','晚'].includes(raw))
+                            label=String(meta.restCategory||'休');
+                    }
+                    if(!leave&&!hasOvertime&&!worked&&date<=today&&
+                        (state==='rest'||state==='open')&&
+                        !/^(?:[代休國例延颱選]?\d{2}-\d{2})$/.test(raw)){
+                        if(specialDates.typhoon.has(date))label='颱';
+                        else if(specialDates.election.has(date)||
+                            /選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||'')))label='選';
+                    }
+                    if(!p79EmployeeDateEligible(emp,date))label='';
+                    line.push(label);
+                }
+                scheduleRows.push(line);
+            }
+            return {scheduleRows};
         }
+
         function p79AuditAttendanceExportPairs(source,month = '') {
             const ids=new Set(source.map(record=>String(record.id??''))),issues=[];
             source.forEach(record=>['In','Out'].forEach(side=>{
@@ -22261,19 +22346,14 @@ function p79EmployeeDateEligible(emp,date) {
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             if(includeSchedule){
-                update('正在建立排班與每日考勤工作表…');
+                update('正在建立與排班系統格式一致的整月正式班表…');
                 const people=getAdminAttendanceEmployees().filter(emp=>companyFilter==='ALL'||String(emp.empId||'').toUpperCase().startsWith(companyFilter));
                 const pairedSource=exportScope.source.filter(canCurrentAdminViewDataRow);
                 if(!requireAdminAction('attendanceExport','匯出考勤')||!p79RequireScheduleExport())return;
                 const report=p79BuildScheduleAttendanceExport(exportMonth,people,pairedSource,roster);
-                const keep=report.scheduleRows[0].map((date,i)=>i<5||(date>=start&&date<=end));
-                report.scheduleRows=report.scheduleRows.map(row=>row.filter((_,i)=>keep[i]));
-                report.dailyRows=report.dailyRows.filter((row,i)=>i===0||(row[0]>=start&&row[0]<=end));
-                const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows),dailySheet=XLSX.utils.aoa_to_sheet(report.dailyRows);
-                scheduleSheet['!cols']=[10,15,14,16,14,...Array(report.scheduleRows[0].length-5).fill(12)].map(wch=>({wch}));
-                dailySheet['!cols']=[12,10,15,14,16,14,12,22,22,12,16].map(wch=>({wch}));
-                XLSX.utils.book_append_sheet(workbook,scheduleSheet,exportMonth+'月排班表');
-                XLSX.utils.book_append_sheet(workbook,dailySheet,'排班與每日考勤');
+                const scheduleSheet=XLSX.utils.aoa_to_sheet(report.scheduleRows);
+                scheduleSheet['!cols']=[16,12,12,10,14,...Array(report.scheduleRows[0].length-5).fill(6)].map(wch=>({wch}));
+                XLSX.utils.book_append_sheet(workbook,scheduleSheet,exportMonth+'職稱班表');
             }
             const missingPairs=p79AuditAttendanceExportPairs(visibleRecords,exportMonth);
             if(missingPairs.length){
@@ -24852,6 +24932,7 @@ setInterval(draw,4000);draw();
 })();
 </script>
 <script src="./v6-engine.js?v=20261019-corrected-lineage"></script>
+<script src="../assets/port79-schedule-punch-restore.js?v=20261029-attendance-export-parity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
 (function(){
 'use strict';
