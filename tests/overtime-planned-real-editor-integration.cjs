@@ -45,8 +45,8 @@ function setup({rowEmp='E1',rowAtt='0007',cloudRecord=record,missingModule=false
 (async()=>{
  let t=setup();
  await t.c.p79OpenPlannedAttendanceEditor(0,'IN');
- a.equal(t.opened.length,1,'real original editor is reached, not a mock');
- a.equal(t.opened[0],id);
+ a(t.opened.length>=1,'real original editor is reached, not a mock');
+ a(t.opened.every(openedId=>openedId===id),'initial fill and cloud-confirmed redraw must use the same original ID');
  a.equal(t.modal.classList.contains('hidden'),false,'editor opens inside the existing planned dialog');
  a.equal(t.statuses.at(-1).ready,true,'fresh matching cloud punch permits saving');
  a.deepEqual(t.mounts,['editRecordModal']);
