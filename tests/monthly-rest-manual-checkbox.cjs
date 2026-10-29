@@ -46,5 +46,5 @@ assert(src.includes('requirePeriodSelection:true,pickDateExplicitly:true'),'must
 assert(report.includes("if(prefill.manualPlan===true&&prefill.pickDateExplicitly===true)el.querySelector('#p79OtDate').value=''"),'no silent today default');
 assert(report.includes('result.directOvertimeSaved')===false || src.includes('result?.directOvertimeSaved===true'),'save ACK checked before removing manually selected person');
 assert(html.includes('manual=20261029-checkbox-in-monthly-v7'),'deployment busts old modal cache');
-assert(html.includes('port79-overtime-report.js?v=20261029-explicit-monthly-plan-date-v2'),'deployment busts original report cache');
+assert(html.includes('port79-overtime-report.js?v=20261029-auto-match-shift-all-staff-v1'),'deployment busts original report cache');
 console.log('PASS 84 staff / manual checkboxes, multi-company selection, date/period workflow, no auto plans/writes, existing auto mode');
