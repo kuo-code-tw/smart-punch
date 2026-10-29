@@ -14,7 +14,7 @@ assert(!open.includes('p79CloseOvertimePlannedDialog()'),'opening manual plan mu
 assert(!open.includes('location.')&&!open.includes('logout')&&!open.includes('sessionStorage'),'never modify login on plan open');
 assert(html.includes('p79OvertimePlannedDialog'),'planned dialog still exists');
 assert(html.includes('p79PlannedAttendanceModalIsOpen'),'planned close protection still exists');
-assert(html.includes("querySelector('#p79OvertimeDialog[open]')"),'planned dialog cannot be closed while new plan form is active');
+assert(html.includes("querySelector?.('#p79OvertimeDialog[open]')"),'planned dialog cannot be closed while new plan form is active');
 assert(report.includes("id==='p79OvertimeDialog'&&planned?.open?planned:document.body"),
   'new plan report mounts inside the open planned review, but the standalone form keeps body host');
 assert(html.includes('port79-overtime-report.js?v=20261029-planned-stay-in-dialog-v1'),
