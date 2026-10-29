@@ -3978,7 +3978,11 @@ function p79EmployeeDateEligible(emp,date) {
       for (const month of months) {
         const ov = schedulePersonnelOverrides?.[month]?.[id];
         if (ov && Object.prototype.hasOwnProperty.call(ov,'group')) {
-          return { month, override: ov };
+          // A snapshot of an untouched new month often stores 不分組.
+          // Only an explicit unassignment may hide a meaningful older group.
+          const value=String(ov.group||'').trim();
+          if(scheduleGroupIsMeaningful(value)||value==='不輪班'||ov.groupExplicit===true)
+            return { month, override: ov };
         }
       }
       return null;
@@ -4026,6 +4030,118 @@ function p79EmployeeDateEligible(emp,date) {
       });
 
 
+    }
+
+    // Read historical group metadata from the same authenticated cloud source.
+    // A month-only GET must not be mistaken for the complete cross-month history.
+    let p79ScheduleGroupHistoryToken='';
+    const p79ScheduleGroupHistoryCache=new Map();
+    let p79ScheduleGroupHistoryUnverifiedMonth='';
+
+    function p79ScheduleGroupPreviousMonth(month,offset=1) {
+      const match=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month||''));
+      if(!match)return '';
+      const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-1-offset,1));
+      return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0');
+    }
+
+    function p79ScheduleGroupHistorySnapshot(data,expectedMonth) {
+      if(!data?.ok||!Array.isArray(data.schedules)||
+         (data.month&&String(data.month)!==expectedMonth))return null;
+      const overrides={},roleOptions={};
+      for(const row of data.schedules){
+        if(row.month&&String(row.month)!==expectedMonth)continue;
+        const id=String(row.empId||'').trim().toUpperCase();
+        if(!id)continue;
+        const personnel=row.schedule?.__personnel&&typeof row.schedule.__personnel==='object'
+          ?row.schedule.__personnel:{};
+        const role=String(personnel.role||row.role||'').trim();
+        if(role&&Array.isArray(personnel.groupOptions)){
+          roleOptions[role]=[...new Set(personnel.groupOptions.filter(g=>typeof g==='string'&&g.trim()))];
+        }
+        overrides[id]={
+          role,
+          group:String(personnel.group||row.group||'不分組').trim()||'不分組',
+          groupExplicit:personnel.groupExplicit===true
+        };
+      }
+      return {month:expectedMonth,overrides,roleOptions};
+    }
+
+    function p79ScheduleRolesWithoutGroups(month) {
+      const roles=new Map();
+      for(const emp of employees){
+        const role=String(emp.role||'');
+        if(!roles.has(role))roles.set(role,[]);
+        roles.get(role).push(emp);
+      }
+      return [...roles].filter(([role,members])=>
+        role&&members.length>=3&&
+        !members.some(emp=>scheduleGroupIsMeaningful(emp.group))&&
+        members.some(emp=>String(emp.group||'不分組')==='不分組'&&
+          schedulePersonnelOverrides[month]?.[emp.id]?.groupExplicit!==true)
+      ).map(([role])=>role);
+    }
+
+    async function p79ScheduleLoadPreviousGroups(month,token,roles) {
+      if(token!==p79ScheduleGroupHistoryToken){
+        p79ScheduleGroupHistoryCache.clear();
+        p79ScheduleGroupHistoryToken=token;
+      }
+      const history=[],found=new Set();
+      // Look back past any untouched months until the prior assignment is found.
+      // Keep requests bounded; never touch official shifts from other months.
+      for(let distance=1;distance<=4;distance++){
+        const previous=p79ScheduleGroupPreviousMonth(month,distance);
+        if(!previous)break;
+        let snapshot=p79ScheduleGroupHistoryCache.get(previous);
+        if(!snapshot){
+          const controller=typeof AbortController!=='undefined'?new AbortController():null;
+          const timer=controller?setTimeout(()=>controller.abort(),8000):null;
+          try{
+            const res=await fetch(
+              GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+
+              '&month='+encodeURIComponent(previous)+'&_='+Date.now(),
+              {redirect:'follow',cache:'no-store',signal:controller?.signal}
+            );
+            if(!res.ok)throw new Error('歷史月份讀取 HTTP '+res.status);
+            snapshot=p79ScheduleGroupHistorySnapshot(await res.json(),previous);
+            if(!snapshot)throw new Error('歷史月份 '+previous+' 回傳資料不完整');
+            p79ScheduleGroupHistoryCache.set(previous,snapshot);
+          }catch(error){
+            console.warn('歷史分組核對失敗：'+previous,error);
+            return {history,verified:false};
+          }finally{if(timer)clearTimeout(timer);}
+        }
+        history.unshift(snapshot);
+        for(const row of Object.values(snapshot.overrides)){
+          if(roles.includes(row.role)&&scheduleGroupIsMeaningful(row.group))found.add(row.role);
+        }
+        if(roles.every(role=>found.has(role)))break;
+      }
+      return {history,verified:true};
+    }
+
+    function p79ScheduleRestorePreviousGroups(month,history) {
+      for(const snapshot of history||[]){
+        if(snapshot.month>=month)continue;
+        if(!schedulePersonnelOverrides[snapshot.month])schedulePersonnelOverrides[snapshot.month]={};
+        for(const [id,override] of Object.entries(snapshot.overrides)){
+          if(!Object.prototype.hasOwnProperty.call(schedulePersonnelOverrides[snapshot.month],id))
+            schedulePersonnelOverrides[snapshot.month][id]=override;
+        }
+        if(!scheduleRoleGroupOptions[snapshot.month])scheduleRoleGroupOptions[snapshot.month]={};
+        for(const [role,groups] of Object.entries(snapshot.roleOptions)){
+          if(!Object.prototype.hasOwnProperty.call(scheduleRoleGroupOptions[snapshot.month],role))
+            scheduleRoleGroupOptions[snapshot.month][role]=groups;
+        }
+      }
+      applySchedulePersonnelOverrides(month);
+      const groups=new Set(availableGroups||[]);
+      for(const emp of employees)if(emp.group)groups.add(emp.group);
+      groups.add('不分組');
+      groups.delete('不輪班');
+      availableGroups=[...groups,'不輪班'];
     }
 
     function p79ApplySchedulePayload(data,requestMonth){
@@ -4183,6 +4299,20 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         p79ApplySchedulePayload(data,requestMonth);
+        const missingRoles=p79ScheduleRolesWithoutGroups(requestMonth);
+        if(missingRoles.length){
+          // No save while history is unverified: an ungrouped snapshot could
+          // otherwise permanently overwrite the previous group's assignments.
+          p79ScheduleGroupHistoryUnverifiedMonth=requestMonth;
+          const {history,verified}=await p79ScheduleLoadPreviousGroups(requestMonth,token,missingRoles);
+          if(requestMonth!==currentScheduleMonthKey()||requestEpoch!==p79SchedulePreviewEpoch||
+             token!==currentPort79SsoToken()||requestMutationVersion!==p79ScheduleLocalMutationVersion||
+             port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight)return false;
+          p79ScheduleRestorePreviousGroups(requestMonth,history);
+          if(verified)p79ScheduleGroupHistoryUnverifiedMonth='';
+        }else if(p79ScheduleGroupHistoryUnverifiedMonth===requestMonth){
+          p79ScheduleGroupHistoryUnverifiedMonth='';
+        }
         p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);
         p79ScheduleRestClient().refresh(requestMonth);
         cloudLoaded = true;
@@ -4347,6 +4477,10 @@ function p79EmployeeDateEligible(emp,date) {
     async function saveScheduleMonthToCloud(showAlert = true) {
       if(!requireScheduleEditLock(showAlert))return false;
       const yearMonth = document.getElementById('month-picker').value;
+      if(p79ScheduleGroupHistoryUnverifiedMonth===yearMonth){
+        if(showAlert)alert('尚未確認上月分組資料，為避免把原組別覆蓋成不分組，請先重新讀取雲端班表。');
+        return false;
+      }
       if(scheduleEditLockState.mine)await p79ApplyNoPunchRestFromOfficial(yearMonth);
       if (scheduleEditLockState.mine) p79ApplyAutomaticRestMetadata();
       const snapshotVersion=p79ScheduleLocalMutationVersion;
