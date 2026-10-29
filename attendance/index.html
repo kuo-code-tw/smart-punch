@@ -22129,7 +22129,7 @@ function p79EmployeeDateEligible(emp,date) {
                 const prefix=meta.type==='substitute'||meta.forEmpId?'代':meta.overtimeType==='extended'?'延':meta.restCategory||'休';
                 return prefix+meta.overtimeStart+'-'+meta.overtimeEnd;
             }
-            if(meta?.restQuotaOvertime&&meta.restCategory)return raw+'（'+meta.restCategory+'加）';
+            if(meta?.restQuotaOvertime&&meta.restCategory&&meta?.overtimeExcluded!==true)return raw+'（'+meta.restCategory+'加）';
             return raw==='休'&&meta?.restCategory?meta.restCategory:raw;
         }
         function p79BuildScheduleAttendanceExport(month,people,source,roster) {
@@ -22305,7 +22305,8 @@ function p79EmployeeDateEligible(emp,date) {
             update((preferCache?'正在優先讀取本機快取，缺少資料才讀取雲端：':'正在讀取雲端最新資料：')+exportMonth+' 考勤'+(includeSchedule?'與排班':'')+'（連線逾時會顯示錯誤，不會無限等待）…');
             const [exportScope,roster]=await Promise.all([
                 p79ReadAttendanceExportScope(exportMonth,readOptions),
-                includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,readOptions):Promise.resolve(null),
+                // 排班必須讀當下正式雲端版本，不能把舊的本機快取當成排班系統現況。
+                includeSchedule?p79ReadAttendanceExportSource('getScheduleDataSecure',exportMonth,{...readOptions,preferCache:false}):Promise.resolve(null),
                 window.p79LoadXlsxLibrary()
             ]);
             if(!window.XLSX?.utils)throw Error('試算表 元件未成功載入，請再試一次');
