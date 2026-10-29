@@ -19,6 +19,13 @@ body:has(#systems.show) #sessionBar{background:#fff!important;border-color:#dbe8
 #systems .p79-modern-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 3px 12px;margin-top:10px}
 #systems .p79-modern-section-heading strong{font-size:20px;font-weight:1000;color:#123962}
 #systems .p79-modern-section-heading small{font-size:12px;color:#6e86a5;font-weight:750}
+#systems .p79-modern-search-row{display:grid;grid-template-columns:170px minmax(150px,1fr) auto;align-items:center;gap:12px;padding:14px 17px;background:#fff;border:1px solid #dceaf9;border-radius:14px;margin-bottom:16px;box-shadow:0 5px 19px rgba(24,70,122,.04)}
+#systems .p79-modern-search-row label{font-size:13px;font-weight:900;color:#244d79;margin:0}
+#systems .p79-modern-search-row input{width:100%;min-width:0;min-height:43px;border:1px solid #cce0f7;border-radius:11px;background:#f9fcff;padding:9px 14px;color:#173959;font:inherit;font-size:13px;outline:none}
+#systems .p79-modern-search-row input:focus{border-color:#3b90f1;box-shadow:0 0 0 3px rgba(23,111,231,.10)}
+#systems .p79-modern-search-row small{font-size:11px;color:#738ca7;line-height:1.5}
+#systems .system-card.p79-modern-search-dim:not(:disabled){opacity:.38!important;filter:grayscale(.45)}
+#systems .system-card.p79-modern-search-hit:not(:disabled){border-color:#5bafff!important;box-shadow:0 0 0 3px rgba(24,121,242,.12),0 9px 25px rgba(24,77,138,.12)!important}
 #systems .system-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:15px!important}
 #systems .system-card{min-height:148px!important;padding:20px!important;border:1px solid #deebf9!important;border-radius:17px!important;background:#fff!important;box-shadow:0 8px 25px rgba(32,82,134,.07)!important;transition:transform .18s,border-color .18s,box-shadow .18s}
 #systems .system-card:hover:not(:disabled){border-color:#92bdf5!important;box-shadow:0 14px 30px rgba(31,88,153,.14)!important;transform:translateY(-2px)!important}
@@ -57,3 +64,5 @@ body:has(#systems.show) .system-version-footer{color:#8b9caf!important}
 }
 html[data-theme="dark"] body:has(#systems.show) #systems :is(.system-card,.note){background:#132b47!important;color:#e4eefb!important}
 html[data-theme="dark"] body:has(#systems.show) #systems .system-card .name{color:#eff8ff!important}
+
+@media(max-width:1050px){#systems .p79-modern-search-row{grid-template-columns:1fr;gap:7px}}
