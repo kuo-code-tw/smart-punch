@@ -965,6 +965,31 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
  box-shadow:0 24px 80px rgba(15,23,42,.35)!important;
 }
 #adminContentOvertime #p79OvertimePlannedDialog::backdrop{background:rgba(15,23,42,.64)}
+/* 預排／待核對標題列固定在視窗頂端：不管明細捲到哪裡都能看到關閉。 */
+#adminContentOvertime #p79OvertimePlannedDialog #p79OvertimePlannedStickyHeader{
+ position:sticky!important;top:0!important;z-index:100!important;
+ display:flex!important;align-items:center!important;
+ background:#f8faff!important;border-bottom:1px solid #c7d2fe!important;
+ box-shadow:0 2px 8px rgba(15,23,42,.10)!important;
+ padding:7px 10px!important;margin:-7px -8px 8px!important;
+}
+#adminContentOvertime #p79OvertimePlannedDialog .p79-ot-planned-close{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ flex:0 0 auto!important;position:relative!important;
+ min-height:34px!important;padding:6px 12px!important;
+ border-radius:8px!important;border:1px solid #b91c1c!important;
+ background:#fff1f2!important;color:#9f1239!important;
+ font-size:13px!important;font-weight:800!important;white-space:nowrap!important;
+ cursor:pointer!important;
+}
+#adminContentOvertime #p79OvertimePlannedDialog .p79-ot-planned-close:hover,
+#adminContentOvertime #p79OvertimePlannedDialog .p79-ot-planned-close:focus-visible{
+ background:#ffe4e6!important;outline:2px solid #fb7185!important;outline-offset:1px!important;
+}
+/* 編輯或補登打卡時，原本的編輯視窗仍在最上層，不能讓列表標題擋住表單。 */
+#p79OvertimePlannedDialog > #editRecordModal,
+#p79OvertimePlannedDialog > #addRecordModal{z-index:150!important}
+
 /* Edit/add forms live in this top-layer dialog, above its table, never on the main page. */
 #p79OvertimePlannedDialog > #editRecordModal,
 #p79OvertimePlannedDialog > #addRecordModal{position:fixed!important;inset:0!important;z-index:150!important;overflow-y:auto}
@@ -1778,7 +1803,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 <div id="overtimePagination" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"></div>
                 <dialog id="p79OvertimePlannedDialog" class="p79-planned-overtime-dialog" aria-labelledby="p79OvertimePlannedHeading" oncancel="p79PlannedDialogCancel(event)" onclose="p79PlannedDialogClosed()">
                 <section id="p79OvertimePlannedSection" class="mt-5 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3" aria-labelledby="p79OvertimePlannedHeading">
-                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div id="p79OvertimePlannedStickyHeader" class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對</h4>
                         <div class="flex flex-wrap items-center gap-2"><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeManual" type="checkbox" checked onchange="p79ChoosePlanningMode('manual')">手動預排</label><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeAuto" type="checkbox" onchange="p79ChoosePlanningMode('auto')">自動預排</label><button type="button" onclick="p79OpenManualOvertimePlan()" class="rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold">＋ 新增預排</button><span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span><button type="button" onclick="p79CloseOvertimePlannedDialog()" class="p79-ot-planned-close rounded-lg border border-indigo-200 px-3 py-1 text-xs text-indigo-800 dark:text-indigo-200" aria-label="關閉預排待核對視窗">✕ 關閉</button></div>
                     </div>
