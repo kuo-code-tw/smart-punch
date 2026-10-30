@@ -7022,7 +7022,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])];
         if(reports.some(report=>String(report?.id||'').trim()&&
           !(meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id))&&
-          (/^颱/.test(String(report.code||''))||/颱風|颱日|停班/.test(String(report.typeName||''))))){typhoonSet.add(date);protectedTyphoonSet.add(date);}
+          (/^颱/.test(String(report.code||''))||/颱風|颱日|停班/.test(String(report.typeName||''))))){protectedTyphoonSet.add(date);}
       }
       const dates=kind=>[...new Set(visibleRestDates?(visibleRestDates[kind]||[]):audit.dates[kind].map(d=>month+'-'+d))];
       const nationalDuplicates=dates('國').filter(day=>protectedTyphoonSet.has(day)).length;

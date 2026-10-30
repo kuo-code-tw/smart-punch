@@ -59,7 +59,7 @@ c.p79TyphoonDates=()=>[];
 c.monthlyScheduleMeta.EMP[day(3)]={overtimeReport:{id:'TYPHOON',category:'國',code:'國08-16',typeName:'颱風天加班'}};
 result=compute([],[]);
 assert.match(cell(result,'國'),/<span>2\/0<\/span>/,'formal typhoon filing cannot count as national');
-assert.match(cell(result,'颱'),/<span>1 天<\/span>/);
+assert.match(cell(result,'颱'),/<span>0 天<\/span>/,'a filing start date must not create a second typhoon calendar event');
 c.monthlyScheduleMeta.EMP={};
 roster[day(4)]='早';
 c.monthlyScheduleMeta.EMP[day(4)]={overtimeReport:{id:'SAVED',category:'國'}};
