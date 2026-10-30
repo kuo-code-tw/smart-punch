@@ -59,6 +59,7 @@
   // 沿用原加班申報表及其雲端權限與計算，僅嵌入本頁；不修改出勤或跳轉考勤頁面。
   const url=new URL('../work-hours/',location.href);
   url.searchParams.set('overtimeExportDate',date);
+  url.searchParams.set('reviewBuild','20261030-v5');
   frame.src=url.toString();
   const status=document.createElement('div');
   status.style.cssText='position:absolute;inset:0;display:grid;place-items:center;background:#f8fafc;color:#475569;font:600 15px system-ui,sans-serif;padding:32px;text-align:center';
