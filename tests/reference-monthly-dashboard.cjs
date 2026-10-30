@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const report=require('../assets/port79-monthly-dashboard.js');
+const vessels=report.analyzeVessels({shipMasters:[{workingNo:'A',totalMoves:100,totalContainers:90,gph:20,lastDate:'2026-10-02'}],records:[{workingNo:'A',timeHours:2},{workingNo:'A',empId:'E1',name:'甲',dept:'甲班',disc:40,load:10,timeHours:3},{workingNo:'A',empId:'E2',disc:20,load:0}]});
+assert.equal(vessels.workHours,5,'valid job hours include details with no employee');assert.equal(vessels.vessels[0].hours,5);assert.equal(vessels.vessels[0].date,'2026-10-02');assert.equal(vessels.people[0].dept,'甲班');assert.equal(vessels.timedRows,2);assert.equal(vessels.detailCount,3);
+const r={id:'OT1',declaredHours:8};const overtime=report.analyzeOvertime({schedules:[{schedule:{__meta:{'2026-10-01':{overtimeReport:r},'2026-10-02':{overtimeReport:{id:'OT2',declaredHours:4,revoked:true}},'2026-09-30':{overtimeReport:{id:'OT3',declaredHours:12}}}}},{schedule:{__meta:{'2026-10-01':{overtimeReport:r},'2026-10-03':{overtimeReport:{id:'OT4',rule:{declaredHours:6}}}}}}]},'2026-10');
+assert.deepEqual(overtime,{hours:14,count:2},'only unique active reports in the selected month');
+const attendance=report.analyzeAttendance({records:[{empId:'E1',timeStr:'2026/10/01 07:00',status:'上班簽到'},{empId:'E1',timeStr:'2026/10/01 19:00',status:'下班簽退'},{empId:'E2',timeStr:'2026/10/02 19:00',status:'下班簽退'}]},'2026-10');
+assert.equal(attendance.personDays,1,'an isolated out-punch does not establish a worked day');assert.deepEqual(attendance.weeklyPeople,[1,0,0,0,0]);assert.equal(attendance.pendingShifts,null,'no invented pending-shift count without the shared engine');
+const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('assets/port79-reference-dashboard.css','utf8'),ui=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');
+for(const id of ['p79DashMonth','p79DashRefresh','p79DashPersonDays','p79DashOvertimeHours','p79DashAnomalies'])assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+assert(!html.includes('p79d-dashboard-controls'),'reference has no extra toolbar above the two sections');assert(html.includes('本月船舶作業量趨勢'));assert(html.includes('本月人員效率排行'));
+assert(css.includes('minmax(0,1.12fr) minmax(0,1.12fr) minmax(0,.78fr)'),'three ship panels at desktop size');assert(css.includes('@media(max-width:620px)'));
+assert(ui.includes('class="p79r-gridline"'));assert(!ui.includes('fetch('),'presentation never adds data reads');assert(!ui.includes('96%'),'no copied reference values');
+console.log('PASS reference composition, source-based work hours, declared overtime, daily attendance and truthful chart rendering');
