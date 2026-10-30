@@ -31,7 +31,7 @@ vm.createContext(c);
 vm.runInContext(extract('p79ScheduleHasVerifiedPunch'),c);
 vm.runInContext(extract('p79DailyRestCount'),c);
 vm.runInContext(extract('p79ScheduleRestCountCells'),c);
-const compute=(off,work)=>c.p79ScheduleRestCountCells(emp,month,{},off,work);
+const compute=(off,work)=>c.p79ScheduleRestCountCells(emp,month,{},off,work,c.p79VisibleRestDayAudit());
 const cell=(html,category)=>html.match(new RegExp('<td data-rest-category="'+category+'"[\\s\\S]*?<\\/td>'))?.[0]||'';
 assert.deepEqual(JSON.parse(JSON.stringify(c.p79DailyRestCount(emp,month,{}).counts)),{例:0,休:1,國:3},'start with three national days and one separately visible rest day');
 let result=compute([day(3)],[day(4)]);
@@ -47,6 +47,20 @@ assert.match(cell(result,'颱'),/<span>2 天<\/span>/,'duplicate event day count
 result=compute([],[]);
 assert.match(cell(result,'國'),/<span>3\/0<\/span>/,'no typhoon flag never alters 國');
 assert.match(cell(result,'颱'),/<span>0 天<\/span>/);
+// A partial attendance redraw can provide empty event arrays even though the
+// official special-day setting is already loaded. Only summary cells change.
+c.p79TyphoonDates=()=>[day(3)];
+result=compute([],[]);
+assert.match(cell(result,'國'),/<span>2\/0<\/span>/);
+assert.doesNotMatch(cell(result,'國'),/國超額/);
+assert.match(cell(result,'颱'),/<span>0 天<\/span>/,'do not change existing typhoon attendance eligibility');
+assert.equal(JSON.stringify(roster),initial,'summary never edits daily shifts');
+c.p79TyphoonDates=()=>[];
+c.monthlyScheduleMeta.EMP[day(3)]={overtimeReport:{id:'TYPHOON',category:'國',code:'國08-16',typeName:'颱風天加班'}};
+result=compute([],[]);
+assert.match(cell(result,'國'),/<span>2\/0<\/span>/,'formal typhoon filing cannot count as national');
+assert.match(cell(result,'颱'),/<span>1 天<\/span>/);
+c.monthlyScheduleMeta.EMP={};
 roster[day(4)]='早';
 c.monthlyScheduleMeta.EMP[day(4)]={overtimeReport:{id:'SAVED',category:'國'}};
 const unchanged=JSON.stringify(c.monthlyScheduleMeta);

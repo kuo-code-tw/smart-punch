@@ -191,7 +191,7 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
  }
 }
 
-/* Full monthly people efficiency ranking: centered filters and all rows, no Top-5 cap. */
+/* Centered filters, five visible ranking rows; retain all rows in scroll. */
 @media screen {
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel{
   height:auto!important;min-height:225px!important;max-height:none!important;
@@ -201,7 +201,7 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
   justify-content:center!important;gap:5px!important;
  }
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79d-table-scroll{
-  height:auto!important;max-height:none!important;overflow:visible!important;
+  height:156px!important;max-height:156px!important;overflow-y:auto!important;overflow-x:auto!important;overscroll-behavior:contain;
  }
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table th,
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table td{
@@ -211,3 +211,5 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
   text-align:center!important;white-space:normal!important;
  }
 }
+
+@media screen { #p79Dashboard .p79r-people-panel table thead tr, #p79Dashboard .p79r-people-panel table tbody tr {height:26px!important} #p79Dashboard .p79r-people-panel table th,#p79Dashboard .p79r-people-panel table td {padding-top:3px!important;padding-bottom:3px!important;white-space:nowrap!important} }

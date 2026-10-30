@@ -1615,7 +1615,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
-<script src="../assets/port79-vessel-versions.js?v=20261030-edit-copies-v1"></script>
+<script src="../assets/port79-vessel-versions.js?v=20261030-original-revisions-v2"></script>
 <script>
 const APP_VERSION='2026.10.16.118';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
@@ -3515,7 +3515,7 @@ function dashboardWorkingReportResult(job){
 function dashboardWorkingReportBadge(job){
   const a=dashboardWorkingReportResult(job),pending=a.status==='pending';
   const signed=v=>v>0?'+'+v:String(v);
-  const label=pending?'待核對':a.status==='match'?'✓ 一致':Math.abs(a.diff||0)>0.01?'⚠ 櫃數差 '+signed(a.diff):'⚠ 明細差異';
+  const label=pending?'待核對':a.status==='match'?'✓ 一致':Math.abs(a.diff||0)>0.01?'⚠ 櫃數差 '+signed(a.diff):'⚠ '+(a.reasons?.[0]||'明細差異');
   const numbers=pending?(a.count?'WR '+a.containers+'／WS 待確認':'司機明細待讀取'):'WR '+a.containers+'／WS '+a.moves;
   const title=['全船 '+a.count+' 筆 WORKING REPORT；WS 為請款櫃數＋SHIFT。',...a.reasons].join(' ');
   return `<button type="button" class="vessel-wr-badge audit-${a.status}" aria-label="司機櫃數核對 ${esc(a.workingNo)}" title="${esc(title)}" onclick="openVesselDetail(this.dataset.workingNo,this.dataset.vessel)" data-working-no="${esc(a.workingNo)}" data-vessel="${esc(job?.vessel||'')}"><strong>${esc(label)}</strong><span>${esc(numbers)}</span></button>`;
@@ -10632,6 +10632,21 @@ async function importExcelFiles(fileList){
 // v2026.09.28.7.44：同一 試算表 WORKING NO. 可能被不同作業重複使用。
 // 不能再只用 workingNo 當唯一鍵；若同 NO. 但碼頭/日期/作業不同，自動配置獨立儲存 NO.
 // 原始 NO. 保存在 sourceWorkingNo，避免不同作業互相覆蓋。
+function originalNumericWorkingNo(value){
+  const raw=String(value||'').trim();
+  return /^\d{7,}-\d+$/.test(raw)?raw.replace(/-\d+$/,''):raw;
+}
+function sameOriginalImportJob(a,b){
+  if(originalNumericWorkingNo(importSourceWorkingNo(a))!==originalNumericWorkingNo(importSourceWorkingNo(b)))return false;
+  // A corrected import may change quantities and completion date. A complete
+  // matching voyage identifies that revision independently of those values.
+  const text=v=>String(v||'').trim().toUpperCase();
+  const av=[text(a?.voyageI),text(a?.voyageE)],bv=[text(b?.voyageI),text(b?.voyageE)];
+  if(text(a?.vessel)&&text(a.vessel)===text(b?.vessel)&&
+    av.some(Boolean)&&bv.some(Boolean)&&av.every((v,i)=>!v||!bv[i]||v===bv[i])&&
+    (!text(a?.wharf)||!text(b?.wharf)||text(a.wharf)===text(b.wharf)))return true;
+  return sameShipMasterJob(a,b);
+}
 function importSourceWorkingNo(v){
   return String(v?.sourceWorkingNo||v?.workingSheetSource?.sourceWorkingNo||v?.workingNo||'').trim();
 }
@@ -10651,7 +10666,7 @@ function nextDistinctWorkingNo(rawNo){
   return `${root}-${n}`;
 }
 function resolveImportWorkingNo(summary, imported, fileName=''){
-  const rawNo=String(summary?.sourceWorkingNo||summary?.workingNo||'').trim();
+  const rawNo=originalNumericWorkingNo(summary?.sourceWorkingNo||summary?.workingNo);
   if(!rawNo)return {rawNo:'',effectiveNo:'',collision:false};
 
   const dates=[...new Set((imported||[]).map(r=>String(r?.workDate||'').slice(0,10)).filter(Boolean))].sort();
@@ -10668,6 +10683,13 @@ function resolveImportWorkingNo(summary, imported, fileName=''){
     lastDate:dates[dates.length-1]||String(summary?.compareDate||'').slice(0,10),
     sourceFileName:String(fileName||'')
   };
+
+  if(/^\d{7,}$/.test(rawNo)){
+    const family=(shipMasters||[]).filter(s=>originalNumericWorkingNo(importSourceWorkingNo(s))===rawNo);
+    const conflict=family.find(s=>!sameOriginalImportJob(s,candidate));
+    if(conflict)throw new Error('原始船號 '+rawNo+' 的船名、航次或作業日期與既有資料不符，請核對來源檔；未新增尾碼或覆寫其他作業');
+    return {rawNo,effectiveNo:rawNo,collision:false,reused:family.length>0};
+  }
 
   // 先找「試算表 現在的 NO. 已經存在，而且核心作業相同」。
   // 例如舊檔 NO=5260149，系統自動拆成 5260149-1；之後使用者把 試算表 NO 改成 5260149-1，
@@ -10851,7 +10873,7 @@ async function importExcel(file) {
       (shipMasters||[]).forEach(oldMaster=>{
         const oldNo=String(oldMaster?.workingNo||'').trim();
         if(!oldNo)return;
-        if(sameShipMasterJobWithSerialGuard(oldMaster,candidateMaster)){
+        if(sameShipMasterJobWithSerialGuard(oldMaster,candidateMaster)||sameOriginalImportJob(oldMaster,candidateMaster)){
           replaceNos.add(oldNo);
           return;
         }
@@ -10868,8 +10890,14 @@ async function importExcel(file) {
       records=records.filter(r=>{
         const rNo=String(r?.workingNo||'').trim();
         // 沒有 WORKING NO. 的舊紀錄不能只靠船名刪除；保留它，交給逐筆去重邏輯處理。
-        if(!rNo)return true;
-        return !replaceNos.has(rNo);
+        if(!rNo||!replaceNos.has(rNo))return true;
+        const importedSource=String(r?.source||'')==='working-report';
+        const knownTime=Number.isFinite(Date.parse(String(r?.workingSheetImportedAt||'')));
+        const knownId=(shipMasters||[]).some(m=>replaceNos.has(String(m?.workingNo||'').trim())&&
+          (m?.workingSheetSource?.reportRecordIds||[]).some(id=>String(id)===String(r?.id)));
+        // Unknown legacy/manual rows are retained; only an identified prior
+        // imported batch can be replaced by this newly confirmed import.
+        return !(importedSource&&(knownTime||knownId));
       });
     }
     records.push(...imported);
@@ -10962,7 +10990,7 @@ async function importExcel(file) {
       const currentFileFamily=normalizeImportFileStem(master?.sourceFileName||'');
       shipMasters=shipMasters.filter(s=>{
         if(String(s.workingNo||'')===master.workingNo)return false;
-        if(sameShipMasterJobWithSerialGuard(s,master))return false;
+        if(sameShipMasterJobWithSerialGuard(s,master)||sameOriginalImportJob(s,master))return false;
         const sameRoot=workingNoRoot(s?.workingNo)===workingNoRoot(master?.workingNo);
         const oldFileFamily=normalizeImportFileStem(s?.sourceFileName||s?.workingSheetSource?.sourceFileName||'');
         if(sameRoot && currentFileFamily && oldFileFamily===currentFileFamily && sameImportJobCoreLoose(s,master))return false;
@@ -11221,7 +11249,11 @@ function canonicalOperationalRecords(list){
     const completeness=(directNo?3:0)+(r?.shipName||r?.vessel?2:0)+(st?1:0)+(et?1:0)+(rawMoves>0?2:0)+(num(r?.hatches)>0?1:0);
     const rank=operationalSourceRank(r)*100+completeness;
     const prev=map.get(key);
-    if(!prev || rank>prev.rank)map.set(key,{r,rank});
+    const importTime=Date.parse(String(r?.workingSheetImportedAt||''))||0;
+    const priorTime=Date.parse(String(prev?.r?.workingSheetImportedAt||''))||0;
+    const sameImportSource=String(r?.source||'')==='working-report'&&String(prev?.r?.source||'')==='working-report';
+    if(!prev || (sameImportSource&&importTime&&priorTime&&importTime!==priorTime
+      ?importTime>priorTime:rank>prev.rank))map.set(key,{r,rank});
   });
   return [...map.values()].map(x=>x.r);
 }
