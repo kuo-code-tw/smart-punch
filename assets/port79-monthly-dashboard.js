@@ -120,7 +120,7 @@ function showVessels(v){
  setMetric('p79DashContainers',fmt(v.containers));setMetric('p79DashGph',fmt(v.averageGph,2));
  vesselTable(v);vesselTrend(v);peopleTable(v);
  statusText('p79DashShipSource','已載入本月船舶歷史資料｜作業量為 Moves；效率為既有 GPH 欄位平均；缺少的欄位不以 0 代替。');
- statusText('p79DashPersonSource','個人效率＝有有效工時的作業明細櫃數 ÷ 對應工時（參考值）；未提供工時者顯示「—」。');
+ statusText('p79DashPersonSource','個人效率＝有有效工時的作業明細 Moves ÷ 對應工時（參考值）；未提供工時者顯示「—」。');
 }
 function showAttendance(a){
  setMetric('p79DashAttendancePeople',fmt(a.peopleCount));
@@ -150,7 +150,10 @@ async function request(kind,ym,token,forceCloud){
  const url=new URL(base);url.searchParams.set('action','historyGetMonthData');url.searchParams.set('type',kind);url.searchParams.set('month',ym);
  url.searchParams.set('token',token);url.searchParams.set('gcToken',token);
  if(!root.P79HistoryRead?.read)throw Error('歷史資料唯讀模組尚未載入');
- return root.P79HistoryRead.read(url.toString(),{forceCloud:forceCloud===true});
+ return root.P79HistoryRead.read(url.toString(),{forceCloud:forceCloud===true}).then(data=>{
+  if(data.month&&String(data.month)!==ym)throw Error('雲端回傳月份與選取月份不同，已拒絕顯示');
+  return data;
+ });
 }
 async function load(forceCloud=false){
  if(loading)return;
