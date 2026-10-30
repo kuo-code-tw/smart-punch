@@ -4362,7 +4362,7 @@ function p79EmployeeDateEligible(emp,date) {
         // The cloud receipt and its formal overtime metadata are now trusted.
         // Refresh the left monthly counts IMMEDIATELY; attendance recheck may
         // be delayed or fail and must not strand the counters at cached 3/2.
-        p79RefreshScheduleRestCounts(requestMonth);
+        if(typeof p79RefreshScheduleRestCounts==='function')p79RefreshScheduleRestCounts(requestMonth);
         p79ScheduleRestClient().refresh(requestMonth);
         cloudLoaded = true;
         saveAllDataToLocalStorage();
