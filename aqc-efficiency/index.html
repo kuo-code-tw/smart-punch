@@ -1615,7 +1615,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
-<script src="../assets/port79-vessel-versions.js?v=20261030-original-revisions-v2"></script>
+<script src="../assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script>
 const APP_VERSION='2026.10.16.118';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
@@ -3678,7 +3678,7 @@ function renderDashboard(){
       <td>${dashboardWorkingReportBadge(x)}</td>
       <td>${shipChangeStatusBadge(x)}</td>
       <td class="font-bold whitespace-nowrap">${esc(dashboardRocDate(dashboardJobDateValue(x)))}</td>
-      ${dashboardChangeCell(x,'workingNo',esc(x.workingNo),'font-black text-indigo-700')}
+      ${dashboardChangeCell(x,'workingNo',esc(originalNumericWorkingNo(x.sourceWorkingNo||x.workingNo))+(vesselImportCallNumber(x)>1?'（第'+vesselImportCallNumber(x)+'靠）':''),'font-black text-indigo-700')}
       ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button>`)}
       ${dashboardChangeCell(x,'voyageI',voyage)}
       ${dashboardChangeCell(x,'wharf',wharf)}
@@ -7847,7 +7847,7 @@ function shipMasterFingerprint(s){
 }
 function workingNoSortParts(v){
   const raw=String(v||'').trim();
-  const m=raw.match(/^(\d+)(?:-(\d+))?$/);
+  const m=raw.match(/^(\d+)(?:-(?:CALL)?(\d+))?$/i);
   if(!m)return {base:0,suffix:0,raw};
 
   return {
@@ -7910,6 +7910,7 @@ function sameShipMasterJob(a,b){
 // 允許 0149 <-> 5260149 這種等價表示，但禁止 0149-1 <-> 0149-2。
 function sameShipMasterJobWithSerialGuard(a,b){
   if(!sameShipMasterJob(a,b))return false;
+  if(typeof vesselImportCallNumber==='function'&&vesselImportCallNumber(a)!==vesselImportCallNumber(b))return false;
   const aNo=String(a?.workingNo||'').trim();
   const bNo=String(b?.workingNo||'').trim();
   if(!aNo||!bNo)return true;
@@ -7921,10 +7922,10 @@ function sameShipMasterJobWithSerialGuard(a,b){
 }
 
 function workingNoHasSuffix(v){
-  return /-\d+$/.test(String(v||'').trim());
+  return /-(?:CALL)?\d+$/i.test(String(v||'').trim());
 }
 function workingNoRoot(v){
-  return String(v||'').trim().replace(/-\d+$/,'');
+  return String(v||'').trim().replace(/-(?:CALL)?\d+$/i,'');
 }
 function sameVoyageForMasters(a,b){
   const av=[a?.voyageI,a?.voyageE].map(v=>normalizeShipText(v)).filter(Boolean);
@@ -10634,19 +10635,20 @@ async function importExcelFiles(fileList){
 // 原始 NO. 保存在 sourceWorkingNo，避免不同作業互相覆蓋。
 function originalNumericWorkingNo(value){
   const raw=String(value||'').trim();
-  return /^\d{7,}-\d+$/.test(raw)?raw.replace(/-\d+$/,''):raw;
+  return /^\d{7,}-(?:CALL)?\d+$/i.test(raw)?raw.replace(/-(?:CALL)?\d+$/i,''):raw;
+}
+function vesselImportCallNumber(value){
+  const file=String(value?.sourceFileName||value?.workingSheetSource?.sourceFileName||'');
+  const match=file.match(/第\s*([一二三四五六七八九十0-9]+)\s*靠/);
+  if(match){const n=Number(match[1])||({'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10})[match[1]];if(n)return n;}
+  return Number(String(value?.workingNo||'').match(/-CALL(\d+)$/i)?.[1])||1;
 }
 function sameOriginalImportJob(a,b){
   if(originalNumericWorkingNo(importSourceWorkingNo(a))!==originalNumericWorkingNo(importSourceWorkingNo(b)))return false;
-  // A corrected import may change quantities and completion date. A complete
-  // matching voyage identifies that revision independently of those values.
-  const text=v=>String(v||'').trim().toUpperCase();
-  const av=[text(a?.voyageI),text(a?.voyageE)],bv=[text(b?.voyageI),text(b?.voyageE)];
-  if(text(a?.vessel)&&text(a.vessel)===text(b?.vessel)&&
-    av.some(Boolean)&&bv.some(Boolean)&&av.every((v,i)=>!v||!bv[i]||v===bv[i])&&
-    (!text(a?.wharf)||!text(b?.wharf)||text(a.wharf)===text(b.wharf)))return true;
+  if(vesselImportCallNumber(a)!==vesselImportCallNumber(b))return false;
   return sameShipMasterJob(a,b);
 }
+
 function importSourceWorkingNo(v){
   return String(v?.sourceWorkingNo||v?.workingSheetSource?.sourceWorkingNo||v?.workingNo||'').trim();
 }
@@ -10686,9 +10688,25 @@ function resolveImportWorkingNo(summary, imported, fileName=''){
 
   if(/^\d{7,}$/.test(rawNo)){
     const family=(shipMasters||[]).filter(s=>originalNumericWorkingNo(importSourceWorkingNo(s))===rawNo);
-    const conflict=family.find(s=>!sameOriginalImportJob(s,candidate));
-    if(conflict)throw new Error('原始船號 '+rawNo+' 的船名、航次或作業日期與既有資料不符，請核對來源檔；未新增尾碼或覆寫其他作業');
-    return {rawNo,effectiveNo:rawNo,collision:false,reused:family.length>0};
+    const call=vesselImportCallNumber(candidate);
+    const matches=family.filter(s=>sameOriginalImportJob(s,candidate));
+    if(matches.length){
+      // Keep a previously assigned call key stable across repeated imports.
+      const stable=matches.find(s=>/-CALL\d+$/i.test(String(s.workingNo)))||matches.find(s=>String(s.workingNo)===rawNo);
+      const rootOccupied=family.some(s=>String(s.workingNo)===rawNo);
+      const effectiveNo=stable?String(stable.workingNo):call===1&&!rootOccupied?rawNo:rawNo+'-CALL'+call;
+      return {rawNo,effectiveNo,collision:false,reused:true};
+    }
+    if(!family.length&&call===1)return {rawNo,effectiveNo:rawNo,collision:false,reused:false};
+    if(family.some(s=>normalizeShipText(s.vessel)!==normalizeShipText(candidate.vessel)))
+      throw new Error('原始船號 '+rawNo+' 與另一艘船的資料相同，請核對來源檔；未覆寫其他船舶');
+    // A named second call is a separate physical operation, not a revision.
+    // CALL keys survive V66's numeric-suffix normalization; sourceWorkingNo
+    // retains the original Excel number for display and audit.
+    const effectiveNo=rawNo+'-CALL'+call;
+    const occupied=(shipMasters||[]).find(s=>String(s.workingNo)===effectiveNo);
+    if(occupied)throw new Error('第 '+call+' 靠的航次或日期與既有紀錄不同，請核對靠泊次數；未覆寫既有作業');
+    return {rawNo,effectiveNo,collision:false,reused:false,separateCall:true,callNumber:call};
   }
 
   // 先找「試算表 現在的 NO. 已經存在，而且核心作業相同」。
@@ -10880,7 +10898,7 @@ async function importExcel(file) {
 
         // 清掉舊版因同一測試檔重匯而產生的 -2/-3 重複項。
         // 必須同根 NO + 同船/航次/碼頭/核心數值，且來源檔名屬同一家族，才允許清理。
-        const sameRoot=workingNoRoot(oldNo)===workingNoRoot(no);
+        const sameRoot=vesselImportCallNumber(oldMaster)===vesselImportCallNumber(candidateMaster)&&workingNoRoot(oldNo)===workingNoRoot(no);
         const oldFileFamily=normalizeImportFileStem(oldMaster?.sourceFileName||oldMaster?.workingSheetSource?.sourceFileName||'');
         if(sameRoot && currentFileFamily && oldFileFamily===currentFileFamily && sameImportJobCoreLoose(oldMaster,candidateMaster)){
           replaceNos.add(oldNo);
@@ -10991,7 +11009,7 @@ async function importExcel(file) {
       shipMasters=shipMasters.filter(s=>{
         if(String(s.workingNo||'')===master.workingNo)return false;
         if(sameShipMasterJobWithSerialGuard(s,master)||sameOriginalImportJob(s,master))return false;
-        const sameRoot=workingNoRoot(s?.workingNo)===workingNoRoot(master?.workingNo);
+        const sameRoot=vesselImportCallNumber(s)===vesselImportCallNumber(master)&&workingNoRoot(s?.workingNo)===workingNoRoot(master?.workingNo);
         const oldFileFamily=normalizeImportFileStem(s?.sourceFileName||s?.workingSheetSource?.sourceFileName||'');
         if(sameRoot && currentFileFamily && oldFileFamily===currentFileFamily && sameImportJobCoreLoose(s,master))return false;
         return true;
@@ -11289,7 +11307,7 @@ function linkedChildMasterCandidates(parent){
     if(s===parent)return false;
     const stored=String(s?.workingNo||'').trim();
     const source=String(importSourceWorkingNo(s)||stored).trim();
-    if(!stored || stored===parentStored)return false;
+    if(!stored || stored===parentStored||/-CALL\d+$/i.test(stored))return false;
     if(workingNoRoot(source)!==root && workingNoRoot(stored)!==root)return false;
     if(!workingNoHasSuffix(source) && !workingNoHasSuffix(stored))return false;
     if(normalizeShipText(s?.vessel)!==pv)return false;
@@ -11372,6 +11390,7 @@ const MONTHLY_COMPARE_MONTH_KEY='port79_gc_monthly_compare_month_v1';
 const MONTHLY_COMPARE_FILE_KEY='port79_gc_monthly_compare_file_v1';
 
 function normalizeMonthlySerial(v){
+  v=String(v||'').replace(/-CALL(\d+)$/i,'-$1');
   const raw=String(v??'').trim();
   if(!raw)return '';
 

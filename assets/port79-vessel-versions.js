@@ -9,7 +9,7 @@
  'use strict';
  const txt=v=>String(v??'').trim().replace(/\s+/g,' ').toUpperCase();
  const no=v=>String(v??'').trim().toUpperCase();
- const rootNo=v=>no(v).replace(/-\d+$/,'');
+ const rootNo=v=>no(v).replace(/-(?:CALL)?\d+$/,'');
  const dateOf=r=>String(r?.compareDate||r?.lastDate||r?._cloudLastDate||r?.firstDate||r?.date||'').slice(0,10);
  const number=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
  const quantity=r=>({
@@ -19,9 +19,15 @@
   shifts:number(r?.shiftMoves??r?.sheetShiftMoves)
  });
  const importedAt=r=>Date.parse(String(r?.workingSheetImportedAt||r?.workingSheetSource?.importedAt||r?.importedAt||''))||0;
+ function callNumber(r){
+  const file=String(r?.sourceFileName||r?.workingSheetSource?.sourceFileName||'');
+  const match=file.match(/第\s*([一二三四五六七八九十0-9]+)\s*靠/);
+  if(match){const n=Number(match[1])||({'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10})[match[1]];if(n)return n;}
+  return Number(no(r?.workingNo).match(/-CALL(\d+)$/)?.[1])||1;
+ }
  function identity(r){
   const workingNo=no(r?.workingNo);
-  if(!/^\d+(?:-\d+)?$/.test(workingNo))return '';
+  if(!/^\d+(?:-(?:CALL)?\d+)?$/.test(workingNo))return '';
   const date=dateOf(r),vessel=txt(r?.vessel||r?.vesselName||r?.shipName);
   const voyage=txt([r?.voyageI,r?.voyageE||r?.voyage].filter(Boolean).join('/'));
   const q=quantity(r);
@@ -32,7 +38,7 @@
   // independently of corrected quantities. Untimed legacy rows retain the
   // conservative quantity key so unknown history is never discarded.
   const revision=importedAt(r)&&voyage;
-  return JSON.stringify([rootNo(workingNo),revision?'same-voyage':date,vessel,voyage,txt(r?.wharf),
+  return JSON.stringify([rootNo(workingNo),callNumber(r),date,vessel,voyage,txt(r?.wharf),
     ...(revision?['import-revision']:[q.containers,q.moves,q.hatches,q.shifts])]);
  }
  function choose(a,b){
@@ -71,5 +77,5 @@
   }
   return {rows:kept,excludedWorkingNos:[...new Set(excluded)]};
  }
- return {collapse,identity,rootNo};
+ return {collapse,identity,rootNo,callNumber};
 });
