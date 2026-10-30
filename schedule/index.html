@@ -7004,14 +7004,34 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const offDates=[...new Set(knownTyphoonDays||(typeof p79ScheduleTyphoonDays==='function'?p79ScheduleTyphoonDays(emp,month,computedWork):[]))];
       const workedDates=[...new Set(knownTyphoonWorkDays||computedWork)];
       const typhoonSet=new Set([...offDates,...workedDates]);
+      // Summary-only classification: a typhoon event must not depend on the
+      // daily cell's punch-loading state or its retained 國 overtime label.
+      // Never rewrite the roster, leave record or formal declaration here.
+      const protectedTyphoonSet=new Set(typhoonSet);
+      const eligible=date=>date.startsWith(month+'-')&&
+        (typeof p79EmployeeDateEligible!=='function'||p79EmployeeDateEligible(emp,date));
+      if(visibleRestDates&&typeof p79TyphoonDates==='function')
+        for(const date of p79TyphoonDates())if(eligible(date))protectedTyphoonSet.add(date);
+      const roster=typeof monthlyScheduleData!=='undefined'?monthlyScheduleData[emp.id]||{}:{};
+      const metadata=typeof monthlyScheduleMeta!=='undefined'?monthlyScheduleMeta[emp.id]||{}:{};
+      for(const date of new Set([...Object.keys(roster),...Object.keys(metadata)])){
+        if(!eligible(date))continue;
+        const meta=metadata[date]||{};
+        if(String(roster[date]||'').trim()==='颱'){protectedTyphoonSet.add(date);continue;}
+        if(meta.overtimeExcluded===true)continue;
+        const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])];
+        if(reports.some(report=>String(report?.id||'').trim()&&
+          !(meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id))&&
+          (/^颱/.test(String(report.code||''))||/颱風|颱日|停班/.test(String(report.typeName||''))))){typhoonSet.add(date);protectedTyphoonSet.add(date);}
+      }
       const dates=kind=>[...new Set(visibleRestDates?(visibleRestDates[kind]||[]):audit.dates[kind].map(d=>month+'-'+d))];
-      const nationalDuplicates=dates('國').filter(day=>typhoonSet.has(day)).length;
+      const nationalDuplicates=dates('國').filter(day=>protectedTyphoonSet.has(day)).length;
       const total=typhoonSet.size;
       const quotaCells=['例','休','國'].map(category=>{
         // A confirmed cloud declaration consumes its original 例/休/國
         // category even when the date cell subsequently shows actual shift.
         // Deduplicate it with visible dated labels; do not count local drafts.
-        const shownDates=dates(category).filter(day=>!typhoonSet.has(day));
+        const shownDates=dates(category).filter(day=>!protectedTyphoonSet.has(day));
         const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[] : [];
         // A cloud report may arrive in the verified quota ledger and monthly
         // roster before the summary receipt cache is rebuilt. Read those
@@ -7032,7 +7052,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 item?.confirmed===true&&String(item.reportId)===String(report.id));
           }).map(([date])=>date):[];
         const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
-          .filter(day=>day.startsWith(month+'-')&&!typhoonSet.has(day)).sort();
+          .filter(day=>day.startsWith(month+'-')&&!protectedTyphoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
         const count=categoryDates.length;
         const displayDates=categoryDates.map(day=>day.slice(-2));

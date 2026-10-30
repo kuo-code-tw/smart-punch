@@ -28,14 +28,19 @@
   // Missing dates, unnamed vessels, and incomplete totals cannot prove copies.
   if(!/^20\d{2}-\d{2}-\d{2}$/.test(date)||!vessel||
     q.containers===null||q.moves===null||q.hatches===null||q.shifts===null)return '';
-  return JSON.stringify([rootNo(workingNo),date,vessel,voyage,txt(r?.wharf),q.containers,q.moves,q.hatches,q.shifts]);
+  // A timestamped import with a complete voyage identifies a revised job
+  // independently of corrected quantities. Untimed legacy rows retain the
+  // conservative quantity key so unknown history is never discarded.
+  const revision=importedAt(r)&&voyage;
+  return JSON.stringify([rootNo(workingNo),revision?'same-voyage':date,vessel,voyage,txt(r?.wharf),
+    ...(revision?['import-revision']:[q.containers,q.moves,q.hatches,q.shifts])]);
  }
  function choose(a,b){
+  const at=importedAt(a),bt=importedAt(b);
+  if(at!==bt&&at&&bt)return at>bt?a:b;
   const ac=a?.workingSheetSource?.reportRecordIds?.length||0;
   const bc=b?.workingSheetSource?.reportRecordIds?.length||0;
   if(ac!==bc)return ac>bc?a:b;
-  const at=importedAt(a),bt=importedAt(b);
-  if(at!==bt&&(at||bt))return at>bt?a:b;
   // For equally complete imports, retain the unsuffixed canonical job when
   // present. For two suffixed copies use the last revision.
   const as=/-\d+$/.test(no(a?.workingNo)),bs=/-\d+$/.test(no(b?.workingNo));
