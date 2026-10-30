@@ -30,7 +30,7 @@
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
-<script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
+<script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261028-short-attendance-shift-v2"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
@@ -6200,9 +6200,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
                   <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：日期格計入天數／未分配額度（另外核對雲端正式申報）">例</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：日期格計入天數／未分配額度（另外核對雲端正式申報）">休</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：日期格計入天數／未分配額度（另外核對雲端正式申報）；不包含颱風停班">國</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假">例</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假">休</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假；不包含颱風停班">國</th>
                   <th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="颱風日：停班、實際出勤及加班均計入；同日只算一次，不併入國定假日額度">颱</th>
       `;
 
@@ -7004,8 +7004,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const nationalDuplicates=dates('國').filter(day=>typhoonSet.has(day)).length;
       const total=typhoonSet.size;
       const quotaCells=['例','休','國'].map(category=>{
-        // A day reported under 颱 must not also count under 例/休/國.
-        const categoryDates=dates(category).filter(day=>!typhoonSet.has(day));
+        // A confirmed cloud declaration consumes its original 例/休/國
+        // category even when the date cell subsequently shows actual shift.
+        // Deduplicate it with visible dated labels; do not count local drafts.
+        const shownDates=dates(category).filter(day=>!typhoonSet.has(day));
+        const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[] : [];
+        const categoryDates=[...new Set([...shownDates,...reportedDates])]
+          .filter(day=>day.startsWith(month+'-')&&!typhoonSet.has(day)).sort();
+        const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
         const count=categoryDates.length;
         const displayDates=categoryDates.map(day=>day.slice(-2));
         const limit=Number.isFinite(ledger?.quota?.[category])?ledger.quota[category]:quota[category];
@@ -7019,7 +7025,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const rest=Math.max(0,limit-count-reportedOutside.size),extra=Math.max(0,count-limit);
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        const title=category+'：逐日計入 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；尚未分配 '+rest+' 天'+
+        const title=category+'：班表日期格及已確認申報合計 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；尚未分配 '+rest+' 天'+
+          (extraReportedDates.length?'；其中 '+extraReportedDates.map(day=>day.slice(-2)).join('、')+' 為雲端已確認'+category+'加班，日期格另顯示班別但仍計入原假別':'')+
           (verified?'；正式已報 '+(ledger.reported?.[category]||0)+' 天；出勤待核 '+(ledger.reserved?.[category]||0)+' 天；帳本未報 '+officialRemaining+' 天':'；雲端申報額度待核')+
           (officialRemaining!==null&&officialRemaining!==rest?'；⚠ 班格與正式帳本差異須核對，未更動正式資料':'')+(extra?'；超額 '+extra+' 天':'')+
           (category==='國'&&nationalDuplicates?'；另有 '+nationalDuplicates+' 天颱風日已移至「颱」統計，不重複計入':'');
