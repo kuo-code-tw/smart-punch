@@ -8,7 +8,20 @@ const cloudConfirmed=html.indexOf('p79ConfirmScheduleSource(data,requestMonth,re
 const summaryRefresh=html.indexOf('p79RefreshScheduleRestCounts(requestMonth);',cloudConfirmed);
 const attendanceRefresh=html.indexOf('p79ScheduleRestClient().refresh(requestMonth);',summaryRefresh);
 a(cloudConfirmed>=0&&summaryRefresh>cloudConfirmed&&attendanceRefresh>summaryRefresh&&attendanceRefresh-cloudConfirmed<600,
- 'official cloud response must refresh visible counters before attendance reread, even if that request fails');
+ 'official cloud response must refresh visible counters before attendance reread, even if it fails');
+let official=false,dirty=false,ledger=[],cloudRest={},confirmed=[];
+const c={
+  window:null,Set,Map,
+  p79RestQuota:()=>({counts:{例:4,休:5,國:2}}),
+  p79DailyRestCount:()=>({dates:{例:[],休:[],國:[]}}),
+  p79ScheduleRestBalance:()=>({quota:{例:4,休:5,國:2},remaining:{例:0,休:2,國:0},reported:{例:0,休:2,國:0},reserved:{例:0,休:0,國:0},ledger}),
+  p79ScheduleTyphoonDays:()=>[],scheduleEscapeHtml:x=>String(x),
+  p79ScheduleHasOfficialData:()=>official,
+  monthlyScheduleMeta:{E1:cloudRest},
+  P79ScheduleRestSummary:{confirmedDates:()=>confirmed}
+};
+Object.defineProperty(c,'port79ScheduleDirty',{get:()=>dirty});c.window=c;
+vm.createContext(c);vm.runInContext(html.slice(i,j),c);
 const shown={例:[day(2),day(9),day(16),day(23)],休:[day(5),day(11),day(22)],國:[day(6),day(24)]};
 const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id},month,null,typhoon,[],shown);
 const value=(id,category)=>render(id).match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)</span>'))?.[1];
