@@ -1,0 +1,118 @@
+/* 79號碼頭月度雙區儀表板 · 僅在登入後管理首頁顯示。
+   樣式不覆寫原始打卡頁面、來源資料、表單事件。 */
+@charset "UTF-8";
+body:has(#systems.show){padding:0!important;display:block!important;min-height:100vh!important;background:#edf5ff!important}
+body:has(#systems.show)>.card{width:calc(100% - 248px)!important;max-width:none!important;margin:0 0 0 248px!important;min-height:100vh!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:linear-gradient(170deg,#eaf5ff,#f5faff 55%,#eaf3fd)!important}
+body:has(#systems.show)>.card>.header{padding:13px 21px!important;min-height:58px!important;background:#f8fbff!important;border-bottom:1px solid #dcebf8!important;color:#173d71!important;border-radius:0!important}
+body:has(#systems.show)>.card>.header .cloud-title{font-size:18px!important;letter-spacing:0!important;color:#113e7b!important;text-shadow:none!important}
+body:has(#systems.show)>.card>.header .cloud-sub{font-size:10px!important;color:#6e8daf!important;letter-spacing:.04em!important;margin:4px 0 0!important}
+body:has(#systems.show)>.card>.header .theme{background:#e6f1ff!important;border:1px solid #c9e0f7!important;color:#2860a2!important}
+body:has(#systems.show)>.card>.body{padding:12px 19px 26px!important}
+body:has(#systems.show) #todayWeather{max-width:490px;margin:0 0 10px auto!important;padding:9px 14px!important;border-radius:12px!important}
+body:has(#systems.show) #sessionBar{padding:8px 13px!important;margin:0 0 10px!important}
+#systems{position:relative}
+#systems::before{content:"🚢 79號碼頭\a 雲端智慧系統";white-space:pre-line;position:fixed;top:0;left:0;width:248px;height:86px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:21px;font-weight:1000;line-height:1.5;letter-spacing:.02em;color:#124c94;z-index:11500;background:#f8fbff;border-right:1px solid #dceaf8;box-shadow:0 1px 0 #e1edf9}
+#systems .p79-modern-home-intro{min-height:143px!important;margin-bottom:13px!important;padding:24px 31px!important;background:linear-gradient(90deg,rgba(8,66,129,.96),rgba(12,78,143,.74) 56%,rgba(23,96,163,.13)),url("./port79-harbor-banner.webp") center center/cover no-repeat!important;border-radius:17px!important}
+#systems .p79-modern-home-intro h2{font-size:clamp(22px,2.5vw,33px)!important;line-height:1.3}
+#systems .p79-modern-home-intro p{color:#e6f6ff!important;line-height:1.6}
+#systems .p79-modern-home-intro::before,#systems .p79-modern-home-intro::after{display:none!important}
+#systems .p79-modern-home-ship{display:none!important}
+#systems .p79-modern-section-heading{margin-top:24px!important}
+#systems .system-grid{position:fixed!important;z-index:11300!important;top:91px!important;left:0!important;bottom:0!important;width:248px!important;padding:8px 10px 24px!important;overflow:auto!important;grid-template-columns:1fr!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:5px!important;align-content:stretch!important;background:linear-gradient(#fbfdff,#f0f8ff)!important;border-right:1px solid #ddeafa!important;box-shadow:3px 0 15px rgba(25,80,139,.04)!important}
+#systems .system-grid .system-card{flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:12px!important;min-height:45px!important;width:100%!important;padding:8px 12px!important;background:transparent!important;border:0!important;border-radius:11px!important;box-shadow:none!important;text-align:left!important}
+#systems .system-grid .system-card:hover:not(:disabled){transform:none!important;background:#e8f3ff!important;box-shadow:none!important}
+#systems .system-grid .system-card::after{content:"›"!important;right:8px;bottom:auto;top:8px;font-size:16px;opacity:.5}
+#systems .system-grid .system-card .icon{flex:0 0 26px!important;width:26px!important;height:27px!important;display:grid!important;place-items:center!important;margin:0!important;padding:0!important;border-radius:8px!important;font-size:19px!important;box-shadow:none!important;background:transparent!important}
+#systems .system-grid .system-card .name{font-size:14px!important;font-weight:950!important;letter-spacing:0!important;color:#194b85!important}
+#systems .system-grid .system-card .desc,#systems .system-grid .system-card .badge{display:none!important}
+#systems .system-grid #cardHistory{grid-column:auto!important;min-height:47px!important;background:#eaf5ff!important;border:0!important}
+#systems .system-grid #cardHistory .icon{display:grid!important;margin:0!important}
+#systems .system-grid #cardHistory .name{font-size:13px!important}
+#systems .system-grid #cardHistory .desc{display:none!important}
+#systems .system-grid .system-card[hidden]{display:none!important}
+/* Main dashboard */
+#p79Dashboard{font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;color:#17395e}
+#p79Dashboard *{box-sizing:border-box}
+#p79Dashboard .p79d-dashboard-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 16px 13px;background:#fff;border:1px solid #e0ecfa;border-radius:14px;margin-bottom:10px;box-shadow:0 4px 17px rgba(19,75,133,.04)}
+#p79Dashboard .p79d-dashboard-controls strong{display:block;font-size:16px;font-weight:950;color:#124881}
+#p79Dashboard .p79d-dashboard-controls small{display:block;margin-top:4px;color:#758ba5;font-size:11px}
+#p79Dashboard .p79d-dashboard-actions{display:flex;align-items:center;gap:8px}
+#p79Dashboard .p79d-dashboard-actions label{margin:0;white-space:nowrap;font-size:12px;font-weight:900;color:#47749d}
+#p79Dashboard #p79DashMonth{min-height:37px;min-width:148px;max-width:170px;border:1px solid #cfe1f4;border-radius:9px;background:white;color:#204b76;padding:7px;font-size:13px}
+#p79Dashboard #p79DashRefresh{border:0;border-radius:10px;padding:10px 13px;min-height:38px;background:#1776e7;color:#fff;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap}
+#p79Dashboard #p79DashRefresh:disabled{opacity:.6;cursor:progress}
+#p79Dashboard .p79d-message{padding:8px 13px;margin-bottom:12px;color:#577ca1;background:#f5fbff;border:1px solid #e0ecfa;border-radius:10px;font-size:11px}
+#p79Dashboard .p79d-section{padding:14px 14px 13px;background:#fff;border:1px solid #dce9f8;border-radius:17px;box-shadow:0 7px 23px rgba(26,75,135,.055);margin-bottom:14px}
+#p79Dashboard .p79d-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px}
+#p79Dashboard .p79d-section-head h2{display:flex;align-items:center;gap:9px;margin:0;font-size:21px;color:#124a8a;font-weight:1000}
+#p79Dashboard .p79d-section-head h2 span{color:#316cba;font-size:15px}
+#p79Dashboard .p79d-section-head button,#p79Dashboard .p79d-plain-link{background:transparent;border:0;color:#1272db;font-weight:900;font-size:12px;cursor:pointer}
+#p79Dashboard .p79d-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+#p79Dashboard .p79d-kpi{display:flex;align-items:center;gap:13px;min-width:0;padding:16px 12px;background:linear-gradient(120deg,#fff,#f9fcff);border:1px solid #e0edfa;border-radius:13px;min-height:84px;box-shadow:0 3px 13px rgba(27,77,134,.045)}
+#p79Dashboard .p79d-kpi-icon{flex:0 0 50px;width:50px;height:50px;display:grid;place-items:center;border-radius:50%;background:#e9f5ff;color:#127bd8;font-size:25px;font-weight:950}
+#p79Dashboard .p79d-kpi:nth-child(3) .p79d-kpi-icon{background:#edf3ff;color:#2469df}
+#p79Dashboard .p79d-kpi:nth-child(4) .p79d-kpi-icon{background:#f2efff;color:#7851d7}
+#p79Dashboard .p79d-kpi span{display:block;color:#234874;font-size:12px;font-weight:900;line-height:1.4}
+#p79Dashboard .p79d-kpi strong{display:inline-block;color:#103f83;font-size:clamp(21px,2vw,30px);line-height:1.25;font-weight:1000;font-variant-numeric:tabular-nums}
+#p79Dashboard .p79d-kpi small{display:inline-block;margin-left:5px;color:#6a86a6;font-size:11px;font-weight:750}
+#p79Dashboard .p79d-panels{display:grid;gap:12px;margin-top:12px;align-items:stretch}
+#p79Dashboard .p79d-ship-panels{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,.9fr)}
+#p79Dashboard .p79d-attendance-panels{grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr)}
+#p79Dashboard .p79d-panel{min-width:0;min-height:210px;padding:13px;background:#fff;border:1px solid #e0ebf7;border-radius:13px;box-shadow:0 3px 13px rgba(27,77,134,.045)}
+#p79Dashboard .p79d-panel-title{display:flex;justify-content:space-between;gap:8px;margin-bottom:13px;align-items:center;color:#174b87}
+#p79Dashboard .p79d-panel-title b{font-size:12px;font-weight:950}
+#p79Dashboard .p79d-panel-title span{font-size:10px;color:#6d8faf;white-space:nowrap}
+#p79Dashboard .p79d-bars{min-height:148px;height:170px;display:flex;align-items:flex-end;justify-content:space-around;gap:5px;overflow:hidden;font-size:11px;color:#6e86a2;padding:12px 4px}
+#p79Dashboard .p79d-bar-col{flex:1 1 0;min-width:0;max-width:52px;height:100%;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;gap:5px}
+#p79Dashboard .p79d-bar-value{font-size:10px;white-space:nowrap;color:#176ed4;font-weight:900}
+#p79Dashboard .p79d-bar{width:min(100%,28px);min-height:3px;display:block;flex:0 0 auto;background:linear-gradient(#61b7ff,#2085ea);border-radius:4px 4px 0 0}
+#p79Dashboard .p79d-bar-label{font-size:9px;color:#6d85a6;text-align:center;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-width:100%}
+#p79Dashboard .p79d-table-scroll{max-height:170px;overflow:auto}
+#p79Dashboard .p79d-table-scroll table{width:100%;border-collapse:collapse;font-size:11px;color:#24496f;white-space:nowrap}
+#p79Dashboard .p79d-table-scroll th{background:#eaf3ff;color:#42668c;font-size:10px;padding:8px 4px;position:sticky;top:0}
+#p79Dashboard .p79d-table-scroll td{border-bottom:1px solid #edf3fa;padding:7px 4px;text-align:center}
+#p79Dashboard .p79d-table-scroll tr:nth-child(even){background:#f9fcff}
+#p79Dashboard .p79d-warning{font-size:11px;line-height:1.6;color:#3b5b79;padding:9px 4px;border-bottom:1px solid #eef3f8}
+#p79Dashboard .p79d-warning:first-of-type{color:#e16c49}
+#p79Dashboard .p79d-plain-link{padding:10px 0}
+#p79Dashboard .p79d-source{color:#748ba5;font-size:10px;margin:10px 2px 0;line-height:1.6}
+#p79Dashboard .p79d-donut-layout{height:166px;display:flex;align-items:center;justify-content:center;gap:18px}
+#p79Dashboard .p79d-donut{--p79d-donut-angle:0%;width:145px;height:145px;aspect-ratio:1;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#2285eb 0 var(--p79d-donut-angle),#f0b44c var(--p79d-donut-angle) 100%)}
+#p79Dashboard .p79d-donut>div{width:104px;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;background:#fff;text-align:center}
+#p79Dashboard .p79d-donut small{color:#7792b1;font-size:10px}
+#p79Dashboard .p79d-donut strong{color:#123c78;font-size:29px;font-weight:1000}
+#p79Dashboard .p79d-donut-legend{font-size:11px;color:#537397;max-width:115px;line-height:1.9}
+#p79Dashboard .p79d-footnote{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:11px 13px;background:#e5f2ff;border-radius:11px;color:#345c87;font-size:12px;font-weight:850}
+#p79Dashboard .p79d-footnote a{color:#126cca;text-decoration:none}
+#p79Dashboard .p79d-footnote a:hover{text-decoration:underline}
+@media(max-width:1400px){
+ #p79Dashboard .p79d-ship-panels{grid-template-columns:1fr 1fr}
+ #p79Dashboard .p79d-ship-panels .p79d-warnings{grid-column:1/-1;min-height:0}
+ #p79Dashboard .p79d-attendance-panels{grid-template-columns:1fr 1fr}
+ #p79Dashboard .p79d-attendance-panels article:last-child{grid-column:1/-1}
+ #p79Dashboard .p79d-kpi{padding:11px 9px;gap:8px}
+ #p79Dashboard .p79d-kpi-icon{width:37px;height:37px;flex-basis:37px;font-size:19px}
+}
+@media(max-width:1050px){
+ body:has(#systems.show)>.card{width:100%!important;margin:0!important}
+ #systems::before{display:none!important}
+ #systems .system-grid{position:relative!important;top:auto!important;bottom:auto!important;left:auto!important;width:100%!important;padding:12px!important;flex-direction:row!important;overflow-x:auto!important;background:#f6fbff!important;border:1px solid #e0eefa!important;border-radius:12px!important}
+ #systems .system-grid .system-card{width:auto!important;min-width:125px!important;max-width:165px!important}
+ #systems .system-grid .system-card .name{font-size:12px!important}
+ #p79Dashboard .p79d-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:680px){
+ #p79Dashboard .p79d-dashboard-controls{flex-direction:column;align-items:flex-start}
+ #p79Dashboard .p79d-dashboard-actions{flex-wrap:wrap}
+ #p79Dashboard .p79d-section{padding:11px}
+ #p79Dashboard .p79d-section-head h2{font-size:17px}
+ #p79Dashboard .p79d-ship-panels,#p79Dashboard .p79d-attendance-panels{grid-template-columns:1fr}
+ #p79Dashboard .p79d-ship-panels .p79d-warnings,#p79Dashboard .p79d-attendance-panels article:last-child{grid-column:auto}
+ #p79Dashboard .p79d-kpi{min-height:73px}
+ #p79Dashboard .p79d-kpi strong{font-size:22px}
+ #p79Dashboard .p79d-donut{width:125px;height:125px}
+ #p79Dashboard .p79d-donut>div{width:90px;height:90px}
+}
+html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-section,
+html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-panel,
+html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{background:#f7fbff!important;color:#204572!important}
