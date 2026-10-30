@@ -86,8 +86,12 @@ function analyzeVessels(data){
   const name=displayPersonName(first(r,['name','employeeName']));
   if(!id&&!name)continue;
   const key=id||'NAME:'+name;
-  const p=people.get(key)||{name:name||id,id,dept:String(first(r,['dept','department','unit'])||'—'),group:rosterGroup(first(r,['group','employeeGroup','team'])),moves:0,validMoves:0,timedMoves:0,hours:0};
+  const p=people.get(key)||{name:name||id,id,dept:String(first(r,['dept','department','unit'])||'—'),group:rosterGroup(first(r,['group','employeeGroup','team'])),moves:0,validMoves:0,timedMoves:0,hours:0,hatches:0,validHatches:0};
   if(!p.group)p.group=rosterGroup(first(r,['group','employeeGroup','team']));
+  // Hatch covers (H/C) are a separate measure from container Moves.
+  // An absent hatch field is unknown, not an invented zero.
+  const hatchCount=numberFrom(r,['hatches','hatchCover','hatchCovers','hatchCoverCount','hc']);
+  if(hatchCount!==null&&hatchCount>=0){p.hatches+=hatchCount;p.validHatches++;}
   const moves=numberFrom(r,['totalMoves','moves','containers'])??(
    numberFrom(r,['disc'])!==null&&numberFrom(r,['load'])!==null?
    numberFrom(r,['disc'])+numberFrom(r,['load']):null);
@@ -95,7 +99,7 @@ function analyzeVessels(data){
   people.set(key,p);
  }
  for(const v of vessels)v.hours=jobHours.get(v.workingNo)??null;
- const personRows=[...people.values()].filter(p=>p.validMoves>0).map(p=>({...p,efficiency:p.hours>0?p.timedMoves/p.hours:null})).sort((a,b)=>(b.efficiency??-1)-(a.efficiency??-1)||b.moves-a.moves);
+ const personRows=[...people.values()].filter(p=>p.validMoves>0).map(p=>({...p,hatches:p.validHatches>0?p.hatches:null,efficiency:p.hours>0?p.timedMoves/p.hours:null})).sort((a,b)=>(b.efficiency??-1)-(a.efficiency??-1)||b.moves-a.moves);
  return {count:masters.length,moves:validMoves?totalMoves:null,containers:validContainers?containers:null,
   averageGph:weight>0?weighted/weight:rateCount?rateSum/rateCount:null,
   vessels,people:personRows,workHours:timedRows?workHours:null,timedRows,detailCount:details.length,completeness:{moves:validMoves,containers:validContainers,total:masters.length}};
@@ -176,7 +180,7 @@ function vesselTable(v){
 function peopleTable(v){
  const el=$('p79DashPeopleRanking');if(!el)return;
  if(!v.people.length){el.innerHTML='<tr><td colspan="5">本月尚無可核對的個人作業明細</td></tr>';return}
- el.innerHTML=v.people.slice(0,6).map((p,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(p.name)+'</td><td>'+fmt(p.moves)+'</td><td>'+fmt(p.hours,1)+'</td><td>'+fmt(p.efficiency,2)+'</td></tr>').join('');
+ el.innerHTML=v.people.map((p,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(p.name)+'</td><td>'+fmt(p.moves)+'</td><td>'+fmt(p.hatches)+'</td><td>'+fmt(p.efficiency,2)+'</td></tr>').join('');
 }
 function showVessels(v){
  setMetric('p79DashShipCount',fmt(v.count));setMetric('p79DashMoves',fmt(v.moves));
