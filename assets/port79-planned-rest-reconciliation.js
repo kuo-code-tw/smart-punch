@@ -4,9 +4,10 @@
 const text=v=>String(v??'').trim(),id=v=>text(v).toUpperCase(),rest=v=>['例','休','國','颱'].includes(text(v))?text(v):'';
 function originalCategory(schedule,date,meta){
  const explicit=rest(meta.plannedRestOriginalCategory);if(explicit)return explicit;
- const original=rest(meta.reportOriginalShift??meta.overtimeOriginalShift);
+ const savedOriginal=meta.reportOriginalShift??meta.overtimeOriginalShift;
+ const original=rest(savedOriginal);
  // A report's category alone cannot prove an originally scheduled holiday.
- return original?(rest(meta.restCategory)||original):rest(schedule[date]);
+ return original?(rest(meta.restCategory)||original):savedOriginal!=null?'':rest(schedule[date]);
 }
 function approved(report){return ['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(k=>report[k]!=null&&text(report[k])!=='')||/^(已核准|已審核|approved|reviewed)$/i.test(text(report.status));}
 function plan({rows=[],date,today,evidence,confirmed=false,actor='',now=''}={}){

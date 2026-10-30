@@ -15,6 +15,7 @@ for(const state of ['missing','worked','open','unknown']){
 }
 for(const field of ['approvedAt','reviewedBy','approvalStatus']){const sample=structuredClone(rows);sample[0].schedule.__meta[date].overtimeReport[field]='confirmed';a.equal(api.plan({...input,rows:sample}).results[0].state,'approved-review');}
 let sample=structuredClone(rows);sample[0].schedule.__meta[date].reportOriginalShift='早';a.equal(api.plan({...input,rows:sample}).results[0].state,'ordinary-workday');
+sample[0].schedule[date]='休';a.equal(api.plan({...input,rows:sample}).results[0].state,'ordinary-workday','a later rest label cannot erase the recorded original workday');
 sample=structuredClone(rows);sample[0].schedule.__meta[date].forEmpId='OTHER';a.equal(api.plan({...input,rows:sample}).results[0].state,'linked-review');
 const c={window:null,console:{info(){}},Date,Intl,Map,Set};c.window=c;vm.createContext(c);
 for(const f of ['attendance/v6-engine.js','assets/port79-rest-attendance.js','assets/port79-planned-rest-reconciliation.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c);
