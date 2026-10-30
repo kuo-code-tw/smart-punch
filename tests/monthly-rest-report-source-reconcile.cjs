@@ -4,6 +4,8 @@ const html=fs.readFileSync('schedule/index.html','utf8');
 const i=html.indexOf('    function p79ScheduleRestCountCells('),j=html.indexOf('    function p79RefreshScheduleRestCounts(',i);
 a(i>0&&j>i,'roster counter function required');
 const month='2026-10',day=d=>month+'-'+String(d).padStart(2,'0');
+a.match(html,/p79ConfirmScheduleSource\(data,requestMonth,requestStartedAt,requestViewer,token\);\s*p79RefreshScheduleRestCounts\(requestMonth\);\s*p79ScheduleRestClient\(\)\.refresh\(requestMonth\);/,
+ 'successful official cloud response must update the visible summary before the optional attendance refresh');
 let official=false,dirty=false,ledger=[],cloudRest={},confirmed=[];
 const c={
   window:null,Set,Map,
