@@ -7015,14 +7015,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // unsaved local draft, bare overtime flag or ordinary punch.
         const ledgerReportDates=(ledger?.ledger||[]).filter(item=>
           item?.category===category&&['reported','reportedPendingAttendance'].includes(item.kind)&&
-          /^\\d{4}-\\d{2}-\\d{2}$/.test(String(item.date||''))
+          /^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))
         ).map(item=>item.date);
         const formalMetaDates=typeof monthlyScheduleMeta!=='undefined'&&
           typeof p79ScheduleHasOfficialData==='function'&&p79ScheduleHasOfficialData()&&
           typeof port79ScheduleDirty!=='undefined'&&!port79ScheduleDirty
           ?Object.entries(monthlyScheduleMeta[emp.id]||{}).filter(([date,meta])=>{
             const report=meta?.overtimeReport;
-            return /^\\d{4}-\\d{2}-\\d{2}$/.test(date)&&String(report?.id||'').trim()&&
+            return /^\d{4}-\d{2}-\d{2}$/.test(date)&&String(report?.id||'').trim()&&
               report.category===category&&meta?.overtimeExcluded!==true&&
               !(meta?.overtimeRevocations||[]).some(item=>
                 item?.confirmed===true&&String(item.reportId)===String(report.id));
