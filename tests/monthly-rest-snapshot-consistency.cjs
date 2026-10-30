@@ -34,7 +34,7 @@ assert(!html.includes('const rest=verified?Math.max(0,ledger.remaining[category]
 
 const evidenceSrc=fs.readFileSync('assets/port79-schedule-rest-evidence.js','utf8');
 const ec={window:null};ec.window=ec;
-ec.P79RestAttendance={build:({now,schedules})=>({complete:true,checkedAt:now,days:{'E1|'+date(6):{state:'rest'}},proof:schedules[0].schedule[date(6)]})};
+ec.P79RestAttendance={build:({now,schedules})=>({complete:true,checkedAt:now,days:{['E1|'+date(6)]:{state:'rest'}},proof:schedules[0].schedule[date(6)]})};
 vm.createContext(ec);vm.runInContext(evidenceSrc,ec);
 let time=Date.parse('2026-10-30T00:00:00Z'),token='MANAGER',offline=false,shift='休';
 const c=ec.P79ScheduleRestEvidence.create({
