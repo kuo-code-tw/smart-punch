@@ -19,7 +19,7 @@ for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  const before=JSON.stringify({roster,meta,snapshot});
  const rendered=c.p79ScheduleRestCountCells(emp,month,meta,[],[],selected);
  const national=rendered.match(/<td data-rest-category="國"[\s\S]*?<\/td>/)[0];
- a.match(national,new RegExp('<span>'+nationalOff+'/0</span>'),'formal reports consume the rest quota once');
+ a.match(national,/<span>2\/0<\/span>/,'visible dates and formally reported dates share the category numerator, without double counting');
  a.match(national,new RegExp('正式已報 '+(2-nationalOff)+' 天'));
  a.equal(JSON.stringify({roster,meta,snapshot}),before,'counter does not edit attendance, roster or reports');
  c.P79ScheduleRestSummary.clear();
@@ -31,4 +31,4 @@ for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  const revoked=c.p79ScheduleRestCountCells(emp,month,meta,[],[],selected).match(/<td data-rest-category="國"[\s\S]*?<\/td>/)[0];
  a.match(revoked,new RegExp('<span>'+nationalOff+'/'+(2-nationalOff)+'</span>'),'revoked reports no longer occupy remaining quota');
 }
-console.log('PASS 83 people x 2 report/rest distributions: visible numerator retained, cloud-confirmed remainder, revocations and unknown evidence; no writes');
+console.log('PASS 83 people x 2 report/rest distributions: confirmed reports included in category numerator, no duplication, revocations and unknown evidence; no writes');
