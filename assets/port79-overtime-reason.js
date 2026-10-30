@@ -61,10 +61,10 @@ function amended(report,meta={}){
   Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
   Array.isArray(report?.amendments)?report.amendments:[];
  const prior=history.filter(x=>x?.confirmed===true&&norm(x.at)&&norm(x.actor)&&(!norm(x.reportId)||norm(x.reportId)===norm(report?.id)));
- const modifiedAt=norm(report?.modifiedAt||report?.updatedAt||prior.at(-1)?.at);
+ const modifiedAt=norm(report?.modifiedAt||prior.at(-1)?.at);
  // reportedAt may be different; do not infer a change from initial creation.
  const createdAt=norm(report?.reportedAt||report?.createdAt);
- const evidence=prior.length>0||!!norm(report?.replacesReportId)||
+ const evidence=prior.length>0||!!(norm(report?.replacesReportId)&&norm(report.replacesReportId)!==norm(report?.id))||
   !!(modifiedAt&&createdAt&&modifiedAt!==createdAt);
  return {verified:evidence,history:prior,modifiedAt:evidence?modifiedAt:'',priorId:norm(report?.replacesReportId)};
 }

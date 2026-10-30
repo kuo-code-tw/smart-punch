@@ -90,6 +90,8 @@
   return {ok:true,report:actual.report};
  }
  function sync(input){
+  // Rendering, exporting and background refresh are never authority to amend a filing.
+  if(input?.userInitiated!==true)return Promise.resolve({ok:false,skipped:true});
   const info=plan(input);
   if(!info)return Promise.resolve({ok:false,skipped:true});
   const token=String(input.token||'').trim();
