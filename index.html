@@ -649,7 +649,7 @@ function updateThemeText(){$('themeToggle').textContent=document.documentElement
 $('themeToggle').onclick=()=>{const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);localStorage.setItem('port79_theme',next);updateThemeText()};initTheme();
 
 function normLevel(v,f='none'){v=String(v??'').toLowerCase();return ['none','view','manage'].includes(v)?v:f}
-function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));return out}
+function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));if(role==='admin'&&Object.prototype.hasOwnProperty.call(raw,'history'))out.history=normLevel(raw.history,'none');return out}
 
 function normalizeDetectedVersion(raw){
   const s=String(raw||'').trim();
