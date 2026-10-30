@@ -1,0 +1,20 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
+const date='2026-10-28',month='2026-10';
+function fixture({lease=false,denied=false,revision=false,invalid=false,late=false}={}){
+ let rows=['例','休','國','颱','休','休','休','早'].map((kind,i)=>({empId:'E'+i,schedule:{[date]:'早',__meta:{[date]:{reportOriginalShift:kind,overtime:true,overtimeReport:{id:'R'+i,planned:true,category:kind==='早'?'休':kind,code:'休08-16',overtimeStart:'08',overtimeEnd:'16'}}}}}));
+ rows[6].schedule.__meta[date].overtimeReport.approvedAt='2026-10-27';
+ const people=rows.map(r=>({empId:r.empId,name:r.empId,attNo:r.empId.slice(1),jobTitle:'AQC'})),logs=[];let writes=0,seqCalls=0;
+ const punches=[{id:'IN4',empId:'E4',timeStr:'2026/10/28 07:45:00',status:'上班簽到'},{id:'OUT4',empId:'E4',timeStr:'2026/10/28 16:15:00',status:'下班簽退'},{id:'IN5',empId:'E5',timeStr:'2026/10/28 08:00:00',status:'上班簽到'}];
+ if(invalid)punches.push({id:'BAD',empId:'E0',timeStr:'unknown',status:'上班簽到'});
+ const sheet={appendRow:r=>logs.push([...r]),getLastRow:()=>logs.length,getRange:(r,c)=>({getValue:()=>logs[r-1][c-1],setValue:v=>logs[r-1][c-1]=v})};
+ const c={window:null,Date,Intl,Map,Set,console:{info(){}},Utilities:{formatDate:()=> '2026-10-30'},SpreadsheetApp:{flush(){}},normalizeEmpId_:v=>String(v||'').trim().toUpperCase(),normalizeId_:v=>String(v||''),p79DateOnly_:v=>String(v||'').slice(0,10),gcRequireSystemPermission_:()=>{if(denied)throw Error('denied');return {empId:'ADMIN',name:'主管'};},scheduleReadEditLock_:()=>lease?{}:null,getScheduleSyncRevision_:()=> 'S',getLeaveSyncRevision_:()=> 'L',getEmployeeAuthRevision_:()=> 'E',getSyncRevision_:()=> 'A',getAttendanceDeltaSeq_:()=>late&&++seqCalls>1?'2':'1',p79GetEmployeeMasterCached_:()=>people,p79CanReadScopedEmployee_:()=>true,readScheduleMonthOnly_:()=>structuredClone(rows),getDeletedRecordIds_:()=>({}),readAttendanceMonthRecords_:()=>punches,p79ReadAttendanceMainDirect_:()=>({records:[]}),p79ListPendingPunchRecords_:()=>[],p79ReadLeaveCoverAssignments_:()=>[],SHEET_LEAVE:'LEAVE',readLeaveRecords_:()=>[],ensureSheet_:()=>sheet,syncSchedules_:(ss,data)=>{writes++;rows=structuredClone(data.schedules);},touchScheduleSyncRevision_(){},P79_OT_HISTORY_ACTOR_:null};
+ c.window=c;vm.createContext(c);for(const f of ['attendance/v6-engine.js','assets/port79-rest-attendance.js','assets/port79-planned-rest-reconciliation.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c);c.P79_PLANNED_REST_SHARED_=c;vm.runInContext(fs.readFileSync('backend/planned-rest-attendance.gs','utf8'),c);
+ return{run:()=>c.p79ConfirmAttendanceDayAndReconcile_({getSheetByName:()=>null},{date,expectedRevision:revision?'stale':'S:L:E:'+month,requestId:'ATTCONF-1234567890-test',token:'TEST'}),get rows(){return rows;},get writes(){return writes;},logs};
+}
+let f=fixture(),r=f.run();a.equal(r.cancelled,4);a.equal(r.punchReview,1);a.equal(r.approvedReview,1);a.equal(f.writes,1);a.equal(f.logs[0][4],'COMMITTED');
+for(let i=0;i<4;i++)a.equal(f.rows[i].schedule[date],['例','休','國','颱'][i]);
+a.equal(f.rows[4].schedule.__meta[date].overtimeReport.actualMinutes,480,'official pair clipped to declared overtime interval');a.equal(f.rows[4].schedule.__meta[date].overtimeReport.planned,true,'attendance does not invent approval');a.equal(f.rows[5].schedule.__meta[date].overtimeReport.attendanceReview,'打卡待核');a(f.rows[6].schedule.__meta[date].overtimeReport);a(f.rows[7].schedule.__meta[date].overtimeReport,'ordinary day report kept');
+a.equal(f.run().cancelled,0,'repeat confirmation cannot cancel same report twice');
+for(const opt of [{lease:true},{denied:true},{revision:true},{invalid:true},{late:true}]){f=fixture(opt);a.throws(f.run);a.equal(f.writes,0);a.equal(f.logs.length,0,'failed preflight cannot record completed confirmation');}
+console.log('PASS GAS adapter official reads, exact hours, no automatic approval, all original categories, partial/approved/ordinary safeguards, lock/auth/revision/time errors, concurrent punches and confirmation audit readback');

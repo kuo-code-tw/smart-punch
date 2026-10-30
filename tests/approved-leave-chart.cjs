@@ -1,0 +1,11 @@
+'use strict';
+const a=require('node:assert/strict'),fs=require('node:fs'),api=require('../assets/port79-approved-leave-summary.js');
+const employees=[{empId:'E1',jobTitle:'AQC',dept:'一'},{empId:'E2',jobTitle:'指揮手',dept:'二'}];
+const row=(id,more={})=>({id,empId:'E1',status:'已核准',startDate:'2026-10-01',endDate:'2026-10-01',days:1,...more});
+const leaves=[row('A'),row('A'),row('HALF',{days:.5,empId:'E2'}),row('CROSS',{startDate:'2026-09-30',endDate:'2026-10-02',days:3}),row('PENDING',{status:'待審核'}),row('CANCEL',{status:'已取消'}),row('DEL',{deleted:true}),row('OTHER',{startDate:'2026-11-01',endDate:'2026-11-01'}),row('DAILY',{empId:'E2',startDate:'2026-09-30',endDate:'2026-10-01',days:1.5,approvedDailyDays:{'2026-09-30':1,'2026-10-01':.5}})];
+let report=api.aggregate({employees,leaveRecords:leaves,month:'2026-10'});a.deepEqual(report.rows,[{title:'AQC',days:3},{title:'指揮手',days:1}]);a.equal(report.issues.length,0);
+report=api.aggregate({employees,month:'2026-10',leaveRecords:[row('AMB',{startDate:'2026-09-30',endDate:'2026-10-01',days:.5}),row('STALE',{updatedAt:'2026-10-01'}),row('STALE',{status:'已取消',updatedAt:'2026-10-02'}),row('CONFLICT'),row('CONFLICT',{days:.5})]});a.equal(report.rows.length,0);a.equal(report.issues.length,2,'ambiguous allocation and duplicate versions are not guessed');
+a.equal(api.aggregate({employees,leaveRecords:leaves,month:'2026-09'}).rows.find(r=>r.title==='AQC').days,1);
+const html=fs.readFileSync('index.html','utf8'),js=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');a(html.includes('id="p79DashAttendancePages"'));for(const name of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])a(html.includes('id="'+name+'"'));
+a(js.includes("attendancePage=0;attendanceReport=null;leaveReport=null"),'month reset clears both old models and defaults to page one');a(js.includes('attendanceReport.weeklyPeople'),'first page uses unchanged attendance values');
+console.log('PASS approved only, deduplicated, cancelled/deleted excluded, formal HR titles, cross-month full/half daily allocations, half days, month refresh and page controls');

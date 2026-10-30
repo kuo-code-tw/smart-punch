@@ -9,6 +9,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=(v,n=0)=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:n,minimumFractionDigits:n}):'—';
 const badge=i=>'<span class="p79r-rank rank-'+i+'">'+i+'</span>';
 const detailBtn=()=>d.getElementById('cardEfficiency')?.click();
+let attendancePage=0,attendanceReport=null,leaveReport=null,attendanceMonth='';
 let peopleGroup='ALL',peopleReport=null,groupRoster=null,groupRosterMonth='';
 function renderPeople(){
  const table=$('p79DashPeopleRanking'),model=g.P79MonthlyDashboard;if(!table||!model)return;
@@ -33,7 +34,7 @@ function choosePeopleGroup(group){
  renderPeople();
 }
 function empty(id,text){const e=$(id);if(e)e.innerHTML='<div class="p79r-empty">'+esc(text)+'</div>'}
-function svgChart(id,values,labels,rates){
+function svgChart(id,values,labels,rates,label='本月各週出勤人數'){
  const el=$(id);if(!el)return;
  if(!values.length){empty(id,'這個月份尚無可繪製的資料');return}
  const w=480,h=190,left=38,right=rates?32:12,top=20,bottom=30,pw=w-left-right,ph=h-top-bottom;
@@ -41,9 +42,9 @@ function svgChart(id,values,labels,rates){
  const rateMax=Math.max(40,...(rates||[]).filter(Number.isFinite)),gap=pw/values.length,bw=Math.max(2,Math.min(34,gap*.65));
  let grid='',bars='',points=[];
  for(let i=0;i<=4;i++){const y=top+ph-i*ph/4;grid+='<path d="M'+left+' '+y+'H'+(w-right)+'" class="p79r-gridline"/><text x="'+(left-7)+'" y="'+(y+4)+'" text-anchor="end">'+fmt(ceiling*i/4)+'</text>';if(rates)grid+='<text x="'+(w-right+7)+'" y="'+(y+4)+'">'+fmt(rateMax*i/4)+'</text>'}
- values.forEach((v,i)=>{const x=left+gap*(i+.5),bh=v/ceiling*ph;bars+='<rect x="'+(x-bw/2)+'" y="'+(top+ph-bh)+'" width="'+bw+'" height="'+bh+'" rx="'+Math.min(5,bw/5)+'" fill="url(#'+id+'Gradient)"><title>'+esc(labels[i])+': '+fmt(v)+'</title></rect>';if(values.length<=6)bars+='<text x="'+x+'" y="'+(top+ph-bh-7)+'" text-anchor="middle" class="p79r-bar-number">'+fmt(v)+'</text>';if(values.length<=6||i===0||i===values.length-1||(i+1)%5===0)bars+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+esc(labels[i])+'</text>';if(rates&&Number.isFinite(rates[i]))points.push([x,top+ph-rates[i]/rateMax*ph]);});
+ values.forEach((v,i)=>{const x=left+gap*(i+.5),bh=v/ceiling*ph;bars+='<rect x="'+(x-bw/2)+'" y="'+(top+ph-bh)+'" width="'+bw+'" height="'+bh+'" rx="'+Math.min(5,bw/5)+'" fill="url(#'+id+'Gradient)"><title>'+esc(labels[i])+': '+fmt(v,Number.isInteger(v)?0:2)+'</title></rect>';if(values.length<=6)bars+='<text x="'+x+'" y="'+(top+ph-bh-7)+'" text-anchor="middle" class="p79r-bar-number">'+fmt(v,Number.isInteger(v)?0:2)+'</text>';if(values.length<=6||i===0||i===values.length-1||(i+1)%5===0)bars+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+esc(labels[i])+'</text>';if(rates&&Number.isFinite(rates[i]))points.push([x,top+ph-rates[i]/rateMax*ph]);});
  const line=points.length?'<polyline points="'+points.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#12b88e" stroke-width="2.5"/>'+points.map(p=>'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.2" fill="white" stroke="#12b88e" stroke-width="2"/>').join(''):'';
- el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(id==='p79DashShipBars'?'依船舶完工日統計的本月作業量與效率':'本月各週出勤人數')+'"><defs><linearGradient id="'+id+'Gradient" x2="0" y2="1"><stop stop-color="#5baaff"/><stop offset="1" stop-color="#1684ff"/></linearGradient></defs>'+grid+bars+line+'</svg>';
+ el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(id==='p79DashShipBars'?'依船舶完工日統計的本月作業量與效率':label)+'"><defs><linearGradient id="'+id+'Gradient" x2="0" y2="1"><stop stop-color="#5baaff"/><stop offset="1" stop-color="#1684ff"/></linearGradient></defs>'+grid+bars+line+'</svg>';
 }
 function weeklyChart(report){
  const el=$('p79DashShipBars'),caption=el?.closest('article')?.querySelector('.p79d-panel-title>span');if(!el)return;
@@ -82,8 +83,23 @@ function attendance(a,ym){
  $('p79DashAttendancePeriod').textContent=current?'依今日打卡':'依所選月份';
  $('p79DashDonut').style.setProperty('--p79d-donut-angle',(total?100*on/total:0)+'%');
  $('p79DashPunchLegend').innerHTML=current?'<div><i></i>目前在崗 <b>'+fmt(a.todayOnDuty)+' 人</b></div><div><i></i>已簽退 <b>'+fmt(Math.max(0,a.todayCount-a.todayOnDuty))+' 人</b></div><small>依今日上班卡與最新打卡狀態</small>':'<div><i></i>上班卡 <b>'+fmt(a.punchIn)+' 筆</b></div><div><i></i>下班卡 <b>'+fmt(a.punchOut)+' 筆</b></div><small>打卡事件分布，非出勤率</small>';
- svgChart('p79DashAttendanceBars',a.weeklyPeople,a.weeklyPeople.map((x,i)=>'第'+(i+1)+'週'));
+ attendanceReport=a;attendanceMonth=ym;renderAttendancePage();
 }
+function renderAttendancePage(){
+ const title=$('p79DashAttendanceChartTitle');if(!title)return;
+ title.innerHTML='<span class="p79r-panel-mark">↥</span>'+(attendancePage?'各職稱當月請假天數':'本月出勤人數趨勢');
+ $('p79DashChartPage').textContent='第'+(attendancePage+1)+'頁／共2頁';
+ $('p79DashChartPrevious').disabled=attendancePage===0;$('p79DashChartNext').disabled=attendancePage===1;
+ const el=$('p79DashAttendanceBars');el.classList.toggle('p79r-leave-chart',attendancePage===1);
+ if(!attendancePage){if(attendanceReport)svgChart(el.id,attendanceReport.weeklyPeople,attendanceReport.weeklyPeople.map((x,i)=>'第'+(i+1)+'週'));else empty(el.id,'正在讀取考勤資料…');return;}
+ if(!leaveReport||leaveReport.month!==attendanceMonth){empty(el.id,'正在讀取正式核准請假與人資職稱…');return;}
+ if(leaveReport.error){empty(el.id,leaveReport.error);return;}
+ const rows=leaveReport.rows,caption=leaveReport.issues.length?'（'+leaveReport.issues.length+' 筆資料待核，未計入）':'';
+ if(!rows.length){empty(el.id,'本月無可核對的核准請假'+caption);return;}
+ const max=Math.max(1,...rows.map(r=>r.days));
+ el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+'各職稱當月核准請假天數'+caption)+'">'+rows.map(r=>'<div class="p79r-leave-row"><span title="'+esc(r.title)+'">'+esc(r.title)+'</span><div><i style="width:'+r.days/max*100+'%"></i></div><b>'+fmt(r.days,Number.isInteger(r.days)?0:2)+' 天</b></div>').join('')+(caption?'<small>'+esc(caption)+'</small>':'')+'</div>';
+}
+function setLeaveReport(report){leaveReport=report;attendanceMonth=report.month;renderAttendancePage();}
 function chrome(){
  if(!d.body.classList.contains('p79-workspace')||!$('p79Dashboard'))return;
  const intro=d.querySelector('.p79-modern-home-intro');if(!intro||!intro.querySelector('.p79-hero-greeting')||intro.dataset.referenceReady)return;
@@ -97,6 +113,8 @@ function chrome(){
 }
 function init(){
  if(!$('p79Dashboard'))return;
+ $('p79DashChartPrevious')?.addEventListener('click',()=>{attendancePage=0;renderAttendancePage();});
+ $('p79DashChartNext')?.addEventListener('click',()=>{attendancePage=1;renderAttendancePage();});
  $('p79DashPeopleGroupFilters')?.addEventListener('click',event=>{
   const btn=event.target.closest('button[data-people-group]');
   if(btn)choosePeopleGroup(btn.dataset.peopleGroup);
@@ -106,7 +124,7 @@ function init(){
  d.querySelectorAll('.p79d-panel-title>b').forEach(e=>{e.textContent=e.textContent.replace(/^[▤▥◉]\s*/, '');e.insertAdjacentHTML('afterbegin','<span class="p79r-panel-mark">↥</span>')});
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
-function reset(){peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))empty('p79DashVesselNotices','正在核對本月資料…');if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
-g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup};
+function reset(){attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))empty('p79DashVesselNotices','正在核對本月資料…');if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setLeaveReport};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);

@@ -38,7 +38,7 @@ for(const marker of [{type:'substitute'},{overtimeReport:{id:'SUB',category:'代
 }
 const evidence={attendanceEvidence:{complete:true,days:{[emp.id+'|'+dates[23]]:{state:'rest'}}}};
 sub=api.summary(emp,substituteRoster,substituteRoster.__meta,month,evidence,'');
-assert.equal(sub.off.休,1,'whole no-card substitution counts once as actual rest');assert.equal(sub.off.休+sub.reserved.休,5,'other scheduled rests retain quota while attendance is unknown');assert.equal(sub.remaining.休,0);
+assert.equal(sub.off.休,0,'no-card substitution cannot silently become rest');assert.equal(sub.off.休+sub.reserved.休,4,'only original scheduled rests retain quota while attendance is unknown');assert.equal(sub.remaining.休,1);
 assert.equal(c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{restCategory:'例',restAllocationSource:'manual'}},month).unresolved.length,3,'manual working-day category without a formal report does not consume quota');
 assert.equal(c.p79AllocateRestMonth(substituteRoster,{[dates[23]]:{...stale,overtimeReport:{id:'REST',category:'例'}}},month).meta[dates[23]].overtimeReport.id,'REST','preserve a real rest declaration');
 console.log('PASS legacy substitute rest metadata: numeric summary, no double deduction, immutable assignment, no-card rest, genuine conflicts retained');
