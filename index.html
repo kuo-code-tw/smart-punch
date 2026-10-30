@@ -336,11 +336,66 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
         <div>
           <div class="p79-modern-home-eyebrow">79 PORT · SMART OPERATIONS</div>
-          <h2>智慧碼頭管理工作台</h2>
-          <p>考勤、請假、排班、船舶、工時、人資與歷史資料集中管理。<br>沿用原有功能與權限，選擇下方模組即可進入工作。</p>
+          <h2>79號碼頭 船舶作業 × 考勤人力 智慧管理中心</h2>
+          <p>上方船舶月作業，下方考勤人力。<br>原資料庫、歷史資料與員工刷卡維持不變。</p>
         </div>
         <div class="p79-modern-home-ship" aria-hidden="true">🚢<small>人性化 · 科技化 · 更好操作</small></div>
       </section>
+      <section id="p79Dashboard" class="p79d-dashboard" aria-label="本月船舶與考勤整合資訊">
+  <div class="p79d-dashboard-controls">
+    <div><strong>🚢 船舶作業 × 考勤人力管理中心</strong><small>上方船舶、下方考勤｜以完成月份／考勤月份分別顯示資料</small></div>
+    <div class="p79d-dashboard-actions">
+      <label for="p79DashMonth">查詢月份</label><input type="month" id="p79DashMonth" aria-label="船舶與考勤統計月份">
+      <button type="button" id="p79DashRefresh">↻ 重新讀取本月</button>
+    </div>
+  </div>
+  <div id="p79DashMessage" class="p79d-message" role="status" aria-live="polite">登入管理介面後，會依權限唯讀載入月份資料；尚未取得資料不顯示假數字。</div>
+  <section class="p79d-section p79d-vessel" aria-labelledby="p79dShipHeading">
+    <div class="p79d-section-head"><h2 id="p79dShipHeading">🚢 船舶作業總覽 <span id="p79DashMonthLabel"></span></h2>
+      <button type="button" onclick="launchSystem('efficiency')">船舶系統詳情 ›</button></div>
+    <div class="p79d-kpis">
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">🚢</div><div><span>本月作業船舶</span><strong id="p79DashShipCount">—</strong><small>艘</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">▥</div><div><span>本月作業量</span><strong id="p79DashMoves">—</strong><small>Moves</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">▣</div><div><span>本月請款櫃數</span><strong id="p79DashContainers">—</strong><small>櫃</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">↗</div><div><span>本月平均船舶效率</span><strong id="p79DashGph">—</strong><small>GPH</small></div></div>
+    </div>
+    <div class="p79d-panels p79d-ship-panels">
+      <article class="p79d-panel p79d-trend"><div class="p79d-panel-title"><b>▥ 本月船邊作業量比較</b><span>依船舶作業量排序</span></div><div id="p79DashShipBars" class="p79d-bars p79d-ship-bars">等待載入</div></article>
+      <article class="p79d-panel p79d-ranking"><div class="p79d-panel-title"><b>▤ 本月主要船舶作業排行</b><span>依作業量</span></div>
+        <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>船名</th><th>工作編號</th><th>Moves</th><th>GPH</th></tr></thead>
+          <tbody id="p79DashShipRanking"><tr><td colspan="5">等待月份資料</td></tr></tbody></table></div></article>
+      <article class="p79d-panel p79d-warnings"><div class="p79d-panel-title"><b>⚠ 船舶 × 人力對照</b><span>待核實項目</span></div>
+        <div class="p79d-warning">◉ 作業數量與船舶效率：僅讀取原始月份資料，不重新寫入。</div>
+        <div class="p79d-warning">◉ 員工打卡不代表已分派到特定船舶，需按工作編號與派工資料核對。</div>
+        <div class="p79d-warning">◉ 資料不足時保留空值，避免把缺漏誤顯示為零。</div>
+        <button class="p79d-plain-link" type="button" onclick="launchSystem('efficiency')">查看原船舶明細 ›</button>
+      </article>
+    </div>
+    <p id="p79DashShipSource" class="p79d-source">船舶統計待讀取；每月資料由原歷史資料功能提供。</p>
+  </section>
+  <section class="p79d-section p79d-attendance" aria-labelledby="p79dAttendanceHeading">
+    <div class="p79d-section-head"><h2 id="p79dAttendanceHeading">👥 考勤人力總覽 <span id="p79DashMonthLabel2"></span></h2>
+      <button type="button" onclick="launchSystem('attendance')">考勤系統詳情 ›</button></div>
+    <div class="p79d-kpis">
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span>本月有打卡人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月考勤紀錄</span><strong id="p79DashPunchRecords">—</strong><small>筆</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月人員出勤日數</span><strong id="p79DashPersonDays">—</strong><small>人日（依打卡紀錄）</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">✓</div><div><span>本月上班打卡紀錄</span><strong id="p79DashPunchIns">—</strong><small>筆</small></div></div>
+    </div>
+    <div class="p79d-panels p79d-attendance-panels">
+      <article class="p79d-panel"><div class="p79d-panel-title"><b>◉ 本月考勤事件類型</b><span>非出勤率</span></div>
+        <div class="p79d-donut-layout"><div id="p79DashDonut" class="p79d-donut"><div><small>上班卡占比</small><strong id="p79DashDonutRate">—</strong></div></div>
+          <div class="p79d-donut-legend" id="p79DashPunchLegend">尚未讀取考勤資料</div></div></article>
+      <article class="p79d-panel"><div class="p79d-panel-title"><b>▥ 本月各週考勤紀錄</b><span>依打卡日期統計</span></div><div class="p79d-bars" id="p79DashAttendanceBars">等待載入</div></article>
+      <article class="p79d-panel"><div class="p79d-panel-title"><b>▤ 本月個人作業效率</b><span>依船舶作業明細</span></div>
+        <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>人員</th><th>作業量</th><th>工時</th><th>櫃/時</th></tr></thead>
+          <tbody id="p79DashPeopleRanking"><tr><td colspan="5">等待月份資料</td></tr></tbody></table></div></article>
+    </div>
+    <p id="p79DashAttendanceSource" class="p79d-source">考勤統計待讀取；不改變員工刷卡上下班。</p>
+    <p id="p79DashPersonSource" class="p79d-source">個人效率只對有工作量與有效工時的作業明細計算，避免錯誤推估。</p>
+  </section>
+  <div class="p79d-footnote"><span>🔒 員工上下班刷卡功能維持原狀</span><a href="./history-data/">🗄️ 歷史資料庫</a><a href="./aqc-efficiency/">🚢 船舶明細</a></div>
+</section>
       <div class="p79-modern-section-heading"><strong>▦ 功能模組與歷史資料庫</strong><small>依原有帳號權限顯示可用的系統</small></div>
       <div class="p79-modern-search-row">
         <label for="p79ModernModuleSearch">🔎 搜尋管理功能</label>
@@ -1486,5 +1541,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./attendance/v6-engine.js?v=20261029-dashboard-shared"></script>
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
 <script src="./assets/port79-home-dashboard.js?v=20261030-integrated-template-v9"></script>
+<script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261030-monthly-top-bottom-v1"></script>
 </body>
 </html>
