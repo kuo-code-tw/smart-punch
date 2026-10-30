@@ -378,7 +378,14 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <div class="p79d-donut-layout"><div id="p79DashDonut" class="p79d-donut"><div><small id="p79DashDonutLabel">今日出勤</small><strong id="p79DashDonutRate">—</strong></div></div>
           <div class="p79d-donut-legend" id="p79DashPunchLegend">尚未讀取考勤資料</div><span id="p79DashAttendancePeriod"></span></div></div></article>
       <article class="p79d-panel"><div class="p79d-panel-title"><b>本月出勤人數趨勢</b><span>每週不重複人數</span></div><div class="p79d-bars" id="p79DashAttendanceBars">等待載入</div></article>
-      <article class="p79d-panel"><div class="p79d-panel-title"><b>本月人員效率排行</b><span>Moves／人時</span></div>
+      <article class="p79d-panel p79r-people-panel"><div class="p79d-panel-title"><b>本月人員效率排行</b><span>Moves／人時</span></div>
+        <div class="p79r-group-filters" id="p79DashPeopleGroupFilters" role="group" aria-label="依組別篩選本月人員效率">
+          <button type="button" data-people-group="ALL" class="active" aria-pressed="true">全部</button>
+          <button type="button" data-people-group="A組" aria-pressed="false">A組</button>
+          <button type="button" data-people-group="B組" aria-pressed="false">B組</button>
+          <button type="button" data-people-group="C組" aria-pressed="false">C組</button>
+          <button type="button" data-people-group="D組" aria-pressed="false">D組</button>
+        </div>
         <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>員工姓名</th><th>所屬單位</th><th>作業量</th><th>效率</th></tr></thead>
           <tbody id="p79DashPeopleRanking"><tr><td colspan="5">等待月份資料</td></tr></tbody></table></div></article>
     </div>
@@ -1534,9 +1541,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
 <script src="./assets/port79-home-dashboard.js?v=20261030-single-monthly-v2"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261030-weekly-import-v1"></script>
-<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-inline-current-v1">
-<script src="./assets/port79-reference-dashboard.js?v=20261030-weekly-import-v1"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261030-group-efficiency-v1"></script>
+<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-group-efficiency-v1">
+<script src="./assets/port79-reference-dashboard.js?v=20261030-group-efficiency-v1"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 </body>
 </html>
