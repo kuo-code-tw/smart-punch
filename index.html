@@ -374,9 +374,9 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div class="p79d-kpi"><div class="p79d-kpi-icon">✓</div><div><span>本月打卡待核</span><strong id="p79DashAnomalies">—</strong><small>班次</small></div></div>
     </div>
     <div class="p79d-panels p79d-attendance-panels">
-      <article class="p79d-panel"><div class="p79d-panel-title"><b>今日出勤狀況</b><span id="p79DashAttendancePeriod">依今日打卡</span></div>
+      <article class="p79d-panel p79r-current-shift-card"><div class="p79d-panel-title"><b>目前班別人員</b><span id="p79CurrentShiftPeriod">依目前班別</span></div><div id="p79CurrentShiftList" class="p79r-current-shift-list" role="region" aria-label="目前班別人員名單" tabindex="0">正在讀取目前班別名單…</div><div hidden>
         <div class="p79d-donut-layout"><div id="p79DashDonut" class="p79d-donut"><div><small id="p79DashDonutLabel">今日出勤</small><strong id="p79DashDonutRate">—</strong></div></div>
-          <div class="p79d-donut-legend" id="p79DashPunchLegend">尚未讀取考勤資料</div></div></article>
+          <div class="p79d-donut-legend" id="p79DashPunchLegend">尚未讀取考勤資料</div><span id="p79DashAttendancePeriod"></span></div></div></article>
       <article class="p79d-panel"><div class="p79d-panel-title"><b>本月出勤人數趨勢</b><span>每週不重複人數</span></div><div class="p79d-bars" id="p79DashAttendanceBars">等待載入</div></article>
       <article class="p79d-panel"><div class="p79d-panel-title"><b>本月人員效率排行</b><span>Moves／人時</span></div>
         <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>員工姓名</th><th>所屬單位</th><th>作業量</th><th>效率</th></tr></thead>
@@ -1535,7 +1535,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-home-dashboard.js?v=20261030-single-monthly-v2"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261030-weekly-import-v1"></script>
-<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-reference-v2">
+<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-inline-current-v1">
 <script src="./assets/port79-reference-dashboard.js?v=20261030-weekly-import-v1"></script>
+<script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 </body>
 </html>
