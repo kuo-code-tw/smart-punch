@@ -60,7 +60,13 @@ function latestImportedVessels(vessels,limit=5){
 }
 function analyzeVessels(data){
  if(!data||!Array.isArray(data.shipMasters))throw Error('船舶月份資料不完整');
- const masters=data.shipMasters,details=Array.isArray(data.records)?data.records:[];
+ const versionView=root.P79VesselVersionView||
+  (typeof module==='object'&&module.exports&&typeof require==='function'?require('./port79-vessel-versions.js'):null);
+ const active=versionView?.collapse?.(data.shipMasters);
+ const masters=active?.rows||data.shipMasters;
+ const excluded=new Set(active?.excludedWorkingNos||[]);
+ const details=(Array.isArray(data.records)?data.records:[]).filter(r=>
+  !excluded.has(String(r?.workingNo||'').trim().toUpperCase()));
  let totalMoves=0,validMoves=0,containers=0,validContainers=0,weight=0,weighted=0,rateSum=0,rateCount=0;
  const vessels=masters.map(m=>{
   const moves=numberFrom(m,['totalMoves','sheetTotalMoves'])??(
