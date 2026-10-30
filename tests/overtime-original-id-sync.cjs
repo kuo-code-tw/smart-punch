@@ -35,6 +35,9 @@ const input={date,empId:'450',report:old,review,rules,inId:'IN450',outId:'OUT450
  assert.equal(mock.P79OvertimePeriodSync.plan({...input,report:{...old,approvedBy:'BOSS'}}),null,'legacy endpoint cannot erase approval history');
  assert.equal(mock.P79OvertimePeriodSync.plan({...input,report:{...old,declaredHours:4}}),null,'hours must not be changed');
  assert.equal(mock.P79OvertimePeriodSync.plan({...input,outId:''}),null,'both recorded punch identities are required');
+ const passive=await mock.P79OvertimePeriodSync.sync(input);
+ assert.equal(passive.skipped,true);assert.equal(postCount,0);assert.equal(getCount,0,'passive viewing cannot invoke the writer');
+ input.userInitiated=true;
  const first=await mock.P79OvertimePeriodSync.sync(input);
  assert.equal(first.ok,true,JSON.stringify(first));
  assert.equal(postCount,1,'one update, no new report');
@@ -45,8 +48,8 @@ const input={date,empId:'450',report:old,review,rules,inId:'IN450',outId:'OUT450
  assert(getCount>=2,'cloud reread must verify persisted report');
  const attendance=fs.readFileSync('attendance/index.html','utf8'),work=fs.readFileSync('work-hours/index.html','utf8');
  for(const html of [attendance,work]){
-  assert(html.includes('port79-overtime-period-sync.js?v='),'every relevant screen loads shared sync');
-  assert(html.includes('P79OvertimePeriodSync.sync('),'every relevant screen invokes sync for confirmed punch');
+  assert(!html.includes('port79-overtime-period-sync.js?v='),'view screens do not load the automatic writer');
+  assert(!html.includes('P79OvertimePeriodSync.sync('),'rendering never invokes cloud amendments');
  }
  assert(attendance.includes('暫估／未簽退'));
  assert(work.includes('p79QueueConfirmedRosterRecheck('));

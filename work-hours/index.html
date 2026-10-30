@@ -5,10 +5,10 @@
 <script src="../assets/port79-overtime-report.js?v=20261029-auto-match-shift-all-staff-v1&role20261026=1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
-<script src="../assets/port79-overtime-period-sync.js?v=20261027-original-id-v1"></script>
+
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
-<script src="../assets/port79-overtime-reason.js?v=20261028-restored-report-id-v3"></script>
+<script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
@@ -1483,7 +1483,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <div class="text-xs font-black text-slate-700 dark:text-slate-200">近期班別</div>
                         <button id="empScheduleToggleBtn" type="button" onclick="toggleEmployeeMonthSchedule()" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-[11px] font-bold hover:bg-slate-200 dark:hover:bg-slate-600">查看整月班表</button>
                     </div>
-                    <div id="empScheduleUpcoming" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div id="empScheduleUpcoming" class="grid grid-co-cols-2 gap-2">
                         <div class="sm:col-span-2 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-5 text-center text-xs text-slate-400">請先登入員工以查看班表</div>
                     </div>
 
@@ -1877,7 +1877,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 <div class="p-3 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveDeptFilter" onchange="onLeaveDeptFilterChange(true, true)" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
-                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveJobTitleFilter" onchange="onLeaveJobTitleFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
+                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveJobTitleFilter" onchange="onLeaveJobTitleFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 da text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div class="min-w-[150px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">員工</label><select id="leaveEmpFilter" onchange="onLeaveEmployeeFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部員工</option></select></div>
                         <div class="min-w-[120px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">狀態</label><select id="leaveStatusFilter" onchange="onLeaveStatusFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部狀態</option><option value="待審核">待審核</option><option value="已核准">已核准</option><option value="已駁回">已駁回</option></select></div>
                         <div class="min-w-[190px] flex-1 relative"><label class="block text-[10px] font-semibold text-slate-500 mb-1">日期範圍</label><details id="leaveFilterDateRangePicker" class="relative"><summary id="leaveFilterDateRangeSummary" class="list-none cursor-pointer w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold">全部日期</summary><div class="absolute right-0 top-full mt-2 z-[80] min-w-[340px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 shadow-2xl"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] font-semibold text-slate-500 mb-1">開始日期</label><input id="leaveStartFilter" type="date" onchange="onLeaveStartFilterChange();updateAttendanceLeaveRangeSummary()" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div><div><label class="block text-[10px] font-semibold text-slate-500 mb-1">結束日期</label><input id="leaveEndFilter" type="date" onchange="syncLeaveFilterRange('end');updateAttendanceLeaveRangeSummary();onLeaveDataScopeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div></div><div class="flex justify-end gap-2 mt-3"><button type="button" onclick="document.getElementById('leaveStartFilter').value='';document.getElementById('leaveEndFilter').value='';updateAttendanceLeaveRangeSummary();onLeaveDataScopeChange()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-xs font-bold">清除日期</button><button type="button" onclick="document.getElementById('leaveFilterDateRangePicker').removeAttribute('open')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">完成</button></div></div></details></div>
@@ -2347,8 +2347,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 <div>
                     <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 點選日期</label>
                     <div class="date-picker-row">
-                        <input type="date" id="addModalDateInput" onclick="openSystemDatePicker('addModalDateInput')" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold cursor-pointer">
-                        <button type="button" class="date-picker-open-btn bg-indigo-600 text-white" onclick="openSystemDatePicker('addModalDateInput')" aria-label="開啟日期選擇">📅</button>
+                        <input type="date" id="addModalDateInput" onclick="openSystemDatePicker('addModalDateInput')" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold cu          <button type="button" class="date-picker-open-btn bg-indigo-600 text-white" onclick="openSystemDatePicker('addModalDateInput')" aria-label="開啟日期選擇">📅</button>
                     </div>
                 </div>
                 <div>
@@ -2940,7 +2939,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                                 sessionStorage.removeItem('port79_gc_superadmin_token');
                             }
 
-                            // 若目前已進入後台，同步更新畫面上的管理員名稱/角色。
+                   // 若目前已進入後台，同步更新畫面上的管理員名稱/角色。
                             if (isAdminLoggedIn) restoreAdminSession();
                         }
                     } catch (e) {
@@ -4718,7 +4717,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             return sendCloudPayload(payload, false)
             .then(data => {
                 if (data?.ok) {
-                    // 單筆新增/修改/刪除本頁已經立即套用，可直接前進 cursor；
+        // 單筆新增/修改/刪除本頁已經立即套用，可直接前進 cursor；
                     // syncRecords 是整批 canonical 變更，必須保留 reset 事件讓下一輪 delta poll 做完整校正。
                     if (Number(data?.deltaSeq || 0) > 0 && ['addRecord','updateRecord','editRecord','deleteRecord'].includes(String(payload?.action || ''))) {
                         attendanceDeltaLastSeq = Math.max(attendanceDeltaLastSeq, Number(data.deltaSeq));
@@ -5588,7 +5587,7 @@ const now = new Date();
                     const tombId = String(item?.id || '').trim();
                     const tombEvent = String(item?.eventKey || '').trim();
                     if (tombId && now - savedAt <= ATTENDANCE_LOCAL_DELETE_ID_TTL_MS) return true;
-                    if (tombEvent && now - savedAt <= ATTENDANCE_LOCAL_DELETE_EVENT_TTL_MS) return true;
+                    if (tombEvenw - savedAt <= ATTENDANCE_LOCAL_DELETE_EVENT_TTL_MS) return true;
                     return false;
                 });
                 if (active.length !== rows.length) {
@@ -7387,7 +7386,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 return;
             }
             try {
-                const objectUrl = URL.createObjectURL(file);
+                const objectL.createObjectURL(file);
                 const image = new Image();
                 await new Promise((resolve, reject) => {
                     image.onload = resolve;
@@ -8171,7 +8170,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const fullId = String(emp.empId || '').trim().toUpperCase();
                 const company = getLeaveBalanceCompany(emp);
                 const used = Math.round(((Number(b.used) || 0) + info.newlyApproved) * 10) / 10;
-                totalRemaining += Number(info.effectiveRemaining) || 0;
+      alRemaining += Number(info.effectiveRemaining) || 0;
                 const remainingClass = Number(info.effectiveRemaining) > 0
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-rose-600 dark:text-rose-400';
@@ -9072,8 +9071,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const localEmp = employees.find(emp => String(emp.empId || '').trim().toUpperCase() === empId);
             if (localEmp) localEmp.deviceId = currentDeviceId;
             saveEmployees();
-            markFirstPunchVerifiedLocally(currentEmp);
-            savePersistentEmployeeSession(currentEmp);
+            markFirstPunchVerifiedLocally(currentEmp)       savePersistentEmployeeSession(currentEmp);
             return true;
         }
 
@@ -10008,7 +10006,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function refreshManualLeaveJobTitles() {
-            const company = document.getElementById('manualLeaveCompany')?.value || 'ALL';
+            const company = document.getElementBy('manualLeaveCompany')?.value || 'ALL';
             const dept = document.getElementById('manualLeaveDept')?.value || 'ALL';
             const jobSelect = document.getElementById('manualLeaveJobTitle');
             if (!jobSelect) return;
@@ -10805,7 +10803,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const byAttNo = sourceEmployees.filter(emp => normalizeAttendanceStatsAttNo(emp.attNo) === attNo);
                 if (byAttNo.length === 1) return byAttNo[0];
             }
-            const name = normalizeEmployeeLookupName(item?.name);
+         const name = normalizeEmployeeLookupName(item?.name);
             if (name) {
                 const byName = sourceEmployees.filter(emp => normalizeEmployeeLookupName(emp.name) === name);
                 if (byName.length === 1) return byName[0];
@@ -12398,7 +12396,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             if (!record && snapshot) {
                 const snapshotEventKey = getAttendanceImportEventKey(snapshot);
-                if (snapshotEventKey) {
+            if (snapshotEventKey) {
                     record = records.find(item => getAttendanceImportEventKey(item) === snapshotEventKey);
                 }
             }
@@ -13220,7 +13218,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
         }
         function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth='',force=false){
-            const token=currentPort79SsoToken();if(!token)return;
+            const token=currentPort79Sso);if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
             const selectedMonth=requestedMonth||(monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()));
             const months=selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
@@ -13427,17 +13425,7 @@ async function p79ExportOvertimeComparison(printMode){
                 date,roster:p79WorkOvertimeRoster(row.empId,date),report:row.overtimeReport||null,
                 start,end,attendanceIssue:row.timeCheckRequired===true,rules
             });
-            // Only complete punch pairs can amend an existing cloud report; keep the same report ID.
-            if(review.confirmed&&review.mismatch&&row.reportVerified&&row.overtimeReport?.id&&
-                row.clockIn?.id&&row.clockOut?.id&&!row.timeCheckRequired&&!p79WorkhoursIsEditing()&&p79CanReportOvertime()&&
-                window.P79OvertimePeriodSync?.sync){
-                window.P79OvertimePeriodSync.sync({
-                    empId:row.empId,date,report:row.overtimeReport,review,rules,
-                    inId:row.clockIn.id,outId:row.clockOut.id,token:currentPort79SsoToken(),
-                    url:getActiveGasUrl,
-                    onSynced:()=>p79QueueConfirmedRosterRecheck(date.slice(0,7))
-                });
-            }
+            // 閱覽僅顯示核對建議；只有使用者送出修改申報才可寫入。
             return review;
         }
         function p79OpenOvertimeChangeForRow(index){
@@ -14414,7 +14402,7 @@ function p79OvertimePeriodLabel(report){
                 const clockInCell = noPunchRest?'休息（整班無卡）':row.planned&&!row.clockIn?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
                 const clockOutCell = noPunchRest?'—':row.planned&&!row.clockOut?(row.clockIn?'尚未下班':'待出勤'):formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${row.overDailyLimit ? 'bg-rose-50/60 dark:bg-rose-950/10' : ''}">
-                    <td data-label="上班日期" class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtml(String(row.dateKey || '').replace(/-/g, '/'))}</td>
+                    <td data-label="上班日期" class="px-3 py-3 font-mono whitespace-nowrap">${escapeHtmlString(row.dateKey || '').replace(/-/g, '/'))}</td>
                     <td data-label="姓名" class="px-3 py-3 font-bold whitespace-nowrap">${escapeHtml(row.name)}</td>
                     <td data-label="部門" class="px-3 py-3">${escapeHtml(row.dept)}</td>
                     <td data-label="職稱" class="px-3 py-3">${escapeHtml(row.jobTitle)}</td>
@@ -15077,7 +15065,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
                 document.getElementById('empModalDept').value = sysConfig.departments.includes('第二事業處') ? '第二事業處' : sysConfig.departments[0];
                 updateEmployeeDeptDetailOptions('經理');
                 document.getElementById('empModalPhone').value = '';
-                document.getElementById('empModalStartDate').value = '';
+                document.getElementByModalStartDate').value = '';
                 document.getElementById('empModalBirthday').value = '';
                 document.getElementById('empModalPassword').value = 'password';
                 setEmployeePermissionFields({ adminRole: 'superadmin', monitorPermissions: [...ADMIN_MONITOR_OPTIONS], employeeListAccess: 'manage' });
@@ -15887,7 +15875,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
     let els=[];
     try{
       if(SYS==='schedule') els=[...document.querySelectorAll('[data-schedule-edit="1"]')];
-      else if(SYS==='hr') els=[...document.querySelectorAll('#addBtn,button[onclick*="openEditor"],button[onclick*="deleteEmployee"],button[onclick*="saveEmployee"],button[onclick*="clearSessionLogs"]')];
+      else if(SYS==='hr') els=[...document.querySelectorAll('#addBtn,button[onclick*="openEditor"],button[onclick*="deleteEmployee"],button[onclick*="savetton[onclick*="clearSessionLogs"]')];
       else if(SYS==='leave') els=[...document.querySelectorAll('#adminMode button[onclick*="approve"],#adminMode button[onclick*="reject"],#adminMode button[onclick*="delete"],#adminMode button[onclick*="updateLeave"]')];
       else if(SYS==='efficiency') els=[...document.querySelectorAll('#efficiencySaveBtn,button[onclick*="saveGroup"],button[onclick*="deleteGroup"],button[onclick*="saveRecord"],button[onclick*="deleteRecord"],button[onclick*="addMonthlyEditorRow"],button[onclick*="applyMonthlyEditorRows"]')];
       else if(SYS==='attendance') els=[...document.querySelectorAll('#viewAdmin button[onclick*="save"],#viewAdmin button[onclick*="delete"],#viewAdmin button[onclick*="edit"],#viewAdmin button[onclick*="add"],#viewAdmin button[onclick*="update"]')];
@@ -16754,8 +16742,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   // its revision before retrying; do not replay ambiguous network failures.
   if(response.ok&&result?.ok===false&&result?.retryable===true&&/雲端目前正在處理其他資料/.test(String(result.error||''))){
    if(lockRetry>=3)throw Error('雲端仍忙碌，未取得寫入鎖；本次修改尚未儲存。請重新開啟原申報核對。');
-   await new Promise(resolve=>setTimeout(resolve,750*(lockRetry+1)));
-   return p79SaveWorkOvertimeDraft(draft,null,lockRetry+1);
+   await new Promise(resolve=>setTimeout(resolve,750*(lockRetry+1))79SaveWorkOvertimeDraft(draft,null,lockRetry+1);
   }
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id||(draft.preventReplace&&result.report?.id!==draft.id))throw Error(result.error||'原申報身分或加班寫入尚未確認');
   window.P79Overtime?.verifySavedReport?.(draft,result);

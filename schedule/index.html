@@ -28,7 +28,7 @@
 
 <script src="../assets/port79-rest-allocation.js?v=20261028-rest-national-reconcile-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261021-no-punch-roster&rev=20261022-workflow"></script>
-<script src="../assets/port79-overtime-reason.js?v=20261028-restored-report-id-v3"></script>
+<script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261028-fresh-issues-v2&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261021-schedule-pending"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261028-short-attendance-shift-v2"></script>
@@ -1836,7 +1836,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       try{token=currentPort79SsoToken()}catch(e){}
       let clientId='';
       try{clientId=getScheduleClientId()}catch(e){}
-      return {token,clientId,canManage:canManageSchedule(),localLock:!!scheduleEditLockState.mine};
+      return {token,clientId,canManage:canManageSchedule(),localLock:!!scheduleEditLockStat.mine};
     }
     function p79DiagStatus(testId,msg,kind=''){
       const el=document.getElementById('p79DiagStatus-'+testId);
@@ -2783,7 +2783,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       { id: "AP1080059", name: "陳駿棋", role: "AQC", group: "不分組", lockType: "ROTATION" },
       { id: "AP1080060", name: "黃柏源", role: "AQC", group: "不分組", lockType: "ROTATION" },
       { id: "AP1080079", name: "單聖彭", role: "AQC", group: "不分組", lockType: "ROTATION" },
-      { id: "AP1080080", name: "劉高銘", role: "AQC", group: "不分組", lockType: "ROTATION" },
+      { id: "AP1080080",: "劉高銘", role: "AQC", group: "不分組", lockType: "ROTATION" },
       { id: "AP1090051", name: "張家旗", role: "AQC", group: "不分組", lockType: "ROTATION" },
       { id: "AP1090053", name: "王榮章", role: "AQC", group: "不分組", lockType: "ROTATION" },
       { id: "AP1100026", name: "張家誠", role: "AQC", group: "不分組", lockType: "ROTATION" },
@@ -4566,7 +4566,7 @@ function p79EmployeeDateEligible(emp,date) {
         schedules=p79PreserveHiddenScheduleRows(schedules,p79ScheduleCloudRows,yearMonth);
         schedules=p79PreserveLinkedScheduleDays(schedules,p79ScheduleCloudRows,yearMonth,
           (id,date,name)=>!!approvedLeaveForEmployee(id,date,name)||p79LeaveCoverOnDay(id,date).length>0);
-        schedules.filter(row=>editedIds.has(String(row.empId).trim().toUpperCase())).forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
+        schedules.filterw=>editedIds.has(String(row.empId).trim().toUpperCase())).forEach(row=>Object.entries(row.schedule.__meta||{}).forEach(([date,meta])=>{
           if(!meta?.overtimeType)return;
           try {
             p79BuildScheduleOvertimeMeta(meta,meta.type==='substitute'?'substitute':meta.overtimeType,
@@ -5442,7 +5442,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     function ensureSubstituteModal() {
-      if (document.getElementById('substitute-assignment-modal')) return;
+      if (ument.getElementById('substitute-assignment-modal')) return;
       const wrap = document.createElement('div');
       wrap.id = 'substitute-assignment-modal';
       wrap.className = 'hidden fixed inset-0 bg-slate-950/55 backdrop-blur-sm p-4 flex items-center justify-center';
@@ -6123,7 +6123,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         <button onclick="promptAddNewGroup()" class="px-3.5 py-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl border border-indigo-200 transition">
           <i class="fa-solid fa-plus-circle"></i> ➕ 新增組別
         </button>
-        <button onclick="promptDeleteGroup()" class="px-3.5 py-1.5 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl border border-rose-200 transition">
+        <button onclick="omptDeleteGroup()" class="px-3.5 py-1.5 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl border border-rose-200 transition">
           <i class="fa-solid fa-trash"></i> 🗑️ 刪除組別
         </button>
       `;
@@ -6809,7 +6809,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const typhoon=specialDates?.typhoon||new Set(p79TyphoonDates());
       if(typhoon.has(date))return '颱';
       const election=specialDates?.election||new Set(window.P79SpecialOvertime?.electionDates?.()||[]);
-      return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
+      return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?;
     }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
       if(p79ScheduleConfirmedOvertime(empId,date,shift))return false;
@@ -7638,7 +7638,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           '排班屬性': emp.lockType === 'FIXED_LOCKED' ? '固定鎖定' : '自動輪班'
         };
 
-        for (let d = 1; d <= totalDays; d++) {
+        for (let d = 1; d <= totlDays; d++) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
           row[String(d)]=selected.visibleCode;
@@ -8370,7 +8370,7 @@ window.P79ScheduleContinuationContext={
   const token=currentPort79SsoToken();if(!token)throw Error('請重新登入');
   const response=await scheduleLockFetch(GAS_URL+'?action=getScheduleDataSecure&month='+encodeURIComponent(month)+'&gcToken='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},25000);
   const text=await response.text();if(!response.ok||scheduleCloudLooksLikeGoogleHtml(text))throw Error('排班雲端讀取失敗，未使用空白資料繼續');
-  const data=JSON.parse(text);if(data.ok!==true||!Array.isArray(data.schedules)||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))throw Error(data.error||'排班資料未完整讀取');
+  const data=JSON.parse(text);if(data.ok!==true||!Array.isArray(data.schedues)||!Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments))throw Error(data.error||'排班資料未完整讀取');
   if(token!==currentPort79SsoToken())throw Error('登入身分已改變');return data;
  },
  people:source=>source.employees.filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN').map(e=>({...e,id:String(e.empId||'').trim().toUpperCase()})),

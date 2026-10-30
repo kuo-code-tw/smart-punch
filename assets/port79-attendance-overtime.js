@@ -117,9 +117,9 @@ function auditChanged(report,meta){
   Array.isArray(meta.overtimeRevisions)?meta.overtimeRevisions:
   Array.isArray(report?.amendments)?report.amendments:[];
  const verified=history.some(a=>a?.confirmed===true&&String(a.at||'').trim()&&String(a.actor||'').trim()&&(!a.reportId||String(a.reportId)===String(report?.id||'')));
- const modified=String(report?.modifiedAt||report?.updatedAt||'').trim();
+ const modified=String(report?.modifiedAt||'').trim();
  const created=String(report?.reportedAt||report?.createdAt||'').trim();
- return verified||!!String(report?.replacesReportId||'').trim()||!!(modified&&created&&modified!==created);
+ return verified||!!(String(report?.replacesReportId||'').trim()&&String(report.replacesReportId).trim()!==String(report?.id||'').trim())||!!(modified&&created&&modified!==created);
 }
 function overtimeDayIndicator(date,monthState){
  if(monthState?.ready!==true)return null;
@@ -212,7 +212,21 @@ function p79ReviewHash(value){
  for(let i=0;i<json.length;i++)hash=Math.imul(hash^json.charCodeAt(i),16777619);
  return (hash>>>0).toString(36);
 }
+function p79ReviewSemanticAudit(value){
+ if(Array.isArray(value))return value.map(p79ReviewSemanticAudit);
+ if(value&&typeof value==='object'){const out={};for(const key of Object.keys(value).sort())if(!['updatedAt','lastSyncedAt','syncedAt','lastReadAt'].includes(key))out[key]=p79ReviewSemanticAudit(value[key]);return out;}
+ return value;
+}
+function p79ReviewViewerScope(state){
+ try{const session=JSON.parse(g.sessionStorage?.getItem('port79_user_session')||'null');if(session?.empId)return p79ReviewStableObject({empId:id(session.empId),role:session.adminRole||session.role||'',scope:session.dataScope||{},permissions:session.systemPermissions||{},fine:session.finePermissions||{}});}catch(_){}
+ return String(state.token||'');
+}
 function reviewFingerprint(date,state){
+ if(state?.ready!==true)return '';
+ const list=p79ReviewSemanticAudit(p79ReviewStableAuditRows(date,state));
+ return 'v4-'+list.length+'-'+p79ReviewHash([p79ReviewViewerScope(state),list]);
+}
+function p79PriorStableReviewFingerprint(date,state){
  if(state?.ready!==true)return '';
  const list=p79ReviewStableAuditRows(date,state);
  return 'v3-'+list.length+'-'+p79ReviewHash([String(state.token||''),list]);
@@ -243,7 +257,7 @@ function isReviewed(date){
  if(!signature)return false;
  const marks=reviewMarks();
  if(marks[date]===signature)return true;
- if(marks[date]&&marks[date]===p79LegacyReviewFingerprint(date,state)){
+ if(marks[date]&&(marks[date]===p79PriorStableReviewFingerprint(date,state)||marks[date]===p79LegacyReviewFingerprint(date,state))){
   // One-time conservative migration: the legacy hash must match exactly.
   marks[date]=signature;
   try{g.localStorage?.setItem(reviewVersionKey,JSON.stringify(marks));}catch(_){}
