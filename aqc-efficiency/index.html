@@ -1615,6 +1615,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] rounded-xl bg-slate-900 text-white px-4 py-3 text-sm shadow-2xl"></div>
 
+<script src="../assets/port79-vessel-versions.js?v=20261030-edit-copies-v1"></script>
 <script>
 const APP_VERSION='2026.10.16.118';
 // BUILD PATCH: 2026.09.24-MONTHLY-AUTO-TOTALMOVES-V7
@@ -2292,7 +2293,13 @@ function summaryRows(){
     return !selectedYear||finishMonth.startsWith(selectedYear);
   };
   // 主檔有效 ID 清單會標示已被取代的舊作業紀錄，不能重算。
-  const base=canonicalOperationalRecords((records||[]).filter(r=>recordMatches(r)&&recordIsCurrentShipDetail(r,completionIndex)));
+  // Do not double count historical WORKING REPORT rows belonging to proven
+  // edit copies excluded from the vessel leaderboard. Keep records in storage.
+  const versioned=typeof window!=='undefined'?window.P79VesselVersionView:null;
+  const superseded=new Set(versioned?.collapse?.(shipMasters||[])?.excludedWorkingNos||[]);
+  const base=canonicalOperationalRecords((records||[]).filter(r=>
+    recordMatches(r)&&recordIsCurrentShipDetail(r,completionIndex)&&
+    !superseded.has(String(r?.workingNo||'').trim().toUpperCase())));
   const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]),historicalRows=new Map();
   ps.forEach((p,i)=>{
     for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
@@ -2618,7 +2625,11 @@ function vesselJobRows(){
     masters=[...byKey.values()];
   }
 
-  return masters.sort(compareWorkingNoDesc);
+  // Distinct -1/-2 records remain separate unless dated vessel, voyage,
+  // wharf AND complete working quantities prove they are duplicate copies.
+  const versioned=typeof window!=='undefined'?window.P79VesselVersionView:null;
+  const current=versioned?.collapse?.(masters)?.rows||masters;
+  return current.sort(compareWorkingNoDesc);
 }
 
 const SUMMARY_PAGE_SIZE=50;
