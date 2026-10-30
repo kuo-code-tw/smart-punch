@@ -22,13 +22,28 @@ function svgChart(id,values,labels,rates){
  const line=points.length?'<polyline points="'+points.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#12b88e" stroke-width="2.5"/>'+points.map(p=>'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.2" fill="white" stroke="#12b88e" stroke-width="2"/>').join(''):'';
  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+esc(id==='p79DashShipBars'?'依船舶完工日統計的本月作業量與效率':'本月各週出勤人數')+'"><defs><linearGradient id="'+id+'Gradient" x2="0" y2="1"><stop stop-color="#5baaff"/><stop offset="1" stop-color="#1684ff"/></linearGradient></defs>'+grid+bars+line+'</svg>';
 }
+function weeklyChart(report){
+ const el=$('p79DashShipBars'),caption=el?.closest('article')?.querySelector('.p79d-panel-title>span');if(!el)return;
+ if(caption)caption.textContent=report.start.slice(5).replace('-','/')+'–'+report.end.slice(5).replace('-','/')+' · GPH';
+ if(report.future){empty('p79DashShipBars','所選月份尚未開始');return}
+ if(report.days.every(d=>d.gph===null)){empty('p79DashShipBars','這七天沒有可核對的船舶效率');return}
+ const w=480,h=190,left=35,right=16,top=24,bottom=28,pw=w-left-right,ph=h-top-bottom;
+ const max=Math.max(...report.days.map(d=>d.gph||0)),ceiling=Math.max(5,Math.ceil(max/5)*5),gap=pw/7;
+ let grid='',points='',segments=[],current=[];
+ for(let i=0;i<=4;i++){const y=top+ph-i*ph/4;grid+='<path class="p79r-gridline" d="M'+left+' '+y+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y+4)+'" text-anchor="end">'+fmt(ceiling*i/4,1)+'</text>';}
+ report.days.forEach((d,i)=>{const x=left+gap*(i+.5),label=Number(d.date.slice(5,7))+'/'+Number(d.date.slice(-2));points+='<text x="'+x+'" y="'+(h-7)+'" text-anchor="middle">'+label+'</text>';
+  if(d.gph===null){if(current.length)segments.push(current);current=[];points+='<text x="'+x+'" y="'+(top+ph-6)+'" text-anchor="middle">—<title>'+label+' 無可核對效率</title></text>';return}
+  const y=top+ph-d.gph/ceiling*ph;current.push([x,y]);points+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+esc(label+'：'+fmt(d.gph,2)+' GPH / '+d.count+' 艘船舶')+'</title></circle><text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+fmt(d.gph,2)+'</text>';
+ });if(current.length)segments.push(current);
+ const lines=segments.map(s=>'<polyline points="'+s.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
+ el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="最近七天船舶效率（GPH），'+esc(report.start+' 至 '+report.end)+'">'+grid+lines+points+'</svg>';
+}
 function vessels(v){
- const table=$('p79DashShipRanking');
- if(table)table.innerHTML=v.vessels.length?v.vessels.slice(0,5).map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td>'+fmt(s.moves)+'</td><td>'+fmt(s.hours,1)+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="6">本月沒有船舶資料</td></tr>';
- const ym=$('p79DashMonth')?.value||'',days=new Date(Number(ym.slice(0,4)),Number(ym.slice(5)),0).getDate();
- const buckets=Array.from({length:days},()=>({moves:0,weight:0,rate:0,known:false}));
- for(const s of v.vessels){if(!s.date.startsWith(ym+'-')||s.moves===null)continue;const b=buckets[Number(s.date.slice(-2))-1];if(!b)continue;b.known=true;b.moves+=s.moves;if(s.rate!==null&&s.moves>0){b.weight+=s.moves;b.rate+=s.rate*s.moves}}
- if(buckets.some(b=>b.known))svgChart('p79DashShipBars',buckets.map(b=>b.moves),buckets.map((b,i)=>Number(ym.slice(5))+'/'+(i+1)),buckets.map(b=>b.weight?b.rate/b.weight:null));else empty('p79DashShipBars','船舶完工日期不足，請至船舶明細核對');
+ const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard,latest=model.latestImportedVessels(v.vessels,5);
+ const importLabel=s=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(s));
+ if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt)+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="6">本月份尚無附匯入時間的船舶資料</td></tr>';
+ const ym=$('p79DashMonth')?.value||'';
+ if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  const p=$('p79DashPeopleRanking');if(p)p.innerHTML=v.people.length?v.people.slice(0,5).map((r,i)=>'<tr><td>'+badge(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.dept||'—')+'</td><td>'+fmt(r.moves)+'</td><td>'+fmt(r.efficiency,2)+'</td></tr>').join(''):'<tr><td colspan="5">本月尚無可核對的個人作業明細</td></tr>';
  const missing=v.vessels.filter(x=>x.moves===null||x.rate===null).length,untimed=v.detailCount-v.timedRows;
  const notices=[{kind:missing?'warning':'success',glyph:missing?'info':'check',title:missing?missing+' 艘船舶統計欄位待核':'本月船舶資料已載入',text:missing?'請確認作業量與 GPH 資料':'共 '+fmt(v.count)+' 艘船舶，依完工月份彙整'}, {kind:'blue',glyph:'boxes',title:'本月請款櫃數 '+fmt(v.containers)+' 櫃',text:'作業量 '+fmt(v.moves)+' Moves，請款櫃數分別呈現'}, {kind:untimed?'amber':'blue',glyph:'clock',title:untimed?fmt(untimed)+' 筆作業明細缺少有效工時':'作業工時已彙整',text:untimed?'個人效率僅採用有有效工時的明細':'共 '+fmt(v.workHours,1)+' 小時，可查詢個人效率'}, {kind:'blue',glyph:'people',title:'本月 '+fmt(v.people.length)+' 位人員有作業紀錄',text:'查看船舶明細核對人員與派工作業'}];

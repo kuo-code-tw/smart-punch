@@ -9,6 +9,27 @@ const numberFrom=(obj,keys)=>num(first(obj,keys));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=(v,d=0)=>v===null||v===undefined||!Number.isFinite(v)?'—':v.toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d});
 const isoMonth=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+function importTimestamp(master){
+ const values=[master?.workingSheetImportedAt,master?.workingSheetSource?.importedAt].filter(v=>Number.isFinite(Date.parse(String(v||''))));
+ return values.sort((a,b)=>Date.parse(b)-Date.parse(a))[0]||'';
+}
+function taipeiDay(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
+function weeklyWindow(month,today=taipeiDay()){
+ const last=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).toISOString().slice(0,10);
+ const end=month===today.slice(0,7)?today:last;
+ const start=new Date(Date.parse(end+'T12:00:00Z')-6*86400000).toISOString().slice(0,10);
+ return {start,end,future:month>today.slice(0,7)};
+}
+function weeklyEfficiency(vessels,month,today=taipeiDay()){
+ const window=weeklyWindow(month,today),days=Array.from({length:7},(_,i)=>({date:new Date(Date.parse(window.start+'T12:00:00Z')+i*86400000).toISOString().slice(0,10),quantity:0,hours:0,count:0,gph:null})),byDate=new Map(days.map(d=>[d.date,d]));
+ for(const s of vessels){const day=byDate.get(s.date),qty=s.containers??s.moves;if(!day||s.deleted||!(qty>0)||!(s.rate>0))continue;day.quantity+=qty;day.hours+=qty/s.rate;day.count++;}
+ for(const day of days)if(day.hours>0)day.gph=day.quantity/day.hours;
+ return {...window,days};
+}
+function latestImportedVessels(vessels,limit=5){
+ const jobs=new Map();for(const v of vessels){if(v.deleted||!Number.isFinite(Date.parse(String(v.importedAt||''))))continue;const key=v.workingNo||v.name+'|'+v.voyage;const previous=jobs.get(key);if(!previous||Date.parse(v.importedAt)>Date.parse(previous.importedAt))jobs.set(key,v);}
+ return [...jobs.values()].sort((a,b)=>Date.parse(b.importedAt)-Date.parse(a.importedAt)||String(a.workingNo).localeCompare(String(b.workingNo))).slice(0,limit);
+}
 function analyzeVessels(data){
  if(!data||!Array.isArray(data.shipMasters))throw Error('船舶月份資料不完整');
  const masters=data.shipMasters,details=Array.isArray(data.records)?data.records:[];
@@ -25,7 +46,7 @@ function analyzeVessels(data){
   if(rate!==null&&rate>=0){rateSum+=rate;rateCount++;if(moves!==null&&moves>0){weight+=moves;weighted+=rate*moves}}
   return {name:String(first(m,['vesselName','shipName','vessel','name'])||'未填船名'),
    workingNo:String(m.workingNo||''),voyage:String(first(m,['voyageE','voyageI','voyage'])||''),
-   moves,containers:boxes,rate,date:attendanceDate({date:first(m,['_cloudLastDate','lastDate','endDate','finishTime'])}),hours:null,status:String(m.status||'')};
+   moves,containers:boxes,rate,importedAt:importTimestamp(m),deleted:m.deleted===true||m.isDeleted===true||!!m.deletedAt,date:attendanceDate({date:first(m,['_cloudLastDate','lastDate','endDate','finishTime'])}),hours:null,status:String(m.status||'')};
  });
  vessels.sort((a,b)=>(b.moves??-1)-(a.moves??-1));
  const people=new Map(),jobHours=new Map();let workHours=0,timedRows=0;
@@ -88,7 +109,7 @@ function analyzeOvertime(data,month){
  }
  return {hours,count};
 }
-const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate};
+const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels};
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
@@ -189,7 +210,15 @@ async function load(forceCloud=false){
    try{
     const data=await request(kind,ym,token,forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
-    if(kind==='vessel'&&Array.isArray(data.shipMasters))render(analyzeVessels(data));
+    if(kind==='vessel'&&Array.isArray(data.shipMasters)){
+     const report=analyzeVessels(data),range=weeklyWindow(ym);
+     if(!range.future&&range.start.slice(0,7)!==ym){
+      try{const previous=await request('vessel',range.start.slice(0,7),token,forceCloud);report.weekVessels=[...analyzeVessels(previous).vessels,...report.vessels];}
+      catch(error){report.weekError='跨月船舶資料尚未讀齊，請重新讀取';failures.push(report.weekError);}
+      if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().vessel)return;
+     }
+     render(report);
+    }
     else if(kind==='attendance'&&Array.isArray(data.records))render(analyzeAttendance(data,ym));
     else if(kind==='schedule'&&Array.isArray(data.schedules))render(analyzeOvertime(data,ym));
     else throw Error('該月份資料結構不完整');

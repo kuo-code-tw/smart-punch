@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const report=require('../assets/port79-monthly-dashboard.js');
+assert.deepEqual(report.weeklyWindow('2026-10','2026-10-30'),{start:'2026-10-24',end:'2026-10-30',future:false});
+assert.deepEqual(report.weeklyWindow('2026-11','2026-11-02'),{start:'2026-10-27',end:'2026-11-02',future:false},'early-month weeks include the previous month');
+assert.deepEqual(report.weeklyWindow('2026-09','2026-10-30'),{start:'2026-09-24',end:'2026-09-30',future:false},'historical months show their final seven days');
+assert.equal(report.weeklyWindow('2026-12','2026-10-30').future,true);
+const week=report.weeklyEfficiency([{date:'2026-10-24',containers:100,rate:10},{date:'2026-10-24',containers:100,rate:20},{date:'2026-10-23',containers:9999,rate:99},{date:'2026-10-25',containers:50,rate:null},{date:'2026-10-26',moves:60,rate:30},{date:'2026-10-26',moves:999,rate:99,deleted:true}], '2026-10','2026-10-30');
+assert.equal(week.days.length,7);assert.equal(week.days[0].gph,200/15,'same quantity/hour weighting as vessel efficiency');assert.equal(week.days[0].count,2);assert.equal(week.days[1].gph,null,'missing source is never a fake zero');assert.equal(week.days[2].gph,30);assert.equal(week.days[6].date,'2026-10-30');
+const data=report.analyzeVessels({shipMasters:[{workingNo:'OLD',vesselName:'大作業量舊匯入',totalMoves:9999,workingSheetImportedAt:'2026-10-20T00:00:00Z'},{workingNo:'NEW',vesselName:'新匯入',totalMoves:10,workingSheetSource:{importedAt:'2026-10-30T01:00:00Z'}},{workingNo:'NO_IMPORT',vesselName:'僅修改時間',totalMoves:50000,updatedAt:'2026-10-31T00:00:00Z'},{workingNo:'DEL',deleted:true,workingSheetImportedAt:'2026-10-31T00:00:00Z'}],records:[]});
+const before=JSON.stringify(data.vessels),latest=report.latestImportedVessels(data.vessels);
+assert.deepEqual(latest.map(v=>v.workingNo),['NEW','OLD'],'sort by real imports, never moves or generic edit timestamps');assert.equal(JSON.stringify(data.vessels),before,'never reorder source/monthly metric data');assert.equal(report.latestImportedVessels(data.vessels,1).length,1);
+assert.equal(report.importTimestamp({workingSheetImportedAt:'2026-10-20T00:00:00Z',workingSheetSource:{importedAt:'2026-10-30T00:00:00Z'}}),'2026-10-30T00:00:00Z');
+const html=fs.readFileSync('index.html','utf8'),ui=fs.readFileSync('assets/port79-reference-dashboard.js','utf8'),loader=fs.readFileSync('assets/port79-monthly-dashboard.js','utf8');
+assert(html.includes('最近七天船舶效率')&&html.includes('最新匯入船舶'));assert(html.includes('<th>匯入時間</th>'));assert(ui.includes('model.latestImportedVessels(v.vessels,5)'));assert(loader.includes("range.start.slice(0,7)!==ym"));assert(loader.includes('report.weekError='),'cross-month failures never render false missing-data days');
+console.log('PASS seven-day GPH window and source weighting, missing/deleted safeguards, true import order and cross-month source loading');
