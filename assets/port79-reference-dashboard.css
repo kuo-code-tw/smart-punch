@@ -216,5 +216,5 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table tr {height:26px!important}
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table th,
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table td {padding:3px 4px!important;line-height:19px!important;white-space:nowrap!important}
- html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79r-rank {vertical-align:middle!important}
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79r-rank {display:grid!important;width:19px!important;margin:0 auto!important}
 }
