@@ -8,6 +8,34 @@ const first=(obj,keys)=>{for(const k of keys){if(obj?.[k]!==undefined&&obj[k]!==
 const numberFrom=(obj,keys)=>num(first(obj,keys));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=(v,d=0)=>v===null||v===undefined||!Number.isFinite(v)?'—':v.toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d});
+// Text after an employee's name is a job title, not part of the name or a roster group.
+function displayPersonName(value){return String(value||'').trim().replace(/\s*[（(]\s*AQC\s*[)）]\s*$/i,'').trim()}
+function rosterGroup(value){const v=String(value||'').trim().replace(/\s/g,'').toUpperCase();const m=v.match(/^([ABCD])(?:組)?$/);return m?m[1]+'組':''}
+// Group membership must come from a named roster group or an explicit ship-detail group.
+// An AQC suffix is a role label and must never be taken as an A/B/C/D group.
+function assignPersonGroups(people,scheduleData){
+ const idMap=new Map(),nameMap=new Map();
+ for(const e of scheduleData?.employees||[]){
+  const group=rosterGroup(e.group||e.team||'');
+  if(!group)continue;
+  const keys=[e.empId,e.id,e.attendanceNo,e.attNo,e.attendanceId].filter(Boolean);
+  for(const key of keys)idMap.set(String(key).trim().toUpperCase(),group);
+  const name=displayPersonName(e.name||e.empName||'');
+  if(name){const old=nameMap.get(name);nameMap.set(name,old&&old!==group?null:group)}
+ }
+ for(const row of scheduleData?.schedules||[]){
+  const group=rosterGroup(row.schedule?.__personnel?.group||row.group||'');
+  if(!group)continue;
+  const id=String(row.empId||row.id||'').trim().toUpperCase();
+  if(id)idMap.set(id,group);
+  const name=displayPersonName(row.name||row.empName||'');
+  if(name){const old=nameMap.get(name);nameMap.set(name,old&&old!==group?null:group)}
+ }
+ return (people||[]).map(p=>{
+  const id=String(p.id||'').trim().toUpperCase(),name=displayPersonName(p.name);
+  return {...p,name,group:idMap.get(id)||nameMap.get(name)||rosterGroup(p.group)||''};
+ });
+}
 const isoMonth=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
 function importTimestamp(master){
  const values=[master?.workingSheetImportedAt,master?.workingSheetSource?.importedAt].filter(v=>Number.isFinite(Date.parse(String(v||''))));
@@ -55,10 +83,11 @@ function analyzeVessels(data){
   const hours=numberFrom(r,['timeHours','workingHours','effectiveHours']);
   if(hours!==null&&hours>0){workHours+=hours;timedRows++;const job=String(r.workingNo||'');jobHours.set(job,(jobHours.get(job)||0)+hours)}
   const id=String(first(r,['empId','employeeId','attNo'])||'').trim();
-  const name=String(first(r,['name','employeeName'])||'').trim();
+  const name=displayPersonName(first(r,['name','employeeName']));
   if(!id&&!name)continue;
   const key=id||'NAME:'+name;
-  const p=people.get(key)||{name:name||id,id,dept:String(first(r,['dept','department','team','group'])||'—'),moves:0,validMoves:0,timedMoves:0,hours:0};
+  const p=people.get(key)||{name:name||id,id,dept:String(first(r,['dept','department','unit'])||'—'),group:rosterGroup(first(r,['group','employeeGroup','team'])),moves:0,validMoves:0,timedMoves:0,hours:0};
+  if(!p.group)p.group=rosterGroup(first(r,['group','employeeGroup','team']));
   const moves=numberFrom(r,['totalMoves','moves','containers'])??(
    numberFrom(r,['disc'])!==null&&numberFrom(r,['load'])!==null?
    numberFrom(r,['disc'])+numberFrom(r,['load']):null);
@@ -109,7 +138,7 @@ function analyzeOvertime(data,month){
  }
  return {hours,count};
 }
-const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels};
+const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels,displayPersonName,rosterGroup,assignPersonGroups};
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
@@ -201,7 +230,7 @@ async function load(forceCloud=false){
  if(!token){statusText('p79DashMessage','沒有管理員登入權杖，請重新登入');return}
  loading=true;const button=$('p79DashRefresh');
  if(button)button.disabled=true;
- reset();statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
+ reset();root.P79ReferenceDashboard?.setGroupRoster(null,ym);statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  statusText('p79DashMessage','正在唯讀查詢 '+selectedMonthTitle()+' 的船舶與考勤資料…');
  const failures=[];
  try{
@@ -220,7 +249,11 @@ async function load(forceCloud=false){
      render(report);
     }
     else if(kind==='attendance'&&Array.isArray(data.records))render(analyzeAttendance(data,ym));
-    else if(kind==='schedule'&&Array.isArray(data.schedules))render(analyzeOvertime(data,ym));
+    else if(kind==='schedule'&&Array.isArray(data.schedules)){
+      render(analyzeOvertime(data,ym));
+      // Read-only roster grouping for the people-efficiency leaderboard.
+      root.P79ReferenceDashboard?.setGroupRoster(data,ym);
+    }
     else throw Error('該月份資料結構不完整');
    }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message); }
   }
