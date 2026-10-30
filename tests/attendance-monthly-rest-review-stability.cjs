@@ -5,12 +5,12 @@ new vm.Script(source);
 const date='2026-10-24',month='2026-10',store=new Map();
 const rev={confirmed:true,reportId:'R1',actor:'主管',at:'2026-10-25',kind:'modified',reason:'時段核對'};
 const report={id:'R1',code:'休08-16',category:'休',declaredHours:8,reportedAt:'2026-10-24T17:00',modifiedAt:'2026-10-25T09:00'};
-function state({order=false,empty=false,edit=false,newReport=false}={}){
+function state({order=false,empty=false,edit=false,newReport=false,timestampOnly=false}={}){
  const details={overtimeReport:order?{
-   modifiedAt:edit?'2026-10-29T11:00':report.modifiedAt,
+   modifiedAt:(edit||timestampOnly)?'2026-10-29T11:00':report.modifiedAt,
    reportedAt:report.reportedAt,declaredHours:report.declaredHours,
-   category:report.category,code:report.code,id:report.id
-  }:{...report,modifiedAt:edit?'2026-10-29T11:00':report.modifiedAt},
+   category:report.category,code:edit?'休16-24':report.code,id:report.id
+  }:{...report,code:edit?'休16-24':report.code,modifiedAt:(edit||timestampOnly)?'2026-10-29T11:00':report.modifiedAt},
   overtimeAmendments:order?[{reason:rev.reason,kind:rev.kind,at:rev.at,actor:rev.actor,reportId:rev.reportId,confirmed:rev.confirmed}]:[{...rev}]
  };
  const a={empId:'E1',schedule:{__meta:{[date]:details}}};
@@ -36,8 +36,11 @@ months.set(month,state({order:true,empty:true}));
 assert.equal(api.reviewFingerprint(date,months.get(month)),first,'read-only reload and reorder cannot change review signature');
 assert.equal(api.isReviewed(date),true,'approved review remains valid');
 assert.equal(color(),'#dcfce7','reopening monthly rest must not turn green to yellow');
+months.set(month,state({timestampOnly:true,order:true,empty:true}));
+assert.equal(api.reviewFingerprint(date,months.get(month)),first,'timestamp-only synchronization does not change filing contents');
+assert.equal(color(),'#dcfce7');
 months.set(month,state({edit:true,order:true,empty:true}));
-assert.notEqual(api.reviewFingerprint(date,months.get(month)),first,'actual modifiedAt changes revision');
+assert.notEqual(api.reviewFingerprint(date,months.get(month)),first,'actual overtime period changes revision');
 assert.equal(api.isReviewed(date),false,'genuine edit invalidates prior review');
 assert.equal(color(),'#fef3c7','new edit turns amended date yellow');
 assert(api.markReviewed(date,true),'operator can recheck actual changed report');

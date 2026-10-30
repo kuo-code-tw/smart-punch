@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const listeners={},root={dataset:{}},location={href:'https://example.test/smart-punch/attendance/',origin:'https://example.test'};
+const g={location,document:{documentElement:root,addEventListener:(type,fn)=>listeners[type]=fn}};g.window=g;vm.createContext(g);g.URL=URL;vm.runInContext(fs.readFileSync('assets/port79-attendance-review-navigation.js','utf8'),g);
+const click=href=>{let result=href;listeners.click({target:{closest:()=>({getAttribute:()=>href,setAttribute:(_,v)=>result=v})}});return result;};
+let url=new URL(click('../work-hours/?overtimeExportDate=2026-10-29#row'));
+assert.equal(url.searchParams.get('reviewBuild'),'20261030-v5');assert.equal(url.searchParams.get('overtimeExportDate'),'2026-10-29');assert.equal(url.hash,'#row');
+location.href='https://example.test/smart-punch/work-hours/';url=new URL(click('../attendance/'));assert.equal(url.searchParams.get('reviewBuild'),'20261030-v5');
+assert.equal(click('../schedule/'),'../schedule/');assert.equal(click('https://else.test/attendance/'),'https://else.test/attendance/');
+assert.equal(root.dataset.p79ReviewBuild,'20261030-v5');
+for(const path of ['attendance/index.html','work-hours/index.html'])assert(fs.readFileSync(path,'utf8').includes('port79-attendance-review-navigation.js?v=20261030-v5'));
+console.log('PASS both directions use compatible builds; queries and hashes preserved; other modules and external URLs unchanged');
