@@ -15,12 +15,12 @@ function renderPeople(){
  const source=peopleReport?.people||[];
  const activeMonth=$('p79DashMonth')?.value||'';
  const matched=model.assignPersonGroups(source,groupRosterMonth===activeMonth?groupRoster:null);
- const rows=(peopleGroup==='ALL'?matched:matched.filter(p=>p.group===peopleGroup)).slice(0,5);
+ const rows=peopleGroup==='ALL'?matched:matched.filter(p=>p.group===peopleGroup);
  const noGroups=source.length>0&&!matched.some(p=>p.group);
  const message=peopleGroup!=='ALL'&&noGroups
    ?'尚無可核對的組別資料，請確認排班月份與人員組別權限'
    :peopleGroup!=='ALL'?'本月'+peopleGroup+'尚無可核對的人員效率資料':'本月尚無可核對的個人作業明細';
- table.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+badge(i+1)+'</td><td>'+esc(model.displayPersonName(r.name))+'</td><td>'+esc(r.dept||'—')+'</td><td>'+fmt(r.moves)+'</td><td>'+fmt(r.efficiency,2)+'</td></tr>').join('')
+ table.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+badge(i+1)+'</td><td>'+esc(model.displayPersonName(r.name))+'</td><td>'+fmt(r.moves)+'</td><td>'+fmt(r.hatches)+'</td><td>'+fmt(r.efficiency,2)+'</td></tr>').join('')
   :'<tr><td colspan="5">'+esc(message)+'</td></tr>';
 }
 function setGroupRoster(data,month){groupRoster=Array.isArray(data?.schedules)?data:null;groupRosterMonth=String(month||'');renderPeople();}
