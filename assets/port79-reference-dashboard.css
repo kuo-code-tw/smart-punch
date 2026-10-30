@@ -218,3 +218,12 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table td {padding:3px 4px!important;line-height:19px!important;white-space:nowrap!important}
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79r-rank {display:grid!important;width:19px!important;margin:0 auto!important}
 }
+
+/* The existing card and plot dimensions are retained across both pages. */
+#p79DashAttendancePages .p79r-chart-pager{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:10px}
+#p79DashAttendancePages .p79r-chart-pager button{width:22px;height:22px;padding:0;border:1px solid #d8e7f4;border-radius:5px;background:#f4faff;color:#1678ce;cursor:pointer;font:700 16px sans-serif}
+#p79DashAttendancePages .p79r-chart-pager button:disabled{opacity:.35;cursor:default}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendanceBars.p79r-leave-chart{display:block!important;overflow-y:auto!important;overflow-x:hidden!important}
+.p79r-leave-bars{width:100%;padding:6px 10px;box-sizing:border-box}
+.p79r-leave-row{display:grid;grid-template-columns:minmax(65px,95px) minmax(50px,1fr) 60px;align-items:center;gap:8px;min-height:27px;font-size:11px}
+.p79r-leave-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.p79r-leave-row>div{height:15px;background:#eef6ff;border-radius:4px}.p79r-leave-row i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#61b3ff,#1684ff)}.p79r-leave-row b{text-align:right;font-size:11px}.p79r-leave-bars>small{font-size:10px;color:#946320}

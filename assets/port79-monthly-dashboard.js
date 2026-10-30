@@ -267,6 +267,18 @@ async function load(forceCloud=false){
     else throw Error('該月份資料結構不完整');
    }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message); }
   }
+  try{
+   const leaveRole=String(s.adminRole||s.role||'').toLowerCase();
+   if(leaveRole!=='superadmin'&&!['view','manage'].includes(String(s.systemPermissions?.leave)))throw Error('目前帳號沒有核准請假統計的檢視權限');
+   const raw=String(root.sessionStorage.getItem('port79_gas_url')||'');
+   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(raw))throw Error('請假資料連線未驗證');
+   const u=new URL(raw);u.searchParams.set('action','getLeaveData');u.searchParams.set('token',token);u.searchParams.set('_',String(Date.now()));
+   const controller=new AbortController(),timer=root.setTimeout(()=>controller.abort(),30000);let response,data;
+   try{response=await root.fetch(u.toString(),{cache:'no-store',signal:controller.signal});data=await response.json();}finally{root.clearTimeout(timer);}
+   if(!response.ok||data?.ok!==true||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords))throw Error(data?.error||'無權限或請假資料尚未讀齊');
+   if(month()!==ym||session()?.empId!==s.empId||(root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
+   root.P79ReferenceDashboard?.setLeaveReport(root.P79ApprovedLeaveSummary.aggregate({...data,month:ym}));
+  }catch(error){if(month()===ym)root.P79ReferenceDashboard?.setLeaveReport({month:ym,error:'核准請假資料未完成核對：'+String(error.message||error)});}
   loadedKey=ym;
   statusText('p79DashMessage',failures.length?failures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
  }finally{loading=false;if(button)button.disabled=false;if(month()!==ym&&$('systems')?.classList.contains('show')){loadedKey='';root.setTimeout(()=>load(false).catch(()=>{}),0);}}

@@ -45,12 +45,12 @@ for(const state of ['worked','missing','open','unknown','rest']){
  assert.equal(b.ledger.length,8);assert.equal(JSON.stringify(t.schedule),before);
 }
 // A new no-card rest cannot use an already reported category a second time.
-{const t=fixture();for(const d of dates.slice(0,4))t.schedule.__meta[d]={overtimeReport:{id:'R'+d,category:'例'}};t.state(dates[4],'rest');const b=t.balance();assert.equal(b.off.例,0);assert.equal(b.off.休,1);assert.equal(b.conflicts.length,0);assert.equal(Object.values(b.remaining).reduce((a,b)=>a+b,0),6);}
+{const t=fixture();for(const d of dates.slice(0,4))t.schedule.__meta[d]={overtimeReport:{id:'R'+d,category:'例'}};t.state(dates[4],'rest');const b=t.balance();assert.equal(b.off.例,0);assert.equal(b.off.休,0);assert.equal(b.conflicts.length,0);assert.equal(Object.values(b.remaining).reduce((a,b)=>a+b,0),7);}
 // Independent totals across every supported month and employee identity: all
-// non-leave absences consume the quota once and leave days never leak between people.
+// scheduled holidays consume the quota once and leave days never leak between people.
 for(let m=1;m<=12;m++)for(let rests=0;rests<=12;rests++)for(let reports=0;reports<=2;reports++){
  const mo='2026-'+String(m).padStart(2,'0'),q=c.p79RestQuota(mo),ds=Array.from({length:q.days},(_,i)=>mo+'-'+String(i+1).padStart(2,'0'));
- const r={...Object.fromEntries(ds.map(d=>[d,'早'])),__meta:{}},ev={complete:true,days:{}};
+ const r={...Object.fromEntries(ds.map((d,i)=>[d,i<rests?'休':'早'])),__meta:{}},ev={complete:true,days:{}};
  ds.forEach((d,i)=>ev.days['A|'+d]={state:i<rests?'rest':'worked'});
  r[ds[rests]]='年';ev.days['A|'+ds[rests]]={state:'rest'};
  const cap={...q.counts};for(let i=0;i<rests;i++)for(const cat of ['例','休','國'])if(cap[cat]>0){cap[cat]--;break;}

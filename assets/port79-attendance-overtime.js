@@ -374,14 +374,14 @@ async function recheckAndMarkReviewed(date,checked=true){
   return {ok:changed,message:changed?date+' 已取消查核；目前有效的修改申報恢復黃色':date+' 取消查核失敗：請確認雲端資料與瀏覽器儲存權限'};
  }
  const month=date.slice(0,7);
- if(activeReviewRequests.has(month))return activeReviewRequests.get(month);
+ if(activeReviewRequests.has(date))return activeReviewRequests.get(date);
  const run=(async()=>{
   const token=typeof getAttendanceEmployeeMasterToken==='function'
    ?String(getAttendanceEmployeeMasterToken()||'').trim():'';
   const base=typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||'').trim():'';
   if(!token||!base)return {ok:false,message:date+' 雲端登入或連線資訊不足，請重新登入後核對'};
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),30000);
+  const timer=setTimeout(()=>controller.abort(),120000);
   try{
    const url=new URL(base,g.location?.href||location.href);
    url.searchParams.set('action','getScheduleDataSecure');
@@ -389,8 +389,15 @@ async function recheckAndMarkReviewed(date,checked=true){
    url.searchParams.set('month',month);
    url.searchParams.set('_',String(Date.now()));
    const response=await g.fetch(url.toString(),{cache:'no-store',signal:controller.signal});
-   const data=await response.json();
+   let data=await response.json();
    if(!response.ok||data?.ok!==true)throw Error(data?.error||'雲端未完成正式資料核對');
+   let attendanceConfirmation=null;
+   if(data.plannedRestAttendanceVersion===1&&data.plannedRestAttendanceCanConfirm===true){
+    const receipt=await g.fetch(base,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'confirmAttendanceDayAndReconcile',gcToken:token,date,expectedRevision:data.revision,requestId:'ATTCONF-'+g.crypto.randomUUID()}),signal:controller.signal});
+    const result=await receipt.json();
+    if(!receipt.ok||result?.ok!==true||result.plannedRestAttendanceVersion!==1||result.date!==date||!Array.isArray(result.schedules))throw Error(result?.error||'正式考勤確認未完成，未標記查核成功');
+    attendanceConfirmation=result;data=result;
+   }
    if(!Array.isArray(data.schedules))throw Error('雲端未提供可查核的正式班表');
    if(String(getAttendanceEmployeeMasterToken()||'').trim()!==token)
     throw Error('登入狀態已變更，請重新操作');
@@ -407,6 +414,7 @@ async function recheckAndMarkReviewed(date,checked=true){
    refreshCurrentStrip();
    const info=overtimeDayIndicator(date,state);
    if(!info?.activeCount){
+    if(attendanceConfirmation)return {ok:true,attendanceConfirmed:attendanceConfirmation.attendanceConfirmed,kind:info?.kind||'none',message:date+' 雲端考勤核對完成；取消預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核交管理員確認 '+attendanceConfirmation.approvedReview+' 筆；原休假類別與異動紀錄保留，無有效申報不強制顯示綠色'};
     const evidence=attendanceReviewEvidence(date,state);
     const details=[
      '本次班表回傳 '+evidence.candidate+' 筆申報候選資料',
@@ -424,14 +432,14 @@ async function recheckAndMarkReviewed(date,checked=true){
    }
    if(!markReviewed(date,true))
     return {ok:false,message:date+' 雲端確認 '+info.activeCount+' 筆有效申報，但查核狀態未能儲存在此瀏覽器，請確認網站儲存權限'};
-   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核完成並顯示綠色；修改／取消歷史仍保留'};
+   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核完成並顯示綠色；修改／取消歷史仍保留'+(attendanceConfirmation?'；取消無出勤預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核待管理員確認 '+attendanceConfirmation.approvedReview+' 筆':'；預排自動取消尚未啟用，原預排保留')};
   }catch(error){
    const reason=error?.name==='AbortError'?'雲端讀取逾時':String(error?.message||error||'未知錯誤');
    return {ok:false,message:date+' 查核失敗：'+reason+'。不會修改正式申報或強制變綠。'};
   }finally{clearTimeout(timer);}
  })();
- activeReviewRequests.set(month,run);
- try{return await run;}finally{if(activeReviewRequests.get(month)===run)activeReviewRequests.delete(month);}
+ activeReviewRequests.set(date,run);
+ try{return await run;}finally{if(activeReviewRequests.get(date)===run)activeReviewRequests.delete(date);}
 }
 
 function decorateOvertimeDateStrip(keys,selectedDate=''){
