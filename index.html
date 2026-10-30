@@ -354,9 +354,9 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月總作業工時</span><strong id="p79DashWorkHours">—</strong><small>小時</small><div class="p79r-kpi-note" id="p79DashWorkHoursNote">依有效作業明細</div></div></div>
     </div>
     <div class="p79d-panels p79d-ship-panels">
-      <article class="p79d-panel p79d-trend"><div class="p79d-panel-title"><b>本月船舶作業量趨勢</b><span>作業量／效率 · 依完工日</span></div><div id="p79DashShipBars" class="p79d-bars p79d-ship-bars">等待載入</div></article>
-      <article class="p79d-panel p79d-ranking"><div class="p79d-panel-title"><b>本月主要船舶作業排行</b><span>依作業量</span></div>
-        <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>船名</th><th>Moves</th><th>工時</th><th>GPH</th><th>狀態</th></tr></thead>
+      <article class="p79d-panel p79d-trend"><div class="p79d-panel-title"><b>最近七天船舶效率</b><span>GPH · 依完工日</span></div><div id="p79DashShipBars" class="p79d-bars p79d-ship-bars">等待載入</div></article>
+      <article class="p79d-panel p79d-ranking"><div class="p79d-panel-title"><b>最新匯入船舶</b><span>依匯入時間 · 最新 5 艘</span></div>
+        <div class="p79d-table-scroll"><table><thead><tr><th>序號</th><th>船名</th><th>Moves</th><th>匯入時間</th><th>GPH</th><th>狀態</th></tr></thead>
           <tbody id="p79DashShipRanking"><tr><td colspan="5">等待月份資料</td></tr></tbody></table></div></article>
       <article class="p79d-panel p79d-warnings"><div class="p79d-panel-title"><b>船舶作業重點提醒</b><button type="button" class="p79d-plain-link" onclick="launchSystem('efficiency')">查看全部 ›</button></div>
         <div id="p79DashVesselNotices" class="p79r-notices"><div class="p79r-empty">正在核對本月資料…</div></div>
@@ -1534,8 +1534,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
 <script src="./assets/port79-home-dashboard.js?v=20261030-single-monthly-v2"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261030-reference-v1"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261030-weekly-import-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-reference-v2">
-<script src="./assets/port79-reference-dashboard.js?v=20261030-reference-v1"></script>
+<script src="./assets/port79-reference-dashboard.js?v=20261030-weekly-import-v1"></script>
 </body>
 </html>
