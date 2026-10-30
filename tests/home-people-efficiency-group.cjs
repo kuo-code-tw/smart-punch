@@ -1,16 +1,16 @@
 'use strict';
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const module=require('../assets/port79-monthly-dashboard.js');
+const analytics=require('../assets/port79-monthly-dashboard.js');
 const html=fs.readFileSync('index.html','utf8');
 const script=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');
 const css=fs.readFileSync('assets/port79-reference-dashboard.css','utf8');
-assert.equal(module.displayPersonName('林宏毅(AQC)'),'林宏毅');
-assert.equal(module.displayPersonName('林宏毅（ AQC ）'),'林宏毅');
-assert.equal(module.displayPersonName('林宏毅'),'林宏毅');
-assert.equal(module.displayPersonName('AQC工程師'),'AQC工程師');
-assert.equal(module.rosterGroup('A組'),'A組');assert.equal(module.rosterGroup(' b 組 '),'B組');
-assert.equal(module.rosterGroup('AQC'),'','AQC is a job title, not a team');
-assert.equal(module.rosterGroup('不分組'),'');
+assert.equal(analytics.displayPersonName('林宏毅(AQC)'),'林宏毅');
+assert.equal(analytics.displayPersonName('林宏毅（ AQC ）'),'林宏毅');
+assert.equal(analytics.displayPersonName('林宏毅'),'林宏毅');
+assert.equal(analytics.displayPersonName('AQC工程師'),'AQC工程師');
+assert.equal(analytics.rosterGroup('A組'),'A組');assert.equal(analytics.rosterGroup(' b 組 '),'B組');
+assert.equal(analytics.rosterGroup('AQC'),'','AQC is a job title, not a team');
+assert.equal(analytics.rosterGroup('不分組'),'');
 const records=[
  {empId:'E1',name:'林宏毅(AQC)',timeHours:2,totalMoves:50,dept:'AQC'},
  {empId:'E1',name:'林宏毅',timeHours:2,totalMoves:50,dept:'AQC'},
@@ -19,7 +19,7 @@ const records=[
  {name:'第四位(AQC)',timeHours:2,totalMoves:80},
  {empId:'E5',name:'第五位(AQC)',timeHours:2,totalMoves:55}
 ];
-const result=module.analyzeVessels({shipMasters:[],records});
+const result=analytics.analyzeVessels({shipMasters:[],records});
 assert.equal(result.people.length,5,'two spelling variants of one known employee merge, not duplicated');
 assert.equal(result.people.find(p=>p.id==='E1').name,'林宏毅');
 assert.equal(result.people.find(p=>p.id==='E1').moves,100);
@@ -37,15 +37,15 @@ const roster={employees:[
  {empId:'E4',name:'第四位',group:'D組',schedule:{__personnel:{group:'D組'}}}
 ]};
 const original=JSON.stringify(roster);
-const people=module.assignPersonGroups(result.people,roster);
+const people=analytics.assignPersonGroups(result.people,roster);
 assert.equal(people.find(p=>p.id==='E1').group,'A組');
 assert.equal(people.find(p=>p.id==='E2').group,'B組');
 assert.equal(people.find(p=>p.id==='E3').group,'C組');
 assert.equal(people.find(p=>p.name==='第四位').group,'D組','name-only ship detail uses unique authoritative roster name');
 assert.equal(people.find(p=>p.id==='E5').group,'','unassigned personnel remains unassigned');
 assert.equal(JSON.stringify(roster),original,'read-only group mapping does not change roster');
-assert.equal(module.assignPersonGroups(result.people,null).find(p=>p.id==='E1').group,'','no authorization implies no guessed group');
-const duplicate=module.assignPersonGroups([{id:'',name:'同名(AQC)',group:''}],{
+assert.equal(analytics.assignPersonGroups(result.people,null).find(p=>p.id==='E1').group,'','no authorization implies no guessed group');
+const duplicate=analytics.assignPersonGroups([{id:'',name:'同名(AQC)',group:''}],{
  employees:[{empId:'X1',name:'同名',group:'A組'},{empId:'X2',name:'同名',group:'B組'}],schedules:[]
 });
 assert.equal(duplicate[0].group,'','same-name ambiguity is not guessed');
