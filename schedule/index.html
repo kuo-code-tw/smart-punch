@@ -7008,7 +7008,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // category even when the date cell subsequently shows actual shift.
         // Deduplicate it with visible dated labels; do not count local drafts.
         const shownDates=dates(category).filter(day=>!typhoonSet.has(day));
-        const reportedDates=window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[];
+        const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[] : [];
         const categoryDates=[...new Set([...shownDates,...reportedDates])]
           .filter(day=>day.startsWith(month+'-')&&!typhoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
