@@ -52,5 +52,5 @@ const old='const [data,options]=await Promise.all([a.snapshot(loadedMonth,false,
 assert(!monthlyRest.includes(old),'monthly-rest load must not shadow options() with TDZ binding');
 assert(monthlyRest.includes('const [data,ruleResponse]=await Promise.all'));
 assert(monthlyRest.includes('function options(values,all)'));
-for(const page of [schedule,hours])assert(page.includes('port79-monthly-rest-overtime.js?v=20261030-fix-options-tdz-v1'));
+for(const page of [schedule,hours])assert(page.includes('tdz=20261030-options-v1'),'each browser view loads fixed modal version');
 console.log('PASS screenshot 5260196 copied revisions 4 -> 2, physical operation 787 not 1574; home/AQC summaries; true separate child work preserved; options TDZ fixed, cache bust; no writes');
