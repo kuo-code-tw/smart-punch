@@ -212,4 +212,4 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
  }
 }
 
-@media screen { #p79Dashboard .p79r-people-panel table thead tr, #p79Dashboard .p79r-people-panel table tbody tr {height:26px!important} #p79Dashboard .p79r-people-panel table th,#p79Dashboard .p79r-people-panel table td {padding-top:3px!important;padding-bottom:3px!important;white-space:nowrap!important} }
+@media screen { #p79Dashboard .p79r-people-panel table thead tr, #p79Dashboard .p79r-people-panel table tbody tr {height:26px!important} #p79Dashboard .p79r-people-panel table th,#p79Dashboard .p79r-people-panel table td {padding-top:3px!important;padding-bottom:3px!important;line-height:20px!important;white-space:nowrap!important} }
