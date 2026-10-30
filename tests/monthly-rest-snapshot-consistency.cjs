@@ -48,8 +48,8 @@ const c=ec.P79ScheduleRestEvidence.create({
 (async()=>{
  assert.equal((await c.refresh(month)).complete,true);
  offline=true;time+=61000;await c.refresh(month);
- assert.equal(c.status(month).evidence.complete,true,'retain previous successful evidence on temporary cloud outage');
- assert.equal(c.status(month).evidence.stale,true);
+ assert.equal(c.status(month).evidence.complete,false,'a failed official read cannot retain verified=true');
+ assert(html.includes('if(!state.error)renderRoleScheduleView();'),'the screen preserves its last rendered counts during failed refresh');
  assert.match(c.status(month).error,/temporary offline/);
  shift='早';time+=61000;await c.refresh(month);
  assert.equal(c.status(month).evidence.complete,false,'changed roster cannot reuse an earlier attendance classification');
