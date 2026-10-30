@@ -178,12 +178,12 @@ async function load(forceCloud=false){
   }
   loadedKey=ym;
   statusText('p79DashMessage',failures.length?failures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
- }finally{loading=false;if(button)button.disabled=false}
+ }finally{loading=false;if(button)button.disabled=false;if(month()!==ym&&$('systems')?.classList.contains('show')){loadedKey='';root.setTimeout(()=>load(false).catch(()=>{}),0);}}
 }
 function showWhenAdmin(){
  const el=$('systems'),s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
  const allow=el?.classList.contains('show')&&['admin','superadmin'].includes(role)&&!s?.punchOnly;
- if(!allow)return;
+ if(!allow){if(sessionStamp||loadedKey){sessionStamp='';loadedKey='';reset();}return;}
  if(sessionStamp===String(s.empId||'')&&loadedKey===month())return;
  sessionStamp=String(s.empId||'');
  if(!loadedKey){root.setTimeout(()=>load(false).catch(e=>{statusText('p79DashMessage',String(e?.message||e))}),150);}
