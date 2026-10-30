@@ -163,3 +163,30 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
 @media(min-width:1500px){html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-current-shift-list{height:185px;max-height:185px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-name b{font-size:11px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-on-duty,html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-checked-in{font-size:8px}}
 @media(max-width:620px){html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-name b{font-size:11px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-person small{font-size:9px}}
 }
+
+/* Home person-efficiency group selector: scope to admin dashboard only. */
+@media screen {
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters{
+  display:flex!important;align-items:center;flex-wrap:wrap;gap:4px!important;
+  margin:1px 0 5px!important;min-height:24px;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button{
+  display:inline-flex!important;justify-content:center;align-items:center!important;
+  padding:2px 8px!important;min-height:23px!important;width:auto!important;
+  font-size:10px!important;line-height:1.2!important;font-weight:700!important;
+  border:1px solid #cbdff5!important;border-radius:7px!important;
+  background:#f5faff!important;color:#446b97!important;box-shadow:none!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button.active,
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button[aria-pressed="true"]{
+  color:#fff!important;background:#137bdf!important;border-color:#137bdf!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79d-table-scroll{
+  height:136px!important;max-height:136px!important;
+ }
+}
+@media screen and (min-width:1500px){
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79d-table-scroll{
+  height:152px!important;max-height:152px!important;
+ }
+}
