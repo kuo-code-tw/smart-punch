@@ -50,7 +50,7 @@ function create(ctx){
    state.evidence.actualShifts=actualShifts;
    state.evidence.actualWorkedMinutes=actualWorkedMinutes;
    return state.evidence;
-  }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence=retained?{...retained,stale:true}:{complete:false,days:{}};return null;}
+  }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence={complete:false,days:{}};return null;}
   finally{state.pending=false;if(ctx.token()===token&&states.get(month)===state)ctx.update?.(month,state);}})();return state.promise;
  }
  function refreshIfStale(month){const s=status(month);return s.pending?s.promise:!s.evidence.complete||now()-s.evidence.checkedAt>=60000?refresh(month):Promise.resolve(s.evidence);}
