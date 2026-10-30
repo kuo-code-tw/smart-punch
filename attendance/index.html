@@ -1405,7 +1405,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                         </div>
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 姓名</label>
-                            <select id="recordNameFilter" onchange="onRecordNameChange()" class="w-full px-2 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indi                 <option value="ALL">全部姓名</option>
+                            <select id="recordNameFilter" onchange="onRecordNameChange()" class="w-full px-2 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                                <option value="ALL">全部姓名</option>
                             </select>
                         </div>
                         <div>
@@ -1847,7 +1848,9 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-slate-800 dark:text-slate-100" id="empModalTitle">👤 新增員工資料</h3>
                 <button onclick="closeEmployeeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
-      <input type="hidden" id="empEditOriginalId">
+            </div>
+
+            <input type="hidden" id="empEditOriginalId">
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -2286,7 +2289,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             <div id="p79PunchResultIcon" class="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-3xl mb-4">✓</div>
             <h2 id="p79PunchResultTitle" class="text-xl font-black text-slate-900 dark:text-white">打卡確認中</h2>
             <p id="punchSuccessEmployee" class="mt-2 font-bold text-slate-700 dark:text-slate-200"></p>
-            <div class="mt-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 text-left space-y-2 text-lass="flex justify-between gap-3"><span class="text-slate-500">打卡項目</span><strong id="punchSuccessStatus"></strong></div>
+            <div class="mt-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 text-left space-y-2 text-sm">
+                <div class="flex justify-between gap-3"><span class="text-slate-500">打卡項目</span><strong id="punchSuccessStatus"></strong></div>
                 <div class="flex justify-between gap-3"><span class="text-slate-500">打卡時間</span><strong id="punchSuccessTime" class="font-mono"></strong></div>
                 <div class="flex justify-between gap-3"><span class="text-slate-500">地點</span><strong id="punchSuccessLocation" class="text-right"></strong></div>
             </div>
@@ -3143,7 +3147,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         }
 
         function getEmployeeIdValue(employeeOrId) {
-            returring(typeof employeeOrId === 'object' ? employeeOrId?.empId : employeeOrId || '').trim().toUpperCase();
+            return String(typeof employeeOrId === 'object' ? employeeOrId?.empId : employeeOrId || '').trim().toUpperCase();
         }
 
         function getEmployeeCompanyRank(employeeOrId) {
@@ -4922,7 +4926,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         function getHomepageVerifiedEmployeeFallback() {
             let session = null;
             try { session = JSON.parse(sessionStorage.getItem('port79_user_session') || 'null'); } catch (e) {}
-            if (!session?.emp = restorePersistentEmployeeSessionToSession();
+            if (!session?.empId) session = restorePersistentEmployeeSessionToSession();
             const role = String(session?.adminRole || session?.role || session?.actualAdminRole || 'employee').toLowerCase();
             const empId = String(session?.empId || sessionStorage.getItem('port79_home_emp_id') || '').trim().toUpperCase();
             if (!empId || role !== 'employee') return null;
@@ -5823,7 +5827,7 @@ const now = new Date();
         // 不使用 30/60 分鐘視窗，所以不會吞掉真正不同時間的打卡。
         // PORT79 V4.0：同一原始事件 lineage 鍵。
         // 人工修改會保留 sourceEventKey（修改前的原始事件鍵），
-        // 原始未修改資料則由標準化時間+狀態」產生同樣鍵。
+        // 原始未修改資料則由「身份+標準化時間+狀態」產生同樣鍵。
         // 因此 15:46 原始事件修改成 15:49 後，不會再顯示成兩筆。
         function p79AttendanceLineageKey(record) {
             if (!record || typeof record !== 'object') return '';
@@ -7682,7 +7686,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     ['admin','superadmin'].includes(String(userProfile?.adminRole || userProfile?.role || userProfile?.actualAdminRole || '').toLowerCase());
 
                 const validRole = role === 'admin' || role === 'superadmin';
-                if (loggedIn && savedAdminId && validRoken) {
+                if (loggedIn && savedAdminId && validRole && token) {
                     // 正規化回管理 Session，讓後續所有舊函式都讀到同一組資料。
                     sessionStorage.setItem('aqc_admin_logged_in','1');
                     sessionStorage.setItem('aqc_admin_id',savedAdminId);
@@ -9310,7 +9314,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     : 'text-rose-600 dark:text-rose-400';
                 return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                     <td class="px-3 py-3 font-bold">${escapeHtml(company)}</td>
-                    <td class="px-3 py-3 font-mono font-semHtml(fullId)}</td>
+                    <td class="px-3 py-3 font-mono font-semibold">${escapeHtml(fullId)}</td>
                     <td class="px-3 py-3 font-semibold">${escapeHtml(emp.name || b.sourceName || '')}</td>
                     <td class="px-3 py-3">${escapeHtml(emp.dept || b.sourceDept || '')}</td>
                     <td class="px-3 py-3">${escapeHtml(emp.jobTitle || emp.deptDetail || '--')}</td>
@@ -10194,7 +10198,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!data?.ok || !Array.isArray(data.records) || String(data.month||'')!==month)
                     throw new Error(data?.error||'正式主表未回傳有效刷卡紀錄');
                 const matched=data.records.filter(record=>{
-                    const rid=String(record||'').trim().toUpperCase();
+                    const rid=String(record?.empId||'').trim().toUpperCase();
                     if(rid)return rid===empId;
                     const att=String(record?.attNo||'').trim();
                     return !!att && att===String(employee.attNo||'').trim() &&
@@ -12000,7 +12004,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 resetFilterControls(['leaveJobTitleFilter', 'leaveEmpFilter', 'leaveStatusFilter', 'leaveStartFilter', 'leaveEndFilter']);
             }
             const dept = document.getElementById('leaveDeptFilter')?.value || 'ALL';
-            const jobTitleSelect = document.getElementById('leaveJTitleFilter');
+            const jobTitleSelect = document.getElementById('leaveJobTitleFilter');
             const empSelect = document.getElementById('leaveEmpFilter');
             if (!jobTitleSelect || !empSelect) return;
             const currentJobTitle = jobTitleSelect.value || 'ALL';
@@ -12886,7 +12890,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function getAttendanceDateKey(timeStr) {
             const s = String(timeStr || '').trim();
             if (!s) return '';
-            const nolized = s.replace(/-/g, '/').replace('T', ' ');
+            const normalized = s.replace(/-/g, '/').replace('T', ' ');
             const m = normalized.match(/^(\d{3,4})\/(\d{1,2})\/(\d{1,2})/);
             if (!m) return normalized.split(' ')[0];
             let year = Number(m[1]);
@@ -15387,7 +15391,7 @@ function getManualPairRecordAnchor(record) {
                     if (!meta || meta.overtimeExcluded) continue;
                     const reports = [
                         ...(Array.isArray(meta.overtimeReports) ? meta.overtimeReports : []),
-                        meta.overtimeReort
+                        meta.overtimeReport
                     ].filter(Boolean);
                     if (reports.some(report => report.id && !(meta.overtimeRevocations || []).some(
                         item => item.confirmed === true && String(item.reportId) === String(report.id)
@@ -16058,7 +16062,7 @@ function getManualPairRecordAnchor(record) {
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
                         && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
                 // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
-                // 不相信舊考勤 record 的 empId，避免 Id 污染造成 -- 或套到別人。
+                // 不相信舊考勤 record 的 empId，避免 empId 污染造成 -- 或套到別人。
                 const displayEmp = findEmployeeForAttendanceDisplay(row, visibleEmployees)
                     || findEmployeeForAttendanceIdentity(row, visibleEmployees);
 
@@ -16808,7 +16812,7 @@ function getManualPairRecordAnchor(record) {
                 // 編輯視窗開著時，背景雲端刷新可能把 records 陣列整批換掉。
                 // 不可因此讓「儲存變更」按鈕無聲失效；改用原始事件鍵/身分/時間重新找到同一筆。
                 if (!r && snapshotSourceKey) {
-                    r = records.find(item => String(item?.sourceEventKe'').trim() === snapshotSourceKey);
+                    r = records.find(item => String(item?.sourceEventKey || '').trim() === snapshotSourceKey);
                 }
                 if (!r && snapshotEventKey) {
                     r = records.find(item => getAttendanceImportEventKey(item) === snapshotEventKey);
@@ -18426,7 +18430,8 @@ function p79EmployeeDateEligible(emp,date) {
                 return;
             }
             if (isAdminLoggedIn && !isCurrentViewerSuperAdmin()) {
-                if (mode === 'admin') { showToast('一般管理員不能新增超級管理員', 'warning'); r                const target = empId ? employees.find(e => e.empId === empId) : null;
+                if (mode === 'admin') { showToast('一般管理員不能新增超級管理員', 'warning'); return; }
+                const target = empId ? employees.find(e => e.empId === empId) : null;
                 if (target && !canCurrentAdminViewEmployee(target)) { showToast('無權查看或修改管理員資料', 'warning'); return; }
             }
             const modal = document.getElementById('employeeModal');
@@ -19310,7 +19315,7 @@ function p79EmployeeDateEligible(emp,date) {
                 needsAttention = true;
 
                 if (hasExcelOut && !hasSystemOut) {
-                    actn = '試算表／系統皆缺上班；系統另缺下班｜可補下班，但上班需人工查核';
+                    action = '試算表／系統皆缺上班；系統另缺下班｜可補下班，但上班需人工查核';
                 } else {
                     action = '試算表／系統皆缺上班｜試算表 無上班來源，需人工查核／補卡';
                 }
@@ -21254,7 +21259,7 @@ function p79EmployeeDateEligible(emp,date) {
                 '系統完整': row.systemComplete ? '是' : '否',
                 '真正完整班次': row.isComplete && !row.needsAttention ? '是' : '否',
                 '試算表來源缺資料': row.sourceIssue ? '是' : '否',
-              '待處理': row.needsAttention ? '是' : '否',
+                '待處理': row.needsAttention ? '是' : '否',
                 '異常等級': row.auditSeverity || '',
                 '比對結果/動作': row.action || ''
             }));
@@ -22961,7 +22966,7 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
       try{
         const row=await window.Port79DataCache?.getDisplaySnapshot?.('attendance');
         if(Number(typeof lastCloudLoadSuccessAt!=='undefined'?lastCloudLoadSuccessAt:0)>=startedAt)return;
-        if(row?.data?.fullDay.isArray(row.data.records)){
+        if(row?.data?.fullDatabase&&Array.isArray(row.data.records)){
           await window.p79ApplyAttendanceFullCache?.(row.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true,previewOnly:true});
           try{setCloudSyncStatus('⚡ 本機考勤快取已顯示｜背景核對雲端中','info')}catch(_){}
         }else if(typeof navigator!=='undefined'&&navigator.onLine===false){
@@ -23930,7 +23935,7 @@ window.p79AttendanceRecordCounts = function(){
   // 提供明確診斷，不需要再猜資料在哪裡消失。
   window.p79AttendanceEngineV2=V2;
   window.p79AttendanceForceRepair=()=>syncMonth(selectedMonth(),{showMessage:true,boundary:true,status:true});
-  windameAudit=function(){
+  window.p79AttendanceNameAudit=function(){
     const month=selectedMonth();
     try{repairAttendanceNamesInMemory();}catch(e){}
     const monthRows=(Array.isArray(records)?records:[]).filter(r=>month==='ALL'||attendanceRecordMonthKey(r)===month);
@@ -24897,7 +24902,7 @@ async function reviewEntry(key){
   if(review.state==='saved'){show(false);el.textContent='✅ 雲端已是這份修改，已確認完成並解除待同步狀態。';return;}
   if(review.state==='obsolete'){show(false);el.textContent='✅ 正式主表已無這筆紀錄，舊修改已備份並結束待同步；不會重新新增或改寫考勤。';return;}
   const cloud=review.cloud,draft=review.payload.record;
-  el.innerHTML='<h3 style="margin-top:16px;font-weight:800">核對 '+safe(draft.name||cloud.name||draft.empId)+' 的修改</h3><table><tr><th>項目</th><th>目前雲端</th><th>你要的修改</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(cloud[field]||'—')+'</td><td>'+safe(draft[field]||'—')+'</td></tr>').join('')+'</table><p>原修改依據的舊時間：'+safe(review.payload.originalTimeStr||'未記錄')+'</p><button id="p79ApplyPausedReview" type="button" style="margin-top:10px;padding:10px:#2563eb;color:white;border-radius:8px">確認套用我的修改</button><button id="p79ReloadPausedReview" type="button" style="margin-left:10px;padding:10px">重新核對</button><p id="p79PausedReviewResult"></p>';
+  el.innerHTML='<h3 style="margin-top:16px;font-weight:800">核對 '+safe(draft.name||cloud.name||draft.empId)+' 的修改</h3><table><tr><th>項目</th><th>目前雲端</th><th>你要的修改</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(cloud[field]||'—')+'</td><td>'+safe(draft[field]||'—')+'</td></tr>').join('')+'</table><p>原修改依據的舊時間：'+safe(review.payload.originalTimeStr||'未記錄')+'</p><button id="p79ApplyPausedReview" type="button" style="margin-top:10px;padding:10px;background:#2563eb;color:white;border-radius:8px">確認套用我的修改</button><button id="p79ReloadPausedReview" type="button" style="margin-left:10px;padding:10px">重新核對</button><p id="p79PausedReviewResult"></p>';
   document.getElementById('p79ReloadPausedReview').onclick=()=>reviewEntry(key);
   document.getElementById('p79ApplyPausedReview').onclick=async function(){
    if(reviewBusy)return;reviewBusy=true;this.disabled=true;
