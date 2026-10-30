@@ -212,4 +212,9 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-shift-empty{
  }
 }
 
-@media screen { #p79Dashboard .p79r-people-panel table thead tr, #p79Dashboard .p79r-people-panel table tbody tr {height:26px!important} #p79Dashboard .p79r-people-panel table th,#p79Dashboard .p79r-people-panel table td {padding-top:3px!important;padding-bottom:3px!important;line-height:20px!important;white-space:nowrap!important} }
+@media screen {
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table tr {height:26px!important}
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table th,
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel table td {padding:3px 4px!important;line-height:19px!important;white-space:nowrap!important}
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79r-rank {display:grid!important;width:19px!important;margin:0 auto!important}
+}
