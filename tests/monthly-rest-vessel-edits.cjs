@@ -18,9 +18,9 @@ const samples=[
  item('5260196','2026-10-29',299,{workingSheetImportedAt:'2026-10-29T13:00:00Z'})
 ];
 const before=JSON.stringify(samples),result=versions.collapse(samples);
-assert.equal(result.rows.length,1,'latest imported voyage replaces older quantities and completion dates');
-assert.deepEqual(result.excludedWorkingNos.slice().sort(),['5260196-2','5260196-3','5260196-4']);
-assert.equal(result.rows.reduce((a,b)=>a+b.totalContainers,0),299);
+assert.equal(result.rows.length,2,'distinct operation dates must not be collapsed without proof of a revision');
+assert.deepEqual(result.excludedWorkingNos.slice().sort(),['5260196-2','5260196-4']);
+assert.equal(result.rows.reduce((a,b)=>a+b.totalContainers,0),787);
 assert.equal(JSON.stringify(samples),before,'no mutation to permanent ship records');
 const actual=[
  item('5260149-1','2026-10-27',350),
@@ -33,18 +33,18 @@ const cannotProve=[item('5260196-5','2026-10-27',488,{hatches:null}),item('52601
 assert.equal(versions.collapse(cannotProve).rows.length,2,'unknown totals must not be presumed duplicate');
 const records=samples.map(s=>({workingNo:s.workingNo,empId:'E1',name:'同一位',totalMoves:s.totalMoves,timeHours:2,hatches:0}));
 const v=monthly.analyzeVessels({shipMasters:samples.map(s=>({...s,lastDate:s.compareDate})),records});
-assert.equal(v.count,1,'homepage vessel count mirrors the active two operations');
-assert.equal(v.moves,299,'monthly ship totals exclude edited copies');
+assert.equal(v.count,2,'homepage vessel count mirrors the active two operations');
+assert.equal(v.moves,787,'monthly ship totals exclude edited copies');
 assert.equal(v.people.length,1);
-assert.equal(v.people[0].moves,299,'personnel Moves do not include superseded report details');
-assert.equal(v.detailCount,1,'historical copied detail rows do not inflate current-month data');
+assert.equal(v.people[0].moves,787,'personnel Moves do not include superseded report details');
+assert.equal(v.detailCount,2,'historical copied detail rows do not inflate current-month data');
 assert(efficiency.includes('window.P79VesselVersionView'),'AQC efficiency page uses same dedupe rule');
 assert(efficiency.includes('const superseded=new Set(versioned?.collapse?.(shipMasters||[])?.excludedWorkingNos||[])'),
  'AQC person summary excludes only proven superseded edit rows');
 assert(efficiency.includes('const current=versioned?.collapse?.(masters)?.rows||masters'),
  'AQC vessel count uses current view rather than raw suffix rows');
-assert(efficiency.includes('port79-vessel-versions.js?v=20261030-original-revisions-v2'));
-assert(home.includes('port79-vessel-versions.js?v=20261030-original-revisions-v2'));
+assert(efficiency.includes('port79-vessel-versions.js?v=20261030-separate-calls-v3'));
+assert(home.includes('port79-vessel-versions.js?v=20261030-separate-calls-v3'));
 
 // The original error shadowed the selector-building function options()
 // with a later block-scoped const options in the click handler.
