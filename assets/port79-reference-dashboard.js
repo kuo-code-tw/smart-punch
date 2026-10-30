@@ -9,6 +9,29 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=(v,n=0)=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:n,minimumFractionDigits:n}):'—';
 const badge=i=>'<span class="p79r-rank rank-'+i+'">'+i+'</span>';
 const detailBtn=()=>d.getElementById('cardEfficiency')?.click();
+let peopleGroup='ALL',peopleReport=null,groupRoster=null,groupRosterMonth='';
+function renderPeople(){
+ const table=$('p79DashPeopleRanking'),model=g.P79MonthlyDashboard;if(!table||!model)return;
+ const source=peopleReport?.people||[];
+ const activeMonth=$('p79DashMonth')?.value||'';
+ const matched=model.assignPersonGroups(source,groupRosterMonth===activeMonth?groupRoster:null);
+ const rows=(peopleGroup==='ALL'?matched:matched.filter(p=>p.group===peopleGroup)).slice(0,5);
+ const noGroups=source.length>0&&!matched.some(p=>p.group);
+ const message=peopleGroup!=='ALL'&&noGroups
+   ?'尚無可核對的組別資料，請確認排班月份與人員組別權限'
+   :peopleGroup!=='ALL'?'本月'+peopleGroup+'尚無可核對的人員效率資料':'本月尚無可核對的個人作業明細';
+ table.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+badge(i+1)+'</td><td>'+esc(model.displayPersonName(r.name))+'</td><td>'+esc(r.dept||'—')+'</td><td>'+fmt(r.moves)+'</td><td>'+fmt(r.efficiency,2)+'</td></tr>').join('')
+  :'<tr><td colspan="5">'+esc(message)+'</td></tr>';
+}
+function setGroupRoster(data,month){groupRoster=Array.isArray(data?.schedules)?data:null;groupRosterMonth=String(month||'');renderPeople();}
+function choosePeopleGroup(group){
+ if(!['ALL','A組','B組','C組','D組'].includes(group))return;
+ peopleGroup=group;
+ $('p79DashPeopleGroupFilters')?.querySelectorAll('[data-people-group]').forEach(b=>{
+  const active=b.dataset.peopleGroup===group;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+ });
+ renderPeople();
+}
 function empty(id,text){const e=$(id);if(e)e.innerHTML='<div class="p79r-empty">'+esc(text)+'</div>'}
 function svgChart(id,values,labels,rates){
  const el=$(id);if(!el)return;
@@ -44,7 +67,7 @@ function vessels(v){
  if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt)+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="6">本月份尚無附匯入時間的船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
- const p=$('p79DashPeopleRanking');if(p)p.innerHTML=v.people.length?v.people.slice(0,5).map((r,i)=>'<tr><td>'+badge(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.dept||'—')+'</td><td>'+fmt(r.moves)+'</td><td>'+fmt(r.efficiency,2)+'</td></tr>').join(''):'<tr><td colspan="5">本月尚無可核對的個人作業明細</td></tr>';
+ peopleReport=v;renderPeople();
  const missing=v.vessels.filter(x=>x.moves===null||x.rate===null).length,untimed=v.detailCount-v.timedRows;
  const notices=[{kind:missing?'warning':'success',glyph:missing?'info':'check',title:missing?missing+' 艘船舶統計欄位待核':'本月船舶資料已載入',text:missing?'請確認作業量與 GPH 資料':'共 '+fmt(v.count)+' 艘船舶，依完工月份彙整'}, {kind:'blue',glyph:'boxes',title:'本月請款櫃數 '+fmt(v.containers)+' 櫃',text:'作業量 '+fmt(v.moves)+' Moves，請款櫃數分別呈現'}, {kind:untimed?'amber':'blue',glyph:'clock',title:untimed?fmt(untimed)+' 筆作業明細缺少有效工時':'作業工時已彙整',text:untimed?'個人效率僅採用有有效工時的明細':'共 '+fmt(v.workHours,1)+' 小時，可查詢個人效率'}, {kind:'blue',glyph:'people',title:'本月 '+fmt(v.people.length)+' 位人員有作業紀錄',text:'查看船舶明細核對人員與派工作業'}];
  $('p79DashVesselNotices').innerHTML=notices.map(n=>'<button type="button" class="p79r-notice '+n.kind+'"><span class="p79r-notice-icon">'+icon(n.glyph)+'</span><span><strong>'+esc(n.title)+'</strong><small>'+esc(n.text)+'</small></span><span class="p79r-notice-arrow">›</span></button>').join('');
@@ -74,12 +97,16 @@ function chrome(){
 }
 function init(){
  if(!$('p79Dashboard'))return;
+ $('p79DashPeopleGroupFilters')?.addEventListener('click',event=>{
+  const btn=event.target.closest('button[data-people-group]');
+  if(btn)choosePeopleGroup(btn.dataset.peopleGroup);
+ });
  d.querySelectorAll('.p79d-kpis').forEach((row,section)=>row.querySelectorAll('.p79d-kpi-icon').forEach((e,i)=>e.innerHTML=icon((section?['people','calendar','calendar','shield']:['ship','boxes','chart','clock'])[i])));
  ['p79dShipHeading','p79dAttendanceHeading'].forEach(id=>{const h=$(id);h.firstChild.textContent=id==='p79dShipHeading'?'船舶作業總覽 ':'考勤人力總覽 ';h.insertAdjacentHTML('afterbegin',icon('ship'));});
  d.querySelectorAll('.p79d-panel-title>b').forEach(e=>{e.textContent=e.textContent.replace(/^[▤▥◉]\s*/, '');e.insertAdjacentHTML('afterbegin','<span class="p79r-panel-mark">↥</span>')});
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
-function reset(){if($('p79DashVesselNotices'))empty('p79DashVesselNotices','正在核對本月資料…');if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
-g.P79ReferenceDashboard={vessels,attendance,reset};
+function reset(){peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))empty('p79DashVesselNotices','正在核對本月資料…');if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
