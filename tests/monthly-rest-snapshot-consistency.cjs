@@ -23,7 +23,7 @@ const first=['例','休','國'].map(k=>span(output,k)).join('|');
 ledger={...ledger,remaining:{例:3,休:4,國:2}};
 assert.equal(['例','休','國'].map(k=>span(render(),k)).join('|'),first,'late official ledger refresh must not change visible quotas');
 ledger={...ledger,ledger:[{date:date(20),kind:'reported',category:'休'}]};
-assert.equal(span(render(),'休'),'3/1','confirmed report outside visible dates consumes one quota');
+assert.equal(span(render(),'休'),'4/1','confirmed report outside visible dates consumes quota and is itself included in the category count');
 ledger={...ledger,ledger:[{date:date(5),kind:'reported',category:'休'}]};
 assert.equal(span(render(),'休'),'3/2','a report already represented by a visible cell must not double-deduct');
 ledger={...ledger,ledger:[]};

@@ -4359,6 +4359,10 @@ function p79EmployeeDateEligible(emp,date) {
           p79ScheduleGroupHistoryUnverifiedMonth='';
         }
         p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);
+        // The cloud receipt and its formal overtime metadata are now trusted.
+        // Refresh the left monthly counts IMMEDIATELY; attendance recheck may
+        // be delayed or fail and must not strand the counters at cached 3/2.
+        if(typeof p79RefreshScheduleRestCounts==='function')p79RefreshScheduleRestCounts(requestMonth);
         p79ScheduleRestClient().refresh(requestMonth);
         cloudLoaded = true;
         saveAllDataToLocalStorage();
@@ -7009,7 +7013,25 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // Deduplicate it with visible dated labels; do not count local drafts.
         const shownDates=dates(category).filter(day=>!typhoonSet.has(day));
         const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[] : [];
-        const categoryDates=[...new Set([...shownDates,...reportedDates])]
+        // A cloud report may arrive in the verified quota ledger and monthly
+        // roster before the summary receipt cache is rebuilt. Read those
+        // same already-confirmed records as well; never infer a report from an
+        // unsaved local draft, bare overtime flag or ordinary punch.
+        const ledgerReportDates=(ledger?.ledger||[]).filter(item=>
+          item?.category===category&&['reported','reportedPendingAttendance'].includes(item.kind)&&
+          /^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))
+        ).map(item=>item.date);
+        const formalMetaDates=typeof monthlyScheduleMeta!=='undefined'&&
+          typeof p79ScheduleHasOfficialData==='function'&&p79ScheduleHasOfficialData()&&
+          typeof port79ScheduleDirty!=='undefined'&&!port79ScheduleDirty
+          ?Object.entries(monthlyScheduleMeta[emp.id]||{}).filter(([date,meta])=>{
+            const report=meta?.overtimeReport;
+            return /^\d{4}-\d{2}-\d{2}$/.test(date)&&String(report?.id||'').trim()&&
+              report.category===category&&meta?.overtimeExcluded!==true&&
+              !(meta?.overtimeRevocations||[]).some(item=>
+                item?.confirmed===true&&String(item.reportId)===String(report.id));
+          }).map(([date])=>date):[];
+        const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
           .filter(day=>day.startsWith(month+'-')&&!typhoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
         const count=categoryDates.length;
@@ -7018,11 +7040,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const verified=Number.isFinite(ledger?.remaining?.[category]);
         // Counter and remainder share the actual date cells for this one render.
         // Official reports on OTHER dates consume quota once without double counting.
-        const reportedOutside=new Set((ledger?.ledger||[]).filter(item=>
-          item?.category===category&&['reported','reportedPendingAttendance'].includes(item.kind)&&
-          item.date&&!typhoonSet.has(item.date)&&!categoryDates.includes(item.date)
-        ).map(item=>item.date));
-        const rest=Math.max(0,limit-count-reportedOutside.size),extra=Math.max(0,count-limit);
+        const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         const title=category+'：班表日期格及已確認申報合計 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；尚未分配 '+rest+' 天'+
