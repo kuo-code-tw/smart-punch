@@ -217,15 +217,54 @@ function p79ReviewSemanticAudit(value){
  if(value&&typeof value==='object'){const out={};for(const key of Object.keys(value).sort())if(!['updatedAt','lastSyncedAt','syncedAt','lastReadAt'].includes(key))out[key]=p79ReviewSemanticAudit(value[key]);return out;}
  return value;
 }
-function p79ReviewViewerScope(state){
+function p79ReviewV4ViewerScope(state){
  try{const session=JSON.parse(g.sessionStorage?.getItem('port79_user_session')||'null');if(session?.empId)return p79ReviewStableObject({empId:id(session.empId),role:session.adminRole||session.role||'',scope:session.dataScope||{},permissions:session.systemPermissions||{},fine:session.finePermissions||{}});}catch(_){}
  return String(state.token||'');
 }
+function p79ReviewViewerScope(state){
+ // Permission refreshes on another module do not alter an overtime filing.
+ // Authorization is enforced by the cloud read; the actual visible filing set
+ // below still changes when the caller's accessible employee set changes.
+ try{const session=JSON.parse(g.sessionStorage?.getItem('port79_user_session')||'null');if(session?.empId)return id(session.empId);}catch(_){}
+ return String(state.token||'');
+}
+function p79ReviewReportContent(report,owner='',date=''){
+ if(!report||!String(report.id||'').trim())return null;
+ const text=key=>String(report[key]??(key==='empId'?owner:key==='date'?date:'')).trim();
+ const fields=['id','empId','date','category','code','typeName','forEmpId','leaveHandoffId','leaveId','note','overtimeStart','overtimeEnd','normalStart','normalEnd','position'];
+ const result=Object.fromEntries(fields.map(key=>[key,text(key)]));
+ for(const key of ['declaredHours','convertedHours'])result[key]=text(key)===''?null:Number.isFinite(Number(report[key]))?Number(report[key]):text(key);
+ result.planned=report.planned===true||report.planned==='true';
+ return result;
+}
+function p79ReviewContentRows(date,state){
+ const list=[];
+ for(const row of state.rows||[]){
+  const meta=row.schedule?.__meta?.[date];if(!meta)continue;
+  // Primary and plural report slots are alternative representations of the
+  // same reports. Property additions, order and repeated copies are not edits.
+  const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])]
+   .map(report=>p79ReviewReportContent(report,id(row.empId),date)).filter(Boolean);
+  const unique=values=>[...new Set(values.map(value=>JSON.stringify(p79ReviewStableObject(value))))].sort();
+  const revocations=(Array.isArray(meta.overtimeRevocations)?meta.overtimeRevocations:[])
+   .filter(a=>a?.confirmed===true&&String(a.reportId||'').trim())
+   .map(a=>({reportId:String(a.reportId).trim(),report:p79ReviewReportContent(a.report,id(row.empId),date),reason:String(a.reason||'').trim()}));
+  if(!reports.length&&!revocations.length&&meta.overtimeExcluded!==true)continue;
+  list.push([id(row.empId),unique(reports),unique(revocations),meta.overtimeExcluded===true]);
+ }
+ return [...new Set(list.map(value=>JSON.stringify(value)))].sort();
+}
 function reviewFingerprint(date,state){
  if(state?.ready!==true)return '';
- const list=p79ReviewSemanticAudit(p79ReviewStableAuditRows(date,state));
- return 'v4-'+list.length+'-'+p79ReviewHash([p79ReviewViewerScope(state),list]);
+ const list=p79ReviewContentRows(date,state);
+ return 'v5-'+list.length+'-'+p79ReviewHash([p79ReviewViewerScope(state),list]);
 }
+function p79V4ReviewFingerprint(date,state){
+ if(state?.ready!==true)return '';
+ const list=p79ReviewSemanticAudit(p79ReviewStableAuditRows(date,state));
+ return 'v4-'+list.length+'-'+p79ReviewHash([p79ReviewV4ViewerScope(state),list]);
+}
+
 function p79PriorStableReviewFingerprint(date,state){
  if(state?.ready!==true)return '';
  const list=p79ReviewStableAuditRows(date,state);
@@ -257,7 +296,7 @@ function isReviewed(date){
  if(!signature)return false;
  const marks=reviewMarks();
  if(marks[date]===signature)return true;
- if(marks[date]&&(marks[date]===p79PriorStableReviewFingerprint(date,state)||marks[date]===p79LegacyReviewFingerprint(date,state))){
+ if(marks[date]&&(marks[date]===p79V4ReviewFingerprint(date,state)||marks[date]===p79PriorStableReviewFingerprint(date,state)||marks[date]===p79LegacyReviewFingerprint(date,state))){
   // One-time conservative migration: the legacy hash must match exactly.
   marks[date]=signature;
   try{g.localStorage?.setItem(reviewVersionKey,JSON.stringify(marks));}catch(_){}
@@ -428,6 +467,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px #4f46e5','important');
   button.dataset.p79OvertimeAudit=effectiveKind||(ready?'none':'unknown');
   button.dataset.p79OvertimeReview=reviewed?'reviewed':'not-reviewed';
+  button.dataset.p79OvertimeContentVersion=ready?reviewFingerprint(date,cloudMonth(date)):'';
   button.title=(info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認')))
    +(reviewed&&info?.activeCount?'\n此版本已人工查核；修改歷史保留':'');
   button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
