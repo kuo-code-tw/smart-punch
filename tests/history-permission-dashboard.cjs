@@ -1,0 +1,30 @@
+// Verify the history permission passed by the server survives dashboard session normalization.
+// The employee punch-only branch and all existing six module levels remain unchanged.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const line=(pattern,label)=>{const m=source.match(pattern);assert(m,'Missing '+label);return m[0]};
+const keys=line(/^const SYSTEM_KEYS=.*$/m,'system module keys');
+const norm=line(/^function normLevel\(.*$/m,'normalizer');
+const permissions=line(/^function normalizePermissions\(.*$/m,'permission projection');
+const context={};
+vm.runInNewContext(keys+'\n'+norm+'\n'+permissions+'\nthis.normalize=normalizePermissions;',context);
+const normalize=context.normalize;
+const normal={attendance:'manage',workhours:'view',leave:'none',schedule:'view',efficiency:'manage',hr:'none',history:'view'};
+const admin=normalize(normal,'admin');
+assert.equal(admin.history,'view');
+assert.equal(admin.attendance,'manage');
+assert.equal(admin.efficiency,'manage');
+assert.equal(admin.schedule,'view');
+assert.equal(normalize({...normal,history:'manage'},'admin').history,'manage');
+assert.equal(normalize({...normal,history:'unexpected'},'admin').history,'none');
+assert.equal(normalize({...normal,history:undefined},'admin').history,'none');
+assert.equal(Object.hasOwn(normalize({attendance:'view'},'admin'),'history'),false);
+const punch=normalize(normal,'employee');
+assert.equal(Object.hasOwn(punch,'history'),false,'Employee punch mode must not gain history permission');
+assert.equal(punch.attendance,'manage','Existing normalized employee module grant untouched');
+assert.equal(normalize({},'superadmin').attendance,'manage');
+assert(source.includes('async function punchLogin()'),'Existing punch implementation still present');
+assert(source.includes('onclick="location.href=\'./history-data/\'"'),'History entry unchanged');
+console.log('PASS history read permissions preserved for admins; punch-session permissions unchanged');

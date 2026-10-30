@@ -1,7 +1,8 @@
 (function(){
 'use strict';
 const d=document,$=id=>d.getElementById(id),A=window.P79HomeAnalytics;
-if(!A||d.body.dataset.p79System)return;
+// The monthly dashboard owns this homepage; never mount the retired daily view.
+if(!A||d.body.dataset.p79System||$('p79Dashboard'))return;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n=x=>Number(x).toLocaleString('zh-TW',{maximumFractionDigits:2}),moneyless=x=>n(x);
 const taipei=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

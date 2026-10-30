@@ -274,7 +274,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
 }
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261030-monthly-stacked-v1">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261030-single-monthly-v2">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -649,7 +649,7 @@ function updateThemeText(){$('themeToggle').textContent=document.documentElement
 $('themeToggle').onclick=()=>{const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);localStorage.setItem('port79_theme',next);updateThemeText()};initTheme();
 
 function normLevel(v,f='none'){v=String(v??'').toLowerCase();return ['none','view','manage'].includes(v)?v:f}
-function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));return out}
+function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));if(role==='admin'&&Object.prototype.hasOwnProperty.call(raw,'history'))out.history=normLevel(raw.history,'none');return out}
 
 function normalizeDetectedVersion(raw){
   const s=String(raw||'').trim();
@@ -1536,12 +1536,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  observer.observe(password,{attributes:true,attributeFilter:['disabled']});
 })();
 </script>
-<link rel="stylesheet" href="./assets/port79-management-workspace.css?v=20261029-integrated-workspace-v2">
-<script src="./assets/port79-management-workspace.js?v=20261029-integrated-workspace-v2"></script>
+<link rel="stylesheet" href="./assets/port79-management-workspace.css?v=20261030-single-monthly-v2">
+<script src="./assets/port79-management-workspace.js?v=20261030-single-monthly-v2"></script>
 <link rel="stylesheet" href="./assets/port79-home-dashboard.css?v=20261030-integrated-template-v9">
 <script src="./attendance/v6-engine.js?v=20261029-dashboard-shared"></script>
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
-<script src="./assets/port79-home-dashboard.js?v=20261030-integrated-template-v9"></script>
+<script src="./assets/port79-home-dashboard.js?v=20261030-single-monthly-v2"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261030-monthly-top-bottom-v1"></script>
 </body>
