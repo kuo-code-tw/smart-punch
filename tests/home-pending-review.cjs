@@ -21,11 +21,14 @@ assert.match(result.pendingDetails.find(r=>r.name==='乙').suggestion,/補登上
 const markup=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 assert.match(markup,/<button[^>]+id="p79DashPendingReviewTrigger"/);
 assert.match(markup,/id="p79DashReviewHint"/);
-assert.match(markup,/port79-monthly-dashboard\.js\?v=20261031-review-drilldown-v2/);
+assert.match(markup,/port79-monthly-dashboard\.js\?v=20261031-home-manual-refresh-v1/);
 const css=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.css'),'utf8');
 assert.match(css,/p79d-kpi-review:focus-visible/);
 const source=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.js'),'utf8');
-for(const needle of ['function openPendingReview','card.addEventListener(\'click\',openPendingReview)','function enrichPendingReview','pendingReviewItems=a.pendingDetails','refreshPendingOnReturn','function renderPendingReview','function refreshPendingReviewFromCloud','系統為什麼列為待核？'])assert(source.includes(needle),needle);
+for(const needle of ['function openPendingReview','card.addEventListener(\'click\',openPendingReview)','function enrichPendingReview','pendingReviewItems=a.pendingDetails','function renderPendingReview','function refreshPendingReviewFromCloud','系統為什麼列為待核？'])assert(source.includes(needle),needle);
+assert(!source.includes('refreshPendingOnReturn'),'首頁不可在重新取得焦點時背景刷新考勤');
+assert(!source.includes("root.addEventListener('focus'"),'首頁不可註冊自動焦點重讀');
+assert(!source.includes("root.document.addEventListener('visibilitychange'"),'首頁不可註冊背景重讀');
 delete globalThis.P79AttendanceV6;
 assert.equal(api.analyzeAttendance({records:[]},'2026-10').pendingShifts,null);
 console.log('PASS: homepage pending review count equals detail rows, preserves dates and record identifiers, accessible drill-down and cloud refresh');
