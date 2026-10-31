@@ -68,6 +68,7 @@ function scheduleClock(v){return v?v.slice(5).replace('-', '/').replace(' ', '�
 function renderShipSchedule(v,ym){
  scheduleRows=Array.isArray(v.scheduleRows)?v.scheduleRows:[];scheduleMonth=ym;
  const host=$('p79DashVesselNotices');if(!host)return;
+ host.className='p79-schedule-board';
  if(!scheduleRows.length){empty('p79DashVesselNotices','所選月份尚無船期或船舶作業資料');return;}
  host.innerHTML='<div class="p79-schedule-list" role="list">'+scheduleRows.slice(0,4).map((s,i)=>
   '<button type="button" role="listitem" class="p79-schedule-row" data-ship-schedule-index="'+i+'" aria-label="查看'+esc(s.name)+' '+esc(s.voyage)+' 船期">'+
