@@ -58,6 +58,37 @@ function latestImportedVessels(vessels,limit=5){
  const jobs=new Map();for(const v of vessels){if(v.deleted||!Number.isFinite(Date.parse(String(v.importedAt||''))))continue;const key=v.workingNo||v.name+'|'+v.voyage;const previous=jobs.get(key);if(!previous||Date.parse(v.importedAt)>Date.parse(previous.importedAt))jobs.set(key,v);}
  return [...jobs.values()].sort((a,b)=>Date.parse(b.importedAt)-Date.parse(a.importedAt)||String(a.workingNo).localeCompare(String(b.workingNo))).slice(0,limit);
 }
+// Read-only ship schedule display. Never use last work date as a fabricated ETA/ETD.
+function shipScheduleRows(masters,today=taipeiDay()){
+ const clean=v=>String(v??'').trim();
+ const timestamp=v=>{
+  const x=clean(v);if(!x)return '';
+  const match=x.match(/^(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{2}))?/);
+  if(!match)return '';
+  const yyyy=Number(match[1]),mm=Number(match[2]),dd=Number(match[3]),hh=match[4]===undefined?null:Number(match[4]),minute=match[5]===undefined?null:Number(match[5]);
+  const valid=new Date(Date.UTC(yyyy,mm-1,dd));if(valid.getUTCFullYear()!==yyyy||valid.getUTCMonth()!==mm-1||valid.getUTCDate()!==dd||hh!==null&&hh>23||minute!==null&&minute>59)return '';
+  return match[1]+'-'+match[2].padStart(2,'0')+'-'+match[3].padStart(2,'0')+(hh===null?'':' '+String(hh).padStart(2,'0')+':'+String(minute).padStart(2,'0'));
+ };
+ const rows=(masters||[]).filter(m=>m&&m.deleted!==true&&m.isDeleted!==true&&!m.deletedAt).map((m,i)=>{
+  const eta=timestamp(first(m,['eta','ETA','etaTime','estimatedArrival','estimatedArrivalTime','plannedArrival','scheduledArrival','arrivalTime','arrivalDate','estimatedBerthTime','planBerthTime'])),
+   etd=timestamp(first(m,['etd','ETD','etdTime','estimatedDeparture','estimatedDepartureTime','plannedDeparture','scheduledDeparture','departureTime','departureDate','estimatedSailingTime'])),
+   workStart=timestamp(first(m,['firstDate','workStartDate','operationStartDate'])),
+   workEnd=timestamp(first(m,['lastDate','_cloudLastDate','workEndDate','endDate','finishTime']));
+  const primary=eta||etd||workStart||workEnd;
+  const kind=eta?'eta':etd?'etd':workStart?'work':workEnd?'work':'unknown';
+  const dateLabel=eta?'預計抵港':etd?'預計離港':workStart?'作業首日':workEnd?'作業末日':'日期未提供';
+  const originalStatus=clean(first(m,['status','vesselStatus','operationStatus']));
+  return {
+   key:clean(m.workingNo)||'ship-'+i,name:clean(first(m,['vesselName','shipName','vessel','name']))||'未填船名',
+   voyage:clean(first(m,['voyageE','voyageI','voyage']))||'—',wharf:clean(first(m,['wharf','berth','pier','terminal']))||'—',
+   eta,etd,workStart,workEnd,primary,kind,dateLabel,status:originalStatus|| (eta||etd?'船期已登錄':workStart||workEnd?'有作業紀錄':'待補資料'),
+   workingNo:clean(m.workingNo)
+  };
+ });
+ const group=r=>r.kind==='unknown'?3:(r.kind!=='work'&&r.primary.slice(0,10)>=today)?0:(r.kind!=='work'?1:2);
+ rows.sort((a,b)=>{const ga=group(a),gb=group(b);if(ga!==gb)return ga-gb;return ga===0?a.primary.localeCompare(b.primary):b.primary.localeCompare(a.primary)||a.name.localeCompare(b.name,'zh-TW');});
+ return rows;
+}
 function analyzeVessels(data){
  if(!data||!Array.isArray(data.shipMasters))throw Error('船舶月份資料不完整');
  const versionView=root.P79VesselVersionView||
@@ -108,7 +139,7 @@ function analyzeVessels(data){
  const personRows=[...people.values()].filter(p=>p.validMoves>0).map(p=>({...p,hatches:p.validHatches>0?p.hatches:null,efficiency:p.hours>0?p.timedMoves/p.hours:null})).sort((a,b)=>(b.efficiency??-1)-(a.efficiency??-1)||b.moves-a.moves);
  return {count:masters.length,moves:validMoves?totalMoves:null,containers:validContainers?containers:null,
   averageGph:weight>0?weighted/weight:rateCount?rateSum/rateCount:null,
-  vessels,people:personRows,workHours:timedRows?workHours:null,timedRows,detailCount:details.length,completeness:{moves:validMoves,containers:validContainers,total:masters.length}};
+  vessels,scheduleRows:shipScheduleRows(masters),people:personRows,workHours:timedRows?workHours:null,timedRows,detailCount:details.length,completeness:{moves:validMoves,containers:validContainers,total:masters.length}};
 }
 function attendanceDate(r){
  const raw=first(r,['timeStr','datetime','dateTime','timestamp','attendanceTime','clockTime','workDate','date']);
@@ -163,7 +194,7 @@ function analyzeOvertime(data,month){
  }
  return {hours,count};
 }
-const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels,displayPersonName,rosterGroup,assignPersonGroups};
+const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels,shipScheduleRows,displayPersonName,rosterGroup,assignPersonGroups};
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
