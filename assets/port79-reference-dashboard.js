@@ -11,7 +11,7 @@ const badge=i=>'<span class="p79r-rank rank-'+i+'">'+i+'</span>';
 const detailBtn=()=>d.getElementById('cardEfficiency')?.click();
 let attendancePage=0,attendanceReport=null,leaveReport=null,attendanceMonth='';
 let peopleGroup='ALL',peopleReport=null,groupRoster=null,groupRosterMonth='';
-let scheduleRows=[],scheduleMonth='',scheduleDialog=null,scheduleSelected=-1;
+
 function renderPeople(){
  const table=$('p79DashPeopleRanking'),model=g.P79MonthlyDashboard;if(!table||!model)return;
  const source=peopleReport?.people||[];
@@ -63,51 +63,7 @@ function weeklyChart(report){
  const lines=segments.map(s=>'<polyline points="'+s.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="最近七天船舶效率（GPH），'+esc(report.start+' 至 '+report.end)+'">'+grid+lines+points+'</svg>';
 }
-// Ship schedule only uses the authenticated monthly vessel snapshot. No polling or new API.
-function scheduleClock(v){return v?v.slice(5).replace('-', '/').replace(' ', '　'):'—';}
-function renderShipSchedule(v,ym){
- scheduleRows=Array.isArray(v.scheduleRows)?v.scheduleRows:[];scheduleMonth=ym;
- const host=$('p79DashVesselNotices');if(!host)return;
- host.className='p79-schedule-board';
- if(!scheduleRows.length){empty('p79DashVesselNotices','所選月份尚無船期或船舶作業資料');return;}
- host.innerHTML='<div class="p79-schedule-list" role="list">'+scheduleRows.slice(0,4).map((s,i)=>
-  '<button type="button" role="listitem" class="p79-schedule-row" data-ship-schedule-index="'+i+'" aria-label="查看'+esc(s.name)+' '+esc(s.voyage)+' 船期">'+
-  '<span class="p79-schedule-time"><b>'+esc(scheduleClock(s.primary))+'</b><small>'+esc(s.dateLabel)+'</small></span>'+
-  '<span class="p79-schedule-info"><strong>'+esc(s.name)+'</strong><small>'+esc('航次 '+s.voyage+(s.wharf==='—'?'':' · '+s.wharf))+'</small></span>'+
-  '<span class="p79-schedule-status">'+esc(s.status)+'</span></button>'
- ).join('')+'</div>'+
- '<div class="p79-schedule-footnote">預計時間與已記錄作業日分別標示，未提供 ETA/ETD 不會推估。</div>';
-}
-function ensureScheduleDialog(){
- if(scheduleDialog)return scheduleDialog;
- scheduleDialog=d.createElement('dialog');scheduleDialog.id='p79ShipScheduleDialog';
- scheduleDialog.setAttribute('aria-labelledby','p79ShipScheduleDialogTitle');
- scheduleDialog.innerHTML='<section class="p79-schedule-dialog-inner"><header class="p79-schedule-dialog-header"><div><h2 id="p79ShipScheduleDialogTitle">船期看板</h2><p id="p79ShipScheduleDialogNote"></p></div><button type="button" data-close-ship-schedule aria-label="關閉船期看板">✕</button></header><div id="p79ShipScheduleDialogBody"></div></section>';
- d.body.appendChild(scheduleDialog);
- scheduleDialog.addEventListener('click',e=>{
-  if(e.target===scheduleDialog||e.target.closest('[data-close-ship-schedule]')){scheduleDialog.close();return;}
-  if(e.target.closest('[data-ship-schedule-detail]')){scheduleDialog.close();detailBtn();}
- });
- return scheduleDialog;
-}
-function openShipSchedule(index=-1){
- const dlg=ensureScheduleDialog();scheduleSelected=Number.isInteger(index)?index:-1;
- const [y,m]=scheduleMonth.split('-');
- $('p79ShipScheduleDialogTitle').textContent=Number(y)+'年'+Number(m)+'月船期看板';
- $('p79ShipScheduleDialogNote').textContent='資料來源：正式船舶月份主檔｜共 '+scheduleRows.length+' 艘｜只在首次載入或手動更新時同步';
- const host=$('p79ShipScheduleDialogBody');
- if(!scheduleRows.length){host.innerHTML='<div class="p79r-empty">本月沒有可顯示的船期資料</div>';}
- else{
-  const rows=scheduleSelected>=0&&scheduleSelected<scheduleRows.length?[scheduleRows[scheduleSelected]]:scheduleRows;
-  host.innerHTML='<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
-   ['船名','航次','碼頭','預計抵港 ETA','預計離港 ETD','作業首日','作業末日','狀態'].map(x=>'<th>'+x+'</th>').join('')+
-   '</tr></thead><tbody>'+rows.map(r=>'<tr><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.voyage)+'</td><td>'+esc(r.wharf)+'</td><td>'+esc(r.eta||'未提供')+'</td><td>'+esc(r.etd||'未提供')+'</td><td>'+esc(r.workStart||'—')+'</td><td>'+esc(r.workEnd||'—')+'</td><td>'+esc(r.status)+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="p79-schedule-dialog-disclaimer">「作業首日／末日」是歷史作業資料，不代表預計靠泊或離港；沒有正式船期的欄位會顯示「未提供」。</p>'+
-   '<div class="p79-schedule-dialog-actions">'+(scheduleSelected>=0?'<button type="button" data-show-all-ships>查看全部 '+scheduleRows.length+' 艘</button>':'')+'<button type="button" data-ship-schedule-detail>前往船舶作業明細 ›</button></div>';
- }
- if(!dlg.open)dlg.showModal();
- dlg.querySelector('[data-show-all-ships]')?.addEventListener('click',()=>openShipSchedule(-1),{once:true});
-}
+// Homepage ship timetable is a separate outside-website source, not the vessel historical snapshot.
 
 function vessels(v){
  const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard,latest=model.latestImportedVessels(v.vessels,5);
@@ -116,7 +72,7 @@ function vessels(v){
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  peopleReport=v;renderPeople();
- renderShipSchedule(v,ym);
+ g.P79ExternalShipSchedule?.render?.();
  if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent=fmt(v.count);
  if($('p79rHeroMonth'))$('p79rHeroMonth').textContent=Number(ym.slice(5))+' 月作業船舶';
 }
@@ -157,8 +113,6 @@ function chrome(){
 }
 function init(){
  if(!$('p79Dashboard'))return;
- $('p79ShipScheduleAll')?.addEventListener('click',()=>openShipSchedule(-1));
- $('p79DashVesselNotices')?.addEventListener('click',event=>{const btn=event.target.closest('[data-ship-schedule-index]');if(btn)openShipSchedule(Number(btn.dataset.shipScheduleIndex));});
  $('p79DashChartPrevious')?.addEventListener('click',()=>{attendancePage=0;renderAttendancePage();});
  $('p79DashChartNext')?.addEventListener('click',()=>{attendancePage=1;renderAttendancePage();});
  $('p79DashPeopleGroupFilters')?.addEventListener('click',event=>{
@@ -170,7 +124,7 @@ function init(){
  d.querySelectorAll('.p79d-panel-title>b').forEach(e=>{e.textContent=e.textContent.replace(/^[▤▥◉]\s*/, '');e.insertAdjacentHTML('afterbegin','<span class="p79r-panel-mark">↥</span>')});
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
-function reset(){scheduleRows=[];scheduleMonth='';scheduleSelected=-1;if(scheduleDialog?.open)scheduleDialog.close();attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))empty('p79DashVesselNotices','正在讀取本月船期資料…');if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+function reset(){attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ExternalShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
 g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setLeaveReport};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
