@@ -36,13 +36,21 @@ function timeLabel(){
  if(!lastSync)return '尚未成功同步';
  return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(lastSync));
 }
+function shipTimeMarkup(value){
+ const raw=str(value);
+ if(!raw)return '未提供';
+ // Present the provider's local timestamp exactly, without timezone conversion.
+ const match=/^(\d{4}[/-]\d{1,2}[/-]\d{1,2})[ T](\d{1,2}:\d{2}(?::\d{2})?)$/.exec(raw);
+ if(!match)return '<span class="p79-wanhai-raw-time">'+esc(raw)+'</span>';
+ return '<span class="p79-wanhai-date">'+esc(match[1])+'</span><span class="p79-wanhai-clock">'+esc(match[2])+'</span>';
+}
 function line(r,i){
  return '<button class="p79-schedule-row p79-wanhai-row" type="button" data-public-ship-index="'+i+'" role="listitem">'+
  '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong>'+
  '<small class="p79-wanhai-voyage">'+esc((r.localName&&r.localName!==r.name?r.localName+' · ':'')+'進港 '+(r.inVoyage||'—')+'／出港 '+(r.outVoyage||'—'))+'</small></span>'+
- '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
- '<span><small>ETB 靠泊</small><b>'+esc(r.etb||'未提供')+'</b></span>'+
- '<span><small>ETD 離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
+ '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b title="'+esc(r.eta||'未提供')+'">'+shipTimeMarkup(r.eta)+'</b></span>'+
+ '<span><small>ETB 靠泊</small><b title="'+esc(r.etb||'未提供')+'">'+shipTimeMarkup(r.etb)+'</b></span>'+
+ '<span><small>ETD 離港</small><b title="'+esc(r.etd||'未提供')+'">'+shipTimeMarkup(r.etd)+'</b></span></span>'+
  '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span></button>';
 }
 function renderOne(host){
