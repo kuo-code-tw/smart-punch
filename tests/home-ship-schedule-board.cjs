@@ -7,7 +7,7 @@ const external=fs.readFileSync(path.join(root,'assets/port79-external-ship-sched
 const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
 assert(html.includes('<b>萬海網站船期</b>'),'label must describe original third-party source');
 assert(html.includes('id="p79ShipScheduleAll"'),'full-site and full-list button stays available');
-assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-image-source-v4'),'external adapter must be loaded');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-json-fields-v5'),'external adapter must be loaded');
 assert(!html.includes('船舶作業重點提醒'));
 assert(!view.includes('renderShipSchedule(v,ym)'),'historical vessel rows must not replace outside website data');
 assert(!view.includes('function openShipSchedule('),'retired private source dialog must not open');
