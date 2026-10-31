@@ -86,6 +86,9 @@
 
 /* V10.34：所有單位縮短休假統計及班別格內空白 */
 #app-main-container .p79-rest-count-compact{width:46px!important;min-width:46px!important;max-width:46px!important;padding:1px 2px!important;white-space:nowrap!important;line-height:20px!important;font-size:11px!important}
+#app-main-container .p79-rest-deficit{display:block!important;font-size:10px!important;line-height:11px!important;color:#b45309!important;font-weight:900!important}
+#app-main-container .p79-rest-election{background:#eef2ff!important;color:#4338ca!important;font-weight:900!important}
+#app-main-container .p79-rest-pending-quota{background:#fffbeb!important;color:#92400e!important}
 #app-main-container .p79-day-cell{height:30px!important;max-height:32px!important;padding:0 1px!important;vertical-align:middle!important}
 #app-main-container .p79-day-cell .p79-shift-select{height:25px!important;min-height:25px!important;line-height:25px!important}
 #app-main-container .p79-month-schedule-table tbody tr{height:33px!important}
@@ -6062,6 +6065,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // parsing and evidence lookups on every employee/day cell.
       const typhoonDays=new Set(p79TyphoonDates().filter(date=>date.startsWith(yearMonth+'-')));
       const electionDays=new Set(window.P79SpecialOvertime.electionDates().filter(date=>date.startsWith(yearMonth+'-')));
+      const specialSummaryColumns=p79ScheduleSpecialSummaryColumns(yearMonth);
+      for(const date of specialSummaryColumns.electionDates)electionDays.add(date);
       const attendanceEvidence=monthEvidence?.evidence||{complete:false,days:{}};
       const attendanceSnapshot={attendanceEvidence};
       const typhoonToday=scheduleTaipeiTodayKey();
@@ -6211,10 +6216,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
               <thead class="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-300">
                 <tr>
                   <th class="p79-person-header sticky-col-left-header border-r border-b text-slate-800">姓名</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假">例</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假">休</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：日期格與雲端正式已申報的假別合計（同日只算一次）／尚未分配額度；不代表全部實際休假；不包含颱風停班">國</th>
-                  <th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="颱風日：停班、實際出勤及加班均計入；同日只算一次，不併入國定假日額度">颱</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-example bg-purple-100 text-purple-800" style="min-width:64px" title="例假日：已配／應配；不代表全部實際休假">例</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-break bg-blue-100 text-blue-800" style="min-width:64px" title="休息日：已配／應配；缺額必須調整正式班別">休</th>
+                  <th class="py-2 px-2 text-center border-b p79-rest-national bg-green-100 text-green-800" style="min-width:64px" title="國定假日：已配／應配；不包含選舉及颱風日">國</th>
+                  ${specialSummaryColumns.typhoon?'<th class="py-2 px-2 text-center border-b p79-rest-typhoon bg-cyan-100 text-cyan-800" style="min-width:64px" title="本月有颱風日事件">颱</th>':''}
+                  ${specialSummaryColumns.election?'<th class="py-2 px-2 text-center border-b p79-rest-election" style="min-width:64px" title="選舉投票日事件；不自動增加例／休額度，是否應放假須看投票資格與原定班別">選</th>':''}
       `;
 
       const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -6356,6 +6362,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${combinedMarker}
               ${verifiedRestAttendance&&!actualShift?'<span class="block text-[9px] leading-tight font-bold text-amber-800" title="出勤已確認，但尚不能從打卡時段推定早／中／晚班；不會自動建立加班申報">班別待核</span>':''}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
+              ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
               ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="已確認無卡，等候正式 GAS 分配休假並重新讀取雲端班表；此處不自行改寫排班">休假待同步</span>':''}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
@@ -6363,7 +6370,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           `;
         }
 
-        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates);
+        const restCategoryCells=p79ScheduleRestCountCells(emp,yearMonth,automaticRestMeta,typhoonShownDates,typhoonWorkedDates,visibleRestDates,specialSummaryColumns);
         const lockBadge = emp.lockType === 'FIXED_LOCKED' ? '<span class="text-[9px] bg-purple-100 text-purple-700 px-1 rounded font-bold">🔒固定</span>' : '';
 
         html += `
@@ -6992,8 +6999,35 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
       return result;
     }
-    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null,visibleRestDates=null) {
+    // Display only configured calendar events; never reclassify shifts here.
+    function p79ScheduleSpecialSummaryColumns(month){
+      const days=Array.from({length:p79RestQuota(month).days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
+      const t=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
+      const e=new Set((window.P79SpecialOvertime?.electionDates?.()||[]).filter(d=>d.startsWith(month+'-')));
+      for(const date of days){
+        if(/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||'')))e.add(date);
+      }
+      for(const emp of employees||[]){
+        const roster=monthlyScheduleData[emp.id]||{},meta=monthlyScheduleMeta[emp.id]||{};
+        for(const date of days){
+          if(String(roster[date]||'').trim()==='颱')t.add(date);
+          if(String(roster[date]||'').trim()==='選')e.add(date);
+          const day=meta[date]||{};
+          if([day.overtimeReport,...(day.overtimeReports||[])].some(r=>String(r?.id||'').trim()&&
+            day.overtimeExcluded!==true&&!(day.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(r.id))&&
+            (/^颱/.test(String(r.code||''))||/颱風|颱日|停班/.test(String(r.typeName||'')))))t.add(date);
+        }
+      }
+      return {typhoon:t.size>0,election:e.size>0,electionDates:[...e].sort()};
+    }
+    function p79ScheduleElectionSummaryDates(emp,month,columns){
+      return (columns.electionDates||[]).filter(date=>
+        (typeof p79EmployeeDateEligible!=='function'||p79EmployeeDateEligible(emp,date))&&
+        !['離','離職'].includes(String(monthlyScheduleData[emp.id]?.[date]||'').trim()));
+    }
+    function p79ScheduleRestCountCells(emp,month,knownAllocation=null,knownTyphoonDays=null,knownTyphoonWorkDays=null,visibleRestDates=null,specialColumns=null) {
       const quota=p79RestQuota(month).counts;
+      const special=specialColumns||p79ScheduleSpecialSummaryColumns(month);
       const audit=visibleRestDates?null:p79DailyRestCount(emp,month,knownAllocation);
       // The visible day count and the unreported balance are different values.
       // Confirmed overtime already consumes quota; do not show it as missing again.
@@ -7072,16 +7106,21 @@ async function p79SaveScheduleOvertimeDraft(draft){
           (verified?'；正式已報 '+(ledger.reported?.[category]||0)+' 天；出勤待核 '+(ledger.reserved?.[category]||0)+' 天；帳本未報 '+officialRemaining+' 天':'；雲端申報額度待核')+
           (officialRemaining!==null&&officialRemaining!==rest?'；⚠ 班格與正式帳本差異須核對，未更動正式資料':'')+(extra?'；超額 '+extra+' 天':'')+
           (category==='國'&&nationalDuplicates?'；另有 '+nationalDuplicates+' 天颱風日已移至「颱」統計，不重複計入':'');
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${rest}</span>${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
+        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${rest?'p79-rest-pending-quota':''} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${limit}</span>${rest?`<small class="p79-rest-deficit" title="仍缺 ${rest} 天需安排">缺${rest}</small>`:''}${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
       }).join('');
       const days=[...typhoonSet].sort().map(date=>date.slice(-2)).join('、')||'無';
-      const typhoonCell='<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
+      const typhoonCell=special.typhoon?'<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
         scheduleEscapeHtml('颱風日：'+total+' 天（'+days+'）；有出勤、加班或颱風停班同一天都只算 1 筆；不重複計入國定假日')+
-        '"><span>'+total+' 天</span></td>';
-      return quotaCells+typhoonCell;
+        '"><span>'+total+' 天</span></td>':'';
+      const electionDates=special.election?p79ScheduleElectionSummaryDates(emp,month,special):[];
+      const electionCell=special.election?'<td data-rest-category="選" class="p79-rest-count-compact p79-rest-election text-center font-bold border-r text-xs" title="'+
+        scheduleEscapeHtml('選舉日：'+(electionDates.map(d=>d.slice(-2)).join('、')||'無')+'；只顯示投票日期事件，不等於另增加補休；原排班不更動')+
+        '"><span>'+electionDates.length+' 天</span></td>':'';
+      return quotaCells+typhoonCell+electionCell;
     }
     function p79RefreshScheduleRestCounts(month) {
       if(currentScheduleMonthKey()!==month)return;
+      const specialColumns=p79ScheduleSpecialSummaryColumns(month);
       document.querySelectorAll('tr[data-p79-drag-emp]').forEach(row=>{
         const emp=employees.find(e=>e.id===row.dataset.p79DragEmp);if(!emp)return;
         const cells=row.querySelectorAll('[data-rest-category]');if(!cells.length)return;
@@ -7095,7 +7134,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           else if(cell.dataset.typhoonCount==='off')typhoonOff.push(date);
         });
         const template=document.createElement('template');template.innerHTML='<table><tbody><tr>'+
-          p79ScheduleRestCountCells(emp,month,p79AutomaticRestMetadata(emp.id,month),typhoonOff,typhoonWorked,restDates)+'</tr></tbody></table>';
+          p79ScheduleRestCountCells(emp,month,p79AutomaticRestMetadata(emp.id,month),typhoonOff,typhoonWorked,restDates,specialColumns)+'</tr></tbody></table>';
         [...template.content.querySelectorAll('[data-rest-category]')].forEach((cell,i)=>cells[i]?.replaceWith(cell));
       });
     }
