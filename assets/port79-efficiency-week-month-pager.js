@@ -9,7 +9,7 @@ var $=id=>d.getElementById(id);
 var base=g.P79ReferenceDashboard;
 var model=g.P79MonthlyDashboard;
 var originalVessels=base.vessels,originalReset=base.reset;
-var mode='week',cursor='',selectedMonth='',sessionKey='',seq=0;
+var mode='week',cursor='',weekCursor='',yearCursor='',selectedMonth='',sessionKey='',seq=0;
 var cache=new Map(),inflight=new Map();
 var style=d.createElement('style');
 style.id='p79-efficiency-week-month-pager-style';
@@ -216,7 +216,11 @@ function latestDateForMonth(month){
 }
 function setMode(next){
  if(next===mode)return;
- mode=next;render();
+ if(mode==='week')weekCursor=cursor;
+ else yearCursor=cursor;
+ mode=next;
+ cursor=mode==='week'?weekCursor:yearCursor;
+ render();
 }
 function move(n){
  if(mode==='week')cursor=iso(plus(date(cursor),7*n));
@@ -235,8 +239,13 @@ function onVessels(v){
  if(previous!==now&&Array.isArray(v.weekVessels)&&!v.weekError){
   cache.set(previous,v.weekVessels.filter(x=>x.date?.startsWith(previous)));
  }
- if(now!==selectedMonth){selectedMonth=now;cursor=latestDateForMonth(now);}
- if(!cursor)cursor=latestDateForMonth(now);
+ if(now!==selectedMonth){
+  selectedMonth=now;
+  weekCursor=latestDateForMonth(now);
+  yearCursor=weekCursor.slice(0,4)+'-01-01';
+  cursor=mode==='week'?weekCursor:yearCursor;
+ }
+ if(!cursor)cursor=mode==='week'?weekCursor:yearCursor;
  render();
 }
 base.vessels=onVessels;
@@ -246,4 +255,6 @@ $('p79EffMonth')?.addEventListener('click',()=>setMode('month'));
 $('p79EffPrevious')?.addEventListener('click',()=>move(-1));
 $('p79EffNext')?.addEventListener('click',()=>move(1));
 cursor=latestDateForMonth($('p79DashMonth')?.value||taipeiToday().slice(0,7));
+weekCursor=cursor;
+yearCursor=cursor.slice(0,4)+'-01-01';
 })(window);
