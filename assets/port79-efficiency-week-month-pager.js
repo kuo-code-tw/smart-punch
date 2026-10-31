@@ -1,0 +1,191 @@
+/* PORT79 2026-10-31: 首頁船舶效率週／月翻頁（唯讀）。
+   週期固定星期日到星期六；沿用船舶主檔 GPH 與櫃量加權算法。
+   不修改船舶、考勤、排班、請假、權限或 GAS 資料。 */
+(function(g){
+'use strict';
+var d=g.document;
+if(!d||!g.P79ReferenceDashboard||!g.P79MonthlyDashboard)return;
+var $=id=>d.getElementById(id);
+var base=g.P79ReferenceDashboard;
+var model=g.P79MonthlyDashboard;
+var originalVessels=base.vessels,originalReset=base.reset;
+var mode='week',cursor='',selectedMonth='',sessionKey='',seq=0;
+var cache=new Map(),inflight=new Map();
+var style=d.createElement('style');
+style.id='p79-efficiency-week-month-pager-style';
+style.textContent=[
+ '.p79-eff-pager{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:7px 1px 9px}',
+ '.p79-eff-pager button{appearance:none;border:1px solid #dbe6f3;background:#fff;color:#356994;border-radius:9px;cursor:pointer;font-size:12px;font-weight:800;line-height:1.2;padding:7px 10px;min-height:32px}',
+ '.p79-eff-pager button:hover{border-color:#83b9ef;background:#eff7ff}',
+ '.p79-eff-pager button[aria-pressed="true"]{background:#1687e8;border-color:#1687e8;color:white}',
+ '.p79-eff-pager button:focus-visible{outline:3px solid #9ecfff;outline-offset:2px}',
+ '.p79-eff-pager .p79-eff-modes,.p79-eff-pager .p79-eff-arrows{display:flex;align-items:center;gap:5px}',
+ '.p79-eff-pager .p79-eff-arrows button{font-size:19px;padding:3px 9px;min-width:30px}',
+ '.p79-eff-pager .p79-eff-period{font-size:12px;color:#587493;font-weight:800;text-align:center;min-width:125px;font-variant-numeric:tabular-nums}',
+ '.p79-eff-summary{font-size:11px;color:#66809a;padding:2px 1px 0;text-align:right}',
+ '@media(max-width:540px){.p79-eff-pager{justify-content:center}.p79-eff-pager .p79-eff-period{min-width:135px}}'
+].join('\n');
+d.head.appendChild(style);
+var periodEl=$('p79EffPeriod'),summaryEl=$('p79EffSummary'),chartEl=$('p79DashShipBars');
+if(!periodEl||!chartEl)return;
+function iso(d){return d.toISOString().slice(0,10);}
+function date(s){return new Date(String(s)+'T12:00:00Z');}
+function plus(d,n){var v=new Date(d.getTime());v.setUTCDate(v.getUTCDate()+n);return v;}
+function taipeiToday(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function endOfMonth(ym){return iso(new Date(Date.UTC(Number(ym.slice(0,4)),Number(ym.slice(5)),0,12)));}
+function mondayIndependentWeekStart(s){var v=date(s);return iso(plus(v,-v.getUTCDay()));}
+function period(){
+ var today=taipeiToday(),start,end;
+ if(mode==='week'){start=mondayIndependentWeekStart(cursor);end=iso(plus(date(start),6));}
+ else{start=cursor.slice(0,7)+'-01';end=endOfMonth(cursor.slice(0,7));}
+ var months=new Set(),day=date(start);
+ while(iso(day)<=end){months.add(iso(day).slice(0,7));day=plus(day,1);}
+ return {start,end,months:[...months],future:start>today};
+}
+function fmtPeriod(p){
+ var a=p.start.replaceAll('-','/'),b=p.end.slice(5).replace('-','/');
+ return mode==='week'?a+'（日）～'+b+'（六）':p.start.slice(0,4)+' 年 '+Number(p.start.slice(5,7))+' 月';
+}
+function cleanSession(){
+ var user=null;try{user=JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
+ var role=String(user?.adminRole||user?.role||'').toLowerCase(),fine=user?.finePermissions?.history||{};
+ var allowed=!!user&&!user.punchOnly&&(role==='superadmin'||(role==='admin'&&String(user?.systemPermissions?.history||'none')!=='none'&&fine['vessel.view']===true));
+ var token=g.sessionStorage.getItem('port79_user_token')||g.sessionStorage.getItem('port79_admin_token')||'';
+ var gas=String(g.sessionStorage.getItem('port79_gas_url')||'').trim();
+ var next=(user?.empId||'')+'|'+token+'|'+gas;
+ if(next!==sessionKey){sessionKey=next;cache.clear();inflight.clear();seq++;}
+ return {allowed,token,gas};
+}
+async function fetchMonth(ym,session){
+ if(cache.has(ym))return cache.get(ym);
+ if(inflight.has(ym))return inflight.get(ym);
+ if(!session.allowed||!session.token||!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(session.gas))
+  throw Error('沒有權限或尚未連接正式船舶資料');
+ if(!g.P79HistoryRead?.read)throw Error('歷史船舶資料讀取模組未載入');
+ var u=new URL(session.gas);
+ u.searchParams.set('action','historyGetMonthData');
+ u.searchParams.set('type','vessel');
+ u.searchParams.set('month',ym);
+ u.searchParams.set('token',session.token);
+ u.searchParams.set('gcToken',session.token);
+ var expected=sessionKey;
+ var promise=g.P79HistoryRead.read(u.toString(),{forceCloud:false}).then(data=>{
+  if(sessionKey!==expected)throw Error('登入狀態已更新');
+  if(data?.month&&String(data.month)!==ym)throw Error('回傳月份不符');
+  if(!Array.isArray(data?.shipMasters))throw Error('船舶月份資料不完整');
+  var result=model.analyzeVessels(data).vessels;
+  cache.set(ym,result);
+  return result;
+ }).finally(()=>inflight.delete(ym));
+ inflight.set(ym,promise);
+ return promise;
+}
+function daily(p){
+ var all=[],seen=new Set();
+ for(var ym of p.months)for(var v of cache.get(ym)||[]){
+  if(!v||v.deleted||!v.date||v.date<p.start||v.date>p.end)continue;
+  var id=String(v.workingNo||v.name+'|'+v.voyage)+'|'+v.date;
+  if(seen.has(id))continue;
+  seen.add(id);all.push(v);
+ }
+ var days=[],totalQuantity=0,totalHours=0;
+ for(var dt=date(p.start);iso(dt)<=p.end;dt=plus(dt,1)){
+  var dateKey=iso(dt),quantity=0,hours=0,count=0;
+  for(var v of all){
+   if(v.date!==dateKey)continue;
+   var q=v.containers??v.moves,rate=v.rate;
+   if(!(q>0)||!(rate>0))continue;
+   quantity+=q;hours+=q/rate;count++;
+  }
+  if(hours>0){totalQuantity+=quantity;totalHours+=hours;}
+  days.push({date:dateKey,gph:hours>0?quantity/hours:null,count});
+ }
+ return {days,average:totalHours>0?totalQuantity/totalHours:null,valid:days.filter(x=>x.gph!==null).length};
+}
+function draw(p,report){
+ var days=report.days;
+ if(summaryEl)summaryEl.textContent=report.average===null?'此期間沒有有效 GPH 資料':'期間加權效率 '+report.average.toFixed(2)+' GPH · 有效 '+report.valid+' 天';
+ if(!report.valid){chartEl.innerHTML='<div class="p79r-empty">這個期間沒有可核對的船舶效率資料</div>';return;}
+ var w=480,h=190,left=35,right=16,top=26,bottom=31,pw=w-left-right,ph=h-top-bottom;
+ var max=Math.max(5,...days.map(v=>v.gph||0)),ceiling=Math.ceil(max/5)*5;
+ var gap=pw/days.length,grid='',texts='',segments=[],part=[];
+ var escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ for(var tick=0;tick<=4;tick++){
+  var y0=top+ph-tick*ph/4;
+  grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y0+4)+'" text-anchor="end">'+(ceiling*tick/4).toFixed(1)+'</text>';
+ }
+ for(var i=0;i<days.length;i++){
+  var x=left+gap*(i+.5),row=days[i],label=Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2));
+  if(mode==='week'||i===0||i===days.length-1||(i+1)%5===0)
+   texts+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+label+'</text>';
+  if(row.gph===null){if(part.length)segments.push(part);part=[];continue;}
+  var y=top+ph-row.gph/ceiling*ph;part.push([x,y]);
+  texts+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
+  if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
+ }
+ if(part.length)segments.push(part);
+ var lines=segments.map(s=>'<polyline points="'+s.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
+ chartEl.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週':'每月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
+}
+async function render(){
+ var requestId=++seq,p=period(),session=cleanSession();
+ requestId=++seq;
+ periodEl.textContent=fmtPeriod(p);
+ ['p79EffWeek','p79EffMonth'].forEach(id=>{
+  var b=$(id);if(b)b.setAttribute('aria-pressed',String((id==='p79EffWeek')===(mode==='week')));
+ });
+ $('p79EffPrevious')?.setAttribute('aria-label',mode==='week'?'上一週':'上一月');
+ $('p79EffNext')?.setAttribute('aria-label',mode==='week'?'下一週':'下一月');
+ var caption=chartEl.closest('article')?.querySelector('.p79d-panel-title>span');
+ if(caption)caption.textContent='依船舶完工日 · GPH';
+ if(!session.allowed){chartEl.textContent='目前登入身分沒有船舶歷史資料的檢視權限';if(summaryEl)summaryEl.textContent='';return;}
+ if(p.future){chartEl.textContent='所選期間尚未開始';if(summaryEl)summaryEl.textContent='';return;}
+ chartEl.innerHTML='<div class="p79r-empty">正在讀取 '+(mode==='week'?'每週':'每月')+'船舶效率…</div>';
+ if(summaryEl)summaryEl.textContent='';
+ try{
+  await Promise.all(p.months.map(ym=>fetchMonth(ym,session)));
+  if(requestId!==seq)return;
+  draw(p,daily(p));
+ }catch(error){
+  if(requestId!==seq)return;
+  chartEl.textContent='尚無法讀取：'+String(error?.message||error);
+ }
+}
+function latestDateForMonth(month){
+ var now=taipeiToday();
+ return month===now.slice(0,7)?now:endOfMonth(month);
+}
+function setMode(next){
+ if(next===mode)return;
+ mode=next;render();
+}
+function move(n){
+ if(mode==='week')cursor=iso(plus(date(cursor),7*n));
+ else{
+  var m=cursor.slice(0,7),d=new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5,7))-1+n,1,12));
+  cursor=iso(d);
+ }
+ render();
+}
+function onVessels(v){
+ originalVessels.call(base,v);
+ var now=$('p79DashMonth')?.value||taipeiToday().slice(0,7);
+ var s=cleanSession();
+ if(!s.allowed)return;
+ cache.set(now,v.vessels||[]);
+ var range=model.weeklyWindow(now),previous=range.start.slice(0,7);
+ if(previous!==now&&Array.isArray(v.weekVessels)&&!v.weekError){
+  cache.set(previous,v.weekVessels.filter(x=>x.date?.startsWith(previous)));
+ }
+ if(now!==selectedMonth){selectedMonth=now;cursor=latestDateForMonth(now);}
+ if(!cursor)cursor=latestDateForMonth(now);
+ render();
+}
+base.vessels=onVessels;
+base.reset=function(){originalReset.call(base);seq++;};
+$('p79EffWeek')?.addEventListener('click',()=>setMode('week'));
+$('p79EffMonth')?.addEventListener('click',()=>setMode('month'));
+$('p79EffPrevious')?.addEventListener('click',()=>move(-1));
+$('p79EffNext')?.addEventListener('click',()=>move(1));
+cursor=latestDateForMonth($('p79DashMonth')?.value||taipeiToday().slice(0,7));
+})(window);
