@@ -67,10 +67,43 @@ function render(){
  }else{
   const message=status==='idle'?'尚未讀取萬海網站船期':status==='empty'?
    '萬海網站已回應，但未取得可辨識的船期表格。':
-   status==='error'?'萬海網站目前無法跨網域讀取，不能在首頁顯示即時清單。':'尚無網站船期資料';
+   status==='error'?'目前無法取得可辨識的萬海船期資料。':'尚無網站船期資料';
   host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(message)+'</strong>'+
-   '<small>'+esc(status==='error'?'這可能是來源網站的 CORS／存取限制，不是沒有船舶。':statusMessage)+'</small>'+
+   '<small>'+esc(status==='error'?(statusMessage||'來源網站可能有限制，並不代表沒有船舶。'):statusMessage)+'</small>'+
    '<div class="p79-schedule-remote-actions">'+link()+'</div></div>';
+ }
+}
+async function loadSourceHtml(signal){
+ const base=trimmed(g.sessionStorage?.getItem('port79_gas_url'));
+ const token=trimmed(g.sessionStorage?.getItem('port79_user_token')||g.sessionStorage?.getItem('port79_admin_token'));
+ let backendError='';
+ if(/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)&&token){
+  try{
+   const uri=new URL(base);
+   uri.searchParams.set('action','wanHaiSailingSchedule');
+   uri.searchParams.set('token',token);
+   uri.searchParams.set('gcToken',token);
+   const response=await g.fetch(uri.toString(),{method:'GET',cache:'no-store',signal});
+   if(!response.ok)throw Error('船期中介服務 HTTP '+response.status);
+   const result=await response.json();
+   if(result?.ok!==true||result?.source!==SOURCE||typeof result.html!=='string')throw Error(String(result?.error||'船期中介服務尚未啟用'));
+   if(result.html.length>2500000)throw Error('船期資料超出安全大小');
+   return result.html;
+  }catch(error){
+   if(signal.aborted)throw error;
+   backendError=String(error?.message||error).slice(0,160);
+  }
+ }
+ try{
+  const response=await g.fetch(SOURCE,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store',signal});
+  if(!response.ok)throw Error('萬海網站 HTTP '+response.status);
+  const type=String(response.headers?.get('content-type')||'');
+  if(type&&!/html|text\/plain/i.test(type))throw Error('網站未回傳 HTML 船期表格');
+  const html=await response.text();
+  if(!html||html.length>2500000)throw Error('船期網頁為空或內容過大');
+  return html;
+ }catch(error){
+  throw Error(backendError?'萬海後端讀取失敗：'+backendError+'；網頁直接讀取也遭拒絕':'萬海網頁無法直接讀取：'+String(error?.message||error));
  }
 }
 async function refresh(){
@@ -82,12 +115,7 @@ async function refresh(){
  const timeout=g.setTimeout(()=>controller.abort(),18000);
  running=(async()=>{
   try{
-   const response=await g.fetch(SOURCE,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store',signal:controller.signal});
-   if(!response.ok)throw new Error('HTTP '+response.status);
-   const type=String(response.headers?.get('content-type')||'');
-   if(type&&!/html|text\/plain/i.test(type))throw new Error('來源不是可辨識的 HTML 表格');
-   const html=await response.text();
-   if(html.length>5e6)throw new Error('網站回應過大');
+   const html=await loadSourceHtml(controller.signal);
    if(seq!==requestSeq)return;
    const doc=new g.DOMParser().parseFromString(html,'text/html');
    rows=parseSailingTables(doc);
