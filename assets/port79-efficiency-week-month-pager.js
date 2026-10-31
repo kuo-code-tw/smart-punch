@@ -1,4 +1,4 @@
-/* PORT79 2026-10-31: 首頁船舶效率週／月翻頁（唯讀）。
+/* PORT79 2026-10-31: 首頁船舶效率週（日～六）／年度逐月翻頁（唯讀）。
    週期固定星期日到星期六；沿用船舶主檔 GPH 與櫃量加權算法。
    不修改船舶、考勤、排班、請假、權限或 GAS 資料。 */
 (function(g){
@@ -42,14 +42,14 @@ function mondayIndependentWeekStart(s){var v=date(s);return iso(plus(v,-v.getUTC
 function period(){
  var today=taipeiToday(),start,end;
  if(mode==='week'){start=mondayIndependentWeekStart(cursor);end=iso(plus(date(start),6));}
- else{start=cursor.slice(0,7)+'-01';end=endOfMonth(cursor.slice(0,7));}
+ else{start=cursor.slice(0,4)+'-01-01';end=cursor.slice(0,4)+'-12-31';}
  var months=new Set(),day=date(start);
  while(iso(day)<=end){months.add(iso(day).slice(0,7));day=plus(day,1);}
  return {start,end,months:[...months],future:start>today};
 }
 function fmtPeriod(p){
  var a=p.start.replaceAll('-','/'),b=p.end.slice(5).replace('-','/');
- return mode==='week'?a+'（日）～'+b+'（六）':p.start.slice(0,4)+' 年 '+Number(p.start.slice(5,7))+' 月';
+ return mode==='week'?a+'（日）～'+b+'（六）':p.start.slice(0,4)+' 年';
 }
 function cleanSession(){
  var user=null;try{user=JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
@@ -107,16 +107,37 @@ function daily(p){
  }
  return {days,average:totalHours>0?totalQuantity/totalHours:null,valid:days.filter(x=>x.gph!==null).length};
 }
+// 每月效率是一年 12 個月，每個月僅一筆船舶完工效率；不以當月每日數值作圖。
+function monthly(p,failures){
+ var series=[],allQuantity=0,allHours=0;
+ for(var ym of p.months){
+  var quantity=0,hours=0,count=0,seen=new Set();
+  for(var v of cache.get(ym)||[]){
+   if(!v||v.deleted||!v.date||v.date.slice(0,7)!==ym)continue;
+   var id=String(v.workingNo||v.name+'|'+v.voyage)+'|'+v.date;
+   if(seen.has(id))continue;
+   seen.add(id);
+   var q=v.containers??v.moves,rate=v.rate;
+   if(!(q>0)||!(rate>0))continue;
+   quantity+=q;hours+=q/rate;count++;
+  }
+  if(hours>0){allQuantity+=quantity;allHours+=hours;}
+  series.push({date:ym,gph:hours>0?quantity/hours:null,count,failed:failures.has(ym)});
+ }
+ return {days:series,average:allHours>0?allQuantity/allHours:null,valid:series.filter(x=>x.gph!==null).length,failures:failures.size};
+}
 function draw(p,report){
  var days=report.days;
- if(summaryEl)summaryEl.textContent=report.average===null?'此期間沒有有效 GPH 資料':'期間加權效率 '+report.average.toFixed(2)+' GPH · 有效 '+report.valid+' 天';
- if(!report.valid){chartEl.innerHTML='<div class="p79r-empty">這個期間沒有可核對的船舶效率資料</div>';return;}
+ if(summaryEl){
+  var suffix=mode==='week'?'天':'個月',errorText=report.failures?' · '+report.failures+' 個月份讀取失敗（未計入）':'';
+  summaryEl.textContent=(report.average===null?'沒有有效 GPH 資料':(report.failures?'已取得月份加權效率 ':'期間加權效率 ')+report.average.toFixed(2)+' GPH')+' · 有效 '+report.valid+' '+suffix+errorText;
+ }
  var w=480,h=190,left=35,right=16,top=26,bottom=31,pw=w-left-right,ph=h-top-bottom;
  // 左側 GPH 刻度：一般週期固定顯示 15、20、25、30；
  // 若實際效率超出這個範圍，按每 5 GPH 自動延伸，避免折線被截斷。
  var validValues=days.filter(v=>Number.isFinite(v.gph)).map(v=>v.gph);
- var floor=Math.max(0,Math.min(15,Math.floor(Math.min(...validValues)/5)*5));
- var ceiling=Math.max(30,Math.ceil(Math.max(...validValues)/5)*5);
+ var floor=validValues.length?Math.max(0,Math.min(15,Math.floor(Math.min(...validValues)/5)*5)):15;
+ var ceiling=validValues.length?Math.max(30,Math.ceil(Math.max(...validValues)/5)*5):30;
  var range=ceiling-floor;
  var gap=pw/days.length,grid='',texts='',segments=[],part=[];
  var escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -125,37 +146,65 @@ function draw(p,report){
   grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y0+4)+'" text-anchor="end">'+tick+'</text>';
  }
  for(var i=0;i<days.length;i++){
-  var x=left+gap*(i+.5),row=days[i],label=Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2));
-  if(mode==='week'||i===0||i===days.length-1||(i+1)%5===0)
-   texts+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+label+'</text>';
-  if(row.gph===null){if(part.length)segments.push(part);part=[];continue;}
+  var x=left+gap*(i+.5),row=days[i],label=mode==='week'?Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2)):Number(row.date.slice(5,7))+'月';
+  texts+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+label+'</text>';
+  if(row.gph===null){
+   if(part.length)segments.push(part);part=[];
+   texts+='<text x="'+x+'" y="'+(top+ph-9)+'" text-anchor="middle" opacity=".45" font-size="11">'+(row.failed?'!':'—')+'</text>';
+   continue;
+  }
   var y=top+ph-(row.gph-floor)/range*ph;part.push([x,y]);
-  texts+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
+  texts+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+(mode==='week'?'':' 月')+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
   if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
  }
  if(part.length)segments.push(part);
  var lines=segments.map(s=>'<polyline points="'+s.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
- chartEl.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週':'每月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
+ chartEl.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週每日':'年度逐月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
+}
+// 年度月份資料讀取限制並行，避免同時向 GAS 發送 12 個請求。
+async function loadYear(p,session,requestId){
+ var todayMonth=taipeiToday().slice(0,7);
+ var queue=p.months.filter(ym=>ym<=todayMonth&&!cache.has(ym));
+ var total=queue.length,done=0,errors=new Set();
+ if(!total)return errors;
+ var workers=Array.from({length:Math.min(3,total)},async()=>{
+  while(queue.length){
+   var ym=queue.shift();
+   try{await fetchMonth(ym,session);}catch(error){errors.add(ym);console.warn('[PORT79 月效率] '+ym+' 資料讀取失敗',error);}
+   done++;
+   if(requestId===seq){
+    chartEl.textContent='正在彙整 '+p.start.slice(0,4)+' 年各月份船舶效率（'+done+'/'+total+'）';
+    if(summaryEl)summaryEl.textContent='依船舶完工月份統計 · 不拆分跨日船舶';
+   }
+  }
+ });
+ await Promise.all(workers);
+ return errors;
 }
 async function render(){
- var requestId=++seq,p=period(),session=cleanSession();
- requestId=++seq;
+ var p=period(),session=cleanSession(),requestId=++seq;
  periodEl.textContent=fmtPeriod(p);
  ['p79EffWeek','p79EffMonth'].forEach(id=>{
   var b=$(id);if(b)b.setAttribute('aria-pressed',String((id==='p79EffWeek')===(mode==='week')));
  });
- $('p79EffPrevious')?.setAttribute('aria-label',mode==='week'?'上一週':'上一月');
- $('p79EffNext')?.setAttribute('aria-label',mode==='week'?'下一週':'下一月');
+ $('p79EffPrevious')?.setAttribute('aria-label',mode==='week'?'上一週':'上一年');
+ $('p79EffNext')?.setAttribute('aria-label',mode==='week'?'下一週':'下一年');
  var caption=chartEl.closest('article')?.querySelector('.p79d-panel-title>span');
- if(caption)caption.textContent='依船舶完工日 · GPH';
+ if(caption)caption.textContent=mode==='week'?'依船舶完工日 · GPH':'依船舶完工月份 · GPH';
  if(!session.allowed){chartEl.textContent='目前登入身分沒有船舶歷史資料的檢視權限';if(summaryEl)summaryEl.textContent='';return;}
  if(p.future){chartEl.textContent='所選期間尚未開始';if(summaryEl)summaryEl.textContent='';return;}
- chartEl.innerHTML='<div class="p79r-empty">正在讀取 '+(mode==='week'?'每週':'每月')+'船舶效率…</div>';
+ chartEl.innerHTML='<div class="p79r-empty">正在讀取 '+(mode==='week'?'每週':'年度逐月')+'船舶效率…</div>';
  if(summaryEl)summaryEl.textContent='';
  try{
-  await Promise.all(p.months.map(ym=>fetchMonth(ym,session)));
-  if(requestId!==seq)return;
-  draw(p,daily(p));
+  if(mode==='week'){
+   await Promise.all(p.months.map(ym=>fetchMonth(ym,session)));
+   if(requestId!==seq)return;
+   draw(p,daily(p));
+  }else{
+   var failures=await loadYear(p,session,requestId);
+   if(requestId!==seq)return;
+   draw(p,monthly(p,failures));
+  }
  }catch(error){
   if(requestId!==seq)return;
   chartEl.textContent='尚無法讀取：'+String(error?.message||error);
@@ -172,8 +221,7 @@ function setMode(next){
 function move(n){
  if(mode==='week')cursor=iso(plus(date(cursor),7*n));
  else{
-  var m=cursor.slice(0,7),d=new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5,7))-1+n,1,12));
-  cursor=iso(d);
+  cursor=String(Number(cursor.slice(0,4))+n)+'-01-01';
  }
  render();
 }
