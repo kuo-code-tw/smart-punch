@@ -46,7 +46,7 @@ jobs:
                 const match=html.match(/SHIP_VIEWPORT_REPORT:(\{[^<]+\})/);
                 if(!match)throw Error("No browser-computed layout result");
                 const data=JSON.parse(match[1]);
-                const checks=["equalHeights","equalTops","compactHeights","naturalTrendReference","chartInsideCard","pagerInsideCard","summaryVisible","chartLabelsPresent","noEllipsis","dateAndTimeSeparate","visibleTime","scrollableSchedule"];
+                const checks=["equalHeights","equalTops","compactHeights","naturalTrendReference","chartInsideCard","pagerInsideCard","summaryVisible","chartLabelsPresent","noEllipsis","dateAndTimeSeparate","visibleTime","scrollableSchedule","onlyETBandETD"];
                 const failed=checks.filter(k=>!data[k]);
                 console.log(process.env.WIDTH,process.env.THEME,JSON.stringify(data));
                 if(failed.length)throw Error("Layout failure: "+failed.join(", "));
