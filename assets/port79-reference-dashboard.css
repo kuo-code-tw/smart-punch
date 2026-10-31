@@ -658,3 +658,48 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-head strong{font-size:11px!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-head>span{font-size:11px!important}
 }
+
+/* PORT79 2026-10-31: dark admin homepage shell consistency — screenshot verified targets. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar{background:linear-gradient(160deg,#12263e,#172f49)!important;border-right:1px solid #344e68!important;color:#e7f2ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-workspace-brand strong{color:#f4f9ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-workspace-brand small{color:#c6def6!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a{color:#d7e8ff!important;background:transparent!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a :is(span,svg){color:inherit!important;stroke:currentColor!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a:hover{background:#294a6d!important;color:#ffffff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a.active{background:#24527f!important;color:#ffffff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-nav-arrow{color:#aac9e8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-sidebar-footer strong{color:#e8f2ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-sidebar-footer small{color:#bed6f0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-sidebar-harbor{background:linear-gradient(0deg,#142a43,transparent 46%),url('./port79-harbor-banner.webp') 80% 76%/auto 205px no-repeat!important;opacity:.26!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar{background:#12263e!important;border-bottom:1px solid #33506e!important;backdrop-filter:blur(14px)!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-toggle{color:#d9e8fa!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-search{background:#213f5e!important;border:1px solid #5d7b9b!important;color:#edf7ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-search :is(svg,span,kbd){color:#dceafb!important;stroke:currentColor!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar #p79rNotifications{color:#d6e9ff!important;background:transparent!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar #p79rNotifications svg{stroke:#d6e9ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-user .p79-user-name{color:#f6faff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-user .p79-user-role{color:#c6d9ef!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-user .p79-avatar{background:#315b7e!important;color:#e1f1ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-theme{background:#294a69!important;border-color:#64819f!important;color:#f1f8ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar #logoutBtn{color:#dceafa!important;border-color:#5c7d9f!important;background:#203954!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting{background:#1a304a!important;border:1px solid #547391!important;color:#f1f7ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79-home-greeting{color:#f6faff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79-home-date{color:#d5e8fc!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79r-hero-summary{border-left-color:#567796!important;color:#e3f0ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79r-hero-summary>span{color:#e2efff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79r-hero-summary small{color:#d3e4fb!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79r-hero-summary b{color:#80bfff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79-integrated-date{color:#d8eaff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .p79-integrated-greeting-sub{color:#d0e4f8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg{color:#d9eafa!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg strong{color:#eff7ff!important;font-size:12px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg small{color:#c5ddf6!important;font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg :is(p,span,div){color:#c5ddf6!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-actions button{background:#2b4e70!important;color:#f5faff!important;border:1px solid #7996b4!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-external-link{background:#2b4e70!important;color:#e5f2ff!important;border:1px solid #7996b4!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-hero-summary{color:#dbeaff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-source{color:#b7d0e9!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll th{color:#e2f0ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll td{color:#e3efff!important}
+}
