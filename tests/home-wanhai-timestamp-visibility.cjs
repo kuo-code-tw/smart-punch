@@ -32,10 +32,13 @@ handlers.DOMContentLoaded();
  for(const id of ['p79DashVesselNotices','p79PublicShipBoard']){
   const html=elements[id].innerHTML;
   assert(html.includes('WAN HAI 271'),id+' ship must render');
-  for(const [date,time] of [['2026/10/29','08:30'],['2026/10/31','02:00'],['2026/10/31','16:00']]){
+  for(const [date,time] of [['2026/10/31','02:00'],['2026/10/31','16:00']]){
    assert(html.includes('<span class="p79-wanhai-date">'+date+'</span><span class="p79-wanhai-clock">'+time+'</span>'),id+' '+date+' '+time+' must be visible separately');
   }
   assert(html.includes('title="2026/10/31 16:00"'),'unmodified time retained for tooltip');
+  assert(!html.includes('ETA 抵港'),'hide ETA from compact ship card');
+  assert(!html.includes('進港 N269'),'hide voyages from compact ship card');
+  assert(html.includes('靠泊時間 ETB')&&html.includes('離岸時間 ETD'),'show only berth and departure labels');
   assert(html.includes('W79'),'berth retained');
  }
  assert(css.includes('grid-auto-rows:260px!important;'),'grid row follows normal vessel trend height');
