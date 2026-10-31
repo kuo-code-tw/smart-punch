@@ -302,7 +302,10 @@ function ensurePendingReview(){
 function openPendingReview(){
  if(!permissions().attendance)return;
  ensurePendingReview();if(!pendingReviewDialog)return;
- pendingReviewSelection=Array.isArray(pendingReviewItems)&&pendingReviewItems.length?0:-1;
+ // 未完成即時核對以前，不再先展示可能過期的快取異常名單。
+ pendingReviewItems=null;pendingReviewSelection=-1;pendingReviewError='';pendingReviewVerifiedAt='';
+ setMetric('p79DashAnomalies','—');
+ statusText('p79DashReviewHint','正在核對雲端正式考勤…');
  renderPendingReview();if(!pendingReviewDialog.open)pendingReviewDialog.showModal();
  refreshPendingReviewFromCloud();
 }
@@ -316,7 +319,7 @@ async function refreshPendingReviewFromCloud(){
   if(!pendingReviewDialog.open||month()!==ym||session()?.empId!==empId||
     (root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token||!permissions().attendance)return;
   if(!Array.isArray(data.records))throw Error('雲端考勤明細格式不完整');
-  const checked=await reconcileAttendanceBoundary(data,ym,token,true);
+  const checked=await verifyAttendancePendingWithOfficial(data,ym,token);
   showAttendance(checked);
   if(checked.boundaryError)pendingReviewError=checked.boundaryError;
   pendingReviewVerifiedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
@@ -361,7 +364,7 @@ function enrichPendingReview(data){
 // 首頁停留與切回視窗時，不自動刷新待核資料；點待核卡或手動更新才重讀雲端。
 function showAttendance(a){
  pendingReviewItems=a.pendingDetails;pendingReviewMonth=month();pendingReviewSelection=Array.isArray(a.pendingDetails)&&a.pendingDetails.length?0:-1;lastPendingReadAt=Date.now();
- statusText('p79DashReviewHint',a.boundaryError?'跨月資料核對未完成 ›':a.pendingShifts===null?'資料尚未載入':a.pendingShifts>0?'點擊查看 '+a.pendingShifts+' 筆異常原因 ›':'點擊查看核對說明 ›');
+ statusText('p79DashReviewHint',a.boundaryError?'正式資料核對未完成 ›':a.pendingShifts===null?'資料尚未載入':a.pendingShifts>0?'點擊查看 '+a.pendingShifts+' 筆異常原因 ›':'已核對：無待核班次 ›');
  setMetric('p79DashAttendancePeople',fmt(a.peopleCount));
  setMetric('p79DashPunchRecords',fmt(a.recordCount));
  setMetric('p79DashPersonDays',fmt(a.personDays));
@@ -373,7 +376,7 @@ function showAttendance(a){
  setMetric('p79DashDonutRate',percentage===null?'—':percentage+'%');
  setMetric('p79DashPunchLegend','上班卡 '+fmt(a.punchIn)+' 筆／下班卡 '+fmt(a.punchOut)+' 筆／其他 '+fmt(a.other)+' 筆');
  formatBars('p79DashAttendanceBars',a.weeks,['第1週','第2週','第3週','第4週','第5週']);
- statusText('p79DashAttendanceSource',a.boundaryError?'跨月考勤未完成核對：'+a.boundaryError:'依正式打卡紀錄統計；出勤人日以有上班卡的日期計算。');
+ statusText('p79DashAttendanceSource',a.boundaryError?'考勤待核尚未完成即時核對：'+a.boundaryError:'依正式打卡紀錄統計；出勤人日以有上班卡的日期計算。');
  root.P79ReferenceDashboard?.attendance(a,month());
  if(pendingReviewDialog?.open)renderPendingReview();
 }
@@ -402,6 +405,58 @@ async function request(kind,ym,token,forceCloud){
 // 每月 1 日的下班卡可能對應上月最後一天的夜班上班卡。
 // 歷史 API 的跨月鄰界讀取失敗時，不可把「未找到本月上班卡」直接認定為異常。
 // 這裡只做唯讀跨月複查；其他首頁指標仍只依原月份資料計算。
+// 重驗只用已正式配對的原始紀錄消除假陽性，絕不憑時間猜測或更動打卡。
+function reconcilePendingAgainstOfficial(summary,officialRecords){
+ if(!Array.isArray(summary?.pendingDetails)||!Array.isArray(officialRecords)||!root.P79AttendanceV6?.buildShifts)return summary;
+ const paired=root.P79AttendanceV6.buildShifts(officialRecords).filter(s=>s.clockIn&&s.clockOut&&!s.timePrecisionIssue);
+ const norm=v=>String(v||'').replace(/\s+/g,'').toUpperCase();
+ const time=v=>{
+  const n=root.P79AttendanceV6.normalizeTime(String(v||''));
+  const t=Date.parse(n.replace(/\//g,'-').replace(' ','T')+'+08:00');
+  return Number.isFinite(t)?t:NaN;
+ };
+ const samePerson=(a,b)=>a.empId&&b.empId?norm(a.empId)===norm(b.empId):
+   a.attNo&&b.attNo?norm(a.attNo).replace(/^0+/,'')===norm(b.attNo).replace(/^0+/,''):false;
+ const details=summary.pendingDetails.filter(r=>{
+  const side=r.clockIn?'clockIn':'clockOut',eventTime=time(r[side]);
+  if(!Number.isFinite(eventTime))return true;
+  // 同員工、同一側打卡且 15 分鐘內相鄰重複刷卡，正式已配對班次優先。
+  const verified=paired.some(s=>samePerson(r,s)&&Number.isFinite(time(s[side]?.timeStr))&&
+    Math.abs(time(s[side].timeStr)-eventTime)<=15*60*1000);
+  return !verified;
+ });
+ return {...summary,pendingDetails:details,pendingShifts:details.length,verifiedFromOfficial:true};
+}
+async function requestOfficialAttendanceAudit(action,ym,token){
+ const base=String(root.sessionStorage.getItem('port79_gas_url')||'').trim();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base))throw Error('無法驗證正式考勤資料服務網址');
+ const url=new URL(base);
+ url.searchParams.set('action',action);url.searchParams.set('month',ym);
+ url.searchParams.set('token',token);url.searchParams.set('gcToken',token);
+ url.searchParams.set('fresh','1');
+ if(!root.P79HistoryRead?.read)throw Error('正式考勤唯讀模組未載入');
+ const data=await root.P79HistoryRead.read(url.toString(),{forceCloud:true});
+ if(!Array.isArray(data.records)||data.month&&String(data.month)!==ym)throw Error('正式考勤回傳資料不完整或月份不符');
+ return data;
+}
+async function verifyAttendancePendingWithOfficial(data,ym,token){
+ let result=await reconcileAttendanceBoundary(data,ym,token,true);
+ if(result.pendingShifts===0)return result;
+ // 歷史資料快取可能保留已補卡前的舊結果。再讀「正式主表」無快取核對。
+ // 主表無法確認時，以全來源無損資料複核；任何查詢失敗都不把舊名單當真。
+ const errors=[];
+ for(const action of ['getAttendanceMainDirect','getAttendanceMonthRaw']){
+  try{
+   const official=await requestOfficialAttendanceAudit(action,ym,token);
+   result=reconcilePendingAgainstOfficial(result,official.records);
+   if(result.pendingShifts===0)return result;
+  }catch(error){errors.push(action+': '+String(error?.message||error));}
+ }
+ if(errors.length){
+  return {...result,pendingDetails:null,pendingShifts:null,boundaryError:'雲端複核未完成；'+errors.join('；')};
+ }
+ return result;
+}
 async function reconcileAttendanceBoundary(data,ym,token,forceCloud){
  const initial=analyzeAttendance(data,ym);
  if(!Array.isArray(initial.pendingDetails)||!initial.pendingDetails.some(r=>r.date===ym+'-01'&&!r.clockIn&&r.clockOut))return initial;
@@ -431,7 +486,7 @@ async function load(forceCloud=false){
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
    if(!allowed){statusText(captionId,accessError());continue}
    try{
-    const data=await request(kind,ym,token,forceCloud);
+    const data=await request(kind,ym,token,kind==='attendance'?true:forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
     if(kind==='vessel'&&Array.isArray(data.shipMasters)){
      const report=analyzeVessels(data),range=weeklyWindow(ym);
@@ -443,7 +498,7 @@ async function load(forceCloud=false){
      render(report);
     }
     else if(kind==='attendance'&&Array.isArray(data.records)){
-      const checked=await reconcileAttendanceBoundary(data,ym,token,forceCloud);
+      const checked=await verifyAttendancePendingWithOfficial(data,ym,token);
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().attendance)return;
       render(checked);
     }
