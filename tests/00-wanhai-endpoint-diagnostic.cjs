@@ -9,7 +9,7 @@ async function get(path){
  const c=new AbortController(), t=setTimeout(()=>c.abort(),12000);
  try{
   const r=await fetch(u,{signal:c.signal,redirect:'follow',headers:{'User-Agent':'Mozilla/5.0 (compatible; PORT79PublicDiagnostic/1.0)','Accept':'text/html,application/javascript,*/*'}});
-  const text=(await r.text()).slice(0,2500000);
+  const text=(await r.text()).slice(0,14000000);
   console.log('[WH]',u.pathname,'status',r.status,'type',r.headers.get('content-type'),'size',text.length,'redirect',new URL(r.url).pathname);
   return {text,url:u,status:r.status};
  }catch(e){console.log('[WH]',u.pathname,'error',String(e.message).slice(0,120));return {text:'',url:u,status:0};}
@@ -30,5 +30,21 @@ function findRelevant(path,body){
   while((m=rg.exec(text))){try{let u=new URL(m[1],url);if(u.origin===origin&&!discovered.includes(u.pathname))discovered.push(u.pathname)}catch{}}
  }
  console.log('[SCRIPT_PATHS]',JSON.stringify(discovered).slice(0,14000));
- for(const path of discovered.slice(0,24)){const r=await get(path);findRelevant(path,r.text)}
+ for(const path of discovered.slice(0,24)){
+  const r=await get(path);findRelevant(path,r.text);
+  if(path.includes('main-')){
+   const source=r.text;
+   for(const [label,re] of [
+    ['HTTP_POST_IMPL',/httpPost\([^)]{1,80}\)\s*\{/g],
+    ['HTTP_POST_URL',/httpPost\s*[:=]\s*function/g],
+    ['API_SERVICE_CONFIG',/apiUrl|apiURL|baseUrl|BASE_URL|apiHost|apiEndpoint|\/api\/|CM\/Eways_GetVesselSchedule/g],
+   ]){
+    let m,count=0;
+    while((m=re.exec(source))&&count++<15){
+     const context=source.slice(Math.max(0,m.index-380),Math.min(source.length,m.index+520));
+     console.log('[JS_LOC]',label,m.index,JSON.stringify(context.slice(0,900)));
+    }
+   }
+  }
+ }
 })().catch(e=>console.log('[DIAG_ERROR]',String(e)));
