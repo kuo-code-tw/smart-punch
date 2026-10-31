@@ -46,11 +46,9 @@ function shipTimeMarkup(value){
 }
 function line(r,i){
  return '<button class="p79-schedule-row p79-wanhai-row" type="button" data-public-ship-index="'+i+'" role="listitem">'+
- '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong>'+
- '<small class="p79-wanhai-voyage">'+esc((r.localName&&r.localName!==r.name?r.localName+' · ':'')+'進港 '+(r.inVoyage||'—')+'／出港 '+(r.outVoyage||'—'))+'</small></span>'+
- '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b title="'+esc(r.eta||'未提供')+'">'+shipTimeMarkup(r.eta)+'</b></span>'+
- '<span><small>ETB 靠泊</small><b title="'+esc(r.etb||'未提供')+'">'+shipTimeMarkup(r.etb)+'</b></span>'+
- '<span><small>ETD 離港</small><b title="'+esc(r.etd||'未提供')+'">'+shipTimeMarkup(r.etd)+'</b></span></span>'+
+ '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong></span>'+
+ '<span class="p79-wanhai-detail"><span><small>靠泊時間 ETB</small><b title="'+esc(r.etb||'未提供')+'">'+shipTimeMarkup(r.etb)+'</b></span>'+
+ '<span><small>離岸時間 ETD</small><b title="'+esc(r.etd||'未提供')+'">'+shipTimeMarkup(r.etd)+'</b></span></span>'+
  '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span></button>';
 }
 function renderOne(host){
@@ -62,7 +60,7 @@ function renderOne(host){
  if(state==='ready'&&rows.length){
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,host.id===STAFF_ID?3:4).map(line).join('')+'</div>'+
-    '<div class="p79-schedule-footnote">ETA 抵港／ETB 靠泊／ETD 離港分開顯示，依萬海船期原始欄位。'+(notice?'來源最近同步失敗，保留上次成功資料。':'')+'</div>';return;
+    '<div class="p79-schedule-footnote">'+(notice?'來源最近同步失敗，保留上次成功資料。':'靠泊及離岸時間依萬海原始船期。')+'</div>';return;
  }
  const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?'萬海網站尚無船期資料':'尚未讀取萬海船期';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
