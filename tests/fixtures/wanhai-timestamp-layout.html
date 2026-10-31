@@ -38,6 +38,7 @@
 <pre id="p79-test-report"></pre>
 <script>
 window.addEventListener('load',()=>{
+ document.documentElement.dataset.theme=new URL(location.href).searchParams.get('theme')||'dark';
  const rect=id=>document.getElementById(id).getBoundingClientRect();
  const cards=['ship-eff','ship-rank','ship-schedule'].map(rect);
  const dates=[...document.querySelectorAll('#p79DashVesselNotices .p79-wanhai-date')];
