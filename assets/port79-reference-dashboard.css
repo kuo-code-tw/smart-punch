@@ -420,3 +420,16 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
   max-height:282px!important;
  }
 }
+
+
+/* PORT79 2026-10-31: center only all-vessel table columns, including name and berth. */
+@media screen {
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll table th,
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll table td {
+  text-align:center!important;
+  vertical-align:middle!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll table td:nth-child(2) {
+  text-align:center!important;
+ }
+}
