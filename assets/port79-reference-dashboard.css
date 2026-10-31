@@ -492,3 +492,51 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 
 @media screen { html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-gridline{stroke:#395773!important}
  }
+
+
+/* PORT79 V75 — shared employee-facing Kaohsiung official sailing board. */
+body:has(#systems.show) #p79EmployeeShipSection{display:none!important}
+#p79EmployeeShipSection{margin:16px auto 22px;width:min(100%,820px);padding:16px;border:1px solid #c8dced;border-radius:15px;background:var(--card,#fff);box-shadow:0 7px 22px rgba(18,58,100,.09);color:var(--text,#183652)}
+#p79EmployeeShipSection .p79-employee-ships-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:10px}
+#p79EmployeeShipSection .p79-employee-ships-head strong{display:block;font-size:16px;font-weight:900}
+#p79EmployeeShipSection .p79-employee-ships-head small{display:block;margin-top:3px;color:var(--muted,#617d92);font-size:11px}
+#p79EmployeeShipSection .p79-employee-ships-actions{display:flex;flex-wrap:wrap;gap:6px}
+#p79EmployeeShipSection .p79-employee-ships-actions button,#p79EmployeeShipSection .p79-schedule-remote-actions button{border:1px solid #b9d5f0;border-radius:7px;padding:6px 10px;background:#e8f4ff;color:#15558b;font-weight:800;cursor:pointer}
+#p79PublicShipBoard{max-height:370px;overflow:auto;scrollbar-width:thin}
+#p79PublicShipBoard .p79-schedule-remote-caption{font-size:11px;color:#426d91;margin:5px 0 9px;font-weight:700}
+#p79PublicShipBoard .p79-schedule-list{display:grid;gap:7px}
+#p79PublicShipBoard .p79-schedule-row{display:flex;flex-direction:column;gap:7px;text-align:left;width:100%;border:1px solid #dce6f0;border-radius:9px;padding:10px 12px;background:rgba(245,250,255,.9);color:#19436a;cursor:pointer}
+#p79PublicShipBoard .p79-wanhai-top{display:flex;justify-content:space-between;align-items:baseline;gap:9px;flex-wrap:wrap}
+#p79PublicShipBoard .p79-wanhai-top strong{font-size:13px;font-weight:900}
+#p79PublicShipBoard .p79-wanhai-voyage{font-size:10px;color:#5a7793}
+#p79PublicShipBoard .p79-wanhai-detail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#p79PublicShipBoard .p79-wanhai-detail span{display:flex;flex-direction:column;gap:3px}
+#p79PublicShipBoard .p79-wanhai-detail small,#p79PublicShipBoard .p79-wanhai-berth small{font-size:10px;color:#66839a}
+#p79PublicShipBoard .p79-wanhai-detail b,#p79PublicShipBoard .p79-wanhai-berth strong{font-size:11px;color:#204e78;overflow-wrap:anywhere}
+#p79PublicShipBoard .p79-wanhai-berth{display:flex;align-items:center;gap:7px}
+#p79PublicShipBoard .p79-schedule-footnote{margin-top:10px;color:#6f8290;font-size:11px;line-height:1.55}
+#p79PublicShipBoard .p79-schedule-remote-msg{display:flex;flex-direction:column;gap:8px;align-items:center;padding:15px;text-align:center;font-size:13px}
+#p79PublicShipBoard .p79-schedule-remote-msg small{font-size:11px;color:#6c8394}
+#p79PublicShipBoard .p79-schedule-remote-actions button{margin-top:5px}
+#p79PublicShipScheduleDialog{width:min(1180px,calc(100vw - 24px));max-width:none;max-height:89vh;border:0;border-radius:13px;background:#fff;color:#16426b;padding:0;box-shadow:0 20px 70px #091c3666}
+#p79PublicShipScheduleDialog::backdrop{background:rgba(8,25,54,.65)}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-inner{padding:18px;max-height:85vh;overflow:auto}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-header{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-header h2{margin:0;font-size:20px;font-weight:900}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-header p{font-size:12px;color:#7891a6}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-header button{border:0;border-radius:7px;padding:7px 10px;background:#e6f1ff;color:#23547d;cursor:pointer}
+#p79PublicShipScheduleDialog .p79-schedule-table-scroll{overflow:auto;max-height:59vh}
+#p79PublicShipScheduleDialog .p79-schedule-table{width:100%;min-width:1050px;border-collapse:collapse;font-size:12px}
+#p79PublicShipScheduleDialog th,#p79PublicShipScheduleDialog td{padding:10px 8px;white-space:nowrap;border-bottom:1px solid #e0e9f3;text-align:left}
+#p79PublicShipScheduleDialog th{position:sticky;top:0;background:#eff6ff}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-disclaimer{font-size:12px;color:#57728d}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-actions{display:flex;justify-content:end;padding:10px 0}
+#p79PublicShipScheduleDialog .p79-schedule-dialog-actions button{border:1px solid #b8d3f0;border-radius:7px;background:#e7f3ff;color:#195d98;padding:9px 12px;cursor:pointer}
+html[data-theme="dark"] #p79EmployeeShipSection{background:#172535;color:#eff7ff;border-color:#35465b}
+html[data-theme="dark"] #p79PublicShipBoard .p79-schedule-row{background:#1c3148;color:#e5f2ff;border-color:#36516d}
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-top strong,
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-detail b,
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-berth strong{color:#e7f1ff}
+html[data-theme="dark"] #p79PublicShipScheduleDialog{background:#16263a;color:#eef5ff}
+html[data-theme="dark"] #p79PublicShipScheduleDialog th{background:#254160;color:#edf7ff}
+@media(max-width:650px){#p79EmployeeShipSection{padding:11px;margin:12px auto 20px}#p79PublicShipBoard .p79-wanhai-detail{gap:5px}#p79PublicShipScheduleDialog .p79-schedule-dialog-inner{padding:12px}}
