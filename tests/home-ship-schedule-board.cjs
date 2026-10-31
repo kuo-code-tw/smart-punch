@@ -7,8 +7,8 @@ const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.c
 assert(html.includes('id="p79EmployeeShipSection"'),'employee-view section must exist outside privileged dashboard');
 assert(html.includes('id="p79PublicShipBoard"'),'public employee ship board must exist');
 assert(html.indexOf('id="p79PublicShipBoard"')<html.indexOf('id="systems"'),'employees see the ship board before management login');
-assert(html.includes('萬海網站船期（全員可看）'));
-assert(html.includes('port79-google-sheet-schedule.js?v=20261031-wanhai-fulltime-v79'));
+assert(html.includes('萬海網站船期'));
+assert(html.includes('port79-google-sheet-schedule.js?v=20261031-berth-depart-only-v80b'));
 assert(!html.includes('port79-external-ship-schedule.js?v='));
 assert(src.includes("const ACTION='publicShipSchedule'"));
 assert(src.includes('g.document.head.appendChild(script)'),'cross-domain GAS script output works without fetch CORS');
@@ -21,9 +21,11 @@ assert(!src.includes('setInterval('),'front end must remain manual updates only'
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
-assert(html.includes('port79-reference-dashboard.css?v=20261031-260px-shortcards-v11'),'cache bust updated CSS');
+assert(html.includes('port79-reference-dashboard.css?v=20261031-two-times-shortcards-v12b'),'cache bust updated CSS');
 assert(src.includes('function shipTimeMarkup(value)'),'timestamp must be split into visible date and time');
-assert(src.includes('shipTimeMarkup(r.eta)')&&src.includes('shipTimeMarkup(r.etb)')&&src.includes('shipTimeMarkup(r.etd)'),'all ETA ETB ETD timestamps rendered fully');
+assert(src.includes('shipTimeMarkup(r.etb)')&&src.includes('shipTimeMarkup(r.etd)')&&!src.includes('shipTimeMarkup(r.eta)'),'card only displays berth and departure timestamps');
+assert(!html.includes('萬海網站船期（全員可看）'),'all-staff suffix removed from visible title');
+assert(styles.includes('WAN HAI compact preview: ONLY ETB'),'two-time card styles present');
 assert(styles.includes('genuinely SHORT vessel cards'),'common vessel panel heights included');
 assert(styles.includes('grid-auto-rows:260px!important;'),'desktop vessel panel grid follows natural height');
 assert(styles.includes('height:260px!important;min-height:260px!important;max-height:260px!important;'),'three ship panels share compact natural height');
