@@ -21,12 +21,12 @@ assert(!src.includes('setInterval('),'front end must remain manual updates only'
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
-assert(html.includes('port79-reference-dashboard.css?v=20261031-wanhai-compact-trendheight-v10'),'cache bust updated CSS');
+assert(html.includes('port79-reference-dashboard.css?v=20261031-wanhai-shortcards-v11'),'cache bust updated CSS');
 assert(src.includes('function shipTimeMarkup(value)'),'timestamp must be split into visible date and time');
 assert(src.includes('shipTimeMarkup(r.eta)')&&src.includes('shipTimeMarkup(r.etb)')&&src.includes('shipTimeMarkup(r.etd)'),'all ETA ETB ETD timestamps rendered fully');
-assert(styles.includes('compact matched vessel cards'),'common vessel panel heights included');
-assert(styles.includes('grid-auto-rows:auto!important;'),'desktop vessel panel grid follows natural height');
-assert(styles.includes('height:auto!important;min-height:310px!important;max-height:none!important;'),'three ship panels share compact natural height');
+assert(styles.includes('genuinely SHORT vessel cards'),'common vessel panel heights included');
+assert(styles.includes('grid-auto-rows:260px!important;'),'desktop vessel panel grid follows natural height');
+assert(styles.includes('height:260px!important;min-height:260px!important;max-height:260px!important;'),'three ship panels share compact natural height');
 assert(styles.includes('.p79-wanhai-date')&&styles.includes('.p79-wanhai-clock'),'date and time are separate lines');
 assert(!styles.includes('grid-auto-rows:620px!important;')&&!styles.includes('grid-auto-rows:440px!important;'),'reject overlong full-height ship row');
 assert(styles.includes('text-overflow:clip!important;'),'timestamps must never be ellipsized');
