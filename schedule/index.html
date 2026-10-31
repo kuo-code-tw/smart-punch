@@ -3086,9 +3086,13 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
       const now = Date.now();
       if (!['login','manual','manual-cloud-sync','month'].includes(reason) && now < p79ScheduleProtectLocalUntil) {
-        return true;
+        // No fresh GET occurred; never tell callers that the latest cloud roster was loaded.
+        p79ScheduleRetryProtectedCloudRead(currentScheduleMonthKey());
+        return false;
       }
-      if (!['login','manual','month'].includes(reason) && now - port79ScheduleLastAutoSyncAt < 8000) return true;
+      // A user-requested cloud read and a scheduled post-protection retry must reach the server.
+      if (!['login','manual','manual-cloud-sync','month','protected-retry'].includes(reason) &&
+          now - port79ScheduleLastAutoSyncAt < 8000) return p79ScheduleHasOfficialData();
 
       port79ScheduleAutoSyncBusy = true;
       try {
