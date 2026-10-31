@@ -227,3 +227,33 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79
 .p79r-leave-bars{width:100%;padding:6px 10px;box-sizing:border-box}
 .p79r-leave-row{display:grid;grid-template-columns:minmax(65px,95px) minmax(50px,1fr) 60px;align-items:center;gap:8px;min-height:27px;font-size:11px}
 .p79r-leave-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.p79r-leave-row>div{height:15px;background:#eef6ff;border-radius:4px}.p79r-leave-row i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#61b3ff,#1684ff)}.p79r-leave-row b{text-align:right;font-size:11px}.p79r-leave-bars>small{font-size:10px;color:#946320}
+
+
+/* Homepage ship schedule board: compact, scrollable and explicitly sourced; no polling. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-board{display:flex;flex-direction:column;gap:5px;min-width:0;height:calc(100% - 25px);overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow:auto;scrollbar-width:thin}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:7px;align-items:center;width:100%;min-height:32px;padding:4px 3px;border:0;border-bottom:1px solid #edf2f9;border-radius:5px;background:white;cursor:pointer;text-align:left;color:#24446c;font:inherit}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-row:hover{background:#f1f8ff}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-row:focus-visible{outline:2px solid #1687ff;outline-offset:-2px}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-time b{display:block;font-size:10px;font-weight:900;color:#0965b5;white-space:nowrap}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-time small{display:block;font-size:9px;color:#728cad}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-info{overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-info strong{display:block;font-size:11px;font-weight:900;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#163d74}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-info small{display:block;font-size:9px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#6986a5}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-status{padding:3px 5px;border-radius:6px;background:#eaf3ff;color:#2166a4;font-size:9px;max-width:73px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-footnote{flex:none;font-size:9px;line-height:1.4;color:#718ba5;white-space:normal}
+#p79ShipScheduleDialog{width:min(1040px,calc(100vw - 24px));max-height:85vh;max-width:none;padding:0;border:0;border-radius:14px;color:#17365b;background:white;box-shadow:0 22px 70px #091c3666}
+#p79ShipScheduleDialog::backdrop{background:#0d244c99}
+#p79ShipScheduleDialog .p79-schedule-dialog-inner{padding:19px;max-height:85vh;overflow:auto}
+#p79ShipScheduleDialog .p79-schedule-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
+#p79ShipScheduleDialog h2{font-size:21px;margin:0 0 5px;font-weight:900;color:#164983}
+#p79ShipScheduleDialog .p79-schedule-dialog-header p{font-size:12px;line-height:1.5;color:#69839d;margin:0 0 15px}
+#p79ShipScheduleDialog .p79-schedule-dialog-header button{border:0;border-radius:8px;padding:7px 11px;background:#ecf3fb;cursor:pointer;font-size:16px}
+#p79ShipScheduleDialog .p79-schedule-table-scroll{max-width:100%;overflow:auto}
+#p79ShipScheduleDialog .p79-schedule-table{width:100%;min-width:850px;border-collapse:collapse;font-size:12px}
+#p79ShipScheduleDialog .p79-schedule-table th,#p79ShipScheduleDialog .p79-schedule-table td{padding:10px 9px;text-align:left;border-bottom:1px solid #e4ebf4;white-space:nowrap}
+#p79ShipScheduleDialog .p79-schedule-table th{background:#edf5ff;color:#345a83;position:sticky;top:0}
+#p79ShipScheduleDialog .p79-schedule-dialog-disclaimer{font-size:12px;line-height:1.6;color:#687f99}
+#p79ShipScheduleDialog .p79-schedule-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+#p79ShipScheduleDialog .p79-schedule-dialog-actions button{padding:9px 13px;border-radius:8px;border:1px solid #c9ddf4;background:#eaf4ff;color:#145aa0;font-weight:800;cursor:pointer}
+@media(max-width:620px){html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-board{height:auto;min-height:135px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-list{max-height:185px}#p79ShipScheduleDialog .p79-schedule-dialog-inner{padding:14px}}
