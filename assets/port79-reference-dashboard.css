@@ -512,3 +512,61 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-empty{color:#cee3f9!important;font-size:11px!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card #p79CurrentShiftPeriod{color:#bfd4ea!important}
 }
+
+/* PORT79 2026-10-31: full dashboard dark mode contrast and control audit. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-search{background:#203953!important;border:1px solid #53708b!important;color:#dce9fa!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-search :is(span,svg,kbd){color:#c1d5ee!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-toggle{color:#c2d9f2!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-user :is(strong,small){color:#e1edfa!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-avatar{background:#294c6d!important;color:#c2e2ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a{color:#d5e5f6!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a.active{background:#21476d!important;color:#d9ecff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar #p79SevenNav a:hover{background:#234361!important;color:#d6edff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar .p79-sidebar-footer :is(strong,small){color:#d3e5f8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .weather-date{color:#c7d9ee!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .weather-line{color:#edf5ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .weather-temp{color:#ffffff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-hero-greeting .weather-refresh{background:#294764!important;color:#ddecff!important;border:1px solid #4a6b8b!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-home-preserve :is(strong,small){color:#d1e2f7!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-section-heading :is(strong,small){color:#e5eefb!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-search-row :is(label,input){color:#d8e7f7!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-search-row input{background:#203852!important;border:1px solid #506e8e!important;color-scheme:dark!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card .name{color:#eef6ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card .desc{color:#c0d2e9!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card .badge{background:#294b68!important;color:#e2f1ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-section-head button{color:#a4d6ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashMonth{background:#203b59!important;border:1px solid #547390!important;color:#eff7ff!important;color-scheme:dark!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashRefresh{background:#1d486a!important;border:1px solid #4d7497!important;color:#d9f0ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-heading-actions button:not(#p79DashRefresh){color:#a6d4ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi .p79d-kpi-icon{background:#274866!important;color:#b7dcff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi:nth-child(3) .p79d-kpi-icon{background:#42375f!important;color:#d8c6ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi:nth-child(4) .p79d-kpi-icon{background:#453349!important;color:#ffd8eb!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review{background:linear-gradient(120deg,#3a2438,#33263a)!important;border:1px solid #8a5264!important;color:#f5e5ea!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-hint{color:#ffb8c1!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-arrow{color:#ffc0c8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body span{color:#f5d9e2!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body strong{color:#fff0f3!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review:hover{border-color:#bc8394!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bar-value{color:#b4dfff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bars{color:#c8d9ee!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bars svg .p79r-gridline{stroke:#43617e!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager{background:#147fe1!important;color:#fff!important;border-color:#3895f0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager button{background:#274362!important;border:1px solid #567493!important;color:#e4f2ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager button:disabled{opacity:.5!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button:not(.active):not([aria-pressed='true']){background:#273f5e!important;border-color:#607d99!important;color:#e4eefc!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button.active{#}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button[aria-pressed='true']{background:#147fe1!important;color:#fff!important;border-color:#3895f0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-list{scrollbar-color:#7995b3 #1a304d!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-row{border-color:#46617a!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-top :is(span,small){color:#c5d9ee!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail :is(span,small,b){color:#d5e9ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-time :is(b,small){color:#cbe0f8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-row :is(small,span){color:#d3e5fa!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-notice{background:#203954!important;color:#d7e8fa!important;border-color:#3c5672!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-empty{color:#d3e3f8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-people-panel .p79d-table-scroll{scrollbar-color:#7b9abb #1a304d!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #port79CalendarModeBox{background:#1d3952!important;border:1px solid #54718b!important;color:#e1efff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #port79CalendarModeBox :is(label,select,span){background:transparent!important;color:#e1efff!important;color-scheme:dark!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashMessage{color:#bfdbf6!important}
+}
