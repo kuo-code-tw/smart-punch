@@ -332,6 +332,11 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div id="cloudProbe" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">☁️ 雲端待命｜登入與本機資料優先</div>
     </div>
 
+    <section class="p79-employee-ships" id="p79EmployeeShipSection" aria-label="所有員工可查看的高雄港船期">
+      <div class="p79-employee-ships-head"><div><strong>🚢 高雄港官方船期</strong><small>全體員工均可查看 · 官方開放資料</small></div>
+        <div class="p79-employee-ships-actions"><button type="button" id="p79PublicShipRefresh">↻ 更新</button><button type="button" id="p79PublicShipAll">查看全部 ›</button></div></div>
+      <div id="p79PublicShipBoard" data-gas-url="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec" aria-live="polite">等待官方船期…</div>
+    </section>
     <div id="systems" class="system-wrap">
       <!-- 純展示區：保留全部原有系統卡片、事件綁定、權限檢查與資料連線。 -->
       <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
@@ -372,8 +377,8 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <article class="p79d-panel p79d-ranking"><div class="p79d-panel-title"><b>最新匯入船舶</b><span id="p79DashShipRankingCount">本月全部船舶 · 依匯入時間</span></div>
         <div class="p79d-table-scroll"><table><thead><tr><th>序號</th><th>船名</th><th>靠泊碼頭</th><th>Moves</th><th>匯入時間</th><th>GPH</th><th>狀態</th></tr></thead>
           <tbody id="p79DashShipRanking"><tr><td colspan="7">等待月份資料</td></tr></tbody></table></div></article>
-      <article class="p79d-panel p79d-warnings p79d-ship-schedule"><div class="p79d-panel-title"><b>自訂船期看板</b><button type="button" id="p79ShipScheduleAll" class="p79d-plain-link" aria-haspopup="dialog">查看全部 ›</button></div>
-        <div id="p79DashVesselNotices" class="p79-schedule-board" aria-label="Google 表格船期資料"><div class="p79r-empty">等待讀取 Google 船期表…</div></div>
+      <article class="p79d-panel p79d-warnings p79d-ship-schedule"><div class="p79d-panel-title"><b>高雄港官方船期（全員可看）</b><button type="button" id="p79ShipScheduleAll" class="p79d-plain-link" aria-haspopup="dialog">查看全部 ›</button></div>
+        <div id="p79DashVesselNotices" class="p79-schedule-board" aria-label="高雄港官方公開船期"><div class="p79r-empty">等待官方船期資料…</div></div>
       </article>
     </div>
     <p id="p79DashShipSource" class="p79d-source">船舶統計待讀取；每月資料由原歷史資料功能提供。</p>
@@ -1565,7 +1570,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-monthly-dashboard.js?v=20261031-private-sheet-all-vessels-v2"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261031-dark-toggle-visible-v2">
 <script src="./assets/port79-reference-dashboard.js?v=20261031-private-sheet-all-vessels-v2"></script>
-<script src="./assets/port79-google-sheet-schedule.js?v=20261031-secure-script-fallback-v3"></script>
+<script src="./assets/port79-google-sheet-schedule.js?v=20261031-public-official-port-v75"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261031-monthly-year-by-month-v4"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 </body>
