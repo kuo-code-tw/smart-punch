@@ -3045,6 +3045,20 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     let p79ScheduleReadTask=null;
     let p79ScheduleCloudReadController=null;
+    let p79ScheduleProtectedRefreshTimer=null;
+    // A cloud response discarded during the post-save protection window is NOT a successful sync.
+    // Retry once after protection expires, without editing or saving any roster cells.
+    function p79ScheduleRetryProtectedCloudRead(month) {
+      if(p79ScheduleProtectedRefreshTimer!==null)clearTimeout(p79ScheduleProtectedRefreshTimer);
+      const delay=Math.min(15000,Math.max(1200,p79ScheduleProtectLocalUntil-Date.now()+1200));
+      p79ScheduleProtectedRefreshTimer=setTimeout(()=>{
+        p79ScheduleProtectedRefreshTimer=null;
+        if(month!==currentScheduleMonthKey()||document.visibilityState!=='visible'||
+           port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||
+           port79ScheduleWriteInFlight)return;
+        void loadScheduleCloudWithRetry('protected-retry',2);
+      },delay);
+    }
     async function loadScheduleCloudWithRetry(reason='auto',retryCount=3){
       const month=currentScheduleMonthKey();
       while(p79ScheduleReadTask){
@@ -4332,13 +4346,20 @@ function p79EmployeeDateEligible(emp,date) {
           leaveCoverAssignments = Array.isArray(data.leaveCoverAssignments) ? data.leaveCoverAssignments : leaveCoverAssignments;
           // 亮燈由獨立即時端點管理；全量排班快照不可覆寫較新的狀態。
           cloudLoaded = true;
-          console.info('[PORT79 SCHEDULE V10.15] 忽略過期雲端班表快照', {
+          console.info('[PORT79 SCHEDULE] 雲端班表尚未套用，不能視為同步成功', {
             requestStartedAt,
             requestMutationVersion,
             currentMutationVersion:p79ScheduleLocalMutationVersion,
             dirty:port79ScheduleDirty
           });
-          return true;
+          if(p79ScheduleSourceState.month===requestMonth){
+            p79ScheduleSourceState.error='雲端資料尚未套用，正在等待重新讀取';
+            p79RenderScheduleDataSource();
+          }
+          // Do not report success when the UI is still showing the previous local snapshot.
+          if(!port79ScheduleDirty&&!scheduleSaveTimer&&!personnelSaveTimer&&
+             !port79ScheduleWriteInFlight)p79ScheduleRetryProtectedCloudRead(requestMonth);
+          return false;
         }
 
         p79ApplySchedulePayload(data,requestMonth);
@@ -4424,7 +4445,7 @@ function p79EmployeeDateEligible(emp,date) {
       return null;
     }
 
-    // 完整考勤僅可修復舊版誤判的工作班；無卡不得自動改為休假。
+    // 無卡改休假由正式 GAS 依例→休→國寫回；前端不重複分配，只在有完整打卡時核對誤判工作班。
     // 考勤歸屬以原上班日為準；隔日凌晨的 OUT 同時計入前一日，避免跨日班誤判。
     async function p79ApplyNoPunchRestFromOfficial(yearMonth) {
       const requestMutationVersion=p79ScheduleLocalMutationVersion;
@@ -6305,7 +6326,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
-          const cellTitle = [verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'原排工作班別保留；整班無卡列為缺勤或待核':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle = [verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
@@ -6331,7 +6352,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${combinedMarker}
               ${verifiedRestAttendance&&!actualShift?'<span class="block text-[9px] leading-tight font-bold text-amber-800" title="出勤已確認，但尚不能從打卡時段推定早／中／晚班；不會自動建立加班申報">班別待核</span>':''}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
-              ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="原排工作班別保留；整班無卡，無出勤維持缺勤或待核，不改為休假">無卡待核</span>':''}
+              ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="已確認無卡，等候正式 GAS 分配休假並重新讀取雲端班表；此處不自行改寫排班">休假待同步</span>':''}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
             </td>
