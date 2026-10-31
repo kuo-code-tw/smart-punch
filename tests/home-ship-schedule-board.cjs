@@ -21,7 +21,7 @@ assert(!src.includes('setInterval('),'front end must remain manual updates only'
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
-assert(html.includes('port79-reference-dashboard.css?v=20261031-wanhai-shortcards-v11'),'cache bust updated CSS');
+assert(html.includes('port79-reference-dashboard.css?v=20261031-260px-shortcards-v11'),'cache bust updated CSS');
 assert(src.includes('function shipTimeMarkup(value)'),'timestamp must be split into visible date and time');
 assert(src.includes('shipTimeMarkup(r.eta)')&&src.includes('shipTimeMarkup(r.etb)')&&src.includes('shipTimeMarkup(r.etd)'),'all ETA ETB ETD timestamps rendered fully');
 assert(styles.includes('genuinely SHORT vessel cards'),'common vessel panel heights included');
