@@ -60,7 +60,7 @@ function renderOne(host){
  if(state==='ready'&&rows.length){
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,host.id===STAFF_ID?3:4).map(line).join('')+'</div>'+
-    '<div class="p79-schedule-footnote">'+(notice?'來源最近同步失敗，保留上次成功資料。':'靠泊及離岸時間依萬海原始船期。')+'</div>';return;
+    (notice?'<div class="p79-schedule-footnote">來源最近同步失敗，保留上次成功資料。</div>':'');return;
  }
  const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?'萬海網站尚無船期資料':'尚未讀取萬海船期';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
@@ -118,7 +118,7 @@ function ensureDialog(){
  if(dialog)return dialog;
  dialog=g.document.createElement('dialog');dialog.id='p79PublicShipScheduleDialog';
  dialog.innerHTML='<div class="p79-schedule-dialog-inner"><header class="p79-schedule-dialog-header">'+
-  '<div><h2>萬海網站船期｜全員可看</h2><p>資料來源：萬海航運網站；不可混用港務公司資料。</p></div>'+
+  '<div><h2>萬海網站船期</h2><p>資料來源：萬海航運網站；不可混用港務公司資料。</p></div>'+
   '<button type="button" data-public-ship-close aria-label="關閉">✕</button></header>'+
   '<div id="p79PublicShipDialogBody"></div></div>';
  g.document.body.appendChild(dialog);
@@ -132,10 +132,10 @@ function showDialog(index=-1){
  if(!showing.length){
   body.innerHTML='<p>目前沒有可顯示的萬海船期，請確認 GAS 已啟用同步且來源有效。</p><p><a href="https://khhtml.wanhai.com/web/SailingScheduleList" target="_blank" rel="noopener noreferrer">前往萬海航運網站查看原始船期</a></p>';
  }else{
-  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'｜ETA、ETB、ETD 依萬海原始欄位，不補造缺少資料。</p>'+
+  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'</p>'+
    '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
-   ['英文船名','中文船名','進港航次','出港航次','ETA 抵港','ETB 靠泊','ETD 離港','靠泊碼頭','狀態'].map(h=>'<th>'+h+'</th>').join('')+
-   '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name,r.localName,r.inVoyage,r.outVoyage,r.eta,r.etb,r.etd,r.berth,r.status].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
+   ['船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD'].map(h=>'<th>'+h+'</th>').join('')+
+   '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name||r.localName,r.berth,r.etb,r.etd].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
    '</tbody></table></div>'+
    (showing.length===1?'<div class="p79-schedule-dialog-actions"><button type="button" data-public-show-all>查看全部 '+rows.length+' 艘</button></div>':'');
  }
