@@ -26,6 +26,6 @@ assert(client.includes("await loadSourceHtml(controller.signal)"),'real cloud fe
 assert(client.includes("data?.source!==SOURCE"),'reject backend source substitution');
 assert(client.includes("p79DashRefresh")&&client.includes("addEventListener('click',refresh)"));
 assert(!client.includes('setInterval('),'homepage must remain manual refresh');
-assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-image-source-v4'),'new URL invalidates old cached client');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-json-fields-v5'),'new URL invalidates old cached client');
 new vm.Script(client);
 console.log('PASS: Wan Hai backend auth, source allow-list, single read, browser bridge, no token leak, manual update and cache bust');
