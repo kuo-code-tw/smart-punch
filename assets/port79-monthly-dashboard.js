@@ -323,10 +323,7 @@ function enrichPendingReview(data){
  }
  if(pendingReviewDialog?.open)renderPendingReview();
 }
-function refreshPendingOnReturn(){
- if(loading||!loadedKey||!$('systems')?.classList.contains('show')||!permissions().attendance||Date.now()-lastPendingReadAt<15000)return;
- loadedKey='';load(true).catch(e=>statusText('p79DashMessage',String(e?.message||e)));
-}
+// 首頁停留與切回視窗時，不自動刷新待核資料；點待核卡或手動更新才重讀雲端。
 function showAttendance(a){
  pendingReviewItems=a.pendingDetails;pendingReviewMonth=month();pendingReviewSelection=Array.isArray(a.pendingDetails)&&a.pendingDetails.length?0:-1;lastPendingReadAt=Date.now();
  statusText('p79DashReviewHint',a.pendingShifts===null?'資料尚未載入':a.pendingShifts>0?'點擊查看 '+a.pendingShifts+' 筆異常原因 ›':'點擊查看核對說明 ›');
@@ -429,8 +426,7 @@ function showWhenAdmin(){
 function init(){
  if(!$('p79Dashboard'))return;
  const selector=$('p79DashMonth');if(selector&&!selector.value)selector.value=isoMonth();
- ensurePendingReview();root.addEventListener('focus',refreshPendingOnReturn);
- root.document.addEventListener('visibilitychange',()=>{if(!root.document.hidden)refreshPendingOnReturn()});
+ ensurePendingReview();
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  selector?.addEventListener('change',()=>{loadedKey='';reset();statusText('p79DashMessage','正在準備所選月份資料…');statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());showWhenAdmin()});
  $('p79DashRefresh')?.addEventListener('click',()=>{loadedKey='';load(true).catch(e=>statusText('p79DashMessage',String(e?.message||e)))});
