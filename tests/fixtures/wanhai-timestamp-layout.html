@@ -48,6 +48,8 @@ window.addEventListener('load',()=>{
  const results={
   viewport:innerWidth,
   equalHeights:innerWidth>620?cards.every(r=>Math.abs(r.height-cards[0].height)<2):true,
+  compactHeights:cards.every(r=>r.height<=395),
+  naturalTrendReference:cards[0].height<=395,
   equalTops:innerWidth>1050?cards.every(r=>Math.abs(r.top-cards[0].top)<2):true,
   noEllipsis:fields.every(el=>getComputedStyle(el).textOverflow!=='ellipsis'&&getComputedStyle(el).whiteSpace!=='nowrap'),
   dateAndTimeSeparate:dates.length===3&&times.length===3&&dates.every((el,i)=>times[i].getBoundingClientRect().top>el.getBoundingClientRect().top),
