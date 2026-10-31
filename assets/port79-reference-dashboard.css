@@ -583,7 +583,7 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body small{color:#f6cfd9!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll tr:hover{background:#2a4765!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79d-bars svg text{fill:#c8dfff!important}
-html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79d-bars svg line{stroke:#466480!important}
+/* Keep data-series stroke colors intact; only .p79r-gridline uses the dark grid tone. */
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review:focus-visible{outline:3px solid #a4d9ff!important;outline-offset:2px!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-eff-pager button:focus-visible{outline:2px solid #b1e0ff!important;outline-offset:2px!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-list:focus-visible{outline:2px solid #a7d8ff!important}
