@@ -36,5 +36,5 @@ expected.forEach(([audit,color],i)=>{
 assert.match(buttons[3].style['box-shadow'],/#4f46e5/,'未申報選取日保持白底、紫框');
 assert.match(buttons[3].title,/沒有正式加班申報/);
 assert.match(buttons[4].title,/尚未確認/,'雲端沒載入不能假裝無申報');
-assert.equal(strip.legend.textContent,'白：無申報｜綠：已申報｜黃：已修改｜紅：已取消｜灰：未確認');
+assert.equal(strip.legend.textContent,'白：無申報｜綠：已申報／已核對｜黃：歷史修改待核對｜紅：已取消｜灰：未確認');
 console.log('PASS: 白=無申報、綠=已申報、黃=已修改、紅=已取消、灰=雲端未知，不被選取日期覆蓋');
