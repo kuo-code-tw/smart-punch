@@ -135,8 +135,21 @@ function analyzeAttendance(data,month){
   else if(/下班|簽退|clock.?out|check.?out/i.test(status))punchOut++;
   else other++;
  }
+ const reviewShifts=root.P79AttendanceV6?.buildShifts?root.P79AttendanceV6.buildShifts(records).filter(s=>{
+  const date=String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-');
+  return date.startsWith(month+'-')&&date<today&&(!s.clockIn||!s.clockOut||s.timePrecisionIssue);
+ }):null;
+ const pendingDetails=reviewShifts===null?null:reviewShifts.map((s,i)=>({
+  key:String(s.key||i),date:String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-'),
+  empId:String(s.empId||''),attNo:String(s.attNo??''),name:displayPersonName(s.name)||'姓名未提供',
+  dept:String(s.dept||''),unit:String(s.unit||''),group:'',jobTitle:String(s.jobTitle||''),shift:'',
+  clockIn:String(s.clockIn?.timeStr||''),clockOut:String(s.clockOut?.timeStr||''),
+  clockInRecordId:String(s.clockIn?.id??''),clockOutRecordId:String(s.clockOut?.id??''),
+  reason:s.timePrecisionIssue?'原始打卡時間不完整':!s.clockIn&&!s.clockOut?'上下班皆無卡':!s.clockIn?'缺少上班卡':!s.clockOut?'缺少下班卡':'打卡時間待核',
+  note:String(s.noteText||'')
+ })).sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name,'zh-TW'));
  return {recordCount:records.length,peopleCount:uniquePeople.size,personDays:peopleDays.size,
-   punchIn,punchOut,other,weeks,today,todayCount:todayPeople.size,todayOnDuty:[...todayPeople].filter(id=>/上班|簽到|clock.?in|check.?in/i.test(todayLatest.get(id)?.status||'')).length,weeklyPeople:seenWeeks.map(s=>s.size),pendingShifts:root.P79AttendanceV6?.buildShifts?root.P79AttendanceV6.buildShifts(records).filter(s=>{const date=String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-');return date.startsWith(month+'-')&&date<today&&(!s.clockIn||!s.clockOut||s.timePrecisionIssue)}).length:null};
+   punchIn,punchOut,other,weeks,today,todayCount:todayPeople.size,todayOnDuty:[...todayPeople].filter(id=>/上班|簽到|clock.?in|check.?in/i.test(todayLatest.get(id)?.status||'')).length,weeklyPeople:seenWeeks.map(s=>s.size),pendingShifts:pendingDetails===null?null:pendingDetails.length,pendingDetails};
 }
 function analyzeOvertime(data,month){
  if(!data||!Array.isArray(data.schedules))throw Error('排班月份資料不完整');
@@ -152,7 +165,7 @@ const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,impor
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
-let loadedKey='',loading=false,sessionStamp='';
+let loadedKey='',loading=false,sessionStamp='',pendingReviewItems=null,pendingReviewMonth='',pendingReviewDialog=null,pendingReviewSelection=-1,lastPendingReadAt=0;
 function session(){try{return JSON.parse(root.sessionStorage.getItem('port79_user_session')||'null')}catch(_){return null}}
 function permissions(){
  const s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
@@ -198,7 +211,97 @@ function showVessels(v){
  statusText('p79DashPersonSource','個人效率＝有有效工時的作業明細 Moves ÷ 對應工時（參考值）；未提供工時者顯示「—」。');
 }
 function showOvertime(a){setMetric('p79DashOvertimeHours',fmt(a.hours,1));statusText('p79DashScheduleSource','· 加班依正式申報紀錄統計');}
+function ensurePendingReview(){
+ if(pendingReviewDialog)return;
+ const card=$('p79DashAnomalies')?.closest('.p79d-kpi');if(!card)return;
+ card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-haspopup','dialog');
+ card.setAttribute('aria-label','查看本月打卡待核明細');card.classList.add('p79-review-card');
+ card.addEventListener('click',openPendingReview);
+ card.addEventListener('keydown',e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openPendingReview();}});
+ const style=root.document.createElement('style');
+ style.textContent=[
+ '.p79-review-card{cursor:pointer}.p79-review-card:hover{box-shadow:0 6px 20px #15375c25}',
+ '.p79-review-card:focus-visible{outline:3px solid #2463ae;outline-offset:2px}',
+ '#p79PendingReviewDialog{width:min(1050px,calc(100vw - 24px));max-height:85vh;border:0;border-radius:14px;padding:0;background:#fff;color:#17365b;box-shadow:0 20px 60px #0005}',
+ '#p79PendingReviewDialog::backdrop{background:#12243e99}',
+ '.p79-review-wrap{padding:20px;max-height:85vh;overflow:auto}',
+ '.p79-review-head{display:flex;justify-content:space-between;gap:16px;align-items:center}',
+ '.p79-review-head h2{margin:0;font-size:19px}',
+ '.p79-review-head button{cursor:pointer;padding:7px 11px;border:0;border-radius:7px;background:#edf2f8}',
+ '.p79-review-sub{color:#697b91;margin:7px 0 14px;font-size:13px}',
+ '.p79-review-scroll{width:100%;overflow:auto}',
+ '.p79-review-table{border-collapse:collapse;width:100%;min-width:790px;font-size:13px}',
+ '.p79-review-table th,.p79-review-table td{padding:10px;text-align:left;border-bottom:1px solid #e4e9f0;white-space:nowrap}',
+ '.p79-review-table th{background:#eff5fb;color:#365370}',
+ '.p79-review-table tbody tr{cursor:pointer}.p79-review-table tbody tr:hover,.p79-review-table tbody tr:focus,.p79-review-table tbody tr.selected{background:#eaf4ff;outline:0}',
+ '.p79-review-issue{color:#c04b3a;font-weight:700}',
+ '.p79-review-detail{margin-top:14px;padding:14px;background:#f7fafd;border:1px solid #dce7f3;border-radius:9px}',
+ '.p79-review-detail dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px 16px;margin:10px 0}',
+ '.p79-review-detail dt{font-size:12px;color:#61738b}',
+ '.p79-review-detail dd{margin:3px 0 0;overflow-wrap:anywhere}',
+ '.p79-review-detail button{border:0;background:#1d62ad;color:white;border-radius:7px;padding:9px 13px;cursor:pointer}',
+ '.p79-review-empty{text-align:center;padding:18px;color:#62748b}'
+ ].join('\n');root.document.head.appendChild(style);
+ pendingReviewDialog=root.document.createElement('dialog');pendingReviewDialog.id='p79PendingReviewDialog';
+ pendingReviewDialog.setAttribute('aria-labelledby','p79PendingReviewTitle');
+ pendingReviewDialog.innerHTML='<div class="p79-review-wrap"><header class="p79-review-head"><h2 id="p79PendingReviewTitle">本月打卡待核明細</h2><button type="button" data-review-close aria-label="關閉明細">✕</button></header><p class="p79-review-sub" id="p79PendingReviewCaption"></p><div id="p79PendingReviewRows"></div></div>';
+ root.document.body.appendChild(pendingReviewDialog);
+ pendingReviewDialog.addEventListener('click',e=>{
+  if(e.target===pendingReviewDialog||e.target.closest('[data-review-close]')){pendingReviewDialog.close();return;}
+  if(e.target.closest('[data-review-attendance]')){if(permissions().attendance&&typeof root.launchSystem==='function')root.launchSystem('attendance');return;}
+  const row=e.target.closest('[data-review-index]');
+  if(row){pendingReviewSelection=Number(row.dataset.reviewIndex);renderPendingReview();}
+ });
+ pendingReviewDialog.addEventListener('keydown',e=>{
+  const row=e.target.closest('[data-review-index]');
+  if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pendingReviewSelection=Number(row.dataset.reviewIndex);renderPendingReview();}
+ });
+}
+function openPendingReview(){
+ if(!permissions().attendance)return;
+ ensurePendingReview();if(!pendingReviewDialog)return;
+ pendingReviewSelection=-1;renderPendingReview();
+ if(!pendingReviewDialog.open)pendingReviewDialog.showModal();
+}
+function renderPendingReview(){
+ if(!pendingReviewDialog||!permissions().attendance)return;
+ const rows=pendingReviewItems,monthKey=pendingReviewMonth||month();
+ statusText('p79PendingReviewTitle',monthKey.slice(0,4)+'年'+Number(monthKey.slice(5))+'月打卡待核明細');
+ statusText('p79PendingReviewCaption',Array.isArray(rows)?'共 '+rows.length+' 筆待核班次，點擊一列即可查看完整資訊':'考勤資料尚未完成載入');
+ const host=$('p79PendingReviewRows');if(!host)return;
+ if(!Array.isArray(rows)){host.innerHTML='<p class="p79-review-empty">考勤明細尚未讀齊，請更新首頁資料。</p>';return;}
+ if(!rows.length){host.innerHTML='<p class="p79-review-empty">所選月份目前沒有待核班次。</p>';return;}
+ if(pendingReviewSelection>=rows.length)pendingReviewSelection=-1;
+ const selected=rows[pendingReviewSelection];
+ host.innerHTML='<div class="p79-review-scroll"><table class="p79-review-table"><thead><tr><th>日期</th><th>員工姓名</th><th>工號／考勤號</th><th>部門／組別</th><th>班別</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
+ rows.map((r,i)=>'<tr data-review-index="'+i+'" tabindex="0" class="'+(i===pendingReviewSelection?'selected':'')+'"><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.empId||r.attNo||'—')+'</td><td>'+esc([r.dept,r.unit,r.group].filter(Boolean).join('／')||'—')+'</td><td>'+esc(r.shift||'—')+'</td><td>'+esc(r.clockIn||'—')+'</td><td>'+esc(r.clockOut||'—')+'</td><td class="p79-review-issue">'+esc(r.reason)+'</td></tr>').join('')+
+ '</tbody></table></div>'+
+ (selected?'<section class="p79-review-detail"><strong>'+esc(selected.name)+'｜'+esc(selected.date)+'｜'+esc(selected.reason)+'</strong><dl>'+
+ [['工號',selected.empId],['考勤號',selected.attNo],['部門',selected.dept],['組別',selected.group],['班別',selected.shift],['職稱',selected.jobTitle],['上班卡時間',selected.clockIn],['下班卡時間',selected.clockOut],['上班卡紀錄ID',selected.clockInRecordId],['下班卡紀錄ID',selected.clockOutRecordId],['備註',selected.note]].map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value||'—')+'</dd></div>').join('')+
+ '</dl><button type="button" data-review-attendance>前往考勤管理核對 ›</button></section>':'<p class="p79-review-empty">選取上方紀錄即可查看打卡明細。</p>');
+}
+function enrichPendingReview(data){
+ if(!Array.isArray(pendingReviewItems)||!Array.isArray(data?.schedules))return;
+ const norm=v=>String(v||'').trim().toUpperCase();
+ for(const item of pendingReviewItems){
+  const ids=data.schedules.filter(r=>item.empId&&norm(r.empId||r.id)===norm(item.empId));
+  const att=data.schedules.filter(r=>item.attNo&&norm(r.attNo||r.attendanceNo)===norm(item.attNo));
+  const names=data.schedules.filter(r=>item.name&&norm(displayPersonName(r.name))===norm(item.name));
+  const match=ids.length===1?ids[0]:att.length===1?att[0]:names.length===1?names[0]:null;
+  if(!match)continue;
+  item.shift=String(match.schedule?.[item.date]||'');
+  item.dept=item.dept||String(match.dept||'');
+  item.unit=item.unit||String(match.unit||'');
+  item.group=String(match.schedule?.__personnel?.group||match.group||'');
+ }
+ if(pendingReviewDialog?.open)renderPendingReview();
+}
+function refreshPendingOnReturn(){
+ if(loading||!loadedKey||!$('systems')?.classList.contains('show')||!permissions().attendance||Date.now()-lastPendingReadAt<15000)return;
+ loadedKey='';load(true).catch(e=>statusText('p79DashMessage',String(e?.message||e)));
+}
 function showAttendance(a){
+ pendingReviewItems=a.pendingDetails;pendingReviewMonth=month();pendingReviewSelection=-1;lastPendingReadAt=Date.now();
  setMetric('p79DashAttendancePeople',fmt(a.peopleCount));
  setMetric('p79DashPunchRecords',fmt(a.recordCount));
  setMetric('p79DashPersonDays',fmt(a.personDays));
@@ -212,8 +315,10 @@ function showAttendance(a){
  formatBars('p79DashAttendanceBars',a.weeks,['第1週','第2週','第3週','第4週','第5週']);
  statusText('p79DashAttendanceSource','依正式打卡紀錄統計；出勤人日以有上班卡的日期計算。');
  root.P79ReferenceDashboard?.attendance(a,month());
+ if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ pendingReviewItems=null;pendingReviewMonth='';pendingReviewSelection=-1;if(pendingReviewDialog?.open)pendingReviewDialog.close();
  for(const id of ['p79DashOvertimeHours','p79DashAnomalies','p79DashWorkHours','p79DashShipCount','p79DashMoves','p79DashContainers','p79DashGph','p79DashAttendancePeople','p79DashPunchRecords','p79DashPersonDays','p79DashPunchIns','p79DashDonutRate'])setMetric(id,'—');
  for(const id of ['p79DashShipRanking','p79DashPeopleRanking']){const el=$(id);if(el)el.innerHTML='<tr><td colspan="5">等待月份資料</td></tr>'}
  for(const id of ['p79DashShipBars','p79DashAttendanceBars']){const el=$(id);if(el)el.textContent='等待載入'}
@@ -260,6 +365,7 @@ async function load(forceCloud=false){
     }
     else if(kind==='attendance'&&Array.isArray(data.records))render(analyzeAttendance(data,ym));
     else if(kind==='schedule'&&Array.isArray(data.schedules)){
+      enrichPendingReview(data);
       render(analyzeOvertime(data,ym));
       // Read-only roster grouping for the people-efficiency leaderboard.
       root.P79ReferenceDashboard?.setGroupRoster(data,ym);
@@ -294,6 +400,8 @@ function showWhenAdmin(){
 function init(){
  if(!$('p79Dashboard'))return;
  const selector=$('p79DashMonth');if(selector&&!selector.value)selector.value=isoMonth();
+ ensurePendingReview();root.addEventListener('focus',refreshPendingOnReturn);
+ root.document.addEventListener('visibilitychange',()=>{if(!root.document.hidden)refreshPendingOnReturn()});
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  selector?.addEventListener('change',()=>{loadedKey='';reset();statusText('p79DashMessage','正在準備所選月份資料…');statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());showWhenAdmin()});
  $('p79DashRefresh')?.addEventListener('click',()=>{loadedKey='';load(true).catch(e=>statusText('p79DashMessage',String(e?.message||e)))});
