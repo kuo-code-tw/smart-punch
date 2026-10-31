@@ -8934,7 +8934,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     if (normalizedDate) months.add(normalizedDate.slice(0, 7));
                 });
             });
-            months.add(scheduleDateKey(new Date()).slice(0, 7));
+            // Allow employees to query the next month's saved official roster
+            // before the calendar turns over. This only adds a selector option;
+            // the shifts must still come from the authenticated GAS month read.
+            const thisMonth=scheduleDateKey(new Date()).slice(0,7);
+            const [year,number]=thisMonth.split('-').map(Number);
+            const nextMonth=new Date(Date.UTC(year,number,1)).toISOString().slice(0,7);
+            months.add(thisMonth);
+            months.add(nextMonth);
             return [...months].filter(Boolean).sort().reverse();
         }
 
