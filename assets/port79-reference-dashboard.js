@@ -66,9 +66,27 @@ function weeklyChart(report){
 // Homepage ship timetable is a separate outside-website source, not the vessel historical snapshot.
 
 function vessels(v){
- const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard,latest=model.latestImportedVessels(v.vessels,5);
- const importLabel=s=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(s));
- if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt)+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="6">本月份尚無附匯入時間的船舶資料</td></tr>';
+ const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard;
+ // 最新匯入的優先，其餘仍屬本月的船舶一併保留，不受「最新 5 艘」限制。
+ const source=Array.isArray(v.vessels)?v.vessels:[];
+ const imported=model.latestImportedVessels(source,Number.MAX_SAFE_INTEGER);
+ const identifier=s=>String(s.workingNo||[s.name,s.voyage].join('|'));
+ const seen=new Set(imported.map(identifier));
+ const untimed=source.filter(s=>{
+  if(!s||s.deleted||Number.isFinite(Date.parse(String(s.importedAt||''))))return false;
+  const id=identifier(s);
+  if(seen.has(id))return false;
+  seen.add(id);
+  return true;
+ }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+ const latest=[...imported,...untimed];
+ const countLabel=$('p79DashShipRankingCount');
+ if(countLabel)countLabel.textContent='本月全部 '+latest.length+' 艘 · 可上下捲動';
+ const importLabel=value=>{
+  if(!Number.isFinite(Date.parse(String(value||''))))return '—';
+  return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
+ };
+ if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="7">本月份尚無船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  peopleReport=v;renderPeople();
