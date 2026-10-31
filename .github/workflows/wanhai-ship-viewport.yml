@@ -1,0 +1,56 @@
+name: WAN HAI full timestamps and equal-height cards
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'assets/port79-reference-dashboard.css'
+      - 'assets/port79-google-sheet-schedule.js'
+      - 'tests/home-ship-schedule-board.cjs'
+      - 'tests/home-wanhai-timestamp-visibility.cjs'
+      - 'tests/fixtures/wanhai-timestamp-layout.html'
+      - '.github/workflows/wanhai-ship-viewport.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check staff and admin timestamps + card size
+        run: |
+          node tests/home-ship-schedule-board.cjs
+          node tests/home-wanhai-timestamp-visibility.cjs
+          node tests/home-wanhai-json-vessel-schedule.cjs
+      - name: Browser computed layout on desktop/tablet/mobile, light/dark
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v chromium || true)"
+          if [ -z "$CHROME" ]; then echo "::error::Chrome unavailable"; exit 1; fi
+          for width in 390 850 1366; do
+            for theme in light dark; do
+              output="$(mktemp)"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
+                --allow-file-access-from-files --window-size="$width,900" \
+                --virtual-time-budget=2500 --dump-dom \
+                "file://$GITHUB_WORKSPACE/tests/fixtures/wanhai-timestamp-layout.html?theme=$theme" \
+                >"$output" 2>/dev/null
+              REPORT_PATH="$output" WIDTH="$width" THEME="$theme" node -e '
+                const fs=require("node:fs");
+                const html=fs.readFileSync(process.env.REPORT_PATH,"utf8");
+                const match=html.match(/SHIP_VIEWPORT_REPORT:(\{[^<]+\})/);
+                if(!match)throw Error("No browser-computed layout result");
+                const data=JSON.parse(match[1]);
+                const checks=["equalHeights","equalTops","noEllipsis","dateAndTimeSeparate","visibleTime","scrollableSchedule"];
+                const failed=checks.filter(k=>!data[k]);
+                console.log(process.env.WIDTH,process.env.THEME,JSON.stringify(data));
+                if(failed.length)throw Error("Layout failure: "+failed.join(", "));
+              '
+              rm "$output"
+            done
+          done
