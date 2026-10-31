@@ -257,3 +257,34 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-foot
 #p79ShipScheduleDialog .p79-schedule-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 #p79ShipScheduleDialog .p79-schedule-dialog-actions button{padding:9px 13px;border-radius:8px;border:1px solid #c9ddf4;background:#eaf4ff;color:#145aa0;font-weight:800;cursor:pointer}
 @media(max-width:620px){html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-board{height:auto;min-height:135px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-list{max-height:185px}#p79ShipScheduleDialog .p79-schedule-dialog-inner{padding:14px}}
+
+
+/* Wan Hai external public source: source name, browsing fallback, and honest CORS status. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote{height:calc(100% - 25px);display:flex;flex-direction:column;overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-caption{font-size:10px;font-weight:800;color:#3675af;line-height:1.4;margin-bottom:4px}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote .p79-schedule-list{flex:1;overflow:auto;scrollbar-width:thin}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote .p79-schedule-time{overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote .p79-schedule-time b{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg{display:flex;flex-direction:column;justify-content:center;gap:9px;flex:1;text-align:center;align-items:center;padding:12px 5px;color:#355b7c}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg strong{font-size:12px;line-height:1.5;font-weight:900;color:#184679}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-msg small{font-size:11px;line-height:1.45;color:#7691a7}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote-actions{display:flex;justify-content:center}
+.p79-schedule-external-link{display:inline-block;text-decoration:none;font-size:12px;font-weight:900;color:#1267bc;background:#edf6ff;border:1px solid #b8d8f4;border-radius:8px;padding:9px 12px}
+.p79-schedule-external-link:hover{background:#e0f0ff}
+#p79WanHaiScheduleDialog{width:min(1060px,calc(100vw - 24px));max-height:88vh;max-width:none;padding:0;border:0;border-radius:14px;color:#17365b;background:white;box-shadow:0 22px 70px #091c3666}
+#p79WanHaiScheduleDialog::backdrop{background:#0d244c99}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-inner{padding:19px;max-height:85vh;overflow:auto}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
+#p79WanHaiScheduleDialog h2{font-size:21px;margin:0 0 5px;font-weight:900;color:#164983}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-header p{font-size:12px;line-height:1.5;color:#69839d;margin:0 0 15px}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-header button{border:0;border-radius:8px;padding:7px 11px;background:#ecf3fb;cursor:pointer;font-size:16px}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-disclaimer{font-size:12px;line-height:1.65;color:#687f99}
+#p79WanHaiScheduleDialog .p79-schedule-table-scroll{max-width:100%;overflow:auto;max-height:58vh}
+#p79WanHaiScheduleDialog .p79-schedule-table{width:100%;min-width:740px;border-collapse:collapse;font-size:12px}
+#p79WanHaiScheduleDialog .p79-schedule-table th,#p79WanHaiScheduleDialog .p79-schedule-table td{padding:10px 9px;text-align:left;border-bottom:1px solid #e4ebf4;white-space:nowrap}
+#p79WanHaiScheduleDialog .p79-schedule-table th{background:#edf5ff;color:#345a83;position:sticky;top:0}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:12px}
+#p79WanHaiScheduleDialog .p79-schedule-dialog-actions button{padding:9px 13px;border-radius:8px;border:1px solid #c9ddf4;background:#eaf4ff;color:#145aa0;font-weight:800;cursor:pointer}
+#p79WanHaiScheduleDialog .p79-schedule-website-preview{height:min(55vh,500px);border:1px solid #d7e7f3;border-radius:8px;overflow:hidden}
+#p79WanHaiScheduleDialog .p79-schedule-website-preview iframe{width:100%;height:100%;border:0;background:#fff}
+@media(max-width:620px){html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-schedule-remote{height:auto;min-height:140px}#p79WanHaiScheduleDialog .p79-schedule-dialog-inner{padding:13px}}
