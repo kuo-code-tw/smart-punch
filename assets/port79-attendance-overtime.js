@@ -176,6 +176,49 @@ function cloudMonth(date){
 // A date review tracks the actual overtime audit payload, not incidental
 // schedule day metadata. Opening the monthly-rest dialog is read-only and may
 // cause a fresh cloud snapshot with different row/property ordering.
+
+const p79ReviewCloudCache=new Map();
+function p79ReviewCloudToken(){try{return String(getAttendanceEmployeeMasterToken()||'').trim();}catch(_){return '';}}
+function p79ReviewCloudKey(month,token){return month+'|'+token;}
+function p79ReviewCloudState(date){const token=p79ReviewCloudToken();return token?p79ReviewCloudCache.get(p79ReviewCloudKey(date.slice(0,7),token)):null;}
+function p79ReviewCloudRead(month){
+ const token=p79ReviewCloudToken(),base=typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||''):'';
+ if(!token||!base)return Promise.resolve(null);
+ const key=p79ReviewCloudKey(month,token),prior=p79ReviewCloudCache.get(key);
+ if(prior&&(prior.pending||Date.now()-prior.at<120000))return prior.task||Promise.resolve(prior);
+ const state={at:Date.now(),pending:true,ready:false,reviewed:{}};p79ReviewCloudCache.set(key,state);
+ state.task=(async()=>{
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);
+  try{
+   const u=new URL(base,g.location?.href||location.href);
+   for(const [k,v] of Object.entries({action:'getOvertimeDateReviewState',gcToken:token,month,_:Date.now()}))u.searchParams.set(k,v);
+   const response=await g.fetch(u.toString(),{cache:'no-store',signal:ctl.signal}),d=await response.json();
+   if(!response.ok||d?.ok!==true||d.action!=='getOvertimeDateReviewState'||d.source!=='cloud'||
+      d.month!==month||d.schemaVersion!==1||!d.reviewed||typeof d.reviewed!=='object'||Array.isArray(d.reviewed))
+    throw Error(d?.error||'GAS 尚未支援雲端加班日期查核');
+   if(p79ReviewCloudCache.get(key)!==state||p79ReviewCloudToken()!==token)return null;
+   state.ready=true;state.reviewed=d.reviewed;return state;
+  }catch(e){console.warn('雲端加班核對狀態讀取未完成',String(e?.message||e));return null;}
+  finally{clearTimeout(tm);state.pending=false;if(p79ReviewCloudCache.get(key)===state&&p79ReviewCloudToken()===token)refreshCurrentStrip();}
+ })();return state.task;
+}
+async function p79ReviewCloudWrite(date,signature,checked,token){
+ const base=typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||''):'';
+ if(!base||!token||p79ReviewCloudToken()!==token)throw Error('登入狀態已失效');
+ const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);
+ try{
+  const r=await g.fetch(base,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+   body:JSON.stringify({action:'setOvertimeDateReviewState',gcToken:token,date,fingerprint:signature,checked}),signal:ctl.signal});
+  const d=await r.json();
+  if(!r.ok||d?.ok!==true||d.action!=='setOvertimeDateReviewState'||d.date!==date||
+     d.fingerprint!==signature||d.checked!==checked)throw Error(d?.error||'GAS 尚未部署雲端核對儲存接口');
+  if(p79ReviewCloudToken()!==token)throw Error('查核期間登入已改變');
+  const key=p79ReviewCloudKey(date.slice(0,7),token),prior=p79ReviewCloudCache.get(key);
+  p79ReviewCloudCache.set(key,{at:Date.now(),pending:false,ready:true,reviewed:{...(prior?.reviewed||{}),[date]:checked?signature:''}});
+  refreshCurrentStrip();return d;
+ }finally{clearTimeout(tm);}
+}
+
 function p79ReviewStableObject(value){
  if(Array.isArray(value))return value.map(p79ReviewStableObject);
  if(value&&typeof value==='object'){
@@ -294,6 +337,8 @@ function isReviewed(date){
  const state=cloudMonth(date);
  const signature=reviewFingerprint(date,state);
  if(!signature)return false;
+ const cloud=p79ReviewCloudState(date);
+ if(cloud?.ready&&Object.prototype.hasOwnProperty.call(cloud.reviewed,date))return cloud.reviewed[date]===signature;
  const marks=reviewMarks();
  if(marks[date]===signature)return true;
  if(marks[date]&&(marks[date]===p79V4ReviewFingerprint(date,state)||marks[date]===p79PriorStableReviewFingerprint(date,state)||marks[date]===p79LegacyReviewFingerprint(date,state))){
@@ -370,8 +415,11 @@ async function recheckAndMarkReviewed(date,checked=true){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))
   return {ok:false,message:'日期格式不正確，無法核對申報'};
  if(!checked){
-  const changed=markReviewed(date,false);
-  return {ok:changed,message:changed?date+' 已取消查核；目前有效的修改申報恢復黃色':date+' 取消查核失敗：請確認雲端資料與瀏覽器儲存權限'};
+  const signature=reviewFingerprint(date,cloudMonth(date)),token=p79ReviewCloudToken();
+  if(!signature||!token)return {ok:false,message:date+' 尚未讀到正式資料，不能取消雲端查核'};
+  try{await p79ReviewCloudWrite(date,signature,false,token);markReviewed(date,false);
+   return {ok:true,message:date+' 已在雲端取消查核，原申報與歷史未更動'};}
+  catch(e){return {ok:false,message:date+' 取消雲端查核失敗：'+String(e?.message||e)};}
  }
  const month=date.slice(0,7);
  if(activeReviewRequests.has(date))return activeReviewRequests.get(date);
@@ -430,9 +478,11 @@ async function recheckAndMarkReviewed(date,checked=true){
       +'這不代表你沒有正式申報，也不能只因取消歷史就否定後續申報。'
       +'如果加班管理已顯示「正常已申報」，代表兩邊資料需要核對；目前不會自行改動正式申報或強制標綠。'};
    }
-   if(!markReviewed(date,true))
-    return {ok:false,message:date+' 雲端確認 '+info.activeCount+' 筆有效申報，但查核狀態未能儲存在此瀏覽器，請確認網站儲存權限'};
-   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核完成並顯示綠色；修改／取消歷史仍保留'+(attendanceConfirmation?'；取消無出勤預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核待管理員確認 '+attendanceConfirmation.approvedReview+' 筆':'；預排自動取消尚未啟用，原預排保留')};
+   const signature=reviewFingerprint(date,state);
+   if(!signature)throw Error('正式申報指紋未完成');
+   await p79ReviewCloudWrite(date,signature,true,token);
+   markReviewed(date,true);
+   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核已跨裝置保存並顯示綠色；修改／取消歷史仍保留'+(attendanceConfirmation?'；取消無出勤預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核待管理員確認 '+attendanceConfirmation.approvedReview+' 筆':'；預排自動取消尚未啟用，原預排保留')};
   }catch(error){
    const reason=error?.name==='AbortError'?'雲端讀取逾時':String(error?.message||error||'未知錯誤');
    return {ok:false,message:date+' 查核失敗：'+reason+'。不會修改正式申報或強制變綠。'};
@@ -449,8 +499,12 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
  try{months=typeof p79AttendanceOvertimeMonths!=='undefined'?p79AttendanceOvertimeMonths:null;}catch(_){return;}
  if(!months)return;
  const buttons=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')];
+ const seenMonths=new Set();
  for(let i=0;i<buttons.length;i++){
   const date=String(keys[i]||'').replaceAll('/','-'),state=months.get(date.slice(0,7));
+  if(state?.ready===true&&!seenMonths.has(date.slice(0,7))){
+   seenMonths.add(date.slice(0,7));void p79ReviewCloudRead(date.slice(0,7));
+  }
   const info=overtimeDayIndicator(date,state),button=buttons[i];
   button.removeAttribute('data-p79-overtime-audit');
   button.style.removeProperty('background-color');
@@ -484,7 +538,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='白：無申報｜綠：已申報｜黃：已修改｜紅：已取消｜灰：未確認';
+  legend.textContent='白：無申報｜綠：已申報／已核對｜黃：歷史修改待核對｜紅：已取消｜灰：未確認';
   host.appendChild(legend);
  }
 }
