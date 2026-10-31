@@ -371,3 +371,52 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
  font-size:9px;line-height:1.4;
 }
 #p79WanHaiScheduleDialog .p79-schedule-table{min-width:1050px}
+
+/* PORT79 2026-10-31 homepage vessel list: all vessels, berth, scroll within equal-height card. */
+@media screen {
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking{
+  display:flex!important;
+  flex-direction:column!important;
+  min-width:0!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-panel-title{
+  flex:0 0 auto!important;
+  min-width:0!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-panel-title>span{
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  min-width:0!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll{
+  flex:1 1 auto!important;
+  height:254px!important;
+  max-height:254px!important;
+  min-height:0!important;
+  overflow-x:auto!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll table{
+  min-width:565px!important;
+  width:100%!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll thead th{
+  position:sticky;
+  top:0;
+  z-index:1;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll td:nth-child(3){
+  white-space:nowrap!important;
+  max-width:105px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+ }
+}
+@media screen and (max-width:540px) {
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels > article.p79d-ranking .p79d-table-scroll{
+  height:282px!important;
+  max-height:282px!important;
+ }
+}
