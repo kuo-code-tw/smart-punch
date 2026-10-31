@@ -30,7 +30,20 @@ function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.cr
  bar=d.createElement('header');bar.id='p79WorkspaceTopbar';
  const toggle=button('切換系統導覽','p79-toolbar-toggle',icon('menu'),()=>{const mobile=matchMedia('(max-width: 900px)').matches;d.body.classList.toggle(mobile?'p79-nav-open':'p79-nav-collapsed');toggle.setAttribute('aria-expanded',String(mobile?d.body.classList.contains('p79-nav-open'):!d.body.classList.contains('p79-nav-collapsed')));});toggle.setAttribute('aria-controls',shell.id);toggle.setAttribute('aria-expanded',String(!matchMedia('(max-width: 900px)').matches));bar.append(toggle);
  bar.append(button('搜尋系統功能','p79-toolbar-search',icon('search')+'<span>搜尋船舶、航次、員工、班表、報表…</span><kbd>Ctrl K</kbd>',openSearch));
- const tools=d.createElement('div');tools.className='p79-toolbar-tools';if(menuWrap){const action=shell.querySelector('.action');if(action){tools.append(action);}else tools.append(menuWrap);}else tools.append(button('切換深淺色','p79-toolbar-theme','◐',()=>d.getElementById('themeToggle')?.click()));
+ const tools=d.createElement('div');tools.className='p79-toolbar-tools';if(menuWrap){const action=shell.querySelector('.action');if(action){tools.append(action);}else tools.append(menuWrap);}
+ // 舊版只在不存在系統選單時才顯示切換鈕；正式首頁有選單，因此切換鈕消失。
+ // 保留舊按鈕既有的 localStorage 主題設定邏輯，不創造第二份狀態來源。
+ if(home||!menuWrap){
+  const themeBtn=button('切換深淺色','p79-toolbar-theme','◐',()=>{
+   d.getElementById('themeToggle')?.click();
+   const isDark=d.documentElement.getAttribute('data-theme')==='dark';
+   themeBtn.setAttribute('aria-pressed',String(isDark));
+   themeBtn.setAttribute('title',isDark?'切換亮色模式':'切換暗色模式');
+  });
+  themeBtn.setAttribute('aria-pressed',String(d.documentElement.getAttribute('data-theme')==='dark'));
+  themeBtn.setAttribute('title',d.documentElement.getAttribute('data-theme')==='dark'?'切換亮色模式':'切換暗色模式');
+  tools.append(themeBtn);
+ }
  const user=d.createElement('div');user.className='p79-toolbar-user';user.innerHTML='<span class="p79-avatar">'+icon('user')+'</span><span><strong class="p79-user-name"></strong><small class="p79-user-role"></small></span>';tools.append(user);if(home&&d.getElementById('p79Dashboard')){const logout=d.getElementById('logoutBtn');if(logout)tools.append(logout);}bar.append(tools);d.body.prepend(bar);
  const backdrop=button('關閉系統導覽','p79-nav-backdrop','',()=>d.body.classList.remove('p79-nav-open'));d.body.append(backdrop);
  if(status){const tray=d.createElement('div');tray.id='p79WorkspaceStatus';tray.append(status);d.body.insertBefore(tray,shell.nextSibling);}
