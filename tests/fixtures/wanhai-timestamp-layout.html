@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PORT79 timestamp and card-height browser fixture</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#14263e;color:#eaf3ff;font-family:Arial,"Microsoft JhengHei",sans-serif}
+#systems{padding:18px 10px}#p79Dashboard{max-width:1400px;margin:auto}
+.p79d-panels{display:grid;gap:10px}.p79d-ship-panels{grid-template-columns:repeat(3,minmax(0,1fr))}
+.p79d-panel{border:1px solid #37516e;border-radius:11px;padding:10px;background:#1a304d}
+.p79d-panel-title{display:flex;align-items:center;justify-content:space-between;height:28px}
+.p79d-panel-title b{font-size:12px}
+.p79-schedule-list{display:flex;flex-direction:column;overflow-y:auto;gap:5px}
+.p79-schedule-row{display:grid;width:100%;border:1px solid #526f8a;border-radius:8px;padding:8px;text-align:left}
+</style>
+<link rel="stylesheet" href="../../assets/port79-reference-dashboard.css">
+</head><body class="p79-workspace">
+<div id="systems" class="show"><main id="p79Dashboard">
+ <section class="p79d-panels p79d-ship-panels">
+  <article id="ship-eff" class="p79d-panel p79d-trend"><div class="p79d-panel-title"><b>船舶效率趨勢</b></div><div style="min-height:120px">圖表</div></article>
+  <article id="ship-rank" class="p79d-panel p79d-ranking"><div class="p79d-panel-title"><b>最新匯入船舶</b></div><div class="p79d-table-scroll">排名</div></article>
+  <article id="ship-schedule" class="p79d-panel p79d-warnings p79d-ship-schedule"><div class="p79d-panel-title"><b>萬海網站船期</b></div>
+   <div id="p79DashVesselNotices" class="p79-schedule-board p79-schedule-remote p79-public-sailing-board">
+    <div class="p79-schedule-remote-caption">萬海網站船期 · 已同步 · 共 6 艘</div>
+    <div class="p79-schedule-list">
+     <button type="button" class="p79-schedule-row p79-wanhai-row">
+      <span class="p79-wanhai-top"><strong class="p79-wanhai-name">WAN HAI 271</strong><small class="p79-wanhai-voyage">百春 · 進港 N269 / 出港 N269</small></span>
+      <span class="p79-wanhai-detail">
+       <span><small>ETA 抵港</small><b><span class="p79-wanhai-date">2026/10/29</span><span class="p79-wanhai-clock">08:30</span></b></span>
+       <span><small>ETB 靠泊</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">02:00</span></b></span>
+       <span><small>ETD 離港</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">16:00</span></b></span>
+      </span><span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>W79</strong></span>
+     </button>
+    </div><div class="p79-schedule-footnote">萬海官方船期</div>
+   </div>
+  </article>
+ </section>
+</main></div>
+<pre id="p79-test-report"></pre>
+<script>
+window.addEventListener('load',()=>{
+ const rect=id=>document.getElementById(id).getBoundingClientRect();
+ const cards=['ship-eff','ship-rank','ship-schedule'].map(rect);
+ const dates=[...document.querySelectorAll('#p79DashVesselNotices .p79-wanhai-date')];
+ const times=[...document.querySelectorAll('#p79DashVesselNotices .p79-wanhai-clock')];
+ const fields=[...document.querySelectorAll('#p79DashVesselNotices .p79-wanhai-detail b')];
+ const rows=[...document.querySelectorAll('#p79DashVesselNotices .p79-schedule-row')];
+ const results={
+  viewport:innerWidth,
+  equalHeights:innerWidth>620?cards.every(r=>Math.abs(r.height-cards[0].height)<2):true,
+  equalTops:innerWidth>1050?cards.every(r=>Math.abs(r.top-cards[0].top)<2):true,
+  noEllipsis:fields.every(el=>getComputedStyle(el).textOverflow!=='ellipsis'&&getComputedStyle(el).whiteSpace!=='nowrap'),
+  dateAndTimeSeparate:dates.length===3&&times.length===3&&dates.every((el,i)=>times[i].getBoundingClientRect().top>el.getBoundingClientRect().top),
+  visibleTime:times.every(el=>{const r=el.getBoundingClientRect();const c=el.closest('b').getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom<=c.bottom+3&&r.right<=c.right+2;}),
+  scrollableSchedule:getComputedStyle(document.querySelector('#p79DashVesselNotices .p79-schedule-list')).overflowY==='auto',
+  heights:cards.map(r=>Math.round(r.height)),
+  times:times.map(x=>x.textContent),
+  dateVisible:dates.map(x=>x.textContent)
+ };
+ document.getElementById('p79-test-report').textContent='SHIP_VIEWPORT_REPORT:'+JSON.stringify(results);
+});
+</script></body></html>
