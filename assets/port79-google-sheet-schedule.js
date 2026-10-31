@@ -61,6 +61,44 @@ function render(){
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(title)+'</strong><small>'+esc(sub)+'</small>'+
   '<div class="p79-schedule-remote-actions">'+(state==='error'?'<button type="button" class="p79-schedule-retry" data-manual-ship-retry>重新讀取</button>':'')+editLink()+'</div></div>';
 }
+// Apps Script ContentService can redirect across Google domains, blocking browser fetch.
+// A strictly authenticated read-only callback is supported by the matching GAS add-on.
+// Never send the PORT79 token to third-party sites or expose it in the UI.
+function readViaSecureScript(base,token){
+ return new Promise((resolve,reject)=>{
+  if(!g.document?.head||!g.document.createElement){reject(Error('瀏覽器無法載入船期備援通道'));return;}
+  const random=(()=>{
+   if(g.crypto?.getRandomValues){
+    const a=new Uint32Array(4);g.crypto.getRandomValues(a);
+    return [...a].map(x=>x.toString(36).padStart(7,'0')).join('');
+   }
+   return Math.random().toString(36).slice(2).padEnd(14,'0')+Date.now().toString(36);
+  })();
+  const callback='P79ShipCb_'+random.slice(0,42);
+  const url=new URL(base);
+  url.searchParams.set('action',ACTION);
+  url.searchParams.set('gcToken',token);
+  url.searchParams.set('token',token);
+  url.searchParams.set('callback',callback);
+  url.searchParams.set('_',String(Date.now()));
+  const element=g.document.createElement('script');
+  let finished=false;
+  const finish=(error,data)=>{
+   if(finished)return;finished=true;
+   g.clearTimeout(timer);
+   element.remove();
+   try{delete g[callback];}catch(ignore){g[callback]=undefined;}
+   error?reject(error):resolve(data);
+  };
+  const timer=g.setTimeout(()=>finish(Error('GAS 船期備援讀取逾時；請確認已更新正式部署的船期入口')),18000);
+  g[callback]=data=>finish(null,data);
+  element.async=true;
+  element.referrerPolicy='no-referrer';
+  element.onerror=()=>finish(Error('GAS 備援讀取遭拒絕；請檢查原部署的存取權限'));
+  element.src=url.toString();
+  g.document.head.appendChild(element);
+ });
+}
 async function refresh(){
  if(!visible()||loading)return loading;
  const base=text(g.sessionStorage?.getItem('port79_gas_url'));
@@ -79,7 +117,18 @@ async function refresh(){
    // This helper handles GAS redirects, response validation, timeouts and retries.
    const reader=g.P79HistoryRead?.read;
    if(typeof reader!=='function')throw Error('PORT79 雲端唯讀連線模組尚未載入');
-   const result=await reader(url.toString(),{forceCloud:true,timeoutMs:45000});
+   let result;
+   try{result=await reader(url.toString(),{forceCloud:true,timeoutMs:18000});}
+   catch(primaryError){
+    // Only network/redirect failures are eligible for backup. Do not hide API
+    // errors, authorization failures or stale backend versions.
+    if(primaryError?.kind!=='network'&&primaryError?.kind!=='timeout')throw primaryError;
+    try{result=await readViaSecureScript(base,token);}
+    catch(backupError){
+     throw Error('一般讀取與 GAS 備援讀取都未成功：'+text(backupError?.message||backupError));
+    }
+   }
+   if(result?.ok!==true)throw Error(text(result?.error)||'GAS 船期讀取失敗');
    if(result.source!=='port79-google-sheet'||result.sheetId!==SHEET_ID||!Array.isArray(result.rows))
     throw Error('目前 GAS 船期入口尚未切換到 Google 表格讀取版');
    rows=parseRows(result.rows);
@@ -87,8 +136,8 @@ async function refresh(){
    state='ready';
   }catch(error){
    rows=[];state='error';
-   errorMessage=error?.kind==='network'?'目前無法連到 GAS，請稍後按「重新讀取」；如其他首頁雲端資料也失敗，請檢查 GAS 部署存取設定':
-    error?.kind==='timeout'?'讀取逾時，請手動重試':
+   errorMessage=error?.kind==='network'?'無法讀取 GAS。請確認原部署仍有效且已啟用船期備援入口':
+    error?.kind==='timeout'?'船期讀取逾時，請按「重新讀取」':
     text(error?.message||error);
   }finally{loading=null;render();}
  })();
