@@ -22,7 +22,7 @@ assert(external.includes("p79DashRefresh")&&external.includes('addEventListener(
 assert(styles.includes('#p79WanHaiScheduleDialog')&&styles.includes('.p79-schedule-remote-msg'));
 new vm.Script(view);new vm.Script(external);
 const website={document:{readyState:'loading',addEventListener(){}},setTimeout(){},clearTimeout(){}};
-vm.runInNewContext(external,{window:website,console,Intl,Date,Number,Map,Set});
+vm.runInNewContext(external,{window:website,console,Intl,Date,Number,Map,Set,URL});
 const {parseSailingTables}=website.P79ExternalShipSchedule;
 const {parseSailingImages,diagnoseSource}=website.P79ExternalShipSchedule;
 const linked=(href,alt='船期表')=>({tagName:'IMG',getAttribute:name=>name==='src'?href:name==='alt'?alt:'',parentElement:{textContent:'船期表'}});
