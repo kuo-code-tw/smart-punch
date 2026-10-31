@@ -639,3 +639,22 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-person:focus-within{outline:2px solid #82cfff!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body .p79d-review-hint{color:#ffbec9!important}
 }
+
+/* PORT79 2026-10-31: dark homepage minimum readable type sizes. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel-title>span{font-size:10px!important;line-height:1.4!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel-title b{font-size:12px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll th{font-size:10px!important;line-height:1.35!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll td{font-size:11px!important;line-height:1.4!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-eff-summary{font-size:11px!important;line-height:1.5!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-chart-pager{font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button{font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-voyage{font-size:10px!important;line-height:1.4!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail small{font-size:10px!important;line-height:1.35!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-time small{font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-message{font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi small{font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-kpi-note{font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-head strong{font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-head>span{font-size:11px!important}
+}
