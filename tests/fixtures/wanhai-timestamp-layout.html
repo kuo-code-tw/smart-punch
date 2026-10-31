@@ -47,9 +47,9 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
      <button type="button" class="p79-schedule-row p79-wanhai-row">
       <span class="p79-wanhai-top"><strong class="p79-wanhai-name">WAN HAI 271</strong><small class="p79-wanhai-voyage">百春 · 進港 N269 / 出港 N269</small></span>
       <span class="p79-wanhai-detail">
-       <span><small>ETA 抵港</small><b><span class="p79-wanhai-date">2026/10/29</span><span class="p79-wanhai-clock">08:30</span></b></span>
-       <span><small>ETB 靠泊</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">02:00</span></b></span>
-       <span><small>ETD 離港</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">16:00</span></b></span>
+       
+       <span><small>靠泊時間 ETB</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">02:00</span></b></span>
+       <span><small>離岸時間 ETD</small><b><span class="p79-wanhai-date">2026/10/31</span><span class="p79-wanhai-clock">16:00</span></b></span>
       </span><span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>W79</strong></span>
      </button>
     </div><div class="p79-schedule-footnote">萬海官方船期</div>
@@ -79,11 +79,12 @@ window.addEventListener('load',()=>{
   chartLabelsPresent:document.querySelectorAll('#p79DashShipBars svg').length===1,
   equalTops:innerWidth>1050?cards.every(r=>Math.abs(r.top-cards[0].top)<2):true,
   noEllipsis:fields.every(el=>getComputedStyle(el).textOverflow!=='ellipsis'&&getComputedStyle(el).whiteSpace!=='nowrap'),
-  dateAndTimeSeparate:dates.length===3&&times.length===3&&dates.every((el,i)=>times[i].getBoundingClientRect().top>el.getBoundingClientRect().top),
+  dateAndTimeSeparate:dates.length===2&&times.length===2&&dates.every((el,i)=>times[i].getBoundingClientRect().top>el.getBoundingClientRect().top),
   visibleTime:times.every(el=>{const r=el.getBoundingClientRect();const c=el.closest('b').getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom<=c.bottom+3&&r.right<=c.right+2;}),
   scrollableSchedule:getComputedStyle(document.querySelector('#p79DashVesselNotices .p79-schedule-list')).overflowY==='auto',
   heights:cards.map(r=>Math.round(r.height)),
   times:times.map(x=>x.textContent),
+  onlyETBandETD:!document.querySelector("#p79DashVesselNotices .p79-wanhai-detail").textContent.includes("ETA")&&times.length===2,
   dateVisible:dates.map(x=>x.textContent)
  };
  document.getElementById('p79-test-report').textContent='SHIP_VIEWPORT_REPORT:'+JSON.stringify(results);
