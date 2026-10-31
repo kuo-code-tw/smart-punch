@@ -314,3 +314,43 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
   min-height:345px!important;
  }
 }
+
+/* Wan Hai homepage: independent berth/terminal field with real source value. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-remote .p79-wanhai-row{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(70px,.66fr);grid-template-rows:auto auto auto;
+ align-items:start;column-gap:7px;row-gap:3px;min-height:65px;padding:5px 4px;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-top{
+ grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-name{
+ display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ font-weight:900;font-size:11px;line-height:1.35;color:#163d74;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-voyage{
+ display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6b84a1;font-size:9px;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail{
+ grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;min-width:0;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail>span{
+ display:flex;flex-direction:column;min-width:0;gap:1px;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail small{
+ font-size:9px;color:#6f8ba8;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-detail b{
+ font-size:10px;font-weight:800;color:#155a96;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-berth{
+ grid-column:2;grid-row:1;display:flex;flex-direction:column;min-width:0;gap:2px;
+ border-radius:6px;padding:3px 5px;background:#eaf4ff;color:#175a91;text-align:left;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-berth small{font-size:9px;font-weight:800;white-space:nowrap}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-berth strong{
+ display:block;font-size:10px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-state{
+ grid-column:1/-1;grid-row:3;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+ white-space:nowrap;color:#63809b;font-size:9px;
+}
