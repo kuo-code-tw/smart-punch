@@ -7,7 +7,7 @@ const external=fs.readFileSync(path.join(root,'assets/port79-external-ship-sched
 const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
 assert(html.includes('<b>萬海網站船期</b>'),'label must describe original third-party source');
 assert(html.includes('id="p79ShipScheduleAll"'),'full-site and full-list button stays available');
-assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-gas-bridge-v2'),'external adapter must be loaded');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-berth-v3'),'external adapter must be loaded');
 assert(!html.includes('船舶作業重點提醒'));
 assert(!view.includes('renderShipSchedule(v,ym)'),'historical vessel rows must not replace outside website data');
 assert(!view.includes('function openShipSchedule('),'retired private source dialog must not open');
@@ -35,6 +35,24 @@ const rows=parseSailingTables({querySelectorAll:()=>[table]});
 assert.equal(rows.length,2,'same vessel/voyage/time cannot be duplicated');
 assert.equal(rows[0].name,'WAN HAI 376');assert.equal(rows[0].eta,'2026-11-01 10:00');
 assert.equal(rows[0].etd,'2026-11-01 18:00');assert.equal(rows[0].berth,'79');
+assert(external.includes("class=\"p79-wanhai-berth\"")||external.includes("class=\"p79-wanhai-berth\""),'home row renders independent berthing terminal');
+assert(external.includes('<th>靠泊碼頭</th>'),'full list labels the berthing terminal column');
+assert(styles.includes('.p79-wanhai-berth'),'berthing terminal style exists');
+const headerFor=t=>({querySelectorAll:()=>t.map(cell)});
+const specificTable={querySelectorAll:selector=>selector==='tr'?[
+ headerFor(['船名','航次','目的港','靠泊碼頭','預計抵港 ETA','預計離港 ETD']),
+ headerFor(['WAN HAI 399','N039','高雄','高雄港第79號碼頭','2026-11-08 07:00','2026-11-08 18:00']),
+ headerFor(['WAN HAI 399','N039','高雄','第80號碼頭','2026-11-08 07:00','2026-11-08 18:00'])
+]:[]};
+const terminals=parseSailingTables({querySelectorAll:()=>[specificTable]});
+assert.equal(terminals.length,2,'different berthing terminals on same sailing are retained');
+assert.equal(terminals[0].berth,'高雄港第79號碼頭','explicit terminal, not destination port');
+assert.equal(terminals[1].berth,'第80號碼頭');
+const noTerminal={querySelectorAll:selector=>selector==='tr'?[
+ headerFor(['船名','航次','目的港','預計抵港 ETA']),
+ headerFor(['WAN HAI 400','N040','高雄','2026-11-09 07:00'])
+]:[]};
+assert.equal(parseSailingTables({querySelectorAll:()=>[noTerminal]})[0].berth,'','no fabricated terminal from destination port');
 assert.equal(rows[1].name,'<script>alert(1)</script>','source strings must remain literal until escaped by UI');
 const unknown=parseSailingTables({querySelectorAll:()=>[{querySelectorAll:()=>[]} ]});
 assert.equal(unknown.length,0,'unknown dynamic website markup must never invent a schedule');
