@@ -7,8 +7,8 @@ const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.c
 assert(html.includes('id="p79EmployeeShipSection"'),'employee-view section must exist outside privileged dashboard');
 assert(html.includes('id="p79PublicShipBoard"'),'public employee ship board must exist');
 assert(html.indexOf('id="p79PublicShipBoard"')<html.indexOf('id="systems"'),'employees see the ship board before management login');
-assert(html.includes('高雄港官方船期（全員可看）'));
-assert(html.includes('port79-google-sheet-schedule.js?v=20261031-public-official-port-v75'));
+assert(html.includes('萬海網站船期（全員可看）'));
+assert(html.includes('port79-google-sheet-schedule.js?v=20261031-wanhai-staff-v76'));
 assert(!html.includes('port79-external-ship-schedule.js?v='));
 assert(src.includes("const ACTION='publicShipSchedule'"));
 assert(src.includes('g.document.head.appendChild(script)'),'cross-domain GAS script output works without fetch CORS');
@@ -18,8 +18,8 @@ assert(!src.includes("src.searchParams.set('gcToken'"),'public source never send
 assert(src.includes("$('p79PublicShipRefresh')?.addEventListener('click',refresh)"));
 assert(src.includes("$('p79DashRefresh')?.addEventListener('click',refresh)"));
 assert(!src.includes('setInterval('),'front end must remain manual updates only');
-assert(!src.includes('khhtml.wanhai.com'),'Wan Hai scraping has been removed');
+assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
 new vm.Script(src);
-console.log('PASS: official ship board is visible to all employees; anonymous public-only reads; admin dashboard; manual refresh; dark mode.');
+console.log('PASS: WAN HAI ship board visible to all employees; anonymous public-only reads; admin dashboard; manual refresh; dark mode.');
