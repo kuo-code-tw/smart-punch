@@ -492,3 +492,23 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 
 @media screen { html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-gridline{stroke:#395773!important}
  }
+
+/* PORT79 2026-10-31: current-shift roster dark contrast, scoped to dashboard only. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-current-shift-list{background:transparent!important;color:#e5efff!important;scrollbar-color:#7d9ab8 #1a304d!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-head{background:#203b59!important;border-bottom:1px solid #526d8b!important;color:#e4effc!important;padding:4px 6px!important;border-radius:5px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-head strong{color:#9df4d7!important;font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-head>span{color:#dcecff!important;font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-role-section{border-bottom:1px dashed #718aa3!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-role-head{color:#dceaff!important;font-size:11px!important;font-weight:750!important;padding:5px 3px 4px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-role-head span{color:#dceaff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-person{background:#274562!important;border:1px solid #5b7896!important;border-radius:6px!important;color:#f4f8ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-name b{color:#f5f9ff!important;font-size:12px!important;font-weight:800!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-person small{color:#d0dff3!important;font-size:10px!important;line-height:1.35!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-on-duty{background:#16513f!important;border-color:#2e8a68!important;color:#adfbd9!important;font-size:9px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-on-duty i{background:#8befc5!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-checked-in{color:#a9e7ff!important;font-size:9px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-sync{color:#bdd3e9!important;font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card .p79r-shift-empty{color:#cee3f9!important;font-size:11px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-card #p79CurrentShiftPeriod{color:#bfd4ea!important}
+}
