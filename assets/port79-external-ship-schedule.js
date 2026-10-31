@@ -61,6 +61,47 @@ function parseSailingTables(doc){
  return found;
 }
 
+
+/* Wan Hai's Eways_GetVesselSchedule XHR returns JSON records, not an HTML table.
+ * Column names are verified from the live response screenshot.
+ * The API URL/method must be verified separately before a backend request is added. */
+function parseWanHaiScheduleJson(payload){
+ const found=[],seen=new Set(),visited=new Set();
+ let nodes=0;
+ function add(r){
+  if(!r||typeof r!=='object'||Array.isArray(r))return;
+  const val=key=>trimmed(r[key]);
+  if(!('VesselEName' in r||'VesselName' in r)||!('InVoyage' in r||'OutVoyage' in r||'ETA' in r||'ETB' in r||'ETD' in r))return;
+  const name=val('VesselEName')||val('VesselName')||val('VesselSName');
+  if(!name||name.length>130)return;
+  const inVoyage=val('InVoyage'),outVoyage=val('OutVoyage');
+  const row={
+   name,localName:val('VesselName'),shortName:val('VesselSName'),
+   voyage:inVoyage||outVoyage||'—',inVoyage,outVoyage,
+   eta:val('ETA'),etb:val('ETB'),etd:val('ETD'),
+   berth:val('Berth'),state:val('Status')||val('Remark')
+  };
+  const key=[row.name,row.inVoyage,row.outVoyage,row.eta,row.etb,row.etd,row.berth].join('|');
+  if(!seen.has(key)){seen.add(key);found.push(row);}
+ }
+ function walk(obj,depth){
+  if(depth>6||++nodes>12000||found.length>=500)return;
+  if(typeof obj==='string'&&depth<3&&/^\s*[\[{]/.test(obj)){
+   try{walk(JSON.parse(obj),depth+1);}catch(ignore){}return;
+  }
+  if(!obj||typeof obj!=='object'||visited.has(obj))return;
+  visited.add(obj);
+  if(Array.isArray(obj)){for(const item of obj.slice(0,1200))walk(item,depth+1);return;}
+  add(obj);
+  for(const [key,value] of Object.entries(obj).slice(0,75)){
+   if(value&&typeof value==='object'||typeof value==='string'&&/^(data|result|rows|list|records|content|payload|d)$/i.test(key))
+    walk(value,depth+1);
+  }
+ }
+ walk(payload,0);
+ return found.slice(0,250);
+}
+
 function parseSailingImages(doc){
  // Only actual schedule notices from the trusted Wan Hai host. Never display logo images.
  const pictures=[],seen=new Set(),base=new URL(SOURCE);
@@ -105,9 +146,9 @@ function render(){
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站公開船期 · '+esc(lastRead)+' 讀取 · '+count+' 筆</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,4).map((r,i)=>
       '<button type="button" role="listitem" class="p79-schedule-row p79-wanhai-row" data-wanhai-index="'+i+'" aria-label="'+esc(r.name+' 航次 '+r.voyage+' 靠泊碼頭 '+(r.berth||'未提供'))+'">'+
-      '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name)+'</strong><small class="p79-wanhai-voyage">'+esc('航次 '+r.voyage)+'</small></span>'+
-      '<span class="p79-wanhai-detail"><span><small>預計抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
-      '<span><small>預計離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
+      '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name)+'</strong><small class="p79-wanhai-voyage">'+esc((r.localName&&r.localName!==r.name?r.localName+' · ':'')+'進 '+(r.inVoyage||r.voyage)+'／出 '+(r.outVoyage||'—'))+'</small></span>'+
+      '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
+      '<span><small>ETB 靠泊</small><b>'+esc(r.etb||'未提供')+'</b></span><span><small>ETD 離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
       '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span>'+
       (r.state?'<span class="p79-wanhai-state">'+esc(r.state)+'</span>':'')+'</button>').join('')+
     '</div><div class="p79-schedule-footnote">靠泊碼頭及時間均來自萬海原站，未提供的欄位不推估。</div>';
@@ -139,9 +180,17 @@ async function loadSourceHtml(signal){
    const response=await g.fetch(uri.toString(),{method:'GET',cache:'no-store',signal});
    if(!response.ok)throw Error('船期中介服務 HTTP '+response.status);
    const result=await response.json();
-   if(result?.ok!==true||result?.source!==SOURCE||typeof result.html!=='string')throw Error(String(result?.error||'船期中介服務尚未啟用'));
-   if(result.html.length>2500000)throw Error('船期資料超出安全大小');
-   return result.html;
+   if(result?.ok!==true||result?.source!==SOURCE)throw Error(String(result?.error||'船期中介服務尚未啟用'));
+   if(typeof result.html==='string'){
+    if(result.html.length>2500000)throw Error('船期資料超出安全大小');
+    return result.html;
+   }
+   const structured=result.rows??result.records??result.data??result.payload;
+   if(structured!=null){
+    if(JSON.stringify(structured).length>2500000)throw Error('船期資料超出安全大小');
+    return structured;
+   }
+   throw Error('尚未收到可辨識的船期 JSON 資料');
   }catch(error){
    if(signal.aborted)throw error;
    backendError=String(error?.message||error).slice(0,160);
@@ -168,12 +217,17 @@ async function refresh(){
  const timeout=g.setTimeout(()=>controller.abort(),18000);
  running=(async()=>{
   try{
-   const html=await loadSourceHtml(controller.signal);
+   const payload=await loadSourceHtml(controller.signal);
    if(seq!==requestSeq)return;
-   const doc=new g.DOMParser().parseFromString(html,'text/html');
-   rows=parseSailingTables(doc);
-   images=rows.length?[]:parseSailingImages(doc);
-   sourceDiagnosis=rows.length||images.length?'':diagnoseSource(doc);
+   rows=parseWanHaiScheduleJson(payload);
+   images=[];
+   if(!rows.length&&typeof payload==='string'){
+    const doc=new g.DOMParser().parseFromString(payload,'text/html');
+    rows=parseSailingTables(doc);
+    images=rows.length?[]:parseSailingImages(doc);
+    sourceDiagnosis=rows.length||images.length?'':diagnoseSource(doc);
+   }else if(!rows.length)sourceDiagnosis='資料已回應，但尚未找到 VesselEName、ETA、ETB、ETD、Berth 等船期欄位。';
+   else sourceDiagnosis='';
    status=rows.length?'ok':images.length?'image':'empty';
    lastRead=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
   }catch(error){
@@ -207,9 +261,9 @@ function showDialog(index=-1){
  if(!body)return;
  if(status==='ok'&&rows.length){
   const selected=Number.isInteger(index)&&index>=0&&index<rows.length?[rows[index]]:rows;
-  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">讀取時間：'+esc(lastRead)+'｜以下欄位直接來自網站表格，請以原站為準。</p>'+
-   '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr><th>船名</th><th>航次</th><th>預計抵達</th><th>預計離開</th><th>靠泊碼頭</th><th>狀態</th></tr></thead><tbody>'+
-   selected.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(r.voyage)+'</td><td>'+esc(r.eta||'未提供')+'</td><td>'+esc(r.etd||'未提供')+'</td><td>'+esc(r.berth||'未提供')+'</td><td>'+esc(r.state||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">讀取時間：'+esc(lastRead)+'｜以下欄位直接來自萬海船期資料，請以原站為準。</p>'+
+   '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr><th>船名</th><th>中文船名</th><th>進港航次</th><th>出港航次</th><th>ETA 抵港</th><th>ETB 靠泊</th><th>ETD 離港</th><th>靠泊碼頭</th><th>狀態</th></tr></thead><tbody>'+
+   selected.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(r.localName||'—')+'</td><td>'+esc(r.inVoyage||r.voyage)+'</td><td>'+esc(r.outVoyage||'—')+'</td><td>'+esc(r.eta||'未提供')+'</td><td>'+esc(r.etb||'未提供')+'</td><td>'+esc(r.etd||'未提供')+'</td><td>'+esc(r.berth||'未提供')+'</td><td>'+esc(r.state||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
    '<div class="p79-schedule-dialog-actions">'+(selected.length===1?'<button type="button" data-wanhai-all>查看全部 '+rows.length+' 筆</button>':'')+link('前往萬海原網站核對 ›')+'</div>';
  }else if(status==='image'&&images.length){
   const selected=Number.isInteger(index)&&index>=0&&index<images.length?[images[index]]:images;
@@ -237,6 +291,6 @@ function init(){
  if(g.MutationObserver)new g.MutationObserver(check).observe(systems,{attributes:true,attributeFilter:['class']});
  check();
 }
-g.P79ExternalShipSchedule={render,refresh,parseSailingTables,parseSailingImages,diagnoseSource,source:SOURCE};
+g.P79ExternalShipSchedule={render,refresh,parseSailingTables,parseWanHaiScheduleJson,parseSailingImages,diagnoseSource,source:SOURCE};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
