@@ -407,7 +407,7 @@ async function load(forceCloud=false){
  const failures=[];
  try{
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
-   if(!allowed){statusText(captionId,accessError());continue}
+   if(!allowed){statusText(captionId,accessError());if(kind==='vessel')statusText('p79DashVesselNotices','目前帳號沒有船舶資料檢視權限');continue}
    try{
     const data=await request(kind,ym,token,forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
@@ -428,7 +428,7 @@ async function load(forceCloud=false){
       root.P79ReferenceDashboard?.setGroupRoster(data,ym);
     }
     else throw Error('該月份資料結構不完整');
-   }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message); }
+   }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='vessel')statusText('p79DashVesselNotices','船期資料讀取失敗，請按首頁「手動更新」重試'); }
   }
   try{
    const leaveRole=String(s.adminRole||s.role||'').toLowerCase();
