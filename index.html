@@ -1028,7 +1028,9 @@ function showSession(session){
     const btn=$('card'+k.charAt(0).toUpperCase()+k.slice(1));
     if(!btn)return;
     let level=session.systemPermissions[k]||'none';
-    if(role==='employee'&&(k==='schedule'||k==='efficiency'||k==='hr'))level='none';
+    // 員工的「排班系統」卡片僅是本人唯讀入口，並非授予 schedule.view 權限。
+    if(role==='employee'&&k==='schedule')level='view';
+    if(role==='employee'&&(k==='efficiency'||k==='hr'))level='none';
 
     // 首頁統一權限顯示規則：
     // 沒有權限（none）的系統整張卡直接隱藏，不再用灰色「無權限」卡佔版面。
@@ -1038,7 +1040,8 @@ function showSession(session){
     btn.style.display=canUse?'':'none';
     btn.disabled=!canUse;
     const badge=btn.querySelector('.badge');
-    if(badge)badge.textContent=canUse?permissionLabel(level):'';
+    if(badge)badge.textContent=canUse?(role==='employee'&&k==='schedule'?'本人查看':permissionLabel(level)):'';
+    if(k==='schedule'){const desc=btn.querySelector('.desc');if(desc)desc.textContent=role==='employee'?'僅能查看自己的班別':'班表查看與排班管理';}
   });
 }
 
@@ -1226,7 +1229,11 @@ function buildSsoHref(base){
   if(name)params.set('name',name);
   return versioned+'#'+params.toString();
 }
-function launchSystem(target){if(!currentSession)return;const role=String(currentSession.adminRole||'employee').toLowerCase();let level=normalizePermissions(currentSession.systemPermissions,role)[target]||'none';if(role==='employee'&&(target==='workhours'||target==='schedule'||target==='efficiency'||target==='hr'))level='none';if(level==='none')return;const path=PATHS[target]||'./';if(role==='employee'&&(target==='attendance'||target==='leave')){location.href=path;return}location.href=buildSsoHref(path)}
+function launchSystem(target){if(!currentSession)return;const role=String(currentSession.adminRole||'employee').toLowerCase();
+  // 員工從既有排班卡片進入考勤頁的「我的班表」，絕不進入排班管理介面。
+  // 考勤頁只呼叫 getMyScheduleMonth；GAS 依登入 Token 的 empId 限定本人。
+  if(role==='employee'&&target==='schedule'){location.href=(PATHS.attendance||'./attendance/')+'#empScheduleCard';return;}
+  let level=normalizePermissions(currentSession.systemPermissions,role)[target]||'none';if(role==='employee'&&(target==='workhours'||target==='efficiency'||target==='hr'))level='none';if(level==='none')return;const path=PATHS[target]||'./';if(role==='employee'&&(target==='attendance'||target==='leave')){location.href=path;return}location.href=buildSsoHref(path)}
 window.launchSystem=launchSystem;
 
 async function restore(){
