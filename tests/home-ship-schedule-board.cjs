@@ -7,7 +7,7 @@ const external=fs.readFileSync(path.join(root,'assets/port79-external-ship-sched
 const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
 assert(html.includes('<b>萬海網站船期</b>'),'label must describe original third-party source');
 assert(html.includes('id="p79ShipScheduleAll"'),'full-site and full-list button stays available');
-assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-berth-v3'),'external adapter must be loaded');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-image-source-v4'),'external adapter must be loaded');
 assert(!html.includes('船舶作業重點提醒'));
 assert(!view.includes('renderShipSchedule(v,ym)'),'historical vessel rows must not replace outside website data');
 assert(!view.includes('function openShipSchedule('),'retired private source dialog must not open');
@@ -24,6 +24,19 @@ new vm.Script(view);new vm.Script(external);
 const website={document:{readyState:'loading',addEventListener(){}},setTimeout(){},clearTimeout(){}};
 vm.runInNewContext(external,{window:website,console,Intl,Date,Number,Map,Set});
 const {parseSailingTables}=website.P79ExternalShipSchedule;
+const {parseSailingImages,diagnoseSource}=website.P79ExternalShipSchedule;
+const linked=(href,alt='船期表')=>({tagName:'IMG',getAttribute:name=>name==='src'?href:name==='alt'?alt:'',parentElement:{textContent:'船期表'}});
+const pictures=parseSailingImages({querySelectorAll:()=>[
+ linked('/content/sailing/SailingSchedule20261031.png'),
+ linked('https://untrusted.example/schedule.png'),
+ linked('/static/brand-logo.png','公司標誌')
+]});
+assert.equal(pictures.length,1,'accept only Wan Hai hosted schedule image');
+assert.equal(pictures[0].url,'https://khhtml.wanhai.com/content/sailing/SailingSchedule20261031.png');
+assert.match(diagnoseSource({querySelectorAll:()=>[{}],body:{textContent:'網頁作業'}}),/JavaScript/,'dynamic-only HTML should be diagnosed accurately');
+assert.match(diagnoseSource({querySelectorAll:()=>[],body:{textContent:'請先登入'}}),/登入/,'site auth issues should not be mistaken for no ships');
+assert(external.includes("status==='image'"),'recognize image-only schedules');
+assert(external.includes('p79-schedule-image-preview'),'show schedule thumbnails within homepage');
 const cell=t=>({textContent:t});
 const table={querySelectorAll:selector=>selector==='tr'?[
  {querySelectorAll:()=>[cell('船名'),cell('航次'),cell('預計抵港 ETA'),cell('預計離港 ETD'),cell('碼頭'),cell('狀態')]},
