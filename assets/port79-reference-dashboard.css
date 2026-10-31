@@ -551,11 +551,11 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bar-value{color:#b4dfff!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bars{color:#c8d9ee!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-bars svg .p79r-gridline{stroke:#43617e!important}
-html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager{background:#147fe1!important;color:#fff!important;border-color:#3895f0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager{color:#d9e8fb!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager button{background:#274362!important;border:1px solid #567493!important;color:#e4f2ff!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79r-chart-pager button:disabled{opacity:.5!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button:not(.active):not([aria-pressed='true']){background:#273f5e!important;border-color:#607d99!important;color:#e4eefc!important}
-html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button.active{#}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button.active{background:#147fe1!important;color:#fff!important;border-color:#3895f0!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-group-filters button[aria-pressed='true']{background:#147fe1!important;color:#fff!important;border-color:#3895f0!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-schedule-list{scrollbar-color:#7995b3 #1a304d!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-wanhai-row{border-color:#46617a!important}
@@ -569,4 +569,24 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #port79CalendarModeBox{background:#1d3952!important;border:1px solid #54718b!important;color:#e1efff!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #port79CalendarModeBox :is(label,select,span){background:transparent!important;color:#e1efff!important;color-scheme:dark!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashMessage{color:#bfdbf6!important}
+}
+
+/* PORT79 2026-10-31: audit remainder - module tiles, date and navigation contrast. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card{background:#213a56!important;border:1px solid #496682!important;color:#edf6ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card:is(:hover,:focus-visible){background:#2a4a6b!important;border-color:#7aa7cb!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .system-card .icon{background:#355571!important;color:#d4eaff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-home-preserve{background:#1b334f!important;border-color:#496781!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .note{background:#1c3550!important;border:1px solid #486784!important;color:#d0e3f8!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #systems .p79-modern-home-intro .p79-modern-home-eyebrow{color:#d2e6ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel-title span{color:#b4cbe2!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body small{color:#f6cfd9!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll tr:hover{background:#2a4765!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79d-bars svg text{fill:#c8dfff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashAttendancePages .p79d-bars svg line{stroke:#466480!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review:focus-visible{outline:3px solid #a4d9ff!important;outline-offset:2px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-eff-pager button:focus-visible{outline:2px solid #b1e0ff!important;outline-offset:2px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-current-shift-list:focus-visible{outline:2px solid #a7d8ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79r-shift-person:focus-within{outline:2px solid #82cfff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-kpi-review .p79d-review-body .p79d-review-hint{color:#ffbec9!important}
 }
