@@ -492,18 +492,77 @@ async function recheckAndMarkReviewed(date,checked=true){
  try{return await run;}finally{if(activeReviewRequests.get(date)===run)activeReviewRequests.delete(date);}
 }
 
-/* 2026-10-31: 考勤日期列只呈現日期與考勤，不得混入加班申報狀態。
- * 加班申報、正式雲端查核及加班管理流程均保留；只移除舊的日期標色 UI。
- * 不再攔截 renderRecordsPagination，也不因新電腦重新載入而顯示申報色條。
- */
-function decorateOvertimeDateStrip(){
- // Kept as an API-compatible no-op for existing callers.
- return;
+function decorateOvertimeDateStrip(keys,selectedDate=''){
+ const host=g.document?.getElementById?.('p79AttendanceDateStrip');
+ if(!host||!Array.isArray(keys))return;
+ let months;
+ try{months=typeof p79AttendanceOvertimeMonths!=='undefined'?p79AttendanceOvertimeMonths:null;}catch(_){return;}
+ if(!months)return;
+ const buttons=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')];
+ const seenMonths=new Set();
+ for(let i=0;i<buttons.length;i++){
+  const date=String(keys[i]||'').replaceAll('/','-'),state=months.get(date.slice(0,7));
+  if(state?.ready===true&&!seenMonths.has(date.slice(0,7))){
+   seenMonths.add(date.slice(0,7));void p79ReviewCloudRead(date.slice(0,7));
+  }
+  const info=overtimeDayIndicator(date,state),button=buttons[i];
+  button.removeAttribute('data-p79-overtime-audit');
+  button.style.removeProperty('background-color');
+  button.style.removeProperty('color');
+  button.style.removeProperty('border-color');
+  button.style.removeProperty('box-shadow');
+  button.removeAttribute('title');
+  // 白色只代表「正式雲端月份已讀取、當日沒有申報或撤銷紀錄」。
+  // 尚未讀到完整月份時不可誤當作無申報；查核標記不參與顏色判斷。
+  const ready=state?.ready===true;
+  // 修改經人工核對且申報版本未再變動，恢復綠色；新的修改仍須重新核對。
+  const reviewed=ready&&isReviewed(date);
+  const effectiveKind=info?.kind==='amended'&&reviewed?'reported':info?.kind;
+  const palette=!ready?['#f1f5f9','#64748b','#94a3b8']:
+   !info?['#ffffff','#334155','#cbd5e1']:
+   effectiveKind==='revoked'?['#fee2e2','#991b1b','#f87171']:
+   effectiveKind==='amended'?['#fef3c7','#92400e','#f59e0b']:
+   ['#dcfce7','#166534','#4ade80'];
+  button.style.setProperty('background-color',palette[0],'important');
+  button.style.setProperty('color',palette[1],'important');
+  button.style.setProperty('border-color',palette[2],'important');
+  if(date===selectedDate)button.style.setProperty('box-shadow','inset 0 0 0 2px #4f46e5','important');
+  button.dataset.p79OvertimeAudit=effectiveKind||(ready?'none':'unknown');
+  button.dataset.p79OvertimeReview=reviewed?'reviewed':'not-reviewed';
+  button.dataset.p79OvertimeContentVersion=ready?reviewFingerprint(date,cloudMonth(date)):'';
+  button.title=(info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認')))
+   +(reviewed&&info?.activeCount?'\n此版本已人工查核；修改歷史保留':'');
+  button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
+ }
+ if(!host.querySelector('#p79OvertimeDateLegend')){
+  const legend=g.document.createElement('span');
+  legend.id='p79OvertimeDateLegend';
+  legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
+  legend.textContent='白：無申報｜綠：已申報／已核對｜黃：歷史修改待核對｜紅：已取消｜灰：未確認';
+  host.appendChild(legend);
+ }
 }
 function installOvertimeDateIndicators(){
- // Do not attach a legacy overtime indicator to attendance date navigation.
- return;
+ const original=g.renderRecordsPagination;
+ if(typeof original!=='function'||original.p79OvertimeDecorated)return;
+ const wrapped=function(...args){
+  const result=original.apply(this,args);
+  decorateOvertimeDateStrip(args[0],args[1]);
+  return result;
+ };
+ wrapped.p79OvertimeDecorated=true;
+ g.renderRecordsPagination=wrapped;
+ try{
+  if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))
+   decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);
+ }catch(_){}
 }
+if(g.document?.readyState==='loading')g.document.addEventListener('DOMContentLoaded',installOvertimeDateIndicators);
+else installOvertimeDateIndicators();
+g.addEventListener?.('load',installOvertimeDateIndicators);
+g.addEventListener?.('focus',()=>{
+ try{if(typeof recordsDatePageKeys!=='undefined'&&Array.isArray(recordsDatePageKeys))decorateOvertimeDateStrip(recordsDatePageKeys,typeof recordsSelectedDateKey==='undefined'?'':recordsSelectedDateKey);}catch(_){}
+});
 g.P79AttendanceOvertimeDayStatus={auditChanged,overtimeDayIndicator,decorateOvertimeDateStrip,isReviewed,markReviewed,recheckAndMarkReviewed,reviewFingerprint};
 
 g.P79AttendanceOvertime={open,save};
