@@ -48,3 +48,34 @@ function p79WanHaiSailingGet_(params) {
   rows:rows,total:rows.length
  };
 }
+
+
+/**
+ * Route helper for the existing doGet(e). Only this one ship-schedule action
+ * supports read-only JSONP fallback for browsers affected by GAS redirects.
+ * Requires the same signed-in PORT79 session and vessel viewing permission
+ * as the normal JSON route. JSONP must not be used for confidential notes.
+ */
+function p79ShipScheduleOutput_(params) {
+ params=params||{};
+ var result;
+ try{result=p79WanHaiSailingGet_(params);}
+ catch(error){result={ok:false,action:'wanHaiSailingSchedule',error:String(error&&error.message||error)};}
+ var callback=String(params.callback||'').trim();
+ if(!callback)return jsonOutput(result);
+ if(!/^P79ShipCb_[A-Za-z0-9]{12,64}$/.test(callback))
+  return jsonOutput({ok:false,error:'船期回傳格式無效'});
+ // Keep JSONP limited to published operational schedule fields, never
+ // exposing the freeform "note" field on this cross-origin script route.
+ if(result.ok&&Array.isArray(result.rows)){
+  result.rows=result.rows.map(function(r){
+   return {name:r.name,localName:r.localName,
+    inVoyage:r.inVoyage,outVoyage:r.outVoyage,
+    eta:r.eta,etb:r.etb,etd:r.etd,berth:r.berth,status:r.status};
+  });
+ }
+ var safeJson=JSON.stringify(result).replace(/</g,'\\u003c')
+   .replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+ return ContentService.createTextOutput(callback+'('+safeJson+');')
+   .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
