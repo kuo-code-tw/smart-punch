@@ -52,6 +52,15 @@ body:has(#systems.show) #sessionBar{padding:8px 13px!important;margin:0 0 10px!i
 #p79Dashboard .p79d-kpi-icon{flex:0 0 50px;width:50px;height:50px;display:grid;place-items:center;border-radius:50%;background:#e9f5ff;color:#127bd8;font-size:25px;font-weight:950}
 #p79Dashboard .p79d-kpi:nth-child(3) .p79d-kpi-icon{background:#edf3ff;color:#2469df}
 #p79Dashboard .p79d-kpi:nth-child(4) .p79d-kpi-icon{background:#f2efff;color:#7851d7}
+#p79Dashboard .p79d-kpi-review{width:100%;text-align:left;appearance:none;font:inherit;color:inherit;position:relative;cursor:pointer;border-color:#f1caca;background:linear-gradient(120deg,#fff,#fff8f7);transition:box-shadow .2s ease,border-color .2s ease,transform .2s ease}
+#p79Dashboard .p79d-kpi-review:hover{border-color:#e98d8d;box-shadow:0 7px 20px rgba(198,52,52,.14);transform:translateY(-2px)}
+#p79Dashboard .p79d-kpi-review:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+#p79Dashboard .p79d-kpi-review .p79d-kpi-icon{background:#fff0ef;color:#e04949}
+#p79Dashboard .p79d-kpi-review .p79d-review-body{flex:1;min-width:0}
+#p79Dashboard .p79d-kpi-review .p79d-review-hint{margin-top:5px;font-size:11px;line-height:1.4;font-weight:800;color:#ba4040}
+#p79Dashboard .p79d-kpi-review .p79d-review-arrow{margin-left:auto;font-size:24px;color:#c75151;font-weight:800}
+@media(max-width:600px){#p79Dashboard .p79d-kpi-review{padding:11px 8px}#p79Dashboard .p79d-kpi-review .p79d-review-hint{font-size:10px}#p79Dashboard .p79d-kpi-review .p79d-review-arrow{font-size:17px}}
+
 #p79Dashboard .p79d-kpi span{display:block;color:#234874;font-size:12px;font-weight:900;line-height:1.4}
 #p79Dashboard .p79d-kpi strong{display:inline-block;color:#103f83;font-size:clamp(21px,2vw,30px);line-height:1.25;font-weight:1000;font-variant-numeric:tabular-nums}
 #p79Dashboard .p79d-kpi small{display:inline-block;margin-left:5px;color:#6a86a6;font-size:11px;font-weight:750}
