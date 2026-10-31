@@ -59,7 +59,7 @@ function render(){
  const title=state==='error'?'Google 船期資料尚未連線':state==='ready'?'目前尚未在 Google 表格填入船期':'尚未讀取 Google 船期表';
  const sub=state==='error'?(errorMessage||'請確認現有 GAS 已更新為 Google 表格讀取版。'):'由管理人員在 Google 表格編輯船期。';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(title)+'</strong><small>'+esc(sub)+'</small>'+
-  '<div class="p79-schedule-remote-actions">'+editLink()+'</div></div>';
+  '<div class="p79-schedule-remote-actions">'+(state==='error'?'<button type="button" class="p79-schedule-retry" data-manual-ship-retry>重新讀取</button>':'')+editLink()+'</div></div>';
 }
 async function refresh(){
  if(!visible()||loading)return loading;
@@ -69,25 +69,28 @@ async function refresh(){
   state='error';errorMessage='尚未登入或 GAS 網址無效';render();return;
  }
  state='loading';errorMessage='';render();
- const controller=new AbortController(),timeout=g.setTimeout(()=>controller.abort(),18000);
  loading=(async()=>{
   try{
    const url=new URL(base);
    url.searchParams.set('action',ACTION);
+   url.searchParams.set('token',token);
    url.searchParams.set('gcToken',token);
-   url.searchParams.set('t',String(Date.now()));
-   const response=await g.fetch(url.toString(),{method:'GET',cache:'no-store',redirect:'follow',signal:controller.signal});
-   if(!response.ok)throw Error('GAS HTTP '+response.status);
-   const result=await response.json();
-   if(result?.ok!==true)throw Error(text(result?.error)||'GAS 船期功能尚未更新');
+   // Use the same proven read-only GAS transport as the rest of the PORT79 homepage.
+   // This helper handles GAS redirects, response validation, timeouts and retries.
+   const reader=g.P79HistoryRead?.read;
+   if(typeof reader!=='function')throw Error('PORT79 雲端唯讀連線模組尚未載入');
+   const result=await reader(url.toString(),{forceCloud:true,timeoutMs:45000});
    if(result.source!=='port79-google-sheet'||result.sheetId!==SHEET_ID||!Array.isArray(result.rows))
-    throw Error('現有 GAS 仍回傳舊版萬海資料；請更新原本船期 GAS 檔案後再部署');
+    throw Error('目前 GAS 船期入口尚未切換到 Google 表格讀取版');
    rows=parseRows(result.rows);
    lastRead=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
    state='ready';
   }catch(error){
-   rows=[];state='error';errorMessage=error?.name==='AbortError'?'Google 船期讀取逾時':text(error?.message||error);
-  }finally{g.clearTimeout(timeout);loading=null;render();}
+   rows=[];state='error';
+   errorMessage=error?.kind==='network'?'目前無法連到 GAS，請稍後按「重新讀取」；如其他首頁雲端資料也失敗，請檢查 GAS 部署存取設定':
+    error?.kind==='timeout'?'讀取逾時，請手動重試':
+    text(error?.message||error);
+  }finally{loading=null;render();}
  })();
  return loading;
 }
@@ -118,7 +121,7 @@ function showAll(selected=-1){
 function init(){
  const host=$('p79DashVesselNotices');if(!host)return;
  $('p79ShipScheduleAll')?.addEventListener('click',()=>showAll(-1));
- host.addEventListener('click',e=>{const row=e.target.closest('[data-manual-ship-index]');if(row)showAll(Number(row.dataset.manualShipIndex));});
+ host.addEventListener('click',e=>{if(e.target.closest('[data-manual-ship-retry]')){refresh();return;}const row=e.target.closest('[data-manual-ship-index]');if(row)showAll(Number(row.dataset.manualShipIndex));});
  $('p79DashRefresh')?.addEventListener('click',refresh);
  const container=$('systems');if(!container)return;
  const check=()=>{if(visible()&&!hasLoaded){hasLoaded=true;refresh();}};
