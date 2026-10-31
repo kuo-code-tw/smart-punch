@@ -8871,6 +8871,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         if(own.length)reportStatus('已同步 '+month+' 本人的正式班表','ok');
                         else reportStatus('正式雲端尚無 '+month+' 這位員工的班表；請管理員確認已儲存及工號一致。','error');
                     }
+                    // The upcoming seven-day list may cross into next month.
+                    // Read the actual next-month cloud roster, never synthesize shifts.
+                    if(own.length && month===scheduleDateKey(new Date()).slice(0,7))
+                        void p79PrefetchUpcomingEmployeeMonth(emp,month);
                     return own.length>0;
                 }catch(error){
                     p79EmployeeRosterCheckedAt.delete(key);
@@ -8890,6 +8894,67 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             p79EmployeeRosterPending.set(key,job);
             return job;
         }
+
+        const p79UpcomingEmployeeMonthTasks=new Map();
+        async function p79PrefetchUpcomingEmployeeMonth(emp,baseMonth) {
+            const empId=String(emp?.empId||'').trim().toUpperCase();
+            if(!empId||baseMonth!==scheduleDateKey(new Date()).slice(0,7))return false;
+            const [year,num]=baseMonth.split('-').map(Number);
+            const nextMonth=new Date(Date.UTC(year,num,1)).toISOString().slice(0,7);
+            const today=scheduleDateKey(new Date());
+            const latestUpcoming=new Date(Date.parse(today+'T00:00:00Z')+6*86400000);
+            // Only prefetch when the next month is visible in the seven-day preview.
+            if(Date.parse(nextMonth+'-01T00:00:00Z')>latestUpcoming.getTime())return false;
+            const key=empId+'|'+nextMonth;
+            if(p79UpcomingEmployeeMonthTasks.has(key))return p79UpcomingEmployeeMonthTasks.get(key);
+            if(Array.isArray(schedules)&&schedules.some(row=>
+                String(row?.empId||'').trim().toUpperCase()===empId &&
+                normalizeScheduleMonthKey(row?.month)===nextMonth))return true;
+            const task=(async()=>{
+                const token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
+                if(!token)return false;
+                const punchMode=p79IsPunchEntryMode();
+                const url=new URL(getActiveGasUrl());
+                url.searchParams.set('action',punchMode?'getMyScheduleMonth':'getScheduleDataSecure');
+                url.searchParams.set('month',nextMonth);
+                url.searchParams.set('empId',empId);
+                url.searchParams.set('gcToken',token);
+                url.searchParams.set('token',token);
+                url.searchParams.set('_',Date.now());
+                const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+                let data;
+                try{
+                    const response=await fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:controller.signal});
+                    if(!response.ok)return false;
+                    data=await response.json();
+                }finally{clearTimeout(timer);}
+                if(data?.ok!==true||!Array.isArray(data.schedules)||
+                    data.month&&normalizeScheduleMonthKey(data.month)!==nextMonth)return false;
+                if(punchMode&&(data.action!=='getMyScheduleMonth'||
+                    String(data.empId||'').trim().toUpperCase()!==empId||
+                    data.schedules.length>1||
+                    data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId)))return false;
+                if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId||
+                    currentPort79SsoToken()!==token)return false;
+                const own=data.schedules.filter(row=>
+                    String(row?.empId||'').trim().toUpperCase()===empId&&
+                    (!row.month||normalizeScheduleMonthKey(row.month)===nextMonth));
+                if(!own.length)return false;
+                schedules=(Array.isArray(schedules)?schedules:[]).filter(row=>!(
+                    String(row?.empId||'').trim().toUpperCase()===empId&&
+                    normalizeScheduleMonthKey(row?.month)===nextMonth));
+                schedules.push(...own);
+                p79EmployeeRosterCheckedAt.set(key,Date.now());
+                renderEmployeeSchedule(currentEmp);
+                return true;
+            })().catch(error=>{
+                console.warn('下一月份本人班表預讀未完成',String(error?.message||error));
+                return false;
+            }).finally(()=>p79UpcomingEmployeeMonthTasks.delete(key));
+            p79UpcomingEmployeeMonthTasks.set(key,task);
+            return task;
+        }
+
         function employeeScheduleMap(emp) {
             const empId = String(emp?.empId || '').trim().toUpperCase();
             const map = {};
