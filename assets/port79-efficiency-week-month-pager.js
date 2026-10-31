@@ -22,8 +22,13 @@ style.textContent=[
  '.p79-eff-pager .p79-eff-modes,.p79-eff-pager .p79-eff-arrows{display:flex;align-items:center;gap:5px}',
  '.p79-eff-pager .p79-eff-arrows button{font-size:19px;padding:3px 9px;min-width:30px}',
  '.p79-eff-pager .p79-eff-period{font-size:12px;color:#587493;font-weight:800;text-align:center;min-width:125px;font-variant-numeric:tabular-nums}',
- '.p79-eff-summary{font-size:11px;color:#66809a;padding:2px 1px 0;text-align:right}',
- '@media(max-width:540px){.p79-eff-pager{justify-content:center}.p79-eff-pager .p79-eff-period{min-width:135px}}'
+ '.p79-eff-summary{font-size:11px;color:#66809a;padding:4px 1px 2px;text-align:right;line-height:1.5}',
+ // 原首頁全站 CSS 把每張卡片鎖在 213/230px 並 overflow:hidden，
+ // 加入週月控制列後就裁掉日期；只解除船舶效率趨勢卡片的固定高度。
+ 'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel.p79d-trend{height:auto!important;min-height:310px!important;max-height:none!important;overflow:hidden!important;align-self:start!important}',
+ 'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashShipBars.p79d-bars{height:185px!important;min-height:185px!important;overflow:visible!important;flex:none!important}',
+ 'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-pager{padding:5px 1px 8px!important}',
+ '@media(max-width:540px){.p79-eff-pager{justify-content:center}.p79-eff-pager .p79-eff-period{min-width:135px}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel.p79d-trend{min-height:345px!important}}'
 ].join('\n');
 d.head.appendChild(style);
 var periodEl=$('p79EffPeriod'),summaryEl=$('p79EffSummary'),chartEl=$('p79DashShipBars');
