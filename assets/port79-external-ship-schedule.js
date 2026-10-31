@@ -14,6 +14,19 @@ function link(label='開啟萬海原始船期網站 ›'){
  return '<a class="p79-schedule-external-link" href="'+SOURCE+'" target="_blank" rel="noopener noreferrer">'+esc(label)+'</a>';
 }
 function findColumn(headers,re){return headers.findIndex(x=>re.test(x));}
+// Only map a real berth/terminal header; general loading/discharge port is not a berth.
+function findBerthColumn(headers){
+ const excluded=/(?:起運|起始|目的|目的地|裝港|卸港|pol|pod|loading\s*port|discharge\s*port|port\s*of)/i;
+ const candidates=[
+  /(?:靠泊碼頭|預計靠泊|靠泊船席|泊靠碼頭|berthing\s*(?:terminal|berth))/i,
+  /(?:碼頭(?:名稱|編號)?|船席(?:號碼|編號)?|泊位(?:號碼|編號)?|berth|wharf|terminal|pier)/i
+ ];
+ for(const re of candidates){
+  const index=headers.findIndex(h=>re.test(h)&&!excluded.test(h));
+  if(index>=0)return index;
+ }
+ return -1;
+}
 function parseSailingTables(doc){
  const found=[],seen=new Set();
  for(const table of [...doc.querySelectorAll('table')].slice(0,40)){
@@ -27,7 +40,7 @@ function parseSailingTables(doc){
      name,voyage,
      eta:findColumn(values,/(?:預計抵|預定抵|到港|抵港|eta|etb|預計靠)/i),
      etd:findColumn(values,/(?:預計離|預定離|離港|開航|etd|預計開)/i),
-     berth:findColumn(values,/(?:碼頭|船席|泊位|berth|wharf)/i),
+     berth:findBerthColumn(values),
      status:findColumn(values,/(?:狀態|status|remark|備註)/i)
     };break;}
   }
@@ -39,7 +52,7 @@ function parseSailingTables(doc){
    if(!name||!voyage||/^(船名|vessel|total|合計)$/i.test(name)||name.length>130||voyage.length>90)continue;
    const row={name,voyage,eta:cells[columns.eta]||'',etd:cells[columns.etd]||'',
     berth:cells[columns.berth]||'',state:cells[columns.status]||''};
-   const key=name+'|'+voyage+'|'+row.eta+'|'+row.etd;
+   const key=name+'|'+voyage+'|'+row.eta+'|'+row.etd+'|'+row.berth;
    if(!seen.has(key)){seen.add(key);found.push(row);}
    if(found.length>=250)break;
   }
@@ -59,11 +72,13 @@ function render(){
   const count=rows.length;
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站公開船期 · '+esc(lastRead)+' 讀取 · '+count+' 筆</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,4).map((r,i)=>
-      '<button type="button" role="listitem" class="p79-schedule-row" data-wanhai-index="'+i+'">'+
-      '<span class="p79-schedule-time"><b>'+esc(r.eta||r.etd||'—')+'</b><small>'+esc(r.eta?'預計到港':r.etd?'預計離港':'時間未提供')+'</small></span>'+
-      '<span class="p79-schedule-info"><strong>'+esc(r.name)+'</strong><small>'+esc('航次 '+r.voyage+(r.berth?' · '+r.berth:''))+'</small></span>'+
-      '<span class="p79-schedule-status">'+esc(r.state||'船期')+'</span></button>').join('')+
-    '</div><div class="p79-schedule-footnote">資料源：萬海網站，實際船期請以原站公告為準。</div>';
+      '<button type="button" role="listitem" class="p79-schedule-row p79-wanhai-row" data-wanhai-index="'+i+'" aria-label="'+esc(r.name+' 航次 '+r.voyage+' 靠泊碼頭 '+(r.berth||'未提供'))+'">'+
+      '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name)+'</strong><small class="p79-wanhai-voyage">'+esc('航次 '+r.voyage)+'</small></span>'+
+      '<span class="p79-wanhai-detail"><span><small>預計抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
+      '<span><small>預計離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
+      '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span>'+
+      (r.state?'<span class="p79-wanhai-state">'+esc(r.state)+'</span>':'')+'</button>').join('')+
+    '</div><div class="p79-schedule-footnote">靠泊碼頭及時間均來自萬海原站，未提供的欄位不推估。</div>';
  }else{
   const message=status==='idle'?'尚未讀取萬海網站船期':status==='empty'?
    '萬海網站已回應，但未取得可辨識的船期表格。':
@@ -153,7 +168,7 @@ function showDialog(index=-1){
  if(status==='ok'&&rows.length){
   const selected=Number.isInteger(index)&&index>=0&&index<rows.length?[rows[index]]:rows;
   body.innerHTML='<p class="p79-schedule-dialog-disclaimer">讀取時間：'+esc(lastRead)+'｜以下欄位直接來自網站表格，請以原站為準。</p>'+
-   '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr><th>船名</th><th>航次</th><th>預計抵達</th><th>預計離開</th><th>碼頭</th><th>狀態</th></tr></thead><tbody>'+
+   '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr><th>船名</th><th>航次</th><th>預計抵達</th><th>預計離開</th><th>靠泊碼頭</th><th>狀態</th></tr></thead><tbody>'+
    selected.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(r.voyage)+'</td><td>'+esc(r.eta||'未提供')+'</td><td>'+esc(r.etd||'未提供')+'</td><td>'+esc(r.berth||'未提供')+'</td><td>'+esc(r.state||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
    '<div class="p79-schedule-dialog-actions">'+(selected.length===1?'<button type="button" data-wanhai-all>查看全部 '+rows.length+' 筆</button>':'')+link('前往萬海原網站核對 ›')+'</div>';
  }else{
