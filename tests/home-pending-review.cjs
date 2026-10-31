@@ -21,7 +21,7 @@ assert.match(result.pendingDetails.find(r=>r.name==='乙').suggestion,/補登上
 const markup=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 assert.match(markup,/<button[^>]+id="p79DashPendingReviewTrigger"/);
 assert.match(markup,/id="p79DashReviewHint"/);
-assert.match(markup,/port79-monthly-dashboard\.js\?v=20261031-private-sheet-v1/);
+assert.match(markup,/port79-monthly-dashboard\.js\?v=20261031-private-sheet-all-vessels-v2/);
 const css=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.css'),'utf8');
 assert.match(css,/p79d-kpi-review:focus-visible/);
 const source=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.js'),'utf8');
