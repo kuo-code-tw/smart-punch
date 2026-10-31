@@ -345,7 +345,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <section id="p79Dashboard" class="p79d-dashboard" aria-label="本月船舶與考勤整合資訊">
   <section class="p79d-section p79d-vessel" aria-labelledby="p79dShipHeading">
     <div class="p79d-section-head"><h2 id="p79dShipHeading">🚢 船舶作業總覽 <span id="p79DashMonthLabel"></span></h2>
-      <div class="p79d-heading-actions"><label class="p79r-sr" for="p79DashMonth">查詢月份</label><input type="month" id="p79DashMonth" aria-label="船舶與考勤統計月份"><button type="button" id="p79DashRefresh" title="重新讀取所選月份">↻</button><button type="button" onclick="launchSystem('efficiency')">查看詳情 ›</button></div></div>
+      <div class="p79d-heading-actions"><label class="p79r-sr" for="p79DashMonth">查詢月份</label><input type="month" id="p79DashMonth" aria-label="船舶與考勤統計月份"><button type="button" id="p79DashRefresh" title="手動重新讀取所選月份的首頁資料">↻ 手動更新</button><button type="button" onclick="launchSystem('efficiency')">查看詳情 ›</button></div></div>
     <div class="p79d-kpis">
       <div class="p79d-kpi"><div class="p79d-kpi-icon">🚢</div><div><span>本月作業船舶</span><strong id="p79DashShipCount">—</strong><small>艘</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▥</div><div><span>本月作業量</span><strong id="p79DashMoves">—</strong><small>Moves</small><div class="p79r-kpi-note">請款櫃數 <b id="p79DashContainers">—</b> 櫃</div></div></div>
@@ -456,7 +456,7 @@ let currentSession=null, loginBusy=false;
 const $=id=>document.getElementById(id);
 
 const PORT79_DEPLOY_STATUS_URL='https://raw.githubusercontent.com/kuoyalun/smart-punch/deploy-status/deploy-status.json';
-const PORT79_DEPLOY_POLL_MS=12000;
+// 首頁手動更新模式：部署狀態只在初次進入時檢查一次。
 const PORT79_DEPLOY_MAX_LOCK_MS=10*60*1000;
 let port79DeploymentUpdating=false;
 let port79DeploymentLastState='normal';
@@ -476,10 +476,10 @@ function p79SetDeploymentUi(updating,payload={}){
   if(updating){
     banner?.classList.add('show');
     if(title)title.textContent=String(payload.message||'系統更新中');
-    if(sub)sub.textContent='GitHub Pages 正在部署最新版本，更新期間暫停登入；部署完成後本頁會自動恢復。';
+    if(sub)sub.textContent='GitHub Pages 正在部署最新版本，更新期間暫停登入；部署完成後請按「手動更新」重新檢查。';
     if(meta){
       const started=payload.started_at?String(payload.started_at):'';
-      meta.textContent=started?('開始時間：'+started+'｜每 12 秒自動檢查一次'):'每 12 秒自動檢查一次';
+      meta.textContent=started?('開始時間：'+started+'｜按手動更新才重新檢查'):'請按手動更新重新檢查';
     }
     if(account)account.disabled=true;
     if(password)password.disabled=true;
@@ -487,7 +487,7 @@ function p79SetDeploymentUi(updating,payload={}){
     if(manage){manage.disabled=true;manage.textContent='🛠️ 系統更新中'}
     if($('status')){
       $('status').className='status warning';
-      $('status').textContent='🛠️ 系統正在更新，登入暫停；完成後會自動恢復，不需要重新整理。';
+      $('status').textContent='🛠️ 系統正在更新，登入暫停；完成後請按手動更新重新檢查。';
     }
   }else{
     banner?.classList.remove('show');
@@ -555,9 +555,9 @@ async function p79CheckDeploymentStatus(){
 }
 
 function p79StartDeploymentStatusWatch(){
-  if(port79DeploymentTimer)clearInterval(port79DeploymentTimer);
+  // 登入/使用首頁期間不輪詢、不切換更新橫幅。重新整理時才重新確認狀態。
+  if(port79DeploymentTimer){clearInterval(port79DeploymentTimer);port79DeploymentTimer=null;}
   p79CheckDeploymentStatus();
-  port79DeploymentTimer=setInterval(p79CheckDeploymentStatus,PORT79_DEPLOY_POLL_MS);
 }
 
 const PORT79_WEATHER={
@@ -1297,10 +1297,8 @@ p79StartDeploymentStatusWatch();
 restore();
 // v10.19：完整健康檢查仍讓位給登入；輕量 pingPost 已在頁面載入後先做一次 runtime 預熱。
 setTimeout(probeGasConnection,7000);
-setTimeout(refreshSystemVersions,15000);
-setInterval(refreshSystemVersions,10*60*1000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!loginBusy&&!String($('account')?.value||'').trim())setTimeout(refreshSystemVersions,2500);});
-window.addEventListener('online',()=>setTimeout(probeGasConnection,1200));
+// 版本資訊僅初次進入首頁讀取一次，之後完全依手動更新，不再定時或切回視窗刷新。
+setTimeout(refreshSystemVersions,3000);
 </script>
 
 <div id="port79CalendarModeBox" aria-label="年份顯示方式">
@@ -1564,7 +1562,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261030-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261031-review-drilldown-v2"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261031-home-manual-refresh-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-five-scroll-v4&leavePages=20261030-v1">
 <script src="./assets/port79-reference-dashboard.js?v=20261030-all-hatches-v1&leavePages=20261030-v1"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261031-chart-dates-visible-v3"></script>
