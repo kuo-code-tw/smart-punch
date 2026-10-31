@@ -7,7 +7,7 @@ const external=fs.readFileSync(path.join(root,'assets/port79-external-ship-sched
 const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
 assert(html.includes('<b>萬海網站船期</b>'),'label must describe original third-party source');
 assert(html.includes('id="p79ShipScheduleAll"'),'full-site and full-list button stays available');
-assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-external-v1'),'external adapter must be loaded');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-gas-bridge-v2'),'external adapter must be loaded');
 assert(!html.includes('船舶作業重點提醒'));
 assert(!view.includes('renderShipSchedule(v,ym)'),'historical vessel rows must not replace outside website data');
 assert(!view.includes('function openShipSchedule('),'retired private source dialog must not open');
@@ -17,6 +17,7 @@ assert(external.includes("mode:'cors'"),'normal browser CORS, not an invented sa
 assert(external.includes("status='error'"),'errors must be surfaced instead of invented data');
 assert(external.includes('於萬海原網站查看完整船期'),'source-site fallback must always be available');
 assert(!external.includes('setInterval('),'no automatic polling on homepage');
+assert(external.includes("uri.searchParams.set('action','wanHaiSailingSchedule')"),'backend integration is present');
 assert(external.includes("p79DashRefresh")&&external.includes('addEventListener(\'click\',refresh)'),'manual button should refresh the external source');
 assert(styles.includes('#p79WanHaiScheduleDialog')&&styles.includes('.p79-schedule-remote-msg'));
 new vm.Script(view);new vm.Script(external);
