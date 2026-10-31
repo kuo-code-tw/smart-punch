@@ -1,182 +1,154 @@
-/* PORT79 manual Google Sheet sailing board.
- * No Wan Hai requests. Read-only, authenticated via the existing GAS route.
- * First entry loads once, further updates are manual via the homepage refresh.
- */
+/* PORT79 V75 shared official Kaohsiung Port sailing board.
+   Public official data only; shown to EVERY employee on the login page and
+   administrators in the dashboard. No private HR data or login tokens read.
+   The server refreshes its Google Sheet snapshot automatically. The display
+   refreshes only on initial visit or a deliberate user click. */
 (function(g){
 'use strict';
-const SHEET_ID='1AjgCs8QvADWYjJeWzJCEDsUaKtKlflNTI4ZQEK14Ipo';
-const SHEET_URL='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit';
-const ACTION='wanHaiSailingSchedule'; // existing GAS doGet route; now backed by our own Sheet
+const ACTION='publicShipSchedule',SOURCE='臺灣港務公司／高雄港進港預報次序';
+const DASH_ID='p79DashVesselNotices',STAFF_ID='p79PublicShipBoard';
 const $=id=>g.document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const text=s=>String(s??'').trim();
-let rows=[],state='idle',lastRead='',errorMessage='',dialog=null,loading=null,hasLoaded=false;
-function editLink(label='開啟 Google 船期表'){
- return '<a class="p79-schedule-external-link" href="'+SHEET_URL+'" target="_blank" rel="noopener noreferrer">'+esc(label)+'</a>';
-}
-function visible(){return !!($('systems')?.classList.contains('show')&&$('p79Dashboard'));}
-function parseRows(items){
- if(!Array.isArray(items))return [];
- const unique=new Set();
- return items.slice(0,1000).map(value=>{
-  const r=value&&typeof value==='object'?value:{};
-  return {
-   name:text(r.name||r.englishName),localName:text(r.localName||r.chineseName),
-   inVoyage:text(r.inVoyage),outVoyage:text(r.outVoyage),
-   eta:text(r.eta),etb:text(r.etb),etd:text(r.etd),
-   berth:text(r.berth),status:text(r.status),note:text(r.note),updatedAt:text(r.updatedAt)
-  };
+const str=v=>String(v??'').trim();
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+const short=v=>str(v).slice(0,180);
+let rows=[],lastSync=0,state='idle',error='',notice='',loaded=false,request=null,dialog=null;
+function parseRows(data){
+ if(!Array.isArray(data))return [];
+ const seen=new Set();
+ return data.slice(0,2000).map(v=>{
+  const r=v&&typeof v==='object'?v:{};
+  return {name:short(r.name||r.englishName),localName:short(r.localName||r.chineseName),
+   inVoyage:short(r.inVoyage),outVoyage:short(r.outVoyage),eta:short(r.eta),
+   etb:short(r.etb),etd:short(r.etd),berth:short(r.berth),
+   status:short(r.status),source:short(r.source),updatedAt:short(r.updatedAt)};
  }).filter(r=>{
   if(!r.name&&!r.localName)return false;
-  if(!r.inVoyage&&!r.outVoyage)return false;
-  const key=[r.name,r.localName,r.inVoyage,r.outVoyage,r.eta,r.etb,r.etd,r.berth].join('|');
-  if(unique.has(key))return false;
-  unique.add(key);return true;
+  if(!r.etb&&!r.etd&&!r.berth&&!r.inVoyage&&!r.outVoyage)return false;
+  const key=[r.name,r.localName,r.etb,r.etd,r.berth].join('|');
+  if(seen.has(key))return false;seen.add(key);return true;
  }).sort((a,b)=>{
-  const date=r=>String(r.eta||r.etb||r.etd||'').replace(/\//g,'-').replace('T',' ').trim();
-  const x=date(a),y=date(b);
-  if(!x)return 1;if(!y)return -1;
-  return x.localeCompare(y);
+  const sortTime=r=>str(r.etb||r.etd||r.eta).replace(/\//g,'-');
+  const x=sortTime(a),y=sortTime(b);
+  if(!x)return 1;if(!y)return -1;return x.localeCompare(y);
  });
 }
-function render(){
- const host=$('p79DashVesselNotices');if(!host)return;
- host.className='p79-schedule-board p79-schedule-remote';
+function timeLabel(){
+ if(!lastSync)return '尚未成功同步';
+ return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(lastSync));
+}
+function line(r,i){
+ return '<button class="p79-schedule-row p79-wanhai-row" type="button" data-public-ship-index="'+i+'" role="listitem">'+
+ '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong>'+
+ '<small class="p79-wanhai-voyage">'+esc(r.localName&&r.localName!==r.name?r.localName:'進出港航次：來源未提供')+'</small></span>'+
+ '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
+ '<span><small>ETB 靠泊</small><b>'+esc(r.etb||'未提供')+'</b></span>'+
+ '<span><small>ETD 離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
+ '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span></button>';
+}
+function renderOne(host){
+ if(!host)return;
+ host.className='p79-schedule-board p79-schedule-remote p79-public-sailing-board';
  if(state==='loading'){
-  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取 Google 船期表…</strong><small>只在首次登入及手動更新時讀取</small></div>';return;
+  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取高雄港官方船期…</strong><small>首次開啟及手動更新時讀取</small></div>';return;
  }
  if(state==='ready'&&rows.length){
-  host.innerHTML='<div class="p79-schedule-remote-caption">自訂 Google 船期表 · '+esc(lastRead)+' 更新 · '+rows.length+' 筆</div>'+
-  '<div class="p79-schedule-list" role="list">'+rows.slice(0,4).map((r,i)=>
-   '<button type="button" role="listitem" class="p79-schedule-row p79-wanhai-row" data-manual-ship-index="'+i+'" aria-label="'+esc((r.name||r.localName)+' 航次 '+(r.inVoyage||r.outVoyage)+' 靠泊碼頭 '+(r.berth||'未提供'))+'">'+
-   '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong><small class="p79-wanhai-voyage">'+esc((r.localName&&r.localName!==r.name?r.localName+' · ':'')+'進 '+(r.inVoyage||'—')+'／出 '+(r.outVoyage||'—'))+'</small></span>'+
-   '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b>'+esc(r.eta||'未提供')+'</b></span><span><small>ETB 靠泊</small><b>'+esc(r.etb||'未提供')+'</b></span><span><small>ETD 離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
-   '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span>'+
-   (r.status?'<span class="p79-wanhai-state">'+esc(r.status)+'</span>':'')+'</button>').join('')+'</div>'+
-  '<div class="p79-schedule-footnote">資料由 PORT79 自行維護，按手動更新才重新讀取。</div>';
-  return;
+  host.innerHTML='<div class="p79-schedule-remote-caption">高雄港進港預報 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
+    '<div class="p79-schedule-list" role="list">'+rows.slice(0,host.id===STAFF_ID?3:4).map(line).join('')+'</div>'+
+    '<div class="p79-schedule-footnote">官方 ETA_DT 為預定靠泊（ETB），非抵港 ETA；航次如無資料不推估。'+(notice?'來源最近同步失敗，保留上次成功資料。':'')+'</div>';return;
  }
- const title=state==='error'?'Google 船期資料尚未連線':state==='ready'?'目前尚未在 Google 表格填入船期':'尚未讀取 Google 船期表';
- const sub=state==='error'?(errorMessage||'請確認現有 GAS 已更新為 Google 表格讀取版。'):'由管理人員在 Google 表格編輯船期。';
- host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(title)+'</strong><small>'+esc(sub)+'</small>'+
-  '<div class="p79-schedule-remote-actions">'+(state==='error'?'<button type="button" class="p79-schedule-retry" data-manual-ship-retry>重新讀取</button>':'')+editLink()+'</div></div>';
+ const headline=state==='error'?'目前無法取得官方船期':state==='ready'?'官方船期尚無資料':'尚未讀取官方船期';
+ host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
+  '<small>'+esc(error||notice||'資料由臺灣港務公司提供，會自動同步到 PORT79 Google 船期表。')+'</small>'+
+  '<div class="p79-schedule-remote-actions"><button type="button" data-public-ship-retry>重新讀取</button></div></div>';
 }
-// Apps Script ContentService can redirect across Google domains, blocking browser fetch.
-// A strictly authenticated read-only callback is supported by the matching GAS add-on.
-// Never send the PORT79 token to third-party sites or expose it in the UI.
-function readViaSecureScript(base,token){
+function render(){renderOne($(STAFF_ID));renderOne($(DASH_ID));}
+function readJsonp(url){
  return new Promise((resolve,reject)=>{
-  if(!g.document?.head||!g.document.createElement){reject(Error('瀏覽器無法載入船期備援通道'));return;}
-  const random=(()=>{
-   if(g.crypto?.getRandomValues){
-    const a=new Uint32Array(4);g.crypto.getRandomValues(a);
-    return [...a].map(x=>x.toString(36).padStart(7,'0')).join('');
-   }
-   return Math.random().toString(36).slice(2).padEnd(14,'0')+Date.now().toString(36);
-  })();
-  const callback='P79ShipCb_'+random.slice(0,42);
-  const url=new URL(base);
-  url.searchParams.set('action',ACTION);
-  url.searchParams.set('gcToken',token);
-  url.searchParams.set('token',token);
-  url.searchParams.set('callback',callback);
-  url.searchParams.set('_',String(Date.now()));
-  const element=g.document.createElement('script');
-  let finished=false;
-  const finish=(error,data)=>{
-   if(finished)return;finished=true;
-   g.clearTimeout(timer);
-   element.remove();
-   try{delete g[callback];}catch(ignore){g[callback]=undefined;}
-   error?reject(error):resolve(data);
+  if(!g.document?.head)return reject(Error('無法建立船期讀取連線'));
+  const nonce=g.crypto?.getRandomValues?(()=>{
+   const array=new Uint32Array(4);g.crypto.getRandomValues(array);
+   return Array.from(array,n=>n.toString(36).padStart(7,'0')).join('');
+  })():Math.random().toString(36).slice(2).padEnd(18,'0')+Date.now().toString(36);
+  const callback='P79ShipCb_'+nonce.slice(0,42);
+  const src=new URL(url);
+  src.searchParams.set('action',ACTION);src.searchParams.set('callback',callback);
+  src.searchParams.set('_',String(Date.now()));
+  const script=g.document.createElement('script');
+  let done=false;
+  const finish=(err,data)=>{
+   if(done)return;done=true;g.clearTimeout(timer);
+   script.remove();try{delete g[callback];}catch(e){g[callback]=undefined;}
+   if(err)reject(err);else resolve(data);
   };
-  const timer=g.setTimeout(()=>finish(Error('GAS 船期備援讀取逾時；請確認已更新正式部署的船期入口')),18000);
+  const timer=g.setTimeout(()=>finish(Error('官方船期連線逾時；請檢查 GAS 是否已部署 V75')),25000);
   g[callback]=data=>finish(null,data);
-  element.async=true;
-  element.referrerPolicy='no-referrer';
-  element.onerror=()=>finish(Error('GAS 備援讀取遭拒絕；請檢查原部署的存取權限'));
-  element.src=url.toString();
-  g.document.head.appendChild(element);
+  script.async=true;script.referrerPolicy='no-referrer';
+  script.onerror=()=>finish(Error('無法載入 GAS 船期；請確認正式部署版本與存取設定'));
+  script.src=src.toString();g.document.head.appendChild(script);
  });
 }
 async function refresh(){
- if(!visible()||loading)return loading;
- const base=text(g.sessionStorage?.getItem('port79_gas_url'));
- const token=text(g.sessionStorage?.getItem('port79_user_token')||g.sessionStorage?.getItem('port79_admin_token'));
- if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)||!token){
-  state='error';errorMessage='尚未登入或 GAS 網址無效';render();return;
+ if(request)return request;
+ const base=str(g.sessionStorage?.getItem('port79_gas_url'))||str($('p79PublicShipBoard')?.dataset.gasUrl);
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)){
+  state='error';error='尚未設定正式 GAS 網址';render();return;
  }
- state='loading';errorMessage='';render();
- loading=(async()=>{
+ state='loading';render();
+ request=(async()=>{
   try{
-   const url=new URL(base);
-   url.searchParams.set('action',ACTION);
-   url.searchParams.set('token',token);
-   url.searchParams.set('gcToken',token);
-   // Use the same proven read-only GAS transport as the rest of the PORT79 homepage.
-   // This helper handles GAS redirects, response validation, timeouts and retries.
-   const reader=g.P79HistoryRead?.read;
-   if(typeof reader!=='function')throw Error('PORT79 雲端唯讀連線模組尚未載入');
-   let result;
-   try{result=await reader(url.toString(),{forceCloud:true,timeoutMs:18000});}
-   catch(primaryError){
-    // Only network/redirect failures are eligible for backup. Do not hide API
-    // errors, authorization failures or stale backend versions.
-    if(primaryError?.kind!=='network'&&primaryError?.kind!=='timeout')throw primaryError;
-    try{result=await readViaSecureScript(base,token);}
-    catch(backupError){
-     throw Error('一般讀取與 GAS 備援讀取都未成功：'+text(backupError?.message||backupError));
-    }
-   }
-   if(result?.ok!==true)throw Error(text(result?.error)||'GAS 船期讀取失敗');
-   if(result.source!=='port79-google-sheet'||result.sheetId!==SHEET_ID||!Array.isArray(result.rows))
-    throw Error('目前 GAS 船期入口尚未切換到 Google 表格讀取版');
-   rows=parseRows(result.rows);
-   lastRead=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
-   state='ready';
-  }catch(error){
-   rows=[];state='error';
-   errorMessage=error?.kind==='network'?'無法讀取 GAS。請確認原部署仍有效且已啟用船期備援入口':
-    error?.kind==='timeout'?'船期讀取逾時，請按「重新讀取」':
-    text(error?.message||error);
-  }finally{loading=null;render();}
+   const data=await readJsonp(base);
+   if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
+   if(data?.source!=='port79-official-port'||!Array.isArray(data.rows))
+    throw Error('目前 GAS 尚未部署 V75 官方船期讀取入口');
+   rows=parseRows(data.rows);
+   lastSync=Number(data.lastSync)||0;notice=str(data.error);
+   state='ready';error='';
+  }catch(e){state='error';error=str(e?.message||e);}
+  finally{request=null;render();}
  })();
- return loading;
+ return request;
 }
 function ensureDialog(){
  if(dialog)return dialog;
- dialog=g.document.createElement('dialog');dialog.id='p79WanHaiScheduleDialog';
- dialog.setAttribute('aria-labelledby','p79ManualShipTitle');
- dialog.innerHTML='<div class="p79-schedule-dialog-inner"><header class="p79-schedule-dialog-header"><div><h2 id="p79ManualShipTitle">PORT79 自訂船期看板</h2><p>資料來源：專用 Google 表格，不使用外部船公司網站。</p></div><button type="button" data-manual-close aria-label="關閉船期">✕</button></header><div id="p79ManualShipBody"></div></div>';
+ dialog=g.document.createElement('dialog');dialog.id='p79PublicShipScheduleDialog';
+ dialog.innerHTML='<div class="p79-schedule-dialog-inner"><header class="p79-schedule-dialog-header">'+
+  '<div><h2>高雄港官方船期｜全員可看</h2><p>資料來源：臺灣港務公司高雄港進港預報；Google 表格自動同步。</p></div>'+
+  '<button type="button" data-public-ship-close aria-label="關閉">✕</button></header>'+
+  '<div id="p79PublicShipDialogBody"></div></div>';
  g.document.body.appendChild(dialog);
- dialog.addEventListener('click',e=>{
-  if(e.target===dialog||e.target.closest('[data-manual-close]')){dialog.close();return;}
-  if(e.target.closest('[data-manual-all]'))showAll(-1);
- });
+ dialog.addEventListener('click',e=>{if(e.target===dialog||e.target.closest('[data-public-ship-close]'))dialog.close();});
  return dialog;
 }
-function showAll(selected=-1){
- const box=ensureDialog(),body=$('p79ManualShipBody');if(!body)return;
- if(state==='ready'&&rows.length){
-  const arr=selected>=0&&selected<rows.length?[rows[selected]]:rows;
-  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">此資料由 Google 表格維護；時間、靠泊碼頭以最後一次人工確認輸入為準。</p>'+
-  '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+['英文船名','中文船名','進港航次','出港航次','ETA','ETB','ETD','靠泊碼頭','狀態','備註'].map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>'+
-  arr.map(r=>'<tr>'+[r.name,r.localName,r.inVoyage,r.outVoyage,r.eta,r.etb,r.etd,r.berth,r.status,r.note].map(v=>'<td>'+esc(v||'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'+
-  '<div class="p79-schedule-dialog-actions">'+(selected>=0?'<button type="button" data-manual-all>查看全部 '+rows.length+' 筆</button>':'')+editLink('編輯 Google 船期表 ›')+'</div>';
- }else body.innerHTML='<p class="p79-schedule-dialog-disclaimer">'+esc(state==='error'?'GAS 船期資料尚未連線。':'Google 表格目前沒有可顯示的船期。')+'</p>'+
-  '<div class="p79-schedule-dialog-actions">'+editLink('開啟 Google 船期表 ›')+'</div>';
- if(!box.open)box.showModal();
+function showDialog(index=-1){
+ const dlg=ensureDialog(),body=$('p79PublicShipDialogBody');
+ if(!body)return;
+ const showing=index>=0&&index<rows.length?[rows[index]]:rows;
+ if(!showing.length){
+  body.innerHTML='<p>目前沒有可顯示的官方船期，請確認 GAS 已啟用同步。</p>';
+ }else{
+  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'｜預定靠泊為 ETB，未公布的航次與 ETA 不推估。</p>'+
+   '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
+   ['英文船名','中文船名','進港航次','出港航次','ETA 抵港','ETB 靠泊','ETD 離港','靠泊碼頭','狀態'].map(h=>'<th>'+h+'</th>').join('')+
+   '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name,r.localName,r.inVoyage,r.outVoyage,r.eta,r.etb,r.etd,r.berth,r.status].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
+   '</tbody></table></div>'+
+   (showing.length===1?'<div class="p79-schedule-dialog-actions"><button type="button" data-public-show-all>查看全部 '+rows.length+' 艘</button></div>':'');
+ }
+ if(!dlg.open)dlg.showModal();
+ const all=body.querySelector('[data-public-show-all]');if(all)all.addEventListener('click',()=>showDialog(-1),{once:true});
 }
 function init(){
- const host=$('p79DashVesselNotices');if(!host)return;
- $('p79ShipScheduleAll')?.addEventListener('click',()=>showAll(-1));
- host.addEventListener('click',e=>{if(e.target.closest('[data-manual-ship-retry]')){refresh();return;}const row=e.target.closest('[data-manual-ship-index]');if(row)showAll(Number(row.dataset.manualShipIndex));});
+ const staff=$(STAFF_ID),admin=$(DASH_ID);
+ [staff,admin].filter(Boolean).forEach(el=>el.addEventListener('click',e=>{
+  if(e.target.closest('[data-public-ship-retry]')){refresh();return;}
+  const item=e.target.closest('[data-public-ship-index]');
+  if(item)showDialog(Number(item.dataset.publicShipIndex));
+ }));
+ $('p79PublicShipRefresh')?.addEventListener('click',refresh);
+ $('p79PublicShipAll')?.addEventListener('click',()=>showDialog(-1));
+ $('p79ShipScheduleAll')?.addEventListener('click',()=>showDialog(-1));
  $('p79DashRefresh')?.addEventListener('click',refresh);
- const container=$('systems');if(!container)return;
- const check=()=>{if(visible()&&!hasLoaded){hasLoaded=true;refresh();}};
- if(g.MutationObserver)new g.MutationObserver(check).observe(container,{attributes:true,attributeFilter:['class']});
- check();render();
+ render();refresh();
 }
-g.P79ManualShipSchedule={render,refresh,parseRows,sheetUrl:SHEET_URL};
+g.P79ManualShipSchedule={render,refresh,parseRows,source:SOURCE};
 if(g.document.readyState==='loading')g.document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
