@@ -703,3 +703,31 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll th{color:#e2f0ff!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll td{color:#e3efff!important}
 }
+
+/* PORT79 2026-10-31: pending punch review dialog dark mode contrasts (runtime-injected modal styles). */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog{background:#14283f!important;color:#eaf3ff!important;border:1px solid #4a6b88!important;box-shadow:0 22px 70px #000a!important;color-scheme:dark!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-wrap{background:#14283f!important;color:#eaf3ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-head h2{color:#f4f9ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-head button{background:#2d4966!important;color:#f3f8ff!important;border:1px solid #66839d!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-head-note{color:#c8dbed!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-sub{color:#c9ddef!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-status{color:#bfd3e9!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-scroll{background:#172c43!important;scrollbar-color:#7a95ad #14283f!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table{color:#e7f3ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table th{background:#294763!important;color:#e8f3ff!important;border-bottom:1px solid #4e6a87!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table td{color:#e5f1ff!important;border-bottom:1px solid #45617d!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table tbody tr{background:#172e47!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table tbody tr:nth-child(even){background:#1e3b56!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table tbody tr:is(:hover,:focus,.selected){background:#345b7b!important;outline:2px solid #85bdf0!important;outline-offset:-2px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-table .p79-review-issue{color:#ffc1b7!important;font-weight:800!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail{background:#203b55!important;border:1px solid #55718d!important;color:#eaf4ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail>strong{color:#f7fbff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail dt{color:#bdd3e9!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail dd{color:#edf7ff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail p.p79-review-cause{background:#423322!important;border:1px solid #8f724b!important;color:#ffe8c2!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail p.p79-review-advice{background:#183a58!important;border:1px solid #547d9d!important;color:#d5ecff!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail p b{color:inherit!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail button{background:#2367a8!important;color:#fff!important;border:1px solid #5b9dd3!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-empty{color:#cadcf0!important}
+}
