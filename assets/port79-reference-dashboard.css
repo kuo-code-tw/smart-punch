@@ -16,7 +16,8 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-user-name{fon
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-user-role{font-size:12px!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79rNotifications{background:transparent!important;border:0!important;color:#0b3272!important;padding:5px!important;margin-right:8px!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79rNotifications svg{width:25px!important;height:25px!important}
-html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-toolbar-theme{display:none!important}
+/* 主題按鈕必須顯示：過去此處 display:none!important 導致首頁無法切換暗色。 */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceTopbar .p79-toolbar-theme{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:none!important;min-width:38px!important;min-height:38px!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #logoutBtn{background:transparent!important;border:0!important;color:#5275a1!important;font-size:11px!important;padding:5px!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79WorkspaceSidebar{background:linear-gradient(120deg,#f5fbff,#e9f5ff)!important;border:0!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79-workspace-brand{min-height:85px!important;padding:15px 22px!important;border:0!important;gap:12px!important}
