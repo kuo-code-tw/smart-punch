@@ -38,9 +38,10 @@ handlers.DOMContentLoaded();
   assert(html.includes('title="2026/10/31 16:00"'),'unmodified time retained for tooltip');
   assert(html.includes('W79'),'berth retained');
  }
- assert(css.includes('grid-auto-rows:620px!important;'),'desktop grid row exactly sized');
- assert(css.includes('height:620px!important;min-height:620px!important;max-height:620px!important;'),'all cards same dimensions');
+ assert(css.includes('grid-auto-rows:auto!important;'),'grid row follows normal vessel trend height');
+ assert(css.includes('height:auto!important;min-height:310px!important;max-height:none!important;'),'cards use shared compact height rather than forced huge height');
  assert(css.includes('overflow:visible!important;text-overflow:clip!important;'),'time no ellipsis');
  assert(css.includes('max-width:620px'),'small screens have own layout');
- console.log('PASS: employee + admin see full date and HH:mm; cards equal height; no text ellipsis; responsive CSS.');
+ assert(!css.includes('grid-auto-rows:620px!important;')&&!css.includes('grid-auto-rows:440px!important;'),'oversized fixed rows prohibited');
+ console.log('PASS: employee + admin see full date and HH:mm; cards follow normal trend height; no ellipsis; responsive CSS.');
 })().catch(e=>{console.error(e);process.exitCode=1});
