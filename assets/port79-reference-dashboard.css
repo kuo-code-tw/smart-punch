@@ -802,28 +802,54 @@ html[data-theme="light"] body.p79-workspace:has(#systems.show):has(#p79Dashboard
 }
 
 
-/* PORT79 2026-10-31 — compact matched vessel cards, using the
- * vessel efficiency chart's intrinsic height as the shared reference.
- * Do NOT force the original 620px/440px heights; ship tables scroll INSIDE.
- * WAN HAI date/clock visibility rules immediately below remain unchanged. */
+/* PORT79 2026-10-31 — genuinely SHORT vessel cards.
+ * All three cards are shorter than the previous 310px chart; neither the
+ * vessel list nor the WAN HAI table may stretch the shared row. */
 @media screen{
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels{
-  display:grid!important;grid-auto-rows:auto!important;align-items:stretch!important;
+  display:grid!important;grid-auto-rows:260px!important;align-items:stretch!important;
  }
  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-panel{
   box-sizing:border-box!important;display:flex!important;flex-direction:column!important;
-  height:auto!important;min-height:310px!important;max-height:none!important;
+  height:260px!important;min-height:260px!important;max-height:260px!important;
   margin:0!important;align-self:stretch!important;overflow:hidden!important;
  }
- /* Keep the compact chart as the actual height reference, not the
-    potentially hundreds of history rows or WAN HAI vessel records. */
- html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-trend{
-  justify-content:flex-start!important;
+ /* Specificity defeats the weekly/monthly pager's old min-height:310px,
+    even when that dynamic stylesheet is injected later than this file. */
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-panel.p79d-trend{
+  height:260px!important;min-height:260px!important;max-height:260px!important;
+  align-self:stretch!important;justify-content:flex-start!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend #p79DashShipBars{
+  height:120px!important;min-height:120px!important;max-height:120px!important;
+  flex:0 0 120px!important;overflow:visible!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-pager{
+  flex:none!important;display:flex!important;gap:3px 7px!important;
+  flex-wrap:wrap!important;align-content:start!important;
+  padding:1px 0 3px!important;margin:0!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-pager button{
+  min-height:26px!important;padding:3px 8px!important;font-size:11px!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-pager .p79-eff-arrows{
+  gap:3px!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-period{
+  font-size:10px!important;min-width:0!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-summary{
+  flex:none!important;padding:0 1px 0!important;
+  margin-top:auto!important;line-height:1.3!important;font-size:10px!important;
  }
 }
 @media screen and (max-width:620px){
- html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-panel{
-  min-height:345px!important;
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels{
+  grid-auto-rows:275px!important;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-panel,
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article.p79d-panel.p79d-trend{
+  height:275px!important;min-height:275px!important;max-height:275px!important;
  }
 }
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ship-panels>article .p79d-panel-title{
