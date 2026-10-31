@@ -8,7 +8,7 @@ const SOURCE='https://khhtml.wanhai.com/web/SailingScheduleList';
 const d=g.document,$=id=>d.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const trimmed=s=>String(s??'').replace(/\s+/g,' ').trim();
-let rows=[],status='idle',statusMessage='',lastRead='',seenHome=false,running=null,dialog=null,requestSeq=0;
+let rows=[],images=[],status='idle',statusMessage='',lastRead='',seenHome=false,running=null,dialog=null,requestSeq=0,sourceDiagnosis='';
 function visible(){return !!($('systems')?.classList.contains('show')&&$('p79Dashboard'))}
 function link(label='開啟萬海原始船期網站 ›'){
  return '<a class="p79-schedule-external-link" href="'+SOURCE+'" target="_blank" rel="noopener noreferrer">'+esc(label)+'</a>';
@@ -60,6 +60,38 @@ function parseSailingTables(doc){
  }
  return found;
 }
+
+function parseSailingImages(doc){
+ // Only actual schedule notices from the trusted Wan Hai host. Never display logo images.
+ const pictures=[],seen=new Set(),base=new URL(SOURCE);
+ const objects=[...doc.querySelectorAll('img,a[href]')].slice(0,260);
+ for(const el of objects){
+  const src=trimmed(el.getAttribute?.('data-src')||el.getAttribute?.('src')||el.getAttribute?.('href'));
+  if(!src||src.startsWith('data:')||src.startsWith('blob:'))continue;
+  let parsed;
+  try{parsed=new URL(src,SOURCE);}catch(ignore){continue;}
+  if(parsed.protocol!=='https:'||parsed.hostname!==base.hostname)continue;
+  if(!/\.(?:png|jpe?g|webp|gif)$/i.test(parsed.pathname)&&el.tagName?.toLowerCase()!=='img')continue;
+  const label=trimmed([el.getAttribute?.('alt'),el.getAttribute?.('title'),
+   el.getAttribute?.('aria-label'),el.parentElement?.textContent?.slice(0,120),
+   parsed.pathname].join(' '));
+  if(!/(?:船期|船班|船舶動態|sailing.?schedule|vessel.?schedule|ship.?schedule)/i.test(label))continue;
+  if(/(?:logo|favicon|avatar|icon|profile|banner)/i.test(parsed.pathname))continue;
+  const url=parsed.toString();
+  if(!seen.has(url)){seen.add(url);pictures.push({url,label:label.slice(0,100)});}
+  if(pictures.length>=8)break;
+ }
+ return pictures;
+}
+function diagnoseSource(doc){
+ const hasScripts=doc.querySelectorAll('script[src],script:not([src])').length>0;
+ const text=trimmed(doc.body?.textContent?.slice(0,350)||'');
+ if(/(?:login|sign in|登[入錄]|請先登入|驗證身分)/i.test(text))
+  return '來源網站可能要求萬海帳號登入；GAS 無法共用你在瀏覽器中的登入狀態。';
+ return hasScripts?'來源頁面沒有直接包含船期表格或圖片，可能要由 JavaScript 額外取得船期資料。':
+  '來源頁面沒有可辨識的船期表格或船期圖片。';
+}
+
 function render(){
  const host=$('p79DashVesselNotices');
  if(!host)return;
@@ -79,12 +111,18 @@ function render(){
       '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span>'+
       (r.state?'<span class="p79-wanhai-state">'+esc(r.state)+'</span>':'')+'</button>').join('')+
     '</div><div class="p79-schedule-footnote">靠泊碼頭及時間均來自萬海原站，未提供的欄位不推估。</div>';
+ }else if(status==='image'&&images.length){
+  host.innerHTML='<div class="p79-schedule-remote-caption">萬海船期圖像 · '+esc(lastRead)+' 讀取 · '+images.length+' 張</div>'+
+   '<div class="p79-schedule-image-preview" role="list">'+images.slice(0,2).map((pic,i)=>
+    '<button type="button" role="listitem" data-wanhai-image-index="'+i+'" aria-label="查看萬海船期圖片 '+(i+1)+'">'+
+    '<img loading="lazy" referrerpolicy="no-referrer" src="'+esc(pic.url)+'" alt="萬海網站船期公告圖片"></button>').join('')+'</div>'+
+   '<div class="p79-schedule-footnote">船期原站以圖片公布；點擊查看大圖，不顯示未經確認的文字船期。</div>';
  }else{
   const message=status==='idle'?'尚未讀取萬海網站船期':status==='empty'?
-   '萬海網站已回應，但未取得可辨識的船期表格。':
+   '來源已回應，但沒有取得實際船期內容。':
    status==='error'?'目前無法取得可辨識的萬海船期資料。':'尚無網站船期資料';
   host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(message)+'</strong>'+
-   '<small>'+esc(status==='error'?(statusMessage||'來源網站可能有限制，並不代表沒有船舶。'):statusMessage)+'</small>'+
+   '<small>'+esc(status==='error'?(statusMessage||'來源網站可能有限制，並不代表沒有船舶。'):(sourceDiagnosis||statusMessage))+'</small>'+
    '<div class="p79-schedule-remote-actions">'+link()+'</div></div>';
  }
 }
@@ -134,11 +172,13 @@ async function refresh(){
    if(seq!==requestSeq)return;
    const doc=new g.DOMParser().parseFromString(html,'text/html');
    rows=parseSailingTables(doc);
-   status=rows.length?'ok':'empty';
+   images=rows.length?[]:parseSailingImages(doc);
+   sourceDiagnosis=rows.length||images.length?'':diagnoseSource(doc);
+   status=rows.length?'ok':images.length?'image':'empty';
    lastRead=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
   }catch(error){
    if(seq!==requestSeq)return;
-   rows=[];status='error';
+   rows=[];images=[];status='error';sourceDiagnosis='';
    statusMessage=error?.name==='AbortError'?'網站查詢逾時':String(error?.message||error);
   }finally{
    g.clearTimeout(timeout);running=null;render();
@@ -171,6 +211,13 @@ function showDialog(index=-1){
    '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr><th>船名</th><th>航次</th><th>預計抵達</th><th>預計離開</th><th>靠泊碼頭</th><th>狀態</th></tr></thead><tbody>'+
    selected.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(r.voyage)+'</td><td>'+esc(r.eta||'未提供')+'</td><td>'+esc(r.etd||'未提供')+'</td><td>'+esc(r.berth||'未提供')+'</td><td>'+esc(r.state||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
    '<div class="p79-schedule-dialog-actions">'+(selected.length===1?'<button type="button" data-wanhai-all>查看全部 '+rows.length+' 筆</button>':'')+link('前往萬海原網站核對 ›')+'</div>';
+ }else if(status==='image'&&images.length){
+  const selected=Number.isInteger(index)&&index>=0&&index<images.length?[images[index]]:images;
+  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">以下為來源網站公布的船期圖片；圖片內文字未經自動辨識，請以萬海原站為準。</p>'+
+   '<div class="p79-schedule-images">'+selected.map(pic=>
+    '<img loading="lazy" referrerpolicy="no-referrer" src="'+esc(pic.url)+'" alt="萬海網站船期公告圖片">').join('')+'</div>'+
+   '<div class="p79-schedule-dialog-actions">'+(selected.length===1?'<button type="button" data-wanhai-all>查看全部船期圖片</button>':'')+
+    link('前往萬海原站核對 ›')+'</div>';
  }else{
   body.innerHTML='<p class="p79-schedule-dialog-disclaimer">來源網站若限制跨網站讀取或禁止嵌入，請直接按下方連結在原站查看。不會以歷史作業紀錄取代網站船期。</p>'+
     '<div class="p79-schedule-website-preview"><iframe title="萬海航運船期網站預覽" loading="lazy" referrerpolicy="no-referrer" src="'+SOURCE+'" sandbox="allow-forms allow-scripts allow-same-origin allow-popups"></iframe></div>'+
@@ -182,7 +229,7 @@ function init(){
  const host=$('p79DashVesselNotices');
  if(!host)return;
  $('p79ShipScheduleAll')?.addEventListener('click',()=>showDialog(-1));
- host.addEventListener('click',e=>{const row=e.target.closest('[data-wanhai-index]');if(row)showDialog(Number(row.dataset.wanhaiIndex));});
+ host.addEventListener('click',e=>{const row=e.target.closest('[data-wanhai-index]');if(row)showDialog(Number(row.dataset.wanhaiIndex));const img=e.target.closest('[data-wanhai-image-index]');if(img)showDialog(Number(img.dataset.wanhaiImageIndex));});
  $('p79DashRefresh')?.addEventListener('click',refresh);
  const systems=$('systems');
  if(!systems)return;
@@ -190,6 +237,6 @@ function init(){
  if(g.MutationObserver)new g.MutationObserver(check).observe(systems,{attributes:true,attributeFilter:['class']});
  check();
 }
-g.P79ExternalShipSchedule={render,refresh,parseSailingTables,source:SOURCE};
+g.P79ExternalShipSchedule={render,refresh,parseSailingTables,parseSailingImages,diagnoseSource,source:SOURCE};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
