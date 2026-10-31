@@ -1,11 +1,11 @@
-/* PORT79 V75 shared official Kaohsiung Port sailing board.
+/* PORT79 V76 shared public WAN HAI website sailing board.
    Public official data only; shown to EVERY employee on the login page and
    administrators in the dashboard. No private HR data or login tokens read.
    The server refreshes its Google Sheet snapshot automatically. The display
    refreshes only on initial visit or a deliberate user click. */
 (function(g){
 'use strict';
-const ACTION='publicShipSchedule',SOURCE='臺灣港務公司／高雄港進港預報次序';
+const ACTION='publicShipSchedule',SOURCE='萬海航運｜網站船期';
 const DASH_ID='p79DashVesselNotices',STAFF_ID='p79PublicShipBoard';
 const $=id=>g.document.getElementById(id);
 const str=v=>String(v??'').trim();
@@ -39,7 +39,7 @@ function timeLabel(){
 function line(r,i){
  return '<button class="p79-schedule-row p79-wanhai-row" type="button" data-public-ship-index="'+i+'" role="listitem">'+
  '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong>'+
- '<small class="p79-wanhai-voyage">'+esc(r.localName&&r.localName!==r.name?r.localName:'進出港航次：來源未提供')+'</small></span>'+
+ '<small class="p79-wanhai-voyage">'+esc((r.localName&&r.localName!==r.name?r.localName+' · ':'')+'進港 '+(r.inVoyage||'—')+'／出港 '+(r.outVoyage||'—'))+'</small></span>'+
  '<span class="p79-wanhai-detail"><span><small>ETA 抵港</small><b>'+esc(r.eta||'未提供')+'</b></span>'+
  '<span><small>ETB 靠泊</small><b>'+esc(r.etb||'未提供')+'</b></span>'+
  '<span><small>ETD 離港</small><b>'+esc(r.etd||'未提供')+'</b></span></span>'+
@@ -49,16 +49,16 @@ function renderOne(host){
  if(!host)return;
  host.className='p79-schedule-board p79-schedule-remote p79-public-sailing-board';
  if(state==='loading'){
-  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取高雄港官方船期…</strong><small>首次開啟及手動更新時讀取</small></div>';return;
+  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>首次開啟及手動更新時讀取</small></div>';return;
  }
  if(state==='ready'&&rows.length){
-  host.innerHTML='<div class="p79-schedule-remote-caption">高雄港進港預報 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
+  host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,host.id===STAFF_ID?3:4).map(line).join('')+'</div>'+
-    '<div class="p79-schedule-footnote">官方 ETA_DT 為預定靠泊（ETB），非抵港 ETA；航次如無資料不推估。'+(notice?'來源最近同步失敗，保留上次成功資料。':'')+'</div>';return;
+    '<div class="p79-schedule-footnote">ETA 抵港／ETB 靠泊／ETD 離港分開顯示，依萬海船期原始欄位。'+(notice?'來源最近同步失敗，保留上次成功資料。':'')+'</div>';return;
  }
- const headline=state==='error'?'目前無法取得官方船期':state==='ready'?'官方船期尚無資料':'尚未讀取官方船期';
+ const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?'萬海網站尚無船期資料':'尚未讀取萬海船期';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
-  '<small>'+esc(error||notice||'資料由臺灣港務公司提供，會自動同步到 PORT79 Google 船期表。')+'</small>'+
+  '<small>'+esc(error||notice||'資料來源為萬海航運船期網站，同步失敗不會使用港務公司資料。')+'</small>'+
   '<div class="p79-schedule-remote-actions"><button type="button" data-public-ship-retry>重新讀取</button></div></div>';
 }
 function render(){renderOne($(STAFF_ID));renderOne($(DASH_ID));}
@@ -80,7 +80,7 @@ function readJsonp(url){
    script.remove();try{delete g[callback];}catch(e){g[callback]=undefined;}
    if(err)reject(err);else resolve(data);
   };
-  const timer=g.setTimeout(()=>finish(Error('官方船期連線逾時；請檢查 GAS 是否已部署 V75')),25000);
+  const timer=g.setTimeout(()=>finish(Error('萬海船期連線逾時；請檢查 GAS 是否已部署 V76')),25000);
   g[callback]=data=>finish(null,data);
   script.async=true;script.referrerPolicy='no-referrer';
   script.onerror=()=>finish(Error('無法載入 GAS 船期；請確認正式部署版本與存取設定'));
@@ -98,8 +98,8 @@ async function refresh(){
   try{
    const data=await readJsonp(base);
    if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
-   if(data?.source!=='port79-official-port'||!Array.isArray(data.rows))
-    throw Error('目前 GAS 尚未部署 V75 官方船期讀取入口');
+   if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
+    throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
    rows=parseRows(data.rows);
    lastSync=Number(data.lastSync)||0;notice=str(data.error);
    state='ready';error='';
@@ -112,7 +112,7 @@ function ensureDialog(){
  if(dialog)return dialog;
  dialog=g.document.createElement('dialog');dialog.id='p79PublicShipScheduleDialog';
  dialog.innerHTML='<div class="p79-schedule-dialog-inner"><header class="p79-schedule-dialog-header">'+
-  '<div><h2>高雄港官方船期｜全員可看</h2><p>資料來源：臺灣港務公司高雄港進港預報；Google 表格自動同步。</p></div>'+
+  '<div><h2>萬海網站船期｜全員可看</h2><p>資料來源：萬海航運網站；不可混用港務公司資料。</p></div>'+
   '<button type="button" data-public-ship-close aria-label="關閉">✕</button></header>'+
   '<div id="p79PublicShipDialogBody"></div></div>';
  g.document.body.appendChild(dialog);
@@ -124,9 +124,9 @@ function showDialog(index=-1){
  if(!body)return;
  const showing=index>=0&&index<rows.length?[rows[index]]:rows;
  if(!showing.length){
-  body.innerHTML='<p>目前沒有可顯示的官方船期，請確認 GAS 已啟用同步。</p>';
+  body.innerHTML='<p>目前沒有可顯示的萬海船期，請確認 GAS 已啟用同步且來源有效。</p>';
  }else{
-  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'｜預定靠泊為 ETB，未公布的航次與 ETA 不推估。</p>'+
+  body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'｜ETA、ETB、ETD 依萬海原始欄位，不補造缺少資料。</p>'+
    '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
    ['英文船名','中文船名','進港航次','出港航次','ETA 抵港','ETB 靠泊','ETD 離港','靠泊碼頭','狀態'].map(h=>'<th>'+h+'</th>').join('')+
    '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name,r.localName,r.inVoyage,r.outVoyage,r.eta,r.etb,r.etd,r.berth,r.status].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
