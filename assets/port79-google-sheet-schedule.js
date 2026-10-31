@@ -59,7 +59,7 @@ function renderOne(host){
  const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?'萬海網站尚無船期資料':'尚未讀取萬海船期';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
   '<small>'+esc(error||notice||'資料來源為萬海航運船期網站，同步失敗不會使用港務公司資料。')+'</small>'+
-  '<div class="p79-schedule-remote-actions"><button type="button" data-public-ship-retry>重新讀取</button></div></div>';
+  '<div class="p79-schedule-remote-actions"><button type="button" data-public-ship-retry>重新讀取</button><a class="p79-schedule-external-link" href="https://khhtml.wanhai.com/web/SailingScheduleList" target="_blank" rel="noopener noreferrer">開啟萬海網站</a></div></div>';
 }
 function render(){renderOne($(STAFF_ID));renderOne($(DASH_ID));}
 function readJsonp(url){
@@ -124,7 +124,7 @@ function showDialog(index=-1){
  if(!body)return;
  const showing=index>=0&&index<rows.length?[rows[index]]:rows;
  if(!showing.length){
-  body.innerHTML='<p>目前沒有可顯示的萬海船期，請確認 GAS 已啟用同步且來源有效。</p>';
+  body.innerHTML='<p>目前沒有可顯示的萬海船期，請確認 GAS 已啟用同步且來源有效。</p><p><a href="https://khhtml.wanhai.com/web/SailingScheduleList" target="_blank" rel="noopener noreferrer">前往萬海航運網站查看原始船期</a></p>';
  }else{
   body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'｜ETA、ETB、ETD 依萬海原始欄位，不補造缺少資料。</p>'+
    '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
