@@ -4,12 +4,14 @@ const base=path.join(__dirname,'..'),html=fs.readFileSync(path.join(base,'index.
 const src=fs.readFileSync(path.join(base,'assets/port79-google-sheet-schedule.js'),'utf8');
 const ref=fs.readFileSync(path.join(base,'assets/port79-reference-dashboard.js'),'utf8');
 assert(html.includes('<b>自訂船期看板</b>'));
-assert(html.includes('port79-google-sheet-schedule.js?v=20261031-private-sheet-v1'));
+assert(html.includes('port79-google-sheet-schedule.js?v=20261031-shared-gas-read-v2'));
 assert(!html.includes('port79-external-ship-schedule.js?v='));
 assert(ref.includes('P79ManualShipSchedule?.render?.()'));
 assert(!ref.includes('P79ExternalShipSchedule?.render?.()'));
 assert(src.includes("const ACTION='wanHaiSailingSchedule'"));
 assert(src.includes("url.searchParams.set('gcToken',token)"));
+assert(src.includes("g.P79HistoryRead?.read"),'use the same GAS read transport as historical vessel and attendance data');
+assert(src.includes("data-manual-ship-retry"),'manual retry must be available on failure');
 assert(src.includes("$('p79DashRefresh')?.addEventListener('click',refresh)"));
 assert(!src.includes('setInterval('),'manual schedule must not poll');
 assert(!src.includes('khhtml.wanhai.com'),'Wan Hai site is not a data source');
