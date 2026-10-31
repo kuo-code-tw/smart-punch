@@ -8823,7 +8823,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         try{
                             const base=getActiveGasUrl();
                             const url=new URL(base);
-                            url.searchParams.set('action','getScheduleDataSecure');
+                            // Punch login may read ONLY this employee's roster, never the management snapshot.
+                            url.searchParams.set('action',punchMode?'getMyScheduleMonth':'getScheduleDataSecure');
                             url.searchParams.set('month',month);
                             url.searchParams.set('empId',empId);
                             url.searchParams.set('gcToken',value);
@@ -8841,7 +8842,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         data=await read(token);
                     }
                     if(data?.ok!==true||!Array.isArray(data.schedules))
-                        throw Error(data?.error||'雲端未回傳正式班表資料，請確認員工查詢權限');
+                        throw Error(data?.error||'雲端未回傳本人班表；請確認 GAS 已部署支援 getMyScheduleMonth 的版本');
+                    // A punch login must never accept another employee's schedule, even if
+                    // a backend regression accidentally returns a larger roster.
+                    if(punchMode && (data.action!=='getMyScheduleMonth' ||
+                        String(data.empId||'').trim().toUpperCase()!==empId ||
+                        data.schedules.length>1 ||
+                        data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId)))
+                        throw Error('本人班表回傳身分不符或 GAS 版本尚未更新，已停止顯示');
                     if(data.month&&normalizeScheduleMonthKey(data.month)!==month)
                         throw Error('雲端班表月份不一致，未套用舊月份資料');
                     if(!sameIdentity())throw Error('員工登入身分已變更，本次班表讀取已取消');
@@ -8870,7 +8878,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const display=/AbortError|aborted/i.test(String(error?.name||'')+' '+message)
                         ? '讀取逾時，請按「重新讀取班表」'
                         : /沒有權限|無權限|權限不足|禁止存取|HTTP 403|HTTP 401/i.test(message)
-                        ? '員工帳號尚未取得本人班表的雲端查閱權限，請管理員檢查 GAS 讀取權限'
+                        ? '本人班表讀取遭拒，請確認 GAS 的 getMyScheduleMonth 已部署（不需要排班管理權限）'
                         : message;
                     if(sameIdentity()&&(!monthInput||monthInput.dataset.requestedMonth===month)){
                         reportStatus('班表讀取失敗：'+display.slice(0,130),'error');
