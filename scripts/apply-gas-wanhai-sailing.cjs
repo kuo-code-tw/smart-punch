@@ -20,7 +20,7 @@ const header=/function doGet\(e\)\s*\{\s*const params=\(e&&e\.parameter\)\|\|\{\
 const matches=[...source.matchAll(header)];
 if(matches.length!==1)throw Error('Expected exactly one compatible live doGet route. Found '+matches.length+'; refused unsafe patch.');
 const anchor=matches[0][0];
-const route="\\n  if(action==='wanHaiSailingSchedule'){try{return jsonOutput(p79WanHaiSailingGet_(params));}catch(error){return jsonOutput({ok:false,action:'wanHaiSailingSchedule',error:String(error.message||error)});}}";
+const route="\n  if(action==='wanHaiSailingSchedule'){try{return jsonOutput(p79WanHaiSailingGet_(params));}catch(error){return jsonOutput({ok:false,action:'wanHaiSailingSchedule',error:String(error.message||error)});}}";
 const result=source.replace(anchor,anchor+route)+'\n\n'+moduleText;
 new vm.Script(result,{filename:outputFile});
 fs.writeFileSync(outputFile,result);
