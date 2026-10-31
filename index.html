@@ -274,7 +274,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
 }
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261030-single-monthly-v2">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261031-review-drilldown-v2">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -385,7 +385,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span id="p79DashPeopleLabel">今日出勤人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月累計出勤天數</span><strong id="p79DashPersonDays">—</strong><small>人日</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月申報加班工時</span><strong id="p79DashOvertimeHours">—</strong><small>小時</small></div></div>
-      <div class="p79d-kpi"><div class="p79d-kpi-icon">✓</div><div><span>本月打卡待核</span><strong id="p79DashAnomalies">—</strong><small>班次</small></div></div>
+      <button type="button" class="p79d-kpi p79d-kpi-review" id="p79DashPendingReviewTrigger" aria-haspopup="dialog" aria-label="點擊查看本月打卡待核的員工、日期及錯誤原因"><div class="p79d-kpi-icon" aria-hidden="true">!</div><div class="p79d-review-body"><span>本月打卡待核</span><strong id="p79DashAnomalies">—</strong><small>班次</small><div class="p79d-review-hint" id="p79DashReviewHint">點擊查看異常原因 ›</div></div><span class="p79d-review-arrow" aria-hidden="true">›</span></button>
     </div>
     <div class="p79d-panels p79d-attendance-panels">
       <article class="p79d-panel p79r-current-shift-card"><div class="p79d-panel-title"><b>目前班別人員</b><span id="p79CurrentShiftPeriod">依目前班別</span></div><div id="p79CurrentShiftList" class="p79r-current-shift-list" role="region" aria-label="目前班別人員名單" tabindex="0">正在讀取目前班別名單…</div><div hidden>
@@ -1564,7 +1564,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261030-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261030-leave-pages-v1"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261031-review-drilldown-v2"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261030-five-scroll-v4&leavePages=20261030-v1">
 <script src="./assets/port79-reference-dashboard.js?v=20261030-all-hatches-v1&leavePages=20261030-v1"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261031-week-sun-month-axis-v2"></script>
