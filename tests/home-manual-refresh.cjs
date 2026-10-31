@@ -19,5 +19,5 @@ assert(!monthly.includes("root.addEventListener('focus'"),'tab focus must not re
 assert(monthly.includes("$('p79DashRefresh')?.addEventListener('click',()=>"),'manual dashboard refresh remains available');
 assert(monthly.includes("if(!loadedKey){root.setTimeout(()=>load(false)"),'first login should still load the dashboard once');
 assert(monthly.includes('refreshPendingReviewFromCloud();'),'user-selected card must still load its actual details');
-assert(home.includes('port79-monthly-dashboard.js?v=20261031-home-manual-refresh-v1'),'bundle should not retain stale cache key');
+assert(home.includes('port79-monthly-dashboard.js?v=20261031-ship-schedule-board-v1'),'bundle should not retain stale cache key');
 console.log('PASS: homepage loads once, version/deployment checks run once, no periodic/focus refresh, manual updates and review details work');
