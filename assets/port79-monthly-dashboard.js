@@ -212,6 +212,16 @@ function permissions(){
 }
 function statusText(id,value){const e=$(id);if(e)e.textContent=value}
 function setMetric(id,value){statusText(id,value)}
+// 待核 KPI 僅依正式檢核結果變色。未知狀態不當作零筆，零筆不使用警示紅。
+function setPendingReviewVisualState(state){
+ const card=$('p79DashPendingReviewTrigger')||$('p79DashAnomalies')?.closest('.p79d-kpi');
+ if(!card)return;
+ const kind=['clear','pending','unverified'].includes(state)?state:'unverified';
+ card.dataset.reviewState=kind;
+ const icon=card.querySelector('.p79d-kpi-icon');
+ if(icon)icon.textContent=kind==='clear'?'✓':kind==='pending'?'!':'?';
+ card.setAttribute('aria-label',kind==='clear'?'本月沒有待核班次，點擊查看核對明細':kind==='pending'?'本月有打卡待核班次，點擊查看異常明細':'本月待核資料尚未核對完成，點擊查看明細');
+}
 function options(){return new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long'}).format(new Date((month()||isoMonth())+'-01T00:00:00'))}
 function month(){return $('p79DashMonth')?.value||isoMonth()}
 function selectedMonthTitle(){const [y,m]=(month()||isoMonth()).split('-');return y+'年'+Number(m)+'月'}
@@ -305,6 +315,7 @@ function openPendingReview(){
  // 未完成即時核對以前，不再先展示可能過期的快取異常名單。
  pendingReviewItems=null;pendingReviewSelection=-1;pendingReviewError='';pendingReviewVerifiedAt='';
  setMetric('p79DashAnomalies','—');
+ setPendingReviewVisualState('unverified');
  statusText('p79DashReviewHint','正在核對雲端正式考勤…');
  renderPendingReview();if(!pendingReviewDialog.open)pendingReviewDialog.showModal();
  refreshPendingReviewFromCloud();
@@ -363,6 +374,7 @@ function enrichPendingReview(data){
 }
 // 首頁停留與切回視窗時，不自動刷新待核資料；點待核卡或手動更新才重讀雲端。
 function showAttendance(a){
+ setPendingReviewVisualState(a.boundaryError||!Number.isFinite(a.pendingShifts)?'unverified':a.pendingShifts===0?'clear':'pending');
  pendingReviewItems=a.pendingDetails;pendingReviewMonth=month();pendingReviewSelection=Array.isArray(a.pendingDetails)&&a.pendingDetails.length?0:-1;lastPendingReadAt=Date.now();
  statusText('p79DashReviewHint',a.boundaryError?'正式資料核對未完成 ›':a.pendingShifts===null?'資料尚未載入':a.pendingShifts>0?'點擊查看 '+a.pendingShifts+' 筆異常原因 ›':'已核對：無待核班次 ›');
  setMetric('p79DashAttendancePeople',fmt(a.peopleCount));
@@ -381,6 +393,7 @@ function showAttendance(a){
  if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ setPendingReviewVisualState('unverified');
  pendingReviewItems=null;pendingReviewMonth='';pendingReviewSelection=-1;pendingReviewError='';pendingReviewVerifiedAt='';if(pendingReviewDialog?.open)pendingReviewDialog.close();
  statusText('p79DashReviewHint','點擊查看異常原因 ›');
  for(const id of ['p79DashOvertimeHours','p79DashAnomalies','p79DashWorkHours','p79DashShipCount','p79DashMoves','p79DashContainers','p79DashGph','p79DashAttendancePeople','p79DashPunchRecords','p79DashPersonDays','p79DashPunchIns','p79DashDonutRate'])setMetric(id,'—');
