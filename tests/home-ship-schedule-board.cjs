@@ -1,46 +1,40 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const model=require('../assets/port79-monthly-dashboard.js');
-const input=[
- {workingNo:'A',shipName:'即將到港',voyageE:'V123',eta:'2026-11-02 09:30',etd:'2026-11-03 18:00',wharf:'79號碼頭',status:'預定'},
- {workingNo:'B',shipName:'有作業資料',voyageI:'V789',firstDate:'2026-10-14',lastDate:'2026-10-15'},
- {workingNo:'C',shipName:'未提供船期'},
- {workingNo:'D',shipName:'已刪除',eta:'2026-11-01',deleted:true},
- {workingNo:'E',shipName:'無效日期',eta:'2026-02-30'},
- {workingNo:'F',shipName:'有預計離港',etd:'2026/11/04 21:05'}
-];
-const before=JSON.stringify(input),rows=model.shipScheduleRows(input,'2026-10-31');
-assert.equal(JSON.stringify(input),before,'display model must never mutate source masters');
-assert.equal(rows.length,5,'deleted masters cannot appear in the ship board');
-assert.equal(rows[0].name,'即將到港','earliest upcoming ETA should be first');
-assert.equal(rows[0].dateLabel,'預計抵港');
-assert.equal(rows[0].eta,'2026-11-02 09:30');
-assert.equal(rows[0].etd,'2026-11-03 18:00');
-assert.equal(rows[0].wharf,'79號碼頭');
-assert.equal(rows[1].dateLabel,'預計離港');
-assert.equal(rows[1].etd,'2026-11-04 21:05');
-const work=rows.find(x=>x.name==='有作業資料');
-assert.equal(work.eta,'','actual work date must not masquerade as ETA');
-assert.equal(work.etd,'','actual work date must not masquerade as ETD');
-assert.equal(work.dateLabel,'作業首日');
-assert.equal(work.workEnd,'2026-10-15');
-assert.equal(rows.find(x=>x.name==='無效日期').eta,'','invalid ETA must not display');
-assert.equal(rows.find(x=>x.name==='未提供船期').dateLabel,'日期未提供','unknown times must remain unknown');
-const report=model.analyzeVessels({shipMasters:input,records:[]});
-assert.equal(report.scheduleRows.length,5,'same loaded monthly ship masters should drive the board');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
-const view=fs.readFileSync(path.join(__dirname,'../assets/port79-reference-dashboard.js'),'utf8');
-const css=fs.readFileSync(path.join(__dirname,'../assets/port79-reference-dashboard.css'),'utf8');
-assert(html.includes('<b>船期看板</b>'));
-assert(html.includes('id="p79ShipScheduleAll"'));
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const view=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.js'),'utf8');
+const external=fs.readFileSync(path.join(root,'assets/port79-external-ship-schedule.js'),'utf8');
+const styles=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
+assert(html.includes('<b>萬海網站船期</b>'),'label must describe original third-party source');
+assert(html.includes('id="p79ShipScheduleAll"'),'full-site and full-list button stays available');
+assert(html.includes('port79-external-ship-schedule.js?v=20261031-wanhai-external-v1'),'external adapter must be loaded');
 assert(!html.includes('船舶作業重點提醒'));
-assert(html.includes('port79-reference-dashboard.js?v=20261031-ship-schedule-board-v1'));
-assert(html.includes('port79-monthly-dashboard.js?v=20261031-ship-schedule-board-v1'));
-assert(view.includes('renderShipSchedule(v,ym)'),'board must be rendered from the existing monthly snapshot');
-assert(view.includes('function openShipSchedule(index=-1)'),'click opens the full-list modal');
-assert(view.includes("['船名','航次','碼頭','預計抵港 ETA','預計離港 ETD','作業首日','作業末日','狀態']"));
-assert(!view.includes('setInterval(')&&!view.includes('fetch('),'board must not add automatic data fetching');
-assert(view.includes('esc(s.name)')&&view.includes('esc(r.name)'),'user-provided ship names must be escaped');
-assert(css.includes('#p79ShipScheduleDialog')&&css.includes('.p79-schedule-row'),'board and dialog styles exist');
-new vm.Script(view);
-console.log('PASS: actual ETA/ETD versus recorded work dates, month snapshot, missing/invalid/deleted cases, safe clickable board, no automatic refresh');
+assert(!view.includes('renderShipSchedule(v,ym)'),'historical vessel rows must not replace outside website data');
+assert(!view.includes('function openShipSchedule('),'retired private source dialog must not open');
+assert(view.includes('g.P79ExternalShipSchedule?.render?.()'),'external timetable should control its own view');
+assert(external.includes("https://khhtml.wanhai.com/web/SailingScheduleList"),'source must be user provided Wan Hai URL');
+assert(external.includes("mode:'cors'"),'normal browser CORS, not an invented same-origin proxy');
+assert(external.includes("status='error'"),'errors must be surfaced instead of invented data');
+assert(external.includes('於萬海原網站查看完整船期'),'source-site fallback must always be available');
+assert(!external.includes('setInterval('),'no automatic polling on homepage');
+assert(external.includes("p79DashRefresh")&&external.includes('addEventListener(\'click\',refresh)'),'manual button should refresh the external source');
+assert(styles.includes('#p79WanHaiScheduleDialog')&&styles.includes('.p79-schedule-remote-msg'));
+new vm.Script(view);new vm.Script(external);
+const website={document:{readyState:'loading',addEventListener(){}},setTimeout(){},clearTimeout(){}};
+vm.runInNewContext(external,{window:website,console,Intl,Date,Number,Map,Set});
+const {parseSailingTables}=website.P79ExternalShipSchedule;
+const cell=t=>({textContent:t});
+const table={querySelectorAll:selector=>selector==='tr'?[
+ {querySelectorAll:()=>[cell('船名'),cell('航次'),cell('預計抵港 ETA'),cell('預計離港 ETD'),cell('碼頭'),cell('狀態')]},
+ {querySelectorAll:()=>[cell('WAN HAI 376'),cell('N036'),cell('2026-11-01 10:00'),cell('2026-11-01 18:00'),cell('79'),cell('預定')]},
+ {querySelectorAll:()=>[cell('WAN HAI 376'),cell('N036'),cell('2026-11-01 10:00'),cell('2026-11-01 18:00'),cell('79'),cell('預定')]},
+ {querySelectorAll:()=>[cell('<script>alert(1)</script>'),cell('S001'),cell(''),cell(''),cell(''),cell('待補')]},
+ ]:[]};
+const rows=parseSailingTables({querySelectorAll:()=>[table]});
+assert.equal(rows.length,2,'same vessel/voyage/time cannot be duplicated');
+assert.equal(rows[0].name,'WAN HAI 376');assert.equal(rows[0].eta,'2026-11-01 10:00');
+assert.equal(rows[0].etd,'2026-11-01 18:00');assert.equal(rows[0].berth,'79');
+assert.equal(rows[1].name,'<script>alert(1)</script>','source strings must remain literal until escaped by UI');
+const unknown=parseSailingTables({querySelectorAll:()=>[{querySelectorAll:()=>[]} ]});
+assert.equal(unknown.length,0,'unknown dynamic website markup must never invent a schedule');
+console.log('PASS: homepage Wan Hai public-site source, data parsed only when identifiable, CORS fallback, manual refresh, no historical-data substitution');
