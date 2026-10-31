@@ -8786,18 +8786,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 reportStatus('員工身分或班表月份不正確，無法查詢。','error');
                 return false;
             }
-            // Punch-only identities may read only their authenticated employee id.
-            // This does not replace server-side authorization; GAS must enforce it too.
-            const punchMode=p79IsPunchEntryMode();
-            if(punchMode){
-                let session=null;
-                try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
-                if(!session||String(session.empId||'').trim().toUpperCase()!==empId||
-                    String(session.adminRole||'').toLowerCase()!=='employee'){
-                    reportStatus('目前打卡登入身分與班表工號不一致，請從首頁使用本人帳號重新登入。','error');
-                    return false;
-                }
+            // My Schedule is ALWAYS an employee-scoped endpoint, irrespective of
+            // a previously remembered manage/punch navigation mode. The server
+            // identifies the employee from the signed token, never from this input.
+            let employeeSession=null;
+            try{employeeSession=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
+            const sessionEmpId=String(employeeSession?.empId||'').trim().toUpperCase();
+            if(!sessionEmpId||sessionEmpId!==empId){
+                reportStatus('登入帳號與本人班表工號不一致，請從首頁使用自己的考勤帳號重新登入。','error');
+                return false;
             }
+            const canRenewPunch=String(employeeSession.adminRole||'').toLowerCase()==='employee';
             const key=empId+'|'+month;
             const monthInput=document.getElementById('empScheduleMonthSelect');
             if(monthInput)monthInput.dataset.requestedMonth=month;
@@ -8812,19 +8811,27 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             reportStatus('正在讀取 '+month+' 的正式班表…');
             if(refreshButton)refreshButton.disabled=true;
             const job=(async()=>{
-                let token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
-                const sameIdentity=()=>String(currentEmp?.empId||'').trim().toUpperCase()===empId &&
-                    (!punchMode||p79IsPunchEntryMode());
+                // The signed-in employee's own token takes precedence over a stale
+                // URL hash/admin navigation token from a previous session.
+                let token=String(sessionStorage.getItem('port79_user_token')||
+                    employeeSession.userToken||employeeSession.gcToken||
+                    currentPort79SsoToken()||getAttendanceEmployeeMasterToken()||'').trim();
+                const sameIdentity=()=>{
+                    let active=null;
+                    try{active=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
+                    return String(currentEmp?.empId||'').trim().toUpperCase()===empId &&
+                        String(active?.empId||'').trim().toUpperCase()===empId;
+                };
                 try{
-                    if(!token&&punchMode)token=await p79MobileRenewPunchSession(emp);
+                    if(!token&&canRenewPunch)token=await p79MobileRenewPunchSession(emp);
                     if(!token)throw Error('尚未取得有效的員工登入憑證，請重新登入');
                     const read=async(value)=>{
                         const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);
                         try{
                             const base=getActiveGasUrl();
                             const url=new URL(base);
-                            // Punch login may read ONLY this employee's roster, never the management snapshot.
-                            url.searchParams.set('action',punchMode?'getMyScheduleMonth':'getScheduleDataSecure');
+                            // Never call the company-wide management endpoint from My Schedule.
+                            url.searchParams.set('action','getMyScheduleMonth');
                             url.searchParams.set('month',month);
                             url.searchParams.set('empId',empId);
                             url.searchParams.set('gcToken',value);
@@ -8837,19 +8844,19 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     };
                     let data=await read(token);
                     const authError=/登入驗證|Token.*逾時|登入.*逾時|身分.*失效/i;
-                    if(punchMode&&data?.ok===false&&authError.test(String(data.error||''))){
+                    if(canRenewPunch&&data?.ok===false&&authError.test(String(data.error||''))){
                         token=await p79MobileRenewPunchSession(emp);
                         data=await read(token);
                     }
                     if(data?.ok!==true||!Array.isArray(data.schedules))
                         throw Error(data?.error||'雲端未回傳本人班表；請確認 GAS 已部署支援 getMyScheduleMonth 的版本');
-                    // A punch login must never accept another employee's schedule, even if
-                    // a backend regression accidentally returns a larger roster.
-                    if(punchMode && (data.action!=='getMyScheduleMonth' ||
+                    // Everyone, including administrators in their personal view,
+                    // may receive only the exact authenticated employee's one row.
+                    if(data.action!=='getMyScheduleMonth' ||
                         String(data.empId||'').trim().toUpperCase()!==empId ||
                         data.schedules.length>1 ||
-                        data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId)))
-                        throw Error('本人班表回傳身分不符或 GAS 版本尚未更新，已停止顯示');
+                        data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId))
+                        throw Error('GAS 未回傳正確的本人專用班表；請更新 GAS 並確認登入工號，沒有必要開啟管理員權限');
                     if(data.month&&normalizeScheduleMonthKey(data.month)!==month)
                         throw Error('雲端班表月份不一致，未套用舊月份資料');
                     if(!sameIdentity())throw Error('員工登入身分已變更，本次班表讀取已取消');
@@ -8882,7 +8889,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const display=/AbortError|aborted/i.test(String(error?.name||'')+' '+message)
                         ? '讀取逾時，請按「重新讀取班表」'
                         : /沒有權限|無權限|權限不足|禁止存取|HTTP 403|HTTP 401/i.test(message)
-                        ? '本人班表讀取遭拒，請確認 GAS 的 getMyScheduleMonth 已部署（不需要排班管理權限）'
+                        ? '本人班表讀取遭拒：請更新 GAS 的 getMyScheduleMonth 接口，員工不必設定管理員權限'
                         : message;
                     if(sameIdentity()&&(!monthInput||monthInput.dataset.requestedMonth===month)){
                         reportStatus('班表讀取失敗：'+display.slice(0,130),'error');
@@ -8911,11 +8918,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 String(row?.empId||'').trim().toUpperCase()===empId &&
                 normalizeScheduleMonthKey(row?.month)===nextMonth))return true;
             const task=(async()=>{
-                const token=currentPort79SsoToken()||getAttendanceEmployeeMasterToken();
+                let session=null;
+                try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(_){}
+                if(String(session?.empId||'').trim().toUpperCase()!==empId)return false;
+                const token=String(sessionStorage.getItem('port79_user_token')||
+                    session.userToken||session.gcToken||currentPort79SsoToken()||'').trim();
                 if(!token)return false;
-                const punchMode=p79IsPunchEntryMode();
                 const url=new URL(getActiveGasUrl());
-                url.searchParams.set('action',punchMode?'getMyScheduleMonth':'getScheduleDataSecure');
+                url.searchParams.set('action','getMyScheduleMonth');
                 url.searchParams.set('month',nextMonth);
                 url.searchParams.set('empId',empId);
                 url.searchParams.set('gcToken',token);
@@ -8930,10 +8940,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }finally{clearTimeout(timer);}
                 if(data?.ok!==true||!Array.isArray(data.schedules)||
                     data.month&&normalizeScheduleMonthKey(data.month)!==nextMonth)return false;
-                if(punchMode&&(data.action!=='getMyScheduleMonth'||
+                if(data.action!=='getMyScheduleMonth'||
                     String(data.empId||'').trim().toUpperCase()!==empId||
                     data.schedules.length>1||
-                    data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId)))return false;
+                    data.schedules.some(row=>String(row?.empId||'').trim().toUpperCase()!==empId))return false;
                 if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId||
                     currentPort79SsoToken()!==token)return false;
                 const own=data.schedules.filter(row=>
