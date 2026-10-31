@@ -30,6 +30,25 @@ function findRelevant(path,body){
   while((m=rg.exec(text))){try{let u=new URL(m[1],url);if(u.origin===origin&&!discovered.includes(u.pathname))discovered.push(u.pathname)}catch{}}
  }
  console.log('[SCRIPT_PATHS]',JSON.stringify(discovered).slice(0,14000));
+ const versionResponse=await get('/version.php');
+ const version=versionResponse.text.trim();
+ console.log('[WANHAI_VERSION]',JSON.stringify(version.slice(0,100)));
+ if(/^[a-zA-Z0-9._-]{1,50}$/.test(version)){
+  const endpoint='/api/'+version+'/CM/Eways_GetVesselSchedule';
+  const controller=new AbortController(),stop=setTimeout(()=>controller.abort(),14000);
+  try{
+   const res=await fetch(new URL(endpoint,origin),{
+    method:'POST',redirect:'follow',signal:controller.signal,
+    headers:{'Content-Type':'application/json','Accept':'application/json,text/plain,*/*'},
+    body:JSON.stringify({SearchTarget:'Home',page:1,limit:99,type:'page'})
+   });
+   const raw=(await res.text()).slice(0,320000);
+   let data=null;try{data=JSON.parse(raw)}catch{}
+   const arr=data?.DataList||data?.data?.DataList||data?.data||[];
+   console.log('[LIVE_WANHAI_POST]',JSON.stringify({path:endpoint,status:res.status,contentType:res.headers.get('content-type'),isJson:!!data,okFlag:data?.status,rows:Array.isArray(arr)?arr.length:null,total:data?.count,first:Array.isArray(arr)?arr.slice(0,2).map(o=>({VesselEName:o.VesselEName,VesselName:o.VesselName,InVoyage:o.InVoyage,OutVoyage:o.OutVoyage,ETA:o.ETA,ETB:o.ETB,ETD:o.ETD,Berth:o.Berth})):null,preview:data?null:raw.slice(0,170)}));
+  }catch(err){console.log('[LIVE_WANHAI_POST_ERR]',String(err?.message||err).slice(0,210))}
+  finally{clearTimeout(stop)}
+ }
  for(const path of discovered.slice(0,24)){
   const r=await get(path);findRelevant(path,r.text);
   if(path.includes('main-')){
