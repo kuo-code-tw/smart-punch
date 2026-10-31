@@ -72,7 +72,7 @@ function vessels(v){
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  peopleReport=v;renderPeople();
- g.P79ExternalShipSchedule?.render?.();
+ g.P79ManualShipSchedule?.render?.();
  if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent=fmt(v.count);
  if($('p79rHeroMonth'))$('p79rHeroMonth').textContent=Number(ym.slice(5))+' 月作業船舶';
 }
@@ -124,7 +124,7 @@ function init(){
  d.querySelectorAll('.p79d-panel-title>b').forEach(e=>{e.textContent=e.textContent.replace(/^[▤▥◉]\s*/, '');e.insertAdjacentHTML('afterbegin','<span class="p79r-panel-mark">↥</span>')});
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
-function reset(){attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ExternalShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+function reset(){attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ManualShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
 g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setLeaveReport};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
