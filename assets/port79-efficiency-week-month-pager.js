@@ -107,19 +107,24 @@ function draw(p,report){
  if(summaryEl)summaryEl.textContent=report.average===null?'此期間沒有有效 GPH 資料':'期間加權效率 '+report.average.toFixed(2)+' GPH · 有效 '+report.valid+' 天';
  if(!report.valid){chartEl.innerHTML='<div class="p79r-empty">這個期間沒有可核對的船舶效率資料</div>';return;}
  var w=480,h=190,left=35,right=16,top=26,bottom=31,pw=w-left-right,ph=h-top-bottom;
- var max=Math.max(5,...days.map(v=>v.gph||0)),ceiling=Math.ceil(max/5)*5;
+ // 左側 GPH 刻度：一般週期固定顯示 15、20、25、30；
+ // 若實際效率超出這個範圍，按每 5 GPH 自動延伸，避免折線被截斷。
+ var validValues=days.filter(v=>Number.isFinite(v.gph)).map(v=>v.gph);
+ var floor=Math.max(0,Math.min(15,Math.floor(Math.min(...validValues)/5)*5));
+ var ceiling=Math.max(30,Math.ceil(Math.max(...validValues)/5)*5);
+ var range=ceiling-floor;
  var gap=pw/days.length,grid='',texts='',segments=[],part=[];
  var escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- for(var tick=0;tick<=4;tick++){
-  var y0=top+ph-tick*ph/4;
-  grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y0+4)+'" text-anchor="end">'+(ceiling*tick/4).toFixed(1)+'</text>';
+ for(var tick=floor;tick<=ceiling;tick+=5){
+  var y0=top+ph-(tick-floor)/range*ph;
+  grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y0+4)+'" text-anchor="end">'+tick+'</text>';
  }
  for(var i=0;i<days.length;i++){
   var x=left+gap*(i+.5),row=days[i],label=Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2));
   if(mode==='week'||i===0||i===days.length-1||(i+1)%5===0)
    texts+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+label+'</text>';
   if(row.gph===null){if(part.length)segments.push(part);part=[];continue;}
-  var y=top+ph-row.gph/ceiling*ph;part.push([x,y]);
+  var y=top+ph-(row.gph-floor)/range*ph;part.push([x,y]);
   texts+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
   if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
  }
