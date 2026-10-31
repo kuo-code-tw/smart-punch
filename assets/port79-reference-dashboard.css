@@ -732,3 +732,25 @@ html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard)
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-detail button{background:#2367a8!important;color:#fff!important;border:1px solid #5b9dd3!important}
 html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79PendingReviewDialog .p79-review-empty{color:#cadcf0!important}
 }
+
+/* PORT79 2026-10-31: fix unreadable berth boxes in dark official ship schedule. */
+@media screen {
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-remote-caption{color:#badafa!important;font-size:11px!important;line-height:1.5!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-list{scrollbar-color:#829fba #182e48!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-row.p79-wanhai-row{background:#203b58!important;color:#eff8ff!important;border:1px solid #526f8a!important;border-radius:8px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-row.p79-wanhai-row:hover{background:#2b4c69!important;border-color:#83add0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-row.p79-wanhai-row:focus-visible{outline:2px solid #b7e0ff!important;outline-offset:-2px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-top .p79-wanhai-name{color:#f6faff!important;font-size:12px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-top .p79-wanhai-voyage{color:#bdd6ee!important;font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-detail :is(small,span){color:#c9e0f6!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-detail b{color:#f0f8ff!important;font-size:10px!important;font-weight:850!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-berth{background:#2a4a68!important;color:#f6fbff!important;border:1px solid #6e91b0!important;box-shadow:none!important;min-width:0!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-berth small{color:#c7e4ff!important;font-size:10px!important;opacity:1!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-berth strong{color:#ffffff!important;font-size:11px!important;font-weight:850!important;opacity:1!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-wanhai-state{color:#d7ecff!important;font-size:10px!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-footnote{color:#bbd5ec!important;font-size:10px!important;line-height:1.5!important}
+html[data-theme="dark"] body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashVesselNotices .p79-schedule-remote-msg :is(strong,small){color:#e1f0ff!important}
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-berth{background:#294863!important;color:#f2f8ff!important;border:1px solid #6389a7!important;border-radius:6px!important;padding:5px 8px!important}
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-berth small{color:#c8e0f9!important}
+html[data-theme="dark"] #p79PublicShipBoard .p79-wanhai-berth strong{color:#ffffff!important}
+}
