@@ -8,7 +8,7 @@ assert(html.includes('id="p79EmployeeShipSection"'),'employee-view section must 
 assert(html.includes('id="p79PublicShipBoard"'),'public employee ship board must exist');
 assert(html.indexOf('id="p79PublicShipBoard"')<html.indexOf('id="systems"'),'employees see the ship board before management login');
 assert(html.includes('萬海網站船期（全員可看）'));
-assert(html.includes('port79-google-sheet-schedule.js?v=20261031-wanhai-staff-v76b'));
+assert(html.includes('port79-google-sheet-schedule.js?v=20261031-wanhai-fulltime-v79'));
 assert(!html.includes('port79-external-ship-schedule.js?v='));
 assert(src.includes("const ACTION='publicShipSchedule'"));
 assert(src.includes('g.document.head.appendChild(script)'),'cross-domain GAS script output works without fetch CORS');
@@ -21,5 +21,13 @@ assert(!src.includes('setInterval('),'front end must remain manual updates only'
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
+assert(html.includes('port79-reference-dashboard.css?v=20261031-wanhai-fulltime-equalheight-v9'),'cache bust updated CSS');
+assert(src.includes('function shipTimeMarkup(value)'),'timestamp must be split into visible date and time');
+assert(src.includes('shipTimeMarkup(r.eta)')&&src.includes('shipTimeMarkup(r.etb)')&&src.includes('shipTimeMarkup(r.etd)'),'all ETA ETB ETD timestamps rendered fully');
+assert(styles.includes('equal-height vessel cards + full WAN HAI date/time'),'common vessel panel heights included');
+assert(styles.includes('grid-auto-rows:620px!important;'),'desktop vessel panel grid uses equal-height rows');
+assert(styles.includes('height:620px!important;min-height:620px!important;max-height:620px!important;'),'all three ship panels use same height');
+assert(styles.includes('.p79-wanhai-date')&&styles.includes('.p79-wanhai-clock'),'date and time are separate lines');
+assert(styles.includes('text-overflow:clip!important;'),'timestamps must never be ellipsized');
 new vm.Script(src);
 console.log('PASS: WAN HAI ship board visible to all employees; anonymous public-only reads; admin dashboard; manual refresh; dark mode.');
