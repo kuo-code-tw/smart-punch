@@ -37,17 +37,28 @@ function decorateNav(){
   a.dataset.p79Decorated='1';
  });
 }
+function homeNavAllowed(key,source){
+ const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
+ if(key==='history')return !!source&&!source.hidden&&!source.disabled&&source.style.display!=='none';
+ if(role==='superadmin'&&!s.punchOnly)return true;
+ if(role==='employee'||s.punchOnly)return false;
+ return ['view','manage'].includes(String(s.systemPermissions?.[key]||'').toLowerCase());
+}
 function buildHomeNav(){
  const nav=d.createElement('nav');nav.id='p79SevenNav';nav.setAttribute('aria-label','系統模組');
  const ids={attendance:'cardAttendance',schedule:'cardSchedule',leave:'cardLeave',hr:'cardHr',workhours:'cardWorkhours',efficiency:'cardEfficiency',history:'cardHistory'};
  order.forEach(key=>{
-  const source=d.getElementById(ids[key]);
-  // Reuse the original home card's permission state and navigation action.
-  if(!source||source.hidden||source.disabled||source.style.display==='none')return;
+  const source=d.getElementById(ids[key]),allowed=homeNavAllowed(key,source);
   const a=d.createElement('a');a.href='./'+paths[key];
   a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
   a.dataset.p79Decorated='1';
-  a.addEventListener('click',e=>{e.preventDefault();source.click();});
+  if(!allowed){a.setAttribute('aria-disabled','true');a.title='此帳號尚無此系統權限';a.style.opacity='0.55';}
+  a.addEventListener('click',e=>{
+   e.preventDefault();
+   if(!homeNavAllowed(key,source))return;
+   if(key==='history'){source.click();return;}
+   if(typeof window.launchSystem==='function')window.launchSystem(key);
+  });
   nav.append(a);
  });
  return nav;
@@ -98,6 +109,6 @@ function openSearch(){if(!enabled())return;let dialog=d.getElementById('p79Works
 function syncHomePermissions(){const signature=JSON.stringify([...d.querySelectorAll('#systems .system-card')].map(x=>[x.id,x.hidden,x.disabled,x.style.display]));if(signature===homePermissionSignature)return;homePermissionSignature=signature;const old=shell.querySelector('#p79SevenNav'),nav=buildHomeNav();navObserver?.disconnect();old.replaceWith(nav);decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});const ids={attendance:'cardAttendance',schedule:'cardSchedule',workhours:'cardWorkhours',efficiency:'cardEfficiency',hr:'cardHr',history:'cardHistory'};const quick=d.querySelector('.p79-quick-grid');if(quick){quick.replaceChildren();Object.entries(ids).forEach(([k,id])=>{const source=d.getElementById(id);if(!source||source.hidden||source.disabled||source.style.display==='none')return;quick.append(button(meta[k][0],'p79-quick-link',icon(k)+'<span>'+meta[k][0]+'</span>',()=>source.click()));});}}
 function sync(){frame=0;const on=enabled();d.body.classList.toggle('p79-workspace',!!on);if(!on){d.body.classList.remove('p79-nav-open','p79-nav-collapsed');d.getElementById('p79WorkspaceSearch')?.close();return;}if(!shell&&!buildShell())return;if(home)syncHomePermissions();updateAccount();}
 function queue(){if(!frame)frame=requestAnimationFrame(sync);}
-function start(){sync();const target=home?d.getElementById('systems'):d.documentElement;if(target)new MutationObserver(queue).observe(target,{attributes:true,attributeFilter:['class']});d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&enabled()){e.preventDefault();openSearch();}if(e.key==='Escape')d.body.classList.remove('p79-nav-open');});window.addEventListener('resize',()=>{if(!matchMedia('(max-width: 900px)').matches)d.body.classList.remove('p79-nav-open');});if(!home&&!shell){const ob=new MutationObserver(()=>{if(d.getElementById('p79SevenTop')){ob.disconnect();queue();}});ob.observe(d.body,{childList:true});}}
+function start(){sync();const target=home?d.getElementById('systems'):d.documentElement;if(target)new MutationObserver(queue).observe(target,{attributes:true,attributeFilter:['class']});if(home&&target){const observer=new MutationObserver(queue);target.querySelectorAll('.system-card').forEach(card=>observer.observe(card,{attributes:true,attributeFilter:['hidden','disabled','style']}));}d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&enabled()){e.preventDefault();openSearch();}if(e.key==='Escape')d.body.classList.remove('p79-nav-open');});window.addEventListener('resize',()=>{if(!matchMedia('(max-width: 900px)').matches)d.body.classList.remove('p79-nav-open');});if(!home&&!shell){const ob=new MutationObserver(()=>{if(d.getElementById('p79SevenTop')){ob.disconnect();queue();}});ob.observe(d.body,{childList:true});}}
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
