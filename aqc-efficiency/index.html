@@ -3572,6 +3572,35 @@ function dashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMove
 function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves){
   const host=document.getElementById('dashboardQuantityReconciliation');
   if(!host)return;
+  // Year-to-date totals must be visibly distinguishable from a single month.
+  // This is a read-only reconciliation: never rewrite WORKING REPORT / ship data.
+  if(!month&&!dashboardDateRange().active){
+    const year=getPort79Year(),byMonth=new Map();
+    const selected=(jobs||[]).filter(job=>{
+      const d=String(job?.compareDate||job?.lastDate||job?.firstDate||'').slice(0,7);
+      return /^20\d{2}-(0[1-9]|1[0-2])$/.test(d)&&d.startsWith(year+'-');
+    });
+    for(const job of selected){
+      const m=String(job.compareDate||job.lastDate||job.firstDate).slice(0,7);
+      const prior=byMonth.get(m)||{count:0,bill:0,shift:0};
+      prior.count++;prior.bill+=num(job.totalContainers);prior.shift+=num(job.shiftMoves);
+      byMonth.set(m,prior);
+    }
+    const sumMoves=selected.reduce((sum,x)=>sum+num(x.totalContainers)+num(x.shiftMoves),0);
+    const diff=round(num(staffMoves)-sumMoves,2);
+    const escCell=s=>esc(String(s));
+    const rows=[...byMonth].sort(([a],[b])=>a.localeCompare(b)).map(([m,x])=>
+      `<tr class="border-t border-slate-100"><td class="p-2">${escCell(m)}</td><td class="p-2 text-right">${x.count}</td><td class="p-2 text-right">${round(x.bill,2)}</td><td class="p-2 text-right">${round(x.shift,2)}</td><td class="p-2 text-right font-bold">${round(x.bill+x.shift,2)}</td></tr>`).join('');
+    host.classList.remove('hidden');
+    host.innerHTML=`<details id="dashboardQuantityReconciliationDetails">
+      <summary class="cursor-pointer text-sm font-black text-slate-700">🔍 ${escCell(year)} 年全年櫃數核對｜各月加總 ${round(sumMoves,2)}｜人員與系統差 ${dashboardSignedDiff(diff)}</summary>
+      <p class="mt-2 text-xs text-slate-600">目前是全年累計，並非單月；以下依畫面已載入的船舶完工月份分列。只讀核對，不修改任何原始資料。</p>
+      <div class="mt-2 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="bg-slate-100"><th class="p-2">月份</th><th class="p-2 text-right">船數</th><th class="p-2 text-right">請款櫃數</th><th class="p-2 text-right">SHIFT</th><th class="p-2 text-right">總 Moves</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="p-2">目前沒有這個年度的船舶資料</td></tr>'}</tbody></table></div>
+      ${Math.abs(diff)>0.01?`<p class="mt-2 text-xs font-bold text-amber-800">⚠ 人員作業與船舶總量目前差 ${dashboardSignedDiff(diff)}；資料可能尚有跨月明細、不同版本或待同步紀錄，差額尚未核銷，不可直接當作零。</p>`:''}
+      <p class="mt-1 text-xs text-slate-500">若人員資料與船舶總數不一致，仍須逐船查核 WORKING NO.，不可用人員值覆蓋船舶原始櫃數。</p>
+    </details>`;
+    return;
+  }
   const audit=dashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves);
   if(!audit){host.classList.add('hidden');host.innerHTML='';return;}
   const previouslyOpen=!!host.querySelector('details')?.open;
