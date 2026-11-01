@@ -2822,6 +2822,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     let cloudLoaded = false;
     let p79ScheduleOfficialMonth='';
     let p79ScheduleOfficialToken='';
+    let p79ScheduleBaseDigest=''; // V79 server-confirmed full-month fingerprint, never computed from a partial view.
     let p79SchedulePreviewEpoch=0;
     let p79ScheduleSourceState={month:'',kind:'loading',savedAt:0,error:''};
     function p79ScheduleHasOfficialData(){
@@ -2838,13 +2839,15 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     function p79ConfirmScheduleSource(data,month,readAt=Date.now(),viewer=window.Port79DataCache?.viewerKey?.(),token=currentPort79SsoToken()){
       if(month!==currentScheduleMonthKey()||token!==currentPort79SsoToken()||!token)return;
       p79ScheduleOfficialMonth=month;p79ScheduleOfficialToken=token;
+      const digest=String(data?.scheduleBaseDigest||'').trim();
+      p79ScheduleBaseDigest=/^[0-9a-f]{64}$/.test(digest)?digest:'';
       p79ScheduleSourceState={month,kind:'live',savedAt:Date.now(),error:''};
       p79RenderScheduleDataSource();
       window.Port79DataCache?.storeSchedulePreview?.(month,data,viewer,token,readAt).catch(error=>console.warn('排班快取保存失敗',error));
     }
     function p79StartSchedulePreview(month){
       const epoch=++p79SchedulePreviewEpoch;
-      p79ScheduleOfficialMonth='';p79ScheduleOfficialToken='';
+      p79ScheduleOfficialMonth='';p79ScheduleOfficialToken='';p79ScheduleBaseDigest='';
       p79ScheduleSourceState={month,kind:'loading',savedAt:0,error:''};
       p79RenderScheduleDataSource();applyScheduleAccessUi();
       // Do not await the disk: a slow or disconnected folder must not delay cloud reads.
@@ -4600,8 +4603,9 @@ function p79EmployeeDateEligible(emp,date) {
         if(data?.ok!==true||!Array.isArray(data.schedules)||
            data.month&&String(data.month)!==month)
           throw Error(String(data?.error||'雲端返回不完整月份資料'));
-        p79ScheduleRowsSignature(data.schedules.map(r=>({...r,month:r.month||month})),month);
-        return data.schedules.map(r=>({...r,month:r.month||month}));
+        const rows=data.schedules.map(r=>({...r,month:r.month||month}));
+        p79ScheduleRowsSignature(rows,month);
+        return {rows,digest:String(data.scheduleBaseDigest||'')};
       }finally{clearTimeout(timeout);}
     }
     async function p79ScheduleVerifyBeforeWrite(month,version){
@@ -4612,10 +4616,10 @@ function p79EmployeeDateEligible(emp,date) {
       let current;
       for(let attempt=0;attempt<3;attempt++){
         current=await p79ScheduleReadGuardMonth(month);
-        if(p79ScheduleRowsSignature(current,month)===baseline)break;
+        if(p79ScheduleRowsSignature(current.rows,month)===baseline)break;
         if(attempt<2)await new Promise(resolve=>setTimeout(resolve,(attempt+1)*750));
       }
-      if(p79ScheduleRowsSignature(current,month)!==baseline)
+      if(p79ScheduleRowsSignature(current.rows,month)!==baseline)
         throw Error('雲端班表已和本次開始編輯時不同，為避免覆蓋其他修改，本次儲存已停止；請先保存畫面並重新讀取核對');
       if(currentScheduleMonthKey()!==month||
          p79ScheduleLocalMutationVersion!==version||
@@ -4629,12 +4633,13 @@ function p79EmployeeDateEligible(emp,date) {
       let lastError='';
       for(let attempt=0;attempt<4;attempt++){
         try{
-          const serverRows=await p79ScheduleReadGuardMonth(month);
+          const savedRead=await p79ScheduleReadGuardMonth(month);
+          const serverRows=savedRead.rows;
           const map=new Map(serverRows.map(r=>[String(r.empId||'').toUpperCase(),r]));
           const recorded=schedules.map(row=>map.get(String(row.empId||'').toUpperCase()));
           if(recorded.every(Boolean)&&
              p79ScheduleRowsSignature(recorded,month)===expected)
-            return serverRows;
+            return savedRead;
           lastError='雲端讀回的班別、組別或人工註記與送出的資料不一致';
         }catch(error){lastError=String(error?.message||error);}
         if(attempt<3)await new Promise(resolve=>setTimeout(resolve,[700,1200,1800][attempt]));
@@ -4715,6 +4720,10 @@ function p79EmployeeDateEligible(emp,date) {
           expectedEmployeeCount:schedules.length,
           saveRequestId:p79CreateScheduleSaveRequestId()
         };
+        // Enable the GAS V79 atomic compare-and-swap automatically after it is
+        // deployed. Old GAS versions do not advertise a digest and remain
+        // supported without a hard cutover of production scheduling.
+        if(p79ScheduleBaseDigest)snapshot.expectedScheduleDigest=p79ScheduleBaseDigest;
         let result;
         for(let attempt=0;attempt<3;attempt++){
           try{
@@ -4745,10 +4754,12 @@ function p79EmployeeDateEligible(emp,date) {
             console.warn('排班雲端忙碌，等待後重試存檔',attempt+2);
           }
         }
-        const savedCloudRows=await p79ScheduleVerifyAfterWrite(yearMonth,schedules);
+        const savedCloudRead=await p79ScheduleVerifyAfterWrite(yearMonth,schedules);
         // Keep the FULL confirmed server snapshot, including server-retained
         // hidden staff, as the baseline for the next save.
-        p79ScheduleCloudRows=JSON.parse(JSON.stringify(savedCloudRows));
+        p79ScheduleCloudRows=JSON.parse(JSON.stringify(savedCloudRead.rows));
+        const confirmedDigest=String(savedCloudRead.digest||result?.scheduleBaseDigest||'');
+        p79ScheduleBaseDigest=/^[0-9a-f]{64}$/.test(confirmedDigest)?confirmedDigest:'';
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         // Notify other open systems only after GAS confirmed this month's schedule save.
