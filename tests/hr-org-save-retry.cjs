@@ -21,14 +21,15 @@ await test('leave permission checkboxes are inside editor, not HR homepage',()=>
  assert(!html.includes('id="scheduleLeaveSettingsPanel"'),'outside settings removed');
  assert(!html.includes('id="scheduleLeaveSettingsBtn"'),'outside toolbar removed');
 });
-await test('employee edit loads per-account rights; only superadmins may check them',async()=>{
+await test('superadmin can grant and revoke admin leave; staff locked',async()=>{
  const controls=['年','事','病','公','喪'].map(hrEditorLeave=>({checked:false,disabled:true,dataset:{hrEditorLeave}}));
  const status={textContent:''};
  const modal={open:true};
+ const currentRole={value:'superadmin'};
  const c={session:{adminRole:'superadmin'},editing:{empId:'EMP01'},editor:modal,
   p79EditorLeavePermission:{ready:false,empId:'',types:[]},
   document:{querySelectorAll:()=>controls},
-  $:id=>id==='adminRole'?{value:'superadmin'}:id==='p79EditorLeavePermissionStatus'?status:null,
+  $:id=>id==='adminRole'?currentRole:id==='p79EditorLeavePermissionStatus'?status:null,
   P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
   P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
   P79_HR_SCHEDULE_LEAVE_LEGACY_KEY:'hrScheduleLeaveEditV1',
@@ -39,11 +40,16 @@ await test('employee edit loads per-account rights; only superadmins may check t
  await c.p79LoadEditorLeavePermission();
  assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['年','病']);
  assert(controls.every(x=>!x.disabled),'superadmin can edit their own employee record');
- c.editing={empId:'EMP02'};
+ c.editing={empId:'EMP02'};currentRole.value='admin';
  await c.p79LoadEditorLeavePermission();
- assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['事'],'each employee has separate rights');
+ assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['事'],'admin account has independent grant');
+ assert(controls.every(x=>!x.disabled),'superadmin can configure an ordinary manager');
+ currentRole.value='employee';c.p79RenderEditorLeavePermission();
+ assert(controls.every(x=>x.disabled&&!x.checked),'ordinary employee is locked and unchecked');
+ currentRole.value='admin';c.p79RenderEditorLeavePermission();
+ assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['事'],'switching back to admin retains editor choices');
  c.session={adminRole:'admin'};c.p79RenderEditorLeavePermission();
- assert(controls.every(x=>x.disabled&&!x.checked),'ordinary manager is denied');
+ assert(controls.every(x=>x.disabled),'a manager cannot grant permissions to other managers');
 });
 await test('employee permission saving merges cloud data without affecting other staff',async()=>{
  let config={hrOrgOptionsV1:{departments:['D']},customFlag:123,hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年'],EMP02:['公']}}};
@@ -62,7 +68,7 @@ await test('employee permission saving merges cloud data without affecting other
  c.session={adminRole:'admin'};
  await assert.rejects(()=>c.p79SaveEditorLeavePermission('EMP02','EMP02',['年']),/超級管理員/);
 });
-await test('roster enforces matching superadmin account, per-employee config and read failure',async()=>{
+await test('roster enforces each authorized admin account, denies employee and stale policy',async()=>{
  const source=fs.readFileSync('schedule/index.html','utf8');
  const start=source.indexOf('    const P79_SCHEDULE_LEAVE_POLICY_KEY='),end=source.indexOf('    let p79OvertimeShiftEditBusy=',start);
  assert(start>=0&&end>start);
@@ -71,21 +77,28 @@ await test('roster enforces matching superadmin account, per-employee config and
  const c={Date,URL,Promise,AbortController,Error,console,setTimeout,clearTimeout,
   GAS_URL:'https://example.invalid/exec',sessionStorage:{getItem:k=>cache.get(k)||''},
   currentScheduleSession:()=>JSON.parse(cache.get('admin_session')||'{}'),
-  currentPort79SsoToken:()=> 'TOKEN',isScheduleSuperAdmin:()=>true,
+  currentPort79SsoToken:()=> 'TOKEN',canManageSchedule:()=>c.schedulePermission==='manage',schedulePermission:'manage',
   fetch:async()=>({ok:true,json:async()=>({ok:true,config:serverConfig})})};
  vm.createContext(c);vm.runInContext(source.slice(start,end),c);
  assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'denied until cloud confirms account');
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
  assert.equal(c.p79ScheduleAllowedEditShift('年'),true);
  assert.equal(c.p79ScheduleAllowedEditShift('事'),false);
- cache.set('admin_session',JSON.stringify({empId:'EMP02',adminRole:'superadmin'}));
+ cache.set('admin_session',JSON.stringify({empId:'EMP02',adminRole:'admin'}));
  assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'another account cannot inherit EMP01 permissions');
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
  assert.equal(c.p79ScheduleAllowedEditShift('事'),true);
  assert.equal(c.p79ScheduleAllowedEditShift('年'),false);
- c.isScheduleSuperAdmin=()=>false;
- assert.equal(c.p79ScheduleAllowedEditShift('事'),false);
- c.isScheduleSuperAdmin=()=>true;
+ c.schedulePermission='view';
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'a non-editor admin cannot change leave on schedule');
+ c.schedulePermission='manage';
+ cache.set('admin_session',JSON.stringify({empId:'EMP03',adminRole:'employee'}));
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'employee denied even if permissions are stale');
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false,'employee may not load privileged permissions');
+ cache.set('admin_session',JSON.stringify({empId:'EMP02',adminRole:'admin'}));
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),true);
+
  c.fetch=async()=>{throw Error('network offline')};
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false);
  assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'error fails closed');
