@@ -3654,7 +3654,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       }
 
       setCurrentMonthDefault();
-      // Read global HR policy without blocking the roster's initial paint.
+      // Read this logged-in employee's HR leave permission without blocking the roster.
       void p79ScheduleReadHrLeavePolicy().then(()=>{
         if(employees.length&&p79ScheduleHasOfficialData()&&!port79ScheduleDirty)
           renderRoleScheduleView();
@@ -6315,7 +6315,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       updateScheduleDateRangeSummary();
       const visibleDays = Array.from({length: totalDays}, (_, i) => i + 1);
       const p79EditorLeaveKinds=p79ScheduleLeavePolicy.ready&&
-        p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&isScheduleSuperAdmin()
+        p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&p79ScheduleLeavePolicy.empId===p79ScheduleLeaveActorId()&&isScheduleSuperAdmin()
         ?p79ScheduleLeavePolicy.types:[];
       // Cache typhoon markers and attendance evidence once per render; avoid storage
       // parsing and evidence lookups on every employee/day cell.
@@ -6963,14 +6963,20 @@ async function p79SaveScheduleOvertimeDraft(draft){
       else alert("❌ 雲端儲存失敗，請稍後再試；若持續失敗請確認 Apps Script 已部署最新版。");
     }
 
-    // HR-owned shared setting; no localStorage fallback or stale access when cloud read fails.
-    const P79_SCHEDULE_LEAVE_POLICY_KEY='hrScheduleLeaveEditV1';
+    // HR employee editor owns these choices: each account is independently controlled.
+    const P79_SCHEDULE_LEAVE_POLICY_KEY='hrScheduleLeaveEditV2';
+    const P79_SCHEDULE_LEAVE_LEGACY_KEY='hrScheduleLeaveEditV1';
     const P79_SCHEDULE_SPECIAL_LEAVES=['年','事','病','公','喪'];
-    let p79ScheduleLeavePolicy={ready:false,types:[],token:''};
+    function p79ScheduleLeaveActorId(){
+      let main={};try{main=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')||{}}catch(e){}
+      const me=currentScheduleSession();
+      return String(me.empId||main.empId||sessionStorage.getItem('aqc_admin_id')||'').trim().toUpperCase();
+    }
+    let p79ScheduleLeavePolicy={ready:false,types:[],token:'',empId:''};
     async function p79ScheduleReadHrLeavePolicy(){
-      const token=currentPort79SsoToken();
-      p79ScheduleLeavePolicy={ready:false,types:[],token};
-      if(!token||!isScheduleSuperAdmin())return false;
+      const token=currentPort79SsoToken(),empId=p79ScheduleLeaveActorId();
+      p79ScheduleLeavePolicy={ready:false,types:[],token,empId};
+      if(!token||!empId||!isScheduleSuperAdmin())return false;
       const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),16000);
       try{
         const url=new URL(GAS_URL);
@@ -6979,22 +6985,29 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if(!response.ok)throw Error('HTTP '+response.status);
         const data=await response.json();
         if(data?.ok!==true||!data.config||typeof data.config!=='object')throw Error(String(data?.error||'人資設定資料不完整'));
-        const saved=data.config[P79_SCHEDULE_LEAVE_POLICY_KEY];
-        if(saved!==undefined&&(!saved||!Array.isArray(saved.allowedTypes)))
-          throw Error('人資請假權限設定格式不完整');
-        const allowed=saved===undefined?P79_SCHEDULE_SPECIAL_LEAVES:saved.allowedTypes;
-        if(token!==currentPort79SsoToken())return false;
-        p79ScheduleLeavePolicy={ready:true,types:P79_SCHEDULE_SPECIAL_LEAVES.filter(x=>allowed.includes(x)),token};
+        const stored=data.config[P79_SCHEDULE_LEAVE_POLICY_KEY]?.byEmployee;
+        const previous=data.config[P79_SCHEDULE_LEAVE_LEGACY_KEY]?.allowedTypes;
+        if(stored!==undefined&&(!stored||typeof stored!=='object'||Array.isArray(stored)))
+          throw Error('人資員工權限設定格式不完整');
+        if(previous!==undefined&&!Array.isArray(previous))
+          throw Error('人資原排班權限設定格式不完整');
+        const own=stored&&Object.prototype.hasOwnProperty.call(stored,empId)?stored[empId]:undefined;
+        if(own!==undefined&&!Array.isArray(own))throw Error('目前員工權限內容不正確');
+        const allowed=own===undefined?(previous===undefined?P79_SCHEDULE_SPECIAL_LEAVES:previous):own;
+        if(token!==currentPort79SsoToken()||empId!==p79ScheduleLeaveActorId())return false;
+        p79ScheduleLeavePolicy={ready:true,types:P79_SCHEDULE_SPECIAL_LEAVES.filter(x=>allowed.includes(x)),token,empId};
         return true;
       }catch(e){
-        console.warn('雲端排班請假權限未核對，已停用直接選取請假',e);
+        console.warn('人資排班假別權限尚未確認，禁止直接選取請假',e);
         return false;
       }finally{clearTimeout(timeout);}
     }
     function p79ScheduleAllowedEditShift(value) {
       const shift=String(value||'').trim();
       if(['早','中','晚','休','例','國','離'].includes(shift))return true;
-      return p79ScheduleLeavePolicy.ready&&p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&
+      return p79ScheduleLeavePolicy.ready&&
+        p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&
+        p79ScheduleLeavePolicy.empId===p79ScheduleLeaveActorId()&&
         isScheduleSuperAdmin()&&p79ScheduleLeavePolicy.types.includes(shift);
     }
     let p79OvertimeShiftEditBusy=false;
