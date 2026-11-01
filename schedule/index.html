@@ -5763,8 +5763,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const worker=fromAnnualLeave?String(cover?.data?.workerIds?.[0]||''):String(empId);
         const meta=getScheduleDayMeta(worker,dayStr)||{};
         const target=String(cover?.data?.leaveEmpId||meta.forEmpId||(fromAnnualLeave?empId:''));
-        const category=meta.overtimeReport?.category||(target?'代':meta.restCategory||(meta.overtimeType==='extended'?'延':'休'));
-        const code=meta.overtimeReport?.code||p79SubstituteShiftLabel(worker,dayStr,meta);
+        const originalShift=String(meta.reportOriginalShift??meta.overtimeOriginalShift??
+          monthlyScheduleData[worker]?.[dayStr]??'').trim();
+        // 正常早／中／晚班不能預設「休息日加班」；沒有任何已核對的
+        // 假別資料時，應提示選擇實際「平日延長」加班時段。
+        const category=meta.overtimeReport?.category||(target?'代':meta.restCategory||
+          (meta.overtimeType==='extended'||/^(早|中|晚)$/.test(originalShift)?'延':'休'));
+        const reportedCode=meta.overtimeReport?.code||p79SubstituteShiftLabel(worker,dayStr,meta);
+        const code=category==='延'&&!meta.overtimeReport&&/^(休|例|國)\d/.test(reportedCode)?'':reportedCode;
         await P79Overtime.openReport({empId:worker,forEmpId:target,date:dayStr,category,code,requirePeriodSelection:!code||code==='代班',leaveHandoffId:cover?.data?.leaveId||'',normalShifts:Object.fromEntries(employees.map(e=>[e.id,monthlyScheduleMeta[e.id]?.[dayStr]?.reportOriginalShift??monthlyScheduleMeta[e.id]?.[dayStr]?.overtimeOriginalShift??monthlyScheduleData[e.id]?.[dayStr]])),allowedEmpIds:cover?.data?.workerIds||[]});
       }catch(error){if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='無法讀取出勤時段：'+error.message;}
     }

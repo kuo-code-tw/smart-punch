@@ -1,0 +1,21 @@
+name: Verify overtime default against scheduled shift
+on:
+  pull_request:
+    paths:
+      - 'schedule/index.html'
+      - 'tests/overtime-default-monthly-roster.cjs'
+      - '.github/workflows/overtime-default-roster.yml'
+permissions:
+  contents: read
+jobs:
+  verify-default:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/overtime-default-monthly-roster.cjs
+      - run: node tests/october-system-roster-overtime.cjs
+      - run: node tests/schedule-november-render-fallback.cjs
+      - run: node tests/vessel-completion-export-integrity.cjs
