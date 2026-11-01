@@ -6,7 +6,9 @@ function create(ctx){
  function months(month){const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date(now()));const adjacent=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);return[adjacent(-1),month,...(adjacent(1)<=current?[adjacent(1)]:[])];}
  function read(month,token){
   const key=token+'|'+month,prior=reads.get(key);if(prior&&now()-prior.at<30000)return prior.promise;
-  const entry={at:now()};entry.promise=Promise.resolve().then(()=>ctx.read(month,token)).then(data=>{if(data?.ok!==true||!Array.isArray(data.records)||data.records.some(r=>!r||typeof r!=='object'||Array.isArray(r))||data.month!=null&&String(data.month)!==month)throw Error('原始考勤未讀齊或月份不符');return data.records;}).catch(e=>{if(reads.get(key)===entry)reads.delete(key);throw e;});reads.set(key,entry);return entry.promise;
+  const entry={at:now()};entry.promise=Promise.resolve().then(()=>ctx.read(month,token)).then(data=>{if(data?.ok!==true||!Array.isArray(data.records)||data.records.some(r=>!r||typeof r!=='object'||Array.isArray(r))||data.month!=null&&String(data.month)!==month)throw Error('正式考勤未讀齊或月份不符');
+    const reference=data.absenceReferenceRecords;
+    return {official:data.records,reference:Array.isArray(reference)&&reference.every(r=>r&&typeof r==='object'&&!Array.isArray(r))?reference:null,referenceError:data.absenceReferenceError||''};}).catch(e=>{if(reads.get(key)===entry)reads.delete(key);throw e;});reads.set(key,entry);return entry.promise;
  }
  function status(month){const s=states.get(month);return s?.token===ctx.token()?s:{pending:false,error:'',evidence:{complete:false,days:{}}};}
  function refresh(month){
@@ -18,7 +20,26 @@ function create(ctx){
   const state={token,rosterSignature,pending:true,error:'',evidence:retained||{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
   state.promise=(async()=>{try{
    const batches=await Promise.all(months(month).map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
-   const records=new Map();for(const batch of batches)for(const r of batch){if(!Number.isFinite(ctx.timestamp(r)))throw Error('出勤時間無效，不能判定整班無卡');const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);records.set(key,r);}
+   const records=new Map(),referenceRecords=new Map();
+   let referenceAvailable=batches.every(batch=>Array.isArray(batch.reference));
+   const referenceErrors=batches.map(batch=>batch.referenceError||'').filter(Boolean);
+   for(const batch of batches){
+     for(const r of batch.official){
+       if(!Number.isFinite(ctx.timestamp(r)))throw Error('正式考勤時間無效，不能判定整班無卡');
+       const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);records.set(key,r);
+     }
+     if(Array.isArray(batch.reference))for(const r of batch.reference){
+       if(!Number.isFinite(ctx.timestamp(r))){referenceAvailable=false;continue;}
+       const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);referenceRecords.set(key,r);
+     }
+   }
+   // An unexpectedly empty original-punch feed is not proof that everyone was off.
+   // Both independent feeds need at least one row for the target month.
+   const belongsToMonth=r=>{
+     const v=String(r.timeStr||r.time||'').match(/^(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})/);
+     return v&&v[1]+'-'+v[2].padStart(2,'0')===month;
+   };
+   if(![...records.values()].some(belongsToMonth)||![...referenceRecords.values()].some(belongsToMonth))referenceAvailable=false;
    const people=ctx.employees(),pairedRows=ctx.buildShifts([...records.values()]);
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
@@ -46,12 +67,41 @@ function create(ctx){
      if(value.conflict){ambiguousShifts[key]='同一工作日存在不同班別的完整出勤';continue;}
      actualShifts[key]=value.shift;actualWorkedMinutes[key]=value.minutes;
    }
-   const sessions=pairedRows.map(row=>{
-    const record=row.clockIn||row.clockOut||row.records?.[0]||row,emp=people.find(e=>id(e.id)===id(row.empId||record.empId))||people.find(e=>att(record.attNo)&&att(e.attNo||e.attendanceNo)===att(record.attNo));
-    return{empId:emp?.id||'',start:row.clockIn?ctx.timestamp(row.clockIn):null,end:row.clockOut?ctx.timestamp(row.clockOut):null,time:ctx.timestamp(record),workDate:row.clockIn&&row.clockOut&&!row.timePrecisionIssue?row.accountingDateKey||row.dateKey||'':''};
-   }).filter(s=>s.empId);
+   const mapSessions=rows=>rows.map(row=>{
+    const record=row.clockIn||row.clockOut||row.records?.[0]||row;
+    const claimed=id(row.empId||record.empId),matchedById=claimed?people.find(e=>id(e.id)===claimed):null;
+    const candidates=att(record.attNo)?people.filter(e=>att(e.attNo||e.attendanceNo)===att(record.attNo)):[];
+    if(candidates.length>1||matchedById&&candidates.length===1&&id(candidates[0].id)!==id(matchedById.id))return null;
+    const emp=matchedById||(candidates.length===1?candidates[0]:null);
+    return emp?{empId:emp.id,start:row.clockIn?ctx.timestamp(row.clockIn):null,
+      end:row.clockOut?ctx.timestamp(row.clockOut):null,time:ctx.timestamp(record),
+      workDate:row.clockIn&&row.clockOut&&!row.timePrecisionIssue?row.accountingDateKey||row.dateKey||'':''}:null;
+   }).filter(Boolean);
+   const sessions=mapSessions(pairedRows);
    if(JSON.stringify(ctx.schedules())!==rosterSignature)throw Error('核對期間班表已更新，需重新讀取考勤');
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
+   // Absence must be confirmed by BOTH independent authenticated feeds, not
+   // inferred from an empty or truncated official attendance response.
+   const confirmed={};let discrepancies=0;
+   let referenceEvidence=null;
+   if(referenceAvailable){
+     const pairedReference=ctx.buildShifts([...referenceRecords.values()]);
+     referenceEvidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,
+       sessions:mapSessions(pairedReference),leaveDates:ctx.leaveDates(month)});
+   }
+   for(const [key,day] of Object.entries(state.evidence.days||{})){
+     if(day.state!=='rest')continue;
+     if(referenceEvidence?.days?.[key]?.state==='rest'){
+       confirmed[key]=true;
+     }else{
+       // Do not conflate incomplete cross-source evidence with verified leave.
+       day.state='unknown';day.absenceUnverified=true;discrepancies++;
+     }
+   }
+   state.evidence.absenceConfirmedDays=confirmed;
+   state.evidence.absenceAuditReady=referenceAvailable;
+   state.evidence.absenceAuditWarning=referenceAvailable?'':referenceErrors.join('；')||'原始打卡核對不完整，已暫停無卡判休';
+   state.evidence.absenceDiscrepancies=discrepancies;
    // Expose shift codes, not the employees' raw punch records or credentials.
    state.evidence.actualShifts=actualShifts;
    state.evidence.actualWorkedMinutes=actualWorkedMinutes;
