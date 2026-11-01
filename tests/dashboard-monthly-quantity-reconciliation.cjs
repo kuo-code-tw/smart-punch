@@ -19,6 +19,7 @@ function run(){
     dashboardSignedDiff:v=>(v>0?'+':'')+String(v),
     canonicalOperationalRecords:rs=>rs,
     recordMoveValues:r=>({disc:r.disc,load:r.load}),
+    dashboardDateRange:()=>({active:false}),getPort79Year:()=> '2026',
     document:{getElementById:id=>id==='dashboardQuantityReconciliation'?host:null}
   };
   vm.createContext(ctx);
@@ -73,7 +74,8 @@ function run(){
   assert.equal(zero.moves,10);
   assert.equal(ctx.dashboardQuantityReconciliation('',jobs,records,masters,20909),null);
   ctx.renderDashboardQuantityReconciliation('',jobs,records,masters,20909);
-  assert.equal(host.visible,false);
+  assert.equal(host.visible,true,'year-view audit is intentionally visible even without a month selected');
+  assert(host.innerHTML.includes('2026 年全年櫃數核對'));
   const missing=ctx.dashboardQuantityReconciliation('2026-10',[jobs[0]],[records[1]],[],381);
   assert.equal(missing.missingIdLists,1,'Missing source linkage must be flagged');
   const malicious=ctx.dashboardQuantityReconciliation('2026-10',jobs,[...records,rec('<img onerror=alert(1)>','B','2026-10-26',5)],masters,21086);
@@ -84,8 +86,8 @@ function run(){
   assert(html.includes('>系統總櫃數（請款＋翻艙）</div>'));
   assert(html.includes("setCum('cumWorkload',systemTotalMoves);"),'System KPI must display billing plus SHIFT, not billing alone');
   assert(html.includes('const systemTotalMoves=workload+shiftTotal;'),'System Moves derives only from ship billing and SHIFT');
-  assert(html.includes("'✓ 與員工作業一致'"),'Equal values should show a comparison confirmation');
-  assert(html.includes('⚠ 與員工作業差'),'Unequal staff and system values must be reported, never silently overwritten');
+  assert(html.includes('✓ 僅與系統人員明細一致（非月報）'),'Equality must distinguish system detail from external Excel');
+  assert(html.includes('⚠ 與系統人員明細差'),'Unequal staff and system values must be reported, never silently overwritten');
   assert(html.includes('renderDashboardQuantityReconciliation(selectedMonth,allDashboardJobs,records,shipMasters,c)'));
   assert(html.includes('const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);'));
   for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);

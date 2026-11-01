@@ -14016,7 +14016,11 @@ function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.v
       return 0;
     };
     // WORKING SHEET quantities remain available when the detailed cache is incomplete.
-    const disc=metric(s.manualOverrides?.disc,ws.disc,rs.length?rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0):s.disc);
+    // WORKING SHEET DISC is raw (before Bundle). Export the billed net split,
+    // never count Bundle twice or inflate DISC+LOAD above the billed quantity.
+    const wsNetDisc=Number.isFinite(Number(ws.disc))&&String(ws.disc??'').trim()!==''
+      ?Math.max(0,num(ws.disc)-num(ws.bundleDeduct)):null;
+    const disc=metric(s.manualOverrides?.disc,wsNetDisc,rs.length?rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0):s.disc);
     const load=metric(s.manualOverrides?.load,ws.load,rs.length?rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0):s.load);
     const date=String(s.compareDate||ws.compareDate||s.firstDate||rs.map(r=>String(r.workDate||'')).filter(Boolean).sort()[0]||'').slice(0,10);
     return {
@@ -14102,6 +14106,9 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     ];
     const mismatch=parity.find(([,a,b])=>Math.abs(a-b)>0.01);
     if(mismatch)throw Error('匯出與系統統計不一致：'+mismatch[0]+' '+mismatch[1]+'／'+mismatch[2]+'；為避免產生錯誤月報已停止匯出');
+    const wrongSplit=rows.find(x=>![x.disc,x.load,x.bill].every(v=>Number.isFinite(Number(v))&&Number(v)>=0)
+      ||Math.abs(num(x.disc)+num(x.load)-num(x.bill))>0.01);
+    if(wrongSplit)throw Error('月報匯出已停止：'+wrongSplit.workingNo+' 卸船＋裝船不等於請款櫃數，請先核對 WORKING SHEET');
     const signatures=saveVesselMonthlySignatureFields();
     await window.P79VesselMonthlyReport.download({month,company:companyName,rows,signatures,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
     document.getElementById('vesselMonthlyExportDialog')?.close();
@@ -14180,19 +14187,29 @@ function pickExportColumns(type,rows){
 
 function buildShipExportRows(){
   const month=document.getElementById('filterMonth')?.value||'';
-  return vesselJobRows().map((s,index)=>{
-    const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>!month||String(r.workDate||'').startsWith(month));
-    const disc=rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0);
-    const load=rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0);
-    const date=[...new Set(rs.map(r=>String(r.workDate||'')).filter(Boolean))].sort()[0]||'';
+  // Select vessels by completion month, not by individual driver's workDate.
+  return vesselJobRows(month).map((s,index)=>{
     const no=String(s.workingNo||'').trim();
+    const master=(shipMasters||[]).find(x=>String(x.workingNo||'').trim()===no)||{};
+    const ws=master.workingSheetSource||{};
+    const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>String(r.source||'')==='working-report');
+    const hasSheetSplit=[ws.disc,ws.load].every(v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)));
+    const disc=hasSheetSplit?Math.max(0,num(ws.disc)-num(ws.bundleDeduct)):rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0);
+    const load=hasSheetSplit?num(ws.load):rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0);
+    const billing=num(s.totalContainers);
+    // A partial month cache may miss the prior-month drivers; never silently
+    // export a smaller split than the completed vessel's billed quantity.
+    if(Math.abs(disc+load-billing)>0.01)
+      throw Error('船舶 '+no+' 卸裝櫃數 '+(disc+load)+' 與請款 '+billing+' 不一致，已停止匯出');
+    const dates=rs.map(r=>String(r.workDate||'')).filter(Boolean).sort();
+    const date=String(s.compareDate||s.lastDate||master.compareDate||dates[dates.length-1]||'').slice(0,10);
     return {
       no:index+1,
       serial:monthlySerialFromWorkingNo(no),
       date,
       ship:String(s.vessel||''),
       voyage:String(s.voyageE||s.voyageI||''),
-      disc,load,billing:num(s.totalContainers)||Math.max(0,disc+load-num(s.shiftMoves)),
+      disc,load,billing,
       bundle:num(s.bundleDeduct),
       hc:num(s.hatches),
       shift:num(s.shiftMoves),
@@ -14206,7 +14223,13 @@ function buildShipExportRows(){
 }
 
 function buildDetailExportRows(){
-  return records.map(r=>{
+  const month=document.getElementById('filterMonth')?.value||'';
+  const completionIndex=shipCompletionIndex(shipMasters||[]);
+  const superseded=new Set(window.P79VesselVersionView?.collapse?.(shipMasters||[])?.excludedWorkingNos||[]);
+  const source=month?canonicalOperationalRecords((records||[]).filter(r=>
+    recordCompletionMonth(r,completionIndex)===month&&recordIsCurrentShipDetail(r,completionIndex)
+    &&!superseded.has(String(r.workingNo||'').trim().toUpperCase()))):records;
+  return source.map(r=>{
     const c=calc(r),mv=recoveredMoveSplit(r),p=people().find(x=>x.empId===String(r.empId||''))||{empId:r.empId,name:r.name};
     return {
       date:r.workDate||'',
@@ -14255,6 +14278,26 @@ async function exportSelectedExcel() {
   const doDetail=document.getElementById('expWorkDetail').checked;
   const doPerson=document.getElementById('expPersonSummary').checked;
   if(!doShip&&!doDetail&&!doPerson)return toast('請至少選擇一個匯出項目');
+  const month=document.getElementById('filterMonth')?.value||'';
+  if(/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)){
+    if(!await loadEfficiencyCloudScope({month},true))
+      return toast('無法讀取完整年度與跨月資料，已停止匯出');
+    if(doDetail||doPerson){
+      const loadedIds=new Set((records||[]).filter(r=>String(r.source||'')==='working-report').map(r=>String(r.id||'')));
+      const byNo=new Map((shipMasters||[]).map(s=>[String(s.workingNo||'').trim(),s]));
+      const missing=[];
+      vesselJobRows(month).forEach(job=>{
+        const master=byNo.get(String(job.workingNo||'').trim())||{};
+        const refs=master.workingSheetSource?.reportRecordIds;
+        if(Array.isArray(refs)&&refs.length){
+          refs.forEach(id=>{if(!loadedIds.has(String(id)))missing.push(String(id));});
+        }else if(String(master.firstDate||'').slice(0,7)!==month){
+          missing.push(String(job.workingNo||'')+' 跨月明細缺少來源索引');
+        }
+      });
+      if(missing.length)return toast('跨月或人員明細未載入完整（'+missing.length+' 筆），已停止匯出：'+missing.slice(0,3).join('、'));
+    }
+  }
 
   const wb=XLSX.utils.book_new();
 
@@ -14262,7 +14305,9 @@ async function exportSelectedExcel() {
     const fields=selectedExportFields('ship');
     if(!fields.length)return toast('船邊作業量表至少選一個欄位');
     saveExportFieldSelection('ship',fields);
-    const x=pickExportColumns('ship',buildShipExportRows());
+    let shipRows;
+    try{shipRows=buildShipExportRows();}catch(e){return toast(e.message||'船舶櫃數核對失敗，已停止匯出');}
+    const x=pickExportColumns('ship',shipRows);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([x.headers,...x.rows]),'船邊作業量表');
   }
 
@@ -14282,8 +14327,8 @@ async function exportSelectedExcel() {
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([x.headers,...x.rows]),'人員統計');
   }
 
-  const month=document.getElementById('filterMonth')?.value||new Date().toISOString().slice(0,7);
-  XLSX.writeFile(wb,`79號碼頭_船舶作業資料_${month}.xlsx`);
+  const filenameMonth=month||new Date().toISOString().slice(0,7);
+  XLSX.writeFile(wb,`79號碼頭_船舶作業資料_${filenameMonth}.xlsx`);
   document.getElementById('exportDialog').close();
   toast('已匯出所選項目');
 }
