@@ -2834,6 +2834,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const time=s.savedAt?new Date(s.savedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'';
       el.textContent=s.kind==='cache'?'本機快取｜'+time+'｜'+(s.error?'雲端更新未完成，暫供查看；請按重新讀取':'先供查看，正在核對雲端最新班表…'):
         s.kind==='live'?'雲端班表已更新｜'+time+(s.error?'｜重新核對未完成，保留上次確認內容':''):
+        s.kind==='provisional'?'⚠️ 10/28 備援班表（未核對月底／唯讀，可匯出）':
         s.error?'班表尚未載入：'+s.error:s.kind==='missing'?'本機沒有此月份可用快取，正在讀取雲端…':'正在讀取本機快取與雲端班表…';
     }
     function p79ConfirmScheduleSource(data,month,readAt=Date.now(),viewer=window.Port79DataCache?.viewerKey?.(),token=currentPort79SsoToken()){
@@ -4340,6 +4341,29 @@ function p79EmployeeDateEligible(emp,date) {
         if (!data.ok) throw new Error(data.error || '讀取失敗');
         if(!Array.isArray(data.employees)||!Array.isArray(data.schedules)||(data.month&&String(data.month)!==requestMonth))throw new Error('排班資料不完整或月份不符，已保留目前畫面');
 
+        // 10 月正式歷史表遺失時：只在原月份顯示備援，不能賦予寫入權。
+        if(requestMonth==='2026-10'&&!data.schedules.length){
+          const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),15000);
+          let backup;
+          try{
+            const url=new URL(GAS_URL);
+            url.searchParams.set('action','historyGetProvisionalScheduleMonth');
+            url.searchParams.set('month',requestMonth);
+            url.searchParams.set('gcToken',token);
+            url.searchParams.set('_',String(Date.now()));
+            const res=await fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:ctl.signal});
+            if(!res.ok)throw Error('備援班表讀取 HTTP '+res.status);
+            backup=await res.json();
+          }finally{clearTimeout(tm);}
+          if(requestMonth!==currentScheduleMonthKey()||requestEpoch!==p79SchedulePreviewEpoch||token!==currentPort79SsoToken())return false;
+          if(backup?.ok!==true||backup.provisional!==true||backup.month!==requestMonth||
+            !Array.isArray(backup.schedules)||backup.schedules.length===0||
+            backup.schedules.some(row=>row.month!==requestMonth||!row.empId||!row.schedule||typeof row.schedule!=='object'||Array.isArray(row.schedule)))
+            throw Error(backup?.error||'10 月正式排班不存在，歷史備援尚未通過核對');
+          data={...data,schedules:backup.schedules,provisional:true,
+            archiveStatus:backup.archiveStatus||'10/28 備援，尚未核對月底異動'};
+        }
+
         // V10.15：這份 GET 若是在使用者修改前發出、修改後才回來，就是過期快照。
         // 不允許它清空 monthlyScheduleData / personnel overrides。
         const staleAgainstLocalEdit =
@@ -4373,6 +4397,18 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         p79ApplySchedulePayload(data,requestMonth);
+        if(data.provisional===true){
+          // 備援可看可匯出，但不取得正式雲端讀取回條，編輯／儲存一律封鎖。
+          p79ScheduleOfficialMonth='';p79ScheduleOfficialToken='';p79ScheduleBaseDigest='';
+          p79ScheduleGroupHistoryUnverifiedMonth=requestMonth;
+          p79ScheduleSourceState={month:requestMonth,kind:'provisional',savedAt:Date.now(),error:''};
+          p79RenderScheduleDataSource();
+          cloudLoaded=true;
+          applyScheduleAccessUi();
+          renderRoleScheduleView();
+          if(showAlert)alert('10 月排班目前顯示 10/28 歷史備援，尚未核對 10/29～10/31。可查詢及匯出，不可儲存。');
+          return true;
+        }
         const missingRoles=typeof p79ScheduleRolesWithoutGroups==='function'
           ?p79ScheduleRolesWithoutGroups(requestMonth):[];
         if(missingRoles.length){
@@ -6201,7 +6237,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function renderRoleScheduleView() {
       p79DisposeRosterScroll();
-      if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&p79ScheduleSourceState.kind==='cache')){
+      if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&['cache','provisional'].includes(p79ScheduleSourceState.kind))){
         const target=document.getElementById('app-main-container');
         const failed=!!p79ScheduleSourceState.error;
         if(target)target.innerHTML=failed
