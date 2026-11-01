@@ -81,12 +81,12 @@ console.log('PASS workhours 2 visible tabs: no viewport-wide negative margins or
 // Home presentation styles must not remove real modules or override the shared JS menu order.
 const homeDashboardCss=fs.readFileSync('assets/port79-home-dashboard.css','utf8');
 const referenceDashboardCss=fs.readFileSync('assets/port79-reference-dashboard.css','utf8');
-const homeSidebarRules=homeDashboardCss.split('\\n').filter(line=>line.includes('#p79SevenNav a'));
-assert(!homeSidebarRules.some(line=>/order\\s*:\\s*\\d/.test(line)),
+const homeSidebarRules=homeDashboardCss.split('\n').filter(line=>line.includes('#p79SevenNav a'));
+assert(!homeSidebarRules.some(line=>/order\s*:\s*\d/.test(line)),
   'homepage CSS must retain JS canonical sidebar order');
-assert(!homeSidebarRules.some(line=>/display\\s*:\\s*none/.test(line)),
+assert(!homeSidebarRules.some(line=>/display\s*:\s*none/.test(line)),
   'homepage CSS must not hide a real system link');
-assert(!referenceDashboardCss.split('\\n').some(line=>line.includes('#p79SevenNav a[href*="work-hours"]')||line.includes('#p79SevenNav a[href*="leave/"]')),
+assert(!referenceDashboardCss.split('\n').some(line=>line.includes('#p79SevenNav a[href*="work-hours"]')||line.includes('#p79SevenNav a[href*="leave/"]')),
   'reference dashboard CSS must not hide overtime or leave sidebar links');
 const homeIndex=fs.readFileSync('index.html','utf8');
 for(const cssName of ['port79-home-dashboard.css','port79-reference-dashboard.css'])
