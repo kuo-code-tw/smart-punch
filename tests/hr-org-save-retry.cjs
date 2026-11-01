@@ -15,20 +15,20 @@ await test('HR superadmin controls five schedule leave types in shared cloud con
  const original={hrOrgOptionsV1:{departments:['A'],jobTitles:['F/L'],units:[]},customFlag:true};
  let current={...original},writes=[];
  const controls=['年','事','病','公','喪'].map(kind=>({checked:false,dataset:{scheduleLeaveKind:kind}}));
- const status={textContent:''},save={disabled:false},dialog={open:false,showModal(){this.open=true}};
+ const status={textContent:''},save={disabled:false},panel={scrolled:false,scrollIntoView(){this.scrolled=true}};
  const c={session:{adminRole:'superadmin'},String,Array,JSON,TextEncoder,Error,
   P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV1',
   P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
-  $:id=>id==='scheduleLeaveSettingsStatus'?status:id==='scheduleLeaveSettingsSaveBtn'?save:id==='status'?{textContent:''}:null,
+  $:id=>id==='scheduleLeaveSettingsStatus'?status:id==='scheduleLeaveSettingsSaveBtn'?save:id==='scheduleLeaveSettingsPanel'?panel:id==='status'?{textContent:''}:null,
   document:{querySelectorAll:()=>controls},
-  scheduleLeaveSettingsDialog:dialog,
   alert:msg=>{throw Error(msg)},
   p79ReadCanonicalOrgOptions:async()=>structuredClone(current),
   p79RetryOrgSave:async cb=>{const req=await cb();writes.push(req);current=structuredClone(req.config);return{ok:true}}
  };vm.createContext(c);
  for(const n of ['p79HrScheduleLeaveIsSuperAdmin','openScheduleLeaveSettings','saveScheduleLeaveSettings'])vm.runInContext(fn(n),c);
- await c.openScheduleLeaveSettings();
- assert.equal(dialog.open,true);
+ await c.openScheduleLeaveSettings(true);
+ assert.equal(panel.scrolled,true,'toolbar shortcut scrolls to visible checkboxes');
+ assert(controls.every(input=>!input.disabled),'superadmin gets editable checkboxes after cloud read');
  assert(controls.every(input=>input.checked),'defaults to five types only for confirmed superadmin');
  for(const input of controls)input.checked=['年','病'].includes(input.dataset.scheduleLeaveKind);
  await c.saveScheduleLeaveSettings();
@@ -38,7 +38,9 @@ await test('HR superadmin controls five schedule leave types in shared cloud con
  assert.deepEqual(current.hrOrgOptionsV1,original.hrOrgOptionsV1,'unrelated HR configuration preserved');
  assert.equal(current.customFlag,true);
  c.session={adminRole:'admin'};
- await assert.rejects(()=>c.openScheduleLeaveSettings(),/只有超級管理員/);
+ await c.openScheduleLeaveSettings();
+ assert(status.textContent.includes('不是超級管理員'),'non superadmin can see read-only notice');
+ assert(controls.every(input=>input.disabled),'non superadmin cannot select checkboxes');
  await assert.rejects(()=>c.saveScheduleLeaveSettings(),/只有超級管理員/);
  assert.equal(writes.length,1,'normal manager cannot save');
 });
@@ -64,6 +66,15 @@ await test('schedule special leave requires verified cloud policy plus superadmi
  c.isScheduleSuperAdmin=()=>true;c.fetch=async()=>{throw Error('offline')};
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false,'read failed');
  assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'offline policy fails closed');
+});
+await test('HR settings are visible directly beneath the status banner',()=>{
+ const statusAt=html.indexOf('id="status" class="banner"');
+ const panelAt=html.indexOf('id="scheduleLeaveSettingsPanel"');
+ const statsAt=html.indexOf('id="stActive"');
+ assert(statusAt>=0&&panelAt>statusAt&&panelAt<statsAt,'inline settings are above HR staff stats');
+ assert.equal((html.match(/data-schedule-leave-kind="/g)||[]).length,5,'all five leave checkboxes are on main page');
+ assert(!html.includes('scheduleLeaveSettingsDialog'),'no hidden modal is required');
+ assert(html.includes("void openScheduleLeaveSettings();"),'cloud settings load on HR startup');
 });
 await test('HR inline JavaScript parses',()=>{for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1])});
 console.log(JSON.stringify({passed,failed:0}));
