@@ -353,7 +353,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
         <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假比對</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
       </div>
       <div class="toolbar">
-        <div class="field"><label for="filterMonth">請假月份</label><select id="filterMonth" onchange="this.dataset.p79MonthUserSelected='1';this.dataset.p79AutoAllReason='';renderAdmin()"><option value="">全部月份</option></select></div>
+        <div class="field"><label for="filterMonth">請假月份</label><select id="filterMonth" onchange="renderAdmin()"><option value="">全部月份</option></select></div>
         <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
         <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
@@ -480,7 +480,11 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
    if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
-   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜請假紀錄總計 '+leaveRecords.length+' 筆（全部月份）'):'☁️ 員工請假申請模式已就緒','');return true;
+   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);
+   const displayedMonth=$('filterMonth')?.value||'';
+   const displayedLabel=displayedMonth?displayedMonth.slice(0,4)+'年'+Number(displayedMonth.slice(5,7))+'月':'全部月份';
+   const displayedLeaveCount=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,displayedMonth)).length;
+   setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜'+displayedLabel+'請假 '+displayedLeaveCount+' 筆'):'☁️ 員工請假申請模式已就緒','');return true;
   }catch(e){
    last=e;
    if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
@@ -619,15 +623,9 @@ function p79LeaveMatchesMonth(record,month){
 function populateLeaveAdminMonths(){
  const select=$('filterMonth');if(!select)return;
  const now=p79LeaveCurrentTaiwanMonth();
- // 選過「全部月份」後，雲端重新整理不得擅自切回當月。
+ // 進入請假管理預設台灣當月，即使本月沒有請假紀錄，也不自動跳到全部月份。
+ // 手動選擇其他月份或全部月份後，重新整理仍保留目前的月份。
  let selected=select.dataset.p79MonthReady==='1'?select.value:now;
- // 首次進入當月，若正式雲端資料只包含其他月份，不要把所有已載入請假隱藏。
- // 真正由使用者選過的月份（包括「全部月份」）永遠維持原選擇。
- if(select.dataset.p79MonthUserSelected!=='1'&&leaveRecords.length&&
-    !leaveRecords.some(r=>p79LeaveMatchesMonth(r,now))){
-   selected='';
-   select.dataset.p79AutoAllReason='no-current';
- }
  const months=new Set([now]);
  if(/^\d{4}-(0[1-9]|1[0-2])$/.test(selected))months.add(selected);
  for(const leave of leaveRecords){
@@ -688,8 +686,7 @@ function renderAdmin(){
  const distinctPeople=new Set(rows.map(l=>String(l.empId||l.attNo||l.name||'').trim().toUpperCase()).filter(Boolean)).size;
  const summary=$('adminLeaveSummary');
  if(summary)summary.textContent=(month?month.slice(0,4)+'年'+Number(month.slice(5))+'月':'全部月份')+
-   '｜顯示 '+rows.length+' 筆請假紀錄／'+distinctPeople+' 位人員｜雲端總計 '+leaveRecords.length+' 筆'+
-   (!month&&$('filterMonth').dataset.p79AutoAllReason==='no-current'?'（本月沒有請假資料，已自動顯示全部月份）':'');
+   '｜顯示 '+rows.length+' 筆請假紀錄／'+distinctPeople+' 位人員';
  rows.sort((a,b)=>String(b.startTime||b.startDate||'').localeCompare(String(a.startTime||a.startDate||'')));
  const balanceCache=new Map(),coverIndex=new Map();
  for(const cover of window.p79LeaveCoverAssignments||[]){const key=String(cover.leaveId),prior=coverIndex.get(key);coverIndex.set(key,prior?{...prior,workerIds:[...new Set([...(prior.workerIds||[]),...(cover.workerIds||[])])]}:cover);}
@@ -728,7 +725,7 @@ function renderAdmin(){
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
- }).join(''):'<tr><td colspan="9">'+(leaveRecords.length?(month?'所選月份沒有符合資料；雲端其他月份仍有請假紀錄，可切換「全部月份」查看。':'目前篩選條件沒有符合資料，請調整部門、職稱或狀態。'):'雲端尚無請假紀錄')+'</td></tr>';
+ }).join(''):'<tr><td colspan="9">'+(leaveRecords.length?(month?'所選月份沒有符合資料。':'目前篩選條件沒有符合資料，請調整部門、職稱或狀態。'):(month?'所選月份沒有請假紀錄':'目前沒有請假紀錄'))+'</td></tr>';
 }
 function renderAdminBalances(){
  if(!$('adminBalancePanel')?.open)return;
