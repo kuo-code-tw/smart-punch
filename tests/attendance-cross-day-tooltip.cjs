@@ -1,0 +1,39 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const engine=require('../attendance/v6-engine.js');
+const att=fs.readFileSync('attendance/index.html','utf8');
+const wh=fs.readFileSync('work-hours/index.html','utf8');
+const punch=(id,kind,time)=>({id,empId:'E65',attNo:'65',name:'員工',status:kind==='IN'?'上班簽到':'下班簽退',timeStr:time});
+const make=(inTime,outTime)=>engine.buildShifts([punch('A','IN',inTime),punch('B','OUT',outTime)])[0];
+const prev=make('2026/10/30 05:35','2026/10/30 07:53');
+const previousNote=engine.shiftWorkdayNote(prev);
+assert.equal(prev.accountingDateKey,'2026-10-29');
+assert.equal(previousNote.kind,'PREVIOUS_DAY');
+assert.equal(previousNote.summary,'凌晨歸前日・計入 10/29');
+assert(previousNote.tooltip.includes('實際上班：2026/10/30 05:35'));
+assert(previousNote.tooltip.includes('實際下班：2026/10/30 07:53'));
+assert(previousNote.tooltip.includes('工作日：2026/10/29'));
+const overnight=make('2026/10/29 23:35','2026/10/30 07:53');
+const overnightNote=engine.shiftWorkdayNote(overnight);
+assert.equal(overnightNote.kind,'OVERNIGHT');
+assert(overnightNote.tooltip.includes('跨越午夜'));
+assert.equal(overnightNote.summary,'跨日班次・計入 10/29');
+assert.equal(engine.shiftWorkdayNote(make('2026/10/30 07:34','2026/10/30 15:47')),null);
+assert.equal(engine.shiftWorkdayNote(make('2026/10/30 05:35','2026/10/30 08:00')),null);
+assert.equal(engine.shiftWorkdayNote({clockIn:punch('solo','IN','2026/10/30 05:35'),clockOut:null,accountingDateKey:'2026-10-30'}),null);
+const untouched=JSON.stringify(prev);
+engine.shiftWorkdayNote(prev);assert.equal(JSON.stringify(prev),untouched,'tooltip computation must be pure');
+for(const [page,label] of [[att,'attendance'],[wh,'work-hours']]){
+ assert(page.includes('const nightWorkdayNote=window.P79AttendanceV6?.shiftWorkdayNote?.(row)||null;'),label+' computes note from paired shift');
+ assert(page.includes('↔ ${escapeHtml(nightWorkdayNote.label)}'),label+' marks status clearly');
+ assert(page.includes('備註：${escapeHtml(nightWorkdayNote.summary)}'),label+' displays note in the remarks cell');
+ assert(page.includes('title="${nightWorkdayTooltip}"'),label+' has native mouse-hover tooltip');
+ assert(page.includes('aria-label="${nightWorkdayTooltip}"'),label+' preserves full details for accessibility');
+ assert(page.includes('tabindex="0"'),label+' allows keyboard focus');
+ assert(page.includes('v6-engine.js?v=20261101-ship-workday-tooltip'),label+' invalidates stale engine cache');
+ for(const script of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
+    if(!/\bsrc=|application\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
+}
+console.log('PASS tooltip: midnight cross-date, early-morning previous workday, normal day unaffected, hover/keyboard labels in both pages, source immutable');

@@ -9,6 +9,7 @@ on:
       - 'work-hours/index.html'
       - 'tests/attendance-oct02-anomaly-filter.cjs'
       - 'tests/attendance-ship-early-workday.cjs'
+      - 'tests/attendance-cross-day-tooltip.cjs'
       - 'tests/attendance-month-view.cjs'
       - 'tests/workhours-attendance-filter-consistency.cjs'
       - '.github/workflows/verify-attendance-anomaly.yml'
@@ -28,6 +29,7 @@ jobs:
       - name: Check October 2 orphan punches and filter consistency
         run: |
           node tests/attendance-ship-early-workday.cjs
+          node tests/attendance-cross-day-tooltip.cjs
           node tests/attendance-oct02-anomaly-filter.cjs
           node tests/workhours-attendance-filter-consistency.cjs
           node tests/attendance-bounded-render.cjs

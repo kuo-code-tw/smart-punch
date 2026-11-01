@@ -156,6 +156,38 @@
       sortTime:inRec?inRec.__ts:(outRec?outRec.__ts:0),v6PairReason:reason||''
     };
   }
+  // Read-only explanation for a shift whose physical punch day differs from its
+  // accounting day, or whose check-in/check-out straddle midnight.
+  // Both attendance and work-hours pages use this same text.
+  function shiftWorkdayNote(row){
+    if(!row?.clockIn||!row?.clockOut)return null;
+    const input=normalizeTime(row.clockIn.timeStr),output=normalizeTime(row.clockOut.timeStr);
+    const inDay=input.slice(0,10).replace(/\//g,'-');
+    const outDay=output.slice(0,10).replace(/\//g,'-');
+    const workday=s(row.accountingDateKey||row.dateKey).replace(/\//g,'-');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(inDay)||
+       !/^\d{4}-\d{2}-\d{2}$/.test(outDay)||
+       !/^\d{4}-\d{2}-\d{2}$/.test(workday))return null;
+    const overnight=inDay!==outDay;
+    const reassigned=workday!==inDay;
+    if(!overnight&&!reassigned)return null;
+    const shortDate=workday.slice(5).replace('-','/');
+    const label=reassigned?'凌晨歸前日':'跨日班次';
+    const reason=reassigned
+      ? '同日凌晨開始且在 08:00 前下班，依夜間工作日歸前一天'
+      : '上下班跨越午夜，依上班開始日歸屬工作日';
+    const displayTime=value=>s(value).replace(/-/g,'/').replace('T',' ');
+    const tooltip=[
+      label,
+      '工作日：'+workday.replace(/-/g,'/'),
+      '實際上班：'+displayTime(row.clockIn.timeStr),
+      '實際下班：'+displayTime(row.clockOut.timeStr),
+      '歸屬說明：'+reason
+    ].join('\n');
+    return {kind:reassigned?'PREVIOUS_DAY':'OVERNIGHT',
+      label,workday,shortDate,reason,tooltip,summary:label+'・計入 '+shortDate};
+  }
+
   function explicitTargetId(r){return s(r.v5PairTargetId);}
   function legacyTargetId(r){return r.__type==='OUT'?s(r.manualPairClockInId):r.__type==='IN'?s(r.manualPairClockOutId):'';}
   function explicitTargetTime(r){
@@ -484,11 +516,11 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.13-SHIP-EARLY-WORKDAY';
+    window.p79AttendanceEngineVersion='V6.0.14-SHIP-WORKDAY-TOOLTIPS';
     console.info('[PORT79] Attendance V6.0.13 ship early-morning work-date installed');
     return true;
   }
-  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};
+  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,shiftWorkdayNote,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
 
