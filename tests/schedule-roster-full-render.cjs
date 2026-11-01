@@ -44,6 +44,7 @@ const c={
  p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){},
  p79ScheduleLeavePolicy:{ready:false,types:[],token:'SESSION',empId:'E'},
  p79ScheduleLeaveActorId:()=> 'E',
+ p79ScheduleCanSelectLeave:()=>c.managerCanEdit===true,
  isScheduleSuperAdmin:()=>c.superAdmin===true,
  currentPort79SsoToken:()=> 'SESSION'
 };
@@ -67,20 +68,23 @@ assert(main.innerHTML.includes('>3</span>'),'special-day summary shows only a nu
 assert.equal((main.innerHTML.match(/data-rest-visible="例"/g)||[]).length,3);
 assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""'),'approved typhoon leave hides the fourth example');
 
-// HR settings apply to every date and every role. A normal manager is never
-// allowed to choose special leave, even when the cloud policy enables it.
+// Each manager receives their own authorized subset from HR.
+// A normal administrator with roster manage rights may use selected leave kinds.
 c.activeRoleTab='ARMG';c.activeGroupFilter='ALL';
-c.superAdmin=false;c.p79ScheduleLeavePolicy={ready:true,types:['年','事','病','公','喪'],token:'SESSION',empId:'E'};
+c.managerCanEdit=false;c.p79ScheduleLeavePolicy={ready:true,types:['年','事','病','公','喪'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
-for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'normal manager cannot select '+type);
-c.superAdmin=true;c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION',empId:'E'};
+for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'employee or viewer cannot select '+type);
+c.managerCanEdit=true;c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
-for(const type of ['年','病'])assert(main.innerHTML.includes('<option value="'+type+'"'),'superadmin gets only HR enabled '+type);
-for(const type of ['事','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'HR-disabled leave must not be in dropdown: '+type);
+for(const type of ['年','病'])assert(main.innerHTML.includes('<option value="'+type+'"'),'authorized administrator can select '+type);
+for(const type of ['事','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'unchecked leave denied '+type);
+c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION',empId:'OTHER'};
+c.renderRoleScheduleView();
+for(const type of ['年','病'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'another manager permissions never inherited');
 c.p79ScheduleLeavePolicy={ready:false,types:['年','事','病','公','喪'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
-for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'unverified HR config fails closed: '+type);
-console.log('PASS HR cloud-configured special leave: 83+ day cells, administrator denied, superadmin allowlist, unavailable config denied');
+for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'unverified HR config fails closed '+type);
+console.log('PASS admin HR leave permissions: admin grants only checked types; employee/other account/unverified denied');
 console.log('PASS 31-day full roster: allocated 4 例, one approved typhoon overlay gives exactly 3 visible 例 and counter 3/1; full special day tooltips');
 
 // Empty groups still need their transfer selector. Its candidates must include
