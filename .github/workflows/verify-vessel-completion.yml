@@ -1,0 +1,32 @@
+name: Vessel completion-month export integrity
+on:
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'tests/vessel-completion-export-integrity.cjs'
+      - 'tests/vessel-monthly-export.cjs'
+      - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - '.github/workflows/verify-vessel-completion.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'tests/vessel-completion-export-integrity.cjs'
+      - 'tests/vessel-monthly-export.cjs'
+      - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - '.github/workflows/verify-vessel-completion.yml'
+permissions:
+  contents: read
+jobs:
+  vessel-completion-exports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test monthly vessel export and completion-month accounting
+        run: |
+          node tests/vessel-completion-export-integrity.cjs
+          node tests/vessel-monthly-export.cjs
+          node tests/dashboard-monthly-quantity-reconciliation.cjs
