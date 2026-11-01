@@ -52,7 +52,10 @@ function build(input){
   }
   candidates.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||a.date.localeCompare(b.date));
   // 只有明確落在跨日班別時段才可歸屬前一日；隔天清晨單卡不能憑時鐘推測前日有上班。
-  const target=candidates[0]?.date||date;
+  // The paired attendance engine owns the accounting workday. Never assign
+  // a complete shift back to the punch calendar date using roster heuristics.
+  const officialDay=paired&&/^\d{4}-\d{2}-\d{2}$/.test(String(session.workDate||''))?session.workDate:'';
+  const target=officialDay||(candidates[0]?.date||date);
   sessionDates[index]=target;
   mark(emp,target,paired?'worked':'missing');
   // One unpaired punch may fit adjacent shifts; neither is proven wholly absent.
