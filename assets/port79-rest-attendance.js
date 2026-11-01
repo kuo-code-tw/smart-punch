@@ -51,7 +51,8 @@ function build(input){
    if(paired?overlap>0:inside||distance<=4*HOUR)candidates.push({date:d,distance,overlap});
   }
   candidates.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||a.date.localeCompare(b.date));
-  const target=candidates[0]?.date||(!hasIn&&hasOut&&new Date(at+8*HOUR).getUTCHours()<9?shiftDate(date,-1):date);
+  // 只有明確落在跨日班別時段才可歸屬前一日；隔天清晨單卡不能憑時鐘推測前日有上班。
+  const target=candidates[0]?.date||date;
   sessionDates[index]=target;
   mark(emp,target,paired?'worked':'missing');
   // One unpaired punch may fit adjacent shifts; neither is proven wholly absent.
