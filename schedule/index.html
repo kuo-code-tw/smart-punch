@@ -3131,6 +3131,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     const p79ScheduleNoPunchTasks=new Map();
     function p79QueueScheduleNoPunchReconcile(yearMonth){
+      // EMERGENCY HOLD: prevent background full-month autosave after
+      // attendance refresh. This function MUST remain read-only for now.
+      return Promise.resolve(0);
       if(p79ScheduleNoPunchTasks.has(yearMonth))return p79ScheduleNoPunchTasks.get(yearMonth);
       const task=p79ApplyNoPunchRestFromOfficial(yearMonth).then(async changed=>{
         if(changed && currentScheduleMonthKey()===yearMonth && scheduleEditLockState.mine){
@@ -4526,6 +4529,9 @@ function p79EmployeeDateEligible(emp,date) {
     // 無卡改休假由正式 GAS 依例→休→國寫回；前端不重複分配，只在有完整打卡時核對誤判工作班。
     // 考勤歸屬以原上班日為準；隔日凌晨的 OUT 同時計入前一日，避免跨日班誤判。
     async function p79ApplyNoPunchRestFromOfficial(yearMonth) {
+      // EMERGENCY HOLD: do not rewrite any saved shifts from inferred
+      // punch classifications while historical data is under reconciliation.
+      return 0;
       const requestMutationVersion=p79ScheduleLocalMutationVersion;
       const requestViewVersion=p79ScheduleAttendanceViewVersion;
       if(!scheduleEditLockState.mine||port79ScheduleDirty||!p79ScheduleHasOfficialData())return 0;
@@ -4718,6 +4724,13 @@ function p79EmployeeDateEligible(emp,date) {
     async function saveScheduleMonthToCloud(showAlert = true, saveIntent = 'background') {
       if(!requireScheduleEditLock(showAlert))return false;
       const yearMonth = document.getElementById('month-picker').value;
+      // Freeze October's bulk write path until original saved shifts have
+      // been reconciled with authenticated cloud backup and attendance.
+      if(yearMonth==='2026-10'){
+        lastScheduleCloudError='安全保護：2026年10月班表正在修復核對，已暫停整月雲端寫入，以防止大量班別變成休假。';
+        if(showAlert)alert(lastScheduleCloudError);
+        return false;
+      }
       if(p79ScheduleSourceState?.month && p79ScheduleSourceState.month!==yearMonth){
         lastScheduleCloudError='月份尚未完成雲端讀取，已禁止將其他月份的班表寫入 '+yearMonth;
         if(showAlert)alert(lastScheduleCloudError);
@@ -7190,6 +7203,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
     }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
+      // EMERGENCY HOLD 2026-11-01: a missing or incomplete monthly attendance
+      // response must never mass-convert scheduled work to 休. Keep the cloud
+      // roster code visible until independently verified per employee and day.
+      return false;
       // 全公司一套規則：只有跨月原始考勤全部讀齊、班次結束後確認無任何 IN/OUT，
       // 才把「過去的排定工作日」顯示／統計為休假。
       // 不修改原班表、既有申報、人工核准假、颱風假及跨日夜班。
@@ -7577,6 +7594,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
 
     function p79ApplyAutomaticRestMetadata() {
+      // EMERGENCY HOLD: no implicit quota allocation during saves.
+      return false;
       const month=document.getElementById('month-picker').value;
       let changed=false;
       for (const emp of employees) {
