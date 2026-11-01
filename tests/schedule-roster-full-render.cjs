@@ -42,7 +42,8 @@ const c={
  p79DailyRestCount:()=>({counts:{例:4,休:0,國:0},dates:{例:['02','13','19','27'],休:[],國:[]}}),
  canManageSchedule:()=>false,p79OvertimePeriodLabel:()=>'',scheduleCanEditNow:()=>false,
  p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){},
- p79ScheduleLeavePolicy:{ready:false,types:[],token:'SESSION'},
+ p79ScheduleLeavePolicy:{ready:false,types:[],token:'SESSION',empId:'E'},
+ p79ScheduleLeaveActorId:()=> 'E',
  isScheduleSuperAdmin:()=>c.superAdmin===true,
  currentPort79SsoToken:()=> 'SESSION'
 };
@@ -69,14 +70,14 @@ assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""
 // HR settings apply to every date and every role. A normal manager is never
 // allowed to choose special leave, even when the cloud policy enables it.
 c.activeRoleTab='ARMG';c.activeGroupFilter='ALL';
-c.superAdmin=false;c.p79ScheduleLeavePolicy={ready:true,types:['年','事','病','公','喪'],token:'SESSION'};
+c.superAdmin=false;c.p79ScheduleLeavePolicy={ready:true,types:['年','事','病','公','喪'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
 for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'normal manager cannot select '+type);
-c.superAdmin=true;c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION'};
+c.superAdmin=true;c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
 for(const type of ['年','病'])assert(main.innerHTML.includes('<option value="'+type+'"'),'superadmin gets only HR enabled '+type);
 for(const type of ['事','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'HR-disabled leave must not be in dropdown: '+type);
-c.p79ScheduleLeavePolicy={ready:false,types:['年','事','病','公','喪'],token:'SESSION'};
+c.p79ScheduleLeavePolicy={ready:false,types:['年','事','病','公','喪'],token:'SESSION',empId:'E'};
 c.renderRoleScheduleView();
 for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'unverified HR config fails closed: '+type);
 console.log('PASS HR cloud-configured special leave: 83+ day cells, administrator denied, superadmin allowlist, unavailable config denied');
