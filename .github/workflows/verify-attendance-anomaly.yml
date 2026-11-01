@@ -8,6 +8,7 @@ on:
       - 'attendance/v6-engine.js'
       - 'work-hours/index.html'
       - 'tests/attendance-oct02-anomaly-filter.cjs'
+      - 'tests/attendance-month-view.cjs'
       - 'tests/workhours-attendance-filter-consistency.cjs'
       - '.github/workflows/verify-attendance-anomaly.yml'
   workflow_dispatch:

@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');const html=fs.readFileSync('attendance/index.html','utf8');function fn(name){const a=html.indexOf('        function '+name+'(');assert(a>=0);return html.slice(a,html.indexOf('\n        }',a)+10)}
-const rows=[{dateKey:'2026-10-01',clockIn:{timeStr:'2026/10/01 23:40'},attendanceStatus:'缺少簽退'},{dateKey:'2026-10-07'},{dateKey:'2026-10-12'}];const c={dailyRows:rows,currentEmp:{empId:'ADMIN'},deptFilter:'ALL',jobTitleFilter:'ALL',nameFilter:'ALL',statusFilter:'ABNORMAL',monthFilter:'2026-10',datePageMonth:'2026-10',dateFrom:'2026-10-01',dateTo:'2026-10-31',getTodayAttendanceIso:()=> '2026-10-12',getAttendanceDateKey:s=>String(s||'').slice(0,10),attendanceRowIsCarryIntoMonth:()=>false,renderAdminRecordsTable(){},document:{getElementById:()=>null}};vm.createContext(c);vm.runInContext("let recordsPaginationSignature='',recordsCurrentPage=1,recordsSelectedDateKey='',recordsDatePageKeys=[],recordsSingleDateRequested=false,recordsRangeViewRequested=false;",c);for(const name of ['attendanceRowDatePageKey','goToRecordsPage','showRecordsDateRange','p79UseRecordsRangeView','p79SelectRecordsViewRows'])vm.runInContext(fn(name),c);
+const rows=[{dateKey:'2026-10-01',clockIn:{timeStr:'2026/10/01 23:40'},attendanceStatus:'缺少簽退'},{dateKey:'2026-10-07'},{dateKey:'2026-10-12'}];const c={dailyRows:rows,currentEmp:{empId:'ADMIN'},deptFilter:'ALL',jobTitleFilter:'ALL',nameFilter:'ALL',statusFilter:'ALL',monthFilter:'2026-10',datePageMonth:'2026-10',dateFrom:'2026-10-01',dateTo:'2026-10-31',getTodayAttendanceIso:()=> '2026-10-12',getAttendanceDateKey:s=>String(s||'').slice(0,10),attendanceRowIsCarryIntoMonth:()=>false,renderAdminRecordsTable(){},document:{getElementById:()=>null}};vm.createContext(c);vm.runInContext("let recordsPaginationSignature='',recordsCurrentPage=1,recordsSelectedDateKey='',recordsDatePageKeys=[],recordsSingleDateRequested=false,recordsRangeViewRequested=false;",c);for(const name of ['attendanceRowDatePageKey','goToRecordsPage','showRecordsDateRange','p79UseRecordsRangeView','p79SelectRecordsViewRows'])vm.runInContext(fn(name),c);
 const a=html.indexOf('            const paginationSignature = [deptFilter,'),b=html.indexOf('            const rawEventKeys = new Set();',a);const block=html.slice(a,b)+'\nthis.result={rows:pageRows,date:selectedDateKey,range:rangeView};';function render(){vm.runInContext("{\n"+block+"\n}",c);return c.result}let passed=0;function test(name,f){f();passed++;console.log('PASS '+name)}
 test('initial load keeps today selected until range is explicitly requested',()=>{const r=render();assert.equal(r.rows.length,1);assert.equal(r.date,'2026-10-12');assert(!r.range)});
 test('explicit whole-month request shows every filtered date',()=>{c.showRecordsDateRange();const r=render();assert.equal(r.rows.length,3);assert.equal(r.date,'');assert(r.range)});
@@ -13,5 +13,14 @@ test('explicit range with month and no date bounds shows whole month',()=>{c.dat
 test('all-month filter preserves explicitly selected day; range can expand',()=>{c.goToRecordsPage(1);c.monthFilter='ALL';assert(!render().range);c.showRecordsDateRange();assert(render().range);assert.equal(c.result.rows.length,3)});
 test('one-sided multi-day ranges expand',()=>assert(c.p79UseRecordsRangeView('2026-10-01','','ALL',false)));
 test('range view keeps already-filtered abnormal rows and input untouched',()=>{assert.equal(c.p79SelectRecordsViewRows(rows,'','2026-10'),rows);assert.equal(rows[0].attendanceStatus,'缺少簽退')});
+test('choosing anomaly searches the entire selected month instead of silently hiding other dates',()=>{
+ c.statusFilter='ABNORMAL';
+ vm.runInContext("recordsSingleDateRequested=true;recordsRangeViewRequested=false;recordsSelectedDateKey='2026-10-12';",c);
+ const r=render();
+ assert.equal(r.rows.length,3);
+ assert.equal(r.date,'');
+ assert(r.range);
+ c.statusFilter='ALL';
+});
 test('all inline scripts parse',()=>{for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1])});
 console.log(JSON.stringify({passed,failed:0,scope:'current renderer date-selection block; latest default-day behavior from d92fbd0; explicit range selection preserved; no production writes'}));
