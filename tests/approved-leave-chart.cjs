@@ -6,6 +6,12 @@ const leaves=[row('A'),row('A'),row('HALF',{days:.5,empId:'E2'}),row('CROSS',{st
 let report=api.aggregate({employees,leaveRecords:leaves,month:'2026-10'});a.deepEqual(report.rows,[{title:'AQC',days:3},{title:'指揮手',days:1}]);a.deepEqual([...report.unitRows].sort((x,y)=>x.unit.localeCompare(y.unit)),[{unit:'丙單位',days:0},{unit:'乙單位',days:1},{unit:'甲單位',days:3}].sort((x,y)=>x.unit.localeCompare(y.unit)));a.equal(report.issues.length,0);
 report=api.aggregate({employees,month:'2026-10',leaveRecords:[row('AMB',{startDate:'2026-09-30',endDate:'2026-10-01',days:.5}),row('STALE',{updatedAt:'2026-10-01'}),row('STALE',{status:'已取消',updatedAt:'2026-10-02'}),row('CONFLICT'),row('CONFLICT',{days:.5})]});a.equal(report.rows.length,0);a.equal(report.issues.length,2,'ambiguous allocation and duplicate versions are not guessed');
 a.equal(api.aggregate({employees,leaveRecords:leaves,month:'2026-09'}).rows.find(r=>r.title==='AQC').days,1);
-const html=fs.readFileSync('index.html','utf8'),js=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');a(html.includes('id="p79DashAttendancePages"'));for(const name of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])a(html.includes('id="'+name+'"'));
-a(js.includes("attendancePage=0;attendanceReport=null;leaveReport=null"),'month reset clears both old models and defaults to page one');a(js.includes('isUnitPage=attendancePage===0'),'first page shows unit leave days');
-console.log('PASS approved only, deduplicated, cancelled/deleted excluded, formal HR titles, cross-month full/half daily allocations, half days, month refresh and page controls');
+const html=fs.readFileSync('index.html','utf8'),js=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');
+a(html.includes('id="p79DashAttendancePages"'));
+a(html.includes('本月各職稱加班時數統計'),'home card now displays role overtime');
+for(const name of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])a(!html.includes('id="'+name+'"'),'removed pagination '+name);
+a(js.includes('function renderOvertimeByJobTitle()'),'render is fixed to job-title overtime');
+a(js.includes('function setOvertimeReport(report)'),'home uses overtime data instead of leave data');
+a(js.includes('overtimeReport=null'),'month reset clears prior overtime report');
+a(!js.includes('attendancePage')&&!js.includes('setLeaveReport'),'old paging logic is removed');
+console.log('PASS approved leave aggregator remains correct; homepage now shows non-paged overtime-by-job-title card');
