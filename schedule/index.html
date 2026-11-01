@@ -8791,6 +8791,10 @@ window.p79ShowCombinedShiftInfo=function(button){
 #app-main-container .p79-month-schedule-table .p79-rest-count-compact .p79-rest-deficit{display:block!important;color:#b45309!important;font-weight:900!important;font-size:10px!important}
 #app-main-container .p79-month-schedule-table .p79-rest-election{background:#eef2ff!important;color:#4338ca!important;font-weight:900!important}
 </style>
+
+<!-- Historical month is read-only and never rewrites active-month state. -->
+<script src="../assets/port79-history-month-inline.js?v=20261101"></script>
+<script>window.P79HistoryMonthInline.enhance({type:"schedule",selector:"#month-picker"});</script>
 </body>
 </html>
 
