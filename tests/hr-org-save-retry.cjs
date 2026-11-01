@@ -27,16 +27,17 @@ await test('superadmin can grant and revoke admin leave; staff locked',async()=>
  const modal={open:true};
  const currentRole={value:'superadmin'};
  const c={session:{adminRole:'superadmin'},editing:{empId:'EMP01'},editor:modal,
-  p79EditorLeavePermission:{ready:false,empId:'',types:[]},
+  p79EditorLeavePermission:{ready:false,empId:'',types:[],dirty:false,touched:{}},
+  p79EditorLeaveRequestId:0,p79EditorLeaveCachedCloud:{key:'',config:null,at:0,pending:null},GAS_URL:'test-gas',token:'ACTOR',Date,
   document:{querySelectorAll:()=>controls},
   $:id=>id==='adminRole'?currentRole:id==='p79EditorLeavePermissionStatus'?status:null,
   P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
   P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
   P79_HR_SCHEDULE_LEAVE_LEGACY_KEY:'hrScheduleLeaveEditV1',
-  p79ReadCanonicalOrgOptions:async()=>({hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年','病'],EMP02:['事']}}}),
+  apiGet:async()=>({config:{hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年','病'],EMP02:['事']}}}}),
   String,Array,JSON,Error,console};
  vm.createContext(c);
- for(const n of ['p79HrScheduleLeaveIsSuperAdmin','p79EditorLeaveRoleAllowed','p79RenderEditorLeavePermission','p79LoadEditorLeavePermission'])vm.runInContext(fn(n),c);
+ for(const n of ['p79HrScheduleLeaveIsSuperAdmin','p79EditorLeaveRoleAllowed','p79EditorLeaveCloudCacheKey','p79ReadEditorLeaveCloudConfig','p79RenderEditorLeavePermission','p79OnEditorLeavePermissionChange','p79LoadEditorLeavePermission'])vm.runInContext(fn(n),c);
  await c.p79LoadEditorLeavePermission();
  assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['年','病']);
  assert(controls.every(x=>!x.disabled),'superadmin can edit their own employee record');
@@ -51,11 +52,48 @@ await test('superadmin can grant and revoke admin leave; staff locked',async()=>
  c.session={adminRole:'admin'};c.p79RenderEditorLeavePermission();
  assert(controls.every(x=>x.disabled),'a manager cannot grant permissions to other managers');
 });
+await test('slow cloud never blocks editor and never overwrites a superadmin click',async()=>{
+ const kinds=['年','事','病','公','喪'];
+ const controls=kinds.map(hrEditorLeave=>({checked:false,disabled:true,dataset:{hrEditorLeave}}));
+ const role={value:'admin'},status={textContent:''};
+ let complete,requests=0;
+ const pending=new Promise(resolve=>complete=resolve);
+ const c={session:{adminRole:'superadmin',empId:'ACTOR'},editing:{empId:'EMP09',adminRole:'admin'},
+  editor:{open:true},token:'TEST',GAS_URL:'GAS_TEST',Date,
+  p79EditorLeavePermission:{ready:false,empId:'',types:[],dirty:false,touched:{}},
+  p79EditorLeaveRequestId:0,p79EditorLeaveCachedCloud:{key:'',config:null,at:0,pending:null},
+  $:id=>id==='adminRole'?role:id==='p79EditorLeavePermissionStatus'?status:null,
+  document:{querySelectorAll:selector=>selector.includes(':checked')?controls.filter(x=>x.checked):controls},
+  P79_HR_SCHEDULE_LEAVE_TYPES:kinds,
+  P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
+  P79_HR_SCHEDULE_LEAVE_LEGACY_KEY:'hrScheduleLeaveEditV1',
+  apiGet:async()=>{requests++;return pending},String,Array,JSON,Error,console,Set,Promise,Object};
+ vm.createContext(c);
+ for(const n of ['p79HrScheduleLeaveIsSuperAdmin','p79EditorLeaveRoleAllowed','p79EditorLeaveCloudCacheKey',
+  'p79ReadEditorLeaveCloudConfig','p79RenderEditorLeavePermission','p79OnEditorLeavePermissionChange','p79LoadEditorLeavePermission'])
+  vm.runInContext(fn(n),c);
+ const load=c.p79LoadEditorLeavePermission();
+ assert(controls.every(x=>!x.disabled),'all five boxes are clickable immediately without cloud response');
+ assert(status.textContent.includes('不必等雲端'),'clear immediate guidance shown');
+ controls[0].checked=true;c.p79OnEditorLeavePermissionChange(controls[0]);
+ assert.equal(c.p79EditorLeavePermission.dirty,true);
+ assert.equal(controls[0].checked,true);
+ complete({config:{hrScheduleLeaveEditV2:{byEmployee:{EMP09:['事','公']}}}});
+ await load;
+ assert.equal(requests,1);
+ assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['年','事','公'],
+  'late cloud response merges checked draft with existing permissions');
+ assert(controls.every(x=>!x.disabled));
+ role.value='employee';c.p79RenderEditorLeavePermission();
+ assert(controls.every(x=>x.disabled),'ordinary staff remain locked');
+});
 await test('employee permission saving merges cloud data without affecting other staff',async()=>{
  let config={hrOrgOptionsV1:{departments:['D']},customFlag:123,hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年'],EMP02:['公']}}};
  const c={session:{adminRole:'superadmin'},String,JSON,Array,Error,TextEncoder,
  P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
  P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
+ P79_HR_SCHEDULE_LEAVE_LEGACY_KEY:'hrScheduleLeaveEditV1',
+ editing:{empId:'EMP01',adminRole:'admin'},p79EditorLeaveCachedCloud:{config:null,at:0},
  p79ReadCanonicalOrgOptions:async()=>JSON.parse(JSON.stringify(config)),
  p79RetryOrgSave:async producer=>{const x=await producer();assert.equal(x.action,'saveConfig');config=x.config;}};
  vm.createContext(c);
@@ -65,6 +103,12 @@ await test('employee permission saving merges cloud data without affecting other
  assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP02,['公'],'another account unaffected');
  assert.equal(config.customFlag,123);
  assert.deepEqual(config.hrOrgOptionsV1,{departments:['D']},'HR organization settings unaffected');
+ await c.p79SaveEditorLeavePermission('EMP01','EMP01',['病'],{'年':false,'病':true});
+ assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP01,['病'],'explicitly unchecked code is revoked');
+ assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP02,['公'],'other staff untouched');
+ config.hrScheduleLeaveEditV2.byEmployee.EMP01=['公'];
+ await c.p79SaveEditorLeavePermission('EMP01','EMP01',['年'],{'年':true});
+ assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP01,['年','公'],'a quick initial click keeps the unseen previously granted code');
  c.session={adminRole:'admin'};
  await assert.rejects(()=>c.p79SaveEditorLeavePermission('EMP02','EMP02',['年']),/超級管理員/);
 });
