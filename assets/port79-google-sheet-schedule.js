@@ -11,7 +11,28 @@ const $=id=>g.document.getElementById(id);
 const str=v=>String(v??'').trim();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const short=v=>str(v).slice(0,180);
-let rows=[],lastSync=0,state='idle',error='',notice='',loaded=false,request=null,dialog=null;
+// WAN HAI API dates are Taiwan-local wall times (UTC+08), not browser-local times.
+// Only suppress a row when its own published ETD has already passed.
+// Preserve it in the source Sheet for auditing; do not infer actual departure.
+function parseTaipeiTime(value){
+ const m=/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(str(value));
+ if(!m)return NaN;
+ const y=Number(m[1]),mon=Number(m[2]),day=Number(m[3]),h=Number(m[4]),min=Number(m[5]),sec=Number(m[6]||0);
+ const local=Date.UTC(y,mon-1,day,h,min,sec),d=new Date(local);
+ if(d.getUTCFullYear()!==y||d.getUTCMonth()+1!==mon||d.getUTCDate()!==day||
+    d.getUTCHours()!==h||d.getUTCMinutes()!==min||d.getUTCSeconds()!==sec)return NaN;
+ return local-8*60*60*1000;
+}
+function selectCurrentRows(parsed,now=Date.now()){
+ const current=[];let expiredCount=0;
+ parsed.forEach(r=>{
+  const etd=parseTaipeiTime(r.etd);
+  if(Number.isFinite(etd)&&etd<now){expiredCount++;return;}
+  current.push(r);
+ });
+ return {rows:current,expiredCount};
+}
+let rows=[],expiredCount=0,lastSync=0,state='idle',error='',notice='',loaded=false,request=null,dialog=null;
 function parseRows(data){
  if(!Array.isArray(data))return [];
  const seen=new Set();
@@ -58,13 +79,13 @@ function renderOne(host){
   host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>首次開啟及手動更新時讀取</small></div>';return;
  }
  if(state==='ready'&&rows.length){
-  host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(notice?' · 更新提醒':'')+'</div>'+
+  host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(expiredCount?' · 另 '+expiredCount+' 艘 ETD 已過未列入':'')+(notice?' · 更新提醒':'')+'</div>'+
     '<div class="p79-schedule-list" role="list">'+rows.slice(0,host.id===STAFF_ID?3:4).map(line).join('')+'</div>'+
     (notice?'<div class="p79-schedule-footnote">來源最近同步失敗，保留上次成功資料。</div>':'');return;
  }
- const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?'萬海網站尚無船期資料':'尚未讀取萬海船期';
+ const headline=state==='error'?'目前無法取得萬海船期':state==='ready'?(expiredCount?'目前沒有可確認的近期船期':'萬海網站尚無船期資料'):'尚未讀取萬海船期';
  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>'+esc(headline)+'</strong>'+
-  '<small>'+esc(error||notice||'資料來源為萬海航運船期網站，同步失敗不會使用港務公司資料。')+'</small>'+
+  '<small>'+esc(error||notice||(expiredCount?'另有 '+expiredCount+' 艘已過預計離港時間，原始船期仍保留供核對。':'資料來源為萬海航運船期網站，同步失敗不會使用港務公司資料。'))+'</small>'+
   '<div class="p79-schedule-remote-actions"><button type="button" data-public-ship-retry>重新讀取</button><a class="p79-schedule-external-link" href="https://khhtml.wanhai.com/web/SailingScheduleList" target="_blank" rel="noopener noreferrer">開啟萬海網站</a></div></div>';
 }
 function render(){renderOne($(STAFF_ID));renderOne($(DASH_ID));}
@@ -106,7 +127,8 @@ async function refresh(){
    if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
    if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
     throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
-   rows=parseRows(data.rows);
+   const filtered=selectCurrentRows(parseRows(data.rows));
+   rows=filtered.rows;expiredCount=filtered.expiredCount;
    lastSync=Number(data.lastSync)||0;notice=str(data.error);
    state='ready';error='';
   }catch(e){state='error';error=str(e?.message||e);}
@@ -155,6 +177,6 @@ function init(){
  $('p79DashRefresh')?.addEventListener('click',refresh);
  render();refresh();
 }
-g.P79ManualShipSchedule={render,refresh,parseRows,source:SOURCE};
+g.P79ManualShipSchedule={render,refresh,parseRows,selectCurrentRows,parseTaipeiTime,source:SOURCE};
 if(g.document.readyState==='loading')g.document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
