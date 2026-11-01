@@ -92,6 +92,10 @@ await test('roster enforces each authorized admin account, denies employee and s
  c.schedulePermission='view';
  assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'a non-editor admin cannot change leave on schedule');
  c.schedulePermission='manage';
+ cache.set('admin_session',JSON.stringify({empId:'EMP04',adminRole:'admin'}));
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true,'manager without grant may read policy');
+ for(const leave of ['年','事','病','公','喪'])
+   assert.equal(c.p79ScheduleAllowedEditShift(leave),false,'unchecked manager cannot select '+leave);
  cache.set('admin_session',JSON.stringify({empId:'EMP03',adminRole:'employee'}));
  assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'employee denied even if permissions are stale');
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false,'employee may not load privileged permissions');
