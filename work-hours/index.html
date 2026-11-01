@@ -10,7 +10,7 @@
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261101-submitted-overtime-readonly-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261101-all-staff-auto-supplement-v3&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -1810,7 +1810,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                         <h4 id="p79OvertimePlannedHeading" class="font-bold text-indigo-900 dark:text-indigo-200">預排／待核對</h4>
                         <div class="flex flex-wrap items-center gap-2"><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeManual" type="checkbox" checked onchange="p79ChoosePlanningMode('manual')">手動預排</label><label class="inline-flex items-center gap-1.5 text-xs font-bold"><input id="p79PlanModeAuto" type="checkbox" onchange="p79ChoosePlanningMode('auto')">自動預排</label><button type="button" onclick="p79OpenManualOvertimePlan()" class="rounded-lg bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold">＋ 新增預排</button><span id="p79OvertimePlannedCount" class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">讀取中…</span><button type="button" onclick="p79CloseOvertimePlannedDialog()" class="p79-ot-planned-close rounded-lg border border-indigo-200 px-3 py-1 text-xs text-indigo-800 dark:text-indigo-200" aria-label="關閉預排待核對視窗">✕ 關閉</button></div>
                     </div>
-                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">預設手動預排；勾選自動預排只產生建議，需再勾選並儲存才會加入清單。讀取未休額度不會自動安排；預排不計入正式加班。</p>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">系統自動核對全員已配休、已申報及缺申報編號。當月未來日期的自動預排仍須確認儲存；歷史月份已核實的原日期8小時出勤可一次確認申報，不必逐人勾選。未完成正式申報及雲端讀回，不得顯示已核准。</p>
                     <p id="p79PlannedPunchNotice" role="status" aria-live="polite" hidden class="text-xs font-semibold px-2 py-1 mb-2 rounded bg-indigo-50 text-indigo-900"></p>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
