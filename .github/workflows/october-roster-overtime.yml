@@ -1,0 +1,23 @@
+name: Check October roster and overtime system fix
+on:
+  pull_request:
+    paths:
+      - 'schedule/index.html'
+      - 'assets/port79-attendance-overtime.js'
+      - 'tests/october-system-roster-overtime.cjs'
+      - '.github/workflows/october-roster-overtime.yml'
+permissions:
+  contents: read
+jobs:
+  focused-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/october-system-roster-overtime.cjs
+      - run: node tests/attendance-overtime-1012-effective-status.cjs
+      - run: node tests/vessel-completion-export-integrity.cjs
+      - run: node tests/schedule-november-render-fallback.cjs
+

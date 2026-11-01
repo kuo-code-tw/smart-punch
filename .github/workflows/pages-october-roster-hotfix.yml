@@ -1,0 +1,42 @@
+name: Publish October roster and overtime hotfix
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'schedule/index.html'
+      - 'assets/port79-attendance-overtime.js'
+      - 'tests/october-system-roster-overtime.cjs'
+      - '.github/workflows/pages-october-roster-hotfix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-static-publish
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify October roster, overtime, November safety and vessel monthly integrity
+        run: |
+          node tests/october-system-roster-overtime.cjs
+          node tests/attendance-overtime-1012-effective-status.cjs
+          node tests/schedule-november-render-fallback.cjs
+          node tests/vessel-completion-export-integrity.cjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
