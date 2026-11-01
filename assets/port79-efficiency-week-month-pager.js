@@ -10,7 +10,7 @@ var base=g.P79ReferenceDashboard;
 var model=g.P79MonthlyDashboard;
 var originalVessels=base.vessels,originalReset=base.reset;
 var mode='week',cursor='',weekCursor='',yearCursor='',selectedMonth='',sessionKey='',seq=0;
-var cache=new Map(),inflight=new Map();
+var cache=new Map(),inflight=new Map(),lastChart=null,lastChartSize='';
 var style=d.createElement('style');
 style.id='p79-efficiency-week-month-pager-style';
 style.textContent=[
@@ -23,10 +23,10 @@ style.textContent=[
  '.p79-eff-pager .p79-eff-arrows button{font-size:19px;padding:3px 9px;min-width:30px}',
  '.p79-eff-pager .p79-eff-period{font-size:12px;color:#587493;font-weight:800;text-align:center;min-width:125px;font-variant-numeric:tabular-nums}',
  '.p79-eff-summary{font-size:11px;color:#66809a;padding:4px 1px 2px;text-align:right;line-height:1.5}',
- // 週／月切換後仍維持短版圖表，不讓動態樣式再次把卡片拉高。
- // 日期標籤與完整圖表比例保留，內容固定在精簡卡片內。
+ // 週／月切換後只讓圖表填滿卡片的剩餘空間；不改變其他兩張卡片高度。
+ // SVG 隨容器自動縮放，週／月日期與數據維持可讀。
  'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel.p79d-trend{height:260px!important;min-height:260px!important;max-height:260px!important;overflow:hidden!important;align-self:stretch!important}',
- 'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashShipBars.p79d-bars{height:120px!important;min-height:120px!important;max-height:120px!important;overflow:visible!important;flex:none!important}',
+ 'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashShipBars.p79d-bars{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;flex:1 1 0!important}',
  'html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-trend .p79-eff-pager{padding:1px 0 3px!important;gap:3px 7px!important}',
  '@media(max-width:620px){.p79-eff-pager{justify-content:center}.p79-eff-pager .p79-eff-period{min-width:0}html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-panel.p79d-trend{height:275px!important;min-height:275px!important;max-height:275px!important}}'
 ].join('\n');
@@ -127,23 +127,38 @@ function monthly(p,failures){
  return {days:series,average:allHours>0?allQuantity/allHours:null,valid:series.filter(x=>x.gph!==null).length,failures:failures.size};
 }
 function draw(p,report){
+ lastChart={p,report};
  var days=report.days;
  if(summaryEl){
   var suffix=mode==='week'?'天':'個月',errorText=report.failures?' · '+report.failures+' 個月份讀取失敗（未計入）':'';
   summaryEl.textContent=(report.average===null?'沒有有效 GPH 資料':(report.failures?'已取得月份加權效率 ':'期間加權效率 ')+report.average.toFixed(2)+' GPH')+' · 有效 '+report.valid+' '+suffix+errorText;
  }
- var w=480,h=190,left=35,right=16,top=26,bottom=31,pw=w-left-right,ph=h-top-bottom;
- // 左側 GPH 刻度：一般週期固定顯示 15、20、25、30；
- // 若實際效率超出這個範圍，按每 5 GPH 自動延伸，避免折線被截斷。
+ // 使用實際可用寬高繪製，不再把 480x190 的 SVG 等比例擠在 120px 容器中。
+ var w=Math.max(260,Math.round(chartEl.clientWidth||480)),h=Math.max(130,Math.round(chartEl.clientHeight||170));
+ var left=43,right=13,top=24,bottom=29,pw=w-left-right,ph=h-top-bottom;
+ // Y 軸依當期有效 GPH 自動縮放，至少保留 4 GPH 的視野，避免微小差距被誇大。
  var validValues=days.filter(v=>Number.isFinite(v.gph)).map(v=>v.gph);
- var floor=validValues.length?Math.max(0,Math.min(15,Math.floor(Math.min(...validValues)/5)*5)):15;
- var ceiling=validValues.length?Math.max(30,Math.ceil(Math.max(...validValues)/5)*5):30;
+ function niceStep(target){
+  var power=Math.pow(10,Math.floor(Math.log10(target||1))),n=target/power;
+  return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*power;
+ }
+ var floor=15,ceiling=30,step=5;
+ if(validValues.length){
+  var minimum=Math.min(...validValues),maximum=Math.max(...validValues);
+  var center=(minimum+maximum)/2,span=Math.max(4,(maximum-minimum)*1.25);
+  var low=Math.max(0,center-span/2),high=center+span/2;
+  step=niceStep((high-low)/5);
+  floor=Math.max(0,Math.floor(low/step)*step);
+  ceiling=Math.ceil(high/step)*step;
+  if(ceiling-floor<step*3)ceiling=floor+step*4;
+ }
  var range=ceiling-floor;
  var gap=pw/days.length,grid='',texts='',segments=[],part=[];
  var escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- for(var tick=floor;tick<=ceiling;tick+=5){
-  var y0=top+ph-(tick-floor)/range*ph;
-  grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y0+4)+'" text-anchor="end">'+tick+'</text>';
+ for(var tickIndex=0,tickCount=Math.round(range/step);tickIndex<=tickCount;tickIndex++){
+  var tick=floor+tickIndex*step,y0=top+ph-(tick-floor)/range*ph;
+  var tickText=step<1?Number(tick.toFixed(2)).toString():Number(tick.toFixed(1)).toString();
+  grid+='<path class="p79r-gridline" d="M'+left+' '+y0+'H'+(w-right)+'"/><text x="'+(left-9)+'" y="'+(y0+4)+'" text-anchor="end">'+tickText+'</text>';
  }
  for(var i=0;i<days.length;i++){
   var x=left+gap*(i+.5),row=days[i],label=mode==='week'?Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2)):Number(row.date.slice(5,7))+'月';
@@ -154,12 +169,13 @@ function draw(p,report){
    continue;
   }
   var y=top+ph-(row.gph-floor)/range*ph;part.push([x,y]);
-  texts+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+(mode==='week'?'':' 月')+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
+  texts+='<circle cx="'+x+'" cy="'+y+'" r="4.5" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+(mode==='week'?'':' 月')+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
   if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
  }
  if(part.length)segments.push(part);
  var lines=segments.map(s=>'<polyline points="'+s.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
- chartEl.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週每日':'年度逐月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
+ chartEl.innerHTML='<svg class="p79-eff-svg" style="font-size:12px" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週每日':'年度逐月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
+ lastChartSize=chartEl.clientWidth+'x'+chartEl.clientHeight;
 }
 // 年度月份資料讀取限制並行，避免同時向 GAS 發送 12 個請求。
 async function loadYear(p,session,requestId){
@@ -248,6 +264,12 @@ function onVessels(v){
  if(!cursor)cursor=mode==='week'?weekCursor:yearCursor;
  render();
 }
+// 視窗尺寸或側欄變動後重算 SVG 座標；不重新讀取雲端資料。
+if(g.ResizeObserver)new g.ResizeObserver(()=>{
+ if(!lastChart||!chartEl.querySelector('svg.p79-eff-svg'))return;
+ var size=chartEl.clientWidth+'x'+chartEl.clientHeight;
+ if(size!==lastChartSize&&chartEl.clientWidth>0&&chartEl.clientHeight>0)draw(lastChart.p,lastChart.report);
+}).observe(chartEl);
 base.vessels=onVessels;
 base.reset=function(){originalReset.call(base);seq++;};
 $('p79EffWeek')?.addEventListener('click',()=>setMode('week'));
