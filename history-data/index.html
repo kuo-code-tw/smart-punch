@@ -212,7 +212,24 @@ function finishProgress(ok,detail){if(progressTimer){clearInterval(progressTimer
 function table(cols,rows){if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
 function recordTime(r){const v=r.timeStr??r.datetime??r.dateTime??r.timestamp??r.time??r.fullTime??r.attendanceTime??r.clockTime??r['完整考勤時間']??r['考勤時間']??'';if(v instanceof Date)return v.toLocaleString('zh-TW',{hour12:false});return v}
 async function loadAttendance(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'attendance',month},{forceCloud}),rows=d.records;if(!Array.isArray(rows)||d.month&&d.month!==month)throw Error('考勤歷史未完整讀取或月份不符，請重新讀取');historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
-async function loadSchedule(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'schedule',month},{forceCloud});if(!Array.isArray(d.schedules)||String(d.month||month)!==month)throw Error('歷史班表月份不符或尚未讀取完整');const rows=d.schedules,report=window.P79HistorySchedule.model(rows,month);historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${report.rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);$('result').innerHTML=window.P79HistorySchedule.html(report)}
+async function loadSchedule(month,forceCloud=false){
+  let d=await api('historyGetMonthData',{type:'schedule',month},{forceCloud});
+  if(!Array.isArray(d.schedules)||String(d.month||month)!==month)
+    throw Error('歷史班表月份不符或尚未讀取完整');
+  if(!d.schedules.length&&month<currentMonth()){
+    const backup=await api('historyGetProvisionalScheduleMonth',{type:'schedule',month},{forceCloud});
+    if(!backup?.ok||!Array.isArray(backup.schedules)||backup.month!==month)
+      throw Error(backup?.error||'正式歷史排班缺少，且目前無可用的已驗證備援');
+    d=backup;
+  }
+  const rows=d.schedules,report=window.P79HistorySchedule.model(rows,month);
+  historyLoaded={type:'schedule',month,rows,provisional:d.provisional===true};
+  $('historyExportExcel').disabled=false;
+  pills([month,report.rows.length+' 名人員班表',d.archiveStatus||d.sourceLabel||'Google Drive']);
+  $('result').innerHTML=(d.provisional===true
+    ?'<div role="status" style="padding:12px;background:#fff7ed;color:#9a3412;font-weight:800">⚠️ 此為 10/28 備援班表，尚未核對月底異動，不可作為正式月結定稿。</div>':'')
+    +window.P79HistorySchedule.html(report);
+}
 async function loadVessel(month,forceCloud=false){
   const d=await api('historyGetMonthData',{type:'vessel',month},{forceCloud}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
   pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
