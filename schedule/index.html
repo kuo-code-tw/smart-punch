@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-all-roster-audit-v2"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-restday-staff-audit-v3"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7114,9 +7114,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(status){
             const audit=state.evidence?.auditSummary;
             const issues=Array.isArray(state.evidence?.audit)?state.evidence.audit:[];
-            const count=audit?audit.shiftMismatch+audit.shiftUnresolved+audit.punchMissing:0;
+            const count=audit?audit.shiftMismatch+audit.shiftUnresolved+audit.punchMissing+audit.restDayWorked:0;
             const summary=audit&&state.evidence?.complete===true?
-              '考勤對帳 '+audit.employees+'人｜班別差異'+audit.shiftMismatch+
+              '考勤對帳 '+audit.employees+'人｜休假日出勤'+audit.restDayWorked+'｜班別差異'+audit.shiftMismatch+
               '｜班別無法推定'+audit.shiftUnresolved+'｜打卡待核'+audit.punchMissing:'';
             const message=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次結果）':'正式考勤核對中'):
               state.error?'考勤核對失敗：'+state.error:summary;
@@ -7127,7 +7127,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
             status.title=issues.length?
               '正式考勤與原排班差異（只核對，不自動覆蓋）：\\n'+
               issues.slice(0,100).map(row=>row.name+' '+row.date+'：'+
-                (row.kind==='shift-mismatch'?'原排'+row.saved+'，打卡推定'+row.actual:
+                (row.kind==='restday-worked'?'原排'+row.saved+'，已有完整'+row.actual+'班出勤；須核對休假日出勤與加班':
+                row.kind==='shift-mismatch'?'原排'+row.saved+'，打卡推定'+row.actual:
                  row.kind==='shift-unresolved'?'有出勤但班別不明（'+(row.reason||'')+'）':
                  '原排'+row.saved+'，打卡配對待核')).join('\\n')+
               (issues.length>100?'\\n其餘 '+(issues.length-100)+' 筆未顯示':''):
