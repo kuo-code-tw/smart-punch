@@ -86,8 +86,8 @@ function run(){
   assert(html.includes('>系統總櫃數（請款＋翻艙）</div>'));
   assert(html.includes("setCum('cumWorkload',systemTotalMoves);"),'System KPI must display billing plus SHIFT, not billing alone');
   assert(html.includes('const systemTotalMoves=workload+shiftTotal;'),'System Moves derives only from ship billing and SHIFT');
-  assert(html.includes("'✓ 與員工作業一致'"),'Equal values should show a comparison confirmation');
-  assert(html.includes('⚠ 與員工作業差'),'Unequal staff and system values must be reported, never silently overwritten');
+  assert(html.includes('✓ 僅與系統人員明細一致（非月報）'),'Equality must distinguish system detail from external Excel');
+  assert(html.includes('⚠ 與系統人員明細差'),'Unequal staff and system values must be reported, never silently overwritten');
   assert(html.includes('renderDashboardQuantityReconciliation(selectedMonth,allDashboardJobs,records,shipMasters,c)'));
   assert(html.includes('const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);'));
   for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
