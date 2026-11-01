@@ -6497,7 +6497,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
-          if(['待排班','打卡待核'].includes(shiftVal)) { /* Unverified is not counted as work or rest. */ } else if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
+          if(shiftVal==='待排班') { /* Future unplanned date is neither off nor work. */ } else if(shiftVal==='打卡待核') { /* Unverified date is neither off nor work. */ } else if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
             offDays++;
           } else {
             workDays++;
