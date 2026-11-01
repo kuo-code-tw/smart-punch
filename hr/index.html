@@ -356,7 +356,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   <div class="field"><label>後台角色</label><select id="adminRole" onchange="onRoleChange()"><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select></div><div class="field"><label>管理員登入密碼</label><input id="password" type="password" placeholder="一般員工不可設定密碼；管理員留空＝維持原密碼"><div class="muted">只有管理員／超級管理員可設定；一般員工此欄鎖定。</div></div><div class="field"><label>裝置綁定</label><input id="deviceState" disabled></div>
   <div class="field wide" id="p79EditorLeavePermissionBox" style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--panel)">
     <label style="font-weight:850;font-size:15px">🔐 排班假別選取權限（此員工）</label>
-    <div class="muted" style="margin:4px 0 10px">由超級管理員在人資設定；只有後台角色為「超級管理員」的帳號可在排班選擇已勾選的假別。正式請假仍須使用請假管理。</div>
+    <div class="muted" style="margin:4px 0 10px">由超級管理員在人資替每位管理員決定可選的假別。管理員／超級管理員可依勾選權限在排班操作；一般員工鎖定。正式請假仍走請假管理。</div>
     <div id="p79EditorLeavePermissionChecks" style="display:flex;flex-wrap:wrap;gap:10px">
       <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="年" disabled> 年假</label>
       <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="事" disabled> 事假</label>
@@ -897,20 +897,22 @@ function p79HrScheduleLeaveIsSuperAdmin(){
     .some(role=>String(role||'').trim().toLowerCase()==='superadmin');
 }
 function p79EditorLeaveRoleAllowed(){
-  return p79HrScheduleLeaveIsSuperAdmin()&&$('adminRole')?.value==='superadmin';
+  return p79HrScheduleLeaveIsSuperAdmin()&&['admin','superadmin'].includes($('adminRole')?.value);
 }
 function p79RenderEditorLeavePermission(){
   const controls=[...document.querySelectorAll('[data-hr-editor-leave]')];
+  const role=$('adminRole')?.value;
+  const eligible=['admin','superadmin'].includes(role);
   const authorized=p79EditorLeaveRoleAllowed()&&p79EditorLeavePermission.ready;
   for(const cb of controls){
-    cb.checked=authorized&&p79EditorLeavePermission.types.includes(cb.dataset.hrEditorLeave);
+    cb.checked=eligible&&p79EditorLeavePermission.ready&&p79EditorLeavePermission.types.includes(cb.dataset.hrEditorLeave);
     cb.disabled=!authorized;
   }
   const status=$('p79EditorLeavePermissionStatus');
   if(status)status.textContent=!p79HrScheduleLeaveIsSuperAdmin()
     ?'僅超級管理員可設定此權限'
-    :$('adminRole')?.value!=='superadmin'
-      ?'此員工不是超級管理員，不能在排班直接選擇請假'
+    :!['admin','superadmin'].includes($('adminRole')?.value)
+      ?'此員工不是管理員，五項排班假別權限已鎖定'
       :p79EditorLeavePermission.ready?'雲端權限已讀取，可在此勾選，並按上方或下方「儲存」'
       :'正在確認此員工的雲端權限；確認前不可修改';
 }
@@ -928,8 +930,12 @@ async function p79LoadEditorLeavePermission(){
     const legacy=config[P79_HR_SCHEDULE_LEAVE_LEGACY_KEY]?.allowedTypes;
     if(existing!==undefined&&!Array.isArray(existing))throw Error('員工排班權限格式不正確');
     if(legacy!==undefined&&!Array.isArray(legacy))throw Error('原排班權限格式不正確');
-    // Prior global settings remain as a backwards-compatible default for superadmins.
-    const allowed=existing===undefined?(legacy===undefined?P79_HR_SCHEDULE_LEAVE_TYPES:legacy):existing;
+    // Managers start with all five unchecked; prior global settings only carry
+    // forward for existing superadmin accounts, never automatically grant admins.
+    const isPriorSuper=String(editing?.adminRole||'').toLowerCase()==='superadmin';
+    const allowed=existing===undefined
+      ?(isPriorSuper?(legacy===undefined?P79_HR_SCHEDULE_LEAVE_TYPES:legacy):[])
+      :existing;
     if(employeeId!==String(editing?.empId||'').trim().toUpperCase()||!editor.open)return;
     p79EditorLeavePermission={ready:true,empId:employeeId,types:P79_HR_SCHEDULE_LEAVE_TYPES.filter(t=>allowed.includes(t))};
     p79RenderEditorLeavePermission();
@@ -1103,7 +1109,17 @@ function buildPermGrid(e){
   const pwd=$('password');if(pwd){pwd.disabled=employeeRole||!canGrant;if(employeeRole)pwd.value='';}
   p79RenderEditorLeavePermission();
 }
-function onRoleChange(){buildPermGrid(editing||{adminRole:$('adminRole').value})}
+function onRoleChange(){
+  // Preserve unsaved per-employee checkboxes when a superadmin changes the role
+  // between admin and superadmin in the same editor session.
+  if(p79EditorLeavePermission.ready&&p79HrScheduleLeaveIsSuperAdmin()&&
+     ['admin','superadmin'].includes($('adminRole')?.value)){
+    const checks=[...document.querySelectorAll('[data-hr-editor-leave]')];
+    if(checks.some(cb=>!cb.disabled))
+      p79EditorLeavePermission.types=checks.filter(cb=>cb.checked).map(cb=>cb.dataset.hrEditorLeave);
+  }
+  buildPermGrid(editing||{adminRole:$('adminRole').value});
+}
 function onEmploymentStatusChange(){
   const st=normalizeEmploymentStatus($('employmentStatus').value);
   const resigned=st==='resigned';
@@ -1181,9 +1197,12 @@ async function saveCurrent(){
     terminationReason:st==='resigned'?$('terminationReason').value.trim():''
   };
   if(st==='resigned'&&!employee.terminationDate){alert('離職狀態請填寫離職日期');return}
-  const configureLeave=p79HrScheduleLeaveIsSuperAdmin()&&role==='superadmin';
+  const configureLeave=p79HrScheduleLeaveIsSuperAdmin()&&(
+    ['admin','superadmin'].includes(role)||
+    ['admin','superadmin'].includes(String(editing?.adminRole||'').toLowerCase())
+  );
   if(configureLeave&&!p79EditorLeavePermission.ready)return alert('排班假別權限尚未從雲端讀取完成，請先確認勾選框已啟用');
-  const editorLeaveSelections=configureLeave
+  const editorLeaveSelections=configureLeave&&['admin','superadmin'].includes(role)
     ?[...document.querySelectorAll('[data-hr-editor-leave]:checked')].map(el=>el.dataset.hrEditorLeave)
     :[];
   const button=$('saveBtn'),originalLabel=button.textContent,originalEmpId=$('origEmpId').value||empId;
