@@ -2886,7 +2886,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       try{
         const month=currentScheduleMonthKey(),source=p79ScheduleSourceState;
         const authorized=p79ScheduleHasOfficialData()||
-          source?.month===month&&source.kind==='cache'&&!!currentPort79SsoToken();
+          source?.month===month&&['cache','provisional'].includes(source.kind)&&!!currentPort79SsoToken();
         if(!authorized||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)||!Array.isArray(employees))return false;
         const main=document.getElementById('app-main-container');if(!main)return false;
         const people=employees.filter(e=>e&&e.id&&
@@ -3946,11 +3946,19 @@ function p79EmployeeDateEligible(emp,date) {
 }
 
     function scheduleEmployeeEligibleForMonth(emp, yearMonth) {
+      const month=String(yearMonth||'').slice(0,7);
       const start=p79EmploymentStartDate(emp);
-      if(start&&String(yearMonth||'').slice(0,7)<start.slice(0,7))return false;
-      // 排班操作名單僅保留在職人員；不刪除雲端既有班表。
+      if(start&&month<start.slice(0,7))return false;
       const end=String(emp?.lastWorkDate||emp?.terminationDate||'').replaceAll('/','-').slice(0,10);
-      if(/^\d{4}-\d{2}-\d{2}$/.test(end)&&end<scheduleTaipeiTodayKey())return false;
+      const endIsValid=/^\d{4}-\d{2}-\d{2}$/.test(end);
+      // A past month's confirmed roster remains visible after a later resignation
+      // or personnel-master change. This is read-only history, not reactivation.
+      const historical=month<scheduleTaipeiTodayKey().slice(0,7);
+      const hadOfficialRow=historical&&(p79ScheduleCloudRows||[]).some(row=>
+        String(row.month||'')===month&&
+        String(row.empId||'').trim().toUpperCase()===String(emp?.id||'').trim().toUpperCase());
+      if(hadOfficialRow)return !endIsValid||end>=month+'-01';
+      if(endIsValid&&end<scheduleTaipeiTodayKey())return false;
       return normalizeScheduleEmploymentStatus(emp?.employmentStatus)==='active';
     }
     function cloneScheduleEmployee(emp) {
@@ -4233,6 +4241,25 @@ function p79EmployeeDateEligible(emp,date) {
           .filter(emp => emp.id);
 
         employeeMasterBase = cloudEmployees.map(cloneScheduleEmployee);
+        // Personnel removed from today's roster can still have a valid prior-month
+        // official schedule. Rehydrate their historical identity ONLY for display.
+        if(requestMonth<scheduleTaipeiTodayKey().slice(0,7)){
+          const present=new Set(employeeMasterBase.map(e=>e.id));
+          for(const row of data.schedules||[]){
+            const id=String(row.empId||'').trim().toUpperCase();
+            if(!id||present.has(id)||row.month&&String(row.month)!==requestMonth)continue;
+            const detail=row.schedule?.__personnel||{};
+            employeeMasterBase.push(cloneScheduleEmployee({
+              id,name:String(row.name||row.employeeName||id),
+              role:String(detail.role||row.role||''),
+              group:String(detail.group||row.group||'不分組'),
+              lockType:String(detail.lockType||'ROTATION'),
+              order:detail.order,
+              employmentStatus:'active'
+            }));
+            present.add(id);
+          }
+        }
 
         leaveRecords = Array.isArray(data.leaveRecords) ? data.leaveRecords : [];
         leaveCoverAssignments = Array.isArray(data.leaveCoverAssignments) ? data.leaveCoverAssignments : [];
@@ -5431,12 +5458,19 @@ function p79EmployeeDateEligible(emp,date) {
       const next = String(roleName || '').trim();
       if (!next) return;
 
-      if(next===activeRoleTab&&next!=='EMP_MGMT'){toggleScheduleRoleRosterCollapsed();return;}
-      // 切換其他單位時沿用該職稱記住的展開／收合狀態，不強制展開。
+      // Clicking a role always opens its roster; collapsing is only the explicit
+      // "收合" button's job. A repeated F/L click must never hide 10月班表.
+      if(next===activeRoleTab&&next!=='EMP_MGMT'){
+        setScheduleRoleRosterCollapsed(false,next);
+        return;
+      }
       activeRoleTab = next;
       activeGroupFilter = 'ALL';
       try { sessionStorage.setItem('port79_schedule_active_role_tab', activeRoleTab); } catch (e) {}
-
+      if(next!=='EMP_MGMT'&&isScheduleRoleRosterCollapsed(next)){
+        readScheduleRoleCollapseMap()[next]=false;
+        try{localStorage.setItem(P79_ROLE_COLLAPSE_KEY,JSON.stringify(readScheduleRoleCollapseMap()));}catch(ignore){}
+      }
       buildRoleTabsAndRender();
     }
 
@@ -6286,6 +6320,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const typhoonToday=scheduleTaipeiTodayKey();
 
       let roleEmps = employees.filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
+      // A closed month shows its saved roster, not new hires without any rows in it.
+      if(yearMonth<scheduleTaipeiTodayKey().slice(0,7)){
+        roleEmps=roleEmps.filter(e=>Object.keys(monthlyScheduleData[e.id]||{})
+          .some(day=>day.startsWith(yearMonth+'-')));
+      }
 
       const groupCounts = {};
       roleEmps.forEach(e => {
@@ -7122,10 +7161,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
         !p79LeaveCoverOnDay(emp.id,dayStr).length?candidate:'';
       const shortWorkMinutes=actualShift&&ctx.attendanceEvidence.actualWorkedMinutes?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]<180
         ?ctx.attendanceEvidence.actualWorkedMinutes[String(emp.id).trim().toUpperCase()+'|'+dayStr]:0;
+      const hasOfficialOvertimeReport=p79ConfirmedOvertimeReport(originalMeta);
       const verifiedRestAttendance=pairedWork&&['休','例','國'].includes(String(rosterShift).trim())&&
         !ownApprovedLeave&&!originalMeta.overtimeReport&&!originalMeta.overtimeReports?.length&&
         !originalMeta.overtime&&!originalMeta.forEmpId&&!p79LeaveCoverOnDay(emp.id,dayStr).length;
-      const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
+      // Incomplete punch evidence cannot cancel a saved, non-revoked declaration.
+      const noPunchRest=!hasOfficialOvertimeReport&&
+        p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=false; // 已核實整班無卡，由 noPunchRest 直接同步畫面及匯出。
       // 原本就排休／例／國的人，絕不能因為歷史考勤尚未讀完或隔日單卡，
       // 被渲染成「打卡待核」。真的有完整打卡時仍應恢復實際出勤。
@@ -7146,7 +7188,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         (['例','休','國'].includes(allocatedOffKind)?allocatedOffKind:'休');
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:noPunchRestKind,
-        restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};
+        restQuotaOvertime:false}:hasOfficialOvertimeReport
+          ?{...(automaticRestMeta[dayStr]||{}),...originalMeta}
+          :automaticRestMeta[dayStr]||{};
       const coverageShift=noPunchRest||punchPending||attendanceUnverified?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
       const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
@@ -7155,11 +7199,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
         attendanceState,ctx.attendanceEvidence,{typhoon:ctx.typhoonDays,election:ctx.electionDays},ctx.typhoonToday);
       // 颱風日原本排休也必須固定顯示「颱」；不准被例／休／國配額覆蓋。
       // 只改顯示，不覆寫原始排班、加班申報、代班及人工鎖定資料。
-      const typhoonScheduledRest=ctx.typhoonDays.has(dayStr)&&['休','例','國'].includes(String(rosterShift).trim())&&!ownApprovedLeave&&!actualShift;
+      const typhoonScheduledRest=ctx.typhoonDays.has(dayStr)&&['休','例','國'].includes(String(rosterShift).trim())&&!ownApprovedLeave&&!actualShift&&!hasOfficialOvertimeReport;
       const specialNoPunch=specialCandidate;
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
-      const visibleSubstituteLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||punchPending||attendanceUnverified?'':substituteLabel;
+      const visibleSubstituteLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
+        ((punchPending||attendanceUnverified)&&!hasOfficialOvertimeReport)?'':substituteLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
       return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,shortWorkMinutes,verifiedRestAttendance,noPunchRest,punchPending,attendanceUnverified,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
