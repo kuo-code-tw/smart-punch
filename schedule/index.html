@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-restday-staff-audit-v3"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-unified-official-attendance-v4"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7105,11 +7105,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const dates=[];for(const emp of employees.filter(e=>!employeeId||e.id===employeeId))for(let d=1;d<=p79RestQuota(month).days;d++){const date=month+'-'+String(d).padStart(2,'0');if(approvedLeaveForEmployee(emp.id,date))dates.push(String(emp.id).toUpperCase()+'|'+date);}return dates;
     }
     function p79ScheduleRestClient() {
+      // Use the SAME authenticated official attendance source as the
+      // cloud-roster reconciliation. Never infer shifts from a separate raw
+      // snapshot while the save pipeline reads getAttendanceMainDirect.
       if(!p79ScheduleRestEvidenceClient)p79ScheduleRestEvidenceClient=window.P79ScheduleRestEvidence.create({
         token:currentPort79SsoToken,employees:()=>employees,schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
-        read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
+        read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMainDirect',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
         update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');
           if(status){
             const audit=state.evidence?.auditSummary;
