@@ -3818,6 +3818,29 @@ function renderDashboard(){
   // 使用未套用表格欄位篩選前的完整月份資料，避免只篩某艘船時把缺漏判斷也縮小。
   renderDashboardMonthlyAudit(selectedMonth,allDashboardJobs);
   p79RenderDashboardMonthlySourceAudit(selectedMonth,allDashboardJobs,c);
+  const monthSafety=/^20\d{2}-(0[1-9]|1[0-2])$/.test(selectedMonth)&&!rangeActive
+    ?p79VesselMonthSafetyAudit(selectedMonth,allDashboardJobs):null;
+  const monthAuditEl=document.getElementById('p79DashboardMonthlySourceAudit');
+  if(monthSafety&&monthAuditEl){
+    if(!monthSafety.ok){
+      monthAuditEl.classList.remove('hidden');
+      monthAuditEl.className='card p-3 border border-rose-300 bg-rose-50';
+      monthAuditEl.innerHTML='<div class="font-black text-rose-800">⚠ 本月船舶自動核對未通過</div>'+
+        '<div class="text-xs text-rose-800 mt-1">'+monthSafety.issues.slice(0,8).map(esc).join('；')+
+        '。已保留原始資料，月報匯出將被阻止。</div>';
+    }else{
+      const suffix=monthSafety.versionCopies.length
+        ?'｜已自動排除 '+monthSafety.versionCopies.length+' 筆編輯版本重複（保留原始紀錄）':'';
+      const note=document.createElement('p');
+      note.className='text-xs font-semibold text-emerald-700 mt-2';
+      note.textContent='✓ 本月自動核對：'+monthSafety.shipCount+' 艘，請款 '+monthSafety.billing+
+        '＋ SHIFT '+monthSafety.shift+'＝'+round(monthSafety.billing+monthSafety.shift,2)+
+        ' Moves，H/C '+monthSafety.hatches+suffix+
+        '。此為系統內部核對，外部 Excel 月報仍須另行比對。';
+      monthAuditEl.classList.remove('hidden');
+      monthAuditEl.appendChild(note);
+    }
+  }
   const systemSub=document.getElementById('cumWorkloadSub');
   if(systemSub){
     const monthlySourceNote=String(systemSub.textContent||'').trim();
@@ -13928,6 +13951,52 @@ function operationExportRows(list){return list.map(r=>{
     num(mv.disc)+num(mv.load),num(gph),num(r.deduct1)+num(r.deduct2)+num(r.deduct3)+num(r.deduct4),r.note||''
   ];
 });}
+
+// Read-only month safety audit. The same canonical version view is required
+// for dashboard accounting and exports for EVERY month, not just October.
+// Never delete an old version: preserve distinct CALL2 / -2 completed jobs.
+function p79VesselMonthSafetyAudit(month,jobs){
+  const target=String(month||'').trim();
+  const issues=[],byNo=new Map();
+  const rows=Array.isArray(jobs)?jobs:[];
+  const versionView=(typeof window!=='undefined'&&window.P79VesselVersionView)||null;
+  if(!versionView||typeof versionView.collapse!=='function'){
+    issues.push('船舶版本去重元件未載入，禁止匯出未核對的月報');
+  }
+  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(target)){
+    issues.push('缺少有效的年月範圍');
+  }
+  for(const ship of rows){
+    const no=String(ship?.workingNo||'').trim();
+    if(!no||no==='—'){issues.push('船舶 WORKING NO. 不完整');continue;}
+    if(byNo.has(no)){
+      issues.push('船舶 WORKING NO. 重複：'+no);
+    }
+    byNo.set(no,ship);
+    const values=[ship.totalContainers,ship.shiftMoves,ship.totalMoves,ship.hatches];
+    if(values.some(v=>!Number.isFinite(Number(v))||Number(v)<0)){
+      issues.push('船舶作業量含無效數值：'+no);continue;
+    }
+    if(Math.abs(num(ship.totalMoves)-num(ship.totalContainers)-num(ship.shiftMoves))>0.01)
+      issues.push('總 Moves ≠ 請款＋SHIFT：'+no);
+  }
+  const source=(shipMasters||[]).filter(row=>shipMasterDateMatchesMonth(row,target));
+  let versionCopies=[];
+  if(versionView&&typeof versionView.collapse==='function'){
+    try{
+      const collapsed=versionView.collapse(source);
+      if(!Array.isArray(collapsed?.rows))issues.push('船舶版本核對沒有回傳有效資料');
+      else versionCopies=Array.isArray(collapsed.excludedWorkingNos)
+        ?collapsed.excludedWorkingNos:[];
+    }catch(error){issues.push('船舶版本去重失敗：'+String(error?.message||error));}
+  }
+  return {ok:issues.length===0,issues:[...new Set(issues)],versionCopies,
+    shipCount:rows.length,month:target,
+    billing:round(rows.reduce((n,x)=>n+num(x.totalContainers),0),2),
+    shift:round(rows.reduce((n,x)=>n+num(x.shiftMoves),0),2),
+    hatches:round(rows.reduce((n,x)=>n+num(x.hatches),0),2)};
+}
+
 function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.value||''){
   // IMPORTANT: the monthly workbook and dashboard MUST use the identical
   // canonical, version-collapsed vessel roster. An old -1 edited duplicate
@@ -14023,6 +14092,8 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     // Guard against exporting an outdated or duplicated master. Check all
     // displayed KPI fields, not just the MOVE sum. Do not alter source rows.
     const dashboardRows=dashboardAdjustJobsForMonthlyReference(vesselJobRows(month),month);
+    const audit=p79VesselMonthSafetyAudit(month,dashboardRows);
+    if(!audit.ok)throw Error('月報匯出已停止：'+audit.issues.slice(0,5).join('；'));
     const summed=(items,key)=>round(items.reduce((total,row)=>total+num(row?.[key]),0),2);
     const parity=[
       ['請款櫃數',summed(rows,'bill'),summed(dashboardRows,'totalContainers')],
