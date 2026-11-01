@@ -257,6 +257,9 @@ const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79Manage
 if(!context||!api||!factory)return;
 let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0;
 const activeReads=new Set();
+// Attendance/work-hours must not interrupt the selected day or an in-progress edit.
+// All cross-system updates are applied by the single explicit refresh control.
+const manualOnly=context.system==='attendance'||context.system==='workhours';
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
 function roleAllowed(){if(g.P79ManagementTestMode!==true&&g.P79ManagementOptimizationMode!==true)return false;try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
@@ -281,7 +284,8 @@ async function readFresh(action,params={}){
 function ensureBar(){
  if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
  bar.style.cssText='display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 16px;background:#eff6ff;color:#1e3a8a;border-bottom:1px solid #93c5fd;font:700 13px system-ui;flex-wrap:wrap';
- const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);
+ const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);
+ if(!manualOnly){const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);}
  const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
 }
 function scheduleReadIdleResume(){
@@ -290,7 +294,10 @@ function scheduleReadIdleResume(){
 }
 function notify(state){
  pendingState=state;if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
- const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';b.querySelector('button').disabled=false;return;}b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():'｜準備同步');b.querySelector('button').disabled=state.running;
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';if(!manualOnly)b.querySelector('button').disabled=false;return;}
+ b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():manualOnly?'｜請按上方「重新整理」核對':'｜準備同步');
+ if(manualOnly)return;
+ b.querySelector('button').disabled=state.running;
  if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}else if(state.pending.length&&!state.running)scheduleReadIdleResume();
 }
 async function synchronize(){
@@ -303,10 +310,10 @@ function boot(){
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:topics=>context.readFresh(readFresh,topics)});
  const backend=new URL(context.gas(),location.href);
- binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()});
+ binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!manualOnly&&!editing()});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.8';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
-const resume=()=>{if(stopped||suspended)return;if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();scheduleReadIdleResume();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+const resume=()=>{if(stopped||suspended)return;if(manualOnly){if(!binding)boot();return;}if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();scheduleReadIdleResume();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
 function pagehide(event){
  suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);timer=null;bootTimer=null;

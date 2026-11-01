@@ -1,0 +1,30 @@
+name: Attendance single real refresh
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-full-refresh.js'
+      - 'assets/port79-management-link.js'
+      - 'tests/attendance-single-real-refresh.cjs'
+      - 'tests/full-refresh.cjs'
+      - '.github/workflows/verify-attendance-manual-refresh.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-full-refresh.js'
+      - 'assets/port79-management-link.js'
+      - 'tests/attendance-single-real-refresh.cjs'
+      - 'tests/full-refresh.cjs'
+      - '.github/workflows/verify-attendance-manual-refresh.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node tests/full-refresh.cjs
+          node tests/attendance-single-real-refresh.cjs
