@@ -11,8 +11,8 @@ async function run({supported=true,failed=false,active=false,canConfirm=true}={}
 (async()=>{
  let x=await run();a.equal(x.result.ok,true);a.equal(x.calls.length,2);const payload=JSON.parse(x.calls[1].opts.body);a.equal(payload.action,'confirmAttendanceDayAndReconcile');a.equal(payload.date,'2026-10-28');a.equal(payload.expectedRevision,'REV');a.equal(x.storage.size,0,'a completed attendance confirmation without active reports cannot fake a green report badge');
  x=await run({failed:true});a.equal(x.result.ok,false);a.match(x.result.message,/班表正在編輯/);a.equal(x.storage.size,0);
- x=await run({supported:false,active:true});a.equal(x.result.ok,true);a.equal(x.calls.length,1,'old GAS never receives an unsupported mutating action');a.match(x.result.message,/自動取消尚未啟用/);
- x=await run({active:true,canConfirm:false});a.equal(x.result.ok,true);a.equal(x.calls.length,1,'read-only accounts keep the existing report review without a mutating request');
+ x=await run({supported:false,active:true});a.equal(x.result.ok,false,'without verified official filing evidence the old GAS must not force a green badge');a.equal(x.calls.length,1,'old GAS never receives an unsupported mutating action');a.match(x.result.message,/不代表你沒有正式申報/);
+ x=await run({active:true,canConfirm:false});a.equal(x.result.ok,false,'read-only account cannot falsely confirm an unverified report');a.equal(x.calls.length,1,'read-only accounts never receive a mutating request');
  x=await run({active:true});a.equal(x.result.ok,true);a.equal(x.storage.size,1,'green receipt uses the post-confirmation report snapshot');
  console.log('PASS explicit right-click confirmation only, fresh revision, authenticated cloud receipt, old GAS compatibility, no fake green badge, failed confirmation retains pending state');
 })().catch(e=>{console.error(e);process.exitCode=1;});
