@@ -12068,8 +12068,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         <td class="px-2 py-3 text-center font-mono text-[11px] whitespace-nowrap">${outTime}</td>
                         <td class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap"><button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow?'':'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow?'帶入員工與班次日期，開啟正式加班申報視窗':!p79CanReportOvertime()?'目前帳號沒有申報加班權限':!row.clockIn||!row.clockOut?'尚未完成上下班打卡': '無法核對員工或日期'}">＋ 申報加班</button></td>
-                        <td class="px-2 py-3 text-center whitespace-nowrap">${statusBadge}${nightWorkdayBadge}</td>
-                        <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5">
+                        <td class="px-2 py-3 text-center whitespace-nowrap" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}"` : ''}>${nightWorkdayBadge}${statusBadge}</td>
+                        <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}"` : ''}>
                             ${nightWorkdayNote ? `<span tabindex="0" role="note" title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}" class="block font-bold text-amber-800 dark:text-amber-200 cursor-help">備註：${escapeHtml(nightWorkdayNote.summary)}</span>` : ''}
                             ${row.noteText ? `備註: ${escapeHtml(String(row.noteText))}<br>` : ''}
                             ${escapeHtml(String(row.locationText || '--'))}

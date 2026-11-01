@@ -30,6 +30,8 @@ for(const [page,label] of [[att,'attendance'],[wh,'work-hours']]){
  assert(page.includes('↔ ${escapeHtml(nightWorkdayNote.label)}'),label+' marks status clearly');
  assert(page.includes('備註：${escapeHtml(nightWorkdayNote.summary)}'),label+' displays note in the remarks cell');
  assert(page.includes('title="${nightWorkdayTooltip}"'),label+' has native mouse-hover tooltip');
+ assert(page.includes('>${nightWorkdayBadge}${statusBadge}'),label+' shows the cross-day warning before the clipped normal status');
+ assert(page.includes('text-slate-500 text-[11px] leading-5" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}"` : \'\'}>'),label+' exposes hover details across the whole remarks cell');
  assert(page.includes('aria-label="${nightWorkdayTooltip}"'),label+' preserves full details for accessibility');
  assert(page.includes('tabindex="0"'),label+' allows keyboard focus');
  assert(page.includes('v6-engine.js?v=20261101-ship-workday-tooltip'),label+' invalidates stale engine cache');
