@@ -13,5 +13,8 @@ const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('assets/port
 for(const id of ['p79DashMonth','p79DashRefresh','p79DashPersonDays','p79DashOvertimeHours','p79DashAnomalies'])assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
 assert(!html.includes('p79d-dashboard-controls'),'reference has no extra toolbar above the two sections');assert(html.includes('最近七天船舶效率'));assert(html.includes('本月人員效率排行'));
 assert(css.includes('minmax(0,1.12fr) minmax(0,1.12fr) minmax(0,.78fr)'),'three ship panels at desktop size');assert(css.includes('@media(max-width:620px)'));
+for(const id of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])assert(html.includes('id="'+id+'"'),'dashboard carousel exists: '+id);
+assert(ui.includes('function setLeaveReport(report)'),'second page keeps formal approved leave');
+assert(ui.includes('function setOvertimeReport(report)'),'first page keeps overtime');
 assert(ui.includes('class="p79r-gridline"'));assert(!ui.includes('fetch('),'presentation never adds data reads');assert(!ui.includes('96%'),'no copied reference values');
 console.log('PASS reference composition, source-based work hours, declared overtime, daily attendance and truthful chart rendering');
