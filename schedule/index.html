@@ -3104,7 +3104,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           if (ok) {
             port79ScheduleLastAutoSyncAt = Date.now();
             const yearMonth = document.getElementById('month-picker')?.value;
-            if (yearMonth) initDefaultScheduleData(yearMonth, false);
+            // Official cloud roster is authoritative: never create default shifts during a read.
             // 先顯示已讀到的班表；整月考勤核對及寫入不阻擋首次顯示。
             try { buildRoleTabsAndRender(); }
             catch(error) { p79SchedulePreviewRenderError(error); }
@@ -4543,6 +4543,11 @@ function p79EmployeeDateEligible(emp,date) {
     async function saveScheduleMonthToCloud(showAlert = true) {
       if(!requireScheduleEditLock(showAlert))return false;
       const yearMonth = document.getElementById('month-picker').value;
+      if(p79ScheduleSourceState?.month && p79ScheduleSourceState.month!==yearMonth){
+        lastScheduleCloudError='月份尚未完成雲端讀取，已禁止將其他月份的班表寫入 '+yearMonth;
+        if(showAlert)alert(lastScheduleCloudError);
+        return false;
+      }
       if(p79ScheduleGroupHistoryUnverifiedMonth===yearMonth){
         if(showAlert)alert('尚未確認上月分組資料，為避免把原組別覆蓋成不分組，請先重新讀取雲端班表。');
         return false;
@@ -5072,6 +5077,21 @@ function p79EmployeeDateEligible(emp,date) {
     function updateScheduleDateRangeSummary(){const a=document.getElementById('scheduleDateFrom')?.value||'',b=document.getElementById('scheduleDateTo')?.value||'',el=document.getElementById('scheduleDateRangeSummary');if(el)el.innerHTML=`<i class="fa-regular fa-calendar-check text-indigo-500 mr-1"></i>${!a&&!b?'日期範圍':a&&b?`${a} ～ ${b}`:a?`${a} 起`:`至 ${b}`}`;}
     function setScheduleFullMonthRange(){const month=document.getElementById('month-picker')?.value||scheduleTaipeiTodayKey().slice(0,7),[a,b]=scheduleMonthBounds(month);document.getElementById('scheduleDateFrom').value=a;document.getElementById('scheduleDateTo').value=b;updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
     async function onScheduleMonthPickerChange(){
+      // A month picker changes its value before onchange. Save the old month's
+      // pending edits under the OLD month, never under the selected new month.
+      const monthPicker=document.getElementById('month-picker');
+      const requestedMonth=monthPicker?.value||scheduleTaipeiTodayKey().slice(0,7);
+      const previousMonth=p79ScheduleSourceState?.month||'';
+      if(previousMonth && previousMonth!==requestedMonth &&
+         (port79ScheduleDirty||scheduleSaveTimer||personnelSaveTimer||port79ScheduleWriteInFlight)){
+        monthPicker.value=previousMonth;
+        const saved=await flushSchedulePendingWrites();
+        if(!saved){
+          showScheduleNotice('前一月份班表尚未成功儲存，已取消月份切換以保護排班資料。','error',10000);
+          return;
+        }
+        monthPicker.value=requestedMonth;
+      }
       p79ScheduleCloudReadController?.abort();
       p79ScheduleAttendanceViewVersion++;
       const monthRequestVersion=p79ScheduleAttendanceViewVersion;
@@ -5097,7 +5117,30 @@ function p79EmployeeDateEligible(emp,date) {
       }catch(e){if(currentScheduleMonthKey()===month&&monthRequestVersion===p79ScheduleAttendanceViewVersion&&status)status.textContent='月份讀取失敗，請按重新讀取';console.warn('月份切換雲端載入失敗',e);}
       finally{if(monthRequestVersion===p79ScheduleAttendanceViewVersion)workspace?.setAttribute('aria-busy','false');}
     }
-    async function onScheduleDateRangeChange(side){p79ScheduleAttendanceViewVersion++;p79ScheduleAttendanceHasSynced=false;applyScheduleAttendanceMonthScope();const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');let a=aEl?.value||'',b=bEl?.value||'';if(a){const month=a.slice(0,7),oldMonth=document.getElementById('month-picker').value;if(month!==oldMonth){document.getElementById('month-picker').value=month;applySchedulePersonnelOverrides(month);initDefaultScheduleData(month);}const [,last]=scheduleMonthBounds(month);if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;}if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;}updateScheduleDateRangeSummary();buildRoleTabsAndRender();}
+    async function onScheduleDateRangeChange(side){
+      p79ScheduleAttendanceViewVersion++;
+      p79ScheduleAttendanceHasSynced=false;
+      applyScheduleAttendanceMonthScope();
+      const aEl=document.getElementById('scheduleDateFrom'),bEl=document.getElementById('scheduleDateTo');
+      let a=aEl?.value||'',b=bEl?.value||'';
+      if(a){
+        const month=a.slice(0,7),picker=document.getElementById('month-picker');
+        if(month!==picker.value){
+          picker.value=month;
+          await onScheduleMonthPickerChange();
+          // An unsaved old month blocks the switch. Do not render generated shifts.
+          if(picker.value!==month)return;
+          aEl.value=a;if(bEl)bEl.value=b;
+        }
+        const [,last]=scheduleMonthBounds(month);
+        if(!b||b.slice(0,7)!==month||b<a)bEl.value=last;
+      }
+      if(aEl?.value&&bEl?.value&&aEl.value>bEl.value){
+        if(side==='end')aEl.value=bEl.value;else bEl.value=aEl.value;
+      }
+      updateScheduleDateRangeSummary();
+      buildRoleTabsAndRender();
+    }
 
     async function onMonthOrRuleChange() {
       const yearMonth = document.getElementById('month-picker').value;
@@ -7956,8 +7999,16 @@ async function p79SaveScheduleOvertimeDraft(draft){
     bEl.value=b;
     monthEl.value=newMonth;
     if(newMonth!==oldMonth){
-      try{applySchedulePersonnelOverrides(newMonth)}catch(e){}
-      try{initDefaultScheduleData(newMonth)}catch(e){}
+      // A date-range jump must load the authoritative month's roster, not
+      // generate a default month from the previously displayed employees.
+      Promise.resolve(onScheduleMonthPickerChange()).then(()=>{
+        if(monthEl.value!==newMonth)return;
+        aEl.value=a;bEl.value=b;
+        window.updateScheduleDateRangeSummary();
+        try{buildRoleTabsAndRender()}catch(e){console.warn(e)}
+      }).catch(e=>console.warn('日期範圍跨月讀取失敗',e));
+      window.closeScheduleRangePicker();
+      return;
     }
     window.updateScheduleDateRangeSummary();
     try{buildRoleTabsAndRender()}catch(e){console.warn(e)}
