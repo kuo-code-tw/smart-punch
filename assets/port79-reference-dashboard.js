@@ -9,7 +9,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=(v,n=0)=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:n,minimumFractionDigits:n}):'—';
 const badge=i=>'<span class="p79r-rank rank-'+i+'">'+i+'</span>';
 const detailBtn=()=>d.getElementById('cardEfficiency')?.click();
-let attendancePage=0,attendanceReport=null,leaveReport=null,attendanceMonth='';
+let attendanceReport=null,overtimeReport=null,attendanceMonth='';
 let peopleGroup='ALL',peopleReport=null,groupRoster=null,groupRosterMonth='';
 
 function renderPeople(){
@@ -101,25 +101,24 @@ function attendance(a,ym){
  $('p79DashAttendancePeriod').textContent=current?'依今日打卡':'依所選月份';
  $('p79DashDonut').style.setProperty('--p79d-donut-angle',(total?100*on/total:0)+'%');
  $('p79DashPunchLegend').innerHTML=current?'<div><i></i>目前在崗 <b>'+fmt(a.todayOnDuty)+' 人</b></div><div><i></i>已簽退 <b>'+fmt(Math.max(0,a.todayCount-a.todayOnDuty))+' 人</b></div><small>依今日上班卡與最新打卡狀態</small>':'<div><i></i>上班卡 <b>'+fmt(a.punchIn)+' 筆</b></div><div><i></i>下班卡 <b>'+fmt(a.punchOut)+' 筆</b></div><small>打卡事件分布，非出勤率</small>';
- attendanceReport=a;attendanceMonth=ym;renderAttendancePage();
+ attendanceReport=a;attendanceMonth=ym;renderOvertimeByJobTitle();
 }
-function renderAttendancePage(){
- const title=$('p79DashAttendanceChartTitle');if(!title)return;
- title.innerHTML='<span class="p79r-panel-mark">↥</span>'+(attendancePage?'各職稱當月請假天數':'本月各單位核准請假天數');
- $('p79DashChartPage').textContent='第'+(attendancePage+1)+'頁／共2頁';
- $('p79DashChartPrevious').disabled=attendancePage===0;$('p79DashChartNext').disabled=attendancePage===1;
- const el=$('p79DashAttendanceBars');el.classList.toggle('p79r-leave-chart',true);
- const isUnitPage=attendancePage===0;
- if(!leaveReport||leaveReport.month!==attendanceMonth){empty(el.id,isUnitPage?'正在讀取正式核准請假與人資單位…':'正在讀取正式核准請假與人資職稱…');return;}
- if(leaveReport.error){empty(el.id,leaveReport.error);return;}
- const rows=isUnitPage?leaveReport.unitRows:leaveReport.rows,caption=(leaveReport.issues||[]).length?'（'+leaveReport.issues.length+' 筆資料待核，未計入）':'';
- if(!Array.isArray(rows)){empty(el.id,isUnitPage?'單位請假資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
- if(!rows.length){empty(el.id,(isUnitPage?'本月尚無可核對的單位資料':'本月無可核對的核准請假')+caption);return;}
- const max=Math.max(1,...rows.map(r=>r.days)),label=r=>isUnitPage?r.unit:r.title;
- const description=isUnitPage?'各單位':'各職稱';
- el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+description+'核准請假天數'+caption)+'">'+rows.map(r=>'<div class="p79r-leave-row"><span title="'+esc(label(r))+'">'+esc(label(r))+'</span><div><i style="width:'+r.days/max*100+'%"></i></div><b>'+fmt(r.days,Number.isInteger(r.days)?0:2)+' 天</b></div>').join('')+(caption?'<small>'+esc(caption)+'</small>':'')+'</div>';
+function renderOvertimeByJobTitle(){
+ const title=$('p79DashAttendanceChartTitle');
+ if(title)title.innerHTML='<span class="p79r-panel-mark">↥</span>本月各職稱加班時數統計';
+ const el=$('p79DashAttendanceBars');if(!el)return;
+ el.classList.add('p79r-leave-chart');
+ if(!overtimeReport||overtimeReport.month!==attendanceMonth){empty(el.id,'正在讀取正式加班申報與職稱資料…');return;}
+ if(overtimeReport.error){empty(el.id,overtimeReport.error);return;}
+ const rows=overtimeReport.rows;
+ if(!Array.isArray(rows)){empty(el.id,'本月職稱加班資料尚未讀齊');return;}
+ if(!rows.length){empty(el.id,'本月沒有可核對的職稱及加班申報資料');return;}
+ const max=Math.max(1,...rows.map(r=>r.hours));
+ el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+'各職稱加班申報時數')+'">'+
+  rows.map(r=>'<div class="p79r-leave-row"><span title="'+esc(r.title)+'">'+esc(r.title)+'</span><div><i style="width:'+Math.max(0,Math.min(100,r.hours/max*100))+'%"></i></div><b title="'+esc('有效申報 '+r.count+' 筆')+'">'+fmt(r.hours,Number.isInteger(r.hours)?0:2)+' 小時</b></div>').join('')+
+  '<small>依正式有效加班申報統計（含待審核），非薪資結算工時</small></div>';
 }
-function setLeaveReport(report){leaveReport=report;attendanceMonth=report.month;renderAttendancePage();}
+function setOvertimeReport(report){overtimeReport=report;attendanceMonth=report.month;renderOvertimeByJobTitle();}
 function chrome(){
  if(!d.body.classList.contains('p79-workspace')||!$('p79Dashboard'))return;
  const intro=d.querySelector('.p79-modern-home-intro');if(!intro||!intro.querySelector('.p79-hero-greeting')||intro.dataset.referenceReady)return;
@@ -133,8 +132,6 @@ function chrome(){
 }
 function init(){
  if(!$('p79Dashboard'))return;
- $('p79DashChartPrevious')?.addEventListener('click',()=>{attendancePage=0;renderAttendancePage();});
- $('p79DashChartNext')?.addEventListener('click',()=>{attendancePage=1;renderAttendancePage();});
  $('p79DashPeopleGroupFilters')?.addEventListener('click',event=>{
   const btn=event.target.closest('button[data-people-group]');
   if(btn)choosePeopleGroup(btn.dataset.peopleGroup);
@@ -144,7 +141,7 @@ function init(){
  d.querySelectorAll('.p79d-panel-title>b').forEach(e=>{e.textContent=e.textContent.replace(/^[▤▥◉]\s*/, '');e.insertAdjacentHTML('afterbegin','<span class="p79r-panel-mark">↥</span>')});
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
-function reset(){attendancePage=0;attendanceReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ManualShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
-g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setLeaveReport};
+function reset(){attendanceReport=null;overtimeReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderOvertimeByJobTitle();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ManualShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setOvertimeReport};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
