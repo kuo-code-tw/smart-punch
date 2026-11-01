@@ -2,10 +2,13 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.P79ApprovedLeaveSummary=api;})(typeof window==='undefined'?null:window,function(){
 'use strict';
 const text=v=>String(v??'').trim(),id=v=>text(v).toUpperCase();
+// 以人資的單位欄位為準，不把部門或職稱冒充單位。
+const unitLabel=e=>text(e.unit||e.unitName)||(text(e.dept)?'未設定單位（'+text(e.dept)+'）':'未設定單位');
 function date(v){const m=text(v).match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);if(!m)return '';const key=m.slice(1).join('-');const t=Date.parse(key+'T00:00:00Z');return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===key?key:'';}
 function aggregate({employees=[],leaveRecords=[],month}={}){
  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw Error('請假統計月份無效');
- const people=new Map(employees.map(e=>[id(e.empId||e.id),e])),records=new Map(),issues=[],totals=new Map();
+ const people=new Map(employees.filter(e=>id(e.empId||e.id)).map(e=>[id(e.empId||e.id),e])),records=new Map(),issues=[],totals=new Map();
+ const unitTotals=new Map();for(const person of people.values())unitTotals.set(unitLabel(person),0);
  for(const r of leaveRecords){const key=text(r.id);if(!key){issues.push('請假紀錄缺少編號');continue;}
   const prior=records.get(key);if(!prior){records.set(key,r);continue;}
   if(JSON.stringify(prior)===JSON.stringify(r))continue;
@@ -34,8 +37,14 @@ function aggregate({employees=[],leaveRecords=[],month}={}){
    }else {issues.push(r.id+'：跨月半日需每日核准天數');continue;}
   }else {issues.push(r.id+'：核准天數待核');continue;}
   totals.set(title,(totals.get(title)||0)+days);
+  const unit=unitLabel(person);unitTotals.set(unit,(unitTotals.get(unit)||0)+days);
  }
- return{month,rows:[...totals].filter(([,days])=>days>0).map(([title,days])=>({title,days:Math.round(days*10000)/10000})).sort((a,b)=>b.days-a.days||a.title.localeCompare(b.title,'zh-TW')),issues};
+ const collator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
+ const unitRows=[...unitTotals].map(([unit,days])=>({unit,days:Math.round(days*10000)/10000})).sort((a,b)=>{
+  const missingA=a.unit.startsWith('未設定單位'),missingB=b.unit.startsWith('未設定單位');
+  return missingA===missingB?collator.compare(a.unit,b.unit):missingA?1:-1;
+ });
+ return{month,rows:[...totals].filter(([,days])=>days>0).map(([title,days])=>({title,days:Math.round(days*10000)/10000})).sort((a,b)=>b.days-a.days||a.title.localeCompare(b.title,'zh-TW')),unitRows,issues};
 }
 return{aggregate};
 });
