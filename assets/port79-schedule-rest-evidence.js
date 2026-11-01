@@ -36,7 +36,7 @@ function create(ctx){
    // An unexpectedly empty original-punch feed is not proof that everyone was off.
    // Both independent feeds need at least one row for the target month.
    const belongsToMonth=r=>{
-     const v=String(r.timeStr||r.time||'').match(/^(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})/);
+     const v=String(r.timeStr||r.time||'').match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
      return v&&v[1]+'-'+v[2].padStart(2,'0')===month;
    };
    if(![...records.values()].some(belongsToMonth)||![...referenceRecords.values()].some(belongsToMonth))referenceAvailable=false;
