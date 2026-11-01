@@ -29,12 +29,17 @@ const mock={
  window:{P79RestAttendance:{state:()=> 'missing'}}, p79EmployeeDateEligible:()=>true,
  monthlyScheduleData:{[id]:{[day]:'休'}},monthlyScheduleMeta:{[id]:{[day]:{restCategory:'休'}}},
  approvedLeaveForEmployee:()=>null,p79ScheduleHasVerifiedPunch:()=>false,
- p79ScheduleNoPunchRest:()=>false,p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=> '',
+ p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=> '',
  p79LeaveCoverOnDay:()=>[], p79ScheduleLeaveExportCode:()=>'',scheduleLeaveTypeText:()=> '',
  p79ScheduleSpecialNoPunchCode:()=>'',p79VisibleRestKind:(v)=>/^(休|例|國)/.exec(v)?.[1]||'',
  scheduleTaipeiTodayKey:()=> '2026-11-01'
 };
-vm.createContext(mock);vm.runInContext(html.slice(begin,end),mock);
+vm.createContext(mock);
+const helperStart=html.indexOf('function p79ScheduleNoPunchRest('),
+ helperEnd=html.indexOf('// Rest totals',helperStart);
+assert(helperStart>=0&&helperEnd>helperStart);
+vm.runInContext(html.slice(helperStart,helperEnd),mock);
+vm.runInContext(html.slice(begin,end),mock);
 const emp={id,name:'黃亦輝'};
 function render(state,complete,shift,worked){
  mock.monthlyScheduleData[id][day]=shift;
