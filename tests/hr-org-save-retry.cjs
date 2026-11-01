@@ -11,6 +11,60 @@ await test('authentication, validation and network failures are not automaticall
 await test('explicit non-retryable lock-like reply is not retried',async()=>{const x=setup();let calls=0;await assert.rejects(()=>x.c.p79RetryOrgOperation(async()=>{calls++;throw Object.assign(Error('雲端目前正在寫入資料'),{retryable:false})}));assert.equal(calls,1)});
 await test('readback mismatch never shows saved success or closes the draft',async()=>{const x=setup();x.c.p79ReadCanonicalOrgOptions=async()=>{x.c.p79CanonicalOrgOptions={departments:[],jobTitles:[],units:[]};return{}};await x.c.saveOrgSettings();assert(!x.c.orgDialog.closed);assert(x.els.orgSaveStatus.textContent.includes('讀回不一致'));assert.equal(x.els.status.textContent,'')});
 await test('job-title labels are unified while legacy data keys remain readable',()=>{for(const path of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','history-data/index.html','aqc-efficiency/index.html']){const s=fs.readFileSync(path,'utf8');assert(!s.replaceAll("['職務']",'').includes('職務'),path);for(const m of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);}assert(fs.readFileSync('aqc-efficiency/index.html','utf8').includes("e['職務']"));assert(fs.readFileSync('assets/port79-hr-import.js','utf8').includes("['職稱','職務','jobtitle']"))});
+await test('HR superadmin controls five schedule leave types in shared cloud config',async()=>{
+ const original={hrOrgOptionsV1:{departments:['A'],jobTitles:['F/L'],units:[]},customFlag:true};
+ let current={...original},writes=[];
+ const controls=['年','事','病','公','喪'].map(kind=>({checked:false,dataset:{scheduleLeaveKind:kind}}));
+ const status={textContent:''},save={disabled:false},dialog={open:false,showModal(){this.open=true}};
+ const c={session:{adminRole:'superadmin'},String,Array,JSON,TextEncoder,Error,
+  P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV1',
+  P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
+  $:id=>id==='scheduleLeaveSettingsStatus'?status:id==='scheduleLeaveSettingsSaveBtn'?save:id==='status'?{textContent:''}:null,
+  document:{querySelectorAll:()=>controls},
+  scheduleLeaveSettingsDialog:dialog,
+  alert:msg=>{throw Error(msg)},
+  p79ReadCanonicalOrgOptions:async()=>structuredClone(current),
+  p79RetryOrgSave:async cb=>{const req=await cb();writes.push(req);current=structuredClone(req.config);return{ok:true}}
+ };vm.createContext(c);
+ for(const n of ['p79HrScheduleLeaveIsSuperAdmin','openScheduleLeaveSettings','saveScheduleLeaveSettings'])vm.runInContext(fn(n),c);
+ await c.openScheduleLeaveSettings();
+ assert.equal(dialog.open,true);
+ assert(controls.every(input=>input.checked),'defaults to five types only for confirmed superadmin');
+ for(const input of controls)input.checked=['年','病'].includes(input.dataset.scheduleLeaveKind);
+ await c.saveScheduleLeaveSettings();
+ assert.equal(writes.length,1);
+ assert.equal(writes[0].action,'saveConfig');
+ assert.deepEqual(JSON.parse(JSON.stringify(current.hrScheduleLeaveEditV1)),{allowedTypes:['年','病']});
+ assert.deepEqual(current.hrOrgOptionsV1,original.hrOrgOptionsV1,'unrelated HR configuration preserved');
+ assert.equal(current.customFlag,true);
+ c.session={adminRole:'admin'};
+ await assert.rejects(()=>c.openScheduleLeaveSettings(),/只有超級管理員/);
+ await assert.rejects(()=>c.saveScheduleLeaveSettings(),/只有超級管理員/);
+ assert.equal(writes.length,1,'normal manager cannot save');
+});
+await test('schedule special leave requires verified cloud policy plus superadmin identity',async()=>{
+ const source=fs.readFileSync('schedule/index.html','utf8');
+ const start=source.indexOf('    const P79_SCHEDULE_LEAVE_POLICY_KEY=');
+ const end=source.indexOf('    let p79OvertimeShiftEditBusy=',start);
+ assert(start>=0&&end>start);
+ const c={Date,URL,Promise,AbortController,Error,console,setTimeout,clearTimeout,
+  GAS_URL:'https://example.invalid/exec',
+  currentPort79SsoToken:()=> 'TOKEN',
+  isScheduleSuperAdmin:()=>true,
+  fetch:async()=>({ok:true,json:async()=>({ok:true,config:{hrScheduleLeaveEditV1:{allowedTypes:['年','病']}}})})};
+ vm.createContext(c);vm.runInContext(source.slice(start,end),c);
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'deny until cloud is verified');
+ assert.equal(c.p79ScheduleAllowedEditShift('早'),true);
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('病'),true);
+ for(const leave of ['事','公','喪'])assert.equal(c.p79ScheduleAllowedEditShift(leave),false);
+ c.isScheduleSuperAdmin=()=>false;
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'normal manager denied even with enabled shared policy');
+ c.isScheduleSuperAdmin=()=>true;c.fetch=async()=>{throw Error('offline')};
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false,'read failed');
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'offline policy fails closed');
+});
 await test('HR inline JavaScript parses',()=>{for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1])});
 console.log(JSON.stringify({passed,failed:0}));
 })().catch(e=>{console.error(e);process.exitCode=1});
