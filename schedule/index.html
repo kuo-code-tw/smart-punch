@@ -6497,7 +6497,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
-          if(shiftVal==='待排班') { /* Future/partial month is neither an off day nor a work day. */ } else if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
+          if(['待排班','打卡待核'].includes(shiftVal)) { /* Unverified is not counted as work or rest. */ } else if(manualNoPunch || ['休','例','國','特','年','事','病','公','喪','颱','離','離職'].includes(shiftVal)) {
             offDays++;
           } else {
             workDays++;
@@ -6542,6 +6542,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             shownShift==='中'?'bg-amber-100 text-amber-800 font-black':
             shownShift==='晚'?'bg-purple-100 text-purple-800 font-black':
              shownShift==='已出勤'?'bg-emerald-100 text-emerald-800 font-black':
+            shownShift==='打卡待核'?'bg-amber-100 text-amber-800 font-black':
             shownShift==='?'?'bg-cyan-100 text-cyan-900 font-black':shiftStyle;
           const leaveCoverBadge = substituteLabel ? '' : p79LeaveCoverBadge(emp.id,dayStr);
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
@@ -6584,7 +6585,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${verifiedRestAttendance&&!actualShift?'<span class="block text-[9px] leading-tight font-bold text-amber-800" title="出勤已確認，但尚不能從打卡時段推定早／中／晚班；不會自動建立加班申報">班別待核</span>':''}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
               ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
-              ${manualNoPunch?'<span class="text-[9px] text-amber-700" title="已確認無卡，等候正式 GAS 分配休假並重新讀取雲端班表；此處不自行改寫排班">休假待同步</span>':''}
+              ${selected.punchPending?'<span class="text-[9px] text-amber-700" title="僅有單邊打卡或配對不明，保留原始資料待核對">打卡待核</span>':''}
+              ${selected.attendanceUnverified?'<span class="text-[9px] text-amber-700" title="歷史原始考勤尚未完整讀齊，不得推定已出勤或休假">考勤未核</span>':''}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
             </td>
@@ -7054,9 +7056,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
     }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
-      // Never turn absence into a holiday on read. The confirmed server operation
-      // restores an original 例/休/國/颱 explicitly and keeps its cancellation audit.
-      return false;
+      // 全公司一套規則：只有跨月原始考勤全部讀齊、班次結束後確認無任何 IN/OUT，
+      // 才把「過去的排定工作日」顯示／統計為休假。
+      // 不修改原班表、既有申報、人工核准假、颱風假及跨日夜班。
+      if(leave||['離','離職','颱'].includes(String(shift||'').trim()))return false;
+      const state=knownState===null
+        ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(date.slice(0,7)).evidence},empId,date)
+        :knownState;
+      return state==='rest'&&!['休','例','國'].includes(String(shift||'').trim());
     }
     // Rest totals must describe the SELECTED value the employee sees in each
     // day cell, not hidden auto-allocation or a superseded overtime report.
@@ -7119,13 +7126,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
         !ownApprovedLeave&&!originalMeta.overtimeReport&&!originalMeta.overtimeReports?.length&&
         !originalMeta.overtime&&!originalMeta.forEmpId&&!p79LeaveCoverOnDay(emp.id,dayStr).length;
       const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
-      const manualNoPunch=['早','中','晚'].includes(rosterShift)&&!ownApprovedLeave&&attendanceState==='rest';
-      const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
+      const manualNoPunch=false; // 已核實整班無卡，由 noPunchRest 直接同步畫面及匯出。
+      const punchPending=attendanceState==='missing'&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const attendanceUnverified=ctx.attendanceEvidence?.complete!==true&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const shiftVal=noPunchRest?'休':punchPending||attendanceUnverified?'打卡待核':
+        actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
       // shared automatic allocation instead of resetting a valid 國 to 休.
       const verifiedOffKind=ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category;
       const allocatedOffKind=automaticRestMeta[dayStr]?.restCategory;
-      const noPunchRestKind=verifiedOffKind||
+      const originalRestKind=['例','休','國'].includes(originalMeta.restCategory)?originalMeta.restCategory:
+        /^(例|休|國)/.exec(rosterShift)?.[1]||'';
+      const noPunchRestKind=verifiedOffKind||originalRestKind||
         (['例','休','國'].includes(allocatedOffKind)?allocatedOffKind:'休');
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:noPunchRestKind,
@@ -7142,9 +7154,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const specialNoPunch=specialCandidate;
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
-      const visibleSubstituteLabel=typhoonScheduledRest||specialNoPunch?'':substituteLabel;
+      const visibleSubstituteLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||punchPending||attendanceUnverified?'':substituteLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
-      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,shortWorkMinutes,verifiedRestAttendance,noPunchRest,
+      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,shortWorkMinutes,verifiedRestAttendance,noPunchRest,punchPending,attendanceUnverified,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,
         // Count the category visibly selected in each cell, including timed labels.
