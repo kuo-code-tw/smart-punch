@@ -14873,7 +14873,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
 
             const attendanceDays = buildAttendanceDayMapByShift(visibleEmployees, year, month);
 
-            const dayHeaders = Array.from({ length: 31 }, (_, index) => `${index + 1}日`);
+            const dayHeaders = Array.from({ length: 31 }, (_, index) => index + 1);
             const sheetRows = [['公司', '完整工號', '姓名', '部門', '職稱', ...dayHeaders, '結算天數']];
             visibleEmployees.forEach(emp => {
                 const empId = String(emp.empId || '');

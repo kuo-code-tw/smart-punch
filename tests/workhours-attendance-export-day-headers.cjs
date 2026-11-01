@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const html=fs.readFileSync('work-hours/index.html','utf8');
+const start=html.indexOf('async function exportAttendanceStatsExcel()');
+const end=html.indexOf('function escapeHtml(',start);
+assert(start>=0&&end>start,'attendance day export function must exist');
+const source=html.slice(start,end);
+assert(source.includes('const dayHeaders = Array.from({ length: 31 }, (_, index) => index + 1);'),'export uses plain numeric day headers');
+assert(!source.includes('(${index + 1}日'),'no day suffix in exported header');
+const cols=Array.from({length:31},(_,i)=>i+1);
+assert.deepEqual(cols.slice(0,4),[1,2,3,4]);
+assert.equal(cols.at(-1),31);
+assert(source.includes("return days.has(day) ? 'V' : '';"),'daily punch values unchanged');
+assert(source.includes("'結算天數'"),'settled days column remains');
+assert(source.includes('XLSX.utils.aoa_to_sheet(sheetRows)'),'Excel output still generated');
+console.log('PASS attendance statistics Excel export uses day numbers 1–31 without 日 and retains original values');
