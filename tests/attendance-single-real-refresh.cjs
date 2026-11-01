@@ -28,7 +28,7 @@ async function simulate({roster=[reportRow],cloudFailure=false,pending=false,mon
   async applySnapshot(s){applied++;return true;}
  };
  const c={
-  URL,AbortController,console,Map,Set,Promise,Date,Error,JSON,
+  URL,AbortController,setTimeout,clearTimeout,console,Map,Set,Promise,Date,Error,JSON,
   document:doc,MutationObserver:class{observe(){}},getComputedStyle:()=>({visibility:'visible'}),
   P79ManagementContext:context,p79AttendanceOvertimeMonths:cache,
   getAttendanceEmployeeMasterToken:()=> 'TOKEN',
