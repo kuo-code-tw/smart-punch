@@ -7887,6 +7887,49 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79ScheduleExportDay(emp,dayStr,context=null) {
       return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;
     }
+    function p79ScheduleOvertimeExportRows_(staff,month){
+      const detail=[],totals=new Map(),seen=new Set();
+      for(const emp of staff){
+        const meta=monthlyScheduleMeta[emp.id]||{};
+        for(const [date,m] of Object.entries(meta)){
+          if(!date.startsWith(month+'-')||!m||typeof m!=='object')continue;
+          const revoked=new Set((Array.isArray(m.overtimeRevocations)?m.overtimeRevocations:[])
+             .filter(x=>x?.confirmed===true).map(x=>String(x.reportId||'')));
+          const reports=[m.overtimeReport,...(Array.isArray(m.overtimeReports)?m.overtimeReports:[])].filter(Boolean);
+          for(const r of reports){
+            const id=String(r.id||'');
+            if(!id||seen.has(emp.id+'|'+date+'|'+id))continue;
+            seen.add(emp.id+'|'+date+'|'+id);
+            const cancelled=revoked.has(id)||m.overtimeExcluded===true;
+            const confirmed=!cancelled&&r.status==='已核對出勤';
+            const hours=Number(r.convertedHours);
+            const declared=Number(r.declaredHours);
+            const eligible=confirmed&&r.convertedHours!==''&&r.convertedHours!=null&&Number.isFinite(hours)&&hours>=0;
+            const name=String(emp.name||''),code=String(r.code||'');
+            detail.push({
+              '日期':date,'工號':String(emp.id||''),'姓名':name,'職稱':String(emp.role||''),
+              '組別':String(emp.group||''),'申報編號':id,'加班班別':code,
+              '申報時數':r.declaredHours??'','換算時數':r.convertedHours??'',
+              '申報狀態':cancelled?'已取消':r.status||'未明',
+              '納入核對小計':eligible?'是':'否',
+              '核對小計時數':eligible?hours:0,
+              '備註':cancelled?'已取消，不重複計入':confirmed&&!eligible?'換算時數缺漏，待核對':
+                '須核對正式考勤／申報版本'
+            });
+            if(!totals.has(emp.id))totals.set(emp.id,{ '工號':String(emp.id||''),'姓名':name,
+                '職稱':String(emp.role||''),'組別':String(emp.group||''),'申報筆數':0,'已核對可計筆數':0,'已核對換算時數':0,
+                '待核對筆數':0,'已取消筆數':0});
+            const t=totals.get(emp.id);
+            t['申報筆數']++;
+            if(cancelled)t['已取消筆數']++;
+            else if(eligible){t['已核對可計筆數']++;t['已核對換算時數']+=hours;}
+            else t['待核對筆數']++;
+          }
+        }
+      }
+      return {detail,totals:[...totals.values()]};
+    }
+
     async function exportScheduleToExcel() {
       if(typeof XLSX==='undefined'&&!await p79LoadScheduleExcel())return;
       const yearMonth = document.getElementById('month-picker').value;
@@ -7903,7 +7946,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const typhoonMarkers=typeof p79TyphoonDates==='function'?p79TyphoonDates():[];
       const hasSpecialDays=typhoonMarkers.some(day=>day.startsWith(yearMonth+'-'))||
         (window.P79SpecialOvertime?.electionDates?.()||[]).some(day=>day.startsWith(yearMonth+'-'));
-      if(hasSpecialDays&&p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
+      const fromProvisional=p79ScheduleSourceState.month===yearMonth&&p79ScheduleSourceState.kind==='provisional';
+      // 備援缺少正式考勤證據時仍允許下載備援原貌，但報表須標示「未核對」。
+      if(hasSpecialDays&&!fromProvisional&&p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
         await p79ScheduleRestClient().refreshIfStale(yearMonth);
         if(p79ScheduleRestClient().status(yearMonth).evidence.complete!==true){
           alert('本月考勤尚未完成核對，無法正確判斷颱風／選舉日無打卡情形，請先完成考勤同步再匯出。');
@@ -7988,8 +8033,20 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // 凍結/顯示左側欄位由 試算表 軟體決定；至少確保資料本身完整輸出。
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `${yearMonth}職稱班表`);
+      const overtime=p79ScheduleOvertimeExportRows_(sortedEmps,yearMonth);
+      const details= overtime.detail.length ? overtime.detail : [{'說明':'此月份來源未查到加班申報，不能以零筆斷言無加班'}];
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(details),'加班申報明細');
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(overtime.totals.length?overtime.totals:[{'說明':'此月份尚無可核對的個人加班小計'}]),'個人加班小計');
+      const notes=[
+        ['月份',yearMonth],
+        ['班表來源',fromProvisional?'10/28 歷史備援，非月底正式定稿':'系統正式月份查詢'],
+        ['加班來源','當月排班 __meta 申報；已取消的申報不重複計入'],
+        ['核對時數規則','僅狀態為已核對出勤、換算時數有效且未取消的申報納入小計'],
+        ['注意','10/29～10/31 後續異動及漏報仍需比對，不可直接作為最終核薪']
+      ];
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(notes),'資料來源與核對說明');
       const roleLabel=selectedRoles.length===new Set(employees.map(window.P79ScheduleTransferRoles.role)).size?'全部職稱':selectedRoles.map(r=>r.replace(/[^\u3400-\u9fffA-Za-z0-9_-]+/g,'-')).join('_');
-      XLSX.writeFile(wb, `${yearMonth}_${roleLabel}_排班表.xlsx`);
+      XLSX.writeFile(wb, `${yearMonth}_${roleLabel}_排班加班核對表.xlsx`);
     }
 
     // 明確掛到 window，確保上方「功能 → 匯出」與頁面按鈕都呼叫同一份正式函式。
