@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync('schedule/index.html','utf8');
+const backend=fs.readFileSync('backend/history-module-month-readonly.gs','utf8');
+assert.match(html,/historyGetProvisionalScheduleMonth/,'original schedule page must request explicit backup');
+assert.match(html,/backup\.provisional!==true/,'backup must be certified provisional by API');
+assert.match(html,/backup\.month!==requestMonth/,'month mismatch must fail closed');
+assert.match(html,/data=\{\.\.\.data,schedules:backup\.schedules,provisional:true/,'never write backup as formal source');
+assert.match(html,/p79ScheduleOfficialMonth='';[\s\S]*p79ScheduleOfficialToken='';[\s\S]*p79ScheduleBaseDigest='';/,'provisional view must clear write receipt');
+assert.match(html,/p79ScheduleGroupHistoryUnverifiedMonth=requestMonth/,'provisional month must remain unsavable');
+assert.match(html,/\['cache','provisional'\]\.includes\(p79ScheduleSourceState\.kind\)/,'provisional must be visible in native calendar');
+assert.match(html,/10\/28歷史備援（未核對月底、禁止儲存）/,'historical status must be visible');
+assert.match(html,/return canManageSchedule\(\) && !!scheduleEditLockState\.mine && p79ScheduleHasOfficialData\(\)/,'edit lock must require official cloud receipt');
+assert.match(backend,/function p79HistoryGetProvisionalScheduleMonth_/,'provisional route must be available');
+console.log('PASS: 10 checks for 2026-10 roster read-only fallback, month scope, save guard and native calendar render');

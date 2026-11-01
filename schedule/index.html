@@ -2834,6 +2834,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const time=s.savedAt?new Date(s.savedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'';
       el.textContent=s.kind==='cache'?'本機快取｜'+time+'｜'+(s.error?'雲端更新未完成，暫供查看；請按重新讀取':'先供查看，正在核對雲端最新班表…'):
         s.kind==='live'?'雲端班表已更新｜'+time+(s.error?'｜重新核對未完成，保留上次確認內容':''):
+        s.kind==='provisional'?'⚠️ '+s.month+' 僅供查看：10/28歷史備援（未核對月底、禁止儲存）':
         s.error?'班表尚未載入：'+s.error:s.kind==='missing'?'本機沒有此月份可用快取，正在讀取雲端…':'正在讀取本機快取與雲端班表…';
     }
     function p79ConfirmScheduleSource(data,month,readAt=Date.now(),viewer=window.Port79DataCache?.viewerKey?.(),token=currentPort79SsoToken()){
@@ -4340,6 +4341,32 @@ function p79EmployeeDateEligible(emp,date) {
         if (!data.ok) throw new Error(data.error || '讀取失敗');
         if(!Array.isArray(data.employees)||!Array.isArray(data.schedules)||(data.month&&String(data.month)!==requestMonth))throw new Error('排班資料不完整或月份不符，已保留目前畫面');
 
+        // Historical month with no formal archive: use the explicitly labelled
+        // 2026-10-28 backup for display ONLY. Never assert official receipt or
+        // accidentally write 83 provisional rows over the formal month.
+        if(!data.schedules.length&&requestMonth<scheduleTaipeiTodayKey().slice(0,7)){
+          const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+          let backup;
+          try {
+            const url=new URL(GAS_URL);
+            url.searchParams.set('action','historyGetProvisionalScheduleMonth');
+            url.searchParams.set('month',requestMonth);
+            url.searchParams.set('gcToken',token);
+            url.searchParams.set('_',String(Date.now()));
+            const response=await fetch(url.toString(),{redirect:'follow',cache:'no-store',signal:controller.signal});
+            if(!response.ok)throw Error('歷史排班備援查詢 HTTP '+response.status);
+            backup=await response.json();
+          }finally{clearTimeout(timer);}
+          if(requestMonth!==currentScheduleMonthKey()||requestEpoch!==p79SchedulePreviewEpoch||token!==currentPort79SsoToken())return false;
+          if(!backup?.ok||backup.provisional!==true||backup.month!==requestMonth||
+             !Array.isArray(backup.schedules)||backup.schedules.length===0||
+             backup.schedules.some(row=>String(row.month||'')!==requestMonth||!row.empId||!row.schedule||
+               typeof row.schedule!=='object'||Array.isArray(row.schedule)))
+            throw Error(backup?.error||'正式歷史排班缺失，備援也未通過資料完整性檢查');
+          data={...data,schedules:backup.schedules,provisional:true,
+            archiveStatus:backup.archiveStatus||'10月28日備援班表，尚未核對月底異動'};
+        }
+
         // V10.15：這份 GET 若是在使用者修改前發出、修改後才回來，就是過期快照。
         // 不允許它清空 monthlyScheduleData / personnel overrides。
         const staleAgainstLocalEdit =
@@ -4373,6 +4400,20 @@ function p79EmployeeDateEligible(emp,date) {
         }
 
         p79ApplySchedulePayload(data,requestMonth);
+        if(data.provisional===true){
+          // Must never call p79ConfirmScheduleSource: that would enable writes.
+          p79ScheduleOfficialMonth='';
+          p79ScheduleOfficialToken='';
+          p79ScheduleBaseDigest='';
+          p79ScheduleGroupHistoryUnverifiedMonth=requestMonth;
+          p79ScheduleSourceState={month:requestMonth,kind:'provisional',savedAt:Date.now(),error:''};
+          p79RenderScheduleDataSource();
+          cloudLoaded=true;
+          applyScheduleAccessUi();
+          renderRoleScheduleView();
+          if(showAlert)alert('已載入 '+requestMonth+' 排班備援供查看。\n注意：這是10/28備援，非月底正式定稿；不可儲存或覆寫。');
+          return true;
+        }
         const missingRoles=typeof p79ScheduleRolesWithoutGroups==='function'
           ?p79ScheduleRolesWithoutGroups(requestMonth):[];
         if(missingRoles.length){
@@ -6201,7 +6242,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function renderRoleScheduleView() {
       p79DisposeRosterScroll();
-      if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&p79ScheduleSourceState.kind==='cache')){
+      if(!p79ScheduleHasOfficialData()&&!(p79ScheduleSourceState.month===currentScheduleMonthKey()&&['cache','provisional'].includes(p79ScheduleSourceState.kind))){
         const target=document.getElementById('app-main-container');
         const failed=!!p79ScheduleSourceState.error;
         if(target)target.innerHTML=failed
@@ -8791,6 +8832,10 @@ window.p79ShowCombinedShiftInfo=function(button){
 #app-main-container .p79-month-schedule-table .p79-rest-count-compact .p79-rest-deficit{display:block!important;color:#b45309!important;font-weight:900!important;font-size:10px!important}
 #app-main-container .p79-month-schedule-table .p79-rest-election{background:#eef2ff!important;color:#4338ca!important;font-weight:900!important}
 </style>
+
+<!-- Historical month is read-only and never rewrites active-month state. -->
+<script src="../assets/port79-history-month-inline.js?v=20261101"></script>
+<script>window.P79HistoryMonthInline.enhance({type:"schedule",selector:"#month-picker"});</script>
 </body>
 </html>
 
