@@ -13064,14 +13064,17 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         // must remain unresolved; never join punches belonging to different employees.
         function p79AttendanceDisplayPairingRecords(sourceRecords, masterEmployees = employees) {
             const idx = getAttendanceEmployeeLookupIndex(masterEmployees);
-            return (Array.isArray(sourceRecords) ? sourceRecords : []).map(record => {
+            return (Array.isArray(sourceRecords) ? sourceRecords : []).map((record,index) => {
                 if (!record) return record;
                 const id = String(record.empId || '').trim().toUpperCase();
                 const attNo = idx.normAtt(record.attNo);
                 const byId = id ? idx.byId.get(id) : null;
                 const attMatches = attNo ? (idx.byAtt.get(attNo) || []) : [];
                 if (attMatches.length > 1 ||
-                    (byId && attMatches.length === 1 && attMatches[0] !== byId)) return record;
+                    (byId && attMatches.length === 1 && attMatches[0] !== byId))
+                    return {...record,__p79PairIdentity:'CONFLICT:'+index};
+                // A pairing conflict is flagged for review instead of silently using
+                // another worker's attendance number to complete a shift.
                 let master = byId || (attMatches.length === 1 ? attMatches[0] : null);
                 if (!master && !id && !attNo) {
                     const nameMatches = idx.byName.get(idx.normName(record.name)) || [];
@@ -14975,6 +14978,8 @@ function getManualPairRecordAnchor(record) {
         }
         function p79AttendanceRowAssessment(row,now=Date.now()){
             const input=!!row?.clockIn,output=!!row?.clockOut;
+            if((row?.records||[]).some(record=>record?.__p79PairIdentity))
+                return {kind:'ABNORMAL',status:'員工身分待核對',reasons:['同筆打卡的工號與考勤號指向不同員工，禁止自動配對；請核對原始身分']};
             const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
             if(row?.timePrecisionIssue===true)return {kind:'ABNORMAL',status:'原始打卡時間不完整',reasons:['雲端只有日期，未推測成00:00；需核對原始時間']};
             if(row?.dateConflict===true&&input!==output&&(output||!Number.isFinite(a)||now-a>=24*3600000))
@@ -15014,6 +15019,7 @@ function getManualPairRecordAnchor(record) {
             onRecordDataScopeChange();
         }
         function getAttendanceStatusBadge(status) {
+            if (status === '員工身分待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">員工身分待核對</span>';
             if (status === '原始打卡時間不完整') return `<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">原始打卡時間不完整</span>`;
             if (status === '補卡日期待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold" title="同日下班時間早於上班，請核對跨日日期">補卡日期待核對</span>';
             if (status === '班表待核對') return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-amber-100 text-amber-800 font-bold">班表待核對</span>';

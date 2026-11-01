@@ -36,7 +36,13 @@ const source=[
 const copied=context.p79AttendanceDisplayPairingRecords(source,master);
 assert.equal(copied[4].attNo,'999','zero padded attendance number corrected for display');
 assert.equal(source[4].attNo,'0999','raw data is untouched');
-assert.equal(copied[5],source[5],'conflicting employee/attendance identities cannot be remapped');
+assert.equal(copied[5].__p79PairIdentity,'CONFLICT:5','conflicting identities are isolated from cross-employee pairing');
+assert.equal(copied[5].empId,'E293');
+assert.equal(copied[5].attNo,'472');
+assert.equal(source[5].__p79PairIdentity,undefined,'original record remains untouched');
+const withConflict=v6.buildShifts(copied);
+const conflictShift=withConflict.find(s=>s.records.some(r=>r.id==='CONFLICT'));
+assert(conflictShift&&!conflictShift.clockIn&&conflictShift.clockOut,'conflicting out punch must never pair to a different employee');
 const shifts=v6.buildShifts(copied.filter(r=>r.id!=='CONFLICT'));
 assert.equal(shifts.filter(s=>s.clockIn&&!s.clockOut).length,2,'both missing sign-outs remain visible');
 assert.equal(shifts.filter(s=>!s.clockIn&&s.clockOut).length,1,'orphan sign-out remains visible');
@@ -57,6 +63,7 @@ assert.equal(normal.length,1,'complete corrected shift must appear under 正常'
 assert.deepEqual(new Set(abnormal.map(x=>x.attNo)),new Set(['293','472','479']));
 assert.equal(assessedContext.p79FilterAttendanceStatus([{clockIn:{timeStr:'2026/11/01 10:00'}}],'PENDING',new Date(2026,10,1,12).getTime()).length,1,'within 24h open shift remains pending');
 assert.equal(assessedContext.p79FilterAttendanceStatus([{clockIn:{timeStr:'2026/10/02 10:00'},dateConflict:true}],'ABNORMAL',now).length,1,'expired reversed punch remains abnormal');
+assert.equal(assessedContext.p79FilterAttendanceStatus(withConflict,'ABNORMAL',now).filter(s=>s.attendanceStatus==='員工身分待核對').length,1,'identity conflict is visible as an anomaly');
 assert(html.includes("const rangeView = statusFilter!=='ALL'||"),'status searches must show whole selected date range');
 assert(html.includes("const evaluatedRows=p79FilterAttendanceStatus(dailyRows,'ALL');"),'status counts and list use same assessment');
 assert(!html.includes("resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);"),'switching months must not silently reset status filter');

@@ -40,6 +40,10 @@
     return d.getFullYear()===Number(m[1])&&d.getMonth()===Number(m[2])-1&&d.getDate()===Number(m[3])&&d.getHours()===Number(m[4])&&d.getMinutes()===Number(m[5])&&d.getSeconds()===Number(m[6])?d.getTime():NaN;
   }
   function identity(r){
+    // Display-only review identities keep conflicting worker IDs/attendance
+    // numbers from being merged by the ordinary attendance-number priority.
+    const isolated=s(r&&r.__p79PairIdentity);
+    if(isolated)return 'REVIEW:'+isolated;
     const a=normAtt(r&&(r.attNo!=null?r.attNo:r['考勤號碼'])); if(a) return 'ATT:'+a;
     const e=normEmp(r&&(r.empId||r['自定義編號'])); if(e) return 'EMP:'+e;
     const n=normName(r&&(r.name||r['姓名'])); return n?'NAME:'+n:'';
