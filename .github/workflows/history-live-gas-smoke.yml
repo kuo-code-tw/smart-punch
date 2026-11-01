@@ -1,0 +1,18 @@
+name: Check live GAS archived-month routes (no credentials)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/history-live-gas-smoke.yml'
+      - 'tests/history-live-gas-smoke.cjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-gas-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/history-live-gas-smoke.cjs
