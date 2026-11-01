@@ -3645,7 +3645,7 @@ function p79RenderDashboardMonthlySourceAudit(month,shipJobs,staffMoves){
   if(!el)return;
   const active=dashboardDateRange().active;
   const selected=String(month||'');
-  if(active||!/^20\\d{2}-(0[1-9]|1[0-2])$/.test(selected)){
+  if(active||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(selected)){
     el.classList.add('hidden');el.innerHTML='';return;
   }
   const jobs=Array.isArray(shipJobs)?shipJobs:[];
