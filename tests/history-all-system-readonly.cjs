@@ -65,3 +65,33 @@ function fixture(options={}){
  assert.throws(()=>t.context.p79HistoryGetArchivedModuleMonth_({type:'login-audit',month:'2026-10'}),/超級管理員|No permission/);
 }
 console.log('PASS: 6 archive boundary, permission, paging, duplicate and missing-month cases');
+
+
+// Provisional October fallback must never be published as a final roster.
+{
+ const permissions=[];
+ const name='79號碼頭_2026-10排班_20261028來源待核對_歷史保全';
+ const file={getName:()=>name,getId:()=> 'backup-id',getMimeType:()=> 'application/vnd.google-apps.spreadsheet'};
+ const sheet={getLastRow:()=>3};
+ const mocks={
+  getSpreadsheet_:()=>({}),
+  gcRequireSystemPermission_:(_ss,_token,area,level)=>{
+   permissions.push([area,level]);return {adminRole:'superadmin'};
+  },
+  getScheduleDriveFolder_:()=>({getFiles:()=>iterator([file])}),
+  Utilities:{formatDate:()=> '2026-11'},
+  SpreadsheetApp:{openById:()=>({getSheets:()=>[sheet],getUrl:()=> 'https://docs.google.com/spreadsheets/d/backup-id/edit'})},
+  readSchedules_:()=>[{empId:'A01',month:'2026-10',schedule:{}},{empId:'A02',month:'2026-10',schedule:{}}],
+  normalizeScheduleMonth_:x=>String(x)
+ };
+ const c=vm.createContext(mocks);
+ vm.runInContext(source,c);
+ const result=c.p79HistoryGetProvisionalScheduleMonth_({month:'2026-10',token:'AUTH'});
+ assert.equal(result.ok,true);
+ assert.equal(result.provisional,true);
+ assert.equal(result.count,2);
+ assert.match(result.archiveStatus,/待核對/);
+ assert.deepEqual(permissions,[['history','view'],['schedule','view']]);
+ assert.throws(()=>c.p79HistoryGetProvisionalScheduleMonth_({month:'2026-11',token:'AUTH'}),/本月/);
+}
+console.log('PASS: provisional roster read-only source, status, permissions and current-month guard');
