@@ -111,3 +111,43 @@ function p79HistoryGetArchivedModuleMonth_(params) {
     hasMore:start+rows.length<totalRows,serverTime:Date.now()
   };
 }
+
+
+/*
+ * Provisional roster retrieval. The formal historyGetMonthData schedule remains
+ * the primary source. This explicit fallback is for a missing formal month tab.
+ * It NEVER publishes, writes, or labels the 2026-10-28 backup as a final roster.
+ */
+function p79HistoryGetProvisionalScheduleMonth_(params) {
+  const p=params||{};
+  const month=p79HistoryArchiveMonthKey_(p.month);
+  const ss=getSpreadsheet_(true);
+  const token=String(p.gcToken||p.token||'').trim();
+  const session=gcRequireSystemPermission_(ss,token,'history','view');
+  const fine=session&&session.finePermissions&&session.finePermissions.history||{};
+  const role=String(session&&session.adminRole||'').trim().toLowerCase();
+  if(role!=='superadmin'&&fine['schedule.view']!==true)
+    throw Error('此帳號沒有排班歷史查詢權限');
+  gcRequireSystemPermission_(ss,token,'schedule','view');
+  const current=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM');
+  if(month>=current)throw Error('本月班表必須從正式主系統讀取');
+  const historyFolder=getScheduleDriveFolder_();
+  const backup=p79HistoryModuleFile_(historyFolder,month,'排班_20261028來源待核對_歷史保全');
+  if(!backup)return {
+    ok:false,action:'historyGetProvisionalScheduleMonth',type:'schedule',month:month,
+    status:'MISSING_BACKUP',error:'找不到該月份備援班表；不得虛構歷史紀錄'
+  };
+  const file=SpreadsheetApp.openById(backup.getId());
+  const sheets=file.getSheets();
+  if(sheets.length!==1)throw Error('排班備援分頁數不符，拒絕混合月份');
+  const schedules=readSchedules_(sheets[0]).filter(function(row){return normalizeScheduleMonth_(row.month)===month;});
+  if(!schedules.length)throw Error('排班備援沒有指定月份紀錄');
+  const expected=sheets[0].getLastRow()-1;
+  if(schedules.length!==expected)throw Error('排班備援筆數不一致，拒絕顯示');
+  return {
+    ok:true,action:'historyGetProvisionalScheduleMonth',type:'schedule',month:month,
+    provisional:true,archiveStatus:'待核對（10月28日排班備援；非月底正式定稿）',
+    schedules:schedules,count:schedules.length,sourceLabel:'Google Drive｜10/28 備援排班｜待核對',
+    sourceUrl:file.getUrl(),serverTime:Date.now()
+  };
+}
