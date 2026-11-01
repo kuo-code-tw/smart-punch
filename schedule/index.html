@@ -7153,7 +7153,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
             const issues=Array.isArray(state.evidence?.audit)?state.evidence.audit:[];
             const count=audit?audit.shiftMismatch+audit.shiftUnresolved+audit.punchMissing+audit.restDayWorked:0;
             const summary=audit&&state.evidence?.complete===true?
-              (state.evidence.absenceAuditReady?'無上下班卡已雙來源核對｜':'無卡判休未啟用（'+(state.evidence.absenceAuditWarning||'資料未讀齊')+'）｜')+
+              (state.evidence.absenceAuditReady?
+                '雙來源無卡休假'+Object.keys(state.evidence.absenceConfirmedDays||{}).length+'格｜來源待核'+(state.evidence.absenceDiscrepancies||0)+'格｜':
+                '無卡判休暫停（'+(state.evidence.absenceAuditWarning||'資料未讀齊')+'）｜')+
               '考勤對帳 '+audit.employees+'人｜休假日出勤'+audit.restDayWorked+'｜班別差異'+audit.shiftMismatch+
               '｜班別無法推定'+audit.shiftUnresolved+'｜打卡待核'+audit.punchMissing:'';
             const message=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次結果）':'正式考勤核對中'):
