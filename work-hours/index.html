@@ -17045,12 +17045,15 @@ window.p79OvertimeApplicationContext={
 <style id="p79-monthly-attendance-wider-v20261020">
 /* 僅每月出勤天數統計：桌機使用接近整個視窗寬度，保留手機正常內距。 */
 @media (min-width:1024px){
+  /* Respect the persistent workspace sidebar: no full-viewport breakout. */
   body.p79-work-hours-page #viewAdmin:has(#adminContentStats:not(.hidden)){
-    width:calc(100vw - 24px)!important;
-    max-width:calc(100vw - 24px)!important;
-    margin-left:calc(50% - 50vw + 12px)!important;
+    width:100%!important;
+    max-width:100%!important;
+    margin-left:0!important;
     margin-right:0!important;
-    padding:12px 4px 24px!important;
+    padding:12px clamp(12px,1.25vw,24px) 24px!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
   }
   body.p79-work-hours-page #viewAdmin:has(#adminContentStats:not(.hidden)) .admin-desktop-content{
     width:100%!important;max-width:none!important;padding:12px!important;
@@ -17086,10 +17089,12 @@ body.p79-work-hours-page #attendanceStatsSummary{padding:9px 13px!important;min-
 <style id="p79-overtime-wide-v20261020">
 /* 每日加班人員統計：桌機展開內容寬度，降低側邊留白；手機維持響應式滾動。 */
 @media(min-width:1024px){
+ /* Preserve the normal content column to the right of the workspace sidebar. */
  body.p79-work-hours-page #viewAdmin:has(#adminContentOvertime:not(.hidden)){
-   width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;
-   margin-left:calc(50% - 50vw + 12px)!important;margin-right:0!important;
-   padding:12px 4px 24px!important;
+   width:100%!important;max-width:100%!important;
+   margin-left:0!important;margin-right:0!important;
+   padding:12px clamp(12px,1.25vw,24px) 24px!important;
+   min-width:0!important;box-sizing:border-box!important;
  }
  body.p79-work-hours-page #viewAdmin:has(#adminContentOvertime:not(.hidden)) .admin-desktop-content{
    width:100%!important;max-width:none!important;min-width:0!important;padding:12px!important;
@@ -17151,7 +17156,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 </script>
 
 
-<link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
+<link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261101-workhours-bleed-fix-v3">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 </body>
 </html>
