@@ -29,6 +29,10 @@ function shiftFromClockIn(inRec,outRec,{displayOnly=false}={}){
  else if(start.hour>=22){shift='晚';}
  else if(start.hour<=2){shift='晚';date=dateBack(date);}
  if(!shift)return null;
+ // Use exactly the official attendance engine workday; a 00:30–09:00
+ // session must not be moved to yesterday by a separate shift heuristic.
+ const accountingDate=engine?.accountingDateForSession?.(inRec,outRec);
+ if(/^\d{4}-\d{2}-\d{2}$/.test(String(accountingDate||'')))date=accountingDate;
  return{date,shift,start:start.ts,end:end.ts};
 }
 function plan({records=[],employees=[],schedules={},metadata={},month='',today='',allowUnmarked=false,isProtected=()=>false}={}){
