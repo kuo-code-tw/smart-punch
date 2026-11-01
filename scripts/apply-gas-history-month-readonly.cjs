@@ -13,6 +13,9 @@ const route=[
 "    if (action === 'historyGetArchivedModuleMonth') {",
 "      return jsonOutput(p79HistoryGetArchivedModuleMonth_(params));",
 "    }",
+"    if (action === 'historyGetProvisionalScheduleMonth') {",
+"      return jsonOutput(p79HistoryGetProvisionalScheduleMonth_(params));",
+"    }",
 "",
 anchor
 ].join('\n');
