@@ -22,7 +22,7 @@ function create(ctx){
    const people=ctx.employees(),pairedRows=ctx.buildShifts([...records.values()]);
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
-   const actualShifts={},actualWorkedMinutes={},duplicates=new Set();
+   const actualShifts={},actualWorkedMinutes={},ambiguousShifts={},aggregates=new Map();
    for(const row of pairedRows){
     if(!row.clockIn||!row.clockOut||row.timePrecisionIssue)continue;
     const rec=row.clockIn,claimed=id(row.empId||rec.empId);
@@ -36,9 +36,15 @@ function create(ctx){
     const paired=ctx.shiftForSession?.(row);
     if(!employee||!paired?.date?.startsWith(month+'-')||!['早','中','晚'].includes(paired.shift))continue;
     const key=id(employee.id)+'|'+paired.date;
-    if(duplicates.has(key))continue;
-    if(actualShifts[key]){delete actualShifts[key];delete actualWorkedMinutes[key];duplicates.add(key);}
-    else {actualShifts[key]=paired.shift;actualWorkedMinutes[key]=Math.round((paired.end-paired.start)/60000);}
+    const minutes=Math.round((paired.end-paired.start)/60000);
+    if(minutes<=0)continue;
+    const prior=aggregates.get(key);
+    if(!prior)aggregates.set(key,{shift:paired.shift,minutes,conflict:false});
+    else{prior.minutes+=minutes;if(prior.shift!==paired.shift)prior.conflict=true;}
+   }
+   for(const [key,value] of aggregates){
+     if(value.conflict){ambiguousShifts[key]='同一工作日存在不同班別的完整出勤';continue;}
+     actualShifts[key]=value.shift;actualWorkedMinutes[key]=value.minutes;
    }
    const sessions=pairedRows.map(row=>{
     const record=row.clockIn||row.clockOut||row.records?.[0]||row,emp=people.find(e=>id(e.id)===id(row.empId||record.empId))||people.find(e=>att(record.attNo)&&att(e.attNo||e.attendanceNo)===att(record.attNo));
@@ -49,6 +55,33 @@ function create(ctx){
    // Expose shift codes, not the employees' raw punch records or credentials.
    state.evidence.actualShifts=actualShifts;
    state.evidence.actualWorkedMinutes=actualWorkedMinutes;
+   state.evidence.ambiguousShifts=ambiguousShifts;
+   // Audit every employee and day of the loaded official month. Read-only:
+   // conflicts are diagnostic, never an authorization to overwrite schedules.
+   const audit=[];
+   const savedRoster=new Map(schedules.map(row=>[id(row.empId),row.schedule||{}]));
+   for(const person of people){
+     const empId=id(person.id||person.empId),roster=savedRoster.get(empId)||{};
+     if(!empId)continue;
+     for(const [date,saved] of Object.entries(roster)){
+       if(date.length!==10||date.slice(0,7)!==month||date[7]!=='-')continue;
+       const key=empId+'|'+date,day=state.evidence.days?.[key];
+       if(!day)continue;
+       const original=String(saved||'').trim(),actual=actualShifts[key]||'';
+       const base={empId,name:String(person.name||person.empName||empId),date,saved:original};
+       if(day.state==='worked'&&actual&&['早','中','晚'].includes(original)&&actual!==original)
+         audit.push({...base,kind:'shift-mismatch',actual});
+       else if(day.state==='worked'&&!actual)
+         audit.push({...base,kind:'shift-unresolved',reason:ambiguousShifts[key]||'完整出勤，班別未能唯一確認'});
+       else if(day.state==='missing')
+         audit.push({...base,kind:'punch-missing'});
+     }
+   }
+   state.evidence.audit=audit;
+   state.evidence.auditSummary={employees:people.length,
+     shiftMismatch:audit.filter(row=>row.kind==='shift-mismatch').length,
+     shiftUnresolved:audit.filter(row=>row.kind==='shift-unresolved').length,
+     punchMissing:audit.filter(row=>row.kind==='punch-missing').length};
    return state.evidence;
   }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence={complete:false,days:{}};return null;}
   finally{state.pending=false;if(ctx.token()===token&&states.get(month)===state)ctx.update?.(month,state);}})();return state.promise;
