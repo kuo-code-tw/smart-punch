@@ -19,6 +19,7 @@ function run(){
     dashboardSignedDiff:v=>(v>0?'+':'')+String(v),
     canonicalOperationalRecords:rs=>rs,
     recordMoveValues:r=>({disc:r.disc,load:r.load}),
+    dashboardDateRange:()=>({active:false}),getPort79Year:()=> '2026',
     document:{getElementById:id=>id==='dashboardQuantityReconciliation'?host:null}
   };
   vm.createContext(ctx);
