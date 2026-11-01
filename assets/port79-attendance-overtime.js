@@ -496,7 +496,8 @@ async function recheckAndMarkReviewed(date,checked=true){
 // 顏色只反映 10/28 備援申報，不應冒充 10 月月底核薪定稿。
 const p79OctoberOvertimeBackupFetches=new Map();
 function p79OctoberOvertimeNeedsFallback(state){
- if(!state?.ready||state.source==='2026-10-provisional')return false;
+ if(state?.source==='2026-10-provisional'||state?.pending===true)return false;
+ if(state?.ready!==true)return true; // 正式月份讀取失敗，也不可讓歷史加班日期永遠沒顏色。
  const rows=Array.isArray(state.rows)?state.rows:[];
  return !rows.some(row=>{
   const meta=row?.schedule?.__meta||{};
