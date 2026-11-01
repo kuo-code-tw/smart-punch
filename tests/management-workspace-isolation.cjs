@@ -53,7 +53,7 @@ assert(navigation.includes('window.launchSystem(key)'),'home menu must use the o
 assert(navigation.includes("attributeFilter:['hidden','disabled','style']"),'home sidebar must update when permissions refresh');
 for(const page of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','aqc-efficiency/index.html','hr/index.html','leave/index.html','history-data/index.html']){
  const html=fs.readFileSync(page,'utf8');
- assert(html.includes('port79-management-workspace.js?v='+(page==='index.html'?'20261101-home-overtime-leave-v4':'20261101-unified-sidebar-v2')),page+' refreshes the shared nav script');
+ assert(html.includes('port79-management-workspace.js?v='+(page==='index.html'?'20261101-sidebar-eight-v1':'20261101-unified-sidebar-v2')),page+' refreshes the shared nav script');
  if(page!=='index.html')
   assert(html.includes('port79-seven-top.js?v=20261101-unified-sidebar-v2'),page+' refreshes the permission-controlled nav');
 }
@@ -77,6 +77,20 @@ for(const css of [whMonthCss,whOvertimeCss]){
  assert(!css.includes('100vw - 24px'),'report never expands beyond sidebar-adjusted content width');
 }
 console.log('PASS workhours 2 visible tabs: no viewport-wide negative margins or full-page horizontal overlap');
+
+// Home presentation styles must not remove real modules or override the shared JS menu order.
+const homeDashboardCss=fs.readFileSync('assets/port79-home-dashboard.css','utf8');
+const referenceDashboardCss=fs.readFileSync('assets/port79-reference-dashboard.css','utf8');
+const homeSidebarRules=homeDashboardCss.split('\\n').filter(line=>line.includes('#p79SevenNav a'));
+assert(!homeSidebarRules.some(line=>/order\\s*:\\s*\\d/.test(line)),
+  'homepage CSS must retain JS canonical sidebar order');
+assert(!homeSidebarRules.some(line=>/display\\s*:\\s*none/.test(line)),
+  'homepage CSS must not hide a real system link');
+assert(!referenceDashboardCss.split('\\n').some(line=>line.includes('#p79SevenNav a[href*="work-hours"]')||line.includes('#p79SevenNav a[href*="leave/"]')),
+  'reference dashboard CSS must not hide overtime or leave sidebar links');
+const homeIndex=fs.readFileSync('index.html','utf8');
+for(const cssName of ['port79-home-dashboard.css','port79-reference-dashboard.css'])
+ assert(homeIndex.includes(cssName+'?v=20261101-sidebar-eight-v1'),cssName+' must have fresh cache version');
 
 console.log('PASS homepage/subsystems share same actual seven modules, labels, order, permissions and cache version');
 
