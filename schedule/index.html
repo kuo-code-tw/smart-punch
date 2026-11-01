@@ -6624,7 +6624,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${combinedMarker}
-              ${verifiedRestAttendance&&!actualShift?'<span class="block text-[9px] leading-tight font-bold text-amber-800" title="出勤已確認，但尚不能從打卡時段推定早／中／晚班；不會自動建立加班申報">班別待核</span>':''}
+              ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
               ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
               ${selected.punchPending?'<span class="text-[9px] text-amber-700" title="僅有單邊打卡或配對不明，保留原始資料待核對">打卡待核</span>':''}
