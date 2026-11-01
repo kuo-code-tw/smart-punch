@@ -7133,7 +7133,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const punchPending=!scheduledRest&&attendanceState==='missing'&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const attendanceUnverified=!scheduledRest&&ctx.attendanceEvidence?.complete!==true&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const shiftVal=noPunchRest?'休':actualShift||
-        (verifiedRestAttendance||pairedWork&&['待排班','休','例','國'].includes(rosterShift)?'已出勤':
+        (verifiedRestAttendance||pairedWork&&rosterShift==='待排班'||pairedWork&&['休','例','國'].includes(rosterShift)?'已出勤':
         scheduledRest?rosterShift:
         punchPending||attendanceUnverified?'打卡待核':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
