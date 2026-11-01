@@ -1658,7 +1658,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
             <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
             <span id="scheduleRestEvidenceStatus" hidden role="status"></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
-            <span class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300"><b>年假/事/病/公/喪</b>：各類假別</span>
+            <a href="../leave/" class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300" title="請至請假管理申請、核准及安排代班"><b>各類請假請至請假管理</b></a>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
         </div></details>
@@ -6604,7 +6604,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 title="${scheduleEscapeHtml(visibleSubstituteLabel || shownShift)}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${visibleSubstituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
-                ${!visibleSubstituteLabel&&!['早','中','晚','休','例','國','颱','年','事','病','公','喪','離'].includes(shownShift)?
+                ${!visibleSubstituteLabel&&!['早','中','晚','休','例','國','離'].includes(shownShift)?
                   `<option value="__display__" selected>${scheduleEscapeHtml(shownShift)}</option>`:''}
                 <option value="早" ${!visibleSubstituteLabel && shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${!visibleSubstituteLabel && shownShift==='中'?'selected':''}>中</option>
@@ -6612,12 +6612,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="休" ${!visibleSubstituteLabel && shownShift==='休'?'selected':''}>休</option>
                 <option value="例" ${!visibleSubstituteLabel && shownShift==='例'?'selected':''}>例</option>
                 <option value="國" ${!visibleSubstituteLabel && shownShift==='國'?'selected':''}>國</option>
-                <option value="颱" ${!visibleSubstituteLabel && shownShift==='颱'?'selected':''}>颱</option>
-                <option value="年" ${!visibleSubstituteLabel && shownShift==='年'?'selected':''}>年</option>
-                <option value="事" ${!visibleSubstituteLabel && shownShift==='事'?'selected':''}>事</option>
-                <option value="病" ${!visibleSubstituteLabel && shownShift==='病'?'selected':''}>病</option>
-                <option value="公" ${!visibleSubstituteLabel && shownShift==='公'?'selected':''}>公</option>
-                <option value="喪" ${!visibleSubstituteLabel && shownShift==='喪'?'selected':''}>喪</option>
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${combinedMarker}
@@ -6960,9 +6954,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
       else alert("❌ 雲端儲存失敗，請稍後再試；若持續失敗請確認 Apps Script 已部署最新版。");
     }
 
+    // Leave is requested, approved and linked exclusively through 請假管理.
+    // 排班可調整正常班別與例／休／國，不能透過日期格或匯入建立請假。
+    function p79ScheduleAllowedEditShift(value) {
+      return ['早','中','晚','休','例','國','離'].includes(String(value||'').trim());
+    }
     let p79OvertimeShiftEditBusy=false;
     async function updateDailyShift(empId,dayStr,val){
       if(val==='__overtime__')return;
+      if(!p79ScheduleAllowedEditShift(val)){alert('排班只能選正常班別及例／休／國；請假請到「請假管理」申請與審核。');renderRoleScheduleView();return;}
       if(approvedLeaveForEmployee(empId,dayStr)||p79LeaveCoverOnDay(empId,dayStr).length){alert('此日期仍連結請假或代班，請先到請假管理完成連動刪除，再修改排班。');renderRoleScheduleView();return;}
       if(p79OvertimeShiftEditBusy){renderRoleScheduleView();return;}
       if(!requireScheduleEditLock())return;
@@ -7006,7 +7006,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       finally{p79OvertimeShiftEditBusy=false;renderRoleScheduleView();try{renderTodaySchedulePanel();}catch(ignore){}}
     }
     function p79SetDailyShift(empId, dayStr, val) {
-      if (!requireScheduleEditLock()) return;
+      if(!p79ScheduleAllowedEditShift(val))return false;
+      if(approvedLeaveForEmployee(empId,dayStr)||p79LeaveCoverOnDay(empId,dayStr).length)return false;
+      if (!requireScheduleEditLock()) return false;
       if(!monthlyScheduleData[empId]) monthlyScheduleData[empId] = {};
       const previousShift=String(monthlyScheduleData[empId][dayStr]||'');
       if(!monthlyScheduleMeta[empId])monthlyScheduleMeta[empId]={};
@@ -7016,10 +7018,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
       meta.manualRosterShift=String(val);
       monthlyScheduleMeta[empId][dayStr]=meta;
       monthlyScheduleData[empId][dayStr] = ['例','國'].includes(val)?'休':val;
-      if(['年','特','年假','特休'].includes(val) && !['年','特','年假','特休'].includes(previousShift)) {
-        setTimeout(()=>openSubstituteAssignment(empId,dayStr,true),0);
-      }
-
       // 立即保留資料，但不要每改一格就重建「所有人 × 31天」整張表。
       queueScheduleCloudSave();
       queueScheduleEditRender(320);
@@ -7757,18 +7755,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if (!raw) return '';
       const compact = raw.replace(/\s+/g, '');
       const map = {
-        '早':'早','早班':'早',
-        '中':'中','中班':'中',
-        '晚':'晚','晚班':'晚',
-        '休':'休','休息':'休','休假':'休','例休':'休','例假':'休','輪休':'休','例':'休','國':'休',
-        '特':'年','特休':'年','特別休假':'年','年':'年','年假':'年',
-        '事':'事','事假':'事',
-        '病':'病','病假':'病',
-        '公':'公','公假':'公',
-        '喪':'喪','喪假':'喪',
-        '颱':'颱','颱風':'颱','颱風假':'颱','停班':'颱',
+        '早':'早','早班':'早','中':'中','中班':'中','晚':'晚','晚班':'晚',
+        '休':'休','休息':'休','輪休':'休','例休':'休','例假':'例','例':'例',
+        '國':'國','國定假日':'國',
         '離':'離','離職':'離','resigned':'離','terminated':'離'
       };
+      // Do not misinterpret the generic word 請假/休假 as a roster rest day.
+      // Formal leave (including annual/sick/personal/official/typhoon) comes from Leave Management only.
       return Object.prototype.hasOwnProperty.call(map, compact) ? map[compact] : null;
     }
 
@@ -7897,10 +7890,23 @@ async function p79SaveScheduleOvertimeDraft(draft){
             }
 
             const dateKey = `${yearMonth}-${dd}`;
-            monthlyScheduleData[emp.id][dateKey] = normalized || '休';
-            if (monthlyScheduleMeta[emp.id][dateKey]) delete monthlyScheduleMeta[emp.id][dateKey];
-            if(importedRestOvertime)monthlyScheduleMeta[emp.id][dateKey]={restCategory:importedRestOvertime[2],restQuotaOvertime:true,restAllocationSource:'manual'};
-            else if(['例','國'].includes(String(rawShift).trim()))monthlyScheduleMeta[emp.id][dateKey]={restCategory:String(rawShift).trim(),restAllocationSource:'manual'};
+            // Never replace formal leave, substitute/cover, overtime, or protected day metadata on import.
+            const originalMeta=monthlyScheduleMeta[emp.id][dateKey]||{};
+            if(approvedLeaveForEmployee(emp.id,dateKey)||p79LeaveCoverOnDay(emp.id,dateKey).length||
+              originalMeta.overtimeReport||originalMeta.overtimeReports?.length||originalMeta.overtime||
+              originalMeta.forEmpId||originalMeta.type==='substitute'||originalMeta.manualRosterShift&&
+              originalMeta.restAllocationLocked){
+              invalid.push(`第 ${r + 2} 列 ${d}日：已有正式請假／代班／加班或鎖定，未覆蓋`);
+              continue;
+            }
+            monthlyScheduleData[emp.id][dateKey] = normalized;
+            // Preserve unrelated metadata rather than erasing linked records from the full month.
+            const clean={...originalMeta};
+            for(const key of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource','restPreferredCategory'])delete clean[key];
+            clean.manualRosterShift=normalized;
+            monthlyScheduleMeta[emp.id][dateKey]=clean;
+            if(importedRestOvertime)Object.assign(monthlyScheduleMeta[emp.id][dateKey],{restCategory:importedRestOvertime[2],restQuotaOvertime:true,restAllocationSource:'manual'});
+            else if(['例','國'].includes(normalized))Object.assign(monthlyScheduleMeta[emp.id][dateKey],{restCategory:normalized,restAllocationSource:'manual'});
             updatedCells++;
           }
         }
