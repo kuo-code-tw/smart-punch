@@ -492,12 +492,65 @@ async function recheckAndMarkReviewed(date,checked=true){
  try{return await run;}finally{if(activeReviewRequests.get(date)===run)activeReviewRequests.delete(date);}
 }
 
+// 10 月正式排班歷史分頁缺失：為日期顏色讀取既有唯讀備援。
+// 顏色只反映 10/28 備援申報，不應冒充 10 月月底核薪定稿。
+const p79OctoberOvertimeBackupFetches=new Map();
+function p79OctoberOvertimeNeedsFallback(state){
+ if(!state?.ready||state.source==='2026-10-provisional')return false;
+ const rows=Array.isArray(state.rows)?state.rows:[];
+ return !rows.some(row=>{
+  const meta=row?.schedule?.__meta||{};
+  return Object.entries(meta).some(([date,value])=>date.startsWith('2026-10-')&&
+   (value?.overtimeReport||(Array.isArray(value?.overtimeReports)&&value.overtimeReports.length)||
+    (Array.isArray(value?.overtimeRevocations)&&value.overtimeRevocations.length)));
+ });
+}
+function p79RestoreOctoberOvertimeColors(months){
+ const month='2026-10',state=months.get(month);
+ if(!p79OctoberOvertimeNeedsFallback(state))return;
+ const token=p79ReviewCloudToken();
+ const base=typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||''):'';
+ if(!token||!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/.test(base))return;
+ const id=month+'|'+token;
+ const previous=p79OctoberOvertimeBackupFetches.get(id);
+ if(previous&&Date.now()-previous.at<120000)return;
+ const attempt={at:Date.now(),pending:true};
+ p79OctoberOvertimeBackupFetches.set(id,attempt);
+ (async()=>{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+  try{
+   const u=new URL(base);
+   u.searchParams.set('action','historyGetProvisionalScheduleMonth');
+   u.searchParams.set('month',month);
+   u.searchParams.set('gcToken',token);
+   u.searchParams.set('_',String(Date.now()));
+   const response=await g.fetch(u.toString(),{cache:'no-store',signal:controller.signal});
+   const data=await response.json();
+   if(!response.ok||data?.ok!==true||data.provisional!==true||data.month!==month||
+      !Array.isArray(data.schedules)||!data.schedules.length||
+      data.schedules.some(row=>row.month!==month||!row.empId||!row.schedule))throw Error(data?.error||'10月加班備援尚未取得');
+   if(p79ReviewCloudToken()!==token||p79OctoberOvertimeBackupFetches.get(id)!==attempt)return;
+   const latest=months.get(month);
+   if(latest?.source==='2026-10-provisional')return;
+   // Never replace a month with newer valid cloud overtime metadata.
+   if(latest?.ready===true&&!p79OctoberOvertimeNeedsFallback(latest))return;
+   months.set(month,{...(latest||{}),token,at:Date.now(),pending:false,ready:true,
+      rows:data.schedules,people:latest?.people||[],covers:latest?.covers||[],
+      source:'2026-10-provisional',archiveStatus:data.archiveStatus||'10/28 備援未核對月底'});
+   refreshCurrentStrip();
+  }catch(error){
+   console.warn('10月備援加班日期讀取失敗，沒有修改正式申報',String(error?.message||error));
+  }finally{clearTimeout(timer);attempt.pending=false;}
+ })();
+}
+
 function decorateOvertimeDateStrip(keys,selectedDate=''){
  const host=g.document?.getElementById?.('p79AttendanceDateStrip');
  if(!host||!Array.isArray(keys))return;
  let months;
  try{months=typeof p79AttendanceOvertimeMonths!=='undefined'?p79AttendanceOvertimeMonths:null;}catch(_){return;}
  if(!months)return;
+ if(keys.some(date=>String(date).startsWith('2026-10-')))p79RestoreOctoberOvertimeColors(months);
  const buttons=[...host.querySelectorAll('button[onclick^="goToRecordsPage("]')];
  const seenMonths=new Set();
  for(let i=0;i<buttons.length;i++){
@@ -531,6 +584,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   button.dataset.p79OvertimeReview=reviewed?'reviewed':'not-reviewed';
   button.dataset.p79OvertimeContentVersion=ready?reviewFingerprint(date,cloudMonth(date)):'';
   button.title=(info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認')))
+   +(state?.source==='2026-10-provisional'?'\n⚠️ 10/28歷史備援，非月底核薪定稿':'')
    +(reviewed&&info?.activeCount?'\n此版本已人工查核；修改歷史保留':'');
   button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
  }
@@ -538,7 +592,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='白：無申報｜綠：已申報／已核對｜黃：歷史修改待核對｜紅：已取消｜灰：未確認';
+  legend.textContent='白：未見申報｜綠：備援有申報｜黃：修改待核｜紅：取消｜灰：尚未確認；10月備援非最終核薪';
   host.appendChild(legend);
  }
 }
