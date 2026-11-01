@@ -41,7 +41,10 @@ const c={
  p79RestQuota:()=>({counts:{例:4,休:5,國:2},days:31}),
  p79DailyRestCount:()=>({counts:{例:4,休:0,國:0},dates:{例:['02','13','19','27'],休:[],國:[]}}),
  canManageSchedule:()=>false,p79OvertimePeriodLabel:()=>'',scheduleCanEditNow:()=>false,
- p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){}
+ p79RefreshRoleTabColors(){},p79ConnectRosterScroll(){},
+ p79ScheduleLeavePolicy:{ready:false,types:[],token:'SESSION'},
+ isScheduleSuperAdmin:()=>c.superAdmin===true,
+ currentPort79SsoToken:()=> 'SESSION'
 };
 vm.createContext(c);
 function extract(name){
@@ -59,10 +62,24 @@ assert(main.innerHTML.includes('選舉日：已核對整班無上下班紀錄'),
 assert(main.innerHTML.includes('<span>3/1</span>'),'visible 3 例 must show 3/1 even if metadata claims 4');
 assert(main.innerHTML.includes('data-rest-date="2026-10-01" data-rest-visible="" data-typhoon-count="off"'),'an originally scheduled 休 still counts as a typhoon event');
 assert(main.innerHTML.includes('data-display-shift="颱" data-rest-date="2026-10-01"'),'scheduled rest on a typhoon day displays 颱');
-assert(main.innerHTML.includes('>3 天</span>'),'event summary includes originally resting staff, typhoon leave and no-card shift');
+assert(main.innerHTML.includes('>3</span>'),'special-day summary shows only a number');
 assert.equal((main.innerHTML.match(/data-rest-visible="例"/g)||[]).length,3);
 assert(main.innerHTML.includes('data-rest-date="2026-10-27" data-rest-visible=""'),'approved typhoon leave hides the fourth example');
 
+// HR settings apply to every date and every role. A normal manager is never
+// allowed to choose special leave, even when the cloud policy enables it.
+c.activeRoleTab='ARMG';c.activeGroupFilter='ALL';
+c.superAdmin=false;c.p79ScheduleLeavePolicy={ready:true,types:['年','事','病','公','喪'],token:'SESSION'};
+c.renderRoleScheduleView();
+for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'normal manager cannot select '+type);
+c.superAdmin=true;c.p79ScheduleLeavePolicy={ready:true,types:['年','病'],token:'SESSION'};
+c.renderRoleScheduleView();
+for(const type of ['年','病'])assert(main.innerHTML.includes('<option value="'+type+'"'),'superadmin gets only HR enabled '+type);
+for(const type of ['事','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'HR-disabled leave must not be in dropdown: '+type);
+c.p79ScheduleLeavePolicy={ready:false,types:['年','事','病','公','喪'],token:'SESSION'};
+c.renderRoleScheduleView();
+for(const type of ['年','事','病','公','喪'])assert(!main.innerHTML.includes('<option value="'+type+'"'),'unverified HR config fails closed: '+type);
+console.log('PASS HR cloud-configured special leave: 83+ day cells, administrator denied, superadmin allowlist, unavailable config denied');
 console.log('PASS 31-day full roster: allocated 4 例, one approved typhoon overlay gives exactly 3 visible 例 and counter 3/1; full special day tooltips');
 
 // Empty groups still need their transfer selector. Its candidates must include
