@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-unified-official-attendance-v4"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-zero-punch-dual-verify-v5"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7125,13 +7125,35 @@ async function p79SaveScheduleOvertimeDraft(draft){
         token:currentPort79SsoToken,employees:()=>employees,schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
-        read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMainDirect',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
+        read:async(month,token)=>{
+          const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+          const get=async action=>{
+            const url=new URL(GAS_URL);
+            for(const [k,v]of Object.entries({action,month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);
+            const response=await fetch(url,{cache:'no-store',signal:ctl.signal});
+            if(!response.ok)throw Error(action+' 讀取失敗');
+            const data=await response.json();
+            if(data?.ok!==true||!Array.isArray(data.records)||data.month!=null&&String(data.month)!==month)
+              throw Error(action+' 月份資料不完整');
+            return data;
+          };
+          try{
+            const [official,reference]=await Promise.allSettled([
+              get('getAttendanceMainDirect'),get('getAttendanceMonthRaw')]);
+            if(official.status!=='fulfilled')throw official.reason;
+            // A failed independent read must NOT turn everybody into a rest day.
+            return {...official.value,
+              absenceReferenceRecords:reference.status==='fulfilled'?reference.value.records:null,
+              absenceReferenceError:reference.status==='rejected'?String(reference.reason?.message||reference.reason):''};
+          }finally{clearTimeout(timer);}
+        },
         update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');
           if(status){
             const audit=state.evidence?.auditSummary;
             const issues=Array.isArray(state.evidence?.audit)?state.evidence.audit:[];
             const count=audit?audit.shiftMismatch+audit.shiftUnresolved+audit.punchMissing+audit.restDayWorked:0;
             const summary=audit&&state.evidence?.complete===true?
+              (state.evidence.absenceAuditReady?'無上下班卡已雙來源核對｜':'無卡判休未啟用（'+(state.evidence.absenceAuditWarning||'資料未讀齊')+'）｜')+
               '考勤對帳 '+audit.employees+'人｜休假日出勤'+audit.restDayWorked+'｜班別差異'+audit.shiftMismatch+
               '｜班別無法推定'+audit.shiftUnresolved+'｜打卡待核'+audit.punchMissing:'';
             const message=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次結果）':'正式考勤核對中'):
@@ -7203,10 +7225,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return election.has(date)||/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(date)?.name||''))?'選':'';
     }
     function p79ScheduleNoPunchRest(empId,date,shift,meta,leave,knownState=null) {
-      // EMERGENCY HOLD 2026-11-01: a missing or incomplete monthly attendance
-      // response must never mass-convert scheduled work to 休. Keep the cloud
-      // roster code visible until independently verified per employee and day.
-      return false;
       // 全公司一套規則：只有跨月原始考勤全部讀齊、班次結束後確認無任何 IN/OUT，
       // 才把「過去的排定工作日」顯示／統計為休假。
       // 不修改原班表、既有申報、人工核准假、颱風假及跨日夜班。
@@ -7214,7 +7232,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const state=knownState===null
         ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(date.slice(0,7)).evidence},empId,date)
         :knownState;
-      return state==='rest'&&!['休','例','國'].includes(String(shift||'').trim());
+      const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
+      const key=String(empId||'').trim().toUpperCase()+'|'+date;
+      return evidence?.complete===true&&evidence.absenceAuditReady===true&&
+        evidence.absenceConfirmedDays?.[key]===true&&state==='rest'&&
+        !['休','例','國'].includes(String(shift||'').trim());
     }
     // Rest totals must describe the SELECTED value the employee sees in each
     // day cell, not hidden auto-allocation or a superseded overtime report.
