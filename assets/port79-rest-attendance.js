@@ -52,7 +52,15 @@ function build(input){
   }
   candidates.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||a.date.localeCompare(b.date));
   // 只有明確落在跨日班別時段才可歸屬前一日；隔天清晨單卡不能憑時鐘推測前日有上班。
-  const target=candidates[0]?.date||date;
+  // Match attendance/v6-engine.js accountingDateForSession: a complete
+  // same-calendar-day shift that both starts and ends before 08:00 belongs
+  // to the previous workday, even if roster slot heuristics prefer today.
+  // Do not reassign incomplete punches this way.
+  const localEnd=paired?new Date(end+8*HOUR):null;
+  const endDate=localEnd?localEnd.toISOString().slice(0,10):'';
+  const earlyComplete=paired&&end-start<=18*HOUR&&endDate===date&&
+    new Date(start+8*HOUR).getUTCHours()<8&&localEnd.getUTCHours()<8;
+  const target=earlyComplete?shiftDate(date,-1):(candidates[0]?.date||date);
   sessionDates[index]=target;
   mark(emp,target,paired?'worked':'missing');
   // One unpaired punch may fit adjacent shifts; neither is proven wholly absent.
