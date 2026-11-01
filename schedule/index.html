@@ -4540,7 +4540,109 @@ function p79EmployeeDateEligible(emp,date) {
       return changed;
     }
 
-    async function saveScheduleMonthToCloud(showAlert = true) {
+
+    // V11.01: Every full-month POST must agree with the last independently
+    // authenticated cloud snapshot. Never infer success from an unchanged UI.
+    function p79ScheduleStableObject(value){
+      if(Array.isArray(value))return value.map(p79ScheduleStableObject);
+      if(value&&typeof value==='object'){
+        return Object.fromEntries(Object.keys(value).sort().map(k=>[k,p79ScheduleStableObject(value[k])]));
+      }
+      return value===undefined?null:value;
+    }
+    function p79ScheduleRowsSignature(rows,month){
+      if(!Array.isArray(rows))throw Error('雲端班表不是人員清單');
+      const seen=new Set(),normalized=[];
+      for(const row of rows){
+        const id=String(row?.empId||'').trim().toUpperCase();
+        if(!id||seen.has(id)||row?.month&&String(row.month)!==month||
+           !row.schedule||typeof row.schedule!=='object'||Array.isArray(row.schedule))
+          throw Error('班表月份、工號或內容不完整，禁止整月覆蓋');
+        seen.add(id);
+        normalized.push([id,String(row.role||''),String(row.group||''),p79ScheduleStableObject(row.schedule)]);
+      }
+      normalized.sort((a,b)=>a[0].localeCompare(b[0]));
+      return JSON.stringify(normalized);
+    }
+    function p79ScheduleBulkOverwriteStats(before,after,month){
+      const originals=new Map((before||[]).map(row=>[String(row.empId||'').toUpperCase(),row]));
+      let oldDays=0,shiftChanges=0,groupChanges=0,affected=new Set();
+      for(const row of after||[]){
+        const id=String(row.empId||'').toUpperCase(),prior=originals.get(id);
+        if(!prior)continue;
+        const a=prior.schedule||{},b=row.schedule||{};
+        if(String(prior.group||prior.schedule?.__personnel?.group||'')!==
+           String(row.group||row.schedule?.__personnel?.group||'')){
+          groupChanges++;affected.add(id);
+        }
+        for(const date of Object.keys(a)){
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(month+'-'))continue;
+          oldDays++;
+          if(String(a[date]??'')!==String(b[date]??'')){shiftChanges++;affected.add(id);}
+        }
+      }
+      return {oldDays,shiftChanges,groupChanges,affected:affected.size,
+        dangerous:affected.size>=10&&(
+          shiftChanges>=Math.max(120,Math.ceil(oldDays*.20))||
+          groupChanges>=8)};
+    }
+    async function p79ScheduleReadGuardMonth(month){
+      const token=currentPort79SsoToken();
+      if(!token)throw Error('登入狀態無法確認，已停止整月排班儲存');
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),12000);
+      try{
+        const url=GAS_URL+'?action=getScheduleDataSecure&gcToken='+
+          encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now();
+        const response=await fetch(url,{cache:'no-store',redirect:'follow',signal:controller.signal});
+        if(!response.ok)throw Error('HTTP '+response.status);
+        const data=await response.json();
+        if(data?.ok!==true||!Array.isArray(data.schedules)||
+           data.month&&String(data.month)!==month)
+          throw Error(String(data?.error||'雲端返回不完整月份資料'));
+        p79ScheduleRowsSignature(data.schedules.map(r=>({...r,month:r.month||month})),month);
+        return data.schedules.map(r=>({...r,month:r.month||month}));
+      }finally{clearTimeout(timeout);}
+    }
+    async function p79ScheduleVerifyBeforeWrite(month,version){
+      if(!p79ScheduleHasOfficialData()||p79ScheduleSourceState.kind!=='live'||
+         p79ScheduleSourceState.month!==month)
+        throw Error('本月尚未讀到正式雲端班表，禁止寫入整月資料');
+      const baseline=p79ScheduleRowsSignature(p79ScheduleCloudRows,month);
+      let current;
+      for(let attempt=0;attempt<3;attempt++){
+        current=await p79ScheduleReadGuardMonth(month);
+        if(p79ScheduleRowsSignature(current,month)===baseline)break;
+        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,(attempt+1)*750));
+      }
+      if(p79ScheduleRowsSignature(current,month)!==baseline)
+        throw Error('雲端班表已和本次開始編輯時不同，為避免覆蓋其他修改，本次儲存已停止；請先保存畫面並重新讀取核對');
+      if(currentScheduleMonthKey()!==month||
+         p79ScheduleLocalMutationVersion!==version||
+         !scheduleEditLockState.mine)
+        throw Error('核對雲端期間月份或班表又有變更；請再儲存目前最新內容');
+    }
+    async function p79ScheduleVerifyAfterWrite(month,schedules){
+      // A POST receipt alone is not a proof that the next reader sees the
+      // saved days/groups/leave/metadata. Retry READ ONLY, never POST twice.
+      const expected=p79ScheduleRowsSignature(schedules,month);
+      let lastError='';
+      for(let attempt=0;attempt<4;attempt++){
+        try{
+          const serverRows=await p79ScheduleReadGuardMonth(month);
+          const map=new Map(serverRows.map(r=>[String(r.empId||'').toUpperCase(),r]));
+          const recorded=schedules.map(row=>map.get(String(row.empId||'').toUpperCase()));
+          if(recorded.every(Boolean)&&
+             p79ScheduleRowsSignature(recorded,month)===expected)
+            return true;
+          lastError='雲端讀回的班別、組別或人工註記與送出的資料不一致';
+        }catch(error){lastError=String(error?.message||error);}
+        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,[700,1200,1800][attempt]));
+      }
+      throw Error('排班已送出，但讀回驗證未通過（'+lastError+'）；請勿重新整理或重複覆蓋，先核對雲端資料');
+    }
+
+    async function saveScheduleMonthToCloud(showAlert = true, saveIntent = 'background') {
       if(!requireScheduleEditLock(showAlert))return false;
       const yearMonth = document.getElementById('month-picker').value;
       if(p79ScheduleSourceState?.month && p79ScheduleSourceState.month!==yearMonth){
@@ -4596,6 +4698,18 @@ function p79EmployeeDateEligible(emp,date) {
         // 限定對可重試的 GAS 忙碌錯誤重試。完整月份快照固定不變，
         // 絕不對編輯權不足、資料格式錯誤或不明原因做盲目重送。
         const confirmedRestRows=JSON.parse(JSON.stringify(schedules));
+        const stats=p79ScheduleBulkOverwriteStats(p79ScheduleCloudRows,schedules,yearMonth);
+        if(stats.dangerous){
+          const detail=stats.affected+' 人、'+stats.shiftChanges+' 格班別、'+stats.groupChanges+' 筆組別';
+          if(saveIntent!=='manual'){
+            showScheduleNotice('偵測到異常大量排班變動（'+detail+'），已禁止背景自動覆蓋整月。請先核對班表。','error',12000);
+            throw Error('已擋下異常整月覆蓋：'+detail+'；需先核對後使用原本的「儲存排班」確認');
+          }
+          if(!confirm('本次修改涉及 '+detail+'。\n請確認這是你刻意修改的整月排班，且已核對人員班別。\n\n確定要儲存嗎？'))
+            throw Error('已取消大量排班覆蓋，原有雲端資料未被改動');
+        }
+        // Compare against the official cloud snapshot BEFORE overwriting.
+        await p79ScheduleVerifyBeforeWrite(yearMonth,snapshotVersion);
         const snapshot={
           action:'syncSchedules',month:yearMonth,schedules,
           expectedEmployeeCount:schedules.length,
@@ -4631,6 +4745,10 @@ function p79EmployeeDateEligible(emp,date) {
             console.warn('排班雲端忙碌，等待後重試存檔',attempt+2);
           }
         }
+        await p79ScheduleVerifyAfterWrite(yearMonth,schedules);
+        // Confirmed rows become the next concurrency baseline. Without this,
+        // a legitimate second edit would compare against the previous version.
+        p79ScheduleCloudRows=JSON.parse(JSON.stringify(schedules));
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         // Notify other open systems only after GAS confirmed this month's schedule save.
@@ -6520,7 +6638,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           return;
         }
       }
-      const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false));
+      const ok = await runScheduleCloudWrite(() => saveScheduleMonthToCloud(false, 'manual'));
 
       if (ok) {
         // The monthly write already confirmed its captured mutation version.
