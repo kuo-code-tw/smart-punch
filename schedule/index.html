@@ -7127,10 +7127,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
         !originalMeta.overtime&&!originalMeta.forEmpId&&!p79LeaveCoverOnDay(emp.id,dayStr).length;
       const noPunchRest=p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=false; // 已核實整班無卡，由 noPunchRest 直接同步畫面及匯出。
-      const punchPending=attendanceState==='missing'&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
-      const attendanceUnverified=ctx.attendanceEvidence?.complete!==true&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
-      const shiftVal=noPunchRest?'休':punchPending||attendanceUnverified?'打卡待核':
-        actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);
+      // 原本就排休／例／國的人，絕不能因為歷史考勤尚未讀完或隔日單卡，
+      // 被渲染成「打卡待核」。真的有完整打卡時仍應恢復實際出勤。
+      const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
+      const punchPending=!scheduledRest&&attendanceState==='missing'&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const attendanceUnverified=!scheduledRest&&ctx.attendanceEvidence?.complete!==true&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const shiftVal=noPunchRest?'休':actualShift||
+        (verifiedRestAttendance||pairedWork&&rosterShift==='待排班'||pairedWork&&['休','例','國'].includes(rosterShift)?'已出勤':
+        scheduledRest?rosterShift:
+        punchPending||attendanceUnverified?'打卡待核':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
       // shared automatic allocation instead of resetting a valid 國 to 休.
       const verifiedOffKind=ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category;

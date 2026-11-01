@@ -1,0 +1,26 @@
+name: Verify October 31 punch isolation and roster rest
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-rest-attendance.js'
+      - 'schedule/index.html'
+      - 'tests/rest-oct31-nextday-punch-isolation.cjs'
+      - '.github/workflows/rest-oct31-nextday-punch.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/rest-oct31-nextday-punch-isolation.cjs
+      - run: node tests/rest-attendance.cjs
+      - run: node tests/rest-attendance-overlap.cjs
+      - run: node tests/schedule-no-punch-rest-display.cjs
+      - run: node tests/schedule-november-render-fallback.cjs
+      - run: node tests/schedule-short-paired-rest-attendance.cjs
+      - run: node tests/october-system-roster-overtime.cjs
+      - run: node tests/vessel-completion-export-integrity.cjs

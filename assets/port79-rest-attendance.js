@@ -51,14 +51,21 @@ function build(input){
    if(paired?overlap>0:inside||distance<=4*HOUR)candidates.push({date:d,distance,overlap});
   }
   candidates.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||a.date.localeCompare(b.date));
-  const target=candidates[0]?.date||(!hasIn&&hasOut&&new Date(at+8*HOUR).getUTCHours()<9?shiftDate(date,-1):date);
+  // 只有明確落在跨日班別時段才可歸屬前一日；隔天清晨單卡不能憑時鐘推測前日有上班。
+  const target=candidates[0]?.date||date;
   sessionDates[index]=target;
   mark(emp,target,paired?'worked':'missing');
   // One unpaired punch may fit adjacent shifts; neither is proven wholly absent.
   if(!paired)for(const candidate of candidates)if(candidate.date!==target)mark(emp,candidate.date,'missing');
   if(!candidates.length&&!hasIn&&hasOut&&target!==date&&roster[date])mark(emp,date,'missing');
+  // 11/1 07:31 單筆上班簽到不能污染 10/31 已排休的班表。
+  // 真正的跨日「晚」班有 period()，由 candidates 依班次時間辨識。
+  // 不得只因隔天早於 08:00 就把「前一日休／例／國」改成單邊缺卡。
   const previous=shiftDate(date,-1);
-  if(!candidates.length&&hasIn&&new Date(at+8*HOUR).getUTCHours()<8&&roster[previous]&&!period(previous,roster).known)mark(emp,previous,'missing');
+  const previousShift=String(roster[previous]||'').trim();
+  if(!candidates.length&&hasIn&&new Date(at+8*HOUR).getUTCHours()<8&&
+     previousShift&&!['休','例','國','颱','待排班','年','特','事','病','公','喪','離','離職'].includes(previousShift)&&
+     !period(previous,roster).known)mark(emp,previous,'missing');
  }
  for(const [emp,roster] of rosters)for(const date of Object.keys(roster)){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(input.month+'-'))continue;
