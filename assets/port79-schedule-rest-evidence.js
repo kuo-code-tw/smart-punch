@@ -69,7 +69,9 @@ function create(ctx){
        if(!day)continue;
        const original=String(saved||'').trim(),actual=actualShifts[key]||'';
        const base={empId,name:String(person.name||person.empName||empId),date,saved:original};
-       if(day.state==='worked'&&actual&&['早','中','晚'].includes(original)&&actual!==original)
+       if(day.state==='worked'&&actual&&['休','例','國'].includes(original))
+         audit.push({...base,kind:'restday-worked',actual});
+       else if(day.state==='worked'&&actual&&['早','中','晚'].includes(original)&&actual!==original)
          audit.push({...base,kind:'shift-mismatch',actual});
        else if(day.state==='worked'&&!actual)
          audit.push({...base,kind:'shift-unresolved',reason:ambiguousShifts[key]||'完整出勤，班別未能唯一確認'});
@@ -79,6 +81,7 @@ function create(ctx){
    }
    state.evidence.audit=audit;
    state.evidence.auditSummary={employees:people.length,
+     restDayWorked:audit.filter(row=>row.kind==='restday-worked').length,
      shiftMismatch:audit.filter(row=>row.kind==='shift-mismatch').length,
      shiftUnresolved:audit.filter(row=>row.kind==='shift-unresolved').length,
      punchMissing:audit.filter(row=>row.kind==='punch-missing').length};
