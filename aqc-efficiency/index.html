@@ -14327,8 +14327,8 @@ async function exportSelectedExcel() {
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([x.headers,...x.rows]),'人員統計');
   }
 
-  const month=document.getElementById('filterMonth')?.value||new Date().toISOString().slice(0,7);
-  XLSX.writeFile(wb,`79號碼頭_船舶作業資料_${month}.xlsx`);
+  const filenameMonth=month||new Date().toISOString().slice(0,7);
+  XLSX.writeFile(wb,`79號碼頭_船舶作業資料_${filenameMonth}.xlsx`);
   document.getElementById('exportDialog').close();
   toast('已匯出所選項目');
 }
