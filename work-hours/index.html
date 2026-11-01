@@ -16932,13 +16932,31 @@ window.p79MonthlyRestContext={
    return {...formal,schedules:backup.schedules,provisional:true,
      archiveStatus:backup.archiveStatus||'10/28備援，未核對月底異動'};
   };
-  const needAttendance=!rosterOnly||reportView;
+  let needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
   const shared=!forceFresh&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
-  const [roster,batches]=shared?[shared.roster,needAttendance?months.map(m=>shared.raw[m]):[]]:await Promise.all([readRoster(),needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])]);
+  let roster,batches,readOnlyDueAttendance=false;
+  if(shared){roster=shared.roster;batches=needAttendance?months.map(m=>shared.raw[m]):[];}
+  else{
+   // Keep the original concurrent reads. A failed attendance read must not
+   // suppress EXISTING saved report IDs in a dedicated read-only review.
+   const [rr,ar]=await Promise.allSettled([
+    readRoster(),
+    needAttendance?Promise.all(months.map(m=>reportView?read('getAttendanceMonthRaw',m):p79ReadWorkRestMonth(m,token))):Promise.resolve([])
+   ]);
+   if(rr.status==='rejected')throw rr.reason;
+   roster=rr.value;
+   if(ar.status==='rejected'){
+    if(archiveReadOnly!==true)throw ar.reason;
+    batches=[];needAttendance=false;readOnlyDueAttendance=true;
+   }else batches=ar.value;
+  }
   if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
   if(!Array.isArray(roster.schedules))throw Error('班表資料未讀齊，不能判定無卡休假');
-  if(needAttendance&&batches.some((data,i)=>!Array.isArray(data.records)||(data.month!=null&&String(data.month)!==months[i])))throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
+  if(needAttendance&&batches.some((data,i)=>!Array.isArray(data?.records)||(data.month!=null&&String(data.month)!==months[i]))){
+   if(archiveReadOnly!==true)throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
+   batches=[];needAttendance=false;readOnlyDueAttendance=true;
+  }
   const attendanceRows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
   const {employees,allowed,sessions,attendanceEvidence,pairs}=p79BuildWorkRestAttendance(month,roster,attendanceRows,needAttendance);
   const cached=p79WorkOvertimeMonths.get(month);if(cached?.token===token){if(needAttendance)cached.attendanceEvidence=attendanceEvidence;}
@@ -16946,7 +16964,7 @@ window.p79MonthlyRestContext={
   p79OvertimeCalculationCache=null;
 
   const leaveDates=p79WorkRestLeaveDates(month,roster,employees);
-  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,provisional:roster.provisional===true,archiveStatus:roster.archiveStatus||'',saveContext:needAttendance?{token,month,ready:roster.provisional!==true&&roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
+  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,provisional:roster.provisional===true,archiveStatus:roster.archiveStatus||'',readOnlyDueAttendance,saveContext:needAttendance?{token,month,ready:roster.provisional!==true&&roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
 </script>
