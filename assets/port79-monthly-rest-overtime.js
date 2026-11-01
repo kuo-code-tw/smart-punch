@@ -597,6 +597,7 @@ async function open(settings={}){
    !(manualPeople.size||(allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
   if(!disabled){
    q('#mrSavePlans').disabled=snapshot?.provisional===true||!autoPlan||!model?.plannedRows?.some(r=>r.checked&&!r.saved);
+   q('#mrNewPlan').disabled=snapshot?.provisional===true;
    q('#mrAll').disabled=!allowed||!visibleRows().some(({r})=>!r.saved&&!r.planned);
    el.querySelectorAll('#mrRows tr[data-row]').forEach(tr=>{
     const r=model?.rows[Number(tr.dataset.row)],pick=tr.querySelector('input.pick');
@@ -762,7 +763,7 @@ async function open(settings={}){
     if(snapshot?.provisional===true){model.rows=[];model.plannedRows=[];model.workflow.canSubmit=false;model.workflow.canSuggest=false;}
     g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);paint();
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
-   setStatus('已核對 '+loadedPeople.length+' 位授權人員；'+(autoPlan?'自動建議尚未儲存，':'未自動建立預排，')+'正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
+   setStatus(snapshot?.provisional===true?'已顯示 '+loadedMonth+' 歷史備援中的既有申報；此備援非月底正式核薪版，不能新增、修改或儲存加班。':'已核對 '+loadedPeople.length+' 位授權人員；'+(autoPlan?'自動建議尚未儲存，':'未自動建立預排，')+'正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
 
   }catch(e){setStatus('讀取失敗：'+e.message);}finally{busy=false;controls(false);}
  };
@@ -780,7 +781,7 @@ async function open(settings={}){
  }
  q('#mrManualMode').onchange=()=>choosePlanningMode(false);
  q('#mrAutoMode').onchange=()=>choosePlanningMode(q('#mrAutoMode').checked);
- q('#mrNewPlan').onclick=async(employeeId='')=>{
+ q('#mrNewPlan').onclick=async(employeeId='')=>{if(snapshot?.provisional===true){setStatus('歷史備援唯讀，不能建立預排。');return;}
   if(busy)return;
   const selected=id(typeof employeeId==='string'?employeeId:'')||
     (manualPeople.size?[...manualPeople.keys()][0]:'');
@@ -839,7 +840,7 @@ async function open(settings={}){
   if(row&&!row.saved){row.checked=e.target.checked;paint();}
  };
  q('#mrPlanAll').onchange=()=>{if(busy||!autoPlan)return;visiblePlannedRows().forEach(r=>{r.checked=q('#mrPlanAll').checked;});paint();};
- q('#mrSavePlans').onclick=async()=>{
+ q('#mrSavePlans').onclick=async()=>{if(snapshot?.provisional===true){setStatus('歷史備援唯讀，不能儲存加班預排。');return;}
   if(busy||!model||!autoPlan)return;
   const selected=model.plannedRows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'))return;
@@ -884,7 +885,7 @@ async function open(settings={}){
    setStatus('本次已確認儲存 '+saved+' 筆預排（未正式申報）。'+(failure?'未完成：'+failure:'')+(selected.some(r=>!r.saved)?'其餘保留選取，請核對後重試。':''));
   }
  };
- q('#mrSave').onclick=async()=>{
+ q('#mrSave').onclick=async()=>{if(snapshot?.provisional===true){setStatus('歷史備援唯讀，禁止送出正式申報。');return;}
   if(busy||!model)return;
   if(autoPlan)return q('#mrSavePlans').onclick();
   if(manualPeople.size)return q('#mrNewPlan').onclick();
