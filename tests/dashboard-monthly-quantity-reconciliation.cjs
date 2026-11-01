@@ -74,7 +74,8 @@ function run(){
   assert.equal(zero.moves,10);
   assert.equal(ctx.dashboardQuantityReconciliation('',jobs,records,masters,20909),null);
   ctx.renderDashboardQuantityReconciliation('',jobs,records,masters,20909);
-  assert.equal(host.visible,false);
+  assert.equal(host.visible,true,'year-view audit is intentionally visible even without a month selected');
+  assert(host.innerHTML.includes('2026 年全年櫃數核對'));
   const missing=ctx.dashboardQuantityReconciliation('2026-10',[jobs[0]],[records[1]],[],381);
   assert.equal(missing.missingIdLists,1,'Missing source linkage must be flagged');
   const malicious=ctx.dashboardQuantityReconciliation('2026-10',jobs,[...records,rec('<img onerror=alert(1)>','B','2026-10-26',5)],masters,21086);
