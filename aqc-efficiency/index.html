@@ -2537,13 +2537,16 @@ function canonicalShipMasters(list){
   return [...byNo.values(),...dedupeShipMasters(noNo)];
 }
 
-function vesselJobRows(){
+function vesselJobRows(monthOverride=''){
   shipMasters=canonicalShipMasters(shipMasters||[]);
-  const month=document.getElementById('filterMonth')?.value||'';
-  const rangeActive=dashboardDateRange().active;
+  // Export a captured month using the same version-collapsed list as the
+  // dashboard, without depending on the currently visible table filter.
+  const requestedMonth=/^20\d{2}-(0[1-9]|1[0-2])$/.test(String(monthOverride||''))?String(monthOverride):'';
+  const month=requestedMonth||document.getElementById('filterMonth')?.value||'';
+  const rangeActive=!requestedMonth&&dashboardDateRange().active;
 
   // 新版以獨立船舶主檔為準；日期區間啟用時優先依 firstDate / lastDate 篩選。
-  const selectedYear=getPort79Year();
+  const selectedYear=requestedMonth?requestedMonth.slice(0,4):getPort79Year();
   let masters=(shipMasters||[])
     .filter(s=>rangeActive?shipMasterMatchesDashboardRange(s):(month?shipMasterDateMatchesMonth(s,month):shipMasterDateMatchesYear(s,selectedYear)))
     .map(s=>applyShipManualOverrides(s)).map(s=>({
@@ -13926,10 +13929,16 @@ function operationExportRows(list){return list.map(r=>{
   ];
 });}
 function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.value||''){
-  // Use the same completion-month rule as the vessel list, independent of table filters.
-  const masters=canonicalShipMasters(shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month));
-  const rows=masters.map(raw=>{
-    const s=applyShipManualOverrides(raw),ws=s.workingSheetSource||{};
+  // IMPORTANT: the monthly workbook and dashboard MUST use the identical
+  // canonical, version-collapsed vessel roster. An old -1 edited duplicate
+  // must not be exported as another completed vessel, while CALL2 remains.
+  const jobs=dashboardAdjustJobsForMonthlyReference(vesselJobRows(month),month);
+  const mastersByNo=new Map(canonicalShipMasters(shipMasters||[])
+    .map(s=>[String(s.workingNo||'').trim(),s]));
+  const rows=jobs.map(job=>{
+    const raw=applyShipManualOverrides(mastersByNo.get(String(job.workingNo||'').trim())||job);
+    const s={...raw,...job,workingSheetSource:raw.workingSheetSource||{},
+      manualOverrides:raw.manualOverrides||{}},ws=s.workingSheetSource;
     const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>String(r.source||'')==='working-report');
     const metric=(...values)=>{
       for(const v of values){
@@ -14011,6 +14020,17 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     }
     const rows=vesselMonthlyExportRows(month);
     if(!rows.length)return toast(`${month} 沒有可匯出的船舶資料`);
+    // Guard against exporting an outdated or duplicated master. Check all
+    // displayed KPI fields, not just the MOVE sum. Do not alter source rows.
+    const dashboardRows=dashboardAdjustJobsForMonthlyReference(vesselJobRows(month),month);
+    const summed=(items,key)=>round(items.reduce((total,row)=>total+num(row?.[key]),0),2);
+    const parity=[
+      ['請款櫃數',summed(rows,'bill'),summed(dashboardRows,'totalContainers')],
+      ['SHIFT',summed(rows,'shift'),summed(dashboardRows,'shiftMoves')],
+      ['H/C',summed(rows,'hc'),summed(dashboardRows,'hatches')]
+    ];
+    const mismatch=parity.find(([,a,b])=>Math.abs(a-b)>0.01);
+    if(mismatch)throw Error('匯出與系統統計不一致：'+mismatch[0]+' '+mismatch[1]+'／'+mismatch[2]+'；為避免產生錯誤月報已停止匯出');
     const signatures=saveVesselMonthlySignatureFields();
     await window.P79VesselMonthlyReport.download({month,company:companyName,rows,signatures,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
     document.getElementById('vesselMonthlyExportDialog')?.close();
