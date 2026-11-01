@@ -52,7 +52,7 @@ function fn(html,name){
  assert(start>=0&&end>start,'missing '+name);return html.slice(start,end+10);
 }
 for(const page of pages){
- assert(page.includes('v6-engine.js?v=20261101-ship-early-workday'),'bust the old V6 script cache');
+ assert(/v6-engine\.js\?v=20261101-ship-(?:early-workday|workday-tooltip)/.test(page),'ship workday engine version busts stale cache');
  const ctx={Date,window:{P79AttendanceV6:v6},getAttendanceDateKey:t=>String(t||'').slice(0,10).replaceAll('-','/')};
  vm.createContext(ctx);vm.runInContext(fn(page,'p79AttendanceSessionWorkDate'),ctx);
  assert.equal(ctx.p79AttendanceSessionWorkDate(source[0],source[2],{}),'2026-10-29','legacy display workday matches V6');
