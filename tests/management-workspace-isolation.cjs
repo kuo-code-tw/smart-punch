@@ -48,9 +48,12 @@ assert(!navigation.includes("const aliases="),'fake homepage-only report/setting
 assert(!navigation.includes("alias=x.dataset.p79Alias"),'homepage special sorting removed');
 assert(navigation.includes('return key?order.indexOf(key):order.length;'),'both menus use shared canonical ordering');
 assert(navigation.includes('source.click();'),'homepage links retain existing permission checks and SSO navigation');
+assert(navigation.includes('function homeNavAllowed(key,source)'),'home menu must not filter by transient disabled/hidden card state');
+assert(navigation.includes('window.launchSystem(key)'),'home menu must use the original permission-checked SSO path');
+assert(navigation.includes("attributeFilter:['hidden','disabled','style']"),'home sidebar must update when permissions refresh');
 for(const page of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','aqc-efficiency/index.html','hr/index.html','leave/index.html','history-data/index.html']){
  const html=fs.readFileSync(page,'utf8');
- assert(html.includes('port79-management-workspace.js?v=20261101-unified-sidebar-v2'),page+' refreshes the shared nav script');
+ assert(html.includes('port79-management-workspace.js?v='+(page==='index.html'?'20261101-home-overtime-leave-v4':'20261101-unified-sidebar-v2')),page+' refreshes the shared nav script');
  if(page!=='index.html')
   assert(html.includes('port79-seven-top.js?v=20261101-unified-sidebar-v2'),page+' refreshes the permission-controlled nav');
 }
