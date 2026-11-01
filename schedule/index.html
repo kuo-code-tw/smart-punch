@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-official-accounting-day-v1"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261101-all-roster-audit-v2"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -1657,7 +1657,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
             <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
             <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
-            <span id="scheduleRestEvidenceStatus" hidden role="status"></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
+            <span id="scheduleRestEvidenceStatus" hidden role="status" class="text-[10px] px-2 py-1 rounded border" title="正式考勤核對狀態"></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
             <a href="../leave/" class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300" title="請至請假管理申請、核准及安排代班"><b>各類請假請至請假管理</b></a>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
@@ -7110,7 +7110,30 @@ async function p79SaveScheduleOvertimeDraft(draft){
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
         read:async(month,token)=>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const url=new URL(GAS_URL);for(const [k,v]of Object.entries({action:'getAttendanceMonthRaw',month,token,gcToken:token,_:Date.now()}))url.searchParams.set(k,v);const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('出勤讀取失敗');return await response.json();}finally{clearTimeout(timer);}},
-        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');if(status)status.textContent=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次成功結果）…':'出勤核對中…'):state.error?'出勤未完成核對：'+state.error:'';if(!state.pending){
+        update:(month,state)=>{if(currentScheduleMonthKey()!==month)return;const status=document.getElementById('scheduleRestEvidenceStatus');
+          if(status){
+            const audit=state.evidence?.auditSummary;
+            const issues=Array.isArray(state.evidence?.audit)?state.evidence.audit:[];
+            const count=audit?audit.shiftMismatch+audit.shiftUnresolved+audit.punchMissing:0;
+            const summary=audit&&state.evidence?.complete===true?
+              '考勤對帳 '+audit.employees+'人｜班別差異'+audit.shiftMismatch+
+              '｜班別無法推定'+audit.shiftUnresolved+'｜打卡待核'+audit.punchMissing:'';
+            const message=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次結果）':'正式考勤核對中'):
+              state.error?'考勤核對失敗：'+state.error:summary;
+            status.textContent=message;
+            status.hidden=!message;
+            status.className='text-[10px] px-2 py-1 rounded border '+(state.error||count?'bg-amber-50 text-amber-900 border-amber-300':
+              state.pending?'bg-slate-50 text-slate-700 border-slate-300':'bg-emerald-50 text-emerald-800 border-emerald-300');
+            status.title=issues.length?
+              '正式考勤與原排班差異（只核對，不自動覆蓋）：\\n'+
+              issues.slice(0,100).map(row=>row.name+' '+row.date+'：'+
+                (row.kind==='shift-mismatch'?'原排'+row.saved+'，打卡推定'+row.actual:
+                 row.kind==='shift-unresolved'?'有出勤但班別不明（'+(row.reason||'')+'）':
+                 '原排'+row.saved+'，打卡配對待核')).join('\\n')+
+              (issues.length>100?'\\n其餘 '+(issues.length-100)+' 筆未顯示':''):
+              '正式考勤已核對；資料顯示不等於正式班表已改寫';
+          }
+          if(!state.pending){
           // A failed official read is unverified. Do not repaint a previously
           // checked roster with unverified fallback counts; display the error
           // without authorizing any write or treating stale evidence as fresh.
