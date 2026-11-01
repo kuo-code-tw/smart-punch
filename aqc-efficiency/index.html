@@ -15356,5 +15356,9 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261030-compact-content-v1"></script>
+
+<!-- Historical month is read-only and never rewrites active-month state. -->
+<script src="../assets/port79-history-month-inline.js?v=20261101"></script>
+<script>window.P79HistoryMonthInline.enhance({type:"vessel",selector:"#filterMonth"});</script>
 </body></html>
 
