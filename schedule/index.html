@@ -7384,21 +7384,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        const title=category+'：班表日期格及已確認申報合計 '+count+' 天（'+(displayDates.join('、')||'無')+'）；額度 '+limit+' 天；尚未分配 '+rest+' 天'+
-          (extraReportedDates.length?'；其中 '+extraReportedDates.map(day=>day.slice(-2)).join('、')+' 為雲端已確認'+category+'加班，日期格另顯示班別但仍計入原假別':'')+
-          (verified?'；正式已報 '+(ledger.reported?.[category]||0)+' 天；出勤待核 '+(ledger.reserved?.[category]||0)+' 天；帳本未報 '+officialRemaining+' 天':'；雲端申報額度待核')+
-          (officialRemaining!==null&&officialRemaining!==rest?'；⚠ 班格與正式帳本差異須核對，未更動正式資料':'')+(extra?'；超額 '+extra+' 天':'')+
-          (category==='國'&&nationalDuplicates?'；另有 '+nationalDuplicates+' 天颱風日已移至「颱」統計，不重複計入':'');
-        return `<td data-rest-category="${category}" class="p79-rest-count-compact text-center font-bold border-r text-xs ${color} ${rest?'p79-rest-pending-quota':''} ${extra?'p79-rest-over-quota':''}" title="${scheduleEscapeHtml(title)}"><span>${count}/${limit}</span>${rest?`<small class="p79-rest-deficit" title="仍缺 ${rest} 天需安排">缺${rest}</small>`:''}${extra?`<strong class="p79-rest-quota-tag" role="status">⚠ ${category}超額 ${extra} 天</strong>`:''}</td>`;
+        // Numbers only: actual allocated days / still available days.
+        return '<td data-rest-category="'+category+'" class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+'"><span>'+count+'/'+rest+'</span></td>';
       }).join('');
       const days=[...typhoonSet].sort().map(date=>date.slice(-2)).join('、')||'無';
       const typhoonCell=special.typhoon?'<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
         scheduleEscapeHtml('颱風日：'+total+' 天（'+days+'）；有出勤、加班或颱風停班同一天都只算 1 筆；不重複計入國定假日')+
-        '"><span>'+total+' 天</span></td>':'';
+        '"><span>'+total+'</span></td>':'';
       const electionDates=special.election?p79ScheduleElectionSummaryDates(emp,month,special):[];
       const electionCell=special.election?'<td data-rest-category="選" class="p79-rest-count-compact p79-rest-election text-center font-bold border-r text-xs" title="'+
         scheduleEscapeHtml('選舉日：'+(electionDates.map(d=>d.slice(-2)).join('、')||'無')+'；只顯示投票日期事件，不等於另增加補休；原排班不更動')+
-        '"><span>'+electionDates.length+' 天</span></td>':'';
+        '"><span>'+electionDates.length+'</span></td>':'';
       return quotaCells+typhoonCell+electionCell;
     }
     function p79RefreshScheduleRestCounts(month) {
