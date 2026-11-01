@@ -782,6 +782,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">累計效率</div><div id="cumEfficiency" class="text-2xl font-black">0.00</div><div id="cumEfficiencySub" class="text-[11px] text-slate-400 mt-1"></div></div>
       </div>
     </div>
+    <div id="p79DashboardMonthlySourceAudit" class="hidden card p-3" role="status" aria-live="polite"></div>
     <div id="dashboardQuantityReconciliation" class="hidden card p-3"></div>
     <div id="dashboardMonthlyAudit" class="hidden rounded-2xl border p-4"></div>
 
@@ -3639,6 +3640,36 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
     </div>
   </details>`;
 }
+function p79RenderDashboardMonthlySourceAudit(month,shipJobs,staffMoves){
+  const el=document.getElementById('p79DashboardMonthlySourceAudit');
+  if(!el)return;
+  const active=dashboardDateRange().active;
+  const selected=String(month||'');
+  if(active||!/^20\\d{2}-(0[1-9]|1[0-2])$/.test(selected)){
+    el.classList.add('hidden');el.innerHTML='';return;
+  }
+  const jobs=Array.isArray(shipJobs)?shipJobs:[];
+  const sum=(rows,key)=>round(rows.reduce((a,x)=>a+num(x?.[key]),0),2);
+  const bill=sum(jobs,'totalContainers'),shift=sum(jobs,'shiftMoves'),hc=sum(jobs,'hatches'),moves=round(bill+shift,2);
+  const reportRows=dashboardMonthlyActualRows(selected);
+  el.classList.remove('hidden');
+  if(!reportRows.length){
+    el.className='card p-3 border border-amber-200 bg-amber-50';
+    el.innerHTML=`<div class="text-sm font-black text-amber-900">⚠ ${esc(selected)} 月報尚未在本頁核對</div>
+      <p class="text-xs text-amber-900 mt-1">雲端船舶統計：請款 ${bill} ＋ SHIFT ${shift} ＝ ${moves} Moves；H/C ${hc}。人員作業與系統數值相同，不代表與外部 Excel 月報一致。請使用既有「月報核對」匯入原始月報逐船比對。</p>`;
+    return;
+  }
+  const expected={bill:sum(reportRows,'containers'),shift:sum(reportRows,'shiftMoves'),hc:sum(reportRows,'hatches')};
+  expected.moves=round(expected.bill+expected.shift,2);
+  const diff={bill:round(bill-expected.bill,2),shift:round(shift-expected.shift,2),hc:round(hc-expected.hc,2),moves:round(moves-expected.moves,2)};
+  const hasDiff=Object.values(diff).some(x=>Math.abs(x)>0.01);
+  const fmt=v=>esc(String(v));
+  const compare=(label,sys,monthly,key)=>`<span class="inline-block mr-4">${esc(label)}：系統 <b>${fmt(sys)}</b>／月報 <b>${fmt(monthly)}</b>／差 <b>${fmt(dashboardSignedDiff(diff[key]))}</b></span>`;
+  el.className='card p-3 border '+(hasDiff?'border-rose-300 bg-rose-50':'border-emerald-200 bg-emerald-50');
+  el.innerHTML=`<div class="text-sm font-black ${hasDiff?'text-rose-800':'text-emerald-900'}">${hasDiff?'❌':'✓'} ${esc(selected)} 月報來源核對 ${hasDiff?'存在差異，請逐船檢查':'四項總量一致'}</div>
+  <div class="mt-1 text-xs leading-6">${compare('請款櫃數',bill,expected.bill,'bill')}${compare('SHIFT',shift,expected.shift,'shift')}${compare('總 Moves',moves,expected.moves,'moves')}${compare('H/C',hc,expected.hc,'hc')}</div>
+  <p class="text-xs mt-1">已匯入月報 ${reportRows.length} 筆；船舶清單 ${jobs.length} 艘。月報總 Moves 按月報請款櫃數＋SHIFT 統一口徑，不能只比較兩個不同欄位的總數。差異明細請展開下方「月報核對」。</p>`;
+}
 function renderDashboard(){
   updateDashboardRangeState();
   updateShipChangeToolbar();
@@ -3783,12 +3814,13 @@ function renderDashboard(){
   // 月份已載入月報時，直接告訴使用者「月報應有 vs 系統已匯入」與缺少哪幾筆。
   // 使用未套用表格欄位篩選前的完整月份資料，避免只篩某艘船時把缺漏判斷也縮小。
   renderDashboardMonthlyAudit(selectedMonth,allDashboardJobs);
+  p79RenderDashboardMonthlySourceAudit(selectedMonth,allDashboardJobs,c);
   const systemSub=document.getElementById('cumWorkloadSub');
   if(systemSub){
     const monthlySourceNote=String(systemSub.textContent||'').trim();
     const comparableMonth=/^\d{4}-\d{2}$/.test(selectedMonth)&&!rangeActive&&jobs.length===allDashboardJobs.length;
     const diff=round(c-systemTotalMoves,2);
-    const comparison=comparableMonth?(Math.abs(diff)<0.01?'✓ 與員工作業一致':`⚠ 與員工作業差 ${dashboardSignedDiff(diff)}`):'';
+    const comparison=comparableMonth?(Math.abs(diff)<0.01?'✓ 僅與系統人員明細一致（非月報）':`⚠ 與系統人員明細差 ${dashboardSignedDiff(diff)}`):'';
     systemSub.textContent=[`請款 ${workload} ＋ SHIFT ${shiftTotal}`,comparison,monthlySourceNote].filter(Boolean).join('｜');
   }
 }
