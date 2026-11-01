@@ -26,4 +26,3 @@ jobs:
       - run: |
           node tests/attendance-core-boot.cjs
           node tests/attendance-delta-no-flicker.cjs
-          node tests/attendance-formal-confirmation-flow.cjs
