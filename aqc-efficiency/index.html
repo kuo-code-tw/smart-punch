@@ -669,8 +669,8 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 <body class="bg-slate-50 text-slate-800" data-p79-system="efficiency">
 <div id="gcAccessDenied" class="hidden">
   <div class="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl">
-    <div class="text-4xl mb-3">🔒</div>
-    <h2 class="text-xl font-black text-slate-900">沒有權限進入效率系統</h2>
+    <div id="gcAccessDeniedIcon" class="text-4xl mb-3">🔒</div>
+    <h2 id="gcAccessDeniedTitle" class="text-xl font-black text-slate-900">沒有權限進入效率系統</h2>
     <p id="gcAccessDeniedText" class="mt-3 text-sm leading-6 text-slate-500">請回首頁登入具有「效率系統」權限的管理員帳號。</p>
     <a href="../?v=20260927.7.13" class="mt-5 inline-block rounded-xl bg-indigo-600 px-5 py-3 font-black text-white no-underline">返回首頁</a>
   </div>
@@ -7246,6 +7246,8 @@ async function readGcSsoJson(response){
   if(/^<!doctype html|^<html/i.test(text))throw new Error('SSO 驗證回傳 Google HTML，不是 JSON');
   try{return JSON.parse(text)}catch{throw new Error('SSO 驗證未收到有效 JSON')}
 }
+let p79EfficiencyRecentlyVerifiedToken='';
+let p79EfficiencyRecentlyVerifiedAt=0;
 async function verifyGcSsoToken(token){
   let lastError=null;
   for(let attempt=1;attempt<=3;attempt++){
@@ -7263,6 +7265,8 @@ async function verifyGcSsoToken(token){
         throw authError;
       }
       data.efficiencyAccessLevel=access;
+      p79EfficiencyRecentlyVerifiedToken=token;
+      p79EfficiencyRecentlyVerifiedAt=Date.now();
       return data;
     }catch(e){
       lastError=e;
@@ -7333,11 +7337,15 @@ function requireSuperAdminAccess(){
   return canManageEfficiency();
 }
 
-function showGcAccessDenied(message){
+function showGcAccessDenied(message,transient=false){
   const box=document.getElementById("gcAccessDenied");
   const text=document.getElementById("gcAccessDeniedText");
+  const heading=document.getElementById("gcAccessDeniedTitle");
+  const icon=document.getElementById("gcAccessDeniedIcon");
   if(text)text.textContent=message||"請先回 79號碼頭智慧管理系統，以超級管理員登入。";
-  if(box){box.classList.remove("hidden");box.classList.add("flex")}
+  if(heading)heading.textContent=transient?'雲端登入驗證暫時中斷':'沒有權限進入效率系統';
+  if(icon)icon.textContent=transient?'⏳':'🔒';
+  if(box){box.dataset.transient=transient?'1':'0';box.classList.remove("hidden");box.classList.add("flex")}
 }
 
 async function gcLogout(){
@@ -14459,6 +14467,25 @@ function startShipFullAutoSync(){
   });
 }
 
+let p79EfficiencyAuthRetryTimer=null;
+let p79EfficiencyAuthReady=false;
+function p79QueueEfficiencyAuthRecovery(){
+  if(p79EfficiencyAuthRetryTimer!==null||p79EfficiencyAuthReady)return;
+  p79EfficiencyAuthRetryTimer=setTimeout(async()=>{
+    p79EfficiencyAuthRetryTimer=null;
+    if(document.visibilityState==='hidden'){
+      p79QueueEfficiencyAuthRecovery();
+      return;
+    }
+    try{
+      await initGcPage();
+      if(p79EfficiencyAuthReady)applyEfficiencyAccessUi();
+    }catch(error){
+      console.warn('效率系統恢復登入驗證失敗',error);
+      p79QueueEfficiencyAuthRecovery();
+    }
+  },7000);
+}
 async function initGcPage(){
   if(!requireEfficiencyAccess()){
     returnToPort79Home('此帳號沒有「效率系統」權限，請由超級管理員到人資管理系統設定。');
@@ -14469,7 +14496,15 @@ async function initGcPage(){
   // 使用同一套 SSO 驗證與重試。只有「明確 Token/角色失效」才要求重新登入；
   // 純網路異常不清除登入狀態，避免首頁與船舶頁來回循環。
   try{
-    await verifyGcSsoToken(gcToken);
+    // Freshly verified SSO handoff on this very page needs no duplicate GET.
+    if(p79EfficiencyRecentlyVerifiedToken!==gcToken||
+       Date.now()-p79EfficiencyRecentlyVerifiedAt>30000)
+      await verifyGcSsoToken(gcToken);
+    p79EfficiencyAuthReady=true;
+    if(p79EfficiencyAuthRetryTimer!==null){
+      clearTimeout(p79EfficiencyAuthRetryTimer);
+      p79EfficiencyAuthRetryTimer=null;
+    }
     const denied=document.getElementById('gcAccessDenied');
     if(denied){
       denied.classList.add('hidden');
@@ -14480,7 +14515,9 @@ async function initGcPage(){
       clearGcSession();
       returnToPort79Home('管理員登入狀態已失效，請重新登入。');
     }else{
-      showGcAccessDenied('目前無法連線驗證登入狀態，請稍後重新整理；系統不會因此清除你的登入。');
+      p79EfficiencyAuthReady=false;
+      showGcAccessDenied('目前無法連線驗證登入狀態，已保留登入資訊並自動重試；恢復後會自動進入系統。',true);
+      p79QueueEfficiencyAuthRecovery();
     }
     return;
   }
