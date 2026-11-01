@@ -54,6 +54,27 @@ for(const page of ['index.html','attendance/index.html','work-hours/index.html',
  if(page!=='index.html')
   assert(html.includes('port79-seven-top.js?v=20261101-unified-sidebar-v2'),page+' refreshes the permission-controlled nav');
 }
+
+// Work-hours had TWO older viewport break-out rules applied with :has(), which
+// outranked the shared CSS and moved the whole report beneath the fixed sidebar.
+// These are not allowed in either overtime or attendance-statistics tabs.
+const whSource=fs.readFileSync('work-hours/index.html','utf8');
+for(const kind of ['Stats','Overtime']){
+ const rule='body.p79-work-hours-page #viewAdmin:has(#adminContent'+kind+':not(.hidden))';
+ assert(whSource.includes(rule),'workhours responsive layout exists: '+kind);
+}
+assert(!whSource.includes('margin-left:calc(50% - 50vw + 12px)'),
+  'no negative full-viewport centering that slides report under persistent sidebar');
+const whMonthCss=whSource.slice(whSource.indexOf('<style id="p79-monthly-attendance-wider'),whSource.indexOf('</style>',whSource.indexOf('<style id="p79-monthly-attendance-wider')));
+const whOvertimeCss=whSource.slice(whSource.indexOf('<style id="p79-overtime-wide'),whSource.indexOf('</style>',whSource.indexOf('<style id="p79-overtime-wide')));
+for(const css of [whMonthCss,whOvertimeCss]){
+ assert(css.includes('width:100%!important'),'main report width follows content container');
+ assert(css.includes('margin-left:0!important'),'main report has no negative centering');
+ assert(css.includes('box-sizing:border-box!important'),'report does not overflow from padding');
+ assert(!css.includes('100vw - 24px'),'report never expands beyond sidebar-adjusted content width');
+}
+console.log('PASS workhours 2 visible tabs: no viewport-wide negative margins or full-page horizontal overlap');
+
 console.log('PASS homepage/subsystems share same actual seven modules, labels, order, permissions and cache version');
 
 console.log('PASS presentation isolation: employee login/punch untouched, no API/storage writes, final stylesheet precedence on all eight pages');
