@@ -18,6 +18,16 @@ const html=fs.readFileSync('schedule/index.html','utf8');let a=html.indexOf('   
 const realQuota=c.p79RestQuota;Object.assign(c,{p79RestQuota:()=>({counts:{例:4,休:5,國:2}}),p79DailyRestCount:()=>({counts:{例:4,休:5,國:1},dates:{例:['01','02','03','04'],休:['05','06','07','08','09'],國:['10']}}),scheduleEscapeHtml:x=>String(x||'')});
 vm.runInContext(html.slice(a,b),c);
 const rendered=c.p79ScheduleRestCountCells(emp,month);c.p79RestQuota=realQuota;assert.match(rendered,/<span>4\/0<\/span>/);assert.match(rendered,/<span>5\/0<\/span>/);assert.match(rendered,/<span>1\/1<\/span>/);assert.match(rendered,/國超額|p79-rest-national/);
+// All staff use the same numeric-only allocated/remaining format, including the 3/1 case.
+c.p79RestQuota=()=>({counts:{例:4,休:4,國:2}});
+c.p79ScheduleRestBalance=()=>({quota:{例:4,休:4,國:2},ledger:[],remaining:{例:0,休:1,國:2}});
+c.p79DailyRestCount=()=>({dates:{例:['01','02','03','04'],休:['05','06','07'],國:[]}});
+for(let i=0;i<83;i++){
+ const summary=c.p79ScheduleRestCountCells({id:'TEST-'+i},month);
+ assert.match(summary,/<td data-rest-category="休"[^>]*><span>3\/1<\/span><\/td>/,'one rest day remains for all roles');
+ assert.doesNotMatch(summary,/p79-rest-deficit|p79-rest-quota-tag|缺\d|超額|⚠|<small|<strong/,'summary cells display numbers only');
+}
+c.p79RestQuota=realQuota;
 assert(html.includes('acceptRows(data.schedules||[])'));assert(html.includes('acceptRows(confirmedRestRows,yearMonth)'));assert(html.includes('p79RefreshScheduleRestCounts(yearMonth)'));assert(!html.includes('for(const d of visibleDays){const date=yearMonth'));
 console.log('PASS schedule summary: full-month cloud accounting, drafts/failure, successful write snapshots, retries, delete, identity/month reset, unknown state and category audit rendering');
 
