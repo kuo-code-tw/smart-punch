@@ -19,3 +19,13 @@ jobs:
       - run: node tests/october-system-roster-overtime.cjs
       - run: node tests/attendance-overtime-1012-effective-status.cjs
       - run: node tests/vessel-completion-export-integrity.cjs
+      - run: node tests/schedule-november-render-fallback.cjs
+      - run: node tests/schedule-save-receipt-recovery.cjs
+      - run: node tests/schedule-hidden-roster-preservation.cjs
+      - run: node tests/schedule-month-navigation.cjs
+      - run: node tests/schedule-export-special-days.cjs
+      - run: node tests/schedule-protected-save-snapshot.cjs
+      - run: node tests/attendance-month-view.cjs
+      - run: node tests/attendance-overtime-date-export.cjs
+      - run: node tests/overtime-revocation-audit.cjs
+      - run: node tests/attendance-overtime-phantom.cjs
