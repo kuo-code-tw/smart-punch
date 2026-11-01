@@ -27,4 +27,33 @@ assert(scoped.includes('min-width:0!important'),'admin flex/grid children shrink
 assert(scoped.includes('.p79-stats-table-wrap,.overflow-x-auto'),'wide tables keep independent horizontal scrolling');
 assert(scoped.includes('overflow-x:auto!important'),'tables still horizontally scroll locally');
 assert(!scoped.includes('left:-'),'workhours view never translated left beneath sidebar');
+
+/* The homepage and all internal pages must show the same seven real modules.
+   'Reports' and 'Settings' used to be misleading homepage-only aliases. */
+const navigation=fs.readFileSync('assets/port79-management-workspace.js','utf8');
+const seven=fs.readFileSync('assets/port79-seven-top.js','utf8');
+const orderMatch=navigation.match(/const order=\[([^\]]+)\]/);
+assert(orderMatch,'canonical order declared');
+const homeOrder=orderMatch[1].split(',').map(t=>t.replace(/['"\s]/g,''));
+const expected=['attendance','schedule','efficiency','hr','workhours','leave','history'];
+assert.deepEqual(homeOrder,expected,'home canonical ordering');
+const navBlock=seven.slice(seven.indexOf('const NAV=['),seven.indexOf('const SYSTEMS=',seven.indexOf('const NAV=[')));
+const internal=[...navBlock.matchAll(/\['([^']+)','[^']+','([^']+)','[^']+'\]/g)].map(x=>({key:x[1],name:x[2]}));
+assert.deepEqual(internal.map(x=>x.key),expected,'system sidebar must use exact homepage order');
+const labels={attendance:'考勤管理',schedule:'排班管理',efficiency:'船舶作業管理',
+ hr:'人資管理',workhours:'工時與加班管理',leave:'請假管理',history:'歷史資料庫'};
+assert.deepEqual(internal.map(x=>x.name),expected.map(k=>labels[k]));
+for(const key of expected)assert(navigation.includes(key+':['+JSON.stringify(labels[key]).replace(/"/g,"'")),key+' label comes from one shared metadata record');
+assert(!navigation.includes("const aliases="),'fake homepage-only report/settings shortcuts removed');
+assert(!navigation.includes("alias=x.dataset.p79Alias"),'homepage special sorting removed');
+assert(navigation.includes('return key?order.indexOf(key):order.length;'),'both menus use shared canonical ordering');
+assert(navigation.includes('source.click();'),'homepage links retain existing permission checks and SSO navigation');
+for(const page of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','aqc-efficiency/index.html','hr/index.html','leave/index.html','history-data/index.html']){
+ const html=fs.readFileSync(page,'utf8');
+ assert(html.includes('port79-management-workspace.js?v=20261101-unified-sidebar-v2'),page+' refreshes the shared nav script');
+ if(page!=='index.html')
+  assert(html.includes('port79-seven-top.js?v=20261101-unified-sidebar-v2'),page+' refreshes the permission-controlled nav');
+}
+console.log('PASS homepage/subsystems share same actual seven modules, labels, order, permissions and cache version');
+
 console.log('PASS presentation isolation: employee login/punch untouched, no API/storage writes, final stylesheet precedence on all eight pages');
