@@ -13141,7 +13141,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             }catch(_){}
         });
         let p79WorkOvertimeLoadQueue=Promise.resolve();
-        const p79WorkOvertimeLoadLanes=[Promise.resolve(),Promise.resolve(),Promise.resolve()];
+        // Limit background roster reads to one month at a time to avoid competing for the GAS lock.
+        const p79WorkOvertimeLoadLanes=[Promise.resolve()];
         let p79WorkOvertimeNextLane=0,p79WorkOvertimeRenderTimer=null;
         function p79WorkRestMonths(month){
             const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date());
@@ -13667,10 +13668,12 @@ async function p79ExportOvertimeComparison(printMode){
                 const old=p79WorkOvertimeMonths.get(month);if(old&&!old.pending)old.at=0;
                 p79LoadWorkOvertimeMonths(records,month,true);
                 const state=p79WorkOvertimeMonths.get(month);
-                // Start both reads together; never wait on unrelated historical months.
-                const [ok]=await Promise.all([loadAttendanceMonthFromCloud(month,false),state?.promise||Promise.resolve()]);
-                if(ok===false)throw Error('出勤讀取未完成，已保留原資料');
+                // The attendance and schedule endpoints share the cloud lock.
+                // Avoid competing with our own read on an explicit refresh.
+                await (state?.promise||Promise.resolve());
                 if(!state?.ready||state.error)throw Error(state?.error||'申報資料尚未讀取完成');
+                const ok=await loadAttendanceMonthFromCloud(month,false);
+                if(ok===false)throw Error('出勤讀取未完成，已保留原資料');
                 p79OvertimeCalculationCache=null;renderOvertimeStats();
             }catch(error){showToast('加班讀取失敗：'+error.message,'warning');}
             finally{if(button){button.disabled=false;button.textContent='重新讀取加班';}}
@@ -14796,7 +14799,7 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             body.innerHTML = `<tr><td colspan="35" class="p-6 text-center text-slate-400">正在整理本頁統計…</td></tr>`;
 
             const renderRows = () => {
-                body.innerHTML = pageRows.map(row => {
+                body.innerHTML = pageRows.map((row, rowIndex) => {
                     const emp = row.emp;
                     const days = row.days || new Set();
                     const dayCells = Array.from({ length: 31 }, (_, index) => {

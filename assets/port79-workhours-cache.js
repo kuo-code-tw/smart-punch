@@ -49,7 +49,17 @@ function load(month,options={}){
   // A scope/HR revision change must immediately stop showing old scoped data.
   if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)options.onInvalidate?.();
   for(let attempt=0;attempt<2;attempt++){
-   const months=monthsFor(month),[roster,batches,config]=await Promise.all([request(s,'getScheduleDataSecure',month),Promise.all(months.map(m=>request(s,'getAttendanceMonthRaw',m))),request(s,'getOvertimeConfig',month)]);assert(s);
+   // GAS can hold a shared document lock for schedule reads. Fetching the roster,
+   // multiple raw months and config together can exhaust its 8-second lock wait.
+   // Start with the roster and then read at most two other resources concurrently.
+   const months=monthsFor(month);
+   const roster=await request(s,'getScheduleDataSecure',month);assert(s);
+   const batches=[];
+   for(let offset=0;offset<months.length;offset+=2){
+    const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
+    batches.push(...group);assert(s);
+   }
+   const config=await request(s,'getOvertimeConfig',month);assert(s);
    const raw=Object.fromEntries(months.map((m,i)=>[m,batches[i]]));
    if(Array.isArray(roster.employees))Object.values(raw).forEach(d=>{if(Array.isArray(d.records)&&context().scopeRecords){d.records=context().scopeRecords(d.records,roster.employees);d.recordCount=d.records.length;delete d.missingNameSamples;}});
    const b={schema:1,month,viewer:s.viewer,url:s.url,version:before.version,roster,raw,config,meta:before};
