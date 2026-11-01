@@ -7850,7 +7850,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         if (!canManageSchedule()) throw new Error('此帳號沒有排班管理權限');
         if (!scheduleCanEditNow()) throw new Error('目前沒有取得排班編輯權，請重新整理後再試');
         if (typeof XLSX === 'undefined') throw new Error('試算表 元件尚未載入');
-        if(isScheduleSuperAdmin())await p79ScheduleReadHrLeavePolicy();
+        if(p79ScheduleCanSelectLeave())await p79ScheduleReadHrLeavePolicy();
         const selectedRoles=JSON.parse(input.dataset.roleSelection||'null');
         if(!Array.isArray(selectedRoles)||!selectedRoles.length)throw new Error('請先勾選要匯入的職稱');
 
