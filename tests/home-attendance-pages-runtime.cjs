@@ -4,10 +4,10 @@ const elements=new Map(),el=id=>{if(elements.has(id))return elements.get(id);con
 let start;const d={getElementById:el,readyState:'loading',addEventListener:(type,fn)=>start=fn,querySelectorAll:()=>[],querySelector:()=>null,body:{classList:{contains:()=>false}}};
 const c={window:null,document:d,MutationObserver:class{observe(){}},Intl,Date,Number};c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync('assets/port79-reference-dashboard.js','utf8'),c);start();
 const api=c.P79ReferenceDashboard;api.attendance({today:'2026-10-30',todayCount:3,todayOnDuty:2,punchIn:4,recordCount:8,peopleCount:4,weeklyPeople:[2,3,4,5,6]},'2026-10');
-a.match(el('p79DashAttendanceBars').innerHTML,/第5週/);a(el('p79DashChartPrevious').disabled);a(!el('p79DashChartNext').disabled);
-api.setLeaveReport({month:'2026-10',rows:[{title:'AQC',days:3.5},{title:'指揮手',days:1}],issues:[]});
+a.match(el('p79DashAttendanceBars').innerHTML,/正在讀取正式核准請假與人資單位/);a(el('p79DashChartPrevious').disabled);a(!el('p79DashChartNext').disabled);
+api.setLeaveReport({month:'2026-10',unitRows:[{unit:'甲單位',days:3.5},{unit:'乙單位',days:0}],rows:[{title:'AQC',days:3.5},{title:'指揮手',days:1}],issues:[]});a.match(el('p79DashAttendanceBars').innerHTML,/甲單位/);a.match(el('p79DashAttendanceBars').innerHTML,/乙單位/);
 el('p79DashChartNext').listeners.click();a.match(el('p79DashAttendanceChartTitle').innerHTML,/各職稱當月請假天數/);a.match(el('p79DashAttendanceBars').innerHTML,/3.50 天/);a.match(el('p79DashAttendanceBars').innerHTML,/指揮手/);a.equal(el('p79DashChartPage').textContent,'第2頁／共2頁');
-el('p79DashChartPrevious').listeners.click();a.match(el('p79DashAttendanceBars').innerHTML,/第5週/,'original attendance chart is restored');
+el('p79DashChartPrevious').listeners.click();a.match(el('p79DashAttendanceBars').innerHTML,/甲單位/,'unit leave chart remains page one');
 el('p79DashMonth').value='2026-11';api.reset();a.equal(el('p79DashChartPage').textContent,'第1頁／共2頁');el('p79DashChartNext').listeners.click();a(!el('p79DashAttendanceBars').innerHTML.includes('3.50'),'old-month leave must disappear immediately');
-api.setLeaveReport({month:'2026-11',rows:[],issues:[]});a.match(el('p79DashAttendanceBars').innerHTML,/本月無可核對的核准請假/);
+api.setLeaveReport({month:'2026-11',unitRows:[{unit:'甲單位',days:0}],rows:[],issues:[]});a.match(el('p79DashAttendanceBars').innerHTML,/本月無可核對的核准請假/);
 console.log('PASS actual page handlers, both chart models, previous/next boundary state, original five-week data, decimal days, reset on month change and no stale leave display');
