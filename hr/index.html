@@ -358,11 +358,11 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <label style="font-weight:850;font-size:15px">🔐 排班假別選取權限（此員工）</label>
     <div class="muted" style="margin:4px 0 10px">由超級管理員在人資替每位管理員決定可選的假別。管理員／超級管理員可依勾選權限在排班操作；一般員工鎖定。正式請假仍走請假管理。</div>
     <div id="p79EditorLeavePermissionChecks" style="display:flex;flex-wrap:wrap;gap:10px">
-      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="年" onchange="p79OnEditorLeavePermissionChange()" disabled> 年假</label>
-      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="事" onchange="p79OnEditorLeavePermissionChange()" disabled> 事假</label>
-      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="病" onchange="p79OnEditorLeavePermissionChange()" disabled> 病假</label>
-      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="公" onchange="p79OnEditorLeavePermissionChange()" disabled> 公假</label>
-      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="喪" onchange="p79OnEditorLeavePermissionChange()" disabled> 喪假</label>
+      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="年" onchange="p79OnEditorLeavePermissionChange(this)" disabled> 年假</label>
+      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="事" onchange="p79OnEditorLeavePermissionChange(this)" disabled> 事假</label>
+      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="病" onchange="p79OnEditorLeavePermissionChange(this)" disabled> 病假</label>
+      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="公" onchange="p79OnEditorLeavePermissionChange(this)" disabled> 公假</label>
+      <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-hr-editor-leave="喪" onchange="p79OnEditorLeavePermissionChange(this)" disabled> 喪假</label>
     </div>
     <div id="p79EditorLeavePermissionStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px">開啟員工資料後讀取雲端權限…</div>
   </div>
@@ -891,7 +891,7 @@ async function p79RetryOrgSave(makePayload){return p79RetryOrgOperation(async()=
 const P79_HR_SCHEDULE_LEAVE_POLICY_KEY='hrScheduleLeaveEditV2';
 const P79_HR_SCHEDULE_LEAVE_LEGACY_KEY='hrScheduleLeaveEditV1';
 const P79_HR_SCHEDULE_LEAVE_TYPES=['年','事','病','公','喪'];
-let p79EditorLeavePermission={ready:false,empId:'',types:[],dirty:false};
+let p79EditorLeavePermission={ready:false,empId:'',types:[],dirty:false,touched:{}};
 let p79EditorLeaveRequestId=0;
 let p79EditorLeaveCachedCloud={key:'',config:null,at:0,pending:null};
 function p79HrScheduleLeaveIsSuperAdmin(){
@@ -945,17 +945,21 @@ function p79RenderEditorLeavePermission(){
           ?'已載入此員工既有設定，可以直接勾選或取消'
           :'可直接勾選，不必等雲端；既有設定在背景讀取，未修改不會覆蓋原設定';
 }
-function p79OnEditorLeavePermissionChange(){
+function p79OnEditorLeavePermissionChange(changed){
   if(!p79EditorLeaveRoleAllowed()){p79RenderEditorLeavePermission();return;}
-  p79EditorLeavePermission.types=[...document.querySelectorAll('[data-hr-editor-leave]:checked')]
-    .map(cb=>cb.dataset.hrEditorLeave);
+  const type=String(changed?.dataset?.hrEditorLeave||'');
+  if(!P79_HR_SCHEDULE_LEAVE_TYPES.includes(type))return;
+  p79EditorLeavePermission.touched[type]=!!changed.checked;
+  const set=new Set(p79EditorLeavePermission.types);
+  if(changed.checked)set.add(type);else set.delete(type);
+  p79EditorLeavePermission.types=P79_HR_SCHEDULE_LEAVE_TYPES.filter(t=>set.has(t));
   p79EditorLeavePermission.dirty=true;
   p79RenderEditorLeavePermission();
 }
 async function p79LoadEditorLeavePermission(){
   const employeeId=String(editing?.empId||'').trim().toUpperCase();
   const requestId=++p79EditorLeaveRequestId;
-  p79EditorLeavePermission={ready:false,empId:employeeId,types:[],dirty:false};
+  p79EditorLeavePermission={ready:false,empId:employeeId,types:[],dirty:false,touched:{}};
   p79RenderEditorLeavePermission();
   if(!p79HrScheduleLeaveIsSuperAdmin())return;
   try{
@@ -975,8 +979,11 @@ async function p79LoadEditorLeavePermission(){
       ?(isPriorSuper?(legacy===undefined?P79_HR_SCHEDULE_LEAVE_TYPES:legacy):[])
       :existing;
     p79EditorLeavePermission.ready=true;
-    if(!p79EditorLeavePermission.dirty)
-      p79EditorLeavePermission.types=P79_HR_SCHEDULE_LEAVE_TYPES.filter(t=>allowed.includes(t));
+    const set=new Set(P79_HR_SCHEDULE_LEAVE_TYPES.filter(t=>allowed.includes(t)));
+    for(const [type,on] of Object.entries(p79EditorLeavePermission.touched||{})){
+      if(on)set.add(type);else set.delete(type);
+    }
+    p79EditorLeavePermission.types=P79_HR_SCHEDULE_LEAVE_TYPES.filter(t=>set.has(t));
     p79RenderEditorLeavePermission();
   }catch(e){
     if(requestId!==p79EditorLeaveRequestId||!editor.open)return;
@@ -987,15 +994,30 @@ async function p79LoadEditorLeavePermission(){
   }
 }
 
-async function p79SaveEditorLeavePermission(empId,originalEmpId,selected){
+async function p79SaveEditorLeavePermission(empId,originalEmpId,selected,touched=null){
   if(!p79HrScheduleLeaveIsSuperAdmin())throw Error('只有超級管理員能設定排班假別');
   const id=String(empId||'').trim().toUpperCase(),oldId=String(originalEmpId||'').trim().toUpperCase();
   if(!id)throw Error('儲存排班假別權限需要工號');
-  const wanted=P79_HR_SCHEDULE_LEAVE_TYPES.filter(x=>selected.includes(x));
+  const desired=P79_HR_SCHEDULE_LEAVE_TYPES.filter(x=>(selected||[]).includes(x));
+  let wanted=desired;
   await p79RetryOrgSave(async()=>{
     const latest=await p79ReadCanonicalOrgOptions();
     const map=latest[P79_HR_SCHEDULE_LEAVE_POLICY_KEY]?.byEmployee||{};
     if(!map||typeof map!=='object'||Array.isArray(map))throw Error('原員工權限資料格式不正確');
+    if(touched&&typeof touched==='object'){
+      // An early edit must not silently remove previously checked, yet-unloaded types.
+      const prior=map[oldId]||map[id];
+      if(prior!==undefined&&!Array.isArray(prior))throw Error('原員工權限資料格式不正確');
+      const wasSuper=String(editing?.adminRole||'').toLowerCase()==='superadmin';
+      const legacy=latest[P79_HR_SCHEDULE_LEAVE_LEGACY_KEY]?.allowedTypes;
+      const initial=prior||(wasSuper?(Array.isArray(legacy)?legacy:P79_HR_SCHEDULE_LEAVE_TYPES):[]);
+      const set=new Set(P79_HR_SCHEDULE_LEAVE_TYPES.filter(x=>initial.includes(x)));
+      for(const [type,on] of Object.entries(touched)){
+        if(!P79_HR_SCHEDULE_LEAVE_TYPES.includes(type))continue;
+        if(on)set.add(type);else set.delete(type);
+      }
+      wanted=P79_HR_SCHEDULE_LEAVE_TYPES.filter(x=>set.has(x));
+    }else wanted=desired;
     const byEmployee={...map,[id]:wanted};
     if(oldId&&oldId!==id)delete byEmployee[oldId];
     const config={...latest,[P79_HR_SCHEDULE_LEAVE_POLICY_KEY]:{byEmployee}};
@@ -1007,6 +1029,8 @@ async function p79SaveEditorLeavePermission(empId,originalEmpId,selected){
   const actual=read[P79_HR_SCHEDULE_LEAVE_POLICY_KEY]?.byEmployee?.[id];
   if(!Array.isArray(actual)||JSON.stringify(P79_HR_SCHEDULE_LEAVE_TYPES.filter(x=>actual.includes(x)))!==JSON.stringify(wanted))
     throw Error('雲端讀回的員工排班假別權限不一致，請保留視窗核對');
+  p79EditorLeaveCachedCloud.config=null;
+  p79EditorLeaveCachedCloud.at=0;
 }
 
 function openMasterPicker(kind,targetId){
@@ -1269,7 +1293,7 @@ async function saveCurrent(){
     if(SYS.some(k=>String(cloudEmployee.dataScope?.[k]||'')!==String(dataScope[k]||'')))
       throw new Error('雲端讀回的資料可見範圍與設定不一致；視窗已保留');
     // Store these checkboxes against this employee's ID, not as a company-wide toggle.
-    if(saveLeaveChange)await p79SaveEditorLeavePermission(empId,originalEmpId,editorLeaveSelections);
+    if(saveLeaveChange)await p79SaveEditorLeavePermission(empId,originalEmpId,editorLeaveSelections,revokeLeave?null:p79EditorLeavePermission.touched);
     p79ApplyHrEmployeesPayload(data,false,'cloud');
     ++p79HrSaveRevision;
     editor.close();
