@@ -70,7 +70,7 @@ function build(input){
  for(const [emp,roster] of rosters)for(const date of Object.keys(roster)){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(input.month+'-'))continue;
   const p=period(date,roster),events=marks.get(emp+'|'+date)||[];
-  const state=events.length?(events.length===1&&events[0]==='worked'?'worked':'missing'):(now>=p.end?'rest':'open');
+  const state=events.length?(events.every(event=>event==='worked')?'worked':'missing'):(now>=p.end?'rest':'open');
   days[emp+'|'+date]={state,shiftEnd:p.end,leave:isLeaveDay(input,emp,date,roster)};
  }
  return{complete:true,month:input.month,checkedAt:now,days,sessionDates,workCalendarDays};
