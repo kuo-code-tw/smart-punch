@@ -88,11 +88,28 @@
   }
   function accountingDateForSession(inRec,outRec){
     const base=inRec||outRec;
-    const calendar=normalizeTime(base&&base.timeStr).slice(0,10).replace(/\//g,'-');
-    // Work date follows the actual clock-in calendar date, including dawn
-    // call-outs. A shift that crosses midnight stays on its clock-in date.
-    // Preserve both original timestamps and never infer a previous day by hour.
-    return calendar;
+    const start=normalizeTime(base&&base.timeStr);
+    const actualDate=start.slice(0,10).replace(/\//g,'-');
+    // A completed ship-arrival shift entirely before 08:00 belongs to the
+    // previous night-work date for ALL employees, regardless of department.
+    // A lone early clock-in may instead be a normal day shift: never re-date
+    // incomplete punches without their matching check-out.
+    if(inRec&&outRec){
+      const inTime=normalizeTime(inRec.timeStr),outTime=normalizeTime(outRec.timeStr);
+      const inMatch=inTime.match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+      const outMatch=outTime.match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+      const inStamp=ts(inRec),outStamp=ts(outRec);
+      if(inMatch&&outMatch&&inTime.slice(0,10)===outTime.slice(0,10)&&
+         Number.isFinite(inStamp)&&Number.isFinite(outStamp)&&
+         outStamp>inStamp&&outStamp-inStamp<=MAX_SHIFT_MS&&
+         Number(inMatch[4])<8&&Number(outMatch[4])<8){
+        const previous=new Date(Date.UTC(Number(inMatch[1]),Number(inMatch[2])-1,Number(inMatch[3])-1));
+        return previous.getUTCFullYear()+'-'+String(previous.getUTCMonth()+1).padStart(2,'0')+'-'+String(previous.getUTCDate()).padStart(2,'0');
+      }
+    }
+    // Overnight work that starts on the prior evening already has the correct
+    // work date; normal daytime shifts keep their actual clock-in date.
+    return actualDate;
   }
   function pairSession(inRec,outRec,reason,allRecords){
     const rawList=Array.isArray(allRecords)?allRecords:[inRec,outRec];
@@ -467,8 +484,8 @@
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.12-TIME-INTEGRITY';
-    console.info('[PORT79] Attendance V6.0.11 calendar work-date installed');
+    window.p79AttendanceEngineVersion='V6.0.13-SHIP-EARLY-WORKDAY';
+    console.info('[PORT79] Attendance V6.0.13 ship early-morning work-date installed');
     return true;
   }
   return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,buildShifts,install};

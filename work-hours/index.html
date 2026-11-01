@@ -9340,6 +9340,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
+            // Same completed-shift work date as V6; incomplete punches keep their real calendar day.
+            if(clockIn && clockOut && typeof window!=='undefined' &&
+               window.P79AttendanceV6?.accountingDateForSession)
+                return window.P79AttendanceV6.accountingDateForSession(clockIn,clockOut);
             return getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
         }
 
@@ -16876,7 +16880,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261019-corrected-lineage"></script>
+<script src="../attendance/v6-engine.js?v=20261101-ship-early-workday"></script>
 
 <script src="../assets/port79-workhours-cache.js?v=20261028-folder-native-display-v3"></script>
 <script>

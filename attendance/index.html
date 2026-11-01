@@ -11183,6 +11183,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function p79AttendanceSessionWorkDate(clockIn,clockOut,emp) {
+            // Same completed-shift work date as V6; incomplete punches keep their real calendar day.
+            if(clockIn && clockOut && typeof window!=='undefined' &&
+               window.P79AttendanceV6?.accountingDateForSession)
+                return window.P79AttendanceV6.accountingDateForSession(clockIn,clockOut);
             return getAttendanceDateKey(clockIn?.timeStr||clockOut?.timeStr||'');
         }
 
@@ -25243,7 +25247,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261019-corrected-lineage"></script>
+<script src="./v6-engine.js?v=20261101-ship-early-workday"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261029-attendance-export-parity"></script>
 <script src="../assets/port79-schedule-punch-restore.js?v=20261029-attendance-export-parity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
