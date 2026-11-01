@@ -687,14 +687,14 @@ async function open(settings={}){
   const pendingRows=visibleRows().map(({r})=>r).filter(r=>!r.saved&&!r.planned);
    const chosen=chosenPeople(),supplement=automaticSupplementReviewRows(snapshot,chosen,loadedMonth,model);
    const allSupplement=automaticSupplementReviewRows(snapshot,loadedPeople,loadedMonth,model);
-   const sum=key=>supplement.reduce((a,r)=>a+(Number(r[key])||0),0);
+   const supplementTotal=key=>supplement.reduce((a,r)=>a+(Number(r[key])||0),0);
    const unresolved=supplement.filter(r=>r.missing||r.noReport||r.remaining||r.pending);
    const unverifiedSource=isReadOnlySource()||snapshot?.attendanceEvidence?.complete!==true;
    q('#mrAutoSupplementSummary').textContent='月份 '+loadedMonth+'｜本次自動核對 '+supplement.length+
-    ' 人（本帳號全範圍 '+allSupplement.length+' 人）｜已自動配休 '+sum('autoRest')+
-    ' 日｜未休加班註記 '+sum('tagged')+' 筆｜已核對申報 '+sum('confirmed')+
-    ' 筆｜申報出勤待核 '+sum('pending')+' 筆｜註記缺正式申報 '+sum('noReport')+
-    ' 筆｜仍有缺額 '+sum('remaining')+' 天｜需處理 '+unresolved.length+' 人'+
+    ' 人（本帳號全範圍 '+allSupplement.length+' 人）｜已自動配休 '+supplementTotal('autoRest')+
+    ' 日｜未休加班註記 '+supplementTotal('tagged')+' 筆｜已核對申報 '+supplementTotal('confirmed')+
+    ' 筆｜申報出勤待核 '+supplementTotal('pending')+' 筆｜註記缺正式申報 '+supplementTotal('noReport')+
+    ' 筆｜仍有缺額 '+supplementTotal('remaining')+' 天｜需處理 '+unresolved.length+' 人'+
     (unverifiedSource?'｜來源尚未完整核對，以上僅依已保存資料列示':'');
    q('#mrAutoSupplementRows').innerHTML=supplement.map(r=>
     '<tr><td>'+esc(r.role)+'</td><td>'+esc(r.name)+' <small>'+esc(r.empId)+'</small></td><td>'+r.autoRest+
