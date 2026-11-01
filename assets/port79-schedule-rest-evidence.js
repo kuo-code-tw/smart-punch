@@ -42,6 +42,7 @@ function create(ctx){
      return v&&v[1]+'-'+v[2].padStart(2,'0')===month;
    };
    if(![...records.values()].some(belongsToMonth)||![...referenceRecords.values()].some(belongsToMonth))referenceAvailable=false;
+   referenceAvailable=referenceAvailable&&referenceByMonth[month]===true;
    const people=ctx.employees(),pairedRows=ctx.buildShifts([...records.values()]);
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
@@ -95,7 +96,7 @@ function create(ctx){
      if(day.state!=='rest')continue;
      // A shift crossing into the next month also needs that month's raw feed.
      const endMonth=Number.isFinite(day.shiftEnd)?new Date(day.shiftEnd+8*3600000).toISOString().slice(0,7):month;
-     if(referenceAvailable&&referenceByMonth[endMonth]!==false&&referenceEvidence?.days?.[key]?.state==='rest'){
+     if(referenceAvailable&&referenceByMonth[endMonth]===true&&referenceEvidence?.days?.[key]?.state==='rest'){
        confirmed[key]=true;
      }else{
        // Do not conflate incomplete cross-source evidence with verified leave.
