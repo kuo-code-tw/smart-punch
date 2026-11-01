@@ -6315,7 +6315,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       updateScheduleDateRangeSummary();
       const visibleDays = Array.from({length: totalDays}, (_, i) => i + 1);
       const p79EditorLeaveKinds=p79ScheduleLeavePolicy.ready&&
-        p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&p79ScheduleLeavePolicy.empId===p79ScheduleLeaveActorId()&&isScheduleSuperAdmin()
+        p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&p79ScheduleLeavePolicy.empId===p79ScheduleLeaveActorId()&&p79ScheduleCanSelectLeave()
         ?p79ScheduleLeavePolicy.types:[];
       // Cache typhoon markers and attendance evidence once per render; avoid storage
       // parsing and evidence lookups on every employee/day cell.
@@ -6967,6 +6967,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
     const P79_SCHEDULE_LEAVE_POLICY_KEY='hrScheduleLeaveEditV2';
     const P79_SCHEDULE_LEAVE_LEGACY_KEY='hrScheduleLeaveEditV1';
     const P79_SCHEDULE_SPECIAL_LEAVES=['年','事','病','公','喪'];
+    function p79ScheduleCanSelectLeave(){
+      // HR can authorize an admin's specific leave codes. Employees never qualify.
+      const me=currentScheduleSession();
+      const role=String(me?.adminRole||me?.role||sessionStorage.getItem('aqc_admin_role')||'').trim().toLowerCase();
+      return canManageSchedule()&&['admin','superadmin'].includes(role);
+    }
     function p79ScheduleLeaveActorId(){
       let main={};try{main=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')||{}}catch(e){}
       const me=currentScheduleSession();
@@ -6976,7 +6982,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     async function p79ScheduleReadHrLeavePolicy(){
       const token=currentPort79SsoToken(),empId=p79ScheduleLeaveActorId();
       p79ScheduleLeavePolicy={ready:false,types:[],token,empId};
-      if(!token||!empId||!isScheduleSuperAdmin())return false;
+      if(!token||!empId||!p79ScheduleCanSelectLeave())return false;
       const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),16000);
       try{
         const url=new URL(GAS_URL);
@@ -7008,7 +7014,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return p79ScheduleLeavePolicy.ready&&
         p79ScheduleLeavePolicy.token===currentPort79SsoToken()&&
         p79ScheduleLeavePolicy.empId===p79ScheduleLeaveActorId()&&
-        isScheduleSuperAdmin()&&p79ScheduleLeavePolicy.types.includes(shift);
+        p79ScheduleCanSelectLeave()&&p79ScheduleLeavePolicy.types.includes(shift);
     }
     let p79OvertimeShiftEditBusy=false;
     async function updateDailyShift(empId,dayStr,val){
@@ -7017,7 +7023,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // Recheck the current cloud policy immediately before a privileged edit.
         await p79ScheduleReadHrLeavePolicy();
       }
-      if(!p79ScheduleAllowedEditShift(val)){alert('此假別需由超級管理員在人資設定開放；其他請假請到「請假管理」申請與審核。');renderRoleScheduleView();return;}
+      if(!p79ScheduleAllowedEditShift(val)){alert('此帳號未經超級管理員在人資開放此排班假別；請假申請仍請到「請假管理」。');renderRoleScheduleView();return;}
       if(approvedLeaveForEmployee(empId,dayStr)||p79LeaveCoverOnDay(empId,dayStr).length){alert('此日期仍連結請假或代班，請先到請假管理完成連動刪除，再修改排班。');renderRoleScheduleView();return;}
       if(p79OvertimeShiftEditBusy){renderRoleScheduleView();return;}
       if(!requireScheduleEditLock())return;
