@@ -1,0 +1,29 @@
+name: Attendance no-flicker regression
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-attendance-core.js'
+      - 'tests/attendance-delta-no-flicker.cjs'
+      - 'tests/attendance-core-boot.cjs'
+      - '.github/workflows/verify-attendance-no-flicker.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-attendance-core.js'
+      - 'tests/attendance-delta-no-flicker.cjs'
+      - 'tests/attendance-core-boot.cjs'
+      - '.github/workflows/verify-attendance-no-flicker.yml'
+permissions:
+  contents: read
+jobs:
+  verify-no-flicker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node tests/attendance-core-boot.cjs
+          node tests/attendance-delta-no-flicker.cjs
+          node tests/attendance-formal-confirmation-flow.cjs
