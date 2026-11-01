@@ -195,13 +195,30 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <button class="btn" onclick="openPermissionOverview()">🔐 <span class="txt">權限總覽</span></button>
     <button class="btn" id="sessionLogBtn" onclick="openSessionLogs()">🧾 <span class="txt">登入紀錄</span></button>
     <button class="btn" id="orgSettingsBtn" onclick="openOrgSettings()">⚙️ <span class="txt">部門／職稱／單位</span></button>
-    <button class="btn hidden" id="scheduleLeaveSettingsBtn" onclick="openScheduleLeaveSettings()">⚙️ <span class="txt">排班請假權限</span></button>
+    <button class="btn hidden" id="scheduleLeaveSettingsBtn" onclick="openScheduleLeaveSettings(true)">⚙️ <span class="txt">排班請假權限</span></button>
     <button class="btn" onclick="exportEmployees()">📥 <span class="txt">匯出人資名冊</span></button>
     <button class="btn primary" id="addBtn" onclick="openEditor()">＋ 新增員工</button>
   </div>
 </div></header>
 <main class="wrap">
   <div id="status" class="banner">正在驗證人資系統權限...</div>
+  <section id="scheduleLeaveSettingsPanel" class="hidden" aria-label="排班請假權限設定" style="margin:14px 0 20px;padding:18px 20px;border:2px solid #c7d2fe;border-radius:16px;background:var(--panel);box-shadow:var(--shadow)">
+    <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div><h2 style="font-size:18px;font-weight:900;margin:0 0 6px">⚙️ 排班請假權限設定</h2>
+      <div class="muted">直接勾選下方假別；僅超級管理員可修改，一般管理員也能看到設定位置。</div></div>
+      <button type="button" class="btn" onclick="openScheduleLeaveSettings()">↻ 重新讀取設定</button>
+    </div>
+    <div id="scheduleLeaveSettingsTypes" style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0">
+      <label style="display:flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;font-weight:800"><input type="checkbox" data-schedule-leave-kind="年" disabled> 年假</label>
+      <label style="display:flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;font-weight:800"><input type="checkbox" data-schedule-leave-kind="事" disabled> 事假</label>
+      <label style="display:flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;font-weight:800"><input type="checkbox" data-schedule-leave-kind="病" disabled> 病假</label>
+      <label style="display:flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;font-weight:800"><input type="checkbox" data-schedule-leave-kind="公" disabled> 公假</label>
+      <label style="display:flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;font-weight:800"><input type="checkbox" data-schedule-leave-kind="喪" disabled> 喪假</label>
+    </div>
+    <div id="scheduleLeaveSettingsStatus" role="status" aria-live="polite" style="margin-bottom:12px;font-size:13px"></div>
+    <button type="button" class="btn primary" id="scheduleLeaveSettingsSaveBtn" onclick="saveScheduleLeaveSettings()" disabled>💾 儲存排班請假權限</button>
+  </section>
+
   <div class="stats">
     <div class="stat"><div class="k">在職人員</div><div class="v" id="stActive">0</div></div>
     <div class="stat"><div class="k">離職人員</div><div class="v" id="stResigned">0</div></div>
@@ -314,23 +331,6 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   </div>
   <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
   <div class="footer"><div class="muted">刪除選項只會移除「選單選項」，不會刪掉既有人員歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
-</div></dialog>
-
-<dialog id="scheduleLeaveSettingsDialog" class="org-dialog"><div class="modal">
-  <div class="modalhead">
-    <div><b>⚙️ 排班請假權限設定</b><div class="muted">僅超級管理員可設定及在排班日期格選取下列假別；一般管理員仍須透過請假管理申請及審核。</div></div>
-    <button class="btn" onclick="scheduleLeaveSettingsDialog.close()">關閉</button>
-  </div>
-  <div id="scheduleLeaveSettingsTypes" class="orggrid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:18px 4px">
-    <label class="orgbox"><input type="checkbox" data-schedule-leave-kind="年"> 年假</label>
-    <label class="orgbox"><input type="checkbox" data-schedule-leave-kind="事"> 事假</label>
-    <label class="orgbox"><input type="checkbox" data-schedule-leave-kind="病"> 病假</label>
-    <label class="orgbox"><input type="checkbox" data-schedule-leave-kind="公"> 公假</label>
-    <label class="orgbox"><input type="checkbox" data-schedule-leave-kind="喪"> 喪假</label>
-  </div>
-  <div class="muted">未勾選的假別不會出現在超級管理員排班選單。既有正式請假資料、核准流程、例／休／國與代班紀錄不會被此設定刪除。</div>
-  <div id="scheduleLeaveSettingsStatus" role="status" aria-live="polite" style="margin:12px 0"></div>
-  <div class="footer"><button class="btn primary" id="scheduleLeaveSettingsSaveBtn" onclick="saveScheduleLeaveSettings()" disabled>💾 儲存排班請假權限</button></div>
 </div></dialog>
 
 <dialog id="masterPickerDialog"><div class="modal">
@@ -651,7 +651,8 @@ function p79ApplyHrSession(s){
   $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
   if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
   $('orgSettingsBtn')?.classList.toggle('hidden',!canHr('org.view'));
-  $('scheduleLeaveSettingsBtn')?.classList.toggle('hidden',!p79HrScheduleLeaveIsSuperAdmin());
+  $('scheduleLeaveSettingsBtn')?.classList.remove('hidden');
+  $('scheduleLeaveSettingsPanel')?.classList.remove('hidden');
   $('sessionLogBtn')?.classList.toggle('hidden',!canHr('audit.view'));
   return true;
 }
@@ -691,6 +692,8 @@ async function init(){
     $('status').textContent='🟡 雲端權限確認較慢｜先使用目前已驗證權限讀取人資資料';
   }
 
+  // Visible checkbox panel loads automatically for authorized HR viewers.
+  void openScheduleLeaveSettings();
   // 讓瀏覽器先完成第一幀，避免權限驗證與人資主檔大表同一時間搶主執行緒。
   await new Promise(r=>setTimeout(r,60));
   await loadEmployees(false);
@@ -714,7 +717,8 @@ function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
   $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
   if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
   $('orgSettingsBtn')?.classList.toggle('hidden',hrAccess!=='manage');
-  $('scheduleLeaveSettingsBtn')?.classList.toggle('hidden',!p79HrScheduleLeaveIsSuperAdmin());
+  $('scheduleLeaveSettingsBtn')?.classList.remove('hidden');
+  $('scheduleLeaveSettingsPanel')?.classList.remove('hidden');
   const sourceText=source==='cache'?'本機快取，背景核對中':'雲端';
   $('status').textContent=`✅ 人資主檔已載入｜${employees.length} 人｜來源：${sourceText}｜目前權限：${permLabel(hrAccess)}${show?'｜已重新整理':''}`;
   return true;
@@ -899,14 +903,18 @@ async function p79RetryOrgSave(makePayload){return p79RetryOrgOperation(async()=
 const P79_HR_SCHEDULE_LEAVE_POLICY_KEY='hrScheduleLeaveEditV1';
 const P79_HR_SCHEDULE_LEAVE_TYPES=['年','事','病','公','喪'];
 function p79HrScheduleLeaveIsSuperAdmin(){
-  return String(session?.adminRole||session?.actualAdminRole||session?.role||'').trim().toLowerCase()==='superadmin';
+  return [session?.adminRole,session?.actualAdminRole,session?.role].some(value=>String(value||'').trim().toLowerCase()==='superadmin');
 }
-async function openScheduleLeaveSettings(){
-  if(!p79HrScheduleLeaveIsSuperAdmin())return alert('只有超級管理員可以調整排班請假權限');
+async function openScheduleLeaveSettings(scrollToPanel=false){
+  if(scrollToPanel)$('scheduleLeaveSettingsPanel')?.scrollIntoView?.({behavior:'smooth',block:'center'});
   const status=$('scheduleLeaveSettingsStatus'),save=$('scheduleLeaveSettingsSaveBtn');
   save.disabled=true;
+  document.querySelectorAll('[data-schedule-leave-kind]').forEach(input=>input.disabled=true);
+  if(!p79HrScheduleLeaveIsSuperAdmin()){
+    status.textContent='目前帳號不是超級管理員；可以看到設定位置，但不能修改年、事、病、公、喪。';
+    return;
+  }
   status.textContent='正在讀取雲端共用設定…';
-  scheduleLeaveSettingsDialog.showModal();
   try{
     const config=await p79ReadCanonicalOrgOptions();
     const raw=config[P79_HR_SCHEDULE_LEAVE_POLICY_KEY];
@@ -914,8 +922,9 @@ async function openScheduleLeaveSettings(){
     const selected=raw===undefined?P79_HR_SCHEDULE_LEAVE_TYPES:raw.allowedTypes;
     document.querySelectorAll('[data-schedule-leave-kind]').forEach(input=>{
       input.checked=selected.includes(input.dataset.scheduleLeaveKind);
+      input.disabled=false;
     });
-    status.textContent='已載入雲端設定。勾選超級管理員可直接排入的假別。';
+    status.textContent='已載入雲端設定，請直接勾選後按下方儲存。';
     save.disabled=false;
   }catch(e){status.textContent='無法讀取雲端設定：'+String(e.message||e)+'；為避免覆蓋既有權限，暫時禁止儲存。';}
 }
