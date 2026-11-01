@@ -105,17 +105,19 @@ function attendance(a,ym){
 }
 function renderAttendancePage(){
  const title=$('p79DashAttendanceChartTitle');if(!title)return;
- title.innerHTML='<span class="p79r-panel-mark">↥</span>'+(attendancePage?'各職稱當月請假天數':'本月出勤人數趨勢');
+ title.innerHTML='<span class="p79r-panel-mark">↥</span>'+(attendancePage?'各職稱當月請假天數':'本月各單位核准請假天數');
  $('p79DashChartPage').textContent='第'+(attendancePage+1)+'頁／共2頁';
  $('p79DashChartPrevious').disabled=attendancePage===0;$('p79DashChartNext').disabled=attendancePage===1;
- const el=$('p79DashAttendanceBars');el.classList.toggle('p79r-leave-chart',attendancePage===1);
- if(!attendancePage){if(attendanceReport)svgChart(el.id,attendanceReport.weeklyPeople,attendanceReport.weeklyPeople.map((x,i)=>'第'+(i+1)+'週'));else empty(el.id,'正在讀取考勤資料…');return;}
- if(!leaveReport||leaveReport.month!==attendanceMonth){empty(el.id,'正在讀取正式核准請假與人資職稱…');return;}
+ const el=$('p79DashAttendanceBars');el.classList.toggle('p79r-leave-chart',true);
+ const isUnitPage=attendancePage===0;
+ if(!leaveReport||leaveReport.month!==attendanceMonth){empty(el.id,isUnitPage?'正在讀取正式核准請假與人資單位…':'正在讀取正式核准請假與人資職稱…');return;}
  if(leaveReport.error){empty(el.id,leaveReport.error);return;}
- const rows=leaveReport.rows,caption=leaveReport.issues.length?'（'+leaveReport.issues.length+' 筆資料待核，未計入）':'';
- if(!rows.length){empty(el.id,'本月無可核對的核准請假'+caption);return;}
- const max=Math.max(1,...rows.map(r=>r.days));
- el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+'各職稱當月核准請假天數'+caption)+'">'+rows.map(r=>'<div class="p79r-leave-row"><span title="'+esc(r.title)+'">'+esc(r.title)+'</span><div><i style="width:'+r.days/max*100+'%"></i></div><b>'+fmt(r.days,Number.isInteger(r.days)?0:2)+' 天</b></div>').join('')+(caption?'<small>'+esc(caption)+'</small>':'')+'</div>';
+ const rows=isUnitPage?leaveReport.unitRows:leaveReport.rows,caption=(leaveReport.issues||[]).length?'（'+leaveReport.issues.length+' 筆資料待核，未計入）':'';
+ if(!Array.isArray(rows)){empty(el.id,isUnitPage?'單位請假資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
+ if(!rows.length){empty(el.id,(isUnitPage?'本月尚無可核對的單位資料':'本月無可核對的核准請假')+caption);return;}
+ const max=Math.max(1,...rows.map(r=>r.days)),label=r=>isUnitPage?r.unit:r.title;
+ const description=isUnitPage?'各單位':'各職稱';
+ el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+description+'核准請假天數'+caption)+'">'+rows.map(r=>'<div class="p79r-leave-row"><span title="'+esc(label(r))+'">'+esc(label(r))+'</span><div><i style="width:'+r.days/max*100+'%"></i></div><b>'+fmt(r.days,Number.isInteger(r.days)?0:2)+' 天</b></div>').join('')+(caption?'<small>'+esc(caption)+'</small>':'')+'</div>';
 }
 function setLeaveReport(report){leaveReport=report;attendanceMonth=report.month;renderAttendancePage();}
 function chrome(){
