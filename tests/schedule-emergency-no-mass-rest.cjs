@@ -18,6 +18,7 @@ const env={
  monthlyScheduleData:original,monthlyScheduleMeta:meta,
  approvedLeaveForEmployee:()=>null,
  window:{P79RestAttendance:{state:()=> 'rest'}},
+ p79ScheduleRestClient:()=>({status:()=>({evidence:ctx.attendanceEvidence})}),
  p79ScheduleHasVerifiedPunch:()=>false,
  p79LeaveCoverOnDay:()=>[],p79ConfirmedOvertimeReport:()=>false,
  scheduleTaipeiTodayKey:()=> '2026-11-01',
