@@ -6999,7 +6999,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
           throw Error('人資原排班權限設定格式不完整');
         const own=stored&&Object.prototype.hasOwnProperty.call(stored,empId)?stored[empId]:undefined;
         if(own!==undefined&&!Array.isArray(own))throw Error('目前員工權限內容不正確');
-        const allowed=own===undefined?(previous===undefined?P79_SCHEDULE_SPECIAL_LEAVES:previous):own;
+        // An unconfigured normal admin must NEVER inherit the old global
+        // superadmin default. Only explicitly checked employee IDs are allowed.
+        const currentRole=String(currentScheduleSession()?.adminRole||'').trim().toLowerCase();
+        const allowed=own===undefined
+          ?(currentRole==='superadmin'?(previous===undefined?P79_SCHEDULE_SPECIAL_LEAVES:previous):[])
+          :own;
         if(token!==currentPort79SsoToken()||empId!==p79ScheduleLeaveActorId())return false;
         p79ScheduleLeavePolicy={ready:true,types:P79_SCHEDULE_SPECIAL_LEAVES.filter(x=>allowed.includes(x)),token,empId};
         return true;
