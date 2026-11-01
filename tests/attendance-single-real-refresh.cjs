@@ -53,6 +53,7 @@ async function simulate({roster=[reportRow],cloudFailure=false,pending=false,mon
 }
 (async()=>{
  let r=await simulate();
+ if(!r.result)console.error('DETAIL',r.status?.textContent,r.calls.map(x=>new URL(x.url).searchParams.get('action')),r.applied,r.renders);
  assert.equal(r.result,true);
  assert.equal(r.calls.length,2,'button must read master and monthly official GAS roster');
  for(const c of r.calls){const u=new URL(c.url);assert.equal(u.searchParams.get('fresh'),'1');assert.equal(u.searchParams.get('month'),u.searchParams.get('action')==='getScheduleDataSecure'?month:null);assert.equal(c.options.cache,'no-store');}
