@@ -22,7 +22,9 @@ function shiftFromClockIn(inRec,outRec,{displayOnly=false}={}){
  // The formal night shift is 24:00–08:00 of its roster date.
  // A clock-in shortly after midnight belongs to the previous roster date.
  let shift='',date=start.date;
- if(start.hour>=6&&start.hour<=10)shift='早';
+ // A complete session entirely before 08:00 belongs to the previous night's roster date.
+ if(start.date===end.date&&start.hour<8&&end.hour<8){shift='晚';date=dateBack(date);}
+ else if(start.hour>=6&&start.hour<=10)shift='早';
  else if(start.hour>=14&&start.hour<=18)shift='中';
  else if(start.hour>=22){shift='晚';}
  else if(start.hour<=2){shift='晚';date=dateBack(date);}
