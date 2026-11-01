@@ -5,6 +5,8 @@ on:
       - 'backend/history-module-month-readonly.gs'
       - 'assets/port79-history-month-inline.js'
       - 'tests/history-all-system-readonly.cjs'
+      - 'tests/schedule-provisional-october-readonly.cjs'
+      - 'schedule/index.html'
       - '.github/workflows/history-archive-readonly.yml'
 permissions:
   contents: read
@@ -17,3 +19,4 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/history-all-system-readonly.cjs
+      - run: node tests/schedule-provisional-october-readonly.cjs
