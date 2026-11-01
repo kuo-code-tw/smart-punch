@@ -24,7 +24,10 @@ const doc={readyState:'loading',getElementById:id=>elements[id]||null,
  }}};
 const window={document:doc,sessionStorage:{getItem(){return null}},crypto:{getRandomValues(arr){for(let i=0;i<arr.length;i++)arr[i]=12345+i;return arr}},
  setTimeout(fn){return 7},clearTimeout(){}};
-vm.runInNewContext(source,{window,URL,Uint32Array,Intl,Date,Promise,Set});
+// Freeze the display test before the fixture's ETD. Current-date filtering
+// is verified separately in home-wanhai-json-vessel-schedule.cjs.
+class DisplayFixtureDate extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}
+vm.runInNewContext(source,{window,URL,Uint32Array,Intl,Date:DisplayFixtureDate,Promise,Set});
 assert.equal(typeof handlers.DOMContentLoaded,'function');
 handlers.DOMContentLoaded();
 (async()=>{
