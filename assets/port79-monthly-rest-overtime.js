@@ -624,7 +624,7 @@ async function open(settings={}){
  el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><section id="mrAutomaticSupplement" style="margin:10px 0;padding:10px;border:1px solid #cbd5e1;border-radius:10px"><b>全員未休假自動補算結果（不須逐人對表）</b><div id="mrAutoSupplementSummary" role="status" style="margin:7px 0;color:#334155;font-size:12px">正在核對全員來源…</div><div class="scroll" style="max-height:300px"><table><thead><tr><th>職稱</th><th>姓名</th><th>已自動配休</th><th>未休加班註記</th><th>已核對申報</th><th>申報出勤待核</th><th>註記缺申報</th><th>未休缺額</th><th>狀態</th></tr></thead><tbody id="mrAutoSupplementRows"></tbody></table></div><small style="display:block;margin-top:5px;color:#64748b">自動配休與加班註記不等於正式申報。只有正式申報編號及出勤核實完成才會列為已核對申報；資料來源未完成時不判定申報成功。</small></section><details id="mrWeeklyDetails" style="margin:8px 0 12px;border:1px solid #dbe4ee;border-radius:10px;padding:10px" open><summary style="cursor:pointer;font-weight:800">逐週例／休／國核對（依原班表）</summary><div class="scroll" style="max-height:230px"><table><thead><tr><th>週期</th><th>人數</th><th>例假</th><th>休息日</th><th>國定假日</th><th>預排建議</th><th>待確認</th></tr></thead><tbody id="mrWeeklyRows"></tbody></table></div><small style="display:block;color:#64748b;margin-top:6px">未設定員工約定七日週期或跨月班表不足時，只做參考核對，不會自行把普通工作日改為休假加班。</small></details><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><section id="mrExistingSection" aria-label="本月已申報休假加班" style="margin:12px 0;border:1px solid #cbd5e1;border-radius:10px;padding:10px"><b>已申報的例／休／國加班（唯讀，不重複申報）</b><div id="mrExistingStatus" role="status" style="margin:6px 0;font-size:12px;color:#334155">讀取班表後顯示既有申報。</div><div class="scroll" style="max-height:310px"><table><thead><tr><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>申報時段</th><th>申報狀態</th><th>來源／說明</th><th>申報編號</th></tr></thead><tbody id="mrExistingRows"></tbody></table></div></section><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'));
  document.body.appendChild(el);el.showModal();
- let autoPlan=settings.autoPlan===true;
+ let autoPlan=settings.autoPlan===true,explicitPlanningMode=settings.autoPlan===true;
  const manualPeople=new Map(); // preserve picks across local filters; no implicit cloud writes
  const q=s=>el.querySelector(s),setStatus=x=>{q('#mrStatus').textContent=x;if(q('#mrResult'))q('#mrResult').textContent=x;};let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
  let people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
@@ -639,6 +639,11 @@ async function open(settings={}){
   return (model?.rows||[]).map((r,i)=>({r,i})).filter(({r})=>ids.has(id(r.empId)));
  }
  function isReadOnlySource(){return snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true;}
+ function autoHistoricalReady(){return autoPlan&&loadedMonth<today().slice(0,7);}
+ function autoSelectVerifiedHistory(){
+  if(!autoHistoricalReady()||isReadOnlySource())return;
+  for(const row of model?.rows||[])if(!row.saved&&!row.planned)row.checked=true;
+ }
  function visibleExistingRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
   return existingRestOvertimeRows(snapshot,loadedPeople,loadedMonth).filter(r=>ids.has(id(r.empId)));
  }
@@ -655,8 +660,8 @@ async function open(settings={}){
  function controls(disabled){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
   const allowed=model?.workflow?.canSubmit===true;
-  q('#mrSave').disabled=disabled||isReadOnlySource()||(autoPlan?!model?.plannedRows?.some(r=>r.checked&&!r.saved):
-   !(manualPeople.size||(allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
+  q('#mrSave').disabled=disabled||isReadOnlySource()||(autoPlan&&!autoHistoricalReady()?!model?.plannedRows?.some(r=>r.checked&&!r.saved):
+   !(manualPeople.size&&!autoPlan||(allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
   if(!disabled){
    q('#mrSavePlans').disabled=isReadOnlySource()||!autoPlan||!model?.plannedRows?.some(r=>r.checked&&!r.saved);
    q('#mrNewPlan').disabled=isReadOnlySource();
@@ -788,14 +793,14 @@ async function open(settings={}){
     '<span>'+esc(emp.name)+'（'+esc(emp.empId)+'）</span>'+
     '<span><button type="button" class="manual-set-date" data-emp="'+esc(emp.empId)+'">設定日期與時段</button> '+
     '<button type="button" class="manual-remove-person" data-emp="'+esc(emp.empId)+'">取消勾選</button></span></div>').join('');
-   q('#mrSave').textContent=autoPlan?'儲存勾選預排（'+selectedPlans.length+' 筆）':
+   q('#mrSave').textContent=autoHistoricalReady()?'一次核對並申報（'+sum('selected')+' 筆已核實出勤）':autoPlan?'儲存勾選預排（'+selectedPlans.length+' 筆）':
    manualPeople.size?'設定勾選預排（'+manualPeople.size+' 人）':
    phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
-  q('#mrResult').textContent=autoPlan?'預排已儲存 '+model.plannedRows.filter(r=>r.saved).length+' 筆／已勾選 '+selectedPlans.length+' 筆（未正式申報）':'已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
+  q('#mrResult').textContent=autoHistoricalReady()?'自動核實候選 '+model.rows.length+' 筆／已選 '+sum('selected')+' 筆，僅申報並完成雲端讀回才算補登成功':autoPlan?'預排已儲存 '+model.plannedRows.filter(r=>r.saved).length+' 筆／已勾選 '+selectedPlans.length+' 筆（未正式申報）':'已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
   q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01'+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   if(busy)q('#mrResult').textContent=q('#mrStatus').textContent;
-  q('#mrSave').disabled=busy||isReadOnlySource()||(autoPlan?!selectedPlans.length:
-    !(manualPeople.size||(phase.canSubmit&&model.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
+  q('#mrSave').disabled=busy||isReadOnlySource()||(autoPlan&&!autoHistoricalReady()?!selectedPlans.length:
+    !(manualPeople.size&&!autoPlan||(phase.canSubmit&&model.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
  }
  q('#mrRows').onclick=e=>{const button=e.target.closest('[data-audit]');if(button&&model)alert(auditText(model,button.dataset.audit));};
  q('#mrRows').onchange=e=>{const tr=e.target.closest('[data-row]');if(!tr)return;const r=model.rows[Number(tr.dataset.row)];if(r.saved)return;if(!e.target.classList.contains('pick'))r.id=crypto.randomUUID();
@@ -839,7 +844,11 @@ async function open(settings={}){
     jobs();
     if(oldJob&&[...q('#mrJob').options].some(o=>o.value===oldJob)){q('#mrJob').value=oldJob;names();}
     if(oldEmp&&[...q('#mrEmp').options].some(o=>o.value===oldEmp))q('#mrEmp').value=oldEmp;
+    if(loadedMonth<today().slice(0,7)&&!explicitPlanningMode)autoPlan=true;
+    q('#mrManualMode').checked=!autoPlan;q('#mrAutoMode').checked=autoPlan;
+    q('#mrNewPlan').hidden=autoPlan;q('#mrPlannedSection').hidden=!autoPlan;
     model=plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan});
+    autoSelectVerifiedHistory();
     if(isReadOnlySource()){model.rows=[];model.plannedRows=[];model.workflow.canSubmit=false;model.workflow.canSuggest=false;}
     g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);paint();
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
@@ -856,11 +865,13 @@ async function open(settings={}){
    const previousRows=model.rows;
    model=plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan});
    model.rows=previousRows;
+   autoSelectVerifiedHistory();
+   if(isReadOnlySource()){model.rows=[];model.plannedRows=[];}
    paint();controls(false);
   }
  }
- q('#mrManualMode').onchange=()=>choosePlanningMode(false);
- q('#mrAutoMode').onchange=()=>choosePlanningMode(q('#mrAutoMode').checked);
+ q('#mrManualMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(false);};
+ q('#mrAutoMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(q('#mrAutoMode').checked);};
  q('#mrNewPlan').onclick=async(employeeId='')=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能建立預排。');return;}
   if(busy)return;
   const selected=id(typeof employeeId==='string'?employeeId:'')||
@@ -967,7 +978,7 @@ async function open(settings={}){
  };
  q('#mrSave').onclick=async()=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能送出正式申報。');return;}
   if(busy||!model)return;
-  if(autoPlan)return q('#mrSavePlans').onclick();
+  if(autoPlan&&!autoHistoricalReady())return q('#mrSavePlans').onclick();
   if(manualPeople.size)return q('#mrNewPlan').onclick();
   if(!workflowStage(loadedMonth).canSubmit){setStatus('尚未到集中申報期間：15日起提出建議，25日起核對正式送出。');return;}
   const selected=model.rows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
