@@ -12679,7 +12679,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const statusFilter = document.getElementById('recordStatusFilter')?.value || 'ALL';
 
             const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
-            let rows = build(records.filter(canCurrentAdminViewDataRow));
+            let rows = build(p79AttendanceDisplayPairingRecords(records.filter(canCurrentAdminViewDataRow),employees));
 
             if (dateFrom || dateTo) {
                 rows = rows.filter(row =>
@@ -12766,11 +12766,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         async function onAttendanceMonthFilterChange() {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
-            recordsSingleDateRequested = true;
-            recordsRangeViewRequested = false;
+            const status=document.getElementById('recordStatusFilter')?.value||'ALL';
+            recordsSingleDateRequested = status==='ALL';
+            recordsRangeViewRequested = status!=='ALL';
             recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(monthSelect.value, false);
-            resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
+            resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter']);
             renderAttendanceMonthTabs([...monthSelect.options].map(option=>option.value), monthSelect.value || 'ALL');
             recordsCurrentPage = 1;
             if (monthSelect.value === 'ALL') {
@@ -12787,11 +12788,12 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const monthSelect = document.getElementById('filterMonthSelect');
             if (!monthSelect) return;
             monthSelect.value = month;
-            recordsSingleDateRequested = true;
-            recordsRangeViewRequested = false;
+            const status=document.getElementById('recordStatusFilter')?.value||'ALL';
+            recordsSingleDateRequested = status==='ALL';
+            recordsRangeViewRequested = status!=='ALL';
             recordsSelectedDateKey = '';
             setRecordDateRangeToMonth(month, false);
-            resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter','recordStatusFilter']);
+            resetFilterControls(['recordDeptFilter','recordJobTitleFilter','recordNameFilter']);
             renderAttendanceMonthTabs([...monthSelect.options].map(option=>option.value), month);
             recordsCurrentPage = 1;
             if (month === 'ALL') await loadCloudData(false, true);
@@ -13054,6 +13056,35 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const result = { at: now, length: list.length, byAtt, byName, byId, normName, normAtt };
             p79AttendanceEmployeeLookupCache.set(list, result);
             return result;
+        }
+
+
+        // Pairing-only employee identity normalization. Original punch records are never mutated.
+        // A real conflict between a known employee ID and a different known attendance number
+        // must remain unresolved; never join punches belonging to different employees.
+        function p79AttendanceDisplayPairingRecords(sourceRecords, masterEmployees = employees) {
+            const idx = getAttendanceEmployeeLookupIndex(masterEmployees);
+            return (Array.isArray(sourceRecords) ? sourceRecords : []).map(record => {
+                if (!record) return record;
+                const id = String(record.empId || '').trim().toUpperCase();
+                const attNo = idx.normAtt(record.attNo);
+                const byId = id ? idx.byId.get(id) : null;
+                const attMatches = attNo ? (idx.byAtt.get(attNo) || []) : [];
+                if (attMatches.length > 1 ||
+                    (byId && attMatches.length === 1 && attMatches[0] !== byId)) return record;
+                let master = byId || (attMatches.length === 1 ? attMatches[0] : null);
+                if (!master && !id && !attNo) {
+                    const nameMatches = idx.byName.get(idx.normName(record.name)) || [];
+                    if (nameMatches.length === 1) master = nameMatches[0];
+                }
+                if (!master) return record;
+                return {
+                    ...record,
+                    empId: master.empId || record.empId,
+                    attNo: master.attNo ?? record.attNo,
+                    name: master.name || record.name
+                };
+            });
         }
 
         function findEmployeeForAttendanceDisplay(item, sourceEmployees = employees) {
@@ -14946,6 +14977,8 @@ function getManualPairRecordAnchor(record) {
             const input=!!row?.clockIn,output=!!row?.clockOut;
             const a=input?getAttendanceTimestamp(row.clockIn):NaN,b=output?getAttendanceTimestamp(row.clockOut):NaN;
             if(row?.timePrecisionIssue===true)return {kind:'ABNORMAL',status:'原始打卡時間不完整',reasons:['雲端只有日期，未推測成00:00；需核對原始時間']};
+            if(row?.dateConflict===true&&input!==output&&(output||!Number.isFinite(a)||now-a>=24*3600000))
+                return {kind:'ABNORMAL',status:input?'缺少簽退':'缺少簽到',reasons:['同日有逆序打卡，需確認班次日期及缺卡，未改動原始時間']};
             if(row?.dateConflict===true)return {kind:'PENDING',status:'補卡日期待核對',reasons:['同日下班時間早於上班；需核對跨日日期，原始時間未更動']};
             if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
             if(input&&output){
@@ -14969,8 +15002,14 @@ function getManualPairRecordAnchor(record) {
                 .filter(row=>!filter||filter==='ALL'||row.attendanceAssessment===filter);
         }
         function onRecordStatusFilterChange(){
-            if(document.getElementById('recordStatusFilter')?.value==='ABNORMAL'){
-                recordsSingleDateRequested=false;recordsRangeViewRequested=true;recordsSelectedDateKey='';recordsCurrentPage=1;
+            const chosen=document.getElementById('recordStatusFilter')?.value||'ALL';
+            // Status is a full selected-month/date-range query, not just the last selected day.
+            if(chosen!=='ALL'){
+                recordsSingleDateRequested=false;
+                recordsRangeViewRequested=true;
+                recordsSelectedDateKey='';
+                recordsCurrentPage=1;
+                recordsRowPage=1;
             }
             onRecordDataScopeChange();
         }
@@ -16009,7 +16048,9 @@ function getManualPairRecordAnchor(record) {
             const visibleEmployees = getAdminAttendanceEmployees();
             ensureAttendanceDisplayMasterFresh();
 
-            let filtered = records.filter(r => {
+            let filtered = p79AttendanceDisplayPairingRecords(
+                records.filter(canCurrentAdminViewDataRow),employees
+            ).filter(r => {
                 if (!canCurrentAdminViewDataRow(r)) return false;
                 // 先限縮到目前月份／日期前後兩天，再執行昂貴的班次配對。
                 // 前後緩衝保留跨日、跨月與人工指定配對的相關事件。
@@ -16058,7 +16099,10 @@ function getManualPairRecordAnchor(record) {
             if(monthFilter!=='ALL')dailyRows = dailyRows.filter(row =>
                 attendanceRowDatePageKey(row, datePageMonth).startsWith(datePageMonth + '-')
             );
-            dailyRows = p79FilterAttendanceStatus(dailyRows,statusFilter);
+            const evaluatedRows=p79FilterAttendanceStatus(dailyRows,'ALL');
+            const statusCounts={ABNORMAL:0,PENDING:0,NORMAL:0};
+            evaluatedRows.forEach(row=>{if(Object.hasOwn(statusCounts,row.attendanceAssessment))statusCounts[row.attendanceAssessment]++;});
+            dailyRows=statusFilter==='ALL'?evaluatedRows:evaluatedRows.filter(row=>row.attendanceAssessment===statusFilter);
             sortAttendanceRowsActiveFirst(dailyRows);
 
             const paginationSignature = [deptFilter, jobTitleFilter, nameFilter, statusFilter, monthFilter, dateFrom, dateTo, currentEmp?.empId || ''].join('|');
@@ -16095,7 +16139,7 @@ function getManualPairRecordAnchor(record) {
             }
             const totalDatePages = Math.max(1, recordsDatePageKeys.length);
             recordsCurrentPage = Math.min(Math.max(1, recordsCurrentPage), totalDatePages);
-            const rangeView = p79UseRecordsRangeView(dateFrom, dateTo, monthFilter, recordsSingleDateRequested, recordsRangeViewRequested);
+            const rangeView = statusFilter!=='ALL'||p79UseRecordsRangeView(dateFrom, dateTo, monthFilter, recordsSingleDateRequested, recordsRangeViewRequested);
             const selectedDateKey = rangeView ? '' : (recordsDatePageKeys[recordsCurrentPage - 1] || '');
             recordsSelectedDateKey = selectedDateKey;
             const pageRows = p79SelectRecordsViewRows(dailyRows, selectedDateKey, monthFilter);
@@ -16118,9 +16162,10 @@ function getManualPairRecordAnchor(record) {
 
             const countEl = document.getElementById('recordFilterResultCount');
             if (countEl) {
+                const statusTotal=statusFilter==='ALL'?'':`｜異常 ${statusCounts.ABNORMAL}／待確認 ${statusCounts.PENDING}／正常 ${statusCounts.NORMAL}`;
                 countEl.textContent = selectedDateKey
-                    ? `(日期 ${selectedDateKey.replaceAll('-', '/')}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆｜共 ${recordsDatePageKeys.length} 天)`
-                    : `(期間 ${dateFrom || '不限'} ～ ${dateTo || '不限'}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆)`;
+                    ? `(日期 ${selectedDateKey.replaceAll('-', '/')}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆｜共 ${recordsDatePageKeys.length} 天${statusTotal})`
+                    : `(期間 ${dateFrom || '不限'} ～ ${dateTo || '不限'}｜班次 ${pageRows.length} 列｜原始打卡 ${rawPunchCount} 筆${statusTotal})`;
                 countEl.title = rangeView ? '顯示選定期間全部符合的班次；點日期可查看單日' : '顯示選定日期的全部班次';
             }
             const rowPageSignature = paginationSignature + '|' + selectedDateKey;
@@ -16135,7 +16180,11 @@ function getManualPairRecordAnchor(record) {
             renderRecordsPagination(recordsDatePageKeys, selectedDateKey, pageRows, rawPunchCount, rowPageInfo);
 
             if (dailyRows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="14" class="p-6 text-center text-slate-400">🔍 找不到符合條件的考勤紀錄</td></tr>`;
+                const filterCaption={ABNORMAL:'異常',PENDING:'待確認',NORMAL:'正常'}[statusFilter];
+                const message=filterCaption
+                    ? `目前選擇的月份／日期與人員範圍沒有「${filterCaption}」班次；異常 ${statusCounts.ABNORMAL}／待確認 ${statusCounts.PENDING}／正常 ${statusCounts.NORMAL}。可調整月份、日期、部門或姓名。`
+                    : '🔍 找不到符合條件的考勤紀錄';
+                tbody.innerHTML = `<tr><td colspan="14" class="p-6 text-center text-slate-400">${message}</td></tr>`;
                 return;
             }
 
