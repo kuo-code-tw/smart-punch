@@ -16,7 +16,7 @@ async function simulate({roster=[reportRow],cloudFailure=false,pending=false,mon
   getElementById:id=>elements.get(id)||null,
   querySelector:sel=>sel==='#p79SevenTop .action'?{prepend(n){this.panel=n;}}:null,
   querySelectorAll:()=>[],
-  createElement(tag){const el={tagName:tag,style:{cssText:''},dataset:{},addEventListener(t,fn){listeners.set(t,fn);},
+  createElement(tag){const el={tagName:tag,style:{cssText:''},dataset:{},setAttribute(k,v){this[k]=v;},addEventListener(t,fn){listeners.set(t,fn);},
    append(...kids){this.children=(this.children||[]).concat(kids);for(const k of kids)if(k.id)elements.set(k.id,k);},
    prepend(n){this.children=[n,...(this.children||[])];}};return el;}
  };
