@@ -14,4 +14,17 @@ for(const page of ['index.html','attendance/index.html','work-hours/index.html',
  const s=fs.readFileSync(page,'utf8');const css=s.indexOf('port79-management-workspace.css'),script=s.indexOf('port79-management-workspace.js');
  assert(css>s.lastIndexOf('port79-vessel-theme.css'),page+' final presentation must override the old theme');assert(script>css&&script<s.lastIndexOf('</body>'),page+' presentation is loaded once at end of the existing page');assert.equal((s.match(/port79-management-workspace\.js/g)||[]).length,1,page);
 }
+// Regression: wide work-hours day tables must never horizontally scroll the
+// document underneath the fixed sidebar; only table wrappers can scroll.
+const workspaceCss=fs.readFileSync('assets/port79-management-workspace.css','utf8');
+const scopedStart=workspaceCss.indexOf('/* Work-hours: wide 31-day grids');
+assert(scopedStart>=0,'workhours sidebar overflow guard exists');
+const scoped=workspaceCss.slice(scopedStart);
+assert(scoped.includes('html:has(>body.p79-workspace[data-p79-system="workhours"])'),'root overflow guard restricted to workhours');
+assert(scoped.includes('overflow-x:clip!important'),'page horizontal overflow is clipped');
+assert(scoped.includes('padding-left:var(--p79-w-width)!important'),'body remains offset by persistent sidebar');
+assert(scoped.includes('min-width:0!important'),'admin flex/grid children shrink inside viewport');
+assert(scoped.includes('.p79-stats-table-wrap,.overflow-x-auto'),'wide tables keep independent horizontal scrolling');
+assert(scoped.includes('overflow-x:auto!important'),'tables still horizontally scroll locally');
+assert(!scoped.includes('left:-'),'workhours view never translated left beneath sidebar');
 console.log('PASS presentation isolation: employee login/punch untouched, no API/storage writes, final stylesheet precedence on all eight pages');
