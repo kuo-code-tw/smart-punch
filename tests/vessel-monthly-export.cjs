@@ -19,7 +19,7 @@ c.vesselJobRows=month=>versionView.collapse(c.shipMasters
   .filter(s=>c.shipMasterDateMatchesMonth(s,month))
   .map(c.applyShipManualOverrides)).rows;
 let passed=0;function test(name,f){f();passed++;console.log('PASS '+name);}
-const master={workingNo:'5260159',vessel:'WAN HAI 292 N073',voyageE:'N073',firstDate:'2026-09-30',lastDate:'2026-10-01',totalContainers:497,hatches:8,shiftMoves:0,gph:23.06,gphHC:23.43,workingSheetSource:{disc:189,load:308}};
+const master={workingNo:'5260159',vessel:'WAN HAI 292 N073',voyageE:'N073',firstDate:'2026-09-30',lastDate:'2026-10-01',totalContainers:497,totalMoves:497,hatches:8,shiftMoves:0,gph:23.06,gphHC:23.43,workingSheetSource:{disc:189,load:308}};
 c.shipMasters=[master,{...master,workingNo:'5260160',lastDate:'2026-11-01'}];
 c.records=[{workingNo:'5260159',source:'working-report',workDate:'2026-09-30',disc:10,load:20}];
 test('completion month includes cross-month ship and excludes next month',()=>{assert.equal(c.vesselMonthlyExportRows('2026-10').length,1);assert.equal(c.vesselMonthlyExportRows('2026-09').length,0);});
