@@ -13,12 +13,45 @@ function account(){try{return JSON.parse(sessionStorage.getItem('port79_user_ses
 function enabled(){if(home){const s=account();return d.getElementById('systems')?.classList.contains('show')&&['admin','superadmin'].includes(String(s.adminRole||s.role).toLowerCase())&&!s.punchOnly;}return d.body.dataset.p79System!=='attendance'||d.documentElement.classList.contains('p79-attendance-management-chrome')&&!d.documentElement.classList.contains('p79-punch-only');}
 function button(label,cls,html,fn){const b=d.createElement('button');b.type='button';b.className=cls;b.setAttribute('aria-label',label);b.innerHTML=html;b.addEventListener('click',fn);return b;}
 function homeTarget(){return home?'./':'../';}
-function decorateNav(){const nav=shell?.querySelector('#p79SevenNav');if(!nav)return;
- if(!nav.querySelector('[data-p79-workspace-home]')){const a=d.createElement('a');a.href=homeTarget();a.dataset.p79WorkspaceHome='1';if(home)a.className='active';a.innerHTML=icon('home')+'<span>首頁</span>';nav.prepend(a);}
- const links=[...nav.querySelectorAll('a')];links.sort((a,b)=>{const rank=x=>{if(x.dataset.p79WorkspaceHome)return -1;const key=Object.keys(paths).find(k=>(x.getAttribute('href')||'').includes(paths[k]));if(home&&d.getElementById('p79Dashboard')){const alias=x.dataset.p79Alias;if(alias)return {reports:4,settings:6,integration:20}[alias]??10;return {efficiency:0,attendance:1,schedule:2,hr:3,history:5,workhours:8,leave:9}[key]??10;}return order.indexOf(key);};return rank(a)-rank(b);});links.forEach((a,i)=>{if(nav.children[i]!==a)nav.insertBefore(a,nav.children[i]||null);});
- nav.querySelectorAll('a:not([data-p79-workspace-home])').forEach(a=>{if(a.dataset.p79Decorated)return;const href=a.getAttribute('href')||'';const k=Object.keys(paths).find(k=>href.includes(paths[k]));if(!k)return;a.innerHTML=icon(k)+'<span>'+meta[k][0]+'</span><span class="p79-nav-arrow">›</span>';a.dataset.p79Decorated='1';});
+// The homepage and all seven management systems use this exact module order,
+// label and icon source. Aliases must not masquerade as separate systems.
+function decorateNav(){
+ const nav=shell?.querySelector('#p79SevenNav');if(!nav)return;
+ if(!nav.querySelector('[data-p79-workspace-home]')){
+  const a=d.createElement('a');a.href=homeTarget();a.dataset.p79WorkspaceHome='1';
+  if(home)a.className='active';
+  a.innerHTML=icon('home')+'<span>首頁</span>';nav.prepend(a);
+ }
+ const links=[...nav.querySelectorAll('a')];
+ const rank=a=>{
+  if(a.dataset.p79WorkspaceHome)return -1;
+  const key=order.find(k=>(a.getAttribute('href')||'').includes(paths[k]));
+  return key?order.indexOf(key):order.length;
+ };
+ links.sort((a,b)=>rank(a)-rank(b));
+ links.forEach((a,i)=>{if(nav.children[i]!==a)nav.insertBefore(a,nav.children[i]||null);});
+ nav.querySelectorAll('a:not([data-p79-workspace-home])').forEach(a=>{
+  const key=order.find(k=>(a.getAttribute('href')||'').includes(paths[k]));
+  if(!key||a.dataset.p79Decorated==='1')return;
+  a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
+  a.dataset.p79Decorated='1';
+ });
 }
-function buildHomeNav(){const nav=d.createElement('nav');nav.id='p79SevenNav';nav.setAttribute('aria-label','系統模組');const ids={attendance:'cardAttendance',schedule:'cardSchedule',leave:'cardLeave',hr:'cardHr',workhours:'cardWorkhours',efficiency:'cardEfficiency',history:'cardHistory'};order.filter(k=>ids[k]).forEach(k=>{const source=d.getElementById(ids[k]);if(!source||source.hidden||source.disabled||source.style.display==='none')return;const a=d.createElement('a');a.href='./'+paths[k];a.innerHTML=icon(k)+'<span>'+(k==='efficiency'?'船舶作業管理':k==='workhours'?'工時管理':meta[k][0])+'</span><span class="p79-nav-arrow">⌄</span>';a.dataset.p79Decorated='1';a.addEventListener('click',e=>{e.preventDefault();source.click();});nav.append(a);});const aliases=[['integration','船舶與考勤整合','cardEfficiency','efficiency'],['reports','報表中心','cardEfficiency','efficiency'],['settings','系統設定','cardHr','hr']];aliases.forEach(([id,label,sourceId,key])=>{const source=d.getElementById(sourceId);if(!source||source.hidden||source.disabled||source.style.display==='none')return;const a=d.createElement('a');a.href=id==='integration'?'#p79Dashboard':'./'+paths[key];a.dataset.p79Decorated='1';a.dataset.p79Alias=id;a.innerHTML=icon(key)+'<span>'+label+'</span><span class="p79-nav-arrow">⌄</span>';a.addEventListener('click',e=>{e.preventDefault();if(id==='integration')d.getElementById('p79Dashboard')?.scrollIntoView({behavior:'smooth'});else source.click();});nav.append(a);});return nav;}
+function buildHomeNav(){
+ const nav=d.createElement('nav');nav.id='p79SevenNav';nav.setAttribute('aria-label','系統模組');
+ const ids={attendance:'cardAttendance',schedule:'cardSchedule',leave:'cardLeave',hr:'cardHr',workhours:'cardWorkhours',efficiency:'cardEfficiency',history:'cardHistory'};
+ order.forEach(key=>{
+  const source=d.getElementById(ids[key]);
+  // Reuse the original home card's permission state and navigation action.
+  if(!source||source.hidden||source.disabled||source.style.display==='none')return;
+  const a=d.createElement('a');a.href='./'+paths[key];
+  a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
+  a.dataset.p79Decorated='1';
+  a.addEventListener('click',e=>{e.preventDefault();source.click();});
+  nav.append(a);
+ });
+ return nav;
+}
 function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.createElement('aside'):d.getElementById('p79SevenTop');if(!shell)return false;
  if(home){shell.id='p79WorkspaceSidebar';d.body.prepend(shell);}shell.classList.add('p79-workspace-sidebar');shell.setAttribute('aria-label','系統導覽');
  const brand=d.createElement('div');brand.className='p79-workspace-brand';brand.innerHTML=logo+'<div><strong>79號碼頭</strong><small>雲端智慧系統</small></div>';
