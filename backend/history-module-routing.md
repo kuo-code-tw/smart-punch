@@ -25,7 +25,11 @@
 
 - October 2026's formal schedule archive is still missing. The 83-row October 28 snapshot is provisional, NOT a final month-end roster.
 - Archive snapshots for HR, workhours, efficiency and shipping have not yet been created and verified.
-- The large attendance and work-hours frontends still need deeper archival-read integration; this branch updates leave, schedule, vessel efficiency dashboard and central history page.
+- The oversized attendance and work-hours HTML files are not rewritten. The shared management-workspace script now attaches the history view to their existing month selectors. Their native table/business-rule integration still requires end-to-end verification.
 - This change does not install new month-end triggers, delete main-sheet old months or alter the November roster.
 - Do not run force month rollover or trim in order to test a read-only endpoint.
 - File discovery refuses multiple matching snapshots rather than selecting an arbitrary version.
+
+## CI status
+
+The PR's complete management test suite currently fails at tests/attendance-formal-confirmation-flow.cjs line 14. This test reads an unchanged attendance overtime module, not the archive code, so it is not evidence that the historical feature passed all tests. The new archive permission/paging simulations were run separately.
