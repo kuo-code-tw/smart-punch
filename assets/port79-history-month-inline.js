@@ -90,10 +90,27 @@ function enhance(config){
       if(!legacy.has(kind)){u.searchParams.set('page',String(nextPage||1));u.searchParams.set('pageSize','100');}
       u.searchParams.set('gcToken',token);u.searchParams.set('token',token);u.searchParams.set('_',String(Date.now()));
       const response=await fetch(u.toString(),{cache:'no-store',redirect:'follow'});
-      const data=await response.json();
+      let data=await response.json();
       if(serial!==generation)return;
       if(!data.ok)throw new Error(data.error||'雲端歷史資料讀取失敗');
+      if(kind==='schedule'&&Array.isArray(data.schedules)&&!data.schedules.length){
+        const fallback=new URL(gas);
+        fallback.searchParams.set('action','historyGetProvisionalScheduleMonth');
+        fallback.searchParams.set('type','schedule');fallback.searchParams.set('month',month);
+        fallback.searchParams.set('token',token);fallback.searchParams.set('gcToken',token);
+        fallback.searchParams.set('_',String(Date.now()));
+        const response=await fetch(fallback.toString(),{cache:'no-store',redirect:'follow'});
+        const candidate=await response.json();
+        if(serial!==generation)return;
+        if(!candidate.ok||!candidate.provisional||candidate.month!==month)
+          throw new Error(candidate.error||'沒有可用的歷史排班，不能以零筆代替');
+        data=candidate;
+      }
       const result=legacy.has(kind)?rowsFromLegacy(kind,data):data;
+      if(data.provisional===true){
+        result.archiveStatus=data.archiveStatus||'備援資料（未核對月底異動）';
+        result.sourceUrl=data.sourceUrl||'';
+      }
       if(!legacy.has(kind)){result.page=data.page;result.pageSize=data.pageSize;result.hasMore=data.hasMore;}
       else{result.page=1;result.pageSize=result.totalRows;result.hasMore=false;result.sourceLabel=data.sourceLabel;}
       page=nextPage||1;renderTable(result,month);
