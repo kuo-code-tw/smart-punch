@@ -239,8 +239,32 @@ function openWorkflow(sys){
  dialog.innerHTML=`<style>#p79WorkflowDialog{width:min(660px,calc(100vw - 28px));max-height:85dvh;overflow:auto;padding:24px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#17354b;font:15px/1.7 'Microsoft JhengHei',sans-serif}#p79WorkflowDialog::backdrop{background:#0f172a88}#p79WorkflowDialog h2{margin:0;font-size:21px}#p79WorkflowDialog ol{padding-left:26px}#p79WorkflowDialog li{padding:9px 0}#p79WorkflowDialog p{margin:3px 0;color:#526677}#p79WorkflowDialog button{padding:8px 22px;border:0;border-radius:8px;background:#126487;color:white;cursor:pointer}#p79WorkflowDialog footer{text-align:right}</style><h2 id="p79WorkflowTitle">${esc(guide.title)}｜操作流程</h2><ol>${guide.steps.map(([title,text])=>`<li><b>${esc(title)}</b><p>${esc(text)}</p></li>`).join('')}</ol><p>可使用的功能依帳號權限顯示；儲存未確認或失敗時，請保留內容並核對狀態。</p><footer><button type="button" autofocus>關閉</button></footer>`;
  dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();document.body.appendChild(dialog);dialog.showModal();
 }
-function closeMenu(){document.getElementById('p79SevenStandardMenu')?.classList.remove('open')}
-function toggleMenu(e){e?.stopPropagation();refreshScheduleLockMenu();document.getElementById('p79SevenStandardMenu')?.classList.toggle('open')}
+// Only an intentional click/keyboard action on the menu trigger may open it.
+// Re-render, synthetic clicks and unexpected focus changes must not open it.
+let menuPointerActivation=null;
+function closeMenu(){
+ const menu=document.getElementById('p79SevenStandardMenu');
+ menu?.classList.remove('open');
+ document.getElementById('p79SevenMenuButton')?.setAttribute('aria-expanded','false');
+ menuPointerActivation=null;
+}
+function toggleMenu(e){
+ const btn=e?.currentTarget;
+ if(!e?.isTrusted||btn?.id!=='p79SevenMenuButton')return;
+ const keyboard=e.detail===0;
+ if(!keyboard){
+   const pointer=menuPointerActivation;
+   if(!pointer||pointer.button!==btn||Date.now()-pointer.at>1200)return;
+ }
+ e.preventDefault();e.stopPropagation();
+ menuPointerActivation=null;
+ const menu=document.getElementById('p79SevenStandardMenu');
+ if(!menu)return;
+ const opening=!menu.classList.contains('open');
+ if(opening)refreshScheduleLockMenu();
+ menu.classList.toggle('open',opening);
+ btn.setAttribute('aria-expanded',String(opening));
+}
 
 async function runAction(sys,a){closeMenu();try{
  if(!actionAllowed(sys,a))return alert('沒有此功能的操作權限，請聯絡管理員確認授權');
@@ -356,10 +380,16 @@ function ensureStandardMenu(sys){
  const old=document.getElementById('p79SevenStandardMenu');
  if(old)old.remove();
  wrap.appendChild(buildMenu(sys));
+ closeMenu(); // Rebuilt menus always start closed, never restore stale open state.
  if(sys==='schedule')refreshScheduleLockMenu();
  const btn=document.getElementById('p79SevenMenuButton');
  if(btn&&!btn.dataset.p79StandardMenuBound){
    btn.dataset.p79StandardMenuBound='1';
+   btn.setAttribute('aria-haspopup','menu');
+   btn.setAttribute('aria-expanded','false');
+   btn.addEventListener('pointerdown',e=>{
+     menuPointerActivation=e.isTrusted&&e.button===0?{button:btn,at:Date.now()}:null;
+   });
    btn.addEventListener('click',toggleMenu);
  }
  return true;
@@ -463,6 +493,8 @@ function mount(){
  ensureStandardMenu(sys);
  document.addEventListener('click',e=>{if(!e.target?.closest?.('#p79SevenMenuWrap'))closeMenu()});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+ window.addEventListener('blur',closeMenu);
+ window.addEventListener('pagehide',closeMenu);
  applyGlobalTheme(savedGlobalTheme(),{save:false});
 }
 
