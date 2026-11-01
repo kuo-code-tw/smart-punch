@@ -593,10 +593,10 @@ async function open(settings={}){
  function controls(disabled){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
   const allowed=model?.workflow?.canSubmit===true;
-  q('#mrSave').disabled=disabled||(autoPlan?!model?.plannedRows?.some(r=>r.checked&&!r.saved):
+  q('#mrSave').disabled=disabled||snapshot?.provisional===true||(autoPlan?!model?.plannedRows?.some(r=>r.checked&&!r.saved):
    !(manualPeople.size||(allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
   if(!disabled){
-   q('#mrSavePlans').disabled=!autoPlan||!model?.plannedRows?.some(r=>r.checked&&!r.saved);
+   q('#mrSavePlans').disabled=snapshot?.provisional===true||!autoPlan||!model?.plannedRows?.some(r=>r.checked&&!r.saved);
    q('#mrAll').disabled=!allowed||!visibleRows().some(({r})=>!r.saved&&!r.planned);
    el.querySelectorAll('#mrRows tr[data-row]').forEach(tr=>{
     const r=model?.rows[Number(tr.dataset.row)],pick=tr.querySelector('input.pick');
@@ -633,7 +633,13 @@ async function open(settings={}){
     '<tr><td colspan="8">'+(scheduleCount?'這個篩選沒有已保存的例／休／國申報編號，其他加班仍需另查。':'本月來源尚未讀到，不能當作零申報。')+'</td></tr>';
 
   q('#mrAll').checked=pendingRows.length>0&&pendingRows.every(r=>r.checked);q('#mrAll').indeterminate=pendingRows.some(r=>r.checked)&&!q('#mrAll').checked;
-  const phase=workflowStage(loadedMonth);model.workflow=phase;
+  const phase=workflowStage(loadedMonth);
+   if(snapshot?.provisional===true){
+    phase.canSubmit=false;phase.canSuggest=false;
+    phase.label='10月歷史備援（只供查看）';
+    phase.tip='來源不是月底正式核薪定稿；已申報清單可查，但不能由備援新增、修改或送出加班。';
+   }
+   model.workflow=phase;
    const backfill=backfillContext(loadedMonth);
    q('#mrBackfill').textContent=backfill.historical
      ?'跨月補報：'+backfill.sourceMonth+' 原始加班日期與額度不變｜'+backfill.handlingMonth+' 提交處理；不佔用本月額度'
@@ -653,7 +659,7 @@ async function open(settings={}){
     q('#mrPlanAll').checked=upcoming.length>0&&upcoming.every(r=>r.checked||r.saved);
     q('#mrPlanAll').indeterminate=selectedPlans.length>0&&!q('#mrPlanAll').checked;
     q('#mrSavePlans').textContent='儲存勾選預排（'+selectedPlans.length+' 筆）';
-    q('#mrSavePlans').disabled=busy||!autoPlan||!selectedPlans.length;
+    q('#mrSavePlans').disabled=busy||snapshot?.provisional===true||!autoPlan||!selectedPlans.length;
     q('#mrPlannedSummary').textContent='自動建議 '+upcoming.length+
       ' 筆（尚未建立）｜未能安排 '+unfilled+' 天'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
     q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
@@ -707,7 +713,7 @@ async function open(settings={}){
   q('#mrResult').textContent=autoPlan?'預排已儲存 '+model.plannedRows.filter(r=>r.saved).length+' 筆／已勾選 '+selectedPlans.length+' 筆（未正式申報）':'已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
   q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01'+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   if(busy)q('#mrResult').textContent=q('#mrStatus').textContent;
-  q('#mrSave').disabled=busy||(autoPlan?!selectedPlans.length:
+  q('#mrSave').disabled=busy||snapshot?.provisional===true||(autoPlan?!selectedPlans.length:
     !(manualPeople.size||(phase.canSubmit&&model.rows.some(r=>r.checked&&!r.saved&&!r.planned))));
  }
  q('#mrRows').onclick=e=>{const button=e.target.closest('[data-audit]');if(button&&model)alert(auditText(model,button.dataset.audit));};
@@ -732,7 +738,7 @@ async function open(settings={}){
      q('#mrDept').innerHTML=options([...new Set(people.map(e=>e.dept||'一般'))],'全部部門');jobs();
     }
     g.p79RestQuota(loadedMonth);loadedPeople=people.slice();if(!loadedPeople.length)throw Error('沒有可檢視的人員');
-   const [data,ruleResponse]=await Promise.all([a.snapshot(loadedMonth,false,false,true),g.P79Overtime.loadRules()]);
+   const [data,ruleResponse]=await Promise.all([a.snapshot(loadedMonth,false,false,true,true),g.P79Overtime.loadRules()]);
     snapshot=data;rules=ruleResponse.rows;
     // Historical employees absent from the current HR roster remain searchable
     // when the authenticated month snapshot contains their official row.
@@ -753,6 +759,7 @@ async function open(settings={}){
     if(oldJob&&[...q('#mrJob').options].some(o=>o.value===oldJob)){q('#mrJob').value=oldJob;names();}
     if(oldEmp&&[...q('#mrEmp').options].some(o=>o.value===oldEmp))q('#mrEmp').value=oldEmp;
     model=plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan});
+    if(snapshot?.provisional===true){model.rows=[];model.plannedRows=[];model.workflow.canSubmit=false;model.workflow.canSuggest=false;}
     g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);paint();
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
    setStatus('已核對 '+loadedPeople.length+' 位授權人員；'+(autoPlan?'自動建議尚未儲存，':'未自動建立預排，')+'正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
