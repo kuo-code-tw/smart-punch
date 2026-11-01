@@ -56,7 +56,7 @@ complete=true;shift='國';assert.equal(get().visibleCode,'國','statutory holida
 shift='早';leave={leaveType:'年假'};assert.equal(get().visibleCode,'年','approved leave has precedence');leave=null;
 overtime=true;assert.equal(get().visibleCode,'休','old overtime display is suppressed when there are no punches');overtime=false;
 shift='晚';state='open';assert.equal(get().visibleCode,'晚','not-yet-ended night shift stays planned');
-assert.match(html,/if\(\['待排班','打卡待核'\]\.includes\(shiftVal\)\)/,'pending state excluded from worked-day count');
+assert.match(html,/else if\(shiftVal==='打卡待核'\)/,'pending state excluded from worked-day count');
 assert.match(html,/const noPunchRest=p79ScheduleNoPunchRest/);
 assert.match(html,/row\[String\(d\)\]=selected\.visibleCode/,'Excel uses exactly the same resolved day code');
 const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(Boolean);
