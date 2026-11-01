@@ -42,7 +42,7 @@ function create(ctx){
    }
    const sessions=pairedRows.map(row=>{
     const record=row.clockIn||row.clockOut||row.records?.[0]||row,emp=people.find(e=>id(e.id)===id(row.empId||record.empId))||people.find(e=>att(record.attNo)&&att(e.attNo||e.attendanceNo)===att(record.attNo));
-    return{empId:emp?.id||'',start:row.clockIn?ctx.timestamp(row.clockIn):null,end:row.clockOut?ctx.timestamp(row.clockOut):null,time:ctx.timestamp(record)};
+    return{empId:emp?.id||'',start:row.clockIn?ctx.timestamp(row.clockIn):null,end:row.clockOut?ctx.timestamp(row.clockOut):null,time:ctx.timestamp(record),workDate:row.clockIn&&row.clockOut&&!row.timePrecisionIssue?row.accountingDateKey||row.dateKey||'':''};
    }).filter(s=>s.empId);
    if(JSON.stringify(ctx.schedules())!==rosterSignature)throw Error('核對期間班表已更新，需重新讀取考勤');
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
