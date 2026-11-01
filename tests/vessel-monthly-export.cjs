@@ -11,10 +11,10 @@ const c={console,Date,document:{getElementById:id=>elements[id]},shipMasters:[],
   recordsForVessel:no=>c.records.filter(r=>r.workingNo===no),recoveredMoveSplit:r=>r,
   requireSuperAdminAccess:()=>true,toast:m=>messages.push(m),loadEfficiencyCloudScope:async()=>true,
   dashboardAdjustJobsForMonthlyReference:jobs=>jobs};
-c.window=c;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,
+c.window=c;c.P79VesselVersionView=versionView;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,
  saveSignatures:values=>values,
  download:async({month,rows,filename,company,signatures})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company,signatures})};vm.createContext(c);
-for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
+for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','p79VesselMonthSafetyAudit','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
 c.vesselJobRows=month=>versionView.collapse(c.shipMasters
   .filter(s=>c.shipMasterDateMatchesMonth(s,month))
   .map(c.applyShipManualOverrides)).rows;
@@ -56,6 +56,31 @@ test('exclude 5260196 edit copy without dropping independent CALL2',()=>{
  assert(rows.some(r=>r.workingNo==='5260196-CALL2'));
 });
 c.shipMasters=previousMasters;
+test('automatic monthly validation keeps valid months and refuses invalid totals',()=>{
+ const checked=c.p79VesselMonthSafetyAudit('2026-10',[master]);
+ assert.equal(checked.ok,true);
+ assert.equal(checked.shipCount,1);
+ const wrong=c.p79VesselMonthSafetyAudit('2026-10',[{...master,totalMoves:999}]);
+ assert.equal(wrong.ok,false);
+ assert(wrong.issues.some(x=>x.includes('Moves')));
+ const duplicated=c.p79VesselMonthSafetyAudit('2026-10',[master,master]);
+ assert.equal(duplicated.ok,false);
+ assert(duplicated.issues.some(x=>x.includes('重複')));
+ const version=c.P79VesselVersionView;
+ c.P79VesselVersionView=null;
+ assert.equal(c.p79VesselMonthSafetyAudit('2026-10',[master]).ok,false);
+ c.P79VesselVersionView=version;
+});
+test('automatic monthly validation identifies duplicate edits and preserves CALL2',()=>{
+ const s=[revisionBase,revisionCopy,actualSecondCall];
+ c.shipMasters=s;
+ const shown=c.vesselJobRows('2026-10');
+ const audit=c.p79VesselMonthSafetyAudit('2026-10',shown);
+ assert.equal(audit.ok,true);
+ assert.equal(audit.versionCopies.length,1);
+ assert.equal(audit.shipCount,2);
+ c.shipMasters=previousMasters;
+});
 // Use a minimal SheetJS contract for offline CI; optionally verify the real writer locally.
 c.XLSX={utils:{aoa_to_sheet(rows){const out={};rows.forEach((row,r)=>row.forEach((v,col)=>{out[String.fromCharCode(65+col)+(r+1)]={v,t:typeof v==='number'?'n':'s'};}));return out;},decode_range:s=>s,book_new:()=>({}),book_append_sheet:(wb,ws)=>{wb.sheet=ws;}},writeFile:(wb,name)=>writes.push({wb,name})};
 test('template headers, ROC month, leading-zero serial and subtotal use the selected month',()=>{const ws=c.buildMonthlyOperationSheet('2026-10');assert(ws.A1.v.includes('115年10月份'));assert.equal(ws.B5.v,'0159');assert.equal(ws.K4.v,'Productivity');assert.equal(ws.F6.f,'SUM(F5:F5)');assert.equal(ws.K6.v,'');assert.equal(ws['!ref'],'A1:N6');});
