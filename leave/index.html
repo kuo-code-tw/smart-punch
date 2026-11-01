@@ -1689,6 +1689,10 @@ window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79Reconc
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261030-compact-content-v1"></script>
+
+<!-- Historical month is read-only and never rewrites active-month state. -->
+<script src="../assets/port79-history-month-inline.js?v=20261101"></script>
+<script>window.P79HistoryMonthInline.enhance({type:"leave",selector:"#filterMonth"});</script>
 </body>
 </html>
 
