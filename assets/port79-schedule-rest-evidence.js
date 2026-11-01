@@ -19,9 +19,11 @@ function create(ctx){
   const retained=prior?.token===token&&prior.rosterSignature===rosterSignature&&prior.evidence?.complete===true?prior.evidence:null;
   const state={token,rosterSignature,pending:true,error:'',evidence:retained||{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
   state.promise=(async()=>{try{
-   const batches=await Promise.all(months(month).map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
+   const requestedMonths=months(month);
+   const batches=await Promise.all(requestedMonths.map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
    const records=new Map(),referenceRecords=new Map();
-   let referenceAvailable=batches.every(batch=>Array.isArray(batch.reference));
+   const referenceByMonth=Object.fromEntries(requestedMonths.map((m,i)=>[m,Array.isArray(batches[i].reference)]));
+   let referenceAvailable=referenceByMonth[month]===true;
    const referenceErrors=batches.map(batch=>batch.referenceError||'').filter(Boolean);
    for(const batch of batches){
      for(const r of batch.official){
@@ -29,7 +31,7 @@ function create(ctx){
        const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);records.set(key,r);
      }
      if(Array.isArray(batch.reference))for(const r of batch.reference){
-       if(!Number.isFinite(ctx.timestamp(r))){referenceAvailable=false;continue;}
+       if(!Number.isFinite(ctx.timestamp(r))){referenceByMonth[requestedMonths[batches.indexOf(batch)]]=false;continue;}
        const key=r.id?'ID:'+r.id:JSON.stringify([r.empId,r.attNo,r.timeStr,r.status]);referenceRecords.set(key,r);
      }
    }
@@ -91,7 +93,9 @@ function create(ctx){
    }
    for(const [key,day] of Object.entries(state.evidence.days||{})){
      if(day.state!=='rest')continue;
-     if(referenceEvidence?.days?.[key]?.state==='rest'){
+     // A shift crossing into the next month also needs that month's raw feed.
+     const endMonth=Number.isFinite(day.shiftEnd)?new Date(day.shiftEnd+8*3600000).toISOString().slice(0,7):month;
+     if(referenceAvailable&&referenceByMonth[endMonth]!==false&&referenceEvidence?.days?.[key]?.state==='rest'){
        confirmed[key]=true;
      }else{
        // Do not conflate incomplete cross-source evidence with verified leave.
