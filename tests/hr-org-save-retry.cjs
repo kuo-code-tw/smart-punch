@@ -11,70 +11,84 @@ await test('authentication, validation and network failures are not automaticall
 await test('explicit non-retryable lock-like reply is not retried',async()=>{const x=setup();let calls=0;await assert.rejects(()=>x.c.p79RetryOrgOperation(async()=>{calls++;throw Object.assign(Error('雲端目前正在寫入資料'),{retryable:false})}));assert.equal(calls,1)});
 await test('readback mismatch never shows saved success or closes the draft',async()=>{const x=setup();x.c.p79ReadCanonicalOrgOptions=async()=>{x.c.p79CanonicalOrgOptions={departments:[],jobTitles:[],units:[]};return{}};await x.c.saveOrgSettings();assert(!x.c.orgDialog.closed);assert(x.els.orgSaveStatus.textContent.includes('讀回不一致'));assert.equal(x.els.status.textContent,'')});
 await test('job-title labels are unified while legacy data keys remain readable',()=>{for(const path of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','history-data/index.html','aqc-efficiency/index.html']){const s=fs.readFileSync(path,'utf8');assert(!s.replaceAll("['職務']",'').includes('職務'),path);for(const m of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);}assert(fs.readFileSync('aqc-efficiency/index.html','utf8').includes("e['職務']"));assert(fs.readFileSync('assets/port79-hr-import.js','utf8').includes("['職稱','職務','jobtitle']"))});
-await test('HR superadmin controls five schedule leave types in shared cloud config',async()=>{
- const original={hrOrgOptionsV1:{departments:['A'],jobTitles:['F/L'],units:[]},customFlag:true};
- let current={...original},writes=[];
- const controls=['年','事','病','公','喪'].map(kind=>({checked:false,dataset:{scheduleLeaveKind:kind}}));
- const status={textContent:''},save={disabled:false},panel={scrolled:false,scrollIntoView(){this.scrolled=true}};
- const c={session:{adminRole:'superadmin'},String,Array,JSON,TextEncoder,Error,
-  P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV1',
-  P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
-  $:id=>id==='scheduleLeaveSettingsStatus'?status:id==='scheduleLeaveSettingsSaveBtn'?save:id==='scheduleLeaveSettingsPanel'?panel:id==='status'?{textContent:''}:null,
-  document:{querySelectorAll:()=>controls},
-  alert:msg=>{throw Error(msg)},
-  p79ReadCanonicalOrgOptions:async()=>structuredClone(current),
-  p79RetryOrgSave:async cb=>{const req=await cb();writes.push(req);current=structuredClone(req.config);return{ok:true}}
- };vm.createContext(c);
- for(const n of ['p79HrScheduleLeaveIsSuperAdmin','openScheduleLeaveSettings','saveScheduleLeaveSettings'])vm.runInContext(fn(n),c);
- await c.openScheduleLeaveSettings(true);
- assert.equal(panel.scrolled,true,'toolbar shortcut scrolls to visible checkboxes');
- assert(controls.every(input=>!input.disabled),'superadmin gets editable checkboxes after cloud read');
- assert(controls.every(input=>input.checked),'defaults to five types only for confirmed superadmin');
- for(const input of controls)input.checked=['年','病'].includes(input.dataset.scheduleLeaveKind);
- await c.saveScheduleLeaveSettings();
- assert.equal(writes.length,1);
- assert.equal(writes[0].action,'saveConfig');
- assert.deepEqual(JSON.parse(JSON.stringify(current.hrScheduleLeaveEditV1)),{allowedTypes:['年','病']});
- assert.deepEqual(current.hrOrgOptionsV1,original.hrOrgOptionsV1,'unrelated HR configuration preserved');
- assert.equal(current.customFlag,true);
- c.session={adminRole:'admin'};
- await c.openScheduleLeaveSettings();
- assert(status.textContent.includes('不是超級管理員'),'non superadmin can see read-only notice');
- assert(controls.every(input=>input.disabled),'non superadmin cannot select checkboxes');
- await assert.rejects(()=>c.saveScheduleLeaveSettings(),/只有超級管理員/);
- assert.equal(writes.length,1,'normal manager cannot save');
+await test('leave permission checkboxes are inside editor, not HR homepage',()=>{
+ const editorStart=html.indexOf('<dialog id="editor"');
+ const editorEnd=html.indexOf('</form></dialog>',editorStart);
+ const location=html.indexOf('id="p79EditorLeavePermissionBox"');
+ assert(editorStart>=0&&location>editorStart&&location<editorEnd,'five checkboxes inside editor dialog');
+ assert.equal((html.match(/data-hr-editor-leave="/g)||[]).length,5);
+ assert(html.indexOf('id="p79EditorLeavePermissionBox"')<html.indexOf('id="permGrid"'),'settings beside role and permissions');
+ assert(!html.includes('id="scheduleLeaveSettingsPanel"'),'outside settings removed');
+ assert(!html.includes('id="scheduleLeaveSettingsBtn"'),'outside toolbar removed');
 });
-await test('schedule special leave requires verified cloud policy plus superadmin identity',async()=>{
+await test('employee edit loads per-account rights; only superadmins may check them',async()=>{
+ const controls=['年','事','病','公','喪'].map(hrEditorLeave=>({checked:false,disabled:true,dataset:{hrEditorLeave}}));
+ const status={textContent:''};
+ const modal={open:true};
+ const c={session:{adminRole:'superadmin'},editing:{empId:'EMP01'},editor:modal,
+  p79EditorLeavePermission:{ready:false,empId:'',types:[]},
+  document:{querySelectorAll:()=>controls},
+  $:id=>id==='adminRole'?{value:'superadmin'}:id==='p79EditorLeavePermissionStatus'?status:null,
+  P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
+  P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
+  P79_HR_SCHEDULE_LEAVE_LEGACY_KEY:'hrScheduleLeaveEditV1',
+  p79ReadCanonicalOrgOptions:async()=>({hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年','病'],EMP02:['事']}}}),
+  String,Array,JSON,Error,console};
+ vm.createContext(c);
+ for(const n of ['p79HrScheduleLeaveIsSuperAdmin','p79EditorLeaveRoleAllowed','p79RenderEditorLeavePermission','p79LoadEditorLeavePermission'])vm.runInContext(fn(n),c);
+ await c.p79LoadEditorLeavePermission();
+ assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['年','病']);
+ assert(controls.every(x=>!x.disabled),'superadmin can edit their own employee record');
+ c.editing={empId:'EMP02'};
+ await c.p79LoadEditorLeavePermission();
+ assert.deepEqual(controls.filter(x=>x.checked).map(x=>x.dataset.hrEditorLeave),['事'],'each employee has separate rights');
+ c.session={adminRole:'admin'};c.p79RenderEditorLeavePermission();
+ assert(controls.every(x=>x.disabled&&!x.checked),'ordinary manager is denied');
+});
+await test('employee permission saving merges cloud data without affecting other staff',async()=>{
+ let config={hrOrgOptionsV1:{departments:['D']},customFlag:123,hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年'],EMP02:['公']}}};
+ const c={session:{adminRole:'superadmin'},String,JSON,Array,Error,TextEncoder,
+ P79_HR_SCHEDULE_LEAVE_TYPES:['年','事','病','公','喪'],
+ P79_HR_SCHEDULE_LEAVE_POLICY_KEY:'hrScheduleLeaveEditV2',
+ p79ReadCanonicalOrgOptions:async()=>JSON.parse(JSON.stringify(config)),
+ p79RetryOrgSave:async producer=>{const x=await producer();assert.equal(x.action,'saveConfig');config=x.config;}};
+ vm.createContext(c);
+ for(const n of ['p79HrScheduleLeaveIsSuperAdmin','p79SaveEditorLeavePermission'])vm.runInContext(fn(n),c);
+ await c.p79SaveEditorLeavePermission('EMP01','EMP01',['年','病']);
+ assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP01,['年','病']);
+ assert.deepEqual(config.hrScheduleLeaveEditV2.byEmployee.EMP02,['公'],'another account unaffected');
+ assert.equal(config.customFlag,123);
+ assert.deepEqual(config.hrOrgOptionsV1,{departments:['D']},'HR organization settings unaffected');
+ c.session={adminRole:'admin'};
+ await assert.rejects(()=>c.p79SaveEditorLeavePermission('EMP02','EMP02',['年']),/超級管理員/);
+});
+await test('roster enforces matching superadmin account, per-employee config and read failure',async()=>{
  const source=fs.readFileSync('schedule/index.html','utf8');
- const start=source.indexOf('    const P79_SCHEDULE_LEAVE_POLICY_KEY=');
- const end=source.indexOf('    let p79OvertimeShiftEditBusy=',start);
+ const start=source.indexOf('    const P79_SCHEDULE_LEAVE_POLICY_KEY='),end=source.indexOf('    let p79OvertimeShiftEditBusy=',start);
  assert(start>=0&&end>start);
+ const cache=new Map([['admin_session',JSON.stringify({empId:'EMP01',adminRole:'superadmin'})]]);
+ let serverConfig={hrScheduleLeaveEditV2:{byEmployee:{EMP01:['年','病'],EMP02:['事']}}};
  const c={Date,URL,Promise,AbortController,Error,console,setTimeout,clearTimeout,
-  GAS_URL:'https://example.invalid/exec',
-  currentPort79SsoToken:()=> 'TOKEN',
-  isScheduleSuperAdmin:()=>true,
-  fetch:async()=>({ok:true,json:async()=>({ok:true,config:{hrScheduleLeaveEditV1:{allowedTypes:['年','病']}}})})};
+  GAS_URL:'https://example.invalid/exec',sessionStorage:{getItem:k=>cache.get(k)||''},
+  currentScheduleSession:()=>JSON.parse(cache.get('admin_session')||'{}'),
+  currentPort79SsoToken:()=> 'TOKEN',isScheduleSuperAdmin:()=>true,
+  fetch:async()=>({ok:true,json:async()=>({ok:true,config:serverConfig})})};
  vm.createContext(c);vm.runInContext(source.slice(start,end),c);
- assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'deny until cloud is verified');
- assert.equal(c.p79ScheduleAllowedEditShift('早'),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'denied until cloud confirms account');
  assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
  assert.equal(c.p79ScheduleAllowedEditShift('年'),true);
- assert.equal(c.p79ScheduleAllowedEditShift('病'),true);
- for(const leave of ['事','公','喪'])assert.equal(c.p79ScheduleAllowedEditShift(leave),false);
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),false);
+ cache.set('admin_session',JSON.stringify({empId:'EMP02',adminRole:'superadmin'}));
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'another account cannot inherit EMP01 permissions');
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),true);
+ assert.equal(c.p79ScheduleAllowedEditShift('年'),false);
  c.isScheduleSuperAdmin=()=>false;
- assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'normal manager denied even with enabled shared policy');
- c.isScheduleSuperAdmin=()=>true;c.fetch=async()=>{throw Error('offline')};
- assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false,'read failed');
- assert.equal(c.p79ScheduleAllowedEditShift('年'),false,'offline policy fails closed');
-});
-await test('HR settings are visible directly beneath the status banner',()=>{
- const statusAt=html.indexOf('id="status" class="banner"');
- const panelAt=html.indexOf('id="scheduleLeaveSettingsPanel"');
- const statsAt=html.indexOf('id="stActive"');
- assert(statusAt>=0&&panelAt>statusAt&&panelAt<statsAt,'inline settings are above HR staff stats');
- assert.equal((html.match(/data-schedule-leave-kind="/g)||[]).length,5,'all five leave checkboxes are on main page');
- assert(!html.includes('scheduleLeaveSettingsDialog'),'no hidden modal is required');
- assert(html.includes("void openScheduleLeaveSettings();"),'cloud settings load on HR startup');
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),false);
+ c.isScheduleSuperAdmin=()=>true;
+ c.fetch=async()=>{throw Error('network offline')};
+ assert.equal(await c.p79ScheduleReadHrLeavePolicy(),false);
+ assert.equal(c.p79ScheduleAllowedEditShift('事'),false,'error fails closed');
 });
 await test('HR inline JavaScript parses',()=>{for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1])});
 console.log(JSON.stringify({passed,failed:0}));
