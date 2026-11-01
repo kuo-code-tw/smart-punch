@@ -49,6 +49,8 @@ let writing=false;
 let deltaBusy=false;
 let deltaTimer=null;
 let deltaResetRepairBusy=false;
+let lastDeltaResetRepairAt=0;
+let lastCloudStatusUiSignature='';
 // V5.11：每次頁面生命週期從 0 開始追最新 Delta，避免舊 sessionStorage 游標高於雲端最新序號後永遠收不到事件。
 let lastSeq=0;
 try{sessionStorage.setItem('port79_attendance_v5_delta_seq','0')}catch(e){}
@@ -894,9 +896,11 @@ function mergeDeltaEvent(event){
     if(!id)return false;
     confirmCloudDelete(id);
     if(pendingForId(id))return false;
+    const before=records.length;
     records=records.filter(r=>String(r?.id??'')!==id);
     try{forgetRecentAttendanceMutation?.(id)}catch(e){}
-    return true;
+    // A repeated tombstone is an acknowledgement, not a new UI change.
+    return records.length!==before;
   }
   const rec=event?.record;
   if(!rec)return false;
@@ -929,7 +933,9 @@ function mergeDeltaEvent(event){
     const currentEdit=Date.parse(String(records[idx].manuallyEditedAt||''))||0;
     const incomingEdit=Date.parse(String(nr.manuallyEditedAt||''))||0;
     const staleEdit=currentEdit>incomingEdit;
-    records[idx]=precise||(staleEdit?records[idx]:{...records[idx],...nr});
+    const next=precise||(staleEdit?records[idx]:{...records[idx],...nr});
+    if(JSON.stringify(next)===JSON.stringify(records[idx]))return false;
+    records[idx]=next;
   }
   else records.unshift(nr);
   return true;
@@ -964,7 +970,11 @@ async function pollDelta(force=false){
       if(resetRequired){
         lastSeq=0;
         try{sessionStorage.setItem('port79_attendance_v5_delta_seq','0')}catch(e){}
-        if(!deltaResetRepairBusy){
+        // Some GAS versions repeat resetRequired on every poll. Repair once per
+        // ten minutes, while still processing fresh Delta events normally.
+        const now=Date.now();
+        if(!deltaResetRepairBusy && now-lastDeltaResetRepairAt>=600000){
+          lastDeltaResetRepairAt=now;
           deltaResetRepairBusy=true;
           setTimeout(async()=>{
             try{
@@ -1072,10 +1082,16 @@ function updateUi(){
     lastStatusUiSignature=signature;
   }
 
-  // 頁首狀態也顯示真實進度，不再只寫「待命」。
+  // Status-only timers should never force the header to rerender unchanged.
+  // Keep the timeout transition observable even without a data change.
+  const opState=window.p79AttendanceOperationState||{};
+  const readTimeout=opState.busy===true&&opState.mode==='read'&&
+    Date.now()-Number(opState.updatedAt||0)>=90000;
+  const cloudSignature=[signature,opState.mode,opState.busy,opState.updatedAt,readTimeout].join('|');
+  if(cloudSignature===lastCloudStatusUiSignature)return;
+  lastCloudStatusUiSignature=cloudSignature;
   try{
     if(typeof setCloudSyncStatus==='function'){
-      const opState = window.p79AttendanceOperationState || {};
       const readBusy = opState.busy === true && opState.mode === 'read';
       const readTimedOut = readBusy && (Date.now() - Number(opState.updatedAt || 0) >= 90000);
       // 讀取逾時不可永久佔住「更新中」，失敗也不能顯示假成功。
@@ -1335,13 +1351,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   updateUi();
   startDelta();
   drain(false);
-  setInterval(()=>{if(document.visibilityState==='visible')updateUi();},3000);
+  setInterval(()=>{if(document.visibilityState==='visible')updateUi();},15000);
 },{once:true});
 window.addEventListener('online',()=>{drain(true);pollDelta(true)});
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){drain(false);pollDelta(true)}
 });
-setInterval(()=>{if(!writing)drain(false)},5000);
+setInterval(()=>{if(!writing&&readQueue().some(x=>!x.paused))drain(false)},5000);
 
 
 // ----- V5.4 HARD BRIDGE -----
