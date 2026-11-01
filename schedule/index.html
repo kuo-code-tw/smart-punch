@@ -4634,7 +4634,7 @@ function p79EmployeeDateEligible(emp,date) {
           const recorded=schedules.map(row=>map.get(String(row.empId||'').toUpperCase()));
           if(recorded.every(Boolean)&&
              p79ScheduleRowsSignature(recorded,month)===expected)
-            return true;
+            return serverRows;
           lastError='雲端讀回的班別、組別或人工註記與送出的資料不一致';
         }catch(error){lastError=String(error?.message||error);}
         if(attempt<3)await new Promise(resolve=>setTimeout(resolve,[700,1200,1800][attempt]));
@@ -4745,10 +4745,10 @@ function p79EmployeeDateEligible(emp,date) {
             console.warn('排班雲端忙碌，等待後重試存檔',attempt+2);
           }
         }
-        await p79ScheduleVerifyAfterWrite(yearMonth,schedules);
-        // Confirmed rows become the next concurrency baseline. Without this,
-        // a legitimate second edit would compare against the previous version.
-        p79ScheduleCloudRows=JSON.parse(JSON.stringify(schedules));
+        const savedCloudRows=await p79ScheduleVerifyAfterWrite(yearMonth,schedules);
+        // Keep the FULL confirmed server snapshot, including server-retained
+        // hidden staff, as the baseline for the next save.
+        p79ScheduleCloudRows=JSON.parse(JSON.stringify(savedCloudRows));
         saveAllDataToLocalStorage();
         p79MarkScheduleCloudWriteConfirmed(snapshotVersion);
         // Notify other open systems only after GAS confirmed this month's schedule save.
