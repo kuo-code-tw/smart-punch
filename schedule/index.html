@@ -6146,8 +6146,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
       let quickAssignPanelHtml = '';
       if (activeGroupFilter !== 'ALL') {
-        const unassignedEmps = employees.filter(e => e.group !== activeGroupFilter && scheduleEmployeeEligibleForMonth(e,yearMonth));
+        // 只調整「快速指派加入組別」下拉名單的顯示順序：
+        // 先按單位筆畫、再按姓名筆畫，不改人員組別、雲端班表或手動拖曳的排序。
+        const quickAssignStroke = new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
+        const unassignedEmps = employees.filter(e => e.group !== activeGroupFilter && scheduleEmployeeEligibleForMonth(e,yearMonth))
+          .sort((a,b)=>quickAssignStroke.compare(String(a.role||''),String(b.role||''))
+            ||quickAssignStroke.compare(String(a.name||''),String(b.name||''))
+            ||String(a.id||'').localeCompare(String(b.id||''),'zh-TW',{numeric:true}));
         let optionsHtml = `<option value="">-- 請選擇要加入【${activeGroupFilter}】的同仁 --</option>`;
+
         unassignedEmps.forEach(uEmp => {
           optionsHtml += `<option value="${scheduleEscapeHtml(uEmp.id)}">[${scheduleEscapeHtml(uEmp.role)}｜${scheduleEscapeHtml(uEmp.group||'不分組')}] ${scheduleEscapeHtml(uEmp.name)} (${scheduleEscapeHtml(uEmp.id)})</option>`;
         });
