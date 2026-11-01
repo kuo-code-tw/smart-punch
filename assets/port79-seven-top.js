@@ -93,10 +93,13 @@ const META={
  history:['🗄️','歷史資料管理','考勤・排班・船舶歷史查詢']
 };
 const NAV=[
- ['attendance','🕒','考勤管理','../attendance/'],['leave','📝','請假管理','../leave/'],
- ['workhours','📊','加班管理','../work-hours/'],['schedule','📅','排班管理','../schedule/'],
- ['efficiency','🚢','船舶管理','../aqc-efficiency/'],['hr','👥','人資管理','../hr/'],
- ['history','🗄️','歷史資料管理','../history-data/']
+ ['attendance','🕒','考勤管理','../attendance/'],
+ ['schedule','📅','排班管理','../schedule/'],
+ ['efficiency','🚢','船舶作業管理','../aqc-efficiency/'],
+ ['hr','👥','人資管理','../hr/'],
+ ['workhours','📊','工時與加班管理','../work-hours/'],
+ ['leave','📝','請假管理','../leave/'],
+ ['history','🗄️','歷史資料庫','../history-data/']
 ];
 const SYSTEMS=[['attendance','考勤管理'],['workhours','加班管理'],['leave','請假管理'],['schedule','排班管理'],['efficiency','船舶管理'],['hr','人資管理'],['history','歷史資料管理']];
 let statusBusy=false,statusTimer=null,lastSignature='';
