@@ -1587,6 +1587,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                             <select id="recordStatusFilter" onchange="onRecordDataScopeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                                 <option value="ALL">全部狀態</option>
                                 <option value="ABNORMAL">異常</option>
+                                <option value="PENDING">待確認</option>
                                 <option value="NORMAL">正常</option>
                             </select>
                         </div>
@@ -10517,13 +10518,56 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         function onRecordDateChange(changedSide='') {const from=document.getElementById('recordDateFilter'),to=document.getElementById('recordDateEndFilter');if(from&&to&&from.value&&to.value&&from.value>to.value){if(changedSide==='end')from.value=to.value;else to.value=from.value;}updateRecordDateRangeSummary();if(from?.value||to?.value){const monthSelect=document.getElementById('filterMonthSelect');if(monthSelect){monthSelect.value='ALL';renderAttendanceMonthTabs([...monthSelect.options].map(option=>option.value),'ALL');}}recordsCurrentPage=1;initDropdowns();renderAdminRecordsTable();}
         function clearRecordDateFilter(){const a=document.getElementById('recordDateFilter'),b=document.getElementById('recordDateEndFilter');if(a)a.value='';if(b)b.value='';updateRecordDateRangeSummary();recordsCurrentPage=1;initDropdowns();renderAdminRecordsTable();}
 
+
+        // Work-hours attendance list uses the same display-only V6 pairing as
+        // attendance management; never change the source punches or accounting.
+        function p79WorkhoursDisplayPairingRows(sourceRecords) {
+            const people=Array.isArray(employees)?employees:[];
+            const byId=new Map(people.filter(e=>e.empId).map(e=>[String(e.empId).trim().toUpperCase(),e]));
+            const norm=v=>String(v??'').trim().replace(/^0+/,'')||String(v??'').trim();
+            const byAtt=new Map();
+            people.forEach(emp=>{const key=norm(emp.attNo);if(!key)return;if(!byAtt.has(key))byAtt.set(key,[]);byAtt.get(key).push(emp);});
+            return (Array.isArray(sourceRecords)?sourceRecords:[]).map((r,index)=>{
+                if(!r)return r;
+                const id=String(r.empId||'').trim().toUpperCase(),att=norm(r.attNo);
+                const byEmployeeId=byId.get(id)||null,byAttendance=byAtt.get(att)||[];
+                if(byAttendance.length>1||(byEmployeeId&&byAttendance.length===1&&byEmployeeId!==byAttendance[0]))
+                    return {...r,__p79PairIdentity:'CONFLICT:'+index};
+                const master=byEmployeeId||(byAttendance.length===1?byAttendance[0]:null);
+                return master?{...r,empId:master.empId||r.empId,attNo:master.attNo??r.attNo,name:master.name||r.name}:r;
+            });
+        }
+        function p79WorkhoursAssessAttendanceRow(row,now=Date.now()) {
+            const input=!!row.clockIn,output=!!row.clockOut;
+            if((row.records||[]).some(r=>r.__p79PairIdentity))return {...row,attendanceAssessment:'ABNORMAL',attendanceStatus:'員工身分待核對'};
+            if(row.timePrecisionIssue)return {...row,attendanceAssessment:'ABNORMAL',attendanceStatus:'原始打卡時間不完整'};
+            const time=record=>{const str=String(record?.timeStr||'').replaceAll('/','-').replace(' ','T');const n=Date.parse(str);return Number.isFinite(n)?n:NaN;};
+            if(input&&output){
+                const a=time(row.clockIn),b=time(row.clockOut);
+                const valid=Number.isFinite(a)&&Number.isFinite(b)&&b>a&&b-a<=24*3600000;
+                return {...row,attendanceAssessment:valid?'NORMAL':'ABNORMAL',attendanceStatus:valid?'正常':'班次時間異常'};
+            }
+            const a=input?time(row.clockIn):NaN;
+            if(input&&!output&&Number.isFinite(a)&&now>=a&&now-a<24*3600000)
+                return {...row,attendanceAssessment:'PENDING',attendanceStatus:'待簽退'};
+            return {...row,attendanceAssessment:'ABNORMAL',attendanceStatus:input?'缺少簽退':output?'缺少簽到':'缺少上下班'};
+        }
+        function p79WorkhoursListAttendanceShifts(records) {
+            const source=p79WorkhoursDisplayPairingRows(records);
+            const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
+            return build(source).map(row=>p79WorkhoursAssessAttendanceRow(row));
+        }
+        function p79WorkhoursFilterAttendanceRows(rows,filter) {
+            return filter==='ALL'?rows:rows.filter(row=>row.attendanceAssessment===filter);
+        }
+
         function getAttendanceRecordFilterRows() {
             const monthFilter = document.getElementById('filterMonthSelect')?.value || 'ALL';
             const dateFrom = normalizeRecordFilterDate(document.getElementById('recordDateFilter')?.value || '');
             const dateTo = normalizeRecordFilterDate(document.getElementById('recordDateEndFilter')?.value || '');
             const statusFilter = document.getElementById('recordStatusFilter')?.value || 'ALL';
 
-            let rows = buildDailyAttendanceRows(records.filter(canCurrentAdminViewDataRow));
+            let rows = p79WorkhoursListAttendanceShifts(records.filter(canCurrentAdminViewDataRow));
 
             if (dateFrom || dateTo) {
                 rows = rows.filter(row => {const d=attendanceRowDateIso(row);return !!d&&(!dateFrom||d>=dateFrom)&&(!dateTo||d<=dateTo);});
@@ -10531,9 +10575,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 rows = rows.filter(row => attendanceRowAccountingMonthKey(row) === monthFilter);
             }
 
-            if (statusFilter === 'NORMAL') rows = rows.filter(row => row.attendanceStatus === '正常');
-            if (statusFilter === 'ABNORMAL') rows = rows.filter(row => row.attendanceStatus !== '正常');
-            return rows;
+            return p79WorkhoursFilterAttendanceRows(rows,statusFilter);
         }
 
         function initDropdowns() {
@@ -11846,6 +11888,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
 
         function getAttendanceStatusBadge(status) {
+            if (status === '員工身分待核對' || status === '原始打卡時間不完整' || status === '班次時間異常')
+                return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-rose-100 text-rose-700 font-bold">'+escapeHtml(status)+'</span>';
+            if (status === '待簽退')
+                return '<span class="px-2.5 py-1 rounded-lg text-[10px] bg-sky-100 text-sky-800 font-bold">待簽退</span>';
             if (status === '正常') {
                 return `<span class="px-2.5 py-1 rounded-lg text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">正常</span>`;
             }
@@ -11951,7 +11997,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
 
             // 同一員工、同一天的上班與下班紀錄合併為一列。
-            let dailyRows = buildDailyAttendanceRows(filtered);
+            let dailyRows = p79WorkhoursListAttendanceShifts(filtered);
             // 先完成跨日／跨月班次配對。
             // 指定日期與月份都以「上班簽到日」歸屬；跨月下班仍留在原上班日。
             if (dateFrom || dateTo) {
@@ -11959,8 +12005,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             } else if (monthFilter !== 'ALL') {
                 dailyRows = dailyRows.filter(row => attendanceRowAccountingMonthKey(row) === monthFilter);
             }
-            if (statusFilter === 'NORMAL') dailyRows = dailyRows.filter(row => row.attendanceStatus === '正常');
-            if (statusFilter === 'ABNORMAL') dailyRows = dailyRows.filter(row => row.attendanceStatus !== '正常');
+            dailyRows = p79WorkhoursFilterAttendanceRows(dailyRows,statusFilter);
             dailyRows.sort((a, b) => b.sortTime - a.sortTime);
 
             const paginationSignature = [deptFilter, jobTitleFilter, nameFilter, statusFilter, monthFilter, dateFrom, dateTo, currentEmp?.empId || ''].join('|');
