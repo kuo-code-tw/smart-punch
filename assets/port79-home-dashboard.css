@@ -60,18 +60,7 @@ html body.p79-workspace #systems:has(#p79HomeDashboard) .p79-modern-home-intro p
 html body.p79-workspace:has(#p79HomeDashboard) .p79-modern-home-eyebrow{display:none}
 html body.p79-workspace #systems:has(#p79HomeDashboard)>:is(.p79-modern-section-heading,.p79-modern-search-row,.system-grid,.p79-modern-home-preserve,.p79-workspace-hero){display:none!important}
 html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav{display:flex!important;flex-direction:column;gap:3px}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a{min-height:45px!important;padding-block:10px!important;order:20}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[data-p79-workspace-home]{order:0}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[data-p79-alias="integration"]{order:1}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="attendance/"]{order:2}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="aqc-efficiency/"]:not([data-p79-alias]){order:3}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="schedule/"]{order:4}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="hr/"]:not([data-p79-alias]){order:5}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="work-hours/"]{order:6}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[data-p79-alias="reports"]{order:7}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="history-data/"]{order:8}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[data-p79-alias="settings"]{order:9}
-html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a[href*="leave/"]{display:none!important}
+html body.p79-workspace:has(#p79HomeDashboard) #p79SevenNav a{min-height:45px!important;padding-block:10px!important}
 #p79HomeDashboard .p79-dash-toolbar{margin:0 0 6px;justify-content:flex-end;min-height:15px}
 #p79HomeDashboard .p79-dash-toolbar strong{display:none}
 #p79HomeDashboard .p79-dash-toolbar span{font-size:10px}
