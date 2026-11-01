@@ -33,7 +33,7 @@ assert.equal(get.day({id:'E1'},'2026-10-01',ctx).visibleCode,'早','October firs
 assert.equal(get.day({id:'E1'},'2026-10-30',ctx).visibleCode,'晚','October thirtieth must retain the saved night shift');
 assert.equal(original.E1['2026-10-01'],'早');
 assert.equal(original.E1['2026-10-30'],'晚');
-assert(html.includes('function p79QueueScheduleNoPunchReconcile(yearMonth){\\n      // EMERGENCY HOLD'),'background autosave hold is mandatory');
-assert(html.includes('function p79ApplyAutomaticRestMetadata() {\\n      // EMERGENCY HOLD'),'implicit quota assignment must be stopped');
+assert(html.includes('function p79QueueScheduleNoPunchReconcile(yearMonth){\n      // EMERGENCY HOLD'),'background autosave hold is mandatory');
+assert(html.includes('function p79ApplyAutomaticRestMetadata() {\n      // EMERGENCY HOLD'),'implicit quota assignment must be stopped');
 assert(html.includes("if(yearMonth==='2026-10'){"),'October full-month save guard is mandatory');
 console.log('PASS emergency: no mass rest, preserve cloud early/night shifts, stop auto overwrite and October bulk save');
