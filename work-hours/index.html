@@ -10,7 +10,7 @@
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261101-existing-reports-v1&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -16897,7 +16897,7 @@ window.p79MonthlyRestContext={
  canReport:p79CanReportOvertime,employees:()=>p79WorkhoursEligibleEmployees(),employmentStart:p79EmploymentStartDate,
  month:()=>{const m=document.getElementById('overtimeMonthFilter')?.value;return /^\d{4}-\d{2}$/.test(m)?m:'';},
  saveReport:p79SaveWorkOvertimeDraft,refresh:()=>{p79OvertimeCalculationCache=null;renderOvertimeStats();},
- snapshot:async function(month,rosterOnly=false,reportView=false,forceFresh=false){
+ snapshot:async function(month,rosterOnly=false,reportView=false,forceFresh=false,archiveReadOnly=false){
   const token=currentPort79SsoToken();if(!token||!(reportView?p79CanExportOvertimeApplication():p79CanReportOvertime()))throw Error('沒有操作權限');
   const read=async (action,readMonth=month)=>{
    const url=new URL(getActiveGasUrl());url.searchParams.set('action',action);url.searchParams.set('month',readMonth);url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('_',Date.now());
@@ -16918,7 +16918,20 @@ window.p79MonthlyRestContext={
     return data;
    }finally{clearTimeout(timer)}
   };
-  const readRoster=()=>read('getScheduleDataSecure');
+  const readRoster=async()=>{
+   const formal=await read('getScheduleDataSecure');
+   // Historical backup is for display only; payroll/export/write paths remain formal.
+   if(!(archiveReadOnly===true&&month==='2026-10'&&!rosterOnly&&!reportView&&
+     Array.isArray(formal.schedules)&&formal.schedules.length===0))return formal;
+   const backup=await read('historyGetProvisionalScheduleMonth');
+   if(backup?.ok!==true||backup.provisional!==true||backup.month!==month||
+     !Array.isArray(backup.schedules)||backup.schedules.length===0||
+     backup.schedules.some(r=>r.month!==month||!r.empId||!r.schedule||
+       typeof r.schedule!=='object'||Array.isArray(r.schedule)))
+     throw Error('10月正式申報未讀到，歷史備援也無法核對；不能判定沒有申報');
+   return {...formal,schedules:backup.schedules,provisional:true,
+     archiveStatus:backup.archiveStatus||'10/28備援，未核對月底異動'};
+  };
   const needAttendance=!rosterOnly||reportView;
   const months=p79WorkRestMonths(month);
   const shared=!forceFresh&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
@@ -16933,7 +16946,7 @@ window.p79MonthlyRestContext={
   p79OvertimeCalculationCache=null;
 
   const leaveDates=p79WorkRestLeaveDates(month,roster,employees);
-  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,saveContext:needAttendance?{token,month,ready:roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
+  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,provisional:roster.provisional===true,archiveStatus:roster.archiveStatus||'',saveContext:needAttendance?{token,month,ready:roster.provisional!==true&&roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
 </script>
