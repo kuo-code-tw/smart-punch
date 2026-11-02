@@ -37,7 +37,9 @@ async function save(draft){
  const roster=cloud.schedules?.find(r=>id(r.empId)===id(draft.empId))?.schedule||{};
  const previous=roster.__meta?.[draft.date]?.overtimeReport;
  if(previous?.id===draft.id&&previous.category===draft.rule.category&&previous.code===draft.rule.code)return {ok:true,directOvertimeSaved:true,id:draft.id,report:previous};
- const pairs=buildDailyAttendanceRows((cloud.records||[]).filter(r=>id(r.empId)===id(draft.empId))).filter(r=>r.clockIn&&r.clockOut).map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)})).filter(p=>P79Overtime.overtimeMinutes(p.start,p.end,draft.date,{overtimeReport:draft.rule})>0);
+ const officialRows=buildDailyAttendanceRows((cloud.records||[]).filter(r=>id(r.empId)===id(draft.empId)));
+ if(officialRows.some(row=>row.overlapIssue && String(row.accountingDateKey||row.dateKey||'').replaceAll('/','-')===draft.date))throw Error('同一工作日有重疊出勤班次，已停止加班申報；請先核對完整原始打卡');
+ const pairs=officialRows.filter(r=>r.clockIn&&r.clockOut).map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)})).filter(p=>P79Overtime.overtimeMinutes(p.start,p.end,draft.date,{overtimeReport:draft.rule})>0);
  if(pairs.length!==1)throw Error(pairs.length?'有多組出勤配對，請先核對考勤':'尚無包含所選時段的完整出勤，請先核對考勤');
  const pair=pairs[0];if(pair.row.pairingIssue||pair.end-pair.start>18*3600000)throw Error('出勤配對待核對，未送出申報');
  const issue=P79Overtime.ruleAttendanceIssue(pair.start,pair.end,draft.date,ruleRow(draft.rule),roster);if(issue)throw Error(issue);
@@ -67,6 +69,7 @@ function p79OfficialOvertimePair(cloud,empId,date,visible,roster,saved){
    const local=new Date(p.start+8*3600000),day=local.toISOString().slice(0,10);
    return day===date||(day===next&&local.getUTCHours()<8);
   });
+ if(sessions.some(p=>p.row.overlapIssue))throw Error('正式考勤有同人重疊班次，請先核對，不可依其中一筆直接申報加班');
  const inId=String(visible?.clockIn?.id||'').trim(),outId=String(visible?.clockOut?.id||'').trim();
  const same=sessions.filter(p=>(inId&&String(p.row.clockIn.id||'').trim()===inId)||
                               (outId&&String(p.row.clockOut.id||'').trim()===outId));
@@ -90,6 +93,7 @@ function p79OfficialOvertimePair(cloud,empId,date,visible,roster,saved){
 async function open({row,employee,date}){
  if(opening)return;opening=true;
  try{
+  if(row?.overlapIssue)throw Error('此員工有同時段重疊班次，請先核對原始考勤再申報加班');
   if(!p79CanReportOvertime())throw Error('沒有加班申報權限');
   g.p79OvertimeContext=context();
   const loading=P79Overtime.showReportLoading();
