@@ -2468,7 +2468,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.23.110';
+        const APP_VERSION='2026.11.02.111';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -2983,7 +2983,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
             }
         }
 
-        const PRIMARY_IN_RANGE_LOCATION_LABEL = '高雄港萬海79號碼頭';
+        // Legacy GPS labels are display aliases, never the authoritative location name.
+        const LEGACY_PRIMARY_LOCATION_NAMES = ['79號碼頭', '高雄港萬海79號碼頭', '高雄港高海79號碼頭'];
         let updateCheckInProgress = false;
 
         async function checkForAppUpdate() {
@@ -3053,7 +3054,13 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         };
 
         function normalizeExtraLocations(list) {
-            const source = Array.isArray(list) ? list.slice(0, 5) : [];
+            // Some older cloud deployments serialize the five locations as JSON text.
+            // Treat invalid input as empty, never as an unlocked GPS geofence.
+            let candidate = list;
+            if (typeof candidate === 'string') {
+                try { candidate = JSON.parse(candidate); } catch (error) { candidate = []; }
+            }
+            const source = Array.isArray(candidate) ? candidate.slice(0, 5) : [];
             return Array.from({ length: 5 }, (_, index) => {
                 const item = source[index] || {};
                 const name = String(item.name || '').trim();
@@ -3102,14 +3109,24 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         async function refreshPunchLocationConfig() {
             if(p79LocationConfigReadPromise)return p79LocationConfigReadPromise;
             p79LocationConfigReadPromise=(async()=>{
-                const url=getActiveGasUrl(),token=currentPort79SsoToken();
-                if(!url||!token)throw Error('登入驗證資料不存在，無法核對最新定位設定');
-                const data=await fetchGasJsonWithRetry(url+(url.includes('?')?'&':'?')+'action=getData&token='+encodeURIComponent(token)+'&gcToken='+encodeURIComponent(token)+'&t='+Date.now(),'定位設定同步',1,15000);
+                // getData is also the authoritative endpoint used by loadCloudData,
+                // which intentionally reads without a management-only token.
+                // Employee punch mode must not require a manager token merely
+                // to learn the officially permitted additional GPS locations.
+                const url=getActiveGasUrl();
+                if(!url)throw Error('尚未設定正式雲端網址，無法核對打卡地點');
+                const data=await fetchGasJsonWithRetry(url+(url.includes('?')?'&':'?')+'action=getData&t='+Date.now(),'定位設定同步',2,15000);
                 if(data?.ok!==true||!data.config||!Object.prototype.hasOwnProperty.call(data.config,'lat')||!Object.prototype.hasOwnProperty.call(data.config,'lng'))throw Error(data?.error||'雲端未回傳完整定位設定');
                 const config=data.config,lat=Number(config.lat),lng=Number(config.lng),radius=Number(config.radius);
                 if(!Number.isFinite(lat)||Math.abs(lat)>90||!Number.isFinite(lng)||Math.abs(lng)>180||!(radius>0))throw Error('雲端主要定位設定無效');
+                if (config.extraLocations != null && !Array.isArray(config.extraLocations) && typeof config.extraLocations !== 'string')
+                    throw Error('雲端額外定位設定格式無效');
                 const extras=normalizeExtraLocations(config.extraLocations);
                 if(extras.some(location=>location.name&&(!Number.isFinite(location.lat)||Math.abs(location.lat)>90||!Number.isFinite(location.lng)||Math.abs(location.lng)>180)))throw Error('雲端額外定位設定無效');
+                // Never silently erase locally configured sites because an
+                // outdated GAS deployment omitted the extraLocations field.
+                if (config.extraLocations == null && normalizeExtraLocations(sysConfig.extraLocations).some(item => item.name))
+                    throw Error('雲端尚未提供額外打卡地點資料，請管理員檢查 GPS 設定是否已成功同步');
                 Object.assign(sysConfig,{locationName:String(config.locationName||sysConfig.locationName),lat,lng,radius,extraLocations:extras});
                 try{saveConfig();}catch(error){console.warn('最新定位已載入，本機快取未更新',error);}
                 return true;
@@ -3119,12 +3136,16 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 
         function formatAttendanceLocationDisplay(value) {
             const raw = String(value || '').trim();
-            if (!raw || raw === PRIMARY_IN_RANGE_LOCATION_LABEL) return raw;
-            if (!raw.includes('(範圍內)')) return raw;
-            const locationName = raw.split('/')[0].trim();
-            const configuredPrimaryName = String(sysConfig?.locationName || '').trim();
-            if ([configuredPrimaryName, '79號碼頭', PRIMARY_IN_RANGE_LOCATION_LABEL].filter(Boolean).includes(locationName)) {
-                return PRIMARY_IN_RANGE_LOCATION_LABEL;
+            if (!raw) return '';
+            const configuredPrimaryName = String(sysConfig?.locationName || defaultConfig.locationName || '79號碼頭').trim();
+            // Historical records keep their original raw location in storage.
+            // Only known primary GPS names (and the former within-range text)
+            // follow the latest primary setting in tables, confirmations,
+            // reports and existing company-compatible Excel exports.
+            const base = raw.includes('(範圍內)') ? raw.split('/')[0].trim() : raw;
+            if ([...LEGACY_PRIMARY_LOCATION_NAMES, configuredPrimaryName].includes(base) &&
+                (base === raw || raw.includes('(範圍內)'))) {
+                return configuredPrimaryName;
             }
             return raw;
         }
@@ -8473,7 +8494,19 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const result=await postToCloud({action:'syncConfig',config:draft},'');
                 if(result?.ok!==true||result.localOnly)throw new Error(result?.error||'雲端尚未確認儲存；請保留欄位並重試');
                 if(result.config&&JSON.stringify(normalizeExtraLocations(result.config.extraLocations))!==JSON.stringify(draft.extraLocations))throw new Error('雲端回覆的定位設定不一致，尚未確認儲存');
+                // Check what staff phones will actually read, not only the
+                // acknowledgement from syncConfig (which older GAS versions
+                // can send without retaining the extraLocations field).
+                await refreshPunchLocationConfig();
+                const samePrimary = String(sysConfig.locationName || '').trim() === draft.locationName &&
+                    Number(sysConfig.lat) === draft.lat && Number(sysConfig.lng) === draft.lng &&
+                    Number(sysConfig.radius) === draft.radius;
+                const sameExtras = JSON.stringify(normalizeExtraLocations(sysConfig.extraLocations)) ===
+                    JSON.stringify(normalizeExtraLocations(draft.extraLocations));
+                if (!samePrimary || !sameExtras)
+                    throw new Error('雲端讀回的地點與剛才儲存的設定不同，尚未確認同步；請檢查正式 GAS 版本');
                 applySysConfigUI();
+                renderAdminRecordsTable();
                 p79SettingsSaveFeedback('✅ 定位與系統設定已由雲端確認儲存');
                 showToast('定位與系統設定已儲存','success');
                 closeSystemSettings(true);
@@ -11024,7 +11057,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const completeLocationCheck=async(success,distance,location,cloudChecked=false)=>{
                 if(!success||!location){releasePunchGuard();return;}
                 if(distance<=location.radius){
-                    execPunch(statusText,location.primary?PRIMARY_IN_RANGE_LOCATION_LABEL:location.name);
+                    execPunch(statusText,location.name);
                     return;
                 }
                 if(!cloudChecked){
