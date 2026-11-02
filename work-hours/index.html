@@ -13508,6 +13508,10 @@ async function p79ExportOvertimeComparison(printMode){
             P79Overtime.openReport({empId:row.empId,date,roster,savedReport:editExisting,reportId:editExisting?row.overtimeReport?.id||'':'',lockOriginal:editExisting,note:row.overtimeReport?.note||'',attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:amendment?.code||row.overtimeReport?.code||inferred?.[1]||'',category:amendment?.category||row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!amendment&&!row.overtimeReport&&!inferred});
         }
         function p79OvertimeAttendanceIssue(session,start,end) {
+            // Do not estimate/pay two intervals for the same person while their
+            // completed punches overlap. Existing official reports remain intact
+            // and visible for explicit reconciliation, not silently rewritten.
+            if(session?.overlapIssue)return '同人完整出勤班次重疊待核（'+Number(session.overlapMinutes||0)+' 分鐘），請核對原始上下班與人工補刷';
             if(session?.pairingIssue)return '班次配對待核對';
             const complete=r=>/\s\d{1,2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(String(r?.timeStr||'').replace('T',' ').trim());
             if(!complete(session?.clockIn)||!complete(session?.clockOut))return '打卡時間不完整';
