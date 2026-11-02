@@ -22384,37 +22384,6 @@ function p79EmployeeDateEligible(emp,date) {
             });
             return selected;
         }
-        // One Excel data row represents one selected work shift, never a raw
-        // IN/OUT event. Cross-midnight selection uses the accounting workday.
-        function p79SelectAttendanceExportSessions(sessions,month,start=month+"-01",end=month+"-31") {
-            return (Array.isArray(sessions)?sessions:[]).filter(shift=>{
-                const day=String(shift?.accountingDateKey||shift?.dateKey||'').replaceAll('/','-');
-                return day.slice(0,7)===month&&day>=start&&day<=end;
-            });
-        }
-        function p79AttendanceExportColumns(selectedFields) {
-            return selectedFields.flatMap(field=>field.key==='time'
-                ?[{key:'clockInTime',label:'簽到時間'},{key:'clockOutTime',label:'簽退時間'}]
-                :[field.key==='status'?{...field,label:'出勤狀態'}:field]);
-        }
-        function p79AttendanceExportSessionValues(session,fields,employee) {
-            const r=session.clockIn||session.clockOut||{};
-            return fields.map(field=>{
-                switch(field.key){
-                    case 'clockInTime':return session.clockIn?formatDateTime(session.clockIn.timeStr)||'':'';
-                    case 'clockOutTime':return session.clockOut?formatDateTime(session.clockOut.timeStr)||'':'';
-                    case 'attNo':return employee?.attNo??r.attNo??'';
-                    case 'empId':return employee?.empId||r.empId||session.empId||'';
-                    case 'name':return employee?.name||r.name||session.name||'';
-                    case 'dept':return employee?.dept||r.dept||session.dept||'';
-                    case 'jobTitle':return employee?.jobTitle||employee?.deptDetail||session.jobTitle||'';
-                    case 'status':return session.overlapIssue||session.pairingIssue?'班次重疊待核':session.attendanceStatus||'';
-                    case 'location':return formatAttendanceLocationDisplay(session.locationText||r.location)||'';
-                    case 'note':return session.noteText||[session.clockIn?.note,session.clockOut?.note].filter(Boolean).join(' / ');
-                    default:return '';
-                }
-            });
-        }
         async function p79ReadAttendanceExportScope(month,options={}) {
             const current=getTodayAttendanceIso().slice(0,7),previous=shiftAttendanceMonthKey(month,-1),next=shiftAttendanceMonthKey(month,1);
             const read=key=>p79ReadAttendanceExportMonth(key,options);
@@ -22694,30 +22663,31 @@ function p79EmployeeDateEligible(emp,date) {
                     const company = recordEmpId.match(/^([A-Z]+)/)?.[1] || '';
                     return company === companyFilter;
                 });
-            const exportSessions=p79SelectAttendanceExportSessions(
-                exportScope.shifts||(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(exportScope.source),
-                exportMonth,start,end);
-            const visibleSessions=exportSessions.filter(shift=>{
-                const punches=[shift.clockIn,shift.clockOut].filter(Boolean);
-                if(!punches.length||!punches.every(canCurrentAdminViewDataRow))return false;
-                if(companyFilter==='ALL')return true;
-                const matchedEmployee=findEmployeeForAttendanceIdentity(shift,identityPool);
-                const employeeId=String(shift.empId||matchedEmployee?.empId||punches[0].empId||'').trim().toUpperCase();
-                return (employeeId.match(/^([A-Z]+)/)?.[1]||'')===companyFilter;
-            });
-            if (visibleSessions.length === 0 && !includeSchedule) {
+            if (visibleRecords.length === 0 && !includeSchedule) {
                 showToast(`${exportMonth} 沒有${companyFilter === 'ALL' ? '' : companyFilter + ' 工號的'}考勤紀錄可供匯出`, "warning");
                 return;
             }
             if (!ensureExcelLibrary()) throw Error('試算表 元件尚未就緒');
-            const exportColumns=p79AttendanceExportColumns(selectedFields);
-            const sheetRows=[exportColumns.map(field=>field.label)];
-            visibleSessions.forEach(session=>{
-                const currentEmployee=findEmployeeForAttendanceIdentity(session,identityPool);
-                sheetRows.push(p79AttendanceExportSessionValues(session,exportColumns,currentEmployee));
+            const sheetRows = [selectedFields.map(f => f.label)];
+            visibleRecords.forEach(r => {
+                const currentEmployee = findEmployeeForAttendanceIdentity(r, identityPool);
+                const rowData = selectedFields.map(f => {
+                    let val = "";
+                    if (f.key === 'attNo') val = currentEmployee?.attNo ?? r.attNo ?? '';
+                    if (f.key === 'empId') val = currentEmployee?.empId || r.empId || '';
+                    if (f.key === 'name') val = currentEmployee?.name || r.name || '';
+                    if (f.key === 'dept') val = currentEmployee?.dept || r.dept || '';
+                    if (f.key === 'jobTitle') val = currentEmployee?.jobTitle || currentEmployee?.deptDetail || '';
+                    if (f.key === 'time') val = formatDateTime(r.timeStr) || '';
+                    if (f.key === 'status') val = r.status || '';
+                    if (f.key === 'location') val = formatAttendanceLocationDisplay(r.location) || '';
+                    if (f.key === 'note') val = r.note || '';
+                    return val;
+                });
+                sheetRows.push(rowData);
             });
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
-            worksheet['!cols'] = exportColumns.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, clockInTime: 22, clockOutTime: 22, status: 24, location: 28, note: 28 })[field.key] || 16 }));
+            worksheet['!cols'] = selectedFields.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, time: 22, status: 14, location: 28, note: 28 })[field.key] || 16 }));
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             if(includeSchedule){
@@ -22744,7 +22714,7 @@ function p79EmployeeDateEligible(emp,date) {
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
             XLSX.writeFile(workbook, `${sysConfig.companyName || defaultConfig.companyName}_考勤紀錄_${dateLabel}_${companySuffix}.xlsx`);
             closeExportRecordsModal();
-            showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 試算表 匯出成功，共 ${visibleSessions.length} 個班次`,missingPairs.length?'warning':'success');
+            showToast(missingPairs.length?`${exportMonth} 已匯出，但有 ${missingPairs.length} 筆配對缺卡，請查看「考勤缺漏核對」工作表`:`${exportMonth} 考勤紀錄 試算表 匯出成功，共 ${visibleRecords.length} 筆`,missingPairs.length?'warning':'success');
             } catch(error) {
                 const message='匯出失敗：'+(error?.message||String(error));
                 if(progress)progress.textContent=message;
@@ -25306,7 +25276,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261102-export-one-shift-per-row"></script>
+<script src="./v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261029-attendance-export-parity"></script>
 <script src="../assets/port79-schedule-punch-restore.js?v=20261029-attendance-export-parity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
