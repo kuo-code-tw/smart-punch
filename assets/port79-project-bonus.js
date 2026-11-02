@@ -29,9 +29,9 @@ function filterPeople(people,prefixes=null){return prefixes===null?people.slice(
 const blankZero=x=>x!==null&&x!==undefined&&x!==''&&Number(x)===0?'':x??'';
 const DEFAULT_HEADERS=['編號','員工編號','職稱','員工姓名','效率','櫃數','加班換算時數','備註'];
 const WIDTHS=[5,14,12,10,8,4,4,4,4,2,2,2,2,2,13,12];
-// Fill A4 rather than limiting every page to the original 30 employee rows.
-// Up to 90 employees now occupy 2 balanced, full-height printed sheets.
-const BONUS_ROWS_PER_PAGE=45;
+// A4 at the user's requested 24pt employee height fits 28 rows,
+// with space reserved for the report title, signatures and page number.
+const BONUS_ROWS_PER_PAGE=28;
 function reportSettings(manual={},month){return {title:String(manual.title||((Number(month.slice(0,4))-1911)+'年'+Number(month.slice(5))+'月 79W效率表(專案獎金)')),headers:DEFAULT_HEADERS.map((x,i)=>String(manual.headers?.[i]||x)),signatures:['副總','協理','經理'].map((x,i)=>String(manual.signatures?.[i]||x))};}
 function paginate(rows){const pages=[];for(let i=0;i<Math.max(1,rows.length);i+=BONUS_ROWS_PER_PAGE){const page=rows.slice(i,i+BONUS_ROWS_PER_PAGE);while(page.length<BONUS_ROWS_PER_PAGE)page.push(null);pages.push(page);}return pages;}
 function rowHtml(r,i,print=false){
@@ -57,10 +57,9 @@ function excelSheet(rows,month,manual={}){
   values.push([]);values.push(['第 '+(p+1)+' / '+pages.length+' 頁']);
   values.forEach((values,r)=>{
    out.rows.push(Array.from({length:16},(_,col)=>({value:values[col]??'',style:r<headerRow?1:r===headerRow?2:r<signatureRow?(col>=4&&col<=7?4:col===8?5:3):r<pageNumberRow?6:7})));
-   // At 100% print scale, 45 rows of 15pt plus headers, signatures and page
-   // breaks fit the A4 area with 6mm margins. Do not enlarge row heights:
-   // that would create a third physical page in Excel.
-   out.heights.push(r<headerRow?10:r===headerRow?24:r<signatureRow?15:r===signatureRow?20:r===signatureRow+1?36:12);
+   // Full-height 24pt rows; 28 employees plus header, signatures, page
+   // number and an 8pt break fit inside a portrait A4 with 6mm margins.
+   out.heights.push(r<headerRow?10:r===headerRow?24:r<signatureRow?24:r===signatureRow?20:r===signatureRow+1?36:12);
   });
   const merge=(x,y,z,w)=>out.merges.push(String.fromCharCode(65+x)+(base+y+1)+':'+String.fromCharCode(65+z)+(base+w+1));
   merge(0,0,15,2);merge(4,headerRow,8,headerRow);merge(9,headerRow,13,headerRow);
