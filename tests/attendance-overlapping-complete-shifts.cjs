@@ -64,9 +64,12 @@ const lateAnother=engine.buildShifts([
   ...linkedPair('H2','AP1080060','293','2026/10/02 15:39','2026/10/02 23:50'),
   ...linkedPair('H3','AP1080060','293','2026/10/02 15:34','2026/10/02 17:46')
 ]);
-assert.equal(lateAnother.length,1,'all 16-24 personnel: retain closest complete #293 shift');
-assert.equal(lateAnother[0].clockIn.timeStr,'2026/10/02 15:39:00');
-assert.equal(lateAnother[0].clockOut.timeStr,'2026/10/02 23:50:00');
+const h293Complete=lateAnother.filter(x=>x.clockIn&&x.clockOut);
+assert.equal(h293Complete.length,1,'all 16-24 personnel: only one completed #293 shift counts');
+assert.equal(h293Complete[0].clockIn.timeStr,'2026/10/02 15:39:00');
+assert.equal(h293Complete[0].clockOut.timeStr,'2026/10/02 23:50:00');
+assert(lateAnother.filter(x=>!x.clockIn||!x.clockOut).every(x=>x.attendanceStatus!=='正常'),
+  'unused orphan punches remain visible for review, never count as completed hours');
 // A corrected 15:50 OUT and its previous 16:50 version share exactly
 // one record ID. The edited sourceEventKey identifies the superseded time.
 const in240=raw('W-IN','AP0900032','240','IN','2026/10/30 07:40');
