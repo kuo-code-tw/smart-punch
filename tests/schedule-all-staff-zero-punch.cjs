@@ -6,7 +6,7 @@ const engine=Function("let module={exports:{}};"+sourceFile('attendance/v6-engin
 const rest=Function("const window={};"+sourceFile('assets/port79-rest-attendance.js')+";return window.P79RestAttendance;")();
 const shifts=Function("engine","const window={P79AttendanceV6:engine};let module={exports:{}};"+sourceFile('assets/port79-schedule-punch-restore.js')+";return module.exports;")(engine);
 const evidenceApi=Function("window",sourceFile('assets/port79-schedule-rest-evidence.js')+";return window.P79ScheduleRestEvidence;")({P79RestAttendance:rest});
-const people=Array.from({length:83},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),attNo:String(i+1),name:i===0?'杜智榮':'測試人員'+(i+1)}));
+const people=Array.from({length:83},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),attNo:String(i+1),name:i===0?'測試領班':'測試人員'+(i+1)}));
 const schedules=people.map(person=>({empId:person.id,schedule:{'2026-10-27':'中','2026-10-28':'中','2026-10-31':'晚'}}));
 const stamp=x=>Date.parse(engine.normalizeTime(x.timeStr).replace(/\//g,'-').replace(' ','T')+'+08:00');
 const punch=(emp,date,time,type)=>({id:emp+'|'+date+'|'+time+'|'+type,
@@ -59,7 +59,7 @@ const make=(records,ref,badMonth=null)=>{
   p79ScheduleLeaveExportCode:()=>'',scheduleLeaveTypeText:()=>'',p79ScheduleSpecialNoPunchCode:()=>'',scheduleTaipeiTodayKey:()=> '2026-11-02'
  };
  const displayed=Function('env','with(env){'+html.slice(from,until)+';return p79ScheduleDisplayDay;}')(env);
- assert.equal(displayed({id:'E001'},'2026-10-27',displayContext).visibleCode,'休','杜智榮-type saved 中 must display 休');
+ assert.equal(displayed({id:'E001'},'2026-10-27',displayContext).visibleCode,'休','測試領班-type saved 中 must display 休');
  assert.equal(env.monthlyScheduleData.E001['2026-10-27'],'中','read-only display must not overwrite saved roster');
  const partial=await make(healthy.slice(0,12),null);
  assert.notEqual(partial.days[key]?.state,'rest','incomplete month must never mark all staff rest');
