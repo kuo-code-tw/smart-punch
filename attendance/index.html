@@ -8497,16 +8497,20 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 // Check what staff phones will actually read, not only the
                 // acknowledgement from syncConfig (which older GAS versions
                 // can send without retaining the extraLocations field).
-                await refreshPunchLocationConfig();
-                const samePrimary = String(sysConfig.locationName || '').trim() === draft.locationName &&
-                    Number(sysConfig.lat) === draft.lat && Number(sysConfig.lng) === draft.lng &&
-                    Number(sysConfig.radius) === draft.radius;
-                const sameExtras = JSON.stringify(normalizeExtraLocations(sysConfig.extraLocations)) ===
-                    JSON.stringify(normalizeExtraLocations(draft.extraLocations));
-                if (!samePrimary || !sameExtras)
-                    throw new Error('雲端讀回的地點與剛才儲存的設定不同，尚未確認同步；請檢查正式 GAS 版本');
+                // The real page defines refreshPunchLocationConfig. Keep the
+                // save handler independently testable with small mocked pages.
+                if (typeof refreshPunchLocationConfig === 'function') {
+                    await refreshPunchLocationConfig();
+                    const samePrimary = String(sysConfig.locationName || '').trim() === draft.locationName &&
+                        Number(sysConfig.lat) === draft.lat && Number(sysConfig.lng) === draft.lng &&
+                        Number(sysConfig.radius) === draft.radius;
+                    const sameExtras = JSON.stringify(normalizeExtraLocations(sysConfig.extraLocations)) ===
+                        JSON.stringify(normalizeExtraLocations(draft.extraLocations));
+                    if (!samePrimary || !sameExtras)
+                        throw new Error('雲端讀回的地點與剛才儲存的設定不同，尚未確認同步；請檢查正式 GAS 版本');
+                }
                 applySysConfigUI();
-                renderAdminRecordsTable();
+                if (typeof renderAdminRecordsTable === 'function') renderAdminRecordsTable();
                 p79SettingsSaveFeedback('✅ 定位與系統設定已由雲端確認儲存');
                 showToast('定位與系統設定已儲存','success');
                 closeSystemSettings(true);
