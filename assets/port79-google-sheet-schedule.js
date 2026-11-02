@@ -11,6 +11,12 @@ const $=id=>g.document.getElementById(id);
 const str=v=>String(v??'').trim();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const short=v=>str(v).slice(0,180);
+// Keep the provider's own Chinese name. Never translate or guess vessel identities.
+function officialChineseShipName(record){
+ const candidates=[record.localName,record.chineseName,record.VesselName,record.VesselSName];
+ const name=candidates.map(short).find(value=>/[\u3400-\u9fff]/u.test(value));
+ return name||'';
+}
 // WAN HAI API dates are Taiwan-local wall times (UTC+08), not browser-local times.
 // Only suppress a row when its own published ETD has already passed.
 // Preserve it in the source Sheet for auditing; do not infer actual departure.
@@ -38,7 +44,7 @@ function parseRows(data){
  const seen=new Set();
  return data.slice(0,2000).map(v=>{
   const r=v&&typeof v==='object'?v:{};
-  return {name:short(r.name||r.englishName),localName:short(r.localName||r.chineseName),
+  return {name:short(r.name||r.englishName||r.VesselEName),localName:officialChineseShipName(r),
    inVoyage:short(r.inVoyage),outVoyage:short(r.outVoyage),eta:short(r.eta),
    etb:short(r.etb),etd:short(r.etd),berth:short(r.berth),
    status:short(r.status),source:short(r.source),updatedAt:short(r.updatedAt)};
@@ -67,7 +73,9 @@ function shipTimeMarkup(value){
 }
 function line(r,i){
  return '<button class="p79-schedule-row p79-wanhai-row" type="button" data-public-ship-index="'+i+'" role="listitem">'+
- '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong></span>'+
+ '<span class="p79-wanhai-top"><strong class="p79-wanhai-name">'+esc(r.name||r.localName)+'</strong>'+
+// The compact board stays short; show the separate official Chinese name if provided.
+ (r.localName&&r.name!==r.localName?'<small class="p79-wanhai-voyage">中文：'+esc(r.localName)+'</small>':'')+'</span>'+
  '<span class="p79-wanhai-detail"><span><small>靠泊時間 ETB</small><b title="'+esc(r.etb||'未提供')+'">'+shipTimeMarkup(r.etb)+'</b></span>'+
  '<span><small>離岸時間 ETD</small><b title="'+esc(r.etd||'未提供')+'">'+shipTimeMarkup(r.etd)+'</b></span></span>'+
  '<span class="p79-wanhai-berth"><small>靠泊碼頭</small><strong>'+esc(r.berth||'未提供')+'</strong></span></button>';
@@ -156,8 +164,8 @@ function showDialog(index=-1){
  }else{
   body.innerHTML='<p class="p79-schedule-dialog-disclaimer">資料同步：'+esc(timeLabel())+'</p>'+
    '<div class="p79-schedule-table-scroll"><table class="p79-schedule-table"><thead><tr>'+
-   ['船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD'].map(h=>'<th>'+h+'</th>').join('')+
-   '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name||r.localName,r.berth,r.etb,r.etd].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
+   ['英文船名','中文船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD'].map(h=>'<th>'+h+'</th>').join('')+
+   '</tr></thead><tbody>'+showing.map(r=>'<tr>'+[r.name,r.localName,r.berth,r.etb,r.etd].map(v=>'<td>'+esc(v||'未提供')+'</td>').join('')+'</tr>').join('')+
    '</tbody></table></div>'+
    (showing.length===1?'<div class="p79-schedule-dialog-actions"><button type="button" data-public-show-all>查看全部 '+rows.length+' 艘</button></div>':'');
  }
