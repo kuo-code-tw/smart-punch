@@ -52,6 +52,8 @@ function create(ctx){
    if(![...records.values()].some(belongsToMonth)||![...referenceRecords.values()].some(belongsToMonth))referenceAvailable=false;
    referenceAvailable=referenceAvailable&&referenceByMonth[month]===true;
    const people=ctx.employees(),pairedRows=ctx.buildShifts([...records.values()]);
+   const eligible=(person,date)=>typeof ctx.dateEligible==='function'?ctx.dateEligible(person,date)!==false:true;
+   const personById=new Map(people.map(person=>[id(person.id||person.empId),person]));
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
    const actualShifts={},actualWorkedMinutes={},actualShiftDetails={},ambiguousShifts={},aggregates=new Map();
@@ -137,6 +139,10 @@ function create(ctx){
    let fallbackCount=0,dualCount=0;
    for(const [key,day] of Object.entries(state.evidence.days||{})){
      if(day.state!=='rest')continue;
+     // Pre-employment dates must never be counted as confirmed leave.
+     const who=personById.get(key.slice(0,key.lastIndexOf('|')));
+     const workDate=key.slice(key.lastIndexOf('|')+1);
+     if(!who||!eligible(who,workDate))continue;
      const date=key.slice(key.lastIndexOf('|')+1);
      const endDay=Number.isFinite(day.shiftEnd)?
        new Date(day.shiftEnd+8*3600000-1).toISOString().slice(0,10):date;
@@ -175,7 +181,7 @@ function create(ctx){
      const empId=id(person.id||person.empId),roster=savedRoster.get(empId)||{};
      if(!empId)continue;
      for(const [date,saved] of Object.entries(roster)){
-       if(date.length!==10||date.slice(0,7)!==month||date[7]!=='-')continue;
+       if(date.length!==10||date.slice(0,7)!==month||date[7]!=='-'||!eligible(person,date))continue;
        const key=empId+'|'+date,day=state.evidence.days?.[key];
        if(!day)continue;
        const original=String(saved||'').trim(),actual=actualShifts[key]||'';
@@ -205,7 +211,7 @@ function create(ctx){
      if(!empId)continue;
      const counts={checked:0,worked:0,rest:0,missing:0,unknown:0};
      for(const date of Object.keys(schedule)){
-       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date.slice(0,7)!==month)continue;
+       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date.slice(0,7)!==month||!eligible(person,date))continue;
        const classification=stateForAudit(state.evidence.days?.[empId+'|'+date]);
        counts.checked++;counts[classification]++;dayCounts.checked++;dayCounts[classification]++;
      }
