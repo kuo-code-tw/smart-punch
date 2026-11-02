@@ -314,6 +314,48 @@
     return result;
   }
 
+  // Read-only all-employee audit of COMPLETED sessions, after explicit pairing
+  // and safe near-duplicate consolidation. Do not discard either record or
+  // treat two overlapping intervals as two confirmed work/overtime periods.
+  function markOverlappingCompletedSessions(rows){
+    const byEmployee=new Map(),flags=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      if(!row?.clockIn||!row?.clockOut)return;
+      const identityKey=sessionIdentity(row);
+      const start=ts(row.clockIn),end=ts(row.clockOut);
+      if(!identityKey||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
+      if(!byEmployee.has(identityKey))byEmployee.set(identityKey,[]);
+      byEmployee.get(identityKey).push({row,start,end});
+    });
+    byEmployee.forEach(sessions=>{
+      sessions.sort((a,b)=>a.start-b.start||a.end-b.end);
+      let active=[];
+      sessions.forEach(current=>{
+        active=active.filter(previous=>previous.end>current.start);
+        active.forEach(previous=>{
+          // Strictly positive physical overlap. Touching end/start is allowed;
+          // 2 genuine non-overlapping shifts must never be collapsed.
+          const minutes=Math.ceil((Math.min(previous.end,current.end)-Math.max(previous.start,current.start))/60000);
+          if(minutes<=0)return;
+          for(const [a,b] of [[previous,current],[current,previous]]){
+            if(!flags.has(a.row))flags.set(a.row,{peers:new Set(),minutes:0});
+            const info=flags.get(a.row);
+            info.peers.add(b.row.key);
+            info.minutes=Math.max(info.minutes,minutes);
+          }
+        });
+        active.push(current);
+      });
+    });
+    return rows.map(row=>{
+      const hit=flags.get(row);
+      if(!hit)return row;
+      return {...row,overlapIssue:true,overlapPeerCount:hit.peers.size,
+        overlapMinutes:hit.minutes,attendanceStatus:'同人班次重疊待核',
+        attendanceCheckLabels:[...new Set([...(row.attendanceCheckLabels||[]),'同人班次時段重疊待核'])]};
+    });
+  }
+
   function isSyntheticManualPairRecovery(r){
     const source=s(r&&r.source).toLowerCase();
     const id=s(r&&r.id);
@@ -509,18 +551,19 @@
       row.attendanceCheckLabels=['原始打卡時間不完整'];
       consolidated.push(row);
     });
-    consolidated.sort((a,b)=>(b.sortTime||0)-(a.sortTime||0));
-    return consolidated;
+    const audited=markOverlappingCompletedSessions(consolidated);
+    audited.sort((a,b)=>(b.sortTime||0)-(a.sortTime||0));
+    return audited;
   }
   function install(){
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.14-SHIP-WORKDAY-TOOLTIPS';
-    console.info('[PORT79] Attendance V6.0.13 ship early-morning work-date installed');
+    window.p79AttendanceEngineVersion='V6.0.15-OVERLAPPING-SHIFT-AUDIT';
+    console.info('[PORT79] Attendance V6.0.15 cross-employee overlapping-shift audit installed');
     return true;
   }
-  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,shiftWorkdayNote,buildShifts,install};
+  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,shiftWorkdayNote,markOverlappingCompletedSessions,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
 
