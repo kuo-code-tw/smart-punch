@@ -205,9 +205,9 @@ function create(ctx){
      if(!empId)continue;
      const counts={checked:0,worked:0,rest:0,missing:0,unknown:0};
      for(const date of Object.keys(schedule)){
-       if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||date.slice(0,7)!==month)continue;
-       const state=stateForAudit(state.evidence.days?.[empId+'|'+date]);
-       counts.checked++;counts[state]++;dayCounts.checked++;dayCounts[state]++;
+       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date.slice(0,7)!==month)continue;
+       const classification=stateForAudit(state.evidence.days?.[empId+'|'+date]);
+       counts.checked++;counts[classification]++;dayCounts.checked++;dayCounts[classification]++;
      }
      personnelAudit[empId]=counts;
    }
