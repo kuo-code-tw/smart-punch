@@ -54,7 +54,7 @@ function create(ctx){
    const people=ctx.employees(),pairedRows=ctx.buildShifts([...records.values()]);
    // Only validated paired punches can supply the ACTUAL shift displayed in
    // the monthly roster. This does not rewrite statutory roster history.
-   const actualShifts={},actualWorkedMinutes={},ambiguousShifts={},aggregates=new Map();
+   const actualShifts={},actualWorkedMinutes={},actualShiftDetails={},ambiguousShifts={},aggregates=new Map();
    for(const row of pairedRows){
     if(!row.clockIn||!row.clockOut||row.timePrecisionIssue)continue;
     const rec=row.clockIn,claimed=id(row.empId||rec.empId);
@@ -71,12 +71,13 @@ function create(ctx){
     const minutes=Math.round((paired.end-paired.start)/60000);
     if(minutes<=0)continue;
     const prior=aggregates.get(key);
-    if(!prior)aggregates.set(key,{shift:paired.shift,minutes,conflict:false});
-    else{prior.minutes+=minutes;if(prior.shift!==paired.shift)prior.conflict=true;}
+    const detail={start:String(row.clockIn.timeStr||''),end:String(row.clockOut.timeStr||''),workday:paired.date,shift:paired.shift};
+    if(!prior)aggregates.set(key,{shift:paired.shift,minutes,conflict:false,details:[detail]});
+    else{prior.minutes+=minutes;prior.details.push(detail);if(prior.shift!==paired.shift)prior.conflict=true;}
    }
    for(const [key,value] of aggregates){
      if(value.conflict){ambiguousShifts[key]='同一工作日存在不同班別的完整出勤';continue;}
-     actualShifts[key]=value.shift;actualWorkedMinutes[key]=value.minutes;
+     actualShifts[key]=value.shift;actualWorkedMinutes[key]=value.minutes;actualShiftDetails[key]=value.details;
    }
    const mapSessions=rows=>rows.map(row=>{
     const record=row.clockIn||row.clockOut||row.records?.[0]||row;
@@ -163,6 +164,7 @@ function create(ctx){
    state.evidence.absenceOfficialCoverageCount=fallbackCount;
    // Expose shift codes, not the employees' raw punch records or credentials.
    state.evidence.actualShifts=actualShifts;
+   state.evidence.actualShiftDetails=actualShiftDetails;
    state.evidence.actualWorkedMinutes=actualWorkedMinutes;
    state.evidence.ambiguousShifts=ambiguousShifts;
    // Audit every employee and day of the loaded official month. Read-only:
