@@ -15724,6 +15724,36 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             document.getElementById('exportFieldCount').textContent = `已選 ${checkedCount} 個欄位`;
         }
 
+        function p79SelectWorkHoursCompanyImportPunches(sourceRecords) {
+            // Company import requires the original punch-per-row workbook format.
+            // Reuse V6's selected IN/OUT pairs, but emit the EXACT original
+            // event objects, never flattened alternatives, normalized rewrites,
+            // new columns or a new shift-per-row schema.
+            const engine=window.P79AttendanceV6;
+            if(!engine?.buildShifts||!engine?.normalizeTime||!engine?.recordType||!engine?.identity)
+                throw Error('正式考勤配對引擎尚未載入，已停止匯出以避免重複匯入公司');
+            const source=Array.isArray(sourceRecords)?sourceRecords:[];
+            const key=record=>JSON.stringify([
+                engine.identity(record),String(record?.id??''),engine.recordType(record),
+                engine.normalizeTime(record?.timeStr||record?.['出勤時間']||'')
+            ]);
+            const selectedCounts=new Map();
+            engine.buildShifts(source).forEach(shift=>{
+                for(const record of [shift.clockIn,shift.clockOut].filter(Boolean)){
+                    const k=key(record);
+                    selectedCounts.set(k,(selectedCounts.get(k)||0)+1);
+                }
+            });
+            const result=[];
+            source.forEach(record=>{
+                const k=key(record),remaining=selectedCounts.get(k)||0;
+                if(remaining>0){result.push(record);selectedCounts.set(k,remaining-1);}
+            });
+            // Never silently export a partial or mismatched data set.
+            if([...selectedCounts.values()].some(n=>n!==0))
+                throw Error('考勤配對與原始打卡資料無法逐筆對應，已停止匯出，請重新讀取正式資料');
+            return result;
+        }
         async function exportSelectedRecordsExcel() {
           await window.p79EnsureXlsx();
             if (!requireAdminAction('attendanceExport', '匯出考勤')) return;
@@ -15741,9 +15771,9 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             }
 
             const companyFilter = document.getElementById('exportCompanyFilter')?.value || 'ALL';
-            const visibleRecords = records
-                .filter(canCurrentAdminViewDataRow)
-                .filter(record => {
+            const visibleRecords = p79SelectWorkHoursCompanyImportPunches(
+                records.filter(canCurrentAdminViewDataRow)
+            ).filter(record => {
                     if (companyFilter === 'ALL') return true;
                     const matchedEmployee = employees.find(emp =>
                         String(emp.empId || '').trim().toUpperCase() === String(record.empId || '').trim().toUpperCase() ||
