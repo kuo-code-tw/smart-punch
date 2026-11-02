@@ -7147,10 +7147,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
               throw Error('正式考勤及原始打卡皆讀取失敗：'+
                 String(official.reason?.message||official.reason||'未知錯誤')+'；'+
                 String(reference.reason?.message||reference.reason||'未知錯誤'));
-            if(official.status!=='fulfilled'){
+            const rawHealthy=reference.status==='fulfilled'&&reference.value.records.length>0;
+            const mainEmpty=official.status==='fulfilled'&&official.value.records.length===0;
+            if(official.status!=='fulfilled'||mainEmpty&&rawHealthy){
               return {...reference.value,absenceReferenceRecords:null,
-                absenceReferenceError:'正式考勤接口讀取失敗，改以原始打卡逐日完整度核對：'+
-                String(official.reason?.message||official.reason)};
+                absenceReferenceError:'正式考勤接口'+(mainEmpty?'沒有返回打卡紀錄':'讀取失敗')+
+                  '，改以原始打卡逐日完整度核對'+
+                  (mainEmpty?'':':'+String(official.reason?.message||official.reason))};
             }
             return {...official.value,
               absenceReferenceRecords:reference.status==='fulfilled'?reference.value.records:null,
