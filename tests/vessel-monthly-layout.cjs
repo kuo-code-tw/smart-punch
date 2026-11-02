@@ -21,6 +21,20 @@ for(const n of [1,35,36,70,71])test(n+' records retain every row in 35-record pr
   const first=p*report.PRINT_ROWS_PER_PAGE+1;assert.equal(s.getCell(first,1).value,'自訂測試公司');assert.equal(s.getCell(first,1).font.size,22);assert.equal(s.getCell(first+3,11).value,'Productivity');assert.equal(s.getCell(first+41,1).value,`第 ${p+1} 頁／共 ${pages} 頁`);assert.equal(s.getCell(first+40,8).value.result,n*569);assert.equal(s.getCell(first+43,1).value,'證明：');assert.equal(s.getCell(first+43,4).value,'協理：');assert.equal(s.getCell(first+43,7).value,'經理：');assert.equal(s.getCell(first+43,10).value,'製表：');
  }
 });
+test('monthly exported header says 作業櫃數 and numeric zeros stay calculable but display blank',()=>{
+ const rows=[{...fixture(1)[0],disc:178,load:319,bill:497,hc:8,shift:0,productivity:23.06,includeHC:0}];
+ const sheet=report.createWorkbook(ExcelJS,{month:'2026-10',rows}).worksheets[0];
+ assert.equal(sheet.getCell(3,8).value,'作業櫃數');
+ assert.equal(sheet.getCell(5,8).value,497);
+ assert.equal(sheet.getCell(5,10).value,0);
+ assert.equal(sheet.getCell(5,12).value,0);
+ assert.equal(sheet.getCell(5,10).numFmt,'#,##0;-#,##0;;@');
+ assert.equal(sheet.getCell(5,12).numFmt,'0.00;-0.00;;@');
+ assert.equal(sheet.getCell(5,8).numFmt,'#,##0;-#,##0;;@');
+ assert.equal(sheet.getCell(40,10).value.result,0);
+ assert.equal(sheet.getCell(40,10).numFmt,'#,##0;-#,##0;;@');
+ assert.equal(sheet.getCell(41,10).numFmt,'#,##0;-#,##0;;@');
+});
 test('blank company has a useful default and company edits persist when storage is available',()=>{
  assert.equal(report.companyName('   '),'亞安顧問管理');assert.equal(report.companyName('  New Company  '),'New Company');
  const old=global.localStorage,store={};global.localStorage={getItem:k=>store[k],setItem:(k,v)=>store[k]=v};report.saveCompany('Company B');assert.equal(report.savedCompany(),'Company B');global.localStorage=old;
