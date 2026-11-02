@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-global-no-punch-evidence-v6"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-live-read-fallback-v7"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7140,8 +7140,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
           try{
             const [official,reference]=await Promise.allSettled([
               get('getAttendanceMainDirect'),get('getAttendanceMonthRaw')]);
-            if(official.status!=='fulfilled')throw official.reason;
-            // A failed independent read must NOT turn everybody into a rest day.
+            // Both endpoints are real, authenticated attendance sources. If
+            // one fails, use the surviving feed ONLY under the strict
+            // complete-month/day coverage check; never mass-mark everyone off.
+            if(official.status!=='fulfilled'&&reference.status!=='fulfilled')
+              throw Error('正式考勤及原始打卡皆讀取失敗：'+
+                String(official.reason?.message||official.reason||'未知錯誤')+'；'+
+                String(reference.reason?.message||reference.reason||'未知錯誤'));
+            if(official.status!=='fulfilled'){
+              return {...reference.value,absenceReferenceRecords:null,
+                absenceReferenceError:'正式考勤接口讀取失敗，改以原始打卡逐日完整度核對：'+
+                String(official.reason?.message||official.reason)};
+            }
             return {...official.value,
               absenceReferenceRecords:reference.status==='fulfilled'?reference.value.records:null,
               absenceReferenceError:reference.status==='rejected'?String(reference.reason?.message||reference.reason):''};
