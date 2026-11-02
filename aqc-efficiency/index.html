@@ -2568,6 +2568,10 @@ function vesselJobRows(monthOverride=''){
     shiftMoves:num(s.shiftMoves),
     aqcCount:num(s.aqcCount||(s.aqcs||[]).length),
     gph:num(s.gph),gphHC:num(s.gphHC),vph:num(s.vph),vphHC:num(s.vphHC),
+    // Month accounting is based on the vessel's completed job, never on
+    // the display date or one individual driver's WORKING REPORT date.
+    accountingMonth:shipCompletionMonth(s),
+    completionDate:String(s._cloudLastDate||s.cloudLastDate||s._authoritativeLastDate||s.lastDate||s.workingSheetSource?.endDate||'').slice(0,10),
     note:String(s.note||s.remark||''),
     workingSheetRuleVersion:String(s.workingSheetRuleVersion||s.workingSheetSource?.ruleVersion||''),
     workingSheetImportedAt:String(s.workingSheetImportedAt||s.workingSheetSource?.importedAt||''),
@@ -2609,6 +2613,8 @@ function vesselJobRows(monthOverride=''){
       gph:num(r.shipGph),gphHC:num(r.shipGphHC),vph:num(r.shipVph),vphHC:num(r.shipVphHC),
       compareDate:String(r.sheetCompareDate||r.compareDate||r.workDate||'').slice(0,10),
       firstDate:String(r.workDate||'').slice(0,10),lastDate:String(r.workDate||'').slice(0,10),
+      accountingMonth:recordCompletionMonth(r,completionIndex),
+      completionDate:String(r.sheetLastDate||r._cloudLastDate||r.workDate||'').slice(0,10),
       note:'',workingSheetRuleVersion:String(r.workingSheetRuleVersion||''),workingSheetImportedAt:String(r.workingSheetImportedAt||'')
     };
 
@@ -2633,7 +2639,11 @@ function vesselJobRows(monthOverride=''){
   // wharf AND complete working quantities prove they are duplicate copies.
   const versioned=typeof window!=='undefined'?window.P79VesselVersionView:null;
   const current=versioned?.collapse?.(masters)?.rows||masters;
-  return current.sort(compareWorkingNoDesc);
+  // Guard after merging master and report-derived vessels as well as after
+  // revision collapse: a foreign-month job must not leak into a selected month.
+  // All-month view still uses the selected YEAR, not the entire history.
+  const scoped=(month?current.filter(x=>String(x.accountingMonth||'')===month):current);
+  return scoped.sort(compareWorkingNoDesc);
 }
 
 const SUMMARY_PAGE_SIZE=50;
@@ -3284,7 +3294,10 @@ function populateDashboardEfficiencyFilter(list){
   if([...sel.options].some(o=>o.value===prev))sel.value=prev;
 }
 function dashboardJobDateValue(x){
-  const direct=normalizeIsoDateOnly(x?.compareDate||x?.firstDate||'');
+  // The listing's month is the vessel COMPLETION month. Showing a September
+  // start date in the October-completed roster looks like an unfiltered list.
+  // Prefer the actual completion date and retain original dates in details.
+  const direct=normalizeIsoDateOnly(x?.completionDate||x?.lastDate||x?.compareDate||x?.firstDate||'');
   if(direct)return direct;
   const no=String(x?.workingNo||'').trim();
   const dates=(records||[])
@@ -3292,7 +3305,7 @@ function dashboardJobDateValue(x){
     .map(r=>normalizeIsoDateOnly(r?.workDate||''))
     .filter(Boolean)
     .sort();
-  return dates[0]||'';
+  return dates[dates.length-1]||'';
 }
 function dashboardRocDate(v){
   const d=normalizeIsoDateOnly(v);
@@ -3364,7 +3377,13 @@ function clearDashboardColumnFilters(){
 }
 function updateDashboardTableFilterState(shown,total){
   const e=document.getElementById('dashboardTableFilterState');
-  if(e)e.textContent=`顯示 ${shown} / ${total} 艘`;
+  if(!e)return;
+  const month=String(document.getElementById('filterMonth')?.value||'').trim();
+  const year=String(getPort79Year()||'').trim();
+  const scope=/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)
+    ?month.replace('-','年')+'月完工船舶'
+    :(/^20\d{2}$/.test(year)?year+'年完工船舶':'年度船舶');
+  e.textContent=scope+`｜顯示 ${shown} / ${total} 艘`;
 }
 function dashboardShiftAuditBadge(x){
   const status=dashboardShiftDataStatus(x);
@@ -3692,7 +3711,8 @@ function renderDashboard(){
 
   const rawDashboardJobs=vesselJobRows();
   const activeDashboardMonth=document.getElementById('filterMonth')?.value||'';
-  const allDashboardJobs=dashboardAdjustJobsForMonthlyReference(rawDashboardJobs,activeDashboardMonth);
+  const allDashboardJobs=dashboardAdjustJobsForMonthlyReference(rawDashboardJobs,activeDashboardMonth)
+    .filter(x=>!activeDashboardMonth||String(x.accountingMonth||'')===activeDashboardMonth);
   populateDashboardVesselFilter(allDashboardJobs);
   populateDashboardEfficiencyFilter(allDashboardJobs);
   const jobs=filterAndSortDashboardJobs(allDashboardJobs);
