@@ -2700,7 +2700,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.10.26.116';
+        const APP_VERSION='2026.11.02.117';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -3106,7 +3106,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             }
         }
 
-        const PRIMARY_IN_RANGE_LOCATION_LABEL = '高雄港萬海79號碼頭';
+        // Legacy primary-site names are recognized only as display aliases.
         let updateCheckInProgress = false;
         let lastAppVersionCheckAt = 0;
 
@@ -3231,7 +3231,9 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
         function getConfiguredPunchLocations() {
             const primary = {
-                name: String(sysConfig.locationName || '主要打卡地點').trim(),
+                name: ['79號碼頭', '高雄港萬海79號碼頭', '高雄港高海79號碼頭'].includes(String(sysConfig.locationName || '').trim())
+                    ? '79號碼頭'
+                    : String(sysConfig.locationName || '主要打卡地點').trim(),
                 lat: Number(sysConfig.lat),
                 lng: Number(sysConfig.lng),
                 radius: Math.max(1, Number(sysConfig.radius) || 100),
@@ -3245,13 +3247,19 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 
         function formatAttendanceLocationDisplay(value) {
             const raw = String(value || '').trim();
-            if (!raw || raw === PRIMARY_IN_RANGE_LOCATION_LABEL) return raw;
-            if (!raw.includes('(範圍內)')) return raw;
-            const locationName = raw.split('/')[0].trim();
-            const configuredPrimaryName = String(sysConfig?.locationName || '').trim();
-            if ([configuredPrimaryName, '79號碼頭', PRIMARY_IN_RANGE_LOCATION_LABEL].filter(Boolean).includes(locationName)) {
-                return PRIMARY_IN_RANGE_LOCATION_LABEL;
+            if (!raw) return '';
+            // A stale cloud/local config can still contain an old alias.
+            // Never let it convert a correctly renamed GPS location back.
+            const aliases = ['79號碼頭', '高雄港萬海79號碼頭', '高雄港高海79號碼頭'];
+            const savedName = String(sysConfig?.locationName || '79號碼頭').trim();
+            const configuredPrimaryName = aliases.includes(savedName) ? '79號碼頭' : savedName;
+            const base = raw.includes('(範圍內)') ? raw.split('/')[0].trim() : raw;
+            if ((aliases.includes(base) || base === configuredPrimaryName) &&
+                (base === raw || raw.includes('(範圍內)'))) {
+                return configuredPrimaryName;
             }
+            // Other additional GPS locations, manual edits and unrelated notes
+            // stay untouched; raw attendance records are never rewritten.
             return raw;
         }
 
@@ -12072,7 +12080,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}"` : ''}>
                             ${nightWorkdayNote ? `<span tabindex="0" role="note" title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}" class="block font-bold text-amber-800 dark:text-amber-200 cursor-help">備註：${escapeHtml(nightWorkdayNote.summary)}</span>` : ''}
                             ${row.noteText ? `備註: ${escapeHtml(String(row.noteText))}<br>` : ''}
-                            ${escapeHtml(String(row.locationText || '--'))}
+                            ${escapeHtml(String(formatAttendanceLocationDisplay(row.locationText) || '--'))}
                         </td>
                         <td class="px-2 py-3 text-center">
                             <div class="flex justify-center min-w-[42px]">
