@@ -1,0 +1,25 @@
+name: Verify vessel dashboard monthly scope
+on:
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'assets/port79-vessel-versions.js'
+      - 'tests/vessel-dashboard-month-scope-20261102.cjs'
+      - '.github/workflows/vessel-dashboard-month-scope.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify month filter, completion dates, historical totals, and exports
+        run: |
+          node tests/vessel-dashboard-month-scope-20261102.cjs
+          node tests/vessel-month-selection.cjs
+          node tests/vessel-completion-driver-month.cjs
+          node tests/vessel-monthly-export.cjs
+          node tests/vessel-monthly-layout.cjs
