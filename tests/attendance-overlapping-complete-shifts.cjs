@@ -65,7 +65,7 @@ const night=engine.buildShifts([
 ]);
 assert.equal(night.length,1,'00-08 cross-day shift follows same rule');
 assert.equal(night[0].clockIn.timeStr,'2026/10/01 23:38:00');
-assert.equal(night[0].clockOut.timeStr,'2026/10/02 07:46:00');
+assert.equal(night[0].clockOut.timeStr,'2026/10/02 07:48:00','07:48 is closer to scheduled 08:00 end');
 const unresolved=engine.buildShifts([
   ...linkedPair('U1','UNKNOWN','456','2026/10/01 23:40','2026/10/02 01:00'),
   ...linkedPair('U2','UNKNOWN','456','2026/10/01 23:36','2026/10/02 02:00')
