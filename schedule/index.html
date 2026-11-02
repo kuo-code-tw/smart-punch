@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-live-read-fallback-v8"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-global-audit-proof-v10"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -1657,7 +1657,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
             <span class="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300"><b>早</b></span>
             <span class="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300"><b>中</b></span>
             <span class="px-2 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300"><b>晚</b></span>
-            <span id="scheduleRestEvidenceStatus" role="status" class="text-[10px] px-2 py-1 rounded border bg-slate-50 text-slate-700 border-slate-300" title="正式考勤核對狀態">考勤核對 v8｜尚未載入</span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
+            <span id="scheduleRestEvidenceStatus" role="status" class="text-[10px] px-2 py-1 rounded border bg-slate-50 text-slate-700 border-slate-300" title="正式考勤核對狀態">考勤核對 v10｜尚未載入</span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>例</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>休</b></span><span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300"><b>國</b></span>
             <a href="../leave/" class="px-2 py-1 rounded-md bg-rose-100 text-rose-800 border border-rose-300" title="請至請假管理申請、核准及安排代班"><b>各類請假請至請假管理</b></a>
             <span class="px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-300 font-bold"><i class="fa-solid fa-flag"></i> 紅字：國定假日</span>
           </div>
@@ -6371,6 +6371,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       }
 
       const titleLabel = (activeRoleTab === 'ALL') ? '全部人員排班表' : `${activeRoleTab} 單位專屬排班表 (含跨單位支援)`;
+      // Always audit the ENTIRE month/staff, independent of the current group filter.
+      const monthlyAudit=monthEvidence?.evidence?.auditSummary;
+      const auditBanner=monthEvidence?.error?'考勤核對失敗：'+monthEvidence.error:
+        monthEvidence?.pending?'考勤核對進行中':
+        monthlyAudit?'全員核對 '+monthlyAudit.employees+' 人／'+monthlyAudit.daysChecked+
+          ' 格｜出勤'+monthlyAudit.workedDays+'｜休'+monthlyAudit.confirmedRestDays+
+          '｜單側'+monthlyAudit.missingDays+'｜待確認'+monthlyAudit.unknownDays:
+        '全員考勤核對尚未完成';
       const rosterCollapsed = isScheduleRoleRosterCollapsed(activeRoleTab);
 
       // V10.23：收合時只建立標題列，不建立 31 天大型班表。
@@ -6458,6 +6466,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <i class="fa-solid fa-layer-group text-teal-600"></i> ${year}年${month}月｜${titleLabel}
                   <span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">${roleEmps.length} 人</span>
+                  <span class="text-xs text-slate-600" title="全公司全部單位逐人逐日核對；不直接改寫雲端班表">核對 v10｜${scheduleEscapeHtml(auditBanner)}</span>
                 </h2>
 
                 <div class="flex items-center space-x-2 no-print">
@@ -6618,7 +6627,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
+          const pairedDetails=attendanceEvidence?.actualShiftDetails?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
+          const pairedProof=Array.isArray(pairedDetails)?
+            pairedDetails.map(item=>'正式上下班配對：'+item.start+'～'+item.end+
+              '；歸屬工作日：'+item.workday+'；判定：'+item.shift+'班').join('；'):'';
           const cellTitle = ['目前顯示：'+shownShift+'；來源：'+shiftSource,
+            pairedProof,
             attendanceRosterConflict?'考勤與原排班不一致：原排'+rosterShift+'、實際'+actualShift+'（此畫面不會改寫正式排班）':'',verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
@@ -7176,7 +7190,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               '｜班別無法推定'+audit.shiftUnresolved+'｜打卡待核'+audit.punchMissing:'';
             const message=state.pending?(state.evidence?.complete?'重新核對中（暫顯示上次結果）':'正式考勤核對中'):
               state.error?'考勤核對失敗：'+state.error:summary;
-            status.textContent='考勤核對 v8｜'+(message||'等待正式資料');
+            status.textContent='考勤核對 v10｜'+(message||'等待正式資料');
             status.hidden=false;
             status.className='text-[10px] px-2 py-1 rounded border '+(state.error||count?'bg-amber-50 text-amber-900 border-amber-300':
               state.pending?'bg-slate-50 text-slate-700 border-slate-300':'bg-emerald-50 text-emerald-800 border-emerald-300');
