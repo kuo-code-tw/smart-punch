@@ -41,7 +41,8 @@ assert(a>=0&&b>a,'roster-day resolver available');
   assert.equal(evidence.days[key]?.state,expectedState,name+' attendance state');
   assert.equal(evidence.absenceConfirmedDays[key]===true,restExpected,name+' confirmed absence');
  }
- const context={automaticRestMeta:{},restBalance:{ledger:[]},typhoonDays:new Set(),
+ const context={automaticRestMeta:{'2026-10-30':{restCategory:'國'}},
+  restBalance:{ledger:[{date:'2026-10-30',kind:'off',category:'國'}]},typhoonDays:new Set(),
   electionDays:new Set(),typhoonToday:'2026-11-01'};
  const env={
   monthlyScheduleData:{E1:{'2026-10-30':'早'}},monthlyScheduleMeta:{E1:{}},
@@ -63,6 +64,9 @@ assert(a>=0&&b>a,'roster-day resolver available');
   assert.equal(day({id:'E1'},'2026-10-30',context).visibleCode,expected,'roster display for '+expected);
  }
  assert.equal(env.monthlyScheduleData.E1['2026-10-30'],'早','display must never rewrite cloud roster');
+ // Unverified auto quota metadata is not permission to relabel an absent workday as 國.
+ context.attendanceEvidence=cases[0][0];context.attendanceSnapshot={attendanceEvidence:cases[0][0]};
+ assert.equal(day({id:'E1'},'2026-10-30',context).visibleCode,'休','zero-punch scheduled workday must show 休 even with stale 國 allocation metadata');
  assert(html.includes("if(yearMonth==='2026-10'){"),'October bulk-write safety remains enabled');
  console.log('PASS: 6 dual-source attendance scenarios and 4 roster display scenarios');
 })().catch(e=>{console.error(e);process.exitCode=1});
