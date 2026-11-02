@@ -104,7 +104,7 @@ function create(ctx){
      prior.add(id(person.id||person.empId));byAtt.set(no,prior);
    }
    for(const record of officialRows){
-     const day=String(record.timeStr||record.time||'').match(/^(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})/);
+     const day=String(record.timeStr||record.time||'').match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
      if(!day)continue;
      const date=day[1]+'-'+day[2].padStart(2,'0')+'-'+day[3].padStart(2,'0');
      const no=att(record.attNo||record.attendanceNo);
