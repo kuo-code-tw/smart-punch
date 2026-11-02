@@ -106,7 +106,7 @@ const exportVm={window:{P79AttendanceV6:engine,p79EnsureXlsx:async()=>true},
 vm.createContext(exportVm);
 vm.runInContext(extract(work,'p79SelectWorkHoursCompanyImportPunches'),exportVm);
 const expAt=work.indexOf('        async function exportSelectedRecordsExcel() {');
-const expEnd=work.indexOf('\\n        }',expAt);
+const expEnd=work.indexOf('\n        }',expAt);
 a(expAt>=0&&expEnd>expAt);
 vm.runInContext(work.slice(expAt,expEnd+10),exportVm);
 (async()=>{
