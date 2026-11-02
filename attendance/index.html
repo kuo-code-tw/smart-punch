@@ -2468,7 +2468,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.11.02.111';
+        const APP_VERSION='2026.11.02.112';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -3088,7 +3088,9 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 
         function getConfiguredPunchLocations() {
             const primary = {
-                name: String(sysConfig.locationName || '主要打卡地點').trim(),
+                name: ['79號碼頭', '高雄港萬海79號碼頭', '高雄港高海79號碼頭'].includes(String(sysConfig.locationName || '').trim())
+                    ? '79號碼頭'
+                    : String(sysConfig.locationName || '主要打卡地點').trim(),
                 lat: Number(sysConfig.lat),
                 lng: Number(sysConfig.lng),
                 radius: Math.max(1, Number(sysConfig.radius) || 100),
@@ -3137,16 +3139,18 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         function formatAttendanceLocationDisplay(value) {
             const raw = String(value || '').trim();
             if (!raw) return '';
-            const configuredPrimaryName = String(sysConfig?.locationName || defaultConfig.locationName || '79號碼頭').trim();
-            // Historical records keep their original raw location in storage.
-            // Only known primary GPS names (and the former within-range text)
-            // follow the latest primary setting in tables, confirmations,
-            // reports and existing company-compatible Excel exports.
+            // A stale cloud/local config can still contain an old alias.
+            // Never let it convert a correctly renamed GPS location back.
+            const aliases = ['79號碼頭', '高雄港萬海79號碼頭', '高雄港高海79號碼頭'];
+            const savedName = String(sysConfig?.locationName || '79號碼頭').trim();
+            const configuredPrimaryName = aliases.includes(savedName) ? '79號碼頭' : savedName;
             const base = raw.includes('(範圍內)') ? raw.split('/')[0].trim() : raw;
-            if ([...LEGACY_PRIMARY_LOCATION_NAMES, configuredPrimaryName].includes(base) &&
+            if ((aliases.includes(base) || base === configuredPrimaryName) &&
                 (base === raw || raw.includes('(範圍內)'))) {
                 return configuredPrimaryName;
             }
+            // Other additional GPS locations, manual edits and unrelated notes
+            // stay untouched; raw attendance records are never rewritten.
             return raw;
         }
 
@@ -16365,7 +16369,7 @@ function getManualPairRecordAnchor(record) {
                         <td class="px-2 py-3 text-center text-slate-500 text-[11px] leading-5" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}"` : ''}>
                             ${nightWorkdayNote ? `<span role="note" tabindex="0" class="block max-w-[180px] mx-auto truncate text-amber-800 dark:text-amber-300 font-bold cursor-help" title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}">備註：${escapeHtml(nightWorkdayNote.summary)}</span>` : ''}
                             ${row.noteText ? `<span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.noteText))}">備註：${escapeHtml(String(row.noteText).length > 14 ? String(row.noteText).slice(0,14)+'…' : String(row.noteText))}</span>` : ''}
-                            <span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(row.locationText || ''))}">${escapeHtml(String(row.locationText || '--'))}</span>
+                            <span class="block max-w-[180px] mx-auto truncate" title="${escapeHtml(String(formatAttendanceLocationDisplay(row.locationText) || ''))}">${escapeHtml(String(formatAttendanceLocationDisplay(row.locationText) || '--'))}</span>
                         </td>
                         <td class="px-2 py-3 text-center">
                             <div class="flex justify-center min-w-[42px]">
