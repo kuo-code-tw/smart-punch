@@ -83,30 +83,76 @@ function create(ctx){
    const sessions=mapSessions(pairedRows);
    if(JSON.stringify(ctx.schedules())!==rosterSignature)throw Error('核對期間班表已更新，需重新讀取考勤');
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
-   // Absence must be confirmed by BOTH independent authenticated feeds, not
-   // inferred from an empty or truncated official attendance response.
-   const confirmed={};let discrepancies=0;
+   // A checked absence is based on either two authenticated feeds or a
+   // high-coverage authenticated official feed if the raw endpoint is missing.
+   // Never treat a partially loaded/empty month as a blanket rest day.
+   const confirmed={},confirmationModes={};let discrepancies=0;
    let referenceEvidence=null;
    if(referenceAvailable){
      const pairedReference=ctx.buildShifts([...referenceRecords.values()]);
      referenceEvidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,
        sessions:mapSessions(pairedReference),leaveDates:ctx.leaveDates(month)});
    }
+   const officialRows=[...records.values()];
+   const activeDateIds=new Map(),distinctMonthIds=new Set(),activeMonthDates=new Set();
+   const peopleById=new Set(people.map(p=>id(p.id||p.empId)));
+   const byAtt=new Map();
+   for(const person of people){
+     const no=att(person.attNo||person.attendanceNo);
+     if(!no)continue;
+     const prior=byAtt.get(no)||new Set();
+     prior.add(id(person.id||person.empId));byAtt.set(no,prior);
+   }
+   for(const record of officialRows){
+     const day=String(record.timeStr||record.time||'').match(/^(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})/);
+     if(!day)continue;
+     const date=day[1]+'-'+day[2].padStart(2,'0')+'-'+day[3].padStart(2,'0');
+     const no=att(record.attNo||record.attendanceNo);
+     const matches=byAtt.get(no);
+     const claimed=id(record.empId);
+     const person=peopleById.has(claimed)&&(!matches||matches.size===1&&matches.has(claimed))
+       ?claimed:(matches?.size===1?[...matches][0]:null);
+     if(!person)continue;
+     const set=activeDateIds.get(date)||new Set();
+     set.add(person);activeDateIds.set(date,set);
+     if(date.startsWith(month+'-')){distinctMonthIds.add(person);activeMonthDates.add(date);}
+   }
+   const employeeCount=people.length;
+   const monthCoverage=employeeCount>0&&
+     officialRows.filter(r=>String(r.timeStr||r.time||'').startsWith(month.replace('-','/'))||
+       String(r.timeStr||r.time||'').startsWith(month)).length>=Math.max(10,Math.ceil(employeeCount*0.7))&&
+     activeMonthDates.size>=10&&
+     distinctMonthIds.size>=Math.min(employeeCount,Math.max(3,Math.ceil(employeeCount*0.20)));
+   const dayThreshold=Math.min(employeeCount,Math.max(2,Math.ceil(employeeCount*0.08)));
+   const dayCovered=date=>(activeDateIds.get(date)?.size||0)>=dayThreshold;
+   let fallbackCount=0,dualCount=0;
    for(const [key,day] of Object.entries(state.evidence.days||{})){
      if(day.state!=='rest')continue;
-     // A shift crossing into the next month also needs that month's raw feed.
-     const endMonth=Number.isFinite(day.shiftEnd)?new Date(day.shiftEnd+8*3600000).toISOString().slice(0,7):month;
-     if(referenceAvailable&&referenceByMonth[endMonth]===true&&referenceEvidence?.days?.[key]?.state==='rest'){
-       confirmed[key]=true;
+     const date=key.slice(key.lastIndexOf('|')+1);
+     const endDay=Number.isFinite(day.shiftEnd)?
+       new Date(day.shiftEnd+8*3600000-1).toISOString().slice(0,10):date;
+     const endMonth=endDay.slice(0,7);
+     const canUseDual=referenceAvailable&&referenceByMonth[endMonth]===true;
+     if(canUseDual&&referenceEvidence?.days?.[key]?.state==='rest'){
+       confirmed[key]=true;confirmationModes[key]='dual';dualCount++;
+     }else if(!canUseDual&&monthCoverage&&dayCovered(date)&&
+       (endDay===date||dayCovered(endDay))&&
+       // Fail closed if the required month in the official feed was missing.
+       requestedMonths.includes(endMonth)){
+       confirmed[key]=true;confirmationModes[key]='official-coverage';fallbackCount++;
      }else{
-       // Do not conflate incomplete cross-source evidence with verified leave.
+       // Cross-source contradictions or insufficient official data are never rest.
        day.state='unknown';day.absenceUnverified=true;discrepancies++;
      }
    }
    state.evidence.absenceConfirmedDays=confirmed;
-   state.evidence.absenceAuditReady=referenceAvailable;
-   state.evidence.absenceAuditWarning=referenceAvailable?'':referenceErrors.join('；')||'原始打卡核對不完整，已暫停無卡判休';
+   state.evidence.absenceConfirmationModes=confirmationModes;
+   state.evidence.absenceAuditReady=dualCount>0||fallbackCount>0||referenceAvailable;
+   state.evidence.absenceAuditMode=fallbackCount?'official-coverage':referenceAvailable?'dual':'unverified';
+   state.evidence.absenceAuditWarning=referenceAvailable?'':referenceErrors.join('；')||'原始打卡來源無法核對，僅可在正式考勤有足夠覆蓋率時確認零打卡';
    state.evidence.absenceDiscrepancies=discrepancies;
+   state.evidence.absenceDualCount=dualCount;
+   state.evidence.absenceOfficialCoverageCount=fallbackCount;
    // Expose shift codes, not the employees' raw punch records or credentials.
    state.evidence.actualShifts=actualShifts;
    state.evidence.actualWorkedMinutes=actualWorkedMinutes;
