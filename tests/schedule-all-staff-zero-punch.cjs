@@ -38,6 +38,29 @@ const make=(records,ref,badMonth=null)=>{
  assert.equal(single.absenceConfirmedDays[key],true);
  assert.equal(single.absenceConfirmationModes[key],'official-coverage');
  assert(single.auditSummary.employees===83,'must scan all 83 employees');
+ // The exact visible defect: a saved middle shift must render 休 when
+ // zero punches are confirmed, even if auto quota metadata says 國.
+ const html=sourceFile('schedule/index.html');
+ const from=html.indexOf('    function p79ScheduleNoPunchRest(');
+ const until=html.indexOf('    // On-demand full staff check',from);
+ assert(from>=0&&until>from,'daily resolver available');
+ const displayContext={
+  automaticRestMeta:{'2026-10-27':{restCategory:'國'}},
+  restBalance:{ledger:[{date:'2026-10-27',kind:'off',category:'國'}]},
+  attendanceEvidence:single,attendanceSnapshot:{attendanceEvidence:single},
+  typhoonDays:new Set(),electionDays:new Set(),typhoonToday:'2026-11-02'
+ };
+ const env={
+  monthlyScheduleData:{E001:{'2026-10-27':'中'}},monthlyScheduleMeta:{E001:{}},
+  p79EmployeeDateEligible:()=>true,p79ScheduleDisplayContext:()=>displayContext,
+  approvedLeaveForEmployee:()=>null,
+  window:{P79RestAttendance:rest},p79ScheduleRestClient:()=>({status:()=>({evidence:single})}),
+  p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=>'',p79LeaveCoverOnDay:()=>[],
+  p79ScheduleLeaveExportCode:()=>'',scheduleLeaveTypeText:()=>'',p79ScheduleSpecialNoPunchCode:()=>'',scheduleTaipeiTodayKey:()=> '2026-11-02'
+ };
+ const displayed=Function('env','with(env){'+html.slice(from,until)+';return p79ScheduleDisplayDay;}')(env);
+ assert.equal(displayed({id:'E001'},'2026-10-27',displayContext).visibleCode,'休','杜智榮-type saved 中 must display 休');
+ assert.equal(env.monthlyScheduleData.E001['2026-10-27'],'中','read-only display must not overwrite saved roster');
  const partial=await make(healthy.slice(0,12),null);
  assert.notEqual(partial.days[key]?.state,'rest','incomplete month must never mark all staff rest');
  const one=await make([...healthy,punch('E001','2026/10/27','16:30','IN')],null);
