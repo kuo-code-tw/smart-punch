@@ -27,6 +27,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,7 +40,7 @@ jobs:
           failed=0
           for test_file in tests/*.cjs; do
             echo "::group::${test_file}"
-            if node "$test_file"; then
+            if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
               :
             else
               echo "::error file=${test_file}::Integration regression failed"
