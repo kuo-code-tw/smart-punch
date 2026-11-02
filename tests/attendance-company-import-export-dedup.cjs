@@ -56,6 +56,15 @@ const corrected=[punch('same-in','240','IN','2026/10/30 07:40'),
 a.deepEqual(exported(corrected).map(r=>r.timeStr),
  ['2026/10/30 07:40','2026/10/30 15:50'],
  'edited official OUT wins; historical 16:50 is excluded only from company export');
+// Two source versions with identical ID/time must select the precise newer
+// edited object, not the first matching event in the company import.
+const unedited=punch('identical','780','IN','2026/10/03 07:35');
+const edited={...unedited,manuallyEdited:true,manuallyEditedAt:'2026-10-03T09:00:00Z',note:'已核實修改版本'};
+const endOriginal=punch('identical-out','780','OUT','2026/10/03 15:50');
+const exactVersion=exported([unedited,edited,endOriginal]);
+a.equal(exactVersion.length,2);
+a.equal(exactVersion[0],edited,'same-ID/time must export latest official source version');
+a.equal(exactVersion[0].note,'已核實修改版本');
 // Attendance page already exports canonical selected punches; the format must stay
 // one row for each original IN or OUT, not two new clock-time columns.
 const selection={window:{P79AttendanceV6:engine},Set};
