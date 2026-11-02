@@ -222,8 +222,20 @@
     const records=uniqueSessionRecords(memberSessions);
     const ins=records.filter(r=>r.__type==='IN').sort((a,b)=>a.__ts-b.__ts||a.__index-b.__index);
     const outs=records.filter(r=>r.__type==='OUT').sort((a,b)=>a.__ts-b.__ts||a.__index-b.__index);
-    const inRec=ins[0]||null;                 // 上班保留最早
-    const outRec=outs.length?outs[outs.length-1]:null; // 下班保留最晚
+    let inRec=ins[0]||null, outRec=outs.length?outs[outs.length-1]:null;
+    // Close duplicate pairs were previously widened to earliest IN/latest
+    // OUT. Apply the same nearest-boundary rule to these 15-minute versions:
+    // otherwise 07:31 wins over 07:35 against an 08:00 shift start.
+    if((ins.length>1||outs.length>1)&&inRec&&outRec){
+      const shift=nearestEightHourWindow(inRec.__ts);
+      if(shift){
+        const nearIn=ins.slice().sort((a,b)=>Math.abs(a.__ts-shift.anchor)-Math.abs(b.__ts-shift.anchor))[0];
+        const nearOut=outs.slice().sort((a,b)=>Math.abs(a.__ts-shift.end)-Math.abs(b.__ts-shift.end))[0];
+        if(Math.abs(nearOut.__ts-shift.end)<=SHIFT_ALIGN_TOLERANCE_MS&&validPair(nearIn,nearOut)){
+          inRec=nearIn;outRec=nearOut;
+        }
+      }
+    }
     if(inRec&&outRec&&!validPair(inRec,outRec)){
       // 理論上近重複合併不會跨過 24 小時；若舊髒資料真的發生，退回原班次避免誤合。
       return memberSessions[0];
