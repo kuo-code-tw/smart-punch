@@ -932,7 +932,7 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79
 
 
 /* PORT79 2026-11-02 — Public WAN HAI ship schedule dialog readability.
- * The dialog is appended directly under body (outside #p79Dashboard).
+ * The dialog is appended directly under body (outside the dashboard panel).
  * Global vessel/workspace dialog rules can paint it navy in dark mode,
  * while old table cells/headings retain navy text. Explicitly scope the
  * complete contrast palette to this one dialog, not attendance tables. */
