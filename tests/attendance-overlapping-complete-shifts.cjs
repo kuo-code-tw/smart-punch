@@ -3,22 +3,27 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const engine=require('../attendance/v6-engine.js');
 const raw=(id,emp,attNo,status,time)=>({id,empId:emp,attNo,name:emp,
   status:status==='IN'?'上班簽到':'下班簽退',timeStr:time,source:'manual-admin'});
+const linkedPair=(prefix,emp,attNo,inTime,outTime)=>{
+  const i=raw(prefix+'-IN',emp,attNo,'IN',inTime);
+  const o=raw(prefix+'-OUT',emp,attNo,'OUT',outTime);
+  i.v5PairTargetId=o.id;o.v5PairTargetId=i.id;return [i,o];
+};
 const person='AP264',att='264';
 const example=[
-  raw('I1',person,att,'IN','2026/10/01 15:51'),
-  raw('O1',person,att,'OUT','2026/10/01 23:50'),
-  raw('I2',person,att,'IN','2026/10/01 15:32'),
-  raw('O2',person,att,'OUT','2026/10/01 23:46')
+  ...linkedPair('G1',person,att,'2026/10/01 15:51','2026/10/01 23:50'),
+  ...linkedPair('G2',person,att,'2026/10/01 15:32','2026/10/01 23:46')
 ];
 const before=JSON.stringify(example);
 const result=engine.buildShifts(example),complete=result.filter(x=>x.clockIn&&x.clockOut);
-assert.equal(complete.length,2,'do not silently drop an original completed shift');
-assert(complete.every(x=>x.overlapIssue===true),'both screenshot rows must be flagged');
-assert(complete.every(x=>x.attendanceStatus==='同人班次重疊待核'));
-assert(complete.every(x=>x.overlapPeerCount===1&&x.overlapMinutes===475));
-assert(complete.every(x=>x.attendanceCheckLabels.includes('同人班次時段重疊待核')));
+assert.equal(complete.length,1,'overlapping versions of one scheduled shift render once');
+assert.equal(complete[0].clockIn.timeStr,'2026/10/01 15:51:00');
+assert.equal(complete[0].clockOut.timeStr,'2026/10/01 23:50:00');
+assert.equal(complete[0].shiftAligned,true,'primary shift flagged as scheduled alignment');
+assert.equal(complete[0].shiftAlignedAlternateCount,1,'other complete version retained as read-only audit');
+assert.equal(complete[0].overlapIssue,undefined,'selected, well-aligned shift is not unresolved');
+assert.equal(complete[0].duplicateRecordCount,0,'never pass suppressed pairs to cloud duplicate deletion');
 assert.equal(JSON.stringify(example),before,'raw punch times and records remain unchanged');
-assert.equal(new Set(complete.flatMap(x=>x.records.map(r=>r.id))).size,4,'four original sides remain recoverable');
+assert.equal(new Set([complete[0],...complete[0].shiftAlignedAlternates].flatMap(x=>x.records.map(r=>r.id))).size,4,'four original sides remain recoverable');
 
 const html=fs.readFileSync('attendance/index.html','utf8');
 function f(name){
@@ -36,10 +41,38 @@ vm.createContext(view);
 for(const name of ['p79AttendanceRowAssessment','p79FilterAttendanceStatus'])
   vm.runInContext(f(name),view);
 const abnormal=view.p79FilterAttendanceStatus(complete,'ABNORMAL',new Date('2026-11-02T00:00:00').getTime());
-assert.equal(abnormal.length,2,'both overlapping complete shifts are listed in the month-wide abnormal filter');
-assert(abnormal.every(r=>r.attendanceStatus==='同人班次重疊待核'));
-assert(abnormal.every(r=>r.attendanceAssessmentReasons.some(t=>t.includes('475 分鐘'))));
-assert.equal(view.p79FilterAttendanceStatus(complete,'NORMAL').length,0);
+assert.equal(abnormal.length,0,'high-confidence nearest scheduled shift is not double-counted as abnormal');
+assert.equal(view.p79FilterAttendanceStatus(complete,'NORMAL').length,1,'selected shift stays in normal attendance');
+
+const oct02=engine.buildShifts([
+  ...linkedPair('Z1','AN1150010','472','2026/10/02 15:36','2026/10/02 23:47'),
+  ...linkedPair('Z2','AN1150010','472','2026/10/02 15:34','2026/10/02 17:47')
+]);
+assert.equal(oct02.length,1,'10/02 #472 must display one scheduled shift');
+assert.equal(oct02[0].clockIn.timeStr,'2026/10/02 15:36:00');
+assert.equal(oct02[0].clockOut.timeStr,'2026/10/02 23:47:00');
+assert.equal(oct02[0].shiftAlignedAlternateCount,1);
+const morning=engine.buildShifts([
+  ...linkedPair('M1','AP0920091','248','2026/10/01 07:35','2026/10/01 15:55'),
+  ...linkedPair('M2','AP0920091','248','2026/10/01 07:31','2026/10/01 15:47')
+]);
+assert.equal(morning.length,1,'08-16 follows the same nearest-boundary rule');
+assert.equal(morning[0].clockIn.timeStr,'2026/10/01 07:35:00');
+assert.equal(morning[0].clockOut.timeStr,'2026/10/01 15:55:00');
+const night=engine.buildShifts([
+  ...linkedPair('N1','NIGHT','455','2026/10/01 23:30','2026/10/02 07:48'),
+  ...linkedPair('N2','NIGHT','455','2026/10/01 23:38','2026/10/02 07:46')
+]);
+assert.equal(night.length,1,'00-08 cross-day shift follows same rule');
+assert.equal(night[0].clockIn.timeStr,'2026/10/01 23:38:00');
+assert.equal(night[0].clockOut.timeStr,'2026/10/02 07:46:00');
+const unresolved=engine.buildShifts([
+  ...linkedPair('U1','UNKNOWN','456','2026/10/01 23:40','2026/10/02 01:00'),
+  ...linkedPair('U2','UNKNOWN','456','2026/10/01 23:36','2026/10/02 02:00')
+]);
+assert.equal(unresolved.length,2,'no near-shift-end clock-out: keep both pending, do not invent 8 hours');
+assert(unresolved.every(x=>x.overlapIssue),'unresolved overlaps remain visible and block overtime');
+assert.equal(view.p79FilterAttendanceStatus(unresolved,'ABNORMAL').length,2);
 
 function session(emp,attNo,inTime,outTime){
   return [raw('IN-'+emp+'-'+inTime,emp,attNo,'IN',inTime),raw('OUT-'+emp+'-'+outTime,emp,attNo,'OUT',outTime)];
@@ -63,7 +96,9 @@ const overlapAcrossMidnight=engine.buildShifts([
 ]);
 assert(overlapAcrossMidnight.every(x=>x.overlapIssue),'physical overlap across month must be flagged');
 const other=engine.buildShifts([...example,...session('E65','65','2026/10/01 15:51','2026/10/01 23:50')]);
-assert.equal(other.filter(x=>x.overlapIssue).length,2,'flag only implicated employee, never all company');
+assert.equal(other.filter(x=>x.shiftAligned).length,1,'only the conflict owner is aligned');
+assert.equal(other.filter(x=>x.overlapIssue).length,0);
+assert.equal(other.length,2,'an unrelated employee is never suppressed');
 const hourHtml=fs.readFileSync('work-hours/index.html','utf8');
 assert(html.includes('v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102'));
 assert(hourHtml.includes('v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102'));
@@ -74,7 +109,7 @@ const issueStart=hourHtml.indexOf('function p79OvertimeAttendanceIssue(session,s
 const issueEnd=hourHtml.indexOf('\n        }',issueStart);
 assert(issueStart>=0&&issueEnd>issueStart,'work-hours overtime issue function exists');
 const hCtx={Number,Date};vm.createContext(hCtx);vm.runInContext(hourHtml.slice(issueStart,issueEnd+10),hCtx);
-const out=hCtx.p79OvertimeAttendanceIssue(complete[0],0,0);
+const out=hCtx.p79OvertimeAttendanceIssue(unresolved[0],0,0);
 assert.match(out,/同人完整出勤班次重疊待核/,'overlap blocks automatic overtime estimation for all staff');
 
 
@@ -85,4 +120,4 @@ assert(ov.includes("if(row?.overlapIssue)throw Error"),'overtime dialog cannot o
 for(const page of [html,hourHtml])
  for(const match of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
   if(!/\bsrc=|application\/json|importmap/.test(match[1])&&match[2].trim())new vm.Script(match[2]);
-console.log('PASS October 1 #264 two complete overlapping manual pairs flagged; all staff, shifts, month boundary, source integrity, anomaly filter, overtime safeguards, scripts');
+console.log('PASS nearest 16-24 / 08-16 / 00-08 shift selection, Oct 02 #472, unresolved guards, boundaries and raw history');
