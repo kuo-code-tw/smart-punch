@@ -929,3 +929,83 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79
  column-gap:9px!important;
 }
 #p79PublicShipScheduleDialog .p79-schedule-table{min-width:600px!important}
+
+
+/* PORT79 2026-11-02 — Public WAN HAI ship schedule dialog readability.
+ * The dialog is appended directly under body (outside #p79Dashboard).
+ * Global vessel/workspace dialog rules can paint it navy in dark mode,
+ * while old table cells/headings retain navy text. Explicitly scope the
+ * complete contrast palette to this one dialog, not attendance tables. */
+@media screen {
+ html body #p79PublicShipScheduleDialog{
+  background:#ffffff!important;color:#173550!important;
+  border:1px solid #b9ccdf!important;color-scheme:light;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-dialog-header h2{
+  color:#173550!important;opacity:1!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-dialog-header p,
+ html body #p79PublicShipScheduleDialog .p79-schedule-dialog-disclaimer{
+  color:#44617b!important;opacity:1!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-table{
+  background:#ffffff!important;color:#173550!important;
+  font-size:13px!important;font-variant-numeric:tabular-nums;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-table th{
+  background:#e7f1fd!important;color:#213b57!important;
+  border-bottom:1px solid #b9ccdf!important;font-weight:800!important;
+  opacity:1!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-table td{
+  background:#ffffff!important;color:#173550!important;
+  border-bottom:1px solid #cad9e7!important;opacity:1!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-table tbody tr:nth-child(even) td{
+  background:#f1f6fc!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-dialog-header button{
+  background:#e7f1fd!important;color:#19456b!important;
+  border:1px solid #b9ccdf!important;
+ }
+ html body #p79PublicShipScheduleDialog .p79-schedule-dialog-actions button,
+ html body #p79PublicShipScheduleDialog a{
+  color:#125b9b!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog{
+  background:#14283f!important;color:#eef5ff!important;
+  border-color:#55718e!important;color-scheme:dark;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-dialog-header h2{
+  color:#f5f9ff!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-dialog-header p,
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-dialog-disclaimer{
+  color:#c6d9ee!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-table{
+  background:#172f49!important;color:#eef5ff!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-table th{
+  background:#25415f!important;color:#f1f7ff!important;
+  border-bottom-color:#68829b!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-table td{
+  background:#172f49!important;color:#eef5ff!important;
+  border-bottom-color:#55718e!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-table tbody tr:nth-child(even) td{
+  background:#1c3955!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-dialog-header button{
+  background:#e2eefb!important;color:#173550!important;
+  border-color:#d0dff0!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog .p79-schedule-dialog-actions button{
+  background:#25415f!important;color:#eef5ff!important;
+  border:1px solid #6a87a4!important;
+ }
+ html[data-theme="dark"] body #p79PublicShipScheduleDialog a{
+  color:#a8d7ff!important;
+ }
+}
