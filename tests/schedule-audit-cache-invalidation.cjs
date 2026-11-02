@@ -5,7 +5,7 @@ const engine=Function("let module={exports:{}};"+file('attendance/v6-engine.js')
 const rest=Function("const window={};"+file('assets/port79-rest-attendance.js')+";return window.P79RestAttendance;")();
 const classify=Function("engine","const window={P79AttendanceV6:engine};let module={exports:{}};"+file('assets/port79-schedule-punch-restore.js')+";return module.exports;")(engine);
 const API=Function("window",file('assets/port79-schedule-rest-evidence.js')+";return window.P79ScheduleRestEvidence;")({P79RestAttendance:rest});
-const people=[{id:'E1',attNo:'1',startDate:'2026-10-01'},{id:'E2',attNo:'2',startDate:'2026-10-20'},{id:'E3',attNo:'3',startDate:'2026-10-01'},{id:'E4',attNo:'4',startDate:'2026-10-01'}];
+const people=[{id:'E1',attNo:'1',startDate:'2026-10-01'},{id:'E2',attNo:'2',startDate:'2026-10-28'},{id:'E3',attNo:'3',startDate:'2026-10-01'},{id:'E4',attNo:'4',startDate:'2026-10-01'}];
 let roster=people.map(p=>({empId:p.id,schedule:{'2026-10-27':'中','2026-10-29':'早'}}));
 let reads=0,updates=0;
 const client=API.create({
