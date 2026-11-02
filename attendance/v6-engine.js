@@ -222,8 +222,20 @@
     const records=uniqueSessionRecords(memberSessions);
     const ins=records.filter(r=>r.__type==='IN').sort((a,b)=>a.__ts-b.__ts||a.__index-b.__index);
     const outs=records.filter(r=>r.__type==='OUT').sort((a,b)=>a.__ts-b.__ts||a.__index-b.__index);
-    const inRec=ins[0]||null;                 // 上班保留最早
-    const outRec=outs.length?outs[outs.length-1]:null; // 下班保留最晚
+    let inRec=ins[0]||null, outRec=outs.length?outs[outs.length-1]:null;
+    // Close duplicate pairs were previously widened to earliest IN/latest
+    // OUT. Apply the same nearest-boundary rule to these 15-minute versions:
+    // otherwise 07:31 wins over 07:35 against an 08:00 shift start.
+    if((ins.length>1||outs.length>1)&&inRec&&outRec){
+      const shift=nearestEightHourWindow(inRec.__ts);
+      if(shift){
+        const nearIn=ins.slice().sort((a,b)=>Math.abs(a.__ts-shift.anchor)-Math.abs(b.__ts-shift.anchor))[0];
+        const nearOut=outs.slice().sort((a,b)=>Math.abs(a.__ts-shift.end)-Math.abs(b.__ts-shift.end))[0];
+        if(Math.abs(nearOut.__ts-shift.end)<=SHIFT_ALIGN_TOLERANCE_MS&&validPair(nearIn,nearOut)){
+          inRec=nearIn;outRec=nearOut;
+        }
+      }
+    }
     if(inRec&&outRec&&!validPair(inRec,outRec)){
       // 理論上近重複合併不會跨過 24 小時；若舊髒資料真的發生，退回原班次避免誤合。
       return memberSessions[0];
@@ -312,6 +324,132 @@
     });
 
     return result;
+  }
+
+  // General eight-hour shift rule: use the completed pairing nearest to the
+  // scheduled 00-08, 08-16 or 16-24 window. This affects the DISPLAY/derived
+  // work-hours model only; never delete or rewrite cloud punch events.
+  //
+  // Require a completed shift close to BOTH anchors. Otherwise the conflicting
+  // rows remain visible as "overlap pending", not a fabricated full shift.
+  const SHIFT_ANCHORS=[0,8,16];
+  const SHIFT_ALIGN_TOLERANCE_MS=90*60*1000;
+  function nearestEightHourWindow(start){
+    if(!Number.isFinite(start))return null;
+    const date=new Date(start);let best=null;
+    for(let offset=-1;offset<=1;offset++){
+      for(const hour of SHIFT_ANCHORS){
+        const anchor=new Date(date.getFullYear(),date.getMonth(),date.getDate()+offset,hour).getTime();
+        const diff=Math.abs(start-anchor);
+        if(!best||diff<best.diff)best={anchor,end:anchor+8*3600000,diff};
+      }
+    }
+    return best&&best.diff<=SHIFT_ALIGN_TOLERANCE_MS?best:null;
+  }
+  function selectNearestShiftOverlaps(rows){
+    const groups=new Map(),hidden=new Set(),chosen=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      if(!row?.clockIn||!row?.clockOut)return;
+      const who=sessionIdentity(row),start=ts(row.clockIn),end=ts(row.clockOut);
+      if(!who||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
+      const shift=nearestEightHourWindow(start);
+      if(!shift)return;
+      const groupKey=who+'|'+shift.anchor;
+      if(!groups.has(groupKey))groups.set(groupKey,[]);
+      groups.get(groupKey).push({row,start,end,shift});
+    });
+    groups.forEach(items=>{
+      items.sort((a,b)=>a.start-b.start||a.end-b.end);
+      const clusters=[];
+      items.forEach(item=>{
+        // A legitimate back-to-back second shift never joins the first.
+        let match=clusters.find(cluster=>
+          cluster.every(x=>Math.abs(x.start-item.start)<=SHIFT_ALIGN_TOLERANCE_MS) &&
+          cluster.some(x=>Math.max(x.start,item.start)<Math.min(x.end,item.end)));
+        if(match)match.push(item);
+        else clusters.push([item]);
+      });
+      clusters.forEach(cluster=>{
+        if(cluster.length<2)return;
+        const eligible=cluster.filter(x=>Math.abs(x.end-x.shift.end)<=SHIFT_ALIGN_TOLERANCE_MS);
+        // A short/early-out conflicting pair must not be presented as an
+        // eight-hour confirmed shift when no valid clock-out is near its end.
+        if(!eligible.length)return;
+        eligible.sort((a,b)=>{
+          const ea=Math.abs(a.start-a.shift.anchor)+Math.abs(a.end-a.shift.end);
+          const eb=Math.abs(b.start-b.shift.anchor)+Math.abs(b.end-b.shift.end);
+          if(ea!==eb)return ea-eb;
+          const ma=isManual(a.row.clockIn)||isManual(a.row.clockOut)?1:0;
+          const mb=isManual(b.row.clockIn)||isManual(b.row.clockOut)?1:0;
+          if(ma!==mb)return ma-mb;
+          return s(a.row.key).localeCompare(s(b.row.key));
+        });
+        const primary=eligible[0],alternates=cluster.filter(x=>x!==primary);
+        // An exact-score tie with different underlying punches is ambiguous;
+        // keep both visible for review rather than silently choose.
+        if(eligible.length>1){
+          const next=eligible[1];
+          const aScore=Math.abs(primary.start-primary.shift.anchor)+Math.abs(primary.end-primary.shift.end);
+          const bScore=Math.abs(next.start-next.shift.anchor)+Math.abs(next.end-next.shift.end);
+          if(aScore===bScore) return;
+        }
+        alternates.forEach(x=>hidden.add(x.row));
+        chosen.set(primary.row,{
+          ...primary.row,
+          attendanceStatus:'正常｜已依班別時間擇近',
+          attendanceCheckLabels:[...new Set([...(primary.row.attendanceCheckLabels||[]),'依班別時間選用最接近之上下班','其他同班重疊配對保留備查'])],
+          shiftAligned:true,shiftAlignedAlternateCount:alternates.length,
+          shiftAlignedAnchorStart:primary.shift.anchor,
+          shiftAlignedAnchorEnd:primary.shift.end,
+          // Keep original pairs available for audit; do not promote them to
+          // duplicateRecordCount or the existing automatic cloud delete list.
+          shiftAlignedAlternates:alternates.map(x=>x.row)
+        });
+      });
+    });
+    return rows.filter(row=>!hidden.has(row)).map(row=>chosen.get(row)||row);
+  }
+
+  // Read-only all-employee audit of COMPLETED sessions, after explicit pairing
+  // and safe near-duplicate consolidation. Do not discard either record or
+  // treat two overlapping intervals as two confirmed work/overtime periods.
+  function markOverlappingCompletedSessions(rows){
+    const byEmployee=new Map(),flags=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      if(!row?.clockIn||!row?.clockOut)return;
+      const identityKey=sessionIdentity(row);
+      const start=ts(row.clockIn),end=ts(row.clockOut);
+      if(!identityKey||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
+      if(!byEmployee.has(identityKey))byEmployee.set(identityKey,[]);
+      byEmployee.get(identityKey).push({row,start,end});
+    });
+    byEmployee.forEach(sessions=>{
+      sessions.sort((a,b)=>a.start-b.start||a.end-b.end);
+      let active=[];
+      sessions.forEach(current=>{
+        active=active.filter(previous=>previous.end>current.start);
+        active.forEach(previous=>{
+          // Strictly positive physical overlap. Touching end/start is allowed;
+          // 2 genuine non-overlapping shifts must never be collapsed.
+          const minutes=Math.ceil((Math.min(previous.end,current.end)-Math.max(previous.start,current.start))/60000);
+          if(minutes<=0)return;
+          for(const [a,b] of [[previous,current],[current,previous]]){
+            if(!flags.has(a.row))flags.set(a.row,{peers:new Set(),minutes:0});
+            const info=flags.get(a.row);
+            info.peers.add(b.row.key);
+            info.minutes=Math.max(info.minutes,minutes);
+          }
+        });
+        active.push(current);
+      });
+    });
+    return rows.map(row=>{
+      const hit=flags.get(row);
+      if(!hit)return row;
+      return {...row,overlapIssue:true,overlapPeerCount:hit.peers.size,
+        overlapMinutes:hit.minutes,attendanceStatus:'同人班次重疊待核',
+        attendanceCheckLabels:[...new Set([...(row.attendanceCheckLabels||[]),'同人班次時段重疊待核'])]};
+    });
   }
 
   function isSyntheticManualPairRecovery(r){
@@ -509,18 +647,19 @@
       row.attendanceCheckLabels=['原始打卡時間不完整'];
       consolidated.push(row);
     });
-    consolidated.sort((a,b)=>(b.sortTime||0)-(a.sortTime||0));
-    return consolidated;
+    const audited=markOverlappingCompletedSessions(selectNearestShiftOverlaps(consolidated));
+    audited.sort((a,b)=>(b.sortTime||0)-(a.sortTime||0));
+    return audited;
   }
   function install(){
     if(typeof window==='undefined') return false;
     window.p79V6BuildDailyAttendanceRows=buildShifts;
     window.buildDailyAttendanceRows=function(sourceRecords){return buildShifts(sourceRecords);};
-    window.p79AttendanceEngineVersion='V6.0.14-SHIP-WORKDAY-TOOLTIPS';
-    console.info('[PORT79] Attendance V6.0.13 ship early-morning work-date installed');
+    window.p79AttendanceEngineVersion='V6.0.16-NEAREST-8H-SHIFT';
+    console.info('[PORT79] Attendance V6.0.16 nearest-scheduled-shift selection with unresolved-overlap audit installed');
     return true;
   }
-  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,shiftWorkdayNote,buildShifts,install};
+  return {MAX_SHIFT_MS,NEAR_DUPLICATE_SIDE_MS,normalizeTime,recordType,identity,isManual,dedupe,accountingDateForSession,shiftWorkdayNote,markOverlappingCompletedSessions,selectNearestShiftOverlaps,buildShifts,install};
 });
 if(typeof window!=='undefined'&&window.P79AttendanceV6){window.P79AttendanceV6.install();}
 

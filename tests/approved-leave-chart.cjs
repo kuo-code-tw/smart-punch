@@ -8,7 +8,7 @@ report=api.aggregate({employees,month:'2026-10',leaveRecords:[row('AMB',{startDa
 a.equal(api.aggregate({employees,leaveRecords:leaves,month:'2026-09'}).rows.find(r=>r.title==='AQC').days,1);
 const html=fs.readFileSync('index.html','utf8'),js=fs.readFileSync('assets/port79-reference-dashboard.js','utf8'),monthly=fs.readFileSync('assets/port79-monthly-dashboard.js','utf8');
 a(html.includes('id="p79DashAttendancePages"'));
-a(html.includes('本月各職稱加班時數統計'),'first page is overtime by job');
+a(html.includes('本月員工職稱加班時數統計'),'first page is overtime by job');
 for(const name of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])a(html.includes('id="'+name+'"'),'pagination remains in same card');
 a(js.includes('function renderAttendancePage()')&&js.includes("chartPage=0")&&js.includes("chartPage=1"));
 a(js.includes('function setOvertimeReport(report)')&&js.includes('function setLeaveReport(report)'));

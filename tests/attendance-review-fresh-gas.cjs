@@ -25,7 +25,16 @@ const ctx={document,URL,AbortController,setTimeout,clearTimeout,
  getAttendanceEmployeeMasterToken:()=> 'TOKEN',getActiveGasUrl:()=> 'https://example.test/gas',
  p79AttendanceOvertimeMonths:months,
  localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},
- fetch:async(url,opts)=>{requests.push({url,opts});return responses.shift()||{ok:true,json:async()=>makeCloud('new')};}
+ fetch:async(url,opts)=>{
+  const action=opts?.method==='POST'?JSON.parse(opts.body).action:new URL(url).searchParams.get('action');
+  requests.push({url,opts,action});
+  if(action==='getOvertimeDateReviewState')return {ok:true,json:async()=>({ok:false,error:'No prior cloud audit state'})};
+  if(action==='setOvertimeDateReviewState'){
+    const body=JSON.parse(opts.body);
+    return {ok:true,json:async()=>({ok:true,action,date:body.date,fingerprint:body.fingerprint,checked:body.checked})};
+  }
+  return responses.shift()||{ok:true,json:async()=>makeCloud('new')};
+ }
 };
 ctx.window=ctx;vm.createContext(ctx);vm.runInContext(source,ctx);
 const api=ctx.P79AttendanceOvertimeDayStatus;
@@ -37,9 +46,9 @@ function color(){api.decorateOvertimeDateStrip([date],date);return styles['backg
  assert.equal(fixed.ok,true);
  assert.match(fixed.message,/已確認 1 筆有效申報/);
  assert.equal(color(),'#dcfce7','fresh effective report is green after checking');
- assert(requests[0].url.includes('action=getScheduleDataSecure'));
- assert(requests[0].url.includes('month=2026-10'));
- assert.equal(requests[0].opts.cache,'no-store');
+ assert(requests.some(request=>request.action==='getScheduleDataSecure'),'the active read always queries official GAS');
+ assert(requests.filter(request=>request.action==='getScheduleDataSecure').every(request=>request.url.includes('month=2026-10')));
+ assert(requests.filter(request=>request.action==='getScheduleDataSecure').every(request=>request.opts.cache==='no-store'));
  responses.push({ok:true,json:async()=>makeCloud('old')});
  const missing=await api.recheckAndMarkReviewed(date,true);
  assert.equal(missing.ok,false);
@@ -54,6 +63,6 @@ function color(){api.decorateOvertimeDateStrip([date],date);return styles['backg
  responses.push({ok:false,json:async()=>({ok:false,error:'權限不足'})});
  const error=await api.recheckAndMarkReviewed(date,true);
  assert.equal(error.ok,false);assert.match(error.message,/權限不足/);
- assert.equal(requests.length,4,'each explicit click hits GAS, never stale month cache');
+ assert.equal(requests.filter(request=>request.action==='getScheduleDataSecure').length,4,'each explicit click hits GAS, never stale month cache');
  console.log('PASS 10/12: fresh GAS report makes green, revoked-only reports remain unverified with evidence and no false claim of non-filing, errors are visible');
 })().catch(e=>{console.error(e);process.exitCode=1});

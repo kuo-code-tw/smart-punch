@@ -14989,6 +14989,10 @@ function getManualPairRecordAnchor(record) {
             if(row?.dateConflict===true&&input!==output&&(output||!Number.isFinite(a)||now-a>=24*3600000))
                 return {kind:'ABNORMAL',status:input?'缺少簽退':'缺少簽到',reasons:['同日有逆序打卡，需確認班次日期及缺卡，未改動原始時間']};
             if(row?.dateConflict===true)return {kind:'PENDING',status:'補卡日期待核對',reasons:['同日下班時間早於上班；需核對跨日日期，原始時間未更動']};
+            if(row?.overlapIssue===true)
+                return {kind:'ABNORMAL',status:'同人班次重疊待核',reasons:[
+                    '與同一員工另 '+Number(row.overlapPeerCount||1)+' 筆完整班次重疊（最多 '+Number(row.overlapMinutes||0)+' 分鐘），兩筆均保留，未核對前不可重複計算正式工時或加班'
+                ]};
             if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
             if(input&&output){
                 if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||b-a>24*3600000)return {kind:'ABNORMAL',status:'班次時間異常'};
@@ -15545,6 +15549,7 @@ function getManualPairRecordAnchor(record) {
         function p79OpenAdminAttendanceOvertime(index) {
             const row = p79AdminAttendanceReportRows[index];
             if (!row || !p79CanReportOvertime()) return showToast('目前沒有加班申報權限，請重新登入或確認權限', 'warning');
+            if (row.overlapIssue) return showToast('此員工有重疊出勤班次，請先核對原始打卡與人工補卡後再申報加班', 'warning');
             if (!row.clockIn || !row.clockOut) return showToast('此班次尚未完成上下班打卡，不能直接申報加班', 'warning');
             const date = attendanceRowDateIso(row);
             const employee = findEmployeeForAttendanceIdentity(row, getAdminVisibleEmployees());
@@ -15584,9 +15589,21 @@ function getManualPairRecordAnchor(record) {
         }
         function p79OpenDuplicateList() {
             const list = p79GetDuplicateListRows();
+            // Separate read-only overlapping-complete-shift review. This must
+            // never join the existing automatic duplicate-deletion candidates.
+            const allowed=(Array.isArray(records)?records:[]).filter(canCurrentAdminViewDataRow);
+            const build=window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows;
+            const overlaps=build(p79AttendanceDisplayPairingRecords(allowed,employees))
+                .filter(row=>row.overlapIssue===true);
             p79DuplicateReviewRows = list;
             p79CloseDuplicateReview();
             const totalExtra = list.reduce((n,row) => n + Number(row.duplicateRecordCount || 0),0);
+            const overlapHtml=overlaps.slice(0,150).map(row=>`<tr class="border-b border-amber-100 dark:border-amber-900">
+                <td class="px-3 py-2">${escapeHtml(String(row.accountingDateKey||row.dateKey||''))}</td>
+                <td class="px-3 py-2">${escapeHtml(String(row.name||row.empId||''))}（${escapeHtml(String(row.attNo||''))}）</td>
+                <td class="px-3 py-2">${escapeHtml(String(row.clockIn?.timeStr||''))} ～ ${escapeHtml(String(row.clockOut?.timeStr||''))}</td>
+                <td class="px-3 py-2">${Number(row.overlapMinutes||0)} 分／另 ${Number(row.overlapPeerCount||0)} 班</td>
+            </tr>`).join('');
             const modal = document.createElement('div');
             modal.id = 'p79DuplicateReviewModal';
             modal.className = 'fixed inset-0 bg-slate-950/60 flex items-center justify-center p-2 sm:p-4';
@@ -15602,6 +15619,11 @@ function getManualPairRecordAnchor(record) {
                 <div class="flex justify-between items-center mb-3"><h3 class="font-black text-base">🔎 疑似重複考勤清單</h3><button type="button" onclick="p79CloseDuplicateReview()" aria-label="關閉">✕</button></div>
                 <div class="text-sm font-bold mb-2">疑似重複班次：${list.length} 組｜整合多餘刷卡：${totalExtra} 筆</div>
                 <p class="text-xs text-amber-700 dark:text-amber-300 mb-3">僅統計目前已載入、且你有權限查看的考勤資料；不是全年雲端全部重複筆數。這是班次整合候選，並非確認可刪資料。人工補卡與不同事件 ID 請逐筆核對。</p>
+                <div class="mb-3 rounded-lg border border-amber-200 p-2">
+                    <div class="font-black text-amber-800 dark:text-amber-200">⚠ 同人完整班次時段重疊待核：${overlaps.length} 列</div>
+                    <p class="text-xs text-amber-700 dark:text-amber-300">此處僅列出前 150 列已載入的重疊紀錄。保留全部原始打卡、不自動刪除；請在考勤「異常」狀態篩選中核對相關員工。正式月結前不得重複認列未確認工時。</p>
+                    <div class="overflow-auto max-h-44"><table class="min-w-full text-xs"><tbody>${overlapHtml||'<tr><td class="p-2 text-slate-400">目前已載入資料沒有完整班次重疊</td></tr>'}</tbody></table></div>
+                </div>
                 <div class="overflow-auto min-h-0 flex-1"><table class="min-w-full text-xs text-left"><thead><tr class="border-b"><th class="px-3 py-2">日期</th><th class="px-3 py-2">員工</th><th class="px-3 py-2">考勤號</th><th class="px-3 py-2">多餘刷卡候選</th><th class="px-3 py-2">操作</th></tr></thead><tbody>${listHtml || '<tr><td colspan="5" class="p-5 text-center text-slate-400">目前已載入的班次沒有偵測到可整合的重複刷卡</td></tr>'}</tbody></table></div>
                 <div class="flex flex-wrap justify-end gap-2 pt-3 mt-2 border-t border-slate-200 dark:border-slate-700 shrink-0"><button type="button" onclick="p79BatchCleanDuplicateAttendance()" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold">清理可確認的 試算表 重複</button><button type="button" onclick="p79CloseDuplicateReview()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700">關閉／全部保留</button></div>
             </div>`;
@@ -16209,6 +16231,7 @@ function getManualPairRecordAnchor(record) {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
                 const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee, overtimeView);
                 const canReportThisRow = p79CanReportOvertime()
+                    && !row.overlapIssue
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
                         && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
                 // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
@@ -25253,7 +25276,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261101-ship-workday-tooltip"></script>
+<script src="./v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261029-attendance-export-parity"></script>
 <script src="../assets/port79-schedule-punch-restore.js?v=20261029-attendance-export-parity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
