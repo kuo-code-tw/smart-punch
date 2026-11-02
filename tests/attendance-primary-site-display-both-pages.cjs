@@ -22,6 +22,7 @@ for (const path of paths) {
     extraLocations:[{name:'新增加班地點',lat:22.61,lng:120.41,radius:150}]},
     defaultConfig:{locationName:'79號碼頭'},JSON,Array,Number,Math,String};
   vm.createContext(env);
+  vm.runInContext(sourceFunction(html,'normalizeExtraLocations'),env);
   vm.runInContext(sourceFunction(html,'formatAttendanceLocationDisplay'),env);
   vm.runInContext(sourceFunction(html,'getConfiguredPunchLocations'),env);
   // Regression: old cloud name used to override the corrected display.
