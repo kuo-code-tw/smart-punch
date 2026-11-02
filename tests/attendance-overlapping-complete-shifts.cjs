@@ -59,6 +59,26 @@ const morning=engine.buildShifts([
 assert.equal(morning.length,1,'08-16 follows the same nearest-boundary rule');
 assert.equal(morning[0].clockIn.timeStr,'2026/10/01 07:35:00');
 assert.equal(morning[0].clockOut.timeStr,'2026/10/01 15:55:00');
+const lateAnother=engine.buildShifts([
+  ...linkedPair('H1','AP1080060','293','2026/10/02 15:34','2026/10/02 23:48'),
+  ...linkedPair('H2','AP1080060','293','2026/10/02 15:39','2026/10/02 23:50'),
+  ...linkedPair('H3','AP1080060','293','2026/10/02 15:34','2026/10/02 17:46')
+]);
+assert.equal(lateAnother.length,1,'all 16-24 personnel: retain closest complete #293 shift');
+assert.equal(lateAnother[0].clockIn.timeStr,'2026/10/02 15:39:00');
+assert.equal(lateAnother[0].clockOut.timeStr,'2026/10/02 23:50:00');
+// A corrected 15:50 OUT and its previous 16:50 version share exactly
+// one record ID. The edited sourceEventKey identifies the superseded time.
+const in240=raw('W-IN','AP0900032','240','IN','2026/10/30 07:40');
+const previous240=raw('W-OUT','AP0900032','240','OUT','2026/10/30 16:50');
+const corrected240={...previous240,timeStr:'2026/10/30 15:50',
+  manuallyEdited:true,manuallyEditedAt:'2026-10-30T09:04:44.015Z',
+  sourceEventKey:'240|2026/10/30 16:50|下班簽退'};
+const correctedRows=engine.buildShifts([in240,previous240,corrected240]);
+const correctedComplete=correctedRows.filter(x=>x.clockIn&&x.clockOut);
+assert.equal(correctedComplete.length,1,'same-ID corrected OUT must not create a second shift');
+assert.equal(correctedComplete[0].clockOut.timeStr,'2026/10/30 15:50:00',
+  'confirmed later edit must take priority over original earlier version');
 const night=engine.buildShifts([
   ...linkedPair('N1','NIGHT','455','2026/10/01 23:30','2026/10/02 07:48'),
   ...linkedPair('N2','NIGHT','455','2026/10/01 23:38','2026/10/02 07:46')
@@ -95,6 +115,12 @@ const overlapAcrossMidnight=engine.buildShifts([
   ...session('E80','80','2026/11/01 06:30','2026/11/01 13:30')
 ]);
 assert(overlapAcrossMidnight.every(x=>x.overlapIssue),'physical overlap across month must be flagged');
+const crossAdjacent=engine.buildShifts([
+  ...linkedPair('CJ1','AN1140010','428','2026/09/30 23:37','2026/10/01 07:49'),
+  ...linkedPair('CJ2','AN1140010','428','2026/10/01 07:33','2026/10/01 15:48')
+]);
+assert.equal(crossAdjacent.length,2,'genuine 00-08 and 08-16 sessions remain separate');
+assert(crossAdjacent.every(x=>x.overlapIssue===true),'16-minute cross-shift overlap remains an abnormal review');
 const other=engine.buildShifts([...example,...session('E65','65','2026/10/01 15:51','2026/10/01 23:50')]);
 assert.equal(other.filter(x=>x.shiftAligned).length,1,'only the conflict owner is aligned');
 assert.equal(other.filter(x=>x.overlapIssue).length,0);
