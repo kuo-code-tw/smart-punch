@@ -3,6 +3,8 @@
 'use strict';
 const DEFAULT_COMPANY='亞安顧問管理',COMPANY_KEY='port79_vessel_monthly_company_v1',SIGNATURE_KEY='port79_vessel_monthly_signature_labels_v1',PAGE_SIZE=35,PRINT_ROWS_PER_PAGE=45;
 const DEFAULT_SIGNATURES=['證明：','協理：','經理：','製表：'];
+// Keep numeric zeros for calculations, but show empty cells in Excel (positive;negative;zero;text).
+const COUNT_DISPLAY_FORMAT='#,##0;-#,##0;;@',EFFICIENCY_DISPLAY_FORMAT='0.00;-0.00;;@';
 function signatureLabels(values){
  return DEFAULT_SIGNATURES.map((fallback,i)=>{
   if(!Array.isArray(values)||values[i]===undefined||values[i]===null)return fallback;
@@ -71,7 +73,7 @@ function createWorkbook(ExcelJS,{month,company,rows,signatures}={}){
   }
   sheet.mergeCells(first,1,first,13);sheet.getCell(first,1).value=title;sheet.getCell(first,1).font={...baseFont,size:22,bold:true};sheet.getCell(first,1).alignment={horizontal:'center',vertical:'middle',shrinkToFit:true};sheet.getRow(first).height=32;
   sheet.mergeCells(first+1,1,first+1,13);sheet.getCell(first+1,1).value=report;sheet.getCell(first+1,1).font={...baseFont,size:13,bold:true};sheet.getRow(first+1).height=22;
-  const headings=['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','請款櫃數','翻艙蓋數','翻艙數','效率','','備註'];
+  const headings=['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','作業櫃數','翻艙蓋數','翻艙數','效率','','備註'];
   headings.forEach((v,i)=>sheet.getCell(first+2,i+1).value=v);
   for(let col=1;col<=10;col++)sheet.mergeCells(first+2,col,first+3,col);
   sheet.mergeCells(first+2,11,first+2,12);sheet.mergeCells(first+2,13,first+3,13);
@@ -86,8 +88,8 @@ function createWorkbook(ExcelJS,{month,company,rows,signatures}={}){
    const values=[start+i+1,String(x.serial||''),date,String(x.shipName||''),String(x.voyage||''),x.disc,x.load,x.bill,x.hc,x.shift,x.productivity,x.includeHC,''];
    values.forEach((v,col)=>sheet.getCell(r,col+1).value=v);
    sheet.getCell(r,3).numFmt='mm/dd';
-   for(let col=6;col<=10;col++)sheet.getCell(r,col).numFmt='#,##0';
-   for(let col=11;col<=12;col++)sheet.getCell(r,col).numFmt='0.00';
+   for(let col=6;col<=10;col++)sheet.getCell(r,col).numFmt=COUNT_DISPLAY_FORMAT;
+   for(let col=11;col<=12;col++)sheet.getCell(r,col).numFmt=EFFICIENCY_DISPLAY_FORMAT;
   }
   const subtotal=first+39,grand=first+40,footer=first+41;
   sheet.mergeCells(subtotal,1,subtotal,5);sheet.getCell(subtotal,1).value='本頁小計';
@@ -96,7 +98,7 @@ function createWorkbook(ExcelJS,{month,company,rows,signatures}={}){
    const letter=String.fromCharCode(64+col),sum=chunk.reduce((v,x)=>v+Number([x.disc,x.load,x.bill,x.hc,x.shift][col-6]||0),0);
    sheet.getCell(subtotal,col).value={formula:`SUM(${letter}${first+4}:${letter}${first+38})`,result:sum};
    sheet.getCell(grand,col).value={formula:Array.from({length:pages},(_,p)=>`${letter}${p*PRINT_ROWS_PER_PAGE+40}`).join('+'),result:totals[col-6]};
-   sheet.getCell(subtotal,col).numFmt=sheet.getCell(grand,col).numFmt='#,##0';
+   sheet.getCell(subtotal,col).numFmt=sheet.getCell(grand,col).numFmt=COUNT_DISPLAY_FORMAT;
   }
   for(const r of [subtotal,grand]){sheet.getRow(r).height=19;sheet.getRow(r).eachCell(cell=>{cell.font={...baseFont,bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};});}
   sheet.mergeCells(footer,1,footer,13);sheet.getCell(footer,1).value=`第 ${page+1} 頁／共 ${pages} 頁`;sheet.getRow(footer).height=18;
