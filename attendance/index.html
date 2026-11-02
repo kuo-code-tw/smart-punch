@@ -23698,7 +23698,12 @@ window.p79AttendanceRecordCounts = function(){
     if(!r||typeof r!=='object')return out;
     const id=String(r.id??'').trim();
     const ty=getAttendanceRecordType(r);
-    if(id)out.push('ID:'+id+'|TYPE:'+ty);
+    // A legacy cloud record ID may be reused on another calendar date.
+    // Constrain ID aliases to the physical punch day so 11/01 OUT cannot
+    // silently overwrite a distinct 10/31 OUT during month-boundary merge.
+    const punchDay=String(normalizeImportedAttendanceTime(r.timeStr)||r.timeStr||'').replaceAll('-','/').slice(0,10);
+    const physicalDay=/^\d{4}\/\d{2}\/\d{2}$/.test(punchDay)?punchDay:'';
+    if(id)out.push('ID:'+id+'|TYPE:'+ty+(physicalDay?'|DAY:'+physicalDay:''));
     const ev=String(getAttendanceImportEventKey(r)||'').trim();
     if(ev)out.push('EV:'+stripManualPairSuffixFromEventKey(ev)+'|TYPE:'+ty);
     const src=String(r.sourceEventKey||'').trim();
@@ -23891,23 +23896,41 @@ window.p79AttendanceRecordCounts = function(){
     };
   }
 
-  async function fetchBoundaryMonth(month){
-    // A successful empty raw reply does not prove archived boundary events are absent.
-    const replies=await Promise.allSettled([
-      readApi('getAttendanceMonthRaw',{month},`跨月原始邊界 ${month}`,12000),
-      readApi('historyGetMonthData',{type:'attendance',month},`跨月歷史邊界 ${month}`,12000)
-    ]);
-    const center=selectedMonth();
+  async function fetchBoundaryMonth(month, originMonth=selectedMonth()){
+    // The first day of the next physical month may close a shift that began
+    // on the final day of the accounting month. Read both official sources:
+    // the raw endpoint alone may not expose every freshly confirmed punch.
+    const center=validMonth(originMonth)?originMonth:selectedMonth();
     const edge=month<center
       ? new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()
       : 1;
     const day=month+'-'+String(edge).padStart(2,'0');
+    const datesMatch=r=>String(r.timeStr||'').slice(0,10).replaceAll('/','-')===day;
+    const replies=await Promise.allSettled([
+      readApi('getAttendanceMonthRaw',{month},`跨月原始邊界 ${month}`,12000),
+      readApi('getAttendanceMainDirect',{month},`跨月主表邊界 ${month}`,12000),
+      readApi('historyGetMonthData',{type:'attendance',month},`跨月歷史邊界 ${month}`,12000)
+    ]);
     const groups=replies.map(r=>r.status==='fulfilled'?normRows(r.value.records):[]);
-    if(replies.every(r=>r.status==='rejected') || (replies[1].status==='rejected'&&!groups[0].length))throw new Error('跨月邊界尚未讀取完成，請重新從雲端拉取');
-    const primary=groups[0].filter(r=>String(r.timeStr||'').slice(0,10).replaceAll('/','-')===day);
-    const seen=new Set(primary.flatMap(stableAliasKeys));
-    const extra=groups[1].filter(r=>{
-      if(String(r.timeStr||'').slice(0,10).replaceAll('/','-')!==day)return false;
+    // Older GAS backends may expose a newly clocked OUT only via month/core.
+    // Fallback is limited to an empty boundary day to keep normal page loads fast.
+    if(!groups.some(g=>g.some(datesMatch))){
+      const additional=await Promise.allSettled([
+        readApi('getAttendanceMonthData',{month},`跨月月份備援 ${month}`,12000),
+        readApi('getAttendanceCoreData',{month},`跨月核心備援 ${month}`,12000)
+      ]);
+      additional.forEach(r=>groups.push(r.status==='fulfilled'?normRows(r.value.records):[]));
+      replies.push(...additional);
+    }
+    if(replies.every(r=>r.status==='rejected') ||
+       (replies[2].status==='rejected'&&!groups.some(g=>g.some(datesMatch))))
+      throw new Error('跨月邊界尚未讀取完成，請重新從雲端拉取');
+
+    // Keep the raw source first; add genuinely absent events from the main
+    // table, archive and compatible endpoints without changing original times.
+    const primary=groups[0].filter(datesMatch),seen=new Set(primary.flatMap(stableAliasKeys));
+    groups.slice(1).forEach(group=>group.forEach(r=>{
+      if(!datesMatch(r))return;
       const keys=stableAliasKeys(r);
       if(keys.some(k=>seen.has(k))){
         const index=primary.findIndex(p=>stableAliasKeys(p).some(k=>keys.includes(k)));
@@ -23915,11 +23938,12 @@ window.p79AttendanceRecordCounts = function(){
           const precise=p79AttendancePreciseVersion(primary[index],r);
           if(precise===r)primary[index]=r;
         }
-        return false;
+        return;
       }
-      keys.forEach(k=>seen.add(k));return true;
-    });
-    return [...primary,...extra];
+      keys.forEach(k=>seen.add(k));
+      primary.push(r);
+    }));
+    return primary;
   }
 
   async function syncMonth(month, options={}){
@@ -23945,7 +23969,7 @@ window.p79AttendanceRecordCounts = function(){
         if(options.boundary!==false){
           const prev=shiftAttendanceMonthKey(month,-1),next=shiftAttendanceMonthKey(month,1);
           const months=[prev,...(next<=monthNow()?[next]:[])];
-          const boundary=await Promise.allSettled(months.map(key=>fetchBoundaryMonth(key)));
+          const boundary=await Promise.allSettled(months.map(key=>fetchBoundaryMonth(key,month)));
           boundary.forEach((result,index)=>{
             if(result.status==='fulfilled'){
               if(result.value.length)applyMonth(months[index],result.value,{boundary:result.value.length},null);
@@ -24049,7 +24073,7 @@ window.p79AttendanceRecordCounts = function(){
   try{loadAttendanceBoundaryMonthsFromCloud=async (month)=>{
     const m=validMonth(month)?month:selectedMonth();
     const prev=shiftAttendanceMonthKey(m,-1),next=shiftAttendanceMonthKey(m,1);
-    const [a,b]=await Promise.all([fetchBoundaryMonth(prev),fetchBoundaryMonth(next)]);
+    const [a,b]=await Promise.all([fetchBoundaryMonth(prev,m),fetchBoundaryMonth(next,m)]);
     if(a.length)applyMonth(prev,a,{boundary:a.length},null);
     if(b.length)applyMonth(next,b,{boundary:b.length},null);
     return true;
