@@ -68,6 +68,15 @@ const hourHtml=fs.readFileSync('work-hours/index.html','utf8');
 assert(html.includes('v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102'));
 assert(hourHtml.includes('v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102'));
 assert(html.includes('&& !row.overlapIssue'),'inline overtime button must be suppressed on overlap');
+assert(html.includes('同人完整班次時段重疊待核'),'existing duplicate audit panel lists overlaps separately');
+assert(html.includes('p79DuplicateReviewRows = list;'),'automatic duplicate deletion remains limited to original confirmed near-duplicates');
+const issueStart=hourHtml.indexOf('function p79OvertimeAttendanceIssue(session,start,end) {');
+const issueEnd=hourHtml.indexOf('\n        }',issueStart);
+assert(issueStart>=0&&issueEnd>issueStart,'work-hours overtime issue function exists');
+const hCtx={Number,Date};vm.createContext(hCtx);vm.runInContext(hourHtml.slice(issueStart,issueEnd+10),hCtx);
+const out=hCtx.p79OvertimeAttendanceIssue(complete[0],0,0);
+assert.match(out,/同人完整出勤班次重疊待核/,'overlap blocks automatic overtime estimation for all staff');
+
 
 const ov=fs.readFileSync('assets/port79-attendance-overtime.js','utf8');
 assert(ov.includes('officialRows.some(row=>row.overlapIssue'),'cloud-saving must recheck official overlapping pairs');
