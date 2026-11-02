@@ -8,7 +8,7 @@ assert(html.includes('id="p79EmployeeShipSection"'),'employee-view section must 
 assert(html.includes('id="p79PublicShipBoard"'),'public employee ship board must exist');
 assert(html.indexOf('id="p79PublicShipBoard"')<html.indexOf('id="systems"'),'employees see the ship board before management login');
 assert(html.includes('萬海網站船期'));
-assert(html.includes('port79-google-sheet-schedule.js?v=20261101-expired-etd-filter-v81'));
+assert(html.includes('port79-google-sheet-schedule.js?v=20261102-bilingual-names-v82'));
 assert(!html.includes('port79-external-ship-schedule.js?v='));
 assert(src.includes("const ACTION='publicShipSchedule'"));
 assert(src.includes('g.document.head.appendChild(script)'),'cross-domain GAS script output works without fetch CORS');

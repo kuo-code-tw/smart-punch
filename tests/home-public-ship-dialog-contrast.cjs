@@ -10,7 +10,7 @@ assert(begin >= 0, 'public Wan Hai dialog contrast patch exists');
 const patch = css.slice(begin);
 const scope = '#p79PublicShipScheduleDialog';
 assert(sailing.includes("dialog.id='p79PublicShipScheduleDialog'"), 'the patched ID is the actual public vessel dialog');
-assert(sailing.includes("['船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD']"), 'four required columns remain');
+assert(sailing.includes("['英文船名','中文船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD']"), 'four required columns remain');
 assert(html.includes('port79-reference-dashboard.css?v=20261102-public-ship-contrast-v1'), 'fresh stylesheet URL busts cached CSS');
 assert(!patch.includes('#p79Dashboard'), 'contrast patch is scoped to this one dialog, not dashboard-wide');
 function rule(selector) {
