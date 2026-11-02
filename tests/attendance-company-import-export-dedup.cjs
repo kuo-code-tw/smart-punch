@@ -87,4 +87,38 @@ for(const html of [work,attendance]) {
  a(!source.includes('clockInTime'),'no extra clock-in column added');
  a(!source.includes('clockOutTime'),'no extra clock-out column added');
 }
+// Execute the actual work-hours Excel exporter with a real duplicate-pair
+// fixture and a fake spreadsheet writer: verify the EXACT original columns.
+const fields=['attNo','empId','name','time','status'].map((key)=>({
+ checked:true,value:key,getAttribute:()=>({attNo:'考勤號碼',empId:'工號',name:'姓名',time:'打卡時間',status:'出勤狀態'})[key]
+}));
+let saved=null;
+const exportVm={window:{P79AttendanceV6:engine,p79EnsureXlsx:async()=>true},
+ document:{querySelectorAll:()=>fields,getElementById:()=>({value:'ALL'})},
+ records:mid,JSON,Map,Set,Error,
+ requireAdminAction:()=>true,canCurrentAdminViewDataRow:()=>true,
+ findEmployeeForAttendanceIdentity:r=>({attNo:r.attNo,empId:r.empId,name:r.name||'472'}),
+ formatDateTime:v=>v,formatAttendanceLocationDisplay:v=>v,
+ ensureExcelLibrary:()=>true,sysConfig:{companyName:'測試'},defaultConfig:{companyName:'測試'},
+ closeExportRecordsModal:()=>{},showToast:()=>{},
+ XLSX:{utils:{aoa_to_sheet:rows=>({rows}),book_new:()=>({}),book_append_sheet:(wb,ws)=>{wb.sheet=ws}},writeFile:(wb,name)=>saved={wb,name}}
+};
+vm.createContext(exportVm);
+vm.runInContext(extract(work,'p79SelectWorkHoursCompanyImportPunches'),exportVm);
+const expAt=work.indexOf('        async function exportSelectedRecordsExcel() {');
+const expEnd=work.indexOf('\\n        }',expAt);
+a(expAt>=0&&expEnd>expAt);
+vm.runInContext(work.slice(expAt,expEnd+10),exportVm);
+(async()=>{
+ await exportVm.exportSelectedRecordsExcel();
+ a(saved,'real exporter produced a workbook');
+ a.deepEqual(Array.from(saved.wb.sheet.rows[0]),['考勤號碼','工號','姓名','打卡時間','出勤狀態']);
+ a.equal(saved.wb.sheet.rows.length,3,'one selected IN and one selected OUT, not four rows');
+ a.deepEqual(Array.from(saved.wb.sheet.rows.slice(1),r=>[r[3],r[4]]),
+  [['2026/10/02 15:36','上班簽到'],['2026/10/02 23:47','下班簽退']]);
+ a(!saved.wb.sheet.rows[0].some(c=>c==='簽到時間'||c==='簽退時間'),
+  'company import layout is not changed into shift-per-row');
+ console.log('PASS real work-hours XLSX generation retains header/order and exactly one canonical IN/OUT pair');
+})().catch(e=>{console.error(e);process.exitCode=1});
+
 console.log('PASS unchanged company import schema; canonical selected IN/OUT only; cross-day, morning/middle, corrected official event and real second shifts');
