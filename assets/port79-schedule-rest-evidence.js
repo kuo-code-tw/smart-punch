@@ -97,6 +97,22 @@ function create(ctx){
    if(JSON.stringify(ctx.schedules())!==rosterSignature||JSON.stringify(ctx.employees())!==personnelSignature)
      throw Error('核對期間人員或班表已更新，需重新讀取考勤');
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
+   // Explain each single-sided attendance exception directly from its
+   // source timestamp. This is read-only diagnostic proof, not a shift change.
+   const pendingPunchDetails={};
+   const localTime=ts=>Number.isFinite(ts)?new Date(ts+8*3600000).toISOString().replace('T',' ').slice(0,16):'';
+   sessions.forEach((session,index)=>{
+     if(Number.isFinite(session.start)&&Number.isFinite(session.end)&&session.end>session.start)return;
+     const workday=state.evidence.sessionDates?.[index];
+     const key=id(session.empId)+'|'+workday;
+     if(!workday?.startsWith(month+'-')||state.evidence.days?.[key]?.state!=='missing')return;
+     (pendingPunchDetails[key] ||= []).push({
+       type:Number.isFinite(session.start)?'只有上班卡':'只有下班卡',
+       time:localTime(Number.isFinite(session.start)?session.start:session.end),
+       workday
+     });
+   });
+   state.evidence.pendingPunchDetails=pendingPunchDetails;
    // A checked absence is based on either two authenticated feeds or a
    // high-coverage authenticated official feed if the raw endpoint is missing.
    // Never treat a partially loaded/empty month as a blanket rest day.
