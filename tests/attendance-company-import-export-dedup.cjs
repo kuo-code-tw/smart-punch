@@ -1,0 +1,81 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
+const engine=require('../attendance/v6-engine.js');
+const work=fs.readFileSync('work-hours/index.html','utf8');
+const attendance=fs.readFileSync('attendance/index.html','utf8');
+function extract(html,name) {
+ const at=html.indexOf('        function '+name+'(');
+ a(at>=0,name+' exists');
+ const end=html.indexOf('\n        }',at);
+ a(end>at,name+' ends');
+ return html.slice(at,end+10);
+}
+const context={window:{P79AttendanceV6:engine},JSON,Map,Error};
+vm.createContext(context);
+vm.runInContext(extract(work,'p79SelectWorkHoursCompanyImportPunches'),context);
+const exported=source=>Array.from(context.p79SelectWorkHoursCompanyImportPunches(source));
+const punch=(id,emp,side,time)=>({
+ id,empId:emp,attNo:emp,status:side==='IN'?'上班簽到':'下班簽退',
+ timeStr:time,location:'公司GPS位置',note:'供正式公司匯入'
+});
+function pair(label,emp,start,end){
+ const inside=punch(label+'-I',emp,'IN',start),outside=punch(label+'-O',emp,'OUT',end);
+ inside.v5PairTargetId=outside.id;outside.v5PairTargetId=inside.id;
+ return [inside,outside];
+}
+const mid=[
+ ...pair('valid','472','2026/10/02 15:36','2026/10/02 23:47'),
+ ...pair('dupe','472','2026/10/02 15:34','2026/10/02 17:47')];
+const morning=[
+ ...pair('morning-keep','248','2026/10/01 07:35','2026/10/01 15:55'),
+ ...pair('morning-drop','248','2026/10/01 07:31','2026/10/01 15:47')];
+const night=[
+ ...pair('night-drop','455','2026/10/01 23:30','2026/10/02 07:46'),
+ ...pair('night-keep','455','2026/10/01 23:38','2026/10/02 07:48')];
+const twoShifts=[
+ ...pair('first','100','2026/10/01 07:34','2026/10/01 15:58'),
+ ...pair('second','100','2026/10/01 15:59','2026/10/01 23:52')];
+const all=[...mid,...morning,...night,...twoShifts];
+const original=JSON.stringify(all);
+const picked=exported(all);
+a.deepEqual(picked.map(r=>r.id),[
+ 'valid-I','valid-O','morning-keep-I','morning-keep-O',
+ 'night-keep-I','night-keep-O','first-I','first-O','second-I','second-O'
+],'only chosen original punches exported, two different shifts remain independent');
+a.equal(picked.length,10);
+a.equal(picked[0],all[0],'original event object retained, not a normalized copy');
+a.equal(picked[1].timeStr,'2026/10/02 23:47','original timestamp format unchanged');
+a.equal(picked[1].status,'下班簽退','original import status unchanged');
+a.equal(picked[1].location,'公司GPS位置','source location untouched');
+a.equal(JSON.stringify(all),original,'export selection must not mutate any raw data');
+const corrected=[punch('same-in','240','IN','2026/10/30 07:40'),
+ punch('same-out','240','OUT','2026/10/30 16:50'),
+ {...punch('same-out','240','OUT','2026/10/30 15:50'),
+ manuallyEdited:true,manuallyEditedAt:'2026-10-30T09:04:44.015Z',
+ sourceEventKey:'240|2026/10/30 16:50|下班簽退'}];
+a.deepEqual(exported(corrected).map(r=>r.timeStr),
+ ['2026/10/30 07:40','2026/10/30 15:50'],
+ 'edited official OUT wins; historical 16:50 is excluded only from company export');
+// Attendance page already exports canonical selected punches; the format must stay
+// one row for each original IN or OUT, not two new clock-time columns.
+const selection={window:{P79AttendanceV6:engine},Set};
+vm.createContext(selection);
+vm.runInContext(extract(attendance,'p79SelectAttendanceExportShifts'),selection);
+const attendanceSelected=Array.from(selection.p79SelectAttendanceExportShifts(
+ mid,'2026-10','2026-10-02','2026-10-02'));
+a.equal(attendanceSelected.length,2,'attendance export matches work-hours canonical pair');
+a.deepEqual(attendanceSelected.map(r=>r.id),['valid-I','valid-O']);
+for(const html of [work,attendance]) {
+ const idx=html.indexOf('async function exportSelectedRecordsExcel()');
+ a(idx>=0,'company import export still exists');
+ const source=html.slice(idx,idx+8000);
+ a(source.includes('const sheetRows = [selectedFields.map(f => f.label)]'),
+  'company-import header and selected field order unchanged');
+ a(source.includes('visibleRecords.forEach(r => {'),
+  'each chosen original punch remains one row');
+ a(source.includes("if (f.key === 'time') val = formatDateTime(r.timeStr)"),
+  'existing company time column unchanged');
+ a(!source.includes('clockInTime'),'no extra clock-in column added');
+ a(!source.includes('clockOutTime'),'no extra clock-out column added');
+}
+console.log('PASS unchanged company import schema; canonical selected IN/OUT only; cross-day, morning/middle, corrected official event and real second shifts');
