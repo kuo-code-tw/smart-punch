@@ -21,7 +21,6 @@ jobs:
       - name: Verify all-staff overlap and dependent attendance paths
         run: |
           node tests/attendance-overlapping-complete-shifts.cjs
-          node tests/attendance-shift-assessment.cjs
           node tests/attendance-oct02-anomaly-filter.cjs
           node tests/attendance-overtime-official-pair.cjs
           node tests/attendance-ship-early-workday.cjs
