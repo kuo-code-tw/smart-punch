@@ -1,0 +1,34 @@
+name: Verify all-staff attendance overlap audit
+on:
+  pull_request:
+    paths:
+      - 'attendance/v6-engine.js'
+      - 'attendance/index.html'
+      - 'work-hours/index.html'
+      - 'assets/port79-attendance-overtime.js'
+      - 'tests/attendance-overlapping-complete-shifts.cjs'
+      - '.github/workflows/attendance-overlapping-complete-shifts.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify all-staff overlap and dependent attendance paths
+        run: |
+          node tests/attendance-overlapping-complete-shifts.cjs
+          node tests/attendance-shift-assessment.cjs
+          node tests/attendance-oct02-anomaly-filter.cjs
+          node tests/attendance-overtime-official-pair.cjs
+          node tests/attendance-ship-early-workday.cjs
+          node tests/attendance-cross-day-tooltip.cjs
+          node tests/attendance-boundary-history.cjs
+          node tests/attendance-month-view.cjs
+          node tests/attendance-export-month.cjs
+          node tests/attendance-duplicate-stop.cjs
+          node tests/attendance-single-pair-cleanup.cjs
+          node tests/attendance-bounded-render.cjs
