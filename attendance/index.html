@@ -14989,6 +14989,10 @@ function getManualPairRecordAnchor(record) {
             if(row?.dateConflict===true&&input!==output&&(output||!Number.isFinite(a)||now-a>=24*3600000))
                 return {kind:'ABNORMAL',status:input?'缺少簽退':'缺少簽到',reasons:['同日有逆序打卡，需確認班次日期及缺卡，未改動原始時間']};
             if(row?.dateConflict===true)return {kind:'PENDING',status:'補卡日期待核對',reasons:['同日下班時間早於上班；需核對跨日日期，原始時間未更動']};
+            if(row?.overlapIssue===true)
+                return {kind:'ABNORMAL',status:'同人班次重疊待核',reasons:[
+                    '與同一員工另 '+Number(row.overlapPeerCount||1)+' 筆完整班次重疊（最多 '+Number(row.overlapMinutes||0)+' 分鐘），兩筆均保留，未核對前不可重複計算正式工時或加班'
+                ]};
             if(row?.pairingIssue===true)return {kind:'ABNORMAL',status:'班次配對異常'};
             if(input&&output){
                 if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||b-a>24*3600000)return {kind:'ABNORMAL',status:'班次時間異常'};
@@ -15545,6 +15549,7 @@ function getManualPairRecordAnchor(record) {
         function p79OpenAdminAttendanceOvertime(index) {
             const row = p79AdminAttendanceReportRows[index];
             if (!row || !p79CanReportOvertime()) return showToast('目前沒有加班申報權限，請重新登入或確認權限', 'warning');
+            if (row.overlapIssue) return showToast('此員工有重疊出勤班次，請先核對原始打卡與人工補卡後再申報加班', 'warning');
             if (!row.clockIn || !row.clockOut) return showToast('此班次尚未完成上下班打卡，不能直接申報加班', 'warning');
             const date = attendanceRowDateIso(row);
             const employee = findEmployeeForAttendanceIdentity(row, getAdminVisibleEmployees());
@@ -16209,6 +16214,7 @@ function getManualPairRecordAnchor(record) {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
                 const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee, overtimeView);
                 const canReportThisRow = p79CanReportOvertime()
+                    && !row.overlapIssue
                     && !!(row.clockIn && row.clockOut && reportEmployee?.empId
                         && /^\d{4}-\d{2}-\d{2}$/.test(attendanceRowDateIso(row)));
                 // V5.10.3：顯示單位／職稱時每列直接用考勤號查員工主檔。
@@ -25253,7 +25259,7 @@ panel.addEventListener('click',e=>{if(e.target===panel)panel.classList.remove('o
 setInterval(draw,4000);draw();
 })();
 </script>
-<script src="./v6-engine.js?v=20261101-ship-workday-tooltip"></script>
+<script src="./v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 <script src="../assets/port79-rest-allocation.js?v=20261029-attendance-export-parity"></script>
 <script src="../assets/port79-schedule-punch-restore.js?v=20261029-attendance-export-parity"></script>
 <script id="p79-v14-cloud-ack-reconciliation">
