@@ -14058,7 +14058,7 @@ function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')
   const period=valid?`${Number(valid[1])-1911}年${Number(valid[2])}月份`:'';
   const aoa=[
     [`亞安顧問管理79W ${period}船邊作業量表`],[],
-    ['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','請款櫃數','翻艙蓋數','翻艙數','效率','','備註'],
+    ['編號','序號','日期','船名','航次','卸船櫃數','裝船櫃數','作業櫃數','翻艙蓋數','翻艙數','效率','','備註'],
     ['','','','','','','','','','','Productivity','(Include HC)']
   ];
   rows.forEach((x,i)=>aoa.push([
@@ -14074,11 +14074,12 @@ function buildMonthlyOperationSheet(month=document.getElementById('filterMonth')
     const r=i+5;
     ws['!merges'].push(XLSX.utils.decode_range(`M${r}:N${r}`));
     if(ws[`C${r}`]?.t==='n')ws[`C${r}`].z='mm/dd';
-    ['K','L'].forEach(col=>{if(ws[`${col}${r}`])ws[`${col}${r}`].z='0.00';});
+    ['F','G','H','I','J'].forEach(col=>{if(ws[`${col}${r}`])ws[`${col}${r}`].z='#,##0;-#,##0;;@';});
+    ['K','L'].forEach(col=>{if(ws[`${col}${r}`])ws[`${col}${r}`].z='0.00;-0.00;;@';});
   });
   const last=rows.length+5;
   ws['!merges'].push(XLSX.utils.decode_range(`M${last}:N${last}`));
-  if(rows.length)'FGHIJ'.split('').forEach(col=>{ws[`${col}${last}`].f=`SUM(${col}5:${col}${last-1})`;});
+  if(rows.length)'FGHIJ'.split('').forEach(col=>{ws[`${col}${last}`].f=`SUM(${col}5:${col}${last-1})`;ws[`${col}${last}`].z='#,##0;-#,##0;;@';});
   ws['!cols']=[8,10,12,14,12,12,12,12,12,10,16,16,14,10].map(wch=>({wch}));
   ws['!rows']=[{hpt:24},{hpt:12},{hpt:25},{hpt:22}];
   ws['!ref']=`A1:N${last}`;
@@ -15234,7 +15235,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 });
 </script>
 <script src="../assets/port79-aqc-schedule-groups.js?v=20261026-group-identity-v2"></script>
-<script src="../assets/port79-vessel-monthly-report.js?v=20261027-portrait-editable-signatures-v1"></script>
+<script src="../assets/port79-vessel-monthly-report.js?v=20261102-operation-count-hide-zeros-v1"></script>
 <script src="../assets/port79-seven-top.js?v=20261101-unified-sidebar-v2"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 船舶作業明細滿版寬度 + 年份選單防空白 -->
