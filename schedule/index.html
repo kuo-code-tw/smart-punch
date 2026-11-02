@@ -31,7 +31,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-global-audit-proof-v10"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-all-staff-audit-eligibility-v11"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7136,7 +7136,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // cloud-roster reconciliation. Never infer shifts from a separate raw
       // snapshot while the save pipeline reads getAttendanceMainDirect.
       if(!p79ScheduleRestEvidenceClient)p79ScheduleRestEvidenceClient=window.P79ScheduleRestEvidence.create({
-        token:currentPort79SsoToken,employees:()=>employees,schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
+        token:currentPort79SsoToken,employees:()=>employees,
+        dateEligible:(emp,date)=>p79EmployeeDateEligible(emp,date),
+        schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
         buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
         read:async(month,token)=>{
