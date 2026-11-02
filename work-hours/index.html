@@ -15741,49 +15741,43 @@ window.p79AttendanceRoleOrderDefault=['領班','AQC','ARMG','F/L','指揮手'];
             }
 
             const companyFilter = document.getElementById('exportCompanyFilter')?.value || 'ALL';
-            // Use exactly the canonical shift selector used by the attendance
-            // page. Never export raw IN/OUT events or alternate overlap pairs.
-            const build=window.P79AttendanceV6?.buildShifts;
-            if(typeof build!=='function')throw Error('正式考勤班次引擎尚未載入，為避免重複匯出，請重新整理後再試');
-            const visibleRecords = records.filter(canCurrentAdminViewDataRow);
-            const visibleSessions=build(visibleRecords).filter(shift=>{
-                const punches=[shift.clockIn,shift.clockOut].filter(Boolean);
-                if(!punches.length||!punches.every(canCurrentAdminViewDataRow))return false;
-                if(companyFilter==='ALL')return true;
-                const currentEmployee=findEmployeeForAttendanceIdentity(shift);
-                const empId=String(shift.empId||currentEmployee?.empId||punches[0].empId||'').trim().toUpperCase();
-                return (empId.match(/^([A-Z]+)/)?.[1]||'')===companyFilter;
-            });
-            if (visibleSessions.length === 0) {
+            const visibleRecords = records
+                .filter(canCurrentAdminViewDataRow)
+                .filter(record => {
+                    if (companyFilter === 'ALL') return true;
+                    const matchedEmployee = employees.find(emp =>
+                        String(emp.empId || '').trim().toUpperCase() === String(record.empId || '').trim().toUpperCase() ||
+                        normalizeAttendanceStatsAttNo(emp.attNo) === normalizeAttendanceStatsAttNo(record.attNo)
+                    );
+                    const recordEmpId = String(record.empId || matchedEmployee?.empId || '').trim().toUpperCase();
+                    const company = recordEmpId.match(/^([A-Z]+)/)?.[1] || '';
+                    return company === companyFilter;
+                });
+            if (visibleRecords.length === 0) {
                 showToast(companyFilter === 'ALL' ? "目前無考勤紀錄可供匯出" : `目前沒有 ${companyFilter} 工號的考勤紀錄`, "warning");
                 return;
             }
             if (!ensureExcelLibrary()) return;
-            const exportColumns=selectedFields.flatMap(field=>field.key==='time'
-                ?[{key:'clockInTime',label:'簽到時間'},{key:'clockOutTime',label:'簽退時間'}]
-                :[field.key==='status'?{...field,label:'出勤狀態'}:field]);
-            const sheetRows=[exportColumns.map(field=>field.label)];
-            visibleSessions.forEach(shift=>{
-                const r=shift.clockIn||shift.clockOut||{};
-                const employee=findEmployeeForAttendanceIdentity(shift);
-                sheetRows.push(exportColumns.map(field=>{
-                    switch(field.key){
-                        case 'clockInTime':return shift.clockIn?formatDateTime(shift.clockIn.timeStr)||'':'';
-                        case 'clockOutTime':return shift.clockOut?formatDateTime(shift.clockOut.timeStr)||'':'';
-                        case 'attNo':return employee?.attNo??r.attNo??'';
-                        case 'empId':return employee?.empId||shift.empId||r.empId||'';
-                        case 'name':return employee?.name||shift.name||r.name||'';
-                        case 'dept':return employee?.dept||shift.dept||r.dept||'';
-                        case 'jobTitle':return employee?.jobTitle||employee?.deptDetail||shift.jobTitle||'';
-                        case 'status':return shift.overlapIssue||shift.pairingIssue?'班次重疊待核':shift.attendanceStatus||'';
-                        case 'location':return formatAttendanceLocationDisplay(shift.locationText||r.location)||'';
-                        case 'note':return shift.noteText||[shift.clockIn?.note,shift.clockOut?.note].filter(Boolean).join(' / ');
-                        default:return '';
-                    }
-                }));
+            const sheetRows = [selectedFields.map(f => f.label)];
+            visibleRecords.forEach(r => {
+                const currentEmployee = findEmployeeForAttendanceIdentity(r);
+                const rowData = selectedFields.map(f => {
+                    let val = "";
+                    if (f.key === 'attNo') val = currentEmployee?.attNo ?? r.attNo ?? '';
+                    if (f.key === 'empId') val = currentEmployee?.empId || r.empId || '';
+                    if (f.key === 'name') val = currentEmployee?.name || r.name || '';
+                    if (f.key === 'dept') val = currentEmployee?.dept || r.dept || '';
+                    if (f.key === 'jobTitle') val = currentEmployee?.jobTitle || currentEmployee?.deptDetail || '';
+                    if (f.key === 'time') val = formatDateTime(r.timeStr) || '';
+                    if (f.key === 'status') val = r.status || '';
+                    if (f.key === 'location') val = formatAttendanceLocationDisplay(r.location) || '';
+                    if (f.key === 'note') val = r.note || '';
+                    return val;
+                });
+                sheetRows.push(rowData);
             });
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
-            worksheet['!cols'] = exportColumns.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, clockInTime: 22, clockOutTime: 22, status: 24, location: 28, note: 28 })[field.key] || 16 }));
+            worksheet['!cols'] = selectedFields.map(field => ({ wch: ({ attNo: 10, empId: 15, name: 14, dept: 16, jobTitle: 14, time: 22, status: 14, location: 28, note: 28 })[field.key] || 16 }));
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, '考勤紀錄');
             const companySuffix = companyFilter === 'ALL' ? 'AP_AN' : companyFilter;
@@ -16896,7 +16890,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261102-export-one-shift-per-row"></script>
+<script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 
 <script src="../assets/port79-workhours-cache.js?v=20261028-folder-native-display-v3"></script>
 <script>
