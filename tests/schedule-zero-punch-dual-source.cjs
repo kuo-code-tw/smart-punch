@@ -40,6 +40,11 @@ assert(a>=0&&b>a,'roster-day resolver available');
   const key='E1|'+date;
   assert.equal(evidence.days[key]?.state,expectedState,name+' attendance state');
   assert.equal(evidence.absenceConfirmedDays[key]===true,restExpected,name+' confirmed absence');
+  if(name==='one-sided punch'){
+    const details=evidence.pendingPunchDetails[key]||[];
+    assert.equal(details[0]?.type,'只有上班卡','one-sided review has the correct evidence source');
+    assert.equal(details[0]?.time,'2026-10-30 07:38','review timestamp identifies the actual source');
+  }
  }
  const context={automaticRestMeta:{'2026-10-30':{restCategory:'國'}},
   restBalance:{ledger:[{date:'2026-10-30',kind:'off',category:'國'}]},typhoonDays:new Set(),
