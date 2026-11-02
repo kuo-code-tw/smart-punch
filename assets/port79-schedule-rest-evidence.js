@@ -190,8 +190,31 @@ function create(ctx){
          audit.push({...base,kind:'punch-missing'});
      }
    }
+   const stateForAudit=day=>{
+     const value=String(day?.state||'unknown');
+     return ['worked','rest','missing'].includes(value)?value:'unknown';
+   };
    state.evidence.audit=audit;
-   state.evidence.auditSummary={employees:people.length,
+   // Account for EVERY rostered employee/date, including confirmed rest,
+   // complete paired attendance, missing cards and incomplete source reads.
+   // Scanning uses the entire loaded roster, independent of group filters.
+   const dayCounts={checked:0,worked:0,rest:0,missing:0,unknown:0};
+   const personnelAudit={};
+   for(const person of people){
+     const empId=id(person.id||person.empId),schedule=savedRoster.get(empId)||{};
+     if(!empId)continue;
+     const counts={checked:0,worked:0,rest:0,missing:0,unknown:0};
+     for(const date of Object.keys(schedule)){
+       if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||date.slice(0,7)!==month)continue;
+       const state=stateForAudit(state.evidence.days?.[empId+'|'+date]);
+       counts.checked++;counts[state]++;dayCounts.checked++;dayCounts[state]++;
+     }
+     personnelAudit[empId]=counts;
+   }
+   state.evidence.personnelAudit=personnelAudit;
+   state.evidence.auditSummary={employees:Object.keys(personnelAudit).length,
+     daysChecked:dayCounts.checked,workedDays:dayCounts.worked,
+     confirmedRestDays:dayCounts.rest,missingDays:dayCounts.missing,unknownDays:dayCounts.unknown,
      restDayWorked:audit.filter(row=>row.kind==='restday-worked').length,
      shiftMismatch:audit.filter(row=>row.kind==='shift-mismatch').length,
      shiftUnresolved:audit.filter(row=>row.kind==='shift-unresolved').length,
