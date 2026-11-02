@@ -6638,7 +6638,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${combinedMarker}
-              ${attendanceRosterConflict?'<span class="block text-[9px] text-amber-700 font-bold" title="正式考勤與原始班別不同；僅顯示實際班別，未修改排班資料">原排'+scheduleEscapeHtml(rosterShift)+'</span>':''}
+              ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
               ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
