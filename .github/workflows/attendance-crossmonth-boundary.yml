@@ -1,0 +1,31 @@
+name: Verify cross-month attendance accounting
+
+on:
+  pull_request:
+    paths:
+      - 'attendance/index.html'
+      - 'attendance/v6-engine.js'
+      - 'tests/attendance-next-month-boundary-direct.cjs'
+      - '.github/workflows/attendance-crossmonth-boundary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check month-end source, deduplication, pairing, and exports
+        run: |
+          node tests/attendance-next-month-boundary-direct.cjs
+          node tests/attendance-boundary-history.cjs
+          node tests/attendance-month-partial-pull.cjs
+          node tests/attendance-cross-day-tooltip.cjs
+          node tests/attendance-ship-early-workday.cjs
+          node tests/attendance-export-month.cjs
+          node tests/rest-oct31-nextday-punch-isolation.cjs
+          node tests/attendance-month-view.cjs
