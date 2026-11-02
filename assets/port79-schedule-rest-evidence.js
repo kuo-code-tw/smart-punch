@@ -16,8 +16,10 @@ function create(ctx){
   // A transient remote read failure must not replace the last checked month
   // with an unverified fallback. Retain it only for the SAME roster snapshot.
   const schedules=ctx.schedules(),rosterSignature=JSON.stringify(schedules);
-  const retained=prior?.token===token&&prior.rosterSignature===rosterSignature&&prior.evidence?.complete===true?prior.evidence:null;
-  const state={token,rosterSignature,pending:true,error:'',evidence:retained||{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
+  const personnelSignature=JSON.stringify(ctx.employees());
+  const retained=prior?.token===token&&prior.rosterSignature===rosterSignature&&
+    prior.personnelSignature===personnelSignature&&prior.evidence?.complete===true?prior.evidence:null;
+  const state={token,rosterSignature,personnelSignature,pending:true,error:'',evidence:retained||{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
   state.promise=(async()=>{try{
    const requestedMonths=months(month);
    const fetched=await Promise.allSettled(requestedMonths.map(m=>read(m,token)));
@@ -92,7 +94,8 @@ function create(ctx){
       workDate:row.clockIn&&row.clockOut&&!row.timePrecisionIssue?row.accountingDateKey||row.dateKey||'':''}:null;
    }).filter(Boolean);
    const sessions=mapSessions(pairedRows);
-   if(JSON.stringify(ctx.schedules())!==rosterSignature)throw Error('核對期間班表已更新，需重新讀取考勤');
+   if(JSON.stringify(ctx.schedules())!==rosterSignature||JSON.stringify(ctx.employees())!==personnelSignature)
+     throw Error('核對期間人員或班表已更新，需重新讀取考勤');
    state.evidence=g.P79RestAttendance.build({complete:true,month,now:now(),schedules,sessions,leaveDates:ctx.leaveDates(month)});
    // A checked absence is based on either two authenticated feeds or a
    // high-coverage authenticated official feed if the raw endpoint is missing.
@@ -229,7 +232,15 @@ function create(ctx){
   }catch(e){state.error=e?.name==='AbortError'?'出勤核對逾時':String(e.message||e);state.evidence={complete:false,days:{}};return null;}
   finally{state.pending=false;if(ctx.token()===token&&states.get(month)===state)ctx.update?.(month,state);}})();return state.promise;
  }
- function refreshIfStale(month){const s=status(month);return s.pending?s.promise:!s.evidence.complete||now()-s.evidence.checkedAt>=60000?refresh(month):Promise.resolve(s.evidence);}
+ function refreshIfStale(month){
+   const s=status(month);
+   const changed=s.rosterSignature!==JSON.stringify(ctx.schedules())||
+     s.personnelSignature!==JSON.stringify(ctx.employees());
+   // A recent response is stale as soon as the roster OR personnel changes.
+   if(s.pending)return s.promise.then(()=>refreshIfStale(month));
+   return changed||!s.evidence.complete||now()-s.evidence.checkedAt>=60000?
+     refresh(month):Promise.resolve(s.evidence);
+ }
  return{refresh,status,refreshIfStale};
 }
 g.P79ScheduleRestEvidence={create};
