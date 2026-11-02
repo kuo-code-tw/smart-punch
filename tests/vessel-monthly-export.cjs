@@ -83,7 +83,7 @@ test('automatic monthly validation identifies duplicate edits and preserves CALL
 });
 // Use a minimal SheetJS contract for offline CI; optionally verify the real writer locally.
 c.XLSX={utils:{aoa_to_sheet(rows){const out={};rows.forEach((row,r)=>row.forEach((v,col)=>{out[String.fromCharCode(65+col)+(r+1)]={v,t:typeof v==='number'?'n':'s'};}));return out;},decode_range:s=>s,book_new:()=>({}),book_append_sheet:(wb,ws)=>{wb.sheet=ws;}},writeFile:(wb,name)=>writes.push({wb,name})};
-test('template headers, ROC month, leading-zero serial and subtotal use the selected month',()=>{const ws=c.buildMonthlyOperationSheet('2026-10');assert(ws.A1.v.includes('115年10月份'));assert.equal(ws.B5.v,'0159');assert.equal(ws.K4.v,'Productivity');assert.equal(ws.F6.f,'SUM(F5:F5)');assert.equal(ws.K6.v,'');assert.equal(ws['!ref'],'A1:N6');});
+test('template headers, ROC month, leading-zero serial and subtotal use the selected month',()=>{const ws=c.buildMonthlyOperationSheet('2026-10');assert(ws.A1.v.includes('115年10月份'));assert.equal(ws.B5.v,'0159');assert.equal(ws.K4.v,'Productivity');assert.equal(ws.H3.v,'作業櫃數');assert.equal(ws.J5.v,0);assert.equal(ws.J5.z,'#,##0;-#,##0;;@');assert.equal(ws.L5.z,'0.00;-0.00;;@');assert.equal(ws.J6.z,'#,##0;-#,##0;;@');assert.equal(ws.F6.f,'SUM(F5:F5)');assert.equal(ws.K6.v,'');assert.equal(ws['!ref'],'A1:N6');});
 (async()=>{
  elements.filterMonth.value='';await c.exportVesselMonthlyExcel();assert.equal(writes.length,0);passed++;
  elements.filterMonth.value='2026-10';c.loadEfficiencyCloudScope=async()=>false;await c.exportVesselMonthlyExcel();assert.equal(writes.length,0);assert.equal(elements.vesselMonthlyExportBtn.disabled,false);passed++;
