@@ -49,5 +49,13 @@ approvedLeave=null;covered=true;
 result=display(employee,'2026-10-30',context('晚'));
 assert.equal(result.actualShift,'','covered shift remains protected from overwrite');
 assert.equal(roster.E1['2026-10-30'],'早');
-assert(html.includes("attendanceRosterConflict?'<span"),'a conflict should be visible without changing saved roster');
-console.log('PASS: verified night wins display; saved roster untouched; unknown/real early, leave and cover stay safe');
+// Example: lead has a saved 中 shift but complete 07:32–15:46 punches show 早.
+covered=false;
+roster.E1['2026-10-30']='中';
+result=display(employee,'2026-10-30',context('早'));
+assert.equal(result.visibleCode,'早','verified 早 wins over the saved 中 shift');
+assert.equal(result.attendanceRosterConflict,true);
+assert.equal(roster.E1['2026-10-30'],'中','preserve original saved middle shift for audit');
+assert(!html.includes("attendanceRosterConflict?'<span"),'do not put misleading 原排中 label inside the day cell');
+assert(html.includes("attendanceRosterConflict?'考勤與原排班不一致"),'retain conflict explanation in cell hover tooltip');
+console.log('PASS: verified 早/晚 shown; misleading 原排 label hidden; saved roster and protected leave intact');
