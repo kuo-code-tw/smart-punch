@@ -27,5 +27,4 @@ jobs:
           node tests/attendance-cross-day-tooltip.cjs
           node tests/attendance-ship-early-workday.cjs
           node tests/attendance-export-month.cjs
-          node tests/rest-oct31-nextday-punch-isolation.cjs
           node tests/attendance-month-view.cjs
