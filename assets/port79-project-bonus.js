@@ -29,8 +29,11 @@ function filterPeople(people,prefixes=null){return prefixes===null?people.slice(
 const blankZero=x=>x!==null&&x!==undefined&&x!==''&&Number(x)===0?'':x??'';
 const DEFAULT_HEADERS=['編號','員工編號','職稱','員工姓名','效率','櫃數','加班換算時數','備註'];
 const WIDTHS=[5,14,12,10,8,4,4,4,4,2,2,2,2,2,13,12];
+// Fill A4 rather than limiting every page to the original 30 employee rows.
+// Up to 90 employees now occupy 2 balanced, full-height printed sheets.
+const BONUS_ROWS_PER_PAGE=45;
 function reportSettings(manual={},month){return {title:String(manual.title||((Number(month.slice(0,4))-1911)+'年'+Number(month.slice(5))+'月 79W效率表(專案獎金)')),headers:DEFAULT_HEADERS.map((x,i)=>String(manual.headers?.[i]||x)),signatures:['副總','協理','經理'].map((x,i)=>String(manual.signatures?.[i]||x))};}
-function paginate(rows){const pages=[];for(let i=0;i<Math.max(1,rows.length);i+=30){const page=rows.slice(i,i+30);while(page.length<30)page.push(null);pages.push(page);}return pages;}
+function paginate(rows){const pages=[];for(let i=0;i<Math.max(1,rows.length);i+=BONUS_ROWS_PER_PAGE){const page=rows.slice(i,i+BONUS_ROWS_PER_PAGE);while(page.length<BONUS_ROWS_PER_PAGE)page.push(null);pages.push(page);}return pages;}
 function rowHtml(r,i,print=false){
  const input=(field,value)=>print?esc(field==='note'?value:blankZero(value)):'<input aria-label="'+esc(r.name)+' '+(field==='efficiency'?'效率':field==='containers'?'櫃數':'備註')+'" data-id="'+esc(uid(r.empId))+'" data-field="'+field+'" '+(field==='note'?'type="text"':'type="number" min="0" step="0.01"')+' style="width:100%;min-width:0;box-sizing:border-box;border:0!important;border-radius:0!important;background:transparent!important;text-align:center;padding:2px" value="'+esc(field==='note'?value:blankZero(value))+'">';
  const cells=r?[{v:i+1},{v:esc(r.empId)},{v:esc(r.job)},{v:esc(r.name)},
@@ -39,27 +42,30 @@ function rowHtml(r,i,print=false){
  return '<tr>'+cells.map((c,j)=>'<td'+(c.span?' colspan="'+c.span+'"':'')+' style="padding:2px;height:30px;border:1px solid #94a3b8;'+(j>=4&&j<=8?'border-left:0;'+(j<8?'border-right:0;':''):'')+'text-align:center;overflow:hidden">'+c.v+'</td>').join('')+'</tr>';
 }
 function reportHtml(rows,month,manual={},print=false){const cfg=reportSettings(manual,month),pages=paginate(rows);
- return pages.map((page,p)=>'<section class="pb-page"><h2>'+esc(cfg.title)+'</h2><table class="pb-table"><colgroup>'+WIDTHS.map(w=>'<col style="width:'+w+'%">').join('')+'</colgroup><thead><tr>'+cfg.headers.map((label,i)=>'<th'+([4,5].includes(i)?' colspan="5"':'')+'>'+esc(label)+'</th>').join('')+'</tr></thead><tbody>'+page.map((r,i)=>rowHtml(r,p*30+i,print)).join('')+'</tbody></table><table class="pb-signatures"><tbody><tr>'+cfg.signatures.map(x=>'<td>'+esc(x)+'：</td>').join('')+'</tr><tr>'+cfg.signatures.map(()=>'<td style="height:48px"></td>').join('')+'</tr></tbody></table><div class="pb-page-number">第 '+(p+1)+' / '+pages.length+' 頁</div></section>').join('');
+ return pages.map((page,p)=>'<section class="pb-page"><h2>'+esc(cfg.title)+'</h2><table class="pb-table"><colgroup>'+WIDTHS.map(w=>'<col style="width:'+w+'%">').join('')+'</colgroup><thead><tr>'+cfg.headers.map((label,i)=>'<th'+([4,5].includes(i)?' colspan="5"':'')+'>'+esc(label)+'</th>').join('')+'</tr></thead><tbody>'+page.map((r,i)=>rowHtml(r,p*BONUS_ROWS_PER_PAGE+i,print)).join('')+'</tbody></table><table class="pb-signatures"><tbody><tr>'+cfg.signatures.map(x=>'<td>'+esc(x)+'：</td>').join('')+'</tr><tr>'+cfg.signatures.map(()=>'<td style="height:48px"></td>').join('')+'</tr></tbody></table><div class="pb-page-number">第 '+(p+1)+' / '+pages.length+' 頁</div></section>').join('');
 }
-const reportCss='.pb-page{background:white;color:#18314b;margin:12px 0 22px;break-inside:avoid}.pb-page h2{font-size:18px;text-align:center;margin:10px 0}.pb-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}.pb-table th{border:1px solid #94a3b8;background:#eef2f6;padding:5px 2px;font-weight:600;white-space:normal}.pb-signatures{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:0;font-size:13px}.pb-signatures td{border:1px solid #94a3b8;padding:4px 7px;text-align:left;vertical-align:top}.pb-page-number{text-align:right;font-size:11px;margin-top:4px}@media print{@page{size:A4 portrait;margin:10mm}.pb-page{break-after:page;margin:0}.pb-page:last-child{break-after:auto}.pb-page h2{font-size:14px;margin:0 0 3mm}.pb-table{font-size:9px}.pb-table td{height:6mm!important;padding:1px!important}.pb-table th{height:7mm}.pb-signatures{font-size:11px}.pb-signatures td{height:7mm}.pb-page-number{font-size:9px}}';
+const reportCss='.pb-page{background:white;color:#18314b;margin:12px 0 22px;break-inside:avoid}.pb-page h2{font-size:18px;text-align:center;margin:10px 0}.pb-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}.pb-table th{border:1px solid #94a3b8;background:#eef2f6;padding:5px 2px;font-weight:600;white-space:normal}.pb-signatures{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:0;font-size:13px}.pb-signatures td{border:1px solid #94a3b8;padding:4px 7px;text-align:left;vertical-align:top}.pb-page-number{text-align:right;font-size:11px;margin-top:4px}@media print{@page{size:A4 portrait;margin:10mm}html,body{margin:0!important;padding:0!important}.pb-page{break-after:page;margin:0;box-sizing:border-box}.pb-page:last-child{break-after:auto}.pb-page h2{font-size:14px;margin:0 0 2mm}.pb-table{font-size:9px}.pb-table td{height:4.75mm!important;padding:0 1px!important}.pb-table th{height:7mm!important;padding:1px!important}.pb-signatures{font-size:11px;margin-top:0}.pb-signatures td{height:7mm}.pb-page-number{font-size:9px;margin-top:2mm}}';
 function excelRows(rows,month,manual={}){const cfg=reportSettings(manual,month),h=cfg.headers;const output=[[cfg.title],[],[],[h[0],h[1],h[2],h[3],h[4],'','','','',h[5],'','','','',h[6],h[7]]];
  rows.forEach((r,i)=>output.push(r?[i+1,r.empId,r.job,r.name,blankZero(r.efficiency),r.leave?'X':'',r.leave?blankZero(r.factor):'',r.leave?'/':'',r.leave?30:'',blankZero(r.containers),'','','','',r.converted===null?'待核對':blankZero(r.converted),r.note]:Array(16).fill('')));return output;}
 function excelSheet(rows,month,manual={}){
  const cfg=reportSettings(manual,month),pages=paginate(rows),out={rows:[],heights:[],widths:WIDTHS.map(w=>w*.93),merges:[],breaks:[]};
+ const headerRow=3,firstDataRow=4,signatureRow=firstDataRow+BONUS_ROWS_PER_PAGE,pageNumberRow=signatureRow+2;
  pages.forEach((page,p)=>{
   const base=out.rows.length,values=excelRows(page,month,manual);
-  page.forEach((r,i)=>{if(r)values[i+4][0]=p*30+i+1;});
+  page.forEach((r,i)=>{if(r)values[i+firstDataRow][0]=p*BONUS_ROWS_PER_PAGE+i+1;});
   values.push([cfg.signatures[0]+'：','','','','',cfg.signatures[1]+'：','','','','',cfg.signatures[2]+'：']);
   values.push([]);values.push(['第 '+(p+1)+' / '+pages.length+' 頁']);
   values.forEach((values,r)=>{
-   out.rows.push(Array.from({length:16},(_,c)=>({value:values[c]??'',style:r<3?1:r===3?2:r<34?(c>=4&&c<=7?4:c===8?5:3):r<36?6:7})));
-   out.heights.push(r<3?10:r===3?24:r<34?17.01:r===34?20:r===35?36:12);
+   out.rows.push(Array.from({length:16},(_,col)=>({value:values[col]??'',style:r<headerRow?1:r===headerRow?2:r<signatureRow?(col>=4&&col<=7?4:col===8?5:3):r<pageNumberRow?6:7})));
+   // 45 rows * 14.8pt leave enough space for the title, stamps, and page number
+   // on portrait A4 at the workbook's existing 95% print scale.
+   out.heights.push(r<headerRow?10:r===headerRow?24:r<signatureRow?14.8:r===signatureRow?20:r===signatureRow+1?36:12);
   });
-  const merge=(a,b,c,d)=>out.merges.push(String.fromCharCode(65+a)+(base+b+1)+':'+String.fromCharCode(65+c)+(base+d+1));
-  merge(0,0,15,2);merge(4,3,8,3);merge(9,3,13,3);
-  for(let i=4;i<34;i++)merge(9,i,13,i);
-  for(const r of [34,35]){merge(0,r,4,r);merge(5,r,9,r);merge(10,r,15,r);}
-  merge(0,36,15,36);
+  const merge=(x,y,z,w)=>out.merges.push(String.fromCharCode(65+x)+(base+y+1)+':'+String.fromCharCode(65+z)+(base+w+1));
+  merge(0,0,15,2);merge(4,headerRow,8,headerRow);merge(9,headerRow,13,headerRow);
+  for(let i=firstDataRow;i<signatureRow;i++)merge(9,i,13,i);
+  for(const y of [signatureRow,signatureRow+1]){merge(0,y,4,y);merge(5,y,9,y);merge(10,y,15,y);}
+  merge(0,pageNumberRow,15,pageNumberRow);
   if(p<pages.length-1){out.rows.push(Array.from({length:16},()=>({value:'',style:0})));out.heights.push(8);out.breaks.push(out.rows.length);}
  });
  return out;
