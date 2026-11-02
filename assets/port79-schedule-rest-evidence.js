@@ -20,7 +20,15 @@ function create(ctx){
   const state={token,rosterSignature,pending:true,error:'',evidence:retained||{complete:false,days:{}}};states.set(month,state);ctx.update?.(month,state);
   state.promise=(async()=>{try{
    const requestedMonths=months(month);
-   const batches=await Promise.all(requestedMonths.map(m=>read(m,token)));if(ctx.token()!==token||states.get(month)!==state)return null;
+   const fetched=await Promise.allSettled(requestedMonths.map(m=>read(m,token)));
+   const ownIndex=requestedMonths.indexOf(month);
+   if(fetched[ownIndex]?.status!=='fulfilled')throw fetched[ownIndex]?.reason||Error('當月正式考勤讀取失敗');
+   if(ctx.token()!==token||states.get(month)!==state)return null;
+   const officialByMonth=Object.fromEntries(requestedMonths.map((m,i)=>[m,fetched[i].status==='fulfilled']));
+   const batches=fetched.map((result,i)=>result.status==='fulfilled'?result.value:{
+     official:[],reference:null,referenceError:'相鄰月份 '+requestedMonths[i]+' 讀取失敗',
+     officialReadError:true
+   });
    const records=new Map(),referenceRecords=new Map();
    const referenceByMonth=Object.fromEntries(requestedMonths.map((m,i)=>[m,Array.isArray(batches[i].reference)]));
    let referenceAvailable=referenceByMonth[month]===true;
@@ -132,13 +140,13 @@ function create(ctx){
      const endDay=Number.isFinite(day.shiftEnd)?
        new Date(day.shiftEnd+8*3600000-1).toISOString().slice(0,10):date;
      const endMonth=endDay.slice(0,7);
-     const canUseDual=referenceAvailable&&referenceByMonth[endMonth]===true;
+     const canUseDual=referenceAvailable&&officialByMonth[endMonth]===true&&referenceByMonth[endMonth]===true;
      if(canUseDual&&referenceEvidence?.days?.[key]?.state==='rest'){
        confirmed[key]=true;confirmationModes[key]='dual';dualCount++;
      }else if(!canUseDual&&monthCoverage&&dayCovered(date)&&
        (endDay===date||dayCovered(endDay))&&
-       // Fail closed if the required month in the official feed was missing.
-       requestedMonths.includes(endMonth)){
+       // Fail closed for dates requiring a month whose official feed failed.
+       officialByMonth[endMonth]===true){
        confirmed[key]=true;confirmationModes[key]='official-coverage';fallbackCount++;
      }else{
        // Cross-source contradictions or insufficient official data are never rest.
