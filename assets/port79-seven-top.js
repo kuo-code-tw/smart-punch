@@ -112,7 +112,24 @@ function currentSystem(){
  if(p.includes('/history-data/'))return 'history';
  const b=String(document.body?.dataset?.p79System||'').toLowerCase();return b==='work-hours'?'workhours':(META[b]?b:'attendance');
 }
-function navigationSession(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
+function navigationSession(){
+ // Management SSO may leave an employee-shaped port79_user_session while storing
+ // the authenticated manager in admin_session. Do not let the former mask the latter.
+ let user=null,admin=null;
+ try{user=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(e){}
+ try{admin=JSON.parse(sessionStorage.getItem('admin_session')||'null')}catch(e){}
+ const entryMode=String(sessionStorage.getItem('port79_entry_mode')||user?.entryMode||'').toLowerCase();
+ if(entryMode==='punch'||user?.punchOnly===true)return user;
+ const userRole=String(user?.adminRole||user?.role||'').toLowerCase();
+ if(['admin','superadmin'].includes(userRole))return user;
+ const adminRole=String(admin?.adminRole||admin?.role||'').toLowerCase();
+ const authenticated=sessionStorage.getItem('aqc_admin_logged_in')==='1'
+   && !!String(sessionStorage.getItem('port79_admin_token')||
+       sessionStorage.getItem('port79_gc_superadmin_token')||
+       sessionStorage.getItem('port79_gc_token')||'').trim();
+ if(authenticated&&['admin','superadmin'].includes(adminRole)&&admin?.punchOnly!==true)return admin;
+ return user||admin||null;
+}
 function systemLevel(key,session=navigationSession()){
  if(!session)return 'none';
  const role=String(session.adminRole||session.role||'employee').toLowerCase();
@@ -130,16 +147,31 @@ function actionAllowed(sys,action){
  return !manage.includes(action)||level==='manage';
 }
 let navigationSignature='';
+function desktopManagementNavigation(){
+ // An actual attendance punch-only page must not expose management navigation.
+ return window.matchMedia('(min-width:901px)').matches&&
+   (currentSystem()!=='attendance'||
+    document.documentElement.classList.contains('p79-attendance-management-chrome'));
+}
+function renderPermissionNavigation(){
+ const session=navigationSession(),system=currentSystem();
+ const all=desktopManagementNavigation();
+ const entries=all?NAV:NAV.filter(n=>systemLevel(n[0],session)!=='none');
+ return entries.map(n=>{
+  const permitted=systemLevel(n[0],session)!=='none';
+  const restricted=permitted?'':' aria-disabled="true" tabindex="-1" title="此帳號尚未取得此系統權限" style="opacity:.48!important;pointer-events:none!important;cursor:not-allowed!important" onclick="return false"';
+  return `<a class="${n[0]===system?'active':''}" href="${n[3]}"${restricted}>${n[1]} ${n[2]}</a>`;
+ }).join('')||'<span>目前沒有可開啟的管理系統，請聯絡管理員確認權限。</span>';
+}
 function syncPermissionNavigation(){
- const allowed=NAV.filter(n=>systemLevel(n[0])!=='none');
- const signature=JSON.stringify([navigationSession(),currentSystem()]);if(signature===navigationSignature)return;
+ const signature=JSON.stringify([navigationSession(),currentSystem(),desktopManagementNavigation()]);if(signature===navigationSignature)return;
  navigationSignature=signature;
- const nav=document.getElementById('p79SevenNav');if(nav)nav.innerHTML=allowed.map(n=>`<a class="${n[0]===currentSystem()?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')||'<span>目前沒有可開啟的管理系統，請聯絡管理員確認權限。</span>';
+ const nav=document.getElementById('p79SevenNav');if(nav)nav.innerHTML=renderPermissionNavigation();
  document.querySelectorAll('#p79SevenStatus [data-sys]').forEach(el=>{if(systemLevel(el.dataset.sys)==='none')el.style.setProperty('display','none','important');else el.style.removeProperty('display');});
  ensureStandardMenu(currentSystem());
 }
-function roleText(){try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');const r=String(s?.adminRole||s?.role||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();return r==='superadmin'?'超級管理員':r==='admin'?'管理員':'一般員工'}catch(e){return'登入使用者'}}
-function userInfo(){try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')||{};const name=String(s.name||s.empName||s.employeeName||s.empId||sessionStorage.getItem('aqc_admin_name')||'登入使用者').trim();return{name,role:roleText()}}catch(e){return{name:'登入使用者',role:roleText()}}}
+function roleText(){const s=navigationSession();const r=String(s?.adminRole||s?.role||'').toLowerCase();return r==='superadmin'?'超級管理員':r==='admin'?'管理員':'一般員工'}
+function userInfo(){try{const s=navigationSession()||{};const name=String(s.name||s.empName||s.employeeName||s.empId||sessionStorage.getItem('aqc_admin_name')||'登入使用者').trim();return{name,role:roleText()}}catch(e){return{name:'登入使用者',role:roleText()}}}
 function gasUrl(){try{if(typeof GAS_URL!=='undefined'&&GAS_URL)return String(GAS_URL)}catch(e){}try{if(window.GAS_URL)return String(window.GAS_URL)}catch(e){}try{for(const k of ['port79_gas_url','gasUrl','GAS_URL']){const v=sessionStorage.getItem(k)||localStorage.getItem(k);if(v&&/script\.google\.com/i.test(v))return v}}catch(e){}return''}
 
 function normalizedTheme(v){return String(v||'').toLowerCase()==='dark'?'dark':'light'}
@@ -488,7 +520,7 @@ function mount(){
    return;
  }
  const root=document.createElement('div');root.id='p79SevenTop';
- root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${NAV.filter(n=>systemLevel(n[0])!=='none').map(n=>`<a class="${n[0]===sys?'active':''}" href="${n[3]}">${n[1]} ${n[2]}</a>`).join('')}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><span class="p79-sys-icon" aria-hidden="true">${META[k]?.[0]||'☁️'}</span><b>${l}</b><span class="p79-sys-state">● 待命</span></span>`).join('')}</div>`;
+ root.innerHTML=`<div class="top-row"><div class="brand"><div class="logo">${m[0]}</div><div><div class="brand-name">${m[1]}</div><div class="brand-sub">79號碼頭雲端智慧系統｜${m[2]}</div></div></div><nav id="p79SevenNav">${renderPermissionNavigation()}</nav><div class="action"><div id="p79SevenMenuWrap"><button id="p79SevenMenuButton" type="button">☰ 功能選單</button></div></div></div><div id="p79SevenStatus"><span class="cloud-title">☁️ 雲端</span>${SYSTEMS.map(([k,l])=>`<span class="sys" data-sys="${k}" data-state="idle"><span class="p79-sys-icon" aria-hidden="true">${META[k]?.[0]||'☁️'}</span><b>${l}</b><span class="p79-sys-state">● 待命</span></span>`).join('')}</div>`;
  document.body.insertBefore(root,document.body.firstChild);
  ensureStandardMenu(sys);
  document.addEventListener('click',e=>{if(!e.target?.closest?.('#p79SevenMenuWrap'))closeMenu()});
