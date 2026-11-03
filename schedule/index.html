@@ -3732,6 +3732,16 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       };
       window.addEventListener('storage',event=>{
         if(event.key==='p79_schedule_overtime_changed_v1')refreshChangedOvertime();
+        if(event.key==='p79_leave_data_changed_v1'&&event.newValue){
+          try{
+            const changed=JSON.parse(event.newValue);
+            const month=currentScheduleMonthKey();
+            if(!changed.months||changed.months.includes(month)){
+              // 請假頁刪除成功後，不等下一次 60 秒輪詢就讀正式雲端班表。
+              void loadScheduleCloudWithRetry('leave-delete-sync',2);
+            }
+          }catch(error){console.warn('請假異動通知解析失敗',error);}
+        }
       });
       window.addEventListener('focus',refreshChangedOvertime);
       document.addEventListener('visibilitychange',()=>{
@@ -7112,6 +7122,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const previousShift=String(monthlyScheduleData[empId][dayStr]||'');
       if(!monthlyScheduleMeta[empId])monthlyScheduleMeta[empId]={};
       const meta={...(monthlyScheduleMeta[empId][dayStr]||{})};
+      // V10.31：改選年／事／病／公／喪時保存原班別；刪除核准請假後，
+      // 雲端才有可核對的原班可自動恢復，而不是猜成「休」。
+      const originalShift=previousShift==='休'&&['例','國'].includes(meta.restCategory)
+        ?meta.restCategory:previousShift;
+      if(P79_SCHEDULE_SPECIAL_LEAVES.includes(val)){
+        if(!P79_SCHEDULE_SPECIAL_LEAVES.includes(previousShift)&&
+           ['早','中','晚','休','例','國','颱','離'].includes(originalShift))
+          meta.leaveOriginalShift=originalShift;
+      }else{
+        delete meta.leaveOriginalShift;
+        delete meta.leaveRestorePending;
+      }
       for(const key of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete meta[key];
       if(['例','國'].includes(val)) {meta.restCategory=val;meta.restAllocationSource='manual';}
       meta.manualRosterShift=String(val);
