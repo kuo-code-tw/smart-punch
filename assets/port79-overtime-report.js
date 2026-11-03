@@ -295,6 +295,11 @@
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
   return defaults();
  }
+ function activeSupportPeriods(rows,config={}){
+  // Never regenerate 延 periods for a builtin that an admin deleted.
+  if(deletedBuiltins(config).has(typeLabel.延))return {rows:validate(rows),added:0};
+  return p79AddLeaveSupportPeriods(rows);
+ }
  function activeReportRules(){
   return activeReportRows(reportRules(),global.p79OvertimeContext?.config?.()||{});
  }
@@ -400,7 +405,7 @@
   try{
    const cached=global.p79OvertimeContext?.config?.();
    let removedBuiltinNames=deletedBuiltins(cached||{});
-   let rows=p79AddLeaveSupportPeriods(activeReportRules()).rows;
+   let rows=activeSupportPeriods(activeReportRules(),cached||{}).rows;
    let allCloudRows=reportRules();
    let loadedRows='',loadedVisibleRows='',customTypes=JSON.parse(JSON.stringify(cached?.[TYPECONFIG]||[])),loadedTypes='',loadedDeleted='',cloudReady=false,reading=false;
    el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(editorRow).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
@@ -606,7 +611,7 @@
      removedBuiltinNames=deletedBuiltins(loaded.config);
      loadedDeleted=JSON.stringify([...removedBuiltinNames]);
      allCloudRows=loaded.rows;
-     const support=p79AddLeaveSupportPeriods(activeReportRows(loaded.rows,loaded.config));
+     const support=activeSupportPeriods(activeReportRows(loaded.rows,loaded.config),loaded.config);
      rows=support.rows;
      customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[]));
      loadedTypes=JSON.stringify(customTypes);
@@ -1025,7 +1030,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={DELETED_CONFIG,deletedBuiltins,activeReportRows,activeReportRules,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={DELETED_CONFIG,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
