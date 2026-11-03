@@ -1044,7 +1044,11 @@ function p79IsAdminPhoneDevice(){
 }
 function p79SyncAdminPhonePanels(session){
   const role=String(session?.adminRole||session?.role||'').toLowerCase();
-  const phone=['admin','superadmin'].includes(role)&&!session?.punchOnly&&p79IsAdminPhoneDevice();
+  // Ordinary administrators use the two-card mobile layout.
+  // Superadministrators retain the complete original dashboard and navigation.
+  const actualRole=String(session?.actualAdminRole||role).toLowerCase();
+  const phone=role==='admin'&&actualRole!=='superadmin'&&
+    !session?.punchOnly&&p79IsAdminPhoneDevice();
   document.documentElement.classList.toggle('p79-admin-phone-two-panels',phone);
   // Keep existing DOM/data bindings intact. Explicitly hide both extra vessel panels.
   // This also covers old styles with stronger !important display rules.
@@ -1701,88 +1705,88 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
      efficiency trend / latest imported ships or other management cards. -->
 <style id="p79-admin-mobile-css-fallback-20261103">
 @media screen and (max-width:900px){
-  body.p79-workspace:has(#systems.show):has(#p79Dashboard){
+  html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard){
     --p79-w-width:0px!important;padding:56px 0 0!important;min-height:100dvh!important;
   }
-  body.p79-workspace>.card{
+  html.p79-admin-phone-two-panels body.p79-workspace>.card{
     width:100%!important;max-width:100%!important;min-height:calc(100dvh - 56px)!important;
     margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;
   }
-  body.p79-workspace>.card>.body{
+  html.p79-admin-phone-two-panels body.p79-workspace>.card>.body{
     padding:12px 10px 24px!important;width:100%!important;max-width:none!important;
   }
-  body.p79-workspace>.card>.header,
-  body.p79-workspace #todayWeather,
-  body.p79-workspace #sessionBar,
-  body.p79-workspace #p79EmployeeShipSection,
-  body.p79-workspace #p79WorkspaceSidebar,
-  body.p79-workspace #p79WorkspaceStatus,
-  body.p79-workspace .p79-nav-backdrop{display:none!important;}
-  body.p79-workspace #p79WorkspaceTopbar{
+  html.p79-admin-phone-two-panels body.p79-workspace>.card>.header,
+  html.p79-admin-phone-two-panels body.p79-workspace #todayWeather,
+  html.p79-admin-phone-two-panels body.p79-workspace #sessionBar,
+  html.p79-admin-phone-two-panels body.p79-workspace #p79EmployeeShipSection,
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceSidebar,
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceStatus,
+  html.p79-admin-phone-two-panels body.p79-workspace .p79-nav-backdrop{display:none!important;}
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar{
     display:flex!important;position:fixed!important;left:0!important;right:0!important;top:0!important;
     height:56px!important;min-height:56px!important;padding:6px 12px!important;
     background:var(--p79-w-panel,#fff)!important;border-bottom:1px solid var(--p79-w-line,#dbeafe)!important;
     z-index:11001!important;
   }
-  body.p79-workspace #p79WorkspaceTopbar>:not(.p79-toolbar-tools),
-  body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-tools>:not(.p79-toolbar-user):not(#logoutBtn){
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar>:not(.p79-toolbar-tools),
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-tools>:not(.p79-toolbar-user):not(#logoutBtn){
     display:none!important;
   }
-  body.p79-workspace #p79WorkspaceTopbar>.p79-toolbar-tools{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar>.p79-toolbar-tools{
     display:flex!important;width:100%!important;margin:0!important;padding:0!important;
     align-items:center!important;justify-content:space-between!important;gap:10px!important;
   }
-  body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-user{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-user{
     display:flex!important;margin:0!important;padding:0!important;min-width:0!important;border:0!important;
   }
-  body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-user .p79-avatar{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-user .p79-avatar{
     display:none!important;
   }
-  body.p79-workspace #p79WorkspaceTopbar #logoutBtn{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar #logoutBtn{
     display:inline-flex!important;align-items:center!important;flex:none!important;min-height:36px!important;
     padding:6px 10px!important;
   }
-  body.p79-workspace #systems.show{
+  html.p79-admin-phone-two-panels body.p79-workspace #systems.show{
     display:block!important;width:100%!important;max-width:100%!important;
     min-width:0!important;margin:0!important;padding:0!important;
   }
-  body.p79-workspace #systems.show>:not(#p79Dashboard){display:none!important;}
-  body.p79-workspace #p79Dashboard{
+  html.p79-admin-phone-two-panels body.p79-workspace #systems.show>:not(#p79Dashboard){display:none!important;}
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard{
     display:flex!important;flex-direction:column!important;gap:12px!important;
     width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important;
   }
-  body.p79-workspace #p79Dashboard>:not(.p79d-vessel):not(.p79d-attendance){display:none!important;}
-  body.p79-workspace #p79Dashboard>.p79d-section{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard>:not(.p79d-vessel):not(.p79d-attendance){display:none!important;}
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard>.p79d-section{
     display:block!important;width:100%!important;min-width:0!important;
     margin:0!important;padding:9px!important;border-radius:12px!important;
   }
-  body.p79-workspace #p79Dashboard>.p79d-section>:not(.p79d-panels){display:none!important;}
-  body.p79-workspace #p79Dashboard .p79d-panels{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard>.p79d-section>:not(.p79d-panels){display:none!important;}
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-panels{
     display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:auto!important;
     width:100%!important;min-width:0!important;gap:0!important;margin:0!important;padding:0!important;
   }
-  body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule),
-  body.p79-workspace #p79Dashboard .p79d-attendance-panels>:not(.p79r-current-shift-card){
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule),
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-attendance-panels>:not(.p79r-current-shift-card){
     display:none!important;
   }
-  body.p79-workspace #p79Dashboard .p79d-ship-panels>.p79d-ship-schedule,
-  body.p79-workspace #p79Dashboard .p79d-attendance-panels>.p79r-current-shift-card{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>.p79d-ship-schedule,
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-attendance-panels>.p79r-current-shift-card{
     display:flex!important;flex-direction:column!important;
     grid-column:1/-1!important;grid-row:auto!important;width:100%!important;min-width:0!important;
     height:auto!important;min-height:200px!important;max-height:none!important;margin:0!important;
     padding:12px!important;overflow:visible!important;
   }
-  body.p79-workspace #p79Dashboard .p79d-ship-schedule #p79DashVesselNotices{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-schedule #p79DashVesselNotices{
     display:block!important;flex:none!important;width:100%!important;height:auto!important;
     min-height:140px!important;max-height:none!important;overflow:visible!important;
   }
-  body.p79-workspace #p79Dashboard .p79r-current-shift-card #p79CurrentShiftList{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79r-current-shift-card #p79CurrentShiftList{
     display:block!important;flex:1 1 auto!important;width:100%!important;height:auto!important;
     min-height:120px!important;max-height:60dvh!important;overflow-y:auto!important;
   }
   /* Explicitly remove these two cards from the administrator phone view. */
-  body.p79-workspace #p79Dashboard .p79d-ship-panels > .p79d-trend,
-  body.p79-workspace #p79Dashboard .p79d-ship-panels > .p79d-ranking{
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels > .p79d-trend,
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels > .p79d-ranking{
     display:none!important;visibility:hidden!important;height:0!important;
     min-height:0!important;max-height:0!important;margin:0!important;
     padding:0!important;overflow:hidden!important;
