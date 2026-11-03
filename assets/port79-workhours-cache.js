@@ -53,7 +53,15 @@ function load(month,options={}){
    // multiple raw months and config together can exhaust its 8-second lock wait.
    // Start with the roster and then read at most two other resources concurrently.
    const months=monthsFor(month);
-   const roster=await request(s,'getScheduleDataSecure',month);assert(s);
+   // Reuse a just-finished authenticated roster request already made by the
+   // visible overtime page. This removes a duplicate GAS sheet read, not its
+   // version, identity or per-scope verification.
+   let sharedRoster=null;
+   try{sharedRoster=await context()?.recentRoster?.(month,s.token,s.stamp);}catch(_){}
+   assert(s);
+   const roster=sharedRoster?.ok===true&&sharedRoster.month===month&&Array.isArray(sharedRoster.employees)&&Array.isArray(sharedRoster.schedules)
+    ? sharedRoster : await request(s,'getScheduleDataSecure',month);
+   assert(s);
    const batches=[];
    for(let offset=0;offset<months.length;offset+=2){
     const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
