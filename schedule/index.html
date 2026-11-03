@@ -5679,9 +5679,12 @@ function p79EmployeeDateEligible(emp,date) {
  }
  const start=String(report.overtimeStart||'').trim(),end=String(report.overtimeEnd||'').trim();
  const part=value=>{const m=value.match(/^(\d{1,2})(?::(\d{2}))?$/);if(!m||Number(m[1])>24||Number(m[2]||0)>59||(Number(m[1])===24&&Number(m[2]||0)))return '';return m[1].padStart(2,'0')+(m[2]&&m[2]!=='00'?':'+m[2]:'');};
- if(part(start)&&part(end))return part(start)+'-'+(part(end)==='00'?'24':part(end));
+ // All extension overtime labels must visibly carry 延, even if a legacy
+ // stored rule code starts with 代. This is DISPLAY ONLY; never rewrite code.
+ if(part(start)&&part(end))return '延'+part(start)+'-'+(part(end)==='00'?'24':part(end));
  const bare=code.replace(/^[代延]/,'');
- return ({'08-20':'16-20','20-08':'20-24'})[bare]||bare;
+ const period=({'08-20':'16-20','20-08':'20-24'})[bare]||bare;
+ return period?'延'+period:'';
 }
 
     function p79SubstituteShiftLabel(empId,dayStr,meta){
@@ -6701,7 +6704,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 title="${scheduleEscapeHtml((visibleSubstituteLabel || shownShift)+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
-                class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>7?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
+                class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${visibleSubstituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
                 ${!visibleSubstituteLabel&&!['早','中','晚','休','例','國','離',...p79EditorLeaveKinds].includes(shownShift)?
                   `<option value="__display__" selected>${scheduleEscapeHtml(shownShift)}</option>`:''}
