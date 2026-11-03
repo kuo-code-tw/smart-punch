@@ -18,6 +18,8 @@ on:
       - 'hr/**'
       - 'history-data/**'
       - 'data-cache/**'
+      # Keep the deployment gate verifiable when a regression harness is repaired.
+      - 'tests/**'
       - '.github/workflows/pages-static.yml'
   workflow_dispatch:
 
