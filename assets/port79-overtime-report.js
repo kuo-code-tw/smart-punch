@@ -6,13 +6,28 @@
  // Soft-deleted builtins are not available for NEW filings. Retain their
  // original conversion rows inside the cloud config for historical report
  // lookups, audits, and existing-report edits; never mutate past reports.
+ // Keep the previous wording as a read-only alias. New reports, menus, and
+ // labels must use ONE official type: 平日延時加班 (category 延).
+ const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延時加班'};
+ const canonicalType=value=>{
+  const name=String(value??'').trim();
+  return name==='代班加班'?'休假代班加班':
+   name==='平日延長加班'?'平日延時加班':name;
+ };
  function deletedBuiltins(config={}){
   const raw=config?.[DELETED_CONFIG]||[];
   if(!Array.isArray(raw))throw Error('已刪除加班類型設定格式錯誤');
-  return new Set(raw.filter(name=>Object.values(typeLabel).includes(name)));
+  // A previously deleted OLD builtin must not accidentally suppress a
+  // separate, explicitly configured newer-name type during consolidation.
+  const newName=typeLabel.延;
+  const newConfigured=Array.isArray(config?.[TYPECONFIG])&&
+   config[TYPECONFIG].some(row=>Array.isArray(row)&&String(row[0]).trim()===newName&&row[1]==='延');
+  const oldDeleted=raw.includes('平日延長加班');
+  const newDeleted=raw.includes(newName);
+  return new Set(raw.map(canonicalType).filter(name=>
+   Object.values(typeLabel).includes(name)&&
+   !(name===newName&&oldDeleted&&!newDeleted&&newConfigured)));
  }
- const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'};
- const canonicalType=name=>name==='代班加班'?'休假代班加班':name;
  const isBuiltinType=name=>Object.values(typeLabel).includes(canonicalType(name));
  // 舊表格切換假別後可能保留原來的預設名稱；預設類型一律依假別辨識。
  const ruleType=r=>r[9]&&!isBuiltinType(r[9])?r[9]:typeLabel[r[0]];
@@ -52,7 +67,13 @@
    if(!Array.isArray(r)||![9,10].includes(r.length))throw Error('第'+(i+1)+'列格式錯誤');
    const v=r.map(x=>String(x??'').trim()),code=v[1];
    if(!types.includes(v[0])||!/^(?:[^0-9]{1,12})?\d{2}(?::\d{2})?-\d{2}(?::\d{2})?$/.test(code))throw Error('第'+(i+1)+'列類型或代碼有誤');
-   const key=ruleType(v)+'|'+code;if(seen.has(key))throw Error('同一加班類型的出勤時段重複：'+code);seen.add(key);
+   // Legacy 延長 and 延時 periods may share a code in the cloud but have
+   // different historical conversions. Preserve their raw identities for
+   // existing reports rather than destroying one while merging menus.
+   const legacyIdentity=v[9]?'named:'+v[9]:'builtin:'+typeLabel[v[0]];
+   const key=legacyIdentity+'|'+code;
+   if(seen.has(key))throw Error('同一加班類型的出勤時段重複：'+code);
+   seen.add(key);
    if(!(Number(v[2])>0&&Number(v[2])<=24)||v[3]!==''&&!(Number.isFinite(Number(v[3]))&&Number(v[3])>=0&&Number(v[3])<=100))throw Error(code+' 時數無效');
    if(!Number.isFinite(span(v[6],v[7])))throw Error(code+' 加班起迄時間無效');
    if(v[0]==='延'){
@@ -62,7 +83,10 @@
    const label=code.match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);
    if(v[0]!=='延'&&(hour(label[1])%1440!==hour(v[6])%1440||hour(label[2])%1440!==hour(v[7])%1440))throw Error(code+' 代碼時段與加班時段不一致');
    if(v[0]==='延'&&v[8]==='before'&&(hour(label[1])%1440!==hour(v[6])%1440||hour(label[2])%1440!==hour(v[5])%1440))throw Error(code+' 班前加班代碼須包含完整出勤時段');
-   if(v.length===10&&(!v[9]||isBuiltinType(v[9])))v.pop();
+   // Retain the original legacy label INSIDE the cloud rule record.
+   // The display is unified by ruleType(), not by overwriting history.
+   if(v.length===10&&(!v[9]||isBuiltinType(v[9])&&
+      !['平日延長加班','平日延時加班'].includes(v[9])))v.pop();
    return v;
   });
  }
@@ -71,7 +95,7 @@
  function excelRows(rows){return [excelHeaders,...validate(rows).map(r=>[typeLabel[r[0]],...r.slice(1,8),positionLabels[r[8]],ruleType(r)])];}
  function parseExcelRows(rows){
   if(!Array.isArray(rows)||!rows.length||excelHeaders.some((h,i)=>String(rows[0][i]||'').trim()!==h))throw Error('匯入欄位不符，請先匯出試算表範本');
-  const categories=Object.fromEntries(types.map(c=>[typeLabel[c],c])),positions=Object.fromEntries(Object.entries(positionLabels).map(([a,b])=>[b,a]));
+  const categories={...Object.fromEntries(types.map(c=>[typeLabel[c],c])),'平日延長加班':'延'},positions=Object.fromEntries(Object.entries(positionLabels).map(([a,b])=>[b,a]));
   return validate(rows.slice(1).filter(r=>r.some(v=>String(v??'').trim())).map(r=>[categories[String(r[0]).trim()]||r[0],...Array.from({length:7},(_,i)=>r[i+1]??''),positions[String(r[8]).trim()]||r[8],r[9]||'']));
  }
  async function ensureExcel(){
@@ -700,7 +724,7 @@
   if(work&&['休','例','國'].includes(category))
     return prefix+' 當天不是'+categoryName+'，不能自動帶入休息日出勤時段；如有班前／班後加班，請核對實際時段與申報類型。';
   if(rest&&category==='延')
-    return prefix+' 當天不是一般工作班，無法由正常班推算平日延長加班。';
+    return prefix+' 當天不是一般工作班，無法由正常班推算平日延時加班。';
   if(!hasRules)return prefix+' 雲端目前沒有這個加班類型的出勤時段規則，請由授權管理員核對設定。';
   if(work&&category==='延')
     return prefix+' 正常班不是加班時數；班前或班後延長時段須另行確認，不能自動當成已出勤。';
@@ -752,7 +776,7 @@
    // Preserve existing formal reports and explicit future plans. New reports
    // use the verified IN/OUT period within the requested overtime type.
    if(!prefill.savedReport&&!prefill.manualPlan&&prefill.attendance&&prefill.date){
-    const requestedType=prefill.preferredType||typeLabel[prefill.category]||'';
+    const requestedType=canonicalType(prefill.preferredType)||typeLabel[prefill.category]||'';
     const matched=matchingReportPeriod(prefill.date,prefill.roster,prefill.attendance,rows,requestedType);
     if(matched)prefill={...prefill,code:matched[1],category:matched[0],
       preferredType:ruleType(matched),requirePeriodSelection:false};
@@ -914,7 +938,7 @@
     refreshPairPeople();empSelect.value=String(prefill.empId);syncApprovedLeaveDate();preview();
    }
    function applyPreferredType(){
-    const requested=prefill.preferredType;if(!requested)return;
+    const requested=canonicalType(prefill.preferredType);if(!requested)return;
     if(!typeOptions(dialogRuleConfig(),rows).some(x=>x.name===requested)){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent='原選加班類型已變更，請重新選擇類型與出勤時段。';return;}
     kind.value=requested;refresh();
     const period=String(prefill.code||'').match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);
@@ -1002,7 +1026,7 @@
       if(['早','中','晚'].includes(actualRosterShift))
        throw Error('正式班表此日為「'+actualRosterShift+'」班，不是休息日／例假／國定假日加班，請核對正確加班類型與時段。');
      }
-     // 已存在的平日延長加班預排，只核對同一張申報、同一員工、日期與原代班關聯；
+     // 已存在的平日延時加班預排，只核對同一張申報、同一員工、日期與原代班關聯；
      // 請假資料缺漏不可抹去原申報日期。新申報及真正請假代班仍須核對核准請假日。
      const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&rows[Number(select.value)]?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
@@ -1047,7 +1071,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={DELETED_CONFIG,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
