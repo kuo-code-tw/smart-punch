@@ -61,7 +61,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    if(converted!==null&&(!Number.isFinite(converted)||converted<0))throw Error(emp.name+' 換算時數無效，請核對申報');
    const reasons=g.P79OvertimeReason;
     const note=reasons?.reportNote?.({empId:emp.empId,date,meta,report,roster:entry.schedule||{},snapshot})||
-      String(report.note||report.typeName||'加班申報');
+      String(report.note||(report.typeName==='平日延長加班'?'平日延時加班':report.typeName)||'加班申報');
     rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note,planned,reportId:report.id});
   }
  }
