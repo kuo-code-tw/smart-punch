@@ -27,8 +27,8 @@ assert.equal(ctx.p79UnreportedOvertimeSummary(rows.slice(2)).minutes,0,'official
 assert(html.includes('id="overtimePendingEstimateHours"'),'pending hours card is visible');
 assert(html.includes('p79UnreportedOvertimeSummary(rows)'),'pending hours derive from filtered current page scope, not cloud mutation');
 assert(html.includes("document.getElementById('overtimePendingEstimateHours').textContent = formatDurationMinutes(pendingEstimate.minutes)"));
-assert(html.includes("document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時'"),'formal raw total remains separate');
-assert(html.includes("document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)"),'formal conversion remains separate');
+assert(html.includes("document.getElementById('overtimeRawReportedHours').textContent = rawMinutes%60?formatDurationMinutes(rawMinutes)"),'raw overtime cards must show even minute-level values');
+assert(html.includes("document.getElementById('overtimeTotalHours').textContent = totals.missing?"),'missing cloud conversion must not display misleading 0.00');
 assert(html.includes('const attendanceSignature=JSON.stringify([sourceRecords,visibleEmployees]);'));
 assert.equal((html.match(/const attendanceSignature=JSON.stringify\(\[sourceRecords,visibleEmployees\]\);/g)||[]).length,1,'avoid double punch serialization');
 assert(html.includes('const declaration=specialOvertimeMinutes>0?'),'non-special shifts skip needless period lookup');
