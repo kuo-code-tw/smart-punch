@@ -13721,7 +13721,7 @@ async function p79ExportOvertimeComparison(printMode){
                         overtimeReport:restMeta?.overtimeReport||null,
                         amendment:globalThis.P79OvertimeReason?.amended?.(restMeta?.overtimeReport,restMeta)||null,
                         reportVerified:p79WorkOvertimeOfficialReport(restMeta?.overtimeReport,restMeta),
-                        savedOvertimeHistory:p79WorkOvertimeSavedHistory(restMeta),
+                        savedOvertimeHistory:typeof p79WorkOvertimeSavedHistory==='function'?p79WorkOvertimeSavedHistory(restMeta):null,
                         rosterDate:matchedReport.date,forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,coverAlreadyArranged:!!restMeta?.coverAlreadyArranged,
                         overDailyLimit: totalMinutes > 720
                     };
