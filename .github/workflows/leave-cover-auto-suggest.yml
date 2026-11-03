@@ -1,0 +1,30 @@
+name: Verify automatic leave cover recommendations
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'leave/index.html'
+      - 'assets/port79-leave-cover-suggest.js'
+      - 'tests/leave-cover-auto-suggest.cjs'
+      - '.github/workflows/leave-cover-auto-suggest.yml'
+  pull_request:
+    paths:
+      - 'leave/index.html'
+      - 'assets/port79-leave-cover-suggest.js'
+      - 'tests/leave-cover-auto-suggest.cjs'
+      - '.github/workflows/leave-cover-auto-suggest.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test automatic cover candidate rest and no auto persistence
+        run: |
+          node tests/leave-cover-auto-suggest.cjs
+          node tests/leave-handoff-dedupe.cjs
+          node tests/leave-admin-month-filter.cjs
