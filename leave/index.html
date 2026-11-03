@@ -865,7 +865,7 @@ async function deleteLeave(id){
   if(leaveRecords.some(l=>String(l.id)===String(id)))throw new Error('雲端讀回仍有此請假單，請重新核對');
   const months=Array.isArray(result.updatedMonths)?result.updatedMonths.slice():[];
   for(const date of [prior?.startTime||prior?.startDate,prior?.endTime||prior?.endDate]){
-    const match=String(date||'').match(/^(\\d{4}-\\d{2})-\\d{2}/);
+    const match=String(date||'').match(/^([0-9]{4}-[0-9]{2})-[0-9]{2}/);
     if(match&&!months.includes(match[1]))months.push(match[1]);
   }
   try{localStorage.setItem('p79_leave_data_changed_v1',JSON.stringify({kind:'delete',id,months,at:Date.now()}));}catch(ignore){}
