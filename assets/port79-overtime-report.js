@@ -391,9 +391,9 @@
        return inputs.length>=10&&ruleType(inputs)===name;
       });
       const prompt='確定刪除自訂加班類型「'+name+'」？'+
-       (matching.length?'\\n同時將移除該類型的 '+matching.length+' 個出勤時段選項。':'')+
-       '\\n刪除後仍須按「儲存加班類型與出勤時段」才會同步雲端。'+
-       '\\n已正式申報的加班紀錄不會刪除。';
+       (matching.length?'\n同時將移除該類型的 '+matching.length+' 個出勤時段選項。':'')+
+       '\n刪除後仍須按「儲存加班類型與出勤時段」才會同步雲端。'+
+       '\n已正式申報的加班紀錄不會刪除。';
       if(!global.confirm(prompt))return;
       customTypes.splice(index,1);
       matching.forEach(tr=>tr.remove());
