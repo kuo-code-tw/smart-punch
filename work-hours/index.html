@@ -13421,7 +13421,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // The fresh secure roster read below must authorize every individual deletion.
             const hasCoverLink=!!(row.forEmpId||row.coverCandidate||row.coverAlreadyArranged);
             if(!confirm(estimateOnly
-                ? '確定排除 '+row.name+' '+date+' 的打卡推算加班？\n這不是正式申報，系統會在雲端將該日加班標記為排除，不再列入加班清單。\n原始簽到、簽退和班表仍保留；日後若要重新申報，必須先核對並解除此排除註記。'
+                ? '確定刪除 '+row.name+' '+date+' 的加班？\n原始打卡資料會保留。'
                 : p79WorkOvertimeIsUnconfirmedPlan(row)&&!hasCoverLink
                 ? '刪除 '+row.name+' '+date+' 這筆已儲存的預排？原始班表、請假及打卡紀錄保留。'
                 : hasCoverLink
@@ -13491,7 +13491,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!refreshed?.ready||refreshed.error)throw Error('已確認刪除，但重新同步失敗：'+(refreshed?.error||'班表未讀取完成'));
                 p79OvertimeCalculationCache=null;
                 renderOvertimeStats();
-                alert(estimateOnly?'已由雲端確認排除此日加班估算，原始打卡及正式申報紀錄未刪除。':'已由雲端確認刪除，並完成正式班表重新同步。');
+                alert(estimateOnly?'加班已從清單刪除，原始打卡保留。':'加班已刪除，並已同步雲端班表。');
             }catch(error){
                 const message=String(error?.message||error);
                 const oldState=p79WorkOvertimeMonths.get(month);
@@ -14530,7 +14530,7 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
                     <td data-label="申報加班" class="px-3 py-3"><div class="p79-overtime-inline"><div class="p79-overtime-detail">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'🔴 疑似多報｜整班無卡，請核對後刪除':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.specialOvertimeMinutes>0?`<span class="font-black text-red-700 dark:text-red-300">特殊日待申報｜${row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)+'（待確認）':(row.specialReportMinutes/60)+' 小時'}（${escapeHtml((row.specialOvertimeLabels||[]).join('／'))}）</span>`:''}${pendingPunchOvertime}${periodSuggestion}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.reportVerified?(row.overtimeReport.attendanceReview?'正式申報（待核）':'申報'):row.coverAlreadyArranged||row.coverCandidate?'已安排／未申報':'未核實註記／非申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.reportVerified?(noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)):'尚未申報'}</span>` : ''}</div><div class="p79-overtime-row-actions">${p79CanReportOvertime()?(row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改申報</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報加班</button>`):'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}${p79CanDeleteOvertime()?(p79CanExcludeOvertimeEstimate(row)
-                    ?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" class="px-2 py-1 rounded bg-amber-100 text-amber-900 font-bold" title="排除這筆未正式申報的打卡加班估算；保留原始打卡">排除估算</button>`
+                    ?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" class="px-2 py-1 rounded bg-amber-100 text-amber-900 font-bold" title="刪除這筆未正式申報的加班顯示；原始打卡保留">刪除加班</button>`
                     :`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${row.reportVerified||row.coverCandidate||row.coverAlreadyArranged?'':'disabled title="沒有正式加班申報；須先核對代班或舊班表註記"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`)
                     :'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>' }${amendmentBadge||'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}</div></div></td>
                 </tr>`;
