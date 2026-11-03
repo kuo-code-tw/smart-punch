@@ -30,6 +30,22 @@ await test('scope changes invalidate preview and require current scoped roster',
 await test('a failed cloud validation never confirms a stale preview',async()=>{const t=setup();await t.api.load(month);const n=setup(t.disk);n.fail('getOvertimeReportCacheMeta');const previews=[];await assert.rejects(n.api.load(month,{onPreview:x=>previews.push(x)}),/rejection/);assert(previews[0].preview);assert.equal(n.calls.length,1);});
 await test('version churn and mismatched raw revisions never poison saved cache',async()=>{const t=setup();t.churn(true);await assert.rejects(t.api.load(month),/持續更新/);assert.equal(t.disk.size,0);const n=setup();n.corrupt(true);await assert.rejects(n.api.load(month),/持續更新/);assert.equal(n.disk.size,0);});
 await test('disk write failure does not block a verified visible result',async()=>{const t=setup();t.diskFailure(true);const b=await t.api.load(month);assert.equal(b.preview,false);assert.equal(t.disk.size,0);});
+await test('same-session roster is reused without another cloud roster call, but metadata still verifies',async()=>{
+ const t=setup();let reused=0;
+ t.win.P79WorkhoursCacheContext.recentRoster=async(m,token,stamp)=>{
+  reused++;assert.equal(m,month);assert.equal(token,'TOKEN');
+  return {ok:true,month:m,employees:[{empId:'A1'}],schedules:[{empId:'A1',month:m,schedule:{__meta:{}}}],revision:'S1:L1:E1:'+m,overtimeLinkedDelete:true};
+ };
+ const b=await t.api.load(month);
+ assert.equal(b.roster.schedules.length,1);assert.equal(reused,1);
+ assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,0,'reuse one authenticated request');
+ assert.equal(t.calls.filter(c=>c.action==='getOvertimeReportCacheMeta').length,2,'do not skip independent cloud revision check');
+});
+await test('wrong-month recent roster falls back to authenticated cloud',async()=>{
+ const t=setup();t.win.P79WorkhoursCacheContext.recentRoster=async m=>({ok:true,month:'2026-01',employees:[],schedules:[]});
+ await t.api.load(month);
+ assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,1,'mismatched month cannot bypass cloud');
+});
 await test('explicit refresh skips stale previews and restricted readers use the legacy permission path',async()=>{const t=setup();await t.api.load(month);let previews=0;await t.api.load(month,{force:true,onPreview:()=>previews++});assert.equal(previews,0);t.win.P79WorkhoursCacheContext.cacheAccess=()=>false;assert.equal(t.api.enabled(),false);assert.throws(()=>t.api.load(month),/權限/);});
 await test('denied viewers cannot read memory or disk through the service',async()=>{const t=setup();t.deny(true);assert.throws(()=>t.api.load(month),/權限/);assert.equal(t.calls.length,0);});
 await test('multiple startup paths apply one shared verified load',async()=>{const t=setup();assert.deepEqual(await Promise.all([t.api.startup(),t.api.startup()]),[true,true]);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,1);assert.equal(t.applied.filter(x=>!x.preview&&!x.error).length,1);});
