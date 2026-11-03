@@ -1180,6 +1180,10 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 #adminContentOvertime .p79-overtime-action-group button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 #adminContentOvertime .p79-ot-btn-history{background:#ede9fe!important;color:#5b21b6!important;border-color:#c4b5fd!important}
 #adminContentOvertime .p79-ot-btn-history:hover{background:#ddd6fe!important}
+#adminContentOvertime .p79-ot-btn-detail{background:#e0f2fe!important;color:#075985!important;border-color:#7dd3fc!important}
+#adminContentOvertime .p79-ot-btn-detail:hover{background:#bae6fd!important}
+#adminContentOvertime .p79-ot-btn-options{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important}
+#adminContentOvertime .p79-ot-btn-options:hover{background:#bbf7d0!important}
 #adminContentOvertime .p79-ot-btn-monthly{background:#4338ca!important;color:#fff!important;border-color:#4338ca!important}
 #adminContentOvertime .p79-ot-btn-monthly:hover{background:#3730a3!important}
 #adminContentOvertime .p79-ot-btn-report{background:#0369a1!important;color:#fff!important;border-color:#0369a1!important}
@@ -1726,8 +1730,10 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   <div class="p79-overtime-compact-actions">
                     <div class="p79-overtime-action-group">
                       <button type="button" onclick="P79OvertimeStatus.open()" class="p79-ot-btn-history">申報／異動紀錄</button>
+                      <button type="button" onclick="P79OvertimeStatus.open({state:'all'})" class="p79-ot-btn-detail" title="查看所有已儲存加班申報，不只異常或修改紀錄">加班明細</button>
                       <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">每月未休假加班</button>
                       <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
+                      <button type="button" onclick="if(p79CanManageOvertime())P79Overtime.openRules();else alert('沒有管理加班選項的權限')" class="p79-ot-btn-options" title="新增、修改或刪除加班類型與出勤時段">⚙ 加班選項管理</button>
                       <button id="p79OvertimePlannedToggle" type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-btn-planned" aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false" title="開啟預排／待核對視窗">預排／待核對</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
                     </div>
