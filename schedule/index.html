@@ -4650,13 +4650,55 @@ function p79EmployeeDateEligible(emp,date) {
         // Ignore only that empty container, not real shifts, groups or manual annotations.
         const comparableSchedule={...row.schedule};
         if(comparableSchedule.__meta&&typeof comparableSchedule.__meta==='object'&&
-           !Array.isArray(comparableSchedule.__meta)&&
-           Object.keys(comparableSchedule.__meta).length===0)
-          delete comparableSchedule.__meta;
+           !Array.isArray(comparableSchedule.__meta)){
+          const realNotes=Object.fromEntries(Object.entries(comparableSchedule.__meta).filter(([date,note])=>
+            !(date.length===10&&date[4]==='-'&&date[7]==='-'&&
+              note&&typeof note==='object'&&!Array.isArray(note)&&Object.keys(note).length===0)));
+          if(Object.keys(realNotes).length)comparableSchedule.__meta=realNotes;
+          else delete comparableSchedule.__meta;
+        }
         normalized.push([id,String(row.role||''),String(row.group||''),p79ScheduleStableObject(comparableSchedule)]);
       }
       normalized.sort((a,b)=>a[0].localeCompare(b[0]));
       return JSON.stringify(normalized);
+    }
+    function p79ScheduleReadbackFirstDiff(sent,read,month){
+      const actual=new Map(read.map(row=>[String(row.empId||'').trim().toUpperCase(),row]));
+      for(const expected of sent){
+        const id=String(expected.empId||'').trim().toUpperCase();
+        const found=actual.get(id);
+        const who=String(expected.name||id);
+        if(!found)return who+'（'+id+'）：雲端未讀回這筆員工班表';
+        if(String(expected.role||'')!==String(found.role||'')||
+           String(expected.group||'')!==String(found.group||''))
+          return who+'（'+id+'）：職稱或組別與送出內容不符';
+        const a=expected.schedule||{},b=found.schedule||{};
+        const dates=new Set([...Object.keys(a),...Object.keys(b)]
+          .filter(date=>date.length===10&&date.startsWith(month+'-')&&date[7]==='-'));
+        for(const date of dates){
+          if(String(a[date]??'')!==String(b[date]??'')){
+            return who+'（'+id+'）'+date+' 班別：送出「'+
+              String(a[date]??'')+'」、雲端讀回「'+String(b[date]??'')+'」';
+          }
+        }
+        const meta=x=>p79ScheduleStableObject(Object.fromEntries(Object.entries(x||{})
+          .filter(([date,note])=>!(date.length===10&&date[4]==='-'&&date[7]==='-'&&
+            note&&typeof note==='object'&&!Array.isArray(note)&&!Object.keys(note).length))));
+        const ea=meta(a.__meta),eb=meta(b.__meta);
+        if(JSON.stringify(ea)!==JSON.stringify(eb)){
+          const keys=new Set([...Object.keys(ea),...Object.keys(eb)]);
+          const key=[...keys].find(d=>JSON.stringify(ea[d])!==JSON.stringify(eb[d]))||'';
+          return who+'（'+id+'）'+key+'：人工註記或加班資訊與雲端不一致';
+        }
+        if(JSON.stringify(p79ScheduleStableObject(a.__personnel||{}))!==
+           JSON.stringify(p79ScheduleStableObject(b.__personnel||{})))
+          return who+'（'+id+'）：人員排班屬性與雲端不一致';
+        const extra=x=>p79ScheduleStableObject(Object.fromEntries(Object.entries(x)
+          .filter(([k])=>k!=='__meta'&&k!=='__personnel'&&!(k.length===10&&k[4]==='-'&&k[7]==='-'))));
+        if(JSON.stringify(extra(a))!==JSON.stringify(extra(b)))
+          return who+'（'+id+'）：其他排班資料與雲端不一致';
+      }
+      return '雲端讀回的班別、組別或人工註記與送出的資料不一致';
     }
     function p79ScheduleBulkOverwriteStats(before,after,month){
       const originals=new Map((before||[]).map(row=>[String(row.empId||'').toUpperCase(),row]));
@@ -4731,7 +4773,7 @@ function p79EmployeeDateEligible(emp,date) {
           if(recorded.every(Boolean)&&
              p79ScheduleRowsSignature(recorded,month)===expected)
             return savedRead;
-          lastError='雲端讀回的班別、組別或人工註記與送出的資料不一致';
+          lastError=p79ScheduleReadbackFirstDiff(schedules,serverRows,month);
         }catch(error){lastError=String(error?.message||error);}
         if(attempt<3)await new Promise(resolve=>setTimeout(resolve,[700,1200,1800][attempt]));
       }
