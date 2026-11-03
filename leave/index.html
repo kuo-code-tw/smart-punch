@@ -854,12 +854,29 @@ async function setLeaveStatus(id,status){
 }
 async function deleteLeave(id){
  if(leaveAccess!=='manage')return;
- if(!confirm('確定刪除此請假紀錄？對應的一位／兩位代班安排與代班加班會一起移除，班表恢復原班別。'))return;
+ if(!confirm('確定刪除此請假紀錄？對應的代班與加班一併移除，原排班別有留存就直接恢復。'))return;
  try{
+  const prior=leaveRecords.find(l=>String(l.id)===String(id));
   const result=await postCloud({action:'deleteLeaveRecord',id});
   if(!result.linkedDelete)throw new Error('請假已刪除，但後端尚未完成連動刪除更新；代班殘留需清除，請勿直接重新安排');
   p79ClearDeletedLeaveDraft(id);
-  setStatus('✅ 請假、對應代班與代班加班已一併刪除','success');await loadCloud();renderAdmin();
+  // V78：先讀回正式請假表，確認真的不存在，再通知其他已開啟的班表頁。
+  if(!await loadCloud(false,true))throw new Error('刪除回條已收到，但無法讀回正式請假資料');
+  if(leaveRecords.some(l=>String(l.id)===String(id)))throw new Error('雲端讀回仍有此請假單，請重新核對');
+  const months=Array.isArray(result.updatedMonths)?result.updatedMonths.slice():[];
+  for(const date of [prior?.startTime||prior?.startDate,prior?.endTime||prior?.endDate]){
+    const match=String(date||'').match(/^(\\d{4}-\\d{2})-\\d{2}/);
+    if(match&&!months.includes(match[1]))months.push(match[1]);
+  }
+  try{localStorage.setItem('p79_leave_data_changed_v1',JSON.stringify({kind:'delete',id,months,at:Date.now()}));}catch(ignore){}
+  renderAdmin();
+  if(!Array.isArray(result.restoredScheduleDays)){
+    setStatus('⚠️ 請假已刪除，但雲端尚未部署班表自動還原 V78，不能保證「年」已消失','warn');
+  }else if((result.restorePendingDays||[]).length){
+    setStatus('✅ 請假已刪除，班表已清除舊假別；'+result.restorePendingDays.length+' 天找不到原班別，已標示「待排班」供核對','warn');
+  }else{
+    setStatus('✅ 請假與代班已刪除；相關班表已同步核對','success');
+  }
  }catch(e){setStatus('連動刪除未確認：'+(e?.message||e),'error')}
 }
 function p79ClearDeletedLeaveDraft(id){
