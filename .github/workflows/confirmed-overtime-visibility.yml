@@ -10,6 +10,7 @@ on:
       - 'tests/overtime-pending-metrics-speed.cjs'
       - 'tests/overtime-visible-ledger-total.cjs'
       - 'tests/overtime-existing-record-controls.cjs'
+      - 'tests/overtime-leave-cover-extension-periods.cjs'
       - 'tests/overtime-edit-action.cjs'
       - 'assets/port79-workhours-cache.js'
       - 'assets/port79-overtime-report.js'
@@ -25,6 +26,7 @@ on:
       - 'tests/overtime-pending-metrics-speed.cjs'
       - 'tests/overtime-visible-ledger-total.cjs'
       - 'tests/overtime-existing-record-controls.cjs'
+      - 'tests/overtime-leave-cover-extension-periods.cjs'
       - 'tests/overtime-edit-action.cjs'
       - 'assets/port79-workhours-cache.js'
       - 'assets/port79-overtime-report.js'
@@ -52,5 +54,6 @@ jobs:
           node tests/overtime-pending-metrics-speed.cjs
           node tests/overtime-visible-ledger-total.cjs
           node tests/overtime-existing-record-controls.cjs
+          node tests/overtime-leave-cover-extension-periods.cjs
           node tests/overtime-load-speed.cjs
           node tests/workhours-verified-cache.cjs
