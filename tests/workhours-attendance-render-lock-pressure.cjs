@@ -5,7 +5,7 @@ const cache=fs.readFileSync('assets/port79-workhours-cache.js','utf8');
 assert(html.includes('body.innerHTML = pageRows.map((row, rowIndex) => {'),'monthly attendance rows must receive row index');
 assert(html.includes('const p79WorkOvertimeLoadLanes=[Promise.resolve()];'),'background schedule reads must be serialized by month');
 assert(html.includes("await (state?.promise||Promise.resolve());"),'manual overtime refresh must finish schedule read before attendance read');
-assert(cache.includes("const roster=await request(s,'getScheduleDataSecure',month);"),'schedule read must start before other full bundle reads');
+assert(cache.includes('await context()?.recentRoster?.(month,s.token,s.stamp)')&&cache.includes("await request(s,'getScheduleDataSecure',month)"),'secure roster may reuse the same-session request but must retain cloud fallback');
 assert(cache.includes('offset<months.length;offset+=2'),'raw month reads limited to 2 requests');
 const block=html.match(/const renderRows = \(\) => \{\s*body\.innerHTML = pageRows\.map\(\(row, rowIndex\) => \{([\s\S]*?)\}\)\.join\(''\);\s*\};/);
 assert(block,'attendance page rendering callback present');
