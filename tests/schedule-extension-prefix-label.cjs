@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const page=fs.readFileSync('schedule/index.html','utf8');
+const overtime=fs.readFileSync('assets/port79-overtime-report.js','utf8');
+const begin=page.indexOf('    function p79OvertimePeriodLabel(report){');
+const end=page.indexOf('    function p79SubstituteShiftLabel(',begin);
+assert(begin>0&&end>begin,'schedule overtime period renderer is present');
+const label=new Function(page.slice(begin,end)+'return p79OvertimePeriodLabel;')();
+assert.equal(label({category:'延',code:'延04-16',overtimeStart:'04',overtimeEnd:'08'}),'延04-08');
+assert.equal(label({category:'延',code:'延24-12',overtimeStart:'24',overtimeEnd:'04'}),'延24-04');
+assert.equal(label({category:'延',code:'代08-20',overtimeStart:'16',overtimeEnd:'20'}),'延16-20');
+assert.equal(label({category:'延',code:'代08-20'}),'延16-20');
+assert.equal(label({category:'延',code:''}),'');
+assert.equal(label({category:'休',code:'休04-08'}),'休04-08');
+assert.equal(label({category:'代',code:'代04-08'}),'代04-08');
+assert(page.includes("visibleSubstituteLabel.length>5?' p79-substitute-time-long'"),'six-character extension label receives smaller font in narrow date cells');
+const win={};vm.runInNewContext(overtime,{window:win,Date,Intl,Set,Map,TextEncoder});
+const api=win.P79Overtime,rule=['延','延04-16',4,6.02,'08','16','04','08','before'];
+assert.equal(api.displayPeriodCode(rule),'延04-08｜平日延時加班');
+assert.equal(api.report(rule).code,'延04-16','display must not rewrite stored rule code');
+for(const m of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
+ if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
+console.log('PASS 延04-08 and 延24-04 schedule/period UI, other category prefixes unchanged, underlying overtime code immutable');
