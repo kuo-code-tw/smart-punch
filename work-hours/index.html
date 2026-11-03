@@ -13401,18 +13401,28 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 String(x.reportId)===String(report.id));
         }
         function p79CanDeleteOvertime(){return p79CanManageOvertime()&&(isVerifiedSuperAdminSession()||currentEmp?.systemPermissions?.schedule==='manage');}
+        function p79CanExcludeOvertimeEstimate(row){
+            // An estimate originates from attendance, not from a confirmed report.
+            // An active/legacy report or any leave-cover link must use its audited flow.
+            return !!row&&!row.reportVerified&&!row.planned&&!row.overtimeReport&&
+                !row.coverCandidate&&!row.coverAlreadyArranged&&!row.forEmpId&&
+                (Number(row.overtimeMinutes)>0||Number(row.specialOvertimeMinutes)>0);
+        }
         async function p79DeleteWorkOvertimeRow(index,button){
             return p79DeleteOvertimeRecord(p79WorkOvertimeDisplayedRows[index],button);
         }
         async function p79DeleteOvertimeRecord(row,button){
             if(!row||!p79CanDeleteOvertime())return;
-            if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged)
-                return alert('這筆只有出勤估算或未核實的班表註記，沒有可確認的正式加班申報；未執行刪除。');
+            const estimateOnly=p79CanExcludeOvertimeEstimate(row);
+            if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged&&!estimateOnly)
+                return alert('這筆不是可以直接刪除的正式加班申報，且可能有班表或代班連結，請先核對原始紀錄。');
             const date=row.rosterDate||normalizeScheduleDateKey(row.dateKey),month=date.slice(0,7);
             // Do not trust a cached canDelete/revision flag after another overtime amendment.
             // The fresh secure roster read below must authorize every individual deletion.
             const hasCoverLink=!!(row.forEmpId||row.coverCandidate||row.coverAlreadyArranged);
-            if(!confirm(p79WorkOvertimeIsUnconfirmedPlan(row)&&!hasCoverLink
+            if(!confirm(estimateOnly
+                ? '確定排除 '+row.name+' '+date+' 的打卡推算加班？\n這不是正式申報，系統會在雲端將該日加班標記為排除，不再列入加班清單。\n原始簽到、簽退和班表仍保留；日後若要重新申報，必須先核對並解除此排除註記。'
+                : p79WorkOvertimeIsUnconfirmedPlan(row)&&!hasCoverLink
                 ? '刪除 '+row.name+' '+date+' 這筆已儲存的預排？原始班表、請假及打卡紀錄保留。'
                 : hasCoverLink
                 ? '刪除 '+row.name+' '+date+' 的加班，並取消當日對應的代班安排？同筆安排若有兩位代班人員，兩位當日安排都會取消；其他日期、請假與打卡紀錄保留。'
@@ -13436,12 +13446,25 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!latest?.ok||!latest.revision||!Array.isArray(latest.schedules))throw Error('無法取得最新班表版本，未執行刪除；請稍後重試');
                 if(latest.overtimeLinkedDelete!==true)throw Error('雲端尚未開放安全刪除，未執行刪除');
                 // Never delete another user's replacement of the report displayed in this row.
-                if(row.reportVerified){
-                    const currentMeta=latest.schedules.find(r=>String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase())?.schedule?.__meta?.[date];
+                const currentRoster=latest.schedules.find(r=>String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase());
+                const currentMeta=currentRoster?.schedule?.__meta?.[date];
+                if(estimateOnly){
+                    if(!currentRoster)throw Error('找不到此人當月的正式班表，未執行排除');
+                    if(currentMeta?.overtimeExcluded===true)throw Error('此日雲端已標記排除，請重新讀取核對');
+                    if(currentMeta?.overtimeReport||currentMeta?.overtime||currentMeta?.forEmpId||
+                       currentMeta?.coverCandidate||currentMeta?.coverAlreadyArranged)
+                        throw Error('雲端已有申報或加班／代班註記，不可用排除估算取代正式刪除；請重新讀取並核對原申報');
+                    if((latest.leaveCoverAssignments||[]).some(c=>
+                        date>=String(c.startDate||'')&&date<=String(c.endDate||'')&&
+                        (String(c.leaveEmpId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase()||
+                         (c.workerIds||[]).some(id=>String(id||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase()))))
+                        throw Error('此日期有請假代班安排，請先到請假管理核對，未執行排除');
+                }else if(row.reportVerified){
                     const currentId=String(currentMeta?.overtimeReport?.id||'').trim();
-                    if(!currentId||currentId!==String(row.overtimeReport?.id||'').trim())throw Error('這筆原申報已被其他操作修改或刪除，為避免刪到新的申報，本次未刪除；請重新讀取。');
+                    if(!currentId||currentId!==String(row.overtimeReport?.id||'').trim())
+                        throw Error('這筆原申報已被其他操作修改或刪除，為避免刪到新的申報，本次未刪除；請重新讀取。');
                 }
-                const deleted=await rpc('deleteOvertimeAssignment',{empId:row.empId,date,expectedRevision:latest.revision,expectedReportId:row.overtimeReport?.id||''});
+                const deleted=await rpc('deleteOvertimeAssignment',{empId:row.empId,date,expectedRevision:latest.revision,expectedReportId:estimateOnly?'':row.overtimeReport?.id||''});
                 // 刪除後立即核對雲端正式班表；不寫入永久 overtimeExcluded，避免新申報被誤擋。
                 const freshCtl=new AbortController(),freshTimer=setTimeout(()=>freshCtl.abort(),15000);
                 let fresh;
@@ -13452,6 +13475,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!fresh?.ok||!Array.isArray(fresh.schedules))throw Error('刪除指令已送出，但最新班表讀回失敗，請重新整理核對');
                 const remaining=fresh.schedules.find(r=>String(r.empId||'').trim().toUpperCase()===String(row.empId||'').trim().toUpperCase())?.schedule?.__meta?.[date];
                 if(remaining?.overtimeReport||remaining?.overtime)throw Error('雲端仍存在此筆加班，不顯示刪除成功；請查核雲端資料');
+                if(estimateOnly&&remaining?.overtimeExcluded!==true)
+                    throw Error('雲端尚未確認加班估算的排除註記，請重新讀取，未宣告排除成功');
                 try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month,empId:row.empId,date,at:Date.now()}));}catch(_){}
                 const affected=new Set((deleted.affectedEmployeeIds||[row.empId]).map(id=>String(id).trim().toUpperCase()));
                 for(const r of schedules||[]){
@@ -13466,7 +13491,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if(!refreshed?.ready||refreshed.error)throw Error('已確認刪除，但重新同步失敗：'+(refreshed?.error||'班表未讀取完成'));
                 p79OvertimeCalculationCache=null;
                 renderOvertimeStats();
-                alert('已由雲端確認刪除，並完成正式班表重新同步。');
+                alert(estimateOnly?'已由雲端確認排除此日加班估算，原始打卡及正式申報紀錄未刪除。':'已由雲端確認刪除，並完成正式班表重新同步。');
             }catch(error){
                 const message=String(error?.message||error);
                 const oldState=p79WorkOvertimeMonths.get(month);
@@ -14504,7 +14529,10 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${row.planned?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
-                    <td data-label="申報加班" class="px-3 py-3"><div class="p79-overtime-inline"><div class="p79-overtime-detail">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'🔴 疑似多報｜整班無卡，請核對後刪除':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.specialOvertimeMinutes>0?`<span class="font-black text-red-700 dark:text-red-300">特殊日待申報｜${row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)+'（待確認）':(row.specialReportMinutes/60)+' 小時'}（${escapeHtml((row.specialOvertimeLabels||[]).join('／'))}）</span>`:''}${pendingPunchOvertime}${periodSuggestion}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.reportVerified?(row.overtimeReport.attendanceReview?'正式申報（待核）':'申報'):row.coverAlreadyArranged||row.coverCandidate?'已安排／未申報':'未核實註記／非申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.reportVerified?(noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)):'尚未申報'}</span>` : ''}</div><div class="p79-overtime-row-actions">${p79CanReportOvertime()?(row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改申報</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報加班</button>`):'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}${p79CanDeleteOvertime()?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${row.reportVerified||row.coverCandidate||row.coverAlreadyArranged?'':'disabled title="沒有可確認的正式申報或代班安排，不能刪除"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`:'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>' }${amendmentBadge||'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}</div></div></td>
+                    <td data-label="申報加班" class="px-3 py-3"><div class="p79-overtime-inline"><div class="p79-overtime-detail">${row.timeCheckRequired?`<span class="font-bold text-rose-700" title="${escapeHtml(row.attendanceIssue)}">${noPunchRest?'🔴 疑似多報｜整班無卡，請核對後刪除':'出勤待核對｜暫不自動估算'}</span>`:''}${row.planned&&!noPunchRest?'<span class="font-black text-indigo-700 dark:text-indigo-300">'+(row.clockIn?'已出勤／待簽退':'預排／待核對')+'</span>':''}${row.specialOvertimeMinutes>0?`<span class="font-black text-red-700 dark:text-red-300">特殊日待申報｜${row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)+'（待確認）':(row.specialReportMinutes/60)+' 小時'}（${escapeHtml((row.specialOvertimeLabels||[]).join('／'))}）</span>`:''}${pendingPunchOvertime}${periodSuggestion}${row.overtimeReport ? `<span class="text-cyan-800 dark:text-cyan-200">${escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))}｜${row.reportVerified?(row.overtimeReport.attendanceReview?'正式申報（待核）':'申報'):row.coverAlreadyArranged||row.coverCandidate?'已安排／未申報':'未核實註記／非申報'} ${escapeHtml(row.overtimeReport.declaredHours)}小時</span><span class="text-slate-500">換算 ${row.reportVerified?(noPunchRest?'0小時':p79DisplayedOvertimeConversion(row.overtimeReport)):'尚未申報'}</span>` : ''}</div><div class="p79-overtime-row-actions">${p79CanReportOvertime()?(row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改申報</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報加班</button>`):'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}${p79CanDeleteOvertime()?(p79CanExcludeOvertimeEstimate(row)
+                    ?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" class="px-2 py-1 rounded bg-amber-100 text-amber-900 font-bold" title="排除這筆未正式申報的打卡加班估算；保留原始打卡">排除估算</button>`
+                    :`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${row.reportVerified||row.coverCandidate||row.coverAlreadyArranged?'':'disabled title="沒有正式加班申報；須先核對代班或舊班表註記"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除加班</button>`)
+                    :'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>' }${amendmentBadge||'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}</div></div></td>
                 </tr>`;
             }).join('') : `<tr><td colspan="8" class="p-8 text-center text-slate-400">${loadingWithoutRows?'正在讀取本機快取並核對雲端版本，請稍候…':'目前沒有符合條件的加班紀錄；未申報的出勤估算請切換「出勤待申報」'}</td></tr>`;
 
