@@ -719,11 +719,16 @@
   const editingOriginal=Boolean(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);
   const el=dialog(editingOriginal?'修改加班申報':prefill.manualPlan===true?'新增預排（未正式申報）':'申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
+   // Always read authoritative cloud configuration when opening a filing.
+   // A deleted type must disappear on other already-open computers too.
+   const latestRules=await loadRules();
+   const sharedConfig=global.p79OvertimeContext?.config?.();
+   if(sharedConfig)Object.assign(sharedConfig,latestRules.config);
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
    if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
    // Open new filings with ACTIVE rules only; historical rules stay in the
    // cloud for audit and are not automatically offered as new submissions.
-   const historicalRule=prefill.savedReport?reportRules().find(row=>
+   const historicalRule=prefill.savedReport?latestRules.rows.find(row=>
     String(row[0])===String(prefill.category||'')&&String(row[1])===String(prefill.code||'')):null;
    const dialogRuleConfig=()=>{
     const cfg=global.p79OvertimeContext.config();
@@ -738,7 +743,7 @@
      current.push(historicalRule);
     return current;
    };
-   let rows=specialRows(reportRowsForDialog(reportRules()),dialogRuleConfig(),extra);
+   let rows=specialRows(reportRowsForDialog(latestRules.rows),dialogRuleConfig(),extra);
    if(prefill.attendance&&prefill.roster&&!prefill.savedReport){
     const kinds=global.P79SpecialOvertime?.forShift(prefill.attendance.start,prefill.attendance.end)||[];
     const special=kinds.flatMap(p=>p.kinds).filter(k=>['颱','選'].includes(k.code));
@@ -979,6 +984,18 @@
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
      verifyPlannedReviewSelection(rows[Number(select.value)]);
+     // Deleted builtin types remain in GAS only to preserve OLD reports.
+     // Reject NEW submissions from stale browser tabs even before backend POST.
+     if(!editingOriginal){
+      const latest=await loadRules(),selected=rows[Number(select.value)];
+      const active=activeReportRows(latest.rows,latest.config);
+      const stillActive=typeOptions(latest.config,active).some(option=>option.name===ruleType(selected));
+      const known=active.some(row=>row[0]===selected[0]&&row[1]===selected[1]&&
+       ruleType(row)===ruleType(selected));
+      const transientSpecial=specialTypes.some(([name])=>name===ruleType(selected));
+      if(!stillActive||!known&&!transientSpecial)
+       throw Error('所選加班類型或時段已從雲端刪除，請重新開啟申報視窗選擇有效選項。');
+     }
      const selectedCategoryNow=rows[Number(select.value)]?.[0];
      if(!editingOriginal&&['休','例','國'].includes(selectedCategoryNow)){
       const actualRosterShift=await officialOvertimeRosterShift(empId,date);
