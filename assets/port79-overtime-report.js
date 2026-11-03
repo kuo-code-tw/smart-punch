@@ -508,7 +508,7 @@
       if(!global.confirm(prompt))return;
       customTypes.splice(index,1);
       matching.forEach(tr=>tr.remove());
-      renderAddedTypeList();
+      renderAddedTypeList();refreshManageTypePicker();
       el.querySelector('#p79AddedTypeMessage').textContent='已從編輯清單移除「'+name+'」'+(matching.length?'及 '+matching.length+' 個出勤時段':'')+'；尚未更新雲端。';
       el.querySelector('#p79OtStatus').textContent='已暫存刪除「'+name+'」，請按下方「儲存加班類型與出勤時段」確認寫入。';
      };
@@ -561,7 +561,7 @@
        removedBuiltinNames.add(name);related.forEach(tr=>tr.remove());
        el.querySelector('#p79AddedTypeMessage').textContent='已暫存刪除「'+name+'」；新申報不再顯示，歷史申報保留。';
       }
-      renderBuiltinTypeList();
+      renderBuiltinTypeList();refreshManageTypePicker();
       el.querySelector('#p79OtStatus').textContent='內建加班類型有尚未儲存的變更，請按下方儲存。';
      };
      item.append(label,button);list.append(item);
@@ -617,7 +617,7 @@
     if(!imported.length)throw Error('試算表沒有加班選項，未覆蓋原表');
     rows=activeReportRows(imported,{[DELETED_CONFIG]:[...removedBuiltinNames]});
      customTypes=typeOptions({[DELETED_CONFIG]:[...removedBuiltinNames]},rows).filter(t=>!isBuiltinType(t.name)).map(t=>[t.name,t.category]);
-     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderBuiltinTypeList();
+     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderBuiltinTypeList();refreshManageTypePicker();
     el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
    }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}finally{event.target.value=''}};
    el.querySelector('#p79OtSave').onclick=async()=>{
