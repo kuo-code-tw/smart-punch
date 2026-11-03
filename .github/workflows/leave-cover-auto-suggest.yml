@@ -5,13 +5,17 @@ on:
     paths:
       - 'leave/index.html'
       - 'assets/port79-leave-cover-suggest.js'
+      - 'assets/port79-approved-cover-auto.js'
       - 'tests/leave-cover-auto-suggest.cjs'
+      - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
   pull_request:
     paths:
       - 'leave/index.html'
       - 'assets/port79-leave-cover-suggest.js'
+      - 'assets/port79-approved-cover-auto.js'
       - 'tests/leave-cover-auto-suggest.cjs'
+      - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
 permissions:
   contents: read
@@ -26,5 +30,6 @@ jobs:
       - name: Test automatic cover candidate rest and no auto persistence
         run: |
           node tests/leave-cover-auto-suggest.cjs
+          node tests/leave-approved-cover-roster.cjs
           node tests/leave-handoff-dedupe.cjs
           node tests/leave-admin-month-filter.cjs
