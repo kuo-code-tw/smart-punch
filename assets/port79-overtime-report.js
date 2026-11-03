@@ -292,7 +292,7 @@
   const suffix=match?.[1]||'';
   const code=name==='颱風日加班'&&suffix?'颱'+suffix:
    name==='選舉日加班'&&suffix?'選'+suffix:
-   row[0]==='延'&&suffix?row[6]+'-'+row[7]:
+   row[0]==='延'&&suffix?'延'+row[6]+'-'+row[7]:
    original;
   return code+'｜'+name;
  }
