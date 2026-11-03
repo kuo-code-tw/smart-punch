@@ -63,7 +63,7 @@ function collect(snapshot,people,month,balance,readOnlyOnIncomplete=false){
     const reason=verified?R.classify({empId:emp.empId,date,meta:m,report,roster,snapshot}):{exempt:false,kind:'',label:'考勤待核對',detail:'未核對完整出勤，不判定休假超額'};
     const amendment=R.amended(report,m);
     rows.push({...common,id:report.id,date,report:JSON.parse(JSON.stringify(report)),
-      category:report.category,type:report.typeName||({例:'例假加班',休:'休息日加班',國:'國定假日加班',延:'平日延長加班',代:'休假代班加班'}[report.category])||report.code,
+      category:report.category,type:(report.typeName==='平日延長加班'?'平日延時加班':report.typeName)||({例:'例假加班',休:'休息日加班',國:'國定假日加班',延:'平日延時加班',代:'休假代班加班'}[report.category])||report.code,
       period:String(report.overtimeStart||'')+'–'+String(report.overtimeEnd||''),hours:report.declaredHours,
       excessDays:!audit&&!reason.exempt?(excess[report.category]||0):0,issue:!audit?error:'',
       linked:reason.kind==='cover'||!!(m.forEmpId||report.leaveId),reasonLabel:reason.label,
