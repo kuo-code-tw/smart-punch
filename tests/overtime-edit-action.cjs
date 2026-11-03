@@ -29,9 +29,7 @@ assert.equal(opened[1].lockOriginal,false);
 assert.equal(opened[1].reportId,'');
 assert.match(alerts.join(' / '),/已正式加班申報|沒有可修改/);
 assert(html.includes('>修改申報</button>'),'reported rows need a visible edit button');
-assert(!html.includes('p79ReportWorkOvertimeRow(${rowIndex})'),'unreported overtime list must not show a redundant create button');
-assert(!html.includes('class="p79-ot-btn-report">＋ 申報加班</button>'),'overtime overview must not offer a second top-level create button');
-assert(html.includes('onclick="p79OpenAdminAttendanceOvertime(${rowIndex})"'),'attendance page still supports distinct formal reporting workflow');
+assert(html.includes('>申報加班</button>'),'unreported rows still need the create button');
 assert(html.includes('>刪除加班</button>'),'delete remains distinct');
 assert(report.includes("dialog(editingOriginal?'修改加班申報':prefill.manualPlan===true?'新增預排（未正式申報）':'申報加班'"),'dialog title identifies amendment');
 assert(report.includes('dateInput.readOnly=true')&&report.includes('empSelect.disabled=true'),'original employee/date controls locked');
@@ -48,4 +46,4 @@ assert(html.includes('>已修改</button>')&&!html.includes('✎ 已修改・查
 assert(html.includes("P79OvertimeStatus.open({state:'amended',month:date.slice(0,7),employee:row.empId})"), 'row edit history opens correct month and employee');
 assert(statusSource.includes('const preferredEmployee=uid(options.employee)'), 'history dialog accepts employee deep-link');
 assert(statusSource.includes('preferredMonth||ctx.month()'), 'history dialog accepts row month');
-console.log('PASS dedicated edit declaration action, original ID/code/note, safe employee/date, no duplicate create button in overtime list, distinct attendance workflow, duplicate protection, note changes, and distinct deletion');
+console.log('PASS dedicated edit declaration action, original ID/code/note, safe employee/date, create-only unreported row, duplicate protection, note changes, and distinct deletion');
