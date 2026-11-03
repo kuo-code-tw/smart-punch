@@ -36,7 +36,8 @@ assert(kept.rows.find(x=>x[1]==='自訂04-16'),'existing custom rule remains int
 assert.equal(kept.rows.find(x=>x[1]==='自訂04-16')[3],'8.88','existing conversion cannot be overwritten');
 assert(kept.rows.filter(x=>x[0]==='延'&&x[4]==='08'&&x[6]==='04'&&x[7]==='08').length===1);
 assert.equal(kept.rows.find(x=>x[1]==='延16-04')[3],'','conflicting existing extension conversions require manual review');
-assert(source.includes('loadedRows=JSON.stringify(validate(loaded.rows));const support=p79AddLeaveSupportPeriods(loaded.rows);rows=support.rows;'),'cloud snapshot remains unmodified until explicit Save');
+assert(source.includes('loadedRows=JSON.stringify(validate(loaded.rows));'),'cloud snapshot remains unmodified until explicit Save');
+assert(source.includes('const support=activeSupportPeriods(activeReportRows(loaded.rows,loaded.config),loaded.config);'),'deleted builtins do not regenerate automatic periods');
 assert(source.includes('請核對換算值後按「儲存加班類型與出勤時段」寫入雲端'),'user sees truthful save requirement');
-assert(source.includes("const draft=validate(getRows()),fresh=await loadRules()"),'original cloud concurrency/readback guard remains');
+assert(source.includes('const draft=validate(getRows()),fresh=await loadRules(),deleted=[...removedBuiltinNames]'),'cloud concurrency and delete-state verification remain');
 console.log('PASS four night/morning leave coverage periods, 4h conversion reuse, no duplicate, custom overrides retained, save only on confirmation');
