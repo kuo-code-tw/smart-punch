@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const html=fs.readFileSync('schedule/index.html','utf8');
+const begin=html.indexOf('    function p79ScheduleStableObject(value)');
+const end=html.indexOf('    function p79ScheduleBulkOverwriteStats(',begin);
+assert(begin>=0&&end>begin,'post-save canonical comparison must exist');
+const ctx={Map,Set,JSON,Object,Array,String,Error};
+vm.runInNewContext(html.slice(begin,end),ctx);
+const signature=ctx.p79ScheduleRowsSignature,diagnostic=ctx.p79ScheduleReadbackFirstDiff;
+const month='2026-11';
+const original={empId:'AN1150003',name:'李建忠',month,role:'指揮手',group:'不分組',
+  schedule:{'2026-11-07':'晚',__personnel:{role:'指揮手',group:'不分組'}}};
+const clone=x=>JSON.parse(JSON.stringify(x));
+const equal=(a,b)=>signature([a],month)===signature([b],month);
+const cloud=clone(original);cloud.schedule.__meta={'2026-11-07':{},'2026-11-14':{}};
+assert(equal(original,cloud),'empty GAS-inserted note containers must not fake a write failure');
+const meaningful=clone(cloud);meaningful.schedule.__meta['2026-11-07']={manualRosterShift:'晚'};
+assert(!equal(original,meaningful),'non-empty manual note still requires an exact match');
+const badDay=clone(cloud);badDay.schedule['2026-11-07']='年';
+assert(!equal(original,badDay),'real late-shift mismatch must stay blocked');
+assert(/李建忠.*2026-11-07/.test(diagnostic([original],[badDay],month)),'mismatch identifies employee/date');
+const badGroup=clone(cloud);badGroup.group='A組';
+assert(!equal(original,badGroup),'group mismatch must stay blocked');
+console.log('PASS schedule readback: empty GAS __meta ignored, real shift/group/manual note differences rejected');
