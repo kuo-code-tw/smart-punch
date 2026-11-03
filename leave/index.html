@@ -782,7 +782,7 @@ function p79OpenLeaveCover(id){
  modal.hidden=false;
  const fetchMonth=month=>{
   const token=leaveRequestToken();if(!token)throw Error('管理員身分尚未驗證');
-  return jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  return jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000).then(data=>({...data,month:data.month||month}));
  };
  void window.P79ApprovedCoverAuto?.open({leave,people:employees,leaves:leaveRecords,covers:window.p79LeaveCoverAssignments||[],fetchMonth});
 }
@@ -1471,7 +1471,7 @@ async function p79SuggestCreateLeaveCover(){
  try{
   const token=leaveRequestToken();if(!token)throw Error('管理員身分尚未驗證');
   const months=window.P79LeaveCoverSuggest.monthsFor(date);
-  const payloads=await Promise.all(months.map(month=>jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000)));
+  const payloads=await Promise.all(months.map(month=>jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000).then(data=>({...data,month:data.month||month}))));
   const rosters=window.P79LeaveCoverSuggest.mergeRosters(payloads);
   const uniq=(items,key)=>[...new Map(items.map(x=>[key(x),x])).values()];
   const records=uniq([...leaveRecords,...payloads.flatMap(x=>x.leaveRecords||[])],x=>String(x.id||x.empId+'|'+x.startDate+'|'+x.endDate));
