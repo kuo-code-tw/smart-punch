@@ -36,7 +36,7 @@ assert.equal(result.first.empId,'EARLY');
 assert.equal(result.second.empId,'MID');
 assert.equal(result.slots[0].overtime,'08–12');
 assert.equal(result.slots[1].overtime,'12–16');
-assert.deepEqual(api.monthsFor('2026-11-01').sort(),['2026-10','2026-11']);
+assert.deepEqual(Array.from(api.monthsFor('2026-11-01')).sort(),['2026-10','2026-11']);
 assert.throws(()=>api.mergeRosters([{ok:false,schedules:[]}]),/正式班表/);
 assert(page.includes('id="adminCreateLeaveRecommendation"'),'recommendation status in original form');
 assert(page.includes('p79OnCreateLeaveEmployeeChange()'),'trigger on selected leave employee');
