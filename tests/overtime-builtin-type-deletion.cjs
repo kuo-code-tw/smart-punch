@@ -22,7 +22,7 @@ const keepHistory=api.validate([...active,...archived]);
 assert.equal(keepHistory.length,original.length,'old conversion rules remain restorable for history');
 assert.equal(JSON.stringify(original),snapshot,'deletion never mutates the historical source rows');
 const restored=api.typeOptions({[CONFIG]:[]},original).map(x=>x.name);
-assert(restored.includes('平日延長加班'),'administrator can restore a builtin');
+assert(restored.includes('平日延時加班'),'administrator can restore the canonical builtin under the renamed label');
 assert(api.activeReportRows(original,{[CONFIG]:[]}).some(row=>row[0]==='延'));
 assert(source.includes('p79OtBuiltinDelete'),'delete/restore controls must be rendered in manager');
 assert(source.includes('const archived=fresh.rows.filter(row=>removedBuiltinNames.has(ruleType(row)))'),'historic rules remain in cloud for old report validation');
