@@ -7,7 +7,7 @@ const headers=[...section.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(m=>m[1]);
 assert.deepEqual(headers,['職稱','總人數','請假天數','未換算加班（小時）','每人平均']);
 assert(!section.includes('已申報人數')&&!section.includes('有效筆數'),'unwanted count columns are not visible');
 const render=html.slice(html.indexOf('const jobBody=document.getElementById(\'p79OvertimeJobTitleRows\')'),html.indexOf('const deptNotice=document.getElementById(\'p79OvertimeJobTitleNotice\')'));
-assert(render.includes("g.raw+'</td>'"),'raw declared overtime must remain the source of displayed hours');
+assert(render.includes("Number(g.raw.toFixed(2))"),'raw displayed overtime must show accurate fraction while keeping old whole hours');
 assert(render.includes("formatAverage(g.rawAverage)"),'per-person average uses unconverted hours divided by all staff');
 assert(!render.includes("g.people+'</td>'")&&!render.includes("g.count+'</td>'"),'reporter/record counts cannot remain as hidden extra cells');
 assert(render.includes('colspan="5"'),'empty result must span exactly five columns');
