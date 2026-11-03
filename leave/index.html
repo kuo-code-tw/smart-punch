@@ -1345,19 +1345,20 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
   </div>
   <div class="p79-create-dates">
-   <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays()"></div>
-   <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays()"></div>
+   <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
+   <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
    <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
   </div>
   <div class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
    <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
-   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="filterAdminCreateLeavePeople()"></select></div>
+   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="p79OnCreateLeaveEmployeeChange()"></select></div>
   </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
   <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" style="width:16px;height:16px;min-height:16px" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
-   <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="filterAdminCreateLeavePeople()"></select></div></div>
-   <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond"></select></div></div>
+   <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div></div>
+   <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond" onchange="p79CreateCoverManual=true"></select></div></div>
   </div>
+  <p id="adminCreateLeaveRecommendation" class="note" role="status" aria-live="polite">選擇請假人員後，系統將核對正式班表並推薦代班人員。</p>
   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
   <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
   <p class="note">若是補登請假、排班表已安排代班或已申報加班，請勾選「只補登請假」；系統不新增代班、也不改動原有班表。一位代8小時；兩位各代4小時。</p>
@@ -1366,6 +1367,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
 
+<script src="../assets/port79-leave-cover-suggest.js?v=20261103-roster-rest12-v1"></script>
 <script>
 let p79CreateDailyPlan=new Map();
 function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
@@ -1428,6 +1430,59 @@ function filterAdminCreateLeavePeople(){
  p79RenderDailyCreateCover();
  $('adminCreateLeaveDepartment').textContent=target?'部門：'+(dept||'尚未設定')+'｜右側依職稱篩選同部門人員':'';
 }
+let p79CreateCoverSuggestRequest=0,p79CreateCoverManual=false;
+function p79OnCreateLeaveEmployeeChange(){
+ p79CreateCoverSuggestRequest++;p79CreateCoverManual=false;
+ for(const id of ['adminCreateLeaveWorker','adminCreateLeaveWorkerSecond','adminCreateLeaveWorkerJob','adminCreateLeaveWorkerSecondJob'])$(id).value='';
+ filterAdminCreateLeavePeople();void p79SuggestCreateLeaveCover();
+}
+function p79OnCreateLeaveDateChange(){
+ p79CreateCoverSuggestRequest++;
+ if(!p79CreateCoverManual){
+  for(const id of ['adminCreateLeaveWorker','adminCreateLeaveWorkerSecond'])$(id).value='';
+  filterAdminCreateLeavePeople();
+ }
+ void p79SuggestCreateLeaveCover();
+}
+async function p79SuggestCreateLeaveCover(){
+ const request=++p79CreateCoverSuggestRequest,notice=$('adminCreateLeaveRecommendation');
+ const selected=$('adminCreateLeaveEmployee').value,date=$('adminCreateLeaveStart').value;
+ const sameDay=date&&date===$('adminCreateLeaveEnd').value;
+ if(!selected){notice.textContent='請先選擇請假人員。';return;}
+ if($('adminCreateLeaveNoCover').checked){notice.textContent='只補登請假，不需要推薦代班。';return;}
+ if($('adminCreateLeaveDaily').checked||!sameDay){notice.textContent='多日請假請依日期分別安排代班；不會將單日推薦套用到整段請假。';return;}
+ if(p79CreateCoverManual){notice.textContent='你已手動選擇代班人員；系統不會覆蓋。';return;}
+ if(!window.P79LeaveCoverSuggest){notice.textContent='代班推薦模組尚未載入，請重新整理。';return;}
+ const leave=employees.find(e=>String(e.empId)===String(selected));
+ if(!leave)return;
+ notice.textContent='正在核對同部門同職稱的正式班表、請假及前後 12 小時休息…';
+ try{
+  const token=leaveRequestToken();if(!token)throw Error('管理員身分尚未驗證');
+  const months=window.P79LeaveCoverSuggest.monthsFor(date);
+  const payloads=await Promise.all(months.map(month=>jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000)));
+  const rosters=window.P79LeaveCoverSuggest.mergeRosters(payloads);
+  const uniq=(items,key)=>[...new Map(items.map(x=>[key(x),x])).values()];
+  const records=uniq([...leaveRecords,...payloads.flatMap(x=>x.leaveRecords||[])],x=>String(x.id||x.empId+'|'+x.startDate+'|'+x.endDate));
+  const covers=uniq([...(window.p79LeaveCoverAssignments||[]),...payloads.flatMap(x=>x.leaveCoverAssignments||[])],x=>String(x.id||x.leaveId+'|'+x.startDate+'|'+x.endDate+'|'+(x.workerIds||[]).join(',')));
+  const recommendation=window.P79LeaveCoverSuggest.suggest({people:employees,rosters,leaves:records,covers,leaveEmpId:selected,date});
+  if(request!==p79CreateCoverSuggestRequest||p79CreateCoverManual||!$('adminCreateLeaveDialog').open||
+     $('adminCreateLeaveEmployee').value!==selected||$('adminCreateLeaveStart').value!==date||$('adminCreateLeaveEnd').value!==date)return;
+  if(!recommendation.first||!recommendation.second){notice.textContent=recommendation.reason||'暫無符合條件的兩人代班組合，請人工核對。';return;}
+  const first=recommendation.first,second=recommendation.second;
+  $('adminCreateLeaveWorkerJob').value=leavePersonJob(first);
+  $('adminCreateLeaveWorkerSecondJob').value=leavePersonJob(second);
+  filterAdminCreateLeavePeople();
+  const firstSelect=$('adminCreateLeaveWorker'),secondSelect=$('adminCreateLeaveWorkerSecond');
+  if(![...firstSelect.options].some(o=>o.value===String(first.empId))||
+     ![...secondSelect.options].some(o=>o.value===String(second.empId)))throw Error('候選人已不在目前人員清單，請重新核對');
+  firstSelect.value=String(first.empId);filterAdminCreateLeavePeople();
+  secondSelect.value=String(second.empId);
+  notice.textContent='已建議 '+first.name+'（'+recommendation.slots[0].period+'，加班 '+recommendation.slots[0].overtime+'）＋'+second.name+'（'+recommendation.slots[1].period+'，加班 '+recommendation.slots[1].overtime+'）。已依班表核對前後至少 12 小時休息；實際打卡、其他異動仍須由管理員確認後儲存。';
+ }catch(error){
+  if(request!==p79CreateCoverSuggestRequest||p79CreateCoverManual||!$('adminCreateLeaveDialog').open)return;
+  notice.textContent='目前無法安全自動推薦：'+(error?.message||error)+'。仍可手動選擇代班人員，沒有自動儲存。';
+ }
+}
 function p79PopulateCreateOvertimeTypes(){
  const select=$('adminCreateLeaveOvertimeType');if(!select)return;
  const previous=select.value||'',module=window.P79Overtime;
@@ -1444,7 +1499,8 @@ async function openAdminCreateLeave(){
   try{await loadCloud(true,true);}catch(error){$('adminCreateLeaveMessage').textContent='人員載入失敗：'+(error.message||error);return;}finally{$('adminCreateLeaveSave').disabled=false;}
   if(!dialog.open)return;
  }
- p79CreateDailyPlan=new Map();$('adminCreateLeaveNoCover').checked=false;p79ToggleCreateNoCover();$('adminCreateLeaveDaily').checked=false;$('adminCreateLeaveOvertimeType').value='';p79PopulateCreateOvertimeTypes();adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ p79CreateCoverSuggestRequest++;p79CreateCoverManual=false;p79CreateDailyPlan=new Map();$('adminCreateLeaveNoCover').checked=false;p79ToggleCreateNoCover();$('adminCreateLeaveDaily').checked=false;$('adminCreateLeaveOvertimeType').value='';p79PopulateCreateOvertimeTypes();adminCreateLeaveId=crypto.randomUUID();$('adminCreateLeaveReason').value='';$('adminCreateLeaveMessage').textContent='';
+ $('adminCreateLeaveRecommendation').textContent='選擇請假人員後，系統將核對正式班表並推薦代班人員。';
  $('adminCreateLeaveJob').value='';$('adminCreateLeaveWorkerJob').value='';$('adminCreateLeaveWorkerSecondJob').value='';
  $('adminCreateLeaveEmployee').value='';$('adminCreateLeaveWorker').value='';$('adminCreateLeaveWorkerSecond').value='';
  leaveFillJobFilter($('adminCreateLeaveJob'),leaveCreatePeople());filterAdminCreateLeaveApplicants();
@@ -1467,6 +1523,7 @@ function p79PlanLeaveCoverRequest(records,covers,request){
 }
 function p79ToggleCreateNoCover(){
  const noCover=!!$('adminCreateLeaveNoCover')?.checked;
+ if(noCover)p79CreateCoverSuggestRequest++;
  $('adminCreateLeaveWorkers').hidden=noCover;
  $('adminCreateLeaveDailyToggle').hidden=noCover;
  $('adminCreateLeaveDailyRows').hidden=noCover||!$('adminCreateLeaveDaily').checked;
