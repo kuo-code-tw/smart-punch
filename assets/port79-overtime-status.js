@@ -35,8 +35,9 @@ function collect(snapshot,people,month,balance,readOnlyOnIncomplete=false){
  for(const entry of snapshot.schedules){
   const emp=employees.get(uid(entry.empId));if(!emp)continue;
   const roster=entry.schedule||{},meta=roster.__meta||{};
+  // Future, unconfirmed plans are not completed overtime declarations.
   const valid=([date,m])=>date.startsWith(month+'-')&&!!String(m?.overtimeReport?.id??'').trim()&&
-    m.overtimeExcluded!==true&&!(m.overtimeRevocations||[]).some(x=>
+    m.overtimeReport.planned!==true&&m.overtimeExcluded!==true&&!(m.overtimeRevocations||[]).some(x=>
      x?.confirmed===true&&String(x.reportId)===String(m.overtimeReport.id));
   const active=Object.entries(meta).filter(valid);
   const countEligible=([date,m])=>!R.classify({empId:emp.empId,date,meta:m,report:m.overtimeReport,roster,snapshot}).exempt;
@@ -226,7 +227,8 @@ function open(options={}){
   q('#osRevoke').textContent='撤銷勾選申報（'+selected.size+'）';
  }
  function lock(on){busy=on;el.querySelectorAll('.os-filters input,.os-filters select,.os-filters button,.os-tabs button,[data-close]').forEach(n=>n.disabled=on);paint();}
- async function load(){const month=q('#osMonth').value;if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('請選有效月份');if(identity()!==account||!ctx.canOpen())throw Error('登入身分已變更，請關閉後重新開啟');const snapshot=await ctx.snapshot(month);if(identity()!==account)throw Error('登入身分已變更');const result=collect(snapshot,ctx.employees(),month,ctx.balance,true);
+ async function load(){const month=q('#osMonth').value;if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('請選有效月份');if(identity()!==account||!ctx.canOpen())throw Error('登入身分已變更，請關閉後重新開啟');const snapshot=await ctx.snapshot(month);if(identity()!==account)throw Error('登入身分已變更');const displaySnapshot=snapshot.readOnlyDueAttendance===true?{...snapshot,attendanceEvidence:{...snapshot.attendanceEvidence,complete:false}}:snapshot;
+ const result=collect(displaySnapshot,ctx.employees(),month,ctx.balance,true);
  loaded=snapshot;data=result;staff=sortEmployeesByStroke(ctx.employees()||[]);options();selected.clear();paint();
  // Keep the prominent banner in sync after an authoritative full reload.
  updateBanner(auditSummary(snapshot.schedules,ctx.employees(),month),{ready:true});
