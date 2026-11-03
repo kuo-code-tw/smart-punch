@@ -20,8 +20,10 @@
   // A previously deleted OLD builtin must not accidentally suppress a
   // separate, explicitly configured newer-name type during consolidation.
   const newName=typeLabel.延;
-  const newConfigured=Array.isArray(config?.[TYPECONFIG])&&
-   config[TYPECONFIG].some(row=>Array.isArray(row)&&String(row[0]).trim()===newName&&row[1]==='延');
+  const newConfigured=(Array.isArray(config?.[TYPECONFIG])&&
+   config[TYPECONFIG].some(row=>Array.isArray(row)&&String(row[0]).trim()===newName&&row[1]==='延'))||
+   (Array.isArray(config?.[CONFIG])&&
+   config[CONFIG].some(row=>Array.isArray(row)&&row[0]==='延'&&String(row[9]||'').trim()===newName));
   const oldDeleted=raw.includes('平日延長加班');
   const newDeleted=raw.includes(newName);
   return new Set(raw.map(canonicalType).filter(name=>
