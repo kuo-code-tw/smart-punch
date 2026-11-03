@@ -4646,7 +4646,14 @@ function p79EmployeeDateEligible(emp,date) {
            !row.schedule||typeof row.schedule!=='object'||Array.isArray(row.schedule))
           throw Error('班表月份、工號或內容不完整，禁止整月覆蓋');
         seen.add(id);
-        normalized.push([id,String(row.role||''),String(row.group||''),p79ScheduleStableObject(row.schedule)]);
+        // GAS audit can add an empty __meta object even when no day notes exist.
+        // Ignore only that empty container, not real shifts, groups or manual annotations.
+        const comparableSchedule={...row.schedule};
+        if(comparableSchedule.__meta&&typeof comparableSchedule.__meta==='object'&&
+           !Array.isArray(comparableSchedule.__meta)&&
+           Object.keys(comparableSchedule.__meta).length===0)
+          delete comparableSchedule.__meta;
+        normalized.push([id,String(row.role||''),String(row.group||''),p79ScheduleStableObject(comparableSchedule)]);
       }
       normalized.sort((a,b)=>a[0].localeCompare(b[0]));
       return JSON.stringify(normalized);
