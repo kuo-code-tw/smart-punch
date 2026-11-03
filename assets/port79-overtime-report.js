@@ -255,9 +255,9 @@
   const conversion=conversions.length===1?conversions[0]:'';
   const periods=[
    ['延','延16-04','4',conversion,'16','24','24','04','after'],
-   ['延','延04-08','4',conversion,'08','16','04','08','before'],
+   ['延','延04-16','4',conversion,'08','16','04','08','before'],
    ['延','延24-12','4',conversion,'24','08','08','12','after'],
-   ['延','延12-16','4',conversion,'16','24','12','16','before']
+   ['延','延12-24','4',conversion,'16','24','12','16','before']
   ];
   const added=[];
   for(const period of periods){
