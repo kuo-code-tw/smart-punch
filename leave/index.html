@@ -1514,10 +1514,18 @@ async function p79SuggestCreateLeaveCover(){
 }
 function p79PopulateCreateOvertimeTypes(){
  const select=$('adminCreateLeaveOvertimeType');if(!select)return;
- const previous=select.value||'',module=window.P79Overtime;
- const options=module?module.typeOptions(window.p79OvertimeContext?.config?.()||{},module.reportRules()):[];
- select.innerHTML='<option value="">依班表自動判斷</option>'+options.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
- if(previous){if(!options.some(x=>x.name===previous))select.innerHTML+='<option value="'+esc(previous)+'">'+esc(previous)+'（待核對）</option>';select.value=previous;}
+ const module=window.P79Overtime;
+ const rename=name=>module?.canonicalType?module.canonicalType(name):
+   String(name||'').trim()==='平日延長加班'?'平日延時加班':String(name||'').trim();
+ const previous=rename(select.value);
+ const listed=module?module.typeOptions(window.p79OvertimeContext?.config?.()||{},module.reportRules()):[];
+ // Both legacy 延長 and new 延時 are ONE type; keep the previous selection
+ // only when it is still active after the cloud options reload.
+ const seen=new Set(),options=listed.map(x=>({...x,name:rename(x.name)}))
+   .filter(x=>x.name&&!seen.has(x.name)&&seen.add(x.name));
+ select.innerHTML='<option value="">依班表自動判斷</option>'+
+   options.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
+ if(previous&&options.some(x=>x.name===previous))select.value=previous;
 }
 async function openAdminCreateLeave(){
  if(adminCreateLeaveBusy)return;
