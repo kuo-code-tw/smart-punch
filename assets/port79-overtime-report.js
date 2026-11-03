@@ -435,7 +435,38 @@
    let allCloudRows=reportRules();
    let loadedRows='',loadedVisibleRows='',customTypes=JSON.parse(JSON.stringify(cached?.[TYPECONFIG]||[])),loadedTypes='',loadedDeleted='',cloudReady=false,reading=false;
    el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
-   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div class="p79-ot-new-type-controls" style="margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType" style="background:#0369a1;color:#fff;padding:9px 14px;border-radius:8px;font-weight:800">＋新增加班類型</button></div><p id="p79AddedTypeMessage" role="status" style="font-weight:700;color:#075985;margin-top:8px">可輸入「颱風日加班」，再選擇實際適用的假別。颱風日不一定屬國定假日。</p><div id="p79AddedTypeList" style="margin-top:6px;font-size:12px"></div><p style="font-size:12px;color:#475569">操作順序：①新增加班類型 → ②新增出勤時段並選剛新增的名稱 → ③按最下方「儲存加班類型與出勤時段」。內建與自訂類型都可刪除；刪除後從新申報移除，歷史申報及原換算規則保留，按下方儲存才會更新雲端。</p></div>');
+   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div class="p79-ot-new-type-controls" style="margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType" style="background:#0369a1;color:#fff;padding:9px 14px;border-radius:8px;font-weight:800">＋新增加班類型</button></div><div class="p79-ot-new-type-controls" style="margin-top:10px;border-top:1px solid #bae6fd;padding-top:12px"><label for="p79ManageTypeSelect" style="font-size:13px;font-weight:700">刪除現有加班類型</label><select id="p79ManageTypeSelect" aria-label="選擇要刪除的加班類型" style="'+inputStyle+';width:240px"><option value="">請選擇要刪除的類型</option></select><button type="button" id="p79ManageTypeAction" disabled style="background:#b91c1c;color:#fff;padding:9px 14px;border-radius:8px;font-weight:800">刪除加班類型</button></div><p id="p79AddedTypeMessage" role="status" style="font-weight:700;color:#075985;margin-top:8px">可輸入「颱風日加班」，再選擇實際適用的假別。颱風日不一定屬國定假日。</p><div id="p79AddedTypeList" style="margin-top:6px;font-size:12px"></div><p style="font-size:12px;color:#475569">操作順序：①新增加班類型 → ②新增出勤時段並選剛新增的名稱 → ③按最下方「儲存加班類型與出勤時段」。內建與自訂類型都可刪除；刪除後從新申報移除，歷史申報及原換算規則保留，按下方儲存才會更新雲端。</p></div>');
+   // A single, clear delete action sits directly in the '新增加班類型' area.
+   // Reuse existing built-in/custom handlers so confirmation, cloud save,
+   // history preservation and restore semantics are identical.
+   const manageTypeSelect=el.querySelector('#p79ManageTypeSelect');
+   const manageTypeButton=el.querySelector('#p79ManageTypeAction');
+   function refreshManageTypePicker(){
+    if(!manageTypeSelect||!manageTypeButton)return;
+    const previous=manageTypeSelect.value;
+    const list=types.map(category=>({
+     name:typeLabel[category],builtin:true,removed:removedBuiltinNames.has(typeLabel[category])
+    })).concat(customTypes
+     .filter(entry=>Array.isArray(entry)&&String(entry[0]||'').trim()&&!isBuiltinType(entry[0]))
+     .map(entry=>({name:String(entry[0]).trim(),builtin:false,removed:false})));
+    const seen=new Set();
+    const choices=list.filter(item=>{
+     const key=canonicalType(item.name);
+     if(seen.has(key))return false;
+     seen.add(key);return true;
+    });
+    manageTypeSelect.innerHTML='<option value="">請選擇要刪除的類型</option>'+
+     choices.map(item=>'<option value="'+esc(item.name)+'">'+esc(item.name)+
+       (item.removed?'（已刪除，可恢復）':item.builtin?'（內建）':'（自訂）')+'</option>').join('');
+    manageTypeSelect.value=choices.some(item=>item.name===previous)?previous:'';
+    const selected=choices.find(item=>item.name===manageTypeSelect.value);
+    manageTypeButton.textContent=selected?.removed?'恢復加班類型':'刪除加班類型';
+    manageTypeButton.style.background=selected?.removed?'#15803d':'#b91c1c';
+    const editable=cloudReady&&!reading&&!!global.p79OvertimeContext?.canEditRules?.();
+    manageTypeSelect.disabled=!editable;
+    manageTypeButton.disabled=!editable||!selected;
+   }
+   manageTypeSelect.onchange=refreshManageTypePicker;
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');
     if(!list)return;
@@ -537,12 +568,26 @@
     }
    }
    renderBuiltinTypeList();
+   refreshManageTypePicker();
+   manageTypeButton.onclick=()=>{
+    if(!cloudReady||reading||!global.p79OvertimeContext?.canEditRules?.())return;
+    const name=manageTypeSelect.value;
+    if(!name)return el.querySelector('#p79OtStatus').textContent='請先選擇要刪除的加班類型';
+    const builtin=isBuiltinType(name),removed=builtin&&removedBuiltinNames.has(name);
+    const expected=(removed?'恢復':'刪除')+(builtin?'內建加班類型 ':'自訂加班類型 ')+name;
+    const selector=builtin?'.p79OtBuiltinDelete':'.p79OtDeleteType';
+    const target=[...el.querySelectorAll(selector)].find(button=>
+     button.getAttribute('aria-label')===expected);
+    if(!target)return el.querySelector('#p79OtStatus').textContent='類型清單已變更，請重新讀取雲端後再操作';
+    target.click(); // Existing confirmation and safe-delete/restore logic.
+    refreshManageTypePicker();
+   };
    el.querySelector('#p79AddType').onclick=()=>{
     const name=el.querySelector('#p79NewTypeName').value.trim(),category=el.querySelector('#p79NewTypeCategory').value;
     if(!name)return el.querySelector('#p79OtStatus').textContent='請填加班類型名稱';
     if(typeOptions({[TYPECONFIG]:customTypes,[DELETED_CONFIG]:[...removedBuiltinNames]},rows).some(x=>x.name===name)||isBuiltinType(name))return el.querySelector('#p79OtStatus').textContent='此類型已存在';
     customTypes.push([name,category]);el.querySelector('#p79NewTypeName').value='';
-    renderAddedTypeList();
+    renderAddedTypeList();refreshManageTypePicker();
     el.querySelector('#p79AddedTypeMessage').textContent='✅ 已暫存「'+name+'」；接著按「＋新增出勤時段」，選擇「'+name+'」並設定時數，最後按最下方儲存。';
     el.querySelector('#p79OtStatus').textContent='已暫存「'+name+'」，尚未寫入雲端。';
    };
@@ -611,8 +656,8 @@
      const current=global.p79OvertimeContext?.config?.();if(current)Object.assign(current,check.config);
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('雲端已保存，本機快取更新失敗',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
-     renderAddedTypeList();renderBuiltinTypeList();
-     el.querySelector('#p79OtStatus').textContent='✅ 已儲存：刪除的內建類型不再出現在新申報；歷史加班與原換算規則保留。';
+     renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();
+     el.querySelector('#p79OtStatus').textContent='✅ 已儲存：刪除的類型不再出現在新申報；歷史加班與原換算規則保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{b.disabled=false}
    };
    const setReady=ready=>{
@@ -620,6 +665,7 @@
     ['p79OtAdd','p79AddType','p79OtSave','p79OtImport'].forEach(id=>el.querySelector('#'+id).disabled=!ready);
     body.querySelectorAll('input,select,button').forEach(input=>input.disabled=!ready);
     el.querySelectorAll('.p79OtDeleteType,.p79OtBuiltinDelete').forEach(button=>button.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
+    refreshManageTypePicker();
    };
    const reload=async()=>{
     if(reading)return;
@@ -642,7 +688,7 @@
      customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[]));
      loadedTypes=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
-     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderAddedTypeList();renderBuiltinTypeList();
+     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();
      if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
