@@ -9,7 +9,22 @@ const icons={home:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',attendance
 const icon=k=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[k]||icons.leave)+'</svg>';
 const logo='<svg class="p79-port-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="27" r="24" fill="#dcefff"/><path d="M8 31 32 21l24 10-10 14H18z" fill="#1689ef"/><path d="M24 23V12h16v11M30 12V5" fill="none" stroke="#fff" stroke-width="5"/><path d="M2 49q12-9 28 0t32-2M5 57q12-7 27 0t27-2" fill="none" stroke="#197be1" stroke-width="4"/></svg>';
 let shell,bar,frame=0,navObserver,homePermissionSignature="";
-function account(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')||{}}catch(_){return {}}}
+function account(){
+ let user=null,admin=null;
+ try{user=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
+ try{admin=JSON.parse(sessionStorage.getItem('admin_session')||'null')}catch(_){}
+ const mode=String(sessionStorage.getItem('port79_entry_mode')||user?.entryMode||'').toLowerCase();
+ if(mode==='punch'||user?.punchOnly===true)return user||{};
+ const userRole=String(user?.adminRole||user?.role||'').toLowerCase();
+ if(['admin','superadmin'].includes(userRole))return user;
+ const adminRole=String(admin?.adminRole||admin?.role||'').toLowerCase();
+ const verified=sessionStorage.getItem('aqc_admin_logged_in')==='1'
+  && !!String(sessionStorage.getItem('port79_admin_token')||
+    sessionStorage.getItem('port79_gc_superadmin_token')||
+    sessionStorage.getItem('port79_gc_token')||'').trim();
+ if(verified&&['admin','superadmin'].includes(adminRole)&&admin?.punchOnly!==true)return admin;
+ return user||admin||{};
+}
 function enabled(){if(home){const s=account();return d.getElementById('systems')?.classList.contains('show')&&['admin','superadmin'].includes(String(s.adminRole||s.role).toLowerCase())&&!s.punchOnly;}return d.body.dataset.p79System!=='attendance'||d.documentElement.classList.contains('p79-attendance-management-chrome')&&!d.documentElement.classList.contains('p79-punch-only');}
 function button(label,cls,html,fn){const b=d.createElement('button');b.type='button';b.className=cls;b.setAttribute('aria-label',label);b.innerHTML=html;b.addEventListener('click',fn);return b;}
 function homeTarget(){return home?'./':'../';}
