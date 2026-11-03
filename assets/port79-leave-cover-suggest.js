@@ -11,11 +11,17 @@
   const map=new Map();
   for(const data of payloads){
    if(data?.ok!==true||!Array.isArray(data.schedules))throw Error('正式班表讀取不完整');
+   const month=String(data.month||'').slice(0,7).replace('/','-');
    for(const item of data.schedules){
     const id=norm(item.empId),schedule=item.schedule;
     if(!id||!schedule||typeof schedule!=='object')continue;
     const prior=map.get(id)||{};
-    for(const [date,value] of Object.entries(schedule))if(/^\d{4}-\d{2}-\d{2}$/.test(date))prior[date]=value;
+    for(const [raw,value] of Object.entries(schedule)){
+     const date=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw:
+       /^\d{4}\/\d{2}\/\d{2}$/.test(raw)?raw.replaceAll('/','-'):
+       /^\d{1,2}$/.test(raw)&&/^\d{4}-\d{2}$/.test(month)?month+'-'+raw.padStart(2,'0'):'';
+     if(date)prior[date]=value;
+    }
     map.set(id,prior);
    }
   }
