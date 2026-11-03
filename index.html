@@ -998,7 +998,7 @@ function p79BackgroundLoginLog(session,token){
 
 function saveSession(data,mode='manage'){const requestedMode=String(mode||'manage').toLowerCase();const serverRole=String(data.adminRole||data.role||'employee').toLowerCase();const role=requestedMode==='punch'?'employee':serverRole;const token=String(data.userToken||data.adminToken||data.gcToken||data.token||'').trim();const session={empId:String(data.empId||'').trim().toUpperCase(),attNo:String(data.attNo||''),name:String(data.name||''),dept:String(data.dept||''),jobTitle:String(data.jobTitle||''),adminRole:role,actualAdminRole:String(data.actualAdminRole||serverRole),punchOnly:requestedMode==='punch'||!!data.punchOnly,systemPermissions:normalizePermissions(data.systemPermissions,role),finePermissions:data.finePermissions||{},dataScope:data.dataScope||{},loginAt:new Date().toISOString()};sessionStorage.setItem('port79_user_session',JSON.stringify(session));sessionStorage.setItem('port79_user_token',token);sessionStorage.setItem('port79_gas_url',GAS_URL);sessionStorage.setItem('port79_home_emp_id',session.empId);if(role==='employee')sessionStorage.setItem('port79_leave_emp_id',session.empId);if(['admin','superadmin'].includes(role)){sessionStorage.setItem('admin_session',JSON.stringify(session));sessionStorage.setItem('aqc_admin_logged_in','1');sessionStorage.setItem('aqc_admin_id',session.empId);sessionStorage.setItem('aqc_admin_role',role);sessionStorage.setItem('aqc_admin_name',session.name);sessionStorage.setItem('port79_admin_token',token);sessionStorage.setItem('port79_gc_token',token);sessionStorage.setItem('port79_sso_verified','1');if(role==='superadmin')sessionStorage.setItem('port79_gc_superadmin_token',token);else sessionStorage.removeItem('port79_gc_superadmin_token')}currentSession=session;if(requestedMode==='manage')p79BackgroundLoginLog(session,token);setTimeout(()=>window.Port79DataCache?.preloadCurrent?.(),80);return session}
 function clearSession(){
-  document.documentElement.classList.remove('p79-admin-phone-two-panels');
+  p79SyncAdminPhonePanels(null);
   ['port79_user_session','port79_user_token','port79_home_emp_id','port79_leave_emp_id','admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name','aqc_admin_active_tab','port79_admin_token','port79_gc_token','port79_gc_superadmin_token','port79_sso_verified'].forEach(k=>sessionStorage.removeItem(k));
 
   // v2026.10.06 HOME-SECOND-LOGIN-FIX：
@@ -1035,9 +1035,39 @@ function clearSession(){
   // 讓下一次輸入一定會重新走 account.oninput → scheduleIdentityLookup。
   try{$('account').focus()}catch(e){}
 }
+// A phone requesting a desktop website may report a viewport wider than 900px.
+function p79IsAdminPhoneDevice(){
+  const ua=String(navigator.userAgent||'');
+  return window.matchMedia('(max-width:900px)').matches
+    || !!navigator.userAgentData?.mobile
+    || /iPhone|iPod|Windows Phone|Android.*Mobile|Mobile/i.test(ua);
+}
+function p79SyncAdminPhonePanels(session){
+  const role=String(session?.adminRole||session?.role||'').toLowerCase();
+  const phone=['admin','superadmin'].includes(role)&&!session?.punchOnly&&p79IsAdminPhoneDevice();
+  document.documentElement.classList.toggle('p79-admin-phone-two-panels',phone);
+  // Keep existing DOM/data bindings intact. Explicitly hide both extra vessel panels.
+  // This also covers old styles with stronger !important display rules.
+  for(const selector of ['.p79d-ship-panels > .p79d-trend','.p79d-ship-panels > .p79d-ranking']){
+    const card=document.querySelector('#p79Dashboard '+selector);
+    if(!card)continue;
+    if(phone){
+      card.dataset.p79PhoneHidden='1';
+      card.hidden=true;
+      card.setAttribute('aria-hidden','true');
+      card.style.setProperty('display','none','important');
+    }else if(card.dataset.p79PhoneHidden==='1'){
+      delete card.dataset.p79PhoneHidden;
+      card.hidden=false;
+      card.removeAttribute('aria-hidden');
+      card.style.removeProperty('display');
+    }
+  }
+}
+window.addEventListener('resize',()=>p79SyncAdminPhonePanels(currentSession));
 function showSession(session){
   const role=String(session.adminRole||'employee').toLowerCase();
-  document.documentElement.classList.toggle('p79-admin-phone-two-panels', ['admin','superadmin'].includes(role)&&!session.punchOnly);
+  p79SyncAdminPhonePanels(session);
   session.systemPermissions=normalizePermissions(session.systemPermissions,role);
   $('sessionTitle').innerHTML=`✅ ${escapeHtml(session.name||session.empId)}｜${roleLabel(role)}`;
   $('sessionMeta').textContent=`工號 ${session.empId||'--'}${session.dept?'｜'+session.dept:''}`;
@@ -1577,7 +1607,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 <!-- PORT79 2026-11-03: 管理員手機首頁只顯示萬海網站船期與目前班別人員；桌面版、員工登入與原資料讀取不變。 -->
 <style id="p79-admin-phone-two-panels-20261103">
-@media screen and (max-width:900px){
+@media screen{
   html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard){
     --p79-w-width:0px!important;padding:56px 0 0!important;min-height:100dvh!important;
   }
@@ -1656,6 +1686,13 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79r-current-shift-card #p79CurrentShiftList{
     display:block!important;flex:1 1 auto!important;width:100%!important;height:auto!important;
     min-height:120px!important;max-height:60dvh!important;overflow-y:auto!important;
+  }
+  /* Explicitly remove these two cards from the administrator phone view. */
+  html.p79-admin-phone-two-panels #p79Dashboard .p79d-ship-panels > .p79d-trend,
+  html.p79-admin-phone-two-panels #p79Dashboard .p79d-ship-panels > .p79d-ranking{
+    display:none!important;visibility:hidden!important;height:0!important;
+    min-height:0!important;max-height:0!important;margin:0!important;
+    padding:0!important;overflow:hidden!important;
   }
 }
 </style>
