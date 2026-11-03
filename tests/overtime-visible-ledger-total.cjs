@@ -38,5 +38,5 @@ assert.equal(mixed.totals.missing,2);
 assert(html.includes('>加班時數（未換算）</div>')&&html.includes('>換算加班時數</div>'),'card wording no longer implies missing IDs mean zero work');
 assert(html.includes("'待換算（'+totals.missing+'筆）'"),'missing conversions show pending rather than false 0');
 assert(html.includes('p79OvertimeDisplaySummary(jobTitleRows,p79BuildOvertimeJobTitleSummary(jobTitleRows,staff))'));
-for(const m of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
+for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS displayed 11-month 8h29 in raw totals, conversion missing rather than fake 0, role sums and filtered rows; October declarations unchanged');
