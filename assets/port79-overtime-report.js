@@ -2,13 +2,37 @@
  'use strict';
  const KEY='port79_overtime_report_draft_v1',CONFIG='overtimeConversionRowsV1';
  const types=['休','國','例','代','延'];
- const TYPECONFIG='overtimeReportTypesV1';
+ const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1';
+ // Soft-deleted builtins are not available for NEW filings. Retain their
+ // original conversion rows inside the cloud config for historical report
+ // lookups, audits, and existing-report edits; never mutate past reports.
+ function deletedBuiltins(config={}){
+  const raw=config?.[DELETED_CONFIG]||[];
+  if(!Array.isArray(raw))throw Error('已刪除加班類型設定格式錯誤');
+  return new Set(raw.filter(name=>Object.values(typeLabel).includes(name)));
+ }
  const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延長加班'};
  const canonicalType=name=>name==='代班加班'?'休假代班加班':name;
  const isBuiltinType=name=>Object.values(typeLabel).includes(canonicalType(name));
  // 舊表格切換假別後可能保留原來的預設名稱；預設類型一律依假別辨識。
  const ruleType=r=>r[9]&&!isBuiltinType(r[9])?r[9]:typeLabel[r[0]];
- function typeOptions(config={},rows=[]){const map=new Map(types.map(c=>[typeLabel[c],c]));for(const r of config[TYPECONFIG]||[]){if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');const name=String(r[0]).trim();if(!isBuiltinType(name))map.set(name,r[1]);}for(const r of rows){const name=ruleType(r);if(r[9]&&!isBuiltinType(name))map.set(name,r[0]);}return [...map].map(([name,category])=>({name,category}));}
+ function typeOptions(config={},rows=[]){
+  const removed=deletedBuiltins(config);
+  const map=new Map(types.filter(c=>!removed.has(typeLabel[c])).map(c=>[typeLabel[c],c]));
+  for(const r of config[TYPECONFIG]||[]){
+   if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');
+   const name=String(r[0]).trim();if(!isBuiltinType(name))map.set(name,r[1]);
+  }
+  for(const r of rows){
+   const name=ruleType(r);
+   if(r[9]&&!isBuiltinType(name)&&!removed.has(name))map.set(name,r[0]);
+  }
+  return [...map].map(([name,category])=>({name,category}));
+ }
+ function activeReportRows(rows,config={}){
+  const removed=deletedBuiltins(config);
+  return validate(rows).filter(row=>!removed.has(ruleType(row)));
+ }
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const hour=x=>{const m=String(x).match(/^(\d{2})(?::(\d{2}))?$/);if(!m)return NaN;const h=Number(m[1]),n=Number(m[2]||0);return h<=24&&n<60&&(h!==24||n===0)?h*60+n:NaN};
  const span=(a,b)=>{const x=hour(a),y=hour(b);return Number.isFinite(x)&&Number.isFinite(y)&&x%1440!==y%1440?(y-x+1440)%1440:NaN};
@@ -270,6 +294,9 @@
   const config=global.p79OvertimeContext?.config?.();
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
   return defaults();
+ }
+ function activeReportRules(){
+  return activeReportRows(reportRules(),global.p79OvertimeContext?.config?.()||{});
  }
  function reportEmployeeRole(e){
   return String(e?.jobTitle||e?.deptDetail||e?.role||e?.position||'未設定職稱').trim()||'未設定職稱';
@@ -597,7 +624,24 @@
   try{
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
    if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
-   let rows=specialRows(reportRules(),global.p79OvertimeContext.config(),extra);
+   // Open new filings with ACTIVE rules only; historical rules stay in the
+   // cloud for audit and are not automatically offered as new submissions.
+   const historicalRule=prefill.savedReport?reportRules().find(row=>
+    String(row[0])===String(prefill.category||'')&&String(row[1])===String(prefill.code||'')):null;
+   const dialogRuleConfig=()=>{
+    const cfg=global.p79OvertimeContext.config();
+    if(!historicalRule)return cfg;
+    // An existing report may still inspect/edit its exact archived period.
+    const removed=deletedBuiltins(cfg);removed.delete(ruleType(historicalRule));
+    return {...cfg,[DELETED_CONFIG]:[...removed]};
+   };
+   const reportRowsForDialog=source=>{
+    const current=activeReportRows(source,global.p79OvertimeContext.config());
+    if(historicalRule&&!current.some(row=>row[0]===historicalRule[0]&&row[1]===historicalRule[1]))
+     current.push(historicalRule);
+    return current;
+   };
+   let rows=specialRows(reportRowsForDialog(reportRules()),dialogRuleConfig(),extra);
    if(prefill.attendance&&prefill.roster&&!prefill.savedReport){
     const kinds=global.P79SpecialOvertime?.forShift(prefill.attendance.start,prefill.attendance.end)||[];
     const special=kinds.flatMap(p=>p.kinds).filter(k=>['颱','選'].includes(k.code));
@@ -702,7 +746,7 @@
    const findPrefill=(code,category)=>{const exact=rows.findIndex(r=>r[1]===code&&r[0]===category);if(exact>=0)return exact;if(category!=='延')return -1;const m=String(code||'').match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);if(!m)return -1;const candidates=rows.map((r,i)=>({r,i})).filter(({r})=>r[0]==='延'&&((hour(m[1])%1440===hour(r[6])%1440&&hour(m[2])%1440===hour(r[7])%1440)||(hour(m[1])%1440===hour(r[8]==='after'?r[4]:r[6])%1440&&hour(m[2])%1440===hour(r[8]==='after'?r[7]:r[5])%1440)));return candidates.length===1?candidates[0].i:-1;};
    const refresh=()=>{const previous=select.value;select.innerHTML=rows.map((r,i)=>({r,i})).filter(({r})=>matches(r)).map(({r,i})=>'<option data-ot-category="'+r[0]+'" value="'+i+'">'+esc(displayPeriodCode(r))+'</option>').join('');if(previous!==''&&rows[Number(previous)]&&matches(rows[Number(previous)]))select.value=previous;preview()};
    function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'雲端尚未設定這類加班規則');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
-   const refreshTypes=()=>{const previous=kind.value,options=typeOptions(global.p79OvertimeContext?.config?.()||{},rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
+   const refreshTypes=()=>{const previous=kind.value,options=typeOptions(dialogRuleConfig(),rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    function syncApprovedLeaveDate(){
     const forId=String(forSelect.value||'');
     approvedDates=approvedLeaveDateChoices(leaveRecords,forId);
@@ -769,7 +813,7 @@
    }
    function applyPreferredType(){
     const requested=prefill.preferredType;if(!requested)return;
-    if(!typeOptions(global.p79OvertimeContext?.config?.()||{},rows).some(x=>x.name===requested)){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent='原選加班類型已變更，請重新選擇類型與出勤時段。';return;}
+    if(!typeOptions(dialogRuleConfig(),rows).some(x=>x.name===requested)){select.selectedIndex=-1;select.value='';el.querySelector('#p79OtStatus').textContent='原選加班類型已變更，請重新選擇類型與出勤時段。';return;}
     kind.value=requested;refresh();
     const period=String(prefill.code||'').match(/(\d{2}(?::\d{2})?)-(\d{2}(?::\d{2})?)$/);
     const candidates=rows.map((r,i)=>({r,i})).filter(({r})=>matchesReportType(r,requested)&&(r[1]===prefill.code||period&&hour(period[1])%1440===hour(r[6])%1440&&hour(period[2])%1440===hour(r[7])%1440));
@@ -799,7 +843,7 @@
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
     const previous=select.selectedIndex>=0?rows[Number(select.value)]:null;
-    rows=specialRows(nextRows,global.p79OvertimeContext.config(),extra);refreshTypes();
+    rows=specialRows(reportRowsForDialog(nextRows),dialogRuleConfig(),extra);refreshTypes();
     const code=previous?.[1]||prefill.code,category=previous?.[0]||prefill.category;
     const index=findPrefill(code,category);
     if(index>=0){if(!matches(rows[index])){kind.value=ruleType(rows[index]);refresh();}select.value=String(index);preview();}
@@ -889,7 +933,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={DELETED_CONFIG,deletedBuiltins,activeReportRows,activeReportRules,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
