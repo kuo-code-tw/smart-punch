@@ -547,35 +547,72 @@
    el.querySelector('#p79OtSave').onclick=async()=>{
     const b=el.querySelector('#p79OtSave');if(b.disabled||!cloudReady)return;b.disabled=true;
     try{
-     const draft=validate(getRows()),fresh=await loadRules();
-     if(JSON.stringify(fresh.rows)!==loadedRows&&JSON.stringify(fresh.rows)!==JSON.stringify(draft))throw Error('換算表已由其他人修改，請關閉後重新載入再編輯');
-     if(JSON.stringify(fresh.config[TYPECONFIG]||[])!==loadedTypes&&JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes))throw Error('加班類型已被其他人修改，請重新載入');
-     const config={...fresh.config,[CONFIG]:draft,[TYPECONFIG]:customTypes};
-     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，尚未儲存；請匯出試算表保留，再改用獨立試算表分頁');
-     if(!Object.prototype.hasOwnProperty.call(fresh.config,CONFIG)||!Object.prototype.hasOwnProperty.call(fresh.config,TYPECONFIG)||JSON.stringify(fresh.rows)!==JSON.stringify(draft)||JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes))await rpc('saveConfig',{config});const check=await loadRules();
-     if(!Object.prototype.hasOwnProperty.call(check.config,CONFIG)||!Object.prototype.hasOwnProperty.call(check.config,TYPECONFIG)||JSON.stringify(check.rows)!==JSON.stringify(draft))throw Error('雲端尚未保存這份加班選項，未確認儲存成功；請保留視窗再試');
-     loadedRows=JSON.stringify(check.rows);loadedTypes=JSON.stringify(check.config[TYPECONFIG]||[]);if(loadedTypes!==JSON.stringify(customTypes))throw Error('加班類型讀回不一致');
-     const current=global.p79OvertimeContext?.config?.();if(current)Object.assign(current,check.config);try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項已在雲端保存，本機快取更新失敗',error);}global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));renderAddedTypeList();el.querySelector('#p79OtStatus').textContent='✅ 加班類型與出勤時段已儲存，之後申報可直接選用。';
+     const draft=validate(getRows()),fresh=await loadRules(),deleted=[...removedBuiltinNames];
+     // Never overwrite a teammate's newer settings with an old browser tab.
+     if(JSON.stringify(fresh.rows)!==loadedRows)throw Error('加班時段已由其他人修改，請重新載入核對');
+     if(JSON.stringify(fresh.config[TYPECONFIG]||[])!==loadedTypes)throw Error('加班類型已由其他人修改，請重新載入核對');
+     if(JSON.stringify([...deletedBuiltins(fresh.config)])!==loadedDeleted)throw Error('內建加班類型刪除狀態已變更，請重新載入核對');
+     // Preserve original conversion rows of deleted builtins in the cloud for
+     // EXISTING reports, whose GAS validation still refers to those rows.
+     // These archived rows are hidden by the tombstones from every NEW form.
+     const archived=fresh.rows.filter(row=>removedBuiltinNames.has(ruleType(row)));
+     const nextRows=validate([...draft,...archived]);
+     const config={...fresh.config,[CONFIG]:nextRows,[TYPECONFIG]:customTypes,[DELETED_CONFIG]:deleted};
+     if(new TextEncoder().encode(JSON.stringify(config)).length>8800)
+      throw Error('雲端設定已達安全容量上限，尚未變更；請先保留原設定並聯絡管理員');
+     if(!Object.prototype.hasOwnProperty.call(fresh.config,CONFIG)||
+        !Object.prototype.hasOwnProperty.call(fresh.config,TYPECONFIG)||
+        !Object.prototype.hasOwnProperty.call(fresh.config,DELETED_CONFIG)||
+        JSON.stringify(fresh.rows)!==JSON.stringify(nextRows)||
+        JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
+        JSON.stringify([...deletedBuiltins(fresh.config)])!==JSON.stringify(deleted))
+      await rpc('saveConfig',{config});
+     const check=await loadRules();
+     if(JSON.stringify(check.rows)!==JSON.stringify(nextRows)||
+        JSON.stringify(check.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
+        JSON.stringify([...deletedBuiltins(check.config)])!==JSON.stringify(deleted))
+      throw Error('加班選項雲端讀回不一致，請保留畫面供核對');
+     loadedRows=JSON.stringify(check.rows);
+     loadedTypes=JSON.stringify(check.config[TYPECONFIG]||[]);
+     loadedDeleted=JSON.stringify([...deletedBuiltins(check.config)]);
+     loadedVisibleRows=JSON.stringify(draft);
+     allCloudRows=check.rows;
+     const current=global.p79OvertimeContext?.config?.();if(current)Object.assign(current,check.config);
+     try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('雲端已保存，本機快取更新失敗',error);}
+     global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
+     renderAddedTypeList();renderBuiltinTypeList();
+     el.querySelector('#p79OtStatus').textContent='✅ 已儲存：刪除的內建類型不再出現在新申報；歷史加班與原換算規則保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{b.disabled=false}
    };
    const setReady=ready=>{
     cloudReady=ready;
     ['p79OtAdd','p79AddType','p79OtSave','p79OtImport'].forEach(id=>el.querySelector('#'+id).disabled=!ready);
     body.querySelectorAll('input,select,button').forEach(input=>input.disabled=!ready);
-    el.querySelectorAll('.p79OtDeleteType').forEach(button=>button.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
+    el.querySelectorAll('.p79OtDeleteType,.p79OtBuiltinDelete').forEach(button=>button.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
    };
    const reload=async()=>{
     if(reading)return;
-    let dirty=false;try{dirty=cloudReady&&(JSON.stringify(validate(getRows()))!==loadedRows||JSON.stringify(customTypes)!==loadedTypes);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
+    let dirty=false;try{dirty=cloudReady&&(
+     JSON.stringify(validate(getRows()))!==loadedVisibleRows||
+     JSON.stringify(customTypes)!==loadedTypes||
+     JSON.stringify([...removedBuiltinNames])!==loadedDeleted);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
     if(dirty){
      el.querySelector('#p79OtStatus').textContent='有尚未儲存的修改，請先儲存或匯出；未重新載入覆蓋你的內容。';return;
     }
     reading=true;setReady(false);el.querySelector('#p79OtReload').disabled=true;
     try{
      const loaded=await loadRules();if(!el.isConnected)return;
-     loadedRows=JSON.stringify(validate(loaded.rows));const support=p79AddLeaveSupportPeriods(loaded.rows);rows=support.rows;customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[]));loadedTypes=JSON.stringify(customTypes);
-     body.innerHTML=rows.map(editorRow).join('');renderAddedTypeList();
-     if(cached){for(const key of [CONFIG,TYPECONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
+     loadedRows=JSON.stringify(validate(loaded.rows));
+     removedBuiltinNames=deletedBuiltins(loaded.config);
+     loadedDeleted=JSON.stringify([...removedBuiltinNames]);
+     allCloudRows=loaded.rows;
+     const support=p79AddLeaveSupportPeriods(activeReportRows(loaded.rows,loaded.config));
+     rows=support.rows;
+     customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[]));
+     loadedTypes=JSON.stringify(customTypes);
+     loadedVisibleRows=JSON.stringify(validate(rows));
+     body.innerHTML=rows.map(editorRow).join('');renderAddedTypeList();renderBuiltinTypeList();
+     if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
      setReady(true);el.querySelector('#p79OtStatus').textContent=support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
