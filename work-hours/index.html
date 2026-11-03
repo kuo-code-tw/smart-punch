@@ -13814,8 +13814,12 @@ async function p79ExportOvertimeComparison(printMode){
                 const latest=p79WorkOvertimeMonths.get(month);
                 if(latest?.pending)throw Error('當月申報仍在讀取，請稍後再試');
                 if(!latest?.ready||latest.error){
-                    if(p79WorkhoursIsEditing())throw Error('目前正在編輯資料，為避免覆蓋未儲存內容，已延後更新。請完成編輯並關閉視窗再重新讀取');
-                    throw Error(latest?.error||'當月正式班表尚未完成讀取，請重新整理並核對登入與雲端連線');
+                    // Report the cloud failure when present; never misdiagnose a
+                    // failed network read as a 90-second unsaved-form lock.
+                    if(latest?.error)throw Error(latest.error);
+                    if(typeof p79WorkhoursHasOpenEditor==='function'&&p79WorkhoursHasOpenEditor())
+                        throw Error('有編輯視窗尚未關閉，請先完成或取消編輯，再重新讀取加班');
+                    throw Error('當月正式班表尚未完成讀取，請核對登入與雲端連線');
                 }
                 p79OvertimeCalculationCache=null;renderOvertimeStats();
                 // The roster already establishes the month report status. Raw
