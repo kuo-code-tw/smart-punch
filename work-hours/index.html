@@ -3127,18 +3127,25 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                !target.closest?.('#adminContentOvertime .p79-overtime-compact-filters'))
                 p79LastUnsavedFormInteractionAt=Date.now();
         }, true);
-        function p79WorkhoursIsEditing(){
+        function p79WorkhoursHasOpenEditor(){
+            // Only a visibly open editor may block an explicit overtime refresh.
+            // Filters and recently completed form changes are not open edits.
             const active=document.activeElement;
-            // The overtime month/department/job/name filters are never editable
-            // application forms; keeping a select focused must not cancel refresh.
             const readOnlyFilter=active?.closest?.('#adminContentOvertime .p79-overtime-compact-filters');
             if(!readOnlyFilter &&
                active?.matches?.('input:not([type="hidden"]):not([type="button"]),select,textarea,[contenteditable="true"]') &&
                active.getClientRects?.().length)return true;
-            if([...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(el=>el.getClientRects?.().length&&getComputedStyle(el).visibility!=='hidden'))return true;
+            if([...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(el=>
+               el.getClientRects?.().length&&getComputedStyle(el).visibility!=='hidden'&&
+               getComputedStyle(el).display!=='none'))return true;
             if(typeof activeEditingAttendanceRecord!=='undefined' && activeEditingAttendanceRecord &&
                document.getElementById('editRecordModal')?.getClientRects?.().length)return true;
-            return Date.now()-p79LastUnsavedFormInteractionAt<90000;
+            return false;
+        }
+        function p79WorkhoursIsEditing(){
+            // Only protect the brief blur interval after a real form edit;
+            // the old 90-second blanket lock falsely blocked month refresh.
+            return p79WorkhoursHasOpenEditor()||Date.now()-p79LastUnsavedFormInteractionAt<6000;
         }
         function p79ShowAppVersionNotice(latestVersion){
             if(!latestVersion||latestVersion===APP_VERSION)return;
@@ -13305,8 +13312,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const selectedMonth=requestedMonth||(monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()));
             const months=selectedMonth&&selectedMonth!=='ALL'?[selectedMonth]:[...new Set(sourceRecords.map(r=>normalizeScheduleDateKey(getAttendanceDateKey(r.timeStr)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
             months.forEach(month=>{
-                // A periodic read must not replace an in-use snapshot while a form is being edited.
-                if(!force&&p79WorkhoursIsEditing())return;
+                // Background requests respect edit drafts. An explicit month refresh
+                // may bypass only the recent-input grace period, never an open editor.
+                if(force?p79WorkhoursHasOpenEditor():p79WorkhoursIsEditing())return;
                 const previous=p79WorkOvertimeMonths.get(month);
                 if(previous?.token===token){
                     if(previous.pending)return;
@@ -13319,16 +13327,15 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
                     try{
-                        if(typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()){
-                            const bundle=await window.P79WorkhoursCache.load(month,{force,onPreview:b=>window.P79WorkhoursCacheContext.applyBundle(b,state),onInvalidate:()=>window.P79WorkhoursCacheContext.invalidatePreview(month)});
-                            if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
-                            window.P79WorkhoursCacheContext.applyBundle(bundle,state);return;
-                        }
+                        // Read the authoritative monthly overtime roster first.
+                        // Full workhours bundles also fetch previous/next months' raw
+                        // punches and config, which must NOT delay the detail table.
+                        // Separate attendance evidence is verified asynchronously below.
                         const response=await fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+month+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
                         const data=await response.json();if(response.ok===false||!data.ok||!Array.isArray(data.schedules))throw Error(data.error||'班表申報資料讀取不完整');
                         if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
-                        if(p79WorkhoursIsEditing()){
-                            // If an edit begins after the request starts, retain the previous verified snapshot.
+                        if(p79WorkhoursHasOpenEditor()||!force&&p79WorkhoursIsEditing()){
+                            // If a real edit begins during the request, retain the previous verified snapshot.
                             state.pending=false;
                             if(previous?.token===token&&previous.ready)p79WorkOvertimeMonths.set(month,previous);
                             else{state.error='編輯中，已延後套用更新';state.at=0;}
@@ -13810,9 +13817,13 @@ async function p79ExportOvertimeComparison(printMode){
                     if(p79WorkhoursIsEditing())throw Error('目前正在編輯資料，為避免覆蓋未儲存內容，已延後更新。請完成編輯並關閉視窗再重新讀取');
                     throw Error(latest?.error||'當月正式班表尚未完成讀取，請重新整理並核對登入與雲端連線');
                 }
-                const ok=await loadAttendanceMonthFromCloud(month,false);
-                if(ok===false)throw Error('出勤讀取未完成，已保留原資料');
                 p79OvertimeCalculationCache=null;renderOvertimeStats();
+                // The roster already establishes the month report status. Raw
+                // attendance is supplementary and must not hold this button or
+                // invalidate a successful overtime read when the cloud is busy.
+                void Promise.resolve().then(()=>loadAttendanceMonthFromCloud(month,false))
+                    .then(ok=>{if(ok!==false){p79OvertimeCalculationCache=null;renderOvertimeStats();}})
+                    .catch(error=>console.warn('加班月份考勤背景核對未完成',String(error?.message||error)));
             }catch(error){showToast('加班讀取失敗：'+error.message,'warning');}
             finally{if(button){button.disabled=false;button.textContent='重新讀取加班';}}
         }
@@ -14540,14 +14551,13 @@ function p79OvertimePeriodLabel(report){
                 // Punch-derived overtime is available immediately. Show it distinctly from an audited cloud declaration.
                 const cloudVerified=p79WorkOvertimeMonthVerified(row.monthKey);
                 const history=row.savedOvertimeHistory;
-                const pendingLabel=!cloudVerified?'雲端申報尚未核對，不能判定是否已申報':
-                    history?.kind==='history'?'雲端有 '+history.count+' 筆歷史加班申報，須核對正式版本':
-                    history?.kind==='legacy'?'雲端舊班表已有加班註記，須核對正式版本':
-                    '尚未讀到正式申報，不計正式合計';
+                // Display recorded working time without asserting that an
+                // authenticated declaration is missing. Formal payroll totals
+                // remain based solely on a verified report ID.
                 const pendingPunchOvertime=!row.reportVerified&&!row.planned&&!row.timeCheckRequired&&Number(row.overtimeMinutes)>0
                   ? '<span class="block font-bold text-amber-800 dark:text-amber-300">'
-                    +(Number(row.specialOvertimeMinutes)>0?'一般時段打卡加班 ':'打卡加班 ')
-                    +formatDurationMinutes(row.overtimeMinutes)+'（'+pendingLabel+'）</span>'
+                    +'加班出勤 '+formatDurationMinutes(row.overtimeMinutes)+'</span>'
+                    +(history?'<span class="block text-xs text-amber-800">歷史加班紀錄待核對</span>':'')
                   : '';
                 const clockInCell = noPunchRest?'休息（整班無卡）':row.planned&&!row.clockIn?'待出勤':formatEditableAttendanceTimeCell(row.clockIn, 'IN', allowAttendanceEdit);
                 const clockOutCell = noPunchRest?'—':row.planned&&!row.clockOut?(row.clockIn?'尚未下班':'待出勤'):formatEditableAttendanceTimeCell(row.clockOut, 'OUT', allowAttendanceEdit);
