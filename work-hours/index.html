@@ -1740,11 +1740,12 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   </div>
                 </div>
 
-                <div class="p79-overtime-metrics grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <div class="p79-overtime-metrics grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-3"><div class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">加班人數</div><div id="overtimeEmployeeCount" class="mt-1 text-xl font-bold text-indigo-700 dark:text-indigo-300">0</div></div>
                     <div class="rounded-2xl border border-sky-100 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30 p-3"><div class="text-xs font-semibold text-sky-600 dark:text-sky-400">加班班次</div><div id="overtimeShiftCount" class="mt-1 text-xl font-bold text-sky-700 dark:text-sky-300">0</div></div>
-                    <div class="rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3"><div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">加班時數（未換算）</div><div id="overtimeRawReportedHours" class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">0 小時</div></div>
-                    <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3"><div class="text-xs font-semibold text-amber-700 dark:text-amber-400">換算加班時數</div><div id="overtimeTotalHours" class="mt-1 text-xl font-bold text-amber-800 dark:text-amber-300">0.00 小時</div></div>
+                    <div class="rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3"><div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">正式申報（未換算）</div><div id="overtimeRawReportedHours" class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">0 小時</div></div>
+                    <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3"><div class="text-xs font-semibold text-amber-700 dark:text-amber-400">正式申報（已換算）</div><div id="overtimeTotalHours" class="mt-1 text-xl font-bold text-amber-800 dark:text-amber-300">0.00 小時</div></div>
+                    <div class="rounded-2xl border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 p-3"><div class="text-xs font-semibold text-orange-700 dark:text-orange-400">打卡推算待申報</div><div id="overtimePendingEstimateHours" class="mt-1 text-xl font-bold text-orange-800 dark:text-orange-300">0 小時</div><div id="overtimePendingEstimateCount" class="text-[11px] text-orange-700 dark:text-orange-300">0 班次｜不計入正式換算</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
                 <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
@@ -13645,7 +13646,10 @@ async function p79ExportOvertimeComparison(printMode){
                 restMetaByEmp.forEach(map=>Object.keys(map).forEach(date=>{if(date.startsWith(month+'-'))delete map[date];}));
                 p79MergeWorkOvertimeSnapshot(state,restMetaByEmp);
             });
-            const signature = JSON.stringify([sourceRecords, visibleEmployees, [...restMetaByEmp],scopedSchedules.map(r=>[r.empId,r.month,r.schedule]),[...p79WorkOvertimeMonths].map(([m,s])=>[m,s.ready?s.rows:null]),globalThis.P79SpecialOvertime?.signature?.()||'']);
+            // Reuse the same attendance fingerprint for the full report and the
+            // pairing cache: filtering should not stringify every punch twice.
+            const attendanceSignature=JSON.stringify([sourceRecords,visibleEmployees]);
+            const signature = JSON.stringify([attendanceSignature, [...restMetaByEmp],scopedSchedules.map(r=>[r.empId,r.month,r.schedule]),[...p79WorkOvertimeMonths].map(([m,s])=>[m,s.ready?s.rows:null]),globalThis.P79SpecialOvertime?.signature?.()||'']);
             if (p79OvertimeCalculationCache?.signature === signature) return p79OvertimeCalculationCache.rows;
             // 每個班次查人員用索引；保留考勤號／姓名重複時不配對的既有規則。
             const employeeById = new Map(), employeeByAtt = new Map(), employeeByName = new Map();
@@ -13657,7 +13661,6 @@ async function p79ExportOvertimeComparison(printMode){
                 addUnique(employeeByName,normalizeEmployeeLookupName(employee.name),employee);
             });
             const indexedEmployee = session => employeeById.get(String(session.empId||'').trim().toUpperCase()) || employeeByAtt.get(normalizeAttendanceStatsAttNo(session.attNo)) || employeeByName.get(normalizeEmployeeLookupName(session.name)) || null;
-            const attendanceSignature=JSON.stringify([sourceRecords,visibleEmployees]);
             let attendanceSessions;
             if(buildOvertimeStatisticsRows.attendanceCache?.signature===attendanceSignature)attendanceSessions=buildOvertimeStatisticsRows.attendanceCache.rows;
             else{
@@ -13694,7 +13697,7 @@ async function p79ExportOvertimeComparison(printMode){
                         return !specialMeta?.overtimeExcluded&&!specialMeta?.overtimeReport;
                     });
                     const specialOvertimeMinutes=specialParts.reduce((sum,part)=>sum+part.minutes,0);
-                    const declaration=P79Overtime.declarationWindow?.(start,end,normalizeScheduleDateKey(session.accountingDateKey||session.dateKey),p79WorkOvertimeRoster(employee.empId,normalizeScheduleDateKey(session.accountingDateKey||session.dateKey)));
+                    const declaration=specialOvertimeMinutes>0?P79Overtime.declarationWindow?.(start,end,normalizeScheduleDateKey(session.accountingDateKey||session.dateKey),p79WorkOvertimeRoster(employee.empId,normalizeScheduleDateKey(session.accountingDateKey||session.dateKey))):null;
                     const specialReportMinutes=declaration?(globalThis.P79SpecialOvertime?.overlap(declaration.start,declaration.end)||[]).filter(part=>specialParts.some(raw=>raw.date===part.date)).reduce((sum,part)=>sum+part.minutes,0):null;
                     let overtimeMinutes=baseOvertimeMinutes;
                     if(specialOvertimeMinutes){
@@ -14439,6 +14442,17 @@ function p79OvertimePeriodLabel(report){
                 '<div class="flex gap-2"><button type="button" onclick="goToPlannedOvertimePage('+(p79OvertimePlannedPage-1)+')" '+(p79OvertimePlannedPage<=1?'disabled':'')+' class="rounded-md border px-3 py-1 disabled:opacity-40">上一頁</button>'+
                 '<button type="button" onclick="goToPlannedOvertimePage('+(p79OvertimePlannedPage+1)+')" '+(p79OvertimePlannedPage>=pageCount?'disabled':'')+' class="rounded-md border px-3 py-1 disabled:opacity-40">下一頁</button></div>';
         }
+        function p79UnreportedOvertimeSummary(rows){
+            let minutes=0,count=0;
+            for(const row of rows){
+                // This is a punch-derived indication, NOT a formal declaration or payroll conversion.
+                if(row.reportVerified||row.planned||row.timeCheckRequired)continue;
+                const value=Number(row.overtimeMinutes);
+                if(!Number.isFinite(value)||value<=0)continue;
+                minutes+=value;count++;
+            }
+            return {minutes,count};
+        }
         function renderOvertimeStats() {
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
@@ -14476,15 +14490,18 @@ function p79OvertimePeriodLabel(report){
             const formatConverted=number=>Number(number).toFixed(2);
             const formatAverage=number=>number===null?'—':Number(number).toFixed(2);
             const totals=cardTotals;
+            const pendingEstimate=p79UnreportedOvertimeSummary(rows);
             const over12Count = rows.filter(row => row.overDailyLimit).length;
             const loadingWithoutRows=rows.length===0&&!p79WorkOvertimeMonths.get(month)?.ready;
             document.getElementById('overtimeEmployeeCount').textContent = uniqueEmployees;
             document.getElementById('overtimeShiftCount').textContent = rows.length;
             document.getElementById('overtimeTotalHours').textContent = formatConverted(totals.converted)+' 小時'+(totals.missing?'（'+totals.missing+'筆待換算）':'');
             document.getElementById('overtimeRawReportedHours').textContent = totals.raw+' 小時';
+            document.getElementById('overtimePendingEstimateHours').textContent = formatDurationMinutes(pendingEstimate.minutes);
+            document.getElementById('overtimePendingEstimateCount').textContent = pendingEstimate.count+' 班次｜不計入正式換算';
             document.getElementById('overtimeOver12Count').textContent = over12Count;
             p79RenderOvertimeMissingConversion(rows,loadingWithoutRows);
-            if(loadingWithoutRows){for(const id of ['overtimeEmployeeCount','overtimeShiftCount','overtimeTotalHours','overtimeRawReportedHours','overtimeOver12Count'])document.getElementById(id).textContent='載入中…';}
+            if(loadingWithoutRows){for(const id of ['overtimeEmployeeCount','overtimeShiftCount','overtimeTotalHours','overtimeRawReportedHours','overtimePendingEstimateHours','overtimeOver12Count'])document.getElementById(id).textContent='載入中…';}
             const monthRosterState=p79WorkOvertimeMonths.get(month);
             const titleLeave=p79BuildOvertimeTitleLeaveDays(
                 staff,monthRosterState?.ready&&!monthRosterState.error&&Array.isArray(monthRosterState.leaveRecords)?monthRosterState.leaveRecords:null,month
@@ -14518,7 +14535,7 @@ function p79OvertimePeriodLabel(report){
             const reportState=p79WorkOvertimeMonths.get(month);
             const reportStatus=reportState?.pending?'｜申報資料讀取中…':reportState?.error?'｜'+reportState.error:'';
             const restStatus=reportState?.restEvidencePending?'｜無卡休假核對中…':reportState?.restEvidenceError?'｜'+reportState.restEvidenceError:'';
-            const pendingEstimateCount=rows.filter(row=>!row.reportVerified&&!row.planned&&!row.timeCheckRequired&&Number(row.overtimeMinutes)>0).length;
+            const pendingEstimateCount=pendingEstimate.count;
             document.getElementById('overtimeFilterResultCount').textContent = `(符合條件共 ${rows.length} 個班次)${pendingEstimateCount?'｜打卡估算待申報 '+pendingEstimateCount+' 班':''}${reportStatus}${restStatus}${rows.some(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest')?'｜🔴 疑似多報 '+rows.filter(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest').length+' 筆，請核對後刪除':''}`;
 
             const totalPages = Math.max(1, Math.ceil(rows.length / OVERTIME_PAGE_SIZE));
