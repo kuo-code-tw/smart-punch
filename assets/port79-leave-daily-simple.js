@@ -56,6 +56,7 @@ window.openAdminCreateLeave=async function(...args){
  redraw();
 };
 async function saveDaily(){
+ if(adminCreateLeaveBusy)return;
  const dates=days(),people=leaveCreatePeople(),type=$id('adminCreateLeaveType').value;
  const notice=$id('adminCreateLeaveMessage');
  if(!dates.length||!type){notice.textContent='請選擇日期與假別（最多62天）';return;}
@@ -95,10 +96,12 @@ async function saveDaily(){
    done.push(p.date+' '+p.employee.name);
   }
   $id('adminCreateLeaveDialog').close();
-  setStatus('✅ 已逐日儲存 '+done.length+' 筆請假及代班','success');
+  setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；加班另列待核對，不會自動認定已出勤或已申報','success');
   if(entries.length){
    sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:entries[0].leaveId,createdAt:Date.now(),entries,preferredType:$id('adminCreateLeaveOvertimeType')?.value||''}));
-   p79ActivateLeaveHandoff();await p79OpenLeaveOvertimeHandoff();
+   // 請假與代班先完成，僅建立待核對清單；不強制跳入加班表單。
+   p79ActivateLeaveHandoff();
+   p79UpdateLeaveHandoffBanner();
   }
   void loadCloud(false,true);
  }catch(error){
