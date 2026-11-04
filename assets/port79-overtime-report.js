@@ -680,23 +680,27 @@
     if(!imported.length)throw Error('試算表沒有加班選項，未覆蓋原表');
     rows=activeReportRows(imported,{[DELETED_CONFIG]:[...removedBuiltinNames]});
      customTypes=typeOptions({[DELETED_CONFIG]:[...removedBuiltinNames]},rows).filter(t=>!isBuiltinType(t.name)).map(t=>[t.name,t.category]);
-     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderBuiltinTypeList();refreshManageTypePicker();
+     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderBuiltinTypeList();refreshManageTypePicker();renderRoleTypeDefaults();
     el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
    }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}finally{event.target.value=''}};
    el.querySelector('#p79OtSave').onclick=async()=>{
     const b=el.querySelector('#p79OtSave');if(b.disabled||!cloudReady)return;b.disabled=true;
     try{
      const draft=validate(getRows()),fresh=await loadRules(),deleted=[...removedBuiltinNames];
+     const rolesDraft=normalizeRoleTypeDefaults({[ROLE_DEFAULTS_CONFIG]:roleTypeDefaults});
      // Never overwrite a teammate's newer settings with an old browser tab.
      if(JSON.stringify(fresh.rows)!==loadedRows)throw Error('加班時段已由其他人修改，請重新載入核對');
      if(JSON.stringify(fresh.config[TYPECONFIG]||[])!==loadedTypes)throw Error('加班類型已由其他人修改，請重新載入核對');
      if(JSON.stringify([...deletedBuiltins(fresh.config)])!==loadedDeleted)throw Error('內建加班類型刪除狀態已變更，請重新載入核對');
+     if(JSON.stringify(normalizeRoleTypeDefaults(fresh.config))!==loadedRoleDefaults)
+      throw Error('職稱預設加班類型已由其他管理員變更，請重新讀取雲端核對');
      // Preserve original conversion rows of deleted builtins in the cloud for
      // EXISTING reports, whose GAS validation still refers to those rows.
      // These archived rows are hidden by the tombstones from every NEW form.
      const archived=fresh.rows.filter(row=>removedBuiltinNames.has(ruleType(row)));
      const nextRows=validate([...draft,...archived]);
-     const config={...fresh.config,[CONFIG]:nextRows,[TYPECONFIG]:customTypes,[DELETED_CONFIG]:deleted};
+     const config={...fresh.config,[CONFIG]:nextRows,[TYPECONFIG]:customTypes,[DELETED_CONFIG]:deleted,
+      [ROLE_DEFAULTS_CONFIG]:rolesDraft};
      if(new TextEncoder().encode(JSON.stringify(config)).length>8800)
       throw Error('雲端設定已達安全容量上限，尚未變更；請先保留原設定並聯絡管理員');
      if(!Object.prototype.hasOwnProperty.call(fresh.config,CONFIG)||
@@ -704,23 +708,27 @@
         !Object.prototype.hasOwnProperty.call(fresh.config,DELETED_CONFIG)||
         JSON.stringify(fresh.rows)!==JSON.stringify(nextRows)||
         JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
-        JSON.stringify([...deletedBuiltins(fresh.config)])!==JSON.stringify(deleted))
+        JSON.stringify([...deletedBuiltins(fresh.config)])!==JSON.stringify(deleted)||
+        JSON.stringify(normalizeRoleTypeDefaults(fresh.config))!==JSON.stringify(rolesDraft))
       await rpc('saveConfig',{config});
      const check=await loadRules();
      if(JSON.stringify(check.rows)!==JSON.stringify(nextRows)||
         JSON.stringify(check.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
-        JSON.stringify([...deletedBuiltins(check.config)])!==JSON.stringify(deleted))
-      throw Error('加班選項雲端讀回不一致，請保留畫面供核對');
+        JSON.stringify([...deletedBuiltins(check.config)])!==JSON.stringify(deleted)||
+        JSON.stringify(normalizeRoleTypeDefaults(check.config))!==JSON.stringify(rolesDraft))
+      throw Error('加班選項及職稱對應雲端讀回不一致，請保留畫面供核對');
      loadedRows=JSON.stringify(check.rows);
      loadedTypes=JSON.stringify(check.config[TYPECONFIG]||[]);
      loadedDeleted=JSON.stringify([...deletedBuiltins(check.config)]);
+     roleTypeDefaults=normalizeRoleTypeDefaults(check.config);
+     loadedRoleDefaults=JSON.stringify(roleTypeDefaults);
      loadedVisibleRows=JSON.stringify(draft);
      allCloudRows=check.rows;
      const current=global.p79OvertimeContext?.config?.();if(current)Object.assign(current,check.config);
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('雲端已保存，本機快取更新失敗',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
-     renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();
-     el.querySelector('#p79OtStatus').textContent='✅ 已儲存：刪除的類型不再出現在新申報；歷史加班與原換算規則保留。';
+     renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();renderRoleTypeDefaults();
+     el.querySelector('#p79OtStatus').textContent='✅ 加班選項與職稱對應已儲存雲端；歷史申報及換算規則保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{b.disabled=false}
    };
    const setReady=ready=>{
@@ -728,6 +736,8 @@
     ['p79OtAdd','p79AddType','p79OtSave','p79OtImport'].forEach(id=>el.querySelector('#'+id).disabled=!ready);
     body.querySelectorAll('input,select,button').forEach(input=>input.disabled=!ready);
     el.querySelectorAll('.p79OtDeleteType,.p79OtBuiltinDelete').forEach(button=>button.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
+    el.querySelectorAll('#p79RoleTypeDefaultsRows select').forEach(select=>
+     select.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
     refreshManageTypePicker();
    };
    const reload=async()=>{
@@ -735,7 +745,8 @@
     let dirty=false;try{dirty=cloudReady&&(
      JSON.stringify(validate(getRows()))!==loadedVisibleRows||
      JSON.stringify(customTypes)!==loadedTypes||
-     JSON.stringify([...removedBuiltinNames])!==loadedDeleted);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
+     JSON.stringify([...removedBuiltinNames])!==loadedDeleted||
+     JSON.stringify(roleTypeDefaults)!==loadedRoleDefaults);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
     if(dirty){
      el.querySelector('#p79OtStatus').textContent='有尚未儲存的修改，請先儲存或匯出；未重新載入覆蓋你的內容。';return;
     }
@@ -745,14 +756,16 @@
      loadedRows=JSON.stringify(validate(loaded.rows));
      removedBuiltinNames=deletedBuiltins(loaded.config);
      loadedDeleted=JSON.stringify([...removedBuiltinNames]);
+     roleTypeDefaults=normalizeRoleTypeDefaults(loaded.config);
+     loadedRoleDefaults=JSON.stringify(roleTypeDefaults);
      allCloudRows=loaded.rows;
      const support=activeSupportPeriods(activeReportRows(loaded.rows,loaded.config),loaded.config);
      rows=support.rows;
      customTypes=JSON.parse(JSON.stringify(loaded.config[TYPECONFIG]||[]));
      loadedTypes=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
-     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();
-     if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
+     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderAddedTypeList();renderBuiltinTypeList();refreshManageTypePicker();renderRoleTypeDefaults();
+     if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ROLE_DEFAULTS_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
      setReady(true);el.querySelector('#p79OtStatus').textContent=support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
