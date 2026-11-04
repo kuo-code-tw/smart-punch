@@ -564,6 +564,11 @@
    const body=el.querySelector('#p79OtRuleRows');
    const getRows=()=>[...body.querySelectorAll('tr[data-ot-active="true"]')].map(tr=>
     Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??''));
+   const refreshRuleCount=()=>{
+    const current=body.querySelectorAll('tr[data-ot-active="true"]').length;
+    const historic=body.querySelectorAll('tr[data-ot-active="false"]').length;
+    el.querySelector('#p79OtRuleCount').textContent='使用中 '+current+' 筆｜歷史保留 '+historic+' 筆（唯讀）';
+   };
    function renderArchivedRows(source,config){
     body.querySelectorAll('tr[data-ot-active="false"]').forEach(tr=>tr.remove());
     const active=new Set(activeReportRows(source,config).map(ruleKey));
@@ -579,8 +584,7 @@
      tr.children[7].className='p79-ot-historical-label';
      body.append(tr);
     }
-    const current=body.querySelectorAll('tr[data-ot-active="true"]').length;
-    el.querySelector('#p79OtRuleCount').textContent='使用中 '+current+' 筆｜歷史保留 '+historical.length+' 筆（唯讀）';
+    refreshRuleCount();
     return historical.length;
    }
    const renderAddedTypeList=()=>{
@@ -678,7 +682,7 @@
    }
    renderRoleTypeDefaults();
    // Row type and accounting category are fixed; no dropdown selection required.
-   body.addEventListener('click',e=>{if(!cloudReady)return;if(e.target.closest('.p79OtDelete'))e.target.closest('tr').remove()});
+   body.addEventListener('click',e=>{if(!cloudReady)return;if(e.target.closest('.p79OtDelete')){e.target.closest('tr').remove();refreshRuleCount();}});
    el.querySelector('#p79OtStatus').textContent=rows.length?'已顯示本機保存的選項（尚未核對雲端），正在確認…':'選項視窗已開啟，正在確認雲端資料…';
    el.querySelector('#p79OtAdd').onclick=()=>{
     if(!customTypes.length){
@@ -691,7 +695,7 @@
      const chosen=choices[Number(form.querySelector('#p79PeriodType').value)],times=[0,1,2,3].map(i=>form.querySelector('#p79PeriodTime'+i).value),position=form.querySelector('#p79PeriodPosition').value;
      const code=form.querySelector('#p79PeriodCode').value.trim()||(chosen.category+times[2]+'-'+times[3]);
      const row=[chosen.category,code,form.querySelector('#p79PeriodActual').value,form.querySelector('#p79PeriodConverted').value,...(chosen.category==='延'?times.slice(0,2):['','']),...times.slice(2),position,chosen.name];
-     validate([...getRows(),row]);body.insertAdjacentHTML('afterbegin',editorRow(row,[...removedBuiltinNames]));form.close();el.querySelector('#p79OtStatus').textContent='已加入「'+chosen.name+'／'+code+'」，請按儲存。';
+     validate([...getRows(),row]);body.insertAdjacentHTML('afterbegin',editorRow(row,[...removedBuiltinNames]));refreshRuleCount();form.close();el.querySelector('#p79OtStatus').textContent='已加入「'+chosen.name+'／'+code+'」，請按儲存。';
     }catch(error){form.querySelector('#p79PeriodMessage').textContent=error.message}};
    };
    el.querySelector('#p79OtExport').onclick=async()=>{try{
@@ -705,7 +709,7 @@
     if(!imported.length)throw Error('試算表沒有加班選項，未覆蓋原表');
     rows=validate(imported);
      customTypes=[...new Map([...customTypes,...rows.map(row=>[ruleType(row),row[0]])].map(pair=>[pair[0],pair])).values()];
-     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderRoleTypeDefaults();
+     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderArchivedRows(allCloudRows,cached||{});renderRoleTypeDefaults();
     el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
    }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}finally{event.target.value=''}};
    el.querySelector('#p79OtSave').onclick=async()=>{
