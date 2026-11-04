@@ -13412,7 +13412,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         // Only a non-revoked cloud report ID confirms an overtime declaration.
         // Old roster flags and derived cover proposals are not formal reports.
         function p79WorkOvertimeOfficialReport(report,meta=null){
-            if(!String(report?.id??'').trim()||meta?.overtimeExcluded===true)return false;
+            if(!String(report?.id??'').trim()||meta?.overtimeExcluded===true||
+               report?.deleted===true||report?.revoked===true||
+               /取消|撤銷|刪除|作廢|cancel|revok/i.test(String(report?.status||'')))return false;
             return !(meta?.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
                 String(x.reportId)===String(report.id));
         }
