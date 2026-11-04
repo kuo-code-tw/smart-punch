@@ -17,5 +17,13 @@ assert.equal((source.match(/p79OtSave'\)\.click\(\)/g)||[]).length,2,'add and de
 assert(source.includes("global.confirm('確定刪除加班類型"),'delete is confirmed');
 assert(source.includes('[ARCHIVED_CONFIG]:archiveKeys'),'history is retained without a restore action');
 assert.equal(api.typeOptions({},api.defaults()).length,0,'no automatic type list');
+assert(source.includes('class="p79-ot-type-manager"'),'compact two-column manager renders');
+assert(source.includes('id="p79OvertimeTypeList"'),'type list remains available');
+assert(source.includes('<details id="p79RoleTypeDefaultsPanel"'),'job title mapping collapses by default');
+assert(source.includes('p79-ot-table-help'),'period table gets compact heading');
+assert(source.includes('#p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 200px!important'),'rule table owns remaining dialog height');
+assert(source.includes('#p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:72px'),'type list has bounded height');
+assert(source.includes('id="p79OtSave"'),'original save action retained');
+assert(source.includes('id="p79OtAdd"'),'period add action retained');
 new vm.Script(source);
 console.log('PASS single list, inline permanent delete, immediate cloud sync and no preinstalled types');
