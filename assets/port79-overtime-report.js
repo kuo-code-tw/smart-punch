@@ -873,7 +873,7 @@
    roleSelect.innerHTML='<option value="">全部職稱</option>'+roles.map(role=>'<option value="'+esc(role)+'">'+esc(role)+'</option>').join('');
    forSelect.innerHTML='<option value="">請選擇請假人員</option>'+sorted().map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）'+(e.dept?'｜'+e.dept:''))+'</option>').join('');
    function refreshPairPeople(){
-    const rule=select.selectedIndex<0?null:rows[Number(select.value)],target=people.find(e=>String(e.empId)===String(forSelect.value)),previous=empSelect.value;
+    const rule=selectedRow(),target=people.find(e=>String(e.empId)===String(forSelect.value)),previous=empSelect.value;
     const allowed=prefill.allowedEmpIds?.length?prefill.allowedEmpIds:prefill.leaveHandoffId?[prefill.empId]:null;
     const matches=sorted().filter(e=>(!roleSelect.value||roleOf(e)===roleSelect.value)&&(!allowed||allowed.some(id=>String(id)===String(e.empId)))&&(rule?.[0]!=='代'||target&&String(target.dept||'').trim()&&String(e.dept||'').trim()===String(target.dept||'').trim()&&String(e.empId)!==String(target.empId)));
     empSelect.innerHTML='<option value="">'+(rule?.[0]==='代'&&!target?'先選左邊請假人員':matches.length?'請選擇代班人員':'同部門沒有可代班人員')+'</option>'+matches.map(e=>'<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）')+'</option>').join('');
@@ -881,6 +881,11 @@
    }
    const kind=el.querySelector('#p79OtKind'),select=el.querySelector('#p79OtCode');
    const matches=r=>matchesReportType(r,kind.value);
+    // Empty placeholder is not row 0. Require an actual matching period.
+    const selectedRow=()=>{
+     const row=select.value!==''&&select.selectedIndex>=0?rows[Number(select.value)]:null;
+     return row&&matches(row)?row:null;
+    };
    // Read-only, short-lived monthly roster lookup. Changing employees/dates must
    // never reuse the last employee's inferred overtime selection.
    el.querySelector('#p79OtPreview').insertAdjacentHTML('afterend',
@@ -993,7 +998,11 @@
      if(!el.isConnected||epoch!==rosterHintEpoch)return;
      lastOfficialShift=shift;lastRosterDate=date;lastRosterEmployee=empId;
      const allTypes=typeOptions(dialogRuleConfig(),rows);
-     if(!isExplicitPeriod()&&!manuallySelectedType&&!prefill.preferredType){
+     const employee=people.find(person=>String(person.empId)===String(empId));
+     const rolePreset=preferredOvertimeTypeForRole(
+      global.p79OvertimeContext?.config?.()||{},employee?reportEmployeeRole(employee):String(roleSelect.value||''),rows);
+     // Never overwrite the configured job-title default with a roster guess.
+     if(!isExplicitPeriod()&&!manuallySelectedType&&!prefill.preferredType&&!rolePreset){
       const suggested=['休','國','例'].includes(shift)?shift:
         ['早','中','晚'].includes(shift)?'延':'';
       const next=suggested?allTypes.find(option=>option.category===suggested):null;
@@ -1004,14 +1013,17 @@
       refresh();
       const choices=rows.map((row,index)=>({row,index}))
         .filter(({row})=>matches(row)&&matchesOfficialRosterPeriod(row));
-      if(choices.length===1){
+      if(choices.length===1&&!manuallySelectedPeriod){
        select.value=String(choices[0].index);preview();
        rosterHint.textContent='正式班表 '+shift+'：已自動帶出唯一候選時段 '+displayPeriodCode(choices[0].row)+
          '；正式申報仍須符合完整實際打卡。';
       }else{
-       select.value='';preview();
-       rosterHint.textContent=officialOvertimeTypeHint(shift,category,choices.length>0)+
-         (choices.length>1?' 已列出 '+choices.length+' 個可用時段，請依實際加班起迄選擇。':'');
+       // Do not reset a period manually selected during the async roster read.
+       if(!manuallySelectedPeriod){select.value='';preview();}
+       const available=rows.filter(matches).length;
+       rosterHint.textContent=officialOvertimeTypeHint(shift,category,available>0)+
+         (choices.length>1?' 已列出 '+choices.length+' 個正式班表相符的候選時段。':
+          available&&!choices.length?' 已顯示雲端儲存的 '+available+' 個時段供核對，但無法由此班表自動選定。':'');
       }
      }else rosterHint.textContent=officialOvertimeTypeHint(shift,category,rows.some(matches));
      if(!isExplicitPeriod()&&!manuallySelectedPeriod){
@@ -1034,7 +1046,8 @@
    const refresh=()=>{
     const previous=select.value;
     const choices=rows.map((row,index)=>({row,index}))
-      .filter(({row})=>matches(row)&&matchesOfficialRosterPeriod(row));
+      .filter(({row})=>matches(row));
+    // Display existing cloud periods even if roster cannot verify them.
     const hint=choices.length?'請選擇實際加班時段':'目前沒有符合班別的加班時段';
     select.innerHTML='<option value="">'+hint+'</option>'+
       choices.map(({row,index})=>'<option data-ot-category="'+row[0]+'" value="'+index+'">'+
@@ -1042,12 +1055,12 @@
     select.value=previous!==''&&choices.some(item=>String(item.index)===previous)?previous:'';
     preview();
    };
-   function preview(){const r=select.selectedIndex<0?null:rows[Number(select.value)];const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'雲端尚未設定這類加班規則');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
+   function preview(){const r=selectedRow();const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'雲端尚未設定這類加班規則');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
    const refreshTypes=()=>{const previous=kind.value,options=typeOptions(dialogRuleConfig(),rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    function syncApprovedLeaveDate(){
     const forId=String(forSelect.value||'');
     approvedDates=approvedLeaveDateChoices(leaveRecords,forId);
-    const selectedRule=select.selectedIndex>=0?rows[Number(select.value)]:null;
+    const selectedRule=selectedRow();
     const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&selectedRule?.[0]==='延';
     leaveDateWrap.style.display=forId&&['代','延'].includes(selectedRule?.[0])&&!originalExtensionReview?'flex':'none';
     leaveDateSelect.innerHTML='<option value="">'+(approvedDates.length?'請選核准請假日期':'沒有可核對的已核准請假日期')+'</option>'+approvedDates.map(d=>'<option value="'+d+'">'+d.replaceAll('-','/')+'</option>').join('');
@@ -1098,23 +1111,26 @@
       '職稱「'+title+'」預設建議：'+recommended+'；仍須依當日班表及實際加班核對。':
       title?'職稱「'+title+'」未設定預設加班類型，請依當日班表判斷。':'';
     const explicit=!!(prefill.savedReport||prefill.leaveHandoffId||
-      prefill.preferredType||prefill.code||prefill.category||
-      prefill.attendance||prefill.lockOriginal||prefill.manualPlan||prefill.forEmpId);
-    if(!recommended||explicit||editingOriginal)return;
+      prefill.preferredType||prefill.lockOriginal||(prefill.attendance&&prefill.code));
+    // For a new report, an inferred category (休/延) is not an explicit choice.
+    if(!recommended||explicit||editingOriginal||manuallySelectedType)return;
     if(!typeOptions(dialogRuleConfig(),rows).some(o=>o.name===recommended))return;
     // Change the suggested TYPE, never silently choose any period or
     // declare hours; the day-level formal roster check remains mandatory.
-    kind.value=recommended;
-    refresh();select.selectedIndex=-1;select.value='';preview();
-    el.querySelector('#p79OtStatus').textContent='已依職稱建議 '+recommended+'；請核對當日班表並選擇符合的出勤時段。';
+    if(kind.value!==recommended){
+     kind.value=recommended;
+     refresh();select.selectedIndex=-1;select.value='';preview();
+     autoSelectPeriodForCurrentType();
+    }
+    el.querySelector('#p79OtStatus').textContent='已自動帶入職稱「'+title+'」設定的 '+recommended+'；請核對當日班表及實際出勤時段。';
    }
-   roleSelect.onchange=()=>{refreshPairPeople();preview();suggestBySelectedRole();void refreshOfficialRosterHint();};
-   kind.onchange=()=>{manuallySelectedType=true;prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
+   roleSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;refreshPairPeople();preview();suggestBySelectedRole();void refreshOfficialRosterHint();};
+   kind.onchange=()=>{manuallySelectedType=true;manuallySelectedPeriod=false;prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
    select.onchange=()=>{manuallySelectedPeriod=true;preview();};
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
    leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
-   empSelect.onchange=()=>{manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
-   dateInput.onchange=()=>{manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
+   empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
+   dateInput.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
    if(prefill.empId||prefill.forEmpId){
     el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
@@ -1161,8 +1177,8 @@
    }
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
-    const previous=select.selectedIndex>=0?rows[Number(select.value)]:null;
-    rows=specialRows(reportRowsForDialog(nextRows),dialogRuleConfig(),extra);refreshTypes();
+    const previous=selectedRow();
+    rows=specialRows(reportRowsForDialog(nextRows),dialogRuleConfig(),extra);refreshTypes();suggestBySelectedRole();
     const code=previous?.[1]||prefill.code,category=previous?.[0]||prefill.category;
     const index=findPrefill(code,category);
     if(index>=0){if(!matches(rows[index])){kind.value=ruleType(rows[index]);refresh();}select.value=String(index);preview();}
@@ -1175,7 +1191,7 @@
    el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent='已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
    // Render cached options immediately; reconcile missing legacy labels with authoritative cloud rows.
    if(prefill.code&&findPrefill(prefill.code,prefill.category)<0){
-    loadRules().then(loaded=>{if(!el.isConnected)return;Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=select.selectedIndex>=0?'已從雲端更新並帶入出勤時段。':'已更新雲端選項；請選擇符合的出勤時段。';}).catch(error=>{if(el.isConnected)el.querySelector('#p79OtStatus').textContent='雲端時段更新失敗：'+error.message+'；可按更新雲端時段選項重試。';});
+    loadRules().then(loaded=>{if(!el.isConnected)return;Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=selectedRow()?'已從雲端更新並帶入出勤時段。':'已更新雲端選項；請選擇符合的出勤時段。';}).catch(error=>{if(el.isConnected)el.querySelector('#p79OtStatus').textContent='雲端時段更新失敗：'+error.message+'；可按更新雲端時段選項重試。';});
    }
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
@@ -1197,14 +1213,14 @@
      throw Error('原預排時段與實際打卡不符，不能確認正式申報；請選擇符合 08-16、16-24 等實際上下班的時段。');
    }
    el.querySelector('#p79OtStage').onclick=async()=>{
-    try{if(select.selectedIndex<0)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
+    try{const chosen=selectedRow();if(!chosen)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
-     verifyPlannedReviewSelection(rows[Number(select.value)]);
+     verifyPlannedReviewSelection(chosen);
      // Deleted builtin types remain in GAS only to preserve OLD reports.
      // Reject NEW submissions from stale browser tabs even before backend POST.
      if(!editingOriginal){
-      const latest=await loadRules(),selected=rows[Number(select.value)];
+      const latest=await loadRules(),selected=chosen;
       const active=activeReportRows(latest.rows,latest.config);
       const stillActive=typeOptions(latest.config,active).some(option=>option.name===ruleType(selected));
       const known=active.some(row=>row[0]===selected[0]&&row[1]===selected[1]&&
@@ -1213,27 +1229,29 @@
       if(!stillActive||!known&&!transientSpecial)
        throw Error('所選加班類型或時段已從雲端刪除，請重新開啟申報視窗選擇有效選項。');
      }
-     const selectedCategoryNow=rows[Number(select.value)]?.[0];
-     if(!editingOriginal&&['休','例','國'].includes(selectedCategoryNow)){
+     const selectedCategoryNow=chosen?.[0];
+     if(!editingOriginal&&['休','例','國','延'].includes(selectedCategoryNow)){
       const actualRosterShift=await officialOvertimeRosterShift(empId,date);
-      if(['早','中','晚'].includes(actualRosterShift))
+      if(['休','例','國'].includes(selectedCategoryNow)&&['早','中','晚'].includes(actualRosterShift))
        throw Error('正式班表此日為「'+actualRosterShift+'」班，不是休息日／例假／國定假日加班，請核對正確加班類型與時段。');
+      if(selectedCategoryNow==='延'&&['休','例','國'].includes(actualRosterShift))
+       throw Error('正式班表此日為「'+actualRosterShift+'」，與平日延時加班不符；請先核對日期、班別與正確加班類型。');
      }
      // 已存在的平日延時加班預排，只核對同一張申報、同一員工、日期與原代班關聯；
      // 請假資料缺漏不可抹去原申報日期。新申報及真正請假代班仍須核對核准請假日。
-     const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&rows[Number(select.value)]?.[0]==='延'&&
+     const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&chosen?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
-     if(!originalExtensionReview&&['代','延'].includes(rows[Number(select.value)]?.[0]))validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?prefill.date:'');
-     if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,rows[Number(select.value)]);if(issue)throw Error(issue);}
+     if(!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?prefill.date:'');
+     if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
      if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
      if(editingExisting&&!(prefill.attendance?.end>prefill.attendance?.start))throw Error('原申報需完成上下班打卡才能確認修改時段；目前只顯示暫估');
-     const selectedCategory=rows[Number(select.value)][0];
+     const selectedCategory=chosen[0];
      const pair=editingOriginal&&!['代','延'].includes(selectedCategory)
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
-     const draft={id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(rows[Number(select.value)]),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
+     const draft={id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''};
      try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}
@@ -1241,7 +1259,7 @@
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
       const button=el.querySelector('#p79OtStage');if(button.disabled)return;let completed=false;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
       try{
-       await ensureSpecialRule(rows[Number(select.value)]);
+       await ensureSpecialRule(chosen);
        const result=await global.p79OvertimeContext.saveReport(draft);
        verifySavedReport(draft,result);
        if(draft.plannedReview===true&&result?.report?.planned!==false)throw Error('雲端仍顯示預排，尚未確認轉為正式申報；請重新核對。');
