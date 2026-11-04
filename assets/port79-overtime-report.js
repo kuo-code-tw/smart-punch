@@ -406,6 +406,18 @@
   return {departments:unique(people.map(dept)),jobTitles:unique(scoped.map(title)),employees:scoped.filter(e=>!jobTitle||title(e)===jobTitle)};
  }
  async function loadRules(){const d=await rpc('getOvertimeConfig');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:validate(normalizeStored(d.config[CONFIG]))};}
+ // Replace ONLY the cloud-owned overtime fields. Shallow Object.assign leaves
+ // old archive flags behind when the authoritative cloud no longer has them.
+ // Other context settings, such as permissions or local page data, stay intact.
+ function syncCloudOvertimeConfig(cloudConfig){
+  const current=global.p79OvertimeContext?.config?.();
+  if(!current)return null;
+  for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG,HIDDEN_MANAGER_RULES]){
+   if(!Object.prototype.hasOwnProperty.call(cloudConfig,key))delete current[key];
+  }
+  Object.assign(current,cloudConfig);
+  return current;
+ }
  function resolveLeaveCoverReport(data,handoff,entry){
   const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
   const cover=(data.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(handoff.id)&&key(c.leaveEmpId)===key(entry.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry.empId))&&String(c.startDate)<=date&&String(c.endDate)>=date);
@@ -1004,8 +1016,7 @@
     preverified.config&&typeof preverified.config==='object'&&Array.isArray(preverified.rows));
    const latestRules=verifiedFresh?
     {config:preverified.config,rows:validate(preverified.rows)}:await loadRules();
-   const sharedConfig=global.p79OvertimeContext?.config?.();
-   if(sharedConfig)Object.assign(sharedConfig,latestRules.config);
+   syncCloudOvertimeConfig(latestRules.config);
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
    if(window&&window.minutes>0){const hour=new Date(window.start+8*3600000).getUTCHours();extra.push([hour||24,window.minutes/60]);}
    // Open new filings with ACTIVE rules only; historical rules stay in the
@@ -1402,7 +1413,7 @@
    }
    const optionsSaved=()=>{if(el.isConnected)applyReportRows(reportRules());};
    el.insertAdjacentHTML('beforeend','<button id="p79OtReloadOptions" type="button">更新雲端時段選項</button>');
-   el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型；請先到加班選項管理新增類型及出勤時段。':!rows.length?'已讀到加班類型，但還沒有可用的出勤時段；請先設定時段。':'已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
+   el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();syncCloudOvertimeConfig(loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型；請先到加班選項管理新增類型及出勤時段。':!rows.length?'已讀到加班類型，但還沒有可用的出勤時段；請先設定時段。':'已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
    // Initial options already come from authoritative config. A duplicate
    // background read previously overwrote rendered choices and caused flicker.
    // Only the explicit refresh button should refetch and redraw this dialog.
