@@ -74,6 +74,7 @@ window.openAdminCreateLeave=async function(...args){
 };
 async function saveDaily(){
  if(adminCreateLeaveBusy)return;
+ if(!adminSession||leaveAccess!=='manage'){alert('沒有新增請假管理權限');return;}
  const dates=days(),people=leaveCreatePeople(),type=$id('adminCreateLeaveType').value;
  const notice=$id('adminCreateLeaveMessage');
  if(!dates.length||!type){notice.textContent='請選擇日期與假別（最多62天）';return;}
@@ -108,15 +109,18 @@ async function saveDaily(){
    if(!plan.covered){
     const result=await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode:p.mode,workerIds:p.ids});
     if(!result?.ok)throw Error('代班儲存未獲雲端確認');
-    fresh.leaveCoverAssignments.push({leaveId:plan.leaveId,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
-    for(const id of p.ids){const worker=people.find(e=>String(e.empId)===String(id));entries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',date:p.date,forEmpId:String(p.employee.empId)});}
+    fresh.leaveCoverAssignments.push({leaveEmpId:p.employee.empId,leaveId:plan.leaveId,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
+    const confirmedEntries=[];
+    for(const id of p.ids){const worker=people.find(e=>String(e.empId)===String(id));confirmedEntries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',date:p.date,forEmpId:String(p.employee.empId)});}
+    // Preserve each confirmed day immediately, including when a later day fails.
+    p79AppendLeaveHandoffEntries(confirmedEntries);entries.push(...confirmedEntries);
    }
    done.push(p.date+' '+p.employee.name);
   }
   $id('adminCreateLeaveDialog').close();
   setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；加班另列待核對，不會自動認定已出勤或已申報','success');
   if(entries.length){
-   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:entries[0].leaveId,createdAt:Date.now(),entries}));
+   p79AppendLeaveHandoffEntries(entries);
    // 請假與代班先完成，僅建立待核對清單；不強制跳入加班表單。
    p79ActivateLeaveHandoff();
    p79UpdateLeaveHandoffBanner();

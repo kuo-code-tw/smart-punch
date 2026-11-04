@@ -12,7 +12,7 @@ assert.match(hint('休','休',true),/實際加班起迄時間仍需確認/);
 assert.match(hint('休','休',false),/沒有這個加班類型的出勤時段規則/);
 assert.match(hint('中','延',true),/正常班不是加班時數/);
 assert(code.includes("endpoint.searchParams.set('action','getScheduleDataSecure')"),'official cloud roster must be read');
-assert(code.includes("const actualRosterShift=await officialOvertimeRosterShift(empId,date);"),'save guard rechecks the roster');
+assert(code.includes("const officialRoster=validation.cloud.schedules.find"),'save guard uses the same fresh official roster as the revision-checked write');
 assert(code.includes("['早','中','晚'].includes(actualRosterShift)"),'regular work shift blocked as rest overtime');
 assert(code.includes('void refreshOfficialRosterHint()'),'dialog loads official shift');
 assert(code.includes("rows.some(matches)?'尚未選定出勤時段"),'unselected rule is not mislabeled as missing configuration');

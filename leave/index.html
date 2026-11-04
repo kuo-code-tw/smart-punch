@@ -597,8 +597,8 @@ function renderMy(){
 function updateDays(){const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){$('leaveDays').value='';return}const a=new Date(s+'T00:00:00'),b=new Date(e+'T00:00:00');const d=Math.floor((b-a)/86400000)+1;$('leaveDays').value=d>0?d:''}
 async function submitLeave(){
  if(!currentEmployee)return;const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){setStatus('請選擇開始與結束日期','warn');return}updateDays();const days=Number($('leaveDays').value);if(!days){setStatus('結束日期不可早於開始日期','error');return}
- const btn=$('submitLeaveBtn');btn.disabled=true;btn.textContent='上傳中...';
- try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';await loadCloud()}
+ const btn=$('submitLeaveBtn');if(btn.disabled)return;btn.disabled=true;btn.textContent='上傳中...';
+ try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';void loadCloud()}
  catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
  finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
 }
@@ -928,7 +928,7 @@ async function p79SaveLeaveCover(){
    const start=normalizeLeaveFilterDate(leave?.startTime||leave?.startDate),end=normalizeLeaveFilterDate(leave?.endTime||leave?.endDate||leave?.startTime||leave?.startDate);
    if(!leave||!start||!end)throw new Error('代班已儲存，但無法取得申報日期；請至加班管理接續申報');
    const entries=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const empId of daily?daily.find(item=>item.date===date)?.workerIds||[]:mode==='two'?[first,second]:[first]){const person=employees.find(e=>String(e.empId)===String(empId));entries.push({empId:String(empId),name:person?.name||empId,date,forEmpId:String(leave.empId)});}}
-   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:leaveId,createdAt:Date.now(),entries}));
+   p79AppendLeaveHandoffEntries(entries.map(e=>({...e,leaveId})));
   p79ActivateLeaveHandoff();
    await p79OpenLeaveOvertimeHandoff();
   void loadCloud(false,true);
@@ -974,7 +974,7 @@ async function deleteLeave(id){
  }catch(e){setStatus('連動刪除未確認：'+(e?.message||e),'error')}
 }
 function p79ClearDeletedLeaveDraft(id){
- try{const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');if(String(handoff?.id)===String(id))sessionStorage.removeItem(key);const draftKey='port79_overtime_report_draft_v1',draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(String(draft?.leaveHandoffId)===String(id))sessionStorage.removeItem(draftKey);}catch(ignore){}
+ try{p79DiscardLeaveHandoff(id);const draftKey='port79_overtime_report_draft_v1',draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(String(draft?.leaveHandoffId)===String(id))sessionStorage.removeItem(draftKey);}catch(ignore){}
 }
 async function p79CleanupDeletedLeaveCovers(){
  if(leaveAccess!=='manage')return;
@@ -982,11 +982,10 @@ async function p79CleanupDeletedLeaveCovers(){
  try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
 }
 async function p79ReadCurrentLeaveCoverState(){
- const read=()=>jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
- let fresh=await read();
+ // Preflight is read-only. Cleaning unrelated historical covers here added a
+ // whole write/read cycle and could change rosters during a no-cover leave save.
+ const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
- const ids=new Set(fresh.leaveRecords.map(l=>String(l.id)));
- if(fresh.leaveCoverAssignments.some(c=>!ids.has(String(c.leaveId)))){await postCloud({action:'cleanupOrphanLeaveCovers'});fresh=await read();if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'清除後無法確認雲端資料，請重試');}
  return fresh;
 }
 function leaveBalanceNumber(v){
@@ -1645,7 +1644,7 @@ async function openAdminCreateLeave(){
  $('adminCreateLeaveType').innerHTML=$('leaveType').innerHTML;
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());$('adminCreateLeaveStart').value=today;$('adminCreateLeaveEnd').value=today;
  updateAdminCreateLeaveDays();filterAdminCreateLeavePeople();
- if(window.P79Overtime&&p79CanReportOvertime())void P79Overtime.loadRules().then(loaded=>{if(!dialog.open)return;p79LeaveOvertimeConfig=loaded.config;p79PopulateCreateOvertimeTypes();}).catch(()=>{});
+ // Leave creation does not use overtime rules; load them only when opening a filing.
 }
 function updateAdminCreateLeaveDays(){const s=$('adminCreateLeaveStart').value,e=$('adminCreateLeaveEnd').value;const days=s&&e?Math.round((Date.parse(e+'T00:00:00Z')-Date.parse(s+'T00:00:00Z'))/86400000)+1:0;$('adminCreateLeaveDays').value=days>0?days:'';if(typeof p79RenderDailyCreateCover==='function')p79RenderDailyCreateCover();}
 function p79PlanLeaveCoverRequest(records,covers,request){
@@ -1687,8 +1686,8 @@ async function p79SaveCreateLeaveWithoutCover(employee,days){
   const start=$('adminCreateLeaveStart').value,end=$('adminCreateLeaveEnd').value,type=$('adminCreateLeaveType').value;
   const existing=fresh.leaveRecords.find(l=>String(l.status)==='已核准'&&String(l.empId)===String(employee.empId)&&String(l.leaveType)===type&&normalizeLeaveFilterDate(l.startTime||l.startDate)===start&&normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)===end);
   if(existing){
-   if(fresh.leaveCoverAssignments.some(c=>String(c.leaveId)===String(existing.id)))throw Error('已有相同請假且已安排代班，請由原請假紀錄修改，避免留下代班資料');
-   if(String(existing.id)!==String(adminCreateLeaveId)&&existing.source!=='manual-admin-no-cover')throw Error('已有相同請假紀錄，請由原紀錄處理，避免重複新增');
+   // Explicit no-cover mode acknowledges an existing exact leave without
+   // rewriting its cover, roster, overtime or original application details.
    adminCreateLeaveId=String(existing.id);
   }else{
    await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:type,startDate:start,endDate:end,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin-no-cover'}});
@@ -1731,7 +1730,7 @@ async function saveAdminCreateLeave(){
    return;
   }
   const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of (dailyAssignments?dailyAssignments.find(p=>p.date===date).workerIds.map(id=>employees.find(e=>String(e.empId)===String(id))):[worker,second]).filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
-  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
+  p79AppendLeaveHandoffEntries(entries.map(e=>({...e,leaveId:adminCreateLeaveId})));
   p79ActivateLeaveHandoff();
   p79UpdateLeaveHandoffBanner();
   void loadCloud(false,true);
@@ -1741,7 +1740,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261104-mixed-worker-category-v4"></script>
+<script src="../assets/port79-overtime-report.js?v=20261104-save-preflight-sync-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1766,7 +1765,8 @@ async function p79SaveWorkOvertimeDraft(draft){
    }finally{clearTimeout(timer)}
   }
  };
- const cloud=await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ const prepared=P79Overtime.takeSaveContext?.(draft);
+ const cloud=prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
  const employeeId=String(draft.empId).trim().toUpperCase();
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
@@ -1776,6 +1776,14 @@ async function p79SaveWorkOvertimeDraft(draft){
  if(!planned&&['休','國'].includes(draft.rule.category)){const cutoff=P79Overtime.interval(draft.date,draft.rule.overtimeStart,draft.rule.overtimeEnd)[1]-15*60000;if(pairs[0].end<cutoff)throw Error('國定假日／休息日加班須於所選時段結束前15分鐘起簽退（例如08–16須15:45起），尚未符合申報條件');}
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
+ if(previous?.id&&String(previous.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ if(draft.preventReplace&&String(previous?.id||'')!==String(draft.id))throw Error('原申報已變更或不存在，請重新讀取核對。');
+ if(!planned){
+  const rule=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''];
+  const issue=P79Overtime.ruleAttendanceIssue(pairs[0].start,pairs[0].end,draft.date,rule,roster);
+  if(issue)throw Error(issue);
+ }
+
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
@@ -1804,13 +1812,30 @@ function p79GetLeaveHandoff(){
   return h;
  }catch(ignore){sessionStorage.removeItem(P79_HANDOFF_KEY);return null;}
 }
+function p79AppendLeaveHandoffEntries(entries){
+ if(!entries.length)return;
+ const previous=p79GetLeaveHandoff(),pending=new Map();
+ for(const entry of [...(previous?.entries||[]),...entries]){
+  const value={...entry,leaveId:String(entry.leaveId||previous?.id||'')};
+  if(!value.leaveId)throw Error('待申報資料缺少請假識別碼');
+  const key=JSON.stringify([value.leaveId,String(value.empId),value.date,String(value.forEmpId||'')]);
+  pending.set(key,value);
+ }
+ const merged=[...pending.values()];
+ sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify({id:merged[0].leaveId,createdAt:Date.now(),pendingReports:true,entries:merged}));
+ p79ActivateLeaveHandoff();p79UpdateLeaveHandoffBanner();
+}
 function p79ActivateLeaveHandoff(){
  const h=p79GetLeaveHandoff();
  p79CurrentHandoff=h?String(h.id)+'|'+h.createdAt:'';
 }
 function p79DiscardLeaveHandoff(leaveId){
  const h=p79GetLeaveHandoff();
- if(h&&String(h.id)===String(leaveId)){sessionStorage.removeItem(P79_HANDOFF_KEY);p79CurrentHandoff='';}
+ if(h){
+  const remaining=h.entries.filter(e=>String(e.leaveId||h.id)!==String(leaveId));
+  if(remaining.length)sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify({...h,id:remaining[0].leaveId||h.id,entries:remaining}));
+  else{sessionStorage.removeItem(P79_HANDOFF_KEY);p79CurrentHandoff='';}
+ }
  p79UpdateLeaveHandoffBanner();
 }
 function p79LeaveHandoffEntryState(h,e,cloud,active){
@@ -1832,17 +1857,18 @@ async function p79ReconcileLeaveHandoff(){
   const h=p79GetLeaveHandoff();
   if(!h?.entries?.length){p79UpdateLeaveHandoffBanner();return null;}
   if(!adminSession||!p79CanReportOvertime()||!leaveRequestToken())return h;
-  const active=p79CurrentHandoff===String(h.id)+'|'+h.createdAt;
-  const contextByMonth=new Map(),remaining=[];
+  const active=h.pendingReports===true||p79CurrentHandoff===String(h.id)+'|'+h.createdAt;
+  const contextByEntry=new Map(),remaining=[];
   for(const [entryIndex,e] of h.entries.entries()){
    const month=String(e.date||'').slice(0,7);
-   let data=contextByMonth.get(month);
-   const hasEmployee=d=>(d?.schedules||[]).some(r=>String(r.empId).trim().toUpperCase()===String(e.empId).trim().toUpperCase());
-   if(!data||!hasEmployee(data)){
+   // Context attendance is scoped to one employee/day/leave, not the whole month.
+   const contextKey=JSON.stringify([String(e.empId).trim().toUpperCase(),e.date,String(e.leaveId||h.id)]);
+   let data=contextByEntry.get(contextKey);
+   if(!data){
     const token=leaveRequestToken();
     data=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(e.leaveId||h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
     if(!data?.ok)throw Error(data?.error||'雲端資料讀取失敗');
-    contextByMonth.set(month,data);
+    contextByEntry.set(contextKey,data);
    }
    const state=p79LeaveHandoffEntryState(h,e,data,active);
    if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
@@ -1925,7 +1951,7 @@ window.addEventListener('p79-overtime-report-saved',()=>{p79LeaveHandoffContext=
 window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);});
 
 </script>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
@@ -1976,7 +2002,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 #adminCreateLeaveDialog .p79-simple-add{justify-self:start;font-size:12px}
 @media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
 </style>
-<script src="../assets/port79-leave-daily-simple.js?v=20261104-applicant-default-v3"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261104-confirmed-day-queue-v1"></script>
 </body>
 </html>
 

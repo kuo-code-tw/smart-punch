@@ -40,7 +40,7 @@ assert(source.includes('.filter(({row})=>matches(row));'),
  'saved periods remain visible even when the formal roster disagrees');
 assert(source.includes("if(!chosen)throw Error('請先選擇正確出勤時段"),
  'submissions require explicit actual selected period');
-assert(source.includes("const actualRosterShift=await officialOvertimeRosterShift(empId,date);"),
+assert(source.includes("const officialRoster=validation.cloud.schedules.find"),
  'official roster still blocks false rest-day declarations');
 new vm.Script(source);
 console.log('PASS overtime job-title defaults in options manager; cloud conflict/readback checks; deleted type/legacy alias; no automatic periods or history changes');

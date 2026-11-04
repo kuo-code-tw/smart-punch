@@ -71,7 +71,7 @@ async function simulate({roster=[reportRow],cloudFailure=false,pending=false,mon
  r=await simulate({monthSync:false});
  assert.equal(r.result,false);assert.equal(r.status.dataset.state,'error');
  const management=fs.readFileSync(path.resolve(__dirname,'../assets/port79-management-link.js'),'utf8');
- assert(management.includes("const manualOnly=context.system==='attendance'||context.system==='workhours'"));
+ assert(management.includes("const manualOnly=context.system==='attendance'"));
  assert(management.includes('autoRefreshSafe:()=>!manualOnly&&!editing()'));
  assert(management.includes('if(manualOnly)return;'),'incoming signals must not auto refresh active attendance pages');
  assert(management.includes('if(!manualOnly){const button=document.createElement'), 'attendance must have only primary refresh control');

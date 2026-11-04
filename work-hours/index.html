@@ -3,7 +3,7 @@
 <head>
 <script src="../assets/port79-attendance-review-navigation.js?v=20261030-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261104-stable-overtime-recovery-v3"></script>
+<script src="../assets/port79-overtime-report.js?v=20261104-save-preflight-sync-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
 
@@ -17184,9 +17184,11 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   }
  };
  const reuse=batch?.token===token&&batch.month===month&&batch.ready===true&&batch.cloud?.revision!=null;
- const cloud=reuse?batch.cloud:await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ const prepared=!reuse&&lockRetry===0?window.P79Overtime?.takeSaveContext?.(draft):null;
+ const cloud=reuse?batch.cloud:prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
  const employeeId=String(draft.empId).trim().toUpperCase();
  const existingReport=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+ if(existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
  if(draft.preventReplace&&(!existingReport?.id||String(existingReport.id)!==String(draft.id)))throw Error('原申報已變更或不存在，未新增另一筆；請重新讀取核對。');
  // 原申報在開窗後若已被別處更新，不可用本機舊 16-24 蓋掉雲端新 08-16。
  if(draft.plannedReview&&draft.expectedOriginalCode&&
@@ -17564,7 +17566,7 @@ window.p79OvertimeApplicationContext={
 </script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261026-conversion-diagnostics"></script>
 <script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261027-live-paused-audit"></script>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <style id="p79-monthly-attendance-wider-v20261020">
 /* 僅每月出勤天數統計：桌機使用接近整個視窗寬度，保留手機正常內距。 */
