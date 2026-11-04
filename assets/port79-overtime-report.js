@@ -843,7 +843,8 @@
      rows=managerVisibleRules(check.rows,check.config);
      body.innerHTML=rows.map(row=>editorRow(row)).join('');
      rowDeletionConfirmed=false;refreshRuleCount();renderAddedTypeList();renderRoleTypeDefaults();
-     el.querySelector('#p79OtStatus').textContent='✅ 已將 '+draft.length+' 筆加班時段寫入雲端；已刪除的時段不會再出現，原有申報歷史仍保留。';
+     const activeCount=activeReportRows(check.rows,check.config).length;
+     el.querySelector('#p79OtStatus').textContent='✅ 已將 '+draft.length+' 筆加班時段寫入雲端，目前可供新申報 '+activeCount+' 筆。已刪除的時段不會再出現，原有申報歷史仍保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{saving=false;setReady(true);renderAddedTypeList();}
    };
    const setReady=ready=>{
@@ -886,8 +887,14 @@
      if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG,HIDDEN_MANAGER_RULES])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
+     const activeRows=activeReportRows(loaded.rows,loaded.config);
+     const activeKeys=new Set(activeRows.map(ruleKey));
+     const enabledNames=new Set(typeOptions(loaded.config).map(t=>t.name));
+     const archivedVisible=rows.filter(row=>enabledNames.has(ruleType(row))&&!activeKeys.has(ruleKey(row))).length;
      setReady(true);el.querySelector('#p79OtStatus').textContent=rows.length?
-      '已讀取雲端 '+rows.length+' 筆加班時段（包括先前保留時段）；可直接編輯及刪除，請按最下方儲存。':
+      '已讀取雲端 '+rows.length+' 筆加班時段｜可供新申報 '+activeRows.length+' 筆'+
+      (archivedVisible?'｜其中 '+archivedVisible+' 筆仍封存。若要重新開放，請核對表格內容並按最下方「儲存加班類型與出勤時段」。':'')+
+      '；原換算時數會保留。':
       '雲端尚未讀到可編輯的加班時段；請先確認資料來源，不要以空白表格覆蓋。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
