@@ -2,7 +2,7 @@
  'use strict';
  const KEY='port79_overtime_report_draft_v1',CONFIG='overtimeConversionRowsV1';
  const types=['休','國','例','代','延'];
- const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1',ROLE_DEFAULTS_CONFIG='overtimeRoleTypeDefaultsV1';
+ const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1',ARCHIVED_CONFIG='overtimeArchivedRuleKeysV1',ROLE_DEFAULTS_CONFIG='overtimeRoleTypeDefaultsV1';
  // Soft-deleted builtins are not available for NEW filings. Retain their
  // original conversion rows inside the cloud config for historical report
  // lookups, audits, and existing-report edits; never mutate past reports.
@@ -33,22 +33,21 @@
  const isBuiltinType=name=>Object.values(typeLabel).includes(canonicalType(name));
  // 舊表格切換假別後可能保留原來的預設名稱；預設類型一律依假別辨識。
  const ruleType=r=>r[9]&&!isBuiltinType(r[9])?r[9]:typeLabel[r[0]];
+ // Internal category labels are NOT installed overtime options.
  function typeOptions(config={},rows=[]){
-  const removed=deletedBuiltins(config);
-  const map=new Map(types.filter(c=>!removed.has(typeLabel[c])).map(c=>[typeLabel[c],c]));
-  for(const r of config[TYPECONFIG]||[]){
-   if(!Array.isArray(r)||!types.includes(r[1])||!String(r[0]).trim())throw Error('加班類型設定無效');
-   const name=String(r[0]).trim();if(!isBuiltinType(name))map.set(name,r[1]);
-  }
-  for(const r of rows){
-   const name=ruleType(r);
-   if(r[9]&&!isBuiltinType(name)&&!removed.has(name))map.set(name,r[0]);
+  const configured=config?.[TYPECONFIG]||[];
+  if(!Array.isArray(configured))throw Error('加班類型設定無效');
+  const map=new Map();
+  for(const row of configured){
+   if(!Array.isArray(row)||!types.includes(row[1])||!String(row[0]||'').trim())throw Error('加班類型設定無效');
+   map.set(canonicalType(row[0]),row[1]);
   }
   return [...map].map(([name,category])=>({name,category}));
  }
+ const ruleKey=row=>(row[9]?'named:'+row[9]:'builtin:'+typeLabel[row[0]])+'|'+row[1];
  function activeReportRows(rows,config={}){
-  const removed=deletedBuiltins(config);
-  return validate(rows).filter(row=>!removed.has(ruleType(row)));
+  const allowed=new Set(typeOptions(config).map(t=>t.name)),archived=new Set(config?.[ARCHIVED_CONFIG]||[]);
+  return validate(rows).filter(row=>allowed.has(ruleType(row))&&!archived.has(ruleKey(row)));
  }
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const hour=x=>{const m=String(x).match(/^(\d{2})(?::(\d{2}))?$/);if(!m)return NaN;const h=Number(m[1]),n=Number(m[2]||0);return h<=24&&n<60&&(h!==24||n===0)?h*60+n:NaN};
@@ -220,7 +219,9 @@
  function specialRows(rows,config={},extra=[]){
   const out=validate(rows),options=typeOptions(config,out);
   for(const [name,prefix] of specialTypes){
-   const category=options.find(t=>t.name===name)?.category||'國';
+   const selected=options.find(t=>t.name===name);
+   if(!selected)continue;
+   const category=selected.category;
    const periods=[];
    for(const begin of [8,16,24])for(let duration=1;duration<=8;duration++)periods.push([begin,duration]);
    periods.push(...extra);
@@ -240,8 +241,8 @@
    const fresh=await loadRules(),name=ruleType(row),same=fresh.rows.find(r=>ruleType(r)===name&&r[1]===row[1]);
    if(same){if(JSON.stringify(report(same))!==JSON.stringify(report(row)))throw Error('此出勤時段已更新，請更新雲端時段選項後再申報');return;}
    if(!global.p79OvertimeContext?.canEditRules?.())throw Error('此時段尚未存入雲端，請由有加班選項管理權限的人員首次儲存');
-   const custom=typeOptions(fresh.config,fresh.rows).filter(t=>!isBuiltinType(t.name)).map(t=>[t.name,t.category]);
-   for(const [type] of specialTypes)if(!custom.some(t=>t[0]===type))custom.push([type,type===name?row[0]:'國']);
+   const custom=typeOptions(fresh.config).map(t=>[t.name,t.category]);
+   if(!custom.some(t=>t[0]===name))throw Error('此加班類型已刪除，不能建立新申報時段');
    const config={...fresh.config,[CONFIG]:validate([...fresh.rows,row]),[TYPECONFIG]:custom};
    if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，新時段尚未儲存');
    const latest=await loadRules();
@@ -322,8 +323,8 @@
   return defaults();
  }
  function activeSupportPeriods(rows,config={}){
-  // Never regenerate 延 periods for a builtin that an admin deleted.
-  if(deletedBuiltins(config).has(typeLabel.延))return {rows:validate(rows),added:0};
+  // Auto-support periods apply only after explicitly creating this type.
+  if(!typeOptions(config).some(t=>t.name===typeLabel.延))return {rows:validate(rows),added:0};
   return p79AddLeaveSupportPeriods(rows);
  }
  function activeReportRules(){
@@ -445,7 +446,7 @@
   host.appendChild(el);el.querySelector('#p79OtClose').onclick=()=>el.close();el.showModal();return el;
  }
  const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
- function editorRow(row,removedBuiltinNames=[]){return '<tr data-ot-category="'+esc(row[0])+'">'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.filter(t=>!removedBuiltinNames.includes(typeLabel[t])||t===v).map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
+ function editorRow(row,removedBuiltinNames=[]){return '<tr data-ot-category="'+esc(row[0])+'">'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
   const el=dialog('加班選項管理','<p id="p79OtStatus">正在讀取已儲存的選項…</p>','p79OvertimeOptionsDialog');
@@ -1264,7 +1265,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={ROLE_DEFAULTS_CONFIG,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
