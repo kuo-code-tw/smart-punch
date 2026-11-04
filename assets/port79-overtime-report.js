@@ -755,7 +755,17 @@
     const b=el.querySelector('#p79OtSave');if(b.disabled||!cloudReady||saving)return;
     saving=true;setReady(false);
     try{
-     const draft=validate(getRows()),fresh=await loadRules();
+     const draft=validate(getRows());
+     // Old cloud rows may have both named/builtin identities for one visible
+     // type/code. Preserve them until the admin chooses which one to keep;
+     // never newly activate both in official filing by accident.
+     const visiblePeriods=new Set();
+     for(const row of draft){
+      const key=canonicalType(ruleType(row))+'|'+row[1];
+      if(visiblePeriods.has(key))throw Error('加班類型「'+ruleType(row)+'」的出勤時段「'+row[1]+'」重複；請核對實際與換算時數，刪除多餘的一列再儲存。');
+      visiblePeriods.add(key);
+     }
+     const fresh=await loadRules();
      if(!draft.length&&!customTypes.length&&fresh.rows.length&&
         loadedVisibleRows==='[]'&&loadedTypes==='[]'&&!rowDeletionConfirmed)
       throw Error('雲端仍保留舊換算時段，不能以空白設定覆蓋。請直接核對表格中的「歷史保留」列。');
