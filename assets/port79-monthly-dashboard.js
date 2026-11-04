@@ -188,13 +188,17 @@ function analyzeAttendance(data,month,boundaryRecords){
 }
 function analyzeOvertime(data,month){
  if(!data||!Array.isArray(data.schedules))throw Error('排班月份資料不完整');
- const titles=new Map(),roster=new Map(),seen=new Set();let hours=0,count=0;
+ const titles=new Map(),roster=new Map(),people=new Map(),seen=new Set(),details=[];let hours=0,count=0;
  const key=v=>String(v??'').trim().toUpperCase();
  const ensure=title=>{if(!titles.has(title))titles.set(title,{title,hours:0,count:0});return titles.get(title);};
  for(const e of data.employees||[]){
   const title=String(e.jobTitle||e.deptDetail||'').trim();
   if(!title)continue;
-  const id=key(e.empId||e.id);if(id)roster.set(id,title);
+  const id=key(e.empId||e.id);
+  if(id){
+   roster.set(id,title);
+   people.set(id,{name:String(e.name||e.fullName||'').trim(),dept:String(e.dept||e.department||'').trim(),title});
+  }
   ensure(title);
  }
  for(const row of data.schedules){
@@ -209,9 +213,19 @@ function analyzeOvertime(data,month){
    const h=num(r.declaredHours??r.rule?.declaredHours);
    if(h===null||h<0)continue;
    seen.add(String(r.id));hours+=h;count++;item.hours+=h;item.count++;
+   const person=people.get(key(row.empId||row.id))||{};
+   details.push({
+    id:String(r.id),date,empId:key(row.empId||row.id),
+    name:person.name||String(row.name||row.empName||'').trim()||'—',
+    dept:person.dept||String(row.dept||row.department||'').trim(),
+    title,code:String(r.code||''),typeName:String(r.typeName||''),
+    declaredHours:h,planned:r.planned===true,
+    status:r.planned===true?'預排／待核對':'已申報'
+   });
   }
  }
- return {month,hours,count,rows:[...titles.values()].sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW'))};
+ return {month,hours,count,rows:[...titles.values()].sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW')),
+  details:details.sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name,'zh-TW')||a.id.localeCompare(b.id))};
 }
 const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels,shipScheduleRows,displayPersonName,rosterGroup,assignPersonGroups};
 if(typeof module==='object'&&module.exports)module.exports=api;
@@ -272,7 +286,38 @@ function showVessels(v){
  root.P79ReferenceDashboard?.vessels(v);
  statusText('p79DashPersonSource','個人效率＝有有效工時的作業明細 Moves ÷ 對應工時（參考值）；未提供工時者顯示「—」。');
 }
-function showOvertime(a){setMetric('p79DashOvertimeHours',fmt(a.hours,1));statusText('p79DashScheduleSource','· 加班依正式申報紀錄統計');root.P79ReferenceDashboard?.setOvertimeReport(a);}
+function renderHomeOvertimeList(data){
+ const list=$('p79DashOvertimeRecords'),section=$('p79DashOvertimeList');
+ if(!list||!section)return;
+ // This screen is READ ONLY. The work-hours subsystem owns all mutations.
+ if(!permissions().schedule){
+  list.replaceChildren();section.hidden=true;return;
+ }
+ section.hidden=false;list.replaceChildren();
+ const rows=Array.isArray(data?.details)?data.details:[];
+ statusText('p79DashOvertimeCount','共 '+rows.length+' 筆（含預排）');
+ if(!rows.length){
+  const tr=root.document.createElement('tr'),td=root.document.createElement('td');
+  td.colSpan=7;td.textContent='本月沒有可查詢的加班申報紀錄';
+  tr.append(td);list.append(tr);return;
+ }
+ for(const item of rows.slice(0,100)){
+  const tr=root.document.createElement('tr');
+  for(const value of [item.date,item.name,item.dept,item.title,
+    item.code||item.typeName,item.declaredHours+' 小時',item.status]){
+   const td=root.document.createElement('td');td.textContent=String(value||'—');tr.append(td);
+  }
+  list.append(tr);
+ }
+ if(rows.length>100)statusText('p79DashOvertimeCount',
+  '共 '+rows.length+' 筆（含預排）；首頁先顯示最新100筆，完整明細請到加班管理');
+}
+function showOvertime(a){
+ setMetric('p79DashOvertimeHours',fmt(a.hours,1));
+ statusText('p79DashScheduleSource','· 加班依正式申報紀錄統計');
+ renderHomeOvertimeList(a);
+ root.P79ReferenceDashboard?.setOvertimeReport(a);
+}
 function ensurePendingReview(){
  if(pendingReviewDialog)return;
  const card=$('p79DashAnomalies')?.closest('.p79d-kpi');if(!card)return;
@@ -410,6 +455,9 @@ function showAttendance(a){
  if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ const list=$('p79DashOvertimeRecords'),section=$('p79DashOvertimeList');
+ if(list)list.replaceChildren();
+ if(section)section.hidden=true;
  setPendingReviewVisualState('unverified');
  pendingReviewItems=null;pendingReviewMonth='';pendingReviewSelection=-1;pendingReviewError='';pendingReviewVerifiedAt='';if(pendingReviewDialog?.open)pendingReviewDialog.close();
  statusText('p79DashReviewHint','點擊查看異常原因 ›');
@@ -515,7 +563,7 @@ async function load(forceCloud=false){
  let scheduleSnapshot=null;
  try{
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
-   if(!allowed){statusText(captionId,accessError());if(kind==='schedule')root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});continue}
+   if(!allowed){statusText(captionId,accessError());if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});renderHomeOvertimeList(null);}continue}
    try{
     const data=await request(kind,ym,token,kind==='attendance'?true:forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
@@ -541,7 +589,7 @@ async function load(forceCloud=false){
       root.P79ReferenceDashboard?.setGroupRoster(data,ym);
     }
     else throw Error('該月份資料結構不完整');
-   }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule')root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message}); }
+   }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message});renderHomeOvertimeList(null);} }
   }
   try{
    const leaveRole=String(s.adminRole||s.role||'').toLowerCase();
