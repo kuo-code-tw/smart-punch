@@ -30,8 +30,8 @@ assert.equal(types.filter(r=>r.name==='平日延時加班').length,1,'exactly on
 assert(!types.some(r=>r.name==='平日延長加班'),'remove legacy duplicate from menu');
 assert.equal(api.report(legacy).typeName,'平日延時加班','new report uses canonical name');
 assert.equal(JSON.stringify(oldReport),oldSnapshot,'old report is immutable');
-assert(!api.typeOptions({...cloud,overtimeDeletedBuiltinTypesV1:['平日延時加班']},rows)
- .some(r=>r.name==='平日延時加班'),'explicit deletion of canonical builtin is still respected');
+assert(api.typeOptions({...cloud,overtimeDeletedBuiltinTypesV1:['平日延時加班']},rows)
+ .some(r=>r.name==='平日延時加班'),'manually configured type overrides a legacy deleted-builtin flag');
 const begin=page.indexOf('function p79PopulateCreateOvertimeTypes(){');
 const end=page.indexOf('async function openAdminCreateLeave()',begin);
 assert(begin>=0&&end>begin,'leave type-picker function exists');
