@@ -538,7 +538,7 @@
    let removedBuiltinNames=deletedBuiltins(cached||{});
    let rows=activeSupportPeriods(activeReportRules(),cached||{}).rows;
    let allCloudRows=reportRules();
-   let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
+   let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedTypeDraft='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
    let roleTypeDefaults=normalizeRoleTypeDefaults(cached||{}),loadedRoleDefaults='';
    el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">加班出勤時段與換算表 <span id="p79OtRuleCount" style="font-size:11px;font-weight:400;color:#64748b">（直接查看與修改；歷史紀錄為唯讀）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['加班類型','出勤時段','實際時數','換算時數','正常班','加班時間','位置','狀態','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend',
@@ -691,7 +691,7 @@
      const chosen=choices[Number(form.querySelector('#p79PeriodType').value)],times=[0,1,2,3].map(i=>form.querySelector('#p79PeriodTime'+i).value),position=form.querySelector('#p79PeriodPosition').value;
      const code=form.querySelector('#p79PeriodCode').value.trim()||(chosen.category+times[2]+'-'+times[3]);
      const row=[chosen.category,code,form.querySelector('#p79PeriodActual').value,form.querySelector('#p79PeriodConverted').value,...(chosen.category==='延'?times.slice(0,2):['','']),...times.slice(2),position,chosen.name];
-     validate([...getRows(),row]);body.insertAdjacentHTML('beforeend',editorRow(row,[...removedBuiltinNames]));form.close();el.querySelector('#p79OtStatus').textContent='已加入「'+chosen.name+'／'+code+'」，請按儲存。';
+     validate([...getRows(),row]);body.insertAdjacentHTML('afterbegin',editorRow(row,[...removedBuiltinNames]));form.close();el.querySelector('#p79OtStatus').textContent='已加入「'+chosen.name+'／'+code+'」，請按儲存。';
     }catch(error){form.querySelector('#p79PeriodMessage').textContent=error.message}};
    };
    el.querySelector('#p79OtExport').onclick=async()=>{try{
@@ -703,7 +703,7 @@
     const x=await ensureExcel(),wb=x.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets['加班選項']||wb.Sheets[wb.SheetNames[0]];
     const imported=parseExcelRows(x.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false}));
     if(!imported.length)throw Error('試算表沒有加班選項，未覆蓋原表');
-    rows=activeReportRows(imported,{[DELETED_CONFIG]:[...removedBuiltinNames]});
+    rows=validate(imported);
      customTypes=[...new Map([...customTypes,...rows.map(row=>[ruleType(row),row[0]])].map(pair=>[pair[0],pair])).values()];
      renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderRoleTypeDefaults();
     el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
@@ -715,7 +715,7 @@
      const draft=validate(getRows()),fresh=await loadRules();
      if(!draft.length&&!customTypes.length&&fresh.rows.length&&
         loadedVisibleRows==='[]'&&loadedTypes==='[]')
-      throw Error('雲端仍保留舊換算時段，不能以空白設定覆蓋。請展開「雲端保留的歷史時段」核對。');
+      throw Error('雲端仍保留舊換算時段，不能以空白設定覆蓋。請直接核對表格中的「歷史保留」列。');
      const enabledNames=new Set(customTypes.map(pair=>canonicalType(pair[0])));
      const deleted=types.map(code=>typeLabel[code]).filter(name=>!enabledNames.has(name));
      const rolesDraft=normalizeRoleTypeDefaults({[ROLE_DEFAULTS_CONFIG]:roleTypeDefaults});
@@ -754,6 +754,7 @@
       throw Error('加班選項及職稱對應雲端讀回不一致，請保留畫面供核對');
      loadedRows=JSON.stringify(check.rows);
      loadedTypes=JSON.stringify(check.config[TYPECONFIG]||[]);
+     loadedTypeDraft=JSON.stringify(customTypes);
      loadedDeleted=JSON.stringify([...deletedBuiltins(check.config)]);
      loadedArchived=JSON.stringify(check.config[ARCHIVED_CONFIG]||[]);
      removedBuiltinNames=new Set(deleted);
@@ -782,7 +783,7 @@
     if(reading)return;
     let dirty=false;try{dirty=cloudReady&&(
      JSON.stringify(validate(getRows()))!==loadedVisibleRows||
-     JSON.stringify(customTypes)!==loadedTypes||
+     JSON.stringify(customTypes)!==loadedTypeDraft||
      JSON.stringify(roleTypeDefaults)!==loadedRoleDefaults);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
     if(dirty){
      el.querySelector('#p79OtStatus').textContent='有尚未儲存的修改，請先儲存或匯出；未重新載入覆蓋你的內容。';return;
@@ -801,6 +802,7 @@
      rows=support.rows;
      customTypes=typeOptions(loaded.config,loaded.rows).map(t=>[t.name,t.category]);
      loadedTypes=JSON.stringify(loaded.config[TYPECONFIG]||[]);
+     loadedTypeDraft=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
      body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');
      const archivedCount=renderArchivedRows(loaded.rows,loaded.config);
