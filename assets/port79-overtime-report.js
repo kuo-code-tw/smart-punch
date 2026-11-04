@@ -587,7 +587,7 @@
      '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增加班類型</span>'+
       '<div class="p79-ot-new-type-controls">'+
        '<input id="p79NewTypeName" aria-label="新加班類型名稱" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+'">'+
-       '<select id="p79NewTypeCategory" aria-label="新類型的工時計算方式" title="計算分類不代表已存在的加班類型" style="'+inputStyle+'">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select>'+
+       '<select id="p79NewTypeCategory" aria-label="新類型的工時計算方式" title="計算分類不代表已存在的加班類型" style="'+inputStyle+'">'+types.filter(c=>c!=='代').map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select>'+
        '<button type="button" id="p79AddType" style="background:#0369a1;color:#fff;border-radius:6px;font-weight:700">＋新增加班類型</button>'+
       '</div></div>'+
      '<div class="p79-ot-type-list-wrap"><span class="p79-ot-section-title">現有加班類型（可刪除）</span>'+
@@ -643,7 +643,8 @@
     if(!cloudReady||reading||saving||!global.p79OvertimeContext?.canEditRules?.())return;
     const name=canonicalType(el.querySelector('#p79NewTypeName').value.trim()),category=el.querySelector('#p79NewTypeCategory').value;
     if(!name){el.querySelector('#p79OtStatus').textContent='請輸入加班類型名稱';return;}
-    if(!types.includes(category)){el.querySelector('#p79OtStatus').textContent='請選擇新類型使用的工時計算方式';return;}
+     if(name===typeLabel.代){el.querySelector('#p79OtStatus').textContent='「休假代班加班」已從新增選項移除';return;}
+    if(category==='代'||!types.includes(category)){el.querySelector('#p79OtStatus').textContent='請選擇新類型使用的工時計算方式';return;}
     if(typeOptions({[TYPECONFIG]:customTypes}).some(t=>t.name===name)){
      el.querySelector('#p79OtStatus').textContent='此加班類型已存在';return;
     }
