@@ -1471,6 +1471,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
    <select id="adminCreateLeaveOvertimeType" hidden aria-hidden="true" tabindex="-1"><option value="">各員工獨立判斷</option></select>
   </div>
+  <div id="adminCreateLeaveApplicantWrap" class="p79-create-person"><b>請假人員（上方選一次，預設套用所有日期）</b><div class="p79-create-two">
+   <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
+   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="p79OnCreateLeaveEmployeeChange()"></select></div>
+  </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
   <div class="p79-create-dates">
    <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
    <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
@@ -1480,10 +1484,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">每天分別安排代班（可更換當日請假人員）</label>
    <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   </div>
-  <div id="adminCreateLeaveApplicantWrap" class="p79-create-person"><b>請假人員（上方選一次，預設套用所有日期）</b><div class="p79-create-two">
-   <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
-   <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="p79OnCreateLeaveEmployeeChange()"></select></div>
-  </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
    <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div></div>
    <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond" onchange="p79CreateCoverManual=true"></select></div></div>
