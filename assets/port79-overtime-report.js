@@ -1271,6 +1271,16 @@
     }
     const hintTarget=el.querySelector('#p79OtPeriodAvailabilityHint');
     if(hintTarget)hintTarget.textContent=reason;
+    // Use the EXISTING refresh button for an explicit, scoped recovery when
+    // all cloud periods for this active type are archived, not deleted.
+    const refreshButton=el.querySelector('#p79OtReloadOptions');
+    if(refreshButton){
+     const canActivate=global.p79OvertimeContext?.canEditRules?.()&&
+      diagnostic.configured&&diagnostic.archived>0&&diagnostic.active===0&&
+      kind.value!==typeLabel.代;
+     refreshButton.textContent=canActivate?
+      '開放 '+diagnostic.archived+' 筆「'+kind.value+'」封存時段':'更新雲端時段選項';
+    }
     // Display existing cloud periods even if roster cannot verify them.
     const hint=choices.length?'請選擇實際加班時段':diagnostic.archived?'此類型時段仍封存，尚未開放申報':!typeOptions(dialogRuleConfig(),rows).length?'請先新增加班類型及出勤時段':!kind.value?'請先選擇加班類型':'此類型尚未設定出勤時段';
     select.innerHTML='<option value="">'+hint+'</option>'+
@@ -1413,7 +1423,62 @@
    }
    const optionsSaved=()=>{if(el.isConnected)applyReportRows(reportRules());};
    el.insertAdjacentHTML('beforeend','<button id="p79OtReloadOptions" type="button">更新雲端時段選項</button>');
-   el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();syncCloudOvertimeConfig(loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型；請先到加班選項管理新增類型及出勤時段。':!rows.length?'已讀到加班類型，但還沒有可用的出勤時段；請先設定時段。':'已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
+   el.querySelector('#p79OtReloadOptions').onclick=async()=>{
+    const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;
+    const selectedType=String(kind.value||'');
+    button.disabled=true;
+    try{
+     const loaded=await loadRules();
+     if(!el.isConnected)return;
+     const diagnostic=reportPeriodDiagnostic(loaded.rows,loaded.config,selectedType);
+     const mayReactivate=global.p79OvertimeContext?.canEditRules?.()&&
+      diagnostic.configured&&diagnostic.archived>0&&diagnostic.active===0&&
+      selectedType!==typeLabel.代;
+     if(mayReactivate){
+      const archivedKeys=new Set(loaded.config[ARCHIVED_CONFIG]||[]);
+      const hiddenKeys=new Set(loaded.config[HIDDEN_MANAGER_RULES]||[]);
+      const affected=loaded.rows.filter(row=>ruleType(row)===selectedType&&
+       archivedKeys.has(ruleKey(row))&&!hiddenKeys.has(ruleKey(row)));
+      if(affected.length){
+       const approved=global.confirm('雲端目前保留「'+selectedType+'」'+affected.length+
+        ' 筆歷史封存的出勤時段。\\n確定只將這些時段重新開放給新加班申報嗎？'+
+        '\\n原換算時數不變，已刪除的時段不會恢復；正式儲存仍須核對打卡與班表。');
+       if(approved){
+        if(kind.value!==selectedType)throw Error('加班類型已切換，請重新核對後操作');
+        // Confirm cloud settings have not been changed by another administrator.
+        const current=await loadRules();
+        if(JSON.stringify(current.config)!==JSON.stringify(loaded.config)||
+           JSON.stringify(current.rows)!==JSON.stringify(loaded.rows))
+         throw Error('加班選項已在其他地方更新，請重新讀取後核對');
+        const recoveryKeys=new Set(affected.map(ruleKey));
+        const nextConfig={...current.config,
+         [ARCHIVED_CONFIG]:(current.config[ARCHIVED_CONFIG]||[]).filter(key=>!recoveryKeys.has(key))};
+        if(new TextEncoder().encode(JSON.stringify(nextConfig)).length>8800)
+         throw Error('雲端設定已達安全容量上限，尚未變更');
+        await rpc('saveConfig',{config:nextConfig});
+        const checked=await loadRules();
+        const active=new Set(activeReportRows(checked.rows,checked.config).map(ruleKey));
+        if(!affected.every(row=>active.has(ruleKey(row))))
+         throw Error('雲端尚未確認這些時段全部啟用，請重新核對，不要重複新增');
+        syncCloudOvertimeConfig(checked.config);
+        try{global.p79OvertimeContext.persistConfig?.();}catch(error){console.warn('雲端已確認，畫面快取更新失敗',error);}
+        applyReportRows(checked.rows);
+        el.querySelector('#p79OtStatus').textContent='✅ 雲端已確認開放「'+selectedType+
+         '」'+affected.length+' 筆出勤時段；請選擇實際加班時段後申報。';
+        return;
+       }
+      }
+     }
+     syncCloudOvertimeConfig(loaded.config);
+     try{global.p79OvertimeContext.persistConfig?.();}catch(error){console.warn('加班選項快取更新失敗',error);}
+     applyReportRows(loaded.rows);
+     el.querySelector('#p79OtStatus').textContent=!typeOptions(dialogRuleConfig(),rows).length?
+      '雲端尚未新增加班類型，請至加班選項管理核對。':
+      !rows.length?'雲端已有加班類型，但尚未有可申報的出勤時段。':
+      '已更新 '+rows.length+' 筆可申報的出勤時段。';
+    }catch(error){if(el.isConnected)el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}
+    finally{button.disabled=false;}
+   };
    // Initial options already come from authoritative config. A duplicate
    // background read previously overwrote rendered choices and caused flicker.
    // Only the explicit refresh button should refetch and redraw this dialog.
