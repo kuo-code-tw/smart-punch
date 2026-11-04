@@ -15,13 +15,16 @@ function redraw(){
  root.hidden=!daily||plain;
  $id('adminCreateLeaveWorkers').hidden=daily||plain;
  const applicant=$id('adminCreateLeaveApplicantWrap');
- if(applicant)applicant.hidden=daily&&!plain;
+ if(applicant)applicant.hidden=false; // 上方統一選請假人員，逐日僅顯示代班
  $id('adminCreateLeaveRecommendation').hidden=daily&&!plain;
  if(root.hidden)return;
  const people=leaveCreatePeople();
  root.innerHTML=days().map(date=>{
-  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:''});
-  const row=rows.get(date),leave=people.find(p=>String(p.empId)===String(row.applicant));
+  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',applicantOverride:false,first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:''});
+  const row=rows.get(date);
+  const defaultEmpId=String($id('adminCreateLeaveEmployee')?.value||'');
+  const leaveId=row.applicantOverride?row.applicant:defaultEmpId;
+  const leave=people.find(p=>String(p.empId)===String(leaveId));
   const available=leave?people.filter(p=>String(p.empId)!==String(leave.empId)&&String(p.dept||'').trim()===String(leave.dept||'').trim()):[];
   if(!available.some(p=>String(p.empId)===row.first))row.first='';
   if(!available.some(p=>String(p.empId)===row.second&&row.second!==row.first))row.second='';
@@ -32,7 +35,9 @@ function redraw(){
    const jobOptions='<option value="">全部職稱</option>'+allJobs.map(job=>'<option value="'+safe(job)+'"'+(job===chosenJob?' selected':'')+'>'+safe(job)+'</option>').join('');
    return '<div class="p79-daily-person"><label>'+label+'職稱</label><select data-date="'+date+'" data-field="'+jobKey+'">'+jobOptions+'</select><label>'+label+'姓名</label><select data-date="'+date+'" data-field="'+key+'">'+personOptions(matched,row[key],placeholder)+'</select></div>';
   };
-  return '<section class="p79-simple-day"><strong>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</strong><div class="p79-simple-grid">'+field('applicant','請假人員',people,'請選擇請假人員')+field('first','第一位代班',available,leave?'請選擇代班人員':'請先選請假人員')+'</div>'+(row.secondVisible?'<div class="p79-simple-second">'+field('second','第二位代班（選填）',available.filter(p=>String(p.empId)!==row.first),'不安排第二位')+'<button type="button" class="btn btn-sec" data-remove="'+date+'">移除</button></div>':'<button type="button" class="btn btn-sec p79-simple-add" data-add="'+date+'">＋ 第二位代班</button>')+'<small>'+(row.second?'兩位各代4小時':'一位代8小時')+'</small></section>';
+  const applicantInfo='<div class="p79-day-applicant"><span>請假人員：<strong>'+safe(leave?.name||'請先選上方請假人員')+'</strong>'+(leave?' <small>｜'+safe(leavePersonJob(leave))+'</small>':'')+'</span><button class="btn btn-sec p79-day-applicant-switch" type="button" data-applicant-toggle="'+date+'">'+(row.applicantOverride?'↩ 使用上方人員':'本日不同請假人員')+'</button></div>';
+  const extraApplicant=row.applicantOverride?'<div class="p79-day-applicant-override">'+field('applicant','本日請假人員',people,'請選擇本日請假人員')+'</div>':'';
+  return '<section class="p79-simple-day"><strong>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</strong>'+applicantInfo+extraApplicant+'<div class="p79-simple-grid">'+field('first','第一位代班',available,leave?'請選擇代班人員':'請先選上方請假人員')+'</div>'+(row.secondVisible?'<div class="p79-simple-second">'+field('second','第二位代班（選填）',available.filter(p=>String(p.empId)!==row.first),'不安排第二位')+'<button type="button" class="btn btn-sec" data-remove="'+date+'">移除</button></div>':'<button type="button" class="btn btn-sec p79-simple-add" data-add="'+date+'">＋ 第二位代班</button>')+'<small>'+(row.second?'兩位各代4小時':'一位代8小時')+'</small></section>';
  }).join('')||'<p>請選擇有效日期，最多62天。</p>';
  root.querySelectorAll('select[data-date]').forEach(el=>el.onchange=()=>{
   const row=rows.get(el.dataset.date);row[el.dataset.field]=el.value;
@@ -41,6 +46,18 @@ function redraw(){
   if(el.dataset.field==='firstJob')row.first='';
   if(el.dataset.field==='secondJob')row.second='';
   if(el.dataset.field==='first'&&row.second===row.first)row.second='';
+  redraw();
+ });
+ root.querySelectorAll('[data-applicant-toggle]').forEach(el=>el.onclick=()=>{
+  const row=rows.get(el.dataset.applicantToggle);
+  if(!row)return;
+  row.applicantOverride=!row.applicantOverride;
+  if(row.applicantOverride){
+   const base=people.find(p=>String(p.empId)===String($id('adminCreateLeaveEmployee')?.value||''));
+   row.applicant=String(base?.empId||'');
+   row.applicantJob=base?leavePersonJob(base):'';
+  }else{row.applicant='';row.applicantJob='';}
+  row.first='';row.second='';row.firstJob='';row.secondJob='';
   redraw();
  });
  root.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{rows.get(el.dataset.add).secondVisible=true;redraw();});
@@ -63,8 +80,9 @@ async function saveDaily(){
  const plans=[];
  try{
   for(const date of dates){
-   const row=rows.get(date)||{},employee=people.find(p=>String(p.empId)===String(row.applicant));
-   if(!employee)throw Error(date+' 請選擇請假人員');
+   const row=rows.get(date)||{},effectiveId=row.applicantOverride?row.applicant:String($id('adminCreateLeaveEmployee')?.value||'');
+   const employee=people.find(p=>String(p.empId)===String(effectiveId));
+   if(!employee)throw Error(date+(row.applicantOverride?' 請選擇本日請假人員':' 請先選擇上方請假人員'));
    const ids=[row.first,row.second].filter(Boolean);
    if(!ids.length||new Set(ids.map(String)).size!==ids.length)throw Error(date+' 請選擇一至兩位不同代班人員');
    if(!String(employee.dept||'').trim())throw Error(date+' 請假人員未設定部門');
