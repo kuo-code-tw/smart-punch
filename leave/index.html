@@ -1469,27 +1469,29 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="p79-workflow-step p79-workflow-overtime"><strong>③ 加班待申報</strong><small>儲存後再核對申報</small></div>
   </div>
   <div class="p79-create-two">
-   <div class="field"><label for="adminCreateLeaveOvertimeType">加班類型</label><select id="adminCreateLeaveOvertimeType"><option value="">依班表自動判斷</option></select></div>
    <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
+   <select id="adminCreateLeaveOvertimeType" hidden aria-hidden="true" tabindex="-1"><option value="">各員工獨立判斷</option></select>
   </div>
   <div class="p79-create-dates">
    <div class="field"><label for="adminCreateLeaveStart">開始日期</label><input id="adminCreateLeaveStart" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
    <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
    <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
   </div>
+  <div class="p79-create-mode-row">
+   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">每天獨立選請假人員與代班（簡易模式）</label>
+   <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
+  </div>
   <div id="adminCreateLeaveApplicantWrap" class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
    <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
    <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="p79OnCreateLeaveEmployeeChange()"></select></div>
   </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
-  <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" style="width:16px;height:16px;min-height:16px" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
    <div class="p79-create-person"><b>第一位代班人員</b><div class="field"><label for="adminCreateLeaveWorkerJob">職稱</label><select id="adminCreateLeaveWorkerJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorker">姓名</label><select id="adminCreateLeaveWorker" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div></div>
    <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond" onchange="p79CreateCoverManual=true"></select></div></div>
   </div>
   <p id="adminCreateLeaveRecommendation" class="note" role="status" aria-live="polite">選擇請假人員後，系統將核對正式班表並推薦代班人員。</p>
-  <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">每天獨立選請假人員與代班（簡易模式）</label><div id="adminCreateLeaveDailyRows" hidden></div>
-  <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
-  <p class="note">若是補登請假、排班表已安排代班或已申報加班，請勾選「只補登請假」；系統不新增代班、也不改動原有班表。一位代8小時；兩位各代4小時。</p>
+  <div id="adminCreateLeaveDailyRows" hidden></div>
+  <input id="adminCreateLeaveReason" type="hidden" value="">
   <p id="adminCreateLeaveMessage" role="status"></p>
  </div>
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
@@ -1659,12 +1661,22 @@ function p79PlanLeaveCoverRequest(records,covers,request){
 }
 function p79ToggleCreateNoCover(){
  const noCover=!!$('adminCreateLeaveNoCover')?.checked;
- if(noCover)p79CreateCoverSuggestRequest++;
- $('adminCreateLeaveWorkers').hidden=noCover;
- $('adminCreateLeaveDailyToggle').hidden=noCover;
- $('adminCreateLeaveDailyRows').hidden=noCover||!$('adminCreateLeaveDaily').checked;
- $('adminCreateLeaveOvertimeType').disabled=noCover;
+ if(noCover){
+  p79CreateCoverSuggestRequest++;
+  $('adminCreateLeaveDaily').checked=false; // 補登請假走單一人員流程
+ }
+ const daily=$('adminCreateLeaveDaily').checked;
+ $('adminCreateLeaveWorkers').hidden=noCover||daily;
+ $('adminCreateLeaveDailyRows').hidden=noCover||!daily;
+ $('adminCreateLeaveApplicantWrap').hidden=daily&&!noCover;
+ $('adminCreateLeaveRecommendation').hidden=daily&&!noCover;
+ $('adminCreateLeaveOvertimeType').disabled=true;
  $('adminCreateLeaveSave').textContent=noCover?'儲存請假':'儲存請假並安排代班';
+ if(typeof p79RenderDailyCreateCover==='function')p79RenderDailyCreateCover();
+}
+function p79SetDailyCreateMode(){
+ if($('adminCreateLeaveDaily').checked)$('adminCreateLeaveNoCover').checked=false;
+ p79ToggleCreateNoCover();
 }
 async function p79SaveCreateLeaveWithoutCover(employee,days){
  const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
@@ -1910,6 +1922,12 @@ window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79Reconc
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 <style id="p79-leave-workflow-color-v1">
 /* 三階段色彩：藍色請假、青綠核對、橘色加班。低飽和配色維持表單易讀性。 */
+#adminCreateLeaveDialog .p79-create-mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:2px 0}
+#adminCreateLeaveDialog .p79-create-mode-row>.p79-create-daily-toggle{display:flex!important;align-items:center;gap:8px!important;margin:0!important;padding:10px 12px!important;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;color:#1d4ed8!important;font-weight:700}
+#adminCreateLeaveDialog .p79-create-mode-row>.p79-create-daily-toggle:last-child{border-color:#99f6e4;background:#ecfdf5;color:#0f766e!important}
+#adminCreateLeaveDialog .p79-create-mode-row input[type=checkbox]{width:17px!important;height:17px!important;min-width:17px!important;min-height:17px!important;flex:0 0 17px;accent-color:#2563eb}
+@media(max-width:600px){#adminCreateLeaveDialog .p79-create-mode-row{grid-template-columns:1fr}}
+
 #adminCreateLeaveDialog{border:1px solid #cbd5e1!important;box-shadow:0 22px 80px #0f172a33!important}
 #adminCreateLeaveDialog .p79-create-heading{background:linear-gradient(110deg,#1d4ed8,#0f766e)!important;color:white!important}
 #adminCreateLeaveDialog .p79-create-heading h2{color:white!important}
