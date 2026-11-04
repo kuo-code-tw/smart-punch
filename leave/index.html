@@ -1931,11 +1931,16 @@ async function p79OpenLeaveOvertimeHandoff(){
   const suggested=typeByShift[ownShift]||null;
   const configured=new Set(P79Overtime.typeOptions(data.config||{},data.config?.[P79Overtime.CONFIG]||[]).map(t=>t.name));
   const perPersonType=suggested&&configured.has(suggested[1])?suggested:null;
+  // 表單人工選擇優先只作為「候選類型」帶入；正式申報仍必須核對個別班表與打卡。
+  const entryType=String(e.preferredType||'').trim();
+  const selectedCategories={休息日加班:'休',平日延時加班:'延',國定假日加班:'國',例假加班:'例'};
+  const entryCategory=selectedCategories[entryType]||'';
+  const requestedType=entryCategory?[entryCategory,entryType]:perPersonType;
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
-  await P79Overtime.openReport({...e,...period,...(!perPersonType?{code:'',requirePeriodSelection:true,periodHint:'此員工的正式班表或加班選項尚未確認，請核對後選擇類型與時段。'}:{}),verifiedOvertimeRules,preferredType:perPersonType?.[1]||'',category:perPersonType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
-  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+(perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
+  await P79Overtime.openReport({...e,...period,...(!perPersonType?{code:'',requirePeriodSelection:true,periodHint:'此員工的正式班表或加班選項尚未確認，請核對後選擇類型與時段。'}:{}),verifiedOvertimeRules,preferredType:requestedType?.[1]||'',category:requestedType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
+  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+(entryType?'｜本位指定 '+entryType+'（待核對）':perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
   setStatus('加班明細尚未完成：'+error.message,'warn');
