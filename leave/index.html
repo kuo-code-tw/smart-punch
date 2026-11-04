@@ -738,24 +738,119 @@ function renderAdminBalances(){
 
 let p79SavedCoverReportBusy=false;
 async function p79ReportSavedLeaveCover(id){
- if(p79SavedCoverReportBusy||leaveAccess!=='manage')return;
- p79SavedCoverReportBusy=true;
- try{
-  setStatus('正在帶入已安排代班的加班明細…','info');
-  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
-  if(!fresh?.ok)throw new Error(fresh?.error||'雲端讀取失敗');
-  const leave=(fresh.leaveRecords||[]).find(l=>String(l.id)===String(id));
-  const covers=(fresh.leaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(id));
-  if(!leave||leave.status!=='已核准'||!covers.length)throw new Error('此筆請假目前沒有已儲存的代班安排，請重新整理核對');
-  const entries=[],seen=new Set();
-  for(const cover of covers){const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);if(!start||!end||start>end)throw new Error('代班日期無效，請先核對');for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const worker of cover.workerIds||[]){const empId=String(worker),key=empId+'|'+date;if(seen.has(key))continue;seen.add(key);const person=(fresh.employees||[]).find(e=>String(e.empId)===empId);entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId)});if(entries.length>124)throw new Error('申報日期超出單次範圍，請分次安排');}}}
-  if(!entries.length)throw new Error('找不到可申報的代班人員');
-  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:String(id),createdAt:Date.now(),entries}));
-  p79ActivateLeaveHandoff();
-  await p79OpenLeaveOvertimeHandoff();
-  void loadCloud(false,true);
- }catch(error){setStatus('加班明細未開啟：'+String(error.message||error),'error');}
- finally{p79SavedCoverReportBusy=false;}
+ if(leaveAccess!=='manage')return;
+ const existing=document.getElementById('p79SavedCoverDetailsDialog');
+ if(existing?.open){existing.focus();return;}
+ if(p79SavedCoverReportBusy)return;
+ // This button is a VIEWER, including when every cover already has a filed report.
+ // Do not send saved reports through the pending-handoff queue: it removes
+ // already-reported entries and made the old window flash and disappear.
+ const dialog=document.createElement('dialog');
+ dialog.id='p79SavedCoverDetailsDialog';
+ dialog.style.cssText='width:min(820px,95vw);max-height:86vh;overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:18px;background:var(--card,#fff);color:var(--text,#172a44)';
+ dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:19px">已安排代班／加班明細</h2><button type="button" data-close style="padding:7px 12px">✕ 關閉</button></div>'+
+  '<p data-status role="status" aria-live="polite" style="margin:12px 0">正在核對已儲存的請假與代班資料…</p>'+
+  '<div data-rows style="display:grid;gap:8px;max-height:54vh;overflow:auto"></div>'+
+  '<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:14px"><button type="button" data-reload>重新核對雲端</button><button type="button" data-continue class="btn btn-pri" hidden>接續尚未申報的加班</button></div>';
+ dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ document.body.appendChild(dialog);dialog.showModal();
+ const status=dialog.querySelector('[data-status]'),body=dialog.querySelector('[data-rows]'),continueButton=dialog.querySelector('[data-continue]');
+ const norm=value=>String(value||'').trim().toUpperCase();
+ const refresh=async()=>{
+  if(p79SavedCoverReportBusy||!dialog.isConnected)return;
+  p79SavedCoverReportBusy=true;continueButton.hidden=true;
+  status.textContent='正在讀取雲端已儲存資料…';body.replaceChildren();
+  try{
+   const token=leaveRequestToken();
+   if(!token)throw Error('找不到有效登入憑證，請返回首頁重新登入');
+   const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   if(!dialog.isConnected)return;
+   if(!fresh?.ok)throw Error(fresh?.error||'雲端請假資料讀取失敗');
+   const leave=(fresh.leaveRecords||[]).find(l=>String(l.id)===String(id));
+   const covers=(fresh.leaveCoverAssignments||[]).filter(c=>String(c.leaveId)===String(id));
+   if(!leave||leave.status!=='已核准'||!covers.length)throw Error('這筆請假目前沒有有效的已儲存代班安排');
+   const entries=[],seen=new Set();
+   for(const cover of covers){
+    const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);
+    if(!start||!end||start>end)throw Error('代班日期無效，請核對雲端安排');
+    for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){
+     const date=day.toISOString().slice(0,10);
+     for(const worker of cover.workerIds||[]){
+      const empId=String(worker),key=norm(empId)+'|'+date;
+      if(seen.has(key))continue;
+      seen.add(key);
+      const person=(fresh.employees||[]).find(e=>norm(e.empId)===norm(empId));
+      entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId),mode:cover.mode||''});
+      if(entries.length>124)throw Error('代班日期超出單次明細範圍');
+     }
+    }
+   }
+   if(!entries.length)throw Error('找不到已儲存的代班人員');
+   body.innerHTML=entries.map(e=>'<div style="border:1px solid #dbe4ee;border-radius:9px;padding:10px;background:rgba(148,163,184,.06)">'+
+    '<b>'+esc(e.name)+'</b> <small>'+esc(e.empId)+'</small>｜'+esc(e.date)+
+    '<div data-entry-status style="margin-top:5px;font-size:13px">正在核對加班申報…</div></div>').join('');
+   const cells=Array.from(body.querySelectorAll('[data-entry-status]')),monthContexts=new Map(),pending=[];
+   let reported=0,unverified=0,restCovers=0;
+   for(let i=0;i<entries.length;i++){
+    if(!dialog.isConnected)return;
+    const entry=entries[i],cell=cells[i];
+    if(entry.mode==='rest'){
+     cell.textContent='排休代班（非加班申報）';restCovers++;continue;
+    }
+    try{
+     const month=entry.date.slice(0,7);
+     let cloud=monthContexts.get(month);
+     if(!cloud||(cloud.schedules||[]).every(row=>norm(row.empId)!==norm(entry.empId))){
+      cloud=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+
+       '&empId='+encodeURIComponent(entry.empId)+'&date='+encodeURIComponent(entry.date)+
+       '&leaveHandoffId='+encodeURIComponent(id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+      if(!cloud?.ok||!Array.isArray(cloud.schedules))throw Error(cloud?.error||'雲端班表核對失敗');
+      monthContexts.set(month,cloud);
+     }
+     if(!dialog.isConnected)return;
+     const employeeRow=cloud.schedules.find(row=>norm(row.empId)===norm(entry.empId));
+     if(!employeeRow)throw Error('雲端找不到這位代班人員的班表');
+     const report=employeeRow.schedule?.__meta?.[entry.date]?.overtimeReport;
+     if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
+      const fields=[report.typeName||report.category||'',report.code||'',
+       report.declaredHours!=null?'申報 '+report.declaredHours+' 小時':'',
+       report.convertedHours!=null&&String(report.convertedHours)!==''?'換算 '+report.convertedHours+' 小時':'',
+       report.note||''].filter(Boolean);
+      cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')+fields.join('｜');
+      reported++;
+     }else{
+      cell.textContent='尚未申報加班';pending.push(entry);
+     }
+    }catch(error){
+     if(!dialog.isConnected)return;
+     cell.textContent='無法核對：'+String(error.message||error);
+     unverified++;
+     if(/登入驗證|重新登入|token.*(?:expired|invalid)|登入.*(?:過期|逾時)/i.test(String(error.message||error))){
+      for(let j=i+1;j<entries.length;j++)cells[j].textContent='登入驗證未完成，請重新登入後核對';
+      unverified+=entries.length-i-1;break;
+     }
+    }
+   }
+   if(!dialog.isConnected)return;
+   status.textContent='已列出 '+entries.length+' 筆代班日期｜已申報／預排 '+reported+
+    ' 筆｜未申報 '+pending.length+' 筆'+(restCovers?'｜排休代班 '+restCovers+' 筆':'')+
+    (unverified?'｜未核對 '+unverified+' 筆（請重新核對雲端）':'');
+   continueButton.hidden=!pending.length||unverified>0;
+   continueButton.onclick=async()=>{
+    if(!pending.length||unverified>0)return;
+    sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({
+     id:String(id),createdAt:Date.now(),entries:pending
+    }));
+    p79ActivateLeaveHandoff();dialog.close();
+    await p79OpenLeaveOvertimeHandoff();
+   };
+  }catch(error){
+   if(dialog.isConnected)status.textContent='加班明細讀取失敗：'+String(error.message||error)+'；視窗會保留，可重新核對雲端。';
+  }finally{p79SavedCoverReportBusy=false;}
+ };
+ dialog.querySelector('[data-reload]').onclick=refresh;
+ void refresh();
 }
 function p79OpenLeaveCover(id){
  window.P79ApprovedCoverAuto?.close();
