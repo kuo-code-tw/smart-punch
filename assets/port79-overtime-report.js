@@ -62,7 +62,23 @@
  const ruleKey=row=>(row[9]?'named:'+row[9]:'builtin:'+typeLabel[row[0]])+'|'+row[1];
  function activeReportRows(rows,config={}){
   const allowed=new Set(typeOptions(config).map(t=>t.name)),archived=new Set(config?.[ARCHIVED_CONFIG]||[]);
-  return validate(rows).filter(row=>allowed.has(ruleType(row))&&!archived.has(ruleKey(row)));
+  const hidden=new Set(config?.[HIDDEN_MANAGER_RULES]||[]);
+  return validate(rows).filter(row=>allowed.has(ruleType(row))&&!archived.has(ruleKey(row))&&!hidden.has(ruleKey(row)));
+ }
+ // Diagnose stored-but-disabled rules without reviving archived or deleted periods.
+ function reportPeriodDiagnostic(rows,config={},selectedType=''){
+  const name=canonicalType(selectedType),configured=typeOptions(config).find(t=>t.name===name);
+  const saved=validate(rows),archived=new Set(config?.[ARCHIVED_CONFIG]||[]),
+   hidden=new Set(config?.[HIDDEN_MANAGER_RULES]||[]);
+  const matching=saved.filter(row=>ruleType(row)===name);
+  const visible=matching.filter(row=>!hidden.has(ruleKey(row)));
+  return {name,configured:!!configured,
+   active:configured?visible.filter(row=>!archived.has(ruleKey(row))).length:0,
+   archived:visible.filter(row=>archived.has(ruleKey(row))).length,
+   deleted:matching.length-visible.length,
+   otherNamed:configured?saved.filter(row=>row[0]===configured.category&&
+    ruleType(row)!==name&&!hidden.has(ruleKey(row))).length:0,
+   total:matching.length};
  }
  function managerVisibleRules(rows,config={}){
   const hidden=config?.[HIDDEN_MANAGER_RULES]||[];
@@ -1003,6 +1019,7 @@
     return current;
    };
    let rows=specialRows(reportRowsForDialog(latestRules.rows),dialogRuleConfig(),extra);
+   let cloudRuleSource=latestRules.rows;
    if(prefill.attendance&&prefill.roster&&!prefill.savedReport){
     const kinds=global.P79SpecialOvertime?.forShift(prefill.attendance.start,prefill.attendance.end)||[];
     const special=kinds.flatMap(p=>p.kinds).filter(k=>['颱','選'].includes(k.code));
@@ -1054,7 +1071,8 @@
     '<p id="p79OtRosterHint" style="margin:4px 0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;color:#334155;background:#f8fafc"></p>');
    const rosterHint=el.querySelector('#p79OtRosterHint');
    rosterHint.insertAdjacentHTML('beforebegin',
-    '<p id="p79OtRoleTypeHint" style="margin:4px 0;font-size:12px;color:#0369a1"></p>');
+    '<p id="p79OtRoleTypeHint" style="margin:4px 0;font-size:12px;color:#0369a1"></p>'+
+    '<p id="p79OtPeriodAvailabilityHint" role="status" style="margin:4px 0;font-size:12px;color:#a16207"></p>');
    const roleTypeHint=el.querySelector('#p79OtRoleTypeHint');
    const officialMonthReads=new Map();
    let rosterHintEpoch=0,lastOfficialShift='',lastRosterDate='',lastRosterEmployee='',manuallySelectedType=false,manuallySelectedPeriod=false;
@@ -1221,8 +1239,21 @@
     const previous=select.value;
     const choices=rows.map((row,index)=>({row,index}))
       .filter(({row})=>matches(row));
+    const diagnostic=reportPeriodDiagnostic(cloudRuleSource,dialogRuleConfig(),kind.value);
+    let reason='';
+    if(!choices.length&&kind.value){
+     if(diagnostic.archived)reason='雲端保留「'+kind.value+'」'+diagnostic.archived+
+      ' 筆出勤時段，但目前是歷史封存，不開放新申報。管理員請至「加班選項管理」核對這些時段，按最下方「儲存加班類型與出勤時段」才會正式啟用；換算時數不變。';
+     else if(diagnostic.deleted)reason='「'+kind.value+'」的 '+diagnostic.deleted+
+      ' 筆時段已被管理員刪除／隱藏，系統不會自動恢復。';
+     else if(diagnostic.otherNamed)reason='同一假別有 '+diagnostic.otherNamed+
+      ' 筆其他加班類型名稱的時段，不能混用；請至加班選項管理核對類型名稱與時段。';
+     else reason='雲端尚未儲存「'+kind.value+'」可供新申報的出勤時段，請至加班選項管理核對並儲存。';
+    }
+    const hintTarget=el.querySelector('#p79OtPeriodAvailabilityHint');
+    if(hintTarget)hintTarget.textContent=reason;
     // Display existing cloud periods even if roster cannot verify them.
-    const hint=choices.length?'請選擇實際加班時段':!typeOptions(dialogRuleConfig(),rows).length?'請先新增加班類型及出勤時段':!kind.value?'請先選擇加班類型':'此類型尚未設定出勤時段';
+    const hint=choices.length?'請選擇實際加班時段':diagnostic.archived?'此類型時段仍封存，尚未開放申報':!typeOptions(dialogRuleConfig(),rows).length?'請先新增加班類型及出勤時段':!kind.value?'請先選擇加班類型':'此類型尚未設定出勤時段';
     select.innerHTML='<option value="">'+hint+'</option>'+
       choices.map(({row,index})=>'<option data-ot-category="'+row[0]+'" value="'+index+'">'+
        esc(displayPeriodCode(row))+'</option>').join('');
@@ -1352,6 +1383,7 @@
    el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／管理加班類型與時段</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
     const previous=selectedRow();
+    cloudRuleSource=nextRows;
     rows=specialRows(reportRowsForDialog(nextRows),dialogRuleConfig(),extra);refreshTypes();suggestBySelectedRole();
     const code=previous?.[1]||prefill.code,category=previous?.[0]||prefill.category;
     const index=findPrefill(code,category);
@@ -1456,7 +1488,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
