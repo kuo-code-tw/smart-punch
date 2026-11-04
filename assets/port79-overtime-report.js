@@ -492,6 +492,46 @@
    #p79OvertimeOptionsDialog .p79-ot-historical-label{font-weight:700;color:#8b5cf6!important}
    #p79OvertimeOptionsDialog .p79-ot-muted{color:#94a3b8}
    #p79OvertimeOptionsDialog .p79OtDelete{font-size:11px;color:#991b1b;background:#fff1f2;border:1px solid #fecaca;border-radius:5px;padding:5px 6px}
+
+   /* Production overtime type manager, matched to approved editable design. */
+   #p79OvertimeOptionsDialog{width:min(1450px,calc(100vw - 22px))!important;max-width:calc(100vw - 22px)!important;height:min(93dvh,990px)!important;padding:14px 18px!important;gap:9px!important}
+   #p79OvertimeOptionsDialog .p79-ot-dialog-header h2{font-size:21px!important;color:#0f2950}
+   #p79OvertimeOptionsDialog .p79-ot-type-manager{display:flex!important;flex-direction:column;align-items:stretch;background:transparent;border:0;padding:0;gap:8px!important}
+   #p79OvertimeOptionsDialog .p79-ot-type-list-wrap{order:-1;text-align:center!important}
+   #p79OvertimeOptionsDialog .p79-ot-type-list-wrap>.p79-ot-section-title{display:none!important}
+   #p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:86px!important;min-height:34px!important;border:0;background:transparent;padding:0;overflow:auto;margin:0!important}
+   #p79OvertimeOptionsDialog #p79AddedTypeList{justify-content:center;align-items:center;flex-wrap:wrap;gap:8px}
+   #p79OvertimeOptionsDialog #p79AddedTypeList>div[role="listitem"]{min-height:33px!important;border-radius:22px!important;padding:3px 7px 3px 12px!important;background:var(--ot-field)!important;color:var(--ot-ink)!important;border:1px solid var(--ot-ink)!important}
+   #p79OvertimeOptionsDialog #p79AddedTypeList .p79OtDeleteType{padding:1px 6px!important;font-size:14px!important;border-radius:50%!important;border:0!important;background:transparent!important;color:var(--ot-ink)!important;line-height:1.25}
+   #p79OvertimeOptionsDialog .p79-ot-add-type-wrap{background:#eaf6fd;border-radius:12px;padding:12px 16px;text-align:center!important}
+   #p79OvertimeOptionsDialog .p79-ot-add-type-wrap .p79-ot-section-title{text-align:center!important;font-size:15px}
+   #p79OvertimeOptionsDialog .p79-ot-new-type-controls{justify-content:center!important;flex-wrap:wrap;gap:10px;margin-top:8px!important}
+   #p79OvertimeOptionsDialog #p79NewTypeName{flex:0 1 270px;width:270px!important;min-width:180px!important;height:37px!important}
+   #p79OvertimeOptionsDialog #p79NewTypeCategory{flex:0 1 175px;width:175px!important;min-width:145px!important;height:37px!important}
+   #p79OvertimeOptionsDialog #p79AddType{height:37px!important;padding:6px 17px!important}
+   #p79OvertimeOptionsDialog #p79AddedTypeMessage{text-align:center!important;font-size:12px!important;color:#276381;min-height:16px;margin-top:-3px!important}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel{display:none!important}
+   #p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 380px!important;min-height:255px!important;overflow:auto;border-radius:9px;border:1px solid #dbe5f3}
+   #p79OvertimeOptionsDialog table{min-width:1220px!important;table-layout:fixed!important;width:100%!important}
+   #p79OvertimeOptionsDialog th{padding:9px 4px!important;white-space:nowrap!important;font-size:12px!important;background:#e8f1fa!important}
+   #p79OvertimeOptionsDialog td{padding:4px!important;overflow:hidden!important}
+   #p79OvertimeOptionsDialog td input,#p79OvertimeOptionsDialog td select{width:100%!important;min-width:0!important;height:32px!important;padding:4px 3px!important;border-radius:7px!important;font-size:12px!important}
+   #p79OvertimeOptionsDialog th:nth-child(1){width:13%}
+   #p79OvertimeOptionsDialog th:nth-child(2){width:10%}
+   #p79OvertimeOptionsDialog th:nth-child(3){width:10%}
+   #p79OvertimeOptionsDialog th:nth-child(4){width:9%}
+   #p79OvertimeOptionsDialog th:nth-child(5),#p79OvertimeOptionsDialog th:nth-child(6),#p79OvertimeOptionsDialog th:nth-child(7),#p79OvertimeOptionsDialog th:nth-child(8){width:7%}
+   #p79OvertimeOptionsDialog th:nth-child(9){width:8%}
+   #p79OvertimeOptionsDialog th:nth-child(10){width:13%}
+   #p79OvertimeOptionsDialog th:nth-child(11){width:7%}
+   #p79OvertimeOptionsDialog [data-ot-category="休"]{--ot-row:#e0edff;--ot-field:#f4f8ff;--ot-ink:#1d4d92}
+   #p79OvertimeOptionsDialog [data-ot-category="國"]{--ot-row:#d8f8e5;--ot-field:#f1fcf6;--ot-ink:#17653d}
+   #p79OvertimeOptionsDialog [data-ot-category="例"]{--ot-row:#f0e9ff;--ot-field:#f8f5ff;--ot-ink:#63379b}
+   #p79OvertimeOptionsDialog [data-ot-category="代"]{--ot-row:#d9f6fa;--ot-field:#f0fcfe;--ot-ink:#11677b}
+   #p79OvertimeOptionsDialog [data-ot-category="延"]{--ot-row:#ffdee5;--ot-field:#fff2f4;--ot-ink:#9e2746}
+   #p79OvertimeOptionsDialog .p79OtDelete{color:#1e293b!important;background:#f8fafc!important;border:1px solid #94a3b8!important;padding:4px 6px!important;white-space:nowrap}
+   #p79OvertimeOptionsDialog .p79-ot-actions{justify-content:center;flex-wrap:wrap;gap:9px;padding:10px 0!important}
+   #p79OvertimeOptionsDialog #p79OtSave{font-weight:700}
    @media(max-width:760px){
     #p79OvertimeOptionsDialog{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;padding:8px!important;height:calc(100dvh - 16px)!important}
     #p79OvertimeOptionsDialog .p79-ot-type-manager{grid-template-columns:minmax(0,1fr);gap:5px;padding:7px}
@@ -583,12 +623,12 @@
      const empty=document.createElement('div');empty.textContent='目前沒有啟用的加班類型';
      empty.style.cssText='padding:14px;text-align:center;color:#64748b';list.append(empty);return;
     }
-    customTypes.forEach(([name],index)=>{
-     const item=document.createElement('div');item.setAttribute('role','listitem');
+    customTypes.forEach(([name,category],index)=>{
+     const item=document.createElement('div');item.setAttribute('role','listitem');item.dataset.otCategory=category;
      item.style.cssText='display:inline-flex;align-items:center;justify-content:space-between;gap:5px;padding:2px 5px;border:1px solid #dbe4ee;border-radius:5px;background:#fff;min-height:28px;font-size:12px';
      const label=document.createElement('span');label.textContent=name;
      const button=document.createElement('button');button.type='button';button.className='p79OtDeleteType';
-     button.textContent='刪除';button.setAttribute('aria-label','刪除加班類型 '+name);
+     button.textContent='×';button.setAttribute('aria-label','刪除加班類型 '+name);
      button.title='確認後直接儲存雲端，不提供恢復';
      button.style.cssText='padding:4px 9px;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;background:#fff1f2;font-size:12px;font-weight:700';
      button.disabled=!cloudReady||reading||saving||!global.p79OvertimeContext?.canEditRules?.();
