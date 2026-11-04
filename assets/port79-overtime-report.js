@@ -971,9 +971,15 @@
   const editingOriginal=Boolean(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);
   const el=dialog(editingOriginal?'修改加班申報':prefill.manualPlan===true?'新增預排（未正式申報）':'申報加班','<p id="p79OtStatus">正在讀取加班換算表…</p>');
   try{
-   // Always read authoritative cloud configuration when opening a filing.
-   // A deleted type must disappear on other already-open computers too.
-   const latestRules=await loadRules();
+   // Reuse an immediately prior, authenticated cloud rule read from leave handoff.
+   // Never reuse it on save: save rereads current rules/revision before POST.
+   const preverified=prefill.verifiedOvertimeRules,credentials=auth();
+   const verifiedFresh=!!(preverified&&Number(preverified.checkedAt)>0&&
+    Date.now()-Number(preverified.checkedAt)>=0&&Date.now()-Number(preverified.checkedAt)<10000&&
+    preverified.token===credentials.token&&preverified.url===credentials.url&&
+    preverified.config&&typeof preverified.config==='object'&&Array.isArray(preverified.rows));
+   const latestRules=verifiedFresh?
+    {config:preverified.config,rows:validate(preverified.rows)}:await loadRules();
    const sharedConfig=global.p79OvertimeContext?.config?.();
    if(sharedConfig)Object.assign(sharedConfig,latestRules.config);
    const extra=[],window=prefill.attendance&&declarationWindow(prefill.attendance.start,prefill.attendance.end,prefill.date,prefill.roster);
@@ -1143,6 +1149,14 @@
    }
    async function refreshOfficialRosterHint(){
     const epoch=++rosterHintEpoch;
+    // Original reports and verified leave handoffs already carry their context.
+    // Actual save still checks the newest cloud attendance and official roster.
+    if(editingOriginal||prefill.leaveHandoffId){
+     rosterHint.textContent=editingOriginal?
+      '原申報將在正式儲存時重新核對最新打卡與班表。':
+      '請假代班安排已核對；正式儲存時會重新核對雲端出勤及班表。';
+     return;
+    }
     if(!typeOptions(dialogRuleConfig(),rows).length){
      rosterHint.textContent='雲端尚未建立加班類型；請先在「加班選項管理」自行新增類型與出勤時段，班表不會自動建立加班。';
      return;
