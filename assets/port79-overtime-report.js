@@ -937,6 +937,9 @@
    el.querySelector('#p79OtPreview').insertAdjacentHTML('afterend',
     '<p id="p79OtRosterHint" style="margin:4px 0;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;color:#334155;background:#f8fafc"></p>');
    const rosterHint=el.querySelector('#p79OtRosterHint');
+   rosterHint.insertAdjacentHTML('beforebegin',
+    '<p id="p79OtRoleTypeHint" style="margin:4px 0;font-size:12px;color:#0369a1"></p>');
+   const roleTypeHint=el.querySelector('#p79OtRoleTypeHint');
    const officialMonthReads=new Map();
    let rosterHintEpoch=0;
    async function officialOvertimeRosterShift(empId,date){
@@ -1042,10 +1045,31 @@
     }
     preview();
    }
-   roleSelect.onchange=()=>{refreshPairPeople();preview();void refreshOfficialRosterHint();};kind.onchange=()=>{prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};select.onchange=preview;
+   function suggestBySelectedRole(){
+    const person=people.find(e=>String(e.empId)===String(empSelect.value));
+    const title=person?reportEmployeeRole(person):String(roleSelect.value||'');
+    const recommended=preferredOvertimeTypeForRole(
+     global.p79OvertimeContext?.config?.()||{},title,rows);
+    roleTypeHint.textContent=recommended?
+      '職稱「'+title+'」預設建議：'+recommended+'；仍須依當日班表及實際加班核對。':
+      title?'職稱「'+title+'」未設定預設加班類型，請依當日班表判斷。':'';
+    const explicit=!!(prefill.savedReport||prefill.leaveHandoffId||
+      prefill.preferredType||prefill.code||prefill.category||
+      prefill.attendance||prefill.lockOriginal);
+    if(!recommended||explicit||editingOriginal)return;
+    if(!typeOptions(dialogRuleConfig(),rows).some(o=>o.name===recommended))return;
+    // Change the suggested TYPE, never silently choose any period or
+    // declare hours; the day-level formal roster check remains mandatory.
+    kind.value=recommended;
+    refresh();select.selectedIndex=-1;select.value='';preview();
+    el.querySelector('#p79OtStatus').textContent='已依職稱建議 '+recommended+'；請核對當日班表並選擇符合的出勤時段。';
+   }
+   roleSelect.onchange=()=>{refreshPairPeople();preview();suggestBySelectedRole();void refreshOfficialRosterHint();};
+   kind.onchange=()=>{prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
+   select.onchange=preview;
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
    leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
-   empSelect.onchange=()=>{refresh();void refreshOfficialRosterHint();};
+   empSelect.onchange=()=>{refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
    dateInput.onchange=()=>{if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
    if(prefill.empId||prefill.forEmpId){
@@ -1071,6 +1095,7 @@
     else{select.selectedIndex=-1;select.value='';preview();el.querySelector('#p79OtStatus').textContent='已帶入「'+requested+'」，請選擇本位人員的出勤時段。';}
    }
    applyPreferredType();
+   suggestBySelectedRole();
    void refreshOfficialRosterHint();
    if(!prefill.code&&prefill.requirePeriodSelection&&prefill.attendance)
     autoSelectPeriodForCurrentType();
