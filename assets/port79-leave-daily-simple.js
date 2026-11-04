@@ -38,6 +38,7 @@ function redraw(){
  root.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{const row=rows.get(el.dataset.remove);row.secondVisible=false;row.second='';redraw();});
 }
 window.p79RenderDailyCreateCover=redraw;
+document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
 window.openAdminCreateLeave=async function(...args){
  rows.clear();
  await originalOpen(...args);
