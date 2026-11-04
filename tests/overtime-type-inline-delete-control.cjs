@@ -12,7 +12,7 @@ assert(source.includes("button.className='p79OtDeleteType'"),'one delete button 
 assert(!source.includes('p79ManageTypeSelect'),'no redundant delete dropdown');
 assert(!source.includes('p79BuiltinTypeList'),'no preinstalled list');
 assert(!source.includes('p79OtBuiltinDelete'),'no restore button');
-assert(source.includes('尚未新增加班類型'),'empty list is rendered');
+assert(source.includes('目前沒有啟用的加班類型'),'empty list is rendered');
 assert.equal((source.match(/p79OtSave'\)\.click\(\)/g)||[]).length,2,'add and delete directly persist');
 assert(source.includes("global.confirm('確定刪除加班類型"),'delete is confirmed');
 assert(source.includes('[ARCHIVED_CONFIG]:archiveKeys'),'history is retained without a restore action');
