@@ -498,8 +498,19 @@
    let allCloudRows=reportRules();
    let loadedRows='',loadedVisibleRows='',customTypes=JSON.parse(JSON.stringify(cached?.[TYPECONFIG]||[])),loadedTypes='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
    let roleTypeDefaults=normalizeRoleTypeDefaults(cached||{}),loadedRoleDefaults='';
-   el.insertAdjacentHTML('beforeend','<p style="margin:12px 0;color:#475569">依你圖片預填換算值，可自行修改。時間使用08、16、24或08:30。申報時數與時段長度分開保存。空白換算時數表示尚未設定。</p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
-   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend','<div style="padding:12px;margin:12px 0;background:#f0f9ff;border-radius:10px"><b>新增加班類型</b><div class="p79-ot-new-type-controls" style="margin-top:8px"><input id="p79NewTypeName" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+';width:240px"><select id="p79NewTypeCategory" style="'+inputStyle+';width:170px">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select><button type="button" id="p79AddType" style="background:#0369a1;color:#fff;padding:9px 14px;border-radius:8px;font-weight:800">＋新增加班類型</button></div><div class="p79-ot-type-list-wrap" style="margin-top:14px;padding-top:12px;border-top:1px solid #bae6fd"><b>加班類型清單（點右側刪除）</b><div id="p79OvertimeTypeList" role="list" aria-label="加班類型清單" style="margin-top:8px;max-width:680px;margin-inline:auto;max-height:360px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:9px"><div id="p79AddedTypeList"></div></div></div><p id="p79AddedTypeMessage" role="status" style="font-weight:700;color:#075985;margin-top:8px">可輸入「颱風日加班」，再選擇實際適用的假別。颱風日不一定屬國定假日。</p><p style="font-size:12px;color:#475569">在清單內選擇要刪除的類型，確認後按最下方「儲存加班類型與出勤時段」同步雲端。已正式申報的歷史資料保留，刪除確認後立即同步雲端，不提供恢復。</p></div>');
+   el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">出勤時段／換算設定 <span style="font-size:11px;font-weight:400;color:#64748b">（修改後按下方儲存）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
+   el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend',
+    '<div class="p79-ot-type-manager">'+
+     '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增類型</span>'+
+      '<div class="p79-ot-new-type-controls">'+
+       '<input id="p79NewTypeName" aria-label="新加班類型名稱" placeholder="輸入類型名稱" maxlength="40" style="'+inputStyle+'">'+
+       '<select id="p79NewTypeCategory" aria-label="加班假別" style="'+inputStyle+'">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select>'+
+       '<button type="button" id="p79AddType" style="background:#0369a1;color:#fff;border-radius:6px;font-weight:700">＋新增</button>'+
+      '</div></div>'+
+     '<div class="p79-ot-type-list-wrap"><span class="p79-ot-section-title">現有加班類型（可刪除）</span>'+
+      '<div id="p79OvertimeTypeList" role="list" aria-label="加班類型清單"><div id="p79AddedTypeList"></div></div></div>'+
+     '<p id="p79AddedTypeMessage" role="status" aria-live="polite"></p>'+
+    '</div>');
    const body=el.querySelector('#p79OtRuleRows'),getRows=()=>[...body.rows].map(tr=>[...tr.querySelectorAll('[data-col]')].map(i=>i.value));
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');if(!list)return;
@@ -510,7 +521,7 @@
     }
     customTypes.forEach(([name],index)=>{
      const item=document.createElement('div');item.setAttribute('role','listitem');
-     item.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0;background:#fff;min-height:48px';
+     item.style.cssText='display:inline-flex;align-items:center;justify-content:space-between;gap:5px;padding:2px 5px;border:1px solid #dbe4ee;border-radius:5px;background:#fff;min-height:28px;font-size:12px';
      const label=document.createElement('span');label.textContent=name;
      const button=document.createElement('button');button.type='button';button.className='p79OtDeleteType';
      button.textContent='刪除';button.setAttribute('aria-label','刪除加班類型 '+name);
@@ -552,10 +563,11 @@
     el.querySelector('#p79OtSave').click();
    };
    el.querySelector('#p79AddedTypeMessage').parentElement.insertAdjacentHTML('afterend',
-    '<section id="p79RoleTypeDefaultsPanel" style="margin:12px 0;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc">'+
-    '<b>職稱預設加班類型</b><p style="font-size:12px;color:#475569;margin:7px 0">'+
-    '依職稱帶入新申報的建議類型；實際休息日或平日延時性質，仍依當日正式班表與考勤確認。此處不會自動申報或增加時數。'+
-    '</p><div id="p79RoleTypeDefaultsRows" style="display:grid;gap:6px;max-height:280px;overflow:auto"></div></section>');
+    '<details id="p79RoleTypeDefaultsPanel">'+
+     '<summary>職稱預設加班類型 <span style="color:#64748b;font-weight:400">（點擊展開設定）</span></summary>'+
+     '<p style="font-size:11px;color:#64748b;margin:4px 10px">依職稱建議加班類型；仍以正式班表與考勤為準，不會自動增加時數。</p>'+
+     '<div id="p79RoleTypeDefaultsRows"></div>'+
+    '</details>');
    function renderRoleTypeDefaults(){
     const panel=el.querySelector('#p79RoleTypeDefaultsRows');if(!panel)return;
     panel.replaceChildren();
