@@ -2,7 +2,7 @@
  'use strict';
  const KEY='port79_overtime_report_draft_v1',CONFIG='overtimeConversionRowsV1';
  const types=['休','國','例','代','延'];
- const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1',ARCHIVED_CONFIG='overtimeArchivedRuleKeysV1',ROLE_DEFAULTS_CONFIG='overtimeRoleTypeDefaultsV1';
+ const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1',ARCHIVED_CONFIG='overtimeArchivedRuleKeysV1',ROLE_DEFAULTS_CONFIG='overtimeRoleTypeDefaultsV1',HIDDEN_MANAGER_RULES='overtimeManagerHiddenRuleKeysV1';
  // Category labels provide internal day classifications, not installed types.
  // Keep archived conversion rows in cloud storage for historical audit/edit,
  // while only administrator-created types are offered in NEW filing forms.
@@ -515,20 +515,15 @@
  }
  const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
  function editorRow(row){
-  const v=row.map(x=>String(x??'')),name=ruleType(row),style=inputStyle+';padding:6px 5px;font-size:12px';
-  const field=(i,label,number=false)=>'<input data-col="'+i+'" aria-label="'+esc(label)+'" style="'+style+'" value="'+esc(v[i])+'" '+(number?'type="number" min="0" step="0.01"':'type="text"')+'>';
-  const timeFields=(x,y)=>'<div class="p79-ot-times">'+field(x,'開始時刻')+'<span>～</span>'+field(y,'結束時刻')+'</div>';
-  const normal=v[0]==='延'?timeFields(4,5):'<span class="p79-ot-muted">—</span><input type="hidden" data-col="4" value=""><input type="hidden" data-col="5" value="">';
-  return '<tr data-ot-active="true" data-ot-category="'+esc(v[0])+'">'+
-   '<td><b>'+esc(name)+'</b><input type="hidden" data-col="0" value="'+esc(v[0])+'"><input type="hidden" data-col="9" value="'+esc(name)+'"></td>'+
-   '<td>'+field(1,'出勤時段')+'</td>'+
-   '<td>'+field(2,'實際加班時數',true)+'</td>'+
-   '<td>'+field(3,'換算時數',true)+'</td>'+
-   '<td>'+normal+'</td>'+
-   '<td>'+timeFields(6,7)+'</td>'+
-   '<td><span>'+esc(positionLabels[v[8]]||v[8])+'</span><input type="hidden" data-col="8" value="'+esc(v[8])+'"></td>'+
-   '<td><span class="p79-ot-status-active">使用中</span></td>'+
-   '<td><button type="button" class="p79OtDelete" aria-label="刪除時段 '+esc(name)+' '+esc(v[1])+'">刪除時段</button></td></tr>';
+  const v=[...row.slice(0,9),ruleType(row)].map(x=>String(x??''));
+  const field=(i,label,number=false)=>'<input data-col="'+i+'" aria-label="'+esc(label)+'" value="'+esc(v[i])+'" '+(number?'type="number" min="0" step="0.01"':'type="text"')+'>';
+  const category='<select data-col="0" aria-label="加班假別">'+types.map(t=>'<option value="'+t+'" '+(t===v[0]?'selected':'')+'>'+esc(typeLabel[t])+'</option>').join('')+'</select>';
+  const position='<select data-col="8" aria-label="加班位置">'+[['full','全段'],['after','班後'],['before','班前']].map(([value,label])=>'<option value="'+value+'" '+(v[8]===value?'selected':'')+'>'+label+'</option>').join('')+'</select>';
+  return '<tr data-ot-active="true" data-ot-key="'+esc(ruleKey(row))+'" data-ot-category="'+esc(v[0])+'">'+
+   '<td>'+category+'</td><td>'+field(1,'出勤時段')+'</td><td>'+field(2,'實際加班時數',true)+'</td><td>'+field(3,'換算時數',true)+'</td>'+
+   '<td>'+field(4,'正常起')+'</td><td>'+field(5,'正常迄')+'</td><td>'+field(6,'加班起')+'</td><td>'+field(7,'加班迄')+'</td>'+
+   '<td>'+position+'</td><td>'+field(9,'加班類型名稱')+'</td>'+
+   '<td><button type="button" class="p79OtDelete" aria-label="刪除時段 '+esc(v[1])+'">刪除</button></td></tr>';
  }
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
@@ -540,25 +535,19 @@
    let allCloudRows=reportRules();
    let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedTypeDraft='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
    let roleTypeDefaults=normalizeRoleTypeDefaults(cached||{}),loadedRoleDefaults='';
-   el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">加班出勤時段與換算表 <span id="p79OtRuleCount" style="font-size:11px;font-weight:400;color:#64748b">（直接查看與修改；歷史紀錄為唯讀）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['加班類型','出勤時段','實際時數','換算時數','正常班','加班時間','位置','狀態','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
+   el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">加班出勤時段與換算表 <span id="p79OtRuleCount" style="font-size:11px;font-weight:400;color:#64748b">（雲端時段均可編輯與刪除；修改後按儲存）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend',
     '<div class="p79-ot-type-manager">'+
-     '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增類型</span>'+
+     '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增加班類型</span>'+
       '<div class="p79-ot-new-type-controls">'+
-       '<input id="p79NewTypeName" aria-label="新加班類型名稱" placeholder="輸入類型名稱" maxlength="40" style="'+inputStyle+'">'+
-       '<select id="p79NewTypeCategory" aria-label="新類型的工時計算方式" title="計算分類不代表已存在的加班類型" style="'+inputStyle+';display:none"><option value="">選擇計算方式</option>'+types.map(c=>'<option value="'+c+'">'+esc(({休:'休息日換算',國:'國定假日換算',例:'例假日換算',代:'休假代班換算',延:'平日延時換算'})[c])+'</option>').join('')+'</select>'+
-       '<button type="button" id="p79AddType" style="background:#0369a1;color:#fff;border-radius:6px;font-weight:700">＋新增</button>'+
+       '<input id="p79NewTypeName" aria-label="新加班類型名稱" placeholder="例如：吊櫃作業休息日" maxlength="40" style="'+inputStyle+'">'+
+       '<select id="p79NewTypeCategory" aria-label="新類型的工時計算方式" title="計算分類不代表已存在的加班類型" style="'+inputStyle+'">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'</option>').join('')+'</select>'+
+       '<button type="button" id="p79AddType" style="background:#0369a1;color:#fff;border-radius:6px;font-weight:700">＋新增加班類型</button>'+
       '</div></div>'+
      '<div class="p79-ot-type-list-wrap"><span class="p79-ot-section-title">現有加班類型（可刪除）</span>'+
       '<div id="p79OvertimeTypeList" role="list" aria-label="加班類型清單"><div id="p79AddedTypeList"></div></div></div>'+
-     '<p id="p79AddedTypeMessage" role="status" aria-live="polite"></p>'+
+     '<p id="p79AddedTypeMessage" role="status" aria-live="polite">輸入自訂名稱並選擇實際適用的假別，儲存後才會變更雲端。</p>'+
     '</div>');
-   const categoryPicker=el.querySelector('#p79NewTypeCategory');
-   el.querySelector('#p79NewTypeName').addEventListener('input',()=>{
-    const hasName=!!el.querySelector('#p79NewTypeName').value.trim();
-    categoryPicker.style.display=hasName?'':'none';
-    if(!hasName)categoryPicker.value='';
-   });
    // Unified display: active rows are editable, archived rows remain read-only.
    // Archived rows never have data-col fields and cannot be included in saves.
    const body=el.querySelector('#p79OtRuleRows');
@@ -634,7 +623,6 @@
      el.querySelector('#p79OtStatus').textContent='此名稱應選擇「'+typeLabel[standard]+'」作為適用假別';return;
     }
     customTypes.push([name,category]);el.querySelector('#p79NewTypeName').value='';
-    categoryPicker.value='';categoryPicker.style.display='none';
     renderAddedTypeList();renderRoleTypeDefaults();
     el.querySelector('#p79AddedTypeMessage').textContent='正在新增「'+name+'」並同步雲端…';
     el.querySelector('#p79OtSave').click();
