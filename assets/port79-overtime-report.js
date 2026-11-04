@@ -725,7 +725,7 @@
     if(!imported.length)throw Error('試算表沒有加班選項，未覆蓋原表');
     rows=validate(imported);
      customTypes=[...new Map([...customTypes,...rows.map(row=>[ruleType(row),row[0]])].map(pair=>[pair[0],pair])).values()];
-     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderArchivedRows(allCloudRows,cached||{});renderRoleTypeDefaults();
+     renderAddedTypeList();body.innerHTML=rows.map(row=>editorRow(row)).join('');refreshRuleCount();renderRoleTypeDefaults();
     el.querySelector('#p79OtStatus').textContent='已匯入'+rows.length+'筆，請核對後按儲存。';
    }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message}finally{event.target.value=''}};
    el.querySelector('#p79OtSave').onclick=async()=>{
@@ -744,6 +744,7 @@
      if(JSON.stringify(fresh.config[TYPECONFIG]||[])!==loadedTypes)throw Error('加班類型已由其他人修改，請重新載入核對');
      if(JSON.stringify([...deletedBuiltins(fresh.config)])!==loadedDeleted)throw Error('加班類型刪除狀態已變更，請重新載入核對');
      if(JSON.stringify(fresh.config[ARCHIVED_CONFIG]||[])!==loadedArchived)throw Error('歷史加班規則已由其他人修改，請重新載入核對');
+     if(JSON.stringify(fresh.config[HIDDEN_MANAGER_RULES]||[])!==loadedHidden)throw Error('可刪除時段清單已由其他管理員變更，請重新讀取雲端');
      if(JSON.stringify(normalizeRoleTypeDefaults(fresh.config))!==loadedRoleDefaults)
       throw Error('職稱預設加班類型已由其他管理員變更，請重新讀取雲端核對');
      // Keep original cloud conversion rules for historical report validation;
@@ -751,9 +752,10 @@
      const draftKeys=new Set(draft.map(ruleKey));
      const archived=fresh.rows.filter(row=>!draftKeys.has(ruleKey(row)));
      const archiveKeys=[...new Set(archived.map(ruleKey))];
+     const hiddenManagerKeys=[...new Set([...(fresh.config[HIDDEN_MANAGER_RULES]||[]),...archiveKeys])];
      const nextRows=validate([...draft,...archived]);
      const config={...fresh.config,[CONFIG]:nextRows,[TYPECONFIG]:customTypes,[DELETED_CONFIG]:deleted,
-      [ARCHIVED_CONFIG]:archiveKeys,[ROLE_DEFAULTS_CONFIG]:rolesDraft};
+      [ARCHIVED_CONFIG]:archiveKeys,[ROLE_DEFAULTS_CONFIG]:rolesDraft,[HIDDEN_MANAGER_RULES]:hiddenManagerKeys};
      if(new TextEncoder().encode(JSON.stringify(config)).length>8800)
       throw Error('雲端設定已達安全容量上限，尚未變更；請先保留原設定並聯絡管理員');
      if(!Object.prototype.hasOwnProperty.call(fresh.config,CONFIG)||
@@ -763,6 +765,7 @@
         JSON.stringify(fresh.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
         JSON.stringify([...deletedBuiltins(fresh.config)])!==JSON.stringify(deleted)||
         JSON.stringify(fresh.config[ARCHIVED_CONFIG]||[])!==JSON.stringify(archiveKeys)||
+        JSON.stringify(fresh.config[HIDDEN_MANAGER_RULES]||[])!==JSON.stringify(hiddenManagerKeys)||
         JSON.stringify(normalizeRoleTypeDefaults(fresh.config))!==JSON.stringify(rolesDraft))
       await rpc('saveConfig',{config});
      const check=await loadRules();
@@ -770,6 +773,7 @@
         JSON.stringify(check.config[TYPECONFIG]||[])!==JSON.stringify(customTypes)||
         JSON.stringify([...deletedBuiltins(check.config)])!==JSON.stringify(deleted)||
         JSON.stringify(check.config[ARCHIVED_CONFIG]||[])!==JSON.stringify(archiveKeys)||
+        JSON.stringify(check.config[HIDDEN_MANAGER_RULES]||[])!==JSON.stringify(hiddenManagerKeys)||
         JSON.stringify(normalizeRoleTypeDefaults(check.config))!==JSON.stringify(rolesDraft))
       throw Error('加班選項及職稱對應雲端讀回不一致，請保留畫面供核對');
      loadedRows=JSON.stringify(check.rows);
@@ -777,6 +781,7 @@
      loadedTypeDraft=JSON.stringify(customTypes);
      loadedDeleted=JSON.stringify([...deletedBuiltins(check.config)]);
      loadedArchived=JSON.stringify(check.config[ARCHIVED_CONFIG]||[]);
+     loadedHidden=JSON.stringify(check.config[HIDDEN_MANAGER_RULES]||[]);
      removedBuiltinNames=new Set(deleted);
      roleTypeDefaults=normalizeRoleTypeDefaults(check.config);
      loadedRoleDefaults=JSON.stringify(roleTypeDefaults);
