@@ -3,13 +3,14 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const source=fs.readFileSync('assets/port79-overtime-report.js','utf8');
 const win={};vm.runInNewContext(source,{window:win,Date,Intl,Set,Map,TextEncoder});
 const api=win.P79Overtime,config={
- [api.ROLE_DEFAULTS_CONFIG]:[['指揮手','平日延時加班'],['吊車司機','休息日加班']]
+ [api.ROLE_DEFAULTS_CONFIG]:[['指揮手','平日延時加班'],['吊車司機','休息日加班']],
+ overtimeReportTypesV1:[['平日延時加班','延'],['休息日加班','休']]
 };
 assert.equal(api.ROLE_DEFAULTS_CONFIG,'overtimeRoleTypeDefaultsV1');
 assert.equal(api.preferredOvertimeTypeForRole(config,'指揮手',api.defaults()),'平日延時加班');
 assert.equal(api.preferredOvertimeTypeForRole(config,'吊車司機',api.defaults()),'休息日加班');
 assert.equal(api.preferredOvertimeTypeForRole(config,'未指定職稱',api.defaults()),'');
-const disabled={...config,overtimeDeletedBuiltinTypesV1:['平日延時加班']};
+const disabled={...config,overtimeReportTypesV1:[['休息日加班','休']]};
 assert.equal(api.preferredOvertimeTypeForRole(disabled,'指揮手',api.defaults()),'');
 const legacy={[api.ROLE_DEFAULTS_CONFIG]:[['指揮手','平日延長加班']]};
 assert.equal(api.normalizeRoleTypeDefaults(legacy)[0][1],'平日延時加班');
