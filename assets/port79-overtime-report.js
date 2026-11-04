@@ -925,9 +925,9 @@
     }finally{clearTimeout(timer);}
     const dateStart=Date.parse(date+'T00:00:00+08:00');
     const canonTime=value=>{
-     let raw=String(value||'').trim().replace(/\\//g,'-').replace(' ','T');
-     if(!/^\\d{4}-\\d{2}-\\d{2}T\\d{1,2}:\\d{2}/.test(raw))return NaN;
-     if(!/[zZ]$|[+-]\\d{2}:?\\d{2}$/.test(raw))raw+='+08:00';
+     let raw=String(value||'').trim().split('/').join('-').replace(' ','T');
+     if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{1,2}:[0-9]{2}/.test(raw))return NaN;
+     if(!/[zZ]$|[+-][0-9]{2}:?[0-9]{2}$/.test(raw))raw+='+08:00';
      return Date.parse(raw);
     };
     const records=data.records.filter(row=>
