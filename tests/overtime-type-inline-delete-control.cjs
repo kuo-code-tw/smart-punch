@@ -25,5 +25,11 @@ assert(source.includes('#p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 20
 assert(source.includes('#p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:72px'),'type list has bounded height');
 assert(source.includes('id="p79OtSave"'),'original save action retained');
 assert(source.includes('id="p79OtAdd"'),'period add action retained');
+assert(source.includes('尚未新增任何加班類型'),'empty type select must explain missing setup');
+assert(source.includes('請先新增加班類型及出勤時段'),'empty period select must show setup instructions');
+assert(source.includes('請先在上方新增至少一種加班類型'),'period editor must not open with no type');
+assert(source.includes('請按「＋新增出勤時段」完成設定'),'saved type without periods must prompt period setup');
+assert(source.includes('＋新增／管理加班類型與時段'),'filing form must link to type manager');
+assert(source.includes('雲端尚未新增加班類型；請按「＋新增／管理加班類型與時段」'),'cloud reload must not falsely claim available options');
 new vm.Script(source);
 console.log('PASS single list, inline permanent delete, immediate cloud sync and no preinstalled types');
