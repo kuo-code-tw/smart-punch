@@ -1472,7 +1472,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveEnd">結束日期</label><input id="adminCreateLeaveEnd" type="date" onchange="updateAdminCreateLeaveDays();p79OnCreateLeaveDateChange()"></div>
    <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
   </div>
-  <div class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
+  <div id="adminCreateLeaveApplicantWrap" class="p79-create-person"><b>請假人員</b><div class="p79-create-two">
    <div class="field"><label for="adminCreateLeaveJob">職稱</label><select id="adminCreateLeaveJob" onchange="filterAdminCreateLeaveApplicants()"></select></div>
    <div class="field"><label for="adminCreateLeaveEmployee">姓名</label><select id="adminCreateLeaveEmployee" onchange="p79OnCreateLeaveEmployeeChange()"></select></div>
   </div><p id="adminCreateLeaveDepartment" class="note"></p></div>
@@ -1482,7 +1482,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="p79-create-person"><b>第二位代班人員（選填）</b><div class="field"><label for="adminCreateLeaveWorkerSecondJob">職稱</label><select id="adminCreateLeaveWorkerSecondJob" onchange="p79CreateCoverManual=true;filterAdminCreateLeavePeople()"></select></div><div class="field"><label for="adminCreateLeaveWorkerSecond">姓名</label><select id="adminCreateLeaveWorkerSecond" onchange="p79CreateCoverManual=true"></select></div></div>
   </div>
   <p id="adminCreateLeaveRecommendation" class="note" role="status" aria-live="polite">選擇請假人員後，系統將核對正式班表並推薦代班人員。</p>
-  <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">依日期分別安排代班（一位或兩位）</label><div id="adminCreateLeaveDailyRows" hidden></div>
+  <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79RenderDailyCreateCover()">每天獨立選請假人員與代班（簡易模式）</label><div id="adminCreateLeaveDailyRows" hidden></div>
   <div class="field"><label for="adminCreateLeaveReason">事由／備註</label><textarea id="adminCreateLeaveReason" rows="2"></textarea></div>
   <p class="note">若是補登請假、排班表已安排代班或已申報加班，請勾選「只補登請假」；系統不新增代班、也不改動原有班表。一位代8小時；兩位各代4小時。</p>
   <p id="adminCreateLeaveMessage" role="status"></p>
@@ -1800,7 +1800,7 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
  if(!Array.isArray(cloud?.leaveCoverAssignments)||!Array.isArray(cloud?.schedules))throw Error('雲端未提供完整代班與排班資料，暫不變更待核對清單');
  const norm=v=>String(v||'').trim().toUpperCase(),date=String(e?.date||'');
  if(date.length!==10||date[4]!=='-'||date[7]!=='-'||!norm(e.empId)||!norm(e.forEmpId))return 'invalid';
- const validCover=cloud.leaveCoverAssignments.some(c=>String(c.leaveId)===String(h.id)&&(!c.leaveEmpId||norm(c.leaveEmpId)===norm(e.forEmpId))&&Array.isArray(c.workerIds)&&c.workerIds.some(id=>norm(id)===norm(e.empId))&&normalizeLeaveFilterDate(c.startDate)<=date&&normalizeLeaveFilterDate(c.endDate)>=date);
+ const validCover=cloud.leaveCoverAssignments.some(c=>String(c.leaveId)===String(e.leaveId||h.id)&&(!c.leaveEmpId||norm(c.leaveEmpId)===norm(e.forEmpId))&&Array.isArray(c.workerIds)&&c.workerIds.some(id=>norm(id)===norm(e.empId))&&normalizeLeaveFilterDate(c.startDate)<=date&&normalizeLeaveFilterDate(c.endDate)>=date);
  if(!validCover)return 'cancelled';
  const row=cloud.schedules.find(r=>norm(r.empId)===norm(e.empId));
  if(!row)return 'unverified';
@@ -1823,7 +1823,7 @@ async function p79ReconcileLeaveHandoff(){
    const hasEmployee=d=>(d?.schedules||[]).some(r=>String(r.empId).trim().toUpperCase()===String(e.empId).trim().toUpperCase());
    if(!data||!hasEmployee(data)){
     const token=leaveRequestToken();
-    data=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+    data=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(e.leaveId||h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
     if(!data?.ok)throw Error(data?.error||'雲端資料讀取失敗');
     contextByMonth.set(month,data);
    }
@@ -1832,7 +1832,7 @@ async function p79ReconcileLeaveHandoff(){
    if(state==='pending'){
     remaining.push(e);
     // Reuse this exact verified employee/day context for the next handoff.
-    if(remaining.length===1)p79LeaveHandoffContext={...data,leaveId:h.id,
+    if(remaining.length===1)p79LeaveHandoffContext={...data,leaveId:e.leaveId||h.id,
      month,date:e.date,employeeId:String(e.empId),at:Date.now()};
     // Verify the next filing before opening; retain later entries for their own turn.
     // A slow/offline later month must not block this verified employee/day.
@@ -1867,22 +1867,22 @@ async function p79OpenLeaveOvertimeHandoff(){
   if(!loading.isConnected)return;
   if(!h?.entries?.length){loading.close();setStatus('✅ 已安排或已申報的代班資料已核對，不再重複提醒','success');return;}
   const e=h.entries[0],token=leaveRequestToken(),cached=p79LeaveHandoffContext;
-  const canUse=cached&&String(cached.leaveId)===String(h.id)&&
+  const canUse=cached&&String(cached.leaveId)===String(e.leaveId||h.id)&&
    cached.month===e.date.slice(0,7)&&cached.date===e.date&&
    String(cached.employeeId||'').toUpperCase()===String(e.empId).toUpperCase()&&
    Date.now()-cached.at<30000&&(cached.schedules||[]).some(row=>String(row.empId).toUpperCase()===String(e.empId).toUpperCase());
-  const data=canUse?cached:await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
+  const data=canUse?cached:await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(e.leaveId||h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
   if(!loading.isConnected)return;
   if(!data?.ok)throw Error(data?.error||'無法核對代班班表');
   if(p79LeaveHandoffEntryState(h,e,data,true)!=='pending'){loading.close();await p79ReconcileLeaveHandoff();return;}
-  p79LeaveHandoffContext={...data,leaveId:h.id,month:e.date.slice(0,7),
+  p79LeaveHandoffContext={...data,leaveId:e.leaveId||h.id,month:e.date.slice(0,7),
    date:e.date,employeeId:String(e.empId),at:canUse?cached.at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
   const period=P79Overtime.resolveLeaveCoverReport(data,h,e);
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
-  await P79Overtime.openReport({...e,...period,verifiedOvertimeRules,preferredType:e.preferredType||h.preferredType||'',category:'代',leaveHandoffId:h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
+  await P79Overtime.openReport({...e,...period,verifiedOvertimeRules,preferredType:e.preferredType||h.preferredType||'',category:'代',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
   $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+'，儲存成功後接續下一筆。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
@@ -1903,6 +1903,16 @@ window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79Reconc
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
+<style id="p79-leave-simple-daily-style">
+#adminCreateLeaveDialog .p79-simple-day{border:1px solid #dbe3ee;border-radius:12px;padding:12px;margin:8px 0;display:grid;gap:8px}
+#adminCreateLeaveDialog .p79-simple-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#adminCreateLeaveDialog .p79-simple-second{display:flex;align-items:end;gap:8px;flex-wrap:wrap}
+#adminCreateLeaveDialog .p79-simple-second>div{flex:1;min-width:180px}
+#adminCreateLeaveDialog .p79-simple-day small{color:#64748b}
+#adminCreateLeaveDialog .p79-simple-add{justify-self:start;font-size:12px}
+@media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
+</style>
+<script src="../assets/port79-leave-daily-simple.js?v=20261104-daily-independent-v1"></script>
 </body>
 </html>
 
