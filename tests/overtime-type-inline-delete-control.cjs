@@ -19,7 +19,7 @@ assert(source.includes('[ARCHIVED_CONFIG]:archiveKeys'),'history is retained wit
 assert.equal(api.typeOptions({},api.defaults()).length,0,'no automatic type list');
 assert(source.includes('class="p79-ot-type-manager"'),'compact two-column manager renders');
 assert(source.includes('id="p79OvertimeTypeList"'),'type list remains available');
-assert(source.includes('<details id="p79RoleTypeDefaultsPanel"'),'job title mapping collapses by default');
+assert(source.includes('<section id="p79RoleTypeDefaultsPanel"'),'role mapping is always visible without click-to-expand');
 assert(source.includes('p79-ot-table-help'),'period table gets compact heading');
 assert(source.includes('#p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 200px!important'),'rule table owns remaining dialog height');
 assert(source.includes('#p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:72px'),'type list has bounded height');
