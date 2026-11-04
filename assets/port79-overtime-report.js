@@ -64,6 +64,12 @@
   const allowed=new Set(typeOptions(config).map(t=>t.name)),archived=new Set(config?.[ARCHIVED_CONFIG]||[]);
   return validate(rows).filter(row=>allowed.has(ruleType(row))&&!archived.has(ruleKey(row)));
  }
+ function managerVisibleRules(rows,config={}){
+  const hidden=config?.[HIDDEN_MANAGER_RULES]||[];
+  if(!Array.isArray(hidden))throw Error('加班管理刪除清單格式錯誤');
+  const keys=new Set(hidden);
+  return validate(rows).filter(row=>!keys.has(ruleKey(row)));
+ }
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const hour=x=>{const m=String(x).match(/^(\d{2})(?::(\d{2}))?$/);if(!m)return NaN;const h=Number(m[1]),n=Number(m[2]||0);return h<=24&&n<60&&(h!==24||n===0)?h*60+n:NaN};
  const span=(a,b)=>{const x=hour(a),y=hour(b);return Number.isFinite(x)&&Number.isFinite(y)&&x%1440!==y%1440?(y-x+1440)%1440:NaN};
@@ -559,7 +565,7 @@
   const field=(i,label,number=false)=>'<input data-col="'+i+'" aria-label="'+esc(label)+'" value="'+esc(v[i])+'" '+(number?'type="number" min="0" step="0.01"':'type="text"')+'>';
   const category='<select data-col="0" aria-label="加班假別">'+types.map(t=>'<option value="'+t+'" '+(t===v[0]?'selected':'')+'>'+esc(typeLabel[t])+'</option>').join('')+'</select>';
   const position='<select data-col="8" aria-label="加班位置">'+[['full','全段'],['after','班後'],['before','班前']].map(([value,label])=>'<option value="'+value+'" '+(v[8]===value?'selected':'')+'>'+label+'</option>').join('')+'</select>';
-  return '<tr data-ot-active="true" data-ot-key="'+esc(ruleKey(row))+'" data-ot-category="'+esc(v[0])+'">'+
+  return '<tr data-ot-active="true" data-ot-key="'+esc(ruleKey(row))+'" data-ot-legacy-builtin="'+(row.length===9?'1':'0')+'" data-ot-original-category="'+esc(row[0])+'" data-ot-category="'+esc(v[0])+'">'+
    '<td>'+category+'</td><td>'+field(1,'出勤時段')+'</td><td>'+field(2,'實際加班時數',true)+'</td><td>'+field(3,'換算時數',true)+'</td>'+
    '<td>'+field(4,'正常起')+'</td><td>'+field(5,'正常迄')+'</td><td>'+field(6,'加班起')+'</td><td>'+field(7,'加班迄')+'</td>'+
    '<td>'+position+'</td><td>'+field(9,'加班類型名稱')+'</td>'+
@@ -571,9 +577,9 @@
   try{
    const cached=global.p79OvertimeContext?.config?.();
    let removedBuiltinNames=deletedBuiltins(cached||{});
-   let rows=activeSupportPeriods(activeReportRules(),cached||{}).rows;
+   let rows=cached&&Object.prototype.hasOwnProperty.call(cached,CONFIG)?managerVisibleRules(normalizeStored(cached[CONFIG]),cached):[];
    let allCloudRows=reportRules();
-   let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedTypeDraft='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
+   let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedTypeDraft='',loadedDeleted='',loadedArchived='',loadedHidden='',cloudReady=false,reading=false,saving=false;
    let roleTypeDefaults=normalizeRoleTypeDefaults(cached||{}),loadedRoleDefaults='';
    el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">加班出勤時段與換算表 <span id="p79OtRuleCount" style="font-size:11px;font-weight:400;color:#64748b">（雲端時段均可編輯與刪除；修改後按儲存）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend',
@@ -588,34 +594,19 @@
       '<div id="p79OvertimeTypeList" role="list" aria-label="加班類型清單"><div id="p79AddedTypeList"></div></div></div>'+
      '<p id="p79AddedTypeMessage" role="status" aria-live="polite">輸入自訂名稱並選擇實際適用的假別，儲存後才會變更雲端。</p>'+
     '</div>');
-   // Unified display: active rows are editable, archived rows remain read-only.
-   // Archived rows never have data-col fields and cannot be included in saves.
+   // Show all cloud periods as real editable rows. Preserve raw legacy
+   // builtin identity so a label does not create a duplicate new rule.
    const body=el.querySelector('#p79OtRuleRows');
-   const getRows=()=>[...body.querySelectorAll('tr[data-ot-active="true"]')].map(tr=>
-    Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??''));
-   const refreshRuleCount=()=>{
-    const current=body.querySelectorAll('tr[data-ot-active="true"]').length;
-    const historic=body.querySelectorAll('tr[data-ot-active="false"]').length;
-    el.querySelector('#p79OtRuleCount').textContent='使用中 '+current+' 筆｜歷史保留 '+historic+' 筆（唯讀）';
+   const readEditorRow=tr=>{
+    const row=Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??'');
+    if(tr.dataset.otLegacyBuiltin==='1'&&row[0]===tr.dataset.otOriginalCategory&&row[9]===typeLabel[row[0]])row.pop();
+    return row;
    };
-   function renderArchivedRows(source,config){
-    body.querySelectorAll('tr[data-ot-active="false"]').forEach(tr=>tr.remove());
-    const active=new Set(activeReportRows(source,config).map(ruleKey));
-    const historical=validate(source).filter(row=>!active.has(ruleKey(row)));
-    for(const row of historical){
-     const tr=document.createElement('tr');tr.setAttribute('data-ot-active','false');
-     tr.className='p79-ot-historical';
-     const cells=[ruleType(row),row[1],row[2],row[3]===''?'—':row[3],
-      row[0]==='延'?row[4]+'～'+row[5]:'—',
-      row[6]+'～'+row[7],positionLabels[row[8]]||row[8],
-      '歷史保留','唯讀'];
-     for(const value of cells){const td=document.createElement('td');td.textContent=String(value);tr.append(td);}
-     tr.children[7].className='p79-ot-historical-label';
-     body.append(tr);
-    }
-    refreshRuleCount();
-    return historical.length;
-   }
+   const getRows=()=>[...body.querySelectorAll('tr[data-ot-active="true"]')].map(readEditorRow);
+   const refreshRuleCount=()=>{
+    const count=body.querySelectorAll('tr[data-ot-active="true"]').length;
+    el.querySelector('#p79OtRuleCount').textContent='雲端出勤時段 '+count+' 筆｜可直接修改與刪除，按最下方儲存後生效';
+   };
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');if(!list)return;
     list.replaceChildren();
