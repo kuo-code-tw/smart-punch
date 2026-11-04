@@ -23,14 +23,22 @@ assert(source.includes('JSON.stringify(normalizeRoleTypeDefaults(check.config))!
  'cloud readback must verify role mapping persistence');
 assert(source.includes('JSON.stringify(normalizeRoleTypeDefaults(fresh.config))!==loadedRoleDefaults'),
  'concurrent administrator edits must be guarded');
-assert(source.includes("roleSelect.onchange=()=>{refreshPairPeople();preview();suggestBySelectedRole();"),
+assert(source.includes("roleSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;refreshPairPeople();preview();suggestBySelectedRole();"),
  'employee role selection suggests configured type');
-assert(source.includes("empSelect.onchange=()=>{refresh();suggestBySelectedRole();"),
+assert(source.includes("empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;"),
  'employee change suggests configured type');
 assert(source.includes("refresh();select.selectedIndex=-1;select.value='';preview();"),
  'role recommendation may never choose overtime period/hours automatically');
-assert(source.includes('prefill.lockOriginal||prefill.manualPlan||prefill.forEmpId'),
- 'manual or leave cover plan must not be overwritten by role default');
+assert(source.includes('prefill.preferredType||prefill.lockOriginal||(prefill.attendance&&prefill.code)'),
+ 'saved reports and verified attendance must not be overwritten by role default');
+assert(source.includes('!prefill.preferredType&&!rolePreset'),
+ 'official roster must not silently overwrite configured job title type');
+assert(source.includes('const selectedRow=()=>')&&source.includes("select.value!==''&&select.selectedIndex>=0"),
+ 'empty period selector cannot be interpreted as index zero');
+assert(source.includes('.filter(({row})=>matches(row));'),
+ 'saved periods remain visible even when the formal roster disagrees');
+assert(source.includes("if(!chosen)throw Error('請先選擇正確出勤時段"),
+ 'submissions require explicit actual selected period');
 assert(source.includes("const actualRosterShift=await officialOvertimeRosterShift(empId,date);"),
  'official roster still blocks false rest-day declarations');
 new vm.Script(source);
