@@ -98,7 +98,7 @@ async function saveDaily(){
   $id('adminCreateLeaveDialog').close();
   setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；加班另列待核對，不會自動認定已出勤或已申報','success');
   if(entries.length){
-   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:entries[0].leaveId,createdAt:Date.now(),entries,preferredType:$id('adminCreateLeaveOvertimeType')?.value||''}));
+   sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:entries[0].leaveId,createdAt:Date.now(),entries}));
    // 請假與代班先完成，僅建立待核對清單；不強制跳入加班表單。
    p79ActivateLeaveHandoff();
    p79UpdateLeaveHandoffBanner();
