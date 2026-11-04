@@ -44,5 +44,23 @@ function fixture(report=null,covers=true,rows=true){
  t=fixture(null,true,false);t.put();t.context.p79ActivateLeaveHandoff();
  await assert.rejects(t.context.p79ReconcileLeaveHandoff(),/班表/);
  assert.equal(t.read().entries.length,1,'missing employee schedule must not be treated as completed');
+ // A slow later employee/month must not delay the first verified filing.
+ t=fixture();
+ const later={...t.entry,empId:'SECOND',date:'2026-11-01'};
+ t.put([t.entry,later]);t.context.p79ActivateLeaveHandoff();
+ const fetchFirst=t.context.jsonFetch;
+ t.context.jsonFetch=async url=>{
+  if(url.includes('empId=SECOND'))throw Error('later month offline');
+  return fetchFirst(url);
+ };
+ await t.context.p79OpenLeaveOvertimeHandoff();
+ assert.equal(t.calls.open,1,'first verified filing opens without fetching later entries');
+ assert.equal(t.calls.fetch,1,'one context read is reused by the filing dialog');
+ assert.equal(t.read().entries.length,2,'unverified later entries must remain queued');
+ // Once the first filing is saved, the later error must preserve the whole queue.
+ const firstData=await fetchFirst();
+ firstData.schedules[0].schedule.__meta['2026-10-20']={overtimeReport:{id:'SAVED'}};
+ await assert.rejects(t.context.p79ReconcileLeaveHandoff(),/later month offline/);
+ assert.equal(t.read().entries.length,2,'partial reconciliation cannot drop entries on error');
  console.log('PASS leave cover handoff: existing arrangements, filed overtime, new submission, original date, cancelled covers, offline safeguards');
 })().catch(e=>{console.error(e);process.exit(1)});

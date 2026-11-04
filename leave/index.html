@@ -1817,7 +1817,7 @@ async function p79ReconcileLeaveHandoff(){
   if(!adminSession||!p79CanReportOvertime()||!leaveRequestToken())return h;
   const active=p79CurrentHandoff===String(h.id)+'|'+h.createdAt;
   const contextByMonth=new Map(),remaining=[];
-  for(const e of h.entries){
+  for(const [entryIndex,e] of h.entries.entries()){
    const month=String(e.date||'').slice(0,7);
    let data=contextByMonth.get(month);
    const hasEmployee=d=>(d?.schedules||[]).some(r=>String(r.empId).trim().toUpperCase()===String(e.empId).trim().toUpperCase());
@@ -1834,6 +1834,10 @@ async function p79ReconcileLeaveHandoff(){
     // Reuse this exact verified employee/day context for the next handoff.
     if(remaining.length===1)p79LeaveHandoffContext={...data,leaveId:h.id,
      month,date:e.date,employeeId:String(e.empId),at:Date.now()};
+    // Verify the next filing before opening; retain later entries for their own turn.
+    // A slow/offline later month must not block this verified employee/day.
+    remaining.push(...h.entries.slice(entryIndex+1));
+    break;
    }
   }
   const current=p79GetLeaveHandoff();
