@@ -18,11 +18,15 @@ assert(!source.includes("esc(typeLabel[c])+'類別</option>'"),
 assert(source.includes("categoryPicker.style.display=hasName?'':'none'"),
  'typing a NEW type is required before the computation basis appears');
 assert(source.includes("if(!types.includes(category))"),'new type needs an explicit computation basis');
-assert(source.includes('id="p79OtArchivedRules"'),'retained historical periods must be discoverable');
+assert(source.includes('function renderArchivedRows(source,config)'),'historical cloud periods must render into the main table');
 assert(source.includes('const archivedCount=renderArchivedRows(loaded.rows,loaded.config)'),
  'cloud reload must display preserved historical records even with no active types');
-assert(source.includes("line.textContent=ruleType(row)+'｜'+row[1]+'｜實際 '+row[2]"),
- 'read-only historical list shows actual and converted original hours');
+assert(source.includes("const cells=[ruleType(row),row[1],row[2],row[3]===''?'—':row[3]"),
+ 'original actual and conversion values are visible in the unified table');
+assert(source.includes("tr.setAttribute('data-ot-active','false')"),
+ 'historical rows are labeled read only');
+assert(source.includes("body.querySelectorAll('tr[data-ot-active=\"true\"]')"),
+ 'only editable active rows go into the save payload');
 assert(source.includes("loadedVisibleRows==='[]'&&loadedTypes==='[]'"),
  'blank unchanged settings must not overwrite stored history');
 assert(!source.includes('p79OtBuiltinDelete'),'never expose a fake builtin delete or restore action');
