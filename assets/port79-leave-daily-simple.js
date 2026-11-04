@@ -20,17 +20,26 @@ function redraw(){
  if(root.hidden)return;
  const people=leaveCreatePeople();
  root.innerHTML=days().map(date=>{
-  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',first:'',second:'',secondVisible:false});
+  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:''});
   const row=rows.get(date),leave=people.find(p=>String(p.empId)===String(row.applicant));
   const available=leave?people.filter(p=>String(p.empId)!==String(leave.empId)&&String(p.dept||'').trim()===String(leave.dept||'').trim()):[];
   if(!available.some(p=>String(p.empId)===row.first))row.first='';
   if(!available.some(p=>String(p.empId)===row.second&&row.second!==row.first))row.second='';
-  const field=(key,label,choices,placeholder)=>'<div><label>'+label+'</label><select data-date="'+date+'" data-field="'+key+'">'+personOptions(choices,row[key],placeholder)+'</select></div>';
+  const field=(key,label,choices,placeholder)=>{
+   const jobKey=key+'Job',allJobs=[...new Set(choices.map(leavePersonJob))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+   const chosenJob=String(row[jobKey]||'');
+   const matched=choices.filter(p=>!chosenJob||leavePersonJob(p)===chosenJob);
+   const jobOptions='<option value="">全部職稱</option>'+allJobs.map(job=>'<option value="'+safe(job)+'"'+(job===chosenJob?' selected':'')+'>'+safe(job)+'</option>').join('');
+   return '<div class="p79-daily-person"><label>'+label+'職稱</label><select data-date="'+date+'" data-field="'+jobKey+'">'+jobOptions+'</select><label>'+label+'姓名</label><select data-date="'+date+'" data-field="'+key+'">'+personOptions(matched,row[key],placeholder)+'</select></div>';
+  };
   return '<section class="p79-simple-day"><strong>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</strong><div class="p79-simple-grid">'+field('applicant','請假人員',people,'請選擇請假人員')+field('first','第一位代班',available,leave?'請選擇代班人員':'請先選請假人員')+'</div>'+(row.secondVisible?'<div class="p79-simple-second">'+field('second','第二位代班（選填）',available.filter(p=>String(p.empId)!==row.first),'不安排第二位')+'<button type="button" class="btn btn-sec" data-remove="'+date+'">移除</button></div>':'<button type="button" class="btn btn-sec p79-simple-add" data-add="'+date+'">＋ 第二位代班</button>')+'<small>'+(row.second?'兩位各代4小時':'一位代8小時')+'</small></section>';
  }).join('')||'<p>請選擇有效日期，最多62天。</p>';
  root.querySelectorAll('select[data-date]').forEach(el=>el.onchange=()=>{
   const row=rows.get(el.dataset.date);row[el.dataset.field]=el.value;
-  if(el.dataset.field==='applicant'){row.first='';row.second='';}
+  if(el.dataset.field==='applicant'){row.first='';row.second='';row.firstJob='';row.secondJob='';}
+  if(el.dataset.field==='applicantJob'){row.applicant='';row.first='';row.second='';row.firstJob='';row.secondJob='';}
+  if(el.dataset.field==='firstJob')row.first='';
+  if(el.dataset.field==='secondJob')row.second='';
   if(el.dataset.field==='first'&&row.second===row.first)row.second='';
   redraw();
  });
@@ -38,7 +47,6 @@ function redraw(){
  root.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{const row=rows.get(el.dataset.remove);row.secondVisible=false;row.second='';redraw();});
 }
 window.p79RenderDailyCreateCover=redraw;
-document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
 document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
 window.openAdminCreateLeave=async function(...args){
  rows.clear();
