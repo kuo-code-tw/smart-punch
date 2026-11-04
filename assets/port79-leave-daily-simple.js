@@ -39,6 +39,7 @@ function redraw(){
 }
 window.p79RenderDailyCreateCover=redraw;
 document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
+document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
 window.openAdminCreateLeave=async function(...args){
  rows.clear();
  await originalOpen(...args);
