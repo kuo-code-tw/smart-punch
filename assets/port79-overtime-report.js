@@ -955,8 +955,9 @@
  function advanceLeaveHandoff(draft){
   if(!draft.leaveHandoffId)return null;
   const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');
-  if(!handoff||String(handoff.id)!==String(draft.leaveHandoffId)||!Array.isArray(handoff.entries))return null;
-  const index=handoff.entries.findIndex(e=>String(e.empId)===String(draft.empId)&&e.date===draft.date&&String(e.forEmpId||'')===String(draft.forEmpId||''));
+  if(!handoff||!Array.isArray(handoff.entries))return null;
+  // 每天每位代班員工各有請假關聯 ID，不能只與佇列第一筆比對。
+  const index=handoff.entries.findIndex(e=>String(e.leaveId||handoff.id)===String(draft.leaveHandoffId)&&String(e.empId)===String(draft.empId)&&e.date===draft.date&&String(e.forEmpId||'')===String(draft.forEmpId||''));
   if(index<0)return null;
   handoff.entries.splice(index,1);
   if(handoff.entries.length)sessionStorage.setItem(key,JSON.stringify(handoff));else sessionStorage.removeItem(key);
