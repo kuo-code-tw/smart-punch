@@ -996,6 +996,10 @@
    }
    async function refreshOfficialRosterHint(){
     const epoch=++rosterHintEpoch;
+    if(!typeOptions(dialogRuleConfig(),rows).length){
+     rosterHint.textContent='雲端尚未建立加班類型；請先在「加班選項管理」自行新增類型與出勤時段，班表不會自動建立加班。';
+     return;
+    }
     const date=String(dateInput.value||''),empId=String(empSelect.value||'');
     if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!empId){
      rosterHint.textContent='選擇人員及日期後，自動核對正式班別；排班不等於加班時數。';
@@ -1057,15 +1061,15 @@
     const choices=rows.map((row,index)=>({row,index}))
       .filter(({row})=>matches(row));
     // Display existing cloud periods even if roster cannot verify them.
-    const hint=choices.length?'請選擇實際加班時段':'目前沒有符合班別的加班時段';
+    const hint=choices.length?'請選擇實際加班時段':!typeOptions(dialogRuleConfig(),rows).length?'請先新增加班類型及出勤時段':!kind.value?'請先選擇加班類型':'此類型尚未設定出勤時段';
     select.innerHTML='<option value="">'+hint+'</option>'+
       choices.map(({row,index})=>'<option data-ot-category="'+row[0]+'" value="'+index+'">'+
        esc(displayPeriodCode(row))+'</option>').join('');
     select.value=previous!==''&&choices.some(item=>String(item.index)===previous)?previous:'';
     preview();
    };
-   function preview(){const r=selectedRow();const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'雲端尚未設定這類加班規則');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
-   const refreshTypes=()=>{const previous=kind.value,options=typeOptions(dialogRuleConfig(),rows);kind.innerHTML=options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
+   function preview(){const r=selectedRow();const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型，請先按「＋新增／管理加班類型與時段」新增類型及時段':!kind.value?'請先選擇加班類型':rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'此加班類型尚未建立出勤時段，請先到加班選項管理新增');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
+   const refreshTypes=()=>{const previous=kind.value,options=typeOptions(dialogRuleConfig(),rows);kind.innerHTML=(options.length?'':'<option value="">尚未新增任何加班類型</option>')+options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    function syncApprovedLeaveDate(){
     const forId=String(forSelect.value||'');
     approvedDates=approvedLeaveDateChoices(leaveRecords,forId);
@@ -1140,7 +1144,7 @@
    leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
    empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
    dateInput.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
-   refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
+   refreshTypes();el.querySelector('#p79OtStatus').textContent=typeOptions(dialogRuleConfig(),rows).length?'請選擇員工、日期與出勤時段。':'雲端目前沒有可用的加班類型。請按下方「＋新增／管理加班類型與時段」，先新增類型，再設定出勤時段。';
    if(prefill.empId||prefill.forEmpId){
     el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
     if(prefill.forEmpId)forSelect.value=String(prefill.forEmpId);
@@ -1184,7 +1188,7 @@
     roleSelect.disabled=true;
     el.querySelector('#p79OtStatus').textContent=prefill.plannedReview===true?'原預排已有打卡，請確認實際工作、休息時間及原申報時段；送出後沿用原申報 ID，不建立第二筆。':'修改原正式申報：保留員工與日期，請選擇正確時段或修改備註後儲存。';
    }
-   el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／儲存加班選項</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
+   el.insertAdjacentHTML('beforeend',' <button id="p79OtManageOptions" type="button" style="margin-left:10px;padding:10px;border:1px solid #0369a1;border-radius:8px">＋新增／管理加班類型與時段</button>');el.querySelector('#p79OtManageOptions').onclick=openRules;el.querySelector('#p79OtManageOptions').style.display=global.p79OvertimeContext?.canEditRules?.()?'inline-block':'none';
    function applyReportRows(nextRows){
     const previous=selectedRow();
     rows=specialRows(reportRowsForDialog(nextRows),dialogRuleConfig(),extra);refreshTypes();suggestBySelectedRole();
@@ -1197,10 +1201,10 @@
    }
    const optionsSaved=()=>{if(el.isConnected)applyReportRows(reportRules());};
    el.insertAdjacentHTML('beforeend','<button id="p79OtReloadOptions" type="button">更新雲端時段選項</button>');
-   el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent='已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
+   el.querySelector('#p79OtReloadOptions').onclick=async()=>{const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;button.disabled=true;try{const loaded=await loadRules();Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型；請先到加班選項管理新增類型及出勤時段。':!rows.length?'已讀到加班類型，但還沒有可用的出勤時段；請先設定時段。':'已更新 '+rows.length+' 個出勤時段選項。';}catch(error){el.querySelector('#p79OtStatus').textContent='選項更新失敗：'+error.message;}finally{button.disabled=false}};
    // Render cached options immediately; reconcile missing legacy labels with authoritative cloud rows.
    if(prefill.code&&findPrefill(prefill.code,prefill.category)<0){
-    loadRules().then(loaded=>{if(!el.isConnected)return;Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=selectedRow()?'已從雲端更新並帶入出勤時段。':'已更新雲端選項；請選擇符合的出勤時段。';}).catch(error=>{if(el.isConnected)el.querySelector('#p79OtStatus').textContent='雲端時段更新失敗：'+error.message+'；可按更新雲端時段選項重試。';});
+    loadRules().then(loaded=>{if(!el.isConnected)return;Object.assign(global.p79OvertimeContext.config(),loaded.config);global.p79OvertimeContext.persistConfig?.();applyReportRows(loaded.rows);el.querySelector('#p79OtStatus').textContent=selectedRow()?'已從雲端更新並帶入出勤時段。':(!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型；請按「＋新增／管理加班類型與時段」自行新增類型及出勤時段。':'已更新雲端選項；請選擇符合的出勤時段。');}).catch(error=>{if(el.isConnected)el.querySelector('#p79OtStatus').textContent='雲端時段更新失敗：'+error.message+'；可按更新雲端時段選項重試。';});
    }
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
