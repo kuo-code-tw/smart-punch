@@ -2001,13 +2001,18 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 #adminCreateLeaveDialog .p79-day-applicant>span strong{font-weight:700}
 #adminCreateLeaveDialog .p79-day-applicant-switch{padding:5px 9px!important;min-height:30px!important;background:white!important;border:1px solid #bfdbfe!important;color:#1d4ed8!important;font-size:12px!important}
 #adminCreateLeaveDialog .p79-day-applicant-override{background:#f0fdfa;border:1px solid #99f6e4;padding:10px;border-radius:8px}
+#adminCreateLeaveDialog .p79-worker-overtime{display:grid;gap:5px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:9px 10px;margin-top:7px;min-width:0}
+#adminCreateLeaveDialog .p79-worker-overtime label{color:#9a3412!important;font-weight:700}
+#adminCreateLeaveDialog .p79-worker-overtime select{background:#fff!important;border-color:#fdba74!important}
+#adminCreateLeaveDialog .p79-worker-overtime small{font-size:11px!important;color:#9a3412!important;line-height:1.45}
+#adminCreateLeaveDialog .p79-simple-second .p79-worker-overtime{flex:1 1 100%}
 #adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:minmax(0,1fr)}
 #adminCreateLeaveDialog .p79-simple-day .p79-daily-person{display:grid;grid-template-columns:1fr;gap:3px;min-width:0}
 #adminCreateLeaveDialog .p79-simple-day .p79-daily-person>label{color:#334155!important;font-size:12px!important}
 #adminCreateLeaveDialog .p79-simple-add{justify-self:start;font-size:12px}
 @media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
 </style>
-<script src="../assets/port79-leave-daily-simple.js?v=20261104-confirmed-day-queue-v1"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261104-per-worker-overtime-v2"></script>
 </body>
 </html>
 
