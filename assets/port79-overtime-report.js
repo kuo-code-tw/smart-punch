@@ -436,6 +436,47 @@
    #p79OvertimeOptionsDialog th:nth-child(10){width:13%}
    #p79OvertimeOptionsDialog th:last-child{width:6%}
    #p79OvertimeOptionsDialog td input,#p79OvertimeOptionsDialog td select{width:100%!important;padding:7px 3px!important}
+   /* Compact overtime options manager; maximize space for actual period rows. */
+   #p79OvertimeOptionsDialog{height:min(90dvh,840px)!important;max-height:calc(100dvh - 20px)!important;padding:10px 14px!important;gap:5px!important}
+   #p79OvertimeOptionsDialog .p79-ot-dialog-header{min-height:28px}
+   #p79OvertimeOptionsDialog .p79-ot-dialog-header h2{font-size:16px}
+   #p79OvertimeOptionsDialog #p79OtStatus{margin:0!important;min-height:17px;font-size:12px;line-height:1.35}
+   #p79OvertimeOptionsDialog .p79-ot-type-manager{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:6px 12px;align-items:start;background:#f0f9ff;border:1px solid #dbeafe;border-radius:8px;padding:8px 10px;margin:0;flex-shrink:0}
+   #p79OvertimeOptionsDialog .p79-ot-section-title{display:block;font-size:12px;font-weight:700;margin:0;text-align:left}
+   #p79OvertimeOptionsDialog .p79-ot-new-type-controls{display:flex;flex-wrap:nowrap;gap:5px;margin-top:6px!important;justify-content:flex-start}
+   #p79OvertimeOptionsDialog #p79NewTypeName{flex:1 1 155px;width:0!important;min-width:75px!important;height:32px;padding:5px 6px!important}
+   #p79OvertimeOptionsDialog #p79NewTypeCategory{flex:0 1 155px;width:155px!important;min-width:106px!important;height:32px;padding:5px 4px!important}
+   #p79OvertimeOptionsDialog #p79AddType{flex:0 0 auto;white-space:nowrap!important;height:32px;padding:5px 10px!important;font-size:12px}
+   #p79OvertimeOptionsDialog .p79-ot-type-list-wrap{min-width:0}
+   #p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:72px;min-height:37px;overflow:auto;margin-top:6px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:4px}
+   #p79OvertimeOptionsDialog #p79AddedTypeList{display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px}
+   #p79OvertimeOptionsDialog #p79AddedTypeList>div[role="listitem"]{min-height:28px!important;padding:2px 5px!important}
+   #p79OvertimeOptionsDialog #p79AddedTypeList .p79OtDeleteType{padding:3px 6px!important;font-size:11px}
+   #p79OvertimeOptionsDialog #p79AddedTypeMessage{grid-column:1/-1;margin:0!important;text-align:left!important;font-size:11px;line-height:1.35;min-height:0}
+   #p79OvertimeOptionsDialog .p79-ot-table-help{margin:0!important;font-size:12px;font-weight:700;text-align:left!important;color:#334155}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel{margin:0!important;padding:0!important;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;flex-shrink:0}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel summary{cursor:pointer;text-align:left;font-size:12px;font-weight:700;padding:6px 10px;list-style-position:inside;user-select:none}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel[open]{padding-bottom:6px!important}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsRows{display:grid;gap:4px;grid-template-columns:repeat(2,minmax(0,1fr));max-height:190px;overflow:auto;margin:5px 10px}
+   #p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 200px!important;min-height:180px!important;max-height:none!important;overflow:auto}
+   #p79OvertimeOptionsDialog table{min-width:930px!important}
+   #p79OvertimeOptionsDialog th{padding:6px 4px!important;font-size:12px}
+   #p79OvertimeOptionsDialog td{padding:3px!important;font-size:12px}
+   #p79OvertimeOptionsDialog td input,#p79OvertimeOptionsDialog td select{padding:5px 3px!important;font-size:12px!important}
+   #p79OvertimeOptionsDialog .p79-ot-actions{flex-shrink:0;margin:0!important;padding:5px 0!important;gap:5px!important;border-top:1px solid #e2e8f0}
+   #p79OvertimeOptionsDialog .p79-ot-actions button{padding:7px 9px!important;font-size:12px;white-space:nowrap!important}
+   @media(max-width:760px){
+    #p79OvertimeOptionsDialog{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;padding:8px!important;height:calc(100dvh - 16px)!important}
+    #p79OvertimeOptionsDialog .p79-ot-type-manager{grid-template-columns:minmax(0,1fr);gap:5px;padding:7px}
+    #p79OvertimeOptionsDialog #p79NewTypeName{flex-basis:110px}
+    #p79OvertimeOptionsDialog #p79NewTypeCategory{flex-basis:110px;width:110px!important}
+    #p79OvertimeOptionsDialog #p79AddType{padding:4px 7px!important}
+    #p79OvertimeOptionsDialog #p79OvertimeTypeList{max-height:45px}
+    #p79OvertimeOptionsDialog #p79RoleTypeDefaultsRows{grid-template-columns:minmax(0,1fr)}
+    #p79OvertimeOptionsDialog .p79-ot-actions{flex-wrap:wrap;gap:4px!important}
+    #p79OvertimeOptionsDialog .p79-ot-actions button{font-size:11px;padding:5px 6px!important}
+    #p79OvertimeOptionsDialog .p79-ot-table-wrap{min-height:140px!important}
+   }
    @media(max-width:600px){.p79-overtime-dialog{padding:12px!important;width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 20px)!important}.p79-ot-dialog-header{padding:0 65px}.p79-ot-dialog-header h2{font-size:17px}.p79-ot-new-type-controls input,.p79-ot-new-type-controls select{width:100%!important}.p79-ot-actions button{padding:8px!important}}
   </style><div class="p79-ot-dialog-header"><h2>`+esc(title)+'</h2><button type="button" id="p79OtClose">✕ 關閉</button></div>'+content;
   // A manual preplan launched from the planned-review dialog must remain in
