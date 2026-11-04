@@ -890,7 +890,7 @@
     '<p id="p79OtRoleTypeHint" style="margin:4px 0;font-size:12px;color:#0369a1"></p>');
    const roleTypeHint=el.querySelector('#p79OtRoleTypeHint');
    const officialMonthReads=new Map();
-   let rosterHintEpoch=0,lastOfficialShift='',lastRosterDate='',lastRosterEmployee='',manuallySelectedType=false;
+   let rosterHintEpoch=0,lastOfficialShift='',lastRosterDate='',lastRosterEmployee='',manuallySelectedType=false,manuallySelectedPeriod=false;
    const isExplicitPeriod=()=>editingOriginal||!!(prefill.savedReport||prefill.code||
      prefill.leaveHandoffId||prefill.attendance||prefill.lockOriginal);
    function matchesOfficialRosterPeriod(row){
@@ -904,6 +904,53 @@
     }
     if(['休','國','例'].includes(lastOfficialShift)&&row[0]==='延')return false;
     return true;
+   }
+   // A future plan is never evidence of attendance. For completed dates,
+   // securely re-read this employee's actual cloud IN/OUT records; no new
+   // report is created and neither stored roster nor punches are modified.
+   async function officialPunchPeriodChoice(empId,date,shift){
+    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+    if(date>today)return null;
+    const {url,token}=auth(),endpoint=new URL(url);
+    for(const [key,value] of Object.entries({
+     action:'getOvertimeReportContext',month:date.slice(0,7),empId,date,
+     token,gcToken:token,_:String(Date.now())
+    }))endpoint.searchParams.set(key,value);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    let data;
+    try{
+     const response=await fetch(endpoint.toString(),{cache:'no-store',signal:controller.signal});
+     data=await response.json();
+     if(!response.ok||data?.ok!==true||!Array.isArray(data.records))return null;
+    }finally{clearTimeout(timer);}
+    const dateStart=Date.parse(date+'T00:00:00+08:00');
+    const canonTime=value=>{
+     let raw=String(value||'').trim().replace(/\\//g,'-').replace(' ','T');
+     if(!/^\\d{4}-\\d{2}-\\d{2}T\\d{1,2}:\\d{2}/.test(raw))return NaN;
+     if(!/[zZ]$|[+-]\\d{2}:?\\d{2}$/.test(raw))raw+='+08:00';
+     return Date.parse(raw);
+    };
+    const records=data.records.filter(row=>
+     String(row.empId||'').trim().toUpperCase()===String(empId).trim().toUpperCase())
+     .map(row=>({
+      time:canonTime(row.timeStr),
+      type:String(row.recordType||row.type||row.status||'').trim().toUpperCase()
+     })).filter(row=>Number.isFinite(row.time));
+    const isIn=row=>['IN','CLOCK_IN','上班','簽到'].includes(row.type);
+    const isOut=row=>['OUT','CLOCK_OUT','下班','簽退'].includes(row.type);
+    const starts=records.filter(row=>isIn(row)&&row.time>=dateStart&&row.time<dateStart+86400000);
+    if(starts.length!==1)return null;
+    const start=starts[0].time;
+    const ends=records.filter(row=>isOut(row)&&row.time>start&&row.time-start<=18*3600000);
+    if(ends.length!==1)return null;
+    const end=ends[0].time;
+    const matched=matchingReportPeriod(date,{[date]:shift},{start,end},rows,kind.value);
+    if(!matched)return null;
+    const candidates=rows.map((row,index)=>({row,index})).filter(({row})=>
+     matches(row)&&matchesOfficialRosterPeriod(row)&&
+     row[0]===matched[0]&&row[1]===matched[1]&&
+     row[6]===matched[6]&&row[7]===matched[7]);
+    return candidates.length===1?candidates[0]:null;
    }
    async function officialOvertimeRosterShift(empId,date){
     const {url,token}=auth(),month=date.slice(0,7),current=officialMonthReads.get(month);
@@ -967,6 +1014,16 @@
          (choices.length>1?' 已列出 '+choices.length+' 個可用時段，請依實際加班起迄選擇。':'');
       }
      }else rosterHint.textContent=officialOvertimeTypeHint(shift,category,rows.some(matches));
+     if(!isExplicitPeriod()&&!manuallySelectedPeriod){
+      try{
+       const attendanceMatch=await officialPunchPeriodChoice(empId,date,shift);
+       if(el.isConnected&&epoch===rosterHintEpoch&&!manuallySelectedPeriod&&attendanceMatch){
+        select.value=String(attendanceMatch.index);preview();
+        rosterHint.textContent='已依正式上下班打卡自動帶入 '+displayPeriodCode(attendanceMatch.row)+
+         '；請核對後再儲存，這不代表系統已自動核准加班。';
+       }
+      }catch(error){console.warn('正式打卡時段無法自動帶入，保留班表候選項目',error);}
+     }
     }catch(error){
      if(!el.isConnected||epoch!==rosterHintEpoch)return;
      rosterHint.textContent='正式班表暫時無法即時核對，請勿把未確認的班別當作加班時數。';
@@ -1053,11 +1110,11 @@
    }
    roleSelect.onchange=()=>{refreshPairPeople();preview();suggestBySelectedRole();void refreshOfficialRosterHint();};
    kind.onchange=()=>{manuallySelectedType=true;prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
-   select.onchange=preview;
+   select.onchange=()=>{manuallySelectedPeriod=true;preview();};
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
    leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
-   empSelect.onchange=()=>{lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
-   dateInput.onchange=()=>{lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
+   empSelect.onchange=()=>{manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
+   dateInput.onchange=()=>{manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent='請選擇員工、日期與出勤時段。';
    if(prefill.empId||prefill.forEmpId){
     el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
