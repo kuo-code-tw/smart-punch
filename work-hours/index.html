@@ -17260,7 +17260,10 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   if(savedRow){savedRow.schedule.__meta=savedRow.schedule.__meta||{};savedRow.schedule.__meta[draft.date]={...(savedRow.schedule.__meta[draft.date]||{}),overtimeReport:result.report,forEmpId:draft.forEmpId||''};}
   if(batch){batch.ready=result.revision!=null;batch.cloud={...cloud,revision:result.revision,schedules:p79WorkOvertimeMonths.get(month).rows};}
   try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month,empId:draft.empId,date:draft.date,at:Date.now()}));}catch(_){ }
-  p79OvertimeCalculationCache=null;if(!batch)renderOvertimeStats();return result;
+  // The cloud write is verified; rebuilding all statistics must not delay the save confirmation.
+  p79OvertimeCalculationCache=null;
+  if(!batch)setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('加班已儲存，統計畫面更新失敗',error);}},0);
+  return result;
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
 window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),approvedLeaves:()=>sanitizeLeaveRecords(leaveRecords),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
