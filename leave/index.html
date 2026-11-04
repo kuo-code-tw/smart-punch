@@ -1463,6 +1463,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <dialog id="adminCreateLeaveDialog">
  <div class="p79-create-heading"><h2>新增請假與代班安排</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
  <div class="p79-create-body">
+  <div class="p79-workflow-steps" aria-label="請假代班加班三階段">
+   <div class="p79-workflow-step p79-workflow-leave"><strong>① 請假與代班</strong><small>每天獨立選人</small></div>
+   <div class="p79-workflow-step p79-workflow-check"><strong>② 系統核對</strong><small>核對正式資料與衝突</small></div>
+   <div class="p79-workflow-step p79-workflow-overtime"><strong>③ 加班待申報</strong><small>儲存後再核對申報</small></div>
+  </div>
   <div class="p79-create-two">
    <div class="field"><label for="adminCreateLeaveOvertimeType">加班類型</label><select id="adminCreateLeaveOvertimeType"><option value="">依班表自動判斷</option></select></div>
    <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
@@ -1854,8 +1859,8 @@ async function p79ReconcileLeaveHandoff(){
 function p79UpdateLeaveHandoffBanner(){
  const banner=$('p79LeaveHandoffBanner');if(!banner)return;
  const h=p79GetLeaveHandoff(),count=h?.entries?.length||0;
- banner.hidden=!adminSession||!p79CanReportOvertime()||!count||!h.verifiedAt;
- if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對，可接續申報。';
+ banner.hidden=!adminSession||!p79CanReportOvertime()||!count;
+ if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對｜請先核對出勤時段，再逐筆完成申報。';
 }
 async function p79OpenLeaveOvertimeHandoff(){
  if(p79LeaveHandoffBusy)return;
@@ -1903,6 +1908,30 @@ window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79Reconc
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
+<style id="p79-leave-workflow-color-v1">
+/* 三階段色彩：藍色請假、青綠核對、橘色加班。低飽和配色維持表單易讀性。 */
+#adminCreateLeaveDialog{border:1px solid #cbd5e1!important;box-shadow:0 22px 80px #0f172a33!important}
+#adminCreateLeaveDialog .p79-create-heading{background:linear-gradient(110deg,#1d4ed8,#0f766e)!important;color:white!important}
+#adminCreateLeaveDialog .p79-create-heading h2{color:white!important}
+#adminCreateLeaveDialog .p79-create-heading .btn{background:#ffffff28!important;color:white!important;border:1px solid #ffffff60!important}
+#adminCreateLeaveDialog .p79-simple-day{background:#f8fbff!important;border-color:#bfdbfe!important;border-left:4px solid #2563eb!important}
+#adminCreateLeaveDialog .p79-simple-day strong{color:#1e40af!important}
+#adminCreateLeaveDialog .p79-daily-person label{color:#334155!important}
+#adminCreateLeaveDialog .p79-simple-add{background:#eff6ff!important;color:#1d4ed8!important;border:1px solid #93c5fd!important}
+#adminCreateLeaveDialog #adminCreateLeaveDailyToggle{color:#1d4ed8!important;font-weight:700}
+#adminCreateLeaveDialog #adminCreateLeaveSave{background:#0f766e!important;color:white!important}
+#adminCreateLeaveDialog #adminCreateLeaveSave:disabled{opacity:.65!important}
+#adminCreateLeaveDialog .p79-workflow-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:4px}
+#adminCreateLeaveDialog .p79-workflow-step{padding:10px;border-radius:10px;border:1px solid;display:grid;gap:3px}
+#adminCreateLeaveDialog .p79-workflow-step strong{font-size:12px}
+#adminCreateLeaveDialog .p79-workflow-step small{font-size:11px;line-height:1.35}
+#adminCreateLeaveDialog .p79-workflow-leave{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+#adminCreateLeaveDialog .p79-workflow-check{background:#ecfdf5;border-color:#99f6e4;color:#0f766e}
+#adminCreateLeaveDialog .p79-workflow-overtime{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
+html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!important;align-items:center;flex-wrap:wrap;gap:10px;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important}
+#p79LeaveHandoffBanner:not([hidden]) .btn{background:#c2410c!important;color:#fff!important;border:0!important}
+@media(max-width:520px){#adminCreateLeaveDialog .p79-workflow-steps{grid-template-columns:1fr}}
+</style>
 <style id="p79-leave-simple-daily-style">
 #adminCreateLeaveDialog #adminCreateLeaveApplicantWrap[hidden],#adminCreateLeaveDialog #adminCreateLeaveWorkers[hidden],#adminCreateLeaveDialog #adminCreateLeaveDailyRows[hidden],#adminCreateLeaveDialog #adminCreateLeaveRecommendation[hidden]{display:none!important}
 #adminCreateLeaveDialog .p79-simple-day{border:1px solid #dbe3ee;border-radius:12px;padding:12px;margin:8px 0;display:grid;gap:8px}
