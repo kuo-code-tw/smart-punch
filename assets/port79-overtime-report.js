@@ -1423,6 +1423,9 @@
    }
    const optionsSaved=()=>{if(el.isConnected)applyReportRows(reportRules());};
    el.insertAdjacentHTML('beforeend','<button id="p79OtReloadOptions" type="button">更新雲端時段選項</button>');
+   // The selector was first rendered before this button existed; refresh its
+   // label now without changing the selected overtime period.
+   refresh();
    el.querySelector('#p79OtReloadOptions').onclick=async()=>{
     const button=el.querySelector('#p79OtReloadOptions');if(button.disabled)return;
     const selectedType=String(kind.value||'');
