@@ -17320,7 +17320,7 @@ async function p79OpenLeaveOvertimeHandoff(){
     let optionsWarning='';
     if(results[2].status==='fulfilled'){Object.assign(sysConfig,results[2].value.config);saveConfig();}else optionsWarning='最新選項讀取未完成，請核對現有選項或按更新雲端時段選項。';
     const verifiedOvertimeRules=results[2].status==='fulfilled'?
-     {...results[2].value,token,url:getActiveGasUrl()}:null;
+     {...results[2].value,token,url:getActiveGasUrl(),source:'getOvertimeConfig'}:null;
     await P79Overtime.openReport({...entry,...period,verifiedOvertimeRules,category:'代',leaveHandoffId:handoff.id,allowedEmpIds:handoff.entries.filter(x=>x.date===entry.date&&String(x.forEmpId||'')===String(entry.forEmpId||'')).map(x=>x.empId)});
     if(status)status.textContent=optionsWarning||('尚有 '+handoff.entries.length+' 筆待申報；請核對 '+entry.date+' '+(entry.name||entry.empId)+' 的出勤時段。');
   }catch(error){const message='請假與代班已儲存，申報時段尚未帶入：'+(error.message||error);if(status)status.textContent=message;if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent=message;}
