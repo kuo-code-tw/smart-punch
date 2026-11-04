@@ -1741,7 +1741,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261104-stable-overtime-recovery-v3"></script>
+<script src="../assets/port79-overtime-report.js?v=20261104-mixed-worker-category-v4"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1899,7 +1899,7 @@ async function p79OpenLeaveOvertimeHandoff(){
   // 每位代班人員只從自己的正式班表提出加班類型建議，無法確認則交由人工核對。
   const ownRow=(data.schedules||[]).find(row=>String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
   const ownSchedule=ownRow?.schedule||{},ownMeta=ownSchedule.__meta?.[e.date]||{};
-  const ownShift=[ownMeta.reportOriginalShift,ownMeta.overtimeOriginalShift,ownSchedule[e.date]]
+  const ownShift=[ownSchedule[e.date],ownMeta.reportOriginalShift,ownMeta.overtimeOriginalShift]
    .map(v=>String(v||'').trim()).find(v=>['休','國','例','早','中','晚'].includes(v))||'';
   const typeByShift={休:['休','休息日加班'],國:['國','國定假日加班'],例:['例','例假加班'],早:['延','平日延時加班'],中:['延','平日延時加班'],晚:['延','平日延時加班']};
   const suggested=typeByShift[ownShift]||null;
@@ -1969,7 +1969,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 #adminCreateLeaveDialog .p79-simple-add{justify-self:start;font-size:12px}
 @media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
 </style>
-<script src="../assets/port79-leave-daily-simple.js?v=20261104-daily-independent-v1"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261104-independent-category-v2"></script>
 </body>
 </html>
 
