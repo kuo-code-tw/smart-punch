@@ -795,9 +795,6 @@ async function p79ReportSavedLeaveCover(id){
    for(let i=0;i<entries.length;i++){
     if(!dialog.isConnected)return;
     const entry=entries[i],cell=cells[i];
-    if(entry.mode==='rest'){
-     cell.textContent='排休代班（非加班申報）';restCovers++;continue;
-    }
     try{
      const month=entry.date.slice(0,7);
      let cloud=monthContexts.get(month);
@@ -819,6 +816,8 @@ async function p79ReportSavedLeaveCover(id){
        report.note||''].filter(Boolean);
       cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')+fields.join('｜');
       reported++;
+     }else if(entry.mode==='rest'){
+      cell.textContent='排休代班（目前沒有加班申報）';restCovers++;
      }else{
       cell.textContent='尚未申報加班';pending.push(entry);
      }
