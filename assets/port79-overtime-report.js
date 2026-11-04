@@ -470,8 +470,8 @@
    #p79OvertimeOptionsDialog #p79AddedTypeMessage{grid-column:1/-1;margin:0!important;text-align:left!important;font-size:11px;line-height:1.35;min-height:0}
    #p79OvertimeOptionsDialog .p79-ot-table-help{margin:0!important;font-size:12px;font-weight:700;text-align:left!important;color:#334155}
    #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel{margin:0!important;padding:0!important;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;flex-shrink:0}
-   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel summary{cursor:pointer;text-align:left;font-size:12px;font-weight:700;padding:6px 10px;list-style-position:inside;user-select:none}
-   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel[open]{padding-bottom:6px!important}
+   #p79OvertimeOptionsDialog .p79-ot-role-heading{text-align:left;font-size:12px;font-weight:700;padding:6px 10px}
+   #p79OvertimeOptionsDialog #p79RoleTypeDefaultsPanel{padding-bottom:4px!important}
    #p79OvertimeOptionsDialog #p79RoleTypeDefaultsRows{display:grid;gap:4px;grid-template-columns:repeat(2,minmax(0,1fr));max-height:190px;overflow:auto;margin:5px 10px}
    #p79OvertimeOptionsDialog .p79-ot-table-wrap{flex:1 1 200px!important;min-height:180px!important;max-height:none!important;overflow:auto}
    #p79OvertimeOptionsDialog table{min-width:930px!important}
@@ -480,6 +480,18 @@
    #p79OvertimeOptionsDialog td input,#p79OvertimeOptionsDialog td select{padding:5px 3px!important;font-size:12px!important}
    #p79OvertimeOptionsDialog .p79-ot-actions{flex-shrink:0;margin:0!important;padding:5px 0!important;gap:5px!important;border-top:1px solid #e2e8f0}
    #p79OvertimeOptionsDialog .p79-ot-actions button{padding:7px 9px!important;font-size:12px;white-space:nowrap!important}
+   /* One table for current rules and historical conversion rates. */
+   #p79OvertimeOptionsDialog .p79-ot-table-wrap{min-height:250px!important}
+   #p79OvertimeOptionsDialog table{min-width:880px!important;table-layout:auto!important}
+   #p79OvertimeOptionsDialog table th{position:sticky;top:0;background:#eaf3fa!important;z-index:2;white-space:nowrap!important}
+   #p79OvertimeOptionsDialog table td{padding:6px 5px!important;overflow:visible}
+   #p79OvertimeOptionsDialog .p79-ot-times{display:flex;gap:4px;align-items:center;white-space:nowrap}
+   #p79OvertimeOptionsDialog .p79-ot-times input{width:43px!important;min-width:43px!important;text-align:center!important}
+   #p79OvertimeOptionsDialog .p79-ot-status-active{font-size:11px;color:#166534;font-weight:700}
+   #p79OvertimeOptionsDialog .p79-ot-historical td{background:#f8fafc!important;color:#475569!important;border-bottom:1px solid #e2e8f0}
+   #p79OvertimeOptionsDialog .p79-ot-historical-label{font-weight:700;color:#8b5cf6!important}
+   #p79OvertimeOptionsDialog .p79-ot-muted{color:#94a3b8}
+   #p79OvertimeOptionsDialog .p79OtDelete{font-size:11px;color:#991b1b;background:#fff1f2;border:1px solid #fecaca;border-radius:5px;padding:5px 6px}
    @media(max-width:760px){
     #p79OvertimeOptionsDialog{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;padding:8px!important;height:calc(100dvh - 16px)!important}
     #p79OvertimeOptionsDialog .p79-ot-type-manager{grid-template-columns:minmax(0,1fr);gap:5px;padding:7px}
@@ -502,7 +514,22 @@
   host.appendChild(el);el.querySelector('#p79OtClose').onclick=()=>el.close();el.showModal();return el;
  }
  const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
- function editorRow(row,removedBuiltinNames=[]){return '<tr data-ot-category="'+esc(row[0])+'">'+[...row.slice(0,9),ruleType(row)].map((v,j)=>'<td style="padding:4px">'+(j===0?'<select data-col="0" style="'+inputStyle+'">'+types.map(t=>'<option '+(v===t?'selected':'')+'>'+t+'</option>').join('')+'</select>':j===8?'<select data-col="8" style="'+inputStyle+'">'+[['full','全段'],['after','班後'],['before','班前']].map(([val,label])=>'<option value="'+val+'" '+(v===val?'selected':'')+'>'+label+'</option>').join('')+'</select>':'<input data-col="'+j+'" style="'+inputStyle+'" value="'+esc(v)+'" '+([2,3].includes(j)?'type="number" min="0" step="0.01"':'type="text"')+'>')+'</td>').join('')+'<td><button type="button" class="p79OtDelete">刪除</button></td></tr>';}
+ function editorRow(row){
+  const v=row.map(x=>String(x??'')),name=ruleType(row),style=inputStyle+';padding:6px 5px;font-size:12px';
+  const field=(i,label,number=false)=>'<input data-col="'+i+'" aria-label="'+esc(label)+'" style="'+style+'" value="'+esc(v[i])+'" '+(number?'type="number" min="0" step="0.01"':'type="text"')+'>';
+  const timeFields=(x,y)=>'<div class="p79-ot-times">'+field(x,'開始時刻')+'<span>～</span>'+field(y,'結束時刻')+'</div>';
+  const normal=v[0]==='延'?timeFields(4,5):'<span class="p79-ot-muted">—</span><input type="hidden" data-col="4" value=""><input type="hidden" data-col="5" value="">';
+  return '<tr data-ot-active="true" data-ot-category="'+esc(v[0])+'">'+
+   '<td><b>'+esc(name)+'</b><input type="hidden" data-col="0" value="'+esc(v[0])+'"><input type="hidden" data-col="9" value="'+esc(name)+'"></td>'+
+   '<td>'+field(1,'出勤時段')+'</td>'+
+   '<td>'+field(2,'實際加班時數',true)+'</td>'+
+   '<td>'+field(3,'換算時數',true)+'</td>'+
+   '<td>'+normal+'</td>'+
+   '<td>'+timeFields(6,7)+'</td>'+
+   '<td><span>'+esc(positionLabels[v[8]]||v[8])+'</span><input type="hidden" data-col="8" value="'+esc(v[8])+'"></td>'+
+   '<td><span class="p79-ot-status-active">使用中</span></td>'+
+   '<td><button type="button" class="p79OtDelete" aria-label="刪除時段 '+esc(name)+' '+esc(v[1])+'">刪除時段</button></td></tr>';
+ }
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
   const el=dialog('加班選項管理','<p id="p79OtStatus">正在讀取已儲存的選項…</p>','p79OvertimeOptionsDialog');
@@ -513,7 +540,7 @@
    let allCloudRows=reportRules();
    let loadedRows='',loadedVisibleRows='',customTypes=typeOptions(cached||{},allCloudRows).map(t=>[t.name,t.category]),loadedTypes='',loadedDeleted='',loadedArchived='',cloudReady=false,reading=false,saving=false;
    let roleTypeDefaults=normalizeRoleTypeDefaults(cached||{}),loadedRoleDefaults='';
-   el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">出勤時段／換算設定 <span style="font-size:11px;font-weight:400;color:#64748b">（修改後按下方儲存）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['假別','出勤時段','實際加班時數','換算時數','正常起','正常迄','加班起','加班迄','位置','加班類型名稱','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
+   el.insertAdjacentHTML('beforeend','<p class="p79-ot-table-help">加班出勤時段與換算表 <span id="p79OtRuleCount" style="font-size:11px;font-weight:400;color:#64748b">（直接查看與修改；歷史紀錄為唯讀）</span></p><div class="p79-ot-table-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>'+['加班類型','出勤時段','實際時數','換算時數','正常班','加班時間','位置','狀態','操作'].map(t=>'<th style="padding:8px;white-space:nowrap;background:#e0f2fe">'+t+'</th>').join('')+'</tr></thead><tbody id="p79OtRuleRows">'+rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('')+'</tbody></table></div><div class="p79-ot-actions"><button id="p79OtAdd" type="button">＋新增出勤時段</button><button id="p79OtExport" type="button">匯出加班設定</button><button id="p79OtImport" type="button">匯入加班設定</button><input id="p79OtImportFile" type="file" accept=".xlsx,.xls" hidden><button id="p79OtReload" type="button">重新讀取雲端</button><button id="p79OtSave" type="button" style="background:#0369a1;color:white;padding:8px 18px;border-radius:8px">儲存加班類型與出勤時段</button></div>');
    el.querySelector('#p79OtStatus').insertAdjacentHTML('afterend',
     '<div class="p79-ot-type-manager">'+
      '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增類型</span>'+
@@ -607,11 +634,11 @@
     el.querySelector('#p79OtSave').click();
    };
    el.querySelector('#p79AddedTypeMessage').parentElement.insertAdjacentHTML('afterend',
-    '<details id="p79RoleTypeDefaultsPanel">'+
-     '<summary>職稱預設加班類型 <span style="color:#64748b;font-weight:400">（點擊展開設定）</span></summary>'+
+    '<section id="p79RoleTypeDefaultsPanel">'+
+     '<div class="p79-ot-role-heading">職稱預設加班類型 <span style="color:#64748b;font-weight:400">（直接顯示）</span></div>'+
      '<p style="font-size:11px;color:#64748b;margin:4px 10px">依職稱建議加班類型；仍以正式班表與考勤為準，不會自動增加時數。</p>'+
      '<div id="p79RoleTypeDefaultsRows"></div>'+
-    '</details>');
+    '</section>');
    function renderRoleTypeDefaults(){
     const panel=el.querySelector('#p79RoleTypeDefaultsRows');if(!panel)return;
     panel.replaceChildren();
