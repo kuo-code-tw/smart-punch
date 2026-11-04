@@ -1731,9 +1731,9 @@ async function saveAdminCreateLeave(){
    return;
   }
   const entries=[];for(let day=new Date($('adminCreateLeaveStart').value+'T12:00:00Z'),last=new Date($('adminCreateLeaveEnd').value+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){const date=day.toISOString().slice(0,10);for(const person of (dailyAssignments?dailyAssignments.find(p=>p.date===date).workerIds.map(id=>employees.find(e=>String(e.empId)===String(id))):[worker,second]).filter(Boolean))entries.push({empId:String(person.empId),name:person.name,date,forEmpId:String(employee.empId)});}
-  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries,preferredType:$('adminCreateLeaveOvertimeType')?.value||''}));
+  sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({id:adminCreateLeaveId,createdAt:Date.now(),entries}));
   p79ActivateLeaveHandoff();
-  await p79OpenLeaveOvertimeHandoff();
+  p79UpdateLeaveHandoffBanner();
   void loadCloud(false,true);
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
@@ -1896,11 +1896,20 @@ async function p79OpenLeaveOvertimeHandoff(){
    date:e.date,employeeId:String(e.empId),at:canUse?cached.at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
   const period=P79Overtime.resolveLeaveCoverReport(data,{...h,id:e.leaveId||h.id},e);
+  // 每位代班人員只從自己的正式班表提出加班類型建議，無法確認則交由人工核對。
+  const ownRow=(data.schedules||[]).find(row=>String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
+  const ownSchedule=ownRow?.schedule||{},ownMeta=ownSchedule.__meta?.[e.date]||{};
+  const ownShift=[ownMeta.reportOriginalShift,ownMeta.overtimeOriginalShift,ownSchedule[e.date]]
+   .map(v=>String(v||'').trim()).find(v=>['休','國','例','早','中','晚'].includes(v))||'';
+  const typeByShift={休:['休','休息日加班'],國:['國','國定假日加班'],例:['例','例假加班'],早:['延','平日延時加班'],中:['延','平日延時加班'],晚:['延','平日延時加班']};
+  const suggested=typeByShift[ownShift]||null;
+  const configured=new Set(P79Overtime.typeOptions(data.config||{},data.config?.[P79Overtime.CONFIG]||[]).map(t=>t.name));
+  const perPersonType=suggested&&configured.has(suggested[1])?suggested:null;
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
-  await P79Overtime.openReport({...e,...period,verifiedOvertimeRules,preferredType:e.preferredType||h.preferredType||'',category:'代',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
-  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+'，儲存成功後接續下一筆。';
+  await P79Overtime.openReport({...e,...period,verifiedOvertimeRules,preferredType:perPersonType?.[1]||'',category:perPersonType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
+  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+(perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
   setStatus('加班明細尚未完成：'+error.message,'warn');
