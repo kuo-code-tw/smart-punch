@@ -559,28 +559,30 @@
     categoryPicker.style.display=hasName?'':'none';
     if(!hasName)categoryPicker.value='';
    });
-   // Historical cloud rows are view-only. Never reenable or overwrite them on opening.
-   el.querySelector('.p79-ot-table-wrap').insertAdjacentHTML('afterend',
-    '<details id="p79OtArchivedRules" hidden style="margin:3px 0;border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;background:#f8fafc;text-align:left">'+
-     '<summary style="cursor:pointer;font-size:12px;font-weight:700;text-align:left">雲端保留的歷史時段（唯讀）</summary>'+
-     '<div id="p79OtArchivedRuleList" style="max-height:160px;overflow:auto;margin-top:5px"></div>'+
-    '</details>');
+   // Unified display: active rows are editable, archived rows remain read-only.
+   // Archived rows never have data-col fields and cannot be included in saves.
+   const body=el.querySelector('#p79OtRuleRows');
+   const getRows=()=>[...body.querySelectorAll('tr[data-ot-active="true"]')].map(tr=>
+    Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??''));
    function renderArchivedRows(source,config){
-    const panel=el.querySelector('#p79OtArchivedRules'),list=el.querySelector('#p79OtArchivedRuleList');
+    body.querySelectorAll('tr[data-ot-active="false"]').forEach(tr=>tr.remove());
     const active=new Set(activeReportRows(source,config).map(ruleKey));
     const historical=validate(source).filter(row=>!active.has(ruleKey(row)));
-    panel.hidden=historical.length===0;
-    panel.querySelector('summary').textContent='雲端保留的歷史時段（'+historical.length+' 筆｜唯讀，不會自動啟用）';
-    list.replaceChildren();
     for(const row of historical){
-     const line=document.createElement('div');
-     line.style.cssText='padding:4px 6px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left';
-     line.textContent=ruleType(row)+'｜'+row[1]+'｜實際 '+row[2]+' 小時｜換算 '+(row[3]===''?'尚未設定':row[3]+' 小時');
-     list.append(line);
+     const tr=document.createElement('tr');tr.setAttribute('data-ot-active','false');
+     tr.className='p79-ot-historical';
+     const cells=[ruleType(row),row[1],row[2],row[3]===''?'—':row[3],
+      row[0]==='延'?row[4]+'～'+row[5]:'—',
+      row[6]+'～'+row[7],positionLabels[row[8]]||row[8],
+      '歷史保留','唯讀'];
+     for(const value of cells){const td=document.createElement('td');td.textContent=String(value);tr.append(td);}
+     tr.children[7].className='p79-ot-historical-label';
+     body.append(tr);
     }
+    const current=body.querySelectorAll('tr[data-ot-active="true"]').length;
+    el.querySelector('#p79OtRuleCount').textContent='使用中 '+current+' 筆｜歷史保留 '+historical.length+' 筆（唯讀）';
     return historical.length;
    }
-   const body=el.querySelector('#p79OtRuleRows'),getRows=()=>[...body.rows].map(tr=>[...tr.querySelectorAll('[data-col]')].map(i=>i.value));
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');if(!list)return;
     list.replaceChildren();
@@ -675,7 +677,7 @@
     }
    }
    renderRoleTypeDefaults();
-   body.addEventListener('change',e=>{if(e.target.matches('select[data-col="0"]')){const row=e.target.closest('tr');row.dataset.otCategory=e.target.value;const name=row.querySelector('[data-col="9"]');if(name&&(!name.value.trim()||isBuiltinType(name.value.trim())))name.value=typeLabel[e.target.value];}});
+   // Row type and accounting category are fixed; no dropdown selection required.
    body.addEventListener('click',e=>{if(!cloudReady)return;if(e.target.closest('.p79OtDelete'))e.target.closest('tr').remove()});
    el.querySelector('#p79OtStatus').textContent=rows.length?'已顯示本機保存的選項（尚未核對雲端），正在確認…':'選項視窗已開啟，正在確認雲端資料…';
    el.querySelector('#p79OtAdd').onclick=()=>{
