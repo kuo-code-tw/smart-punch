@@ -1820,10 +1820,16 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     </div>
                     <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">系統自動核對全員已配休、已申報及缺申報編號。當月未來日期的自動預排仍須確認儲存；歷史月份已核實的原日期8小時出勤可一次確認申報，不必逐人勾選。未完成正式申報及雲端讀回，不得顯示已核准。</p>
                     <p id="p79PlannedPunchNotice" role="status" aria-live="polite" hidden class="text-xs font-semibold px-2 py-1 mb-2 rounded bg-indigo-50 text-indigo-900"></p>
+                    <div id="p79PlannedBulkActions" class="flex items-center flex-wrap gap-3 mb-2 text-xs font-semibold text-indigo-900">
+                        <label class="inline-flex items-center gap-2"><input id="p79PlannedBulkAll" type="checkbox" onchange="p79PlannedBulkSelectPage(this.checked)">全選本頁可核對</label>
+                        <span id="p79PlannedBulkSelectedCount" role="status">已選 0 筆</span>
+                        <button id="p79PlannedBulkSave" type="button" disabled onclick="p79BatchConfirmPlannedOvertime()" class="rounded-lg bg-indigo-700 text-white px-3 py-1.5 font-bold disabled:opacity-40">批次核對申報</button>
+                        <small class="text-slate-500">僅完整打卡、時段唯一且有原預排 ID 可勾選；未出勤及異常紀錄不可直接申報。</small>
+                    </div>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100">
-                                <tr><th class="p-3">預排日期</th><th class="p-3">姓名</th><th class="p-3">部門</th><th class="p-3">職稱</th><th class="p-3">預排時段</th><th class="p-3">預排時數</th><th class="p-3">上班時間（實際打卡）</th><th class="p-3">下班時間（實際打卡）</th><th class="p-3">狀態／操作</th></tr>
+                                <tr><th class="p-3">選取</th><th class="p-3">預排日期</th><th class="p-3">姓名</th><th class="p-3">部門</th><th class="p-3">職稱</th><th class="p-3">預排時段</th><th class="p-3">預排時數</th><th class="p-3">上班時間（實際打卡）</th><th class="p-3">下班時間（實際打卡）</th><th class="p-3">狀態／操作</th></tr>
                             </thead>
                             <tbody id="p79OvertimePlannedBody" class="divide-y divide-indigo-100 dark:divide-indigo-900/50"></tbody>
                         </table>
@@ -14119,7 +14125,7 @@ function p79OvertimePeriodLabel(report){
             })||!!document.getElementById('p79OvertimePlannedDialog')?.querySelector?.('#p79OvertimeDialog[open]');
         }
         function p79PlannedDialogCancel(event){
-            if(p79PlannedAttendanceModalIsOpen())event.preventDefault();
+            if(p79PlannedAttendanceModalIsOpen()||p79PlannedBulkBusy)event.preventDefault();
         }
         function p79PlannedDialogClosed(){
             // Covers external dialog.close(): no form can remain stranded in
@@ -14132,6 +14138,10 @@ function p79OvertimePeriodLabel(report){
             p79SyncOvertimePlannedDialogState();
         }
         function p79CloseOvertimePlannedDialog(){
+            if(p79PlannedBulkBusy){
+                p79PlannedPunchNotice('批次核對仍在儲存，請先完成本次申報。','warning');
+                return;
+            }
             const dialog=document.getElementById('p79OvertimePlannedDialog');
             if(p79PlannedAttendanceModalIsOpen()){
                 showToast('請先儲存或取消目前的打卡修改，再關閉預排清單','warning');
@@ -14196,6 +14206,9 @@ function p79OvertimePeriodLabel(report){
             renderOvertimeStats();
         }
         let p79OvertimePlannedDisplayedRows=[];
+        let p79OvertimePlannedFilteredRows=[];
+        const p79PlannedBulkSelected=new Set();
+        let p79PlannedBulkBusy=false;
         // 清單與申報視窗共用唯一的「實際打卡 → 預排時段」比對，不再各自沿用舊報單 code。
         function p79ResolvePlannedOvertimePeriod(row){
             if(!row?.clockIn||!row?.clockOut||!window.P79OvertimeShiftMatch?.resolve||
@@ -14242,6 +14255,143 @@ function p79OvertimePeriodLabel(report){
                 requirePeriodSelection:!suggested,
                 periodHint:!suggested?'實際打卡與原預排時段不符，請先核對正確出勤時段；不得直接沿用舊班別。':''
             });
+        }
+
+        // Batch confirmation only updates an EXISTING planned report. It never
+        // creates new report IDs or automatically declares unpunched shifts.
+        function p79PlannedBulkKey(row){
+            const date=normalizeScheduleDateKey(row?.rosterDate||row?.dateKey);
+            return [String(row?.empId||'').trim().toUpperCase(),date,
+                String(row?.overtimeReport?.id||'').trim()].join('|');
+        }
+        function p79PlannedBulkCandidate(row,todayKey){
+            if(!row||row.p79RestDraft||!p79CanReportOvertime())return null;
+            const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
+            const report=row.overtimeReport||{};
+            if(!date||date>todayKey||!report.id||row.reportVerified!==true||
+                report.planned!==true||p79OvertimePendingReason(row,todayKey).code!=='review'||
+                !row.clockIn||!row.clockOut||row.timeCheckRequired)return null;
+            const start=p79DirectAttendanceTimestamp(row.clockIn),end=p79DirectAttendanceTimestamp(row.clockOut);
+            if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||
+                p79OvertimeAttendanceIssue(row,start,end))return null;
+            const match=p79ResolvePlannedOvertimePeriod(row);
+            if(match?.state!=='completed'||match.confirmed!==true||!match.suggested)return null;
+            const rules=window.P79Overtime?.reportRules?.()||[];
+            const matchedRules=rules.filter(rule=>rule?.[0]===match.suggested.category&&
+                rule[1]===match.suggested.code&&
+                String(rule[6])===String(match.suggested.overtimeStart)&&
+                String(rule[7])===String(match.suggested.overtimeEnd));
+            // Ambiguous legacy/custom codes cannot be silently confirmed in bulk.
+            if(matchedRules.length!==1)return null;
+            const selected=matchedRules[0];
+            if(window.P79Overtime?.ruleAttendanceIssue?.(start,end,date,selected,
+                p79WorkOvertimeRoster(row.empId,date)))return null;
+            return {row,date,report,start,end,rule:selected,key:p79PlannedBulkKey(row)};
+        }
+        function p79RefreshPlannedBulkControls(){
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            const available=p79OvertimePlannedFilteredRows
+                .filter(row=>p79PlannedBulkCandidate(row,today));
+            const visible=p79OvertimePlannedDisplayedRows.filter(row=>
+                p79PlannedBulkCandidate(row,today));
+            const marked=visible.filter(row=>p79PlannedBulkSelected.has(p79PlannedBulkKey(row))).length;
+            const all=document.getElementById('p79PlannedBulkAll');
+            if(all){
+                all.checked=visible.length>0&&marked===visible.length;
+                all.indeterminate=marked>0&&marked<visible.length;
+                all.disabled=p79PlannedBulkBusy||!visible.length;
+            }
+            const count=document.getElementById('p79PlannedBulkSelectedCount');
+            if(count)count.textContent='已選 '+p79PlannedBulkSelected.size+
+                ' 筆｜可核對 '+available.length+' 筆';
+            const button=document.getElementById('p79PlannedBulkSave');
+            if(button)button.disabled=p79PlannedBulkBusy||!p79PlannedBulkSelected.size||
+                !p79CanReportOvertime();
+            document.querySelectorAll('#p79OvertimePlannedBody .p79-planned-bulk-pick').forEach(input=>{
+                input.disabled=p79PlannedBulkBusy;
+            });
+        }
+        function p79PlannedBulkToggle(index,checked){
+            if(p79PlannedBulkBusy)return;
+            const row=p79OvertimePlannedDisplayedRows[Number(index)];
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            const candidate=p79PlannedBulkCandidate(row,today);
+            if(!candidate){p79RefreshPlannedBulkControls();return;}
+            if(checked)p79PlannedBulkSelected.add(candidate.key);
+            else p79PlannedBulkSelected.delete(candidate.key);
+            p79RefreshPlannedBulkControls();
+        }
+        function p79PlannedBulkSelectPage(checked){
+            if(p79PlannedBulkBusy)return;
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            for(const row of p79OvertimePlannedDisplayedRows){
+                const candidate=p79PlannedBulkCandidate(row,today);
+                if(!candidate)continue;
+                if(checked)p79PlannedBulkSelected.add(candidate.key);
+                else p79PlannedBulkSelected.delete(candidate.key);
+            }
+            document.querySelectorAll('#p79OvertimePlannedBody .p79-planned-bulk-pick').forEach(input=>{
+                input.checked=checked;
+            });
+            p79RefreshPlannedBulkControls();
+        }
+        async function p79BatchConfirmPlannedOvertime(){
+            if(p79PlannedBulkBusy||!p79CanReportOvertime())return;
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            const eligible=p79OvertimePlannedFilteredRows
+                .map(row=>p79PlannedBulkCandidate(row,today)).filter(Boolean);
+            const selected=eligible.filter(item=>p79PlannedBulkSelected.has(item.key));
+            const unique=new Set(selected.map(x=>x.key));
+            if(!selected.length||unique.size!==selected.length||
+                selected.length!==p79PlannedBulkSelected.size){
+                p79PlannedPunchNotice('勾選紀錄已變更或仍有缺卡項目，請重新核對清單後再批次申報。','warning');
+                return;
+            }
+            const details=selected.map(item=>
+                (item.row.name||item.row.empId)+' '+item.date+' '+item.rule[1]).join('\\n');
+            if(!window.confirm('確定依完整實際打卡，核對以下 '+selected.length+
+                ' 筆原預排並逐筆儲存為正式申報？\\n'+details+
+                '\\n這不等於主管核准或薪資結算，若某筆雲端資料改變會停止該筆。'))return;
+            p79PlannedBulkBusy=true;
+            p79RefreshPlannedBulkControls();
+            let completed=0,failed=[];
+            try{
+                for(let i=0;i<selected.length;i++){
+                    const item=selected[i],original=item.report,rule=window.P79Overtime.report(item.rule);
+                    p79PlannedPunchNotice('批次核對進行中 '+(i+1)+' / '+selected.length+
+                        '：'+(item.row.name||item.row.empId)+' '+item.date);
+                    const draft={
+                        id:String(original.id),empId:item.row.empId,date:item.date,rule,
+                        manualPlan:false,preventReplace:true,plannedReview:true,
+                        expectedOriginalCode:String(original.code||''),
+                        expectedOriginalCategory:String(original.category||''),
+                        expectedPunchStart:item.start,expectedPunchEnd:item.end,
+                        forEmpId:String(item.row.forEmpId||''),
+                        leaveHandoffId:String(original.leaveId||''),
+                        note:String(original.note||''),autoSave:true
+                    };
+                    try{
+                        const result=await p79SaveWorkOvertimeDraft(draft);
+                        window.P79Overtime.verifySavedReport(draft,result);
+                        if(result?.ok!==true||result.directOvertimeSaved!==true||
+                            String(result.id)!==draft.id||result.report?.planned!==false)
+                            throw Error('雲端未確認原報單解除預排狀態');
+                        p79PlannedBulkSelected.delete(item.key);
+                        completed++;
+                    }catch(error){
+                        failed.push((item.row.name||item.row.empId)+' '+item.date+
+                            '：'+String(error?.message||error));
+                    }
+                }
+            }finally{
+                p79PlannedBulkBusy=false;
+                p79OvertimeCalculationCache=null;
+                renderOvertimeStats();
+                p79RefreshPlannedBulkControls();
+                const message='批次核對完成：成功 '+completed+' 筆、需單筆核對 '+
+                    failed.length+' 筆。'+(failed.length?'\\n'+failed.join('\\n'):'');
+                p79PlannedPunchNotice(message,failed.length?'warning':'success');
+            }
         }
         // 每一筆待處理項目都要說明「缺的是申報還是考勤」，不能只顯示籠統的待核對。
         function p79OvertimePendingReason(row,todayKey){
@@ -14401,6 +14551,11 @@ function p79OvertimePeriodLabel(report){
             p79OvertimePlannedPage=Math.min(p79OvertimePlannedPage,pageCount);
             const visible=rows.slice((p79OvertimePlannedPage-1)*pageSize,p79OvertimePlannedPage*pageSize);
             p79OvertimePlannedDisplayedRows=visible;
+            p79OvertimePlannedFilteredRows=rows;
+            const eligibleKeys=new Set(rows.map(row=>
+                p79PlannedBulkCandidate(row,todayKey)).filter(Boolean).map(item=>item.key));
+            for(const key of [...p79PlannedBulkSelected])
+                if(!eligibleKeys.has(key))p79PlannedBulkSelected.delete(key);
             const problems=rows.map(row=>p79OvertimePendingReason(row,todayKey));
             const attendanceProblems=problems.filter(r=>['both-missing','in-missing','out-missing','not-out-yet','abnormal'].includes(r.code)).length;
             const unsent=problems.filter(r=>r.code==='unsent').length;
@@ -14419,10 +14574,15 @@ function p79OvertimePeriodLabel(report){
                 const reason=p79OvertimePendingReason(row,todayKey);
                 const inCell=p79OvertimePendingPunchCell(row,'IN',todayKey,index);
                 const outCell=p79OvertimePendingPunchCell(row,'OUT',todayKey,index);
+                const candidate=p79PlannedBulkCandidate(row,todayKey);
+                const picked=candidate&&p79PlannedBulkSelected.has(candidate.key);
                 const warning=['both-missing','in-missing','out-missing','not-out-yet','abnormal'].includes(reason.code);
                 const reasonTone=warning?'text-rose-800 dark:text-rose-300':reason.code==='unsent'?
                     'text-amber-800 dark:text-amber-300':'text-indigo-900 dark:text-indigo-200';
                 return '<tr>'+
+                    '<td class="p-3 text-center">'+(candidate?
+                        '<input type="checkbox" class="p79-planned-bulk-pick" aria-label="選取 '+escapeHtml(String(row.name||row.empId))+' '+escapeHtml(date)+' 核對申報" onchange="p79PlannedBulkToggle('+index+',this.checked)" '+(picked?'checked ':'')+(p79PlannedBulkBusy?'disabled':'')+'>':
+                        '<span title="尚未完成可安全批次核對的打卡與時段">—</span>')+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+escapeHtml(date.replaceAll('-','/'))+'</td>'+
                     '<td class="p-3 font-semibold whitespace-nowrap">'+escapeHtml(row.name||'')+'</td>'+
                     '<td class="p-3">'+escapeHtml(row.dept||'')+'</td>'+
@@ -14437,10 +14597,11 @@ function p79OvertimePeriodLabel(report){
                         :'')+
                     (typeof p79CanDeleteOvertime==='function'&&p79CanDeleteOvertime()
                         ?' <button type="button" onclick="p79DeletePlannedOvertimeRow('+index+',this)" class="p79-planned-delete-btn bg-rose-100 text-rose-800 font-semibold">刪除預排</button>':'')+'</div></td></tr>';
-            }).join(''):'<tr><td colspan="9" class="p-5 text-center text-slate-500">目前篩選條件沒有預排／待核對紀錄</td></tr>';
+            }).join(''):'<tr><td colspan="10" class="p-5 text-center text-slate-500">目前篩選條件沒有預排／待核對紀錄</td></tr>';
             pages.innerHTML='<span>第 '+p79OvertimePlannedPage+' / '+pageCount+' 頁（每頁50筆）</span>'+
                 '<div class="flex gap-2"><button type="button" onclick="goToPlannedOvertimePage('+(p79OvertimePlannedPage-1)+')" '+(p79OvertimePlannedPage<=1?'disabled':'')+' class="rounded-md border px-3 py-1 disabled:opacity-40">上一頁</button>'+
                 '<button type="button" onclick="goToPlannedOvertimePage('+(p79OvertimePlannedPage+1)+')" '+(p79OvertimePlannedPage>=pageCount?'disabled':'')+' class="rounded-md border px-3 py-1 disabled:opacity-40">下一頁</button></div>';
+            p79RefreshPlannedBulkControls();
         }
         function p79UnreportedOvertimeSummary(rows){
             let minutes=0,count=0;
