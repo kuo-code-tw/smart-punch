@@ -1541,6 +1541,7 @@ function filterAdminCreateLeaveApplicants(){
  select.innerHTML='<option value="">請選擇請假人員</option>'+people.map(leavePersonOption).join('');
  if(people.some(e=>String(e.empId)===previous))select.value=previous;
  filterAdminCreateLeavePeople();
+ window.p79RenderDailyCreateCover?.();
 }
 function filterAdminCreateLeavePeople(){
  const target=employees.find(e=>String(e.empId)===String($('adminCreateLeaveEmployee').value)),worker=$('adminCreateLeaveWorker'),previous=worker.value,dept=String(target?.dept||'').trim();
@@ -1563,7 +1564,7 @@ let p79CreateCoverSuggestRequest=0,p79CreateCoverManual=false;
 function p79OnCreateLeaveEmployeeChange(){
  p79CreateCoverSuggestRequest++;p79CreateCoverManual=false;
  for(const id of ['adminCreateLeaveWorker','adminCreateLeaveWorkerSecond','adminCreateLeaveWorkerJob','adminCreateLeaveWorkerSecondJob'])$(id).value='';
- filterAdminCreateLeavePeople();void p79SuggestCreateLeaveCover();
+ filterAdminCreateLeavePeople();window.p79RenderDailyCreateCover?.();void p79SuggestCreateLeaveCover();
 }
 function p79OnCreateLeaveDateChange(){
  p79CreateCoverSuggestRequest++;
