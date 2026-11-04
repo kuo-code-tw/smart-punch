@@ -519,13 +519,40 @@
      '<div class="p79-ot-add-type-wrap"><span class="p79-ot-section-title">新增類型</span>'+
       '<div class="p79-ot-new-type-controls">'+
        '<input id="p79NewTypeName" aria-label="新加班類型名稱" placeholder="輸入類型名稱" maxlength="40" style="'+inputStyle+'">'+
-       '<select id="p79NewTypeCategory" aria-label="適用假別分類（非已新增的加班類型）" title="僅供計算時選擇適用假別，不代表系統已內建加班類型" style="'+inputStyle+'">'+types.map(c=>'<option value="'+c+'">'+esc(typeLabel[c])+'類別</option>').join('')+'</select>'+
+       '<select id="p79NewTypeCategory" aria-label="新類型的工時計算方式" title="計算分類不代表已存在的加班類型" style="'+inputStyle+';display:none"><option value="">選擇計算方式</option>'+types.map(c=>'<option value="'+c+'">'+esc(({休:'休息日換算',國:'國定假日換算',例:'例假日換算',代:'休假代班換算',延:'平日延時換算'})[c])+'</option>').join('')+'</select>'+
        '<button type="button" id="p79AddType" style="background:#0369a1;color:#fff;border-radius:6px;font-weight:700">＋新增</button>'+
       '</div></div>'+
      '<div class="p79-ot-type-list-wrap"><span class="p79-ot-section-title">現有加班類型（可刪除）</span>'+
       '<div id="p79OvertimeTypeList" role="list" aria-label="加班類型清單"><div id="p79AddedTypeList"></div></div></div>'+
      '<p id="p79AddedTypeMessage" role="status" aria-live="polite"></p>'+
     '</div>');
+   const categoryPicker=el.querySelector('#p79NewTypeCategory');
+   el.querySelector('#p79NewTypeName').addEventListener('input',()=>{
+    const hasName=!!el.querySelector('#p79NewTypeName').value.trim();
+    categoryPicker.style.display=hasName?'':'none';
+    if(!hasName)categoryPicker.value='';
+   });
+   // Historical cloud rows are view-only. Never reenable or overwrite them on opening.
+   el.querySelector('.p79-ot-table-wrap').insertAdjacentHTML('afterend',
+    '<details id="p79OtArchivedRules" hidden style="margin:3px 0;border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;background:#f8fafc;text-align:left">'+
+     '<summary style="cursor:pointer;font-size:12px;font-weight:700;text-align:left">雲端保留的歷史時段（唯讀）</summary>'+
+     '<div id="p79OtArchivedRuleList" style="max-height:160px;overflow:auto;margin-top:5px"></div>'+
+    '</details>');
+   function renderArchivedRows(source,config){
+    const panel=el.querySelector('#p79OtArchivedRules'),list=el.querySelector('#p79OtArchivedRuleList');
+    const active=new Set(activeReportRows(source,config).map(ruleKey));
+    const historical=validate(source).filter(row=>!active.has(ruleKey(row)));
+    panel.hidden=historical.length===0;
+    panel.querySelector('summary').textContent='雲端保留的歷史時段（'+historical.length+' 筆｜唯讀，不會自動啟用）';
+    list.replaceChildren();
+    for(const row of historical){
+     const line=document.createElement('div');
+     line.style.cssText='padding:4px 6px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left';
+     line.textContent=ruleType(row)+'｜'+row[1]+'｜實際 '+row[2]+' 小時｜換算 '+(row[3]===''?'尚未設定':row[3]+' 小時');
+     list.append(line);
+    }
+    return historical.length;
+   }
    const body=el.querySelector('#p79OtRuleRows'),getRows=()=>[...body.rows].map(tr=>[...tr.querySelectorAll('[data-col]')].map(i=>i.value));
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');if(!list)return;
@@ -565,6 +592,7 @@
     if(!cloudReady||reading||saving||!global.p79OvertimeContext?.canEditRules?.())return;
     const name=canonicalType(el.querySelector('#p79NewTypeName').value.trim()),category=el.querySelector('#p79NewTypeCategory').value;
     if(!name){el.querySelector('#p79OtStatus').textContent='請輸入加班類型名稱';return;}
+    if(!types.includes(category)){el.querySelector('#p79OtStatus').textContent='請選擇新類型使用的工時計算方式';return;}
     if(typeOptions({[TYPECONFIG]:customTypes}).some(t=>t.name===name)){
      el.querySelector('#p79OtStatus').textContent='此加班類型已存在';return;
     }
@@ -573,6 +601,7 @@
      el.querySelector('#p79OtStatus').textContent='此名稱應選擇「'+typeLabel[standard]+'」作為適用假別';return;
     }
     customTypes.push([name,category]);el.querySelector('#p79NewTypeName').value='';
+    categoryPicker.value='';categoryPicker.style.display='none';
     renderAddedTypeList();renderRoleTypeDefaults();
     el.querySelector('#p79AddedTypeMessage').textContent='正在新增「'+name+'」並同步雲端…';
     el.querySelector('#p79OtSave').click();
@@ -655,6 +684,9 @@
     saving=true;setReady(false);
     try{
      const draft=validate(getRows()),fresh=await loadRules();
+     if(!draft.length&&!customTypes.length&&fresh.rows.length&&
+        loadedVisibleRows==='[]'&&loadedTypes==='[]')
+      throw Error('雲端仍保留舊換算時段，不能以空白設定覆蓋。請展開「雲端保留的歷史時段」核對。');
      const enabledNames=new Set(customTypes.map(pair=>canonicalType(pair[0])));
      const deleted=types.map(code=>typeLabel[code]).filter(name=>!enabledNames.has(name));
      const rolesDraft=normalizeRoleTypeDefaults({[ROLE_DEFAULTS_CONFIG]:roleTypeDefaults});
@@ -703,6 +735,7 @@
      const current=global.p79OvertimeContext?.config?.();if(current)Object.assign(current,check.config);
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('雲端已保存，本機快取更新失敗',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
+     renderArchivedRows(check.rows,check.config);
      renderAddedTypeList();renderRoleTypeDefaults();
      el.querySelector('#p79OtStatus').textContent=customTypes.some(([name])=>!draft.some(row=>ruleType(row)===canonicalType(name)))?'✅ 加班類型已同步雲端；尚未設定出勤時段的類型，請按「＋新增出勤時段」完成設定。':'✅ 加班類型已同步雲端；刪除類型不再顯示、沒有恢復功能，歷史申報保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{saving=false;setReady(true);renderAddedTypeList();}
@@ -740,11 +773,13 @@
      customTypes=typeOptions(loaded.config,loaded.rows).map(t=>[t.name,t.category]);
      loadedTypes=JSON.stringify(loaded.config[TYPECONFIG]||[]);
      loadedVisibleRows=JSON.stringify(validate(rows));
-     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');renderAddedTypeList();renderRoleTypeDefaults();
+     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');
+     const archivedCount=renderArchivedRows(loaded.rows,loaded.config);
+     renderAddedTypeList();renderRoleTypeDefaults();
      if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
-     setReady(true);el.querySelector('#p79OtStatus').textContent=!customTypes.length?'目前沒有啟用的加班類型，請在上方自行新增。':!Array.isArray(loaded.config[ARCHIVED_CONFIG])&&legacySavedTypes(loaded.config).length?'已從原雲端設定讀回先前的加班類型與換算時數；確認後可直接刪除不需要的類型。':support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
+     setReady(true);el.querySelector('#p79OtStatus').textContent=!customTypes.length?(archivedCount?'目前沒有啟用的加班類型；雲端仍保留 '+archivedCount+' 筆歷史換算時段，可展開下方唯讀清單核對。':'目前沒有啟用的加班類型，且雲端未讀到可顯示的換算時段。'):!Array.isArray(loaded.config[ARCHIVED_CONFIG])&&legacySavedTypes(loaded.config).length?'已從原雲端設定讀回先前的加班類型與換算時數；確認後可直接刪除不需要的類型。':support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
    };
