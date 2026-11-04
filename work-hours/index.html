@@ -14265,9 +14265,13 @@ function p79OvertimePeriodLabel(report){
                 String(row?.overtimeReport?.id||'').trim()].join('|');
         }
         function p79PlannedBulkCandidate(row,todayKey){
+            try{
             if(!row||row.p79RestDraft||!p79CanReportOvertime())return null;
             const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
             const report=row.overtimeReport||{};
+            // Complex leave-cover reports must use their original individual
+            // editor so all linked person/date references survive unchanged.
+            if(String(report.leaveId||row.forEmpId||'').trim())return null;
             if(!date||date>todayKey||!report.id||row.reportVerified!==true||
                 report.planned!==true||p79OvertimePendingReason(row,todayKey).code!=='review'||
                 !row.clockIn||!row.clockOut||row.timeCheckRequired)return null;
@@ -14287,6 +14291,10 @@ function p79OvertimePeriodLabel(report){
             if(window.P79Overtime?.ruleAttendanceIssue?.(start,end,date,selected,
                 p79WorkOvertimeRoster(row.empId,date)))return null;
             return {row,date,report,start,end,rule:selected,key:p79PlannedBulkKey(row)};
+            }catch(error){
+                console.warn('批次核對資格解析失敗，請改用單筆：',error);
+                return null;
+            }
         }
         function p79RefreshPlannedBulkControls(){
             const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
@@ -14348,10 +14356,10 @@ function p79OvertimePeriodLabel(report){
                 return;
             }
             const details=selected.map(item=>
-                (item.row.name||item.row.empId)+' '+item.date+' '+item.rule[1]).join('\\n');
+                (item.row.name||item.row.empId)+' '+item.date+' '+item.rule[1]).join('\n');
             if(!window.confirm('確定依完整實際打卡，核對以下 '+selected.length+
-                ' 筆原預排並逐筆儲存為正式申報？\\n'+details+
-                '\\n這不等於主管核准或薪資結算，若某筆雲端資料改變會停止該筆。'))return;
+                ' 筆原預排並逐筆儲存為正式申報？\n'+details+
+                '\n這不等於主管核准或薪資結算，若某筆雲端資料改變會停止該筆。'))return;
             p79PlannedBulkBusy=true;
             p79RefreshPlannedBulkControls();
             let completed=0,failed=[];
@@ -14389,7 +14397,7 @@ function p79OvertimePeriodLabel(report){
                 renderOvertimeStats();
                 p79RefreshPlannedBulkControls();
                 const message='批次核對完成：成功 '+completed+' 筆、需單筆核對 '+
-                    failed.length+' 筆。'+(failed.length?'\\n'+failed.join('\\n'):'');
+                    failed.length+' 筆。'+(failed.length?'\n'+failed.join('\n'):'');
                 p79PlannedPunchNotice(message,failed.length?'warning':'success');
             }
         }
