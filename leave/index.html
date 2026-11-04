@@ -1878,7 +1878,7 @@ async function p79OpenLeaveOvertimeHandoff(){
   p79LeaveHandoffContext={...data,leaveId:e.leaveId||h.id,month:e.date.slice(0,7),
    date:e.date,employeeId:String(e.empId),at:canUse?cached.at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
-  const period=P79Overtime.resolveLeaveCoverReport(data,h,e);
+  const period=P79Overtime.resolveLeaveCoverReport(data,{...h,id:e.leaveId||h.id},e);
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
@@ -1904,6 +1904,7 @@ window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79Reconc
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 <style id="p79-leave-simple-daily-style">
+#adminCreateLeaveDialog #adminCreateLeaveApplicantWrap[hidden],#adminCreateLeaveDialog #adminCreateLeaveWorkers[hidden],#adminCreateLeaveDialog #adminCreateLeaveDailyRows[hidden],#adminCreateLeaveDialog #adminCreateLeaveRecommendation[hidden]{display:none!important}
 #adminCreateLeaveDialog .p79-simple-day{border:1px solid #dbe3ee;border-radius:12px;padding:12px;margin:8px 0;display:grid;gap:8px}
 #adminCreateLeaveDialog .p79-simple-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #adminCreateLeaveDialog .p79-simple-second{display:flex;align-items:end;gap:8px;flex-wrap:wrap}
