@@ -1055,7 +1055,7 @@
       title?'職稱「'+title+'」未設定預設加班類型，請依當日班表判斷。':'';
     const explicit=!!(prefill.savedReport||prefill.leaveHandoffId||
       prefill.preferredType||prefill.code||prefill.category||
-      prefill.attendance||prefill.lockOriginal);
+      prefill.attendance||prefill.lockOriginal||prefill.manualPlan||prefill.forEmpId);
     if(!recommended||explicit||editingOriginal)return;
     if(!typeOptions(dialogRuleConfig(),rows).some(o=>o.name===recommended))return;
     // Change the suggested TYPE, never silently choose any period or
