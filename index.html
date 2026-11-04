@@ -408,6 +408,20 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <div class="p79d-table-scroll"><table><thead><tr><th>排名</th><th>員工姓名</th><th>作業量</th><th>艙蓋</th><th>效率</th></tr></thead>
           <tbody id="p79DashPeopleRanking"><tr><td colspan="5">等待月份資料</td></tr></tbody></table></div></article>
     </div>
+    <article id="p79DashOvertimeList" class="p79d-panel p79-home-overtime-list" aria-label="本月加班申報清單" hidden style="margin:14px 0;padding:14px;max-width:100%">
+      <div class="p79d-panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <b>本月加班清單</b>
+        <span id="p79DashOvertimeCount" style="font-size:12px">正在讀取</span>
+        <button type="button" onclick="launchSystem('workhours')" style="padding:7px 11px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:700">前往加班管理：申報／修改／刪除</button>
+      </div>
+      <p style="font-size:12px;color:#64748b;margin:8px 0">首頁只顯示有權限範圍內的雲端加班明細；預排尚待核對，不等於正式核准。新增、修改或刪除請到「加班管理」。</p>
+      <div class="p79d-table-scroll" style="overflow-x:auto;max-height:340px">
+        <table style="width:100%;min-width:760px;text-align:left;border-collapse:collapse;font-size:13px">
+          <thead><tr><th>日期</th><th>姓名</th><th>部門</th><th>職稱</th><th>加班時段</th><th>申報時數</th><th>狀態</th></tr></thead>
+          <tbody id="p79DashOvertimeRecords"><tr><td colspan="7">等待加班資料</td></tr></tbody>
+        </table>
+      </div>
+    </article>
     <div class="p79r-audit-counts">本月考勤紀錄 <span id="p79DashPunchRecords">—</span> 筆 · 上班卡 <span id="p79DashPunchIns">—</span> 筆 <span id="p79DashScheduleSource"></span></div><p id="p79DashAttendanceSource" class="p79d-source">考勤統計待讀取；不改變員工刷卡上下班。</p>
     <p id="p79DashPersonSource" class="p79d-source">個人效率僅依可核對的作業量 Moves 與有效工時計算，避免錯誤推估。</p>
   </section>
@@ -1603,7 +1617,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261101-overtime-leave-pager-v2"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261104-home-overtime-list-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261102-public-ship-contrast-v1">
 <script src="./assets/port79-reference-dashboard.js?v=20261101-overtime-leave-pager-v2"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261102-bilingual-names-v82"></script>
