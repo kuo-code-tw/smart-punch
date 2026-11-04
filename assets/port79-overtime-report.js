@@ -3,9 +3,9 @@
  const KEY='port79_overtime_report_draft_v1',CONFIG='overtimeConversionRowsV1';
  const types=['休','國','例','代','延'];
  const TYPECONFIG='overtimeReportTypesV1',DELETED_CONFIG='overtimeDeletedBuiltinTypesV1',ARCHIVED_CONFIG='overtimeArchivedRuleKeysV1',ROLE_DEFAULTS_CONFIG='overtimeRoleTypeDefaultsV1';
- // Soft-deleted builtins are not available for NEW filings. Retain their
- // original conversion rows inside the cloud config for historical report
- // lookups, audits, and existing-report edits; never mutate past reports.
+ // Category labels provide internal day classifications, not installed types.
+ // Keep archived conversion rows in cloud storage for historical audit/edit,
+ // while only administrator-created types are offered in NEW filing forms.
  // Keep the previous wording as a read-only alias. New reports, menus, and
  // labels must use ONE official type: 平日延時加班 (category 延).
  const typeLabel={休:'休息日加班',國:'國定假日加班',例:'例假加班',代:'休假代班加班',延:'平日延時加班'};
@@ -649,7 +649,6 @@
     let dirty=false;try{dirty=cloudReady&&(
      JSON.stringify(validate(getRows()))!==loadedVisibleRows||
      JSON.stringify(customTypes)!==loadedTypes||
-     JSON.stringify([...removedBuiltinNames])!==loadedDeleted||
      JSON.stringify(roleTypeDefaults)!==loadedRoleDefaults);}catch(error){el.querySelector('#p79OtStatus').textContent='修改內容尚未通過驗證：'+error.message+'；請先修正或匯出，未重新載入。';return;}
     if(dirty){
      el.querySelector('#p79OtStatus').textContent='有尚未儲存的修改，請先儲存或匯出；未重新載入覆蓋你的內容。';return;
@@ -673,7 +672,7 @@
      if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
-     setReady(true);el.querySelector('#p79OtStatus').textContent=support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
+     setReady(true);el.querySelector('#p79OtStatus').textContent=!customTypes.length?'目前沒有啟用的加班類型，請在上方自行新增。':support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
    };
