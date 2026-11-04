@@ -1781,7 +1781,7 @@ async function p79OpenLeaveOvertimeHandoff(){
    date:e.date,employeeId:String(e.empId),at:canUse?cached.at:Date.now()};
   p79LeaveOvertimeConfig=data.config||{};
   const period=P79Overtime.resolveLeaveCoverReport(data,h,e);
-  const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])?
+  const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
   await P79Overtime.openReport({...e,...period,verifiedOvertimeRules,preferredType:e.preferredType||h.preferredType||'',category:'代',leaveHandoffId:h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
