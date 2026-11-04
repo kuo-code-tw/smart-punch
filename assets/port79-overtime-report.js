@@ -625,17 +625,15 @@
      button.disabled=!cloudReady||reading||saving||!global.p79OvertimeContext?.canEditRules?.();
      button.onclick=()=>{
       if(!cloudReady||reading||saving||!global.p79OvertimeContext?.canEditRules?.()||customTypes[index]?.[0]!==name)return;
-      const matching=[...body.rows].filter(tr=>{
-       const row=[...tr.querySelectorAll('[data-col]')].map(field=>field.value);
-       return row.length>=10&&ruleType(row)===canonicalType(name);
-      });
+      const matching=[...body.querySelectorAll('tr[data-ot-active="true"]')].filter(tr=>
+       ruleType(readEditorRow(tr))===canonicalType(name));
       if(!global.confirm('確定刪除加班類型「'+name+'」？'+
        (matching.length?'\\n同時停止提供 '+matching.length+' 個出勤時段。':'')+
        '\\n確認後直接同步雲端，不提供恢復；歷史加班紀錄保留。'))return;
       customTypes.splice(index,1);matching.forEach(tr=>tr.remove());
       renderAddedTypeList();renderRoleTypeDefaults();
-      el.querySelector('#p79AddedTypeMessage').textContent='正在刪除「'+name+'」並同步雲端…';
-      el.querySelector('#p79OtSave').click();
+      el.querySelector('#p79AddedTypeMessage').textContent='已移除「'+name+'」及其時段；請按最下方「儲存加班類型與出勤時段」。';
+      refreshRuleCount();
      };
      item.append(label,button);list.append(item);
     });
@@ -655,8 +653,7 @@
     }
     customTypes.push([name,category]);el.querySelector('#p79NewTypeName').value='';
     renderAddedTypeList();renderRoleTypeDefaults();
-    el.querySelector('#p79AddedTypeMessage').textContent='正在新增「'+name+'」並同步雲端…';
-    el.querySelector('#p79OtSave').click();
+    el.querySelector('#p79AddedTypeMessage').textContent='已新增「'+name+'」；請按最下方儲存後才會寫入雲端。';
    };
    el.querySelector('#p79AddedTypeMessage').parentElement.insertAdjacentHTML('afterend',
     '<section id="p79RoleTypeDefaultsPanel">'+
@@ -818,22 +815,24 @@
      removedBuiltinNames=new Set(types.map(code=>typeLabel[code]).filter(name=>!typeOptions(loaded.config).some(t=>t.name===name)));
      loadedDeleted=JSON.stringify([...deletedBuiltins(loaded.config)]);
      loadedArchived=JSON.stringify(loaded.config[ARCHIVED_CONFIG]||[]);
+     loadedHidden=JSON.stringify(loaded.config[HIDDEN_MANAGER_RULES]||[]);
      roleTypeDefaults=normalizeRoleTypeDefaults(loaded.config);
      loadedRoleDefaults=JSON.stringify(roleTypeDefaults);
      allCloudRows=loaded.rows;
-     const support=activeSupportPeriods(activeReportRows(loaded.rows,loaded.config),loaded.config);
-     rows=support.rows;
+     rows=managerVisibleRules(Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?loaded.rows:[],loaded.config);
      customTypes=typeOptions(loaded.config,loaded.rows).map(t=>[t.name,t.category]);
      loadedTypes=JSON.stringify(loaded.config[TYPECONFIG]||[]);
      loadedTypeDraft=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
-     body.innerHTML=rows.map(row=>editorRow(row,[...removedBuiltinNames])).join('');
-     const archivedCount=renderArchivedRows(loaded.rows,loaded.config);
+     body.innerHTML=rows.map(row=>editorRow(row)).join('');
+     refreshRuleCount();
      renderAddedTypeList();renderRoleTypeDefaults();
      if(cached){for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG])if(!Object.prototype.hasOwnProperty.call(loaded.config,key))delete cached[key];Object.assign(cached,loaded.config);}
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('加班選項本機快取未更新',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
-     setReady(true);el.querySelector('#p79OtStatus').textContent=!customTypes.length?(archivedCount?'目前沒有啟用的加班類型；雲端仍保留 '+archivedCount+' 筆歷史換算時段，可展開下方唯讀清單核對。':'目前沒有啟用的加班類型，且雲端未讀到可顯示的換算時段。'):!Array.isArray(loaded.config[ARCHIVED_CONFIG])&&legacySavedTypes(loaded.config).length?'已從原雲端設定讀回先前的加班類型與換算時數；確認後可直接刪除不需要的類型。':support.added?'已預填大夜請假與早班請假的 '+support.added+' 個延時支援時段（各 4 小時），請核對換算值後按「儲存加班類型與出勤時段」寫入雲端。':Object.prototype.hasOwnProperty.call(loaded.config,CONFIG)?'已讀取雲端儲存的加班選項；修改後按儲存。':'雲端尚未儲存加班選項，目前顯示預設表；請按儲存建立雲端設定。';
+     setReady(true);el.querySelector('#p79OtStatus').textContent=rows.length?
+      '已讀取雲端 '+rows.length+' 筆加班時段（包括先前保留時段）；可直接編輯及刪除，請按最下方儲存。':
+      '雲端尚未讀到可編輯的加班時段；請先確認資料來源，不要以空白表格覆蓋。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
    };
