@@ -8,6 +8,14 @@ const days=()=>p79DailyCreateDates();
 const rows=new Map();
 const safe=s=>esc(String(s??''));
 const personOptions=(people,selected,label)=>'<option value="">'+label+'</option>'+people.map(p=>'<option value="'+safe(p.empId)+'"'+(String(p.empId)===String(selected)?' selected':'')+'>'+safe(p.name+'｜'+leavePersonJob(p))+'</option>').join('');
+// 加班類型各人獨立選擇，僅作待申報偏好，正式核對仍以班表與打卡為準。
+const overtimeTypes=['休息日加班','平日延時加班','國定假日加班','例假加班'];
+function overtimeTypeField(date,row,workerKey){
+ const key=workerKey+'OvertimeType',selected=String(row[key]||'');
+ return '<div class="p79-worker-overtime"><label>本位加班類型</label><select data-date="'+date+'" data-field="'+key+'"><option value="">依本人班表判斷</option>'+
+  overtimeTypes.map(type=>'<option value="'+safe(type)+'"'+(selected===type?' selected':'')+'>'+safe(type)+'</option>').join('')+
+  '</select><small>此選項獨立於其他代班人員，申報前仍須核對班表與打卡。</small></div>';
+}
 function redraw(){
  const root=$id('adminCreateLeaveDailyRows');
  if(!root)return;
@@ -20,7 +28,7 @@ function redraw(){
  if(root.hidden)return;
  const people=leaveCreatePeople();
  root.innerHTML=days().map(date=>{
-  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',applicantOverride:false,first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:''});
+  if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',applicantOverride:false,first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:'',firstOvertimeType:'',secondOvertimeType:''});
   const row=rows.get(date);
   const defaultEmpId=String($id('adminCreateLeaveEmployee')?.value||'');
   const leaveId=row.applicantOverride?row.applicant:defaultEmpId;
@@ -37,14 +45,14 @@ function redraw(){
   };
   const applicantInfo='<div class="p79-day-applicant"><span>請假人員：<strong>'+safe(leave?.name||'請先選上方請假人員')+'</strong>'+(leave?' <small>｜'+safe(leavePersonJob(leave))+'</small>':'')+'</span><button class="btn btn-sec p79-day-applicant-switch" type="button" data-applicant-toggle="'+date+'">'+(row.applicantOverride?'↩ 使用上方人員':'本日不同請假人員')+'</button></div>';
   const extraApplicant=row.applicantOverride?'<div class="p79-day-applicant-override">'+field('applicant','本日請假人員',people,'請選擇本日請假人員')+'</div>':'';
-  return '<section class="p79-simple-day"><strong>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</strong>'+applicantInfo+extraApplicant+'<div class="p79-simple-grid">'+field('first','第一位代班',available,leave?'請選擇代班人員':'請先選上方請假人員')+'</div>'+(row.secondVisible?'<div class="p79-simple-second">'+field('second','第二位代班（選填）',available.filter(p=>String(p.empId)!==row.first),'不安排第二位')+'<button type="button" class="btn btn-sec" data-remove="'+date+'">移除</button></div>':'<button type="button" class="btn btn-sec p79-simple-add" data-add="'+date+'">＋ 第二位代班</button>')+'<small>'+(row.second?'兩位各代4小時':'一位代8小時')+'</small></section>';
+  return '<section class="p79-simple-day"><strong>'+date+'（'+['日','一','二','三','四','五','六'][new Date(date+'T12:00:00Z').getUTCDay()]+'）</strong>'+applicantInfo+extraApplicant+'<div class="p79-simple-grid">'+field('first','第一位代班',available,leave?'請選擇代班人員':'請先選上方請假人員')+overtimeTypeField(date,row,'first')+'</div>'+(row.secondVisible?'<div class="p79-simple-second">'+field('second','第二位代班（選填）',available.filter(p=>String(p.empId)!==row.first),'不安排第二位')+overtimeTypeField(date,row,'second')+'<button type="button" class="btn btn-sec" data-remove="'+date+'">移除</button></div>':'<button type="button" class="btn btn-sec p79-simple-add" data-add="'+date+'">＋ 第二位代班</button>')+'<small>'+(row.second?'兩位各代4小時':'一位代8小時')+'</small></section>';
  }).join('')||'<p>請選擇有效日期，最多62天。</p>';
  root.querySelectorAll('select[data-date]').forEach(el=>el.onchange=()=>{
   const row=rows.get(el.dataset.date);row[el.dataset.field]=el.value;
-  if(el.dataset.field==='applicant'){row.first='';row.second='';row.firstJob='';row.secondJob='';}
-  if(el.dataset.field==='applicantJob'){row.applicant='';row.first='';row.second='';row.firstJob='';row.secondJob='';}
-  if(el.dataset.field==='firstJob')row.first='';
-  if(el.dataset.field==='secondJob')row.second='';
+  if(el.dataset.field==='applicant'){row.first='';row.second='';row.firstJob='';row.secondJob='';row.firstOvertimeType='';row.secondOvertimeType='';}
+  if(el.dataset.field==='applicantJob'){row.applicant='';row.first='';row.second='';row.firstJob='';row.secondJob='';row.firstOvertimeType='';row.secondOvertimeType='';}
+  if(el.dataset.field==='firstJob'||el.dataset.field==='first'){row.firstOvertimeType='';if(el.dataset.field==='firstJob')row.first='';}
+  if(el.dataset.field==='secondJob'||el.dataset.field==='second'){row.secondOvertimeType='';if(el.dataset.field==='secondJob')row.second='';}
   if(el.dataset.field==='first'&&row.second===row.first)row.second='';
   redraw();
  });
@@ -57,11 +65,11 @@ function redraw(){
    row.applicant=String(base?.empId||'');
    row.applicantJob=base?leavePersonJob(base):'';
   }else{row.applicant='';row.applicantJob='';}
-  row.first='';row.second='';row.firstJob='';row.secondJob='';
+  row.first='';row.second='';row.firstJob='';row.secondJob='';row.firstOvertimeType='';row.secondOvertimeType='';
   redraw();
  });
  root.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{rows.get(el.dataset.add).secondVisible=true;redraw();});
- root.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{const row=rows.get(el.dataset.remove);row.secondVisible=false;row.second='';redraw();});
+ root.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{const row=rows.get(el.dataset.remove);row.secondVisible=false;row.second='';row.secondOvertimeType='';redraw();});
 }
 window.p79RenderDailyCreateCover=redraw;
 document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
@@ -91,7 +99,7 @@ async function saveDaily(){
     const worker=people.find(p=>String(p.empId)===String(id));
     if(!worker||String(worker.empId)===String(employee.empId)||String(worker.dept||'').trim()!==String(employee.dept||'').trim())throw Error(date+' 代班人員必須是同部門在職的其他人員');
    }
-   plans.push({date,id:row.id,employee,ids,mode:ids.length===2?'two':'one'});
+   plans.push({date,id:row.id,employee,ids,mode:ids.length===2?'two':'one',overtimeTypeByWorker:{[String(row.first)]:row.firstOvertimeType||'',...(row.second?{[String(row.second)]:row.secondOvertimeType||''}:{})}});
   }
  }catch(e){notice.textContent=e.message;return;}
  const button=$id('adminCreateLeaveSave'),done=[],entries=[];
@@ -111,7 +119,7 @@ async function saveDaily(){
     if(!result?.ok)throw Error('代班儲存未獲雲端確認');
     fresh.leaveCoverAssignments.push({leaveEmpId:p.employee.empId,leaveId:plan.leaveId,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
     const confirmedEntries=[];
-    for(const id of p.ids){const worker=people.find(e=>String(e.empId)===String(id));confirmedEntries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',date:p.date,forEmpId:String(p.employee.empId)});}
+    for(const id of p.ids){const worker=people.find(e=>String(e.empId)===String(id));confirmedEntries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',date:p.date,forEmpId:String(p.employee.empId),preferredType:p.overtimeTypeByWorker[String(id)]||''});}
     // Preserve each confirmed day immediately, including when a later day fails.
     p79AppendLeaveHandoffEntries(confirmedEntries);entries.push(...confirmedEntries);
    }
