@@ -608,6 +608,10 @@
    body.addEventListener('click',e=>{if(!cloudReady)return;if(e.target.closest('.p79OtDelete'))e.target.closest('tr').remove()});
    el.querySelector('#p79OtStatus').textContent=rows.length?'已顯示本機保存的選項（尚未核對雲端），正在確認…':'選項視窗已開啟，正在確認雲端資料…';
    el.querySelector('#p79OtAdd').onclick=()=>{
+    if(!customTypes.length){
+     el.querySelector('#p79OtStatus').textContent='請先在上方新增至少一種加班類型，再建立出勤時段。';
+     el.querySelector('#p79NewTypeName').focus();return;
+    }
     const choices=typeOptions({[TYPECONFIG]:customTypes,[DELETED_CONFIG]:[...removedBuiltinNames]},getRows()),form=dialog('新增出勤時段','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>加班類型<select id="p79PeriodType" style="'+inputStyle+'">'+choices.map((x,i)=>'<option value="'+i+'">'+esc(x.name)+'</option>').join('')+'</select></label><label>出勤時段名稱<input id="p79PeriodCode" placeholder="例如：休08-16、代16-20" style="'+inputStyle+'"></label>'+['正常起','正常迄','加班起','加班迄'].map((label,i)=>'<label>'+label+'<select id="p79PeriodTime'+i+'" style="'+inputStyle+'">'+Array.from({length:25},(_,h)=>'<option value="'+String(h).padStart(2,'0')+'">'+String(h).padStart(2,'0')+'</option>').join('')+'</select></label>').join('')+'<label>加班位置<select id="p79PeriodPosition" style="'+inputStyle+'"><option value="full">整段加班</option><option value="after">正常班後加班</option><option value="before">正常班前加班</option></select></label><label>實際加班時數<input id="p79PeriodActual" type="number" step="0.01" style="'+inputStyle+'"></label><label>換算加班時數<input id="p79PeriodConverted" type="number" step="0.01" style="'+inputStyle+'"></label></div><p id="p79PeriodMessage"></p><button id="p79PeriodAdd" type="button" style="background:#0369a1;color:white;padding:10px;border-radius:8px">加入出勤時段</button>','p79OvertimePeriodDialog');
     [8,16,8,16].forEach((h,i)=>form.querySelector('#p79PeriodTime'+i).value=String(h).padStart(2,'0'));form.querySelector('#p79PeriodActual').value='8';
     form.querySelector('#p79PeriodAdd').onclick=()=>{try{
@@ -685,7 +689,7 @@
      try{global.p79OvertimeContext?.persistConfig?.();}catch(error){console.warn('雲端已保存，本機快取更新失敗',error);}
      global.dispatchEvent?.(new CustomEvent('p79-overtime-options-saved'));
      renderAddedTypeList();renderRoleTypeDefaults();
-     el.querySelector('#p79OtStatus').textContent='✅ 加班類型已同步雲端；刪除類型不再顯示、沒有恢復功能，歷史申報保留。';
+     el.querySelector('#p79OtStatus').textContent=customTypes.some(([name])=>!draft.some(row=>ruleType(row)===canonicalType(name)))?'✅ 加班類型已同步雲端；尚未設定出勤時段的類型，請按「＋新增出勤時段」完成設定。':'✅ 加班類型已同步雲端；刪除類型不再顯示、沒有恢復功能，歷史申報保留。';
     }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message;}finally{saving=false;setReady(true);renderAddedTypeList();}
    };
    const setReady=ready=>{
