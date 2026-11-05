@@ -10739,8 +10739,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const employee=currentEmp,empId=String(employee?.empId||'').trim().toUpperCase();
             if(!window.P79PunchDeviceState)throw Error('手機驗證元件尚未載入，請重新整理');
             const result=prepared ? await prepared : null;
-            if(result?.error)throw result.error;
-            const master=result?.master || await window.P79PunchDeviceState.read(employee);
+            // The parallel attendance read may legitimately renew this employee's token.
+            const tokenChanged=!!result && result.token!==sessionStorage.getItem('port79_user_token');
+            if(result?.error && !tokenChanged)throw result.error;
+            const master=(!tokenChanged && result?.master) || await window.P79PunchDeviceState.read(employee);
             if(String(currentEmp?.empId||'').trim().toUpperCase()!==empId)throw Error('登入身分已變更，請重試');
             currentEmp=normalizeEmployeeIdentifiers({...employee,...master,sessionFallback:false,masterTemporarilyUnavailable:false});
             const local=employees.find(e=>String(e.empId||'').trim().toUpperCase()===empId);
@@ -10856,8 +10858,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const result={device:null,location:null};
             const superAdmin=sysConfig.adminIds.includes(String(employee.empId||'').toUpperCase());
             if(!superAdmin && employee.sessionFallback && !isFirstPunchVerified(employee) && window.P79PunchDeviceState){
+                const token=sessionStorage.getItem('port79_user_token');
                 result.device=window.P79PunchDeviceState.read(employee)
-                    .then(master=>({master}),error=>({error}));
+                    .then(master=>({master,token}),error=>({error,token}));
             }
             const knownPhone=isFirstPunchVerified(employee) &&
                 (employee.allowPunchWithoutDeviceBinding===true ||
