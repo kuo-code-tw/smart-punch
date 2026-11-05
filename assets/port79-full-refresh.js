@@ -49,12 +49,26 @@ const sys=()=>document.body.dataset.p79System||'',element=id=>document.getElemen
 function isEditing(){return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden');}
 function check(){const context=g.P79ManagementContext;if(sys()==='history'){if(typeof g.p79RefreshHistoryAll!=='function')throw Error('歷史資料頁仍在初始化');return;}
  if(!context||!context.canRead())throw Error('請先登入並確認本系統查詢權限');
- if(context.hasPendingChanges()!==false||isEditing())throw Error('有編輯中或尚未儲存的內容，請先完成儲存再重新整理，原資料已保留');}
+ if(context.hasPendingChanges()!==false)throw Error(context.pendingReason?.()||'有尚未儲存或待上傳的資料，請先完成雲端同步，原資料已保留');
+ if(isEditing())throw Error('目前正在編輯，請先完成編輯再重新整理，原資料已保留');}
 function notify(state,message){const b=element('p79FullRefreshButton'),status=element('p79FullRefreshStatus');if(b){b.disabled=state==='loading';b.textContent=state==='loading'?'↻ 更新中…':'↻ 重新整理';}if(status){status.textContent=message;status.dataset.state=state;}}
 async function refreshCurrentSystem(){
  if(sys()==='history'){await g.p79RefreshHistoryAll();return true;}
  const context=g.P79ManagementContext,identity=context.identity(),scope=JSON.stringify(context.scope?.()||{});
  const assertCurrent=()=>{check();if(context.identity()!==identity||JSON.stringify(context.scope?.()||{})!==scope)throw Error('查詢範圍已變更，請重新整理目前範圍');};
+ // 船舶的完整 gcGetData 曾超過 30 秒；不可沿用跨系統快照的短逾時，
+ // 也不可只讀歷史月份或用本機 revision 判斷本次手動更新已完成。
+ if(sys()==='efficiency'){
+  if(typeof g.restoreVesselDataFromCloud!=='function')throw Error('船舶雲端讀取程式尚未就緒，請重新開啟船舶頁');
+  if(typeof g.ensureGcQueueReady==='function')await g.ensureGcQueueReady();
+  check(); // 佇列載入後重新確認，不能覆蓋還沒上傳的船舶資料。
+  const loginToken=String(context.token()||'');
+  const pulled=await g.restoreVesselDataFromCloud(false,true); // 正式 GAS 完整讀取（90 秒保護）
+  if(pulled!==true)throw Error('船舶正式雲端資料尚未讀回，已保留現有資料');
+  if(String(context.token()||'')!==loginToken)throw Error('登入狀態已變更，請重新整理');
+  check();
+  return {ok:true,summary:'船舶資料已從正式雲端完整讀回並更新畫面；船舶 '+(g.shipMasters?.length||0)+' 艘、作業明細 '+(g.records?.length||0)+' 筆（含安全合併的本機資料）。'};
+ }
  const read=createReader({context,fetchImpl:(...args)=>g.fetch(...args),identity,assertCurrent});
  const snapshot=await context.readFresh(read,['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history']);
  assertCurrent();if(snapshot?.ok!==true||snapshot.confirmedFresh!==true||snapshot.fromCache)throw Error('雲端回覆不完整');
