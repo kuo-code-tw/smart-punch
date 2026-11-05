@@ -1,0 +1,18 @@
+name: Verify schedule overtime label readability
+on:
+  pull_request:
+    paths:
+      - 'schedule/index.html'
+      - 'tests/schedule-overtime-label-font.cjs'
+      - '.github/workflows/schedule-overtime-label-font.yml'
+permissions:
+  contents: read
+jobs:
+  font-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/schedule-overtime-label-font.cjs
