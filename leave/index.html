@@ -519,11 +519,26 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
 
  setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
 }
+// 請假、核准及代班不需要持有排班「長期編輯鎖」。
+ // 短暫 GAS 共用寫入鎖繁忙時，只重試後端明確回覆未開始寫入的 retryable 拒絕。
+ // 無回條／網路逾時一律不盲目重送，避免重複請假與重複代班。
 async function postCloud(payload){
  const userToken=leaveRequestToken();
  if(userToken){payload.token=userToken;if(adminToken)payload.gcToken=adminToken}
- const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'},['updateLeaveBalances','saveLeaveCoverAssignment'].includes(payload.action)?45000:25000);
- if(!d?.ok)throw new Error(d?.error||d?.message||'雲端操作失敗');return d;
+ const timeout=['updateLeaveBalances','saveLeaveCoverAssignment'].includes(payload.action)?45000:25000;
+ const body=JSON.stringify(payload);
+ for(let attempt=0;attempt<3;attempt++){
+  const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'},timeout);
+  if(d?.ok===true)return d;
+  if(d?.ok===false&&d?.retryable===true&&attempt<2){
+   // 後端明確拒絕寫入；不因別人編排班表而直接讓請假失敗。
+   await new Promise(resolve=>setTimeout(resolve,400+attempt*700));
+   continue;
+  }
+  if(d?.ok===false&&d?.retryable===true)
+   throw new Error('雲端正在處理其他資料，請假內容未確認儲存。請稍後再按儲存；不需要取得排班編輯權。');
+  throw new Error(d?.error||d?.message||'雲端操作失敗');
+ }
 }
 function readHash(){try{const p=new URLSearchParams(String(location.hash||'').replace(/^#/,''));const gas=p.get('gasurl');if(gas)sessionStorage.setItem('port79_gas_url',gas);return String(p.get('port79sso')||'')}catch{return''}}
 function storedToken(){return String(readHash()||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim()}
@@ -595,10 +610,31 @@ function renderMy(){
  const body=$('myLeaveBody');if(body)body.innerHTML='<tr><td colspan="5">一般員工不開放請假紀錄查閱</td></tr>';
 }
 function updateDays(){const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){$('leaveDays').value='';return}const a=new Date(s+'T00:00:00'),b=new Date(e+'T00:00:00');const d=Math.floor((b-a)/86400000)+1;$('leaveDays').value=d>0?d:''}
+let p79EmployeeLeaveDraft=null;
+function p79EmployeeLeaveStableId(key){
+ // 只在 sessionStorage 保存不可直接還原的摘要與單號，避免留下請假原因原文。
+ let hash=2166136261;for(const char of String(key||'')){hash=Math.imul(hash^char.charCodeAt(0),16777619);}
+ const fingerprint=(hash>>>0).toString(36);
+ if(p79EmployeeLeaveDraft?.key===fingerprint)return p79EmployeeLeaveDraft.id;
+ let saved=null;
+ try{saved=JSON.parse(sessionStorage.getItem('port79_pending_leave_submit_v1')||'null')}catch(_){}
+ const id=saved?.key===fingerprint&&Date.now()-Number(saved.at||0)<86400000?String(saved.id||''):String(Date.now());
+ p79EmployeeLeaveDraft={key:fingerprint,id};
+ try{sessionStorage.setItem('port79_pending_leave_submit_v1',JSON.stringify({key:fingerprint,id,at:Date.now()}))}catch(_){}
+ return id;
+}
+function p79EmployeeLeaveClearStableId(){
+ p79EmployeeLeaveDraft=null;
+ try{sessionStorage.removeItem('port79_pending_leave_submit_v1')}catch(_){}
+}
 async function submitLeave(){
  if(!currentEmployee)return;const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){setStatus('請選擇開始與結束日期','warn');return}updateDays();const days=Number($('leaveDays').value);if(!days){setStatus('結束日期不可早於開始日期','error');return}
  const btn=$('submitLeaveBtn');if(btn.disabled)return;btn.disabled=true;btn.textContent='上傳中...';
- try{const rec={id:String(Date.now()),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};await postCloud({action:'addLeave',leave:rec});setStatus('✅ 請假申請已送出','');$('leaveReason').value='';void loadCloud()}
+ try{const type=/^(年假|特休|特別休假)$/.test($('leaveType').value)?'特休假':$('leaveType').value;
+ const signature=JSON.stringify([String(currentEmployee.empId||''),s,e,type,$('leaveReason').value.trim()]);
+ const rec={id:p79EmployeeLeaveStableId(signature),attNo:currentEmployee.attNo||'',empId:currentEmployee.empId||'',name:currentEmployee.name||'',dept:currentEmployee.dept||'',leaveType:type,startDate:s,endDate:e,days,reason:$('leaveReason').value.trim(),status:'待審核',source:'leave-system'};
+ await postCloud({action:'addLeave',leave:rec});
+ p79EmployeeLeaveClearStableId();setStatus('✅ 請假申請已送出','');$('leaveReason').value='';void loadCloud()}
  catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
  finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
 }
@@ -982,11 +1018,17 @@ async function p79CleanupDeletedLeaveCovers(){
  try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
 }
 async function p79ReadCurrentLeaveCoverState(){
- // Preflight is read-only. Cleaning unrelated historical covers here added a
- // whole write/read cycle and could change rosters during a no-cover leave save.
- const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
- if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
- return fresh;
+ // Preflight is read-only and never acquires a roster edit lock. Avoid background
+ // cover cleanup or unrelated schedule writes before an independent leave save.
+ for(let attempt=0;attempt<3;attempt++){
+  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+  if(fresh?.ok===true&&Array.isArray(fresh.leaveRecords)&&Array.isArray(fresh.leaveCoverAssignments))return fresh;
+  if(fresh?.ok===false&&fresh.retryable===true&&attempt<2){
+   await new Promise(resolve=>setTimeout(resolve,400+attempt*700));
+   continue;
+  }
+  throw new Error(fresh?.error||'無法確認雲端請假與代班安排，請稍後重試');
+ }
 }
 function leaveBalanceNumber(v){
  const s=String(v??'').trim().replace(/,/g,'');

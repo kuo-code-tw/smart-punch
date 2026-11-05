@@ -1,0 +1,26 @@
+name: Verify leave filing without roster editor lock
+on:
+  pull_request:
+    paths:
+      - 'leave/index.html'
+      - 'tests/leave-roster-edit-lock-independent.cjs'
+      - '.github/workflows/leave-roster-edit-lock-independent.yml'
+permissions:
+  contents: read
+jobs:
+  leave-independent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify leave submission and cover safety
+        run: |
+          node tests/leave-roster-edit-lock-independent.cjs
+          node tests/gas-leave-save-fast.cjs
+          node tests/leave-daily-partial-save-queue.cjs
+          node tests/leave-handoff-dedupe.cjs
+          node tests/leave-cover-auto-suggest.cjs
+          node tests/leave-readonly-no-cover-save.cjs
+          node tests/leave-approved-cover-roster.cjs
