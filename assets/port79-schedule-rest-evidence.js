@@ -1,6 +1,74 @@
 (function(g){
 'use strict';
 const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().replace(/^0+/,'');
+
+ // Verified partial night shift: 20:00–24:00 actual paired overtime, then a
+ // punch-free 00:00–08:00 interval, both assigned to the original roster date.
+ // It does not create or change leave, overtime approval or roster records.
+ function detectNightSplitRest({month,schedules,people,sessions,referenceSessions,officialRecords,
+   referenceRecords,officialByMonth,referenceByMonth,referenceAvailable,timestamp,now}){
+   const found={};
+   if(!referenceAvailable||!referenceSessions||!Number.isFinite(now))return found;
+   const numbers=new Map(),known=new Set();
+   for(const person of people||[]){
+     const who=id(person.id||person.empId),no=att(person.attNo||person.attendanceNo);
+     if(!who)continue;known.add(who);
+     if(no){const set=numbers.get(no)||new Set();set.add(who);numbers.set(no,set);}
+   }
+   const owner=r=>{
+     const claimed=id(r.empId),options=numbers.get(att(r.attNo||r.attendanceNo));
+     if(options?.size>1)return '';
+     if(options?.size===1){const actual=[...options][0];return known.has(claimed)&&claimed!==actual?'':actual;}
+     return known.has(claimed)?claimed:'';
+   };
+   const rawByPerson=new Map();
+   for(const row of [...(officialRecords||[]),...(referenceRecords||[])]){
+     const who=owner(row),ms=timestamp(row);
+     if(!who||!Number.isFinite(ms))continue;
+     if(!rawByPerson.has(who))rawByPerson.set(who,[]);
+     rawByPerson.get(who).push(ms);
+   }
+   const paired=(rows,who,date,start,end)=>{
+     const matches=(rows||[]).filter(s=>{
+       if(id(s.empId)!==who||!Number.isFinite(s.start)||!Number.isFinite(s.end)||s.end<=s.start)return false;
+       if(new Date(s.start+28800000).toISOString().slice(0,10)!==date||
+         s.workDate&&s.workDate!==date)return false;
+       return Math.abs(s.start-start)<=900000&&Math.abs(s.end-end)<=900000&&
+         s.end-s.start>=210*60000&&s.end-s.start<=270*60000;
+     });
+     return matches.length===1;
+   };
+   for(const row of schedules||[]){
+     const who=id(row.empId),roster=row.schedule||{};
+     if(!who||!known.has(who))continue;
+     for(const date of Object.keys(roster)){
+       if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!date.startsWith(month+'-'))continue;
+       const meta=roster.__meta?.[date]||{},report=meta.overtimeReport;
+       if(!(roster[date]==='晚'||meta.reportOriginalShift==='晚'||meta.overtimeOriginalShift==='晚')||
+         !report?.id||meta.overtimeExcluded===true||
+         (meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id)))continue;
+       const startText=String(report.overtimeStart||meta.overtimeStart||'').trim();
+       const endText=String(report.overtimeEnd||meta.overtimeEnd||'').trim();
+       const code=String(report.code||'').replace(/^[代延休例國]/,'');
+       if(startText&&endText?
+         !(startText==='20:00'&&['00:00','24:00'].includes(endText)):
+         code!=='20-24')continue;
+       const start=Date.parse(date+'T20:00:00+08:00'),end=start+4*3600000,finish=end+8*3600000;
+       const nextDate=new Date(end+28800000).toISOString().slice(0,10),nextMonth=nextDate.slice(0,7);
+       if(now<end+12*3600000||!officialByMonth?.[month]||!referenceByMonth?.[month]||
+         !officialByMonth?.[nextMonth]||!referenceByMonth?.[nextMonth])continue;
+       // Across month boundaries, a completely empty next-month feed is unverified.
+       if(nextMonth!==month&&
+         (![...(officialRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))||
+          ![...(referenceRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))))continue;
+       if(!paired(sessions,who,date,start,end)||!paired(referenceSessions,who,date,start,end))continue;
+       if((rawByPerson.get(who)||[]).some(ms=>ms>=end&&ms<finish))continue;
+       found[who+'|'+date]={workDate:date,workStart:'20:00',workEnd:'24:00',
+         restStart:'00:00',restEnd:'08:00',reportId:String(report.id)};
+     }
+   }
+   return found;
+ }
 function create(ctx){
  const states=new Map(),reads=new Map(),now=()=>ctx.now?ctx.now():Date.now();
  function months(month){const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date(now()));const adjacent=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);return[adjacent(-1),month,...(adjacent(1)<=current?[adjacent(1)]:[])];}
@@ -147,6 +215,12 @@ function create(ctx){
      set.add(person);activeDateIds.set(date,set);
      if(date.startsWith(month+'-')){distinctMonthIds.add(person);activeMonthDates.add(date);}
    }
+   const referenceSessions=referenceAvailable?mapSessions(ctx.buildShifts([...referenceRecords.values()])):null;
+   state.evidence.nightSplitRestConfirmed=detectNightSplitRest({
+     month,schedules,people,sessions,referenceSessions,
+     officialRecords:[...records.values()],referenceRecords:[...referenceRecords.values()],
+     officialByMonth,referenceByMonth,referenceAvailable,timestamp:ctx.timestamp,now:now()
+   });
    const employeeCount=people.length;
    const monthCoverage=employeeCount>0&&
      officialRows.filter(r=>String(r.timeStr||r.time||'').startsWith(month.replace('-','/'))||
@@ -259,5 +333,5 @@ function create(ctx){
  }
  return{refresh,status,refreshIfStale};
 }
-g.P79ScheduleRestEvidence={create};
+g.P79ScheduleRestEvidence={create,detectNightSplitRest};
 })(window);
