@@ -1240,12 +1240,25 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       currentOpText='同步完成';
       activeSyncRecordId='';
 
-      try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
-      try{renderAdminRecordsTable?.()}catch(e){}
-      try{renderAdminLiveTable?.()}catch(e){}
-
-      if(successMsg)try{showToast(successMsg,'success')}catch(e){}
-      if(typeof onSuccess==='function')try{onSuccess(data)}catch(e){}
+      const renderConfirmedViews=()=>{
+        try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
+        try{renderAdminRecordsTable?.()}catch(e){}
+        try{renderAdminLiveTable?.()}catch(e){}
+      };
+      const employeePunch=['queueEmployeePunch','persistEmployeePunch'].includes(String(payload?.action||'')) ||
+        (String(payload?.action||'')==='addRecord' && ['employee-punch','mobile-punch'].includes(String(payload?.record?.source||'').toLowerCase()));
+      if(employeePunch){
+        // send() has already validated the actual cloud receipt. Paint it before large tables.
+        if(typeof onSuccess==='function')try{onSuccess(data)}catch(e){}
+        if(successMsg)try{showToast(successMsg,'success')}catch(e){}
+        if(typeof window!=='undefined' && typeof window.requestAnimationFrame==='function'){
+          window.requestAnimationFrame(()=>setTimeout(renderConfirmedViews,0));
+        }else setTimeout(renderConfirmedViews,0);
+      }else{
+        renderConfirmedViews();
+        if(successMsg)try{showToast(successMsg,'success')}catch(e){}
+        if(typeof onSuccess==='function')try{onSuccess(data)}catch(e){}
+      }
 
       // 直送完成後再補傳之前失敗的考勤。
       setTimeout(()=>drain(false),0);
@@ -1448,3 +1461,22 @@ window.postRealtimePunchToCloud=function(record,successMsg,onPersistSuccess,onEr
 
 })();
 
+
+// Immediate, visible feedback for the existing guarded punch flow; never claims persistence.
+(function installPunchInstantFeedback(){
+ if(window.p79PunchInstantFeedbackInstalled || typeof window.p79SetPunchProgress!=='function')return;
+ window.p79PunchInstantFeedbackInstalled=true;
+ const original=window.p79SetPunchProgress;
+ window.p79SetPunchProgress=function(message){
+  const result=original.apply(this,arguments);
+  let banner=document.getElementById('p79PunchInstantFeedback');
+  if(message && !banner){
+   banner=document.createElement('div');banner.id='p79PunchInstantFeedback';
+   banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');
+   banner.style.cssText='position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:10000;width:max-content;max-width:calc(100vw - 24px);padding:14px 18px;border-radius:14px;background:#312e81;color:#fff;box-shadow:0 8px 30px #0004;font-size:16px;font-weight:700;line-height:1.5;pointer-events:none';
+   document.body.appendChild(banner);
+  }
+  if(banner){banner.textContent=message?'打卡處理中｜'+message:'';banner.style.display=message?'block':'none';}
+  return result;
+ };
+})();
