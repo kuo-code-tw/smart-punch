@@ -1820,6 +1820,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     let scheduleEditLockRefreshBusy = false;
     let scheduleLockRequestEpoch = 0; // 忽略手動鎖定後才抵達的舊背景回應
     let scheduleManualLockBusy = false;
+    // 未按「鎖定編輯」前，只讀取租約狀態，禁止背景申請或續租。
+    let scheduleManualEditIntent = false;
     let scheduleEditLockState = { locked:false, mine:false, ownerName:'', ownerEmpId:'', expiresAt:0, startedAt:0, lastCheckedAt:0 };
 
     // 內建診斷：不開新分頁、不使用 iframe，也不傳送或記錄登入 Token。
@@ -2041,7 +2043,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
     }
 
     function scheduleCanEditNow() {
-      return canManageSchedule() && !!scheduleEditLockState.mine && p79ScheduleHasOfficialData();
+      return canManageSchedule() && scheduleManualEditIntent && !!scheduleEditLockState.mine && p79ScheduleHasOfficialData();
     }
 
     function scheduleLockOwnerLabel() {
@@ -2082,7 +2084,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if (!canManageSchedule()) message = '此帳號只有排班查看權限，不能修改班表。';
       else if (!p79ScheduleHasOfficialData()) message = '目前班表尚未向雲端確認，只能查看；請等更新完成或按重新讀取。';
       else if (scheduleEditLockState.locked && !scheduleEditLockState.mine) message = `目前由 ${scheduleLockOwnerLabel()} 正在更改班表，為避免多人同時修改造成錯亂，已禁止修改。`;
-      else message = '尚未取得排班編輯權，正在等待雲端編輯鎖。';
+      else message = '尚未按「鎖定編輯」取得排班編輯權。';
       if (showAlert) alert('🔒 ' + message);
       return false;
     }
@@ -2118,7 +2120,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           s=`此帳號不能修改班表｜最後確認 ${scheduleEscapeHtml(checked||'剛剛')}`;
           i='<i class="fa-solid fa-eye"></i>';
         }
-      } else if(scheduleEditLockState.mine) {
+      } else if(scheduleEditLockState.mine && scheduleManualEditIntent) {
         state='mine';
         t=`✍️ 你正在編輯排班｜${scheduleEscapeHtml(myLabel)}`;
         if(scheduleLockLastError){
@@ -2128,6 +2130,11 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           s=`其他管理者目前只能查看｜編輯權每 ${Math.round(SCHEDULE_LOCK_HEARTBEAT_MS/1000)} 秒背景續租一次`;
         }
         i='<i class="fa-solid fa-pen-to-square"></i>';
+      } else if(scheduleEditLockState.mine) {
+        state='view';
+        t='👁️ 查看模式｜本裝置仍有先前取得的編輯鎖';
+        s='本頁沒有按鎖定編輯，不自動續租；可按上方解除鎖定釋放舊鎖。';
+        i='<i class="fa-solid fa-eye"></i>';
       } else if(scheduleEditLockState.locked) {
         state='other';
         t=`🚨 ${scheduleEscapeHtml(owner)} 正在編輯排班`;
@@ -2168,6 +2175,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       if (!canManageSchedule()) {
         el.className = 'px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-xs font-black text-amber-700 dark:text-amber-300';
         el.innerHTML = '<i class="fa-solid fa-eye mr-1"></i> 查看模式｜不可修改';
+      } else if (scheduleEditLockState.mine && !scheduleManualEditIntent) {
+        el.className = 'px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-xs font-black text-amber-700';
+        el.innerHTML = '<i class="fa-solid fa-eye mr-1"></i> 查看模式｜偵測到先前鎖定（不自動續租，可點解除鎖定）';
       } else if (scheduleEditLockState.mine) {
         const me = currentScheduleSession();
         const who = String(me.name || scheduleEditLockState.ownerName || me.empId || '目前帳號');
@@ -2189,7 +2199,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           : 'px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-black text-slate-600 dark:text-slate-300';
         el.innerHTML = scheduleLockLastError
           ? '<i class="fa-solid fa-triangle-exclamation mr-1"></i> 鎖定狀態暫時無法更新'
-          : '<i class="fa-solid fa-lock-open mr-1"></i> 正在自動取得排班編輯權';
+          : '<i class="fa-solid fa-eye mr-1"></i> 查看模式｜按「鎖定編輯」才可修改';
       }
       updateScheduleActiveEditorBanner();
       try { window.p79UpdateScheduleLockTop?.(); } catch(e) {}
@@ -2211,6 +2221,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         startedAt: Number(data?.startedAt || scheduleEditLockState.startedAt || 0),
         lastCheckedAt: Date.now()
       };
+      if(!scheduleEditLockState.mine)scheduleManualEditIntent=false;
       updateScheduleLockBadge();
       applyScheduleAccessUi();
       if (previousMine && !scheduleEditLockState.mine) {
@@ -2320,6 +2331,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       try {
         const data = await scheduleLockPost('scheduleForceAcquireEditLock');
         scheduleLockLastError = '';
+        scheduleManualEditIntent=!!(data?.mine||data?.acquired);
         setScheduleEditLockState(data);
         if(!scheduleEditLockState.mine)throw new Error(data?.error||'雲端尚未確認編輯權接管成功');
         await loadScheduleCloudWithRetry('manual', 2);
@@ -2339,13 +2351,10 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       scheduleEditLockRefreshBusy = true;
       try {
         if (canManageSchedule()) {
-          // V10.31：自動取得編輯租約；保留 GAS 原子鎖避免多人覆蓋。
-          const status = scheduleEditLockState.mine
+          // 登入、focus、同步和背景輪詢只能 GET。僅明確手動取得的鎖才續租。
+          const data = scheduleEditLockState.mine && scheduleManualEditIntent
             ? await scheduleLockPost('scheduleHeartbeatEditLock')
             : await scheduleLockGet();
-          const data = !status.mine && !status.locked && document.visibilityState === 'visible'
-            ? await scheduleLockPost('scheduleAcquireEditLock')
-            : status;
           if (requestEpoch !== scheduleLockRequestEpoch || scheduleManualLockBusy) return false;
           scheduleLockLastError = ''; scheduleLockFailureCount=0; scheduleLockFirstFailureAt=0;
           setScheduleEditLockState(data);
@@ -2368,6 +2377,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         if(!leaseStillValid && scheduleEditLockState.mine){
           scheduleEditLockState.mine=false;
           scheduleEditLockState.locked=false;
+          scheduleManualEditIntent=false;
         }
         updateScheduleLockBadge();
         applyScheduleAccessUi();
@@ -2379,7 +2389,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     function scheduleEditLockNextDelay() {
       if (document.visibilityState !== 'visible') return SCHEDULE_LOCK_HIDDEN_POLL_MS;
-      if (scheduleEditLockState.mine) return SCHEDULE_LOCK_HEARTBEAT_MS;
+      if (scheduleEditLockState.mine && scheduleManualEditIntent) return SCHEDULE_LOCK_HEARTBEAT_MS;
       if (scheduleEditLockState.locked) return SCHEDULE_LOCK_WATCH_OTHER_MS;
       return SCHEDULE_LOCK_FREE_POLL_MS;
     }
@@ -2417,7 +2427,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     async function manualAcquireScheduleEditLock(){
       if (!canManageSchedule()) { alert('只有管理員以上且具有排班管理權限才可鎖定編輯。'); return false; }
-      if (scheduleEditLockState.mine) { window.p79UpdateScheduleLockTop?.(); return true; }
+      if (scheduleEditLockState.mine && scheduleManualEditIntent) { window.p79UpdateScheduleLockTop?.(); return true; }
       if (scheduleManualLockBusy) return false;
       scheduleManualLockBusy = true;
       ++scheduleLockRequestEpoch;
@@ -2429,6 +2439,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         // 不額外 GET 一次，以免慢網路下兩個請求串行等待。
         const data = await scheduleLockPost('scheduleAcquireEditLock');
         scheduleLockLastError='';scheduleLockFailureCount=0;scheduleLockFirstFailureAt=0;
+        scheduleManualEditIntent=!!(data?.mine||data?.acquired);
         setScheduleEditLockState(data);
         if (scheduleEditLockState.mine) return true;
 
@@ -2500,6 +2511,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
       scheduleEditLockState.mine = false;
       scheduleEditLockState.locked = false;
+      scheduleManualEditIntent=false;
       scheduleEditLockState.startedAt = 0;
       scheduleEditLockState.lastCheckedAt = Date.now();
     }
@@ -2514,6 +2526,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           throw new Error(String(result?.error||'雲端尚未確認解鎖，已保留原鎖定狀態'));
         }
         scheduleLockLastError='';
+        scheduleManualEditIntent=false;
         setScheduleEditLockState({ok:true,locked:false,mine:false,ownerName:'',ownerEmpId:'',expiresAt:0,startedAt:0});
         return true;
       }catch(e){
@@ -3764,7 +3777,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       const owner = lockedByOther ? scheduleLockOwnerLabel() : '';
       const disabledTitle = !manage
         ? '此帳號只有排班查看權限'
-        : (!p79ScheduleHasOfficialData() ? '正在核對雲端最新班表，目前僅供查看' : lockedByOther ? `目前由 ${owner} 正在更改班表，禁止修改` : '尚未取得排班編輯權');
+        : (!p79ScheduleHasOfficialData() ? '正在核對雲端最新班表，目前僅供查看' : lockedByOther ? `目前由 ${owner} 正在更改班表，禁止修改` : '請先按「鎖定編輯」取得編輯權');
 
       const mutationPatterns = [
         'resetToDefaultData','saveAllPersonnelChanges','openAddModal','openEditModal',
@@ -3818,9 +3831,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         } else if (editable) {
           html='<div class="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 rounded-xl px-3 py-2 text-center">✅ 已取得排班編輯權｜此時其他管理者會顯示「禁止修改」</div>';
         } else if (lockedByOther) {
-          html=`<div class="bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-xl px-3 py-2 text-center">🔒 禁止修改｜目前由 <b>${scheduleEscapeHtml(owner)}</b> 正在更改班表，待對方離開或鎖定逾時後會自動取得編輯權</div>`;
+          html=`<div class="bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-xl px-3 py-2 text-center">🔒 禁止修改｜目前由 <b>${scheduleEscapeHtml(owner)}</b> 正在更改班表，請等待對方解除鎖定，再手動按「鎖定編輯」</div>`;
         } else {
-          html='<div class="bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-900 rounded-xl px-3 py-2 text-center">👁️ 班表已可查看｜編輯權在背景確認；需要修改時按「鎖定編輯」即可</div>';
+          html='<div class="bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-900 rounded-xl px-3 py-2 text-center">👁️ 查看模式｜需要修改時，請手動按「鎖定編輯」</div>';
         }
         if(banner.innerHTML!==html)banner.innerHTML=html;
       }
@@ -5077,7 +5090,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
     async function p79EnsureGroupEdit(){
       if(!canManageSchedule()){alert('沒有排班管理權限');return false;}
-      if(!scheduleCanEditNow()&&!await manualAcquireScheduleEditLock())return false;
+      if(!scheduleCanEditNow())return requireScheduleEditLock();
       return requireScheduleEditLock();
     }
     async function p79CommitRoleGroups(role,groups,removed=[]){
@@ -6807,15 +6820,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
     async function saveCurrentTabSchedule() {
       if(p79ManualScheduleSaveBusy)return;
       if (!canManageSchedule()) { requireScheduleEditLock(); return; }
-      // 儲存前由 GAS 原子確認編輯權；不以可能延遲的本機狀態直接拒絕管理員。
+      // 儲存只能使用已手動取得的編輯鎖，不得因按「儲存」暗中申請。
       // 若其他帳號持鎖，必須拒絕寫入，不可強制接管。
-      if (!scheduleEditLockState.mine) {
-        const acquired = await manualAcquireScheduleEditLock();
-        if (!acquired) {
-          const owner=scheduleEditLockState.locked ? '目前由 '+scheduleLockOwnerLabel()+' 編輯' : '雲端尚未確認編輯權';
-          alert('❌ 排班尚未儲存：'+owner+'。請稍候再按儲存，勿重新整理以免丟失未儲存的變更。');
-          return;
-        }
+      if(!scheduleCanEditNow()){
+        requireScheduleEditLock();
+        return;
       }
       if (!requireScheduleEditLock(false)) return;
       p79ApplyAutomaticRestMetadata();
@@ -8868,20 +8877,36 @@ body[data-p79-system="schedule"] #schedule-rule-toolbar{display:none!important}
 <script id="p79-schedule-v10-14-7-manual-lock-mode-script">
 (function(){'use strict';
 function lockBtn(){return document.getElementById('p79ScheduleLockTopBtn')}
-window.p79UpdateScheduleLockTop=function(){const b=lockBtn();if(!b)return;try{if(typeof canManageSchedule==='function'&&!canManageSchedule()){b.className='p79v103-btn p79-lock-btn view';b.textContent='👁️ 查看模式';b.disabled=true;return}b.disabled=false;if(scheduleEditLockState?.mine){const me=typeof currentScheduleSession==='function'?currentScheduleSession():{};const who=String(me?.name||scheduleEditLockState?.ownerName||me?.empId||'我');b.className='p79v103-btn p79-lock-btn mine';b.textContent='✅ '+who+' 可編輯';b.title='已自動取得編輯權，無需操作';return}if(scheduleEditLockState?.locked){const who=typeof scheduleLockOwnerLabel==='function'?scheduleLockOwnerLabel():(scheduleEditLockState?.ownerName||scheduleEditLockState?.ownerEmpId||'其他管理員');b.className='p79v103-btn p79-lock-btn other';b.textContent='🔒 '+who+' 鎖定中';b.title='目前由 '+who+' 鎖定排班';return}b.className='p79v103-btn p79-lock-btn';b.textContent='⏳ 自動開放中';b.title='系統會自動取得編輯權'}catch(e){b.className='p79v103-btn p79-lock-btn';b.textContent='🔒 鎖定編輯'}};
-window.p79ToggleScheduleLock=async function(){try{
- if(scheduleEditLockState?.mine){return}
- if(scheduleEditLockState?.locked){
-   try{await refreshOrAcquireScheduleEditLock?.()}catch(e){}
-   if(!scheduleEditLockState?.locked){await window.manualAcquireScheduleEditLock?.();return}
-   const who=typeof scheduleLockOwnerLabel==='function'?scheduleLockOwnerLabel():'其他管理員';
-   if(typeof isScheduleSuperAdmin==='function'&&isScheduleSuperAdmin()){
-     if(confirm('目前由「'+who+'」鎖定。\n\n是否由超級管理員強制接管？'))await forceTakeoverScheduleEditLock();
-   }
-   return;
- }
- await refreshOrAcquireScheduleEditLock?.();
-}finally{window.p79UpdateScheduleLockTop?.()}};
+window.p79UpdateScheduleLockTop=function(){const b=document.getElementById('p79ScheduleLockTopBtn');if(!b)return;try{
+  if(!canManageSchedule()){b.className='p79v103-btn p79-lock-btn view';b.textContent='👁️ 查看模式';b.title='沒有排班管理權限';b.disabled=true;return;}
+  b.disabled=false;
+  if(scheduleEditLockState?.mine){
+    b.className='p79v103-btn p79-lock-btn mine';
+    b.textContent=scheduleManualEditIntent?'🔓 解除鎖定':'🔓 解除舊鎖';
+    b.title=scheduleManualEditIntent?'點擊釋放目前編輯權':'本頁未按鎖定編輯；既有舊鎖不會自動續租，點擊可解除';return;
+  }
+  if(scheduleEditLockState?.locked){
+    const who=scheduleLockOwnerLabel();
+    b.className='p79v103-btn p79-lock-btn other';b.textContent='🔒 '+who+' 鎖定中';b.title='別人持鎖中，不會自動接管';return;
+  }
+  b.className='p79v103-btn p79-lock-btn';b.textContent='🔒 鎖定編輯';b.title='僅在按下本按鈕時才向雲端申請編輯權';
+ }catch(e){b.className='p79v103-btn p79-lock-btn';b.textContent='🔒 鎖定編輯'} };
+window.p79ToggleScheduleLock=async function(){
+ const b=lockBtn();if(b)b.disabled=true;
+ try{
+  if(scheduleEditLockState?.mine){await manualReleaseScheduleEditLock();return;}
+  if(scheduleEditLockState?.locked){
+    try{await refreshOrAcquireScheduleEditLock()}catch(e){}
+    if(!scheduleEditLockState?.locked){await manualAcquireScheduleEditLock();return;}
+    if(scheduleEditLockState?.mine){await manualReleaseScheduleEditLock();return;}
+    const who=scheduleLockOwnerLabel();
+    if(isScheduleSuperAdmin()&&confirm('目前由「'+who+'」鎖定。\\n\\n是否由超級管理員強制接管？'))
+      await forceTakeoverScheduleEditLock();
+    return;
+  }
+  await manualAcquireScheduleEditLock();
+ }finally{if(b)b.disabled=false;window.p79UpdateScheduleLockTop?.();}
+};
 function ensureModeModal(){let m=document.getElementById('p79ScheduleModeModal');if(m)return m;m=document.createElement('div');m.id='p79ScheduleModeModal';m.className='p79-schedule-mode-modal';m.innerHTML='<div class="p79-schedule-mode-card" role="dialog" aria-modal="true" aria-label="排班模式"><div class="p79-schedule-mode-head"><div class="p79-schedule-mode-title">📅 排班模式</div><button type="button" class="p79-schedule-mode-close" onclick="window.p79CloseScheduleModeModal()">✕ 關閉</button></div><div id="p79ScheduleModeContent"></div></div>';m.addEventListener('click',e=>{if(e.target===m)window.p79CloseScheduleModeModal()});document.body.appendChild(m);const toolbar=document.getElementById('schedule-rule-toolbar');const c=document.getElementById('p79ScheduleModeContent');if(toolbar&&c)c.appendChild(toolbar);return m}
 window.p79OpenScheduleModeModal=function(){const m=ensureModeModal();m.classList.add('open');window.p79CloseSystemMenu?.()};window.p79CloseScheduleModeModal=function(){document.getElementById('p79ScheduleModeModal')?.classList.remove('open')};document.addEventListener('keydown',e=>{if(e.key==='Escape')window.p79CloseScheduleModeModal()});function init(){ensureModeModal();setTimeout(()=>window.p79UpdateScheduleLockTop?.(),0)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();})();
 </script>
@@ -9132,7 +9157,7 @@ window.P79ScheduleContinuationContext={
  people:source=>source.employees.filter(e=>String(e.empId||'').toUpperCase()!=='ADMIN').map(e=>({...e,id:String(e.empId||'').trim().toUpperCase()})),
  eligible:(person,date)=>p79EmployeeDateEligible(person,date),
  allocate:(schedule,meta,month,excluded,person)=>{const preserved=JSON.parse(JSON.stringify(meta));Object.values(preserved).forEach(m=>{if(m?.restAllocationSource==='auto-v1')m.restAllocationSource='preserved-continuation';});return p79AllocateRestMonth(schedule,preserved,month,excluded,p79EmploymentStartDate(person)).meta;},
- acquire:async()=>{if(!scheduleEditLockState.mine&&!await manualAcquireScheduleEditLock())throw Error('尚未取得排班編輯權；他人編輯時不會強制接管');if(!requireScheduleEditLock(false))throw Error('排班編輯權已失效');},
+ acquire:async()=>{if(!scheduleCanEditNow())throw Error('請先按「鎖定編輯」再執行延續排班；他人編輯時不會強制接管');if(!requireScheduleEditLock(false))throw Error('排班編輯權已失效');},
  requestId:p79CreateScheduleSaveRequestId,receipt:p79ConfirmScheduleSaveReceipt,
  persist:async(month,rows,requestId)=>{
   let failure;const result=await runScheduleCloudWrite(async()=>{try{return await cloudPost({action:'syncSchedules',month,schedules:rows,expectedEmployeeCount:rows.length,saveRequestId:requestId});}catch(error){failure=error;throw error;}});

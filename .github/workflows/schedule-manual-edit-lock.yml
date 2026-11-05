@@ -1,0 +1,19 @@
+name: Verify schedule manual-only edit lock
+on:
+  pull_request:
+    paths:
+      - 'schedule/index.html'
+      - 'tests/schedule-lock-manual-only.cjs'
+      - '.github/workflows/schedule-manual-edit-lock.yml'
+permissions:
+  contents: read
+jobs:
+  manual-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/schedule-lock-manual-only.cjs
+      - run: node tests/schedule-edit-lock-lane.cjs
