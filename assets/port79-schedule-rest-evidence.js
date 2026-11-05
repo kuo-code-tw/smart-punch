@@ -42,7 +42,7 @@ const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().repla
      const who=id(row.empId),roster=row.schedule||{};
      if(!who||!known.has(who))continue;
      for(const date of Object.keys(roster)){
-       if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!date.startsWith(month+'-'))continue;
+       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(month+'-'))continue;
        const meta=roster.__meta?.[date]||{},report=meta.overtimeReport;
        if(!(roster[date]==='晚'||meta.reportOriginalShift==='晚'||meta.overtimeOriginalShift==='晚')||
          !report?.id||meta.overtimeExcluded===true||
