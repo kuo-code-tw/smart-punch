@@ -1198,7 +1198,8 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
     <div class="grid sm:grid-cols-2 gap-3">
       <div><label class="text-xs font-bold">WORKING NO.</label><input id="shipEditWorkingNo" class="w-full border rounded-xl px-3 py-3"></div>
-      <div><label class="text-xs font-bold">船名</label><input id="shipEditVessel" class="w-full border rounded-xl px-3 py-3"></div>
+      <div><label class="text-xs font-bold">英文船名</label><input id="shipEditVessel" class="w-full border rounded-xl px-3 py-3"></div>
+      <div><label class="text-xs font-bold">中文船名</label><input id="shipEditVesselChineseName" placeholder="填入正式中文船名" class="w-full border rounded-xl px-3 py-3"></div>
       <div><label class="text-xs font-bold">航次 I</label><input id="shipEditVoyageI" class="w-full border rounded-xl px-3 py-3"></div>
       <div><label class="text-xs font-bold">航次 E</label><input id="shipEditVoyageE" class="w-full border rounded-xl px-3 py-3"></div>
       <div><label class="text-xs font-bold">碼頭</label><input id="shipEditWharf" class="w-full border rounded-xl px-3 py-3"></div>
@@ -2453,6 +2454,7 @@ function normalizeWorkingSheetBillingSemantics(master){
 
 function sanitizeShipMasterMetrics(raw){
   const s={...(raw||{})};
+  s.vesselChineseName=p79VesselChineseName(s);
   const finiteMetric=v=>{
     const n=Number(v);
     return Number.isFinite(n) && Math.abs(n)<=100000 ? n : null;
@@ -3738,7 +3740,7 @@ function renderDashboard(){
       <td>${shipChangeStatusBadge(x)}</td>
       <td class="font-bold whitespace-nowrap">${esc(dashboardRocDate(dashboardJobDateValue(x)))}</td>
       ${dashboardChangeCell(x,'workingNo',esc(originalNumericWorkingNo(x.sourceWorkingNo||x.workingNo))+(vesselImportCallNumber(x)>1?'（第'+vesselImportCallNumber(x)+'靠）':''),'font-black text-indigo-700')}
-      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button>`)}
+      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button><div class="text-xs text-slate-500">中文：${esc(p79VesselChineseDisplay(x)||'未提供')}</div>`)}
       ${dashboardChangeCell(x,'voyageI',voyage)}
       ${dashboardChangeCell(x,'wharf',wharf)}
       ${dashboardChangeCell(x,'totalContainers',String(num(x.totalContainers)),'font-bold')}
@@ -4263,6 +4265,7 @@ function renderRecords(){
       <td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td>
       <td>
         <div class="record-vessel-name">${esc(vp.vessel)}</div>
+        <div class="text-xs text-slate-500">中文：${esc(p79VesselChineseDisplay((shipMasters||[]).find(s=>String(s.workingNo)===String(r.workingNo))||r)||'未提供')}</div>
         <div class="record-voyage">${esc(tfcE||'—')}</div>
       </td>
       <td class="whitespace-nowrap">${esc(r.workDate)}</td>
@@ -7497,7 +7500,7 @@ async function apiGet(action,params={}){
       if(/^<!doctype html|^<html/i.test(text))throw Error('GAS 回傳 Google HTML，不是 JSON；請確認 Web App 部署網址與權限');
       let j;
       try{j=JSON.parse(text)}catch{throw Error('GAS 未回有效 JSON')}
-      if(!j?.ok)throw Error(j?.error||'雲端錯誤');
+      if(!j?.ok){const error=Error(j?.error||'雲端錯誤');error.retryable=j?.retryable===true;throw error;}
       return j;
     }catch(e){
       lastError=e;
@@ -7507,6 +7510,61 @@ async function apiGet(action,params={}){
     }
   }
   throw lastError||Error('GAS 讀取失敗');
+}
+
+// Only retry read-only requests rejected by the server's synchronization lock.
+async function p79ReadFullVesselData(action,params={}){
+  const deadline=Date.now()+GC_FULL_READ_TIMEOUT_MS;
+  for(let attempt=0;;attempt++){
+    try{return await apiGetQuick(action,params,Math.max(3000,deadline-Date.now()));}
+    catch(error){
+      const busy=error?.retryable===true||/船舶雲端資料正在同步|船舶資料正在同步/.test(String(error?.message||''));
+      if(!busy)throw error;
+      error.vesselReadPending=true;
+      const delay=Math.min(6000,1500*(attempt+1));
+      if(attempt>=5||Date.now()+delay+3000>=deadline)throw error;
+      p79SetEfficiencySyncLight('pending','雲端忙碌，等待讀回確認（自動重試 '+(attempt+1)+'）');
+      await new Promise(resolve=>setTimeout(resolve,delay));
+    }
+  }
+}
+
+function p79VesselChineseName(master){
+  const values=[master?.vesselChineseName,master?.chineseName,master?.localName];
+  return String(values.find(v=>/[\u3400-\u9fff]/u.test(String(v||'')))||'').trim();
+}
+function p79VesselChineseDisplay(master){
+  const own=p79VesselChineseName(master);
+  if(own)return own;
+  const key=String(master?.vessel||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const matches=(shipMasters||[]).filter(s=>String(s.vessel||'').toUpperCase().replace(/[^A-Z0-9]/g,'')===key).map(p79VesselChineseName).filter(Boolean);
+  const unique=[...new Set(matches)];
+  if(unique.length===1)return unique[0];
+  try{return JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}')[key]||'';}catch{return '';}
+
+}
+
+// Official sailing data is enrichment only; it must never delay saving or readback.
+async function p79RefreshOfficialVesselNames(){
+  try{
+    const previous=Number(sessionStorage.getItem('p79_official_vessel_names_at')||0);
+    if(Date.now()-previous<3600000)return;
+    sessionStorage.setItem('p79_official_vessel_names_at',String(Date.now()));
+    const data=await apiGetQuick('publicShipSchedule',{},15000);
+    if(data.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))return;
+    const names={};
+    for(const row of data.rows){
+      const key=String(row.name||row.englishName||row.VesselEName||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const name=p79VesselChineseName({localName:row.localName,chineseName:row.chineseName||row.VesselName||row.VesselSName});
+      if(!key||!name)continue;
+      if(names[key]!==undefined&&names[key]!==name)names[key]=null;
+      else if(names[key]!==null)names[key]=name;
+    }
+    const cached=JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}');
+    Object.entries(names).forEach(([key,name])=>{if(name)cached[key]=name;else delete cached[key];});
+    localStorage.setItem('p79_official_vessel_names',JSON.stringify(cached));
+    renderVesselSummary();
+  }catch(error){console.warn('官方中文船名暫時無法更新，保留既有名稱');}
 }
 
 // 輕量即時檢查專用：單次請求、短逾時，不做 25 秒 × 3 次重試。
@@ -7533,7 +7591,7 @@ async function apiGetQuick(action,params={},timeoutMs=7000){
     if(!text)throw Error('GAS 回傳空白內容');
     if(/^<!doctype html|^<html/i.test(text))throw Error('GAS 回傳 Google HTML');
     let j;try{j=JSON.parse(text)}catch{throw Error('GAS 未回有效 JSON')}
-    if(!j?.ok)throw Error(j?.error||'雲端錯誤');
+    if(!j?.ok){const error=Error(j?.error||'雲端錯誤');error.retryable=j?.retryable===true;throw error;}
     return j;
   }catch(error){
     if(controller?.signal.aborted)throw Error((action==='gcGetData'?'完整船舶資料':'雲端資料')+'讀取逾時（'+Math.round(Math.max(3000,Number(timeoutMs)||7000)/1000)+'秒），尚未取得完整回覆');
@@ -7855,7 +7913,7 @@ function mergeShipMasterOne(local,cloud){
   if(!cloud)return local;
   const out={...local,...cloud};
   const textFields=[
-    'workingNo','vessel','voyageI','voyageE','wharf','firstDate','lastDate','note',
+    'workingNo','vessel','vesselChineseName','voyageI','voyageE','wharf','firstDate','lastDate','note',
     'unlashingDateTime','lashingDateTime','compareDate','compareMonth','compareDateSource'
   ];
   const numFields=['disc','load','totalContainers','hatches','totalMoves','bundleDeduct','shiftMoves','aqcCount','gph','gphHC','vph','vphHC'];
@@ -8129,7 +8187,7 @@ function mergeShipMastersPreferComplete(localList,cloudList){
 function shipMasterToSummary(s){
   if(!s)return null;
   return {
-    workingNo:s.workingNo||'',vessel:s.vessel||'',voyageI:s.voyageI||'',voyageE:s.voyageE||'',
+    workingNo:s.workingNo||'',vessel:s.vessel||'',vesselChineseName:p79VesselChineseDisplay(s),voyageI:s.voyageI||'',voyageE:s.voyageE||'',
     wharf:s.wharf||'',totalContainers:num(s.totalContainers),hatches:num(s.hatches),
     totalMoves:num(s.totalMoves),bundleDeduct:num(s.bundleDeduct),bundlePresent:!!s.bundlePresent,
     shiftMoves:num(s.shiftMoves),aqcs:s.aqcs||[],
@@ -8229,7 +8287,7 @@ async function onMonthlyCompareMonthChange(){
 
 function gcLocalSyncState(){return JSON.stringify({groups,assignments,records,shipMasters});}
 async function buildSafeGcSyncPayload(payload={}){
-  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>apiGetQuick(action,params,GC_FULL_READ_TIMEOUT_MS):apiGet;
+  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>p79ReadFullVesselData(action,params):apiGet;
   const localPayload={...payload};
   const beforeState=gcLocalSyncState();
   const matchesCurrent=JSON.stringify({
@@ -8670,7 +8728,7 @@ async function restoreVesselFromHistoryFallback(){
 async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=false){
   if(!requireEfficiencyAccess())return false;
 
-  const read=requireCloudSuccess?(action,params)=>apiGetQuick(action,params,GC_FULL_READ_TIMEOUT_MS):apiGet;
+  const read=requireCloudSuccess?(action,params)=>p79ReadFullVesselData(action,params):apiGet;
   try{
     cloudStatus('正在找回船舶資料...',false);
 
@@ -8851,6 +8909,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
       }
     }
 
+    void p79RefreshOfficialVesselNames();
     return afterMasters>0 || afterRecords>0 || beforeMasters>0 || beforeRecords>0;
   }catch(e){
     console.error('找回船舶資料失敗',e);
@@ -8893,7 +8952,7 @@ async function p79ReadCompleteWorkingReportOnMismatch(strict=false){
 }
 async function syncFromCloud(force=false){
  if(!requireEfficiencyAccess()) return
- if(cloudBusy)return;cloudBusy=true;
+ if(cloudBusy||p79EfficiencyManualSyncActive)return;cloudBusy=true;
  if(force)p79WorkingReportRepairReads.clear();
  try{
    cloudStatus('讀取雲端...',false);
@@ -8954,7 +9013,7 @@ async function manualCloudSync(){
     // 1. 先把本機待上傳修改補傳。
     // 2. 再把 Google 雲端最新船舶/作業/人員資料安全合併回來。
     const waitUntil=Date.now()+30000;
-    while(typeof cloudBusy!=='undefined'&&cloudBusy&&!(typeof gcQueueFlushPromise!=='undefined'&&gcQueueFlushPromise)){
+    while((typeof port79ShipAutoSyncBusy!=='undefined'&&port79ShipAutoSyncBusy)||(typeof cloudBusy!=='undefined'&&cloudBusy&&!(typeof gcQueueFlushPromise!=='undefined'&&gcQueueFlushPromise))){
       p79SetEfficiencySyncLight('syncing','等待背景讀取完成…');
       if(Date.now()>=waitUntil)throw Error('背景雲端讀取尚未結束，本次尚未開始上傳；資料已保留，請稍後再按同步');
       await new Promise(resolve=>setTimeout(resolve,120));
@@ -8975,11 +9034,12 @@ async function manualCloudSync(){
   }catch(e){
     console.error(e);
     const reason=String(e?.message||e);
-    p79SetEfficiencySyncLight('error','同步未完成');
+    if(e?.vesselReadPending)p79EfficiencyReadbackRequired=true;
+    p79SetEfficiencySyncLight(e?.vesselReadPending?'pending':'error',e?.vesselReadPending?'等待雲端讀回確認':'同步未完成');
     const details=document.getElementById('efficiencySyncError'),detailText=document.getElementById('efficiencySyncErrorText');
     if(details&&detailText){details.hidden=false;details.open=true;detailText.textContent=reason+'\n失敗階段：'+p79EfficiencySyncCurrentStage+'\n待同步：'+readQueue().length+' 批（原資料保留）\n'+p79EfficiencySyncTrace.map((step,i,all)=>step.stage+'：'+Math.round(((all[i+1]?.at||Date.now())-step.at)/100)/10+' 秒'+(step.info?'｜'+step.info:'')).join('\n');}
     cloudStatus('雲端同步未完成：'+reason,false);
-    toast(`❌ 雲端同步失敗：${e.message||e}`);
+    toast(e?.vesselReadPending?'雲端忙碌，資料已保留；背景同步將繼續讀回確認':`❌ 雲端同步失敗：${e.message||e}`);
   }finally{
     clearTimeout(watchdog);
     p79EfficiencyManualSyncActive=false;
@@ -8987,7 +9047,7 @@ async function manualCloudSync(){
   }
 }
 
-async function checkRevision(){if(!requireEfficiencyAccess()||document.visibilityState==='hidden')return;try{await flushQueue();const d=await apiGetQuick('gcGetSyncMeta',{},6000),local=localStorage.getItem(STORE.rev)||'';if((typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired)||String(d.revision)!==String(local))await syncFromCloud(true)}catch(e){console.warn('快速版本檢查失敗，保留本機資料',e)}}
+async function checkRevision(){if(!requireEfficiencyAccess()||p79EfficiencyManualSyncActive||document.visibilityState==='hidden')return;try{await flushQueue();const d=await apiGetQuick('gcGetSyncMeta',{},6000),local=localStorage.getItem(STORE.rev)||'';if((typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired)||String(d.revision)!==String(local))await syncFromCloud(true)}catch(e){console.warn('快速版本檢查失敗，保留本機資料',e)}}
 function excelTime(v){
  if(v==null||v==='')return''; if(typeof v==='number'){let mins=Math.round((v%1)*1440);if(mins===1440)mins=0;return `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`}
  const s=String(v).trim(),m=s.match(/(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:''
@@ -13239,6 +13299,7 @@ function openShipEditDialog(workingNo){
   set('shipEditOriginalNo',s.workingNo||'');
   set('shipEditWorkingNo',s.workingNo||'');
   set('shipEditVessel',s.vessel||'');
+  set('shipEditVesselChineseName',p79VesselChineseDisplay(s));
   set('shipEditVoyageI',s.voyageI||'');
   set('shipEditVoyageE',s.voyageE||'');
   set('shipEditWharf',s.wharf||'');
@@ -13308,6 +13369,7 @@ async function saveShipMasterEdit(){
     ...s,
     workingNo,
     vessel,
+    vesselChineseName:String(document.getElementById('shipEditVesselChineseName')?.value||'').trim(),
     voyageI:String(document.getElementById('shipEditVoyageI')?.value||'').trim(),
     voyageE:String(document.getElementById('shipEditVoyageE')?.value||'').trim(),
     wharf:String(document.getElementById('shipEditWharf')?.value||'').trim(),
@@ -13341,6 +13403,7 @@ async function saveShipMasterEdit(){
     ...(s.manualOverrides||{}),
     workingNo:updated.workingNo,
     vessel:updated.vessel,
+    vesselChineseName:updated.vesselChineseName,
     voyageI:updated.voyageI,
     voyageE:updated.voyageE,
     wharf:updated.wharf,
@@ -14576,7 +14639,7 @@ let port79ShipAutoSyncBusy=false;
 let port79ShipLastAutoSyncAt=0;
 
 async function autoRestoreVesselCloud(reason='auto',retryCount=3){
-  if(port79ShipAutoSyncBusy)return false;
+  if(port79ShipAutoSyncBusy||p79EfficiencyManualSyncActive)return false;
 
   const now=Date.now();
   if(reason!=='login' && now-port79ShipLastAutoSyncAt<10000)return true;
