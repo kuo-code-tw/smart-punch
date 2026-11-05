@@ -27,12 +27,12 @@
 <!-- PORT79 2026-10-04 SCHEDULE-COLOR-RESTORE：恢復原班別顏色＋放大字體/格子＋交錯列辨識。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
-<script src="../assets/port79-rest-allocation.js?v=20261028-rest-national-reconcile-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261030-absence-not-rest-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261102-audit-consistency-proof-v11"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261105-night-split-proof-v12"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7387,13 +7387,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     // 20:00–24:00 加班、隔日 00:00–08:00 休假，都歸屬同一班別日期。
     // 僅使用已保存且未撤銷的正式申報及原有假別，不自造加班或休假。
-    function p79NightSplitRestLabel(meta,rosterShift,allocatedMeta,ownApprovedLeave,rawOvertimeLabel){
+    function p79NightSplitRestLabel(meta,rosterShift,allocatedMeta,ownApprovedLeave,rawOvertimeLabel,proof){
       const report=meta?.overtimeReport;
-      if(ownApprovedLeave||!rawOvertimeLabel||!p79ConfirmedOvertimeReport(meta))return '';
+      if(ownApprovedLeave||!rawOvertimeLabel||!p79ConfirmedOvertimeReport(meta)||!proof||String(proof.reportId)!==String(report?.id))return '';
       const original=String(rosterShift||'').trim();
       const fromRest=['例','休','國'].includes(original)||
         ['例','休','國'].includes(String(meta?.overtimeOriginalShift||'').trim())||
-        ['例','休','國'].includes(String(meta?.restCategory||'').trim());
+        ['例','休','國'].includes(String(meta?.restCategory||'').trim())||
+        ['例','休','國'].includes(String(allocatedMeta?.restCategory||'').trim());
       if(!fromRest)return '';
       const code=p79CompactOvertimeCode(report?.code);
       const period=code.replace(/^[代延例休國]/,'');
@@ -7501,7 +7502,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
       const overtimeLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
         ((punchPending||attendanceUnverified)&&!hasOfficialOvertimeReport)?'':substituteLabel;
-      const nightSplitLabel=p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel);
+      const proof=ctx.attendanceEvidence?.nightSplitRestConfirmed?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
+      const nightSplitLabel=p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel,proof);
       const visibleSubstituteLabel=nightSplitLabel||overtimeLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
       const shiftSource=visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':
@@ -7726,17 +7728,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // This is a calendar event exclusion, not a mutation of the original roster.
     function p79RestAutomaticExcludedDates(emp,month) {
       const quota=p79RestQuota(month),typhoon=new Set(p79TyphoonDates());
-      const punchShifts=typeof p79ScheduleRestClient==='function'
-        ?p79ScheduleRestClient().status(month).evidence?.actualShifts:null;
+      const auditEvidence=typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(month).evidence:null;
+      const punchShifts=auditEvidence?.actualShifts,splitRest=auditEvidence?.nightSplitRestConfirmed||{};
       const elections=new Set(window.P79SpecialOvertime?.electionDates?.()||[]);
       const dates=[];
       for(let n=1;n<=quota.days;n++){
         const date=month+'-'+String(n).padStart(2,'0');
+        const key=String(emp.id).trim().toUpperCase()+'|'+date;
         if(approvedLeaveForEmployee(emp.id,date)||
            p79LeaveCoverOnDay(emp.id,date).length||
-           !!punchShifts?.[String(emp.id).trim().toUpperCase()+'|'+date]||
-           (['休','例','國'].includes(String(monthlyScheduleData[emp.id]?.[date]||'').trim())&&
-            p79ScheduleHasVerifiedPunch(emp.id,date))||
+           (!splitRest[key]&&(!!punchShifts?.[key]||
+             (['休','例','國'].includes(String(monthlyScheduleData[emp.id]?.[date]||'').trim())&&
+              p79ScheduleHasVerifiedPunch(emp.id,date))))||
            // 颱風假完全獨立；即使原排休也不可拿去補例／休／國。
            typhoon.has(date)||elections.has(date)||
            String(monthlyScheduleData[emp.id]?.[date]||'').trim()==='颱')dates.push(date);
@@ -7757,7 +7760,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // Absence on an ordinary workday must not consume any holiday quota.
       const evidence=p79ScheduleRestClient().status(month).evidence;
       const existing=metadata||monthlyScheduleMeta[emp.id]||{};
-      const observedOffDates=[];
+      const observedOffDates=Object.keys(evidence?.nightSplitRestConfirmed||{}).filter(key=>key.startsWith(String(emp.id).trim().toUpperCase()+'|')).map(key=>key.split('|')[1]).filter(date=>date.startsWith(month+'-'));
       const exemptReports=window.P79MonthlyRest?.restQuotaExemptDates?.(
         {...emp,empId:emp.id},{...schedule,__meta:existing},
         Object.keys(schedule).filter(date=>date.startsWith(month+'-')),
