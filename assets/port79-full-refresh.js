@@ -13,10 +13,12 @@ function createReader({context,fetchImpl,identity,assertCurrent,timeoutMs=30000}
   }finally{clearTimeout(timer);}
  };
 }
-function createRunner({check,run,notify=()=>{},setFresh=()=>{}}){
+function createRunner({check,run,prepare,notify=()=>{},setFresh=()=>{}}){
  let running=null;
  return function refresh(){if(running)return running;
-  running=Promise.resolve().then(async()=>{check();setFresh(true);notify('loading','正在重新讀取正式雲端資料…');try{
+  running=Promise.resolve().then(async()=>{try{
+    if(prepare){setFresh(true);await prepare();}
+    check();setFresh(true);notify('loading','正在重新讀取正式雲端資料…');
     const result=await run();
     if(result!==true&&result?.ok!==true)throw Error('雲端資料尚未全部更新');
     check();
@@ -46,10 +48,12 @@ function auditRosterOvertime(rows,date=''){
 }
 const api={createReader,createRunner,auditRosterOvertime};if(typeof module==='object'&&module.exports){module.exports=api;return;}g.P79FullRefresh=api;
 const sys=()=>document.body.dataset.p79System||'',element=id=>document.getElementById(id);
-function isEditing(){return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden');}
+function isEditing(){return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(node=>!(sys()==='efficiency'&&['dualAuditDetailDialog','personalAuditDetailDialog','dashboardAuditDialog'].includes(node.id))&&node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden');}
 function check(){const context=g.P79ManagementContext;if(sys()==='history'){if(typeof g.p79RefreshHistoryAll!=='function')throw Error('歷史資料頁仍在初始化');return;}
  if(!context||!context.canRead())throw Error('請先登入並確認本系統查詢權限');
- if(context.hasPendingChanges()!==false||isEditing())throw Error('有編輯中或尚未儲存的內容，請先完成儲存再重新整理，原資料已保留');}
+ const unsaved=typeof context.hasUnsavedChanges==='function'?context.hasUnsavedChanges():context.hasPendingChanges();
+ if(unsaved!==false||isEditing())throw Error('有編輯中或尚未儲存的內容，請先完成儲存再重新整理，原資料已保留');
+ if(context.isReadBusy?.()===true)throw Error('船舶雲端同步仍在處理中，尚未開始重新整理；原資料已保留');}
 function notify(state,message){const b=element('p79FullRefreshButton'),status=element('p79FullRefreshStatus');if(b){b.disabled=state==='loading';b.textContent=state==='loading'?'↻ 更新中…':'↻ 重新整理';}if(status){status.textContent=message;status.dataset.state=state;}}
 async function refreshCurrentSystem(){
  if(sys()==='history'){await g.p79RefreshHistoryAll();return true;}
@@ -110,7 +114,21 @@ async function refreshCurrentSystem(){
  }
  assertCurrent();return true;
 }
-const refresh=createRunner({check,run:refreshCurrentSystem,notify,setFresh:value=>{g.P79FullRefreshRunning=value;}});api.refresh=refresh;g.p79FullRefresh=refresh;
+async function prepareRefresh(){
+ if(sys()!=='efficiency')return;
+ const context=g.P79ManagementContext;
+ if(!context||!context.canRead())throw Error('請先登入並確認本系統查詢權限');
+ const identity=context.identity(),deadline=Date.now()+90000;
+ while(context.isReadBusy?.()===true){
+  if(context.hasUnsavedChanges?.()!==false||isEditing())throw Error('有編輯中或尚未儲存的內容，請先完成儲存再重新整理，原資料已保留');
+  if(context.identity()!==identity)throw Error('登入或查詢範圍已變更，請再重新整理');
+  if(Date.now()>=deadline)throw Error('船舶雲端同步尚未結束，請稍後重新整理；原資料已保留');
+  notify('loading','船舶雲端同步中，完成後自動重新整理…');
+  await new Promise(resolve=>setTimeout(resolve,200));
+ }
+ if(context.identity()!==identity)throw Error('登入或查詢範圍已變更，請再重新整理');
+}
+const refresh=createRunner({check,prepare:prepareRefresh,run:refreshCurrentSystem,notify,setFresh:value=>{g.P79FullRefreshRunning=value;}});api.refresh=refresh;g.p79FullRefresh=refresh;
 function mount(){if(element('p79FullRefreshButton'))return;const host=document.querySelector('#p79SevenTop .action');if(!host)return;
  const box=document.createElement('div');box.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap';
  const button=document.createElement('button');button.id='p79FullRefreshButton';button.type='button';button.textContent='↻ 重新整理';button.title='手動讀取目前月份正式考勤、排班與加班申報；未完成會顯示錯誤，不會覆蓋未儲存資料';button.addEventListener('click',refresh);
