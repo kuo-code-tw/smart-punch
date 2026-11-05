@@ -14473,7 +14473,7 @@ let port79ShipLastAutoSyncAt=0;
 
 async function autoRestoreVesselCloud(reason='auto',retryCount=3){
   // 全系統手動重新整理進行中，不同時啟動船舶自動讀寫。
-  if(window.P79FullRefreshRunning===true||port79ShipAutoSyncBusy)return false;
+  if((typeof window!=='undefined'&&window.P79FullRefreshRunning===true)||port79ShipAutoSyncBusy)return false;
 
   const now=Date.now();
   if(reason!=='login' && now-port79ShipLastAutoSyncAt<10000)return true;
