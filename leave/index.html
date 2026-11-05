@@ -612,12 +612,15 @@ function renderMy(){
 function updateDays(){const s=$('leaveStart').value,e=$('leaveEnd').value;if(!s||!e){$('leaveDays').value='';return}const a=new Date(s+'T00:00:00'),b=new Date(e+'T00:00:00');const d=Math.floor((b-a)/86400000)+1;$('leaveDays').value=d>0?d:''}
 let p79EmployeeLeaveDraft=null;
 function p79EmployeeLeaveStableId(key){
- if(p79EmployeeLeaveDraft?.key===key)return p79EmployeeLeaveDraft.id;
+ // 只在 sessionStorage 保存不可直接還原的摘要與單號，避免留下請假原因原文。
+ let hash=2166136261;for(const char of String(key||'')){hash=Math.imul(hash^char.charCodeAt(0),16777619);}
+ const fingerprint=(hash>>>0).toString(36);
+ if(p79EmployeeLeaveDraft?.key===fingerprint)return p79EmployeeLeaveDraft.id;
  let saved=null;
  try{saved=JSON.parse(sessionStorage.getItem('port79_pending_leave_submit_v1')||'null')}catch(_){}
- const id=saved?.key===key&&Date.now()-Number(saved.at||0)<86400000?String(saved.id||''):String(Date.now());
- p79EmployeeLeaveDraft={key,id};
- try{sessionStorage.setItem('port79_pending_leave_submit_v1',JSON.stringify({key,id,at:Date.now()}))}catch(_){}
+ const id=saved?.key===fingerprint&&Date.now()-Number(saved.at||0)<86400000?String(saved.id||''):String(Date.now());
+ p79EmployeeLeaveDraft={key:fingerprint,id};
+ try{sessionStorage.setItem('port79_pending_leave_submit_v1',JSON.stringify({key:fingerprint,id,at:Date.now()}))}catch(_){}
  return id;
 }
 function p79EmployeeLeaveClearStableId(){
