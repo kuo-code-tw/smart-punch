@@ -56,8 +56,9 @@ async function run(){
  assert.ok(single.indexOf('await postToCloud(')<single.indexOf('p79ApplyConfirmedAttendanceDelete('),'single deletion confirmation before local mutation');
  assert.ok(!single.includes('purgeDeletedAttendanceRecordFromAllLocalCaches'),'single deletion does not hide a failed delete');
  const daily=html.slice(html.indexOf('        async function deleteDailyAttendance(ids) {'),html.indexOf('\n        async function deleteRecord(id) {'));
- assert.ok(daily.indexOf('await postToCloud(')<daily.indexOf('p79ApplyConfirmedAttendanceDelete('),'daily deletion is also cloud-first');
- assert.match(daily,/已停止後續刪除/,'partial failure stops further deletes');
+ assert.ok(daily.indexOf('p79V5EnqueueDeleteGroup(validIds)')<daily.indexOf('await window.p79V5Drain(false)'),'daily deletion persists all punch IDs before starting cloud sync');
+ assert.ok(!daily.includes('await postToCloud('),'daily deletion must not stop before enqueuing the other side');
+ assert.match(daily,/stillQueued/,'unconfirmed paired punches remain visibly pending');
  saved++;
  const styleStart=html.indexOf('<style id="p79-overtime-rest-visible-hover-v2">');
  assert.ok(styleStart>0,'new rest-label-specific overtime CSS present');
