@@ -24,6 +24,13 @@ jobs:
           node tests/home-wanhai-bilingual-ship-names.cjs
       - name: Check full production regression suite
         run: |
+          failures=0
           for test_file in tests/*.cjs; do
-            node "$test_file" || exit 1
+            if ! node "$test_file" > /tmp/p79-test-result.log 2>&1; then
+              echo "FAILED: $test_file"
+              tail -n 16 /tmp/p79-test-result.log
+              failures=$((failures+1))
+            fi
           done
+          echo "Full regression failures: $failures"
+          test "$failures" -eq 0
