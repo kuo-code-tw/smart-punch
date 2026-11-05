@@ -59,8 +59,8 @@ const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().repla
          !officialByMonth?.[nextMonth]||!referenceByMonth?.[nextMonth])continue;
        // Across month boundaries, a completely empty next-month feed is unverified.
        if(nextMonth!==month&&
-         (![...(officialRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))||
-          ![...(referenceRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))))continue;
+         (![...(officialRecords||[])].some(r=>String(r.timeStr||r.time||'').replaceAll('/','-').startsWith(nextMonth))||
+          ![...(referenceRecords||[])].some(r=>String(r.timeStr||r.time||'').replaceAll('/','-').startsWith(nextMonth))))continue;
        const officialOut=paired(sessions,who,date,start,end);
        const referenceOut=paired(referenceSessions,who,date,start,end);
        if(!Number.isFinite(officialOut)||!Number.isFinite(referenceOut))continue;
