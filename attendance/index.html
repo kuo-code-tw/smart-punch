@@ -16468,33 +16468,46 @@ function getManualPairRecordAnchor(record) {
         }
 
         async function deleteDailyAttendance(ids) {
-            if(!requireAdminAction('attendanceDelete','刪除打卡紀錄'))return;
-            const validIds=Array.isArray(ids)?[...new Set(ids.map(id=>String(id??'').trim()).filter(Boolean))]:[];
-            if(!validIds.length||!confirm('確定要刪除這一天的考勤紀錄嗎？\n將刪除 '+validIds.length+' 筆原始打卡資料。'))return;
-            let confirmed=0;
-            showToast('正在逐筆確認雲端刪除，未確認的原始紀錄會保留','warning');
-            for(const id of validIds){
-                try{
-                    const reply=await postToCloud({action:'deleteRecord',id});
-                    if(reply?.ok!==true||reply?.queued||reply?.localOnly){
-                        showToast('已確認刪除 '+confirmed+' 筆；其餘雲端尚未確認，已停止後續刪除','warning');
-                        break;
-                    }
-                    if(p79ApplyConfirmedAttendanceDelete(id,{skipRender:true}))confirmed++;
-                    else{
-                        showToast('雲端已回覆，但本機刪除核對未完成，請重新讀取考勤','warning');
-                        break;
-                    }
-                }catch(error){
-                    showToast('雲端刪除異常，後續紀錄已保留：'+String(error?.message||error),'warning');
-                    break;
-                }
+            if (!requireAdminAction('attendanceDelete','刪除打卡紀錄')) return;
+            const validIds=Array.isArray(ids)
+                ? [...new Set(ids.map(id=>String(id??'').trim()).filter(Boolean))]
+                : [];
+            if (!validIds.length) return;
+            // One rendered shift can contain both IN and OUT (including an overnight pair).
+            // Save ALL delete intents durably before the first cloud request: never leave
+            // the second punch unsubmitted merely because the first write was queued.
+            const missing=validIds.filter(id=>!(Array.isArray(records)?records:[]).some(r=>String(r?.id??'').trim()===id));
+            const ambiguous=validIds.filter(id=>(Array.isArray(records)?records:[]).filter(r=>String(r?.id??'').trim()===id).length>1);
+            if (missing.length||ambiguous.length) {
+                showToast('這筆上下班紀錄的 ID 無法唯一核對，已停止刪除，請先重新讀取雲端考勤','warning');
+                return;
             }
-            if(confirmed){
-                renderAdminRecordsTable();
-                try{renderAdminLiveTable()}catch(ignore){}
-                if(confirmed===validIds.length)showToast('雲端已確認刪除 '+confirmed+' 筆考勤紀錄','success');
+            if (!confirm('確定要一併刪除這個班次的上下班考勤嗎？\n將處理 '+validIds.length+' 筆原始打卡資料；其他班次不受影響。')) return;
+            if(typeof window.p79V5EnqueueDeleteGroup!=='function'||typeof window.p79V5Drain!=='function') {
+                showToast('成對刪除保護尚未載入，沒有刪除任何資料，請重新整理網頁','warning');
+                return;
             }
+            const queued=window.p79V5EnqueueDeleteGroup(validIds);
+            if(queued?.ok!==true) {
+                showToast('無法完整保存上下班刪除任務，沒有送出刪除：'+String(queued?.error||'請檢查瀏覽器儲存空間'),'warning');
+                return;
+            }
+            showToast('上下班共 '+validIds.length+' 筆刪除已完整排入同步，正在逐筆等待雲端確認','warning');
+            try {
+                await window.p79V5Drain(false);
+            } catch(error) {
+                console.warn('[PORT79] 成對刪除雲端同步待重試',error);
+            }
+            const stillQueued=validIds.filter(id=>!!window.p79V5QueueInfoForId?.(id));
+            const stillVisible=validIds.filter(id=>(Array.isArray(records)?records:[]).some(r=>String(r?.id??'').trim()===id));
+            if(stillQueued.length||stillVisible.length) {
+                showToast('整筆刪除已保存；目前 '+Math.max(stillQueued.length,stillVisible.length)+' 筆尚待雲端確認／畫面刷新，系統會繼續同步，不會漏送另一筆','warning');
+            } else {
+                showToast('雲端已確認：同班次上下班 '+validIds.length+' 筆均已刪除','success');
+            }
+            try{renderAdminRecordsTable()}catch(ignore){}
+            try{renderAdminLiveTable()}catch(ignore){}
+            try{updateHomeClockInButtonState()}catch(ignore){}
         }
 
         async function deleteRecord(id) {
