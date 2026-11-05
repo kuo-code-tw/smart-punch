@@ -11158,32 +11158,38 @@ async function importExcel(file) {
 
     setExcelImportStage('同步船舶主檔與人員明細到雲端',88);
     const upload=await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
-    if(!upload?.ok){setExcelImportStage('本機已保存，等待雲端補傳',96);return;}
-
-    // 最後一份才更新本次船舶主檔；讀回驗證改成背景，不阻塞匯入完成。
-    try{
-      setExcelImportStage('更新本次船舶主檔',95);
-      await apiPost('gcUpsertShipMaster',{shipMaster:master,records});
-      cloudStatus('本次船舶主檔已更新');
-    }catch(e){
-      console.error('本次船舶主檔單筆更新失敗',e);
-      toast(`⚠️ 本機已更新，但雲端單筆更新失敗：${e?.message||e}`);
+    if(!upload?.ok){
+      lastExcelImportResult={...lastExcelImportResult,ok:false,reason:'已保存本機，雲端尚未完成寫入核對'};
+      setEfficiencySaveState(true,'本機匯入完成，雲端寫入尚未確認');
+      setExcelImportStage('本機已保存，等待雲端補傳',96);return;
     }
 
-    Promise.resolve().then(async()=>{
-      try{
-        const verifyMonth=String(master?.compareMonth||master?.firstDate||summary?.workDate||'').slice(0,7);
-        const verify=await apiGet('gcGetData',/^\d{4}-\d{2}$/.test(verifyMonth)?{month:verifyMonth}:efficiencyCloudScopeParams());
-        const cloudMaster=(verify.shipMasters||[]).find(x=>String(x.workingNo||'').trim()===String(summary.workingNo).trim());
-        if(cloudMaster){
-          shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,verify.shipMasters||[]));
-          saveLocal();
-          cloudStatus('雲端資料已背景驗證');
-        }
-      }catch(e){
-        console.warn('背景驗證雲端船舶主檔失敗',e);
-      }
-    });
+    // ACK 表示這次寫入已受理；必須再用正式完整 GC 讀回核對本船主檔
+    // 與報表人員列，才能對使用者宣稱不同電腦可取得。
+    try{
+      setExcelImportStage('從正式雲端核對船舶資料',94);
+      const remote=await apiGetQuick('gcGetData',{},GC_FULL_READ_TIMEOUT_MS);
+      const savedMasters=Array.isArray(remote?.shipMasters)?remote.shipMasters:[];
+      const savedRecords=Array.isArray(remote?.records)?remote.records:[];
+      const latest=savedMasters.find(x=>String(x?.workingNo||'').trim()===String(master.workingNo||'').trim());
+      const expectedIds=new Set(imported.map(row=>String(row.id||'').trim()).filter(Boolean));
+      const savedIds=new Set(savedRecords.filter(row=>String(row?.workingNo||'').trim()===String(master.workingNo||'').trim())
+        .map(row=>String(row?.id||'').trim()).filter(Boolean));
+      if(!latest||!expectedIds.size||[...expectedIds].some(id=>!savedIds.has(id)))
+        throw Error('雲端讀回未找到本次船舶主檔或完整人員明細，不能標示同步成功');
+      mergeEfficiencyCloudData(remote);
+      saveLocal();invalidateWorkloadIndex();renderVesselSummary();renderEfficiencyTabFast();
+      lastExcelImportResult={...lastExcelImportResult,ok:true,cloudConfirmed:true,reason:'正式雲端主檔與作業明細已核對'};
+      setExcelImportStage('雲端寫入與讀回核對完成',100);
+      setEfficiencySaveState(false,'本次船舶主檔與報表人員明細已在雲端核對');
+      cloudStatus('船舶資料已核對雲端｜主檔 '+savedMasters.length+'｜明細 '+savedRecords.length);
+    }catch(e){
+      lastExcelImportResult={...lastExcelImportResult,ok:false,cloudConfirmed:false,reason:'本機已匯入；雲端讀回未確認：'+(e?.message||e)};
+      p79EfficiencyReadbackRequired=true;
+      setEfficiencySaveState(true,'雲端寫入後讀回未確認，請按「同步船舶資料」重新核對');
+      cloudStatus('船舶已保存在本機，雲端資料待核對',false);
+      toast('⚠️ '+lastExcelImportResult.reason);
+    }
     return;
   }
   setExcelImportStage('辨識 試算表 格式',25);
@@ -13203,9 +13209,11 @@ async function saveEfficiencyChangesToCloud(){
   try{
     saveLocal();
     await postCloudConfirmed('gcSyncAll',{groups,assignments,records,shipMasters});
+    const pulled=await restoreVesselDataFromCloud(false,true);
+    if(pulled!==true||readQueue().length)throw Error('雲端寫入已送出，但正式資料讀回尚未確認，請按「同步船舶資料」再次核對');
     forceFullSystemConsistencyRefresh();
-    setEfficiencySaveState(false,'已同步至 Google 雲端');
-    toast('✅ 效率系統變更已儲存到雲端，已重新核對全部狀態');
+    setEfficiencySaveState(false,'已從 Google 雲端讀回核對');
+    toast('✅ 船舶變更已寫入並從正式雲端讀回；其他電腦可重新整理取得資料');
   }catch(e){
     setEfficiencySaveState(true,'雲端儲存失敗，可再次按儲存');
     toast(`❌ 本機已保留，但雲端儲存失敗：${e?.message||e}`);
