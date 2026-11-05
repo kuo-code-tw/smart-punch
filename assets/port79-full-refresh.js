@@ -67,7 +67,7 @@ async function refreshCurrentSystem(){
   if(pulled!==true)throw Error('船舶正式雲端資料尚未讀回，已保留現有資料');
   if(String(context.token()||'')!==loginToken)throw Error('登入狀態已變更，請重新整理');
   check();
-  return {ok:true,summary:'船舶資料已從正式雲端完整讀回並更新畫面；船舶 '+(g.shipMasters?.length||0)+' 艘、作業明細 '+(g.records?.length||0)+' 筆（含安全合併的本機資料）。'};
+  return {ok:true,summary:'已重新讀取正式雲端船舶資料，並更新船舶主檔及作業明細（保留原有本機資料）。'};
  }
  const read=createReader({context,fetchImpl:(...args)=>g.fetch(...args),identity,assertCurrent});
  const snapshot=await context.readFresh(read,['people','organization','permissions','leave','cover','schedule','overtime','attendance','efficiency','history']);
