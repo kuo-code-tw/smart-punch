@@ -46,6 +46,26 @@ function missingRows(dailyRows,logs,start,end,now=Date.now()){
 function filterRows(rows,query,kind){
  const text=id(query);return rows.filter(r=>(!kind||r.kind===kind)&&(!text||[r.name,r.empId,r.attNo,r.dept,r.role].some(x=>id(x).includes(text))));
 }
+// A cloud page-initialization response can be temporary; retry once after a
+// short pause, but never treat missing records as a successful empty search.
+const retryableReadiness=message=>/畫面資料尚未完整載入|資料尚未完整載入|資料尚未完成載入|正在載入|讀取中|尚未就緒|請重新讀取後再操作/.test(String(message||''));
+async function readVerifiedSource(label,read,assertCurrent){
+ for(let attempt=0;attempt<2;attempt++){
+  assertCurrent();
+  try{
+   const value=await read();
+   assertCurrent();
+   return value;
+  }catch(error){
+   assertCurrent();
+   if(attempt===0&&retryableReadiness(error?.message||error)){
+    await new Promise(resolve=>setTimeout(resolve,900));
+    continue;
+   }
+   throw Error(label+'：'+String(error?.message||error));
+  }
+ }
+}
 async function load(start,end){
  const dates=dateRange(start,end),months=[...new Set(dates.map(d=>d.slice(0,7)))];
  if(!hasAuthoritativeAdminSession())throw Error('請以管理帳號登入考勤系統');
@@ -53,9 +73,10 @@ async function load(start,end){
  const token=getAttendanceEmployeeMasterToken(),backend=getActiveGasUrl();
  const assertCurrent=()=>{if(!hasAuthoritativeAdminSession()||getAttendanceEmployeeMasterToken()!==token||getActiveGasUrl()!==backend)throw Error('登入身分已變更，請重新搜尋');};
  const people=getAdminAttendanceEmployees().map(p=>({...p}));
+ if(!people.length)throw Error('員工主檔尚未完成載入，無法安全核對漏卡；請等待人員資料更新後重試');
  const url=new URL(backend);url.searchParams.set('action','getData');url.searchParams.set('token',token);url.searchParams.set('gcToken',token);url.searchParams.set('t',String(Date.now()));
- // The read is explicit and read-only; never merge search snapshots into the
- // current attendance page or reuse local logs as an authoritative cloud reply.
+ // Read official sources without mutating the attendance page or using
+ // an incomplete on-screen table as proof of an absent clock event.
  const logPromise=fetchGasJsonWithRetry(url.toString(),'登入／登出核對',1,25000).then(data=>{
   assertCurrent();if(!data?.ok)throw Error(data?.error||'登入／登出紀錄讀取失敗');
   return Array.isArray(data.sessionLogs)?{rows:data.sessionLogs,available:true}:{rows:[],available:false};
@@ -64,9 +85,21 @@ async function load(start,end){
   const daily=[];
   for(const month of months){
    assertCurrent();
-   const [scope,roster]=await Promise.all([p79ReadAttendanceExportScope(month),p79ReadAttendanceExportSource('getScheduleDataSecure',month)]);
+   // Do not read the previous month for a November 5 single-day query.
+   // Read adjacent month only at a real month boundary to preserve night shifts.
+   const monthDates=dates.filter(d=>d.slice(0,7)===month);
+   const scopeOptions={start:monthDates[0],end:monthDates[monthDates.length-1],preferCache:false};
+   const [scope,roster]=await Promise.all([
+    readVerifiedSource(month+' 正式考勤讀取未完成',
+      ()=>p79ReadAttendanceExportScope(month,scopeOptions),assertCurrent),
+    readVerifiedSource(month+' 正式排班讀取未完成',
+      ()=>p79ReadAttendanceExportSource('getScheduleDataSecure',month,{preferCache:false}),assertCurrent)
+   ]);
    assertCurrent();
+   if(!scope||!Array.isArray(scope.source)||!roster||!Array.isArray(roster.schedules))
+    throw Error(month+' 正式考勤或排班回覆不完整，未將缺少資料判成缺卡');
    const report=p79BuildScheduleAttendanceExport(month,people,scope.source.filter(canCurrentAdminViewDataRow),roster);
+   if(!Array.isArray(report?.dailyRows))throw Error(month+' 班別出勤核對結果不完整');
    daily.push(...report.dailyRows.slice(1));
   }
   const logs=await logPromise;assertCurrent();

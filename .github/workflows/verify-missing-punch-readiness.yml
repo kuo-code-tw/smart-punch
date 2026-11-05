@@ -1,0 +1,19 @@
+name: Verify missing-punch search readiness
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-missing-punch-login-preview.js'
+      - 'tests/missing-punch-search.cjs'
+      - '.github/workflows/verify-missing-punch-readiness.yml'
+permissions:
+  contents: read
+jobs:
+  missing-punch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/missing-punch-search.cjs
+      - run: node tests/attendance-export-month.cjs
