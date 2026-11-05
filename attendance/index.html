@@ -11090,7 +11090,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             let deviceReady=false;
             try{deviceReady=await verifyAndBindCurrentDevice();}
             catch(error){releasePunchGuard();showToast('裝置驗證未完成：'+String(error?.message||error)+'。請保留目前頁面，稍後重試。','warning');return;}
-            if (!deviceReady) {
+            if (!deviceReady || !samePunchEmployee()) {
                 releasePunchGuard();
                 return;
             }
