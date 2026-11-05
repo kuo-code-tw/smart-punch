@@ -7503,7 +7503,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const overtimeLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
         ((punchPending||attendanceUnverified)&&!hasOfficialOvertimeReport)?'':substituteLabel;
       const proof=ctx.attendanceEvidence?.nightSplitRestConfirmed?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
-      const nightSplitLabel=p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel,proof);
+      const nightSplitLabel=typeof p79NightSplitRestLabel==='function'
+        ?p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel,proof):'';
       const visibleSubstituteLabel=nightSplitLabel||overtimeLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
       const shiftSource=visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':
