@@ -22,3 +22,11 @@
 - tests/punch-self-read.cjs：缺 Token 拒絕、從 Token 限本人、忽略指定他人 ID、同考勤號不同姓名拒絕、保留配對欄位、原始保護合併、正式主表優先、刪除標記、舊 API 相容。
 - tests/mobile-punch-session.cjs、tests/punch-device-state.cjs：本人權杖續期、權限拒絕、身分切換、錯月份、並行讀取及綁定檢查回歸通過。
 - V98 完整準備來源通過 JavaScript syntax parse；完整來源未公開提交。
+
+## 手機打卡等待優化（前端 2026.11.05.113）
+
+已驗證同一手機的 GPS 與正式考勤核對同時開始；需要本人綁定資料時，唯讀查詢與考勤讀取並行，之後只消費同一回覆一次。登入辨識本人後提早啟動正式讀取。按下打卡立即顯示處理進度並停用按鈕，直到本次流程結束，不再因等待超過 15 秒允許第二次處理。
+
+不延長考勤 8 秒新鮮度；定位使用 GPS 樣本原始時間，超過 8 秒或地點規則有變即重新定位。必要考勤、裝置與 GPS 檢查全部通過才進入原有 execPunch；原始本機備份、正式雲端 ACK、待傳與原始打卡寫入流程保留。
+
+新增 tests/punch-parallel-preparation.cjs 驗證並行啟動、核對前無寫入、雲端與 GPS 拒絕、帳號切換、定位過期及設定變更、長等待連點防護、綁定只讀一次與管理員豁免；既有 punch-login-deadline、punch-device-state、mobile-punch-session、attendance-gps-config-locations 通過。這是隔離行為驗證，不代表已完成實體手機 GPS 與正式上下班送出的耗時量測。
