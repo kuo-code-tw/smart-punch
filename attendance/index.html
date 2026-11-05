@@ -10646,7 +10646,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             function setButtonState(button, enabled, enabledText, disabledText, disabledTitle) {
                 if (!button) return;
-                if(window.p79PunchInProgress===true)enabled=false;
+                if(typeof window!=='undefined' && window.p79PunchInProgress===true)enabled=false;
                 button.disabled = !enabled;
                 button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
                 button.textContent = enabled ? enabledText : disabledText;
@@ -10714,7 +10714,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             );
 
             // State refreshes must not re-enable the OUT recheck during an active attempt.
-            if(window.p79PunchInProgress===true){
+            if(typeof window!=='undefined' && window.p79PunchInProgress===true){
                 [clockInButton,clockOutButton,overtimeInButton,overtimeOutButton].forEach(button=>{
                     if(button){button.disabled=true;button.setAttribute('aria-disabled','true');}
                 });
