@@ -2,8 +2,8 @@
 <html data-p79-design="vessel" lang="zh-Hant">
 <head><script>window.P79ManagementOptimizationMode=true;</script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<!-- PORT79 2026-10-07 V8.12：船舶主檔永遠與 WORKING REPORT 明細互補；手動雲端拉取先抓目前月份，完整 GC 改背景補齊。 -->
-<!-- PORT79 2026-10-07 效率雲端快速版本檢查：revision 未變不重抓整批船舶；本機先顯示，只在版本變更時下載。 -->
+<!-- 2026-11-05：手動重新整理與船舶拉取都須正式完整讀回；中文船名僅顯示來源欄位或已確認輸入。 -->
+<!-- 背景可檢查 revision；使用者主動重新整理時不採版本捷徑。 -->
 <!-- PORT79 2026-10-07 效率滿版＋雲端船舶強制備援＋櫃數時間戳防呆 -->
 
 <script id="p79-default-light-v20261001">
@@ -1222,7 +1222,8 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 
     <div class="grid sm:grid-cols-2 gap-3">
       <div><label class="text-xs font-bold">WORKING NO.</label><input id="shipEditWorkingNo" class="w-full border rounded-xl px-3 py-3"></div>
-      <div><label class="text-xs font-bold">船名</label><input id="shipEditVessel" class="w-full border rounded-xl px-3 py-3"></div>
+      <div><label class="text-xs font-bold">英文船名</label><input id="shipEditVessel" class="w-full border rounded-xl px-3 py-3"></div>
+      <div><label class="text-xs font-bold">中文船名（來源確認後填寫）</label><input id="shipEditLocalName" class="w-full border rounded-xl px-3 py-3" placeholder="來源未提供可留空"></div>
       <div><label class="text-xs font-bold">航次 I</label><input id="shipEditVoyageI" class="w-full border rounded-xl px-3 py-3"></div>
       <div><label class="text-xs font-bold">航次 E</label><input id="shipEditVoyageE" class="w-full border rounded-xl px-3 py-3"></div>
       <div><label class="text-xs font-bold">碼頭</label><input id="shipEditWharf" class="w-full border rounded-xl px-3 py-3"></div>
@@ -2552,6 +2553,7 @@ function vesselJobRows(monthOverride=''){
     .map(s=>applyShipManualOverrides(s)).map(s=>({
     workingNo:String(s.workingNo||'—'),
     vessel:String(s.vessel||'—'),
+    localName:String(s.localName||s.chineseName||''),
     voyageI:String(s.voyageI||''),
     voyageE:String(s.voyageE||''),
     wharf:String(s.wharf||''),
@@ -3762,7 +3764,7 @@ function renderDashboard(){
       <td>${shipChangeStatusBadge(x)}</td>
       <td class="font-bold whitespace-nowrap">${esc(dashboardRocDate(dashboardJobDateValue(x)))}</td>
       ${dashboardChangeCell(x,'workingNo',esc(originalNumericWorkingNo(x.sourceWorkingNo||x.workingNo))+(vesselImportCallNumber(x)>1?'（第'+vesselImportCallNumber(x)+'靠）':''),'font-black text-indigo-700')}
-      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button>`)}
+      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button><span class="block text-[11px] font-normal text-slate-500">中文：${esc(x.localName||'未提供')}</span>`)}
       ${dashboardChangeCell(x,'voyageI',voyage)}
       ${dashboardChangeCell(x,'wharf',wharf)}
       ${dashboardChangeCell(x,'totalContainers',String(num(x.totalContainers)),'font-bold')}
@@ -7879,7 +7881,7 @@ function mergeShipMasterOne(local,cloud){
   if(!cloud)return local;
   const out={...local,...cloud};
   const textFields=[
-    'workingNo','vessel','voyageI','voyageE','wharf','firstDate','lastDate','note',
+    'workingNo','vessel','localName','chineseName','voyageI','voyageE','wharf','firstDate','lastDate','note',
     'unlashingDateTime','lashingDateTime','compareDate','compareMonth','compareDateSource'
   ];
   const numFields=['disc','load','totalContainers','hatches','totalMoves','bundleDeduct','shiftMoves','aqcCount','gph','gphHC','vph','vphHC'];
@@ -11044,6 +11046,7 @@ async function importExcel(file) {
       sourceWorkingNo:String(summary.sourceWorkingNo||summary.workingNo||'').trim(),
       sourceFileName:String(file?.name||''),
       vessel:String(summary.vessel||'').trim(),
+      localName:String(summary.localName||'').trim(),
       voyageI:String(summary.voyageI||'').trim(),
       voyageE:String(summary.voyageE||'').trim(),
       wharf:String(summary.wharf||'').trim(),
@@ -11117,6 +11120,7 @@ async function importExcel(file) {
       String(s.workingNo||'').trim()===String(master.workingNo||'').trim() ||
       sameShipMasterJobWithSerialGuard(s,master)
     )||null;
+    if(previousMaster?.localName&&!master.localName)master.localName=String(previousMaster.localName);
     buildShipChangeState(previousMaster,master);
 
     // 匯入新版資料時，如果只是 WORKING NO. 或摘要資訊被修正，
@@ -13265,6 +13269,7 @@ function openShipEditDialog(workingNo){
   set('shipEditOriginalNo',s.workingNo||'');
   set('shipEditWorkingNo',s.workingNo||'');
   set('shipEditVessel',s.vessel||'');
+  set('shipEditLocalName',s.localName||s.chineseName||'');
   set('shipEditVoyageI',s.voyageI||'');
   set('shipEditVoyageE',s.voyageE||'');
   set('shipEditWharf',s.wharf||'');
@@ -13320,6 +13325,7 @@ async function saveShipMasterEdit(){
 
   const workingNo=String(document.getElementById('shipEditWorkingNo')?.value||'').trim();
   const vessel=String(document.getElementById('shipEditVessel')?.value||'').trim();
+  const localName=String(document.getElementById('shipEditLocalName')?.value||'').trim();
 
   if(!workingNo)return toast('WORKING NO. 不可空白');
   if(!vessel)return toast('船名不可空白');
@@ -13334,6 +13340,7 @@ async function saveShipMasterEdit(){
     ...s,
     workingNo,
     vessel,
+    localName,
     voyageI:String(document.getElementById('shipEditVoyageI')?.value||'').trim(),
     voyageE:String(document.getElementById('shipEditVoyageE')?.value||'').trim(),
     wharf:String(document.getElementById('shipEditWharf')?.value||'').trim(),
@@ -13367,6 +13374,7 @@ async function saveShipMasterEdit(){
     ...(s.manualOverrides||{}),
     workingNo:updated.workingNo,
     vessel:updated.vessel,
+    localName:updated.localName,
     voyageI:updated.voyageI,
     voyageE:updated.voyageE,
     wharf:updated.wharf,
@@ -15190,7 +15198,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-personnel-dispatch.js?v=20261019.1"></script>
-<script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
+<script src="../assets/port79-full-refresh.js?v=20261105-vessel-strict-cloud-v1"></script>
 <style id="p79-vessel-desktop-fullwidth-v20261019">
 @media(min-width:1000px){
  html[data-p79-design="vessel"] body[data-p79-system="efficiency"] main#efficiencyPageMain{
