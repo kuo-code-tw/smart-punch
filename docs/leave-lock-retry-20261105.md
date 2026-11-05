@@ -16,3 +16,11 @@
 `tests/leave-lock-retry.cjs` 驗證 production-derived router、版本通知、排班心跳、單列讀回、同 ID 重試、錯誤內容拒絕、僅重試明確拒絕、固定 payload、有限等待及前端語法。既有 GAS V95 與 full-refresh 回歸測試通過。
 
 `backend/leave-lock-retry.gs` 是核對用路由及請假函式快照，必須使用 `scripts/apply-gas-leave-lock-retry.cjs` 套用至已核對的 V95 完整主程式，不能獨立取代整份 GAS。
+
+## V97：編輯鎖與大型資料鎖分離
+
+正式重測另外發現：編輯權取得長時間回覆「排班編輯權正在切換中」，請假前置讀取亦可能收到 retryable 忙碌。前置唯讀核對已補有限重試。
+
+V97 將取得／心跳／釋放／強制接管的短原子作業改用 UserLock。正式部署固定以同一公司帳號執行，因此所有網頁使用者共用此鎖；**不能改為以各訪客執行**。排班資料儲存仍持有 ScriptLock，續租編輯權時依 ScriptLock → UserLock 的固定順序，再次核對帳號及 clientId；持有人變更時拒絕寫入。權限、租約及強制接管規則保留。getLeaveData 等待資料鎖的時間由 1.5 秒調為 5 秒，仍有有限前端預算。
+
+`tests/schedule-edit-lock-lane.cjs` 核對短鎖獨立、續租仍精準驗證持有人、持有人變更拒絕、成功與失敗都釋放鎖。
