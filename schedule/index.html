@@ -7402,7 +7402,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const end=String(report?.overtimeEnd||meta?.overtimeEnd||'').trim();
       // 20-08 整段夜班不可誤當成 20-24。
       const exactPeriod=start&&end
-        ?start==='20:00'&&['00:00','24:00'].includes(end)
+        ?/^20(?::00)?$/.test(start)&&/^(?:00|24)(?::00)?$/.test(end)
         :period==='20-24';
       if(!exactPeriod)return '';
       const kind=['例','休','國'].includes(report?.category)?report.category:
