@@ -4,6 +4,10 @@ on:
     paths:
       - 'schedule/index.html'
       - 'tests/schedule-no-punch-rest-display.cjs'
+      - 'tests/schedule-night-split-auto.cjs'
+      - 'assets/port79-schedule-rest-evidence.js'
+      - 'assets/port79-rest-allocation.js'
+      - 'assets/port79-monthly-rest-overtime.js'
       - '.github/workflows/schedule-no-punch-rest.yml'
 permissions:
   contents: read
@@ -15,6 +19,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node tests/schedule-night-split-auto.cjs
+      - run: node tests/schedule-attendance-display-priority.cjs
+      - run: node tests/schedule-emergency-no-mass-rest.cjs
+      - run: node tests/schedule-rest-unverified-overtime.cjs
       - run: node tests/schedule-no-punch-rest-display.cjs
       - run: node tests/schedule-november-render-fallback.cjs
       - run: node tests/october-system-roster-overtime.cjs

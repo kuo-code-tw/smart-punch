@@ -59,13 +59,18 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  // Any 休/例/國 roster day with one complete IN/OUT pair is an actual attended day.
  // A short pair counts as attendance without inventing a full shift or approved overtime.
  // 只改統計歸屬，不將打卡直接視為已核准的加班；正式申報仍須人工確認。
+ const partialNightDates=dates.filter(d=>
+   snapshot?.attendanceEvidence?.nightSplitRestConfirmed?.[id(emp.empId)+'|'+d]);
+ const partialNightSet=new Set(partialNightDates);
  const workedRestEvidence=new Set(dates.filter(d=>{
-   if(!cats.includes(String(roster[d]||'').trim())||roster.__meta?.[d]?.overtimeReport)return false;
+   if(partialNightSet.has(d)||!cats.includes(String(roster[d]||'').trim())||
+      roster.__meta?.[d]?.overtimeReport)return false;
    const pairs=(snapshot?.pairs||[]).filter(p=>id(p.empId)===id(emp.empId)&&p.date===d&&p.start&&p.end);
    return pairs.length===1&&g.P79RestAttendance?.state(snapshot,emp.empId,d)==='worked';
  }));
  const excluded=dates.filter(d=>{
    if(workedRestEvidence.has(d))return true;
+   if(partialNightSet.has(d))return false;
    if(nonQuotaDates.has(d)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||(snapshot?.leaveDates||[]).includes(id(emp.empId)+'|'+d))return true;
    // 代別人的班不等於自己請假；有正式本人休加不可從額度中剔除。
    return (snapshot?.leaveCoverAssignments||[]).some(a=>d>=a.startDate&&d<=a.endDate&&
@@ -73,7 +78,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
        (a.workerIds||[]).some(x=>id(x)===id(emp.empId))&&!ownRestCoverReport(roster.__meta?.[d],roster,d)));
  });
  // Only scheduled rest belongs in the holiday ledger; absence is not rest.
- const observedOffDates=[];
+ const observedOffDates=partialNightDates;
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
    [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...exemptReportDates]).meta;
  const ledger=[],extraRestDates=[];

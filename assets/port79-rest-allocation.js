@@ -26,6 +26,14 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const observedOff=new Set(observedOffDates),quotaExempt=new Set(quotaExemptReportDates);
   const isRestCandidate=date=>schedule[date]==='休'||
     (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
+  // Partial-night rest proof comes only from the official dual-source attendance audit.
+  const nightSplit=date=>observedOff.has(date)&&
+    ['晚','休'].includes(String(schedule[date]||'').trim())&&
+    !!String(result[date]?.overtimeReport?.id||'').trim()&&
+    !['例','休','國'].includes(result[date]?.overtimeReport?.category)&&
+    result[date]?.overtimeExcluded!==true&&
+    !(result[date]?.overtimeRevocations||[]).some(x=>
+      x?.confirmed===true&&String(x.reportId)===String(result[date]?.overtimeReport?.id));
   const allDates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
@@ -57,7 +65,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     const item=result[date];if(!item)continue;
     const substitute=item.forEmpId||item.type==='substitute'||item.overtimeReport?.category==='代';
     const restReport=['例','休','國'].includes(item.overtimeReport?.category);
-    if(!substitute||restReport)continue;
+    if(!substitute||restReport||nightSplit(date))continue;
     substitutionDates.add(date);
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
   }
@@ -96,8 +104,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     const item=result[date]||{};
     if(!isRestCandidate(date)||item.restQuotaOvertime||
        item.restAllocationLocked||item.restCategoryLocked||
-       item.overtime||item.overtimeReport||item.overtimeReports?.length||
-       item.forEmpId||item.type==='substitute')continue;
+       (!nightSplit(date)&&(item.overtime||item.overtimeReport||item.overtimeReports?.length||
+       item.forEmpId||item.type==='substitute')))continue;
     if(item.restCategory==='休'||item.restPreferredCategory==='休'||
        item.restCategory==='國'&&nationalBlocked.has(date))flexible.add(date);
   }
@@ -106,9 +114,12 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     isRestCandidate(date)&&!substitutionDates.has(date)&&!excluded.has(date)&&
     (!result[date]?.restCategory||flexible.has(date))&&
     !result[date]?.restAllocationLocked&&!result[date]?.restCategoryLocked&&
-    !result[date]?.overtime&&!result[date]?.overtimeReport&&
-    !result[date]?.overtimeReports?.length&&!result[date]?.forEmpId&&
-    !result[date]?.manualRosterShift&&!result[date]?.restQuotaOvertime);
+    (!result[date]?.overtime||nightSplit(date))&&
+    (!result[date]?.overtimeReport||nightSplit(date))&&
+    (!result[date]?.overtimeReports?.length||nightSplit(date))&&
+    (!result[date]?.forEmpId||nightSplit(date))&&
+    (!result[date]?.manualRosterShift||nightSplit(date))&&
+    !result[date]?.restQuotaOvertime);
   // Only a non-revoked formal report can consume an unworked rest quota
   // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
   const verifiedRestReport=item=>{
@@ -153,6 +164,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       'restQuotaOvertime','restAllocationSource','restPreferredCategory'])delete clean[field];
     result[date]={...clean,restCategory:slot.category,restSourceDate:slot.sourceDate,
       restHolidayName:slot.holidayName||'',restQuotaOvertime:false,restAllocationSource:'auto-v1',
+      ...(nightSplit(date)?{restSegmentSource:'night-split-v1'}:{}),
       ...(preference?{restPreferredCategory:preference}:{})};
     used.add(date);
   };
@@ -168,7 +180,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       // cannot otherwise be filled, those 休 cells are still convertible.
       const x=(slot.category==='休'?!pref(a):!!pref(a))?1:0;
       const y=(slot.category==='休'?!pref(b):!!pref(b))?1:0;
-      return x-y||Math.abs(Number(a.slice(8))-Number(slot.sourceDate.slice(8)))-
+      return Number(nightSplit(b))-Number(nightSplit(a))||x-y||
+        Math.abs(Number(a.slice(8))-Number(slot.sourceDate.slice(8)))-
         Math.abs(Number(b.slice(8))-Number(slot.sourceDate.slice(8)))||a.localeCompare(b);
     });
     if(pool.length)assign(pool[0],slot);
