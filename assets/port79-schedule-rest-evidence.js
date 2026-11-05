@@ -51,7 +51,7 @@ const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().repla
        const endText=String(report.overtimeEnd||meta.overtimeEnd||'').trim();
        const code=String(report.code||'').replace(/^[代延休例國]/,'');
        if(startText&&endText?
-         !(startText==='20:00'&&['00:00','24:00'].includes(endText)):
+         !(/^20(?::00)?$/.test(startText)&&/^(?:00|24)(?::00)?$/.test(endText)):
          code!=='20-24')continue;
        const start=Date.parse(date+'T20:00:00+08:00'),end=start+4*3600000,finish=end+8*3600000;
        const nextDate=new Date(end+28800000).toISOString().slice(0,10),nextMonth=nextDate.slice(0,7);
