@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const source=fs.readFileSync('assets/port79-missing-punch-login-preview.js','utf8');
-const context={window:{},document:{readyState:'loading',addEventListener(){}},Date,URL,Map,Set,Promise};vm.createContext(context);vm.runInContext(source,context);const api=context.window.P79MissingPunchSearch;
+const context={window:{},document:{readyState:'loading',addEventListener(){}},Date,URL,Map,Set,Promise,setTimeout:fn=>fn()};vm.createContext(context);vm.runInContext(source,context);const api=context.window.P79MissingPunchSearch;
 const day='2026-10-20',now=Date.parse('2026-10-21T09:00:00+08:00');
 const row=(emp,label,clockIn='',clockOut='',date=day)=>[date,'1',emp,'員工'+emp,'測試部門','AQC',label,clockIn,clockOut,'',''];
 const input=day+' 08:00:00',output=day+' 16:00:00';
