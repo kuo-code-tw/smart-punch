@@ -848,31 +848,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vph')">VPH <span data-sort-mark="vph"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vphHC')">VPH(含H/C) <span data-sort-mark="vphHC"></span></th>
             </tr>
-            <tr class="bg-slate-50/95">
-              <th><button type="button" onclick="clearDashboardColumnFilters()" class="text-xs font-black text-slate-600 hover:text-indigo-700">清除</button></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th><select id="dashboardFilterVessel" class="w-full min-w-[145px] border rounded-lg px-2 py-1.5 text-xs bg-white font-bold" onchange="onDashboardTableFilterChange()"><option value="">全部船名</option></select></th>
-              <th></th>
-              <th><input id="dashboardFilterWharf" class="w-full min-w-[70px] border rounded-lg px-2 py-1.5 text-xs" placeholder="例如 79R" oninput="onDashboardTableFilterChange()"></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th>
-                <select id="dashboardEfficiencyFilter" class="w-full min-w-[92px] border rounded-lg px-2 py-1.5 text-xs bg-white" onchange="onDashboardTableFilterChange()">
-                  <option value="">全部效率</option>
-                </select>
-              </th>
-              <th></th>
-              <th></th>
-              <th></th>
-            </tr>
+
           </thead>
           <tbody id="summaryBody"></tbody>
         </table>
