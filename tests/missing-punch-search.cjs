@@ -20,6 +20,30 @@ assert.equal(api.dateRange('2026-09-30','2026-10-01').length,2);assert.throws(()
 function setup(){let token='T';const reads=[];Object.assign(context,{hasAuthoritativeAdminSession:()=>true,isVerifiedSuperAdminSession:()=>true,getAttendanceEmployeeMasterToken:()=>token,getActiveGasUrl:()=> 'https://fixture.invalid/exec',getAdminAttendanceEmployees:()=>[{empId:'B'}],canCurrentAdminViewDataRow:r=>r.empId==='B',p79ReadAttendanceExportScope:async m=>{reads.push('attendance:'+m);return{source:[{empId:'B'},{empId:'OTHER'}]}},p79ReadAttendanceExportSource:async(a,m)=>{reads.push(a+':'+m);return{schedules:[]}},p79BuildScheduleAttendanceExport:(m,p,s)=>{assert.equal(s.length,1);return{dailyRows:[[],row('B','早','',output)]}},fetchGasJsonWithRetry:async url=>{assert.equal(new URL(url).searchParams.get('token'),'T');return{ok:true,sessionLogs:logs}}});return{reads,token:t=>token=t};}
 (async()=>{let t=setup();let result=await api.load(day,day);assert.equal(result.rows.length,1);assert.equal(result.logsAvailable,true);assert.equal(t.reads.length,2);t.token('OTHER');assert.throws(()=>result.assertCurrent(),/登入身分/);
  t=setup();context.fetchGasJsonWithRetry=async()=>{throw Error('offline')};result=await api.load(day,day);assert.equal(result.logsAvailable,false);assert.equal(result.rows.length,1,'unavailable logs do not invent a complete punch or hide missing records');
+ // A one-day search must not ask the export scope to load an unrelated month.
+ t=setup();let scopeOptions,rosterOptions;
+ context.p79ReadAttendanceExportScope=async(month,opts)=>{scopeOptions={month,...opts};return{source:[{empId:'B'}]};};
+ context.p79ReadAttendanceExportSource=async(action,month,opts)=>{rosterOptions={action,month,...opts};return{schedules:[]};};
+ result=await api.load(day,day);
+ assert.equal(scopeOptions.start,day);assert.equal(scopeOptions.end,day);
+ assert.equal(scopeOptions.preferCache,false);
+ assert.equal(rosterOptions.preferCache,false,'fresh official roster is mandatory');
+ // A temporary 'not fully loaded' reply retries exactly once without inventing empty results.
+ t=setup();let retries=0;
+ context.p79ReadAttendanceExportScope=async()=>{retries++;if(retries===1)throw Error('畫面資料尚未完整載入，請重新讀取後再操作');return{source:[{empId:'B'}]};};
+ result=await api.load(day,day);assert.equal(result.rows.length,1);assert.equal(retries,2);
+ // A persistent readiness error reports the exact failed source and does not claim no gaps.
+ t=setup();retries=0;
+ context.p79ReadAttendanceExportScope=async()=>{retries++;throw Error('畫面資料尚未完整載入，請重新讀取後再操作');};
+ await assert.rejects(api.load(day,day),/正式考勤讀取未完成：畫面資料尚未完整載入/);
+ assert.equal(retries,2,'bounded one retry only');
+ // A roster error must identify roster, not attendance, for operator triage.
+ t=setup();context.p79ReadAttendanceExportSource=async()=>{throw Error('排班資料未就緒');};
+ await assert.rejects(api.load(day,day),/正式排班讀取未完成：排班資料未就緒/);
+ // Empty staff identity must be considered incomplete, never '0 missing punches'.
+ t=setup();context.getAdminAttendanceEmployees=()=>[];
+ await assert.rejects(api.load(day,day),/員工主檔尚未完成載入/);
+
  t=setup();context.p79ReadAttendanceExportScope=async()=>{throw Error('incomplete attendance')};await assert.rejects(api.load(day,day),/incomplete attendance/);
  t=setup();context.fetchGasJsonWithRetry=async()=>{t.token('OTHER');return{ok:true,sessionLogs:logs}};await assert.rejects(api.load(day,day),/登入身分/);
  t=setup();context.hasAuthoritativeAdminSession=()=>false;await assert.rejects(api.load(day,day),/管理帳號/);assert.equal(t.reads.length,0);
