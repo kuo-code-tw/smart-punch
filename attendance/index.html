@@ -10319,7 +10319,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 let renewed=false;
                 if(!token){token=await p79MobileRenewPunchSession(employee);renewed=true;}
                 const read=()=>fetchGasJsonWithRetry(gas+(gas.includes('?')?'&':'?')+
-                    'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+
+                    'action=getAttendanceMainDirect&punchSelf=1&month='+encodeURIComponent(month)+
                     '&token='+encodeURIComponent(token)+'&t='+Date.now(),
                     '本人正式考勤快速核對',1,45000);
                 let data=await read();

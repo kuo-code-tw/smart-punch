@@ -910,7 +910,23 @@ function p79MarkCloudOnline(text='雲端可連線'){
 }
 
 async function readJson(response,label){const raw=await response.text();const text=String(raw||'').replace(/^\uFEFF/,'').trim();if(!response.ok)throw new Error(`${label} HTTP ${response.status}`);if(!text)throw new Error(`${label} 回傳空白`);if(/^<!doctype html|^<html/i.test(text))throw new Error(`${label} 回傳 Google 網頁，不是 JSON`);try{return JSON.parse(text)}catch{throw new Error(`${label} 回傳格式錯誤`)}}
-async function fetchTimeout(url,options={},timeoutMs=10000,label='連線'){const c=typeof AbortController!=='undefined'?new AbortController():null;let timed=false;const t=c?setTimeout(()=>{timed=true;try{c.abort()}catch{}},timeoutMs):null;try{return await fetch(url,{...options,signal:c?.signal})}catch(e){if(timed||String(e?.name)==='AbortError'||/abort/i.test(String(e?.message||e)))throw new Error(`${label}逾時`);throw e}finally{if(t)clearTimeout(t)}}
+// Keep one deadline through headers AND body; GAS may deliver headers before JSON.
+async function fetchTimeout(url,options={},timeoutMs=10000,label='連線'){
+  const controller=typeof AbortController!=='undefined'?new AbortController():null;
+  let timer;
+  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{
+    reject(new Error(`${label}逾時`));
+    try{controller?.abort()}catch{}
+  },timeoutMs)});
+  try{
+    return await Promise.race([(async()=>{
+      const response=await fetch(url,{...options,signal:controller?.signal});
+      const raw=await response.text();
+      // These JSON callers need only status and text; do not read the network body twice.
+      return {ok:response.ok,status:response.status,text:async()=>raw};
+    })(),deadline]);
+  }finally{clearTimeout(timer)}
+}
 async function verifyUser(loginId,password,mode='punch'){
   const account=String(loginId||'').trim();
   const loginMode=String(mode||'punch').toLowerCase()==='manage'?'manage':'punch';
@@ -948,7 +964,6 @@ async function verifyUser(loginId,password,mode='punch'){
   // v10.20：管理登入雙路徑。
   // 先走 verifyAdmin；若舊/新 GAS 部署對 action 或 POST 解析方式不同，
   // 自動改走 verifyUser(manage)。兩條都必須由後端真正驗證密碼。
-  let adminLastError=null;
 
   async function tryManageForm(action,label,timeoutMs){
     const form=new URLSearchParams();
@@ -977,25 +992,16 @@ async function verifyUser(loginId,password,mode='punch'){
     return raw;
   }
 
-  try{
-    const data=await tryManageForm('verifyAdmin','管理登入驗證',18000);
-    if(data?.ok)return data;
-    adminLastError=new Error(data?.error||'verifyAdmin 驗證未通過');
-  }catch(e){
-    adminLastError=e;
+  // One current authentication request; a timeout does not prove it stopped server-side.
+  const data=await tryManageForm('verifyAdmin','管理登入驗證',25000);
+  if(data?.ok)return data;
+  if(data && data.ok===false && /unknown action|unsupported action|不支援.*action|未知.*action/i.test(String(data.error||''))){
+    const fallback=await tryManageForm('verifyUser','管理登入相容驗證',15000);
+    if(fallback?.ok)return fallback;
+    throw new Error(fallback?.error||'管理登入驗證未通過');
   }
+  throw new Error(data?.error||'管理登入驗證未通過');
 
-  await new Promise(r=>setTimeout(r,180));
-
-  try{
-    const data=await tryManageForm('verifyUser','管理登入備援驗證',18000);
-    if(data?.ok)return data;
-    adminLastError=new Error(data?.error||'verifyUser 管理驗證未通過');
-  }catch(e){
-    adminLastError=e;
-  }
-
-  throw adminLastError||new Error('管理登入驗證失敗');
 }
 async function verifySession(token){const url=GAS_URL+'?action=getSessionMeta&token='+encodeURIComponent(token)+'&t='+Date.now();const res=await fetchTimeout(url,{cache:'no-store',redirect:'follow'},9000,'登入狀態驗證');return await readJson(res,'登入狀態驗證')}
 
@@ -1198,8 +1204,7 @@ async function autoDetectLoginIdentity(){
         if(role==='admin'||role==='superadmin'){
           $('password').disabled=false;$('password').placeholder='請輸入管理密碼';$('status').className='status ok';
           $('status').textContent='🛡️ '+(displayName?displayName+'｜':'')+(role==='superadmin'?'超級管理員':'管理員')+'：身分已由手機快取辨識；管理密碼仍會連線驗證。';
-          // 使用者輸入密碼的同時，在背景把這個帳號的登入列預熱到 GAS CacheService。
-          p79WarmLoginIdentity(loginId);
+          // 正式登入優先，不額外啟動並行預熱請求。
         }else{
           $('password').disabled=true;$('password').placeholder='一般員工不可輸入管理密碼';$('status').className='status ok';
           $('status').textContent='🕒 '+(displayName?displayName+'｜':'')+'一般員工：'+(p79EmployeeCacheNeedsVerification()?'可先進入打卡；目前資料已超過 24 小時，將標記待雲端驗證。':'可直接進入打卡。');
@@ -1253,10 +1258,9 @@ async function manageLogin(){
   loginBusy=true;$('punchLoginBtn').disabled=true;$('manageLoginBtn').disabled=true;$('manageLoginBtn').textContent='管理登入中...';$('status').className='status';$('status').textContent='正在驗證管理權限...';
   let slowTimer=null,verySlowTimer=null;
   try{
-    // 若輸入工號時啟動的預熱仍在跑，最多等 6 秒共用同一個請求，避免手機同時打兩支 GAS。
     // 管理密碼驗證優先，不等待非必要的身分預熱（原本最長 6 秒）。
     slowTimer=setTimeout(()=>{if(loginBusy){$('status').className='status warning';$('status').textContent='雲端正在完成管理驗證，請稍候，不會重複送出登入。'}},8000);
-    verySlowTimer=setTimeout(()=>{if(loginBusy){$('status').className='status warning';$('status').textContent='GAS 本次回應較慢，仍持續等待同一筆安全驗證中…'}},18000);
+    verySlowTimer=setTimeout(()=>{if(loginBusy){$('status').className='status warning';$('status').textContent='雲端驗證較慢，最多等待 25 秒；尚未登入成功，請勿重複按確認。'}},18000);
     const data=await verifyUser(loginId,password,'manage');
     if(!data?.ok)throw new Error(data?.error||'管理登入資料不正確');
 
