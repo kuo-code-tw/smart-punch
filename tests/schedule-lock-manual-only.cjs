@@ -49,6 +49,7 @@ const ctx={
  lockBtn:()=>button,
  manualReleaseScheduleEditLock:async()=>{calls.push('release-click');server.mine=false;server.locked=false;
    ctx.scheduleEditLockState={...server};ctx.scheduleManualEditIntent=false;},
+ scheduleLockOwnerLabel:()=>String(server.ownerName||'OTHER'),
  isScheduleSuperAdmin:()=>false,confirm:()=>false,alert:()=>{},
  p79UpdateScheduleLockTop:()=>{}
 };ctx.window=ctx;vm.createContext(ctx);
