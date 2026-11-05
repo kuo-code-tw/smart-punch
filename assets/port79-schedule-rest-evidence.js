@@ -36,7 +36,7 @@ const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().repla
        return Math.abs(s.start-start)<=900000&&Math.abs(s.end-end)<=900000&&
          s.end-s.start>=210*60000&&s.end-s.start<=270*60000;
      });
-     return matches.length===1;
+     return matches.length===1?matches[0].end:NaN;
    };
    for(const row of schedules||[]){
      const who=id(row.empId),roster=row.schedule||{};
@@ -61,8 +61,13 @@ const id=x=>String(x||'').trim().toUpperCase(),att=x=>String(x||'').trim().repla
        if(nextMonth!==month&&
          (![...(officialRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))||
           ![...(referenceRecords||[])].some(r=>String(r.timeStr||r.time||'').startsWith(nextMonth))))continue;
-       if(!paired(sessions,who,date,start,end)||!paired(referenceSessions,who,date,start,end))continue;
-       if((rawByPerson.get(who)||[]).some(ms=>ms>=end&&ms<finish))continue;
+       const officialOut=paired(sessions,who,date,start,end);
+       const referenceOut=paired(referenceSessions,who,date,start,end);
+       if(!Number.isFinite(officialOut)||!Number.isFinite(referenceOut))continue;
+       // The 20-24 shift's own midnight clock-out is not a new night punch.
+       // Every other event during 00-08, including a stray single punch, blocks rest.
+       if((rawByPerson.get(who)||[]).some(ms=>ms>=end&&ms<finish&&
+          ms!==officialOut&&ms!==referenceOut))continue;
        found[who+'|'+date]={workDate:date,workStart:'20:00',workEnd:'24:00',
          restStart:'00:00',restEnd:'08:00',reportId:String(report.id)};
      }
