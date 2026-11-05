@@ -25,6 +25,7 @@ function routerTest(available,action='addLeave'){
  responses=[busy,busy,{ok:true}];assert((await c.postCloud(payload)).ok);assert.equal(calls.length,3);assert(calls.every(x=>x===calls[0]));assert.equal(JSON.parse(calls[0]).leave.id,'SAME-ID');
  for(const failure of [{ok:false,retryable:true,error:'busy without proof'},{ok:false,error:'permission'},Error('timeout')]){calls=[];responses=[failure,{ok:true}];await assert.rejects(c.postCloud(payload));assert.equal(calls.length,1,'uncertain/error replies never blindly retry');}
  calls=[];responses=Array(6).fill(busy);await assert.rejects(c.postCloud(payload));assert.equal(calls.length,6);assert(clock<90000);
+ vm.runInContext(fn(html,'p79ReadCurrentLeaveCoverState'),c);calls=[];responses=[{ok:false,retryable:true,error:'read busy'},{ok:true,leaveRecords:[],leaveCoverAssignments:[]}];assert((await c.p79ReadCurrentLeaveCoverState()).ok);assert.equal(calls.length,2);responses=[{ok:false,error:'permission'}];await assert.rejects(c.p79ReadCurrentLeaveCoverState());
  for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/\bsrc=|application\/ld\+json/.test(m[1]))new vm.Script(m[2]);
  console.log('PASS real router lock rejection produces no revision churn; heartbeat does not invalidate data; leave single-row readback, same-ID retry, wrong content rejection; frontend retries only proven pre-write rejection with immutable body, bounded attempts and no timeout replay; inline syntax');
 })().catch(e=>{console.error(e);process.exitCode=1;});

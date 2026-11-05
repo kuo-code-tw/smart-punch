@@ -999,12 +999,23 @@ async function p79CleanupDeletedLeaveCovers(){
  try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
 }
 async function p79ReadCurrentLeaveCoverState(){
- // Preflight is read-only. Cleaning unrelated historical covers here added a
- // whole write/read cycle and could change rosters during a no-cover leave save.
- const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
- if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw new Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
- return fresh;
+ // This preflight is read-only. Busy replies can be retried without replaying a write.
+ const deadline=Date.now()+90000;
+ for(let attempt=0;;attempt++){
+  const remaining=deadline-Date.now();
+  if(remaining<3000)throw Error('雲端資料核對仍忙碌，原內容已保留，尚未送出請假');
+  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},Math.min(22000,remaining));
+  if(fresh?.ok===true&&Array.isArray(fresh.leaveRecords)&&Array.isArray(fresh.leaveCoverAssignments))return fresh;
+  if(fresh?.ok===false&&fresh.retryable===true&&attempt<5){
+   const delay=Math.min(6000,1500*(attempt+1));
+   if(Date.now()+delay+3000>=deadline)throw Error(fresh.error||'雲端資料核對仍忙碌');
+   if(typeof adminCreateLeaveBusy!=='undefined'&&adminCreateLeaveBusy)$('adminCreateLeaveMessage').textContent='正在等待正式資料核對（自動重試 '+(attempt+1)+'/5）…';
+   await new Promise(resolve=>setTimeout(resolve,delay));continue;
+  }
+  throw Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
+ }
 }
+
 function leaveBalanceNumber(v){
  const s=String(v??'').trim().replace(/,/g,'');
  if(!s)return 0;
