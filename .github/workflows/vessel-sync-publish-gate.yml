@@ -1,0 +1,36 @@
+name: Verify ship cloud refresh before production
+on:
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'assets/port79-full-refresh.js'
+      - 'tests/vessel-cloud-pull-chinese.cjs'
+      - '.github/workflows/vessel-sync-publish-gate.yml'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify vessel cloud refresh and bilingual vessel names
+        run: |
+          node tests/vessel-cloud-pull-chinese.cjs
+          node tests/full-refresh.cjs
+          node tests/vessel-save-queue.cjs
+          node tests/home-wanhai-bilingual-ship-names.cjs
+      - name: Check full production regression suite
+        run: |
+          failures=0
+          for test_file in tests/*.cjs; do
+            if ! node "$test_file" > /tmp/p79-test-result.log 2>&1; then
+              echo "FAILED: $test_file"
+              tail -n 16 /tmp/p79-test-result.log
+              failures=$((failures+1))
+            fi
+          done
+          echo "Full regression failures: $failures"
+          test "$failures" -eq 0
