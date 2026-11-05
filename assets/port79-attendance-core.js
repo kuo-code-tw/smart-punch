@@ -140,6 +140,41 @@ function enqueue(payload){
   saveQueue(next);
   return next.length;
 }
+// Persist all punches belonging to one displayed shift as one durable local intent.
+// Network operations still run through the existing sequential V5 outbox, which
+// preserves unconfirmed entries for retry rather than silently omitting a side.
+function enqueueDeleteGroup(ids){
+  const wanted=Array.isArray(ids)
+    ? [...new Set(ids.map(id=>String(id??'').trim()).filter(Boolean))]
+    : [];
+  if(!wanted.length)return {ok:false,error:'沒有可刪除的考勤 ID'};
+  const prior=readQueue();
+  const next=prior.slice();
+  for(const id of wanted){
+    const payload={action:'deleteRecord',id};
+    const key=opKey(payload);
+    if(!next.some(item=>item?.key===key&&samePayload(item.payload,payload))){
+      next.push({key,payload,createdAt:Date.now(),attempts:0,nextRetryAt:0,state:'pending'});
+    }
+  }
+  // For destructive paired operations, an in-memory-only queue is not durable.
+  // Refuse to send ANY request unless the entire group is saved together.
+  if(!saveQueue(next)||queueStorage==='memory'){
+    saveQueue(prior);
+    return {ok:false,error:'上下班刪除佇列無法持久保存'};
+  }
+  const verified=readQueue();
+  if(!wanted.every(id=>verified.some(item=>
+    item?.key===opKey({action:'deleteRecord',id})&&
+    String(item?.payload?.action||'')==='deleteRecord'&&
+    String(item?.payload?.id??'')===id))){
+    saveQueue(prior);
+    return {ok:false,error:'上下班刪除佇列核對未通過'};
+  }
+  updateUi();
+  return {ok:true,count:wanted.length,ids:wanted};
+}
+
 function samePayload(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function p79ClearMatchingLegacyEdit(payload){
  if(!['updateRecord','editRecord'].includes(String(payload?.action||'')))return;
@@ -1123,6 +1158,7 @@ function updateUi(){
 
 // ---- replace legacy sync API with V5 ----
 window.p79V5Enqueue=enqueue;
+window.p79V5EnqueueDeleteGroup=enqueueDeleteGroup;
 window.p79V5Drain=drain;
 window.p79V5DrainFast=drainFast;
 window.p79V5StartDelta=startDelta;
