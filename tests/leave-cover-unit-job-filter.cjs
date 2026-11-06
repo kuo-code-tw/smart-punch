@@ -33,7 +33,7 @@ assert(html.includes('甲員')&&html.includes('丙員'),'initial all-person list
 
 html=picker.render({...params,unitFilter:'第一單位'});
 assert(html.includes('甲員')&&html.includes('乙員'),'unit selection lists only matching staff');
-assert(!html.includes('丙員')&&!html.includes('丁員'),'other units removed from visible list');
+assert(!html.includes('<strong>丙員</strong>')&&!html.includes('<strong>丁員</strong>'),'other units hidden from candidate rows, even when an existing selection remains in the preview');
 assert(html.includes('已勾選 2 / 2 位'),'hiding an assigned person never deselects');
 assert(html.includes('甲員</span>')&&html.includes('丙員</span>'),'both assigned staff stay in preview');
 const unitOnly=Array.from(picker.recommend({...params,unitFilter:'第一單位'},'two'));
