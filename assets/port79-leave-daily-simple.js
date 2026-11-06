@@ -249,12 +249,15 @@ async function saveDaily(){
    done.push(p.date+' '+p.employee.name);
   }
   $id('adminCreateLeaveDialog').close();
-  setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；加班另列待核對，不會自動認定已出勤或已申報','success');
+  setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；正在開啟第一位代班人員加班申報核對視窗','success');
   if(entries.length){
    p79AppendLeaveHandoffEntries(entries);
-   // 請假與代班先完成，僅建立待核對清單；不強制跳入加班表單。
+   // Open only after ALL selected dates have confirmed cloud saves.
+   // Keep other employees/days pending; this never files overtime automatically.
    p79ActivateLeaveHandoff();
    p79UpdateLeaveHandoffBanner();
+   if(typeof window.p79LaunchLeaveOvertimeAfterSave==='function')
+    window.p79LaunchLeaveOvertimeAfterSave();
   }
   void loadCloud(false,true);
  }catch(error){
