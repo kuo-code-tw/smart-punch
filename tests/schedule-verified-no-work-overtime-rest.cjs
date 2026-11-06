@@ -4,17 +4,20 @@ const html=fs.readFileSync('schedule/index.html','utf8');
 const rest=fs.readFileSync('assets/port79-rest-attendance.js','utf8');
 const ledger=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 function extract(name){
- const start=html.indexOf('function '+name+'(');
- assert(start>=0,name+' found');const open=html.indexOf('{',start);
- let depth=0,quote='',escaped=false;
- for(let p=open;p<html.length;p++){
-  const ch=html[p];
-  if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}
-  if(ch==="'"||ch==='"'||ch==='\`'){quote=ch;continue;}
-  if(ch==='{')depth++;else if(ch==='}'&&--depth===0)return html.slice(start,p+1);
- }
- throw Error('unbalanced '+name);
+ const markers={
+  p79CompactOvertimeCode:'    function p79OvertimePeriodLabel(',
+  p79ConfirmedOvertimeReport:'    function p79ConfirmedRestOvertime(',
+  p79ScheduleHasVerifiedPunch:'    // 20:00–24:00',
+  p79ScheduleNoPunchRest:'    // Rest totals',
+  p79VisibleRestKind:'    // Single source of truth',
+  p79ScheduleDisplayDay:'    // On-demand full staff check',
+  p79ScheduleOvertimeExportRows_:'    async function exportScheduleToExcel()'
+ };
+ const start=html.indexOf('    function '+name+'('),end=html.indexOf(markers[name],start);
+ assert(start>=0&&end>start,name+' extract boundary');
+ return html.slice(start,end);
 }
+
 const day='2026-11-05',month='2026-11',id='E1';
 const report={id:'OT-05',category:'休',code:'休24-08',status:'已核對出勤',convertedHours:8,declaredHours:8};
 const meta={restCategory:'休',overtime:true,overtimeReport:report};
@@ -88,9 +91,7 @@ for(const kind of ['休','例','國']){
  assert.equal(result.visibleCode,kind,'true statutory '+kind+' is preserved when no work');
 }
 fullRoster[day]='晚';
-for(const tag of ['2026-11-05','2026-11-06']){
- assert(!html.includes('postCloud({action:\'deleteOvertime'), 'rendering must not secretly remove cloud reports');
-}
+assert(!html.includes("postCloud({action:'deleteOvertime"),'displaying absence never posts a delete to cloud');
 for(const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
  if(!/\bsrc=|application\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
 }
