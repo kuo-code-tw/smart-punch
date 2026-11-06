@@ -1329,7 +1329,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 </dialog>
 
   <section id="view-weekly" class="hidden space-y-4">
-  <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-slate-100" onclick="switchTab('ranking')">每月績效排行</button></div>
+  <div class="card p-3"><h2 class="font-bold text-slate-800">人員統計</h2><p class="mt-1 text-sm text-slate-500">作業查詢（日期／本周）</p></div>
     <div class="p79-section" data-section-key="personnel-groups"><div><span>人員作業量與效率</span></div>
 <div class="card p-4">
       <p class="text-sm text-slate-500 mb-3">選日期及姓名，查看 A、B、C、D 組作業量與效率排名（效率高到低；同分並列）。可選任意日期區間；本周以星期日至星期六計算。</p>
@@ -1495,7 +1495,7 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
 </section>
 
 <section id="view-ranking" class="hidden space-y-4">
-  <div class="card p-3 flex flex-wrap gap-2 items-center"><span class="font-bold mr-2">人員統計</span><button type="button" class="btn bg-slate-100" onclick="switchTab('weekly')">作業查詢（日期／本周）</button><button type="button" class="btn bg-indigo-600 text-white" onclick="switchTab('ranking')">每月績效排行</button></div>
+  
   <div class="p79-section" data-section-key="ranking-filters"><div><span>🏆 每月人員績效排行</span></div>
     <div class="card p-4"><p class="text-sm text-slate-500 mb-3">依作業日期統計每位人員整月資料。效率＝（DISC＋LOAD＋H/C）÷ 作業時數；同分並列名次。沒有作業資料或無有效時數者不列效率名次。排班 AQC 名冊內無作業資料的人員也會列出。</p>
     <div class="flex flex-wrap items-end gap-3">
@@ -1986,7 +1986,7 @@ function shipMasterDateMatchesYear(s,year){
   return (records||[]).some(r=>String(r?.workingNo||'').trim()===no && String(r?.workDate||'').startsWith(y));
 }
 
-function activeEfficiencyTabName(){const tab=document.querySelector('.tab.active')?.dataset?.tab||'dashboard';return tab==='weekly'&&document.getElementById?.('view-ranking')&&!document.getElementById('view-ranking').classList.contains('hidden')?'ranking':tab;}
+function activeEfficiencyTabName(){return document.querySelector('.tab.active')?.dataset?.tab||'dashboard';}
 function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
@@ -2009,13 +2009,12 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
     initWorkloadDateRangePicker();updateWorkloadDateRangeSummary();populatePersonStatPeople();renderPersonStats();return;
   }
   if(name==='dispatch'){window.P79PersonnelDispatch?.render();return;}
-  if(name==='ranking'){renderMonthlyRanking();return;}
-  if(name==='weekly'){renderWeeklyEfficiency();return;}
+  if(name==='ranking'||name==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();return;}
 }
-function switchTab(name,btn){if(name==='workload'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
+function switchTab(name,btn){if(name==='workload'||name==='ranking'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
   ['dashboard','multi-rod','compare','groups','personstats','weekly','ranking','dispatch'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
-    if(e)e.classList.toggle('hidden',x!==name);
+    if(e)e.classList.toggle('hidden',x!==name&&!(name==='weekly'&&x==='ranking'));
   });
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   const tabBtn=btn||document.querySelector(`[data-tab="${name==='ranking'?'weekly':name}"]`);
@@ -4496,8 +4495,7 @@ function retryOperationScheduleGroups(){
 function refreshOperationGroupView(){
   const active=activeEfficiencyTabName();
   if(active==='dispatch')window.P79PersonnelDispatch?.render();
-  else if(active==='ranking')renderMonthlyRanking();
-  else if(active==='weekly')renderWeeklyEfficiency();
+  else if(active==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
   else if(active==='workload')renderPersonStats();
   else if(active==='personstats')renderVesselDriverView();
   else if(active==='records')renderRecords();
@@ -6829,7 +6827,7 @@ async function loadMonthlyRanking(force=false){
   let count=0;for(const result of results){if(result.status==='fulfilled'&&(Array.isArray(result.value?.records)||Array.isArray(result.value?.shipMasters))){try{mergeEfficiencyCloudData(result.value);count++;}catch(_){}}}
   monthlyRankingReads.set(key,{status:count===2?'ready':count?'partial':'error'});
   if(count){saveLocal();invalidateWorkloadIndex();}
-  if(activeEfficiencyTabName()==='ranking')renderMonthlyRanking();
+  if(activeEfficiencyTabName()==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
 }
 function renderMonthlyRanking(){
   const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');if(!input||!body||!window.P79PersonnelRanking)return;
