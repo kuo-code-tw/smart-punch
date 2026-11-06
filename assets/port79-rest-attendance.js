@@ -79,6 +79,15 @@ function build(input){
  return{complete:true,month:input.month,checkedAt:now,days,sessionDates,workCalendarDays};
 }
 function state(snapshot,emp,date){return snapshot?.attendanceEvidence?.complete===true?snapshot.attendanceEvidence.days?.[id(emp)+'|'+date]?.state||'unknown':'unknown'}
-function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return s==='rest'?'整班無上下班卡，按休假處理，原申報不列有效加班':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':'';}
-g.P79RestAttendance={build,state,reportIssue,period,isLeaveDay};
+// Stronger than "no punch found yet": month and cross-midnight audit must be
+// complete, with the work-date absence confirmed by the formal source checks.
+// Never cancel a night shift while its next-morning clock-out is still pending.
+function verifiedNoWork(snapshot,emp,date){
+ const evidence=snapshot?.attendanceEvidence,key=id(emp)+'|'+String(date||'');
+ return evidence?.complete===true&&evidence.absenceAuditReady===true&&
+  evidence.absenceConfirmedDays?.[key]===true&&state(snapshot,emp,date)==='rest';
+}
+function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return verifiedNoWork(snapshot,emp,date)?'已核實整班無上下班卡，當日不計加班；原正式申報待取消':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':s==='rest'?'無完整配對，等待正式考勤核實後再判定':'';
+}
+g.P79RestAttendance={build,state,verifiedNoWork,reportIssue,period,isLeaveDay};
 })(window);
