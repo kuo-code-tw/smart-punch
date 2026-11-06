@@ -10,7 +10,7 @@ function extract(name){
  for(let p=open;p<html.length;p++){
   const ch=html[p];
   if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}
-  if("'\\"`".includes(ch)){quote=ch;continue;}
+  if(ch==="'"||ch==='"'||ch==='\`'){quote=ch;continue;}
   if(ch==='{')depth++;else if(ch==='}'&&--depth===0)return html.slice(start,p+1);
  }
  throw Error('unbalanced '+name);
@@ -91,7 +91,7 @@ fullRoster[day]='晚';
 for(const tag of ['2026-11-05','2026-11-06']){
  assert(!html.includes('postCloud({action:\'deleteOvertime'), 'rendering must not secretly remove cloud reports');
 }
-for(const script of html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/g)){
- if(!/\\bsrc=|application\\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
+for(const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
+ if(!/\bsrc=|application\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
 }
 console.log('PASS verified absent night overtime: shows/rest counts, no-work export hours zero, incomplete/single-punch protected, legal leave/status and raw report preserved');
