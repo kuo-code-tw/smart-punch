@@ -33,6 +33,7 @@ function restQuotaExemptDates(emp,roster,dates,snapshot=null){
  return dates.filter(date=>{
   const meta=roster.__meta?.[date],report=meta?.overtimeReport;
   if(!confirmedReport(meta,report))return false;
+  if(g.P79RestAttendance?.verifiedNoWork?.(snapshot,emp.empId,date)===true)return false;
   const reason=R?.classify?.({empId:emp.empId,date,meta,report,roster,snapshot});
   return reason?.exempt===true&&(reason.kind==='typhoon'||!ownRestCoverReport(meta,roster,date));
  });
@@ -97,12 +98,26 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    continue;
   }
   const verified=cats.includes(r?.category)&&confirmedReport(m,r);
+  const confirmedNoWork=confirmedReport(m,r)&&g.P79RestAttendance?.verifiedNoWork?.(snapshot,emp.empId,d)===true;
   const hasUnverifiedReport=cats.includes(r?.category)&&!verified&&r&&!storedReport(r);
   const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
   const leave=g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||false;
   if(leave){
    ledger.push({date:d,kind:'leave',category:'',actual});
-   if(verified){reported[r.category]++;ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與正式加班申報重疊，保留原申報供核對'});}
+   if(verified&&!confirmedNoWork){reported[r.category]++;ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與正式加班申報重疊，保留原申報供核對'});}
+   if(confirmedNoWork)conflicts.push({date:d,reportId:r.id,reason:'已核實請假日沒有實際出勤，不計加班；原申報待管理員正式取消'});
+   continue;
+  }
+  // A confirmed, cross-source absence audit overrides even an old cloud report.
+  // Account as a rest day and exclude this report's quota/time WITHOUT erasing
+  // the historical report. Formal cancellation remains an authorized action.
+  if(confirmedNoWork){
+   const original=String(roster[d]||'').trim();
+   const restKind=cats.includes(original)?original:cats.includes(m.restCategory)?m.restCategory:'休';
+   off[restKind]++;
+   ledger.push({date:d,kind:'off',category:restKind,actual:'rest',reportId:r.id,
+     statusNote:'已核實整班無卡；加班不計，原申報待正式取消'});
+   conflicts.push({date:d,reportId:r.id,reason:'已核實整班無卡，當日按休息計算；原正式加班申報待取消'});
    continue;
   }
   // Only a non-revoked cloud report ID proves a formal overtime report.
