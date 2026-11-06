@@ -14743,6 +14743,11 @@ function p79OvertimePeriodLabel(report){
                     if(accepted)row.schedule=JSON.parse(JSON.stringify(accepted));
                 }
                 p79OvertimeCalculationCache=null;
+                // Invalidate authenticated month bundles BEFORE the next
+                // attendance refresh. Otherwise an older IndexedDB roster
+                // could reinsert a report the server already cancelled.
+                try{sessionStorage.setItem('port79_cache_mutated_at',String(Date.now()));}catch(ignore){}
+                try{window.P79WorkhoursCache?.invalidate?.();}catch(ignore){}
                 try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({
                     month:item.month,date:item.date,at:Date.now(),source:'confirmed-no-punch-planned-cancellation'}));}catch(ignore){}
                 // The updated official roster is the only source used to remove
