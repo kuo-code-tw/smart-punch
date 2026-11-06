@@ -6711,7 +6711,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${unworkedOvertime?'已核實未出勤，加班不計；正式報單待管理員取消':coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${unworkedOvertime?'未出勤不計':coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
           // 複合狀態只做視覺提示：已申報代班加班且本人同日排休／請假。
           const combinedLeave = !!ownApprovedLeave || ['休','例','國','特','年','事','病','公','喪'].includes(String(shiftVal||''));
