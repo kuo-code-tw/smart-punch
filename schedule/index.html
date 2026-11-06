@@ -7370,10 +7370,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // 才把「過去的排定工作日」顯示／統計為休假。
       // 不修改原班表、既有申報、人工核准假、颱風假及跨日夜班。
       if(leave||['離','離職','颱'].includes(String(shift||'').trim()))return false;
+      const evidence=typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(date.slice(0,7)).evidence:null;
+      if(!evidence)return false;
       const state=knownState===null
-        ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(date.slice(0,7)).evidence},empId,date)
+        ?window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)
         :knownState;
-      const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
       const key=String(empId||'').trim().toUpperCase()+'|'+date;
       return evidence?.complete===true&&evidence.absenceAuditReady===true&&
         evidence.absenceConfirmedDays?.[key]===true&&state==='rest'&&
@@ -8310,7 +8311,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             const cancelled=revoked.has(id)||m.overtimeExcluded===true;
             // Only a completed zero-punch audit excludes an existing report's
             // conversion hours; it never falsely marks the cloud report revoked.
-            const noWork=!cancelled&&window.P79RestAttendance?.verifiedNoWork?.(attendanceSnapshot,emp.id,date)===true;
+            const noWork=!cancelled&&typeof window!=='undefined'&&window.P79RestAttendance?.verifiedNoWork?.(attendanceSnapshot,emp.id,date)===true;
             const confirmed=!cancelled&&!noWork&&r.status==='已核對出勤';
             const hours=Number(r.convertedHours);
             const declared=Number(r.declaredHours);
