@@ -9,6 +9,8 @@
 
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261027-shift-priority&rev=20261027-workflow"></script>
+<script src="../assets/port79-planned-rest-reconciliation.js?v=20261106-workhours-no-punch-v1"></script>
+<script src="../assets/port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261101-automatic-rest-bulk-v4&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
@@ -14704,6 +14706,58 @@ function p79OvertimePeriodLabel(report){
             totals.rawAverage=totals.staffCount?totals.raw/totals.staffCount:null;
             return {...officialSummary,groups,totals,fallbackMinutes,fallbackCount};
         }
+        // The attendance-only manual date action already calls the audited GAS
+        // confirmation endpoint. The work-hours ledger now uses that SAME
+        // permission/lock/cross-midnight verification for past unworked saved
+        // plans, instead of requiring someone to press 刪除 on each row.
+        const p79WorkNoPunchAutoCancel=window.P79WorkhoursNoPunchAutoCancel?.create({
+            token:currentPort79SsoToken,
+            canManage:p79CanDeleteOvertime,
+            isEditing:()=>p79WorkhoursIsEditing()||
+                (typeof p79WorkhoursHasOpenEditor==='function'&&p79WorkhoursHasOpenEditor()),
+            stateFor:month=>p79WorkOvertimeMonths.get(month),
+            isVerified:p79WorkOvertimeMonthVerified,
+            reconcile:window.P79PlannedRestReconciliation,
+            gasUrl:getActiveGasUrl,
+            fetch:(url,options)=>fetch(url,options),
+            requestId:()=>crypto.randomUUID(),
+            onCommitted:async (item,receipt,readback,token)=>{
+                const state=p79WorkOvertimeMonths.get(item.month);
+                if(!state||state.token!==token||currentPort79SsoToken()!==token)return;
+                // Never replace a live edit draft with a background cloud receipt.
+                if(p79WorkhoursIsEditing()){
+                    p79QueueConfirmedRosterRecheck(item.month);return;
+                }
+                state.rows=readback.schedules;
+                state.revision=readback.revision;
+                state.covers=readback.leaveCoverAssignments||[];
+                state.leaveRecords=readback.leaveRecords||[];
+                state.officialPayload=readback;
+                state.at=Date.now();
+                state.ready=true;state.pending=false;state.error='';
+                state.restEvidenceLoaded=false;state.restEvidenceError='';
+                const canonical=new Map(readback.schedules.map(r=>[String(r.empId||'').trim().toUpperCase(),r.schedule||{}]));
+                for(const row of schedules||[]){
+                    if(normalizeScheduleMonthKey(row.month)!==item.month)continue;
+                    const accepted=canonical.get(String(row.empId||'').trim().toUpperCase());
+                    if(accepted)row.schedule=JSON.parse(JSON.stringify(accepted));
+                }
+                p79OvertimeCalculationCache=null;
+                // Invalidate authenticated month bundles BEFORE the next
+                // attendance refresh. Otherwise an older IndexedDB roster
+                // could reinsert a report the server already cancelled.
+                try{sessionStorage.setItem('port79_cache_mutated_at',String(Date.now()));}catch(ignore){}
+                try{window.P79WorkhoursCache?.invalidate?.();}catch(ignore){}
+                try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({
+                    month:item.month,date:item.date,at:Date.now(),source:'confirmed-no-punch-planned-cancellation'}));}catch(ignore){}
+                // The updated official roster is the only source used to remove
+                // a successfully cancelled plan from the active list.
+                renderOvertimeStats();
+                state.restEvidencePromise=p79EnsureWorkRestEvidence(item.month,state);
+            },
+            onFailure:msg=>console.warn('[Workhours no-punch planned cancellation]',msg),
+            onStatus:()=>{if(!p79WorkhoursIsEditing())renderOvertimeStats();}
+        });
         function renderOvertimeStats() {
             const tbody = document.getElementById('overtimeTableBody');
             if (!tbody) return;
@@ -14711,6 +14765,7 @@ function p79OvertimePeriodLabel(report){
             const formalRows=buildOvertimeStatisticsRows();
             const plannedRows=p79OvertimeCalculationCache?.plannedRows||[];
             const allOvertimeRows=p79OvertimeMainLedgerRows(formalRows,plannedRows);
+            p79WorkNoPunchAutoCancel?.offer(allOvertimeRows);
             initOvertimeFilters(allOvertimeRows);
             p79UpdateOvertimeChangeAlert();
             const month = document.getElementById('overtimeMonthFilter')?.value || 'ALL';
@@ -14792,12 +14847,15 @@ function p79OvertimePeriodLabel(report){
             const reportState=p79WorkOvertimeMonths.get(month);
             const reportStatus=reportState?.pending?'｜申報資料讀取中…':reportState?.error?'｜'+reportState.error:'';
             const restStatus=reportState?.restEvidencePending?'｜無卡休假核對中…':reportState?.restEvidenceError?'｜'+reportState.restEvidenceError:'';
+            const noPunchAutoStatus=p79WorkNoPunchAutoCancel?.status();
+            const noPunchAutoNotice=noPunchAutoStatus?.running?'｜無卡預排正在雲端自動取消…':
+                noPunchAutoStatus?.lastError?'｜⚠ 無卡預排取消未完成，請核對雲端版本或管理權限':'';
             const pendingEstimateCount=pendingEstimate.count;
             const savedPlanCount=rows.filter(row=>p79WorkOvertimeIsUnconfirmedPlan(row)&&row.reportVerified).length;
             document.getElementById('overtimeFilterResultCount').textContent =
                 '(清單 '+rows.length+' 筆｜已儲存預排 '+savedPlanCount+' 筆；預排不算已完成時數)'+
                 (pendingEstimateCount?'｜加班出勤 '+pendingEstimateCount+' 班':'')+
-                reportStatus+restStatus+
+                reportStatus+restStatus+noPunchAutoNotice+
                 (rows.some(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest')
                   ?'｜🔴 疑似多報 '+rows.filter(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest').length+' 筆，請核對後刪除':'');
 
