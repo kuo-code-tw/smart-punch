@@ -8295,6 +8295,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function p79ScheduleOvertimeExportRows_(staff,month){
       const detail=[],totals=new Map(),seen=new Set();
+      const attendanceSnapshot={attendanceEvidence:p79ScheduleRestClient().status(month).evidence};
       for(const emp of staff){
         const meta=monthlyScheduleMeta[emp.id]||{};
         for(const [date,m] of Object.entries(meta)){
@@ -8307,7 +8308,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
             if(!id||seen.has(emp.id+'|'+date+'|'+id))continue;
             seen.add(emp.id+'|'+date+'|'+id);
             const cancelled=revoked.has(id)||m.overtimeExcluded===true;
-            const confirmed=!cancelled&&r.status==='已核對出勤';
+            // Only a completed zero-punch audit excludes an existing report's
+            // conversion hours; it never falsely marks the cloud report revoked.
+            const noWork=!cancelled&&window.P79RestAttendance?.verifiedNoWork?.(attendanceSnapshot,emp.id,date)===true;
+            const confirmed=!cancelled&&!noWork&&r.status==='已核對出勤';
             const hours=Number(r.convertedHours);
             const declared=Number(r.declaredHours);
             const eligible=confirmed&&r.convertedHours!==''&&r.convertedHours!=null&&Number.isFinite(hours)&&hours>=0;
@@ -8316,10 +8320,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
               '日期':date,'工號':String(emp.id||''),'姓名':name,'職稱':String(emp.role||''),
               '組別':String(emp.group||''),'申報編號':id,'加班班別':code,
               '申報時數':r.declaredHours??'','換算時數':r.convertedHours??'',
-              '申報狀態':cancelled?'已取消':r.status||'未明',
+              '申報狀態':cancelled?'已取消':noWork?'未出勤（待正式取消）':r.status||'未明',
               '納入核對小計':eligible?'是':'否',
               '核對小計時數':eligible?hours:0,
-              '備註':cancelled?'已取消，不重複計入':confirmed&&!eligible?'換算時數缺漏，待核對':
+              '備註':cancelled?'已取消，不重複計入':noWork?'已核實整班無出勤，本筆不計入核對加班；原申報需正式取消':confirmed&&!eligible?'換算時數缺漏，待核對':
                 '須核對正式考勤／申報版本'
             });
             if(!totals.has(emp.id))totals.set(emp.id,{ '工號':String(emp.id||''),'姓名':name,
@@ -8447,7 +8451,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ['月份',yearMonth],
         ['班表來源',fromProvisional?'10/28 歷史備援，非月底正式定稿':'系統正式月份查詢'],
         ['加班來源','當月排班 __meta 申報；已取消的申報不重複計入'],
-        ['核對時數規則','僅狀態為已核對出勤、換算時數有效且未取消的申報納入小計'],
+        ['核對時數規則','僅已核對出勤、換算時數有效且未取消且未經正式整班無卡核實的申報納入小計'],
         ['注意','10/29～10/31 後續異動及漏報仍需比對，不可直接作為最終核薪']
       ];
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(notes),'資料來源與核對說明');
