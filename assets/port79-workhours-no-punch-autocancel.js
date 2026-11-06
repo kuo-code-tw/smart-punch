@@ -23,7 +23,7 @@ function candidates(rows,{token='',today='',stateFor=()=>null,isVerified=()=>fal
   if(!official||text(official.id)!==text(r.id)||official.planned!==true||
    meta.overtimeExcluded===true||reportApproved(official)||reconcile.approved(meta)||
    meta.forEmpId||meta.coverAssignmentId||official.leaveId||official.leaveHandoffId||
-   (meta.overtimeReports||[]).some(x=>x&&text(x.id)&&text(x.id)!==text(official.id))||
+   (Array.isArray(meta.overtimeReports)?meta.overtimeReports:[]).some(x=>x&&text(x.id)&&text(x.id)!==text(official.id))||
    !reconcile.originalCategory(schedule,date,meta))continue;
   if((state.covers||[]).some(c=>date>=day(c.startDate)&&date<=day(c.endDate)&&
     (id(c.leaveEmpId)===emp||(c.workerIds||[]).some(w=>id(w)===emp))))continue;
@@ -40,7 +40,7 @@ function candidates(rows,{token='',today='',stateFor=()=>null,isVerified=()=>fal
 }
 function create(options){
  const fetcher=options.fetch,now=options.now||(()=>new Date()),attempted=new Set(),queue=new Map();
- let running=false,lastError='',lastMessage='',account='';
+ let running=false,drainTask=null,lastError='',lastMessage='',account='';
  const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now());
  function snapshot(){return{running,queued:queue.size,lastError,lastMessage};}
  function offer(rows){
@@ -81,7 +81,12 @@ function create(options){
    return data;
   }finally{clearTimeout(timer);}
  }
- async function flush(){
+ function flush(){
+  if(drainTask)return drainTask;
+  drainTask=flushCore().finally(()=>{drainTask=null;});
+  return drainTask;
+ }
+ async function flushCore(){
   if(running)return;running=true;
   try{
    while(queue.size){
