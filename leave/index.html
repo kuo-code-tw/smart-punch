@@ -1448,7 +1448,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .p79-cover-again{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:6px;background:#dbeafe;color:#1d4ed8;font-size:11px}
 </style>
 <div id="p79LeaveCoverModal" role="dialog" aria-modal="true" aria-label="請假核准代班安排" hidden>
-<div class="cover-card"><h3 style="font-weight:900;font-size:19px">請假核准｜安排代班</h3>
+<div class="cover-card"><h3 style="font-weight:900;font-size:19px">智慧請假代班｜統一指派</h3>
 <p id="p79LeaveCoverSummary" style="margin-top:8px;font-size:12px"></p>
 <input type="hidden" id="p79LeaveCoverId">
 <div id="p79LeaveCoverDefaultWorkers">
@@ -1459,10 +1459,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <div id="p79LeaveCoverSecondWrap"><label for="p79LeaveCoverSecondJob">第二位代班人員職稱</label><select id="p79LeaveCoverSecondJob" onchange="P79ApprovedCoverAuto?.manual();p79FilterLeaveCoverPeople()"></select><label for="p79LeaveCoverSecond">第二位代班人員</label><select id="p79LeaveCoverSecond" onchange="P79ApprovedCoverAuto?.manual()"></select></div>
 </div>
 <div id="p79LeaveCoverDailyRows" hidden></div>
-<p id="p79LeaveCoverAutoStatus" class="note" role="status" aria-live="polite" style="margin:12px 0">選定請假紀錄後從正式班表核對人員。</p>
+<p id="p79LeaveCoverAutoStatus" class="note" role="status" aria-live="polite" style="margin:12px 0">讀取正式排班後提供候選人勾選；實際出勤及加班仍待確認。</p>
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
+<script src="../assets/port79-smart-cover-picker.js?v=20261106-unified-cover-v1"></script>
 <script src="../assets/port79-approved-cover-auto.js?v=20261103-approved-roster-daily-v1"></script>
 
 <style id="p79-leave-create-layout-v91">
@@ -1488,7 +1489,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 @media(max-width:480px){#adminCreateLeaveDialog .p79-create-dates{grid-template-columns:1fr 1fr}#adminCreateLeaveDialog .p79-create-dates>.field:last-child{grid-column:1/-1}#adminCreateLeaveDialog .p79-create-body{padding:10px;gap:8px}#adminCreateLeaveDialog .p79-create-two{gap:8px}}
 </style>
 <dialog id="adminCreateLeaveDialog">
- <div class="p79-create-heading"><h2>新增請假與代班安排</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
+ <div class="p79-create-heading"><h2>智慧請假代班｜統一指派</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
  <div class="p79-create-body">
   <div class="p79-workflow-steps" aria-label="請假代班加班三階段">
    <div class="p79-workflow-step p79-workflow-leave"><strong>① 請假與代班</strong><small>每天獨立選人</small></div>
@@ -1509,7 +1510,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
   </div>
   <div class="p79-create-mode-row">
-   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">每天分別安排代班（可更換當日請假人員）</label>
+   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">每天分別指派（可更換本日請假人員）</label>
    <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   </div>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
@@ -2041,7 +2042,51 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 #adminCreateLeaveDialog .p79-simple-add{justify-self:start;font-size:12px}
 @media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
 </style>
-<script src="../assets/port79-leave-daily-simple.js?v=20261104-per-worker-overtime-v2"></script>
+
+<style id="p79-unified-smart-cover-style-v1">
+/* Shared visual system for creation and approved-leave cover, without a new page. */
+#p79LeaveCoverModal .cover-card{width:min(820px,100%);max-height:92dvh;padding:20px 22px}
+#adminCreateLeaveDialog{width:min(880px,calc(100vw - 24px))!important}
+.p79-smart-cover-picker{display:grid;gap:10px;margin:10px 0;color:var(--text,#17283f)}
+.p79-smart-cover-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.p79-smart-cover-caption{font-size:13px;font-weight:850;color:var(--text,#17283f)}
+.p79-smart-cover-modes{display:flex;gap:5px;padding:4px;background:#eff4fa;border-radius:10px}
+#p79LeaveCoverModal .p79-smart-cover-modes button,.p79-smart-cover-modes button{border:0!important;background:transparent;color:#475569;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:750}
+#p79LeaveCoverModal .p79-smart-cover-modes button[aria-pressed="true"],.p79-smart-cover-modes button[aria-pressed="true"]{background:#2563eb;color:#fff;box-shadow:0 2px 7px #2563eb30}
+#p79LeaveCoverModal .p79-smart-cover-recommend,.p79-smart-cover-recommend{margin-left:auto;background:#eff6ff!important;color:#1d4ed8!important;border:1px solid #bfdbfe!important;border-radius:9px;padding:8px 11px;font-size:13px;font-weight:800}
+.p79-smart-cover-recommend:disabled{opacity:.45;cursor:not-allowed}
+.p79-smart-cover-summary{font-size:12px;color:#64748b;font-weight:650}
+.p79-smart-cover-list{display:grid;gap:7px;max-height:270px;overflow:auto;padding-right:4px}
+#p79LeaveCoverModal label.p79-smart-cover-person,.p79-smart-cover-person{display:flex;align-items:center;gap:11px;margin:0;padding:12px 13px;border:1px solid #d9e2ef;border-radius:10px;background:var(--card,#fff);cursor:pointer;min-width:0}
+#p79LeaveCoverModal label.p79-smart-cover-person.selected,.p79-smart-cover-person.selected{background:#eff6ff;border-color:#60a5fa}
+#p79LeaveCoverModal label.p79-smart-cover-person.excluded,.p79-smart-cover-person.excluded{opacity:.55;cursor:not-allowed}
+.p79-smart-cover-person input[type=checkbox]{accent-color:#2563eb;width:18px;height:18px;flex-shrink:0}
+.p79-smart-cover-person-content{min-width:0;display:grid;gap:3px;flex:1}
+.p79-smart-cover-person-content strong{font-size:15px}
+.p79-smart-cover-person-content small{color:#64748b;font-weight:500;font-size:12px;line-height:1.4}
+.p79-smart-cover-priority{color:#15803d;font-size:11px;font-weight:850;white-space:nowrap}
+.p79-smart-cover-preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+.p79-smart-cover-preview>strong{font-size:13px;display:block;margin-bottom:8px}
+.p79-smart-cover-preview-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;padding:6px 0;border-bottom:1px solid #e2e8f0;font-size:13px}
+.p79-smart-cover-preview-row strong{color:#1d4ed8}
+.p79-smart-cover-preview-row small{color:#64748b}
+.p79-smart-cover-total{font-size:13px;font-weight:850;text-align:right;margin-top:8px}
+.p79-smart-cover-hint{margin:2px 0;font-size:12px;line-height:1.5;color:#7c5b1d}
+.p79-smart-cover-days{display:flex;gap:7px;overflow:auto;padding:6px 2px}
+#p79LeaveCoverModal .p79-smart-cover-days button,.p79-smart-cover-days button{white-space:nowrap;padding:8px 11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#334155;font-weight:750;font-size:12px}
+#p79LeaveCoverModal .p79-smart-cover-days button[aria-pressed=true],.p79-smart-cover-days button[aria-pressed=true]{background:#2563eb;color:white;border-color:#2563eb}
+.p79-smart-cover-day{display:grid;gap:8px;padding:10px;border:1px solid #d8e1ee;border-radius:11px;margin-top:8px}
+.p79-smart-cover-day>strong{font-size:14px}
+.p79-smart-cover-applicant{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.p79-smart-cover-applicant button{font-size:12px;color:#2563eb;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:7px 9px}
+.p79-smart-cover-override select{width:100%;min-height:38px;border-radius:8px;border:1px solid #cbd5e1;background:var(--card,#fff);padding:6px}
+.p79-smart-cover-overtime{border-top:1px dashed #cbd5e1;padding-top:7px}
+.p79-smart-cover-overtime>strong{font-size:12px}
+.p79-smart-cover-overtime select{width:100%;min-height:35px;border-radius:8px;border:1px solid #cbd5e1;background:var(--card,#fff);padding:5px}
+@media(max-width:600px){#p79LeaveCoverModal .cover-card{padding:12px} .p79-smart-cover-toolbar{align-items:stretch}.p79-smart-cover-recommend{margin-left:0!important}.p79-smart-cover-day{padding:7px}.p79-smart-cover-person{padding:10px!important}}
+</style>
+
+<script src="../assets/port79-leave-daily-simple.js?v=20261106-unified-smart-v1"></script>
 </body>
 </html>
 
