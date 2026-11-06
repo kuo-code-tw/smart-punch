@@ -24,7 +24,7 @@
  }
  function smartOptions(entry){
    return {people:state.people,target:state.target,date:entry.date,selected:[entry.first,entry.second].filter(Boolean),
-     mode:entry.mode||'one',unitFilter:entry.filterUnit||'',jobFilter:entry.filterJob||'',rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
+     mode:entry.mode||'one',jobFilter:entry.filterJob||'',nameFilter:entry.filterName||'',rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
  }
  function renderSmart(){
    const host=el('p79LeaveCoverDailyRows'),picker=global.P79SmartCoverPicker;
@@ -46,12 +46,12 @@
    host.querySelectorAll('[data-approved-day]').forEach(node=>node.onclick=()=>{state.activeDate=node.dataset.approvedDay;renderSmart();});
    picker.bind(host,action=>{
      const row=state.entries.find(e=>e.date===action.date);if(!row)return;
-     if(action.kind==='filter-unit'){
-       row.filterUnit=action.value;row.filterJob='';
+     if(action.kind==='filter-job'){
+       row.filterJob=action.value;row.filterName='';
        renderSmart();return;
      }
-     if(action.kind==='filter-job'){
-       row.filterJob=action.value;
+     if(action.kind==='filter-name'){
+       row.filterName=action.value;
        renderSmart();return;
      }
      state.manual=true;
