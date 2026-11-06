@@ -7467,12 +7467,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const attendanceRosterConflict=!!actualShift&&['早','中','晚'].includes(rosterShift)&&rosterShift!==actualShift;
       const shortWorkMinutes=actualShift&&ctx.attendanceEvidence.actualWorkedMinutes?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]<180
         ?ctx.attendanceEvidence.actualWorkedMinutes[String(emp.id).trim().toUpperCase()+'|'+dayStr]:0;
-      const hasOfficialOvertimeReport=p79ConfirmedOvertimeReport(originalMeta);
+      const hasOfficialOvertimeReport=typeof p79ConfirmedOvertimeReport==='function'?p79ConfirmedOvertimeReport(originalMeta):!!String(originalMeta.overtimeReport?.id||'').trim();
       const verifiedNoWork=window.P79RestAttendance?.verifiedNoWork?.(ctx.attendanceSnapshot,emp.id,dayStr)===true;
       // Verified cross-midnight zero punches outrank historical overtime labels;
       // keep formal cloud reports unchanged for authorized cancellation/audit.
       const unworkedOvertime=verifiedNoWork&&(
-        hasOfficialOvertimeReport||!!p79CompactOvertimeCode(rosterShift)||
+        hasOfficialOvertimeReport||/^[代休國例延颱選]?\d{1,2}(?::\d{2})?-\d{1,2}(?::\d{2})?$/.test(rosterShift)||
         originalMeta.overtime===true||!!originalMeta.forEmpId||
         p79LeaveCoverOnDay(emp.id,dayStr).some(entry=>entry.kind==='worker'));
       const verifiedRestAttendance=pairedWork&&['休','例','國'].includes(String(rosterShift).trim())&&
@@ -8295,7 +8295,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function p79ScheduleOvertimeExportRows_(staff,month){
       const detail=[],totals=new Map(),seen=new Set();
-      const attendanceSnapshot={attendanceEvidence:p79ScheduleRestClient().status(month).evidence};
+      const attendanceSnapshot={attendanceEvidence:typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(month).evidence:{complete:false}};
       for(const emp of staff){
         const meta=monthlyScheduleMeta[emp.id]||{};
         for(const [date,m] of Object.entries(meta)){
