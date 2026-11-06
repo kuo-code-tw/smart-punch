@@ -70,6 +70,6 @@ html=picker.render({...params,people:[...people,bad]});
 assert(!html.includes('<img src=x'),'staff names and titles HTML-escaped');
 assert(!html.includes('<script>alert(1)</script>'),'unit HTML-escaped');
 new vm.Script(moduleSrc);new vm.Script(create);new vm.Script(approved);
-for(const m of htmlPage.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/g))
- if(!/\\bsrc=|application\\/json|importmap/.test(m[1]))new vm.Script(m[2]);
+for(const m of htmlPage.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
+ if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
 console.log('PASS unit/title filters: both entry points, department limits, selected persistence, HR title/unit, recommendations, escaping and JS parse');
