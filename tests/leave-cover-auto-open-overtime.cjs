@@ -34,7 +34,7 @@ vm.createContext(c);vm.runInContext(code,c);
  const save=page.slice(saveStart,saveEnd);
  assert(save.includes('p79LaunchLeaveOvertimeAfterSave();'),'legacy single/multi-day entry opens filing too');
  assert(save.indexOf('p79AppendLeaveHandoffEntries(entries.map')<save.indexOf('p79LaunchLeaveOvertimeAfterSave();'),'must persist handoff first');
- assert(save.indexOf('p79LaunchLeaveOvertimeAfterSave();')<save.indexOf('void loadCloud(false,true);'),'open before background refresh');
+ assert(save.indexOf('p79LaunchLeaveOvertimeAfterSave();')<save.indexOf('void loadCloud(false,true);',save.indexOf('p79LaunchLeaveOvertimeAfterSave();')),'open before background refresh');
  const dailySuccess=daily.slice(daily.indexOf("  $id('adminCreateLeaveDialog').close();"),daily.indexOf(' }catch(error){',daily.indexOf("  $id('adminCreateLeaveDialog').close();")));
  assert(dailySuccess.includes('window.p79LaunchLeaveOvertimeAfterSave()'),'daily app opens report after complete save');
  assert(dailySuccess.indexOf("  $id('adminCreateLeaveDialog').close();")<dailySuccess.indexOf('window.p79LaunchLeaveOvertimeAfterSave()'),'daily window closes before report opens');
