@@ -1763,6 +1763,8 @@ async function saveAdminCreateLeave(){
   p79AppendLeaveHandoffEntries(entries.map(e=>({...e,leaveId:adminCreateLeaveId})));
   p79ActivateLeaveHandoff();
   p79UpdateLeaveHandoffBanner();
+  // New covers reopen the existing overtime filing workflow immediately.
+  p79LaunchLeaveOvertimeAfterSave();
   void loadCloud(false,true);
  }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
@@ -1929,6 +1931,23 @@ function p79UpdateLeaveHandoffBanner(){
  const h=p79GetLeaveHandoff(),count=h?.entries?.length||0;
  banner.hidden=!adminSession||!p79CanReportOvertime()||!count;
  if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對｜請先核對出勤時段，再逐筆完成申報。';
+}
+// After cloud-confirmed cover save, open the first pending overtime filing.
+// Filing is never submitted automatically; subsequent workers stay in the handoff queue.
+function p79LaunchLeaveOvertimeAfterSave(){
+ const handoff=p79GetLeaveHandoff();
+ if(!handoff?.entries?.length)return false;
+ if(!p79CanReportOvertime()){
+  setStatus('✅ 請假與代班已儲存，但目前帳號沒有加班申報權限；請由有權限的管理員接續申報。','warn');
+  return false;
+ }
+ void p79OpenLeaveOvertimeHandoff().catch(error=>{
+  // Leave/cover writes are already confirmed. Never turn filing navigation
+  // failure into a false "leave save failed" message or delete queued work.
+  console.warn('[PORT79] 待申報加班自動開啟失敗',error);
+  setStatus('✅ 請假與代班已儲存；加班視窗未能開啟，請按「集中核對加班」接續。','warn');
+ });
+ return true;
 }
 async function p79OpenLeaveOvertimeHandoff(){
  if(p79LeaveHandoffBusy)return;
