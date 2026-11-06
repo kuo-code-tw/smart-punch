@@ -433,6 +433,7 @@ async function p79HydrateLeaveComputerCache(canApply=()=>true){
   if(!canApply()||p79LeaveCloudDataReady||!row||!adminSession||!Array.isArray(row.data?.employees))return false;
   employees=row.data.employees;leaveRecords=Array.isArray(row.data.leaveRecords)?row.data.leaveRecords:[];
   window.p79LeaveCoverAssignments=Array.isArray(row.data.leaveCoverAssignments)?row.data.leaveCoverAssignments:[];
+   window.p79LeaveCoverCancellations=Array.isArray(row.data.leaveCoverCancellations)?row.data.leaveCoverCancellations:[];
   populateDepartments();renderAll();setStatus('⚡ 本機請假快取已顯示｜背景核對雲端中','info');return true;
  }catch(e){console.warn('請假本機快取讀取失敗',e);return false;}
 }
@@ -479,6 +480,7 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null){
    employees=Array.isArray(d.employees)?d.employees:[];
    leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
    window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
+   window.p79LeaveCoverCancellations=Array.isArray(d.leaveCoverCancellations)?d.leaveCoverCancellations:[];
    if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
    populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);
    const displayedMonth=$('filterMonth')?.value||'';
@@ -692,6 +694,22 @@ async function p79ExportLeaveComparison(printMode){
  return [l.name||l.empId,l.dept||'',l.leaveType||'',l.startTime||l.startDate||'',l.endTime||l.endDate||'',l.days??l.dayCount??'',l.reason||'',l.status||'',ids.map(id=>employees.find(e=>String(e.empId)===String(id))?.name||id).join('、')];})];
  try{await p79ComparisonOutput('請假比對表',rows,printMode)}catch(e){alert(e.message)}
 }
+function p79LeaveCancelledCoverTextV102(leaveId,active,cancellations,people,month){
+ const messages=new Map(),norm=value=>String(value||'').slice(0,10);
+ for(const c of cancellations||[]){
+  if(String(c.leaveId)!==String(leaveId))continue;
+  const start=norm(c.startDate),end=norm(c.endDate||c.startDate);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end)||start>end)continue;
+  for(let d=start,step=0;d<=end&&step++<366;d=new Date(Date.parse(d+'T12:00:00Z')+86400000).toISOString().slice(0,10)){
+   if(month&&d.slice(0,7)!==month)continue;
+   const ids=[...new Set((active||[]).filter(a=>String(a.leaveId)===String(leaveId)&&norm(a.startDate)<=d&&norm(a.endDate)>=d).flatMap(a=>a.workerIds||[]))];
+   const names=ids.map(id=>people.get(String(id).trim().toUpperCase())?.name||String(id));
+   messages.set(d,d.slice(5).replace('-','/')+' 原代班人員未出勤／'+(names.length?'目前代班：'+names.join('、')+'（請核對是否需補派）':'目前無代班人員（待重新安排）'));
+  }
+ }
+ return [...messages.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(e=>e[1]).join('；');
+}
+
 function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
@@ -722,9 +740,10 @@ function renderAdmin(){
      const e=peopleIndex.get(String(id).trim().toUpperCase());
      return e?.name||String(id);
    });
-   const coverText=workerNames.length
+   const cancelledCoverText=p79LeaveCancelledCoverTextV102(l.id,window.p79LeaveCoverAssignments||[],window.p79LeaveCoverCancellations||[],peopleIndex,month);
+   const coverText=cancelledCoverText||(workerNames.length
      ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
-     : l.source==='manual-admin-no-cover'?'無須代班人員':'尚未安排代班';
+     : l.source==='manual-admin-no-cover'?'無須代班人員':'尚未安排代班');
    const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
      ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>${workerIds.length?`<button type="button" class="p79-cover-again" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">加班明細</button>`:''}`
      : '';
