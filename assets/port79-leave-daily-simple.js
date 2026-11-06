@@ -75,7 +75,7 @@ function legacyRedraw(){
 let smartDay='',smartMonthKey='',smartSerial=0,smartRosters=null,smartLeaves=[],smartCovers=[],smartLoadStatus='';
 function smartOptions(date,row,target,people){
  return {date,people,target,selected:[row.first,row.second].filter(Boolean),mode:row.secondVisible?'two':'one',
-  rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,scope:'new'};
+  rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,excludeLeaveId:row.id||'',scope:'new'};
 }
 function refreshSmartRosters(){
  const picker=window.P79SmartCoverPicker,helper=window.P79LeaveCoverSuggest;
@@ -232,6 +232,7 @@ async function saveDaily(){
   for(const p of plans){
    notice.textContent='正在儲存 '+p.date+'｜'+p.employee.name;
    const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:p.id,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
+   const localPlan=rows.get(p.date);if(localPlan)localPlan.id=plan.leaveId; // preserve confirmed identity for partial retry
    if(!plan.existing){
     await postCloud({action:'addLeaveRecord',leave:{id:plan.leaveId,empId:p.employee.empId,attNo:p.employee.attNo||'',name:p.employee.name||'',dept:p.employee.dept||'',leaveType:type,startDate:p.date,endDate:p.date,days:1,reason:$id('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
     fresh.leaveRecords.push({id:plan.leaveId,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,status:'已核准'});
