@@ -75,7 +75,7 @@ function legacyRedraw(){
 let smartDay='',smartMonthKey='',smartSerial=0,smartRosters=null,smartLeaves=[],smartCovers=[],smartLoadStatus='';
 function smartOptions(date,row,target,people){
  return {date,people,target,selected:[row.first,row.second].filter(Boolean),mode:row.secondVisible?'two':'one',
-  unitFilter:row.filterUnit||'',jobFilter:row.filterJob||'',
+  jobFilter:row.filterJob||'',nameFilter:row.filterName||'',
   rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,excludeLeaveId:row.id||'',scope:'new'};
 }
 function refreshSmartRosters(){
@@ -141,7 +141,7 @@ function redraw(){
   return '<button type="button" data-new-day="'+safe(date)+'" aria-pressed="'+(date===smartDay)+'">'+safe(date.slice(5))+'｜'+(r.first&&(!r.secondVisible||r.second)?'已選':'待選')+'</button>';
  }).join('')+'</div>';
  const basePerson=people.find(p=>String(p.empId)===String($id('adminCreateLeaveEmployee')?.value||''));
- const applicantMeta=target?'｜單位：'+safe(picker.personUnit(target))+'｜職稱：'+safe(picker.personJob(target)):'';
+ const applicantMeta=target?'｜職稱：'+safe(picker.personJob(target)):'';
  const override='<div class="p79-smart-cover-applicant"><strong>請假人員：'+safe(target?.name||'請先選擇請假人員')+'</strong><small>'+applicantMeta+'</small>'+
   '<button type="button" data-applicant-toggle="'+safe(smartDay)+'">'+(row.applicantOverride?'↩ 使用上方請假人員':'本日不同請假人員')+'</button></div>'+
   (row.applicantOverride?'<div class="p79-smart-cover-override"><label>本日請假人員</label><select data-smart-applicant="'+safe(smartDay)+'"><option value="">請選擇本日請假人員</option>'+
@@ -166,12 +166,12 @@ function redraw(){
  picker.bind(root,action=>{
   const entry=rows.get(action.date),date=action.date;
   if(!entry)return;
-  if(action.kind==='filter-unit'){
-   entry.filterUnit=action.value;entry.filterJob='';
+  if(action.kind==='filter-job'){
+   entry.filterJob=action.value;entry.filterName='';
    redraw();return;
   }
-  if(action.kind==='filter-job'){
-   entry.filterJob=action.value;
+  if(action.kind==='filter-name'){
+   entry.filterName=action.value;
    redraw();return;
   }
   entry.manual=true;
