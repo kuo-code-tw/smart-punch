@@ -113,7 +113,9 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   // the historical report. Formal cancellation remains an authorized action.
   if(confirmedNoWork){
    const original=String(roster[d]||'').trim();
-   const restKind=cats.includes(original)?original:cats.includes(m.restCategory)?m.restCategory:'休';
+   // Match the actual calendar: only an originally saved bare 例/休/國
+   // retains that category; a night/overtime code without work shows 休.
+   const restKind=cats.includes(original)?original:'休';
    off[restKind]++;
    ledger.push({date:d,kind:'off',category:restKind,actual:'rest',reportId:r.id,
      statusNote:'已核實整班無卡；加班不計，原申報待正式取消'});
