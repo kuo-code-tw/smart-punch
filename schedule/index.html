@@ -28,9 +28,9 @@
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
 <script src="../assets/port79-rest-allocation.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
-<script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1"></script>
+<script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1&noWork=20261106"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261105-night-split-proof-v12"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
@@ -6656,7 +6656,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const {rosterShift,ownApprovedLeave,attendanceState,actualShift,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
-            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel}=selected;
+            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime}=selected;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6680,7 +6680,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
 
           const subRec = (shiftVal === '事' || shiftVal === '病' || shiftVal === '喪' || shiftVal === '特') ? getSubstituteRecommendation(emp.role, emp.id, dayStr) : '';
 
-          const metaBadge = dayMeta?.forEmpId
+          const metaBadge = dayMeta?.forEmpId&&!unworkedOvertime
             ? `<span class="p79-cover-only-mark" title="${scheduleEscapeHtml(dayMeta.forName ? '代班：'+dayMeta.forName : '代班')}">代班</span>`
             : '';
                     const leaveBadge = ''; // 假別由日期格單一中文字顯示，不再重複顯示「假」。
@@ -6711,13 +6711,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${unworkedOvertime?'已核實未出勤，加班不計；正式報單待管理員取消':coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${unworkedOvertime?'未出勤不計':coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
           // 複合狀態只做視覺提示：已申報代班加班且本人同日排休／請假。
           const combinedLeave = !!ownApprovedLeave || ['休','例','國','特','年','事','病','公','喪'].includes(String(shiftVal||''));
-          const combinedOvertime = dayMeta?.overtimeReport && (dayMeta.overtimeReport.category==='代'||dayMeta.overtimeReport.category==='延'||!!dayMeta.forEmpId);
+          const combinedOvertime = !unworkedOvertime&&dayMeta?.overtimeReport && (dayMeta.overtimeReport.category==='代'||dayMeta.overtimeReport.category==='延'||!!dayMeta.forEmpId);
           const leaveLink = window.P79CombinedLeaveLink?.resolve({empId:emp.id,date:dayStr,meta:dayMeta,assignments:leaveCoverAssignments,leaveRecords,employees}) || {links:[],conflict:false};
-          const hasCoverLink = leaveLink.links.length>0;
+          const hasCoverLink = !unworkedOvertime&&leaveLink.links.length>0;
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
             ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
@@ -6732,7 +6732,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const cellTitle = ['目前顯示：'+(nightSplitLabel||shownShift)+'；來源：'+shiftSource,
             nightSplitLabel?'20:00～24:00 加班（依正式申報及考勤核對）；00:00～08:00 是休假班段，均歸屬 '+dayStr+'；例休國依既有額度，不代表已符合完整24小時法定休息':'',
             pairedProof,pendingProof,
-            attendanceRosterConflict?'考勤與原排班不一致：原排'+rosterShift+'、實際'+actualShift+'（此畫面不會改寫正式排班）':'',verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+            attendanceRosterConflict?'考勤與原排班不一致：原排'+rosterShift+'、實際'+actualShift+'（此畫面不會改寫正式排班）':'',verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',unworkedOvertime?'已核實整班無出勤，此日加班不計；原申報需由管理員正式取消，保留稽核資料':'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
@@ -7370,10 +7370,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // 才把「過去的排定工作日」顯示／統計為休假。
       // 不修改原班表、既有申報、人工核准假、颱風假及跨日夜班。
       if(leave||['離','離職','颱'].includes(String(shift||'').trim()))return false;
+      const evidence=typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(date.slice(0,7)).evidence:null;
+      if(!evidence)return false;
       const state=knownState===null
-        ?window.P79RestAttendance.state({attendanceEvidence:p79ScheduleRestClient().status(date.slice(0,7)).evidence},empId,date)
+        ?window.P79RestAttendance.state({attendanceEvidence:evidence},empId,date)
         :knownState;
-      const evidence=p79ScheduleRestClient().status(date.slice(0,7)).evidence;
       const key=String(empId||'').trim().toUpperCase()+'|'+date;
       return evidence?.complete===true&&evidence.absenceAuditReady===true&&
         evidence.absenceConfirmedDays?.[key]===true&&state==='rest'&&
@@ -7467,12 +7468,19 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const attendanceRosterConflict=!!actualShift&&['早','中','晚'].includes(rosterShift)&&rosterShift!==actualShift;
       const shortWorkMinutes=actualShift&&ctx.attendanceEvidence.actualWorkedMinutes?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]<180
         ?ctx.attendanceEvidence.actualWorkedMinutes[String(emp.id).trim().toUpperCase()+'|'+dayStr]:0;
-      const hasOfficialOvertimeReport=p79ConfirmedOvertimeReport(originalMeta);
+      const hasOfficialOvertimeReport=typeof p79ConfirmedOvertimeReport==='function'?p79ConfirmedOvertimeReport(originalMeta):!!String(originalMeta.overtimeReport?.id||'').trim();
+      const verifiedNoWork=window.P79RestAttendance?.verifiedNoWork?.(ctx.attendanceSnapshot,emp.id,dayStr)===true;
+      // Verified cross-midnight zero punches outrank historical overtime labels;
+      // keep formal cloud reports unchanged for authorized cancellation/audit.
+      const unworkedOvertime=verifiedNoWork&&(
+        hasOfficialOvertimeReport||/^[代休國例延颱選]?\d{1,2}(?::\d{2})?-\d{1,2}(?::\d{2})?$/.test(rosterShift)||
+        originalMeta.overtime===true||!!originalMeta.forEmpId||
+        p79LeaveCoverOnDay(emp.id,dayStr).some(entry=>entry.kind==='worker'));
       const verifiedRestAttendance=pairedWork&&['休','例','國'].includes(String(rosterShift).trim())&&
         !ownApprovedLeave&&!originalMeta.overtimeReport&&!originalMeta.overtimeReports?.length&&
         !originalMeta.overtime&&!originalMeta.forEmpId&&!p79LeaveCoverOnDay(emp.id,dayStr).length;
       // Incomplete punch evidence cannot cancel a saved, non-revoked declaration.
-      const noPunchRest=!hasOfficialOvertimeReport&&
+      const noPunchRest=(!hasOfficialOvertimeReport||verifiedNoWork)&&
         p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=false; // 已核實整班無卡，由 noPunchRest 直接同步畫面及匯出。
       // 原本就排休／例／國的人，絕不能因為歷史考勤尚未讀完或隔日單卡，
@@ -7498,11 +7506,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const dayMeta=noPunchRest?{...(automaticRestMeta[dayStr]||{}),
         restCategory:noPunchRestKind,
         restQuotaOvertime:false}:hasOfficialOvertimeReport
-          ?{...(automaticRestMeta[dayStr]||{}),...originalMeta}
+          ?{...(automaticRestMeta[dayStr]||{}),...originalMeta,...(unworkedOvertime?{overtimeExcluded:true}: {})}
           :automaticRestMeta[dayStr]||{};
-      const coverageShift=noPunchRest||punchPending||attendanceUnverified?'':p79CoverageShift(emp.id,dayStr);
+      const coverageShift=noPunchRest||unworkedOvertime||punchPending||attendanceUnverified?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||shiftVal;
-      const substituteLabel=ownApprovedLeave||noPunchRest?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
+      const substituteLabel=ownApprovedLeave||noPunchRest||unworkedOvertime?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
       const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
       const specialCandidate=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
         attendanceState,ctx.attendanceEvidence,{typhoon:ctx.typhoonDays,election:ctx.electionDays},ctx.typhoonToday);
@@ -7519,13 +7527,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ?p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel,proof):'';
       const visibleSubstituteLabel=nightSplitLabel||overtimeLabel;
       const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
-      const shiftSource=visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':
+      const shiftSource=visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':unworkedOvertime?'已核實整班無出勤（加班不計）':
         actualShift&&shownShift===actualShift?'已配對正式考勤推定':
         coverageShift&&shownShift===coverageShift?'代班班別':
         shownShift===rosterShift?'原始儲存班表':
         noPunchRest?'已核實無出勤':
         attendanceUnverified?'考勤尚未完整讀取':'排班／考勤狀態計算';
-      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,attendanceRosterConflict,shiftSource,shortWorkMinutes,verifiedRestAttendance,noPunchRest,punchPending,attendanceUnverified,
+      return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,attendanceRosterConflict,shiftSource,shortWorkMinutes,verifiedRestAttendance,verifiedNoWork,unworkedOvertime,noPunchRest,punchPending,attendanceUnverified,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,nightSplitLabel,
         // Count the category visibly selected in each cell, including timed labels.
@@ -8288,6 +8296,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function p79ScheduleOvertimeExportRows_(staff,month){
       const detail=[],totals=new Map(),seen=new Set();
+      const attendanceSnapshot={attendanceEvidence:typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(month).evidence:{complete:false}};
       for(const emp of staff){
         const meta=monthlyScheduleMeta[emp.id]||{};
         for(const [date,m] of Object.entries(meta)){
@@ -8300,7 +8309,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
             if(!id||seen.has(emp.id+'|'+date+'|'+id))continue;
             seen.add(emp.id+'|'+date+'|'+id);
             const cancelled=revoked.has(id)||m.overtimeExcluded===true;
-            const confirmed=!cancelled&&r.status==='已核對出勤';
+            // Only a completed zero-punch audit excludes an existing report's
+            // conversion hours; it never falsely marks the cloud report revoked.
+            const noWork=!cancelled&&typeof window!=='undefined'&&window.P79RestAttendance?.verifiedNoWork?.(attendanceSnapshot,emp.id,date)===true;
+            const confirmed=!cancelled&&!noWork&&r.status==='已核對出勤';
             const hours=Number(r.convertedHours);
             const declared=Number(r.declaredHours);
             const eligible=confirmed&&r.convertedHours!==''&&r.convertedHours!=null&&Number.isFinite(hours)&&hours>=0;
@@ -8309,10 +8321,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
               '日期':date,'工號':String(emp.id||''),'姓名':name,'職稱':String(emp.role||''),
               '組別':String(emp.group||''),'申報編號':id,'加班班別':code,
               '申報時數':r.declaredHours??'','換算時數':r.convertedHours??'',
-              '申報狀態':cancelled?'已取消':r.status||'未明',
+              '申報狀態':cancelled?'已取消':noWork?'未出勤（待正式取消）':r.status||'未明',
               '納入核對小計':eligible?'是':'否',
               '核對小計時數':eligible?hours:0,
-              '備註':cancelled?'已取消，不重複計入':confirmed&&!eligible?'換算時數缺漏，待核對':
+              '備註':cancelled?'已取消，不重複計入':noWork?'已核實整班無出勤，本筆不計入核對加班；原申報需正式取消':confirmed&&!eligible?'換算時數缺漏，待核對':
                 '須核對正式考勤／申報版本'
             });
             if(!totals.has(emp.id))totals.set(emp.id,{ '工號':String(emp.id||''),'姓名':name,
@@ -8440,7 +8452,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ['月份',yearMonth],
         ['班表來源',fromProvisional?'10/28 歷史備援，非月底正式定稿':'系統正式月份查詢'],
         ['加班來源','當月排班 __meta 申報；已取消的申報不重複計入'],
-        ['核對時數規則','僅狀態為已核對出勤、換算時數有效且未取消的申報納入小計'],
+        ['核對時數規則','僅已核對出勤、換算時數有效且未取消且未經正式整班無卡核實的申報納入小計'],
         ['注意','10/29～10/31 後續異動及漏報仍需比對，不可直接作為最終核薪']
       ];
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(notes),'資料來源與核對說明');
