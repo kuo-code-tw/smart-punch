@@ -12,9 +12,11 @@
  const personJob=p=>str(p?.jobTitle||p?.deptDetail||p?.role)||'未設定職稱';
  const orderedOptions=list=>[...new Set(list)].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
  // Filters only change list visibility, never eligibility or saved worker ids.
- function visible(options,{unitFilter='',jobFilter=''}={}){
-  return options.filter(x=>(!unitFilter||personUnit(x.person)===unitFilter)&&
-    (!jobFilter||personJob(x.person)===jobFilter));
+ function visible(options,{jobFilter='',nameFilter=''}={}){
+  // Filters restrict the visible list, not who can legally be assigned.
+  // Filtering by employee ID avoids ambiguous duplicate Chinese names.
+  return options.filter(x=>(!jobFilter||personJob(x.person)===jobFilter)&&
+    (!nameFilter||norm(x.id)===norm(nameFilter)));
  }
  const isRest=v=>/^(休|例|例休|排休|休假日|休息日|例假|國|國定|國定假日)$/.test(kind(v));
  function inRange(date,start,end){
@@ -76,24 +78,27 @@
   if(shift.startsWith('中'))return index===0?'16:00–20:00':'20:00–24:00';
   return index===0?'次日 00:00–04:00':'次日 04:00–08:00';
  }
- function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',unitFilter='',jobFilter=''}={}){
+ function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',jobFilter='',nameFilter=''}={}){
   const options=candidates({people,target,date,rosters,leaves,covers,excludeLeaveId});
   const wanted=mode==='two'?2:1;
   const valid=selected.filter(id=>options.some(x=>x.id===str(id)&&!x.disabled)).slice(0,wanted);
   const official=rosters instanceof Map&&rosters.size>0;
   const qualified=options.filter(x=>!x.disabled).length;
-  const units=orderedOptions(options.map(x=>personUnit(x.person)));
-  const byUnit=unitFilter?options.filter(x=>personUnit(x.person)===unitFilter):options;
-  const jobs=orderedOptions(byUnit.map(x=>personJob(x.person)));
-  const matched=visible(options,{unitFilter,jobFilter});
-  const filterSelect=(name,action,values,current,label)=>'<label class="p79-smart-cover-filter-label">'+label+
-   '<select data-smart-action="'+action+'" aria-label="依'+label+'篩選代班人員"><option value="">全部'+label+'</option>'+
-   values.map(value=>'<option value="'+esc(value)+'"'+(current===value?' selected':'')+'>'+esc(value)+'</option>').join('')+'</select></label>';
-  const filterHtml='<div class="p79-smart-cover-filters">'+filterSelect('單位','filter-unit',units,unitFilter,'單位')+
-   filterSelect('職稱','filter-job',jobs,jobFilter,'職稱')+'</div>';
+  const jobs=orderedOptions(options.map(x=>personJob(x.person)));
+  const byJob=jobFilter?options.filter(x=>personJob(x.person)===jobFilter):options;
+  const names=[...byJob].sort((a,b)=>str(a.person.name||a.id).localeCompare(str(b.person.name||b.id),'zh-Hant')||a.id.localeCompare(b.id));
+  const matched=visible(options,{jobFilter,nameFilter});
+  const jobChoices=jobs.map(value=>'<option value="'+esc(value)+'"'+(jobFilter===value?' selected':'')+'>'+esc(value)+'</option>').join('');
+  const nameChoices=names.map(x=>'<option value="'+esc(x.id)+'"'+(norm(nameFilter)===norm(x.id)?' selected':'')+'>'+
+   esc(str(x.person.name||x.id)+'（'+x.id+'）')+'</option>').join('');
+  const filterHtml='<div class="p79-smart-cover-filters">'+
+   '<label class="p79-smart-cover-filter-label">職稱<select data-smart-action="filter-job" aria-label="依職稱篩選代班人員">'+
+   '<option value="">全部職稱</option>'+jobChoices+'</select></label>'+
+   '<label class="p79-smart-cover-filter-label">姓名<select data-smart-action="filter-name" aria-label="依姓名篩選代班人員">'+
+   '<option value="">全部姓名</option>'+nameChoices+'</select></label></div>';
   const rows=matched.map(x=>'<label class="p79-smart-cover-person'+(valid.includes(x.id)?' selected':'')+(x.disabled?' excluded':'')+'">'+
    '<input type="checkbox" data-smart-action="pick" data-smart-id="'+esc(x.id)+'"'+(valid.includes(x.id)?' checked':'')+(x.disabled?' disabled':'')+'>'+
-   '<span class="p79-smart-cover-person-content"><strong>'+esc(x.person.name||x.id)+'</strong><small>'+esc(personUnit(x.person))+'｜'+esc(personJob(x.person))+'｜'+esc(x.shift||'班表待核')+'</small><small>'+esc(x.note)+'</small></span>'+
+   '<span class="p79-smart-cover-person-content"><strong>'+esc(x.person.name||x.id)+'</strong><small>'+esc(personJob(x.person))+'｜'+esc(x.shift||'班表待核')+'</small><small>'+esc(x.note)+'</small></span>'+
    (x.priority?'<span class="p79-smart-cover-priority">優先推薦</span>':'')+'</label>').join('');
   const preview=valid.map((id,i)=>{
     const p=options.find(x=>x.id===id);
@@ -109,8 +114,8 @@
     '<button type="button" class="p79-smart-cover-recommend" data-smart-action="recommend"'+(!official?' disabled':'')+'>✦ 排休優先推薦</button></div>'+
     filterHtml+
     '<div class="p79-smart-cover-summary">已勾選 '+valid.length+' / '+wanted+' 位｜顯示 '+matched.length+' 位候選人'+
-    ((unitFilter||jobFilter)?'（篩選不影響已勾選人員）':'')+'</div>'+
-    '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">目前篩選沒有符合的候選人，請調整單位或職稱</p>')+'</div>'+
+    ((jobFilter||nameFilter)?'（篩選不影響已勾選人員）':'')+'</div>'+
+    '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">目前篩選沒有符合的候選人，請調整職稱或姓名</p>')+'</div>'+
     '<div class="p79-smart-cover-preview"><strong>指派預覽</strong>'+(preview||'<p class="p79-smart-cover-hint">請勾選人員</p>')+
     '<div class="p79-smart-cover-total">合計 '+(valid.length*(mode==='two'?4:8))+' / 8 小時</div></div>'+
     '<p class="p79-smart-cover-hint">'+esc(alert)+'</p></div>';
@@ -120,7 +125,7 @@
   root.querySelectorAll('[data-smart-action]').forEach(node=>{
    const act=node.dataset.smartAction;
    if(act==='pick')node.onchange=()=>onAction({kind:'pick',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',id:node.dataset.smartId,checked:!!node.checked});
-   else if(act==='filter-unit'||act==='filter-job')node.onchange=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.value});
+   else if(act==='filter-job'||act==='filter-name')node.onchange=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.value});
    else node.onclick=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.dataset.smartValue||''});
   });
  }
