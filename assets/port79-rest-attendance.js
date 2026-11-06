@@ -87,7 +87,7 @@ function verifiedNoWork(snapshot,emp,date){
  return evidence?.complete===true&&evidence.absenceAuditReady===true&&
   evidence.absenceConfirmedDays?.[key]===true&&state(snapshot,emp,date)==='rest';
 }
-function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return verifiedNoWork(snapshot,emp,date)?'已核實整班無上下班卡，當日不計加班；原正式申報待取消':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':s==='rest'?'無完整配對，等待正式考勤核實後再判定':'';
+function reportIssue(snapshot,emp,date){const s=state(snapshot,emp,date);return verifiedNoWork(snapshot,emp,date)?'已核實整班無上下班卡，當日不計加班；原正式申報待取消':s==='missing'?'只有單邊打卡或配對不明，保留原申報待補卡核對':s==='rest'?'整班無上下班卡的初步判斷，等待正式考勤核實後再判定':'';
 }
 g.P79RestAttendance={build,state,verifiedNoWork,reportIssue,period,isLeaveDay};
 })(window);
