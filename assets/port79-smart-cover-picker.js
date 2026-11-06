@@ -39,11 +39,13 @@
     const shift=rosterLabel(rosters,person.empId,date);
     const rest=isRest(shift);
     const leave=isLeave(person,date,leaves),occupied=hasCover(person,date,covers,excludeLeaveId);
-    const disabled=leave||occupied;
+    const targetShift=rosterLabel(rosters,target.empId,date);
+    const sameScheduledShift=!!shift&&!!targetShift&&!rest&&kind(shift)===kind(targetShift);
+    const disabled=leave||occupied||sameScheduledShift;
     const sameJob=!!title(target)&&title(target)===title(person);
     const verified=!!shift;
     const priority=!disabled&&rest&&sameJob;
-    const note=leave?'已有請假，無法指派':occupied?'已有其他代班，無法指派':
+    const note=leave?'已有請假，無法指派':occupied?'已有其他代班，無法指派':sameScheduledShift?'與請假者同班次，禁止重疊指派':
       rest?'當日排休・加班類型待核對':
       shift?'當日班別：'+shift+'・需核對時間衝突':'班表待確認・僅供人工選擇';
     const score=disabled?100:rest?(sameJob?0:1):(sameJob?2:3);
