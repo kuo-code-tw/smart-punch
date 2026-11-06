@@ -29,7 +29,7 @@ function evidence(){
   days:{[id+'|'+day]:{state:absenceState}},actualShifts:{[id+'|'+day]:absenceState==='worked'?'晚':''},
   actualWorkedMinutes:{[id+'|'+day]:absenceState==='worked'?480:0}};
 }
-const c={Date,Set,Map,Intl,console,monthlyScheduleData:{[id]:fullRoster},monthlyScheduleMeta:{[id]:meta},
+const c={Date,Set,Map,Intl,console,monthlyScheduleData:{[id]:fullRoster},monthlyScheduleMeta:{[id]:{[day]:meta}},
  p79EmployeeDateEligible:()=>true,approvedLeaveForEmployee:()=>ownLeave,
  p79LeaveCoverOnDay:()=>[],p79CoverageShift:()=> '休24-08',
  p79SubstituteShiftLabel:()=> '休24-08',p79ScheduleSpecialNoPunchCode:()=> '',
