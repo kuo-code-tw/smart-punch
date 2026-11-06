@@ -1,0 +1,56 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const pickerSource=fs.readFileSync('assets/port79-smart-cover-picker.js','utf8');
+const createSource=fs.readFileSync('assets/port79-leave-daily-simple.js','utf8');
+const approvedSource=fs.readFileSync('assets/port79-approved-cover-auto.js','utf8');
+const page=fs.readFileSync('leave/index.html','utf8');
+const window={};
+vm.runInNewContext(pickerSource,{window,Date,Map,Set}, {filename:'port79-smart-cover-picker.js'});
+const picker=window.P79SmartCoverPicker;
+const date='2026-11-08',person=(id,name,dept='A',job='指揮手')=>({empId:id,name,dept,jobTitle:job,employmentStatus:'active'});
+const people=[person('LEAVER','請假者'),person('REST','排休甲'),person('REST2','排休乙'),person('OTHER','上班甲'),person('LEAVE','已請假'),person('COVER','已代班'),person('CROSS','不同部門','B'),person('INACTIVE','離職者')];
+people[7].employmentStatus='inactive';
+const rosters=new Map([
+ ['LEAVER',{[date]:'早'}],['REST',{[date]:'休'}],['REST2',{[date]:'例'}],
+ ['OTHER',{[date]:'早'}],['LEAVE',{[date]:'休'}],['COVER',{[date]:'休'}]]);
+const leaves=[{empId:'LEAVE',startDate:date,endDate:date,status:'已核准'}];
+const covers=[{leaveId:'another-leave',workerIds:['COVER'],startDate:date,endDate:date}];
+const params={people,target:people[0],date,rosters,leaves,covers};
+const ranked=picker.candidates(params);
+assert.deepEqual(Array.from(ranked.slice(0,2),x=>x.id).sort(),['REST','REST2'],'verified rest first');
+assert.equal(ranked.find(x=>x.id==='LEAVE').disabled,true,'approved leave blocked');
+assert.equal(ranked.find(x=>x.id==='COVER').disabled,true,'cover overlap blocked');
+assert.equal(ranked.find(x=>x.id==='OTHER').disabled,true,'same official shift cannot double-book a worker');
+assert(!ranked.some(x=>['LEAVER','CROSS','INACTIVE'].includes(x.id)),'self/other-department/inactive excluded');
+assert.deepEqual(Array.from(picker.recommend(params,'two')).sort(),['REST','REST2']);
+assert.deepEqual(Array.from(picker.recommend({...params,rosters:null},'one')),[],'no blind recommendation without official roster');
+assert.equal(picker.candidates({...params,covers,excludeLeaveId:'another-leave'}).find(x=>x.id==='COVER').disabled,false,'same leave replacement scope does not self-conflict');
+assert.equal(picker.isRest('排休'),true);assert.equal(picker.isRest('早班'),false);
+assert.match(picker.period(people[0],date,rosters,'two',0),/08:00/);
+assert.match(picker.period(people[0],date,rosters,'two',1),/12:00/);
+let html=picker.render({...params,selected:['REST','REST2'],mode:'two',scope:'new'});
+assert.match(html,/data-smart-action="pick"/);
+assert.match(html,/data-smart-action="recommend"/);
+assert.match(html,/aria-pressed="true">2 人各 4H/);
+assert.match(html,/合計 8 \/ 8 小時/);
+assert.match(html,/優先推薦/);
+assert(!html.includes('不同部門'));
+const malicious={...person('M','<img src=x onerror=alert(1)>')};
+html=picker.render({...params,people:[...people,malicious]});
+assert(!html.includes('<img src=x'),'names must be escaped');
+assert(html.includes('&lt;img'),'dangerous text escaped');
+assert(!picker.render({...params,rosters:null}).includes('data-smart-action="recommend">'),'disabled recommendation when roster not ready');
+
+assert(page.includes('port79-smart-cover-picker.js?v='),'shared module loaded into live leave page');
+assert(page.includes('port79-approved-cover-auto.js?v='),'approved flow retained');
+assert(page.includes('port79-leave-daily-simple.js?v='),'creation flow retained');
+assert(page.indexOf('port79-smart-cover-picker.js?v=')<page.indexOf('port79-approved-cover-auto.js?v='),'shared picker loaded before approved form');
+assert(page.includes('p79-unified-smart-cover-style-v1'),'shared styling mounted');
+assert(createSource.includes('function redraw()')&&createSource.includes('picker.render(smartOptions('),'creation uses shared picker');
+assert(approvedSource.includes('function renderSmart()')&&approvedSource.includes('picker.render(smartOptions('),'approved uses same picker');
+assert(createSource.includes("p79AppendLeaveHandoffEntries(confirmedEntries)"),'confirmed handoff remains');
+assert(approvedSource.includes('state.covers=allCovers'),'approved picker checks existing covers');
+for(const match of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
+ if(!/\bsrc=|application\/json|importmap/.test(match[1])&&match[2].trim())new vm.Script(match[2]);
+new vm.Script(createSource);new vm.Script(approvedSource);
+console.log('PASS unified smart leave picker: verified rest ranking, same-dept, leave/cover exclusions, HTML safety, both flows and inline syntax');

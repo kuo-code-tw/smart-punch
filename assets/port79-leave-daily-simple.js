@@ -16,7 +16,7 @@ function overtimeTypeField(date,row,workerKey){
   overtimeTypes.map(type=>'<option value="'+safe(type)+'"'+(selected===type?' selected':'')+'>'+safe(type)+'</option>').join('')+
   '</select><small>此選項獨立於其他代班人員，申報前仍須核對班表與打卡。</small></div>';
 }
-function redraw(){
+function legacyRedraw(){
  const root=$id('adminCreateLeaveDailyRows');
  if(!root)return;
  const daily=$id('adminCreateLeaveDaily').checked,plain=$id('adminCreateLeaveNoCover').checked;
@@ -71,10 +71,130 @@ function redraw(){
  root.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{rows.get(el.dataset.add).secondVisible=true;redraw();});
  root.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{const row=rows.get(el.dataset.remove);row.secondVisible=false;row.second='';row.secondOvertimeType='';redraw();});
 }
+
+let smartDay='',smartMonthKey='',smartSerial=0,smartRosters=null,smartLeaves=[],smartCovers=[],smartLoadStatus='';
+function smartOptions(date,row,target,people){
+ return {date,people,target,selected:[row.first,row.second].filter(Boolean),mode:row.secondVisible?'two':'one',
+  rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,excludeLeaveId:row.id||'',scope:'new'};
+}
+function refreshSmartRosters(){
+ const picker=window.P79SmartCoverPicker,helper=window.P79LeaveCoverSuggest;
+ if(!picker||!helper||!$id('adminCreateLeaveDialog')?.open)return;
+ const dateList=days(),months=[...new Set(dateList.map(x=>x.slice(0,7)))];
+ const requested=months.join(',');
+ if(requested===smartMonthKey)return;
+ smartMonthKey=requested;const serial=++smartSerial;
+ smartRosters=null;smartLeaves=[];smartCovers=[];
+ if(!months.length)return;
+ const token=leaveRequestToken();
+ if(!token){smartLoadStatus='尚未驗證管理員身分，請重新登入';return;}
+ smartLoadStatus='正在核對正式班表與已核准請假…';
+ void Promise.all(months.map(month=>jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+
+   '&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000)
+   .then(data=>({...data,month:data.month||month})))).then(payloads=>{
+  const rosters=helper.mergeRosters(payloads);
+  if(serial!==smartSerial||!$id('adminCreateLeaveDialog')?.open)return;
+  smartRosters=rosters;
+  smartLeaves=[...(typeof leaveRecords!=='undefined'?leaveRecords:[]),...payloads.flatMap(x=>x.leaveRecords||[])];
+  smartCovers=[...(window.p79LeaveCoverAssignments||[]),...payloads.flatMap(x=>x.leaveCoverAssignments||[])];
+  smartLoadStatus='正式班表已核對；排休人員優先推薦，實際加班仍需審核。';
+  const people=leaveCreatePeople();
+  dateList.forEach(date=>{
+   const row=rows.get(date);if(!row||row.manual||row.first)return;
+   const id=row.applicantOverride?row.applicant:String($id('adminCreateLeaveEmployee')?.value||'');
+   const target=people.find(p=>String(p.empId)===id);
+   const ids=picker.recommend(smartOptions(date,row,target,people),row.secondVisible?'two':'one');
+   row.first=ids[0]||'';row.second=ids[1]||'';
+  });
+  redraw();
+ }).catch(error=>{
+  if(serial!==smartSerial)return;
+  smartRosters=null;
+  smartLoadStatus='正式班表未完成核對：'+String(error?.message||error)+'。可以人工選人，但不會自動指定。';
+  redraw();
+ });
+}
+function redraw(){
+ if(!window.P79SmartCoverPicker)return legacyRedraw();
+ const root=$id('adminCreateLeaveDailyRows'),picker=window.P79SmartCoverPicker;
+ if(!root)return;
+ const daily=$id('adminCreateLeaveDaily').checked,plain=$id('adminCreateLeaveNoCover').checked;
+ root.hidden=!daily||plain;
+ $id('adminCreateLeaveWorkers').hidden=daily||plain;
+ $id('adminCreateLeaveRecommendation').hidden=daily&&!plain;
+ const applicant=$id('adminCreateLeaveApplicantWrap');if(applicant)applicant.hidden=false;
+ if(root.hidden)return;
+ const people=leaveCreatePeople(),list=days();
+ if(!list.length){root.innerHTML='<p>請選擇有效請假日期，最多62天。</p>';return;}
+ if(!list.includes(smartDay))smartDay=list[0];
+ list.forEach(date=>{if(!rows.has(date))rows.set(date,{id:crypto.randomUUID(),applicant:'',applicantOverride:false,first:'',second:'',secondVisible:false,applicantJob:'',firstJob:'',secondJob:'',firstOvertimeType:'',secondOvertimeType:''});});
+ refreshSmartRosters();
+ const row=rows.get(smartDay),effectiveId=row.applicantOverride?row.applicant:String($id('adminCreateLeaveEmployee')?.value||'');
+ const target=people.find(p=>String(p.empId)===String(effectiveId));
+ const options=picker.candidates(smartOptions(smartDay,row,target,people));
+ if(!options.some(x=>x.id===row.first&&!x.disabled)){row.first='';row.firstOvertimeType='';}
+ if(!options.some(x=>x.id===row.second&&!x.disabled)||row.second===row.first){row.second='';row.secondOvertimeType='';}
+ if(!row.secondVisible){row.second='';row.secondOvertimeType='';}
+ const daysHtml='<div class="p79-smart-cover-days" role="group" aria-label="選擇每日代班">'+list.map(date=>{
+  const r=rows.get(date);
+  return '<button type="button" data-new-day="'+safe(date)+'" aria-pressed="'+(date===smartDay)+'">'+safe(date.slice(5))+'｜'+(r.first&&(!r.secondVisible||r.second)?'已選':'待選')+'</button>';
+ }).join('')+'</div>';
+ const basePerson=people.find(p=>String(p.empId)===String($id('adminCreateLeaveEmployee')?.value||''));
+ const override='<div class="p79-smart-cover-applicant"><strong>請假人員：'+safe(target?.name||'請先選擇請假人員')+'</strong>'+
+  '<button type="button" data-applicant-toggle="'+safe(smartDay)+'">'+(row.applicantOverride?'↩ 使用上方請假人員':'本日不同請假人員')+'</button></div>'+
+  (row.applicantOverride?'<div class="p79-smart-cover-override"><label>本日請假人員</label><select data-smart-applicant="'+safe(smartDay)+'"><option value="">請選擇本日請假人員</option>'+
+   people.map(p=>'<option value="'+safe(p.empId)+'"'+(row.applicant===String(p.empId)?' selected':'')+'>'+safe(p.name||p.empId)+'｜'+safe(leavePersonJob(p))+'</option>').join('')+'</select></div>':'');
+ const personOvertime=(key,id)=>id?'<div class="p79-smart-cover-overtime"><strong>'+safe(people.find(p=>String(p.empId)===String(id))?.name||id)+'｜加班類型（申報前待核對）</strong>'+
+   overtimeTypeField(smartDay,row,key)+'</div>':'';
+ root.innerHTML=daysHtml+'<div class="p79-smart-cover-day">'+override+
+  picker.render(smartOptions(smartDay,row,target,people))+
+  '<p class="p79-smart-cover-hint">'+safe(smartLoadStatus||'先核對正式班表；代班不得直接視為已出勤或已申報加班。')+'</p>'+
+  personOvertime('first',row.first)+personOvertime('second',row.second)+'</div>';
+ root.querySelectorAll('[data-new-day]').forEach(el=>el.onclick=()=>{smartDay=el.dataset.newDay;redraw();});
+ root.querySelectorAll('[data-applicant-toggle]').forEach(el=>el.onclick=()=>{
+  row.applicantOverride=!row.applicantOverride;
+  row.applicant=row.applicantOverride?String(basePerson?.empId||''):'';
+  row.first='';row.second='';row.manual=false;row.firstOvertimeType='';row.secondOvertimeType='';
+  redraw();
+ });
+ root.querySelectorAll('[data-smart-applicant]').forEach(el=>el.onchange=()=>{
+  row.applicant=el.value;row.first='';row.second='';row.manual=false;row.firstOvertimeType='';row.secondOvertimeType='';redraw();
+ });
+ root.querySelectorAll('select[data-field]').forEach(el=>el.onchange=()=>{row[el.dataset.field]=el.value;});
+ picker.bind(root,action=>{
+  const entry=rows.get(action.date),date=action.date;
+  if(!entry)return;
+  entry.manual=true;
+  if(action.kind==='mode'){
+   entry.secondVisible=action.value==='two';
+   if(!entry.secondVisible){entry.second='';entry.secondOvertimeType='';}
+  }else if(action.kind==='recommend'){
+   const p=people.find(x=>String(x.empId)===String(entry.applicantOverride?entry.applicant:$id('adminCreateLeaveEmployee')?.value||''));
+   const ids=picker.recommend(smartOptions(date,entry,p,people),entry.secondVisible?'two':'one');
+   if(!ids.length){$id('adminCreateLeaveMessage').textContent='當日沒有已核對的排休候選人，請人工選擇。';return;}
+   entry.first=ids[0]||'';entry.second=ids[1]||'';
+   entry.firstOvertimeType='';entry.secondOvertimeType='';
+  }else if(action.kind==='pick'){
+   const available=picker.candidates(smartOptions(date,entry,target,people));
+   if(!available.some(x=>x.id===action.id&&!x.disabled))return;
+   if(!action.checked){
+    if(entry.first===action.id){entry.first=entry.second||'';entry.second='';}
+    else if(entry.second===action.id)entry.second='';
+   }else if(entry.first===action.id||entry.second===action.id)return;
+   else if(!entry.first)entry.first=action.id;
+   else if(entry.secondVisible&&!entry.second)entry.second=action.id;
+   else{$id('adminCreateLeaveMessage').textContent='已達本日人數上限，請先取消其他人員。';return;}
+   entry.firstOvertimeType='';entry.secondOvertimeType='';
+  }
+  $id('adminCreateLeaveMessage').textContent='';
+  redraw();
+ });
+}
+
 window.p79RenderDailyCreateCover=redraw;
 document.addEventListener('change',event=>{if(event.target?.id==='adminCreateLeaveNoCover')redraw();});
 window.openAdminCreateLeave=async function(...args){
- rows.clear();
+ rows.clear();smartDay='';smartMonthKey='';smartRosters=null;smartLeaves=[];smartCovers=[];smartLoadStatus='';++smartSerial;
  await originalOpen(...args);
  if(!$id('adminCreateLeaveDialog').open)return;
  $id('adminCreateLeaveDaily').checked=true;
@@ -94,6 +214,8 @@ async function saveDaily(){
    if(!employee)throw Error(date+(row.applicantOverride?' 請選擇本日請假人員':' 請先選擇上方請假人員'));
    const ids=[row.first,row.second].filter(Boolean);
    if(!ids.length||new Set(ids.map(String)).size!==ids.length)throw Error(date+' 請選擇一至兩位不同代班人員');
+   if(window.P79SmartCoverPicker&&ids.length!==(row.secondVisible?2:1))throw Error(date+' 請按代班模式完整勾選人員');
+   if(window.P79SmartCoverPicker){const opts=window.P79SmartCoverPicker.candidates(smartOptions(date,row,employee,people));if(ids.some(id=>!opts.some(x=>x.id===id&&!x.disabled)))throw Error(date+' 已核准請假或重複代班人員不得儲存');}
    if(!String(employee.dept||'').trim())throw Error(date+' 請假人員未設定部門');
    for(const id of ids){
     const worker=people.find(p=>String(p.empId)===String(id));
@@ -110,6 +232,7 @@ async function saveDaily(){
   for(const p of plans){
    notice.textContent='正在儲存 '+p.date+'｜'+p.employee.name;
    const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:p.id,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
+   const localPlan=rows.get(p.date);if(localPlan)localPlan.id=plan.leaveId; // preserve confirmed identity for partial retry
    if(!plan.existing){
     await postCloud({action:'addLeaveRecord',leave:{id:plan.leaveId,empId:p.employee.empId,attNo:p.employee.attNo||'',name:p.employee.name||'',dept:p.employee.dept||'',leaveType:type,startDate:p.date,endDate:p.date,days:1,reason:$id('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
     fresh.leaveRecords.push({id:plan.leaveId,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,status:'已核准'});

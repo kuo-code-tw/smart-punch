@@ -22,7 +22,52 @@
   const placeholder=required?'請選擇代班人員':'不選第二位（單人代班 8 小時）';
   return '<option value="">'+placeholder+'</option>'+candidates.map(p=>'<option value="'+escaped(p.empId)+'"'+(key(p.empId)===key(selected)?' selected':'')+'>'+escaped(p.name||p.empId)+'｜'+escaped(job(p))+'</option>').join('');
  }
+ function smartOptions(entry){
+   return {people:state.people,target:state.target,date:entry.date,selected:[entry.first,entry.second].filter(Boolean),
+     mode:entry.mode||'one',rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
+ }
+ function renderSmart(){
+   const host=el('p79LeaveCoverDailyRows'),picker=global.P79SmartCoverPicker;
+   if(!state||!host||!picker)return;
+   state.entries.forEach(entry=>{
+     const options=picker.candidates(smartOptions(entry));
+     if(!options.some(x=>key(x.id)===key(entry.first)&&!x.disabled))entry.first='';
+     if(!options.some(x=>key(x.id)===key(entry.second)&&!x.disabled)||key(entry.first)===key(entry.second))entry.second='';
+     if(entry.mode!=='two')entry.second='';
+   });
+   const active=state.entries.find(e=>e.date===state.activeDate)||state.entries[0];
+   if(!active){host.hidden=true;return;}
+   state.activeDate=active.date;
+   host.hidden=false;el('p79LeaveCoverDefaultWorkers').hidden=true;
+   const tabs=state.entries.length===1?'':('<div class="p79-smart-cover-days" role="group" aria-label="每日代班">'+state.entries.map(e=>
+    '<button type="button" data-approved-day="'+escaped(e.date)+'" aria-pressed="'+(e.date===active.date)+'">'+escaped(e.date.slice(5))+'｜'+((e.first&&((e.mode||'one')==='one'||e.second))?'已選':'待選')+'</button>').join('')+'</div>');
+   host.innerHTML=tabs+'<section class="p79-smart-cover-day"><strong>'+escaped(active.date)+'｜'+escaped(active.recommendation?.leaveShift||'班別待核')+'班次代班</strong>'+
+     picker.render(smartOptions(active))+'</section>';
+   host.querySelectorAll('[data-approved-day]').forEach(node=>node.onclick=()=>{state.activeDate=node.dataset.approvedDay;renderSmart();});
+   picker.bind(host,action=>{
+     const row=state.entries.find(e=>e.date===action.date);if(!row)return;
+     state.manual=true;
+     if(action.kind==='mode'){
+       row.mode=action.value==='two'?'two':'one';
+       if(row.mode==='one')row.second='';
+     }else if(action.kind==='recommend'){
+       const ids=picker.recommend(smartOptions(row),row.mode);
+       if(!ids.length){el('p79LeaveCoverAutoStatus').textContent='當天沒有已核對的排休候選人，請依班次及休息條件人工選擇。';return;}
+       row.first=ids[0]||'';row.second=row.mode==='two'?(ids[1]||''):'';
+     }else if(action.kind==='pick'){
+       const options=picker.candidates(smartOptions(row));
+       if(!options.some(x=>x.id===action.id&&!x.disabled))return;
+       if(!action.checked){if(row.first===action.id){row.first=row.second||'';row.second='';}else if(row.second===action.id)row.second='';}
+       else if(row.first===action.id||row.second===action.id)return;
+       else if(!row.first)row.first=action.id;
+       else if(row.mode==='two'&&!row.second)row.second=action.id;
+       else{el('p79LeaveCoverAutoStatus').textContent='已達代班人數上限，請先取消其他勾選。';return;}
+     }
+     renderSmart();
+   });
+ }
  function render(){
+  if(state&&global.P79SmartCoverPicker)return renderSmart();
   const host=el('p79LeaveCoverDailyRows');if(!state||!host)return;
   const current=eligible(state);
   host.hidden=false;
@@ -54,13 +99,12 @@
   if(!state?.entries?.length)return null;
   const candidates=eligible(state);
   return state.entries.map(entry=>{
-   const ids=[entry.first,entry.second].filter(Boolean);
+   const ids=[entry.first,entry.mode==='one'?'':entry.second].filter(Boolean);
    if(!entry.first||new Set(ids.map(key)).size!==ids.length)throw Error(entry.date+' 請選擇不同的代班人員');
-   if(['早','晚'].includes(entry.recommendation?.leaveShift)&&ids.length!==2)
-    throw Error(entry.date+' 早班／大夜班請假需選兩位各支援 4 小時，請核對人員');
+   if(entry.mode==='two'&&ids.length!==2)throw Error(entry.date+' 兩人代班模式需選兩位各支援 4 小時');
    for(const id of ids)if(!candidates.some(p=>key(p.empId)===key(id)))
     throw Error(entry.date+' 選擇的人員不在同部門在職名單中，請重新選擇');
-   return {date:entry.date,mode:ids.length===2?'two':'one',workerIds:ids};
+   return {date:entry.date,mode:entry.mode==='two'?'two':'one',workerIds:ids};
   });
  }
  async function open({leave,people,leaves=[],covers=[],fetchMonth}){
@@ -73,20 +117,32 @@
   if(!id||!target||!dates.length){status.textContent='無法核對請假人員或日期；請先重新整理正式資料。';return;}
   if(!helper){status.textContent='推薦模組未載入，請重新整理。';return;}
   if(covers.some(c=>String(c.leaveId)===id)){status.textContent='原請假已有代班安排，保留既有紀錄，不自動更動。';return;}
-  state={id,target,people,entries:[],manual:false};
+  state={id,target,people,entries:[],manual:false,activeDate:dates[0],rosters:null,leaves,covers};
   status.textContent='正在讀取 '+dates.length+' 天正式班表與前後12小時休息條件…';
   try{
    const months=[...new Set(dates.flatMap(date=>helper.monthsFor(date)))];
    const results=await Promise.all(months.map(fetchMonth));
    const roster=helper.mergeRosters(results);
+   state.rosters=roster;
    const allLeaves=[...leaves,...results.flatMap(r=>r.leaveRecords||[])],allCovers=[...covers,...results.flatMap(r=>r.leaveCoverAssignments||[])];
+   state.leaves=allLeaves;state.covers=allCovers;
    if(seq!==serial||!state||state.id!==id||state.manual||el('p79LeaveCoverModal')?.hidden)return;
    if(allCovers.some(c=>String(c.leaveId)===id)){status.textContent='雲端發現已有代班安排，已保留原紀錄；請先重新整理。';state=null;return;}
    const entries=dates.map(date=>{const suggestion=helper.suggest({people,rosters:roster,leaves:allLeaves,covers:allCovers,leaveEmpId:target.empId,date});
-    return {date,recommendation:suggestion,first:suggestion.first?.empId||'',second:suggestion.second?.empId||''};
+    return {date,recommendation:suggestion,first:suggestion.first?.empId||'',second:suggestion.second?.empId||'',mode:suggestion.first&&suggestion.second?'two':'one'};
    });
    state.entries=entries;
-   if(entries.length===1){
+   if(global.P79SmartCoverPicker){
+    entries.forEach(entry=>{
+     if(entry.first)return; // Keep verified 12-hour extension recommendations.
+     const ids=global.P79SmartCoverPicker.recommend(smartOptions(entry),entry.mode);
+     entry.first=ids[0]||'';entry.second=ids[1]||'';
+    });
+    el('p79LeaveCoverDefaultWorkers').hidden=true;
+    render();
+    const matched=entries.filter(item=>item.first&&((item.mode==='one')||item.second)).length;
+    status.textContent='已查詢 '+entries.length+' 天正式班表；'+matched+' 天有初步建議。可依每天情況勾選不同代班人員，儲存前仍須核對加班。';
+   }else if(entries.length===1){
     const item=entries[0],r=item.recommendation;
     if(!r.first||!r.second){status.textContent=r.reason||'沒有通過班表與休息時間檢查的兩名人員，可人工選擇。';state=null;return;}
     el('p79LeaveCoverMode').value='two';global.p79RefreshLeaveCoverMode?.();
