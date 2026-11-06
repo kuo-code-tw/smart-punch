@@ -133,6 +133,11 @@
    });
    state.entries=entries;
    if(global.P79SmartCoverPicker){
+    entries.forEach(entry=>{
+     if(entry.first)return; // Keep verified 12-hour extension recommendations.
+     const ids=global.P79SmartCoverPicker.recommend(smartOptions(entry),entry.mode);
+     entry.first=ids[0]||'';entry.second=ids[1]||'';
+    });
     el('p79LeaveCoverDefaultWorkers').hidden=true;
     render();
     const matched=entries.filter(item=>item.first&&((item.mode==='one')||item.second)).length;
