@@ -8,6 +8,14 @@
  const day=v=>str(v).slice(0,10).replaceAll('/','-');
  const active=p=>!/^(resigned|terminated|inactive|leave|loa|離職|留停)$/.test(str(p?.employmentStatus||'active').toLowerCase());
  const kind=v=>str(v).replace(/\s+/g,'');
+ const personUnit=p=>str(p?.unit||p?.unitName)||'未設定單位';
+ const personJob=p=>str(p?.jobTitle||p?.deptDetail||p?.role)||'未設定職稱';
+ const orderedOptions=list=>[...new Set(list)].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
+ // Filters only change list visibility, never eligibility or saved worker ids.
+ function visible(options,{unitFilter='',jobFilter=''}={}){
+  return options.filter(x=>(!unitFilter||personUnit(x.person)===unitFilter)&&
+    (!jobFilter||personJob(x.person)===jobFilter));
+ }
  const isRest=v=>/^(休|例|例休|排休|休假日|休息日|例假|國|國定|國定假日)$/.test(kind(v));
  function inRange(date,start,end){
   const s=day(start),e=day(end||start);
@@ -53,7 +61,7 @@
   }).sort((a,b)=>a.score-b.score||((a.index+rotation)%Math.max(1,sameDept.length))-((b.index+rotation)%Math.max(1,sameDept.length)));
  }
  function recommend(params,mode){
-  const options=candidates(params),take=mode==='two'?2:1;
+  const options=visible(candidates(params),params),take=mode==='two'?2:1;
   // Auto-pick only when the official roster actually contains a rest entry.
   return options.filter(p=>p.rest&&!p.disabled&&p.verified).slice(0,take).map(p=>p.id);
  }
@@ -68,15 +76,24 @@
   if(shift.startsWith('中'))return index===0?'16:00–20:00':'20:00–24:00';
   return index===0?'次日 00:00–04:00':'次日 04:00–08:00';
  }
- function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope=''}={}){
+ function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',unitFilter='',jobFilter=''}={}){
   const options=candidates({people,target,date,rosters,leaves,covers,excludeLeaveId});
   const wanted=mode==='two'?2:1;
   const valid=selected.filter(id=>options.some(x=>x.id===str(id)&&!x.disabled)).slice(0,wanted);
   const official=rosters instanceof Map&&rosters.size>0;
   const qualified=options.filter(x=>!x.disabled).length;
-  const rows=options.map(x=>'<label class="p79-smart-cover-person'+(valid.includes(x.id)?' selected':'')+(x.disabled?' excluded':'')+'">'+
+  const units=orderedOptions(options.map(x=>personUnit(x.person)));
+  const byUnit=unitFilter?options.filter(x=>personUnit(x.person)===unitFilter):options;
+  const jobs=orderedOptions(byUnit.map(x=>personJob(x.person)));
+  const matched=visible(options,{unitFilter,jobFilter});
+  const filterSelect=(name,action,values,current,label)=>'<label class="p79-smart-cover-filter-label">'+label+
+   '<select data-smart-action="'+action+'" aria-label="依'+label+'篩選代班人員"><option value="">全部'+label+'</option>'+
+   values.map(value=>'<option value="'+esc(value)+'"'+(current===value?' selected':'')+'>'+esc(value)+'</option>').join('')+'</select></label>';
+  const filterHtml='<div class="p79-smart-cover-filters">'+filterSelect('單位','filter-unit',units,unitFilter,'單位')+
+   filterSelect('職稱','filter-job',jobs,jobFilter,'職稱')+'</div>';
+  const rows=matched.map(x=>'<label class="p79-smart-cover-person'+(valid.includes(x.id)?' selected':'')+(x.disabled?' excluded':'')+'">'+
    '<input type="checkbox" data-smart-action="pick" data-smart-id="'+esc(x.id)+'"'+(valid.includes(x.id)?' checked':'')+(x.disabled?' disabled':'')+'>'+
-   '<span class="p79-smart-cover-person-content"><strong>'+esc(x.person.name||x.id)+'</strong><small>'+esc(str(x.person.jobTitle||x.person.deptDetail||x.person.role)||'未設定職稱')+'｜'+esc(x.shift||'班表待核')+'</small><small>'+esc(x.note)+'</small></span>'+
+   '<span class="p79-smart-cover-person-content"><strong>'+esc(x.person.name||x.id)+'</strong><small>'+esc(personUnit(x.person))+'｜'+esc(personJob(x.person))+'｜'+esc(x.shift||'班表待核')+'</small><small>'+esc(x.note)+'</small></span>'+
    (x.priority?'<span class="p79-smart-cover-priority">優先推薦</span>':'')+'</label>').join('');
   const preview=valid.map((id,i)=>{
     const p=options.find(x=>x.id===id);
@@ -90,8 +107,10 @@
     '<div class="p79-smart-cover-modes"><button type="button" data-smart-action="mode" data-smart-value="one" aria-pressed="'+(mode==='one')+'">1 人 8H</button>'+
     '<button type="button" data-smart-action="mode" data-smart-value="two" aria-pressed="'+(mode==='two')+'">2 人各 4H</button></div>'+
     '<button type="button" class="p79-smart-cover-recommend" data-smart-action="recommend"'+(!official?' disabled':'')+'>✦ 排休優先推薦</button></div>'+
-    '<div class="p79-smart-cover-summary">已勾選 '+valid.length+' / '+wanted+' 位｜可手動改選</div>'+
-    '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">此部門暫無可選的在職代班人員</p>')+'</div>'+
+    filterHtml+
+    '<div class="p79-smart-cover-summary">已勾選 '+valid.length+' / '+wanted+' 位｜顯示 '+matched.length+' 位候選人'+
+    ((unitFilter||jobFilter)?'（篩選不影響已勾選人員）':'')+'</div>'+
+    '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">目前篩選沒有符合的候選人，請調整單位或職稱</p>')+'</div>'+
     '<div class="p79-smart-cover-preview"><strong>指派預覽</strong>'+(preview||'<p class="p79-smart-cover-hint">請勾選人員</p>')+
     '<div class="p79-smart-cover-total">合計 '+(valid.length*(mode==='two'?4:8))+' / 8 小時</div></div>'+
     '<p class="p79-smart-cover-hint">'+esc(alert)+'</p></div>';
@@ -101,8 +120,9 @@
   root.querySelectorAll('[data-smart-action]').forEach(node=>{
    const act=node.dataset.smartAction;
    if(act==='pick')node.onchange=()=>onAction({kind:'pick',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',id:node.dataset.smartId,checked:!!node.checked});
+   else if(act==='filter-unit'||act==='filter-job')node.onchange=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.value});
    else node.onclick=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.dataset.smartValue||''});
   });
  }
- root.P79SmartCoverPicker={candidates,recommend,render,bind,isRest,period};
+ root.P79SmartCoverPicker={candidates,recommend,render,bind,isRest,period,personUnit,personJob,visible};
 })(typeof window!=='undefined'?window:globalThis);
