@@ -20,6 +20,7 @@ const ranked=picker.candidates(params);
 assert.deepEqual(Array.from(ranked.slice(0,2),x=>x.id).sort(),['REST','REST2'],'verified rest first');
 assert.equal(ranked.find(x=>x.id==='LEAVE').disabled,true,'approved leave blocked');
 assert.equal(ranked.find(x=>x.id==='COVER').disabled,true,'cover overlap blocked');
+assert.equal(ranked.find(x=>x.id==='OTHER').disabled,true,'same official shift cannot double-book a worker');
 assert(!ranked.some(x=>['LEAVER','CROSS','INACTIVE'].includes(x.id)),'self/other-department/inactive excluded');
 assert.deepEqual(Array.from(picker.recommend(params,'two')).sort(),['REST','REST2']);
 assert.deepEqual(Array.from(picker.recommend({...params,rosters:null},'one')),[],'no blind recommendation without official roster');
