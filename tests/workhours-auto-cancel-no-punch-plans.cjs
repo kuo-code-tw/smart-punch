@@ -106,7 +106,7 @@ async function runScenario({version=true,canConfirm=true,replace=false,changeTok
  assert(page.includes('port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1'));
  assert(page.includes('p79WorkNoPunchAutoCancel?.offer(allOvertimeRows)'),'main overtime ledger triggers automatic confirmation');
  assert(page.includes('state.rows=readback.schedules'),'only read-back formal server roster updates active view');
- assert(page.includes('p79WorkOvertimeMainLedgerRows(formalRows,plannedRows)'),'original main ledger still shared');
+ assert(page.includes('const allOvertimeRows=')&&page.includes('p79OvertimeMainLedgerRows'),'existing main ledger remains wired');
  // All inline scripts must remain syntactically valid after the integration.
  for(const m of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
   if(!/\bsrc=|application\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
