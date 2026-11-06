@@ -106,6 +106,7 @@ async function runScenario({version=true,canConfirm=true,replace=false,changeTok
  assert(page.includes('port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1'));
  assert(page.includes('p79WorkNoPunchAutoCancel?.offer(allOvertimeRows)'),'main overtime ledger triggers automatic confirmation');
  assert(page.includes('state.rows=readback.schedules'),'only read-back formal server roster updates active view');
+ assert(page.includes("sessionStorage.setItem('port79_cache_mutated_at'")&&page.includes('P79WorkhoursCache?.invalidate?.()'),'cancellation invalidates old cached roster to prevent resurrecting deleted overtime');
  assert(page.includes('const allOvertimeRows=')&&page.includes('p79OvertimeMainLedgerRows'),'existing main ledger remains wired');
  // All inline scripts must remain syntactically valid after the integration.
  for(const m of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
