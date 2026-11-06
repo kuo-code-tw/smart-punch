@@ -1463,8 +1463,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-unified-cover-v1"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261103-approved-roster-daily-v1"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261106-unit-title-filter-v2"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261106-unit-title-filter-v2"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -2062,6 +2062,20 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 @media(max-width:570px){#adminCreateLeaveDialog .p79-simple-grid{grid-template-columns:1fr}}
 </style>
 
+<style id="p79-smart-cover-unit-job-filter-v2">
+/* Same fields in both new-leave and approved-leave dialogs, with mobile stacking. */
+.p79-smart-cover-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:2px 0 5px}
+#p79LeaveCoverModal label.p79-smart-cover-filter-label,
+#adminCreateLeaveDialog label.p79-smart-cover-filter-label{display:grid;gap:5px;margin:0;font-size:13px;font-weight:800;color:var(--text,#334155)}
+#p79LeaveCoverModal .p79-smart-cover-filter-label select,
+#adminCreateLeaveDialog .p79-smart-cover-filter-label select{
+  display:block;width:100%;min-width:0;min-height:42px;margin:0;padding:8px 10px;
+  border:1px solid var(--border,#cbd5e1);border-radius:9px;
+  background:var(--card,#fff);color:var(--text,#172033);font-size:14px;font-weight:550
+}
+.p79-smart-cover-applicant small{font-size:12px;color:#64748b}
+@media(max-width:480px){.p79-smart-cover-filters{grid-template-columns:1fr}}
+</style>
 <style id="p79-unified-smart-cover-style-v1">
 /* Shared visual system for creation and approved-leave cover, without a new page. */
 #p79LeaveCoverModal .cover-card{width:min(820px,100%);max-height:92dvh;padding:20px 22px}
@@ -2105,7 +2119,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 @media(max-width:600px){#p79LeaveCoverModal .cover-card{padding:12px} .p79-smart-cover-toolbar{align-items:stretch}.p79-smart-cover-recommend{margin-left:0!important}.p79-smart-cover-day{padding:7px}.p79-smart-cover-person{padding:10px!important}}
 </style>
 
-<script src="../assets/port79-leave-daily-simple.js?v=20261106-unified-smart-v1"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261106-unit-title-filter-v2"></script>
 </body>
 </html>
 
