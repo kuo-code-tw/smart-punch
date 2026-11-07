@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>PORT79 | Gate 進出站櫃量匯入</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;background:#f1f6fc;color:#153755}
+*{box-sizing:border-box}body{margin:0;padding:22px 14px 45px}
+main{max-width:1020px;margin:0 auto}
+a{color:#155caa}header{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+h1{font-size:23px;margin:4px 0 3px}header p{margin:0;color:#617e9b;font-size:13px}
+.panel{background:#fff;border:1px solid #d9e7f4;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 3px 13px #4380a10c}
+h2{font-size:17px;margin:0 0 11px}
+.hint{color:#5e7b97;font-size:13px;line-height:1.7}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0}
+input[type=file],select{font-size:14px;border:1px solid #c8dcef;padding:8px;border-radius:9px;max-width:100%;background:#fff}
+button,.action{font-family:inherit;display:inline-block;cursor:pointer;font-size:13px;font-weight:800;padding:9px 14px;border-radius:9px;color:#154d84;background:#eaf4ff;border:1px solid #b7d7ef}
+button:disabled{opacity:.55;cursor:not-allowed}
+button.primary{background:#1468b8;border-color:#1468b8;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.metric{text-align:center;border:1px solid #e3edf7;border-radius:10px;background:#f6faff;padding:10px}
+.metric span{font-size:12px;color:#5d748c;display:block}.metric strong{font-size:21px;color:#174c83}
+table{border-collapse:collapse;font-size:12px;width:100%;white-space:nowrap}
+th,td{padding:7px 5px;border-bottom:1px solid #e8f1f9;text-align:right}
+th{background:#ebf3fb;color:#476d91}th:first-child,td:first-child{text-align:left}
+.scroll{overflow:auto;max-width:100%;max-height:410px}
+#gateMessage{font-size:13px;line-height:1.6;color:#456884;min-height:22px}
+#gateMessage[data-kind="error"]{color:#ac2632}
+#gateMessage[data-kind="success"]{color:#18744b}
+code{font-family:ui-monospace,monospace;font-size:12px}
+@media(max-width:620px){body{padding:12px 8px}h1{font-size:19px}.panel{padding:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric strong{font-size:18px}}
+</style>
+<script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script defer src="../assets/port79-gate-import.js?v=20261107-gate-import-v1"></script>
+</head>
+<body><main>
+<header><div><a href="../">‹ 返回 PORT79 首頁</a><h1>🚛 Gate 進出站櫃量 Excel 匯入</h1><p>按日期保存交空、領空、交重、領重、進站拖車車次</p></div><a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">開啟正式 Google 資料庫</a></header>
+<section class="panel">
+<h2>1. 選擇 Gate Excel</h2>
+<p class="hint">支援你目前提供的 <code>gate.xlsx</code> 報表格式（日期在第一列、ITT／Non ITT 交領空重櫃數、及第 15 列進站卡車數）。系統會自動合併 ITT 和 Non ITT、檢查每日合計，再依日期寫入；相同日期覆寫，不重複累加。</p>
+<div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>讀取並預覽</button></div>
+<p id="gateMessage" role="status" aria-live="polite">請先選擇檔案。</p>
+</section>
+<section class="panel" id="gateResult" hidden>
+<h2>2. 核對每天的進出櫃量</h2>
+<div class="grid">
+<div class="metric"><span>交空櫃</span><strong id="gateDe">—</strong></div>
+<div class="metric"><span>領空櫃</span><strong id="gatePe">—</strong></div>
+<div class="metric"><span>交重櫃</span><strong id="gateDl">—</strong></div>
+<div class="metric"><span>領重櫃</span><strong id="gatePl">—</strong></div>
+<div class="metric"><span>總櫃量</span><strong id="gateTotal">—</strong></div>
+<div class="metric"><span>進站拖車</span><strong id="gateTruck">—</strong></div>
+</div>
+<p class="hint" id="gateRange"></p>
+<div class="scroll"><table><thead><tr><th>日期</th><th>交空</th><th>領空</th><th>交重</th><th>領重</th><th>總櫃量</th><th>拖車車次</th></tr></thead><tbody id="gatePreviewRows"></tbody></table></div>
+<div class="controls">
+<button type="button" class="primary" id="gateSave" disabled>確認寫入正式資料庫</button>
+<button type="button" id="gateDownload">下載整理後 CSV（備援）</button>
+<a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">手動查看／修正每日資料</a>
+</div>
+<p class="hint">正式自動匯入需先在 PORT79 Google Apps Script 部署 Gate 寫入接口。若尚未部署，預覽與 CSV 下載仍可使用，但不會假裝已儲存。手動貼入資料庫時，請按照日期更新原列，避免同日期重複。</p>
+</section>
+<section class="panel"><h2>3. 每月與每年的資料去哪裡？</h2><p class="hint">全部保存於同一份 Google 試算表。「每日進出站」保留各日期，「每月累計」和「年度累計」用 Google Sheets 公式自動統計，「匯入紀錄」保留匯入來源。首頁小卡片會從正式雲端資料讀取，沒有資料的月份顯示 —，不會當成零。</p></section>
+</main></body></html>
