@@ -7544,12 +7544,16 @@ function p79VesselChineseDisplay(master){
 // Official sailing data is enrichment only; it must never delay saving or readback.
 async function p79RefreshOfficialVesselNames(){
   try{
-    const previous=Number(sessionStorage.getItem('p79_official_vessel_names_at')||0);
+    const previous=Number(sessionStorage.getItem('p79_official_vessel_names_v104_at')||0);
     if(Date.now()-previous<3600000)return;
-    sessionStorage.setItem('p79_official_vessel_names_at',String(Date.now()));
     const data=await apiGetQuick('publicShipSchedule',{},15000);
     if(data.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))return;
     const names={};
+    for(const [raw,value] of Object.entries(data.chineseNames||{})){
+      const key=String(raw).toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const name=p79VesselChineseName({localName:value});
+      if(key&&name)names[key]=name;
+    }
     for(const row of data.rows){
       const key=String(row.name||row.englishName||row.VesselEName||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
       const name=p79VesselChineseName({localName:row.localName,chineseName:row.chineseName||row.VesselName||row.VesselSName});
@@ -7560,6 +7564,7 @@ async function p79RefreshOfficialVesselNames(){
     const cached=JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}');
     Object.entries(names).forEach(([key,name])=>{if(name)cached[key]=name;else delete cached[key];});
     localStorage.setItem('p79_official_vessel_names',JSON.stringify(cached));
+    sessionStorage.setItem('p79_official_vessel_names_v104_at',String(Date.now()));
     renderVesselSummary();
   }catch(error){console.warn('官方中文船名暫時無法更新，保留既有名稱');}
 }

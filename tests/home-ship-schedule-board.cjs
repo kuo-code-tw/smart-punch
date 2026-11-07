@@ -17,7 +17,7 @@ assert(!src.includes("src.searchParams.set('token'"),'public source never sends 
 assert(!src.includes("src.searchParams.set('gcToken'"),'public source never sends privileged tokens');
 assert(src.includes("$('p79PublicShipRefresh')?.addEventListener('click',refresh)"));
 assert(src.includes("$('p79DashRefresh')?.addEventListener('click',refresh)"));
-assert(!src.includes('setInterval('),'front end must remain manual updates only');
+assert(src.includes('g.setTimeout(tick,300000)'),'refresh the public schedule every five minutes');
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');

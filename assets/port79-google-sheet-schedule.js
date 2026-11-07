@@ -2,7 +2,7 @@
    Public official data only; shown to EVERY employee on the login page and
    administrators in the dashboard. No private HR data or login tokens read.
    The server refreshes its Google Sheet snapshot automatically. The display
-   refreshes only on initial visit or a deliberate user click. */
+   refreshes on initial visit, every five minutes and when the page resumes. */
 (function(g){
 'use strict';
 const ACTION='publicShipSchedule',SOURCE='萬海航運｜網站船期';
@@ -49,8 +49,12 @@ function readOfficialNameCache(){
   return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
  }catch(_){return {};}
 }
-function rememberOfficialChineseNames(allRows){
+function rememberOfficialChineseNames(allRows,directory){
  const byName=Object.create(null);
+ for(const [raw,name] of Object.entries(directory||{})){
+  const key=vesselNameKey(raw),chinese=officialChineseShipName({localName:name});
+  if(key&&chinese)byName[key]=chinese;
+ }
  for(const r of allRows){
   const key=vesselNameKey(r.name);
   const chinese=officialChineseShipName(r);
@@ -116,7 +120,7 @@ function renderOne(host){
  if(!host)return;
  host.className='p79-schedule-board p79-schedule-remote p79-public-sailing-board';
  if(state==='loading'){
-  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>首次開啟及手動更新時讀取</small></div>';return;
+  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>每五分鐘自動讀取最新資料</small></div>';return;
  }
  if(state==='ready'&&rows.length){
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(expiredCount?' · 另 '+expiredCount+' 艘 ETD 已過未列入':'')+(notice?' · 更新提醒':'')+'</div>'+
@@ -168,13 +172,13 @@ async function refresh(){
    if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
     throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
    const parsed=parseRows(data.rows);
-   rememberOfficialChineseNames(parsed);
+   rememberOfficialChineseNames(parsed,data.chineseNames);
    const filtered=selectCurrentRows(parsed);
    rows=filtered.rows;expiredCount=filtered.expiredCount;
    lastSync=Number(data.lastSync)||0;notice=str(data.error);
    state='ready';error='';
    try{g.document?.dispatchEvent(new g.CustomEvent('p79:wanhai-names-updated'));}catch(_){}
-  }catch(e){state='error';error=str(e?.message||e);}
+  }catch(e){error=str(e?.message||e);if(rows.length){state='ready';notice=error;}else state='error';}
   finally{request=null;render();}
  })();
  return request;
@@ -219,6 +223,11 @@ function init(){
  $('p79ShipScheduleAll')?.addEventListener('click',()=>showDialog(-1));
  $('p79DashRefresh')?.addEventListener('click',refresh);
  render();refresh();
+ // Recursive timeout avoids overlapping requests and pauses hidden pages.
+ const tick=()=>{if(g.document.visibilityState!=='hidden')void refresh();g.setTimeout(tick,300000);};
+ g.setTimeout(tick,300000);
+ g.document.addEventListener('visibilitychange',()=>{if(g.document.visibilityState==='visible')void refresh();});
+ g.addEventListener?.('online',()=>void refresh());
 }
 g.P79ManualShipSchedule={render,refresh,parseRows,selectCurrentRows,parseTaipeiTime,getChineseName,source:SOURCE};
 if(g.document.readyState==='loading')g.document.addEventListener('DOMContentLoaded',init,{once:true});else init();
