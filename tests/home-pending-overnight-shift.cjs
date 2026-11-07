@@ -7,7 +7,7 @@ const engine=require('../attendance/v6-engine.js');
 const source=fs.readFileSync('assets/port79-monthly-dashboard.js','utf8');
 const homepage=fs.readFileSync('index.html','utf8');
 new vm.Script(source);
-assert(homepage.includes('port79-monthly-dashboard.js?v=20261107-imported-chinese-names-v1-night-pending-fix-v2'),
+assert(homepage.includes('port79-monthly-dashboard.js?v=20261108-lashing-completion-v1'),
  'homepage must bust the cached early-missing-checkout script');
 assert(source.includes('function p79HomePendingTiming'));
 assert(source.includes('const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleData)'));
