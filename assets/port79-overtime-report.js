@@ -1578,7 +1578,7 @@
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
      const selection=selectionKey();
-     const validationRequest={empId,date,leaveHandoffId:prefill.leaveHandoffId||''};
+     const validationRequest={empId,date,coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
      const validation=await prepareSaveValidation(validationRequest,!editingOriginal);
      if(selectionKey()!==selection)throw Error('核對期間申報內容已變更，請確認內容後再次儲存');
      // Deleted builtin types remain in GAS only to preserve OLD reports.
