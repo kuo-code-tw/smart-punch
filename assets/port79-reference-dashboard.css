@@ -1009,3 +1009,34 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79
   color:#a8d7ff!important;
  }
 }
+
+/* 2026-11-07: compact, single-line English + verified Chinese names in imported ships.
+   This is display-only: completed-status source data is preserved and never modified. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ranking .p79d-table-scroll table {
+  table-layout:auto!important;
+  min-width:490px!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ranking .p79d-table-scroll #p79DashShipRanking td {
+  padding:4px 3px!important;
+  white-space:nowrap!important;
+  line-height:1.35!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ranking .p79d-table-scroll #p79DashShipRanking td:nth-child(2) {
+  max-width:none!important;
+  min-width:145px!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ranking .p79r-vessel-one-line {
+  display:inline-block;
+  white-space:nowrap;
+  font-weight:700;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-ranking .p79r-vessel-chinese-name {
+  display:inline!important;
+  margin:0!important;
+  color:#64748b;
+  font-size:10px;
+  font-weight:500;
+  white-space:nowrap;
+}
