@@ -1,0 +1,31 @@
+name: Verify cross-midnight overtime workday
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-overtime-report.js'
+      - 'work-hours/index.html'
+      - 'tests/overtime-extension-cross-midnight-workdate.cjs'
+      - '.github/workflows/overtime-cross-midnight-workday.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-overtime-report.js'
+      - 'work-hours/index.html'
+      - 'tests/overtime-extension-cross-midnight-workdate.cjs'
+      - '.github/workflows/overtime-cross-midnight-workday.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original-workday overtime and cutoff policy
+        run: |
+          node tests/overtime-extension-cross-midnight-workdate.cjs
+          node tests/overtime-clockout-policy.cjs
+          node tests/overtime-leave-cover-extension-periods.cjs
+          node tests/attendance-overtime-official-pair.cjs
