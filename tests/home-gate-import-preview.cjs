@@ -47,7 +47,7 @@ matrix[14][0]='本日進站卡車數';matrix[14][2]=263;matrix[14][3]=981;
 const book={SheetNames:['KHHGate'],Sheets:{KHHGate:{}}};
 const win={document:doc,XLSX:{read:()=>book,utils:{sheet_to_json:()=>matrix}},sessionStorage:{getItem:()=>null},setTimeout(){}};
 el('gateFile').files=[{name:'gate.xlsx',size:1200,arrayBuffer:async()=>new ArrayBuffer(8)}];
-vm.runInNewContext(importer,{window:win});
+vm.runInNewContext(importer,{window:win,URL});
 (async()=>{
  await el('gateFile').listeners.change();
  el('gatePreview').listeners.click();
@@ -60,5 +60,26 @@ vm.runInNewContext(importer,{window:win});
  assert.equal(el('gateTruck').textContent,'1,244');
  assert.equal(el('gateSave').disabled,true,'cloud save cannot be enabled without a verified live Gate backend');
  assert(el('gateMessage').textContent.includes('PORT79 管理員帳號'), 'missing login leaves preview available but disables write');
- console.log('PASS: Gate card-local tab, no hard minimum width, validated Excel preview and backend date upsert source');
+ // A configured user still must not be allowed to POST until the backend route exists.
+ win.sessionStorage.getItem=(k)=>{
+  if(k==='port79_user_session')return JSON.stringify({role:'superadmin',empId:'ADMIN'});
+  if(k==='port79_user_token')return 'TEST-TOKEN';
+  if(k==='port79_gas_url')return 'https://script.google.com/macros/s/TEST-DEPLOYMENT/exec';
+  return null;
+ };
+ win.fetch=async()=>({ok:true,json:async()=>({ok:false,error:'未知操作: [gateStatsReadYear]。請檢查前端 action 參數'})});
+ el('gatePreview').listeners.click();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(el('gateSave').disabled,true,'unknown GAS action must prevent cloud POST');
+ assert(el('gateMessage').textContent.includes('尚未部署 Gate 匯入服務'),'explain actual missing GAS route');
+ // After the official backend publishes a confirmed read route, save becomes available.
+ win.fetch=async()=>({ok:true,json:async()=>({
+  ok:true,source:'port79-gate-daily',year:'2026',rows:[]
+ })});
+ el('gatePreview').listeners.click();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(el('gateSave').disabled,false,'deployed GAS enables upload');
+ assert(el('gateMessage').textContent.includes('正式 Gate 雲端查詢服務已驗證'));
+
+ console.log('PASS: Gate preview, missing backend blocks upload, authenticated backend enables upload');
 })().catch(error=>{console.error(error);process.exitCode=1;});
