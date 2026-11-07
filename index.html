@@ -378,19 +378,18 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <div id="p79RankingView" role="tabpanel" aria-labelledby="p79HomeOperationsTab" class="p79d-table-scroll"><table><thead><tr><th>序號</th><th>船名（中文）</th><th>靠泊碼頭</th><th>Moves</th><th>匯入時間</th><th>GPH</th></tr></thead>
           <tbody id="p79DashShipRanking"><tr><td colspan="6">等待月份資料</td></tr></tbody></table></div>
 <section id="p79HomeGatePanel" class="p79-gate-section" role="tabpanel" aria-labelledby="p79HomeGateTab" hidden>
-    <div class="p79-gate-header">
-      <div class="p79-gate-caption">依正式 Gate 每日紀錄計算</div>
+    <div class="p79-gate-toolbar" aria-label="Gate 期間選擇與日期切換">
       <div class="p79-gate-modes" role="group" aria-label="Gate 進出櫃統計期間">
-        <button type="button" id="p79GateDay" aria-pressed="false">日</button>
-        <button type="button" id="p79GateWeek" aria-pressed="false">週</button>
-        <button type="button" id="p79GateMonth" aria-pressed="true">月</button>
-        <button type="button" id="p79GateYear" aria-pressed="false">年</button>
+        <button type="button" id="p79GateDay" aria-pressed="false" title="每日統計">日</button>
+        <button type="button" id="p79GateWeek" aria-pressed="false" title="每週統計">週</button>
+        <button type="button" id="p79GateMonth" aria-pressed="true" title="每月統計">月</button>
+        <button type="button" id="p79GateYear" aria-pressed="false" title="每年統計">年</button>
       </div>
-    </div>
-    <div class="p79-gate-navigation" aria-label="日週月年期間翻頁">
-      <button type="button" id="p79GatePrev" aria-label="上一個統計期間">‹</button>
-      <strong id="p79GatePeriod" aria-live="polite">正在讀取期間…</strong>
-      <button type="button" id="p79GateNext" aria-label="下一個統計期間">›</button>
+      <div class="p79-gate-navigation" aria-label="日週月年期間翻頁">
+        <button type="button" id="p79GatePrev" aria-label="上一個統計期間">‹</button>
+        <strong id="p79GatePeriod" aria-live="polite">正在讀取期間…</strong>
+        <button type="button" id="p79GateNext" aria-label="下一個統計期間">›</button>
+      </div>
     </div>
     <div class="p79-gate-metrics">
       <div><span>交空櫃</span><strong id="p79GateDeliverEmpty">—</strong><small>櫃</small></div>
@@ -1651,11 +1650,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261107-imported-chinese-names-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261107-gate-grid-track-fix-v4">
-<link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-dwmy-v1">
+<link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2">
 <script src="./assets/port79-reference-dashboard.js?v=20261107-efficiency-mode-guard-v3"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261107-hourly-auto-refresh-v105"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261107-monthly-labels-mode-persist-v3"></script>
-<script src="./assets/port79-gate-home.js?v=20261107-gate-dwmy-v1"></script>
+<script src="./assets/port79-gate-home.js?v=20261107-gate-equal-height-v2"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 <!-- PORT79 2026-11-03: 管理員手機首頁只顯示萬海網站船期與目前班別人員；桌面版、員工登入與原資料讀取不變。 -->
 <style id="p79-admin-phone-two-panels-20261103">
