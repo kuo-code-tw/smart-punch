@@ -1589,7 +1589,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
 
-<script src="../assets/port79-leave-cover-suggest.js?v=20261107-cross-day-workdate-v2"></script>
+<script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <script>
 let p79CreateDailyPlan=new Map();
 function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
@@ -1840,7 +1840,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261107-legacy-handoff-nextday-preplan-v3"></script>
+<script src="../assets/port79-overtime-report.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
