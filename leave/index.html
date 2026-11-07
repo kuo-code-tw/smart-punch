@@ -1977,21 +1977,27 @@ async function p79ReconcileLeaveHandoff(){
     return cloud;
    };
    let data=await fetchEntry(e);
-   // Older browser sessions retained both workers under the original leave
-   // date. Re-map only when the verified leave, cover and worker order agree.
-   const corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(data,{...h,id:e.leaveId||h.id},e);
-   if(corrected.date!==e.date){
-    const original=data,oldEmployee=(original.schedules||[]).find(row=>
+   // Verify the approved leave on its ORIGINAL date, even when this queue
+   // entry was already migrated to the next worker workday in a prior visit.
+   const originalDate=String(e.coverDate||e.date);
+   const original=originalDate===e.date?data:await fetchEntry({...e,date:originalDate});
+   const corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(original,{...h,id:e.leaveId||h.id},e);
+   if(corrected.coverDate!==corrected.date){
+    const oldEmployee=(original.schedules||[]).find(row=>
      String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
-    const oldReport=oldEmployee?.schedule?.__meta?.[e.date]?.overtimeReport;
+    const oldReport=oldEmployee?.schedule?.__meta?.[corrected.coverDate]?.overtimeReport;
     if(oldReport?.id&&oldReport.category==='延'&&
        String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08')
-     throw Error(e.empId+' 的原預排仍在 '+e.date+'，正確工作日期為 '+corrected.date+
-      '；可以查看加班時段，但須先更正原報單，避免重複申報。');
+     throw Error(e.empId+' 的原預排仍在 '+corrected.coverDate+'，加班應歸 '+corrected.date+
+      '；原ID須先核對更正，不能重複建立第二筆。');
+   }
+   if(corrected.date!==e.date){
     e=corrected;
     data=await fetchEntry(e);
-    // The original leave is on the prior day. Secure context may be scoped to
-    // workDate; preserve only the already verified cover for display/preflight.
+   }else e=corrected;
+   if(e.coverDate!==e.date){
+    // Some older GAS context reads omit cover assignments on the NEXT workday.
+    // Supplement only from the separately verified ORIGINAL leave-date read.
     const validCover=(original.leaveCoverAssignments||[]).filter(c=>
      String(c.leaveId)===String(e.leaveId||h.id)&&
      (c.workerIds||[]).some(id=>String(id).trim().toUpperCase()===String(e.empId).trim().toUpperCase()));
@@ -2000,7 +2006,7 @@ async function p79ReconcileLeaveHandoff(){
     data={...data,leaveCoverAssignments:[...available,
      ...validCover.filter(c=>!available.some(d=>String(d.leaveId)===String(c.leaveId)))]};
     contextByEntry.set(JSON.stringify([String(e.empId).trim().toUpperCase(),e.date,String(e.leaveId||h.id)]),data);
-   }else e=corrected;
+   }
    const month=String(e.date||'').slice(0,7);
    const state=p79LeaveHandoffEntryState(h,e,data,active);
    if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
