@@ -48,7 +48,7 @@ rCtx.weeklyChart({start:'2026-11-01',end:'2026-11-07',days});
 verifyChart(rChart.innerHTML,'reference weekly chart');
 assert(html.includes('id="p79DashShipRanking"'),'ranking remains present');
 assert(html.includes('<th>GPH</th></tr>'),'GPH column remains visible');
-assert(!html.slice(html.indexOf('最新匯入船舶'),html.indexOf('最新匯入船舶')+420).includes('<th>狀態</th>'),'status stays hidden');
+assert(!html.slice(html.indexOf('最新完工船舶'),html.indexOf('最新完工船舶')+420).includes('<th>狀態</th>'),'status stays hidden');
 assert(css.includes('article.p79d-ranking .p79d-table-scroll table'),'rank-specific CSS');
 assert(css.includes('overflow-x:hidden!important'),'no horizontal table scrollbar');
 assert(css.includes('table-layout:fixed!important'),'fit six columns within card');

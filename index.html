@@ -374,8 +374,8 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         <div id="p79DashShipBars" class="p79d-bars p79d-ship-bars">等待載入</div>
         <div id="p79EffSummary" class="p79-eff-summary" aria-live="polite"></div>
       </article>
-      <article class="p79d-panel p79d-ranking p79d-gate-flip"><div class="p79d-panel-title"><div class="p79-gate-card-tabs" role="tablist" aria-label="首頁小卡片翻頁"><button type="button" role="tab" id="p79HomeOperationsTab" aria-controls="p79RankingView" aria-selected="true">最新匯入船舶</button><button type="button" role="tab" id="p79HomeGateTab" aria-controls="p79HomeGatePanel" aria-selected="false">進出站櫃量</button></div><span id="p79DashShipRankingCount">本月全部船舶 · 依匯入時間</span></div>
-        <div id="p79RankingView" role="tabpanel" aria-labelledby="p79HomeOperationsTab" class="p79d-table-scroll"><table><thead><tr><th>序號</th><th>船名（中文）</th><th>靠泊碼頭</th><th>Moves</th><th>匯入時間</th><th>GPH</th></tr></thead>
+      <article class="p79d-panel p79d-ranking p79d-gate-flip"><div class="p79d-panel-title"><div class="p79-gate-card-tabs" role="tablist" aria-label="首頁小卡片翻頁"><button type="button" role="tab" id="p79HomeOperationsTab" aria-controls="p79RankingView" aria-selected="true">最新完工船舶</button><button type="button" role="tab" id="p79HomeGateTab" aria-controls="p79HomeGatePanel" aria-selected="false">進出站櫃量</button></div><span id="p79DashShipRankingCount">本月完工船舶 · 依完工時間</span></div>
+        <div id="p79RankingView" role="tabpanel" aria-labelledby="p79HomeOperationsTab" class="p79d-table-scroll"><table><thead><tr><th>序號</th><th>船名（中文）</th><th>靠泊碼頭</th><th>Moves</th><th>完工時間</th><th>GPH</th></tr></thead>
           <tbody id="p79DashShipRanking"><tr><td colspan="6">等待月份資料</td></tr></tbody></table></div>
 <section id="p79HomeGatePanel" class="p79-gate-section" role="tabpanel" aria-labelledby="p79HomeGateTab" hidden>
     <div class="p79-gate-toolbar" aria-label="Gate 期間選擇與日期切換">
@@ -1659,10 +1659,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261107-imported-chinese-names-v1-night-pending-fix-v2"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261108-lashing-completion-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261107-gate-grid-track-fix-v4">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
-<script src="./assets/port79-reference-dashboard.js?v=20261107-efficiency-mode-guard-v3"></script>
+<script src="./assets/port79-reference-dashboard.js?v=20261108-completed-ship-list-v1"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261107-hourly-auto-refresh-v105"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261108-source-freshness-v1"></script>
 <script src="./assets/port79-gate-home.js?v=20261107-phone-gate-quantities-v1"></script>

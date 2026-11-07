@@ -77,24 +77,16 @@ let lastVesselsForChineseNames=null;
 function vessels(v){
  lastVesselsForChineseNames=v;
  const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard;
- // 最新匯入的優先，其餘仍屬本月的船舶一併保留，不受「最新 5 艘」限制。
+ // 依正式 WORKING SHEET LASHING 完工時刻排序；缺少時刻只使用有根據的日期。
  const source=Array.isArray(v.vessels)?v.vessels:[];
- const imported=model.latestImportedVessels(source,Number.MAX_SAFE_INTEGER);
- const identifier=s=>String(s.workingNo||[s.name,s.voyage].join('|'));
- const seen=new Set(imported.map(identifier));
- const untimed=source.filter(s=>{
-  if(!s||s.deleted||Number.isFinite(Date.parse(String(s.importedAt||''))))return false;
-  const id=identifier(s);
-  if(seen.has(id))return false;
-  seen.add(id);
-  return true;
- }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
- const latest=[...imported,...untimed];
+ const latest=model.latestCompletedVessels(source,Number.MAX_SAFE_INTEGER);
  const countLabel=$('p79DashShipRankingCount');
- if(countLabel)countLabel.textContent='本月全部 '+latest.length+' 艘 · 可上下捲動';
- const importLabel=value=>{
-  if(!Number.isFinite(Date.parse(String(value||''))))return '—';
-  return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
+ if(countLabel)countLabel.textContent='本月完工資料 '+latest.length+' 艘 · 依完工時間排序';
+ const completionLabel=s=>{
+  const full=String(s.completedAt||'').match(/^20\d{2}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if(full)return full[1]+'/'+full[2]+' '+full[3]+':'+full[4];
+  const day=String(s.completionDate||'').match(/^20\d{2}-(\d{2})-(\d{2})$/);
+  return day?day[1]+'/'+day[2]+'（時間未記錄）':'—';
  };
  if(table)table.innerHTML=latest.length?latest.map((s,i)=>{
   const chinese=p79ImportedChineseShipName(s)||'未提供';
@@ -102,7 +94,7 @@ function vessels(v){
    '<td title="'+esc(s.name+' / '+chinese+' / '+s.workingNo)+'"><span class="p79r-vessel-one-line">'+esc(s.name)+'<span class="p79r-vessel-chinese-name">（'+esc(chinese)+'）</span></span></td>'+
    '<td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td>'+
    '<td>'+fmt(s.moves)+'</td>'+
-   '<td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td>'+
+   '<td title="'+esc(s.completedAt?'WORKING SHEET LASHING 完工：'+s.completedAt.replace('T',' ').slice(0,16):(s.completionDate?'僅記錄完工日期：'+s.completionDate+'；完工時刻未記錄':'正式船舶資料沒有完工日期與時刻'))+'">'+esc(completionLabel(s))+'</td>'+
    '<td>'+fmt(s.rate,2)+'</td></tr>';
  }).join(''):'<tr><td colspan="6">本月份尚無船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
