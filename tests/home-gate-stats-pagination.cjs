@@ -7,11 +7,11 @@ const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const js=fs.readFileSync(path.join(root,'assets/port79-gate-home.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'assets/port79-gate-home.css'),'utf8');
-for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateTruckEntries']){
+for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p79GateDay','p79GateWeek','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateTruckEntries']){
  assert(html.includes('id="'+key+'"'),key+' present in homepage');
 }
-assert(html.includes('port79-gate-home.js?v=20261107-gate-grid-track-fix-v4'));
-assert(html.includes('port79-gate-home.css?v=20261107-gate-grid-track-fix-v4'));
+assert(html.includes('port79-gate-home.js?v=20261107-gate-dwmy-v1'));
+assert(html.includes('port79-gate-home.css?v=20261107-gate-dwmy-v1'));
 assert(!html.includes('id="p79GateImportLink"'),'homepage Gate card is read-only; no upload or download actions');
 assert(!html.includes('id="p79HomeStatTabs"'),'no whole-homepage tabs');
 assert(css.includes('#p79Dashboard #p79HomeGatePanel[hidden]'),'new panel truly hidden by default');
@@ -53,6 +53,13 @@ assert.equal(m.totals.pickupEmpty,201);
 assert.equal(m.totals.deliverLoaded,711);
 assert.equal(m.totals.pickupLoaded,479);
 assert.equal(m.totals.truckEntries,1244);
+const daily=api.aggregateFor(rows,'2026','day','2026-11-02');
+assert.equal(daily.days,1,'daily preview includes only selected date');
+assert.equal(daily.totals.truckEntries,981);
+const weekly=api.aggregateFor(rows,'2026','week','2026-11-02');
+assert.equal(weekly.days,1,'weekly view uses Monday to Sunday');
+assert.equal(weekly.totals.truckEntries,981);
+assert.equal(api.rangeFor('week','2026-11-01').start,'2026-10-26','Sunday belongs to previous Monday week');
 const y=api.aggregateFor(rows,'2026','year','2026-11');
 assert.equal(y.days,3);
 assert.equal(y.totals.truckEntries,1251);
@@ -65,6 +72,10 @@ assert.equal($('p79RankingView').hidden,true,'only imported-vessel ranking is hi
 assert(operationEls.every(e=>!e.hidden),'other homepage panels must remain visible');
 assert.equal($('p79HomeGateTab').attrs['aria-selected'],'true');
 assert($('p79Dashboard').classNames.has('p79-gate-view-active'),'Gate view activates natural card height');
+$('p79GateDay').click();
+assert.equal($('p79GateDay').attrs['aria-pressed'],'true');
+$('p79GateWeek').click();
+assert.equal($('p79GateWeek').attrs['aria-pressed'],'true');
 $('p79GateYear').click();
 assert.equal($('p79GateYear').attrs['aria-pressed'],'true');
 $('p79GatePrev').click();
@@ -76,4 +87,4 @@ assert.equal($('p79RankingView').hidden,false,'ranking card restored');
 assert(operationEls.every(e=>!e.hidden),'whole homepage never changes visibility');
 assert.equal($('p79HomeOperationsTab').attrs['aria-selected'],'true');
 assert(!$('p79Dashboard').classNames.has('p79-gate-view-active'),'vessel list restores normal dashboard layout');
-console.log('PASS: compact homepage gate tab, month/year paging, six KPIs, date dedupe, and private-data safeguards');
+console.log('PASS: compact homepage gate tab, day/week/month/year paging, six KPIs, date dedupe, and private-data safeguards');
