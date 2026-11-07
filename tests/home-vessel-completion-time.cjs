@@ -19,7 +19,7 @@ assert.equal(m.shipCompletionTimestamp({lashingDateTime:'2026-11-08T02:10:00+08:
 assert.equal(m.shipCompletionTimestamp({lastDate:'2026-11-08',workingSheetImportedAt:'2026-11-08T06:24:00+08:00'}),'');
 assert.equal(m.shipCompletionTimestamp({lashingDateTime:'2026-11-31T24:70'}),'');
 assert.deepEqual(m.latestCompletedVessels(report.vessels,1).map(v=>v.workingNo),['B']);
-assert(html.includes('最新完工船舶')&&html.includes('<th>完工時間</th>'));
+assert(html.includes('最新完工船舶')&&html.includes('<th>完工時間</th>')&&html.includes('本月完工船舶 · 依完工時間'));
 assert(!html.includes('最新匯入船舶</button>')&&!html.includes('<th>匯入時間</th>'));
 assert(ui.includes('model.latestCompletedVessels(source,Number.MAX_SAFE_INTEGER)'));
 assert(ui.includes('s.completedAt')&&ui.includes('時間未記錄'));
