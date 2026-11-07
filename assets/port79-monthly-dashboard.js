@@ -110,6 +110,7 @@ function analyzeVessels(data){
   if(boxes!==null){containers+=boxes;validContainers++}
   if(rate!==null&&rate>=0){rateSum+=rate;rateCount++;if(moves!==null&&moves>0){weight+=moves;weighted+=rate*moves}}
   return {name:String(first(m,['vesselName','shipName','vessel','name'])||'未填船名'),
+   chineseName:String(first(m,['vesselChineseName','chineseName','localName','shipNameChinese'])||'').trim(),
    workingNo:String(m.workingNo||''),voyage:String(first(m,['voyageE','voyageI','voyage'])||''),
    // 與正式船舶管理系統的「碼頭」欄位一致，不推測缺失的靠泊資料。
    wharf:String(first(m,['wharf','berth','berthNo','terminal','pier'])??first(m.workingSheetSource,['wharf','berth','berthNo','terminal','pier'])??'').trim(),
