@@ -219,7 +219,7 @@ async function save(){
    message('目前無法確認雲端儲存結果：'+raw.slice(0,160)+
     '。請先開啟正式試算表核對日期，避免不確定時重複操作。','error');
   }
- }finally{button.disabled=!serviceReady;button.textContent='確認寫入正式資料庫';}
+ }finally{button.disabled=!serviceReady;button.textContent='寫入正式資料';}
 }
 $('gateFile').addEventListener('change',chooseFile);
 $('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
