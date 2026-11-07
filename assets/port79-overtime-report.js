@@ -214,12 +214,16 @@
  }
  function overtimeMinutes(start,end,date,meta){
   const r=meta?.overtimeReport;if(!r||!(end>start))return null;
-  let offset=0;
-  if(r.position==='after'){
+  let [a,b]=interval(date,r.overtimeStart,r.overtimeEnd);
+  if(r.position==='after'||r.position==='before'){
    const normal=interval(date,r.normalStart,r.normalEnd);
-   const base=Date.parse(date+'T00:00:00+08:00');offset=Math.floor((normal[1]-base)/86400000);
+   // A 24:00 overtime start is already on the next calendar day. Align the
+   // actual overtime interval to the adjacent normal shift instead of adding
+   // the normal end's day count (which previously skipped one extra day).
+   const shift=r.position==='after'?normal[1]-a:normal[0]-b;
+   if(shift%86400000!==0)return null;
+   a+=shift;b+=shift;
   }
-  const[a,b]=interval(date,r.overtimeStart,r.overtimeEnd,offset);
   return Math.max(0,Math.floor((Math.min(end,b)-Math.max(start,a))/60000));
  }
  function inferRule(start,end,date,rows,category){
