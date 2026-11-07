@@ -140,7 +140,7 @@ function draw(p,report){
  var days=report.days;
  if(summaryEl){
   var suffix=mode==='week'?'天':'個月',errorText=report.failures?' · '+report.failures+' 個月份讀取失敗（未計入）':'';
-  var today=taipeiToday(),currentWeek=mode==='week'&&p.start<=today&&p.end>=today;
+  var today=report.average===null?taipeiToday():'',currentWeek=report.average===null&&mode==='week'&&p.start<=today&&p.end>=today;
   var noData=currentWeek?'本週目前沒有已完工且具有效 GPH 的船舶':'沒有有效 GPH 資料';
   summaryEl.textContent=(report.average===null?noData:(report.failures?'已取得月份加權效率 ':'期間加權效率 ')+report.average.toFixed(2)+' GPH')+' · 有效 '+report.valid+' '+suffix+errorText;
  }
