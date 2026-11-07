@@ -72,6 +72,22 @@
   if(full[1]>midnight(next)&&(leaveOn(id,next,leaves)||covered(id,next,covers)))return false;
   return true;
  }
+ // A leave night starts on its original workday, but the second cover
+ // extends the following day's EARLY shift. Never book both on leaveDate.
+ function coverWorkday(leaveDate,leaveShift,mode,workerIndex){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(leaveDate||''))||mode!=='two'||![0,1].includes(workerIndex))return null;
+  let p;
+  if(shiftName(leaveShift)==='晚'){
+   p=workerIndex===0?
+    {workDate:leaveDate,normalShift:'中',normalStart:'16',normalEnd:'24',overtimeStart:'24',overtimeEnd:'04',period:'16-04',code:'延16-04',position:'after'}:
+    {workDate:addDays(leaveDate,1),normalShift:'早',normalStart:'08',normalEnd:'16',overtimeStart:'04',overtimeEnd:'08',period:'04-16',code:'延04-16',position:'before'};
+  }else if(shiftName(leaveShift)==='早'){
+   p=workerIndex===0?
+    {workDate:addDays(leaveDate,-1),normalShift:'晚',normalStart:'24',normalEnd:'08',overtimeStart:'08',overtimeEnd:'12',period:'24-12',code:'延24-12',position:'after'}:
+    {workDate:leaveDate,normalShift:'中',normalStart:'16',normalEnd:'24',overtimeStart:'12',overtimeEnd:'16',period:'12-24',code:'延12-24',position:'before'};
+  }else return null;
+  return {...p,leaveDate,category:'延',declaredHours:4};
+ }
  function suggest({people=[],rosters=new Map(),leaves=[],covers=[],leaveEmpId,date}={}){
   const target=people.find(e=>norm(e.empId)===norm(leaveEmpId)),schedule=rosters.get(norm(leaveEmpId));
   if(!target||!schedule||!/\d{4}-\d{2}-\d{2}/.test(String(date||'')))return {reason:'請先確認請假人員、日期與正式班表',slots:[]};
@@ -90,5 +106,5 @@
   if(!second)return {leaveShift,slots,reason:'兩段支援沒有兩位不同的合格人員，請核對班表後手動安排'};
   return {leaveShift,slots,first,second,reason:''};
  }
- global.P79LeaveCoverSuggest={suggest,mergeRosters,monthsFor,interval,addDays};
+ global.P79LeaveCoverSuggest={suggest,coverWorkday,mergeRosters,monthsFor,interval,addDays};
 })(typeof window==='undefined'?globalThis:window);
