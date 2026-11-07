@@ -39,6 +39,38 @@ function selectCurrentRows(parsed,now=Date.now()){
  return {rows:current,expiredCount};
 }
 let rows=[],expiredCount=0,lastSync=0,state='idle',error='',notice='',loaded=false,request=null,dialog=null;
+// Shared verified names also cover completed imported ships no longer in the current ETD board.
+const CHINESE_NAME_CACHE='p79_official_vessel_names';
+let verifiedShipNames=Object.create(null);
+const vesselNameKey=name=>str(name).toUpperCase().replace(/[^A-Z0-9]/g,'');
+function readOfficialNameCache(){
+ try{
+  const value=JSON.parse(g.localStorage?.getItem(CHINESE_NAME_CACHE)||'{}');
+  return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+ }catch(_){return {};}
+}
+function rememberOfficialChineseNames(allRows){
+ const byName=Object.create(null);
+ for(const r of allRows){
+  const key=vesselNameKey(r.name);
+  const chinese=officialChineseShipName(r);
+  if(!key||!chinese)continue;
+  if(byName[key]!==undefined&&byName[key]!==chinese)byName[key]=null;
+  else if(byName[key]!==null)byName[key]=chinese;
+ }
+ verifiedShipNames=byName;
+ const cache=readOfficialNameCache();
+ for(const [key,name] of Object.entries(byName)){
+  if(name)cache[key]=name;else delete cache[key];
+ }
+ try{g.localStorage?.setItem(CHINESE_NAME_CACHE,JSON.stringify(cache));}catch(_){}
+}
+function getChineseName(englishName){
+ const key=vesselNameKey(englishName);
+ if(!key||verifiedShipNames[key]===null)return '';
+ const name=verifiedShipNames[key]||readOfficialNameCache()[key]||'';
+ return /[\u3400-\u9fff]/u.test(String(name))?short(name):'';
+}
 function parseRows(data){
  if(!Array.isArray(data))return [];
  const seen=new Set();
@@ -135,10 +167,13 @@ async function refresh(){
    if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
    if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
     throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
-   const filtered=selectCurrentRows(parseRows(data.rows));
+   const parsed=parseRows(data.rows);
+   rememberOfficialChineseNames(parsed);
+   const filtered=selectCurrentRows(parsed);
    rows=filtered.rows;expiredCount=filtered.expiredCount;
    lastSync=Number(data.lastSync)||0;notice=str(data.error);
    state='ready';error='';
+   try{g.document?.dispatchEvent(new g.CustomEvent('p79:wanhai-names-updated'));}catch(_){}
   }catch(e){state='error';error=str(e?.message||e);}
   finally{request=null;render();}
  })();
@@ -185,6 +220,6 @@ function init(){
  $('p79DashRefresh')?.addEventListener('click',refresh);
  render();refresh();
 }
-g.P79ManualShipSchedule={render,refresh,parseRows,selectCurrentRows,parseTaipeiTime,source:SOURCE};
+g.P79ManualShipSchedule={render,refresh,parseRows,selectCurrentRows,parseTaipeiTime,getChineseName,source:SOURCE};
 if(g.document.readyState==='loading')g.document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
