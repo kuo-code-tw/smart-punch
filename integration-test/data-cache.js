@@ -591,6 +591,10 @@ async function getHistoryPreview(url){
  if(!credential||info.action!=='historyGetMonthData'||!key)return null;
  const row=await get(key).catch(()=>null);
  if(!row||viewer!==viewerKey()||credential!==token()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
+ // Historical previews are read-through caches, not permanent snapshots. An expired
+ // vessel/attendance/schedule month must reach the formal cloud source again.
+ const ttl=cacheFreshTtl(info.action,info.u);
+ if(!(ttl>0)||Date.now()-row.savedAt>=ttl)return null;
  if(row.data.month&&row.data.month!==info.u.searchParams.get('month'))return null;
  return {...row.data,sourceLabel:'本機歷史快取 · '+fmtTime(row.savedAt)};
 }
