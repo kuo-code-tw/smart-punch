@@ -106,7 +106,10 @@ function vessels(v){
    '<td>'+fmt(s.rate,2)+'</td></tr>';
  }).join(''):'<tr><td colspan="6">本月份尚無船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
- if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
+ // The weekly/monthly pager owns this chart when available. Do not overwrite its selected view on vessel refresh or name updates.
+ if(!g.P79EfficiencyPager?.active){
+  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
+ }
  peopleReport=v;renderPeople();
  g.P79ManualShipSchedule?.render?.();
  if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent=fmt(v.count);
