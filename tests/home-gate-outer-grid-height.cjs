@@ -26,8 +26,8 @@ assert(override.includes('overflow:visible!important'));
 assert(gateCSS.includes('#p79Dashboard.p79-gate-view-active'),'Gate CSS also scopes expanded layout');
 const versions={
  'port79-reference-dashboard.css':'20261107-gate-grid-track-fix-v4',
- 'port79-gate-home.css':'20261107-gate-dwmy-v1',
- 'port79-gate-home.js':'20261107-gate-dwmy-v1'
+ 'port79-gate-home.css':'20261107-gate-equal-height-v2',
+ 'port79-gate-home.js':'20261107-gate-equal-height-v2'
 };
 for(const [file,version] of Object.entries(versions)){
  assert(html.includes(file+'?v='+version),'cache bust updated for '+file);
@@ -58,13 +58,15 @@ const doc={readyState:'complete',getElementById:element,addEventListener(){}};
 const win={document:doc,sessionStorage:{getItem(){return null;}}};
 vm.runInNewContext(source,{window:win,globalThis:win,Intl,Date,URL},{timeout:3000});
 win.P79GateStatsHome.switchTab('gate');
-assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'max-content','outer grid row MUST fit all six KPI tiles');
-assert.equal(grid.style.getPropertyPriority('grid-auto-rows'),'important','defeat late dashboard CSS');
-assert.equal(card.style.getPropertyValue('height'),'auto');
-assert.equal(card.style.getPropertyValue('min-height'),'0');
-assert.equal(card.style.getPropertyValue('max-height'),'none');
-assert.equal(card.style.getPropertyValue('overflow'),'visible');
-assert.equal(element('p79HomeGatePanel').style.getPropertyValue('overflow-y'),'visible');
+const equal=gateCSS.slice(gateCSS.lastIndexOf('/* 2026-11-07 | Gate same height as the vessel efficiency trend.'));
+assert(equal.includes('grid-auto-rows:260px!important'),'Gate desktop matches the trend panel');
+assert(equal.includes('grid-auto-rows:275px!important'),'Gate mobile matches the trend panel');
+assert(equal.includes('height:260px!important')&&equal.includes('height:275px!important'));
+assert(equal.includes('grid-template-rows:repeat(2,minmax(0,1fr))!important'),'six values form two compact rows');
+assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'','CSS owns responsive height, not inline JS');
+assert.equal(card.style.getPropertyValue('height'),'','no inline height overriding the chart');
+assert.equal(card.style.getPropertyValue('overflow'),'','no inline overflow overriding layout');
+assert.equal(element('p79HomeGatePanel').style.getPropertyValue('overflow-y'),'','no inline scrolling');
 assert.equal(element('p79HomeGatePanel').hidden,false);
 assert.equal(element('p79RankingView').hidden,true);
 win.P79GateStatsHome.switchTab('operations');
@@ -73,4 +75,4 @@ for(const [el,prop] of [[grid,'grid-auto-rows'],[card,'max-height'],[card,'overf
 }
 assert.equal(element('p79HomeGatePanel').hidden,true);
 assert.equal(element('p79RankingView').hidden,false);
-console.log('PASS: Gate toggles 260/275px outer grid height and card overflow; vessel ranking style is restored.');
+console.log('PASS: Gate matches the trend chart at desktop/mobile heights; vessel ranking unaffected.');
