@@ -13,7 +13,12 @@ var originalVessels=base.vessels,originalReset=base.reset;
 var savedMode='week';
 try{savedMode=g.sessionStorage?.getItem('p79_efficiency_chart_mode')==='month'?'month':'week';}catch(_){}
 var mode=savedMode,cursor='',weekCursor='',yearCursor='',selectedMonth='',sessionKey='',seq=0;
-var cache=new Map(),inflight=new Map(),lastChart=null,lastChartSize='';
+var cache=new Map(),fetchedAt=new Map(),inflight=new Map(),lastChart=null,lastChartSize='';
+var LIVE_TTL_MS=120000,HISTORY_TTL_MS=900000;
+function freshMonth(ym){
+ var saved=fetchedAt.get(ym),age=Date.now()-saved;
+ return cache.has(ym)&&Number.isFinite(saved)&&age>=0&&age<(ym===taipeiToday().slice(0,7)?LIVE_TTL_MS:HISTORY_TTL_MS);
+}
 var style=d.createElement('style');
 style.id='p79-efficiency-week-month-pager-style';
 style.textContent=[
@@ -61,11 +66,11 @@ function cleanSession(){
  var token=g.sessionStorage.getItem('port79_user_token')||g.sessionStorage.getItem('port79_admin_token')||'';
  var gas=String(g.sessionStorage.getItem('port79_gas_url')||'').trim();
  var next=(user?.empId||'')+'|'+token+'|'+gas;
- if(next!==sessionKey){sessionKey=next;cache.clear();inflight.clear();seq++;}
+ if(next!==sessionKey){sessionKey=next;cache.clear();fetchedAt.clear();inflight.clear();seq++;}
  return {allowed,token,gas};
 }
 async function fetchMonth(ym,session){
- if(cache.has(ym))return cache.get(ym);
+ if(freshMonth(ym))return cache.get(ym);
  if(inflight.has(ym))return inflight.get(ym);
  if(!session.allowed||!session.token||!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(session.gas))
   throw Error('沒有權限或尚未連接正式船舶資料');
@@ -77,12 +82,13 @@ async function fetchMonth(ym,session){
  u.searchParams.set('token',session.token);
  u.searchParams.set('gcToken',session.token);
  var expected=sessionKey;
- var promise=g.P79HistoryRead.read(u.toString(),{forceCloud:false}).then(data=>{
+ var promise=g.P79HistoryRead.read(u.toString(),{forceCloud:ym===taipeiToday().slice(0,7)}).then(data=>{
   if(sessionKey!==expected)throw Error('登入狀態已更新');
   if(data?.month&&String(data.month)!==ym)throw Error('回傳月份不符');
   if(!Array.isArray(data?.shipMasters))throw Error('船舶月份資料不完整');
   var result=model.analyzeVessels(data).vessels;
   cache.set(ym,result);
+  fetchedAt.set(ym,Date.now());
   return result;
  }).finally(()=>inflight.delete(ym));
  inflight.set(ym,promise);
@@ -134,7 +140,9 @@ function draw(p,report){
  var days=report.days;
  if(summaryEl){
   var suffix=mode==='week'?'天':'個月',errorText=report.failures?' · '+report.failures+' 個月份讀取失敗（未計入）':'';
-  summaryEl.textContent=(report.average===null?'沒有有效 GPH 資料':(report.failures?'已取得月份加權效率 ':'期間加權效率 ')+report.average.toFixed(2)+' GPH')+' · 有效 '+report.valid+' '+suffix+errorText;
+  var today=taipeiToday(),currentWeek=mode==='week'&&p.start<=today&&p.end>=today;
+  var noData=currentWeek?'本週目前沒有已完工且具有效 GPH 的船舶':'沒有有效 GPH 資料';
+  summaryEl.textContent=(report.average===null?noData:(report.failures?'已取得月份加權效率 ':'期間加權效率 ')+report.average.toFixed(2)+' GPH')+' · 有效 '+report.valid+' '+suffix+errorText;
  }
  // 使用實際可用寬高繪製，不再把 480x190 的 SVG 等比例擠在 120px 容器中。
  var w=Math.max(260,Math.round(chartEl.clientWidth||480)),h=Math.max(130,Math.round(chartEl.clientHeight||170));
@@ -186,7 +194,7 @@ function draw(p,report){
 // 年度月份資料讀取限制並行，避免同時向 GAS 發送 12 個請求。
 async function loadYear(p,session,requestId){
  var todayMonth=taipeiToday().slice(0,7);
- var queue=p.months.filter(ym=>ym<=todayMonth&&!cache.has(ym));
+ var queue=p.months.filter(ym=>ym<=todayMonth&&!freshMonth(ym));
  var total=queue.length,done=0,errors=new Set();
  if(!total)return errors;
  var workers=Array.from({length:Math.min(3,total)},async()=>{
@@ -258,9 +266,11 @@ function onVessels(v){
  var s=cleanSession();
  if(!s.allowed)return;
  cache.set(now,v.vessels||[]);
+ fetchedAt.set(now,Date.now());
  var range=model.weeklyWindow(now),previous=range.start.slice(0,7);
  if(previous!==now&&Array.isArray(v.weekVessels)&&!v.weekError){
   cache.set(previous,v.weekVessels.filter(x=>x.date?.startsWith(previous)));
+  fetchedAt.set(previous,Date.now());
  }
  if(now!==selectedMonth){
   selectedMonth=now;
