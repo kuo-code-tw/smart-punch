@@ -2,7 +2,7 @@
 'use strict';
 var d=g.document,$=id=>d.getElementById(id);
 if(!d||!$('gateFile'))return;
-var book=null,sourceFile=null,days=[];
+var book=null,sourceFile=null,days=[],serviceCheck=0,serviceReady=false;
 var names={deliverEmpty:'交空櫃',pickupEmpty:'領空櫃',deliverLoaded:'交重櫃',
  pickupLoaded:'領重櫃',truckEntries:'拖車車次'};
 function message(text,kind){
@@ -78,9 +78,13 @@ function render(){
  $('gateRange').textContent=days.length+' 個日期：'+days[0].date+' ～ '+days[days.length-1].date+
   '。同日期重新匯入會覆寫，不會加進去第二次。';
  $('gateResult').hidden=false;
- $('gateSave').disabled=false;
+ // Never enable cloud save merely because a local Excel preview is valid.
+ // A deployed and authenticated Gate read route must succeed first.
+ $('gateSave').disabled=true;
+ void verifyGateService();
 }
 async function chooseFile(){
+ ++serviceCheck;serviceReady=false;
  sourceFile=$('gateFile').files?.[0]||null;book=null;days=[];
  $('gateResult').hidden=true;$('gateSave').disabled=true;$('gatePreview').disabled=true;
  $('gateSheet').disabled=true;$('gateSheet').textContent='';
@@ -129,6 +133,46 @@ function csvExport(){
  var a=d.createElement('a');a.href=u;a.download='PORT79-Gate-'+days[0].date+'-'+days[days.length-1].date+'.csv';
  d.body.appendChild(a);a.click();a.remove();g.setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
+function gateServiceError(err){
+ var raw=String(err&&err.message||err||'');
+ if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)|未支援.*操作/i.test(raw))
+  return '正式 PORT79 Google Apps Script 尚未部署 Gate 匯入服務（gateStatsReadYear／gateStatsImport）。這不是 Excel 格式或前端 action 參數錯誤。請先完成後端部署；現在可以下載整理 CSV，或在 Google 試算表按日期更新。';
+ return '無法驗證正式 Gate 資料服務：'+raw.slice(0,180)+'。目前已保留預覽，並暫停雲端寫入。';
+}
+async function verifyGateService(){
+ var id=++serviceCheck;
+ serviceReady=false;
+ $('gateSave').disabled=true;
+ if(!days.length)return;
+ var key;
+ try{key=auth();}catch(err){
+  if(id===serviceCheck)message(String(err.message||err),'error');
+  return;
+ }
+ message('正在確認正式 Google Apps Script 是否已啟用 Gate 匯入服務…');
+ try{
+  var url=new URL(key.base);
+  url.searchParams.set('action','gateStatsReadYear');
+  url.searchParams.set('year',days[0].date.slice(0,4));
+  url.searchParams.set('gcToken',key.token);
+  url.searchParams.set('token',key.token);
+  var response=await g.fetch(url.toString(),{cache:'no-store',redirect:'follow'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  var result=await response.json();
+  if(result?.ok!==true||result?.source!=='port79-gate-daily'||
+     String(result?.year)!==days[0].date.slice(0,4)||!Array.isArray(result?.rows))
+    throw Error(result?.error||'gateStatsReadYear 回傳格式不符，後端尚未準備就緒');
+  if(id!==serviceCheck||!days.length)return;
+  serviceReady=true;
+  $('gateSave').disabled=false;
+  message('正式 Gate 雲端查詢服務已驗證，可以送出每日資料。相同日期會更新原紀錄，不會重複累加。','success');
+ }catch(err){
+  if(id!==serviceCheck)return;
+  serviceReady=false;
+  $('gateSave').disabled=true;
+  message(gateServiceError(err),'error');
+ }
+}
 function auth(){
  var base=text(g.sessionStorage?.getItem('port79_gas_url'));
  var token=text(g.sessionStorage?.getItem('port79_user_token')||g.sessionStorage?.getItem('port79_admin_token'));
@@ -145,7 +189,7 @@ function auth(){
  return {base,token};
 }
 async function save(){
- if(!days.length||!sourceFile)return;
+ if(!days.length||!sourceFile||!serviceReady)return;
  var key;
  try{key=auth()}catch(err){message(String(err.message||err),'error');return;}
  var button=$('gateSave');
@@ -167,12 +211,18 @@ async function save(){
   message('已寫入正式資料庫：新增 '+result.added+' 天、更新 '+result.updated+
    ' 天。月、年統計會從每日資料自動重新加總。','success');
  }catch(err){
-  message('目前無法確認雲端儲存結果：'+String(err.message||err)+
-   '。請先開啟正式試算表核對日期，避免不確定時重複操作。','error');
- }finally{button.disabled=false;button.textContent='確認寫入正式資料庫';}
+  var raw=String(err.message||err);
+  if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)/i.test(raw)){
+   serviceReady=false;
+   message(gateServiceError(err),'error');
+  }else{
+   message('目前無法確認雲端儲存結果：'+raw.slice(0,160)+
+    '。請先開啟正式試算表核對日期，避免不確定時重複操作。','error');
+  }
+ }finally{button.disabled=!serviceReady;button.textContent='確認寫入正式資料庫';}
 }
 $('gateFile').addEventListener('change',chooseFile);
-$('gateSheet').addEventListener('change',()=>{days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
+$('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
 $('gatePreview').addEventListener('click',preview);
 $('gateDownload').addEventListener('click',csvExport);
 $('gateSave').addEventListener('click',save);
