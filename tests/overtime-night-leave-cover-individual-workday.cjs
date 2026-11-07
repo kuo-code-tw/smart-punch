@@ -22,6 +22,17 @@ assert.equal(second.code,'延04-16');assert.equal(second.requirePeriodSelection,
 assert.match(second.periodHint,/正常班 08-16/);
 assert.match(second.periodHint,/平日延時加班 04-08/);
 assert.throws(()=>global.P79Overtime.resolveLeaveCoverReport(cloud,context,{date,coverDate:date,empId:'EARLY',forEmpId:'LEAVER'}),/2026-11-08/);
+// An approved leave may replace the leaver's current shift cell with 休,
+// while the preserved original shift still proves the two 4-hour extensions.
+const placeholder=JSON.parse(JSON.stringify(cloud));
+placeholder.schedules[0].schedule[date]='休';
+placeholder.schedules[0].schedule.__meta={[date]:{leaveOriginalShift:'晚'}};
+placeholder.schedules[2].schedule['2026-11-08']='休';
+placeholder.schedules[2].schedule.__meta={'2026-11-08':{reportOriginalShift:'早'}};
+assert.equal(global.P79Overtime.resolveLeaveCoverReport(placeholder,context,
+ {date:'2026-11-08',coverDate:date,empId:'EARLY',forEmpId:'LEAVER'}).code,'延04-16',
+ 'saved original-shift metadata outranks temporary leave/rest cell');
+
 assert.equal(api.coverWorkday(date,'中','two',1),null,'unknown split is not guessed');
 assert.equal(api.coverWorkday(date,'晚','one',1),null,'single-worker coverage is unchanged');
 assert.equal(api.coverWorkday(date,'早','two',0).workDate,'2026-11-06','early leave first worker follows prior night workday');
@@ -38,6 +49,26 @@ assert.equal(global.P79Overtime.overtimeMinutes(Date.parse('2026-11-07T15:36:00+
 assert.equal(global.P79Overtime.overtimeMinutes(Date.parse('2026-11-08T03:37:00+08:00'),
  Date.parse('2026-11-08T16:00:00+08:00'),'2026-11-08',{overtimeReport:earlyRule}),240);
 const work=fs.readFileSync('work-hours/index.html','utf8'),leave=fs.readFileSync('leave/index.html','utf8');
+const auditStart=work.indexOf('function p79OvertimeCoverDateWarning(row){');
+const auditEnd=work.indexOf('function p79ReportWorkOvertimeRow(',auditStart);
+assert(auditStart>=0&&auditEnd>auditStart);
+const ctx={window:{P79LeaveCoverSuggest:api},Map,Set,Date,
+ normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),
+ p79WorkOvertimeMonths:new Map([['2026-11',{
+  ready:true,covers:cloud.leaveCoverAssignments,rows:cloud.schedules
+ }]])};
+vm.createContext(ctx);vm.runInContext(work.slice(auditStart,auditEnd),ctx);
+const wrong=ctx.p79OvertimeCoverDateWarning({
+ empId:'EARLY',rosterDate:date,forEmpId:'LEAVER',overtimeReport:{id:'OLD-PLAN',planned:true,
+ category:'延',normalStart:'08',normalEnd:'16',overtimeStart:'04',overtimeEnd:'08'}
+});
+assert.equal(wrong?.date,'2026-11-08','old stored 11/07 plan must visibly warn that 04-08 belongs to 11/08');
+assert.match(wrong.message,/日期錯置/);
+assert.equal(ctx.p79OvertimeCoverDateWarning({
+ empId:'MID',rosterDate:date,forEmpId:'LEAVER',overtimeReport:{id:'VALID-PLAN',planned:true,
+ category:'延',normalStart:'16',normalEnd:'24',overtimeStart:'24',overtimeEnd:'04'}}),null,
+ 'mid-shift 24-04 belongs to 11/07 and must not be flagged');
+
 assert(work.includes('function p79OvertimeCoverDateWarning(row)'),'old wrong-date plan is visibly audited');
 assert(work.includes('日期待更正→'),'existing wrong-date plan must display a warning, never silently move its cloud ID');
 assert(work.includes('map[linked.workDate]'),'virtual night-cover plan uses the worker workdate');
