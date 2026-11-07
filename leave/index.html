@@ -979,6 +979,7 @@ async function p79SaveLeaveCover(){
  if(!first)return alert('請選擇代班人員');
  if(!daily&&mode==='two'&&(!second||first===second))return alert('請選擇兩位不同的代班人員');
  btn.disabled=true;btn.textContent='雲端保存中…';
+ let coverSaved=false;
  try{
   const requestedId=document.getElementById('p79LeaveCoverId').value;
   const fresh=await p79ReadCurrentLeaveCoverState();
@@ -986,7 +987,7 @@ async function p79SaveLeaveCover(){
   const requestedLeave=fresh.leaveRecords.find(l=>String(l.id)===String(requestedId));
   if(!requestedLeave||String(requestedLeave.status)!=='已核准')throw new Error('請假單不存在或尚未核准，請重新整理');
   const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:requestedId,empId:requestedLeave.empId,leaveType:requestedLeave.leaveType,startDate:normalizeLeaveFilterDate(requestedLeave.startTime||requestedLeave.startDate),endDate:normalizeLeaveFilterDate(requestedLeave.endTime||requestedLeave.endDate||requestedLeave.startTime||requestedLeave.startDate),mode,workerIds:daily?daily[0].workerIds:mode==='two'?[first,second]:[first],...(daily?{dailyAssignments:daily}:{})});
-  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode,workerIds:daily?daily[0].workerIds:mode==='two'?[first,second]:[first],...(daily?{dailyAssignments:daily}:{})});if(daily&&saved.dailyAssignmentsSaved!==true)throw Error('雲端未確認逐日代班安排，請核對後重試');}
+  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode,workerIds:daily?daily[0].workerIds:mode==='two'?[first,second]:[first],...(daily?{dailyAssignments:daily}:{})});if(daily&&saved.dailyAssignmentsSaved!==true)throw Error('雲端未確認逐日代班安排，請核對後重試');coverSaved=true;}
   p79CloseLeaveCover();
   if(plan.covered){
    p79DiscardLeaveHandoff(plan.leaveId);
@@ -1008,7 +1009,7 @@ async function p79SaveLeaveCover(){
    await p79OpenLeaveOvertimeHandoff();
   void loadCloud(false,true);
   }
- }catch(e){alert('代班安排未儲存：'+(e?.message||e))}
+ }catch(e){alert((coverSaved?'代班已儲存，但加班申報日期尚未完成核對：':'代班安排未儲存：')+(e?.message||e))}
  finally{btn.disabled=false;btn.textContent='儲存並同步排班'}
 }
 async function setLeaveStatus(id,status){
@@ -1798,7 +1799,7 @@ async function saveAdminCreateLeave(){
  if(!worker||!leaveEmployeeIsActive(worker)||worker.empId===employee?.empId||!String(employee?.dept||'').trim()||String(worker.dept||'').trim()!==String(employee?.dept||'').trim()){$('adminCreateLeaveMessage').textContent='請選擇同部門的代班人員';return;}
  if(days>62){$('adminCreateLeaveMessage').textContent='一次代班最多62天，請分次安排';return;}
  if(!employee||!leaveEmployeeIsActive(employee)||!days){$('adminCreateLeaveMessage').textContent='請選擇請假人員及有效日期範圍';return;}
- let leaveSaved=false;
+ let leaveSaved=false,coverSaved=false;
  const button=$('adminCreateLeaveSave');adminCreateLeaveBusy=true;button.disabled=true;button.textContent='儲存中…';
  try{
   $('adminCreateLeaveMessage').textContent='正在確認雲端請假與代班安排…';
@@ -1809,7 +1810,7 @@ async function saveAdminCreateLeave(){
   if(!plan.existing)await postCloud({action:'addLeaveRecord',leave:{id:adminCreateLeaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',leaveType:$('adminCreateLeaveType').value,startDate:$('adminCreateLeaveStart').value,endDate:$('adminCreateLeaveEnd').value,days,reason:$('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
   leaveSaved=true;
   $('adminCreateLeaveMessage').textContent='請假已儲存，正在安排代班…';
-  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});if(dailyAssignments&&saved.dailyAssignmentsSaved!==true)throw Error('雲端尚未支援逐日代班，請更新 GAS 後重試');p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;}
+  if(!plan.covered){const saved=await postCloud({action:'saveLeaveCoverAssignment',leaveId:adminCreateLeaveId,mode:second?'two':'one',workerIds:second?[worker.empId,second.empId]:[worker.empId],...(dailyAssignments?{dailyAssignments}:{})});if(dailyAssignments&&saved.dailyAssignmentsSaved!==true)throw Error('雲端尚未支援逐日代班，請更新 GAS 後重試');p79LeaveHandoffContext=saved.handoffContext?{...saved.handoffContext,leaveId:adminCreateLeaveId,at:Date.now()}:null;coverSaved=true;}
   $('adminCreateLeaveDialog').close();
   if(plan.covered){
    p79DiscardLeaveHandoff(adminCreateLeaveId);
@@ -1828,7 +1829,7 @@ async function saveAdminCreateLeave(){
   // New covers reopen the existing overtime filing workflow immediately.
   p79LaunchLeaveOvertimeAfterSave();
   void loadCloud(false,true);
- }catch(error){$('adminCreateLeaveMessage').textContent=(leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
+ }catch(error){$('adminCreateLeaveMessage').textContent=(coverSaved?'請假與代班已儲存，但加班申報日期尚未核對：':leaveSaved?'請假已核准，但代班尚未儲存：':'儲存未確認：')+String(error.message||error);}
  finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
 }
 </script>
