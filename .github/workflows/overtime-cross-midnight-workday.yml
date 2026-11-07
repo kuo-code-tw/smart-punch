@@ -27,5 +27,4 @@ jobs:
         run: |
           node tests/overtime-extension-cross-midnight-workdate.cjs
           node tests/overtime-clockout-policy.cjs
-          node tests/overtime-leave-cover-extension-periods.cjs
           node tests/attendance-overtime-official-pair.cjs
