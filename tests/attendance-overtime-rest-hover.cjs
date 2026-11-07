@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const doc=fs.readFileSync('attendance/index.html','utf8');
-const begin=doc.indexOf('        function attendanceRowOvertimeText(row,view) {');
+const begin=doc.indexOf('        function p79AttendanceOvertimeOnlyCode(planned) {');
 const end=doc.indexOf('\n        function p79CanManageOvertime()',begin);
 assert(begin>0&&end>begin,'overtime rendering function exists');
 const source=doc.slice(begin,end);

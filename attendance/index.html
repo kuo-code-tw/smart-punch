@@ -15566,6 +15566,27 @@ function getManualPairRecordAnchor(record) {
             const minutes = attendanceRowAttendanceMinutes(row);
             return minutes === null ? '—' : formatDurationMinutes(minutes);
         }
+        // The saved 延16-04 / 延04-16 code describes the entire shift.
+        // In the overtime column show only the actual extension, not normal hours.
+        // Read-only display: official report.code and declaredHours stay untouched.
+        function p79AttendanceOvertimeOnlyCode(planned) {
+            const original=String(planned?.label||'').trim(),report=planned?.report;
+            if(!original||planned?.reviewState||report?.category!=='延'||
+               !report.normalStart||!report.normalEnd||!report.overtimeStart||!report.overtimeEnd)return original;
+            const parse=value=>{
+                const m=/^(\d{1,2})(?::(\d{2}))?$/.exec(String(value??'').trim());
+                if(!m)return NaN;
+                const h=Number(m[1]),minute=Number(m[2]||0);
+                return h<=24&&minute<60&&(h!==24||minute===0)?h*60+minute:NaN;
+            };
+            const start=parse(report.overtimeStart),end=parse(report.overtimeEnd);
+            if(!Number.isFinite(start)||!Number.isFinite(end))return original;
+            const duration=(end-start+1440)%1440,declared=Number(report.declaredHours);
+            // Incomplete/mismatched saved periods remain unchanged for audit.
+            if(duration===0||!Number.isFinite(declared)||declared<=0||Math.abs(duration-declared*60)>1)return original;
+            const short=t=>{const h=String(Math.floor(t/60)).padStart(2,'0'),m=t%60;return h+(m?':'+String(m).padStart(2,'0'):'');};
+            return '延'+short(start)+'-'+short(end);
+        }
         function attendanceRowOvertimeText(row,view) {
             const actual=attendanceRowOvertimeMinutes(row);
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
@@ -15582,15 +15603,21 @@ function getManualPairRecordAnchor(record) {
             const estimatedText=estimate>0?'<div class="p79-overtime-primary-visible">估算 '+formatDurationMinutes(estimate)+'</div>':'';
             if(!planned)return estimatedText;
             const code=String(planned.label||'').trim();
+            const visibleCode=p79AttendanceOvertimeOnlyCode(planned);
             const changed=!!planned.reviewState;
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
             const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
             const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+escapeText(planned.originalCode)+'（尚未改寫）</div>':'';
             // 有班別時任何職稱一律只顯示班別代碼：國、休、例、代、延等都適用。
-            const visible=code?'<div class="p79-overtime-code-visible text-cyan-700 dark:text-cyan-300">'+escapeText(code)+'</div>':estimatedText;
+            const visible=visibleCode?'<div class="p79-overtime-code-visible text-cyan-700 dark:text-cyan-300">'+escapeText(visibleCode)+'</div>':estimatedText;
             // 所有申報狀態和時數都移到 hover / focus 區；不得重複顯示在主欄。
             const hours=Number(planned.minutes);
+            const extensionHint=visibleCode!==code&&planned.report?
+                '<div class="text-[10px] text-slate-500">正常'+escapeText(planned.report.normalStart)+'-'+escapeText(planned.report.normalEnd)+
+                '／加班'+escapeText(planned.report.overtimeStart)+'-'+escapeText(planned.report.overtimeEnd)+
+                '；原雲端班次代碼：'+escapeText(code)+'</div>':'';
             const detail='<div class="p79-overtime-hidden-detail">'+
+                extensionHint+
                 (declared||reviewBadge?'<div>'+declared+reviewBadge+'</div>':'')+
                 (planned.minutes!=null&&Number.isFinite(hours)&&hours>0
                     ?'<div class="text-xs">'+(planned.pending?'已安排／待申報':planned.report?'申報':'估算')+' '+formatDurationMinutes(hours)+'</div>':'')+
