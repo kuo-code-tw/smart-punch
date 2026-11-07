@@ -326,13 +326,15 @@
  const saveValidationContexts=new WeakMap();
  async function prepareSaveValidation(request,checkRules=true){
   const credentials=auth(),{url,token}=credentials;
-  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,coverDate:String(request.coverDate||request.date),leaveHandoffId:String(request.leaveHandoffId||'')};
+  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,
+   overtimeDate:String(request.overtimeDate||request.date),coverDate:String(request.coverDate||request.date),leaveHandoffId:String(request.leaveHandoffId||'')};
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   const read=(async()=>{
    try{
     const query='?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+
      '&empId='+encodeURIComponent(scope.empId)+'&date='+encodeURIComponent(scope.date)+
-     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&coverDate='+encodeURIComponent(scope.coverDate)+'&_='+Date.now();
+     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&coverDate='+encodeURIComponent(scope.coverDate)+
+     '&overtimeDate='+encodeURIComponent(scope.overtimeDate)+'&_='+Date.now();
     const response=await fetch(url+query,{cache:'no-store',signal:controller.signal});
     const cloud=await response.json();
     if(!response.ok||cloud?.ok!==true)throw Error(cloud?.error||'出勤與班表核對失敗');
@@ -353,7 +355,8 @@
   const current=auth(),age=Date.now()-saved.checkedAt;
   if(age<0||age>15000||saved.url!==current.url||saved.token!==current.token||
      saved.empId!==String(draft.empId).trim().toUpperCase()||saved.date!==draft.date||
-     saved.coverDate!==String(draft.coverDate||draft.date)||saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
+     saved.coverDate!==String(draft.coverDate||draft.date)||saved.overtimeDate!==String(draft.overtimeDate||draft.date)||
+     saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
   return saved.cloud;
  }
  // Show each rule only under its named overtime type; sharing a quota category
@@ -475,8 +478,8 @@
   if(!plan)return {...entry,coverDate:leaveDate};
   if(entry.date!==leaveDate&&entry.date!==plan.workDate)
    throw Error('原請假日期與代班工作日期不符，不能猜測或重複建立加班');
-  return {...entry,date:plan.workDate,coverDate:leaveDate,coverShift:originalShift,
-   code:plan.code,preferredType:'平日延時加班'};
+  return {...entry,date:plan.workDate,workDate:plan.workDate, overtimeDate:plan.overtimeDate,
+   coverDate:leaveDate,coverShift:originalShift,code:plan.code,preferredType:'平日延時加班'};
  }
  function resolveLeaveCoverReport(data,handoff,entry){
   const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
@@ -490,13 +493,16 @@
   const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
   const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
   if(split){
-   if(date!==split.workDate)throw Error('本筆工作日期應為 '+split.workDate+'（原請假日 '+leaveDate+'）；請重新核對代班預排，尚未正式申報');
+   if(date!==split.workDate)throw Error('本筆實際出勤日期應為 '+split.workDate+'（原請假日 '+leaveDate+'）；請重新核對代班預排，尚未正式申報');
+   if(entry.overtimeDate&&entry.overtimeDate!==split.overtimeDate)
+    throw Error('加班歸屬日應為 '+split.overtimeDate+'，不能依畫面日期自行變更');
    const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
     .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
-    periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
-   return {code:split.code,requirePeriodSelection:false,
-    periodHint:'原請假日 '+leaveDate+'；代班工作日 '+date+'；正常班 '+split.normalStart+'-'+split.normalEnd+
+    overtimeDate:split.overtimeDate,workDate:split.workDate,
+    periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；出勤日 '+split.workDate+'，加班歸屬 '+split.overtimeDate+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
+   return {code:split.code,requirePeriodSelection:false,overtimeDate:split.overtimeDate,workDate:split.workDate,
+    periodHint:'原請假日 '+leaveDate+'；實際出勤日 '+date+'；加班歸屬日 '+split.overtimeDate+'；正常班 '+split.normalStart+'-'+split.normalEnd+
      '；平日延時加班 '+split.overtimeStart+'-'+split.overtimeEnd+'（不含正常班）'};
   }
   const meta=own.__meta?.[date]||{};
@@ -1584,7 +1590,7 @@
    if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());}
    if(prefill.readonlyWrongDate===true){
     const reason='原預排仍在 '+String(prefill.coverDate||'原請假日')+
-     '，正確加班工作日期是 '+String(prefill.date||'')+
+     '，實際出勤日 '+String(prefill.date||'')+'、加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date||'')+
      '。已顯示加班候選時段，但原申報 ID 尚待授權更正；不可建立重複預排。';
     el.querySelector('#p79OtStatus').textContent=reason;
     const stage=el.querySelector('#p79OtStage');
@@ -1619,8 +1625,12 @@
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
      const selection=selectionKey();
-     const validationRequest={empId,date,coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
+     const validationRequest={empId,date,overtimeDate:prefill.overtimeDate||date,
+      coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
      const validation=await prepareSaveValidation(validationRequest,!editingOriginal);
+     // Older GAS stores only the punch/work date. Never silently credit 04-08 to 11/08.
+     if(validationRequest.overtimeDate!==date&&validation.cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
+      throw Error('正式 GAS 尚未支援跨日加班歸屬日 '+validationRequest.overtimeDate+'（出勤日 '+date+'）；保留代班安排，禁止錯日送出申報。');
      if(selectionKey()!==selection)throw Error('核對期間申報內容已變更，請確認內容後再次儲存');
      // Deleted builtin types remain in GAS only to preserve OLD reports.
      // Reject NEW submissions from stale browser tabs even before backend POST.
@@ -1669,6 +1679,8 @@
        await ensureSpecialRule(chosen);
        const result=await global.p79OvertimeContext.saveReport(draft);
        verifySavedReport(draft,result);
+       if(draft.overtimeDate!==draft.date&&String(result?.report?.overtimeDate||'')!==draft.overtimeDate)
+        throw Error('雲端未確認加班歸屬日 '+draft.overtimeDate+'；保留待核對，不可當作已申報。');
        if(draft.plannedReview===true&&result?.report?.planned!==false)throw Error('雲端仍顯示預排，尚未確認轉為正式申報；請重新核對。');
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
        sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent=draft.plannedReview===true?'✅ 原預排已核對為正式申報，沿用同一申報 ID。':editingExisting?'✅ 原申報時段已核對修改，沿用同一申報 ID。':result.report?.planned?'✅ 預排加班已儲存；待實際出勤完成後核算，不會先填入打卡時間。':'✅ 加班申報已儲存，已更新加班管理。';

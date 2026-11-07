@@ -16,6 +16,8 @@ const legacy={empId:'EARLY',forEmpId:'LEAVER',leaveId:'L1',name:'黃信興',date
 const mapped=g.P79Overtime.normalizeLeaveCoverHandoffEntry(origin,{id:'L1'},legacy);
 assert.equal(mapped.date,tomorrow,'legacy next-day worker must be assigned to next workday');
 assert.equal(mapped.coverDate,day,'keep original approved leave date');
+assert.equal(mapped.workDate,tomorrow,'physical 04-16 shift remains on 11/08');
+assert.equal(mapped.overtimeDate,day,'04-08 pay/credit date belongs to 11/07');
 assert.equal(mapped.code,'延04-16');
 assert.equal(mapped.preferredType,'平日延時加班');
 assert.equal(g.P79Overtime.resolveLeaveCoverReport({...future,leaveCoverAssignments:[cover]},
@@ -54,6 +56,7 @@ async function run(initial,original=origin){
  const old=await run(legacy);
  assert.equal(old.result.entries[0].date,tomorrow);
  assert.equal(old.result.entries[0].coverDate,day);
+ assert.equal(old.result.entries[0].overtimeDate,day,'handoff keeps 11/07 accounting attribution');
  assert.equal(JSON.parse(old.store).entries[0].date,tomorrow,'persist corrected queue for next open');
  assert.deepEqual(old.calls,[day,tomorrow],'fetch both original leave and next worker work date');
  assert.equal(old.context.p79LeaveHandoffContext.date,tomorrow);
@@ -63,6 +66,7 @@ async function run(initial,original=origin){
   {id:'L1'},old.result.entries[0]);
  assert.equal(period.code,'延04-16');
  assert.match(period.periodHint,/加班 04-08/);
+ assert.match(period.periodHint,/加班歸屬日 2026-11-07/);
  const again=await run(old.result.entries[0]);
  assert.equal(again.result.entries[0].date,tomorrow,'preplan reload must not shift a second day');
  assert.deepEqual(again.calls,[tomorrow,day],'reverify original approval even for shifted queue');
@@ -88,5 +92,5 @@ async function run(initial,original=origin){
  for(const m of leave.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
   if(!/\bsrc=|application\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
  new vm.Script(report);
- console.log('PASS old 11/07 night leave queue opens next-day 11/08 04-08 planned overtime; original leave stays 11/07; future punches not required; repeat/duplicate safe');
+ console.log('PASS old 11/07 night leave queue keeps 11/08 physical early shift, credits 04-08 to 11/07, no duplicate and no server write');
 })().catch(e=>{console.error(e);process.exitCode=1;});

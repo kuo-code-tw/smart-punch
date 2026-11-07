@@ -6,9 +6,11 @@ vm.runInNewContext(fs.readFileSync('assets/port79-overtime-shift-match.js','utf8
 const api=global.P79LeaveCoverSuggest,date='2026-11-07';
 const mid=api.coverWorkday(date,'晚','two',0),early=api.coverWorkday(date,'晚','two',1);
 assert.equal(mid.workDate,'2026-11-07');
+assert.equal(mid.overtimeDate,'2026-11-07','middle-shift 24-04 credit belongs to original leave night');
 assert.equal(mid.code,'延16-04');assert.equal(mid.normalStart,'16');assert.equal(mid.normalEnd,'24');
 assert.equal(mid.overtimeStart,'24');assert.equal(mid.overtimeEnd,'04');assert.equal(mid.position,'after');
-assert.equal(early.workDate,'2026-11-08','second night-cover worker belongs to the next early-shift workday');
+assert.equal(early.workDate,'2026-11-08','physical clock-in and 08-16 normal shift remain on next day');
+assert.equal(early.overtimeDate,'2026-11-07','04-08 overtime credit belongs to original 11/07 leave night');
 assert.equal(early.code,'延04-16');assert.equal(early.normalStart,'08');assert.equal(early.normalEnd,'16');
 assert.equal(early.overtimeStart,'04');assert.equal(early.overtimeEnd,'08');assert.equal(early.position,'before');
 const cloud={leaveCoverAssignments:[{leaveId:'L1',leaveEmpId:'LEAVER',workerIds:['MID','EARLY'],mode:'two',startDate:date,endDate:date}],
@@ -19,6 +21,8 @@ const first=global.P79Overtime.resolveLeaveCoverReport(cloud,context,{date,cover
 const second=global.P79Overtime.resolveLeaveCoverReport(cloud,context,{date:'2026-11-08',coverDate:date,empId:'EARLY',forEmpId:'LEAVER'});
 assert.equal(first.code,'延16-04');assert.equal(first.requirePeriodSelection,false);
 assert.equal(second.code,'延04-16');assert.equal(second.requirePeriodSelection,false);
+assert.equal(second.workDate,'2026-11-08');assert.equal(second.overtimeDate,'2026-11-07');
+assert.match(second.periodHint,/加班歸屬日 2026-11-07/);
 assert.match(second.periodHint,/正常班 08-16/);
 assert.match(second.periodHint,/平日延時加班 04-08/);
 assert.throws(()=>global.P79Overtime.resolveLeaveCoverReport(cloud,context,{date,coverDate:date,empId:'EARLY',forEmpId:'LEAVER'}),/2026-11-08/);
@@ -62,19 +66,20 @@ const wrong=ctx.p79OvertimeCoverDateWarning({
  empId:'EARLY',rosterDate:date,forEmpId:'LEAVER',overtimeReport:{id:'OLD-PLAN',planned:true,
  category:'延',normalStart:'08',normalEnd:'16',overtimeStart:'04',overtimeEnd:'08'}
 });
-assert.equal(wrong?.date,'2026-11-08','old stored 11/07 plan must visibly warn that 04-08 belongs to 11/08');
-assert.match(wrong.message,/日期錯置/);
+assert.equal(wrong?.date,'2026-11-07','legacy one-date report must be reviewed while overtime credit remains on 11/07');
+assert.match(wrong.message,/原報單使用單一日期/);
 assert.equal(ctx.p79OvertimeCoverDateWarning({
  empId:'MID',rosterDate:date,forEmpId:'LEAVER',overtimeReport:{id:'VALID-PLAN',planned:true,
  category:'延',normalStart:'16',normalEnd:'24',overtimeStart:'24',overtimeEnd:'04'}}),null,
  'mid-shift 24-04 belongs to 11/07 and must not be flagged');
 
 assert(work.includes('function p79OvertimeCoverDateWarning(row)'),'old wrong-date plan is visibly audited');
-assert(work.includes('日期待更正→'),'existing wrong-date plan must display a warning, never silently move its cloud ID');
+assert(work.includes('歸屬待核→'),'existing single-date report must warn without silently moving its cloud ID');
 assert(work.includes('map[linked.workDate]'),'virtual night-cover plan uses the worker workdate');
+assert(work.includes('overtimeDate:linked.overtimeDate'),'virtual night-cover ledger also preserves original-night overtime date');
 assert(leave.includes('p79BuildLeaveCoverWorkdayEntries(leaveId,leave.empId,assignments)'),'existing leave covers use the fixed date handoff');
 assert(leave.includes('p79BuildLeaveCoverWorkdayEntries(adminCreateLeaveId,employee.empId,assignments)'),'new leave creation also uses the fixed date handoff');
 assert(leave.includes("date=String(e?.date||''),coverDate=String(e?.coverDate||date)"),'leave coverage and work dates are separate');
 for(const m of work.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 for(const m of leave.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/\bsrc=|application\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
-console.log('PASS night leave: Chen 11/07 16-24 + 24-04; Huang 11/07 normal 08-16, 11/08 cover 04-16 with 04-08 overtime; no old-date false confirmation; scripts parse');
+console.log('PASS night leave: 11/08 04-08 credit -> 11/07, normal 08-16 physically on 11/08; confirmed no duplicate or silent GAS rewrite; scripts parse');
