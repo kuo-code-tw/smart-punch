@@ -545,3 +545,76 @@ html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes butto
    grid-template-rows:repeat(3,minmax(0,1fr))!important;
  }
 }
+
+
+/* 2026-11-07 Gate desktop six-metric visibility fix.
+ * The compact legacy rule used flex:1 1 0 and min-height:0 on the KPI grid:
+ * the toolbar/footer could consume the flex space, leaving all six values
+ * at zero height while "已記錄 N 天" remained visible. This final override
+ * lets the KPI grid retain content height and the Gate card grow if needed.
+ * It is limited to the active Gate tab; vessel-ranking mode stays unchanged.
+ */
+@media screen {
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-ship-panels {
+    grid-auto-rows:auto!important;
+    align-items:start!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-panel.p79d-ranking.p79d-gate-flip {
+    height:auto!important;
+    min-height:260px!important;
+    max-height:none!important;
+    align-self:start!important;
+    overflow:visible!important;
+    overflow-y:visible!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel.p79-gate-section {
+    display:flex!important;
+    flex:0 0 auto!important;
+    flex-direction:column!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+    overflow-y:visible!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
+    display:grid!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:140px!important;
+    max-height:none!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    grid-template-rows:repeat(2,minmax(66px,auto))!important;
+    grid-auto-rows:minmax(66px,auto)!important;
+    gap:5px!important;
+    overflow:visible!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics > div {
+    min-height:66px!important;
+    height:auto!important;
+    overflow:visible!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-footer {
+    flex:0 0 auto!important;
+  }
+}
+@media screen and (max-width:620px) {
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-panel.p79d-ranking.p79d-gate-flip {
+    min-height:275px!important;
+  }
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+  #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
+    min-height:208px!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-template-rows:repeat(3,minmax(66px,auto))!important;
+  }
+}
