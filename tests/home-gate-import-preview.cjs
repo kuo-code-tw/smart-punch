@@ -58,6 +58,7 @@ vm.runInNewContext(importer,{window:win});
  assert.equal(el('gatePl').textContent,'479');
  assert.equal(el('gateTotal').textContent,'1,559');
  assert.equal(el('gateTruck').textContent,'1,244');
- assert.equal(el('gateSave').disabled,false,'valid source eligible for cloud save when configured');
+ assert.equal(el('gateSave').disabled,true,'cloud save cannot be enabled without a verified live Gate backend');
+ assert(el('gateMessage').textContent.includes('PORT79 管理員帳號'), 'missing login leaves preview available but disables write');
  console.log('PASS: Gate card-local tab, no hard minimum width, validated Excel preview and backend date upsert source');
 })().catch(error=>{console.error(error);process.exitCode=1;});
