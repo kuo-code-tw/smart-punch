@@ -3,6 +3,7 @@
 var d=g.document,$=id=>d.getElementById(id);
 if(!d||!$('gateFile'))return;
 var book=null,sourceFile=null,days=[],serviceCheck=0,serviceReady=false;
+var previewMode='day',previewPage=0,previewPageSize=8;
 var names={deliverEmpty:'交空櫃',pickupEmpty:'領空櫃',deliverLoaded:'交重櫃',
  pickupLoaded:'領重櫃',truckEntries:'拖車車次'};
 function message(text,kind){
@@ -57,29 +58,82 @@ function findGateMatrix(name){
  if(!results.length||results.length>366)throw Error('未找到有效日期，或單次超過366天');
  return results.sort((a,b)=>a.date.localeCompare(b.date));
 }
-function render(){
- var totals=Object.fromEntries(Object.keys(names).map(k=>[k,days.reduce((sum,r)=>sum+r[k],0)]));
+function mondayOf(date){
+ var d=new Date(date+'T00:00:00Z');
+ d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));
+ return d.toISOString().slice(0,10);
+}
+function plusDays(date,offset){
+ var d=new Date(date+'T00:00:00Z');
+ d.setUTCDate(d.getUTCDate()+offset);
+ return d.toISOString().slice(0,10);
+}
+function groupPreviewRows(source,period){
+ var buckets=new Map();
+ source.forEach(function(row){
+  var key=period==='day'?row.date:period==='week'?mondayOf(row.date):
+   period==='month'?row.date.slice(0,7):row.date.slice(0,4);
+  if(!buckets.has(key))buckets.set(key,{date:key,deliverEmpty:0,pickupEmpty:0,
+   deliverLoaded:0,pickupLoaded:0,truckEntries:0,days:0});
+  var target=buckets.get(key);
+  Object.keys(names).forEach(k=>{target[k]+=row[k];});
+  target.days++;
+ });
+ return [...buckets.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+function labelFor(date,period){
+ if(period==='day')return date;
+ if(period==='week')return date.slice(5).replace('-','/')+'－'+plusDays(date,6).slice(5).replace('-','/')+'（'+date.slice(0,4)+'）';
+ if(period==='month')return date.slice(0,4)+' / '+date.slice(5);
+ return date+' 年';
+}
+function renderPreviewTable(){
+ var titles={day:'每日明細',week:'每週合計',month:'每月合計',year:'每年合計'};
+ var headings={day:'日期',week:'週一～週日',month:'月份',year:'年度'};
+ var groups=groupPreviewRows(days,previewMode);
+ var pages=Math.max(1,Math.ceil(groups.length/previewPageSize));
+ previewPage=Math.max(0,Math.min(previewPage,pages-1));
  var table=$('gatePreviewRows');table.textContent='';
- days.forEach(function(row){
+ groups.slice(previewPage*previewPageSize,(previewPage+1)*previewPageSize).forEach(function(row){
   var tr=d.createElement('tr');
-  var cols=[row.date,row.deliverEmpty,row.pickupEmpty,row.deliverLoaded,row.pickupLoaded,
+  var cols=[labelFor(row.date,previewMode),row.deliverEmpty,row.pickupEmpty,
+   row.deliverLoaded,row.pickupLoaded,
    row.deliverEmpty+row.pickupEmpty+row.deliverLoaded+row.pickupLoaded,row.truckEntries];
-  cols.forEach(function(value){
-   var td=d.createElement('td');td.textContent=typeof value==='number'?value.toLocaleString('zh-TW'):value;
-   tr.appendChild(td);
+  var labels=[headings[previewMode],'交空','領空','交重','領重','總櫃量','拖車車次'];
+  cols.forEach(function(value,i){
+   var td=d.createElement('td');
+   td.textContent=typeof value==='number'?value.toLocaleString('zh-TW'):value;
+   td.dataset.label=labels[i];tr.appendChild(td);
   });
   table.appendChild(tr);
  });
+ Object.entries({Day:'day',Week:'week',Month:'month',Year:'year'}).forEach(function(pair){
+  $('gateMode'+pair[0])?.setAttribute?.('aria-pressed',String(previewMode===pair[1]));
+ });
+ if($('gatePeriodHeading'))$('gatePeriodHeading').textContent=headings[previewMode];
+ if($('gateDetailTitle'))$('gateDetailTitle').textContent=titles[previewMode];
+ if($('gateDetailCount'))$('gateDetailCount').textContent='共 '+groups.length+' 筆期間合計';
+ if($('gatePageLabel'))$('gatePageLabel').textContent='第 '+(previewPage+1)+' / '+pages+' 頁';
+ if($('gatePagePrev'))$('gatePagePrev').disabled=previewPage===0;
+ if($('gatePageNext'))$('gatePageNext').disabled=previewPage>=pages-1;
+}
+function changePreviewMode(next){
+ if(!['day','week','month','year'].includes(next))return;
+ previewMode=next;previewPage=0;renderPreviewTable();
+}
+function render(){
+ var totals=Object.fromEntries(Object.keys(names).map(k=>[k,days.reduce((sum,r)=>sum+r[k],0)]));
  var display={gateDe:totals.deliverEmpty,gatePe:totals.pickupEmpty,
   gateDl:totals.deliverLoaded,gatePl:totals.pickupLoaded,
   gateTruck:totals.truckEntries,
   gateTotal:totals.deliverEmpty+totals.pickupEmpty+totals.deliverLoaded+totals.pickupLoaded};
  Object.keys(display).forEach(k=>$(k).textContent=display[k].toLocaleString('zh-TW'));
- $('gateRange').textContent=days.length+' 個日期：'+days[0].date+' ～ '+days[days.length-1].date+
-  '。同日期重新匯入會覆寫，不會加進去第二次。';
+ $('gateRange').textContent='檔案日期 '+days[0].date+' ～ '+days[days.length-1].date+
+  ' · 共 '+days.length+' 天 · 同日期寫入採覆蓋、不重複累加';
  $('gateResult').hidden=false;
- // Never enable cloud save merely because a local Excel preview is valid.
- // A deployed and authenticated Gate read route must succeed first.
+ previewPage=0;renderPreviewTable();
+ // Switching preview tabs never triggers uploads. New files always require a fresh
+ // authenticated read-route verification before enabling a save.
  $('gateSave').disabled=true;
  void verifyGateService();
 }
@@ -209,7 +263,9 @@ async function save(){
   if(result?.ok!==true||result?.source!=='port79-gate-daily')
    throw Error(result?.error||'正式 GAS Gate 匯入接口尚未部署');
   message('已寫入正式資料庫：新增 '+result.added+' 天、更新 '+result.updated+
-   ' 天。月、年統計會從每日資料自動重新加總。','success');
+   ' 天。日、週、月、年統計將自動重新加總。','success');
+  // Only a confirmed backend success refreshes the official read-only view.
+  void g.P79GateLive?.refresh?.();
  }catch(err){
   var raw=String(err.message||err);
   if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)/i.test(raw)){
@@ -221,6 +277,13 @@ async function save(){
   }
  }finally{button.disabled=!serviceReady;button.textContent='寫入正式資料';}
 }
+Object.entries({Day:'day',Week:'week',Month:'month',Year:'year'}).forEach(function(pair){
+ $('gateMode'+pair[0])?.addEventListener('click',()=>changePreviewMode(pair[1]));
+});
+$('gatePagePrev')?.addEventListener('click',()=>{if(previewPage>0){previewPage--;renderPreviewTable();}});
+$('gatePageNext')?.addEventListener('click',()=>{
+ if((previewPage+1)*previewPageSize<groupPreviewRows(days,previewMode).length){previewPage++;renderPreviewTable();}
+});
 $('gateFile').addEventListener('change',chooseFile);
 $('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
 $('gatePreview').addEventListener('click',preview);
