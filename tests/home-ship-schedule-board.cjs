@@ -15,9 +15,14 @@ assert(src.includes('g.document.head.appendChild(script)'),'cross-domain GAS scr
 assert(src.includes("src.searchParams.set('callback',callback)"));
 assert(!src.includes("src.searchParams.set('token'"),'public source never sends privileged tokens');
 assert(!src.includes("src.searchParams.set('gcToken'"),'public source never sends privileged tokens');
-assert(src.includes("$('p79PublicShipRefresh')?.addEventListener('click',refresh)"));
-assert(src.includes("$('p79DashRefresh')?.addEventListener('click',refresh)"));
-assert(src.includes('g.setTimeout(tick,300000)'),'refresh the public schedule every five minutes');
+assert(src.includes("$('p79PublicShipRefresh')?.addEventListener('click',()=>void refresh(true))"));
+assert(src.includes("$('p79DashRefresh')?.addEventListener('click',()=>void refresh(true))"));
+assert(src.includes('const REFRESH_INTERVAL_MS=60*60*1000'),'WAN HAI automatic reads run hourly');
+assert(src.includes('const PUBLIC_SCHEDULE_CACHE='),'browser keeps a recent public-only result across reloads');
+assert(src.includes("if(!force&&lastAutoReadAt&&now-lastAutoReadAt<REFRESH_INTERVAL_MS)"),'automatic focus and reconnect checks only poll when the hour has passed');
+assert(src.includes("refresh(true)"),'manual update still bypasses the hourly limit');
+assert(!src.includes('300000'),'five-minute timer removed');
+assert(!src.includes('每五分鐘'),'five-minute UI hint removed');
 assert(src.includes("data?.source!=='port79-wanhai-vessel'"),'reject all non-Wan Hai data sources');
 assert(styles.includes('#p79EmployeeShipSection'),'new employee board is styled');
 assert(styles.includes('html[data-theme="dark"] #p79EmployeeShipSection'),'dark mode supported');
