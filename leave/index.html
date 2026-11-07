@@ -1945,7 +1945,7 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
  if(coverDate!==date){
   const wrong=(row.schedule||{}).__meta?.[coverDate]?.overtimeReport;
   if(wrong?.id&&wrong.category==='延'&&
-     String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08'&&
+     (String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08'||/04-(?:08|16)$/.test(String(wrong.code||'')))&&
      !(e.readonlyWrongDate===true&&String(e.originalReportId||'')===String(wrong.id)))
    return 'wrong-workdate';
  }
@@ -1992,7 +1992,7 @@ async function p79ReconcileLeaveHandoff(){
      String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
     const oldReport=oldEmployee?.schedule?.__meta?.[corrected.coverDate]?.overtimeReport;
     if(oldReport?.id&&oldReport.category==='延'&&
-       String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08')
+       (String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08'||/04-(?:08|16)$/.test(String(oldReport.code||''))))
      wrongDateReportId=String(oldReport.id);
    }
    // Clear an old browser flag once its source no longer has that report.
