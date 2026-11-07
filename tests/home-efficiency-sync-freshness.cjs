@@ -7,7 +7,7 @@ const slice=(src,start,end)=>{const a=src.indexOf(start),b=src.indexOf(end,a);as
 (async()=>{
  const stamp=Date.now(),month='2026-11',u='https://script.google.com/macros/s/test/exec?action=historyGetMonthData&type=vessel&month='+month;
  let stored={key:'source',savedAt:stamp-120001,data:{ok:true,month,shipMasters:[]}},getCalls=0;
- const env={URL,Date,cacheFreshTtl:()=>120000,actionKey:()=>stored.key,urlInfo:url=>({action:'historyGetMonthData',u:new URL(url)}),viewerKey:()=> 'employee-1',token:()=> 'secret',mutationStamp:()=>0,
+ const env={URL,Date,cacheFreshTtl:()=>120000,actionKey:()=>stored.key,urlInfo:url=>({action:'historyGetMonthData',u:new URL(url)}),viewerKey:()=> 'employee-1',token:()=> 'secret',mutationStamp:()=>0,fmtTime:()=> 'now',
   get:async()=>{getCalls++;return stored;}};
  vm.createContext(env);
  vm.runInContext(slice(cacheSrc,'async function getHistoryPreview(url){','const rawFetch='),env);
