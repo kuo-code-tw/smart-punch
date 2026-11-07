@@ -10,14 +10,14 @@ const css=fs.readFileSync(path.join(root,'assets/port79-gate-home.css'),'utf8');
 for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateTruckEntries']){
  assert(html.includes('id="'+key+'"'),key+' present in homepage');
 }
-assert(html.includes('port79-gate-home.js?v=20261107-gate-compact-card-v2'));
-assert(html.includes('port79-gate-home.css?v=20261107-gate-compact-card-v2'));
+assert(html.includes('port79-gate-home.js?v=20261107-six-tiles-no-scroll-v3'));
+assert(html.includes('port79-gate-home.css?v=20261107-six-tiles-no-scroll-v3'));
 assert(!html.includes('id="p79GateImportLink"'),'homepage Gate card is read-only; no upload or download actions');
 assert(!html.includes('id="p79HomeStatTabs"'),'no whole-homepage tabs');
 assert(css.includes('#p79Dashboard #p79HomeGatePanel[hidden]'),'new panel truly hidden by default');
 assert(!js.includes('5344')&&!js.includes('1124'),'operational XLSX values must not be hard-coded in public source');
 class Element{
- constructor(){this.textContent='';this.hidden=false;this.attrs={};this.listeners={};this.focused=false;}
+ constructor(){this.textContent='';this.hidden=false;this.attrs={};this.listeners={};this.focused=false;this.classNames=new Set();this.classList={toggle:(name,enabled)=>{if(enabled)this.classNames.add(name);else this.classNames.delete(name);}};}
  setAttribute(k,v){this.attrs[k]=v;}
  addEventListener(k,fn){this.listeners[k]=fn;}
  focus(){this.focused=true;}
@@ -64,6 +64,7 @@ assert.equal($('p79HomeGatePanel').hidden,false);
 assert.equal($('p79RankingView').hidden,true,'only imported-vessel ranking is hidden');
 assert(operationEls.every(e=>!e.hidden),'other homepage panels must remain visible');
 assert.equal($('p79HomeGateTab').attrs['aria-selected'],'true');
+assert($('p79Dashboard').classNames.has('p79-gate-view-active'),'Gate view activates natural card height');
 $('p79GateYear').click();
 assert.equal($('p79GateYear').attrs['aria-pressed'],'true');
 $('p79GatePrev').click();
@@ -74,4 +75,5 @@ assert.equal($('p79HomeGatePanel').hidden,true);
 assert.equal($('p79RankingView').hidden,false,'ranking card restored');
 assert(operationEls.every(e=>!e.hidden),'whole homepage never changes visibility');
 assert.equal($('p79HomeOperationsTab').attrs['aria-selected'],'true');
-console.log('PASS: compact homepage gate tab, month/year paging, five counts, date dedupe, and private-data safeguards');
+assert(!$('p79Dashboard').classNames.has('p79-gate-view-active'),'vessel list restores normal dashboard layout');
+console.log('PASS: compact homepage gate tab, month/year paging, six KPIs, date dedupe, and private-data safeguards');
