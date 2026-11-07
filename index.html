@@ -379,7 +379,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
           <tbody id="p79DashShipRanking"><tr><td colspan="6">等待月份資料</td></tr></tbody></table></div>
 <section id="p79HomeGatePanel" class="p79-gate-section" role="tabpanel" aria-labelledby="p79HomeGateTab" hidden>
     <div class="p79-gate-header">
-      <div class="p79-gate-caption">交空／領空／交重／領重／拖車</div>
+      <div class="p79-gate-caption">櫃量及車次一目瞭然</div>
       <div class="p79-gate-modes" role="group" aria-label="選擇統計方式">
         <button type="button" id="p79GateMonth" aria-pressed="true">每月累計</button>
         <button type="button" id="p79GateYear" aria-pressed="false">年度累計</button>
@@ -396,10 +396,10 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div><span>交重櫃</span><strong id="p79GateDeliverLoaded">—</strong><small>櫃</small></div>
       <div><span>領重櫃</span><strong id="p79GatePickupLoaded">—</strong><small>櫃</small></div>
       <div class="p79-gate-truck"><span>進站拖車</span><strong id="p79GateTruckEntries">—</strong><small>車次</small></div>
+      <div class="p79-gate-total"><span>總櫃量</span><strong id="p79GateTotalContainers">—</strong><small>櫃</small></div>
     </div>
     <div class="p79-gate-footer">
-      <span>本期總櫃量 <strong id="p79GateTotalContainers">—</strong> 櫃</span>
-      <span id="p79GateStatus" role="status" aria-live="polite">尚未接入正式進出站櫃量資料庫</span>
+      <span id="p79GateStatus" role="status" aria-live="polite">統計資料尚未同步</span>
     </div>
   </section>
       </article>
@@ -1649,11 +1649,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261107-imported-chinese-names-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261107-imported-no-scroll-v3">
-<link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-compact-card-v2">
+<link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-six-tiles-no-scroll-v3">
 <script src="./assets/port79-reference-dashboard.js?v=20261107-efficiency-mode-guard-v3"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261107-persistent-chinese-names-v104"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261107-monthly-labels-mode-persist-v3"></script>
-<script src="./assets/port79-gate-home.js?v=20261107-gate-compact-card-v2"></script>
+<script src="./assets/port79-gate-home.js?v=20261107-six-tiles-no-scroll-v3"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 <!-- PORT79 2026-11-03: 管理員手機首頁只顯示萬海網站船期與目前班別人員；桌面版、員工登入與原資料讀取不變。 -->
 <style id="p79-admin-phone-two-panels-20261103">
