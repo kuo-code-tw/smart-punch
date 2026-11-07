@@ -1122,7 +1122,7 @@ function p79SyncAdminPhonePanels(session){
     gateCard.style.removeProperty('display');
   }
   // On phones open official Gate statistics automatically, not vessel imports.
-  if(phone&&document.getElementById('p79HomeGateTab')?.getAttribute('aria-selected')!=='true'){
+  if(phone&&document.getElementById?.('p79HomeGateTab')?.getAttribute('aria-selected')!=='true'){
     window.P79GateStatsHome?.switchTab?.('gate');
   }
 }
