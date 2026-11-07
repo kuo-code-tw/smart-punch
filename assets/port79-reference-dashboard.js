@@ -81,7 +81,7 @@ function vessels(v){
  const source=Array.isArray(v.vessels)?v.vessels:[];
  const latest=model.latestCompletedVessels(source,Number.MAX_SAFE_INTEGER);
  const countLabel=$('p79DashShipRankingCount');
- if(countLabel)countLabel.textContent='本月全部 '+latest.length+' 艘 · 可上下捲動';
+ if(countLabel)countLabel.textContent='本月完工資料 '+latest.length+' 艘 · 依完工時間排序';
  const completionLabel=s=>{
   const full=String(s.completedAt||'').match(/^20\d{2}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if(full)return full[1]+'/'+full[2]+' '+full[3]+':'+full[4];
