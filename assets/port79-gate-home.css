@@ -26,10 +26,10 @@ html body #p79Dashboard .p79d-gate-flip>.p79d-panel-title #p79DashShipRankingCou
  flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;
 }
 html body #p79Dashboard .p79d-gate-flip #p79HomeGatePanel.p79-gate-section {
- box-sizing:border-box!important;display:flex!important;flex:1 1 auto!important;
- flex-direction:column!important;gap:5px!important;
- min-height:0!important;max-height:100%!important;
- overflow:auto!important;overflow-x:hidden!important;
+ box-sizing:border-box!important;display:flex!important;flex:0 0 auto!important;
+ flex-direction:column!important;gap:7px!important;
+ min-height:0!important;height:auto!important;max-height:none!important;
+ overflow:visible!important;
  padding:4px 0 2px!important;margin:0!important;
  border:0!important;background:transparent!important;
  box-shadow:none!important;
@@ -69,11 +69,12 @@ html body #p79Dashboard .p79d-gate-flip .p79-gate-navigation strong{
 }
 html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics{
  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
- gap:5px!important;min-width:0!important;
+ grid-auto-rows:minmax(62px,auto)!important;
+ gap:7px!important;min-width:0!important;
 }
 html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div{
  display:flex;flex-direction:column;align-items:center;justify-content:center;
- padding:7px 3px 5px;gap:1px;min-width:0;
+ padding:8px 3px 7px;gap:2px;min-width:0;
  background:#f3f8fd;border:1px solid #e4edf7;border-radius:8px;
 }
 html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics span{
@@ -128,3 +129,95 @@ html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes butto
 html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes button[aria-pressed="true"]{
  background:#386387;color:#fff
 }
+
+
+/* 2026-11-07 Gate compact home, six color-coded metrics, NO inner scroll.
+   Only the Gate flip side is height-auto. The vessel ranking keeps its original
+   own scroll behavior so the rest of the homepage is unchanged. */
+html body.p79-workspace:has(#systems.show) #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip {
+  display:flex!important;
+  flex-direction:column!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  align-self:start!important;
+  overflow:visible!important;
+  padding-bottom:10px!important;
+}
+html body.p79-workspace:has(#systems.show) #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip #p79HomeGatePanel {
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex:0 0 auto!important;
+  flex-direction:column!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding:3px 0 0!important;
+}
+html body.p79-workspace:has(#systems.show) #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip #p79HomeGatePanel[hidden] {
+  display:none!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(1){
+  background:#eef5ff!important;border-color:#d1e3ff!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(1) strong{color:#1d4ed8!important}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(2){
+  background:#eafafd!important;border-color:#c8eef5!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(2) strong{color:#0e7490!important}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(3){
+  background:#fff4e8!important;border-color:#ffe0b6!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(3) strong{color:#c05616!important}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(4){
+  background:#f6efff!important;border-color:#e4d3ff!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(4) strong{color:#7e22ce!important}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(5){
+  background:#eaf8ef!important;border-color:#cdebd8!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(5) strong{color:#047857!important}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div.p79-gate-total {
+  background:#e6edff!important;border-color:#c6d5fc!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div.p79-gate-total strong {
+  color:#1e3a8a!important;font-weight:900!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div {
+  border-radius:9px!important;
+  min-height:64px!important;
+  box-shadow:none!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-footer {
+  display:flex!important;
+  margin-top:1px!important;
+  padding:0 2px!important;
+  min-height:0!important;
+  overflow:visible!important;
+}
+html body #p79Dashboard .p79d-gate-flip #p79GateStatus {
+  flex:1 1 100%!important;
+  line-height:1.45!important;
+  font-size:10px!important;
+  overflow-wrap:break-word!important;
+}
+@media screen and (max-width:540px){
+  html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-auto-rows:minmax(61px,auto)!important;
+  }
+}
+@media screen and (min-width:541px){
+  html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(1){background:#173a68!important;border-color:#28518a!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(2){background:#174550!important;border-color:#22636a!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(3){background:#50351c!important;border-color:#775029!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(4){background:#3a2855!important;border-color:#5c3e83!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(5){background:#183d32!important;border-color:#28694c!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div.p79-gate-total{background:#1c315a!important;border-color:#314f85!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div strong {color:#eaf4ff!important}

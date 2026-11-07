@@ -63,7 +63,7 @@
   if(total)total.textContent=totals?
    fmt(totals.deliverEmpty+totals.pickupEmpty+totals.deliverLoaded+totals.pickupLoaded):'—';
  }
- function status(message){var el=$('p79GateStatus');if(el)el.textContent=message;}
+ function status(message,detail){var el=$('p79GateStatus');if(el){el.textContent=message;el.title=detail||'';}}
  function monthText(m){return m.slice(0,4)+' 年 '+Number(m.slice(5,7))+' 月'}
  function aggregate(rows){
   var subset=mode==='month'?rows.filter(r=>r.date.slice(0,7)===month):rows;
@@ -84,7 +84,7 @@
   if(!stored){setStats(null);return;}
   var result=aggregate(stored);
   setStats(result.totals);
-  status(result.days?'已匯入 '+result.days+' 個作業日・依每日紀錄自動累計':'所選期間尚未有正式匯入紀錄');
+  status(result.days?'累計 '+result.days+' 個作業日':'本期尚無統計資料');
  }
  function updateAuth(){
   var current=auth();
@@ -94,12 +94,12 @@
  async function loadYear(yr){
   var current=updateAuth(),requestId=++generation;
   render();
-  if(!current.allowed||!current.token){status('請使用有船舶歷史檢視權限的帳號登入');return;}
+  if(!current.allowed||!current.token){status('登入後即可查看累計');return;}
   if(memory.has(yr)){render();return;}
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(current.url)||!g.P79HistoryRead?.read){
-   status('進出站櫃量雲端資料尚未串接，暫不顯示估算數字');return;
+   status('累計資料尚未同步');return;
   }
-  status('正在讀取正式進出站資料庫…');
+  status('讀取累計資料中…');
   try{
    var u=new URL(current.url);
    u.searchParams.set('action','gateStatsReadYear');
@@ -115,7 +115,7 @@
   }catch(error){
    if(requestId!==generation||yr!==year||active!=='gate')return;
    setStats(null);
-   status('尚未讀取到正式櫃量資料：'+String(error?.message||error).slice(0,96));
+   status('累計資料暫時無法取得',String(error?.message||error).slice(0,140));
   }
  }
  function chooseMode(next){
@@ -142,6 +142,7 @@
   if(which!=='operations'&&which!=='gate')return;
   active=which;
   var isGate=which==='gate';
+  $('p79Dashboard')?.classList?.toggle('p79-gate-view-active',isGate);
   $('p79HomeOperationsTab')?.setAttribute('aria-selected',String(!isGate));
   $('p79HomeGateTab')?.setAttribute('aria-selected',String(isGate));
   var ranking=$('p79RankingView'),section=$('p79HomeGatePanel');
