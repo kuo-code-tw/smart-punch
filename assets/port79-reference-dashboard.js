@@ -65,7 +65,16 @@ function weeklyChart(report){
 }
 // Homepage ship timetable is a separate outside-website source, not the vessel historical snapshot.
 
+function p79ImportedChineseShipName(ship){
+ const official=g.P79ManualShipSchedule?.getChineseName?.(ship?.name);
+ if(/[\u3400-\u9fff]/u.test(String(official||'')))return String(official).trim();
+ const own=[ship?.chineseName,ship?.vesselChineseName,ship?.localName]
+  .find(value=>/[\u3400-\u9fff]/u.test(String(value||'')));
+ return String(own||'').trim();
+}
+let lastVesselsForChineseNames=null;
 function vessels(v){
+ lastVesselsForChineseNames=v;
  const table=$('p79DashShipRanking'),model=g.P79MonthlyDashboard;
  // 最新匯入的優先，其餘仍屬本月的船舶一併保留，不受「最新 5 艘」限制。
  const source=Array.isArray(v.vessels)?v.vessels:[];
@@ -86,7 +95,7 @@ function vessels(v){
   if(!Number.isFinite(Date.parse(String(value||''))))return '—';
   return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
  };
- if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'">'+esc(s.name)+'</td><td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="7">本月份尚無船舶資料</td></tr>';
+ if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'"><span>'+esc(s.name)+'</span><small class="p79r-vessel-chinese-name" style="display:block;margin-top:2px;font-size:11px;color:#64748b;white-space:nowrap">中文：'+esc(p79ImportedChineseShipName(s)||'未提供')+'</small></td><td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="7">本月份尚無船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  peopleReport=v;renderPeople();
@@ -166,6 +175,7 @@ function init(){
  chrome();new MutationObserver(chrome).observe(d.body,{attributes:true,attributeFilter:['class']});
 }
 function reset(){chartPage=0;attendanceReport=null;overtimeReport=null;leaveReport=null;attendanceMonth=$('p79DashMonth')?.value||'';renderAttendancePage();peopleReport=null;groupRoster=null;groupRosterMonth='';if($('p79DashVesselNotices'))g.P79ManualShipSchedule?.render?.();if($('p79rHeroShipCount'))$('p79rHeroShipCount').textContent='—';}
+d.addEventListener('p79:wanhai-names-updated',()=>{if(lastVesselsForChineseNames)vessels(lastVesselsForChineseNames);});
 g.P79ReferenceDashboard={vessels,attendance,reset,setGroupRoster,choosePeopleGroup,setOvertimeReport,setLeaveReport};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
