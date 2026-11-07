@@ -852,6 +852,10 @@ async function p79ReportSavedLeaveCover(id){
        unverified++;continue;
       }
      if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
+      if(entry.overtimeDate&&entry.overtimeDate!==entry.date&&String(report.overtimeDate||'')!==entry.overtimeDate){
+       cell.textContent='⚠ 已有雲端申報，但尚未確認 '+entry.overtimeDate+' 的加班歸屬；保留原報單 ID，不重複新增。';
+       unverified++;continue;
+      }
       const fields=[report.typeName||report.category||'',report.code||'',
        report.declaredHours!=null?'申報 '+report.declaredHours+' 小時':'',
        report.convertedHours!=null&&String(report.convertedHours)!==''?'換算 '+report.convertedHours+' 小時':'',
