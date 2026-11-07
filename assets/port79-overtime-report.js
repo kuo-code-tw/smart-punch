@@ -326,13 +326,13 @@
  const saveValidationContexts=new WeakMap();
  async function prepareSaveValidation(request,checkRules=true){
   const credentials=auth(),{url,token}=credentials;
-  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,leaveHandoffId:String(request.leaveHandoffId||'')};
+  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,coverDate:String(request.coverDate||request.date),leaveHandoffId:String(request.leaveHandoffId||'')};
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   const read=(async()=>{
    try{
     const query='?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+
      '&empId='+encodeURIComponent(scope.empId)+'&date='+encodeURIComponent(scope.date)+
-     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&_='+Date.now();
+     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&coverDate='+encodeURIComponent(scope.coverDate)+'&_='+Date.now();
     const response=await fetch(url+query,{cache:'no-store',signal:controller.signal});
     const cloud=await response.json();
     if(!response.ok||cloud?.ok!==true)throw Error(cloud?.error||'出勤與班表核對失敗');
@@ -353,7 +353,7 @@
   const current=auth(),age=Date.now()-saved.checkedAt;
   if(age<0||age>15000||saved.url!==current.url||saved.token!==current.token||
      saved.empId!==String(draft.empId).trim().toUpperCase()||saved.date!==draft.date||
-     saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
+     saved.coverDate!==String(draft.coverDate||draft.date)||saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
   return saved.cloud;
  }
  // Show each rule only under its named overtime type; sharing a quota category
@@ -1386,7 +1386,9 @@
     if(!forId)return;
     if(prefill.leaveHandoffId){
      dateInput.value=prefill.date||'';
-     if(approvedDates.includes(dateInput.value))leaveDateSelect.value=dateInput.value;
+     const originalLeaveDate=String(prefill.coverDate||dateInput.value);
+     if(approvedDates.includes(originalLeaveDate))leaveDateSelect.value=originalLeaveDate;
+     leaveDateSelect.disabled=true;
      return;
     }
     if(approvedDates.length===1){
@@ -1439,7 +1441,7 @@
    kind.onchange=()=>{manuallySelectedType=true;manuallySelectedPeriod=false;prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
    select.onchange=()=>{manuallySelectedPeriod=true;preview();};
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
-   leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
+   leaveDateSelect.onchange=()=>{if(prefill.leaveHandoffId)return;dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
    empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
    dateInput.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent=typeOptions(dialogRuleConfig(),rows).length?'請選擇員工、日期與出勤時段。':'雲端目前沒有可用的加班類型。請按下方「＋新增／管理加班類型與時段」，先新增類型，再設定出勤時段。';
@@ -1466,6 +1468,13 @@
     else{select.selectedIndex=-1;select.value='';preview();el.querySelector('#p79OtStatus').textContent='已帶入「'+requested+'」，請選擇本位人員的出勤時段。';}
    }
    applyPreferredType();
+   // Show the intended four-hour period even before the next day's first IN.
+   // It is a plan only, never verified actual overtime or punch evidence.
+   if(prefill.leaveHandoffId&&prefill.periodHint){
+    const p=el.querySelector('#p79OtPreview');
+    p?.insertAdjacentHTML('afterend','<div id="p79OtCoverPlanPreview" style="margin:7px 0;padding:9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1e40af;font-size:13px;font-weight:700">'+
+     '預排代班時段（尚未認列實際加班）｜'+esc(prefill.periodHint)+'</div>');
+   }
    suggestBySelectedRole();
    void refreshOfficialRosterHint();
    if(!prefill.code&&prefill.requirePeriodSelection&&prefill.attendance)
