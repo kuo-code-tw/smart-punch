@@ -1960,17 +1960,48 @@ async function p79ReconcileLeaveHandoff(){
   if(!adminSession||!p79CanReportOvertime()||!leaveRequestToken())return h;
   const active=h.pendingReports===true||p79CurrentHandoff===String(h.id)+'|'+h.createdAt;
   const contextByEntry=new Map(),remaining=[];
-  for(const [entryIndex,e] of h.entries.entries()){
+  for(const [entryIndex,rawEntry] of h.entries.entries()){
+   let e=rawEntry;
+   const fetchEntry=async entry=>{
+    const contextKey=JSON.stringify([String(entry.empId).trim().toUpperCase(),entry.date,String(entry.leaveId||h.id)]);
+    let cloud=contextByEntry.get(contextKey);
+    if(!cloud){
+     const token=leaveRequestToken();
+     cloud=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+
+      '&empId='+encodeURIComponent(entry.empId)+'&date='+encodeURIComponent(entry.date)+
+      '&leaveHandoffId='+encodeURIComponent(entry.leaveId||h.id)+'&t='+Date.now(),
+      {cache:'no-store',redirect:'follow'},45000);
+     if(!cloud?.ok)throw Error(cloud?.error||'雲端資料讀取失敗');
+     contextByEntry.set(contextKey,cloud);
+    }
+    return cloud;
+   };
+   let data=await fetchEntry(e);
+   // Older browser sessions retained both workers under the original leave
+   // date. Re-map only when the verified leave, cover and worker order agree.
+   const corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(data,{...h,id:e.leaveId||h.id},e);
+   if(corrected.date!==e.date){
+    const original=data,oldEmployee=(original.schedules||[]).find(row=>
+     String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
+    const oldReport=oldEmployee?.schedule?.__meta?.[e.date]?.overtimeReport;
+    if(oldReport?.id&&oldReport.category==='延'&&
+       String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08')
+     throw Error(e.empId+' 的原預排仍在 '+e.date+'，正確工作日期為 '+corrected.date+
+      '；可以查看加班時段，但須先更正原報單，避免重複申報。');
+    e=corrected;
+    data=await fetchEntry(e);
+    // The original leave is on the prior day. Secure context may be scoped to
+    // workDate; preserve only the already verified cover for display/preflight.
+    const validCover=(original.leaveCoverAssignments||[]).filter(c=>
+     String(c.leaveId)===String(e.leaveId||h.id)&&
+     (c.workerIds||[]).some(id=>String(id).trim().toUpperCase()===String(e.empId).trim().toUpperCase()));
+    if(!validCover.length)throw Error('原請假代班雲端資料已變更，停止預排');
+    const available=data.leaveCoverAssignments||[];
+    data={...data,leaveCoverAssignments:[...available,
+     ...validCover.filter(c=>!available.some(d=>String(d.leaveId)===String(c.leaveId)))]};
+    contextByEntry.set(JSON.stringify([String(e.empId).trim().toUpperCase(),e.date,String(e.leaveId||h.id)]),data);
+   }else e=corrected;
    const month=String(e.date||'').slice(0,7);
-   // Context attendance is scoped to one employee/day/leave, not the whole month.
-   const contextKey=JSON.stringify([String(e.empId).trim().toUpperCase(),e.date,String(e.leaveId||h.id)]);
-   let data=contextByEntry.get(contextKey);
-   if(!data){
-    const token=leaveRequestToken();
-    data=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&empId='+encodeURIComponent(e.empId)+'&date='+encodeURIComponent(e.date)+'&leaveHandoffId='+encodeURIComponent(e.leaveId||h.id)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
-    if(!data?.ok)throw Error(data?.error||'雲端資料讀取失敗');
-    contextByEntry.set(contextKey,data);
-   }
    const state=p79LeaveHandoffEntryState(h,e,data,active);
    if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
     if(state==='wrong-workdate')throw Error(e.empId+' 的原預排仍儲存在 '+(e.coverDate||'原請假日')+
@@ -2059,7 +2090,7 @@ async function p79OpenLeaveOvertimeHandoff(){
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
-  await P79Overtime.openReport({...e,...period,...(!perPersonType?{code:'',requirePeriodSelection:true,periodHint:'此員工的正式班表或加班選項尚未確認，請核對後選擇類型與時段。'}:{}),verifiedOvertimeRules,preferredType:requestedType?.[1]||'',category:requestedType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
+  await P79Overtime.openReport({...e,...period,...(!perPersonType?{requirePeriodSelection:true,periodHint:period.periodHint||'此員工的正式班表或加班選項尚未確認，請核對後選擇類型與時段。'}:{}),verifiedOvertimeRules,preferredType:requestedType?.[1]||'',category:requestedType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
   $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+(entryType?'｜本位指定 '+entryType+'（待核對）':perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
