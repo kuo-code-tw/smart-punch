@@ -326,3 +326,37 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
   }
 }
+
+/* Gate 日／週／月／年：一列完成切換與期間導覽，不使用區塊內捲動 */
+html body #p79Dashboard .p79d-gate-flip .p79-gate-header{
+ display:flex!important;flex-wrap:wrap!important;align-items:center!important;
+ justify-content:space-between!important;row-gap:6px!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-modes{
+ display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ gap:3px!important;padding:3px!important;min-width:162px!important;
+ border-radius:10px!important;background:#ecf3fb!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-modes button{
+ min-width:0!important;padding:5px 9px!important;border:0!important;
+ border-radius:8px!important;background:transparent!important;
+ color:#526d8a!important;font-size:12px!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-modes button[aria-pressed="true"]{
+ background:#1765b3!important;color:#fff!important;
+ box-shadow:0 2px 5px #164c792b!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-navigation{
+ margin:3px 0 4px!important;gap:8px!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-navigation strong{
+ min-width:128px!important;font-size:12px!important;
+}
+html body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div{
+ min-height:66px!important;padding:8px 3px!important;
+}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes{background:#1c3551!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes button{color:#c2d7ec!important}
+html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-modes button[aria-pressed="true"]{
+ background:#2677c2!important;color:#fff!important
+}
