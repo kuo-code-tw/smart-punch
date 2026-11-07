@@ -5,6 +5,7 @@
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261107-cross-midnight-extension-workday-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
+<script src="../assets/port79-leave-cover-suggest.js?v=20261107-cross-day-workdate-v2"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
 
 <script src="../assets/port79-rest-allocation.js?v=20261025-special-audit-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
@@ -13395,7 +13396,23 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const id=String(worker).trim().toUpperCase(),map=metaByEmp.get(id),own=roster.get(id)||{};if(!map)return;
                     const dates=new Set([...Object.keys(own),...Object.keys(target)]);
                     dates.forEach(date=>{
-                        if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate||map[date]?.overtimeReport)return;
+                        if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate)return;
+                        const originalShift=[target[date],target.__meta?.[date]?.leaveOriginalShift,
+                            target.__meta?.[date]?.reportOriginalShift].find(v=>['早','中','晚'].includes(v))||'';
+                        const linked=window.P79LeaveCoverSuggest?.coverWorkday?.(date,originalShift,cover.mode,index);
+                        if(linked){
+                            // The second half of night leave is worked on the NEXT morning's
+                            // shift date. Do not fabricate a 04-08 overtime plan on leaveDate.
+                            if(own[linked.workDate]!==linked.normalShift||map[linked.workDate]?.overtimeReport)return;
+                            map[linked.workDate]={...map[linked.workDate],forEmpId:cover.leaveEmpId,
+                                coverCandidate:true,coverAlreadyArranged:true,leaveCoverDate:date,
+                                overtimeReport:{category:'延',code:linked.code,declaredHours:4,
+                                    convertedHours:null,normalStart:linked.normalStart,normalEnd:linked.normalEnd,
+                                    overtimeStart:linked.overtimeStart,overtimeEnd:linked.overtimeEnd,
+                                    position:linked.position}};
+                            return;
+                        }
+                        if(map[date]?.overtimeReport)return;
                         const shift=ranges[own[date]]?own[date]:target[date];let times=ranges[shift];if(!times)return;
                         if(cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[shift][index===1?1:0];}
                         map[date]={forEmpId:cover.leaveEmpId,coverCandidate:true,coverAlreadyArranged:true,overtimeReport:{category:'代',code:'代'+times.join('-'),declaredHours:cover.mode==='two'?4:8,convertedHours:null,normalStart:times[0],normalEnd:times[1],overtimeStart:times[0],overtimeEnd:times[1],position:'standalone'}};
@@ -13599,8 +13616,46 @@ async function p79ExportOvertimeComparison(printMode){
             }
             p79SyncOvertimePlannedDialogState();
         }
+        // Identify old saved two-person night-cover plans whose second worker was
+        // incorrectly booked on the leave date instead of the next early workday.
+        // This audit is read-only: do not move original IDs or overwrite cloud data.
+        function p79OvertimeCoverDateWarning(row){
+            const report=row?.overtimeReport,date=normalizeScheduleDateKey(row?.rosterDate||row?.dateKey);
+            if(!report||report.category!=='延'||!date)return null;
+            const state=p79WorkOvertimeMonths.get(date.slice(0,7));
+            if(!state?.ready||!Array.isArray(state.covers)||!Array.isArray(state.rows)||
+               !window.P79LeaveCoverSuggest?.coverWorkday)return null;
+            const norm=x=>String(x||'').trim().toUpperCase(),worker=norm(row.empId);
+            const targetId=norm(row.forEmpId||report.forEmpId||'');
+            const roster=new Map(state.rows.map(item=>[norm(item.empId),item.schedule||{}]));
+            for(const cover of state.covers){
+                const index=(cover.workerIds||[]).findIndex(id=>norm(id)===worker);
+                if(index<0||index>1||cover.mode!=='two'||targetId&&norm(cover.leaveEmpId)!==targetId||
+                   report.leaveId&&String(report.leaveId)!==String(cover.leaveId))continue;
+                const target=roster.get(norm(cover.leaveEmpId))||{};
+                const start=String(cover.startDate||''),end=String(cover.endDate||'');
+                let day=start,count=0;
+                while(/^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=end&&count++<35){
+                    const shift=[target[day],target.__meta?.[day]?.leaveOriginalShift,
+                        target.__meta?.[day]?.reportOriginalShift].find(v=>['早','中','晚'].includes(v))||'';
+                    const plan=window.P79LeaveCoverSuggest.coverWorkday(day,shift,cover.mode,index);
+                    if(plan&&day===date&&plan.workDate!==date&&
+                       String(report.normalStart||'')===plan.normalStart&&
+                       String(report.normalEnd||'')===plan.normalEnd&&
+                       String(report.overtimeStart||'')===plan.overtimeStart&&
+                       String(report.overtimeEnd||'')===plan.overtimeEnd)
+                        return {date:plan.workDate,message:'這筆代班預排的日期錯置：'+date+
+                            ' 僅為正常班；加班 '+plan.overtimeStart+'-'+plan.overtimeEnd+
+                            ' 應依 '+plan.workDate+' 的 '+plan.period+' 代班重新核對。原申報未自動改寫。'};
+                    day=window.P79LeaveCoverSuggest.addDays(day,1);
+                }
+            }
+            return null;
+        }
         function p79ReportWorkOvertimeRow(index,editExisting=false){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
+            const wrongWorkday=p79OvertimeCoverDateWarning(row);
+            if(wrongWorkday){alert(wrongWorkday.message+' 此日的正常出勤不能核為加班。');return;}
             if(editExisting&&(!row.reportVerified||!String(row.overtimeReport?.id||'').trim())){alert('此筆沒有可修改的正式申報，請重新讀取後核對。');return;}
             if(!editExisting&&row.reportVerified){alert('此筆已有正式加班申報，請點選「修改申報」，避免重複新增。');return;}
             if(row.timeCheckRequired){alert('此班次出勤時間待核對，請先點選上下班時間更正，再申報加班。');return;}
@@ -14273,6 +14328,8 @@ function p79OvertimePeriodLabel(report){
             if(!p79CanReportOvertime())return alert('目前沒有核對／修改加班申報權限。');
             const report=row.overtimeReport||{},date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
             if(!report.id||!row.reportVerified||report.planned!==true||!date)return alert('此筆已不是待核對的原預排申報，請重新讀取最新資料。');
+            const wrongWorkday=p79OvertimeCoverDateWarning(row);
+            if(wrongWorkday)return alert(wrongWorkday.message+' 請先由授權管理員更正原代班申報的工作日期，不能把本日正常班當作加班核定。');
             if(!row.clockIn||!row.clockOut)return alert('需要完整上、下班打卡後才能核對，不能直接核定預排加班。');
             const start=p79DirectAttendanceTimestamp(row.clockIn),end=p79DirectAttendanceTimestamp(row.clockOut);
             const issue=p79OvertimeAttendanceIssue(row,start,end);
@@ -14908,14 +14965,22 @@ function p79OvertimePeriodLabel(report){
                     .replace(/休息日加班/g,'休加').replace(/平日延時加班|平日延長加班/g,'平日延時')
                     .replace(/國定假日加班/g,'國假').replace(/休假代班加班/g,'代班')
                     .replace(/例假加班/g,'例假').replace(/\s+/g,'');
+                const p79WrongCoverDate=p79OvertimeCoverDateWarning(row);
+                const p79ExtendedBreakdown=row.overtimeReport?.category==='延'&&
+                    row.overtimeReport.normalStart&&row.overtimeReport.normalEnd?
+                    '正常'+String(row.overtimeReport.normalStart)+'-'+String(row.overtimeReport.normalEnd)+
+                    (p79WrongCoverDate?'（本日無法核加班，04-08應歸'+p79WrongCoverDate.date+'）':
+                    '／加班'+String(row.overtimeReport.overtimeStart)+'-'+String(row.overtimeReport.overtimeEnd)):'';
+
                 const p79OvertimeConversionFull=row.overtimeReport
                     ?(row.reportVerified?(savedPlan?'未列入已完成工時':noPunchRest?'0小時':String(p79DisplayedOvertimeConversion(row.overtimeReport))):'尚未申報'):'';
-                const p79OvertimePlanState=savedPlan&&!noPunchRest
+                const p79OvertimePlanState=p79WrongCoverDate?'僅正常班出勤／原預排待修正':savedPlan&&!noPunchRest
                     ?(row.clockIn&&row.clockOut?'出勤待核':row.clockIn?'待簽退':'未出勤'):'';
                 const overtimeShortText=[
                     row.timeCheckRequired?(noPunchRest?'疑似多報・無卡':'出勤待核'):'',
-                    p79OvertimePeriodShort,
-                    row.overtimeReport?((savedPlan?'預排':row.reportVerified?'申報':row.coverAlreadyArranged||row.coverCandidate?'已排未報':'未申報')+String(row.overtimeReport.declaredHours??'')+'h'):'',
+                    p79WrongCoverDate?'日期待更正→'+p79WrongCoverDate.date:'',
+                    p79ExtendedBreakdown||p79OvertimePeriodShort,
+                    row.overtimeReport?(p79WrongCoverDate?'舊預排錯日':(savedPlan?'預排':row.reportVerified?'申報':row.coverAlreadyArranged||row.coverCandidate?'已排未報':'未申報')+String(row.overtimeReport.declaredHours??'')+'h'):'',
                     row.overtimeReport&&row.reportVerified&&!savedPlan?'換'+p79OvertimeConversionFull.replace(/\s*小時/g,'h'):'',
                     p79OvertimePlanState,
                     row.specialOvertimeMinutes>0?'特殊日'+(row.specialReportMinutes===null?'待核':String(row.specialReportMinutes/60)+'h'):'',
@@ -14926,7 +14991,8 @@ function p79OvertimePeriodLabel(report){
                 const overtimeFullTitle=[
                     row.timeCheckRequired?String(row.attendanceIssue||'出勤待核對'):'',
                     savedPlan&&!noPunchRest?(row.clockIn&&row.clockOut?'已儲存申報｜出勤已完成，時段待核對':row.clockIn?'已儲存申報｜待簽退':'已儲存申報｜預排未出勤'):'',
-                    p79OvertimePeriodFull,
+                    p79WrongCoverDate?p79WrongCoverDate.message:'',
+                    p79ExtendedBreakdown||p79OvertimePeriodFull,
                     row.overtimeReport?((row.reportVerified?(savedPlan?'已儲存預排申報':'已申報'):'尚未正式申報')+' '+String(row.overtimeReport.declaredHours??'')+'小時｜換算 '+p79OvertimeConversionFull):'',
                     row.specialOvertimeMinutes>0?'特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes):'',
                     !row.overtimeReport&&pendingPunchOvertime?'加班出勤 '+formatDurationMinutes(row.overtimeMinutes):'',
@@ -17298,7 +17364,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const originalNote=String(draft.note||'').trim(),reasonNote=reason?.exempt?reason.label:'';
  const finalNote=reasonNote&&!originalNote.includes(reasonNote)
    ?[reasonNote,originalNote].filter(Boolean).join('／'):originalNote;
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();

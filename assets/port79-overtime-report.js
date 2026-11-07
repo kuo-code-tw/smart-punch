@@ -458,9 +458,25 @@
  }
  function resolveLeaveCoverReport(data,handoff,entry){
   const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
-  const cover=(data.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(handoff.id)&&key(c.leaveEmpId)===key(entry.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry.empId))&&String(c.startDate)<=date&&String(c.endDate)>=date);
-  if(!cover)throw Error('此筆請假在該日的代班已取消或更換人員，請重新整理請假管理核對');
+  const leaveDate=String(entry.coverDate||date);
+  const cover=(data.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(handoff.id)&&key(c.leaveEmpId)===key(entry.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry.empId))&&String(c.startDate)<=leaveDate&&String(c.endDate)>=leaveDate);
+  if(!cover)throw Error('此筆請假在原代班日期的安排已取消或更換人員，請重新整理請假管理核對');
   const roster=new Map((data.schedules||[]).map(r=>[key(r.empId),r.schedule||{}])),own=roster.get(key(entry.empId))||{},target=roster.get(key(cover.leaveEmpId))||{};
+  const originalShift=[target[leaveDate],target.__meta?.[leaveDate]?.leaveOriginalShift,
+   target.__meta?.[leaveDate]?.reportOriginalShift,entry.coverShift]
+   .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
+  const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
+  const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
+  if(split){
+   if(date!==split.workDate)throw Error('代班工作日期應為 '+split.workDate+'（原請假日期 '+leaveDate+'），不得把隔日早班加班登在前一天');
+   const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
+    .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
+   if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
+    periodHint:'此人原班別必須核對為'+split.normalShift+'班，不能將正常班誤當加班。'};
+   return {code:split.code,requirePeriodSelection:false,
+    periodHint:'原請假日 '+leaveDate+'；代班工作日 '+date+'；正常班 '+split.normalStart+'-'+split.normalEnd+
+     '；平日延時加班 '+split.overtimeStart+'-'+split.overtimeEnd+'（不含正常班）'};
+  }
   const meta=own.__meta?.[date]||{};
   if(meta.overtimeReport?.category==='代'&&key(meta.forEmpId)===key(cover.leaveEmpId)&&meta.overtimeReport.code)return {code:meta.overtimeReport.code,requirePeriodSelection:false};
   const shift=map=>{const value=map[date]??map[date.slice(-2)]??map[String(Number(date.slice(-2)))];if(['早','中','晚'].includes(value))return value;const m=map.__meta?.[date]||{};return [m.reportOriginalShift,m.overtimeOriginalShift,m.leaveOriginalShift].find(v=>['早','中','晚'].includes(v));};
@@ -1562,7 +1578,7 @@
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
      const selection=selectionKey();
-     const validationRequest={empId,date,leaveHandoffId:prefill.leaveHandoffId||''};
+     const validationRequest={empId,date,coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
      const validation=await prepareSaveValidation(validationRequest,!editingOriginal);
      if(selectionKey()!==selection)throw Error('核對期間申報內容已變更，請確認內容後再次儲存');
      // Deleted builtin types remain in GAS only to preserve OLD reports.
