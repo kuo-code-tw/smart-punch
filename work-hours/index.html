@@ -14987,8 +14987,10 @@ function p79OvertimePeriodLabel(report){
                     '／加班'+String(row.overtimeReport.overtimeStart)+'-'+String(row.overtimeReport.overtimeEnd)):'';
 
                 const p79Attribution=String(row.overtimeDate||row.overtimeReport?.overtimeDate||'');
+                const p79AttributionConfirmed=!!(row.reportVerified&&row.overtimeReport?.overtimeDate===p79Attribution);
                 const p79AttributionText=p79Attribution&&p79Attribution!==String(row.rosterDate||row.dateKey||'')?
-                    (row.reportVerified&&row.overtimeReport?.overtimeDate===p79Attribution?'加班歸屬':'預計加班歸屬')+p79Attribution+(row.reportVerified?'｜待核正式GAS':''):'';
+                    (p79AttributionConfirmed?'加班歸屬':'預計加班歸屬')+p79Attribution+
+                    (p79AttributionConfirmed?'':'（待核正式GAS）'):'';
                 const p79OvertimeConversionFull=row.overtimeReport
                     ?(row.reportVerified?(savedPlan?'未列入已完成工時':noPunchRest?'0小時':String(p79DisplayedOvertimeConversion(row.overtimeReport))):'尚未申報'):'';
                 const p79OvertimePlanState=p79WrongCoverDate?'僅正常班出勤／原預排待修正':savedPlan&&!noPunchRest
