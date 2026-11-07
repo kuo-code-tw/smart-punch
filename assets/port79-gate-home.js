@@ -173,27 +173,24 @@
 // and each article's max-height. The Gate six-tile panel must release both.
 // Inline important values take precedence over late-injected dashboard CSS;
 // they are removed when returning to the original vessel ranking.
-function gateNaturalHeight(open){
+/* Size belongs to the CSS ship-row breakpoints (260px desktop, 275px phone).
+ * Never set inline important max-content/auto here: it overrules the matching
+ * trend card and leaves Gate taller on desktop. Clean up previous inline rules
+ * when switching tabs; the scoped CSS performs the equal-height layout. */
+function gateNaturalHeight(){
  var panel=$('p79HomeGatePanel');
  var card=panel?.closest?.('article.p79d-gate-flip');
  var grid=card?.closest?.('.p79d-ship-panels');
- function props(el,values){
-  if(!el?.style)return;
-  Object.keys(values).forEach(function(key){
-   if(open)el.style.setProperty(key,values[key],'important');
-   else el.style.removeProperty(key);
-  });
- }
- props(grid,{'grid-auto-rows':'max-content','align-items':'start'});
- props(card,{'height':'auto','min-height':'0','max-height':'none',
-   'overflow':'visible','overflow-y':'visible','align-self':'start'});
- props(panel,{'height':'auto','min-height':'0','max-height':'none',
-   'overflow':'visible','overflow-y':'visible','flex':'0 0 auto'});
- // Old dashboard CSS also fixes children to a scrollable height: remove
- // those constraints on the Gate side, but not on the ship-ranking side.
  var metric=panel?.querySelector?.('.p79-gate-metrics');
- props(metric,{'height':'auto','max-height':'none','min-height':'0',
-   'overflow':'visible','overflow-y':'visible'});
+ [
+  [grid,['grid-auto-rows','align-items']],
+  [card,['height','min-height','max-height','overflow','overflow-y','align-self']],
+  [panel,['height','min-height','max-height','overflow','overflow-y','flex']],
+  [metric,['height','min-height','max-height','overflow','overflow-y']]
+ ].forEach(function(item){
+  if(!item[0]?.style)return;
+  item[1].forEach(function(key){item[0].style.removeProperty(key);});
+ });
 }
 function switchTab(which){
   // The two tabs flip only this one small ranking card, never the whole homepage.
