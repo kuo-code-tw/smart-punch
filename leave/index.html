@@ -1982,7 +1982,7 @@ async function p79ReconcileLeaveHandoff(){
    const originalDate=String(e.coverDate||e.date);
    const original=originalDate===e.date?data:await fetchEntry({...e,date:originalDate});
    const corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(original,{...h,id:e.leaveId||h.id},e);
-   if(corrected.coverDate!==corrected.date){
+   if(String(corrected.coverDate||corrected.date)!==String(corrected.date)){
     const oldEmployee=(original.schedules||[]).find(row=>
      String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
     const oldReport=oldEmployee?.schedule?.__meta?.[corrected.coverDate]?.overtimeReport;
@@ -1995,7 +1995,7 @@ async function p79ReconcileLeaveHandoff(){
     e=corrected;
     data=await fetchEntry(e);
    }else e=corrected;
-   if(e.coverDate!==e.date){
+   if(String(e.coverDate||e.date)!==String(e.date)){
     // Some older GAS context reads omit cover assignments on the NEXT workday.
     // Supplement only from the separately verified ORIGINAL leave-date read.
     const validCover=(original.leaveCoverAssignments||[]).filter(c=>
