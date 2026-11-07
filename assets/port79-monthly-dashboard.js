@@ -214,7 +214,7 @@ function analyzeAttendance(data,month,boundaryRecords,reviewOptions={}){
   const date=String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-');
   if(!date.startsWith(month+'-')||date>today||s.clockIn&&s.clockOut&&!s.timePrecisionIssue)return false;
    if(s.clockIn&&!s.clockOut&&!s.timePrecisionIssue&&p79HomePendingTiming(s,date,reviewOptions.scheduleData,now).stillWorking)return false;
-   return date<today||date===today&&!s.clockIn&&!!s.clockOut;
+   return date<today;
  }):null;
  const pendingDetails=reviewShifts===null?null:reviewShifts.map((s,i)=>({
   key:String(s.key||i),date:String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-'),
