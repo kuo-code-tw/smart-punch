@@ -137,12 +137,34 @@
   }
   if(active==='gate')void loadYear(year);else render();
  }
- function switchTab(which){
+ // The vessel dashboard's base stylesheet fixes *both* the grid row (260/275px)
+// and each article's max-height. The Gate six-tile panel must release both.
+// Inline important values take precedence over late-injected dashboard CSS;
+// they are removed when returning to the original vessel ranking.
+function gateNaturalHeight(open){
+ var panel=$('p79HomeGatePanel');
+ var card=panel?.closest?.('article.p79d-gate-flip');
+ var grid=card?.closest?.('.p79d-ship-panels');
+ function props(el,values){
+  if(!el?.style)return;
+  Object.keys(values).forEach(function(key){
+   if(open)el.style.setProperty(key,values[key],'important');
+   else el.style.removeProperty(key);
+  });
+ }
+ props(grid,{'grid-auto-rows':'auto'});
+ props(card,{'height':'auto','min-height':'0','max-height':'none',
+   'overflow':'visible','overflow-y':'visible','align-self':'start'});
+ props(panel,{'height':'auto','min-height':'0','max-height':'none',
+   'overflow':'visible','overflow-y':'visible','flex':'0 0 auto'});
+}
+function switchTab(which){
   // The two tabs flip only this one small ranking card, never the whole homepage.
   if(which!=='operations'&&which!=='gate')return;
   active=which;
   var isGate=which==='gate';
   $('p79Dashboard')?.classList?.toggle('p79-gate-view-active',isGate);
+  gateNaturalHeight(isGate);
   $('p79HomeOperationsTab')?.setAttribute('aria-selected',String(!isGate));
   $('p79HomeGateTab')?.setAttribute('aria-selected',String(isGate));
   var ranking=$('p79RankingView'),section=$('p79HomeGatePanel');
