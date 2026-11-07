@@ -7,6 +7,7 @@ on:
       - 'leave/index.html'
       - 'work-hours/index.html'
       - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - 'tests/overtime-leave-handoff-nextday-preplan.cjs'
       - '.github/workflows/night-leave-cover-workday.yml'
   push:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - 'leave/index.html'
       - 'work-hours/index.html'
       - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - 'tests/overtime-leave-handoff-nextday-preplan.cjs'
       - '.github/workflows/night-leave-cover-workday.yml'
 permissions:
   contents: read
@@ -30,6 +32,7 @@ jobs:
       - name: Check original leave date, each cover workday, and full-punch confirmation
         run: |
           node tests/overtime-night-leave-cover-individual-workday.cjs
+          node tests/overtime-leave-handoff-nextday-preplan.cjs
           node tests/overtime-extension-cross-midnight-workdate.cjs
           node tests/leave-cover-auto-suggest.cjs
           node tests/overtime-clockout-policy.cjs
