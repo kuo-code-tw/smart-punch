@@ -54,6 +54,55 @@ function weeklyEfficiency(vessels,month,today=taipeiDay()){
  for(const day of days)if(day.hours>0)day.gph=day.quantity/day.hours;
  return {...window,days};
 }
+
+function shipCompletionTimestamp(master){
+ const ws=master?.workingSheetSource||{};
+ // WORKING SHEET LASHING is the actual completion instant; importing a file is not completion.
+ const sources=[master?.lashingDateTime,ws.lashingDateTime,master?.actualCompletionDateTime,
+  master?.workCompletionDateTime,master?.finishDateTime,master?.completionDateTime,
+  ws.actualCompletionDateTime,ws.completionDateTime];
+ const pad=v=>String(v).padStart(2,'0');
+ for(const raw of sources){
+  const m=String(raw??'').trim().match(/^(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/i);
+  if(!m)continue;
+  const year=+m[1],month=+m[2],day=+m[3],hour=+m[4],minute=+m[5],second=+(m[6]||0);
+  const check=new Date(Date.UTC(year,month-1,day));
+  if(check.getUTCFullYear()!==year||check.getUTCMonth()!==month-1||check.getUTCDate()!==day||hour>23||minute>59||second>59)continue;
+  const local=year+'-'+pad(month)+'-'+pad(day)+'T'+pad(hour)+':'+pad(minute)+':'+pad(second);
+  if(!m[7])return local; // WORKING SHEET stores Taiwan local wall time with no offset.
+  const zone=m[7].replace(/^([+-]\d{2})(\d{2})$/,'$1:$2');
+  const instant=new Date(local+zone);
+  if(!Number.isFinite(instant.getTime()))continue;
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',
+   day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(instant);
+  const fields={};parts.forEach(p=>{if(p.type!=='literal')fields[p.type]=p.value;});
+  return fields.year+'-'+fields.month+'-'+fields.day+'T'+fields.hour+':'+fields.minute+':'+fields.second;
+ }
+ return '';
+}
+function shipCompletionDate(master,completedAt=shipCompletionTimestamp(master)){
+ if(completedAt)return completedAt.slice(0,10);
+ const ws=master?.workingSheetSource||{};
+ for(const raw of [master?.lashingDate,ws.lashingDate,master?.lastDate,master?._cloudLastDate,
+  master?.cloudLastDate,master?.workEndDate,master?.endDate,ws.endDate]){
+  const m=String(raw??'').trim().match(/^(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(!m)continue;
+  const y=+m[1],mo=+m[2],d=+m[3],check=new Date(Date.UTC(y,mo-1,d));
+  if(check.getUTCFullYear()===y&&check.getUTCMonth()===mo-1&&check.getUTCDate()===d)
+   return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+ }
+ return '';
+}
+function latestCompletedVessels(vessels,limit=5){
+ const jobs=new Map(),key=v=>String(v.completedAt||v.completionDate||v.date||'');
+ for(const v of vessels||[]){
+  if(!v||v.deleted)continue;
+  const id=String(v.workingNo||v.name+'|'+v.voyage),prior=jobs.get(id);
+  if(!prior||key(v)>key(prior))jobs.set(id,v);
+ }
+ return [...jobs.values()].sort((a,b)=>key(b).localeCompare(key(a))||
+  String(a.workingNo||a.name).localeCompare(String(b.workingNo||b.name))).slice(0,limit);
+}
 function latestImportedVessels(vessels,limit=5){
  const jobs=new Map();for(const v of vessels){if(v.deleted||!Number.isFinite(Date.parse(String(v.importedAt||''))))continue;const key=v.workingNo||v.name+'|'+v.voyage;const previous=jobs.get(key);if(!previous||Date.parse(v.importedAt)>Date.parse(previous.importedAt))jobs.set(key,v);}
  return [...jobs.values()].sort((a,b)=>Date.parse(b.importedAt)-Date.parse(a.importedAt)||String(a.workingNo).localeCompare(String(b.workingNo))).slice(0,limit);
@@ -106,6 +155,7 @@ function analyzeVessels(data){
   );
   const boxes=numberFrom(m,['totalContainers','ttlCtnr','TTLCtnr','containerCount']);
   const rate=numberFrom(m,['gph','shipGph']);
+  const completedAt=shipCompletionTimestamp(m),completionDate=shipCompletionDate(m,completedAt);
   if(moves!==null){totalMoves+=moves;validMoves++}
   if(boxes!==null){containers+=boxes;validContainers++}
   if(rate!==null&&rate>=0){rateSum+=rate;rateCount++;if(moves!==null&&moves>0){weight+=moves;weighted+=rate*moves}}
@@ -114,7 +164,7 @@ function analyzeVessels(data){
    workingNo:String(m.workingNo||''),voyage:String(first(m,['voyageE','voyageI','voyage'])||''),
    // 與正式船舶管理系統的「碼頭」欄位一致，不推測缺失的靠泊資料。
    wharf:String(first(m,['wharf','berth','berthNo','terminal','pier'])??first(m.workingSheetSource,['wharf','berth','berthNo','terminal','pier'])??'').trim(),
-   moves,containers:boxes,rate,importedAt:importTimestamp(m),deleted:m.deleted===true||m.isDeleted===true||!!m.deletedAt,date:attendanceDate({date:first(m,['_cloudLastDate','lastDate','endDate','finishTime'])}),hours:null,status:String(m.status||'')};
+   moves,containers:boxes,rate,completedAt,completionDate,importedAt:importTimestamp(m),deleted:m.deleted===true||m.isDeleted===true||!!m.deletedAt,date:attendanceDate({date:first(m,['_cloudLastDate','lastDate','endDate','finishTime'])}),hours:null,status:String(m.status||'')};
  });
  vessels.sort((a,b)=>(b.moves??-1)-(a.moves??-1));
  const people=new Map(),jobHours=new Map();let workHours=0,timedRows=0;
@@ -271,7 +321,7 @@ function analyzeOvertime(data,month){
  return {month,hours,count,rows:[...titles.values()].sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW')),
   details:details.sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name,'zh-TW')||a.id.localeCompare(b.id))};
 }
-const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,weeklyWindow,weeklyEfficiency,latestImportedVessels,shipScheduleRows,displayPersonName,rosterGroup,assignPersonGroups};
+const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,importTimestamp,shipCompletionTimestamp,shipCompletionDate,latestCompletedVessels,weeklyWindow,weeklyEfficiency,latestImportedVessels,shipScheduleRows,displayPersonName,rosterGroup,assignPersonGroups};
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
