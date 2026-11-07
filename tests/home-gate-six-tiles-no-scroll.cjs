@@ -1,0 +1,34 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'assets/port79-gate-home.css'),'utf8');
+const js=fs.readFileSync(path.join(root,'assets/port79-gate-home.js'),'utf8');
+const begin=html.indexOf('<section id="p79HomeGatePanel"');
+const end=html.indexOf('</section>',begin);
+assert(begin>=0&&end>begin,'Gate card present');
+const card=html.slice(begin,end);
+const metricStart=card.indexOf('<div class="p79-gate-metrics">');
+const metricEnd=card.indexOf('<div class="p79-gate-footer">',metricStart);
+assert(metricStart>0&&metricEnd>metricStart,'KPI grid and footer');
+const metricMarkup=card.slice(metricStart,metricEnd);
+for(const id of ['p79GateDeliverEmpty','p79GatePickupEmpty','p79GateDeliverLoaded','p79GatePickupLoaded','p79GateTruckEntries','p79GateTotalContainers']){
+ assert(metricMarkup.includes('id="'+id+'"'),id+' is one of six tiles');
+ assert.equal(card.split('id="'+id+'"').length,2,'single '+id);
+}
+assert.equal((metricMarkup.match(/<div(?: class="[^"]*")?><span>/g)||[]).length,6,'six cards exactly');
+assert(!card.includes('href='),'homepage Gate remains read-only');
+assert(!card.includes('匯入 Gate Excel')&&!card.includes('下載 CSV'),'import/export are not on homepage');
+assert(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important'),'three tiles per row on desktop');
+assert(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'),'two tiles per row on mobile');
+assert(css.includes('#p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip'),'auto sizing scoped to Gate');
+assert(css.includes('height:auto!important')&&css.includes('max-height:none!important'),'no fixed Gate card height');
+const rootRule=css.slice(css.indexOf('#p79HomeGatePanel.p79-gate-section'),css.indexOf('#p79HomeGatePanel[hidden]'));
+assert(rootRule.includes('overflow:visible!important'),'Gate content must not scroll internally');
+assert(!rootRule.includes('overflow:auto'),'remove old Gate vertical scrollbar');
+assert(css.includes('div.p79-gate-total'),'total highlighted as sixth tile');
+assert(js.includes("classList?.toggle('p79-gate-view-active',isGate)"),'switchTab toggles natural layout');
+assert(js.includes("fmt(totals.deliverEmpty+totals.pickupEmpty+totals.deliverLoaded+totals.pickupLoaded)"),'total derived from four fields');
+console.log('PASS: Gate is a read-only 3x2 colorful KPI grid without an inner scrollbar; mobile stacks two columns.');
