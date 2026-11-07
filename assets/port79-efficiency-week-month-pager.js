@@ -153,7 +153,7 @@ function draw(p,report){
   if(ceiling-floor<step*3)ceiling=floor+step*4;
  }
  var range=ceiling-floor;
- var gap=pw/days.length,grid='',texts='',segments=[],part=[];
+ var gap=pw/days.length,grid='',texts='',connected=[];
  var escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  for(var tickIndex=0,tickCount=Math.round(range/step);tickIndex<=tickCount;tickIndex++){
   var tick=floor+tickIndex*step,y0=top+ph-(tick-floor)/range*ph;
@@ -164,16 +164,15 @@ function draw(p,report){
   var x=left+gap*(i+.5),row=days[i],label=mode==='week'?Number(row.date.slice(5,7))+'/'+Number(row.date.slice(-2)):Number(row.date.slice(5,7))+'月';
   texts+='<text x="'+x+'" y="'+(h-8)+'" text-anchor="middle">'+label+'</text>';
   if(row.gph===null){
-   if(part.length)segments.push(part);part=[];
    texts+='<text x="'+x+'" y="'+(top+ph-9)+'" text-anchor="middle" opacity=".45" font-size="11">'+(row.failed?'!':'—')+'</text>';
    continue;
   }
-  var y=top+ph-(row.gph-floor)/range*ph;part.push([x,y]);
+  var y=top+ph-(row.gph-floor)/range*ph;connected.push([x,y]);
   texts+='<circle cx="'+x+'" cy="'+y+'" r="4.5" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+(mode==='week'?'':' 月')+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
   if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
  }
- if(part.length)segments.push(part);
- var lines=segments.map(s=>'<polyline points="'+s.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
+ // Gaps represent absent observations, not zeros. Join the neighboring observed points.
+ var lines=connected.length>1?'<polyline points="'+connected.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>':'';
  chartEl.innerHTML='<svg class="p79-eff-svg" style="font-size:12px" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+escape((mode==='week'?'每週每日':'年度逐月')+'船舶效率，'+p.start+' 至 '+p.end)+'">'+grid+lines+texts+'</svg>';
  lastChartSize=chartEl.clientWidth+'x'+chartEl.clientHeight;
 }
