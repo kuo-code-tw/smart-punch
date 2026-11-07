@@ -436,8 +436,10 @@ async function refreshPendingReviewFromCloud(){
   if(!pendingReviewDialog.open||month()!==ym||session()?.empId!==empId||
     (root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token||!permissions().attendance)return;
   if(!Array.isArray(data.records))throw Error('雲端考勤明細格式不完整');
-  const checked=await verifyAttendancePendingWithOfficial(data,ym,token);
+  const scheduleData=permissions().schedule?await request('schedule',ym,token,true).catch(()=>null):null;
+  const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleData);
   showAttendance(checked);
+  if(scheduleData)enrichPendingReview(scheduleData);
   if(checked.boundaryError)pendingReviewError=checked.boundaryError;
   pendingReviewVerifiedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
   lastPendingReadAt=Date.now();
@@ -561,8 +563,8 @@ async function requestOfficialAttendanceAudit(action,ym,token){
  if(!Array.isArray(data.records)||data.month&&String(data.month)!==ym)throw Error('正式考勤回傳資料不完整或月份不符');
  return data;
 }
-async function verifyAttendancePendingWithOfficial(data,ym,token){
- let result=await reconcileAttendanceBoundary(data,ym,token,true);
+async function verifyAttendancePendingWithOfficial(data,ym,token,scheduleData){
+ let result=await reconcileAttendanceBoundary(data,ym,token,true,scheduleData);
  if(result.pendingShifts===0)return result;
  // 歷史資料快取可能保留已補卡前的舊結果。再讀「正式主表」無快取核對。
  // 主表無法確認時，以全來源無損資料複核；任何查詢失敗都不把舊名單當真。
@@ -579,8 +581,8 @@ async function verifyAttendancePendingWithOfficial(data,ym,token){
  }
  return result;
 }
-async function reconcileAttendanceBoundary(data,ym,token,forceCloud){
- const initial=analyzeAttendance(data,ym);
+async function reconcileAttendanceBoundary(data,ym,token,forceCloud,scheduleData){
+ const initial=analyzeAttendance(data,ym,null,{scheduleData});
  if(!Array.isArray(initial.pendingDetails)||!initial.pendingDetails.some(r=>r.date===ym+'-01'&&!r.clockIn&&r.clockOut))return initial;
  const lastPrevDay=new Date(Date.UTC(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,0)).toISOString().slice(0,10);
  try{
@@ -588,7 +590,7 @@ async function reconcileAttendanceBoundary(data,ym,token,forceCloud){
   if(!Array.isArray(previous.records))throw Error('上月正式考勤格式不完整');
   const neighbors=previous.records.filter(r=>attendanceDate(r)===lastPrevDay);
   if(!neighbors.length)throw Error('無法取得上月最後一天正式打卡資料');
-  return analyzeAttendance(data,ym,neighbors);
+  return analyzeAttendance(data,ym,neighbors,{scheduleData});
  }catch(error){
   // 查不到上月資料只能標為「未核對」，不能把跨月正常班次灌進異常統計。
   return {...initial,pendingDetails:null,pendingShifts:null,boundaryError:String(error?.message||error)};
@@ -609,7 +611,7 @@ async function load(forceCloud=false){
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
    if(!allowed){statusText(captionId,accessError());if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});renderHomeOvertimeList(null);}continue}
    try{
-    const data=await request(kind,ym,token,kind==='attendance'?true:forceCloud);
+    const data=kind==='schedule'&&scheduleSnapshot?scheduleSnapshot:await request(kind,ym,token,kind==='attendance'?true:forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
     if(kind==='vessel'&&Array.isArray(data.shipMasters)){
      const report=analyzeVessels(data),range=weeklyWindow(ym);
@@ -621,9 +623,13 @@ async function load(forceCloud=false){
      render(report);
     }
     else if(kind==='attendance'&&Array.isArray(data.records)){
-      const checked=await verifyAttendancePendingWithOfficial(data,ym,token);
+      if(p.schedule&&!scheduleSnapshot){
+       try{scheduleSnapshot=await request('schedule',ym,token,true);}catch(_){scheduleSnapshot=null;}
+      }
+      const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleSnapshot);
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().attendance)return;
       render(checked);
+      if(scheduleSnapshot)enrichPendingReview(scheduleSnapshot);
     }
     else if(kind==='schedule'&&Array.isArray(data.schedules)){
       scheduleSnapshot=data;
