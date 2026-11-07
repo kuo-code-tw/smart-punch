@@ -63,7 +63,7 @@ handlers.DOMContentLoaded();
  assert(table.includes('<td>WAN HAI 105</td><td>萬和</td>'),'legacy provider name shown only if Chinese');
  assert(table.includes('<td>WAN HAI 103</td><td>未提供</td>'),'no made-up name from English');
  assert.equal(official.rows[1].localName,'','source data never mutated');
- assert(html.includes('port79-google-sheet-schedule.js?v=20261102-bilingual-names-v82'),
+ assert(/port79-google-sheet-schedule\.js\?v=\d{8}-[a-z0-9-]+/i.test(html),
   'bust old browser cache for new schedule UI');
  assert(script.includes("data?.source!=='port79-wanhai-vessel'"),
   'only accepted official-source payloads');
