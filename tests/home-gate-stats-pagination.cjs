@@ -10,8 +10,10 @@ const css=fs.readFileSync(path.join(root,'assets/port79-gate-home.css'),'utf8');
 for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateTruckEntries']){
  assert(html.includes('id="'+key+'"'),key+' present in homepage');
 }
-assert(html.includes('port79-gate-home.js?v=20261107-gate-home-tabs-v1'));
-assert(html.includes('port79-gate-home.css?v=20261107-gate-home-tabs-v1'));
+assert(html.includes('port79-gate-home.js?v=20261107-gate-compact-card-v2'));
+assert(html.includes('port79-gate-home.css?v=20261107-gate-compact-card-v2'));
+assert(html.includes('href="./gate-import/"'),'Gate Excel import link belongs to compact card');
+assert(!html.includes('id="p79HomeStatTabs"'),'no whole-homepage tabs');
 assert(css.includes('#p79Dashboard #p79HomeGatePanel[hidden]'),'new panel truly hidden by default');
 assert(!js.includes('5344')&&!js.includes('1124'),'operational XLSX values must not be hard-coded in public source');
 class Element{
@@ -59,7 +61,8 @@ assert.equal(dup.days,2,'duplicate dates count once');
 assert.equal(dup.totals.truckEntries,1281,'last corrected day replaces earlier day');
 $('p79HomeGateTab').click();
 assert.equal($('p79HomeGatePanel').hidden,false);
-assert(operationEls.every(e=>e.hidden));
+assert.equal($('p79RankingView').hidden,true,'only imported-vessel ranking is hidden');
+assert(operationEls.every(e=>!e.hidden),'other homepage panels must remain visible');
 assert.equal($('p79HomeGateTab').attrs['aria-selected'],'true');
 $('p79GateYear').click();
 assert.equal($('p79GateYear').attrs['aria-pressed'],'true');
@@ -68,6 +71,7 @@ const expectedYear=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei
 assert($('p79GatePeriod').textContent.includes(String(expectedYear)),'year arrow moves backward one year');
 $('p79HomeOperationsTab').click();
 assert.equal($('p79HomeGatePanel').hidden,true);
-assert(operationEls.every(e=>e.hidden===false),'original homepage restored');
+assert.equal($('p79RankingView').hidden,false,'ranking card restored');
+assert(operationEls.every(e=>!e.hidden),'whole homepage never changes visibility');
 assert.equal($('p79HomeOperationsTab').attrs['aria-selected'],'true');
 console.log('PASS: compact homepage gate tab, month/year paging, five counts, date dedupe, and private-data safeguards');
