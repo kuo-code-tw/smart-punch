@@ -24,8 +24,13 @@ assert(override.includes('article.p79d-panel.p79d-gate-flip'));
 assert(override.includes('max-height:none!important'));
 assert(override.includes('overflow:visible!important'));
 assert(gateCSS.includes('#p79Dashboard.p79-gate-view-active'),'Gate CSS also scopes expanded layout');
-for(const file of ['port79-reference-dashboard.css','port79-gate-home.css','port79-gate-home.js']){
- assert(new RegExp(file.replace(/\./g,'\\.')+'\\?v=20261107-gate-grid-track-fix-v4').test(html),'cache bust updated for '+file);
+const versions={
+ 'port79-reference-dashboard.css':'20261107-gate-grid-track-fix-v4',
+ 'port79-gate-home.css':'20261107-gate-dwmy-v1',
+ 'port79-gate-home.js':'20261107-gate-dwmy-v1'
+};
+for(const [file,version] of Object.entries(versions)){
+ assert(html.includes(file+'?v='+version),'cache bust updated for '+file);
 }
 function style(){
  const m=new Map();
