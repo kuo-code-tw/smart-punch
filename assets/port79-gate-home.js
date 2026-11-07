@@ -16,14 +16,12 @@
  var names=['deliverEmpty','pickupEmpty','deliverLoaded','pickupLoaded','truckEntries'];
  var ids=['p79GateDeliverEmpty','p79GatePickupEmpty','p79GateDeliverLoaded','p79GatePickupLoaded','p79GateTruckEntries'];
  var fmt=n=>Number(n).toLocaleString('zh-TW');
- var mode='month',month='',year='',active='operations',generation=0;
- var memory=new Map(),authStamp='';
- var initialized=false;
- function taipeiMonth(){
-  var parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());
-  var y=parts.find(v=>v.type==='year')?.value||String(new Date().getUTCFullYear());
-  var m=parts.find(v=>v.type==='month')?.value||'01';
-  return y+'-'+m.padStart(2,'0');
+ var mode='month',month='',year='',day='',active='operations',generation=0;
+ var memory=new Map(),authStamp='',initialized=false;
+ function taipeiToday(){
+  var parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  var part=type=>parts.find(p=>p.type===type)?.value||'';
+  return part('year')+'-'+part('month')+'-'+part('day');
  }
  function auth(){
   var s=null;
@@ -57,85 +55,119 @@
   });
   return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
  }
+ function shiftDate(value,amount){
+  var dt=new Date(value+'T00:00:00Z');
+  dt.setUTCDate(dt.getUTCDate()+amount);
+  return dt.toISOString().slice(0,10);
+ }
+ function rangeFor(which,anchor){
+  var date=anchor||day;
+  var yr=date.slice(0,4),mo=date.slice(0,7);
+  if(which==='day')return {start:date,end:date,label:date.replace(/-/g,'/')};
+  if(which==='week'){
+   var weekday=new Date(date+'T00:00:00Z').getUTCDay();
+   var monday=shiftDate(date,-((weekday+6)%7));
+   var sunday=shiftDate(monday,6);
+   return {start:monday,end:sunday,label:monday.slice(5).replace('-','/')+'－'+sunday.slice(5).replace('-','/')+' 週'};
+  }
+  if(which==='month'){
+   var last=new Date(Date.UTC(Number(yr),Number(mo.slice(5)),0)).getUTCDate();
+   return {start:mo+'-01',end:mo+'-'+String(last).padStart(2,'0'),label:yr+' 年 '+Number(mo.slice(5))+' 月'};
+  }
+  return {start:yr+'-01-01',end:yr+'-12-31',label:yr+' 年'};
+ }
+ function periodYears(range){
+  return [...new Set([range.start.slice(0,4),range.end.slice(0,4)])];
+ }
+ function sumRows(rows,range){
+  var subset=rows.filter(r=>r.date>=range.start&&r.date<=range.end);
+  if(!subset.length)return {days:0,totals:null};
+  var sums=Object.fromEntries(names.map(k=>[k,0]));
+  subset.forEach(r=>names.forEach(k=>{sums[k]+=r[k];}));
+  return {days:subset.length,totals:sums};
+ }
  function setStats(totals){
   ids.forEach((id,i)=>{var el=$(id);if(el)el.textContent=totals?fmt(totals[names[i]]):'—';});
   var total=$('p79GateTotalContainers');
   if(total)total.textContent=totals?
    fmt(totals.deliverEmpty+totals.pickupEmpty+totals.deliverLoaded+totals.pickupLoaded):'—';
  }
- function status(message,detail){var el=$('p79GateStatus');if(el){el.textContent=message;el.title=detail||'';}}
- function monthText(m){return m.slice(0,4)+' 年 '+Number(m.slice(5,7))+' 月'}
- function aggregate(rows){
-  var subset=mode==='month'?rows.filter(r=>r.date.slice(0,7)===month):rows;
-  if(!subset.length)return {days:0,totals:null};
-  var sums=Object.fromEntries(names.map(k=>[k,0]));
-  subset.forEach(r=>names.forEach(k=>{sums[k]+=r[k];}));
-  return {days:subset.length,totals:sums};
+ function status(message,detail){
+  var el=$('p79GateStatus');if(el){el.textContent=message;el.title=detail||'';}
  }
  function render(){
-  var m=$('p79GatePeriod');if(m)m.textContent=mode==='month'?monthText(month):year+' 年度累計';
-  var b1=$('p79GateMonth'),b2=$('p79GateYear');
-  if(b1)b1.setAttribute('aria-pressed',String(mode==='month'));
-  if(b2)b2.setAttribute('aria-pressed',String(mode==='year'));
-  var previous=$('p79GatePrev'),next=$('p79GateNext');
-  if(previous)previous.setAttribute('aria-label',mode==='month'?'上一個月':'上一年');
-  if(next)next.setAttribute('aria-label',mode==='month'?'下一個月':'下一年');
-  var stored=memory.get(year);
-  if(!stored){setStats(null);return;}
-  var result=aggregate(stored);
+  var range=rangeFor(mode,day),period=$('p79GatePeriod');
+  if(period)period.textContent=range.label;
+  for(var kind of ['day','week','month','year']){
+   var button=$('p79Gate'+kind[0].toUpperCase()+kind.slice(1));
+   if(button)button.setAttribute('aria-pressed',String(mode===kind));
+  }
+  var captions={day:['前一天','後一天'],week:['上一週','下一週'],month:['上一個月','下一個月'],year:['上一年','下一年']};
+  $('p79GatePrev')?.setAttribute('aria-label',captions[mode][0]);
+  $('p79GateNext')?.setAttribute('aria-label',captions[mode][1]);
+  if(!periodYears(range).every(yr=>memory.has(yr))){setStats(null);return;}
+  var rows=periodYears(range).flatMap(yr=>memory.get(yr));
+  var result=sumRows(rows,range);
   setStats(result.totals);
-  status(result.days?'累計 '+result.days+' 個作業日':'本期尚無統計資料');
+  status(result.days?'已記錄 '+result.days+' 天 · 本期合計':'此期間尚無 Gate 資料');
  }
  function updateAuth(){
   var current=auth();
   if(authStamp!==current.stamp){authStamp=current.stamp;memory.clear();}
   return current;
  }
- async function loadYear(yr){
-  var current=updateAuth(),requestId=++generation;
+ async function loadPeriod(){
+  var current=updateAuth(),requestId=++generation,range=rangeFor(mode,day);
   render();
-  if(!current.allowed||!current.token){status('登入後即可查看累計');return;}
-  if(memory.has(yr)){render();return;}
+  if(!current.allowed||!current.token){status('請登入有權限的帳號查看');return;}
+  var missing=periodYears(range).filter(yr=>!memory.has(yr));
+  if(!missing.length){render();return;}
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(current.url)||!g.P79HistoryRead?.read){
-   status('累計資料尚未同步');return;
+   status('Gate 正式資料服務尚未就緒');return;
   }
-  status('讀取累計資料中…');
+  status('正在讀取正式 Gate 資料…');
   try{
-   var u=new URL(current.url);
-   u.searchParams.set('action','gateStatsReadYear');
-   u.searchParams.set('year',yr);
-   u.searchParams.set('gcToken',current.token);
-   u.searchParams.set('token',current.token);
-   var data=await g.P79HistoryRead.read(u.toString(),{forceCloud:true});
-   if(requestId!==generation||auth().stamp!==current.stamp||yr!==year||active!=='gate')return;
-   if(data?.ok!==true||data?.source!=='port79-gate-daily'||String(data?.year)!==yr||!Array.isArray(data?.rows))
-    throw Error('進出站櫃量服務尚未啟用或回傳格式不符');
-   memory.set(yr,normalize(data.rows,yr));
+   await Promise.all(missing.map(async function(yr){
+    var u=new URL(current.url);
+    u.searchParams.set('action','gateStatsReadYear');
+    u.searchParams.set('year',yr);
+    u.searchParams.set('gcToken',current.token);
+    u.searchParams.set('token',current.token);
+    var data=await g.P79HistoryRead.read(u.toString(),{forceCloud:true});
+    if(data?.ok!==true||data?.source!=='port79-gate-daily'||String(data?.year)!==yr||!Array.isArray(data?.rows))
+     throw Error('正式 Gate 資料查詢格式不符');
+    if(requestId===generation&&auth().stamp===current.stamp&&active==='gate')
+     memory.set(yr,normalize(data.rows,yr));
+   }));
+   if(requestId!==generation||auth().stamp!==current.stamp||active!=='gate')return;
    render();
   }catch(error){
-   if(requestId!==generation||yr!==year||active!=='gate')return;
+   if(requestId!==generation||active!=='gate')return;
    setStats(null);
-   status('累計資料暫時無法取得',String(error?.message||error).slice(0,140));
+   status('正式 Gate 資料暫時無法取得',String(error?.message||error).slice(0,140));
   }
  }
  function chooseMode(next){
-  if(next!=='month'&&next!=='year')return;
-  mode=next;
-  year=month.slice(0,4);
-  if(active==='gate')void loadYear(year);else render();
+  if(!['day','week','month','year'].includes(next))return;
+  // On first daily view, show the newest confirmed day within the selected month,
+  // rather than a blank current date while today's report has not been imported.
+  if(next==='day'&&mode!=='day'&&memory.has(day.slice(0,4))){
+   var candidates=memory.get(day.slice(0,4)).filter(r=>r.date.slice(0,7)===day.slice(0,7)&&r.date<=day);
+   if(candidates.length)day=candidates[candidates.length-1].date;
+  }
+  mode=next;month=day.slice(0,7);year=day.slice(0,4);
+  if(active==='gate')void loadPeriod();else render();
  }
  function move(step){
-  if(mode==='month'){
-   var parts=month.split('-').map(Number);
+  if(mode==='day')day=shiftDate(day,step);
+  else if(mode==='week')day=shiftDate(day,step*7);
+  else if(mode==='month'){
+   var parts=day.split('-').map(Number);
    var dt=new Date(Date.UTC(parts[0],parts[1]-1+step,1));
-   month=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0');
-   year=month.slice(0,4);
-  }else{
-   year=String(Number(year)+step);
-   if(!/^20\d{2}$/.test(year)){year=String(Math.max(2000,Math.min(2099,Number(year))));}
-   month=year+month.slice(4);
-  }
-  if(active==='gate')void loadYear(year);else render();
+   day=dt.toISOString().slice(0,7)+'-01';
+  }else day=String(Math.max(2000,Math.min(2099,Number(day.slice(0,4))+step)))+'-01-01';
+  month=day.slice(0,7);year=day.slice(0,4);
+  if(active==='gate')void loadPeriod();else render();
  }
  // The vessel dashboard's base stylesheet fixes *both* the grid row (260/275px)
 // and each article's max-height. The Gate six-tile panel must release both.
@@ -172,7 +204,7 @@ function switchTab(which){
   if(section)section.hidden=!isGate;
   var count=$('p79DashShipRankingCount');
   if(count)count.hidden=isGate;
-  if(isGate)void loadYear(year);
+  if(isGate)void loadPeriod();
  }
  // This read-only injection point is for a future authenticated cloud importer.
  // Never persist business figures in localStorage or ship them in public source code.
@@ -184,9 +216,11 @@ function switchTab(which){
  }
  function init(){
   if(initialized||!$('p79HomeGatePanel'))return;
-  initialized=true;month=taipeiMonth();year=month.slice(0,4);
+  initialized=true;day=taipeiToday();month=day.slice(0,7);year=day.slice(0,4);
   $('p79HomeOperationsTab')?.addEventListener('click',()=>switchTab('operations'));
   $('p79HomeGateTab')?.addEventListener('click',()=>switchTab('gate'));
+  $('p79GateDay')?.addEventListener('click',()=>chooseMode('day'));
+  $('p79GateWeek')?.addEventListener('click',()=>chooseMode('week'));
   $('p79GateMonth')?.addEventListener('click',()=>chooseMode('month'));
   $('p79GateYear')?.addEventListener('click',()=>chooseMode('year'));
   $('p79GatePrev')?.addEventListener('click',()=>move(-1));
@@ -201,12 +235,10 @@ function switchTab(which){
   });
   render();
  }
- g.P79GateStatsHome={setYearRows,normalize,aggregateFor:function(rows,yr,selectedMode,selectedMonth){
-  var prevMode=mode,prevMonth=month;
-  mode=selectedMode==='year'?'year':'month';month=selectedMonth;
-  var result=aggregate(normalize(rows,String(yr)));
-  mode=prevMode;month=prevMonth;
-  return result;
+ g.P79GateStatsHome={setYearRows,normalize,rangeFor,aggregateFor:function(rows,yr,selectedMode,selectedAnchor){
+  var anchor=String(selectedAnchor||yr+'-01-01');
+  if(/^\d{4}-\d{2}$/.test(anchor))anchor+='-01';
+  return sumRows(normalize(rows,String(yr)),rangeFor(['day','week','month','year'].includes(selectedMode)?selectedMode:'month',anchor));
  },chooseMode,move,switchTab};
  if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);
