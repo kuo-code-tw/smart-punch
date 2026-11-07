@@ -78,8 +78,8 @@ async function run(initial,original=origin){
  assert(report.includes("if(prefill.leaveHandoffId)return;dateInput.value=leaveDateSelect.value;"),
   'original leave picker cannot overwrite verified next-day worker date');
  assert(leave.includes('p79ReconcileLeaveHandoff()'));
- for(const m of leave.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi))
-  if(!/\\bsrc=|application\\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
+ for(const m of leave.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
+  if(!/\bsrc=|application\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
  new vm.Script(report);
  console.log('PASS old 11/07 night leave queue opens next-day 11/08 04-08 planned overtime; original leave stays 11/07; future punches not required; repeat/duplicate safe');
 })().catch(e=>{console.error(e);process.exitCode=1;});
