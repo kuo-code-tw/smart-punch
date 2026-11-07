@@ -245,11 +245,11 @@ html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div
 /* 2026-11-07 | Gate card only. Six values visible at once, 3x2 desktop /
    2x3 narrow mobile. Override the older vessel dashboard's 260/275px row
    and scroll constraints without changing the imported-vessels view. */
-html body #p79Dashboard.p79-gate-view-active .p79d-ship-panels {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-ship-panels {
   grid-auto-rows:max-content!important;
   align-items:start!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-panel.p79d-ranking.p79d-gate-flip {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-panel.p79d-ranking.p79d-gate-flip {
   display:flex!important;
   flex-direction:column!important;
   height:auto!important;
@@ -259,7 +259,7 @@ html body #p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-pa
   overflow-y:visible!important;
   align-self:start!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel.p79-gate-section {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel.p79-gate-section {
   display:flex!important;
   flex:0 0 auto!important;
   flex-direction:column!important;
@@ -275,20 +275,20 @@ html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel.p
   padding:3px 0 0!important;
   margin:0!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel[hidden] {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip #p79HomeGatePanel[hidden] {
   display:none!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-header {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-header {
   flex:0 0 auto!important;
   gap:4px!important;
   min-height:0!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-navigation {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-navigation {
   flex:0 0 auto!important;
   margin:2px 0 3px!important;
   min-height:24px!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
   flex:0 0 auto!important;
   display:grid!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
@@ -299,7 +299,7 @@ html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
   gap:5px!important;
   overflow:visible!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics > div {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics > div {
   display:flex!important;
   flex-direction:column!important;
   min-width:0!important;
@@ -311,18 +311,18 @@ html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics >
   gap:1px!important;
   box-sizing:border-box!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics > div strong {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics > div strong {
   font-size:clamp(15px,1.45vw,21px)!important;
   line-height:1.2!important;
 }
-html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-footer {
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-footer {
   margin:2px 0 0!important;
   padding:0 2px!important;
   flex:0 0 auto!important;
   min-height:0!important;
 }
 @media screen and (max-width:420px) {
-  html body #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
+  html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
   }
 }
