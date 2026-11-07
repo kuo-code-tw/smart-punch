@@ -16,13 +16,14 @@ for(const id of ['p79GateDay','p79GateWeek','p79GateMonth','p79GateYear','p79Gat
 }
 assert(card.includes('id="p79GateDay"')&&card.includes('id="p79GateWeek"'),'daily and weekly tabs also visible');
 assert(!card.includes('href=')&&!card.includes('gateSave'),'homepage read-only');
-const patch=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate card only.'));
-assert(patch.includes('grid-auto-rows:max-content!important'),'parent grid grows with Gate card');
-assert(patch.includes('max-height:none!important'),'remove fixed card/panel heights');
-assert(patch.includes('overflow-y:visible!important'),'no internal vertical scrollbar');
+const patch=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate same height as the vessel efficiency trend.'));
+assert(patch.includes('grid-auto-rows:260px!important'),'desktop Gate matches trend height');
+assert(patch.includes('grid-auto-rows:275px!important'),'mobile Gate matches trend height');
+assert(patch.includes('max-height:260px!important')&&patch.includes('max-height:275px!important'),'same bounded height');
+assert(patch.includes('overflow:hidden!important'),'no nested scrolling');
 assert(patch.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important'),'desktop 3 columns, exactly 2 rows');
 assert(patch.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'),'narrow phones 2 columns');
-assert(patch.includes('min-height:54px!important'),'short readable KPI cards');
+assert(patch.includes('min-height:0!important'),'KPI grid is flexible inside the shared panel row');
 function style(){
  const map=new Map();return {setProperty(k,v,priority){map.set(k,{v,priority})},removeProperty:k=>map.delete(k),getPropertyValue:k=>map.get(k)?.v||'',getPropertyPriority:k=>map.get(k)?.priority||''};
 }
@@ -38,13 +39,12 @@ const d={readyState:'complete',getElementById:$,addEventListener(){}};
 const win={document:d,sessionStorage:{getItem(){return null;}}};
 vm.runInNewContext(code,{window:win,globalThis:win,Intl,Date,URL});
 win.P79GateStatsHome.switchTab('gate');
-assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'max-content');
-assert.equal(grid.style.getPropertyPriority('grid-auto-rows'),'important');
-assert.equal(cardEl.style.getPropertyValue('max-height'),'none');
-assert.equal(cardEl.style.getPropertyValue('overflow'),'visible');
-assert.equal($('p79HomeGatePanel').style.getPropertyValue('overflow-y'),'visible');
-assert.equal(metricEl.style.getPropertyValue('max-height'),'none');
-assert.equal(metricEl.style.getPropertyValue('overflow-y'),'visible');
+assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'');
+assert.equal(cardEl.style.getPropertyValue('max-height'),'');
+assert.equal(cardEl.style.getPropertyValue('overflow'),'');
+assert.equal($('p79HomeGatePanel').style.getPropertyValue('overflow-y'),'');
+assert.equal(metricEl.style.getPropertyValue('max-height'),'');
+assert.equal(metricEl.style.getPropertyValue('overflow-y'),'');
 assert.equal($('p79HomeGatePanel').hidden,false);
 assert.equal($('p79RankingView').hidden,true);
 win.P79GateStatsHome.switchTab('operations');
@@ -53,4 +53,4 @@ for(const [el,prop] of [[grid,'grid-auto-rows'],[cardEl,'max-height'],[$('p79Hom
 }
 assert.equal($('p79HomeGatePanel').hidden,true);
 assert.equal($('p79RankingView').hidden,false);
-console.log('PASS: Six KPI tiles, day/week/month/year, 3x2 compact layout, no scroll, styles restored on vessel tab');
+console.log('PASS: Six Gate KPIs fit trend-height row with four mode buttons and no inner scrolling.');
