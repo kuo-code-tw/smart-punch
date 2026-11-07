@@ -33,7 +33,7 @@ code{font-family:ui-monospace,monospace;font-size:12px}
 @media(max-width:620px){body{padding:12px 8px}h1{font-size:19px}.panel{padding:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric strong{font-size:18px}}
 </style>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="../assets/port79-gate-import.js?v=20261107-gate-import-v1"></script>
+<script defer src="../assets/port79-gate-import.js?v=20261107-gate-deploy-check-v2"></script>
 </head>
 <body><main>
 <header><div><a href="../">‹ 返回 PORT79 首頁</a><h1>🚛 Gate 進出站櫃量 Excel 匯入</h1><p>按日期保存交空、領空、交重、領重、進站拖車車次</p></div><a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">開啟正式 Google 資料庫</a></header>
@@ -56,11 +56,11 @@ code{font-family:ui-monospace,monospace;font-size:12px}
 <p class="hint" id="gateRange"></p>
 <div class="scroll"><table><thead><tr><th>日期</th><th>交空</th><th>領空</th><th>交重</th><th>領重</th><th>總櫃量</th><th>拖車車次</th></tr></thead><tbody id="gatePreviewRows"></tbody></table></div>
 <div class="controls">
-<button type="button" class="primary" id="gateSave" disabled>確認寫入正式資料庫</button>
+<button type="button" class="primary" id="gateSave" disabled title="需先驗證正式 Google Apps Script 的 Gate 匯入接口">確認寫入正式資料庫</button>
 <button type="button" id="gateDownload">下載整理後 CSV（備援）</button>
 <a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">手動查看／修正每日資料</a>
 </div>
-<p class="hint">正式自動匯入需先在 PORT79 Google Apps Script 部署 Gate 寫入接口。若尚未部署，預覽與 CSV 下載仍可使用，但不會假裝已儲存。手動貼入資料庫時，請按照日期更新原列，避免同日期重複。</p>
+<p class="hint"><strong>注意：</strong>頁面會先確認正式 Google Apps Script 已啟用 Gate 查詢接口，才開放「確認寫入」按鈕；若出現「未知操作」，代表後端尚未部署，不是檔案錯誤。可先下載整理 CSV，並在 Google 試算表「每日進出站」工作表依日期更新，不要重複追加。後端維護說明：<a href="https://github.com/kuo-code-tw/smart-punch/blob/main/backend/gate-stats-deployment.md" target="_blank" rel="noopener noreferrer">Gate 後端部署步驟</a>。</p>
 </section>
 <section class="panel"><h2>3. 每月與每年的資料去哪裡？</h2><p class="hint">全部保存於同一份 Google 試算表。「每日進出站」保留各日期，「每月累計」和「年度累計」用 Google Sheets 公式自動統計，「匯入紀錄」保留匯入來源。首頁小卡片會從正式雲端資料讀取，沒有資料的月份顯示 —，不會當成零。</p></section>
 </main></body></html>
