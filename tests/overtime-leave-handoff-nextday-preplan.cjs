@@ -70,9 +70,16 @@ async function run(initial,original=origin){
  duplicate.schedules.find(r=>r.empId==='EARLY').schedule.__meta={
   [day]:{overtimeReport:{id:'WRONG-DAY-ID',category:'延',overtimeStart:'04',overtimeEnd:'08'}}
  };
- const rejected=await run(legacy,duplicate).then(()=>null,e=>e);
- assert.match(String(rejected?.message||''),/原預排仍在.*2026-11-07/,
-  'do not create a duplicate next-day plan when original wrong-day ID exists');
+ const existing=await run(legacy,duplicate);
+ assert.equal(existing.result.entries[0].date,tomorrow);
+ assert.equal(existing.result.entries[0].readonlyWrongDate,true,
+  'wrong-day existing cloud plan still opens the correct-date preview');
+ assert.equal(existing.result.entries[0].originalReportId,'WRONG-DAY-ID',
+  'original cloud report ID must be preserved for explicit authorized correction');
+ assert(report.includes("if(prefill.readonlyWrongDate===true)return;"),
+  'the expected-period preview must NEVER submit a duplicate new report');
+ assert(report.includes("stage.disabled=true;stage.title=reason;"),
+  'the preplan submit button is visibly disabled until original ID is corrected');
  assert(report.includes('prefill.coverDate||dateInput.value'),'link date selector to original leave date');
  assert(report.includes('p79OtCoverPlanPreview'),'pending four-hour overtime period must remain visible without a punch');
  assert(report.includes("if(prefill.leaveHandoffId)return;dateInput.value=leaveDateSelect.value;"),
