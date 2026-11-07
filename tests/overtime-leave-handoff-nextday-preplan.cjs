@@ -34,7 +34,7 @@ async function run(initial,original=origin){
   P79Overtime:g.P79Overtime,
   p79GetLeaveHandoff:()=>JSON.parse(store),
   p79UpdateLeaveHandoffBanner:()=>{},
-  p79HandoffSync:null,p79CurrentHandoff:'',
+  p79HandoffSync:null,p79CurrentHandoff:'',P79_HANDOFF_KEY:'port79_leave_overtime_handoff_v1',
   p79LeaveHandoffContext:null,adminSession:{role:'admin'},
   p79CanReportOvertime:()=>true,leaveRequestToken:()=> 'TEST_TOKEN',GAS_URL:'https://example.invalid/gas',
   sessionStorage:{setItem:(k,v)=>{assert.equal(k,'port79_leave_overtime_handoff_v1');store=v;},
