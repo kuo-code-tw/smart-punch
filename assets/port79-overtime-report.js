@@ -462,13 +462,15 @@
   const cover=(data.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(handoff.id)&&key(c.leaveEmpId)===key(entry.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry.empId))&&String(c.startDate)<=leaveDate&&String(c.endDate)>=leaveDate);
   if(!cover)throw Error('此筆請假在原代班日期的安排已取消或更換人員，請重新整理請假管理核對');
   const roster=new Map((data.schedules||[]).map(r=>[key(r.empId),r.schedule||{}])),own=roster.get(key(entry.empId))||{},target=roster.get(key(cover.leaveEmpId))||{};
-  const originalShift=target[leaveDate]||target.__meta?.[leaveDate]?.leaveOriginalShift||
-   target.__meta?.[leaveDate]?.reportOriginalShift||entry.coverShift||'';
+  const originalShift=[target[leaveDate],target.__meta?.[leaveDate]?.leaveOriginalShift,
+   target.__meta?.[leaveDate]?.reportOriginalShift,entry.coverShift]
+   .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
   const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
   const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
   if(split){
    if(date!==split.workDate)throw Error('代班工作日期應為 '+split.workDate+'（原請假日期 '+leaveDate+'），不得把隔日早班加班登在前一天');
-   const ownShift=own[date]||own.__meta?.[date]?.reportOriginalShift||own.__meta?.[date]?.overtimeOriginalShift||'';
+   const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
+    .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
     periodHint:'此人原班別必須核對為'+split.normalShift+'班，不能將正常班誤當加班。'};
    return {code:split.code,requirePeriodSelection:false,
