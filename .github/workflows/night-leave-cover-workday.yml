@@ -1,0 +1,35 @@
+name: Verify night leave-cover workday split
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-leave-cover-suggest.js'
+      - 'assets/port79-overtime-report.js'
+      - 'leave/index.html'
+      - 'work-hours/index.html'
+      - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - '.github/workflows/night-leave-cover-workday.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-leave-cover-suggest.js'
+      - 'assets/port79-overtime-report.js'
+      - 'leave/index.html'
+      - 'work-hours/index.html'
+      - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - '.github/workflows/night-leave-cover-workday.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check original leave date, each cover workday, and full-punch confirmation
+        run: |
+          node tests/overtime-night-leave-cover-individual-workday.cjs
+          node tests/overtime-extension-cross-midnight-workdate.cjs
+          node tests/leave-cover-auto-suggest.cjs
+          node tests/overtime-clockout-policy.cjs
