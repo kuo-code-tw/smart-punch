@@ -8,7 +8,7 @@
 #p79Dashboard .p79-gate-home-tabs button {
  appearance:none;border:1px solid #bfd4e8;border-radius:11px;
  background:#fff;color:#325779;padding:9px 18px;
- font:800 13px/1.25 inherit;line-height:1.25;cursor:pointer;
+ font-weight:800;font-size:13px;font-family:inherit;line-height:1.25;cursor:pointer;
  min-height:39px;
 }
 #p79Dashboard .p79-gate-home-tabs button[aria-selected="true"]{
