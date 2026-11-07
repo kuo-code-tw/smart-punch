@@ -150,10 +150,51 @@ function attendanceDate(r){
  const m=String(raw??'').match(/(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
  return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';
 }
-function analyzeAttendance(data,month,boundaryRecords){
+
+function p79HomePunchMs(value){
+ const m=String(value||'').trim().match(/^(20\d{2})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+ return m?Date.parse(m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0')+'T'+m[4].padStart(2,'0')+':'+m[5]+':'+(m[6]||'00')+'+08:00'):NaN;
+}
+function p79HomePendingTiming(shift,date,scheduleData,now){
+ const norm=v=>String(v||'').trim().toUpperCase();
+ const roster=Array.isArray(scheduleData?.schedules)?scheduleData.schedules:[];
+ let matched=roster.filter(r=>shift.empId&&norm(r.empId||r.id)===norm(shift.empId));
+ if(matched.length!==1)matched=roster.filter(r=>shift.attNo&&norm(r.attNo||r.attendanceNo).replace(/^0+/,'')===norm(shift.attNo).replace(/^0+/,''));
+ if(matched.length!==1)matched=roster.filter(r=>shift.name&&norm(displayPersonName(r.name||r.empName))===norm(displayPersonName(shift.name)));
+ const record=matched.length===1?matched[0]:null,code=String(record?.schedule?.[date]||'').trim();
+ const inMs=p79HomePunchMs(shift.clockIn?.timeStr);
+ const ranges={早:[8,16],中:[16,24],晚:[24,32]};
+ let hours=ranges[code];
+ if(!hours){
+  const m=code.match(/^(\d{1,2})(?::(\d{2}))?\s*[-~～至]\s*(\d{1,2})(?::(\d{2}))?$/);
+  if(m){
+   const begin=Number(m[1])+Number(m[2]||0)/60;let finish=Number(m[3])+Number(m[4]||0)/60;
+   if(finish<=begin)finish+=24;
+   if(begin<=32&&finish<=48&&Number(m[2]||0)<60&&Number(m[4]||0)<60)hours=[begin,finish];
+  }
+ }
+ const base=Date.parse(date+'T00:00:00+08:00');
+ let end=hours&&Number.isFinite(base)?base+hours[1]*3600000:NaN;
+ if(Number.isFinite(end)){
+  const meta=record?.schedule?.__meta?.[date]||{};
+  if(meta.overtime===true||meta.overtimeReport||meta.restQuotaOvertime||meta.forEmpId){
+   const m=String(meta.overtimeEnd||meta.overtimeReport?.endTime||'').match(/^(\d{1,2}):(\d{2})$/);
+   if(m&&Number(m[1])<=24&&Number(m[2])<60){
+    let finish=Number(m[1])+Number(m[2])/60;
+    if(finish<=hours[0])finish+=24;
+    if(finish>hours[1]&&finish<=48)end=base+finish*3600000;
+   }
+  }
+ }
+ // If the official shift is absent or inconsistent with clock-in, do not assume the shift ended.
+ const reliable=Number.isFinite(end)&&Number.isFinite(inMs)&&end>inMs&&end-inMs<=24*3600000;
+ const reviewAfter=reliable?end+60*60000:Number.isFinite(inMs)?inMs+24*3600000:NaN;
+ return {shift:code,stillWorking:Number.isFinite(reviewAfter)&&now<reviewAfter,reviewAfter};
+}
+function analyzeAttendance(data,month,boundaryRecords,reviewOptions={}){
  if(!data||!Array.isArray(data.records))throw Error('考勤月份資料不完整');
  const records=data.records,uniquePeople=new Set(),peopleDays=new Set(),weeks=[0,0,0,0,0],seenWeeks=Array.from({length:5},()=>new Set());
- let punchIn=0,punchOut=0,other=0;const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),todayPeople=new Set(),todayLatest=new Map();
+ let punchIn=0,punchOut=0,other=0;const now=Number.isFinite(reviewOptions.now)?reviewOptions.now:Date.now();const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now)),todayPeople=new Set(),todayLatest=new Map();
  for(const r of records){
   const id=String(first(r,['empId','employeeId','attNo','name','employeeName'])||'').trim();
   if(id)uniquePeople.add(id);
@@ -171,12 +212,14 @@ function analyzeAttendance(data,month,boundaryRecords){
  }
  const reviewShifts=root.P79AttendanceV6?.buildShifts?root.P79AttendanceV6.buildShifts(Array.isArray(boundaryRecords)&&boundaryRecords.length?records.concat(boundaryRecords):records).filter(s=>{
   const date=String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-');
-  return date.startsWith(month+'-')&&date<today&&(!s.clockIn||!s.clockOut||s.timePrecisionIssue);
+  if(!date.startsWith(month+'-')||date>today||s.clockIn&&s.clockOut&&!s.timePrecisionIssue)return false;
+   if(s.clockIn&&!s.clockOut&&!s.timePrecisionIssue&&p79HomePendingTiming(s,date,reviewOptions.scheduleData,now).stillWorking)return false;
+   return date<today||date===today&&!s.clockIn&&!!s.clockOut;
  }):null;
  const pendingDetails=reviewShifts===null?null:reviewShifts.map((s,i)=>({
   key:String(s.key||i),date:String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-'),
   empId:String(s.empId||''),attNo:String(s.attNo??''),name:displayPersonName(s.name)||'姓名未提供',
-  dept:String(s.dept||''),unit:String(s.unit||''),group:'',jobTitle:String(s.jobTitle||''),shift:'',
+  dept:String(s.dept||''),unit:String(s.unit||''),group:'',jobTitle:String(s.jobTitle||''),shift:p79HomePendingTiming(s,String(s.accountingDateKey||s.dateKey||'').replaceAll('/','-'),reviewOptions.scheduleData,now).shift,
   clockIn:String(s.clockIn?.timeStr||''),clockOut:String(s.clockOut?.timeStr||''),
   clockInRecordId:String(s.clockIn?.id??''),clockOutRecordId:String(s.clockOut?.id??''),
   reason:s.timePrecisionIssue?'原始打卡時間不完整':!s.clockIn&&!s.clockOut?'上下班皆無卡':!s.clockIn?'缺少上班卡':!s.clockOut?'缺少下班卡':'打卡時間待核',
