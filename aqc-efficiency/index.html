@@ -656,6 +656,14 @@ html.dark body[data-p79-system="efficiency"] #view-personstats #driverVesselDeta
 #p79EfficiencyCumulative>.grid>div{border-radius:9px!important;padding:8px 10px!important}
 html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card:has(>#kpiHours),html.dark #view-dashboard .card:has(>#kpiContainers),html.dark #view-dashboard .card:has(>#kpiEfficiency){background:#1c354a!important}
 </style>
+
+<style id="p79-gate-embedded-vessel-admin-20261107">
+body.p79-gate-management-active #efficiencyMainTabs>.p79-efficiency-tab-year {display:none!important}
+#efficiencyMainTabs [data-tab="gate"].active {background:#dcfce7!important;color:#166534!important}
+html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!important;color:#dcfce7!important}
+#view-gate #p79GateImportFrame {max-width:100%;overflow:hidden}
+@media(max-width:640px){#view-gate>div:first-child{padding:12px!important}#view-gate h2{font-size:18px!important}}
+</style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -759,9 +767,21 @@ html.dark #view-dashboard .card:has(>#kpiPeople),html.dark #view-dashboard .card
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
       <button class="tab btn bg-slate-100" data-tab="dispatch" onclick="switchTab('dispatch',this)">⚖️ 人員調度與月均效率</button>
+      <button class="tab btn bg-emerald-50 text-emerald-800" data-tab="gate" onclick="switchTab('gate',this)">🚛 進出站櫃量管理</button>
 
     </div>
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
+  </section>
+
+  <section id="view-gate" class="hidden space-y-3" aria-label="Gate 進出站櫃量匯入與資料管理">
+    <div class="card flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
+      <div><h2 class="text-xl font-black text-slate-900">🚛 進出站櫃量管理</h2>
+      <p class="text-sm text-slate-500">這裡匯入 Gate Excel、核對每日進出櫃量，並管理月度／年度累計；首頁只顯示統計。</p></div>
+    </div>
+    <iframe id="p79GateImportFrame" title="Gate Excel 匯入與歷史資料管理"
+      class="w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+      loading="lazy" style="display:block;width:100%;height:800px;min-height:540px;border:1px solid #dbe4ee"
+      data-src="../gate-import/?embed=1"></iframe>
   </section>
 
   <section id="view-dashboard" class="space-y-4">
@@ -2011,13 +2031,19 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='ranking'||name==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();return;}
 }
 function switchTab(name,btn){if(name==='workload'||name==='ranking'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','multi-rod','compare','groups','personstats','weekly','ranking','dispatch'].forEach(x=>{
+  ['dashboard','multi-rod','compare','groups','personstats','weekly','ranking','dispatch','gate'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name&&!(name==='weekly'&&x==='ranking'));
   });
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   const tabBtn=btn||document.querySelector(`[data-tab="${name==='ranking'?'weekly':name}"]`);
   tabBtn?.classList.add('active');
+  document.body.classList.toggle('p79-gate-management-active',name==='gate');
+  if(name==='gate'){
+    const frame=document.getElementById('p79GateImportFrame');
+    if(frame&&!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
+    return;
+  }
   renderEfficiencyTabFast(name);
 }
 function dashboardSelectableMonths(year,loadedMonths=[]){
@@ -15418,5 +15444,20 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
+<script>
+/* Gate manager stays in the vessel system; responsive iframe height is origin-checked. */
+window.addEventListener('message',function(ev){
+ if(ev.origin!==location.origin||ev.data?.type!=='p79-gate-embed-resize')return;
+ const frame=document.getElementById('p79GateImportFrame');
+ if(!frame||ev.source!==frame.contentWindow)return;
+ const h=Number(ev.data.height);
+ if(Number.isFinite(h)&&h>=360&&h<=2400)frame.style.height=Math.ceil(h+8)+'px';
+});
+window.addEventListener('load',function(){
+ if(new URLSearchParams(location.search).get('tab')==='gate'&&typeof switchTab==='function'){
+   switchTab('gate');
+ }
+});
+</script>
 </body></html>
 
