@@ -810,16 +810,14 @@ async function p79ReportSavedLeaveCover(id){
    for(const cover of covers){
     const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);
     if(!start||!end||start>end)throw Error('代班日期無效，請核對雲端安排');
-    for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){
-     const date=day.toISOString().slice(0,10);
-     for(const worker of cover.workerIds||[]){
-      const empId=String(worker),key=norm(empId)+'|'+date;
-      if(seen.has(key))continue;
-      seen.add(key);
-      const person=(fresh.employees||[]).find(e=>norm(e.empId)===norm(empId));
-      entries.push({empId,name:person?.name||empId,date,forEmpId:String(leave.empId),mode:cover.mode||''});
-      if(entries.length>124)throw Error('代班日期超出單次明細範圍');
-     }
+    const assignments=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1))
+     assignments.push({date:day.toISOString().slice(0,10),mode:cover.mode||'one',workerIds:cover.workerIds||[]});
+    const mapped=await p79BuildLeaveCoverWorkdayEntries(String(id),String(leave.empId),assignments);
+    for(const entry of mapped){
+     const key=norm(entry.empId)+'|'+entry.date;
+     if(seen.has(key))continue;seen.add(key);
+     entries.push({...entry,mode:cover.mode||''});
+     if(entries.length>124)throw Error('代班日期超出單次明細範圍');
     }
    }
    if(!entries.length)throw Error('找不到已儲存的代班人員');
@@ -845,6 +843,14 @@ async function p79ReportSavedLeaveCover(id){
      const employeeRow=cloud.schedules.find(row=>norm(row.empId)===norm(entry.empId));
      if(!employeeRow)throw Error('雲端找不到這位代班人員的班表');
      const report=employeeRow.schedule?.__meta?.[entry.date]?.overtimeReport;
+      const oldDay=entry.coverDate&&entry.coverDate!==entry.date?
+       employeeRow.schedule?.__meta?.[entry.coverDate]?.overtimeReport:null;
+      if(!report&&oldDay?.id&&oldDay.category==='延'&&
+         String(oldDay.overtimeStart||'')==='04'&&String(oldDay.overtimeEnd||'')==='08'){
+       cell.textContent='⚠ 原預排仍儲存在 '+entry.coverDate+'，但加班應歸 '+entry.date+
+        '。須先更正原申報日期；目前未重複新增。';
+       unverified++;continue;
+      }
      if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
       const fields=[report.typeName||report.category||'',report.code||'',
        report.declaredHours!=null?'申報 '+report.declaredHours+' 小時':'',
@@ -1935,6 +1941,12 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
  const row=cloud.schedules.find(r=>norm(r.empId)===norm(e.empId));
  if(!row)return 'unverified';
  const report=(row.schedule||{}).__meta?.[date]?.overtimeReport;
+ if(coverDate!==date){
+  const wrong=(row.schedule||{}).__meta?.[coverDate]?.overtimeReport;
+  if(wrong?.id&&wrong.category==='延'&&
+     String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08')
+   return 'wrong-workdate';
+ }
  if(report&&(String(report.id||'').trim()||String(report.code||'').trim()))return 'reported';
  // 排班已有代班的舊佇列不重複提示；僅當次新增代班允許連續申報。
  return active?'pending':'arranged';
@@ -1960,6 +1972,8 @@ async function p79ReconcileLeaveHandoff(){
    }
    const state=p79LeaveHandoffEntryState(h,e,data,active);
    if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
+    if(state==='wrong-workdate')throw Error(e.empId+' 的原預排仍儲存在 '+(e.coverDate||'原請假日')+
+     '，正確工作日為 '+e.date+'；須先更正原申報日期並保留原ID，不可重複建立。');
    if(state==='pending'){
     remaining.push(e);
     // Reuse this exact verified employee/day context for the next handoff.
