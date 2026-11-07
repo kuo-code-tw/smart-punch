@@ -72,8 +72,10 @@
   if(full[1]>midnight(next)&&(leaveOn(id,next,leaves)||covered(id,next,covers)))return false;
   return true;
  }
- // A leave night starts on its original workday, but the second cover
- // extends the following day's EARLY shift. Never book both on leaveDate.
+ // The original leave night's second cover physically WORKS the next morning,
+ // but its 04-08 overtime is ACCOUNTED to the previous leave/night workday.
+ // Normal early-shift attendance still belongs to the actual next day.
+ // Keep independent workDate (punch matching) and overtimeDate (overtime ledger).
  function coverWorkday(leaveDate,leaveShift,mode,workerIndex){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(leaveDate||''))||mode!=='two'||![0,1].includes(workerIndex))return null;
   let p;
@@ -86,7 +88,8 @@
     {workDate:addDays(leaveDate,-1),normalShift:'晚',normalStart:'24',normalEnd:'08',overtimeStart:'08',overtimeEnd:'12',period:'24-12',code:'延24-12',position:'after'}:
     {workDate:leaveDate,normalShift:'中',normalStart:'16',normalEnd:'24',overtimeStart:'12',overtimeEnd:'16',period:'12-24',code:'延12-24',position:'before'};
   }else return null;
-  return {...p,leaveDate,category:'延',declaredHours:4};
+  const overtimeDate=shiftName(leaveShift)==='晚'&&workerIndex===1?leaveDate:p.workDate;
+  return {...p,leaveDate,overtimeDate,category:'延',declaredHours:4};
  }
  function suggest({people=[],rosters=new Map(),leaves=[],covers=[],leaveEmpId,date}={}){
   const target=people.find(e=>norm(e.empId)===norm(leaveEmpId)),schedule=rosters.get(norm(leaveEmpId));
