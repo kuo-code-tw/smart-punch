@@ -1582,6 +1582,15 @@
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
    if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());}
+   if(prefill.readonlyWrongDate===true){
+    const reason='原預排仍在 '+String(prefill.coverDate||'原請假日')+
+     '，正確加班工作日期是 '+String(prefill.date||'')+
+     '。已顯示加班候選時段，但原申報 ID 尚待授權更正；不可建立重複預排。';
+    el.querySelector('#p79OtStatus').textContent=reason;
+    const stage=el.querySelector('#p79OtStage');
+    stage.textContent='原預排日期待更正（不可重複儲存）';
+    stage.disabled=true;stage.title=reason;
+   }
    if(prefill.savedReport&&prefill.reportId)el.querySelector('#p79OtStage').textContent=prefill.plannedReview===true?'確認正式申報':'儲存原申報修改';
    if(prefill.note)el.querySelector('#p79OtNote').value=String(prefill.note);
    // 正式核對只能用與完整上/下班打卡一致的規則；不接受預排快取的舊班別。
@@ -1599,6 +1608,7 @@
    }
    let submissionBusy=false;
    el.querySelector('#p79OtStage').onclick=async()=>{
+    if(prefill.readonlyWrongDate===true)return;
     if(submissionBusy)return;
     submissionBusy=true;let completed=false;
     const stageButton=el.querySelector('#p79OtStage');stageButton.disabled=true;
