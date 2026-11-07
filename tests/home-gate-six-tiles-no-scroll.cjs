@@ -24,7 +24,10 @@ assert(!card.includes('匯入 Gate Excel')&&!card.includes('下載 CSV'),'import
 assert(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important'),'three tiles per row on desktop');
 assert(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'),'two tiles per row on mobile');
 assert(css.includes('#p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip'),'auto sizing scoped to Gate');
-assert(css.includes('height:auto!important')&&css.includes('max-height:none!important'),'no fixed Gate card height');
+const equal=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate same height as the vessel efficiency trend.'));
+assert(equal.includes('height:260px!important')&&equal.includes('height:275px!important'),'same row height as vessel trend');
+assert(equal.includes('grid-template-rows:repeat(2,minmax(0,1fr))!important'),'six KPI tiles in two rows');
+assert(equal.includes('grid-template-rows:repeat(3,minmax(0,1fr))!important'),'small screens use three KPI rows');
 const rootSelector=css.indexOf('#p79HomeGatePanel.p79-gate-section');
 const rootRule=css.slice(rootSelector,css.indexOf('#p79HomeGatePanel[hidden]',rootSelector));
 assert(rootRule.includes('overflow:visible!important'),'Gate content must not scroll internally');
