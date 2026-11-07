@@ -17364,7 +17364,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const originalNote=String(draft.note||'').trim(),reasonNote=reason?.exempt?reason.label:'';
  const finalNote=reasonNote&&!originalNote.includes(reasonNote)
    ?[reasonNote,originalNote].filter(Boolean).join('／'):originalNote;
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
