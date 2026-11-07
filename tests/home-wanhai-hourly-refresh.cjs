@@ -58,6 +58,7 @@ const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
  timers.delete(hourly[0]);hourly[1].fn();await flush();
  assert.equal(network,2,'automatically poll at one-hour mark');
  clock+=5*60*1000;
+ timers.clear(); // a browser navigation cancels timers from the previous page
  mount();await flush();
  assert.equal(network,2,'reload within the hour must reuse public cache');
  const manual=element('p79PublicShipRefresh');
