@@ -2,10 +2,12 @@
    Public official data only; shown to EVERY employee on the login page and
    administrators in the dashboard. No private HR data or login tokens read.
    The server refreshes its Google Sheet snapshot automatically. The display
-   refreshes on initial visit, every five minutes and when the page resumes. */
+   refreshes at most once per hour, reusing recent public data on reload. */
 (function(g){
 'use strict';
 const ACTION='publicShipSchedule',SOURCE='萬海航運｜網站船期';
+const REFRESH_INTERVAL_MS=60*60*1000;
+const PUBLIC_SCHEDULE_CACHE='p79_public_ship_schedule_hourly_v1';
 const DASH_ID='p79DashVesselNotices',STAFF_ID='p79PublicShipBoard';
 const $=id=>g.document.getElementById(id);
 const str=v=>String(v??'').trim();
@@ -39,6 +41,7 @@ function selectCurrentRows(parsed,now=Date.now()){
  return {rows:current,expiredCount};
 }
 let rows=[],expiredCount=0,lastSync=0,state='idle',error='',notice='',loaded=false,request=null,dialog=null;
+let lastAutoReadAt=0,refreshTimer=null;
 // Shared verified names also cover completed imported ships no longer in the current ETD board.
 const CHINESE_NAME_CACHE='p79_official_vessel_names';
 let verifiedShipNames=Object.create(null);
@@ -120,7 +123,7 @@ function renderOne(host){
  if(!host)return;
  host.className='p79-schedule-board p79-schedule-remote p79-public-sailing-board';
  if(state==='loading'){
-  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>每五分鐘自動讀取最新資料</small></div>';return;
+  host.innerHTML='<div class="p79-schedule-remote-msg"><strong>正在讀取萬海網站船期…</strong><small>每小時自動更新一次</small></div>';return;
  }
  if(state==='ready'&&rows.length){
   host.innerHTML='<div class="p79-schedule-remote-caption">萬海網站船期 · '+esc(timeLabel())+' 同步 · 共 '+rows.length+' 艘'+(expiredCount?' · 另 '+expiredCount+' 艘 ETD 已過未列入':'')+(notice?' · 更新提醒':'')+'</div>'+
@@ -158,28 +161,74 @@ function readJsonp(url){
   script.src=src.toString();g.document.head.appendChild(script);
  });
 }
-async function refresh(){
+function scheduleNextRead(){
+ if(refreshTimer!==null){g.clearTimeout(refreshTimer);refreshTimer=null;}
+ if(g.document.visibilityState==='hidden')return;
+ const nextAt=lastAutoReadAt?lastAutoReadAt+REFRESH_INTERVAL_MS:Date.now()+REFRESH_INTERVAL_MS;
+ const wait=Math.max(1000,nextAt-Date.now());
+ refreshTimer=g.setTimeout(()=>{
+  refreshTimer=null;
+  if(g.document.visibilityState!=='hidden')void refresh();
+ },wait);
+}
+function officialScheduleBase(){
+ return str(g.sessionStorage?.getItem('port79_gas_url'))||str($('p79PublicShipBoard')?.dataset.gasUrl);
+}
+function applyOfficialSchedule(data){
+ if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
+ if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
+  throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
+ const parsed=parseRows(data.rows);
+ rememberOfficialChineseNames(parsed,data.chineseNames);
+ const filtered=selectCurrentRows(parsed);
+ rows=filtered.rows;expiredCount=filtered.expiredCount;
+ lastSync=Number(data.lastSync)||0;notice=str(data.error);
+ state='ready';error='';
+ try{g.document?.dispatchEvent(new g.CustomEvent('p79:wanhai-names-updated'));}catch(_){}
+}
+function restoreRecentSchedule(base){
+ try{
+  const stored=JSON.parse(g.localStorage?.getItem(PUBLIC_SCHEDULE_CACHE)||'null');
+  if(!stored||stored.base!==base||!Number.isFinite(stored.checkedAt)||
+     stored.checkedAt>Date.now()||Date.now()-stored.checkedAt>=REFRESH_INTERVAL_MS)return false;
+  applyOfficialSchedule(stored.data);
+  lastAutoReadAt=stored.checkedAt;
+  return true;
+ }catch(_){return false;}
+}
+function cacheOfficialSchedule(base,data,checkedAt){
+ try{
+  g.localStorage?.setItem(PUBLIC_SCHEDULE_CACHE,JSON.stringify({
+   base,checkedAt,data:{
+    ok:true,source:'port79-wanhai-vessel',lastSync:data.lastSync,
+    rows:data.rows.slice(0,2000),chineseNames:data.chineseNames,error:data.error
+   }
+  }));
+ }catch(_){}
+}
+async function refresh(force=false){
  if(request)return request;
- const base=str(g.sessionStorage?.getItem('port79_gas_url'))||str($('p79PublicShipBoard')?.dataset.gasUrl);
+ const now=Date.now();
+ if(!force&&lastAutoReadAt&&now-lastAutoReadAt<REFRESH_INTERVAL_MS){
+  scheduleNextRead();
+  return;
+ }
+ lastAutoReadAt=now; // automatic checks stay hourly even after a connection failure
+ scheduleNextRead();
+ const base=officialScheduleBase();
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)){
   state='error';error='尚未設定正式 GAS 網址';render();return;
  }
- state='loading';render();
+ if(state!=='ready'){state='loading';render();}
  request=(async()=>{
   try{
    const data=await readJsonp(base);
-   if(data?.ok!==true)throw Error(str(data?.error)||'官方船期服務回傳失敗');
-   if(data?.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))
-    throw Error('目前 GAS 尚未部署 V76 萬海船期讀取入口');
-   const parsed=parseRows(data.rows);
-   rememberOfficialChineseNames(parsed,data.chineseNames);
-   const filtered=selectCurrentRows(parsed);
-   rows=filtered.rows;expiredCount=filtered.expiredCount;
-   lastSync=Number(data.lastSync)||0;notice=str(data.error);
-   state='ready';error='';
-   try{g.document?.dispatchEvent(new g.CustomEvent('p79:wanhai-names-updated'));}catch(_){}
-  }catch(e){error=str(e?.message||e);if(rows.length){state='ready';notice=error;}else state='error';}
-  finally{request=null;render();}
+   applyOfficialSchedule(data);
+   cacheOfficialSchedule(base,data,now);
+  }catch(e){
+   error=str(e?.message||e);
+   if(rows.length){state='ready';notice=error;}else state='error';
+  }finally{request=null;render();}
  })();
  return request;
 }
@@ -214,19 +263,23 @@ function showDialog(index=-1){
 function init(){
  const staff=$(STAFF_ID),admin=$(DASH_ID);
  [staff,admin].filter(Boolean).forEach(el=>el.addEventListener('click',e=>{
-  if(e.target.closest('[data-public-ship-retry]')){refresh();return;}
+  if(e.target.closest('[data-public-ship-retry]')){void refresh(true);return;}
   const item=e.target.closest('[data-public-ship-index]');
   if(item)showDialog(Number(item.dataset.publicShipIndex));
  }));
- $('p79PublicShipRefresh')?.addEventListener('click',refresh);
+ $('p79PublicShipRefresh')?.addEventListener('click',()=>void refresh(true));
  $('p79PublicShipAll')?.addEventListener('click',()=>showDialog(-1));
  $('p79ShipScheduleAll')?.addEventListener('click',()=>showDialog(-1));
- $('p79DashRefresh')?.addEventListener('click',refresh);
- render();refresh();
- // Recursive timeout avoids overlapping requests and pauses hidden pages.
- const tick=()=>{if(g.document.visibilityState!=='hidden')void refresh();g.setTimeout(tick,300000);};
- g.setTimeout(tick,300000);
- g.document.addEventListener('visibilitychange',()=>{if(g.document.visibilityState==='visible')void refresh();});
+ $('p79DashRefresh')?.addEventListener('click',()=>void refresh(true));
+ // Recent verified public records keep the page usable without re-fetching on
+ // every reload. On expiry, the next visible-page check retrieves fresh data.
+ restoreRecentSchedule(officialScheduleBase());
+ render();
+ void refresh();
+ g.document.addEventListener('visibilitychange',()=>{
+  if(g.document.visibilityState==='visible')void refresh();
+  else scheduleNextRead();
+ });
  g.addEventListener?.('online',()=>void refresh());
 }
 g.P79ManualShipSchedule={render,refresh,parseRows,selectCurrentRows,parseTaipeiTime,getChineseName,source:SOURCE};
