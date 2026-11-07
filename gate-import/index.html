@@ -95,6 +95,56 @@ tbody td:last-child{font-weight:750;color:#047857}
  #gateResult .metric strong{font-size:21px}
 }
 
+
+/* Vessel system: official read-only dashboard above the optional upload workflow */
+#gateLivePanel .gate-live-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:5px}
+#gateLivePanel h2{font-size:20px;color:#143f66;margin:0 0 3px}
+#gateLivePanel .gate-live-top p{font-size:12px;color:#69839c;margin:0}
+#gateLivePanel .gate-period-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));min-width:220px;border-radius:11px;padding:4px;gap:3px;background:#edf4fb}
+#gateLivePanel .gate-period-tabs button{min-width:0;font-size:13px;padding:8px;border:0;background:transparent;color:#53718c}
+#gateLivePanel .gate-period-tabs button[aria-pressed="true"]{background:#1767b5;color:#fff;box-shadow:0 2px 7px #174c8a28}
+#gateLivePanel .gate-live-nav{display:flex;align-items:center;justify-content:center;gap:9px;margin:7px 0 14px;position:relative}
+#gateLivePanel .gate-live-nav button{width:31px;height:29px;padding:0;line-height:1;font-size:21px;border:1px solid #d2e3f1;background:white}
+#gateLivePanel .gate-live-nav strong{font-size:14px;color:#1b4b76;min-width:150px;text-align:center}
+#gateLivePanel .gate-live-nav .gate-live-refresh{position:absolute;right:0;font-size:20px;color:#48799e}
+#gateLivePanel .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#gateLivePanel .metric{position:relative;min-height:82px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:11px 7px;border-radius:12px}
+#gateLivePanel .metric::before{content:"";width:4px;height:22px;position:absolute;top:50%;left:11px;transform:translateY(-50%);border-radius:8px;background:currentColor;opacity:.35}
+#gateLivePanel .metric span{font-size:12px;font-weight:750}
+#gateLivePanel .metric strong{font-size:clamp(20px,2.3vw,28px);line-height:1.1;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+#gateLivePanel .gate-detail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:17px 0 10px}
+#gateLivePanel .gate-detail-head strong{font-size:14px;color:#1c4a72}
+#gateLivePanel .gate-detail-head span{font-size:12px;color:#6f89a0}
+#gateLivePanel .scroll{max-height:none;max-width:100%;overflow:visible}
+#gateLivePanel table{table-layout:fixed;white-space:normal;width:100%}
+#gateLivePanel th,#gateLivePanel td{padding:10px 7px;overflow-wrap:anywhere}
+#gateLivePanel th:first-child,#gateLivePanel td:first-child{width:21%;font-weight:800}
+#gateLivePanel tbody tr:last-child td{border-bottom:0}
+#gateLivePanel .gate-pager{display:flex;gap:12px;align-items:center;justify-content:center;margin:9px 0 5px}
+#gateLivePanel .gate-pager button{min-width:31px;padding:4px 9px;font-size:20px}
+#gateLivePanel .gate-pager span{font-size:12px;color:#647d97;min-width:91px;text-align:center}
+#gateLiveStatus{font-size:12px;color:#577b9c;margin:5px 0 0;text-align:right}
+#gateLiveStatus[data-state="error"]{color:#a22e2e}
+#gateLiveStatus[data-state="success"]{color:#24765c}
+@media(max-width:650px){
+ #gateLivePanel .gate-live-top{align-items:stretch}
+ #gateLivePanel .gate-period-tabs{width:100%;min-width:0}
+ #gateLivePanel .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #gateLivePanel .metric{min-height:70px}
+ #gateLivePanel .metric strong{font-size:23px}
+ #gateLivePanel table,#gateLivePanel tbody{display:block;width:100%}
+ #gateLivePanel thead{display:none}
+ #gateLivePanel tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #gateLivePanel tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:5px;border:1px solid #dde9f4;background:#fbfdff;border-radius:10px;padding:9px 10px;min-width:0}
+ #gateLivePanel tbody td{display:flex;flex-direction:column;gap:3px;align-items:flex-start;padding:2px;width:auto!important;border:0;font-weight:750;text-align:left;min-width:0}
+ #gateLivePanel tbody td::before{content:attr(data-label);color:#7791a7;font-size:10px;font-weight:650}
+ #gateLivePanel tbody td:first-child{grid-column:1/-1;border-bottom:1px solid #e0ecf5;padding-bottom:6px}
+}
+@media(max-width:420px){
+ #gateLivePanel tbody{grid-template-columns:1fr}
+ #gateLivePanel .metric strong{font-size:21px}
+}
+
 </style>
 <script>
 (function(){
@@ -111,19 +161,50 @@ tbody td:last-child{font-weight:750;color:#047857}
 })();
 </script>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script defer src="../assets/port79-gate-live.js?v=20261107-gate-dwmy-v1"></script>
 <script defer src="../assets/port79-gate-import.js?v=20261107-gate-dwmy-v1"></script>
 </head>
 <body><main>
 <header><div><a href="../">‹ 返回 PORT79 首頁</a><h1>🚛 Gate 進出站櫃量 Excel 匯入</h1><p>按日期保存交空、領空、交重、領重、進站拖車車次</p></div><a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">開啟正式 Google 資料庫</a></header>
+<section class="panel gate-live-dashboard" id="gateLivePanel" aria-label="Gate 正式進出量總覽">
+ <div class="gate-live-top">
+  <div><h2>Gate 進出站櫃量總覽</h2><p>正式資料 · 依日期自動彙總</p></div>
+  <div class="gate-period-tabs" role="group" aria-label="正式 Gate 統計期間">
+   <button type="button" id="gateLiveModeDay" aria-pressed="false">日</button>
+   <button type="button" id="gateLiveModeWeek" aria-pressed="false">週</button>
+   <button type="button" id="gateLiveModeMonth" aria-pressed="true">月</button>
+   <button type="button" id="gateLiveModeYear" aria-pressed="false">年</button>
+  </div>
+ </div>
+ <div class="gate-live-nav">
+  <button type="button" id="gateLivePrev" aria-label="上一期間">‹</button>
+  <strong id="gateLivePeriod" aria-live="polite">統計期間</strong>
+  <button type="button" id="gateLiveNext" aria-label="下一期間">›</button>
+  <button type="button" id="gateLiveRefresh" class="gate-live-refresh" aria-label="重新讀取正式資料" title="重新讀取正式資料">↻</button>
+ </div>
+ <div class="grid gate-live-metrics">
+  <div class="metric"><span>交空櫃</span><strong id="gateLiveDe">—</strong></div>
+  <div class="metric"><span>領空櫃</span><strong id="gateLivePe">—</strong></div>
+  <div class="metric"><span>交重櫃</span><strong id="gateLiveDl">—</strong></div>
+  <div class="metric"><span>領重櫃</span><strong id="gateLivePl">—</strong></div>
+  <div class="metric"><span>總櫃量</span><strong id="gateLiveTotal">—</strong></div>
+  <div class="metric"><span>進站拖車</span><strong id="gateLiveTruck">—</strong></div>
+ </div>
+ <div class="gate-detail-head"><strong id="gateLiveDetailHeading">每日明細</strong><span id="gateLiveDayCount">等待正式資料</span></div>
+ <div class="scroll"><table aria-label="Gate 正式每日進出櫃量"><thead><tr><th>日期／月份</th><th>交空</th><th>領空</th><th>交重</th><th>領重</th><th>總櫃量</th><th>拖車車次</th></tr></thead><tbody id="gateLiveRows"></tbody></table></div>
+ <div class="gate-pager"><button type="button" id="gateLivePagePrev" aria-label="上一頁">‹</button><span id="gateLivePageLabel"></span><button type="button" id="gateLivePageNext" aria-label="下一頁">›</button></div>
+ <p id="gateLiveStatus" role="status" aria-live="polite">統計資料讀取中</p>
+</section>
+
 <section class="panel">
-<h2>1. 選擇檔案</h2>
+<h2>匯入／更新 Gate Excel</h2>
 <p class="hint">選擇 Gate Excel，系統自動彙整交空、領空、交重、領重及拖車車次。相同日期會更新，不會重複累計。</p>
 <div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>開始預覽</button></div>
 <p id="gateMessage" role="status" aria-live="polite">請先選擇檔案。</p>
 </section>
 <section class="panel" id="gateResult" hidden>
 <div class="gate-preview-heading">
-<div><h2>2. Gate 進出站櫃量</h2><p>本次 Excel 匯入範圍合計 · 切換下方統計明細</p></div>
+<div><h2>匯入資料核對</h2><p>本次 Excel 匯入範圍合計 · 切換下方統計明細</p></div>
 <div class="gate-period-tabs" role="group" aria-label="Gate 明細統計期間">
 <button type="button" id="gateModeDay" aria-pressed="true">日</button>
 <button type="button" id="gateModeWeek" aria-pressed="false">週</button>
