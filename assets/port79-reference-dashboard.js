@@ -95,7 +95,15 @@ function vessels(v){
   if(!Number.isFinite(Date.parse(String(value||''))))return '—';
   return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
  };
- if(table)table.innerHTML=latest.length?latest.map((s,i)=>'<tr><td>'+badge(i+1)+'</td><td title="'+esc(s.name+' / '+s.workingNo)+'"><span>'+esc(s.name)+'</span><small class="p79r-vessel-chinese-name" style="display:block;margin-top:2px;font-size:11px;color:#64748b;white-space:nowrap">中文：'+esc(p79ImportedChineseShipName(s)||'未提供')+'</small></td><td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td><td>'+fmt(s.moves)+'</td><td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td><td>'+fmt(s.rate,2)+'</td><td><span class="p79r-state '+(s.date?'done':'neutral')+'">'+esc(s.status||(s.date?'已完工':'待核對'))+'</span></td></tr>').join(''):'<tr><td colspan="7">本月份尚無船舶資料</td></tr>';
+ if(table)table.innerHTML=latest.length?latest.map((s,i)=>{
+  const chinese=p79ImportedChineseShipName(s)||'未提供';
+  return '<tr><td>'+badge(i+1)+'</td>'+
+   '<td title="'+esc(s.name+' / '+chinese+' / '+s.workingNo)+'"><span class="p79r-vessel-one-line">'+esc(s.name)+'<span class="p79r-vessel-chinese-name">（'+esc(chinese)+'）</span></span></td>'+
+   '<td title="'+esc(s.wharf||'—')+'">'+esc(s.wharf||'—')+'</td>'+
+   '<td>'+fmt(s.moves)+'</td>'+
+   '<td title="'+esc(s.importedAt||'未記錄匯入時間')+'">'+esc(importLabel(s.importedAt))+'</td>'+
+   '<td>'+fmt(s.rate,2)+'</td></tr>';
+ }).join(''):'<tr><td colspan="6">本月份尚無船舶資料</td></tr>';
  const ym=$('p79DashMonth')?.value||'';
  if(v.weekError)empty('p79DashShipBars',v.weekError);else weeklyChart(model.weeklyEfficiency(v.weekVessels||v.vessels,ym));
  peopleReport=v;renderPeople();
