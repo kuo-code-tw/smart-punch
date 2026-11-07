@@ -152,11 +152,16 @@ function gateNaturalHeight(open){
    else el.style.removeProperty(key);
   });
  }
- props(grid,{'grid-auto-rows':'auto'});
+ props(grid,{'grid-auto-rows':'max-content','align-items':'start'});
  props(card,{'height':'auto','min-height':'0','max-height':'none',
    'overflow':'visible','overflow-y':'visible','align-self':'start'});
  props(panel,{'height':'auto','min-height':'0','max-height':'none',
    'overflow':'visible','overflow-y':'visible','flex':'0 0 auto'});
+ // Old dashboard CSS also fixes children to a scrollable height: remove
+ // those constraints on the Gate side, but not on the ship-ranking side.
+ var metric=panel?.querySelector?.('.p79-gate-metrics');
+ props(metric,{'height':'auto','max-height':'none','min-height':'0',
+   'overflow':'visible','overflow-y':'visible'});
 }
 function switchTab(which){
   // The two tabs flip only this one small ranking card, never the whole homepage.
