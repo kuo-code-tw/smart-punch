@@ -54,13 +54,14 @@ function weeklyChart(report){
  if(report.days.every(d=>d.gph===null)){empty('p79DashShipBars','這七天沒有可核對的船舶效率');return}
  const w=480,h=190,left=35,right=16,top=24,bottom=28,pw=w-left-right,ph=h-top-bottom;
  const max=Math.max(...report.days.map(d=>d.gph||0)),ceiling=Math.max(5,Math.ceil(max/5)*5),gap=pw/7;
- let grid='',points='',segments=[],current=[];
+ let grid='',points='',connected=[];
  for(let i=0;i<=4;i++){const y=top+ph-i*ph/4;grid+='<path class="p79r-gridline" d="M'+left+' '+y+'H'+(w-right)+'"/><text x="'+(left-7)+'" y="'+(y+4)+'" text-anchor="end">'+fmt(ceiling*i/4,1)+'</text>';}
  report.days.forEach((d,i)=>{const x=left+gap*(i+.5),label=Number(d.date.slice(5,7))+'/'+Number(d.date.slice(-2));points+='<text x="'+x+'" y="'+(h-7)+'" text-anchor="middle">'+label+'</text>';
-  if(d.gph===null){if(current.length)segments.push(current);current=[];points+='<text x="'+x+'" y="'+(top+ph-6)+'" text-anchor="middle">—<title>'+label+' 無可核對效率</title></text>';return}
-  const y=top+ph-d.gph/ceiling*ph;current.push([x,y]);points+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+esc(label+'：'+fmt(d.gph,2)+' GPH / '+d.count+' 艘船舶')+'</title></circle><text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+fmt(d.gph,2)+'</text>';
- });if(current.length)segments.push(current);
- const lines=segments.map(s=>'<polyline points="'+s.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>').join('');
+  if(d.gph===null){points+='<text x="'+x+'" y="'+(top+ph-6)+'" text-anchor="middle">—<title>'+label+' 無可核對效率</title></text>';return}
+  const y=top+ph-d.gph/ceiling*ph;connected.push([x,y]);points+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+esc(label+'：'+fmt(d.gph,2)+' GPH / '+d.count+' 艘船舶')+'</title></circle><text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+fmt(d.gph,2)+'</text>';
+ });
+ // Connect only measured days; missing daily GPH stays unmeasured (shown as —).
+ const lines=connected.length>1?'<polyline points="'+connected.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>':'';
  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="最近七天船舶效率（GPH），'+esc(report.start+' 至 '+report.end)+'">'+grid+lines+points+'</svg>';
 }
 // Homepage ship timetable is a separate outside-website source, not the vessel historical snapshot.
