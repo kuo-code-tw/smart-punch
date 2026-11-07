@@ -10,7 +10,7 @@ const css=fs.readFileSync(path.join(root,'assets/port79-gate-home.css'),'utf8');
 for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p79GateDay','p79GateWeek','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateTruckEntries']){
  assert(html.includes('id="'+key+'"'),key+' present in homepage');
 }
-assert(html.includes('port79-gate-home.js?v=20261107-gate-equal-height-v2'));
+assert(html.includes('port79-gate-home.js?v=20261107-phone-gate-quantities-v1'));
 assert(html.includes('port79-gate-home.css?v=20261107-gate-equal-height-v2'));
 assert(!html.includes('id="p79GateImportLink"'),'homepage Gate card is read-only; no upload or download actions');
 assert(!html.includes('id="p79HomeStatTabs"'),'no whole-homepage tabs');
