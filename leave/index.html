@@ -1945,10 +1945,12 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
  if(coverDate!==date){
   const wrong=(row.schedule||{}).__meta?.[coverDate]?.overtimeReport;
   if(wrong?.id&&wrong.category==='延'&&
-     String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08')
+     String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08'&&
+     !(e.readonlyWrongDate===true&&String(e.originalReportId||'')===String(wrong.id)))
    return 'wrong-workdate';
  }
  if(report&&(String(report.id||'').trim()||String(report.code||'').trim()))return 'reported';
+ if(e.readonlyWrongDate===true&&e.originalReportId)return 'pending';
  // 排班已有代班的舊佇列不重複提示；僅當次新增代班允許連續申報。
  return active?'pending':'arranged';
 }
@@ -1981,16 +1983,21 @@ async function p79ReconcileLeaveHandoff(){
    // entry was already migrated to the next worker workday in a prior visit.
    const originalDate=String(e.coverDate||e.date);
    const original=originalDate===e.date?data:await fetchEntry({...e,date:originalDate});
-   const corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(original,{...h,id:e.leaveId||h.id},e);
+   let corrected=P79Overtime.normalizeLeaveCoverHandoffEntry(original,{...h,id:e.leaveId||h.id},e);
+   // A wrong-date ORIGINAL report is evidence for a read-only preview, not
+   // permission to duplicate or silently move its cloud report ID.
+   let wrongDateReportId='';
    if(String(corrected.coverDate||corrected.date)!==String(corrected.date)){
     const oldEmployee=(original.schedules||[]).find(row=>
      String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
     const oldReport=oldEmployee?.schedule?.__meta?.[corrected.coverDate]?.overtimeReport;
     if(oldReport?.id&&oldReport.category==='延'&&
        String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08')
-     throw Error(e.empId+' 的原預排仍在 '+corrected.coverDate+'，加班應歸 '+corrected.date+
-      '；原ID須先核對更正，不能重複建立第二筆。');
+     wrongDateReportId=String(oldReport.id);
    }
+   // Clear an old browser flag once its source no longer has that report.
+   const {readonlyWrongDate:discardFlag,originalReportId:discardId,...cleanEntry}=corrected;
+   corrected={...cleanEntry,...(wrongDateReportId?{readonlyWrongDate:true,originalReportId:wrongDateReportId}:{})};
    if(corrected.date!==e.date){
     e=corrected;
     data=await fetchEntry(e);
