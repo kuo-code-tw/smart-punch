@@ -347,8 +347,12 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
         </div>
         <div class="p79-modern-home-ship" aria-hidden="true">🚢<small>人性化 · 科技化 · 更好操作</small></div>
       </section>
-      <section id="p79Dashboard" class="p79d-dashboard" aria-label="本月船舶與考勤整合資訊">
-  <section class="p79d-section p79d-vessel" aria-labelledby="p79dShipHeading">
+      <section id="p79Dashboard" class="p79d-dashboard" aria-label="船舶、人力與進出站櫃量統計">
+  <nav id="p79HomeStatTabs" class="p79-gate-home-tabs" role="tablist" aria-label="首頁統計頁面">
+    <button type="button" role="tab" id="p79HomeOperationsTab" aria-controls="p79HomeVesselPanel p79HomeAttendancePanel" aria-selected="true">🚢 船舶與人力</button>
+    <button type="button" role="tab" id="p79HomeGateTab" aria-controls="p79HomeGatePanel" aria-selected="false">🚛 進出站櫃量</button>
+  </nav>
+  <section id="p79HomeVesselPanel" data-p79-home-operations class="p79d-section p79d-vessel" aria-labelledby="p79dShipHeading">
     <div class="p79d-section-head"><h2 id="p79dShipHeading">🚢 船舶作業總覽 <span id="p79DashMonthLabel"></span></h2>
       <div class="p79d-heading-actions"><label class="p79r-sr" for="p79DashMonth">查詢月份</label><input type="month" id="p79DashMonth" aria-label="船舶與考勤統計月份"><button type="button" id="p79DashRefresh" title="手動重新讀取所選月份的首頁資料">↻ 手動更新</button><button type="button" onclick="launchSystem('efficiency')">查看詳情 ›</button></div></div>
     <div class="p79d-kpis">
@@ -383,7 +387,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     </div>
     <p id="p79DashShipSource" class="p79d-source">船舶統計待讀取；每月資料由原歷史資料功能提供。</p>
   </section>
-  <section class="p79d-section p79d-attendance" aria-labelledby="p79dAttendanceHeading">
+  <section id="p79HomeAttendancePanel" data-p79-home-operations class="p79d-section p79d-attendance" aria-labelledby="p79dAttendanceHeading">
     <div class="p79d-section-head"><h2 id="p79dAttendanceHeading">👥 考勤人力總覽 <span id="p79DashMonthLabel2"></span></h2>
       <button type="button" onclick="launchSystem('attendance')">考勤系統詳情 ›</button></div>
     <div class="p79d-kpis">
@@ -425,8 +429,33 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     <div class="p79r-audit-counts">本月考勤紀錄 <span id="p79DashPunchRecords">—</span> 筆 · 上班卡 <span id="p79DashPunchIns">—</span> 筆 <span id="p79DashScheduleSource"></span></div><p id="p79DashAttendanceSource" class="p79d-source">考勤統計待讀取；不改變員工刷卡上下班。</p>
     <p id="p79DashPersonSource" class="p79d-source">個人效率僅依可核對的作業量 Moves 與有效工時計算，避免錯誤推估。</p>
   </section>
-  <div id="p79DashMessage" class="p79d-message" role="status" aria-live="polite">正在準備本月資料…</div>
-  <div class="p79d-footnote"><span>🔒 員工上下班刷卡功能維持原狀</span><a href="./history-data/">🗄️ 歷史資料庫</a><a href="./aqc-efficiency/">🚢 船舶明細</a></div>
+  <section id="p79HomeGatePanel" class="p79d-section p79-gate-section" role="tabpanel" aria-labelledby="p79HomeGateTab" hidden>
+    <div class="p79-gate-header">
+      <div><h2>🚛 進出站櫃量累計</h2><p>交空・領空・交重・領重・進站拖車車次</p></div>
+      <div class="p79-gate-modes" role="group" aria-label="選擇統計方式">
+        <button type="button" id="p79GateMonth" aria-pressed="true">每月累計</button>
+        <button type="button" id="p79GateYear" aria-pressed="false">年度累計</button>
+      </div>
+    </div>
+    <div class="p79-gate-navigation" aria-label="月份年度翻頁">
+      <button type="button" id="p79GatePrev" aria-label="上一個統計期間">‹</button>
+      <strong id="p79GatePeriod" aria-live="polite">正在讀取期間…</strong>
+      <button type="button" id="p79GateNext" aria-label="下一個統計期間">›</button>
+    </div>
+    <div class="p79-gate-metrics">
+      <div><span>交空櫃</span><strong id="p79GateDeliverEmpty">—</strong><small>櫃</small></div>
+      <div><span>領空櫃</span><strong id="p79GatePickupEmpty">—</strong><small>櫃</small></div>
+      <div><span>交重櫃</span><strong id="p79GateDeliverLoaded">—</strong><small>櫃</small></div>
+      <div><span>領重櫃</span><strong id="p79GatePickupLoaded">—</strong><small>櫃</small></div>
+      <div class="p79-gate-truck"><span>進站拖車</span><strong id="p79GateTruckEntries">—</strong><small>車次</small></div>
+    </div>
+    <div class="p79-gate-footer">
+      <span>本期總櫃量 <strong id="p79GateTotalContainers">—</strong> 櫃</span>
+      <span id="p79GateStatus" role="status" aria-live="polite">尚未接入正式進出站櫃量資料庫</span>
+    </div>
+  </section>
+  <div id="p79DashMessage" data-p79-home-operations class="p79d-message" role="status" aria-live="polite">正在準備本月資料…</div>
+  <div data-p79-home-operations class="p79d-footnote"><span>🔒 員工上下班刷卡功能維持原狀</span><a href="./history-data/">🗄️ 歷史資料庫</a><a href="./aqc-efficiency/">🚢 船舶明細</a></div>
 </section>
       <div class="p79-modern-section-heading"><strong>▦ 功能模組與歷史資料庫</strong><small>依原有帳號權限顯示可用的系統</small></div>
       <div class="p79-modern-search-row">
@@ -1623,9 +1652,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261107-imported-chinese-names-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261107-ranking-fit-no-scroll-v2">
+<link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-home-tabs-v1">
 <script src="./assets/port79-reference-dashboard.js?v=20261107-connected-trend-v2"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261107-persistent-chinese-names-v104"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261107-connected-valid-points-v2"></script>
+<script src="./assets/port79-gate-home.js?v=20261107-gate-home-tabs-v1"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 <!-- PORT79 2026-11-03: 管理員手機首頁只顯示萬海網站船期與目前班別人員；桌面版、員工登入與原資料讀取不變。 -->
 <style id="p79-admin-phone-two-panels-20261103">
