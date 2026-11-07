@@ -24,8 +24,9 @@ assert(override.includes('article.p79d-panel.p79d-gate-flip'));
 assert(override.includes('max-height:none!important'));
 assert(override.includes('overflow:visible!important'));
 assert(gateCSS.includes('#p79Dashboard.p79-gate-view-active'),'Gate CSS also scopes expanded layout');
-for(const file of ['port79-reference-dashboard.css','port79-gate-home.css','port79-gate-home.js']){
- assert(new RegExp(file.replace(/\./g,'\\.')+'\\?v=20261107-gate-grid-track-fix-v4').test(html),'cache bust updated for '+file);
+assert(html.includes('port79-reference-dashboard.css?v=20261107-gate-grid-track-fix-v4'));
+for(const file of ['port79-gate-home.css','port79-gate-home.js']){
+ assert(new RegExp(file.replace(/\./g,'\\.')+'\\?v=20261107-six-visible-card-v5').test(html),'cache bust updated for '+file);
 }
 function style(){
  const m=new Map();
@@ -53,7 +54,7 @@ const doc={readyState:'complete',getElementById:element,addEventListener(){}};
 const win={document:doc,sessionStorage:{getItem(){return null;}}};
 vm.runInNewContext(source,{window:win,globalThis:win,Intl,Date,URL},{timeout:3000});
 win.P79GateStatsHome.switchTab('gate');
-assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'auto','outer grid row MUST expand');
+assert.equal(grid.style.getPropertyValue('grid-auto-rows'),'max-content','outer grid row MUST expand to fit all six KPI tiles');
 assert.equal(grid.style.getPropertyPriority('grid-auto-rows'),'important','defeat late dashboard CSS');
 assert.equal(card.style.getPropertyValue('height'),'auto');
 assert.equal(card.style.getPropertyValue('min-height'),'0');
