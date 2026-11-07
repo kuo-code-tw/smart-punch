@@ -7,7 +7,7 @@ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const js=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'assets/port79-reference-dashboard.css'),'utf8');
 const title=html.indexOf('最新匯入船舶');
-const head=html.slice(title,title+420);
+const head=html.slice(title,html.indexOf('</article>',title));
 assert(title>=0,'latest imported vessel panel exists');
 assert(head.includes('<th>船名（中文）</th>'),'ship header identifies bilingual name');
 assert(!head.includes('<th>狀態</th>'),'status column removed');

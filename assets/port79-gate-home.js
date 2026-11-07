@@ -5,6 +5,7 @@
  *  {date:"2026-11-01",deliverEmpty:2,pickupEmpty:37,
  *   deliverLoaded:213,pickupLoaded:122,truckEntries:263}
  * ]}
+ * The Gate Excel import entry is at ./gate-import/.
  * A future importer can call P79GateStatsHome.setYearRows(year, dailyRows)
  * after the official cloud save. Never use browser-local figures as the source of truth.
  */
@@ -137,13 +138,17 @@
   if(active==='gate')void loadYear(year);else render();
  }
  function switchTab(which){
+  // The two tabs flip only this one small ranking card, never the whole homepage.
   if(which!=='operations'&&which!=='gate')return;
   active=which;
-  var isGate=which==='gate',ops=$('p79HomeOperationsTab'),gate=$('p79HomeGateTab');
-  if(ops)ops.setAttribute('aria-selected',String(!isGate));
-  if(gate)gate.setAttribute('aria-selected',String(isGate));
-  d.querySelectorAll('#p79Dashboard [data-p79-home-operations]').forEach(el=>{el.hidden=isGate;});
-  var section=$('p79HomeGatePanel');if(section)section.hidden=!isGate;
+  var isGate=which==='gate';
+  $('p79HomeOperationsTab')?.setAttribute('aria-selected',String(!isGate));
+  $('p79HomeGateTab')?.setAttribute('aria-selected',String(isGate));
+  var ranking=$('p79RankingView'),section=$('p79HomeGatePanel');
+  if(ranking)ranking.hidden=isGate;
+  if(section)section.hidden=!isGate;
+  var count=$('p79DashShipRankingCount');
+  if(count)count.hidden=isGate;
   if(isGate)void loadYear(year);
  }
  // This read-only injection point is for a future authenticated cloud importer.
