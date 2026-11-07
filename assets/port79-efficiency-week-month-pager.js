@@ -9,7 +9,10 @@ var $=id=>d.getElementById(id);
 var base=g.P79ReferenceDashboard;
 var model=g.P79MonthlyDashboard;
 var originalVessels=base.vessels,originalReset=base.reset;
-var mode='week',cursor='',weekCursor='',yearCursor='',selectedMonth='',sessionKey='',seq=0;
+// Preserve the user's selected chart view across page reloads and automatic refreshes.
+var savedMode='week';
+try{savedMode=g.sessionStorage?.getItem('p79_efficiency_chart_mode')==='month'?'month':'week';}catch(_){}
+var mode=savedMode,cursor='',weekCursor='',yearCursor='',selectedMonth='',sessionKey='',seq=0;
 var cache=new Map(),inflight=new Map(),lastChart=null,lastChartSize='';
 var style=d.createElement('style');
 style.id='p79-efficiency-week-month-pager-style';
@@ -169,7 +172,11 @@ function draw(p,report){
   }
   var y=top+ph-(row.gph-floor)/range*ph;connected.push([x,y]);
   texts+='<circle cx="'+x+'" cy="'+y+'" r="4.5" fill="white" stroke="#1687ff" stroke-width="2.5"><title>'+escape(row.date+(mode==='week'?'':' 月')+'：'+row.gph.toFixed(2)+' GPH / '+row.count+' 艘船舶')+'</title></circle>';
-  if(mode==='week')texts+='<text class="p79r-bar-number" x="'+x+'" y="'+(y-10)+'" text-anchor="middle">'+row.gph.toFixed(2)+'</text>';
+  // Both views show the real two-decimal GPH above each measured point.
+  // Stagger monthly labels on narrow screens instead of dropping any values.
+  var labelOffset=mode==='month'&&gap<35?(i%2===0?11:23):12;
+  var labelY=Math.max(12,y-labelOffset);
+  texts+='<text class="p79r-bar-number" x="'+x+'" y="'+labelY+'" text-anchor="middle" font-size="'+(mode==='month'?'10.5':'12')+'">'+row.gph.toFixed(2)+'</text>';
  }
  // Gaps represent absent observations, not zeros. Join the neighboring observed points.
  var lines=connected.length>1?'<polyline points="'+connected.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#1687ff" stroke-width="2.5"/>':'';
@@ -234,6 +241,7 @@ function setMode(next){
  if(mode==='week')weekCursor=cursor;
  else yearCursor=cursor;
  mode=next;
+ try{g.sessionStorage?.setItem('p79_efficiency_chart_mode',mode);}catch(_){}
  cursor=mode==='week'?weekCursor:yearCursor;
  render();
 }
@@ -269,6 +277,7 @@ if(g.ResizeObserver)new g.ResizeObserver(()=>{
  var size=chartEl.clientWidth+'x'+chartEl.clientHeight;
  if(size!==lastChartSize&&chartEl.clientWidth>0&&chartEl.clientHeight>0)draw(lastChart.p,lastChart.report);
 }).observe(chartEl);
+g.P79EfficiencyPager={active:true};
 base.vessels=onVessels;
 base.reset=function(){originalReset.call(base);seq++;};
 $('p79EffWeek')?.addEventListener('click',()=>setMode('week'));
