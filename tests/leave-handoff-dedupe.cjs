@@ -17,7 +17,7 @@ function fixture(report=null,covers=true,rows=true){
    $:id=>id==='p79LeaveHandoffBanner'?banner:id==='p79LeaveHandoffStatus'?label:null,
    normalizeLeaveFilterDate:v=>String(v||'').slice(0,10).replaceAll('/','-'),
    jsonFetch:async()=>{calls.fetch++;return data},
-   P79Overtime:{typeOptions:()=>[],showReportLoading:()=>({isConnected:true,close(){this.isConnected=false},querySelector:()=>({textContent:''})}),resolveLeaveCoverReport:()=>({code:'代08-16'}),openReport:async opts=>{calls.open++;calls.last=opts}},
+   P79Overtime:{normalizeLeaveCoverHandoffEntry:(cloud,h,e)=>e,typeOptions:()=>[],showReportLoading:()=>({isConnected:true,close(){this.isConnected=false},querySelector:()=>({textContent:''})}),resolveLeaveCoverReport:()=>({code:'代08-16'}),openReport:async opts=>{calls.open++;calls.last=opts}},
    setStatus:(msg)=>calls.status.push(msg)};
  vm.createContext(context);vm.runInContext(source,context);
  const put=(entries=[entry])=>{stored.set('port79_leave_overtime_handoff_v1',JSON.stringify({id:'LEAVE',createdAt:Date.now(),entries}));};

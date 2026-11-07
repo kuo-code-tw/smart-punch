@@ -326,13 +326,13 @@
  const saveValidationContexts=new WeakMap();
  async function prepareSaveValidation(request,checkRules=true){
   const credentials=auth(),{url,token}=credentials;
-  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,leaveHandoffId:String(request.leaveHandoffId||'')};
+  const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,coverDate:String(request.coverDate||request.date),leaveHandoffId:String(request.leaveHandoffId||'')};
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   const read=(async()=>{
    try{
     const query='?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+
      '&empId='+encodeURIComponent(scope.empId)+'&date='+encodeURIComponent(scope.date)+
-     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&_='+Date.now();
+     '&leaveHandoffId='+encodeURIComponent(scope.leaveHandoffId)+'&coverDate='+encodeURIComponent(scope.coverDate)+'&_='+Date.now();
     const response=await fetch(url+query,{cache:'no-store',signal:controller.signal});
     const cloud=await response.json();
     if(!response.ok||cloud?.ok!==true)throw Error(cloud?.error||'出勤與班表核對失敗');
@@ -353,7 +353,7 @@
   const current=auth(),age=Date.now()-saved.checkedAt;
   if(age<0||age>15000||saved.url!==current.url||saved.token!==current.token||
      saved.empId!==String(draft.empId).trim().toUpperCase()||saved.date!==draft.date||
-     saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
+     saved.coverDate!==String(draft.coverDate||draft.date)||saved.leaveHandoffId!==String(draft.leaveHandoffId||''))return null;
   return saved.cloud;
  }
  // Show each rule only under its named overtime type; sharing a quota category
@@ -456,6 +456,28 @@
   Object.assign(current,cloudConfig);
   return current;
  }
+ // Convert legacy leave-handoff queue items to the worker's actual work date.
+ // The original leave date is retained for leave-link verification; this is
+ // read-only and never creates a scheduled shift or an overtime report.
+ function normalizeLeaveCoverHandoffEntry(data,handoff,entry){
+  const key=v=>String(v||'').trim().toUpperCase(),leaveDate=String(entry?.coverDate||entry?.date||'');
+  const cover=(data?.leaveCoverAssignments||[]).find(c=>String(c.leaveId)===String(entry?.leaveId||handoff?.id)&&
+   key(c.leaveEmpId)===key(entry?.forEmpId)&&(c.workerIds||[]).some(id=>key(id)===key(entry?.empId))&&
+   String(c.startDate)<=leaveDate&&String(c.endDate)>=leaveDate);
+  if(!cover)throw Error('原請假代班資料未能通過正式雲端核對，保留待申報資料');
+  const roster=new Map((data.schedules||[]).map(r=>[key(r.empId),r.schedule||{}]));
+  const target=roster.get(key(cover.leaveEmpId))||{};
+  const originalShift=[target[leaveDate],target.__meta?.[leaveDate]?.leaveOriginalShift,
+   target.__meta?.[leaveDate]?.reportOriginalShift,entry.coverShift]
+   .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
+  const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
+  const plan=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
+  if(!plan)return {...entry,coverDate:leaveDate};
+  if(entry.date!==leaveDate&&entry.date!==plan.workDate)
+   throw Error('原請假日期與代班工作日期不符，不能猜測或重複建立加班');
+  return {...entry,date:plan.workDate,coverDate:leaveDate,coverShift:originalShift,
+   code:plan.code,preferredType:'平日延時加班'};
+ }
  function resolveLeaveCoverReport(data,handoff,entry){
   const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
   const leaveDate=String(entry.coverDate||date);
@@ -468,11 +490,11 @@
   const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
   const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
   if(split){
-   if(date!==split.workDate)throw Error('代班工作日期應為 '+split.workDate+'（原請假日期 '+leaveDate+'），不得把隔日早班加班登在前一天');
+   if(date!==split.workDate)throw Error('本筆工作日期應為 '+split.workDate+'（原請假日 '+leaveDate+'）；請重新核對代班預排，尚未正式申報');
    const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
     .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
-    periodHint:'此人原班別必須核對為'+split.normalShift+'班，不能將正常班誤當加班。'};
+    periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
    return {code:split.code,requirePeriodSelection:false,
     periodHint:'原請假日 '+leaveDate+'；代班工作日 '+date+'；正常班 '+split.normalStart+'-'+split.normalEnd+
      '；平日延時加班 '+split.overtimeStart+'-'+split.overtimeEnd+'（不含正常班）'};
@@ -1364,7 +1386,9 @@
     if(!forId)return;
     if(prefill.leaveHandoffId){
      dateInput.value=prefill.date||'';
-     if(approvedDates.includes(dateInput.value))leaveDateSelect.value=dateInput.value;
+     const originalLeaveDate=String(prefill.coverDate||dateInput.value);
+     if(approvedDates.includes(originalLeaveDate))leaveDateSelect.value=originalLeaveDate;
+     leaveDateSelect.disabled=true;
      return;
     }
     if(approvedDates.length===1){
@@ -1417,7 +1441,7 @@
    kind.onchange=()=>{manuallySelectedType=true;manuallySelectedPeriod=false;prefill.preferredType='';refresh();autoSelectPeriodForCurrentType();void refreshOfficialRosterHint();};
    select.onchange=()=>{manuallySelectedPeriod=true;preview();};
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
-   leaveDateSelect.onchange=()=>{dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
+   leaveDateSelect.onchange=()=>{if(prefill.leaveHandoffId)return;dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
    empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();void refreshOfficialRosterHint();};
    dateInput.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent=typeOptions(dialogRuleConfig(),rows).length?'請選擇員工、日期與出勤時段。':'雲端目前沒有可用的加班類型。請按下方「＋新增／管理加班類型與時段」，先新增類型，再設定出勤時段。';
@@ -1444,6 +1468,13 @@
     else{select.selectedIndex=-1;select.value='';preview();el.querySelector('#p79OtStatus').textContent='已帶入「'+requested+'」，請選擇本位人員的出勤時段。';}
    }
    applyPreferredType();
+   // Show the intended four-hour period even before the next day's first IN.
+   // It is a plan only, never verified actual overtime or punch evidence.
+   if(prefill.leaveHandoffId&&prefill.periodHint){
+    const p=el.querySelector('#p79OtPreview');
+    p?.insertAdjacentHTML('afterend','<div id="p79OtCoverPlanPreview" style="margin:7px 0;padding:9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1e40af;font-size:13px;font-weight:700">'+
+     '預排代班時段（尚未認列實際加班）｜'+esc(prefill.periodHint)+'</div>');
+   }
    suggestBySelectedRole();
    void refreshOfficialRosterHint();
    if(!prefill.code&&prefill.requirePeriodSelection&&prefill.attendance)
@@ -1551,6 +1582,15 @@
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
    if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());}
+   if(prefill.readonlyWrongDate===true){
+    const reason='原預排仍在 '+String(prefill.coverDate||'原請假日')+
+     '，正確加班工作日期是 '+String(prefill.date||'')+
+     '。已顯示加班候選時段，但原申報 ID 尚待授權更正；不可建立重複預排。';
+    el.querySelector('#p79OtStatus').textContent=reason;
+    const stage=el.querySelector('#p79OtStage');
+    stage.textContent='原預排日期待更正（不可重複儲存）';
+    stage.disabled=true;stage.title=reason;
+   }
    if(prefill.savedReport&&prefill.reportId)el.querySelector('#p79OtStage').textContent=prefill.plannedReview===true?'確認正式申報':'儲存原申報修改';
    if(prefill.note)el.querySelector('#p79OtNote').value=String(prefill.note);
    // 正式核對只能用與完整上/下班打卡一致的規則；不接受預排快取的舊班別。
@@ -1568,6 +1608,7 @@
    }
    let submissionBusy=false;
    el.querySelector('#p79OtStage').onclick=async()=>{
+    if(prefill.readonlyWrongDate===true)return;
     if(submissionBusy)return;
     submissionBusy=true;let completed=false;
     const stageButton=el.querySelector('#p79OtStage');stageButton.disabled=true;
@@ -1649,7 +1690,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
