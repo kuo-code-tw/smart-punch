@@ -1879,7 +1879,7 @@ async function p79SaveWorkOvertimeDraft(draft){
   if(issue)throw Error(issue);
  }
 
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
