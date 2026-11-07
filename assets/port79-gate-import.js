@@ -263,7 +263,9 @@ async function save(){
   if(result?.ok!==true||result?.source!=='port79-gate-daily')
    throw Error(result?.error||'正式 GAS Gate 匯入接口尚未部署');
   message('已寫入正式資料庫：新增 '+result.added+' 天、更新 '+result.updated+
-   ' 天。月、年統計會從每日資料自動重新加總。','success');
+   ' 天。日、週、月、年統計將自動重新加總。','success');
+  // Only a confirmed backend success refreshes the official read-only view.
+  void g.P79GateLive?.refresh?.();
  }catch(err){
   var raw=String(err.message||err);
   if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)/i.test(raw)){
