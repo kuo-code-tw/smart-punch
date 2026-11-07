@@ -847,8 +847,8 @@ async function p79ReportSavedLeaveCover(id){
        employeeRow.schedule?.__meta?.[entry.coverDate]?.overtimeReport:null;
       if(!report&&oldDay?.id&&oldDay.category==='延'&&
          String(oldDay.overtimeStart||'')==='04'&&String(oldDay.overtimeEnd||'')==='08'){
-       cell.textContent='⚠ 原預排仍儲存在 '+entry.coverDate+'，但加班應歸 '+entry.date+
-        '。須先更正原申報日期；目前未重複新增。';
+       cell.textContent='⚠ 原預排儲存在 '+entry.coverDate+'；實際出勤 '+entry.date+
+        '，加班歸屬 '+(entry.overtimeDate||entry.coverDate)+'。須核對原報單及原ID，不重複新增。';
        unverified++;continue;
       }
      if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
@@ -964,6 +964,7 @@ async function p79BuildLeaveCoverWorkdayEntries(leaveId,leaveEmpId,assignments){
    const plan=window.P79LeaveCoverSuggest?.coverWorkday?.(coverDate,leaveShift,mode,index);
    const emp=employees.find(e=>norm(e.empId)===norm(empId));
    entries.push({empId,name:emp?.name||empId,date:plan?.workDate||coverDate,
+    workDate:plan?.workDate||coverDate,overtimeDate:plan?.overtimeDate||plan?.workDate||coverDate,
     coverDate,coverShift:leaveShift,forEmpId:String(leaveEmpId),
     ...(plan?{code:plan.code,preferredType:'平日延時加班'}:{})});
   }
@@ -1862,6 +1863,11 @@ async function p79SaveWorkOvertimeDraft(draft){
  };
  const prepared=P79Overtime.takeSaveContext?.(draft);
  const cloud=prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ const overtimeDate=String(draft.overtimeDate||draft.date);
+ // Older GAS stores the punch/work date only; refuse to claim the following
+ // morning's extension is credited on the previous night before backend support.
+ if(overtimeDate!==String(draft.date)&&cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
+  throw Error('正式 GAS 尚未確認可將 '+draft.date+' 凌晨的加班歸屬 '+overtimeDate+'；不寫入錯日申報。需先部署後端配套。');
  const employeeId=String(draft.empId).trim().toUpperCase();
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
@@ -1879,11 +1885,17 @@ async function p79SaveWorkOvertimeDraft(draft){
   if(issue)throw Error(issue);
  }
 
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,
+  date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,
+  forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,
+  expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,
+  attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
+  if(overtimeDate!==String(draft.date)&&String(result.report?.overtimeDate||'')!==overtimeDate)
+   throw Error('正式 GAS 未確認加班歸屬日；請核對原申報 ID，不可重複新增。');
   return result;
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
@@ -1949,7 +1961,11 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
      !(e.readonlyWrongDate===true&&String(e.originalReportId||'')===String(wrong.id)))
    return 'wrong-workdate';
  }
- if(report&&(String(report.id||'').trim()||String(report.code||'').trim()))return 'reported';
+ if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
+  // Report on physical date alone is not proof of previous-night credit.
+  if(String(e.overtimeDate||date)!==date&&String(report.overtimeDate||'')!==String(e.overtimeDate))return 'wrong-workdate';
+  return 'reported';
+ }
  if(e.readonlyWrongDate===true&&e.originalReportId)return 'pending';
  // 排班已有代班的舊佇列不重複提示；僅當次新增代班允許連續申報。
  return active?'pending':'arranged';
@@ -2017,8 +2033,8 @@ async function p79ReconcileLeaveHandoff(){
    const month=String(e.date||'').slice(0,7);
    const state=p79LeaveHandoffEntryState(h,e,data,active);
    if(state==='unverified')throw Error('無法找到 '+e.empId+' 的正式班表，保留佇列待核對');
-    if(state==='wrong-workdate')throw Error(e.empId+' 的原預排仍儲存在 '+(e.coverDate||'原請假日')+
-     '，正確工作日為 '+e.date+'；須先更正原申報日期並保留原ID，不可重複建立。');
+    if(state==='wrong-workdate')throw Error(e.empId+' 的申報歸屬需核對：實際出勤 '+e.date+
+     '、加班歸屬 '+(e.overtimeDate||e.coverDate||e.date)+'；保留原ID，不可重複建立。');
    if(state==='pending'){
     remaining.push(e);
     // Reuse this exact verified employee/day context for the next handoff.
@@ -2104,7 +2120,7 @@ async function p79OpenLeaveOvertimeHandoff(){
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
   await P79Overtime.openReport({...e,...period,...(!perPersonType?{requirePeriodSelection:true,periodHint:period.periodHint||'此員工的正式班表或加班選項尚未確認，請核對後選擇類型與時段。'}:{}),verifiedOvertimeRules,preferredType:requestedType?.[1]||'',category:requestedType?.[0]||'',leaveHandoffId:e.leaveId||h.id,normalShifts:Object.fromEntries((data.schedules||[]).map(row=>[row.empId,row.schedule?.__meta?.[e.date]?.reportOriginalShift??row.schedule?.__meta?.[e.date]?.overtimeOriginalShift??row.schedule?.[e.date]])),allowedEmpIds:h.entries.filter(item=>item.date===e.date&&String(item.forEmpId||'')===String(e.forEmpId||'')).map(item=>item.empId)});
-  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：'+e.date+' '+(e.name||e.empId)+(entryType?'｜本位指定 '+entryType+'（待核對）':perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
+  $('p79LeaveHandoffStatus').textContent='尚有 '+h.entries.length+' 筆｜目前：出勤 '+e.date+'／加班歸屬 '+(e.overtimeDate||e.date)+' '+(e.name||e.empId)+(entryType?'｜本位指定 '+entryType+'（待核對）':perPersonType?'｜依本人班表建議 '+perPersonType[1]:'｜加班類型待人工核對')+'。';
  }catch(error){
   if(loading.isConnected)loading.querySelector('#p79OtStatus').textContent='請假／代班不受影響。'+error.message;
   setStatus('加班明細尚未完成：'+error.message,'warn');
