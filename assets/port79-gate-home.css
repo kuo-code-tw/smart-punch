@@ -221,3 +221,22 @@ html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div
 html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div:nth-child(5){background:#183d32!important;border-color:#28694c!important}
 html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div.p79-gate-total{background:#1c315a!important;border-color:#314f85!important}
 html[data-theme="dark"] body #p79Dashboard .p79d-gate-flip .p79-gate-metrics>div strong {color:#eaf4ff!important}
+
+/* One viewport, six stats, no nested vertical scrollbar. The dashboard's
+   high-specificity base rules are independently overridden in the reference
+   dashboard stylesheet and with reversible inline styles. */
+#p79Dashboard.p79-gate-view-active .p79d-gate-flip,
+#p79Dashboard.p79-gate-view-active #p79HomeGatePanel {
+ scrollbar-width:none!important;
+}
+#p79Dashboard.p79-gate-view-active #p79HomeGatePanel::-webkit-scrollbar {
+ display:none!important;
+}
+#p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics {
+ width:100%!important;
+ overflow:visible!important;
+}
+#p79Dashboard.p79-gate-view-active .p79d-gate-flip .p79-gate-metrics>div {
+ box-sizing:border-box!important;
+ min-width:0!important;
+}

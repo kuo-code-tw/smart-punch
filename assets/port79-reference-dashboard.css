@@ -1146,3 +1146,36 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
   font-size:clamp(8px,0.88vw,11px)!important;
   white-space:nowrap!important;
 }
+
+/* 2026-11-07 Gate: the original dashboard explicitly assigns 260/275px
+ * grid-auto-rows AND the matching 260/275px min/max heights on cards.
+ * Fix both with stronger specificity; prior Gate-only overflow rules
+ * could not undo the grid sizing and clipped the sixth KPI.
+ * When the original vessel ranking is selected the class is absent and
+ * the compact ship list retains its original design and scrolling. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+#p79Dashboard.p79-gate-view-active .p79d-ship-panels {
+ grid-auto-rows:auto!important;
+ align-items:start!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+#p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-panel.p79d-gate-flip {
+ display:flex!important;
+ flex-direction:column!important;
+ box-sizing:border-box!important;
+ height:auto!important;
+ min-height:0!important;
+ max-height:none!important;
+ align-self:start!important;
+ overflow:visible!important;
+ overflow-y:visible!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard)
+#p79Dashboard.p79-gate-view-active .p79d-ship-panels > article.p79d-gate-flip #p79HomeGatePanel {
+ height:auto!important;
+ min-height:0!important;
+ max-height:none!important;
+ flex:0 0 auto!important;
+ overflow:visible!important;
+ overflow-y:visible!important;
+}
