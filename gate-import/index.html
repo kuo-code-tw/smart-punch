@@ -31,20 +31,51 @@ th{background:#ebf3fb;color:#476d91}th:first-child,td:first-child{text-align:lef
 #gateMessage[data-kind="success"]{color:#18744b}
 code{font-family:ui-monospace,monospace;font-size:12px}
 @media(max-width:620px){body{padding:12px 8px}h1{font-size:19px}.panel{padding:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric strong{font-size:18px}}
+
+html[data-gate-embed="1"]{background:transparent}
+html[data-gate-embed="1"] body{background:transparent!important;padding:0!important}
+html[data-gate-embed="1"] main{max-width:none!important;width:100%}
+html[data-gate-embed="1"] header{display:none!important}
+html[data-gate-embed="1"] .panel{box-shadow:none;border-radius:14px;border-color:#deebf6;margin:0 0 12px}
+.metric{transition:background-color .15s ease,transform .15s ease}
+.metric:nth-child(1){background:#eef5ff;border-color:#bfdbfe}.metric:nth-child(1) strong{color:#1d4ed8}
+.metric:nth-child(2){background:#e8fafc;border-color:#a5e9f2}.metric:nth-child(2) strong{color:#0e7490}
+.metric:nth-child(3){background:#fff4e9;border-color:#fed7aa}.metric:nth-child(3) strong{color:#c2410c}
+.metric:nth-child(4){background:#f5efff;border-color:#d8b4fe}.metric:nth-child(4) strong{color:#7e22ce}
+.metric:nth-child(5){background:#eaf2ff;border-color:#bfdbfe}.metric:nth-child(5) strong{color:#1e40af}
+.metric:nth-child(6){background:#e7f8ef;border-color:#a7f3d0}.metric:nth-child(6) strong{color:#047857}
+tbody tr:hover{background:#edf6ff}tbody td:nth-child(6){font-weight:800;color:#1e40af}
+tbody td:last-child{font-weight:750;color:#047857}
+#gateMessage[data-kind="error"]{background:#fff6ed;border:1px solid #fed7aa;border-radius:9px;padding:9px 11px;color:#9a3412}
+#gateMessage[data-kind="success"]{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:9px;padding:9px 11px;color:#065f46}
 </style>
+<script>
+(function(){
+ var embedded=new URLSearchParams(location.search).get('embed')==='1';
+ if(!embedded){location.replace('../aqc-efficiency/?tab=gate');return;}
+ document.documentElement.setAttribute('data-gate-embed','1');
+ window.addEventListener('DOMContentLoaded',function(){
+  var main=document.querySelector('main');
+  if(!main||!window.ResizeObserver||window.parent===window)return;
+  var send=function(){window.parent.postMessage({type:'p79-gate-embed-resize',height:Math.ceil(main.getBoundingClientRect().height)},location.origin)};
+  new ResizeObserver(send).observe(main);
+  send();
+ });
+})();
+</script>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script defer src="../assets/port79-gate-import.js?v=20261107-gate-deploy-check-v2"></script>
 </head>
 <body><main>
 <header><div><a href="../">‹ 返回 PORT79 首頁</a><h1>🚛 Gate 進出站櫃量 Excel 匯入</h1><p>按日期保存交空、領空、交重、領重、進站拖車車次</p></div><a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">開啟正式 Google 資料庫</a></header>
 <section class="panel">
-<h2>1. 選擇 Gate Excel</h2>
-<p class="hint">支援你目前提供的 <code>gate.xlsx</code> 報表格式（日期在第一列、ITT／Non ITT 交領空重櫃數、及第 15 列進站卡車數）。系統會自動合併 ITT 和 Non ITT、檢查每日合計，再依日期寫入；相同日期覆寫，不重複累加。</p>
-<div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>讀取並預覽</button></div>
+<h2>1. 選擇檔案</h2>
+<p class="hint">選擇 Gate Excel，系統自動彙整交空、領空、交重、領重及拖車車次。相同日期會更新，不會重複累計。</p>
+<div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>開始預覽</button></div>
 <p id="gateMessage" role="status" aria-live="polite">請先選擇檔案。</p>
 </section>
 <section class="panel" id="gateResult" hidden>
-<h2>2. 核對每天的進出櫃量</h2>
+<h2>2. 檢查每日進出櫃量</h2>
 <div class="grid">
 <div class="metric"><span>交空櫃</span><strong id="gateDe">—</strong></div>
 <div class="metric"><span>領空櫃</span><strong id="gatePe">—</strong></div>
@@ -56,11 +87,11 @@ code{font-family:ui-monospace,monospace;font-size:12px}
 <p class="hint" id="gateRange"></p>
 <div class="scroll"><table><thead><tr><th>日期</th><th>交空</th><th>領空</th><th>交重</th><th>領重</th><th>總櫃量</th><th>拖車車次</th></tr></thead><tbody id="gatePreviewRows"></tbody></table></div>
 <div class="controls">
-<button type="button" class="primary" id="gateSave" disabled title="需先驗證正式 Google Apps Script 的 Gate 匯入接口">確認寫入正式資料庫</button>
-<button type="button" id="gateDownload">下載整理後 CSV（備援）</button>
-<a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">手動查看／修正每日資料</a>
+<button type="button" class="primary" id="gateSave" disabled title="需先驗證正式 Google Apps Script 的 Gate 匯入接口">寫入正式資料</button>
+<button type="button" id="gateDownload">下載 CSV</button>
+<a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">查看每日資料</a>
 </div>
-<p class="hint"><strong>注意：</strong>頁面會先確認正式 Google Apps Script 已啟用 Gate 查詢接口，才開放「確認寫入」按鈕；若出現「未知操作」，代表後端尚未部署，不是檔案錯誤。可先下載整理 CSV，並在 Google 試算表「每日進出站」工作表依日期更新，不要重複追加。後端維護說明：<a href="https://github.com/kuo-code-tw/smart-punch/blob/main/backend/gate-stats-deployment.md" target="_blank" rel="noopener noreferrer">Gate 後端部署步驟</a>。</p>
+<p class="hint">尚未啟用雲端匯入時，可先下載 CSV，或到資料庫更新每日紀錄。</p>
 </section>
-<section class="panel"><h2>3. 每月與每年的資料去哪裡？</h2><p class="hint">全部保存於同一份 Google 試算表。「每日進出站」保留各日期，「每月累計」和「年度累計」用 Google Sheets 公式自動統計，「匯入紀錄」保留匯入來源。首頁小卡片會從正式雲端資料讀取，沒有資料的月份顯示 —，不會當成零。</p></section>
+
 </main></body></html>

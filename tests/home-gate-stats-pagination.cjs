@@ -12,7 +12,7 @@ for(const key of ['p79HomeOperationsTab','p79HomeGateTab','p79HomeGatePanel','p7
 }
 assert(html.includes('port79-gate-home.js?v=20261107-gate-compact-card-v2'));
 assert(html.includes('port79-gate-home.css?v=20261107-gate-compact-card-v2'));
-assert(html.includes('href="./gate-import/"'),'Gate Excel import link belongs to compact card');
+assert(!html.includes('id="p79GateImportLink"'),'homepage Gate card is read-only; no upload or download actions');
 assert(!html.includes('id="p79HomeStatTabs"'),'no whole-homepage tabs');
 assert(css.includes('#p79Dashboard #p79HomeGatePanel[hidden]'),'new panel truly hidden by default');
 assert(!js.includes('5344')&&!js.includes('1124'),'operational XLSX values must not be hard-coded in public source');
