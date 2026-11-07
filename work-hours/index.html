@@ -13397,8 +13397,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     const dates=new Set([...Object.keys(own),...Object.keys(target)]);
                     dates.forEach(date=>{
                         if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate)return;
-                        const originalShift=target[date]||target.__meta?.[date]?.leaveOriginalShift||
-                            target.__meta?.[date]?.reportOriginalShift||'';
+                        const originalShift=[target[date],target.__meta?.[date]?.leaveOriginalShift,
+                            target.__meta?.[date]?.reportOriginalShift].find(v=>['早','中','晚'].includes(v))||'';
                         const linked=window.P79LeaveCoverSuggest?.coverWorkday?.(date,originalShift,cover.mode,index);
                         if(linked){
                             // The second half of night leave is worked on the NEXT morning's
@@ -13636,8 +13636,8 @@ async function p79ExportOvertimeComparison(printMode){
                 const start=String(cover.startDate||''),end=String(cover.endDate||'');
                 let day=start,count=0;
                 while(/^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=end&&count++<35){
-                    const shift=target[day]||target.__meta?.[day]?.leaveOriginalShift||
-                        target.__meta?.[day]?.reportOriginalShift||'';
+                    const shift=[target[day],target.__meta?.[day]?.leaveOriginalShift,
+                        target.__meta?.[day]?.reportOriginalShift].find(v=>['早','中','晚'].includes(v))||'';
                     const plan=window.P79LeaveCoverSuggest.coverWorkday(day,shift,cover.mode,index);
                     if(plan&&day===date&&plan.workDate!==date&&
                        String(report.normalStart||'')===plan.normalStart&&
