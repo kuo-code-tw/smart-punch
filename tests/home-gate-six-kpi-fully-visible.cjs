@@ -11,10 +11,10 @@ new vm.Script(code);
 const s=html.indexOf('<section id="p79HomeGatePanel"'),e=html.indexOf('</section>',s);
 assert(s>0&&e>s,'Gate view exists');
 const card=html.slice(s,e);
-for(const id of ['p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateDeliverEmpty','p79GatePickupEmpty','p79GateDeliverLoaded','p79GatePickupLoaded','p79GateTruckEntries','p79GateTotalContainers']){
+for(const id of ['p79GateDay','p79GateWeek','p79GateMonth','p79GateYear','p79GatePrev','p79GateNext','p79GateDeliverEmpty','p79GatePickupEmpty','p79GateDeliverLoaded','p79GatePickupLoaded','p79GateTruckEntries','p79GateTotalContainers']){
  assert(card.includes('id="'+id+'"'),id+' still present');
 }
-assert(!card.includes('id="p79GateDay"')&&!card.includes('id="p79GateWeek"'),'only monthly/yearly');
+assert(card.includes('id="p79GateDay"')&&card.includes('id="p79GateWeek"'),'daily and weekly tabs also visible');
 assert(!card.includes('href=')&&!card.includes('gateSave'),'homepage read-only');
 const patch=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate card only.'));
 assert(patch.includes('grid-auto-rows:max-content!important'),'parent grid grows with Gate card');
@@ -53,4 +53,4 @@ for(const [el,prop] of [[grid,'grid-auto-rows'],[cardEl,'max-height'],[$('p79Hom
 }
 assert.equal($('p79HomeGatePanel').hidden,true);
 assert.equal($('p79RankingView').hidden,false);
-console.log('PASS: Six KPI tiles, month/year only, 3x2 compact layout, no scroll, styles restored on vessel tab');
+console.log('PASS: Six KPI tiles, day/week/month/year, 3x2 compact layout, no scroll, styles restored on vessel tab');
