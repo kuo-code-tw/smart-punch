@@ -61,3 +61,18 @@ assert.equal(a.rows.length,1);assert.equal(a.rows[0].date,'2026-11-07');assert.e
 assert.equal(global.P79OvertimeApplication.collect([snapshot],[employee],['2026-11-08'],'',[],'actual').rows.length,0);
 for(const file of ['work-hours/index.html','leave/index.html'])for(const m of fs.readFileSync(file,'utf8').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/\bsrc=|application\/json|importmap/.test(m[1])&&m[2].trim())new vm.Script(m[2]);
 console.log('PASS GAS dual-date planner, server-derived credit, wrong-date rejection, legacy duplicate block, month boundary, idempotency, revocations, statement date and unchanged hours; HTML parses');
+// Report snapshots merge adjacent credit metadata without replacing this month's
+// ordinary roster. Monthly grids and bonus reports share this export source.
+const html=fs.readFileSync('work-hours/index.html','utf8'),start=html.indexOf('async function p79AccountingReportSnapshotV108('),end=html.indexOf('\nwindow.p79OvertimeApplicationContext=',start);
+const nextReport={...saved,workDate:'2026-11-01',overtimeDate:'2026-10-31',planned:false};
+const monthly={window:{p79MonthlyRestContext:{snapshot:async month=>month==='2026-10'?{schedules:[{empId:'EARLY',schedule:{'2026-10-01':'早',__meta:{}}}]}:{schedules:[{empId:'EARLY',schedule:{'2026-11-01':'早',__meta:{'2026-11-01':{overtimeReport:nextReport}}}}]}}},Date,Map,Object,String};
+vm.createContext(monthly);vm.runInContext(html.slice(start,end),monthly);
+(async()=>{
+ const combined=await monthly.p79AccountingReportSnapshotV108('2026-10');
+ assert.equal(combined.schedules.length,1);assert.equal(combined.schedules[0].schedule['2026-10-01'],'早');assert.equal(combined.schedules[0].schedule['2026-11-01'],'早');
+ assert.equal(global.P79OvertimeApplication.collect([combined],[employee],['2026-10-31'],'',[],'actual').rows.length,1);
+ vm.runInNewContext(fs.readFileSync('assets/port79-overtime-monthly-matrix.js','utf8'),{window:global,Date,Intl,Map,Set,Error});
+ const model=global.P79OvertimeMonthlyMatrix.build(combined,[employee],'2026-10');
+ assert.equal(model.rows[0].actualValues[30],4);assert.equal(model.rows[0].total,4);assert.equal(model.rows[0].converted,6.02);
+ console.log('PASS cross-month snapshot preserves normal roster; monthly grid credits October 31 exactly once');
+})().catch(e=>{console.error(e);process.exitCode=1;});

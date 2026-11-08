@@ -17683,7 +17683,9 @@ async function p79AccountingReportSnapshotV108(month){
  const adjacent=await window.p79MonthlyRestContext.snapshot(next,true,true);
  const incoming=(adjacent.schedules||[]).map(row=>{const meta={};for(const [d,m]of Object.entries(row.schedule?.__meta||{})){if(m?.overtimeReport?.overtimeDate?.startsWith(month+'-')&&m.overtimeReport.workDate===d)meta[d]=m;}return {...row,schedule:{...row.schedule,__meta:meta}};}).filter(row=>Object.keys(row.schedule.__meta).length);
  const local=(current.schedules||[]).map(row=>({...row,schedule:{...row.schedule,__meta:Object.fromEntries(Object.entries(row.schedule?.__meta||{}).filter(([d,m])=>!m?.overtimeReport?.overtimeDate||m.overtimeReport.overtimeDate.startsWith(month+'-')))}}));
- return {...current,schedules:[...local,...incoming]};
+ const merged=new Map(local.map(r=>[String(r.empId).toUpperCase(),r]));
+ for(const r of incoming){const key=String(r.empId).toUpperCase(),old=merged.get(key);if(old)merged.set(key,{...old,schedule:{...r.schedule,...old.schedule,__meta:{...old.schedule?.__meta,...r.schedule.__meta}}});else merged.set(key,r);}
+ return {...current,schedules:[...merged.values()]};
 }
 window.p79OvertimeApplicationContext={
  employmentStart:p79EmploymentStartDate,preparer:()=>currentEmp?.name||'',canExport:p79CanExportOvertimeApplication,
