@@ -45,12 +45,12 @@ function resolvedConvertedHours(report){
 function collect(snapshots,employees,dates,company,jobs,mode){
  const selected=new Set(dates),jobSet=new Set(jobs),people=new Map(employees.map(e=>[uid(e.empId),e])),rows=[],issues=[],seen=new Set();
  for(const snapshot of snapshots)for(const entry of snapshot.schedules||[]){const emp=people.get(uid(entry.empId));if(!emp)continue;const job=String(emp.jobTitle||emp.deptDetail||'未設定'),co=companyFor(emp);if(company&&company!==co||jobSet.size&&!jobSet.has(job))continue;
-  for(const [date,meta]of Object.entries(entry.schedule?.__meta||{})){const report=meta?.overtimeReport;if(!selected.has(date)||!report||meta.overtimeExcluded)continue;
+  for(const [workDate,meta]of Object.entries(entry.schedule?.__meta||{})){const report=meta?.overtimeReport,date=String(report?.overtimeDate||workDate);if(!selected.has(date)||!report||meta.overtimeExcluded)continue;
     if((meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id)))continue;
-   const key=uid(emp.empId)+'|'+date;if(seen.has(key))throw Error(emp.name+' '+date+' 有重複申報資料，請先核對');seen.add(key);
+   const key=uid(emp.empId)+'|'+String(report.id||date);if(seen.has(key))throw Error(emp.name+' '+date+' 有重複申報資料，請先核對');seen.add(key);
    if(!report.id){issues.push(emp.name+' '+date+' 缺少已儲存申報識別碼，未列入');continue;}
-   const review=g.P79RestAttendance?.reportIssue(snapshot,entry.empId,date);if(review){issues.push(emp.name+' '+date+'：'+review);continue;}
-   const planned=report.planned===true&&date>=today();
+   const review=g.P79RestAttendance?.reportIssue(snapshot,entry.empId,workDate);if(review){issues.push(emp.name+' '+date+'：'+review);continue;}
+   const planned=report.planned===true&&workDate>=today();
    if(mode==='actual'&&planned)continue;
    if(mode==='planned'&&!planned)continue;
    const substitute=report.category==='代'||['休假代班加班','代班加班'].includes(report.typeName);
@@ -62,7 +62,7 @@ function collect(snapshots,employees,dates,company,jobs,mode){
    const reasons=g.P79OvertimeReason;
     const note=reasons?.reportNote?.({empId:emp.empId,date,meta,report,roster:entry.schedule||{},snapshot})||
       String(report.note||(report.typeName==='平日延長加班'?'平日延時加班':report.typeName)||'加班申報');
-    rows.push({date,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note,planned,reportId:report.id});
+    rows.push({date,workDate,company:co,job,name:emp.name||emp.empId,empId:emp.empId,periods:spans,actual,converted,note:workDate!==date?note+'／實際出勤 '+workDate:note,planned,reportId:report.id});
   }
  }
  // 特殊日工時只供考勤頁人工申報；未建立正式申報前不產生加班申報匯出列。
