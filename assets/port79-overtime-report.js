@@ -627,7 +627,7 @@
  function editorRow(row){
   const v=[...row.slice(0,9),ruleType(row)].map(x=>String(x??''));
   const field=(i,label,number=false)=>'<input data-col="'+i+'" aria-label="'+esc(label)+'" value="'+esc(v[i])+'" '+(number?'type="number" min="0" step="0.01"':'type="text"')+'>';
-  const category='<select data-col="0" aria-label="加班假別">'+types.map(t=>'<option value="'+t+'" '+(t===v[0]?'selected':'')+'>'+esc(typeLabel[t])+'</option>').join('')+'</select>';
+  const category='<select data-col="0" aria-label="加班假別">'+types.filter(t=>t!=='代'||v[0]==='代').map(t=>'<option value="'+t+'" '+(t===v[0]?'selected':'')+'>'+esc(typeLabel[t])+'</option>').join('')+'</select>';
   const position='<select data-col="8" aria-label="加班位置">'+[['full','全段'],['after','班後'],['before','班前']].map(([value,label])=>'<option value="'+value+'" '+(v[8]===value?'selected':'')+'>'+label+'</option>').join('')+'</select>';
   return '<tr data-ot-active="true" data-ot-key="'+esc(ruleKey(row))+'" data-ot-legacy-builtin="'+(row.length===9?'1':'0')+'" data-ot-original-category="'+esc(row[0])+'" data-ot-category="'+esc(v[0])+'">'+
    '<td>'+category+'</td><td>'+field(1,'出勤時段')+'</td><td>'+field(2,'實際加班時數',true)+'</td><td>'+field(3,'換算時數',true)+'</td>'+
