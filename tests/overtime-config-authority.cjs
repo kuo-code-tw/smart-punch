@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const c={Date,Intl,Map,Set,TextEncoder};c.window=c;
+let config={overtimeConversionRowsV1:[['延','延16-20',4,'','08','16','16','20','after']],overtimeReportTypesV1:[['平日延時加班','延']],overtimeArchivedRuleKeysV1:[]};
+c.p79OvertimeContext={config:()=>config};vm.createContext(c);vm.runInContext(fs.readFileSync('assets/port79-overtime-report.js','utf8'),c);const api=c.P79Overtime;
+assert.equal(api.activeReportRules().length,1);assert.equal(api.report(config.overtimeConversionRowsV1[0]).convertedHours,null,'blank conversion never defaults to 6.02');
+assert.equal(api.activeSupportPeriods(config.overtimeConversionRowsV1,config).added,0);
+assert.equal(api.specialRows(config.overtimeConversionRowsV1,config,[[8,3]]).length,1,'no generated special-day periods');
+config.overtimeReportTypesV1=[];assert.equal(api.activeReportRules().length,0,'deleted type not offered');
+config.overtimeReportTypesV1=[['平日延時加班','延']];config.overtimeArchivedRuleKeysV1=['builtin:平日延時加班|延16-20'];assert.equal(api.activeReportRules().length,0);
+config={};assert.equal(api.reportRules().length,0,'unloaded configuration never installs defaults');
+const row=['延','自訂04-16',4,7.77,'08','16','04','08','before','自訂早班'];const guide=api.ruleGuide([row]);assert(guide.includes('7.77 小時'));assert(guide.includes('04–08'));assert(guide.includes('加班歸屬原晚班請假日'));assert(guide.includes('不會自行產生「代」'));
+vm.runInContext(fs.readFileSync('backend/overtime-config-authority-v109.gs','utf8'),c);config={overtimeConversionRowsV1:[row],overtimeReportTypesV1:[['自訂早班','延']],overtimeArchivedRuleKeysV1:[]};assert.equal(c.p79ConfiguredOvertimeRowsV109_(config).length,1);config.overtimeReportTypesV1=[];assert.equal(c.p79ConfiguredOvertimeRowsV109_(config).length,0);
+for(const file of ['work-hours/index.html','schedule/index.html','leave/index.html','attendance/index.html'])for(const m of fs.readFileSync(file,'utf8').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
+console.log('PASS saved settings only; deleted/archive guards frontend/backend; blank conversion; configured rule guide; all host scripts parse');

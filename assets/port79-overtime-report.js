@@ -142,18 +142,13 @@
   if(!loader)throw Error('試算表元件尚未就緒，請重新整理');
   await loader();if(!global.XLSX)throw Error('試算表元件載入失敗');return global.XLSX;
  }
- function normalizeStored(value){return value===undefined?defaults():validate(value);}
+ function normalizeStored(value){return value===undefined?[]:validate(value);}
  function resolvedRule(row){
-  var r=row.slice(),value=r[3];
-  if(value===null||value===undefined||String(value).trim()===''){
-    r[3]='';
-    var time=function(x){return String(x==null?'':x).trim().replace(/:00$/,'').padStart(2,'0');};
-    if(r[0]==='延'&&r[8]==='after'&&Number(r[2])===4&&
-       time(r[4])==='08'&&time(r[5])==='16'&&time(r[6])==='16'&&time(r[7])==='20'&&
-       /^(?:代|延)?(?:08-20|16-20)$/.test(String(r[1]||'').trim()))r[3]=6.02;
-  }
+  const r=row.slice();
+  if(r[3]===null||r[3]===undefined||String(r[3]).trim()==='')r[3]='';
   return r;
-}
+ }
+
  function report(row){
   const r=resolvedRule(validate([row])[0]);return {version:1,category:r[0],typeName:ruleType(r),code:r[1],declaredHours:Number(r[2]),convertedHours:r[3]===''?null:Number(r[3]),normalStart:r[4],normalEnd:r[5],overtimeStart:r[6],overtimeEnd:r[7],position:r[8]};
  }
@@ -258,43 +253,17 @@
  // Generated choices are available immediately; only the selected new rule is persisted.
  const specialTypes=[['颱風日加班','颱'],['選舉日加班','選']];
  function specialRows(rows,config={},extra=[]){
-  const out=validate(rows),options=typeOptions(config,out);
-  for(const [name,prefix] of specialTypes){
-   const selected=options.find(t=>t.name===name);
-   if(!selected)continue;
-   const category=selected.category;
-   const periods=[];
-   for(const begin of [8,16,24])for(let duration=1;duration<=8;duration++)periods.push([begin,duration]);
-   periods.push(...extra);
-   for(const [begin,duration] of periods){
-    if(!Number.isInteger(begin)||!Number.isInteger(duration)||duration<1||duration>18)continue;
-    const end=(begin+duration)%24||24,a=String(begin||24).padStart(2,'0'),b=String(end).padStart(2,'0');
-    if(out.some(r=>ruleType(r)===name&&hour(r[6])%1440===hour(a)%1440&&hour(r[7])%1440===hour(b)%1440))continue;
-    out.push([category,prefix+a+'-'+b,String(duration),String(duration),'','',a,b,'full',name]);
-   }
-  }
-  return validate(out);
+  // Only saved, enabled periods can be offered, including special days.
+  return activeReportRows(rows,config);
  }
- let specialSaveQueue=Promise.resolve();
- function ensureSpecialRule(row){
-  if(!specialTypes.some(([name])=>ruleType(row)===name))return Promise.resolve();
-  const run=async()=>{
-   const fresh=await loadRules(),name=ruleType(row),same=fresh.rows.find(r=>ruleType(r)===name&&r[1]===row[1]);
-   if(same){if(JSON.stringify(report(same))!==JSON.stringify(report(row)))throw Error('此出勤時段已更新，請更新雲端時段選項後再申報');return;}
-   if(!global.p79OvertimeContext?.canEditRules?.())throw Error('此時段尚未存入雲端，請由有加班選項管理權限的人員首次儲存');
-   const custom=typeOptions(fresh.config).map(t=>[t.name,t.category]);
-   if(!custom.some(t=>t[0]===name))throw Error('此加班類型已刪除，不能建立新申報時段');
-   const config={...fresh.config,[CONFIG]:validate([...fresh.rows,row]),[TYPECONFIG]:custom};
-   if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('共用設定已達容量上限，新時段尚未儲存');
-   const latest=await loadRules();
-   if(JSON.stringify(latest.config)!==JSON.stringify(fresh.config))throw Error('加班設定已由其他人修改，請重試以合併最新設定');
-   await rpc('saveConfig',{config});
-   const check=await loadRules();
-   if(!check.rows.some(r=>JSON.stringify(report(r))===JSON.stringify(report(row)))||!check.config[TYPECONFIG]?.some(t=>t[0]===name&&t[1]===row[0]))throw Error('新出勤時段尚未通過雲端讀回確認，未送出申報');
-   Object.assign(global.p79OvertimeContext.config(),check.config);global.p79OvertimeContext.persistConfig?.();
-  };
-  const pending=specialSaveQueue.then(run);specialSaveQueue=pending.catch(()=>{});return pending;
+
+ async function ensureSpecialRule(row){
+  const fresh=await loadRules();
+  const found=activeReportRows(fresh.rows,fresh.config).find(r=>ruleType(r)===ruleType(row)&&r[1]===row[1]);
+  if(!found||JSON.stringify(report(found))!==JSON.stringify(report(row)))
+   throw Error('此時段未啟用或已更新，請至加班選項管理設定並儲存後再申報');
  }
+
  function matchReport(start,end,date,map){
   const direct=map?.[date]||null,base=Date.parse(date+'T00:00:00+08:00');
   if(!Number.isFinite(base))return {meta:direct,date,minutes:null};
@@ -379,32 +348,17 @@
  // Existing configured categories, rates and periods are never overwritten.
  // New cloud settings are saved only through the normal explicit Save action.
  function p79AddLeaveSupportPeriods(source){
-  const current=validate(source),samePeriod=(a,b)=>a[0]===b[0]&&a[4]===b[4]&&a[5]===b[5]&&a[6]===b[6]&&a[7]===b[7]&&a[8]===b[8];
-  const conversions=[...new Set(current.filter(r=>r[0]==='延'&&Number(r[2])===4&&r[3]!==''&&Number.isFinite(Number(r[3]))).map(r=>String(Number(r[3]))))];
-  const conversion=conversions.length===1?conversions[0]:'';
-  const periods=[
-   ['延','延16-04','4',conversion,'16','24','24','04','after'],
-   ['延','延04-16','4',conversion,'08','16','04','08','before'],
-   ['延','延24-12','4',conversion,'24','08','08','12','after'],
-   ['延','延12-24','4',conversion,'16','24','12','16','before']
-  ];
-  const added=[];
-  for(const period of periods){
-   if(current.some(r=>r[0]===period[0]&&(r[1]===period[1]||samePeriod(r,period))))continue;
-   added.push(period);
-  }
-  return {rows:validate([...current,...added]),added:added.length};
+  return {rows:validate(source),added:0};
  }
  function reportRules(){
   const config=global.p79OvertimeContext?.config?.();
   if(config&&Object.prototype.hasOwnProperty.call(config,CONFIG))return normalizeStored(config[CONFIG]);
-  return defaults();
+  return [];
  }
  function activeSupportPeriods(rows,config={}){
-  // Auto-support periods apply only after explicitly creating this type.
-  if(!typeOptions(config).some(t=>t.name===typeLabel.延))return {rows:validate(rows),added:0};
-  return p79AddLeaveSupportPeriods(rows);
+  return {rows:activeReportRows(rows,config),added:0};
  }
+
  function activeReportRules(){
   return activeReportRows(reportRules(),global.p79OvertimeContext?.config?.()||{});
  }
@@ -506,7 +460,7 @@
      '；平日延時加班 '+split.overtimeStart+'-'+split.overtimeEnd+'（不含正常班）'};
   }
   const meta=own.__meta?.[date]||{};
-  if(meta.overtimeReport?.category==='代'&&key(meta.forEmpId)===key(cover.leaveEmpId)&&meta.overtimeReport.code)return {code:meta.overtimeReport.code,requirePeriodSelection:false};
+
   const shift=map=>{const value=map[date]??map[date.slice(-2)]??map[String(Number(date.slice(-2)))];if(['早','中','晚'].includes(value))return value;const m=map.__meta?.[date]||{};return [m.reportOriginalShift,m.overtimeOriginalShift,m.leaveOriginalShift].find(v=>['早','中','晚'].includes(v));};
   const name=shift(target)||shift(own),ranges={早:['08','16'],中:['16','24'],晚:['24','08']};let times=ranges[name];
   if(times&&cover.mode==='two'){
@@ -517,7 +471,7 @@
     times=adjacent[0];
    }else times=halves[name][cover.workerIds.findIndex(id=>key(id)===key(entry.empId))===1?1:0];
   }
-  return {code:times?'代'+times.join('-'):'',requirePeriodSelection:!times,periodHint:times?'請假班為'+name+'班 '+ranges[name].join('-')+'；本筆代班時段 '+times.join('-')+'，請選擇符合的已設定規則。':''};
+  return {code:'',requirePeriodSelection:true,periodHint:times?'請假班為'+name+'班 '+ranges[name].join('-')+'；本筆代班時段 '+times.join('-')+'，請選擇符合的已設定規則。':''};
  }
  function dialog(title,content,id='p79OvertimeDialog'){
   const previous=document.getElementById(id);previous?.p79Cleanup?.();previous?.remove();
@@ -681,6 +635,17 @@
    '<td>'+position+'</td><td>'+field(9,'加班類型名稱')+'</td>'+
    '<td><button type="button" class="p79OtDelete" aria-label="刪除時段 '+esc(v[1])+'">刪除</button></td></tr>';
  }
+ function ruleGuide(rows){
+  const saved=validate(rows);
+  const lines=saved.map(row=>{
+   const r=report(row),normal=r.normalStart&&r.normalEnd?r.normalStart+'–'+r.normalEnd:'無正常班段';
+   return '<tr><td>'+esc(r.typeName)+'</td><td>'+esc(normal)+'</td><td>'+esc(r.overtimeStart+'–'+r.overtimeEnd)+'</td><td>'+esc(r.declaredHours)+' 小時</td><td>'+esc(r.convertedHours===null?'未設定':r.convertedHours+' 小時')+'</td></tr>';
+  }).join('');
+  return '<p>加班類型、出勤時段、實際與換算時數，均以本管理表儲存到雲端的設定為準。刪除的類型或時段不供新增、推薦或重新申報；缺少設定時顯示待設定，不自動補回。</p>'+
+   '<p>正常班與加班分開計算。晚班請假分由兩人支援時：中班出勤 16:00–翌日04:00，其中 16:00–24:00 為正常班、24:00–04:00 為加班；早班出勤翌日04:00–16:00，其中 08:00–16:00 為正常班、04:00–08:00 為加班。兩段加班歸屬原晚班請假日，實際出勤及打卡日期各自保留；只有管理表存在符合時段時才提供申報。</p>'+
+   '<p>預排可先申報已設定時數，實際出勤須待正式打卡核對。代班安排只記錄支援關係，不會自行產生「代」加班。舊正式申報保留原始資料供核對，刪除選項不會刪除既有工時。</p>'+
+   '<p>以下依目前表格內容顯示；編輯後須按「儲存加班類型與出勤時段」才生效。</p><table style="width:100%;border-collapse:collapse"><thead><tr><th>加班類型</th><th>正常班</th><th>加班時段</th><th>實際時數</th><th>換算時數</th></tr></thead><tbody>'+lines+'</tbody></table>';
+ }
  async function openRules(){
   if(!global.p79OvertimeContext?.canEditRules?.()&&!global.p79OvertimeContext?.canReport?.())return alert('沒有管理加班選項的權限');
   const el=dialog('加班選項管理','<p id="p79OtStatus">正在讀取已儲存的選項…</p>','p79OvertimeOptionsDialog');
@@ -706,6 +671,7 @@
     '</div>');
    // Show all cloud periods as real editable rows. Preserve raw legacy
    // builtin identity so a label does not create a duplicate new rule.
+   el.querySelector('.p79-ot-table-help').insertAdjacentHTML('beforebegin','<details style="margin:12px 0;padding:12px;border:1px solid #bfdbfe;border-radius:8px"><summary style="cursor:pointer;font-weight:700">加班規則說明（依本表設定）</summary><div id="p79OtRuleGuide"></div></details>');
    const body=el.querySelector('#p79OtRuleRows');
    const readEditorRow=tr=>{
     const row=Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??'');
@@ -714,9 +680,11 @@
    };
    const getRows=()=>[...body.querySelectorAll('tr[data-ot-active="true"]')].map(readEditorRow);
    const refreshRuleCount=()=>{
+    try{el.querySelector('#p79OtRuleGuide').innerHTML=ruleGuide(getRows());}catch(error){el.querySelector('#p79OtRuleGuide').textContent='表格內容待修正：'+error.message;}
     const count=body.querySelectorAll('tr[data-ot-active="true"]').length;
     el.querySelector('#p79OtRuleCount').textContent='雲端出勤時段 '+count+' 筆｜可直接修改與刪除，按最下方儲存後生效';
    };
+   body.addEventListener('input',refreshRuleCount);body.addEventListener('change',refreshRuleCount);
    const renderAddedTypeList=()=>{
     const list=el.querySelector('#p79AddedTypeList');if(!list)return;
     list.replaceChildren();
@@ -839,7 +807,7 @@
      el.querySelector('#p79OtStatus').textContent='請先在上方新增至少一種加班類型，再建立出勤時段。';
      el.querySelector('#p79NewTypeName').focus();return;
     }
-    const choices=typeOptions({[TYPECONFIG]:customTypes,[DELETED_CONFIG]:[...removedBuiltinNames]},getRows()),form=dialog('新增出勤時段','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>加班類型<select id="p79PeriodType" style="'+inputStyle+'">'+choices.map((x,i)=>'<option value="'+i+'">'+esc(x.name)+'</option>').join('')+'</select></label><label>出勤時段名稱<input id="p79PeriodCode" placeholder="例如：休08-16、代16-20" style="'+inputStyle+'"></label>'+['正常起','正常迄','加班起','加班迄'].map((label,i)=>'<label>'+label+'<select id="p79PeriodTime'+i+'" style="'+inputStyle+'">'+Array.from({length:25},(_,h)=>'<option value="'+String(h).padStart(2,'0')+'">'+String(h).padStart(2,'0')+'</option>').join('')+'</select></label>').join('')+'<label>加班位置<select id="p79PeriodPosition" style="'+inputStyle+'"><option value="full">整段加班</option><option value="after">正常班後加班</option><option value="before">正常班前加班</option></select></label><label>實際加班時數<input id="p79PeriodActual" type="number" step="0.01" style="'+inputStyle+'"></label><label>換算加班時數<input id="p79PeriodConverted" type="number" step="0.01" style="'+inputStyle+'"></label></div><p id="p79PeriodMessage"></p><button id="p79PeriodAdd" type="button" style="background:#0369a1;color:white;padding:10px;border-radius:8px">加入出勤時段</button>','p79OvertimePeriodDialog');
+    const choices=typeOptions({[TYPECONFIG]:customTypes,[DELETED_CONFIG]:[...removedBuiltinNames]},getRows()),form=dialog('新增出勤時段','<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0"><label>加班類型<select id="p79PeriodType" style="'+inputStyle+'">'+choices.map((x,i)=>'<option value="'+i+'">'+esc(x.name)+'</option>').join('')+'</select></label><label>出勤時段名稱<input id="p79PeriodCode" placeholder="例如：休08-16、延16-20" style="'+inputStyle+'"></label>'+['正常起','正常迄','加班起','加班迄'].map((label,i)=>'<label>'+label+'<select id="p79PeriodTime'+i+'" style="'+inputStyle+'">'+Array.from({length:25},(_,h)=>'<option value="'+String(h).padStart(2,'0')+'">'+String(h).padStart(2,'0')+'</option>').join('')+'</select></label>').join('')+'<label>加班位置<select id="p79PeriodPosition" style="'+inputStyle+'"><option value="full">整段加班</option><option value="after">正常班後加班</option><option value="before">正常班前加班</option></select></label><label>實際加班時數<input id="p79PeriodActual" type="number" step="0.01" style="'+inputStyle+'"></label><label>換算加班時數<input id="p79PeriodConverted" type="number" step="0.01" style="'+inputStyle+'"></label></div><p id="p79PeriodMessage"></p><button id="p79PeriodAdd" type="button" style="background:#0369a1;color:white;padding:10px;border-radius:8px">加入出勤時段</button>','p79OvertimePeriodDialog');
     [8,16,8,16].forEach((h,i)=>form.querySelector('#p79PeriodTime'+i).value=String(h).padStart(2,'0'));form.querySelector('#p79PeriodActual').value='8';
     form.querySelector('#p79PeriodAdd').onclick=()=>{try{
      const chosen=choices[Number(form.querySelector('#p79PeriodType').value)],times=[0,1,2,3].map(i=>form.querySelector('#p79PeriodTime'+i).value),position=form.querySelector('#p79PeriodPosition').value;
@@ -1106,20 +1074,8 @@
    // cloud for audit and are not automatically offered as new submissions.
    const historicalRule=prefill.savedReport?latestRules.rows.find(row=>
     String(row[0])===String(prefill.category||'')&&String(row[1])===String(prefill.code||'')):null;
-   const dialogRuleConfig=()=>{
-    const cfg=global.p79OvertimeContext.config();
-    if(!historicalRule)return cfg;
-    // Historical types remain available only when editing the original report.
-    const name=ruleType(historicalRule),configured=typeOptions(cfg).map(t=>[t.name,t.category]);
-    if(!configured.some(t=>t[0]===name))configured.push([name,historicalRule[0]]);
-    return {...cfg,[TYPECONFIG]:configured,[ARCHIVED_CONFIG]:(cfg[ARCHIVED_CONFIG]||[]).filter(key=>key!==ruleKey(historicalRule))};
-   };
-   const reportRowsForDialog=source=>{
-    const current=activeReportRows(source,global.p79OvertimeContext.config());
-    if(historicalRule&&!current.some(row=>row[0]===historicalRule[0]&&row[1]===historicalRule[1]))
-     current.push(historicalRule);
-    return current;
-   };
+   const dialogRuleConfig=()=>global.p79OvertimeContext.config();
+   const reportRowsForDialog=source=>activeReportRows(source,dialogRuleConfig());
    let rows=specialRows(reportRowsForDialog(latestRules.rows),dialogRuleConfig(),extra);
    let cloudRuleSource=latestRules.rows;
    if(prefill.attendance&&prefill.roster&&!prefill.savedReport){
@@ -1702,7 +1658,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 

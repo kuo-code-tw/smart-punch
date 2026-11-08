@@ -29,15 +29,9 @@ function p79DirectRuleEnvelope_(date,row){
 }
 
 function p79DirectResolvedRule_(row){
-  var r=row.slice(),value=r[3];
-  if(value===null||value===undefined||String(value).trim()===''){
-    r[3]='';
-    var time=function(x){return String(x==null?'':x).trim().replace(/:00$/,'').padStart(2,'0');};
-    if(r[0]==='延'&&r[8]==='after'&&Number(r[2])===4&&
-       time(r[4])==='08'&&time(r[5])==='16'&&time(r[6])==='16'&&time(r[7])==='20'&&
-       /^(?:代|延)?(?:08-20|16-20)$/.test(String(r[1]||'').trim()))r[3]=6.02;
-  }
-  return r;
+ var r=row.slice();
+ if(r[3]===null||r[3]===undefined||String(r[3]).trim()==='')r[3]='';
+ return r;
 }
 
 function p79DirectConversionReceipt_(saved,id,rule){

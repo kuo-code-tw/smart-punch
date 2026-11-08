@@ -77,8 +77,8 @@ for(let i=0;i<people.length;i++){
    timed++;
    assert(balance.conflicts.some(x=>x.date===day(22)&&x.reason.includes('人工加班時段')));
    assert.equal(balance.reported.國,0);
-   assert.equal(c.p79SubstituteShiftLabel(id,day(22),meta[day(22)]),'國08-16',
-     'actual manual time stays visible but must remain unconfirmed');
+   assert.equal(c.p79SubstituteShiftLabel(id,day(22),meta[day(22)]),'',
+     'unconfirmed manual time stays in audit metadata but cannot synthesize a configured overtime detail');
  }else if(scenario===2){
    confirmed++;
    assert.equal(balance.reported.國,1,'verified cloud id counts exactly once');

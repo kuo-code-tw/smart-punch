@@ -3,7 +3,7 @@
 <head>
 <script src="../assets/port79-attendance-review-navigation.js?v=20261030-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
-<script src="../assets/port79-overtime-report.js?v=20261108-night-cover-credit-prev-day-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -13407,19 +13407,19 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             // The 04-08 overtime belongs to the ORIGINAL night overtimeDate.
                             // Never re-date punch records or silently write the cloud report.
                             if(own[linked.workDate]!==linked.normalShift||map[linked.workDate]?.overtimeReport)return;
+                            const configured=window.P79Overtime?.activeReportRules?.().find(r=>r[0]==='延'&&r[1]===linked.code);
+                            if(!configured)return;
                             map[linked.workDate]={...map[linked.workDate],forEmpId:cover.leaveEmpId,
                                 coverCandidate:true,coverAlreadyArranged:true,leaveCoverDate:date,
                                 overtimeDate:linked.overtimeDate,
-                                overtimeReport:{category:'延',code:linked.code,declaredHours:4,
-                                    convertedHours:null,normalStart:linked.normalStart,normalEnd:linked.normalEnd,
-                                    overtimeStart:linked.overtimeStart,overtimeEnd:linked.overtimeEnd,
-                                    overtimeDate:linked.overtimeDate,position:linked.position}};
+                                overtimeReport:{...window.P79Overtime.report(configured),overtimeDate:linked.overtimeDate}};
                             return;
                         }
                         if(map[date]?.overtimeReport)return;
                         const shift=ranges[own[date]]?own[date]:target[date];let times=ranges[shift];if(!times)return;
                         if(cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[shift][index===1?1:0];}
-                        map[date]={forEmpId:cover.leaveEmpId,coverCandidate:true,coverAlreadyArranged:true,overtimeReport:{category:'代',code:'代'+times.join('-'),declaredHours:cover.mode==='two'?4:8,convertedHours:null,normalStart:times[0],normalEnd:times[1],overtimeStart:times[0],overtimeEnd:times[1],position:'standalone'}};
+                        // A cover relationship alone cannot create an overtime detail.
+                        // Open the shared report dialog to select an enabled configured period.
                     });
                 });
             });
@@ -13996,11 +13996,6 @@ async function p79ExportOvertimeComparison(printMode){
 function p79DisplayedOvertimeConversion(report){
  const value=report?.convertedHours;
  if(value!==null&&value!==undefined&&value!=='')return escapeHtml(value)+'小時';
- const norm=x=>String(x??'').trim().replace(/:00$/,'').padStart(2,'0');
- const code=String(report?.code||'').trim();
- const standardNormal=norm(report?.normalStart)==='08'&&norm(report?.normalEnd)==='16';
- const standardOvertime=norm(report?.overtimeStart)==='16'&&norm(report?.overtimeEnd)==='20';
- if((report?.category==='延'||report?.position==='after')&&standardNormal&&standardOvertime&&Number(report?.declaredHours)===4&&/^(?:代|延)?(?:08-20|16-20)$/.test(code))return '6.02小時（規則值，尚未寫入雲端）';
  return '未設定';
 }
 function p79OvertimePeriodLabel(report){
