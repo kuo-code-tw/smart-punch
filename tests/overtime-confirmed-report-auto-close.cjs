@@ -85,7 +85,7 @@ function setup({save='success',throwsEvent=false,handoff=false,cleanupThrows=fal
 (async()=>{
  let t=setup({throwsEvent:true,cleanupThrows:true});
  await t.node('#p79OtStage').onclick();
- assert.equal(t.el.open,false,'verified formal report must close its own dialog');
+ assert.equal(t.el.open,false,'verified formal report must close its own dialog; status='+t.node('#p79OtStatus').textContent);
  assert.equal(t.el.isConnected,false,'confirmed modal must be removed from DOM');
  assert.equal(t.metrics().closed,1);assert.equal(t.metrics().removed,1);
  assert.equal(t.metrics().saves,1,'one click only posts once');
