@@ -8139,7 +8139,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if (!raw) return '';
       const compact = raw.replace(/\s+/g, '');
       const map = {
-        '早':'早','早班':'早','中':'中','中班':'中','晚':'晚','晚班':'晚',
+        '早':'早','早班':'早','08-16':'早','08:00-16:00':'早',
+        '中':'中','中班':'中','16-24':'中','16:00-24:00':'中',
+        '晚':'晚','晚班':'晚','24-08':'晚','24:00-08:00':'晚',
         '休':'休','休息':'休','輪休':'休','例休':'休','例假':'例','例':'例',
         '國':'國','國定假日':'國',
         '離':'離','離職':'離','resigned':'離','terminated':'離',
@@ -8343,8 +8345,19 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(/假/.test(text))return /特|年/.test(text)?'年':/事/.test(text)?'事':/喪/.test(text)?'喪':/公/.test(text)?'公':Array.from(text)[0]||'假';
       return text;
     }
+    // Only the downloaded Excel uses clock ranges. The screen, cloud
+    // roster and edit values stay 早/中/晚, so shift rules are unchanged.
+    // Preserve actual saved overtime and statutory leave codes verbatim.
+    function p79ScheduleExcelShiftCode(value) {
+      const text=String(value??'').trim();
+      const names={早:'08-16',中:'16-24',晚:'24-08'};
+      const pieces=text.split('＋');
+      if(Object.prototype.hasOwnProperty.call(names,pieces[0]))
+        pieces[0]=names[pieces[0]];
+      return pieces.join('＋');
+    }
     function p79ScheduleExportDay(emp,dayStr,context=null) {
-      return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;
+      return p79ScheduleExcelShiftCode(p79ScheduleDisplayDay(emp,dayStr,context).visibleCode);
     }
     function p79ScheduleOvertimeExportRows_(staff,month){
       const detail=[],totals=new Map(),seen=new Set();
@@ -8455,7 +8468,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         for (let d = 1; d <= totalDays; d++) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
-          row[String(d)]=selected.visibleCode;
+          row[String(d)]=p79ScheduleExcelShiftCode(selected.visibleCode);
           const typhoonMarked=(displayContext.typhoonDays.has(dayStr)&&dayStr<=displayContext.typhoonToday)||
             selected.rosterShift==='颱'||selected.approvedLeaveCode==='颱';
           const typhoonWorked=selected.eligible&&p79ScheduleTyphoonHasWork(emp.id,dayStr,
@@ -8467,7 +8480,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // while keeping the editable shift value identical to the UI select.
           if(eligibleEvent&&selected.shownShift!=='颱')exportTyphoonNotes.push({
             row:exportRows.length+1,col:5+d-1,date:dayStr,
-            text:'颱日：原班別仍為 '+selected.visibleCode+'；同日只算一筆'
+            text:'颱日：原班別仍為 '+row[String(d)]+'；同日只算一筆'
           });
         }
 
