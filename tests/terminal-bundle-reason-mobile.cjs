@@ -3,6 +3,9 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 assert(html.includes('<th>Bundle 扣除</th>'));
+assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
+assert(html.includes('#view-terminal .p79-ter-day-table thead th:nth-child(5){width:16%;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important}'),'Bundle 扣除 header stays one line');
+
 assert(html.includes('<th>待核差額</th>'));
 assert(html.includes('<th>原因分類（點選修改）</th>'));
 assert(html.includes('id="terminalReasonFilter"'),'reason filter is visible above detail list');
