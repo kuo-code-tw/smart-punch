@@ -8,7 +8,9 @@ const fake={
   routeMonthFilter:{value:'2026-11',innerHTML:'',dataset:{p79Year:'2026'}},
   routeMonthStatus:{dataset:{},textContent:''},routeStatsWarning:{textContent:''},
   routeDetailPanel:{classList:{toggle(){}}},routeDetailTitle:{textContent:''},
-  routeDetailBody:{innerHTML:''}
+  routeDetailBody:{innerHTML:''},
+  routeSummaryTableBody:{innerHTML:''},
+  routeSummaryTableFoot:{innerHTML:''}
 };
 const c={
   console,Date,Map,Set,Number,String,shipManualOverrideCache:{},shipOverrideKey:s=>s.workingNo,
@@ -55,6 +57,9 @@ c.renderRouteData();
 assert(fake.routeCardsGrid.innerHTML.includes('ABC'));
 assert(fake.routeCardsGrid.innerHTML.includes('FOC'));
 assert(fake.routeCardsGrid.innerHTML.includes('p79-route-card'));
+assert(fake.routeCardsGrid.innerHTML.includes('中文名稱待補'));
+assert(fake.routeSummaryTableBody.innerHTML.includes('中文名稱待補'));
+assert(fake.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
 assert(!fake.routeCardsGrid.innerHTML.includes('<script>'));
 fake.routeSearch.value='foc';c.renderRouteData();
 assert(!fake.routeCardsGrid.innerHTML.includes('>ABC<'));

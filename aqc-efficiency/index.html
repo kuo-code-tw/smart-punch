@@ -1047,6 +1047,21 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-compare .p79-route-card-icon{display:grid;place-items:center;width:43px;height:43px;border-radius:12px;background:var(--route-soft,#eff6ff);font-size:22px}
 #view-compare .p79-route-card-caption{color:#64748b;font-size:11px;font-weight:800;letter-spacing:.07em}
 #view-compare .p79-route-card-name{font-size:24px;font-weight:900;line-height:1.25;color:#132238;overflow-wrap:anywhere}
+#view-compare .p79-route-card-chinese{font-size:13px;font-weight:750;color:#475569;margin-top:3px;line-height:1.4}
+#view-compare .p79-route-list{margin-top:20px;padding-top:18px;border-top:1px solid #dbe7f3}
+#view-compare .p79-route-list-head{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:12px}
+#view-compare .p79-route-list-head h3{font-size:17px;font-weight:900;color:#0f172a}
+#view-compare .p79-route-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:14px;background:white}
+#view-compare .p79-route-table{width:100%;border-collapse:collapse;text-align:center;min-width:780px;font-size:13px}
+#view-compare .p79-route-table th{background:#eef4fc;color:#334155;font-weight:850;padding:12px 9px;white-space:nowrap}
+#view-compare .p79-route-table td{padding:11px 9px;border-top:1px solid #e2e8f0;color:#334155}
+#view-compare .p79-route-table tbody tr:nth-child(even){background:#f8fafc}
+#view-compare .p79-route-table tbody tr:hover{background:#eff6ff}
+#view-compare .p79-route-table .route-tbl-code{font-weight:900;color:#1d4ed8}
+#view-compare .p79-route-table .route-tbl-total{color:#047857;font-weight:900}
+#view-compare .p79-route-table .route-tbl-button{border-radius:10px;padding:7px 12px;background:#eaf1ff;color:#1d4ed8;font-weight:800;cursor:pointer}
+#view-compare .p79-route-table .route-tbl-button:hover{background:#dbeafe}
+#view-compare .p79-route-table tfoot td{font-weight:900;background:#ecfdf5;color:#065f46}
 #view-compare .p79-route-calls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 #view-compare .p79-route-call{display:flex;justify-content:space-between;align-items:center;gap:8px;border-radius:12px;padding:12px;background:#eff6ff;color:#1e40af}
 #view-compare .p79-route-call.out{background:#fff3e6;color:#9a3412}
@@ -1082,6 +1097,16 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <span id="routeMonthStatus" class="p79-route-source" aria-live="polite"></span>
     </div>
     <div id="routeCardsGrid" class="p79-route-grid"></div>
+    <div class="p79-route-list">
+      <div class="p79-route-list-head"><h3>📋 航線對照統計表</h3><span class="text-xs text-slate-500">代碼／中文名稱／當月進出口及櫃數，與上方卡片同步</span></div>
+      <div class="p79-route-table-wrap">
+        <table class="p79-route-table">
+          <thead><tr><th>航線代碼</th><th>中文航線名稱</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead>
+          <tbody id="routeSummaryTableBody"></tbody>
+          <tfoot id="routeSummaryTableFoot"></tfoot>
+        </table>
+      </div>
+    </div>
     <p id="routeStatsWarning"></p>
     <p class="p79-route-help">每筆 WORKING NO. 的進、出口依 SERVICE 分別歸類；卸船、裝船採原始作業量，不將 SHIFT 混入。缺少航線代碼的資料列為「未分類」，不猜測航線。</p>
   </div>
@@ -10047,6 +10072,21 @@ function routeStatsForShips(masters){
     details:row.details
   })).sort((a,b)=>a.route==='未分類'?1:b.route==='未分類'?-1:a.route.localeCompare(b.route,'en',{numeric:true}));
 }
+const P79_ROUTE_CHINESE_NAMES=Object.freeze({
+  CIX:'中國－印度快線',
+  CL1:'中國－呂宋一線',
+  FOC:'福州－廈門－台灣航線',
+  HPH:'台灣－海防航線',
+  JST:'日本關西－泰國航線',
+  JSV:'日本關西－越南航線',
+  JTT:'日本關東－泰國航線',
+  MHT:'民答那峨－香港－台灣航線',
+  TPI:'台灣－中國大陸－印尼航線'
+});
+function p79RouteChineseName(code){
+  const key=p79RouteServiceCode(code);
+  return P79_ROUTE_CHINESE_NAMES[key]||'中文名稱待補';
+}
 let p79RouteSelected='';
 let p79RouteSummaryCache=[];
 let p79RouteMonthRows=[];
@@ -10136,7 +10176,7 @@ function renderRouteData(){
   const month=p79RouteMonthOptions();
   const all=routeStatsForShips(routeDataRows());
   const query=String(document.getElementById('routeSearch')?.value||'').trim().toUpperCase();
-  const rows=all.filter(s=>!query||s.route.toUpperCase().includes(query));
+  const rows=all.filter(s=>!query||s.route.toUpperCase().includes(query)||p79RouteChineseName(s.route).includes(query));
   p79RouteSummaryCache=rows;
   const fmt=n=>Number(n||0).toLocaleString('zh-TW');
   const quantity=(n,missing)=>fmt(n)+(missing?' *':'');
@@ -10149,7 +10189,8 @@ function renderRouteData(){
     const pair=palette[i%palette.length];
     return '<article class="p79-route-card" style="--route-accent:'+pair[0]+';--route-soft:'+pair[1]+'">'+
       '<div class="p79-route-card-head"><div class="p79-route-card-icon">🚢</div><div>'+
-      '<div class="p79-route-card-caption">航線 SERVICE</div><h3 class="p79-route-card-name">'+esc(s.route)+'</h3></div></div>'+
+      '<div class="p79-route-card-caption">航線 SERVICE</div><h3 class="p79-route-card-name">'+esc(s.route)+'</h3>'+
+      '<div class="p79-route-card-chinese">'+esc(p79RouteChineseName(s.route))+'</div></div></div>'+
       '<div class="p79-route-calls">'+
         '<div class="p79-route-call"><span class="p79-route-call-label">↘ 進口艘次</span><strong>'+fmt(s.importCalls)+'</strong></div>'+
         '<div class="p79-route-call out"><span class="p79-route-call-label">↗ 出口艘次</span><strong>'+fmt(s.exportCalls)+'</strong></div>'+
@@ -10162,6 +10203,22 @@ function renderRouteData(){
       '<button type="button" class="p79-route-detail-button" onclick="p79SelectRoute('+i+')">查看船舶明細（'+fmt(s.shipCalls)+'）<span aria-hidden="true">›</span></button>'+
     '</article>';
   }).join(''):'<div class="p79-route-empty">'+(p79RouteMonthStatus==='loading'?'正在讀取 '+esc(month)+' 的航線資料…':'這個月份沒有符合的航線資料')+'</div>';
+  const tbody=document.getElementById('routeSummaryTableBody');
+  if(tbody)tbody.innerHTML=rows.length?rows.map((s,i)=>
+    '<tr><td class="route-tbl-code">'+esc(s.route)+'</td><td>'+esc(p79RouteChineseName(s.route))+'</td>'+
+    '<td>'+fmt(s.importCalls)+'</td><td>'+fmt(s.exportCalls)+'</td>'+
+    '<td>'+quantity(s.disc,s.missingDisc)+'</td><td>'+quantity(s.load,s.missingLoad)+'</td>'+
+    '<td class="route-tbl-total">'+quantity(s.total,s.missingDisc+s.missingLoad)+'</td>'+
+    '<td><button type="button" class="route-tbl-button" onclick="p79SelectRoute('+i+')">查看明細</button></td></tr>'
+  ).join(''):'<tr><td colspan="8" class="p-5 text-slate-500">這個月份沒有符合條件的航線</td></tr>';
+  const foot=document.getElementById('routeSummaryTableFoot');
+  if(foot){
+    const sum=k=>rows.reduce((n,s)=>n+Number(s[k]||0),0);
+    foot.innerHTML='<tr><td colspan="2">當月合計</td><td>'+fmt(sum('importCalls'))+'</td><td>'+
+      fmt(sum('exportCalls'))+'</td><td>'+quantity(sum('disc'),sum('missingDisc'))+'</td><td>'+
+      quantity(sum('load'),sum('missingLoad'))+'</td><td class="route-tbl-total">'+
+      quantity(sum('total'),sum('missingDisc')+sum('missingLoad'))+'</td><td>—</td></tr>';
+  }
   const count=document.getElementById('routeDataCount');
   if(count)count.textContent=month.replace('-',' 年 ')+' 月｜'+fmt(rows.length)+' 條航線｜進口 '+fmt(rows.reduce((n,s)=>n+s.importCalls,0))+' 艘次｜出口 '+fmt(rows.reduce((n,s)=>n+s.exportCalls,0))+' 艘次';
   const source=document.getElementById('routeMonthStatus');

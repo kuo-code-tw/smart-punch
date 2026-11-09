@@ -15,7 +15,9 @@ const nodes={
  routeStatsWarning:{textContent:''},
  routeDetailPanel:{classList:{toggle(){}},},
  routeDetailTitle:{textContent:''},
- routeDetailBody:{innerHTML:''}
+ routeDetailBody:{innerHTML:''},
+ routeSummaryTableBody:{innerHTML:''},
+ routeSummaryTableFoot:{innerHTML:''}
 };
 const fixture=(no,date,serviceI,serviceE,disc,load)=>({
  workingNo:no,firstDate:date,lastDate:date,vessel:no,serviceI,serviceE,
@@ -57,6 +59,14 @@ vm.runInContext(html.slice(from,to),ctx);
   assert(nodes.routeCardsGrid.innerHTML.includes('JTT'));
   assert(!nodes.routeCardsGrid.innerHTML.includes('CIX'));
   assert(nodes.routeCardsGrid.innerHTML.includes('p79-route-card'));
+  assert(nodes.routeCardsGrid.innerHTML.includes('日本關東－泰國航線'));
+  assert(nodes.routeSummaryTableBody.innerHTML.includes('福州－廈門－台灣航線'));
+  assert(nodes.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
+  assert(nodes.routeSummaryTableFoot.innerHTML.includes('當月合計'));
+  const chineseNames=vm.runInContext("Object.entries(P79_ROUTE_CHINESE_NAMES)",ctx);
+  assert.equal(chineseNames.length,9);
+  for(const [code,name] of chineseNames){assert(code&&name&&!name.includes('待補'));}
+  assert.equal(vm.runInContext("p79RouteChineseName('OTHER')",ctx),'中文名稱待補');
   assert(nodes.routeCardsGrid.innerHTML.includes('--route-accent:'));
   assert(nodes.routeCardsGrid.innerHTML.includes('進口艘次'));
   assert(nodes.routeCardsGrid.innerHTML.includes('總櫃數'));
@@ -65,12 +75,21 @@ vm.runInContext(html.slice(from,to),ctx);
   ctx.p79SelectRoute(selected);
   assert(nodes.routeDetailTitle.textContent.includes('2026-11'));
   assert(nodes.routeDetailBody.innerHTML.includes('11A'));
+  nodes.routeSearch.value='日本關東';
+  ctx.renderRouteData();
+  assert(nodes.routeCardsGrid.innerHTML.includes('JTT'));
+  assert(!nodes.routeCardsGrid.innerHTML.includes('FOC'));
+  assert(nodes.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
+  nodes.routeSearch.value='';
+  ctx.renderRouteData();
   assert(!nodes.routeDetailBody.innerHTML.includes('10A'));
   nodes.routeMonthFilter.value='2026-10';
   assert.equal(await ctx.p79LoadRouteMonth(true),true);
   assert.deepEqual(JSON.parse(JSON.stringify(calls[1])),{action:'gcGetData',args:{month:'2026-10'},budget:90000});
   assert.equal(ctx.routeDataRows().length,1);
   assert(nodes.routeCardsGrid.innerHTML.includes('CIX'));
+  assert(nodes.routeSummaryTableBody.innerHTML.includes('中國－印度快線'));
+  assert(!nodes.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
   assert(!nodes.routeCardsGrid.innerHTML.includes('FOC'));
   assert(nodes.routeDetailPanel.classList);
   nodes.routeMonthFilter.value='2026-09';
