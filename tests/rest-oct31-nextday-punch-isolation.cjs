@@ -25,8 +25,10 @@ assert.equal(build('晚',[{start:ts('2026-10-31T23:45:00'),end:ts('2026-11-01T07
 const html=fs.readFileSync('schedule/index.html','utf8');
 const begin=html.indexOf('function p79ScheduleDisplayDay('),end=html.indexOf('// On-demand full staff check',begin);
 assert(begin>=0&&end>begin);
+let checkedAbsence={complete:false,absenceAuditReady:false,absenceConfirmedDays:{},days:{}};
 const mock={
  window:{P79RestAttendance:{state:()=> 'missing'}}, p79EmployeeDateEligible:()=>true,
+ p79ScheduleRestClient:()=>({status:()=>({evidence:checkedAbsence})}),
  monthlyScheduleData:{[id]:{[day]:'休'}},monthlyScheduleMeta:{[id]:{[day]:{restCategory:'休'}}},
  approvedLeaveForEmployee:()=>null,p79ScheduleHasVerifiedPunch:()=>false,
  p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=> '',
@@ -45,6 +47,9 @@ function render(state,complete,shift,worked){
  mock.monthlyScheduleData[id][day]=shift;
  mock.window.P79RestAttendance.state=()=>state;
  mock.p79ScheduleHasVerifiedPunch=()=>worked;
+ checkedAbsence={complete,absenceAuditReady:complete,
+  absenceConfirmedDays:complete&&state==='rest'?{[id+'|'+day]:true}:{},
+  days:{[id+'|'+day]:{state}}};
  const ctx={automaticRestMeta:{},restBalance:{ledger:[]},attendanceEvidence:{complete},
  attendanceSnapshot:{attendanceEvidence:{complete}},typhoonDays:new Set(),
  electionDays:new Set(),typhoonToday:'2026-11-01'};

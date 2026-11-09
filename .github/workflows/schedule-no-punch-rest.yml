@@ -4,6 +4,8 @@ on:
     paths:
       - 'schedule/index.html'
       - 'tests/schedule-no-punch-rest-display.cjs'
+      - 'tests/schedule-november-early-month-no-punch.cjs'
+      - 'tests/rest-oct31-nextday-punch-isolation.cjs'
       - 'tests/schedule-night-split-auto.cjs'
       - 'tests/schedule-national-zero-quota.cjs'
       - 'assets/port79-schedule-rest-evidence.js'
@@ -22,6 +24,10 @@ jobs:
           node-version: '22'
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
+      - run: node tests/schedule-november-early-month-no-punch.cjs
+      - run: node tests/schedule-zero-punch-dual-source.cjs
+      - run: node tests/schedule-all-staff-zero-punch.cjs
+      - run: node tests/rest-oct31-nextday-punch-isolation.cjs
       - run: node tests/monthly-rest-grouped-plan.cjs
       - run: node tests/rest-attendance.cjs
       - run: node tests/schedule-verified-no-work-overtime-rest.cjs
