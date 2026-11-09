@@ -4,6 +4,7 @@ on:
     paths:
       - 'schedule/index.html'
       - 'tests/schedule-no-punch-rest-display.cjs'
+      - 'tests/schedule-navigation-punch-loading.cjs'
       - 'tests/schedule-november-early-month-no-punch.cjs'
       - 'tests/rest-oct31-nextday-punch-isolation.cjs'
       - 'tests/schedule-night-split-auto.cjs'
@@ -40,6 +41,7 @@ jobs:
       - run: node tests/schedule-emergency-no-mass-rest.cjs
       - run: node tests/schedule-rest-unverified-overtime.cjs
       - run: node tests/schedule-no-punch-rest-display.cjs
+      - run: node tests/schedule-navigation-punch-loading.cjs
       - run: node tests/schedule-november-render-fallback.cjs
       - run: node tests/october-system-roster-overtime.cjs
       - run: node tests/vessel-completion-export-integrity.cjs
