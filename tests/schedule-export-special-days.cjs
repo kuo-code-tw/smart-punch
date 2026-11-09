@@ -48,7 +48,7 @@ shifts['2026-10-23']='晚';status.state='rest';
 approved=true;
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'年','approved leave keeps its code');
 approved=false;status.complete=false;
-assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'24-08','incomplete attendance evidence must not invent absence');
+assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'打卡待核','incomplete attendance evidence must not invent absence or a verified night shift');
 status.complete=true;status.state='rest';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'休','future absence must not be labeled election');
 now.value='2026-10-26';
