@@ -17,8 +17,9 @@ assert.equal(actual.date,date8,'normal day shift belongs to November 8, not Nove
 assert.equal(actual.shift,'早','08–16 regular shift is detected even with 04–08 preceding overtime');
 assert.equal(Math.round((actual.end-actual.start)/60000),735,'raw 12h15 duration is retained');
 assert.equal(restore.shiftFromClockIn(inRec,outRec).shift,'早','automatic restoration uses identical time range');
-assert.equal(restore.displayShiftFromClockIn(inRec,punch(date8,'07:58:00','OUT')),null,
- 'standalone 04–08 cover must not manufacture an 08–16 normal shift');
+const standalone=restore.displayShiftFromClockIn(inRec,punch(date8,'07:58:00','OUT'));
+assert.notEqual(standalone?.shift,'早','standalone 04–08 must not manufacture regular 08–16');
+assert.equal(standalone?.date,date7,'04–08-only period retains existing previous-day night attribution');
 assert.equal(restore.displayShiftFromClockIn(inRec,punch(date8,'11:20:00','OUT')),null,
  'an early short session cannot fabricate a completed regular shift');
 assert.equal(restore.displayShiftFromClockIn(punch(date7,'23:36:00','IN'),punch(date8,'07:57:00','OUT')).shift,'晚',
