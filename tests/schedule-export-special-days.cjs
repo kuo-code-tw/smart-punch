@@ -67,7 +67,8 @@ for(const state of ['rest','open','worked','missing']){
   assert.equal(c.p79ScheduleSpecialNoPunchCode('E','2026-10-23','晚',null),'');
  }
  c.monthlyScheduleMeta.E={};shifts['2026-10-23']='颱24-01';
- assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱24-01');
+ assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),state==='missing'?'打卡待核':'颱24-01',
+  'unverified single-punch day stays pending; only otherwise preserve saved special-period code');
  shifts['2026-10-23']='晚';
 }
 console.log('PASS saved overnight reports override stale no-punch evidence across all attendance states');
