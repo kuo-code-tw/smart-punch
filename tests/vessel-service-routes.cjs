@@ -25,8 +25,11 @@ const c={
 vm.createContext(c);
 for(const n of ['parseWorkingSheetService','p79RouteServiceCode','p79RouteQuantity','routeStatsForShips','mergeShipMasterOne'])
   vm.runInContext(fn(n),c);
+const nameStart=html.indexOf('const P79_ROUTE_CHINESE_NAMES=');
 const routeStart=html.indexOf("let p79RouteSelected='';");
 const routeEnd=html.indexOf('function parseWorkingSheetSummary(book){',routeStart);
+assert(nameStart>=0&&nameStart<routeStart);
+vm.runInContext(html.slice(nameStart,routeStart),c);
 assert(routeStart>=0&&routeEnd>routeStart);
 vm.runInContext(html.slice(routeStart,routeEnd),c);
 const parse=rows=>JSON.parse(JSON.stringify(c.parseWorkingSheetService(rows)));
