@@ -48,8 +48,6 @@ const c={
  window,XLSX:X,Date,Set,Map,Math,String,Object,Array,Number,JSON,
  document:{getElementById:id=>id==='app-main-container'?main:id==='month-picker'?picker:null},
  activeRoleTab:'ARMG',activeGroupFilter:'ALL',employees:people,
- p79ScheduleLeavePolicy:{ready:false},
- p79ScheduleSpecialSummaryColumns:()=>({typhoon:true,election:true,electionDates:[date(25)]}),
  monthlyScheduleData:monthData,monthlyScheduleMeta:meta,leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
  p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}}),refreshIfStale:async()=>{}}),
@@ -80,7 +78,7 @@ const c={
 };
 vm.createContext(c);
 for(const n of ['p79ScheduleHasVerifiedPunch','p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
- 'p79ScheduleRestCountCells','p79ScheduleExcelShiftCode','p79ScheduleExportDay'])vm.runInContext(extract(n),c);
+ 'p79ScheduleRestCountCells','p79ScheduleExportDay'])vm.runInContext(extract(n),c);
 const renderStart=html.indexOf('    function renderRoleScheduleView()');
 const renderEnd=html.indexOf('\n    function p79SetScheduleSaving(',renderStart);
 assert(renderStart>0&&renderEnd>renderStart);
@@ -107,21 +105,12 @@ assert.equal(matched.length,83,'renderer must draw every person in the same scop
   for(const cell of dayCells){
    const day=cell[2],selected=(cell[0].match(/<option\b[^>]*\bselected\b[^>]*>([^<]*)<\/option>/)||[])[1];
    const exportedValue=personRow[String(Number(day.slice(-2)))];
-   if(c.p79ScheduleExcelShiftCode(selected)!==exportedValue)
-    mismatches.push({id,day,selected,exportedValue});
+   if(selected!==exportedValue)mismatches.push({id,day,selected,exportedValue});
    compared++;
   }
  }
- assert.deepEqual(mismatches.slice(0,10),[],
-  'export must match screen selections after converting only the three ordinary shifts');
+ assert.deepEqual(mismatches.slice(0,10),[],'export must equal actual selected UI option for every worker/day');
  assert.equal(compared,83*31);
- assert.equal(exported[0]['2'],'16-24','middle shift exports 16-24');
- assert.equal(exported[0]['3'],'24-08','night shift exports 24-08');
- assert.equal(exported[0]['4'],'08-16','early shift exports 08-16');
- assert(!exported.some(row=>Object.values(row).some(x=>['早','中','晚'].includes(x))),
-  'no ordinary shift in the downloaded file is represented by 早中晚');
- assert.equal(c.p79ScheduleExcelShiftCode('早＋延04-08'),'08-16＋延04-08',
-  'mixed regular shift/overtime uses time for the regular portion only');
  assert(exported.some(row=>row['23']==='颱08-16'),'saved typhoon overtime remains visible');
  assert(exported.some(row=>row['27']==='年'),'approved annual leave remains visible');
  assert(exported.some(row=>row['27']==='婚'),'nonstandard leave must be selected as-is rather than defaulting to 早');
@@ -131,5 +120,5 @@ assert.equal(matched.length,83,'renderer must draw every person in the same scop
  const before=JSON.stringify({monthData,meta,leave}); 
  await c.exportScheduleToExcel();
  assert.equal(JSON.stringify({monthData,meta,leave}),before,'export must be read-only and repeatable');
- console.log('PASS 83 employees × 31 days ('+compared+' selected UI cells map to Excel time codes), typhoon, election, overtime, leave, 颱日 Excel comments and no data mutation');
+ console.log('PASS 83 employees × 31 days ('+compared+' actual selected UI cells match XLSX), typhoon, election, overtime, leave, 颱日 Excel comments and no data mutation');
 })().catch(error=>{console.error(error);process.exitCode=1;});
