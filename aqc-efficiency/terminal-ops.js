@@ -74,9 +74,121 @@ function stopDuration(value){
  if(m)return Number(m[1])*60+Number(m[2]);
  return measure(value);
 }
+
+const STOP_CATEGORIES=[
+  {label:'設備故障',tone:'tone-rose',icon:'🛠️'},
+  {label:'系統異常',tone:'tone-purple',icon:'💻'},
+  {label:'鎖具問題',tone:'tone-orange',icon:'🔗'},
+  {label:'等待作業',tone:'tone-blue',icon:'⏳'},
+  {label:'天候因素',tone:'tone-cyan',icon:'🌧️'},
+  {label:'其他異常',tone:'tone-green',icon:'⚠️'},
+  {label:'原因未填',tone:'tone-gray',icon:'❔'}
+];
+const STOP_INTERVAL=/((?:[01]?\d|2[0-3]):?[0-5]\d)\s*(?:-|－|–|—|~|～|至|到)\s*((?:[01]?\d|2[0-3]):?[0-5]\d)/;
+function remarkCategory(raw){
+  const s=String(raw||'').trim();
+  if(!s)return '';
+  if(/(?:系統故障|系統異常|系統更新|CMS|當機|程式異常|電腦故障|資料系統)/i.test(s))return '系統異常';
+  if(/(?:鎖具|卡鐳|撿鐳|鎖頭|鎖銷|twist.?lock|lock.?pin)/i.test(s))return '鎖具問題';
+  if(/(?:天候|天氣|颱風|大雨|強風|風速|雷雨|濃霧)/i.test(s))return '天候因素';
+  if(/(?:等待|待機|待料|等.{0,18}(?:車|作業|吊|AQC|退車|靠泊|指示)|等AQC|等\d{4}退車|移車等待)/i.test(s))return '等待作業';
+  if(/(?:AQC故障|機故|設備故障|機械故障|故障|跳電|吊架下降失速|失速|查修|維修|保養廠|吊具異常|吊具損壞|電力中斷)/i.test(s))return '設備故障';
+  // H/C, OOG, 單吊、Bundle 是正常作業說明，不代表停工。
+  if(/(?:^|[\s\d])(?:H\/?C|OOG)\s*\*\s*\d+/i.test(s)||/(?:單吊|艙蓋|畸零地|BN\/\d+FR)/i.test(s))return '';
+  if(/(?:停工|中斷|異常|延誤|作業問題(?!#\d+$)|壅塞)/i.test(s))return '其他異常';
+  return '';
+}
+function clockMinutes(raw){
+  const s=String(raw||'').replace(':','');
+  if(s.length<3||s.length>4||!/^\d+$/.test(s))return null;
+  const hour=Number(s.slice(0,-2)),minute=Number(s.slice(-2));
+  return hour<=23&&minute<=59?hour*60+minute:null;
+}
+function intervalInRemark(raw){
+  const m=String(raw||'').match(STOP_INTERVAL);
+  if(!m)return null;
+  const from=clockMinutes(m[1]),to=clockMinutes(m[2]);
+  if(from===null||to===null)return null;
+  let minutes=to-from;
+  if(minutes<=0)minutes+=1440;
+  // Very long intervals are ambiguous in free-text Remark; review rather than inflate time.
+  if(minutes>720)return {start:m[1],end:m[2],minutes:null};
+  return {start:m[1],end:m[2],minutes};
+}
+function remarkSegments(row){
+  const source=[row.note,row.remark,row.Remark,row.REMARK,
+    row.stopRemark1,row.stopRemark2,row.stopRemark3,row.stopRemark,
+    row.stopReason,row.stopNote];
+  const unique=new Set();
+  for(const text of source){
+    for(const segment of String(text||'').split(/[｜|；;\n\r]+/)){
+      const s=segment.trim().replace(/\s+/g,' ');
+      if(s)unique.add(s);
+    }
+  }
+  return [...unique];
+}
+function stopEventsForRecord(r){
+  const notes=remarkSegments(r),parsed=[];
+  for(const segment of notes){
+    const category=remarkCategory(segment);
+    if(!category)continue;
+    const interval=intervalInRemark(segment);
+    parsed.push({category,reason:segment,minutes:interval?.minutes??null,
+      start:interval?.start||'',end:interval?.end||'',source:'Remark'});
+  }
+  const timedCategories=new Set(parsed.filter(e=>e.start&&e.end).map(e=>e.category));
+  const events=parsed.filter(e=>e.start||!timedCategories.has(e.category));
+  for(let i=1;i<=3;i++){
+    const label=String(r['stopItem'+i]||'').trim();
+    const detail=String(r['stopRemark'+i]||'').trim();
+    const minutes=stopDuration(r['stopTime'+i]);
+    if(minutes===null||minutes<=0)continue;
+    const category=remarkCategory(label+' '+detail)||'原因未填';
+    const matched=events.some(e=>e.category===category&&e.minutes!==null&&Math.abs(e.minutes-minutes)<1);
+    if(!matched)events.push({category,reason:label||detail||'原因未填',minutes,
+      start:'',end:'',source:'停工填報'});
+  }
+  return events;
+}
+function buildStopSummary(records,wharfByNo,masters){
+  const vesselByNo=new Map(masters.map(s=>[String(s.workingNo||s.sourceWorkingNo||'').trim(),String(s.vessel||'').trim()]));
+  const byStop=new Map(),unique=new Map(),affected=new Set();
+  const work=(key)=>{if(!byStop.has(key))byStop.set(key,{reason:key,events:0,minutes:0,unknown:0,wharfs:new Set(),aqcs:new Set()});return byStop.get(key)};
+  for(const r of records){
+    const no=String(r.workingNo||'').trim(),day=String(r.workDate||'').slice(0,10);
+    const aqc=String(r.number||r.gcNo||'').trim();
+    const wharf=String(r.wharf||'').trim().toUpperCase()||wharfByNo.get(no)||'未指定碼頭';
+    const vessel=String(r.shipName||r.vessel||vesselByNo.get(no)||no).trim();
+    for(const entry of stopEventsForRecord(r)){
+      const period=entry.start&&entry.end?[entry.start,entry.end].join('-'):
+        entry.source==='停工填報'?'填報:'+entry.minutes+':'+entry.reason:
+        '未註時間:'+entry.reason.replace(/\s+/g,'').toLowerCase();
+      const key=[no,day,aqc,entry.category,period].join('|');
+      if(unique.has(key))continue;
+      const event={...entry,date:day,workingNo:no,aqc,wharf,vessel};
+      unique.set(key,event);
+      affected.add(String(r.id||[no,day,aqc,r.startTime,r.endTime].join('|')));
+      const group=work(event.category);
+      group.events++;
+      if(event.minutes!==null)group.minutes+=event.minutes;
+      else group.unknown++;
+      group.wharfs.add(wharf);
+      if(aqc)group.aqcs.add(aqc);
+    }
+  }
+  const details=[...unique.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.workingNo.localeCompare(b.workingNo)||a.aqc.localeCompare(b.aqc)||a.category.localeCompare(b.category,'zh-Hant'));
+  const categories=STOP_CATEGORIES.filter(c=>byStop.has(c.label)).map(c=>({
+    ...byStop.get(c.label),wharfs:[...byStop.get(c.label).wharfs].sort(),aqcs:byStop.get(c.label).aqcs.size
+  }));
+  return {byStop:categories,stopDetails:details,totalStopEvents:details.length,
+    totalStopMinutes:details.reduce((sum,e)=>sum+(e.minutes||0),0),
+    unknownStopEvents:details.filter(e=>e.minutes===null).length,stoppedRows:affected.size};
+}
+
 function build(month,ships,rows){
   const masters=makeUniqueShips(ships,month);
-  const byWharf=new Map(),byDay=new Map(),byShift=new Map(),byStop=new Map();
+  const byWharf=new Map(),byDay=new Map(),byShift=new Map();
   const wharfByNo=new Map();
   const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,missing:0,undated:0};
   const work=(map,key,init)=>{if(!map.has(key))map.set(key,init());return map.get(key)};
@@ -99,8 +211,7 @@ function build(month,ships,rows){
     else vesselTotals.undated++;
   }
   const records=makeUniqueRecords(rows,month);
-  let crossShift=0,missingTime=0,unmatchedWharf=0,stoppedRows=0;
-  let totalStopMinutes=0,totalStopEvents=0;
+  let crossShift=0,missingTime=0,unmatchedWharf=0;
   for(const r of records){
     const no=String(r.workingNo||'').trim();
     const wharf=String(r.wharf||'').trim().toUpperCase()||wharfByNo.get(no)||'未指定碼頭';
@@ -114,28 +225,19 @@ function build(month,ships,rows){
     const item=work(byShift,key,()=>({day,shift,records:0,disc:0,load:0,hc:0,hours:0}));
     item.records++;item.disc+=measure(r.disc)||0;item.load+=measure(r.load)||0;item.hc+=measure(r.hatches)||0;
     if(h!==null)item.hours+=h;
-    let hadStop=false;
-    for(let i=1;i<=3;i++){
-      const mins=stopDuration(r['stopTime'+i]);
-      if(mins===null||mins<=0)continue;
-      const label=String(r['stopItem'+i]||'').trim()||'原因未填';
-      const reason=work(byStop,label,()=>({reason:label,events:0,minutes:0,wharfs:new Set(),aqcs:new Set()}));
-      reason.events++;reason.minutes+=mins;reason.wharfs.add(wharf);
-      if(r.number||r.gcNo)reason.aqcs.add(String(r.number||r.gcNo).trim());
-      hadStop=true;totalStopMinutes+=mins;totalStopEvents++;
-    }
-    if(hadStop)stoppedRows++;
+
   }
+  const stops=buildStopSummary(records,wharfByNo,masters);
   return {
     month,ships:masters,records,
     vesselTotals,byWharf:[...byWharf.values()].sort((a,b)=>b.moves-a.moves||a.wharf.localeCompare(b.wharf)),
     byDay:[...byDay.values()].sort((a,b)=>a.day.localeCompare(b.day)),
     byShift:[...byShift.values()].sort((a,b)=>a.day.localeCompare(b.day)||['24–08','08–16','16–24','時間未提供'].indexOf(a.shift)-['24–08','08–16','16–24','時間未提供'].indexOf(b.shift)),
-    byStop:[...byStop.values()].map(s=>({...s,wharfs:[...s.wharfs].sort(),aqcs:s.aqcs.size})).sort((a,b)=>b.minutes-a.minutes||a.reason.localeCompare(b.reason,'zh-Hant')),
-    crossShift,missingTime,unmatchedWharf,stoppedRows,totalStopMinutes,totalStopEvents
+    byStop:stops.byStop,stopDetails:stops.stopDetails,
+    crossShift,missingTime,unmatchedWharf,...stops
   };
 }
-const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:''};
+const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:''};
 function el(id){return document.getElementById(id)}
 function options(){
  const select=el('terminalMonth');
@@ -178,7 +280,7 @@ function render(){
   htmlMetric('本月裝船櫃數',hasShips?fmt(total.load):'—','WORKING SHEET 原始 LOAD','tone-orange'),
   htmlMetric('本月總 Moves',hasShips?fmt(total.moves):'—','船舶主檔總作業量','tone-green'),
   htmlMetric('AQC 作業明細',stats.records.length?fmt(stats.records.length):'—','按作業日期統計','tone-purple'),
-  htmlMetric('停工填報',stats.totalStopEvents?fmt(stats.totalStopMinutes)+' 分':'—',stats.totalStopEvents?fmt(stats.totalStopEvents)+' 筆停工事件':'目前無有效停工填報','tone-rose')
+  htmlMetric('停工與異常',stats.totalStopEvents?fmt(stats.totalStopEvents)+' 件':'—',stats.totalStopEvents?'可確認 '+fmt(stats.totalStopMinutes)+' 分／未定時 '+fmt(stats.unknownStopEvents)+' 件':'尚無可判讀事件，不能視為零停工','tone-rose')
  ].join('');
  const wharfBody=el('terminalWharfBody');
  if(wharfBody)wharfBody.innerHTML=stats.byWharf.length?stats.byWharf.map(s=>
@@ -189,9 +291,21 @@ function render(){
  const shiftBody=el('terminalShiftBody');
  if(shiftBody)shiftBody.innerHTML=stats.byShift.length?stats.byShift.map(s=>
   '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
+ const categories=el('terminalStopCategoryKpis');
+ if(categories)categories.innerHTML=STOP_CATEGORIES.filter(c=>c.label!=='原因未填'||stats.byStop.some(s=>s.reason==='原因未填')).map(c=>{
+   const s=stats.byStop.find(item=>item.reason===c.label);
+   const count=s?.events||0,minutes=s?.minutes||0,unknown=s?.unknown||0;
+   return '<button type="button" class="p79-ter-stop-kpi '+c.tone+(state.stopCategory===c.label?' active':'')+'" aria-pressed="'+(state.stopCategory===c.label)+'" onclick="P79TerminalOps.selectCategory(\''+c.label+'\')"><span class="stop-kpi-name">'+c.icon+' '+safe(c.label)+'</span><strong>'+fmt(count)+' 件</strong><small>確認 '+fmt(minutes)+' 分'+(unknown?'／'+fmt(unknown)+' 件待核對':'')+'</small></button>';
+ }).join('');
  const stopBody=el('terminalStopBody');
  if(stopBody)stopBody.innerHTML=stats.byStop.length?stats.byStop.map(s=>
-  '<tr><td>'+safe(s.reason)+'</td><td>'+fmt(s.events)+'</td><td class="em">'+decimal(s.minutes)+'</td><td>'+safe(s.wharfs.join('、'))+'</td><td>'+fmt(s.aqcs)+'</td></tr>').join(''):rowMessage(5,stats.records.length?'目前沒有有效的停工項目與停工時間填報，不能據此判定零停工':'尚未取得作業明細，無法統計停工原因');
+  '<tr><td>'+safe(s.reason)+'</td><td>'+fmt(s.events)+'</td><td class="em">'+decimal(s.minutes)+'</td><td>'+fmt(s.unknown)+'</td><td>'+safe(s.wharfs.join('、'))+'</td><td>'+fmt(s.aqcs)+'</td></tr>').join(''):rowMessage(6,stats.records.length?'目前未辨識到有註記的停工或異常，不能據此判定零停工':'尚未取得作業明細，無法統計停工原因');
+ const visible=state.stopCategory?stats.stopDetails.filter(s=>s.category===state.stopCategory):stats.stopDetails;
+ const detailBody=el('terminalStopDetailBody');
+ if(detailBody)detailBody.innerHTML=visible.length?visible.slice(0,160).map(e=>
+  '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td>'+safe(e.source)+'</td></tr>').join(''):rowMessage(8,stats.records.length?'此分類沒有可辨識的異常紀錄':'尚未取得 WORKING REPORT 明細');
+ const detailCaption=el('terminalStopDetailCaption');
+ if(detailCaption)detailCaption.textContent=(state.stopCategory||'全部原因')+'｜共 '+fmt(visible.length)+' 件'+(visible.length>160?'，僅列最近 160 件':'');
  const status=el('terminalDataStatus');
  if(status){
   const cloudForMonth=state.loadedMonth===month,kind=state.inFlight===month?'loading':cloudForMonth?state.mode:'local';
@@ -210,7 +324,8 @@ function render(){
   if(stats.crossShift)list.push('有 '+fmt(stats.crossShift)+' 筆明細跨越班別邊界，整筆櫃數暫歸開始班別，不代表逐櫃精確分攤');
   if(stats.missingTime)list.push('有 '+fmt(stats.missingTime)+' 筆明細沒有可辨識的開始時間');
   if(stats.unmatchedWharf)list.push('有 '+fmt(stats.unmatchedWharf)+' 筆作業明細找不到碼頭對應');
-  if(stats.records.length&&!stats.totalStopEvents)list.push('沒有有效的停工填報，不等同於確定沒有停工');
+  if(stats.unknownStopEvents)list.push('有 '+fmt(stats.unknownStopEvents)+' 件 Remark 異常沒有可確認的起訖時間，只計次數、不計分鐘');
+  if(stats.records.length&&!stats.totalStopEvents)list.push('尚未識別異常註記，不等於確定沒有停工');
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
  const label=el('terminalMonthCaption');
@@ -254,5 +369,6 @@ async function load(force=false){
   if(ticket===state.requestSeq){state.inFlight='';render();}
  }
 }
-root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips};
+function selectCategory(category){state.stopCategory=state.stopCategory===category?'':category;render();}
+root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory};
 })(window);
