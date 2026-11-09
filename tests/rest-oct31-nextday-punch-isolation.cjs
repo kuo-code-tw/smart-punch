@@ -58,7 +58,7 @@ function render(state,complete,shift,worked){
 assert.equal(render('missing',true,'休',false).visibleCode,'休','original rest survives an unrelated next-day single punch');
 assert.equal(render('unknown',false,'休',false).visibleCode,'休','a known scheduled rest survives historical read unavailability');
 assert.equal(render('missing',true,'早',false).visibleCode,'打卡待核','lone real scheduled-work punch still needs reconciliation');
-assert.equal(render('unknown',false,'早',false).visibleCode,'打卡待核','no official evidence is not fabricated as a rest');
+assert.equal(render('unknown',false,'早',false).visibleCode,'早','without any verified punch evidence, show the original early roster provisionally, not a fabricated pending punch or rest');
 assert.equal(render('rest',true,'早',false).visibleCode,'休','confirmed no-card workday becomes rest');
 assert.equal(render('worked',true,'休',true).visibleCode,'已出勤','complete punches override a scheduled rest');
 assert.match(html,/row\[String\(d\)\]=selected\.visibleCode/,'Excel must reuse same shown day code');
