@@ -7141,6 +7141,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
     let p79OvertimeShiftEditBusy=false;
     async function updateDailyShift(empId,dayStr,val){
       if(val==='__overtime__')return;
+      // Validate before acquiring the edit lock or cancelling a formal report.
+      if(val==='國'&&p79RestQuota(dayStr.slice(0,7)).counts.國===0){
+        alert('此月份沒有國定假日額度，不能新增「國」。請依實際班別選擇「休」或「例」。');
+        renderRoleScheduleView();return;
+      }
       if(P79_SCHEDULE_SPECIAL_LEAVES.includes(val)){
         // Recheck the current cloud policy immediately before a privileged edit.
         await p79ScheduleReadHrLeavePolicy();
