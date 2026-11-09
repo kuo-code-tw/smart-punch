@@ -61,7 +61,10 @@ shift='早';leave={leaveType:'年假'};assert.equal(get().visibleCode,'年','app
 overtime=true;assert.equal(get().visibleCode,'休','old overtime display is suppressed when there are no punches');overtime=false;
 shift='晚';state='open';assert.equal(get().visibleCode,'晚','not-yet-ended night shift stays planned');
 assert.match(html,/else if\(shiftVal==='打卡待核'\)/,'pending state excluded from worked-day count');
-assert.match(html,/const noPunchRest=p79ScheduleNoPunchRest/);
+assert.match(html,/const noPunchRest=\(!hasOfficialOvertimeReport\|\|verifiedNoWork\)&&/,
+ 'formal overtime is protected until its zero-punch status is verified');
+assert.match(html,/p79ScheduleNoPunchRest\(emp.id,dayStr,rosterShift/,
+ 'screen still invokes the shared no-card resolution');
 assert.match(html,/row\[String\(d\)\]=selected\.visibleCode/,'Excel uses exactly the same resolved day code');
 const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(Boolean);
 scripts.forEach(code=>new vm.Script(code));
