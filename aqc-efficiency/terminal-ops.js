@@ -154,7 +154,9 @@ function stopEventsForRecord(r){
 
 function shipBundleMetrics(ship){
  const ws=ship.workingSheetSource||{};
- const direct=measure(ship.bundleDeduct,ws.bundleDeduct,ship.importAudit?.bundleDeduct);
+ const master=measure(ship.bundleDeduct),sheet=measure(ws.bundleDeduct),audit=measure(ship.importAudit?.bundleDeduct);
+ const hasManual=!!(ship.manualOverrides&&Object.prototype.hasOwnProperty.call(ship.manualOverrides,'bundleDeduct'));
+ const direct=hasManual?master:(master===0&&sheet!==null&&sheet>0?sheet:measure(master,sheet,audit));
  const bn=measure(ship.bundleBn,ws.bundleBn),fl=measure(ship.bundleFl,ws.bundleFl);
  const detail=Array.isArray(ship.bundleInfo)?ship.bundleInfo:Array.isArray(ws.bundleInfo)?ws.bundleInfo:[];
  const fromDetail=detail.reduce((sum,x)=>sum+Math.max(0,(measure(x.fl,x.FL)||0)-(measure(x.bn,x.BN)||0)),0);
@@ -321,6 +323,18 @@ function currentSources(month){
  return localSources(month);
 }
 function rowMessage(count,text){return '<tr><td colspan="'+count+'" class="p79-terminal-empty">'+text+'</td></tr>'}
+function labelCompactTables(){
+ const host=el('terminalDashboardRoot');
+ if(!host||typeof host.querySelectorAll!=='function')return;
+ host.querySelectorAll('.p79-ter-table').forEach(table=>{
+   const labels=[...table.querySelectorAll('thead th')].map(node=>String(node.textContent||'').trim());
+   table.querySelectorAll('tbody tr').forEach(row=>{
+     [...row.querySelectorAll('td')].forEach((cell,i)=>{
+       if(!cell.hasAttribute('colspan'))cell.setAttribute('data-label',labels[i]||'');
+     });
+   });
+ });
+}
 function render(){
  const rootNode=el('terminalDashboardRoot');if(!rootNode)return;
  const month=options(),src=currentSources(month),stats=build(month,src.ships,src.records);
@@ -393,6 +407,7 @@ function render(){
   if(state.categorySaveWarning)list.push(state.categorySaveWarning);
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
+ labelCompactTables();
  const label=el('terminalMonthCaption');
  if(label)label.textContent=month.replace('-',' 年 ')+' 月';
 }
