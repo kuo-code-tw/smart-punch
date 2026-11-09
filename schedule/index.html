@@ -7432,8 +7432,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const category=split?.[1]||/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
       // A historic 國 overtime code must not silently consume nonexistent
       // November national quota. Keep the original report for audit instead.
-      if(month&&category==='國'&&p79RestQuota(month).counts.國===0)
-        return substitute?'':'休';
+      if(month&&category==='國'){
+        const quota=p79RestQuota(month);
+        const nationalCount=quota.counts?.國??
+          (quota.slots||[]).filter(slot=>slot.category==='國').length;
+        if(nationalCount===0)return substitute?'':'休';
+      }
       return category;
     }
     // Single source of truth for the daily SELECTED value in both roster UI
@@ -7460,8 +7464,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // has priority over legacy automated 休/例/國 allocations in the day cell.
       // Legal leave and submitted overtime remain in the original metadata.
       const originalMeta=monthlyScheduleMeta[emp.id]?.[dayStr]||{};
-      const noNationalQuota=typeof p79RestQuota==='function'&&
-        p79RestQuota(dayStr.slice(0,7)).counts.國===0;
+      const monthQuota=typeof p79RestQuota==='function'?
+        p79RestQuota(dayStr.slice(0,7)):null;
+      const noNationalQuota=!!monthQuota&&
+        (monthQuota.counts?.國??
+          (monthQuota.slots||[]).filter(slot=>slot.category==='國').length)===0;
       const oldNationalLabel=noNationalQuota&&(
         rosterShift==='國'||originalMeta.restCategory==='國'||
         automaticRestMeta[dayStr]?.restCategory==='國'||originalMeta.overtimeReport?.category==='國');
