@@ -87,6 +87,13 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll th{padding:6px 4px!important;font-size:9px!important;color:#567caa!important;background:#e9f4ff!important;white-space:nowrap}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll td{padding:5px 4px!important;border-bottom:1px solid #f1f6fb!important;color:#0c2c64!important;font-size:10px!important;white-space:nowrap}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll td:nth-child(2){text-align:left!important;max-width:115px;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+/* The generic second-column rule above is for compact rankings, not the
+   read-only seven-column home overtime list. Center the name under 姓名
+   without changing the ranking, dates, departments or other cells. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashOvertimeList .p79d-table-scroll th:nth-child(2),
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard #p79DashOvertimeList .p79d-table-scroll td:nth-child(2){
+ text-align:center!important;max-width:none!important;overflow:visible!important;text-overflow:clip!important;
+}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-table-scroll tr:nth-child(even){background:#f3f9ff!important}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-rank{display:inline-grid;place-items:center;min-width:19px;height:19px;border-radius:50%;color:#174d8f;background:#e6f1fb;font-weight:800}
 html body.p79-workspace:has(#systems.show):has(#p79Dashboard) .p79r-rank.rank-1{color:#b98b38;background:#fff0d0}
