@@ -235,7 +235,7 @@ function build(month,ships,rows){
   const masters=makeUniqueShips(ships,month);
   const byWharf=new Map(),byDay=new Map(),byShift=new Map();
   const wharfByNo=new Map();
-  const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0,missing:0,undated:0};
+  const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleMismatch:0,bundleUnexplained:0,missing:0,undated:0};
   const work=(map,key,init)=>{if(!map.has(key))map.set(key,init());return map.get(key)};
   for(const s of masters){
     const ws=s.workingSheetSource||{};
@@ -254,14 +254,14 @@ function build(month,ships,rows){
       target.moves+=(moves||0);target.shift+=(shift||0);target.hc+=(hc||0);
       if(declared){target.bundle+=bundle;target.bundleKnown++;}
       else if(rawDiff!==null&&Math.abs(rawDiff)>0.01)target.bundleUnknown++;
-      if(bundleDifference!==null&&Math.abs(bundleDifference)>0.01)target.bundleUnexplained+=bundleDifference;
+      if(bundleDifference!==null&&Math.abs(bundleDifference)>0.01){target.bundleMismatch++;target.bundleUnexplained+=bundleDifference;}
     };
     add(vesselTotals);
-    const berth=work(byWharf,wharf,()=>({wharf,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0}));
+    const berth=work(byWharf,wharf,()=>({wharf,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleMismatch:0,bundleUnexplained:0}));
     add(berth);
     const dates=[s._cloudLastDate,s.lastDate,s.workingSheetSource?.compareDate,s.compareDate,s.firstDate].map(v=>String(v||'').slice(0,10));
     const day=dates.find(v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&v.startsWith(month));
-    if(day)add(work(byDay,day,()=>({day,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0,bundleList:[]})));
+    if(day)add(work(byDay,day,()=>({day,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleMismatch:0,bundleUnexplained:0,bundleList:[]})));
     else vesselTotals.undated++;
     if(day)byDay.get(day).bundleList.push({no,bundle,bn,fl,rawDiff,bundleDifference});
   }
@@ -357,8 +357,8 @@ function render(){
   '<tr><td>'+safe(s.day)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td>'+
    '<td class="p79-ter-bundle" title="'+safe(s.bundleList.filter(x=>x.bundle!==null&&x.bundle>0).map(x=>x.no+'：扣 '+fmt(x.bundle)+(x.bn!==null&&x.fl!==null?'（'+fmt(x.bn)+'BN／'+fmt(x.fl)+'FL）':'')).join('；')||'尚無已填報 Bundle 明細')+'">'+fmt(s.bundle)+(s.bundleUnknown?' <small>('+fmt(s.bundleUnknown)+' 艘待核)</small>':'')+'</td>'+
    '<td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td>'+
-   '<td class="'+(Math.abs(s.bundleUnexplained)>0.01||s.bundleUnknown?'p79-ter-check':'')+'">'+
-   (s.bundleUnknown?'待核對':Math.abs(s.bundleUnexplained)>0.01?(s.bundleUnexplained>0?'+':'')+decimal(s.bundleUnexplained):'—')+'</td></tr>').join(''):rowMessage(8,'目前無可歸入本月完工日期的船舶資料');
+   '<td class="'+(s.bundleMismatch||s.bundleUnknown?'p79-ter-check':'')+'">'+
+   (s.bundleUnknown?'待核對':s.bundleMismatch?(Math.abs(s.bundleUnexplained)>0.01?(s.bundleUnexplained>0?'+':'')+decimal(s.bundleUnexplained):'待核對'):'—')+'</td></tr>').join(''):rowMessage(8,'目前無可歸入本月完工日期的船舶資料');
  const shiftBody=el('terminalShiftBody');
  if(shiftBody)shiftBody.innerHTML=stats.byShift.length?stats.byShift.map(s=>
   '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
@@ -403,7 +403,7 @@ function render(){
   if(stats.unknownStopEvents)list.push('有 '+fmt(stats.unknownStopEvents)+' 件 Remark 異常沒有可確認的起訖時間，只計次數、不計分鐘');
   if(stats.records.length&&!stats.totalStopEvents)list.push('尚未識別異常註記，不等於確定沒有停工');
   if(total.bundleUnknown)list.push('有 '+fmt(total.bundleUnknown)+' 艘船的卸船＋裝船與作業量不同，但沒有已知 Bundle 扣除數，請核對來源 WORKING SHEET');
-  if(Math.abs(total.bundleUnexplained)>0.01)list.push('有已填報 Bundle 仍無法完全解釋的櫃數差異；每日表「待核差額」可查看');
+  if(total.bundleMismatch)list.push('有已填報 Bundle 仍無法完全解釋的櫃數差異；每日表「待核差額」可查看');
   if(state.categorySaveWarning)list.push(state.categorySaveWarning);
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
