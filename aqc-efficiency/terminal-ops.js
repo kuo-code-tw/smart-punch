@@ -355,7 +355,7 @@ function render(){
  const dayBody=el('terminalDayBody');
  if(dayBody)dayBody.innerHTML=stats.byDay.length?stats.byDay.map(s=>
   '<tr><td>'+safe(s.day)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td>'+
-   '<td class="p79-ter-bundle" title="'+safe(s.bundleList.filter(x=>x.bundle!==null&&x.bundle>0).map(x=>x.no+'：扣 '+fmt(x.bundle)+(x.bn!==null&&x.fl!==null?'（'+fmt(x.bn)+'BN／'+fmt(x.fl)+'FL）':'')).join('；')||'尚無已填報 Bundle 明細')+'">'+fmt(s.bundle)+(s.bundleUnknown?' <small>('+fmt(s.bundleUnknown)+' 艘待核)</small>':'')+(s.bundleList.some(x=>x.bundle!==null&&x.bundle>0)?'<details class="p79-ter-bundle-detail"><summary>查看 Bundle 明細</summary>'+s.bundleList.filter(x=>x.bundle!==null&&x.bundle>0).map(x=>'<div>'+safe(x.no)+'：扣 '+fmt(x.bundle)+(x.bn!==null&&x.fl!==null?'（'+fmt(x.bn)+'BN／'+fmt(x.fl)+'FL）':'')+'</div>').join('')+'</details>':'')+'</td>'+
+   '<td class="p79-ter-bundle"><span class="p79-ter-bundle-value" tabindex="0" title="'+safe(s.bundleList.filter(x=>x.bundle!==null&&x.bundle>0).map(x=>x.no+'：扣 '+fmt(x.bundle)+(x.bn!==null&&x.fl!==null?'（'+fmt(x.bn)+'BN／'+fmt(x.fl)+'FL）':'')).join('；')||'本日無 Bundle 扣除明細')+'">'+fmt(s.bundle)+'</span>'+(s.bundleUnknown?' <small>('+fmt(s.bundleUnknown)+' 艘待核)</small>':'')+'</td>'+
    '<td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td>'+
    '<td class="'+(s.bundleMismatch||s.bundleUnknown?'p79-ter-check':'')+'">'+
    (s.bundleUnknown?'待核對':s.bundleMismatch?(Math.abs(s.bundleUnexplained)>0.01?(s.bundleUnexplained>0?'+':'')+decimal(s.bundleUnexplained):'待核對'):'—')+'</td></tr>').join(''):rowMessage(8,'目前無可歸入本月完工日期的船舶資料');
