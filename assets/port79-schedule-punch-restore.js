@@ -24,6 +24,13 @@ function shiftFromClockIn(inRec,outRec,{displayOnly=false}={}){
  let shift='',date=start.date;
  // A complete session entirely before 08:00 belongs to the previous night's roster date.
  if(start.date===end.date&&start.hour<8&&end.hour<8){shift='晚';date=dateBack(date);}
+ // A 03:38–15:53 completed pair spans pre-shift 04–08 overtime and
+ // the regular 08–16 day shift. Do not leave the workday unclassified just
+ // because its first punch is earlier than the usual 06:00 early-shift gate.
+ // The same-day near-16:00 clock-out prevents a standalone 04–08 cover
+ // or an overnight 00–08 session from being mislabelled as a regular day.
+ else if(start.date===end.date&&start.hour>=3&&start.hour<6&&
+         end.hour>=14&&end.hour<=18&&elapsed>=8)shift='早';
  else if(start.hour>=6&&start.hour<=10)shift='早';
  else if(start.hour>=14&&start.hour<=18)shift='中';
  else if(start.hour>=22){shift='晚';}
