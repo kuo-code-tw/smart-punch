@@ -79,8 +79,13 @@ assert(html.includes("if(val==='國'&&p79RestQuota(dayStr.slice(0,7)).counts.國
  'manual editor must reject national leave with no monthly quota');
 assert(html.includes("p79RestQuota(yearMonth).counts.國>0"),'November dropdown must not offer 國');
 for(let i=0;i<83;i++){
- const model={...s.monthlyScheduleData.E1};
- assert.equal(s.p79ScheduleDisplayDay(emp,no5,ctx()).visibleRestKind,'休','fixture '+i+' must not show 國');
- assert.equal(JSON.stringify(s.monthlyScheduleData.E1),JSON.stringify(model),'fixture '+i+' must be read only');
+ const id='STAFF'+String(i).padStart(3,'0');
+ s.monthlyScheduleData[id]={...roster};
+ s.monthlyScheduleMeta[id]=JSON.parse(JSON.stringify(meta));
+ const original=JSON.stringify({roster:s.monthlyScheduleData[id],meta:s.monthlyScheduleMeta[id]});
+ assert.equal(s.p79ScheduleDisplayDay({id},no5,ctx()).visibleRestKind,'休',
+   'employee '+id+' must not show a nonexistent November national holiday');
+ assert.equal(JSON.stringify({roster:s.monthlyScheduleData[id],meta:s.monthlyScheduleMeta[id]}),
+   original,'employee '+id+' must retain exact raw cloud-source data');
 }
 console.log('PASS: November national=0, legacy allocation/display/counts, 83 staff, October/December and punch protections, no cloud rewrite');
