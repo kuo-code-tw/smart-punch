@@ -5,6 +5,7 @@ on:
       - 'schedule/index.html'
       - 'tests/schedule-no-punch-rest-display.cjs'
       - 'tests/schedule-night-split-auto.cjs'
+      - 'tests/schedule-national-zero-quota.cjs'
       - 'assets/port79-schedule-rest-evidence.js'
       - 'assets/port79-rest-allocation.js'
       - 'assets/port79-monthly-rest-overtime.js'
@@ -20,6 +21,7 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/schedule-night-split-auto.cjs
+      - run: node tests/schedule-national-zero-quota.cjs
       - run: node tests/schedule-attendance-display-priority.cjs
       - run: node tests/schedule-emergency-no-mass-rest.cjs
       - run: node tests/schedule-rest-unverified-overtime.cjs
