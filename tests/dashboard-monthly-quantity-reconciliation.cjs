@@ -83,7 +83,7 @@ function run(){
   assert(!host.innerHTML.includes('<img onerror='),'Record IDs must be escaped in HTML');
   assert(host.innerHTML.includes('&lt;img'));
   assert(html.includes('>人員作業櫃數</div>'));
-  assert(html.includes('>系統總櫃數（請款＋翻艙）</div>'));
+  assert(html.includes('>系統總櫃數（作業量＋翻艙）</div>'));
   assert(html.includes("setCum('cumWorkload',systemTotalMoves);"),'System KPI must display billing plus SHIFT, not billing alone');
   assert(html.includes('const systemTotalMoves=workload+shiftTotal;'),'System Moves derives only from ship billing and SHIFT');
   assert(html.includes('✓ 僅與系統人員明細一致（非月報）'),'Equality must distinguish system detail from external Excel');
