@@ -2,7 +2,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
-for(const id of ['terminalStopCategoryKpis','terminalStopBody','terminalStopDetailBody','terminalStopDetailCaption']){
+for(const id of ['terminalStopCategoryKpis','terminalStopBody','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter']){
  assert(html.includes('id="'+id+'"'),id);
 }
 const mk=(id,day,aqc,note,other={})=>({
@@ -22,7 +22,7 @@ const rows=[
 ];
 const ids=['terminalDashboardRoot','terminalMonth','terminalKpi','terminalWharfBody','terminalDayBody',
  'terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody',
- 'terminalStopDetailCaption','terminalDataStatus','terminalWarnings','terminalMonthCaption'];
+ 'terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus','terminalWarnings','terminalMonthCaption'];
 const els=Object.fromEntries(ids.map(id=>[id,{dataset:{},value:id==='terminalMonth'?'2026-11':'',innerHTML:'',textContent:''}]));
 els.terminalMonth.dataset.p79Year='2026';
 const ctx={window:{},document:{getElementById:id=>els[id]},console:{warn(){}},records:rows,shipMasters:[],
@@ -50,10 +50,17 @@ assert(els.terminalStopBody.innerHTML.includes('未定時')===false,'table rows 
 assert(els.terminalStopDetailBody.innerHTML.includes('0331-0348 7903 故障跳電'));
 assert(els.terminalStopDetailBody.innerHTML.includes('待核對'));
 assert(els.terminalWarnings.innerHTML.includes('只計次數'));
+api.filterReason('系統異常');
+assert.equal(els.terminalReasonFilter.value,'系統異常');
+assert(!els.terminalStopDetailBody.innerHTML.includes('故障跳電'),'dropdown filter narrows details');
+assert(els.terminalStopDetailCaption.textContent.includes('系統異常'));
 api.selectCategory('系統異常');
-assert(!els.terminalStopDetailBody.innerHTML.includes('故障跳電'),'category filter narrows details');
-api.selectCategory('系統異常');
-assert(els.terminalStopDetailBody.innerHTML.includes('故障跳電'),'second click clears filter');
+assert.equal(els.terminalReasonFilter.value,'','color card selection clears identical filter');
+assert(els.terminalStopDetailBody.innerHTML.includes('故障跳電'),'category reset restores details');
+api.selectCategory('設備故障');
+assert.equal(els.terminalReasonFilter.value,'設備故障','color card and dropdown are synchronized');
+api.filterReason('');
+assert(els.terminalStopDetailBody.innerHTML.includes('CMS當機'),'all restores all categories');
 // Untrusted remark strings must never be injected as HTML.
 ctx.records=[mk('x','2026-11-08','7999','0331-0348 AQC故障 <img src=x onerror=alert(1)>')];
 api.render();
