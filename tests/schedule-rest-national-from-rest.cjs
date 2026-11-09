@@ -61,7 +61,7 @@ c.p79ScheduleRestBalance=()=>({ledger:[]});
 c.p79CoverageShift=()=>'';c.p79SubstituteShiftLabel=()=>'';c.p79ScheduleNoPunchRest=()=>false;
 c.p79ScheduleLeaveExportCode=x=>x;c.scheduleLeaveTypeText=x=>x;c.scheduleTaipeiTodayKey=()=>day(31);
 c.p79ScheduleSpecialNoPunchCode=(id,date,shift)=>date===typhoon?'颱':'';
-for(const name of ['p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79ScheduleExcelShiftCode','p79ScheduleExportDay'])
+for(const name of ['p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79ScheduleExportDay'])
  vm.runInContext(extract(name),c);
 const planned=c.p79RestAutomaticPlan(emp,month),context=c.p79ScheduleDisplayContext(emp,month,planned.meta);
 const selected=c.p79ScheduleDisplayDay(emp,typhoon,context);
