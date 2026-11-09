@@ -1225,6 +1225,19 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
  #view-terminal .p79-ter-head .p79-ter-month,#view-terminal .p79-ter-head .p79-ter-month select{min-width:0}
 }
 
+
+/* Keep the daily Bundle label on one line without widening the two-panel layout. */
+@media (min-width:701px){
+ #view-terminal .p79-ter-day-table{table-layout:fixed;min-width:0;width:100%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(1){width:18%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(2){width:8%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(3){width:12%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(4){width:12%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(5){width:16%;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important}
+ #view-terminal .p79-ter-day-table thead th:nth-child(6){width:12%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(7){width:14%}
+ #view-terminal .p79-ter-day-table thead th:nth-child(8){width:8%}
+}
 /* Desktop: keep both terminal cards left/right; squeeze the rows, not the cards. */
 @media (min-width:701px){
  #view-terminal .p79-ter-table-wrap{container-type:normal;overflow-x:hidden;overflow-y:auto}
@@ -1274,7 +1287,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日｜Bundle 取自 WORKING SHEET 或船舶主檔，不以差額推定</span></div>
      <div class="p79-ter-table-wrap">
-      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>待核差額</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
+      <table class="p79-ter-table p79-ter-day-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>待核差額</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
      </div>
      <p class="p79-ter-notice">原始卸船＋裝船－Bundle 扣除＝作業量；如欄位未提供或仍有差異，顯示「待核對」，不會自行推算成 Bundle。總 Moves 另外含 SHIFT。</p>
     </div>
