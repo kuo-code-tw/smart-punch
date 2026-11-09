@@ -7438,25 +7438,26 @@ async function p79ReadFullVesselData(action,params={}){
   }
 }
 
+const P79_CONFIRMED_VESSEL_NAMES_V110=Object.freeze({WANHAI316:'光春'});
 function p79VesselChineseName(master){
-  const values=[master?.vesselChineseName,master?.chineseName,master?.localName];
-  return String(values.find(v=>/[\u3400-\u9fff]/u.test(String(v||'')))||'').trim();
+  const values=[master?.vesselChineseName,master?.chineseName,master?.localName,master?.shipNameZh,master?.shipChineseName];
+  return values.map(v=>String(v||'').trim()).find(v=>/[\u3400-\u9fff]/u.test(v)&&!/^(?:未提供|無資料|未知|未設定|待補|暫無|無)$/.test(v))||'';
 }
 function p79VesselChineseDisplay(master){
   const own=p79VesselChineseName(master);
   if(own)return own;
-  const key=String(master?.vessel||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-  const matches=(shipMasters||[]).filter(s=>String(s.vessel||'').toUpperCase().replace(/[^A-Z0-9]/g,'')===key).map(p79VesselChineseName).filter(Boolean);
+  const key=String(master?.vessel||master?.shipName||master?.name||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const matches=(shipMasters||[]).filter(s=>String(s.vessel||s.shipName||s.name||'').toUpperCase().replace(/[^A-Z0-9]/g,'')===key).map(p79VesselChineseName).filter(Boolean);
   const unique=[...new Set(matches)];
   if(unique.length===1)return unique[0];
-  try{return JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}')[key]||'';}catch{return '';}
-
+  if(P79_CONFIRMED_VESSEL_NAMES_V110[key])return P79_CONFIRMED_VESSEL_NAMES_V110[key];
+  try{return p79VesselChineseName({localName:JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}')[key]});}catch{return '';}
 }
 
 // Official sailing data is enrichment only; it must never delay saving or readback.
 async function p79RefreshOfficialVesselNames(){
   try{
-    const previous=Number(sessionStorage.getItem('p79_official_vessel_names_v104_at')||0);
+    const previous=Number(sessionStorage.getItem('p79_official_vessel_names_v110_at')||0);
     if(Date.now()-previous<3600000)return;
     const data=await apiGetQuick('publicShipSchedule',{},15000);
     if(data.source!=='port79-wanhai-vessel'||!Array.isArray(data.rows))return;
@@ -7476,7 +7477,7 @@ async function p79RefreshOfficialVesselNames(){
     const cached=JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}');
     Object.entries(names).forEach(([key,name])=>{if(name)cached[key]=name;else delete cached[key];});
     localStorage.setItem('p79_official_vessel_names',JSON.stringify(cached));
-    sessionStorage.setItem('p79_official_vessel_names_v104_at',String(Date.now()));
+    sessionStorage.setItem('p79_official_vessel_names_v110_at',String(Date.now()));
     renderVesselSummary();
   }catch(error){console.warn('官方中文船名暫時無法更新，保留既有名稱');}
 }
