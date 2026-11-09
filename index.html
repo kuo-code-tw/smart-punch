@@ -453,7 +453,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     <p id="p79DashPersonSource" class="p79d-source">個人效率僅依可核對的作業量 Moves 與有效工時計算，避免錯誤推估。</p>
   </section>
   <div id="p79DashMessage" class="p79d-message" role="status" aria-live="polite">正在準備本月資料…</div>
-  <div class="p79d-footnote"><span>🔒 員工上下班刷卡功能維持原狀</span><a href="./history-data/">🗄️ 歷史資料庫</a><a href="./aqc-efficiency/">🚢 船舶明細</a></div>
+  <div class="p79d-footnote"><span>🔒 員工上下班刷卡功能維持原狀</span><a href="./history-data/">🗄️ 歷史資料庫</a><a href="./aqc-efficiency/" onclick="event.preventDefault();if(currentSession){launchSystem('efficiency')}else{document.getElementById('account')?.focus();document.getElementById('status').textContent='請先完成管理員登入，再進入船舶系統。'}">🚢 船舶明細</a></div>
 </section>
       <div class="p79-modern-section-heading"><strong>▦ 功能模組與歷史資料庫</strong><small>依原有帳號權限顯示可用的系統</small></div>
       <div class="p79-modern-search-row">

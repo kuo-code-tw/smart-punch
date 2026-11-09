@@ -14390,7 +14390,7 @@ function p79QueueEfficiencyAuthRecovery(){
 }
 async function initGcPage(){
   if(!requireEfficiencyAccess()){
-    returnToPort79Home('此帳號沒有「效率系統」權限，請由超級管理員到人資管理系統設定。');
+    showGcAccessDenied('尚未取得有效的船舶系統管理員登入憑證。請返回首頁，使用管理員帳號登入，再按「船舶系統」進入。');
     return;
   }
 
@@ -14415,7 +14415,7 @@ async function initGcPage(){
   }catch(e){
     if(e?.ssoAuthRejected){
       clearGcSession();
-      returnToPort79Home('管理員登入狀態已失效，請重新登入。');
+      showGcAccessDenied('管理員登入狀態已失效或權限驗證未通過。請返回首頁重新登入。');
     }else{
       p79EfficiencyAuthReady=false;
       showGcAccessDenied('目前無法連線驗證登入狀態，已保留登入資訊並自動重試；恢復後會自動進入系統。',true);
@@ -14520,7 +14520,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   efficiencyAccessLevel=role==='superadmin'?'manage':normalizeEfficiencyPermissionLevel(s?.systemPermissions?.efficiency,efficiencyAccessLevel);
 
   if(!['admin','superadmin'].includes(role) || efficiencyAccessLevel==='none' || !gcToken){
-    returnToPort79Home('此帳號沒有「效率系統」權限，請由超級管理員到人資管理系統設定。');
+    showGcAccessDenied(!gcToken
+      ? '尚未收到首頁的管理員登入憑證。請返回首頁完成管理員登入，再點「船舶系統」；直接開啟網址不會自動帶入憑證。'
+      : '此管理員帳號目前沒有「效率系統」權限，請由超級管理員至人資管理系統設定。');
     return;
   }
 
