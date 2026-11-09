@@ -48,6 +48,8 @@ const c={
  window,XLSX:X,Date,Set,Map,Math,String,Object,Array,Number,JSON,
  document:{getElementById:id=>id==='app-main-container'?main:id==='month-picker'?picker:null},
  activeRoleTab:'ARMG',activeGroupFilter:'ALL',employees:people,
+ p79ScheduleLeavePolicy:{ready:false},
+ p79ScheduleSpecialSummaryColumns:()=>({typhoon:true,election:true,electionDates:[date(25)]}),
  monthlyScheduleData:monthData,monthlyScheduleMeta:meta,leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
  p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}}),refreshIfStale:async()=>{}}),
