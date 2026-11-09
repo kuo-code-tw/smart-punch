@@ -63,7 +63,7 @@ function setup({save='success',throwsEvent=false,handoff=false,cleanupThrows=fal
      schedules:[{empId,schedule:{[date]:'中',__meta:{}}}]},
     rules:{rows:[chosen],config:{}}};
   },
-  activeReportRows:rows=>rows,typeOptions:()=>[{name:'平日延時加班'}],
+  specialTypes:[],activeReportRows:rows=>rows,typeOptions:()=>[{name:'平日延時加班'}],
   ruleType:()=> '平日延時加班',report,auth:()=>({url:'https://fixture.invalid'}),
   validateLeaveLinkedOvertimeDate:()=>{},
   ruleAttendanceIssue:()=>null,reportPair:()=>({forEmpId:'',forName:''}),
