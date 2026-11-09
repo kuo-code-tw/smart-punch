@@ -1159,7 +1159,11 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-terminal .p79-ter-table tbody tr:hover{background:#eaf8f5}
 #view-terminal .p79-ter-table td.em{font-weight:900;color:#047857}
 #view-terminal .p79-terminal-wharf{font-size:15px;font-weight:900;color:#2563eb!important}
-#view-terminal .p79-terminal-shift{display:inline-flex;align-items:center;padding:4px 9px;border-radius:8px;background:#ecfdf5;color:#047857;font-weight:850}
+#view-terminal .p79-terminal-shift{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;border-radius:8px;background:#f1f5f9;color:#475569;font-weight:900;white-space:nowrap;line-height:1.45}
+#view-terminal .p79-terminal-shift.shift-early{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
+#view-terminal .p79-terminal-shift.shift-middle{background:#ffedd5;color:#c2410c;border:1px solid #fed7aa}
+#view-terminal .p79-terminal-shift.shift-night{background:#f3e8ff;color:#7e22ce;border:1px solid #e9d5ff}
+#view-terminal .p79-terminal-shift.shift-unknown{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
 #view-terminal .p79-terminal-empty{padding:24px 12px!important;white-space:normal;color:#64748b!important}
 #view-terminal .p79-ter-columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 #view-terminal .p79-ter-columns .p79-ter-box{min-width:0}
@@ -15456,7 +15460,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-reason-filter-v5"></script>
+<script src="./terminal-ops.js?v=20261109-shift-colors-v6"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
