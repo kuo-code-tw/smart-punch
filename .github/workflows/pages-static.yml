@@ -53,6 +53,7 @@ jobs:
       # immediate pre-push main instead of silently ignoring existing failures.
       - name: Verify vessel dashboard before publishing
         run: |
+          node tests/route-service-summary.cjs
           node tests/vessel-dashboard-row-removal.cjs
           node tests/dashboard-working-report-audit.cjs
           node tests/vessel-dashboard-month-scope-20261102.cjs

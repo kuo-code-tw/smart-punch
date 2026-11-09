@@ -1029,17 +1029,26 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 
 <section id="view-compare" class="hidden space-y-4">
   <div class="card p-4 space-y-3">
-    <h2 class="text-xl font-black">🧭 航線資料</h2>
-    <p class="text-sm text-slate-500">自動讀取已匯入 WORKING SHEET 的 SERVICE(I/E):，支援所有航線代碼，進口與出口分別顯示。</p>
+    <h2 class="text-xl font-black">🧭 航線統計</h2>
+    <p class="text-sm text-slate-500">依 WORKING SHEET 的 SERVICE(I/E) 按航線統計，進出口艘次及卸船／裝船櫃數分開計算；點選航線才展開船舶明細。</p>
     <div class="flex flex-wrap gap-3 items-center">
-      <label>搜尋航線／船名／航次 <input id="routeSearch" class="border rounded-xl px-3 py-2" placeholder="輸入任意航線或船名" oninput="renderRouteData()"></label>
-      <span id="routeDataCount" class="text-sm text-slate-500"></span>
+      <label>搜尋航線 <input id="routeSearch" class="border rounded-xl px-3 py-2" placeholder="例如 FOC、JTT" oninput="renderRouteData()"></label>
+      <label>統計月份 <select id="routeMonthFilter" class="border rounded-xl px-3 py-2" onchange="renderRouteData()"><option value="">全部月份</option></select></label>
+      <span id="routeDataCount" class="text-sm text-slate-600"></span>
     </div>
-    <div class="overflow-auto"><table class="tbl w-full text-center min-w-[850px]">
-      <thead><tr><th>WORKING NO.</th><th>船名</th><th>進口航次</th><th>出口航次</th><th>進口航線 SERVICE(I)</th><th>出口航線 SERVICE(E)</th><th>來源檔案</th></tr></thead>
+    <div class="overflow-auto"><table class="tbl w-full text-center min-w-[760px]">
+      <thead><tr><th>航線 SERVICE</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead>
       <tbody id="routeDataBody"></tbody>
     </table></div>
-    <p class="text-xs text-slate-500">未提供表示已存資料沒有 SERVICE 欄位；重新匯入原始 WORKING SHEET 後會自動補入。</p>
+    <p id="routeStatsWarning" class="text-xs text-amber-700"></p>
+    <p class="text-xs text-slate-500">每筆 WORKING NO. 依進、出口各計一次；櫃數讀取 WORKING SHEET 的 DISCHARGE／LOAD，不把 SHIFT 算入。原始資料缺 SERVICE 時列「未分類」，不推測航線。</p>
+  </div>
+  <div id="routeDetailPanel" class="card p-4 space-y-3 hidden">
+    <div class="flex justify-between gap-3 items-center"><h3 id="routeDetailTitle" class="text-lg font-bold"></h3><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute(-1)">關閉明細</button></div>
+    <div class="overflow-auto"><table class="tbl w-full text-center min-w-[850px]">
+      <thead><tr><th>WORKING NO.</th><th>船名</th><th>進口／出口</th><th>航次</th><th>櫃數</th><th>作業日期</th><th>來源檔案</th></tr></thead>
+      <tbody id="routeDetailBody"></tbody>
+    </table></div>
   </div>
 </section>
 
@@ -9896,39 +9905,160 @@ function parseWorkingReportProductivityByLabels(ws){
 
 function parseWorkingSheetService(ws){
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  let separateI='',separateE='';
+  const splitCodes=value=>String(value??'').trim().split(/\s*\/\s*|\s*[,，、]\s*/).map(v=>v.trim()).filter(Boolean);
+  const isOtherLabel=value=>/^(?:VOYAGE|SERVICE\s*\(|WHARF|M\/V|MV\.?|NO\.?|TFC|COMMENCE|COMPLETE|UNLASHING|LASHING)(?:\b|[.(:：])/i.test(String(value||'').trim());
+  function readValues(row,c,inline,maxValues){
+    const values=splitCodes(inline);
+    for(let k=c+1;k<Math.min(row.length,c+11)&&values.length<maxValues;k++){
+      const value=String(row[k]??'').trim();
+      if(!value)continue;
+      if(isOtherLabel(value))break;
+      values.push(...splitCodes(value));
+    }
+    return values.slice(0,maxValues);
+  }
   for(const row of rows){
     for(let c=0;c<row.length;c++){
-      const label=String(row[c]??'').trim();
-      const match=label.match(/^SERVICE\s*\(\s*I\s*\/\s*E\s*\)\s*[:：]?\s*(.*)$/i);
-      if(!match)continue;
-      const values=[];
-      if(match[1].trim())values.push(match[1].trim());
-      for(let k=c+1;k<row.length && values.length<2;k++){
-        const value=String(row[k]??'').trim();
-        if(!value)continue;
-        if(/[:：]$/.test(value)||/^(?:VOYAGE|WHARF|MV\.|NO\.|UNLASHING|LASHING)\b/i.test(value))break;
-        values.push(value);
+      const label=String(row[c]??'').trim().replace(/\s+/g,' ');
+      const combined=label.match(/^SERVICE\s*\(\s*I\s*\/\s*E\s*\)\s*[:：]?\s*(.*)$/i);
+      if(combined){
+        const v=readValues(row,c,combined[1],2);
+        if(v.length)return {serviceI:v[0]||'',serviceE:v[1]||v[0]||''};
+        continue;
       }
-      // Some templates store I/E together in one cell, others use two cells.
-      const parts=values.length===1?values[0].split(/\s*\/\s*/):values;
-      return {serviceI:String(parts[0]||'').trim(),serviceE:String(parts[1]??parts[0]??'').trim()};
+      const single=label.match(/^SERVICE\s*\(\s*(I|E)\s*\)\s*[:：]?\s*(.*)$/i);
+      if(single){
+        const value=readValues(row,c,single[2],1)[0]||'';
+        if(single[1].toUpperCase()==='I')separateI=value||separateI;
+        else separateE=value||separateE;
+      }
     }
   }
-  return {serviceI:'',serviceE:''};
+  return {serviceI:separateI,serviceE:separateE||separateI};
+}
+function p79RouteServiceCode(value){
+  const s=String(value??'').trim().replace(/\s+/g,' ').toUpperCase();
+  return !s||/^(?:-|—|--|N\/A|NA|NULL|未提供|未知|未設定)$/.test(s)?'':s;
+}
+function p79RouteQuantity(...values){
+  for(const v of values){
+    if(v===undefined||v===null||String(v).trim()==='')continue;
+    const n=Number(v);
+    if(Number.isFinite(n)&&n>=0&&n<=1000000)return n;
+  }
+  return null;
+}
+function routeStatsForShips(masters){
+  const unique=new Map();
+  for(const ship of masters||[]){
+    if(!ship||typeof ship!=='object')continue;
+    const ws=ship.workingSheetSource&&typeof ship.workingSheetSource==='object'?ship.workingSheetSource:{};
+    const no=String(ship.workingNo||ship.sourceWorkingNo||'').trim();
+    const key=no||[ship.vessel,ship.voyageI,ship.voyageE,ship.compareDate||ship.firstDate,ship.wharf].map(v=>String(v||'')).join('|');
+    const job={
+      workingNo:no,vessel:String(ship.vessel||''),voyageI:String(ship.voyageI||''),
+      voyageE:String(ship.voyageE||''),date:String(ship.compareDate||ws.compareDate||ship.firstDate||'').slice(0,10),
+      sourceFileName:String(ship.sourceFileName||ws.sourceFileName||''),
+      serviceI:p79RouteServiceCode(ws.serviceI||ship.serviceI),
+      serviceE:p79RouteServiceCode(ws.serviceE||ship.serviceE),
+      disc:p79RouteQuantity(ws.disc,ship.importAudit?.disc,ship.disc),
+      load:p79RouteQuantity(ws.load,ship.importAudit?.load,ship.load)
+    };
+    const score=Number(!!job.serviceI)+Number(!!job.serviceE)+Number(job.disc!==null)+Number(job.load!==null);
+    if(!unique.has(key)||score>unique.get(key).score)unique.set(key,{job,score});
+  }
+  const byRoute=new Map();
+  for(const {job} of unique.values()){
+    for(const direction of ['I','E']){
+      const code=job['service'+direction]||'未分類';
+      if(!byRoute.has(code))byRoute.set(code,{
+        route:code,importCalls:0,exportCalls:0,disc:0,load:0,
+        missingDisc:0,missingLoad:0,jobKeys:new Set(),details:[]
+      });
+      const summary=byRoute.get(code);
+      summary.jobKeys.add(job.workingNo||[job.vessel,job.voyageI,job.voyageE,job.date].join('|'));
+      const isImport=direction==='I',qty=isImport?job.disc:job.load;
+      if(isImport){
+        summary.importCalls++;
+        if(qty===null)summary.missingDisc++;else summary.disc+=qty;
+      }else{
+        summary.exportCalls++;
+        if(qty===null)summary.missingLoad++;else summary.load+=qty;
+      }
+      summary.details.push({
+        workingNo:job.workingNo,vessel:job.vessel,direction:isImport?'進口':'出口',
+        voyage:isImport?job.voyageI:job.voyageE,quantity:qty,date:job.date,sourceFileName:job.sourceFileName
+      });
+    }
+  }
+  return [...byRoute.values()].map(row=>({
+    route:row.route,importCalls:row.importCalls,exportCalls:row.exportCalls,
+    disc:row.disc,load:row.load,total:row.disc+row.load,
+    missingDisc:row.missingDisc,missingLoad:row.missingLoad,shipCalls:row.jobKeys.size,
+    details:row.details
+  })).sort((a,b)=>a.route==='未分類'?1:b.route==='未分類'?-1:a.route.localeCompare(b.route,'en',{numeric:true}));
+}
+let p79RouteSelected='';
+let p79RouteSummaryCache=[];
+function p79RouteMonthOptions(){
+  const select=document.getElementById('routeMonthFilter');
+  if(!select)return;
+  const year=getPort79Year();
+  const months=new Set();
+  for(const s of shipMasters||[]){
+    if(!shipMasterDateMatchesYear(s,year))continue;
+    const value=String(s.compareMonth||s.workingSheetSource?.compareMonth||s.compareDate||s.firstDate||'').slice(0,7);
+    if(/^20\d{2}-(?:0[1-9]|1[0-2])$/.test(value))months.add(value);
+  }
+  const previous=select.value;
+  select.innerHTML='<option value="">全部月份</option>'+[...months].sort().reverse()
+    .map(m=>'<option value="'+m+'">'+m.replace('-',' 年 ')+' 月</option>').join('');
+  select.value=months.has(previous)?previous:'';
 }
 function routeDataRows(){
-  const query=String(document.getElementById('routeSearch')?.value||'').trim().toUpperCase();
-  return (shipMasters||[]).filter(s=>shipMasterDateMatchesYear(s,getPort79Year())).map(s=>{
-    const ws=s.workingSheetSource||{};
-    return {...s,serviceI:String(ws.serviceI??s.serviceI??''),serviceE:String(ws.serviceE??s.serviceE??'')};
-  }).filter(s=>!query||[s.workingNo,s.vessel,s.voyageI,s.voyageE,s.serviceI,s.serviceE].some(v=>String(v||'').toUpperCase().includes(query)))
-    .sort((a,b)=>String(b.workingNo||'').localeCompare(String(a.workingNo||''),undefined,{numeric:true}));
+  const year=getPort79Year(),month=document.getElementById('routeMonthFilter')?.value||'';
+  return (shipMasters||[]).filter(s=>shipMasterDateMatchesYear(s,year)&&(!month||shipMasterDateMatchesMonth(s,month)));
+}
+function p79SelectRoute(index){
+  if(index<0)p79RouteSelected='';
+  else if(p79RouteSummaryCache[index])p79RouteSelected=p79RouteSelected===p79RouteSummaryCache[index].route?'':p79RouteSummaryCache[index].route;
+  renderRouteData();
 }
 function renderRouteData(){
   const body=document.getElementById('routeDataBody');if(!body)return;
-  const rows=routeDataRows();
-  body.innerHTML=rows.length?rows.map(s=>`<tr>${[s.workingNo,s.vessel,s.voyageI,s.voyageE,s.serviceI||'未提供',s.serviceE||'未提供',s.sourceFileName||s.workingSheetSource?.sourceFileName||'—'].map(v=>`<td>${esc(v||'—')}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="7" class="p-6 text-slate-500">沒有符合的船舶航線資料</td></tr>';
-  const count=document.getElementById('routeDataCount');if(count)count.textContent=`共 ${rows.length} 筆`;
+  p79RouteMonthOptions();
+  const all=routeStatsForShips(routeDataRows());
+  const query=String(document.getElementById('routeSearch')?.value||'').trim().toUpperCase();
+  const rows=all.filter(s=>!query||s.route.toUpperCase().includes(query));
+  p79RouteSummaryCache=rows;
+  const fmt=n=>Number(n||0).toLocaleString('zh-TW');
+  const quantity=(n,missing)=>fmt(n)+(missing?' *':'');
+  body.innerHTML=rows.length?rows.map((s,i)=>
+    '<tr><td class="font-bold">'+esc(s.route)+'</td><td>'+fmt(s.importCalls)+'</td><td>'+fmt(s.exportCalls)+'</td>'+
+    '<td>'+quantity(s.disc,s.missingDisc)+'</td><td>'+quantity(s.load,s.missingLoad)+'</td>'+
+    '<td>'+quantity(s.total,s.missingDisc+s.missingLoad)+'</td>'+
+    '<td><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute('+i+')">查看明細 ('+fmt(s.shipCalls)+')</button></td></tr>'
+  ).join(''):'<tr><td colspan="7" class="p-6 text-slate-500">目前沒有符合條件的航線統計</td></tr>';
+  const count=document.getElementById('routeDataCount');
+  if(count)count.textContent='航線 '+fmt(rows.length)+' 條｜進口 '+fmt(rows.reduce((n,s)=>n+s.importCalls,0))+
+    ' 艘次｜出口 '+fmt(rows.reduce((n,s)=>n+s.exportCalls,0))+' 艘次';
+  const unknown=all.find(s=>s.route==='未分類');
+  const missing=all.reduce((n,s)=>n+s.missingDisc+s.missingLoad,0);
+  const warning=document.getElementById('routeStatsWarning');
+  if(warning)warning.textContent=(unknown?'尚有 '+fmt(unknown.importCalls)+' 筆進口、'+fmt(unknown.exportCalls)+' 筆出口的 SERVICE 未提供，已列「未分類」，需由原始 WORKING SHEET 補入。':'')+
+    (missing?' 部分 '+fmt(missing)+' 筆進／出口缺少原始櫃數，表內「*」為已知數值的小計，不能視為完整櫃數。':'');
+  const panel=document.getElementById('routeDetailPanel');
+  const selected=rows.find(s=>s.route===p79RouteSelected);
+  if(panel)panel.classList.toggle('hidden',!selected);
+  if(!selected)return;
+  const title=document.getElementById('routeDetailTitle');
+  if(title)title.textContent=selected.route+'｜'+selected.shipCalls+' 筆船舶作業';
+  const detailBody=document.getElementById('routeDetailBody');
+  if(detailBody)detailBody.innerHTML=selected.details.map(d=>
+    '<tr>'+[d.workingNo,d.vessel,d.direction,d.voyage,d.quantity===null?'未提供':fmt(d.quantity),d.date,d.sourceFileName]
+      .map(v=>'<td>'+esc(v||'—')+'</td>').join('')+'</tr>'
+  ).join('');
 }
 
 function parseWorkingSheetSummary(book){
@@ -11039,6 +11169,8 @@ async function importExcel(file) {
       voyageI:String(summary.voyageI||'').trim(),
       voyageE:String(summary.voyageE||'').trim(),
       wharf:String(summary.wharf||'').trim(),
+      serviceI:String(summary.serviceI||''),serviceE:String(summary.serviceE||''),
+      disc:num(audit.disc),load:num(audit.load),
       totalContainers:num(summary.totalContainers),
       hatches:num(summary.hatches),
       totalMoves:num(summary.totalMoves),
