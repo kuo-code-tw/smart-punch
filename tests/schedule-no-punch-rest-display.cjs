@@ -32,7 +32,11 @@ const mock={
  scheduleLeaveTypeText:()=> '年',
  p79ScheduleSpecialNoPunchCode:()=> '',
  p79VisibleRestKind:(s,label)=>/^(休|例|國)/.exec(label||s)?.[1]||'',
- p79ScheduleRestClient:()=>({status:()=>({evidence:{complete,days:{}}})}),
+ // Synthetic complete-proof fixture: a verified zero-card rest is not
+ // equivalent to merely loading a page with no matching punches.
+ p79ScheduleRestClient:()=>({status:()=>({evidence:{complete,days:{},
+  absenceAuditReady:complete,
+  absenceConfirmedDays:complete&&state==='rest'?{[id+'|'+day]:true}:{}}})}),
  scheduleTaipeiTodayKey:()=> '2026-11-01',
  monthlyScheduleData:{[id]:{[day]:'早'}},
  monthlyScheduleMeta:{[id]:{[day]:{}}}
