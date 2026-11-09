@@ -88,7 +88,10 @@ ownLeave=null;
 for(const kind of ['休','例','國']){
  fullRoster[day]=kind;
  result=c.p79ScheduleDisplayDay({id},day,context());
- assert.equal(result.visibleCode,kind,'true statutory '+kind+' is preserved when no work');
+ const expected=kind==='國'?'休':kind;
+ assert.equal(result.visibleCode,expected,
+   kind==='國'?'November has no statutory national quota: stale bare 國 is displayed as 休':
+   'valid original '+kind+' is preserved when no work');
 }
 fullRoster[day]='晚';
 assert(!html.includes("postCloud({action:'deleteOvertime"),'displaying absence never posts a delete to cloud');
