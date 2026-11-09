@@ -6753,7 +6753,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
               ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
               ${selected.punchPending?'<span class="text-[9px] text-amber-700" title="僅有單邊打卡或配對不明，保留原始資料待核對">打卡待核</span>':''}
-              ${selected.attendanceUnverified?'<span class="text-[9px] text-amber-700" title="歷史原始考勤尚未完整讀齊，不得推定已出勤或休假">考勤未核</span>':''}
+              ${'' /* 考勤讀取中／失敗於排班表頂部統一提示，勿每人每日反覆顯示考勤未核；唯真正單邊卡保留打卡待核。 */}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
             </td>
@@ -7506,15 +7506,21 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const noPunchRest=(!hasOfficialOvertimeReport||verifiedNoWork)&&
         p79ScheduleNoPunchRest(emp.id,dayStr,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,attendanceState);
       const manualNoPunch=false; // 已核實整班無卡，由 noPunchRest 直接同步畫面及匯出。
-      // 原本就排休／例／國的人，絕不能因為歷史考勤尚未讀完或隔日單卡，
-      // 被渲染成「打卡待核」。真的有完整打卡時仍應恢復實際出勤。
+      // A page/navigation reload starts with attendanceEvidence.complete=false.
+      // It is NOT a confirmed single-sided punch. Never repaint every past
+      // scheduled workday as 打卡待核 while the official source is loading.
+      // Only a completed attendance audit that found an actual missing pair
+      // may display 打卡待核; a verified no-punch day still becomes 休.
       const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
-      const punchPending=!scheduledRest&&attendanceState==='missing'&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
-      const attendanceUnverified=!scheduledRest&&ctx.attendanceEvidence?.complete!==true&&dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const evidenceReady=ctx.attendanceEvidence?.complete===true;
+      const punchPending=!scheduledRest&&evidenceReady&&attendanceState==='missing'&&
+        dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
+      const attendanceUnverified=!scheduledRest&&!evidenceReady&&
+        dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const shiftVal=noPunchRest?'休':actualShift||
         (verifiedRestAttendance||pairedWork&&rosterShift==='待排班'||pairedWork&&['休','例','國'].includes(rosterShift)?'已出勤':
         scheduledRest?rosterShift:
-        punchPending||attendanceUnverified?'打卡待核':rosterShift);
+        punchPending?'打卡待核':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
       // shared automatic allocation instead of resetting a valid 國 to 休.
       const verifiedOffKind=ctx.restBalance.ledger?.find(x=>x.date===dayStr&&x.kind==='off')?.category;
@@ -7540,7 +7546,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         dayMeta={...dayMeta};
         delete dayMeta.overtimeReport;delete dayMeta.overtime;delete dayMeta.forEmpId;delete dayMeta.forName;
       }
-      const coverageShift=noPunchRest||unworkedOvertime||punchPending||attendanceUnverified?'':p79CoverageShift(emp.id,dayStr);
+      // A temporary unread attendance source must not hide an existing
+      // roster/coverage assignment. Only real missing punches block it.
+      const coverageShift=noPunchRest||unworkedOvertime||punchPending?'':p79CoverageShift(emp.id,dayStr);
       const displayShift=coverageShift||(noNationalQuota&&shiftVal==='國'?'休':shiftVal);
       const substituteLabel=ownApprovedLeave||noPunchRest||unworkedOvertime?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
       const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
@@ -7553,7 +7561,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
         (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
       const overtimeLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
-        ((punchPending||attendanceUnverified)&&!hasOfficialOvertimeReport)?'':substituteLabel;
+        (punchPending&&!hasOfficialOvertimeReport)?'':substituteLabel;
       const proof=ctx.attendanceEvidence?.nightSplitRestConfirmed?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
       const nightSplitLabel=typeof p79NightSplitRestLabel==='function'
         ?p79NightSplitRestLabel(originalMeta,rosterShift,automaticRestMeta[dayStr],ownApprovedLeave,overtimeLabel,proof):'';
@@ -7575,6 +7583,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':unworkedOvertime?'已核實整班無出勤（加班不計）':
         actualShift&&shownShift===actualShift?'已配對正式考勤推定':
         coverageShift&&shownShift===coverageShift?'代班班別':
+        attendanceUnverified?'暫顯原排班（正式考勤同步中；尚未確認出勤或無卡判休）':
         shownShift===rosterShift?'原始儲存班表':
         noPunchRest?'已核實無出勤':
         attendanceUnverified?'考勤尚未完整讀取':'排班／考勤狀態計算';
