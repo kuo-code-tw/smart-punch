@@ -4,10 +4,10 @@ const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 assert(html.includes('data-tab="terminal"'));
 assert(html.includes('id="view-terminal"'));
-for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus']){
+for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-bundle-reason-mobile-v4'));
+assert(html.includes('./terminal-ops.js?v=20261109-reason-filter-v5'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(html.includes('<th>Bundle 扣除</th>'));
 assert(html.includes('<th>原因分類（點選修改）</th>'));
@@ -75,6 +75,8 @@ assert(elements.terminalShiftBody.innerHTML.includes('晚班'));
 assert(elements.terminalStopBody.innerHTML.includes('設備故障'));
 assert(elements.terminalDayBody.innerHTML.includes('p79-ter-bundle'));
 assert(elements.terminalStopDetailBody.innerHTML.includes('setReasonCategory'));
+assert(elements.terminalReasonFilter.innerHTML.includes('全部原因'));
+assert(!elements.terminalStopDetailBody.innerHTML.includes('已手動分類'));
 (async()=>{
  let calls=[];
  ctx.apiGetQuick=async(action,args,timeout)=>{
