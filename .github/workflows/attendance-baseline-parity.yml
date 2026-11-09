@@ -9,10 +9,16 @@ on:
       - '.github/workflows/attendance-baseline-parity.yml'
 permissions:
   contents: read
+
 jobs:
-  baseline-parity:
+  suites:
+    name: Run ${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [baseline, candidate]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,42 +26,68 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run full test suite on clean main and candidate, block new failures
+      - name: Test all files and capture failures
         shell: bash
         run: |
           set -euo pipefail
-          baseline_dir="$(mktemp -d)"
-          git worktree add --detach "$baseline_dir" origin/main
-          run_suite() {
-            local folder="$1" output="$2" label="$3" n=0 failed=0
-            : > "$output"
-            pushd "$folder" >/dev/null
-            for test_file in tests/*.cjs; do
-              n=$((n+1))
-              if timeout --signal=TERM --kill-after=5s 30s node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
-                :
-              else
-                failed=$((failed+1))
-                printf '%s\n' "$test_file" >> "$output"
-                echo "$label FAILED: $test_file"
-                tail -n 6 /tmp/p79-parity-last-test.log || true
-              fi
-            done
-            popd >/dev/null
-            LC_ALL=C sort -u "$output" -o "$output"
-            echo "$label SUMMARY: $n tests / $failed failed"
-          }
-          run_suite "$baseline_dir" /tmp/p79-main-failures.txt MAIN
-          run_suite "$GITHUB_WORKSPACE" /tmp/p79-candidate-failures.txt CANDIDATE
-          LC_ALL=C comm -13 /tmp/p79-main-failures.txt /tmp/p79-candidate-failures.txt > /tmp/p79-new-failures.txt
-          LC_ALL=C comm -23 /tmp/p79-main-failures.txt /tmp/p79-candidate-failures.txt > /tmp/p79-fixed-failures.txt
+          test_dir="$GITHUB_WORKSPACE"
+          if [ "${{ matrix.target }}" = "baseline" ]; then
+            test_dir="$(mktemp -d)"
+            git worktree add --detach "$test_dir" origin/main
+          fi
+          failures="$RUNNER_TEMP/failures-${{ matrix.target }}.txt"
+          logfile="$RUNNER_TEMP/last-test-${{ matrix.target }}.log"
+          : > "$failures"
+          cd "$test_dir"
+          count=0
+          failed=0
+          for test_file in tests/*.cjs; do
+            count=$((count+1))
+            if timeout --signal=TERM --kill-after=5s 30s node "$test_file" > "$logfile" 2>&1; then
+              :
+            else
+              failed=$((failed+1))
+              printf '%s\n' "$test_file" >> "$failures"
+              echo "${{ matrix.target }} FAILED: $test_file"
+              tail -n 6 "$logfile" || true
+            fi
+          done
+          LC_ALL=C sort -u "$failures" -o "$failures"
+          echo "${{ matrix.target }} SUMMARY: $count tests / $failed failed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: failures-${{ matrix.target }}
+          path: ${{ runner.temp }}/failures-${{ matrix.target }}.txt
+          retention-days: 1
+
+  baseline-parity:
+    name: baseline-parity
+    needs: suites
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download baseline and candidate results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: failures-*
+          path: failures
+          merge-multiple: true
+      - name: Reject only newly failing tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.suites.result }}" = "success"
+          test -f failures/failures-baseline.txt
+          test -f failures/failures-candidate.txt
+          LC_ALL=C comm -13 failures/failures-baseline.txt failures/failures-candidate.txt > /tmp/p79-new-failures.txt
+          LC_ALL=C comm -23 failures/failures-baseline.txt failures/failures-candidate.txt > /tmp/p79-fixed-failures.txt
           echo '=== New regressions relative to main ==='
           cat /tmp/p79-new-failures.txt
           echo '=== Fixed former main failures ==='
           cat /tmp/p79-fixed-failures.txt
-          echo '=== Detailed baseline ==='
-          echo "baseline failures: $(wc -l </tmp/p79-main-failures.txt)"
-          echo "candidate failures: $(wc -l </tmp/p79-candidate-failures.txt)"
+          echo "baseline failures: $(wc -l <failures/failures-baseline.txt)"
+          echo "candidate failures: $(wc -l <failures/failures-candidate.txt)"
           echo "new failures: $(wc -l </tmp/p79-new-failures.txt)"
           if [ -s /tmp/p79-new-failures.txt ]; then
             echo "::error::New integration regressions detected versus main"
