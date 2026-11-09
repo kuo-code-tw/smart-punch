@@ -46,6 +46,15 @@ for(const [label,expected] of Object.entries({
  assert.equal(ctx.normalizeImportedScheduleShift(label),expected,
   'import of generated Excel shift '+label+' must be reversible');
 }
+for(let emp=0;emp<83;emp++){
+ for(let n=1;n<=31;n++){
+  const shifts=['早','中','晚'];
+  const input=shifts[(emp+n)%3];
+  const expected={早:'08-16',中:'16-24',晚:'24-08'}[input];
+  assert.equal(ctx.p79ScheduleExcelShiftCode(input),expected,
+   '83-person monthly Excel shift conversion: employee '+emp+' day '+n);
+ }
+}
 assert.equal(ctx.normalizeImportedScheduleShift('08-16＋延04-08'),null,
  'combined overtime must not silently become a roster edit');
 assert.equal(ctx.normalizeImportedScheduleShift('延04-08'),null,
@@ -54,4 +63,4 @@ assert(html.includes("row[String(d)]=p79ScheduleExcelShiftCode(selected.visibleC
  'Excel writer must use the time conversion');
 assert(html.includes("text:'颱日：原班別仍為 '+row[String(d)]"),
  'Excel notes must match the displayed Excel value');
-console.log('PASS Excel 早→08-16 中→16-24 晚→24-08; Nov7 延04-08 / Nov8 08-16; combined reports, leaves, statuses, reimport and cloud safety');
+console.log('PASS 83 employees × 31 days; Excel 早→08-16 中→16-24 晚→24-08; Nov7 延04-08 / Nov8 08-16; combined reports, leaves, statuses, reimport and cloud safety');
