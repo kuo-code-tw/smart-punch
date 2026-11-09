@@ -4,8 +4,9 @@ const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const home=fs.readFileSync('index.html','utf8');
 function fn(n){const a=html.indexOf('function '+n+'(');assert(a>=0,n);const b=html.indexOf('\n}',a);assert(b>a,'body '+n);return html.slice(a,b+2)}
 const fake={
-  routeSearch:{value:''},routeDataBody:{innerHTML:''},routeDataCount:{textContent:''},
-  routeMonthFilter:{value:'',innerHTML:''},routeStatsWarning:{textContent:''},
+  routeSearch:{value:''},routeCardsGrid:{innerHTML:''},routeDataCount:{textContent:''},
+  routeMonthFilter:{value:'2026-11',innerHTML:'',dataset:{p79Year:'2026'}},
+  routeMonthStatus:{dataset:{},textContent:''},routeStatsWarning:{textContent:''},
   routeDetailPanel:{classList:{toggle(){}}},routeDetailTitle:{textContent:''},
   routeDetailBody:{innerHTML:''}
 };
@@ -20,10 +21,12 @@ const c={
   num:v=>Number(v)||0,
 };
 vm.createContext(c);
-for(const n of [
-  'parseWorkingSheetService','p79RouteServiceCode','p79RouteQuantity','routeStatsForShips',
-  'p79RouteMonthOptions','routeDataRows','renderRouteData','mergeShipMasterOne'
-]) vm.runInContext(fn(n),c);
+for(const n of ['parseWorkingSheetService','p79RouteServiceCode','p79RouteQuantity','routeStatsForShips','mergeShipMasterOne'])
+  vm.runInContext(fn(n),c);
+const routeStart=html.indexOf("let p79RouteSelected='';");
+const routeEnd=html.indexOf('function parseWorkingSheetSummary(book){',routeStart);
+assert(routeStart>=0&&routeEnd>routeStart);
+vm.runInContext(html.slice(routeStart,routeEnd),c);
 const parse=rows=>JSON.parse(JSON.stringify(c.parseWorkingSheetService(rows)));
 assert.deepEqual(parse([['SERVICE(I/E):','','FOC','','JTT']]),{serviceI:'FOC',serviceE:'JTT'});
 assert.deepEqual(parse([['SERVICE ( I / E )： ABC-7 / XYZ9']]),{serviceI:'ABC-7',serviceE:'XYZ9'});
@@ -49,12 +52,13 @@ assert.equal(by.FOC.load,6);
 assert.equal(by.JTT.exportCalls,1);
 assert.equal(by.JTT.load,4);
 c.renderRouteData();
-assert(fake.routeDataBody.innerHTML.includes('ABC'));
-assert(fake.routeDataBody.innerHTML.includes('FOC'));
-assert(!fake.routeDataBody.innerHTML.includes('<script>'));
+assert(fake.routeCardsGrid.innerHTML.includes('ABC'));
+assert(fake.routeCardsGrid.innerHTML.includes('FOC'));
+assert(fake.routeCardsGrid.innerHTML.includes('p79-route-card'));
+assert(!fake.routeCardsGrid.innerHTML.includes('<script>'));
 fake.routeSearch.value='foc';c.renderRouteData();
-assert(!fake.routeDataBody.innerHTML.includes('>ABC<'));
-assert.equal(fake.routeDataCount.textContent,'航線 1 條｜進口 2 艘次｜出口 1 艘次');
+assert(!fake.routeCardsGrid.innerHTML.includes('>ABC<'));
+assert.equal(fake.routeDataCount.textContent,'2026 年 11 月｜1 條航線｜進口 2 艘次｜出口 1 艘次');
 assert(!html.includes('compareMonthlyExcel'));
 assert(!html.includes('parseMonthlyActualRows'));
 assert(!html.includes('monthlyPasteBox'));

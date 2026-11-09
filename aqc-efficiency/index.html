@@ -1027,21 +1027,63 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 
 </main>
 
+<style id="p79-route-card-styles">
+#view-compare .p79-route-board{border:1px solid #dbe7f3;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:20px;padding:20px;box-shadow:0 8px 30px rgba(15,23,42,.045)}
+#view-compare .p79-route-heading{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:900;color:#0f172a}
+#view-compare .p79-route-subtitle{font-size:13px;color:#64748b;margin-top:6px;line-height:1.8}
+#view-compare .p79-route-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:18px 0 12px}
+#view-compare .p79-route-toolbar label{display:grid;gap:5px;font-size:12px;font-weight:750;color:#475569}
+#view-compare .p79-route-toolbar input,#view-compare .p79-route-toolbar select{border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;background:#fff;font-size:14px;min-width:180px;color:#0f172a}
+#view-compare .p79-route-summary{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:10px 0 18px}
+#view-compare .p79-route-summary #routeDataCount{font-size:13px;font-weight:800;color:#334155;background:#eaf1ff;border-radius:999px;padding:8px 12px}
+#view-compare .p79-route-source{font-size:12px;color:#64748b}
+#view-compare .p79-route-source[data-state="loading"]{color:#1d4ed8}
+#view-compare .p79-route-source[data-state="local"]{color:#a16207}
+#view-compare .p79-route-source[data-state="cloud"]{color:#047857}
+#view-compare .p79-route-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+#view-compare .p79-route-card{position:relative;overflow:hidden;background:#fff;border:1px solid #dce5f0;border-top:5px solid var(--route-accent,#2563eb);border-radius:19px;padding:17px 18px;box-shadow:0 5px 20px rgba(15,23,42,.055);transition:box-shadow .2s,transform .2s}
+#view-compare .p79-route-card:hover{box-shadow:0 13px 30px rgba(15,23,42,.11);transform:translateY(-2px)}
+#view-compare .p79-route-card-head{display:flex;align-items:center;gap:12px;margin-bottom:15px}
+#view-compare .p79-route-card-icon{display:grid;place-items:center;width:43px;height:43px;border-radius:12px;background:var(--route-soft,#eff6ff);font-size:22px}
+#view-compare .p79-route-card-caption{color:#64748b;font-size:11px;font-weight:800;letter-spacing:.07em}
+#view-compare .p79-route-card-name{font-size:24px;font-weight:900;line-height:1.25;color:#132238;overflow-wrap:anywhere}
+#view-compare .p79-route-calls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#view-compare .p79-route-call{display:flex;justify-content:space-between;align-items:center;gap:8px;border-radius:12px;padding:12px;background:#eff6ff;color:#1e40af}
+#view-compare .p79-route-call.out{background:#fff3e6;color:#9a3412}
+#view-compare .p79-route-call-label{font-size:12px;font-weight:800}
+#view-compare .p79-route-call strong{font-size:23px;font-weight:900}
+#view-compare .p79-route-amounts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+#view-compare .p79-route-metric{padding:10px 11px;background:#f5f7fa;border-radius:11px}
+#view-compare .p79-route-metric small{display:block;color:#64748b;font-size:11px;font-weight:750;margin-bottom:4px}
+#view-compare .p79-route-metric strong{font-size:19px;color:#334155;font-weight:900}
+#view-compare .p79-route-grand{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:13px;border:1px solid #bbecd6;border-radius:12px;background:linear-gradient(110deg,#eafbf1,#f5fff9);color:#047857}
+#view-compare .p79-route-grand small{display:block;font-size:12px;font-weight:800}
+#view-compare .p79-route-grand strong{font-size:26px;line-height:1.15;font-weight:900}
+#view-compare .p79-route-detail-button{width:100%;margin-top:13px;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 12px;border-radius:12px;background:var(--route-soft,#eff6ff);color:var(--route-accent,#2563eb);font-size:13px;font-weight:850;border:1px solid transparent;cursor:pointer}
+#view-compare .p79-route-detail-button:hover{border-color:var(--route-accent,#2563eb)}
+#view-compare .p79-route-empty{grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:15px;padding:32px;text-align:center;color:#64748b}
+#view-compare .p79-route-help{font-size:12px;line-height:1.8;color:#64748b;margin-top:12px}
+#view-compare #routeStatsWarning{font-size:12px;line-height:1.7;color:#9a3412;margin-top:12px}
+#view-compare #routeDetailPanel{border:1px solid #c8d7ee;border-radius:18px}
+@media(min-width:1550px){#view-compare .p79-route-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1100px){#view-compare .p79-route-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){#view-compare .p79-route-board{padding:13px}#view-compare .p79-route-grid{grid-template-columns:1fr;gap:12px}#view-compare .p79-route-toolbar label{width:100%}#view-compare .p79-route-toolbar input,#view-compare .p79-route-toolbar select{width:100%}}
+</style>
 <section id="view-compare" class="hidden space-y-4">
-  <div class="card p-4 space-y-3">
-    <h2 class="text-xl font-black">🧭 航線統計</h2>
-    <p class="text-sm text-slate-500">依 WORKING SHEET 的 SERVICE(I/E) 按航線統計，進出口艘次及卸船／裝船櫃數分開計算；點選航線才展開船舶明細。</p>
-    <div class="flex flex-wrap gap-3 items-center">
-      <label>搜尋航線 <input id="routeSearch" class="border rounded-xl px-3 py-2" placeholder="例如 FOC、JTT" oninput="renderRouteData()"></label>
-      <label>統計月份 <select id="routeMonthFilter" class="border rounded-xl px-3 py-2" onchange="renderRouteData()"><option value="">全部月份</option></select></label>
-      <span id="routeDataCount" class="text-sm text-slate-600"></span>
+  <div class="p79-route-board">
+    <h2 class="p79-route-heading">🧭 航線統計</h2>
+    <p class="p79-route-subtitle">依 WORKING SHEET 的 SERVICE(I/E) 分航線統計；選擇月份後只讀取該月船舶資料，進出口艘次與櫃數分開顯示。</p>
+    <div class="p79-route-toolbar">
+      <label>搜尋航線<input id="routeSearch" placeholder="例如 FOC、JTT" oninput="renderRouteData()" autocomplete="off"></label>
+      <label>統計月份<select id="routeMonthFilter" onchange="p79LoadRouteMonth(true)"></select></label>
     </div>
-    <div class="overflow-auto"><table class="tbl w-full text-center min-w-[760px]">
-      <thead><tr><th>航線 SERVICE</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead>
-      <tbody id="routeDataBody"></tbody>
-    </table></div>
-    <p id="routeStatsWarning" class="text-xs text-amber-700"></p>
-    <p class="text-xs text-slate-500">每筆 WORKING NO. 依進、出口各計一次；櫃數讀取 WORKING SHEET 的 DISCHARGE／LOAD，不把 SHIFT 算入。原始資料缺 SERVICE 時列「未分類」，不推測航線。</p>
+    <div class="p79-route-summary">
+      <span id="routeDataCount" aria-live="polite"></span>
+      <span id="routeMonthStatus" class="p79-route-source" aria-live="polite"></span>
+    </div>
+    <div id="routeCardsGrid" class="p79-route-grid"></div>
+    <p id="routeStatsWarning"></p>
+    <p class="p79-route-help">每筆 WORKING NO. 的進、出口依 SERVICE 分別歸類；卸船、裝船採原始作業量，不將 SHIFT 混入。缺少航線代碼的資料列為「未分類」，不猜測航線。</p>
   </div>
   <div id="routeDetailPanel" class="card p-4 space-y-3 hidden">
     <div class="flex justify-between gap-3 items-center"><h3 id="routeDetailTitle" class="text-lg font-bold"></h3><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute(-1)">關閉明細</button></div>
@@ -1918,7 +1960,7 @@ function setPort79Year(year){
   populateMonthlyCompareMonth('');
   renderAll();
   if(monthlyActualRows?.length)rebuildMonthlyComparison();
-  Promise.resolve().then(()=>loadEfficiencyCloudScope({year:y},true)).catch(e=>console.warn('年度船舶資料讀取失敗',e));
+  if(activeEfficiencyTabName()==='compare'){p79RouteMonthLoadedAt=0;void p79LoadRouteMonth(true);}else Promise.resolve().then(()=>loadEfficiencyCloudScope({year:y},true)).catch(e=>console.warn('年度船舶資料讀取失敗',e));
 }
 function shipMasterDateMatchesYear(s,year){
   if(!year)return true;
@@ -1936,7 +1978,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
   if(name==='multi-rod'){window.P79AqcMultiRod?.render();return;}
-  if(name==='compare'){renderRouteData();return;}
+  if(name==='compare'){renderRouteData();void p79LoadRouteMonth();return;}
   if(name==='groups'){populateSelects();renderGroups();renderPeople();return;}
   if(name==='records'){populateSelects();renderRecords();return;}
   if(name==='personstats'){
@@ -10007,24 +10049,82 @@ function routeStatsForShips(masters){
 }
 let p79RouteSelected='';
 let p79RouteSummaryCache=[];
+let p79RouteMonthRows=[];
+let p79RouteMonthLoadedKey='';
+let p79RouteMonthLoadedAt=0;
+let p79RouteMonthStatus='local';
+let p79RouteMonthError='';
+let p79RouteMonthRequestSeq=0;
+let p79RouteMonthInFlight='';
 function p79RouteMonthOptions(){
   const select=document.getElementById('routeMonthFilter');
-  if(!select)return;
-  const year=getPort79Year();
-  const months=new Set();
-  for(const s of shipMasters||[]){
-    if(!shipMasterDateMatchesYear(s,year))continue;
-    const value=String(s.compareMonth||s.workingSheetSource?.compareMonth||s.compareDate||s.firstDate||'').slice(0,7);
-    if(/^20\d{2}-(?:0[1-9]|1[0-2])$/.test(value))months.add(value);
+  if(!select)return '';
+  const year=String(getPort79Year());
+  if(select.dataset?.p79Year!==year || !/^\d{4}-\d{2}$/.test(String(select.value||''))){
+    const previous=String(select.value||'');
+    const now=new Date();
+    const todayMonth=String(now.getMonth()+1).padStart(2,'0');
+    const chosen=previous.startsWith(year+'-')?previous:(year===String(now.getFullYear())?year+'-'+todayMonth:year+'-12');
+    select.innerHTML=Array.from({length:12},(_,i)=>{
+      const month=String(12-i).padStart(2,'0');
+      return '<option value="'+year+'-'+month+'">'+year+' 年 '+(12-i)+' 月</option>';
+    }).join('');
+    select.value=chosen;
+    if(select.dataset)select.dataset.p79Year=year;
+    p79RouteSelected='';
   }
-  const previous=select.value;
-  select.innerHTML='<option value="">全部月份</option>'+[...months].sort().reverse()
-    .map(m=>'<option value="'+m+'">'+m.replace('-',' 年 ')+' 月</option>').join('');
-  select.value=months.has(previous)?previous:'';
+  return String(select.value||'');
 }
 function routeDataRows(){
-  const year=getPort79Year(),month=document.getElementById('routeMonthFilter')?.value||'';
-  return (shipMasters||[]).filter(s=>shipMasterDateMatchesYear(s,year)&&(!month||shipMasterDateMatchesMonth(s,month)));
+  const month=p79RouteMonthOptions();
+  if(!month)return [];
+  if(p79RouteMonthLoadedKey===month)return p79RouteMonthRows;
+  // 雲端讀取期間只顯示所選月份的本機快取，絕不混入其他月份。
+  return (shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month));
+}
+async function p79LoadRouteMonth(force=false){
+  const month=p79RouteMonthOptions();
+  if(!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month))return false;
+  if(p79RouteMonthInFlight===month)return false;
+  if(!force&&p79RouteMonthLoadedKey===month&&Date.now()-p79RouteMonthLoadedAt<180000){
+    renderRouteData();return true;
+  }
+  const ticket=++p79RouteMonthRequestSeq;
+  p79RouteMonthInFlight=month;
+  p79RouteMonthStatus='loading';
+  p79RouteMonthError='';
+  renderRouteData();
+  try{
+    // 查詢限制在 month，不呼叫年度或全部月份的 gcGetData。
+    const remote=await apiGetQuick('gcGetData',{month},GC_FULL_READ_TIMEOUT_MS);
+    if(!remote?.ok||!Array.isArray(remote.shipMasters))throw Error(remote?.error||'沒有取得有效的當月船舶主檔');
+    if(ticket!==p79RouteMonthRequestSeq||month!==p79RouteMonthOptions())return false;
+    const localByNo=new Map((shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month))
+      .map(s=>[String(s.workingNo||'').trim(),s]).filter(([no])=>!!no));
+    p79RouteMonthRows=remote.shipMasters
+      .map(s=>{
+        const raw={...s,_cloudLastDate:String(s.lastDate||'')};
+        const local=localByNo.get(String(s.workingNo||'').trim());
+        return local?{...mergeShipMasterOne(local,raw),_cloudLastDate:raw._cloudLastDate}:raw;
+      })
+      .filter(s=>shipMasterDateMatchesMonth(s,month));
+    p79RouteMonthLoadedKey=month;
+    p79RouteMonthLoadedAt=Date.now();
+    p79RouteMonthStatus='cloud';
+    p79RouteMonthError='';
+    return true;
+  }catch(error){
+    if(ticket!==p79RouteMonthRequestSeq)return false;
+    p79RouteMonthStatus='local';
+    p79RouteMonthError=String(error?.message||error||'雲端讀取失敗');
+    console.warn('航線統計當月雲端讀取未完成，僅顯示所選月份本機快取',month,error);
+    return false;
+  }finally{
+    if(ticket===p79RouteMonthRequestSeq){
+      p79RouteMonthInFlight='';
+      renderRouteData();
+    }
+  }
 }
 function p79SelectRoute(index){
   if(index<0)p79RouteSelected='';
@@ -10032,34 +10132,60 @@ function p79SelectRoute(index){
   renderRouteData();
 }
 function renderRouteData(){
-  const body=document.getElementById('routeDataBody');if(!body)return;
-  p79RouteMonthOptions();
+  const grid=document.getElementById('routeCardsGrid');if(!grid)return;
+  const month=p79RouteMonthOptions();
   const all=routeStatsForShips(routeDataRows());
   const query=String(document.getElementById('routeSearch')?.value||'').trim().toUpperCase();
   const rows=all.filter(s=>!query||s.route.toUpperCase().includes(query));
   p79RouteSummaryCache=rows;
   const fmt=n=>Number(n||0).toLocaleString('zh-TW');
   const quantity=(n,missing)=>fmt(n)+(missing?' *':'');
-  body.innerHTML=rows.length?rows.map((s,i)=>
-    '<tr><td class="font-bold">'+esc(s.route)+'</td><td>'+fmt(s.importCalls)+'</td><td>'+fmt(s.exportCalls)+'</td>'+
-    '<td>'+quantity(s.disc,s.missingDisc)+'</td><td>'+quantity(s.load,s.missingLoad)+'</td>'+
-    '<td>'+quantity(s.total,s.missingDisc+s.missingLoad)+'</td>'+
-    '<td><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute('+i+')">查看明細 ('+fmt(s.shipCalls)+')</button></td></tr>'
-  ).join(''):'<tr><td colspan="7" class="p-6 text-slate-500">目前沒有符合條件的航線統計</td></tr>';
+  const palette=[
+    ['#2563eb','#eff6ff'],['#0d9488','#ecfdf5'],['#7c3aed','#f5f3ff'],
+    ['#c2410c','#fff7ed'],['#db2777','#fdf2f8'],['#0369a1','#f0f9ff'],
+    ['#15803d','#f0fdf4'],['#4338ca','#eef2ff']
+  ];
+  grid.innerHTML=rows.length?rows.map((s,i)=>{
+    const pair=palette[i%palette.length];
+    return '<article class="p79-route-card" style="--route-accent:'+pair[0]+';--route-soft:'+pair[1]+'">'+
+      '<div class="p79-route-card-head"><div class="p79-route-card-icon">🚢</div><div>'+
+      '<div class="p79-route-card-caption">航線 SERVICE</div><h3 class="p79-route-card-name">'+esc(s.route)+'</h3></div></div>'+
+      '<div class="p79-route-calls">'+
+        '<div class="p79-route-call"><span class="p79-route-call-label">↘ 進口艘次</span><strong>'+fmt(s.importCalls)+'</strong></div>'+
+        '<div class="p79-route-call out"><span class="p79-route-call-label">↗ 出口艘次</span><strong>'+fmt(s.exportCalls)+'</strong></div>'+
+      '</div>'+
+      '<div class="p79-route-amounts">'+
+        '<div class="p79-route-metric"><small>卸船櫃數</small><strong>'+quantity(s.disc,s.missingDisc)+'</strong></div>'+
+        '<div class="p79-route-metric"><small>裝船櫃數</small><strong>'+quantity(s.load,s.missingLoad)+'</strong></div>'+
+      '</div>'+
+      '<div class="p79-route-grand"><div><small>📦 總櫃數</small></div><strong>'+quantity(s.total,s.missingDisc+s.missingLoad)+'</strong></div>'+
+      '<button type="button" class="p79-route-detail-button" onclick="p79SelectRoute('+i+')">查看船舶明細（'+fmt(s.shipCalls)+'）<span aria-hidden="true">›</span></button>'+
+    '</article>';
+  }).join(''):'<div class="p79-route-empty">'+(p79RouteMonthStatus==='loading'?'正在讀取 '+esc(month)+' 的航線資料…':'這個月份沒有符合的航線資料')+'</div>';
   const count=document.getElementById('routeDataCount');
-  if(count)count.textContent='航線 '+fmt(rows.length)+' 條｜進口 '+fmt(rows.reduce((n,s)=>n+s.importCalls,0))+
-    ' 艘次｜出口 '+fmt(rows.reduce((n,s)=>n+s.exportCalls,0))+' 艘次';
+  if(count)count.textContent=month.replace('-',' 年 ')+' 月｜'+fmt(rows.length)+' 條航線｜進口 '+fmt(rows.reduce((n,s)=>n+s.importCalls,0))+' 艘次｜出口 '+fmt(rows.reduce((n,s)=>n+s.exportCalls,0))+' 艘次';
+  const source=document.getElementById('routeMonthStatus');
+  if(source){
+    const hasCloudSnapshot=p79RouteMonthLoadedKey===month;
+    const status=p79RouteMonthStatus==='loading'?'loading':
+      p79RouteMonthError?'local':hasCloudSnapshot?'cloud':'local';
+    source.dataset.state=status;
+    source.textContent=status==='loading'?'⏳ 正在向雲端讀取 '+month+' 的船舶資料…':
+      status==='cloud'?'✓ 已讀取當月雲端資料（'+fmt(p79RouteMonthRows.length)+' 艘）':
+      (hasCloudSnapshot?'⚠ 雲端重新讀取未完成，保留上次當月資料':'⚠ 僅顯示當月本機快取')+
+      (p79RouteMonthError?'；原因：'+p79RouteMonthError:'；正在等待當月雲端讀取');
+  }
   const unknown=all.find(s=>s.route==='未分類');
   const missing=all.reduce((n,s)=>n+s.missingDisc+s.missingLoad,0);
   const warning=document.getElementById('routeStatsWarning');
-  if(warning)warning.textContent=(unknown?'尚有 '+fmt(unknown.importCalls)+' 筆進口、'+fmt(unknown.exportCalls)+' 筆出口的 SERVICE 未提供，已列「未分類」，需由原始 WORKING SHEET 補入。':'')+
-    (missing?' 部分 '+fmt(missing)+' 筆進／出口缺少原始櫃數，表內「*」為已知數值的小計，不能視為完整櫃數。':'');
+  if(warning)warning.textContent=(unknown?'尚有 '+fmt(unknown.importCalls)+' 筆進口、'+fmt(unknown.exportCalls)+' 筆出口 SERVICE 未提供，已列「未分類」。':'')+
+    (missing?' 另有 '+fmt(missing)+' 筆進／出口缺少原始櫃數，帶「*」的是已知數值小計。':'');
   const panel=document.getElementById('routeDetailPanel');
   const selected=rows.find(s=>s.route===p79RouteSelected);
   if(panel)panel.classList.toggle('hidden',!selected);
   if(!selected)return;
   const title=document.getElementById('routeDetailTitle');
-  if(title)title.textContent=selected.route+'｜'+selected.shipCalls+' 筆船舶作業';
+  if(title)title.textContent=month+'｜'+selected.route+'｜'+selected.shipCalls+' 筆船舶作業';
   const detailBody=document.getElementById('routeDetailBody');
   if(detailBody)detailBody.innerHTML=selected.details.map(d=>
     '<tr>'+[d.workingNo,d.vessel,d.direction,d.voyage,d.quantity===null?'未提供':fmt(d.quantity),d.date,d.sourceFileName]
