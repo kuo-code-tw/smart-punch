@@ -1460,7 +1460,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-group-select{grid-column:1 / -1!important;grid-row:2!important}
 </style>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
-<script src="../assets/port79-schedule-punch-restore.js?v=20261101-official-workday-v2"></script>
+<script src="../assets/port79-schedule-punch-restore.js?v=20261109-pre08-early-shift-v1"></script>
 
 <style id="p79-rest-overtime-visible-v1037">
 /* Compact shift cell: keep exception / un-rested overtime tags visible without adding blank rows. */
@@ -6648,7 +6648,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const {rosterShift,ownApprovedLeave,attendanceState,actualShift,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
-            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime,oldNationalLabel}=selected;
+            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime,oldNationalLabel,earlyExtensionWithRegularShift}=selected;
+          const showMainShiftSelection=!visibleSubstituteLabel||earlyExtensionWithRegularShift;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6721,7 +6722,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const pendingProof=selected.punchPending?(pendingDetails.length?
             pendingDetails.map(item=>item.type+'：'+item.time+'（歸屬工作日 '+item.workday+'）').join('；'):
             '考勤判為單側／配對異常；請檢查相鄰工作日及正式考勤來源'):'';
-          const cellTitle = ['目前顯示：'+(nightSplitLabel||shownShift)+'；來源：'+shiftSource,
+          const cellTitle = ['目前顯示：'+selected.visibleCode+'；來源：'+shiftSource,
+            earlyExtensionWithRegularShift?'本班：08:00–16:00（早）；加班：04:00–08:00（延），兩段均屬 '+dayStr+'；不變更前一日代班申報':'',
             oldNationalLabel?'本月國定假日額度為0，原紀錄帶有國假標記；一般休假於畫面改顯示休，正式申報與鎖定資料保留待管理員核對':'',
             nightSplitLabel?'20:00～24:00 加班（依正式申報及考勤核對）；00:00～08:00 是休假班段，均歸屬 '+dayStr+'；例休國依既有額度，不代表已符合完整24小時法定休息':'',
             pairedProof,pendingProof,
@@ -6729,12 +6731,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
-                title="${scheduleEscapeHtml((visibleSubstituteLabel || shownShift)+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
-                class="clean-shift-select p79-shift-select ${visibleSubstituteLabel ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
-                ${visibleSubstituteLabel ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
-                ${!visibleSubstituteLabel&&!['早','中','晚','休','例','國','離',...p79EditorLeaveKinds].includes(shownShift)?
+                title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
+                class="clean-shift-select p79-shift-select ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
+                ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
+                ${showMainShiftSelection&&!['早','中','晚','休','例','國','離',...p79EditorLeaveKinds].includes(shownShift)?
                   `<option value="__display__" selected>${scheduleEscapeHtml(shownShift)}</option>`:''}
-                <option value="早" ${!visibleSubstituteLabel && shownShift==='早'?'selected':''}>早</option>
+                <option value="早" ${showMainShiftSelection && shownShift==='早'?'selected':''}>早</option>
                 <option value="中" ${!visibleSubstituteLabel && shownShift==='中'?'selected':''}>中</option>
                 <option value="晚" ${!visibleSubstituteLabel && shownShift==='晚'?'selected':''}>晚</option>
                 <option value="休" ${!visibleSubstituteLabel && shownShift==='休'?'selected':''}>休</option>
@@ -6743,6 +6745,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 ${p79EditorLeaveKinds.map(type=>`<option value="${type}" ${!visibleSubstituteLabel&&shownShift===type?'selected':''}>${type}</option>`).join('')}
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
+              ${earlyExtensionWithRegularShift?
+                '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="加班04:00–08:00；本班08:00–16:00；兩者均已核對正式出勤與報單">延04-08</span>':''}
               ${combinedMarker}
               ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
@@ -7557,8 +7561,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
         workDate!==dayStr&&m?.overtimeReport?.overtimeDate===dayStr&&p79ConfirmedOvertimeReport(m))
         ?p79SubstituteShiftLabel(emp.id,dayStr):'';
       const visibleSubstituteLabel=creditedOvertime||nightSplitLabel||overtimeLabel;
-      const visibleCode=String(visibleSubstituteLabel||shownShift||'').trim();
-      const shiftSource=visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':unworkedOvertime?'已核實整班無出勤（加班不計）':
+      // A verified 03–16 pair can contain both 延04-08 and regular 早08-16.
+      // Do not allow the saved overtime code to hide the regular shift.
+      // Never synthesize a 代/延 report or move a different day's report.
+      const earlyExtensionWithRegularShift=actualShift==='早'&&shownShift==='早'&&
+        hasOfficialOvertimeReport&&originalMeta.overtimeReport?.category==='延'&&
+        (!originalMeta.overtimeReport.overtimeDate||
+         originalMeta.overtimeReport.overtimeDate===dayStr)&&
+        visibleSubstituteLabel==='延04-08'&&!ownApprovedLeave&&!specialNoPunch;
+      const visibleCode=String(earlyExtensionWithRegularShift?
+        '早＋延04-08':visibleSubstituteLabel||shownShift||'').trim();
+      const shiftSource=earlyExtensionWithRegularShift?'正式考勤早班08-16＋已申報延04-08':
+        visibleSubstituteLabel?'正式加班／代班申報':specialNoPunch?'已確認特殊日無打卡':ownApprovedLeave?'已核准請假':unworkedOvertime?'已核實整班無出勤（加班不計）':
         actualShift&&shownShift===actualShift?'已配對正式考勤推定':
         coverageShift&&shownShift===coverageShift?'代班班別':
         shownShift===rosterShift?'原始儲存班表':
@@ -7567,6 +7581,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       return {eligible:true,rosterShift,ownApprovedLeave,attendanceState,actualShift,attendanceRosterConflict,shiftSource,shortWorkMinutes,verifiedRestAttendance,verifiedNoWork,unworkedOvertime,noPunchRest,punchPending,attendanceUnverified,
         manualNoPunch,shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,nightSplitLabel,
+        earlyExtensionWithRegularShift,
         // Count the category visibly selected in each cell, including timed labels.
         // Cloud-confirmed overtime remains a separate quota deduction.
         oldNationalLabel,
