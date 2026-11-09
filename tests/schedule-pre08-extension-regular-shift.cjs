@@ -87,4 +87,11 @@ meta.E1[date8].overtimeReport.overtimeDate=date7;
 after=show(date8);
 assert.equal(after.visibleCode,'早','extension credited to Nov 7 must not be manufactured on Nov 8');
 assert.equal(show(date7).visibleCode,'延04-08','a cross-credited extension stays on its correct accounting date (fixture only)');
-console.log('PASS Nov7 延04-08 / Nov8 03:38-15:53 early 08-16 + 延04-08, separate dates, screen/export, source unchanged');
+// Realistic single-report case: the 11/8 04–08 physical hours are
+// reported against 11/7, while the following regular 08–16 belongs to 11/8.
+// The same overtime must NOT be duplicated in both date cells.
+delete meta.E1[date7];
+assert.equal(show(date7).visibleCode,'延04-08','one overtime report credited to Nov 7 remains visible on Nov 7');
+assert.equal(show(date8).visibleCode,'早','Nov 8 contains only its regular 08–16 shift, without a duplicate extension');
+assert.equal(show(date8).earlyExtensionWithRegularShift,false,'no same-date approved extension means no extra 04–08 badge');
+console.log('PASS single reported 延04-08 credited Nov7 plus Nov8 03:38–15:53 early 08–16; optional separate same-date extension, no duplicate, screen/export unchanged source');
