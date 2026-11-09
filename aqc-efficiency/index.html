@@ -1168,6 +1168,23 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:1050px){#view-terminal .p79-ter-columns{grid-template-columns:1fr}}
 @media(max-width:800px){#view-terminal .p79-terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){#view-terminal .p79-ter-board{padding:12px}#view-terminal .p79-terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#view-terminal .p79-terminal-kpi{padding:13px}#view-terminal .p79-terminal-kpi .kpi-value{font-size:22px}#view-terminal .p79-ter-box{padding:12px}#view-terminal .p79-ter-month,#view-terminal .p79-ter-month select{width:100%}}
+
+#view-terminal .p79-ter-stop-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+#view-terminal .p79-ter-stop-kpi{border:1px solid #dbe4ee;background:#f8fafc;color:#0f172a;border-radius:14px;padding:13px 15px;text-align:left;display:grid;gap:4px;cursor:pointer;font:inherit;min-width:0;position:relative;overflow:hidden}
+#view-terminal .p79-ter-stop-kpi:before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--kpi-color,#64748b)}
+#view-terminal .p79-ter-stop-kpi.active{outline:2px solid var(--kpi-color,#334155);outline-offset:-2px;box-shadow:0 6px 16px rgba(15,23,42,.09)}
+#view-terminal .p79-ter-stop-kpi:hover{background:#eff6ff}
+#view-terminal .p79-ter-stop-kpi .stop-kpi-name{font-weight:850;font-size:12px;color:#475569}
+#view-terminal .p79-ter-stop-kpi strong{font-size:23px;font-weight:900;line-height:1.4}
+#view-terminal .p79-ter-stop-kpi small{font-size:11px;color:#64748b;line-height:1.5}
+#view-terminal .p79-ter-stop-kpi.tone-gray{--kpi-color:#64748b}
+#view-terminal .p79-ter-stop-detail-head{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:24px 0 10px}
+#view-terminal .p79-ter-stop-detail-head h4{font-size:15px;font-weight:900}
+#view-terminal #terminalStopDetailCaption{font-size:12px;color:#475569}
+#view-terminal .p79-ter-stop-detail{min-width:990px}
+#view-terminal .p79-ter-remark{max-width:400px;min-width:190px;text-align:left;white-space:normal;word-break:break-word}
+@media(max-width:800px){#view-terminal .p79-ter-stop-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){#view-terminal .p79-ter-stop-kpis{grid-template-columns:1fr}}
 </style>
 <section id="view-terminal" class="hidden space-y-4" aria-label="碼頭營運統計">
  <div id="terminalDashboardRoot" class="p79-ter-board">
@@ -1204,11 +1221,16 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     </div>
   </div>
   <div class="p79-ter-box">
-   <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🛠️ 停工與異常原因統計</h3><span class="p79-ter-hint">由明細的「停工項目／停工時間」實際填報計算</span></div>
+   <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🛠️ 停工與異常原因統計</h3><span class="p79-ter-hint">以 WORKING REPORT Remark 為主要來源，搭配正式停工填報，依月份自動更新</span></div>
+   <div id="terminalStopCategoryKpis" class="p79-ter-stop-kpis" aria-label="異常分類統計，點選色卡篩選下方明細"></div>
    <div class="p79-ter-table-wrap">
-    <table class="p79-ter-table"><thead><tr><th>停工原因</th><th>填報事件</th><th>累計分鐘</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
+    <table class="p79-ter-table"><thead><tr><th>異常原因</th><th>事件數</th><th>確認分鐘</th><th>未定時事件</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
    </div>
-   <p class="p79-ter-notice">停工分鐘為各 AQC 作業紀錄的回報總和，並非已去重的整個碼頭停擺時間；沒有填報不代表沒有停工。</p>
+   <div class="p79-ter-stop-detail-head"><h4>📋 停工與異常事件明細</h4><span id="terminalStopDetailCaption">全部原因</span></div>
+   <div class="p79-ter-table-wrap">
+    <table class="p79-ter-table p79-ter-stop-detail"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>資料來源</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
+   </div>
+   <p class="p79-ter-notice">色卡可篩選下方明細，再次點選同一卡片顯示全部。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
   </div>
   <div id="terminalWarnings" class="p79-ter-warnings" role="note"></div>
  </div>
@@ -15346,7 +15368,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-pilot-v1"></script>
+<script src="./terminal-ops.js?v=20261109-remark-v2"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
