@@ -75,16 +75,8 @@ assert(html.includes("const showMainShiftSelection=!visibleSubstituteLabel||earl
  'when both exist, early main shift stays selected in the day dropdown');
 assert(html.includes('earlyExtensionWithRegularShift?')&&html.includes('延04-08</span>'),
  'the filed overtime is visibly shown as a second line');
-assert(html.includes('row[String(d)]=p79ScheduleExcelShiftCode(selected.visibleCode)'),
- 'Excel converts ordinary shift names to time ranges without changing filed overtime');
-const excelStart=html.indexOf('    function p79ScheduleExcelShiftCode(');
-const excelEnd=html.indexOf('    function p79ScheduleExportDay(',excelStart);
-assert(excelStart>=0&&excelEnd>excelStart);
-vm.runInContext(html.slice(excelStart,excelEnd),env);
-assert.equal(env.p79ScheduleExcelShiftCode(d7.visibleCode),'延04-08',
- '11/7 filed extension retains its original text');
-assert.equal(env.p79ScheduleExcelShiftCode(d8.visibleCode),'08-16＋延04-08',
- '11/8 regular 08–16 is exported as time even if a separate 04–08 report exists');
+assert(html.includes('row[String(d)]=selected.visibleCode'),
+ 'Excel uses the same both-interval day code');
 
 // Unconfirmed/revoked/moved reports cannot create a second overtime label.
 meta.E1[date8].overtimeRevocations=[{reportId:'EXT-8',confirmed:true}];

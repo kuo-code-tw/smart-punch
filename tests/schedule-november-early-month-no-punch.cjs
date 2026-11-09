@@ -72,7 +72,6 @@ const make=(official,raw=null)=>api.create({
  assert.equal(shown.visibleCode,'休','saved 中 and stale 國 metadata both yield 休');
  assert.equal(shown.visibleRestKind,'休');
  assert.equal(JSON.stringify({originalRoster,originalMeta}),before,'display must not write cloud roster');
- assert(html.includes('row[String(d)]=p79ScheduleExcelShiftCode(selected.visibleCode)'),
-  'Excel uses attendance-resolved day code and formats only regular shift as time');
+ assert(html.includes('row[String(d)]=selected.visibleCode'),'Excel and calendar use the same attendance-resolved code');
  console.log('PASS Nov9: 83-person/month-to-date zero-punch rest, pair/single/early/sparse/dual safety, screen/export parity, no writes');
 })().catch(e=>{console.error(e);process.exitCode=1});
