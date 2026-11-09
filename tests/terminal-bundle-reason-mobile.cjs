@@ -5,6 +5,8 @@ const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 assert(html.includes('<th>Bundle 扣除</th>'));
 assert(html.includes('<th>待核差額</th>'));
 assert(html.includes('<th>原因分類（點選修改）</th>'));
+assert(html.includes('id="terminalReasonFilter"'),'reason filter is visible above detail list');
+assert(html.includes('onchange="P79TerminalOps.filterReason(this.value)"'),'reason filter updates list');
 assert(html.includes('@container (max-width:900px)'),'small tables switch into responsive cards');
 assert(html.includes('overflow-x:hidden!important'),'mobile tables do not horizontally scroll');
 assert(html.includes('@media (min-width:1051px)'),'desktop panels have a dedicated two-column layout');
@@ -33,7 +35,7 @@ function app(){
  const els=Object.fromEntries([
   'terminalDashboardRoot','terminalMonth','terminalKpi','terminalWharfBody',
   'terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis',
-  'terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus',
+  'terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus',
   'terminalWarnings','terminalMonthCaption'
  ].map(id=>[id,{value:id==='terminalMonth'?'2026-11':'',dataset:{},innerHTML:'',textContent:''}]));
  els.terminalMonth.dataset.p79Year='2026';
@@ -69,7 +71,15 @@ assert.equal(cell.attrs['data-label'],'完工日期','responsive cells receive v
 const key=stats.stopDetails[0].eventKey;
 assert(api.setReasonCategory(encodeURIComponent(key),'鎖具問題'));
 assert.equal(api.build('2026-11',ships,records).byStop[0].reason,'鎖具問題');
-assert(els.terminalStopDetailBody.innerHTML.includes('已手動分類'));
+assert(!els.terminalStopDetailBody.innerHTML.includes('已手動分類'),'manual label is removed');
+assert(els.terminalStopDetailBody.innerHTML.includes('鎖具問題'),'selected reason remains visible');
+api.filterReason('系統異常');
+assert.equal(els.terminalReasonFilter.value,'系統異常','reason dropdown reflects selected filter');
+assert(!els.terminalStopDetailBody.innerHTML.includes('AQC故障跳電'),'filter hides unrelated events');
+api.filterReason('鎖具問題');
+assert(els.terminalStopDetailBody.innerHTML.includes('AQC故障跳電'),'manual category is filterable');
+api.filterReason('');
+assert.equal(els.terminalReasonFilter.value,'','all-reasons option restores full list');
 ({api,els}=app());
 assert.equal(api.build('2026-11',ships,records).byStop[0].reason,'鎖具問題','override survives new app instance');
 assert(api.setReasonCategory(encodeURIComponent(key),''));
