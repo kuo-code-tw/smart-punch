@@ -1,5 +1,5 @@
 'use strict';
-// Huang Xin-Xing pattern: 11/07 cover 04–08 remains on the 7th,
+// Huang Xin-Xing pattern: 11/07 extension 04–08 remains on the 7th,
 // 11/08 03:38–15:53 spans extension 04–08 and regular 08–16.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('schedule/index.html','utf8');
@@ -27,7 +27,7 @@ assert.equal(restore.displayShiftFromClockIn(punch(date8,'00:06:00','IN'),punch(
  '00–08 complete work must still belong to the previous workday');
 
 const meta={E1:{
- [date7]:{overtimeReport:{id:'COVER-7',category:'代',code:'代04-08',overtimeDate:date7}},
+ [date7]:{overtimeReport:{id:'EXT-7',category:'延',code:'延04-08',overtimeStart:'04',overtimeEnd:'08',overtimeDate:date7}},
  [date8]:{overtimeReport:{id:'EXT-8',category:'延',code:'延04-08',
   overtimeStart:'04',overtimeEnd:'08',overtimeDate:date8}}
 }};
@@ -62,7 +62,7 @@ const context={automaticRestMeta:{},restBalance:{ledger:[]},attendanceEvidence:e
  typhoonToday:'2026-11-09'};
 const show=day=>env.p79ScheduleDisplayDay({id:empId,name:'測試指揮手'},day,context);
 const d7=show(date7),d8=show(date8);
-assert.equal(d7.visibleCode,'代04-08','Nov 7 confirmed cover remains untouched');
+assert.equal(d7.visibleCode,'延04-08','Nov 7 confirmed extension remains untouched');
 assert.equal(d7.earlyExtensionWithRegularShift,false);
 assert.equal(d8.shownShift,'早','Nov 8 regular 08–16 is displayed in primary shift');
 assert.equal(d8.visibleSubstituteLabel,'延04-08','Nov 8 independent overtime report stays intact');
@@ -85,5 +85,5 @@ delete meta.E1[date8].overtimeRevocations;
 meta.E1[date8].overtimeReport.overtimeDate=date7;
 after=show(date8);
 assert.equal(after.visibleCode,'早','extension credited to Nov 7 must not be manufactured on Nov 8');
-assert.equal(show(date7).visibleCode,'延04-08','a cross-credited extension remains on its saved accounting date (fixture only)');
-console.log('PASS Nov7 cover / Nov8 03:38-15:53 early 08-16 + filed extension 04-08, date separation, screen/export, source unchanged');
+assert.equal(show(date7).visibleCode,'延04-08','a cross-credited extension stays on its correct accounting date (fixture only)');
+console.log('PASS Nov7 延04-08 / Nov8 03:38-15:53 early 08-16 + 延04-08, separate dates, screen/export, source unchanged');
