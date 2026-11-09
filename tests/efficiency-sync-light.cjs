@@ -10,7 +10,7 @@ const manual=html.slice(html.indexOf('async function manualCloudSync('),html.ind
   if(scenario==='slow-warning'){c.setTimeout=(fn,ms)=>{if(ms===60000){watchdog=fn;return 0;}return setTimeout(fn,ms);};}
   vm.createContext(c);vm.runInContext(light,c);vm.runInContext(manual,c);
   const task=c.manualCloudSync();await new Promise(resolve=>setImmediate(resolve));
-  if(scenario!=='upload-failure'){assert(readStarted);assert.equal(elements.efficiencySyncLight.dataset.state,'syncing','intermediate successful read cannot turn green');if(scenario==='slow-warning'){watchdog();assert.equal(elements.efficiencySyncLight.dataset.state,'pending');}release();}
+  if(scenario!=='upload-failure'){assert(readStarted);assert.equal(elements.efficiencySyncLight.dataset.state,'syncing','intermediate successful read cannot turn green');if(scenario==='slow-warning'){watchdog();assert.equal(elements.efficiencySyncLight.dataset.state,'syncing');assert.equal(elements.efficiencySyncError.open,false,'slow request must not expand an error dialog');assert.equal(elements.efficiencySyncError.style.color,'#92400e');}release();}
   await task;assert.equal(elements.efficiencySyncLight.dataset.state,['success','busy-then-success','slow-warning'].includes(scenario)?'success':'error');
   if(scenario==='upload-failure'){assert(elements.efficiencySyncErrorText.textContent.includes('雲端鎖定'));assert.equal(elements.efficiencySyncError.open,true);}
   if(scenario==='success'){pending=[{}];c.p79SetEfficiencySyncLight('success');assert.equal(elements.efficiencySyncLight.dataset.state,'pending','queue blocks green');}
