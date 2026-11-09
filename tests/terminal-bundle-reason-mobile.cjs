@@ -7,6 +7,11 @@ assert(html.includes('<th>待核差額</th>'));
 assert(html.includes('<th>原因分類（點選修改）</th>'));
 assert(html.includes('@container (max-width:900px)'),'small tables switch into responsive cards');
 assert(html.includes('overflow-x:hidden!important'),'mobile tables do not horizontally scroll');
+assert(html.includes('@media (min-width:1051px)'),'desktop panels have a dedicated two-column layout');
+assert(html.includes('#view-terminal .p79-ter-columns{grid-template-columns:repeat(2,minmax(0,1fr))}'),'daily and shift panels display left and right');
+assert(html.includes('#view-terminal .p79-ter-table-wrap{container-type:normal;overflow-x:hidden;overflow-y:auto}'),'desktop tables retain compact rows without horizontal scrolling');
+assert(html.includes('#view-terminal .p79-ter-columns .p79-ter-table{font-size:10.8px}'),'side-by-side tables use tighter cell typography');
+assert(!html.includes('#view-terminal .p79-ter-columns{grid-template-columns:1fr}\n#view-terminal .p79-ter-table-wrap'),'remove the global forced stacked panels');
 const store=new Map();
 const localStorage={getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,value)};
 const ship=(no,day,disc,load,bill,bundle)=>({
