@@ -1,6 +1,5 @@
 name: Verify management synchronization
 on:
-  # Tests and backend-only changes should be verified without redeploying the live website.
   push:
     branches: [main]
     paths:
@@ -24,29 +23,53 @@ on:
       - '.github/workflows/management-sync.yml'
 permissions:
   contents: read
+
 jobs:
-  verify:
+  test-shards:
+    name: Tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run all integration tests and report every failure
+      - name: Run assigned integration tests and report every failure
+        shell: bash
         run: |
+          set -euo pipefail
           failed=0
+          count=0
+          index=0
           for test_file in tests/*.cjs; do
-            echo "::group::${test_file}"
-            if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
-              :
-            else
-              echo "::error file=${test_file}::Integration regression failed"
-              failed=$((failed+1))
+            if (( index % 4 == ${{ matrix.shard }} )); then
+              echo "::group::${test_file}"
+              count=$((count+1))
+              if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
+                :
+              else
+                echo "::error file=${test_file}::Integration regression failed"
+                failed=$((failed+1))
+              fi
+              echo "::endgroup::"
             fi
-            echo "::endgroup::"
+            index=$((index+1))
           done
-          echo "Total failing tests: ${failed}"
-          test "${failed}" -eq 0
+          echo "Shard ${{ matrix.shard }}: $count tests / $failed failed"
+          test "$failed" -eq 0
+
+  verify:
+    name: verify
+    needs: test-shards
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every integration-test shard to pass
+        shell: bash
+        run: |
+          test "${{ needs.test-shards.result }}" = "success"
