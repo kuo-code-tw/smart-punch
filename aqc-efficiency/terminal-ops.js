@@ -151,6 +151,48 @@ function stopEventsForRecord(r){
   }
   return events;
 }
+
+function shipBundleMetrics(ship){
+ const ws=ship.workingSheetSource||{};
+ const direct=measure(ship.bundleDeduct,ws.bundleDeduct,ship.importAudit?.bundleDeduct);
+ const bn=measure(ship.bundleBn,ws.bundleBn),fl=measure(ship.bundleFl,ws.bundleFl);
+ const detail=Array.isArray(ship.bundleInfo)?ship.bundleInfo:Array.isArray(ws.bundleInfo)?ws.bundleInfo:[];
+ const fromDetail=detail.reduce((sum,x)=>sum+Math.max(0,(measure(x.fl,x.FL)||0)-(measure(x.bn,x.BN)||0)),0);
+ const calculated=bn!==null&&fl!==null?Math.max(0,fl-bn):detail.length?fromDetail:null;
+ const bundle=direct!==null?direct:calculated;
+ return {bundle,bn,fl,declared:bundle!==null};
+}
+const REASON_OVERRIDE_KEY='p79_terminal_reason_overrides_v1';
+let cachedReasonOverrides=null;
+function reasonOverrides(){
+ if(cachedReasonOverrides!==null)return cachedReasonOverrides;
+ cachedReasonOverrides={};
+ try{
+  if(typeof localStorage==='undefined')return cachedReasonOverrides;
+  const obj=JSON.parse(localStorage.getItem(REASON_OVERRIDE_KEY)||'{}');
+  if(obj&&typeof obj==='object'&&!Array.isArray(obj))
+   for(const [key,value] of Object.entries(obj))if(STOP_CATEGORIES.some(c=>c.label===value))cachedReasonOverrides[key]=value;
+ }catch(err){console.warn('手動異常分類讀取失敗，保留自動分類',err)}
+ return cachedReasonOverrides;
+}
+function eventManualCategory(key){return reasonOverrides()[key]||''}
+function setReasonCategory(encodedKey,category){
+ let key='';
+ try{key=decodeURIComponent(String(encodedKey||''))}catch(e){return false}
+ if(!key||!(category===''||STOP_CATEGORIES.some(c=>c.label===category)))return false;
+ const map=reasonOverrides();
+ if(category)map[key]=category;
+ else delete map[key];
+ let saved=true;
+ try{
+  if(typeof localStorage==='undefined')saved=false;
+  else localStorage.setItem(REASON_OVERRIDE_KEY,JSON.stringify(map));
+ }catch(error){saved=false;console.warn('手動原因分類無法保存在此瀏覽器',error)}
+ state.categorySaveWarning=saved?'':'⚠ 此瀏覽器無法保存手動分類，重新登入或換裝置可能恢復自動判讀';
+ render();
+ return saved;
+}
+
 function buildStopSummary(records,wharfByNo,masters){
   const vesselByNo=new Map(masters.map(s=>[String(s.workingNo||s.sourceWorkingNo||'').trim(),String(s.vessel||'').trim()]));
   const byStop=new Map(),unique=new Map(),affected=new Set();
@@ -166,7 +208,8 @@ function buildStopSummary(records,wharfByNo,masters){
         '未註時間:'+entry.reason.replace(/\s+/g,'').toLowerCase();
       const key=[no,day,aqc,entry.category,period].join('|');
       if(unique.has(key))continue;
-      const event={...entry,date:day,workingNo:no,aqc,wharf,vessel};
+      const event={...entry,date:day,workingNo:no,aqc,wharf,vessel,eventKey:key,automaticCategory:entry.category};
+      event.category=eventManualCategory(key)||entry.category;
       unique.set(key,event);
       affected.add(String(r.id||[no,day,aqc,r.startTime,r.endTime].join('|')));
       const group=work(event.category);
@@ -190,7 +233,7 @@ function build(month,ships,rows){
   const masters=makeUniqueShips(ships,month);
   const byWharf=new Map(),byDay=new Map(),byShift=new Map();
   const wharfByNo=new Map();
-  const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,missing:0,undated:0};
+  const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0,missing:0,undated:0};
   const work=(map,key,init)=>{if(!map.has(key))map.set(key,init());return map.get(key)};
   for(const s of masters){
     const ws=s.workingSheetSource||{};
@@ -200,15 +243,25 @@ function build(month,ships,rows){
     const disc=measure(ws.disc,s.importAudit?.disc,s.disc),load=measure(ws.load,s.importAudit?.load,s.load);
     const bill=measure(s.totalContainers,ws.totalContainers),moves=measure(s.totalMoves,ws.totalMoves);
     const shift=measure(s.shiftMoves,ws.shiftMoves),hc=measure(s.hatches,ws.hatches);
+    const {bundle,bn,fl,declared}=shipBundleMetrics(s);
+    const rawDiff=disc!==null&&load!==null&&bill!==null?Math.round((disc+load-bill)*100)/100:null;
+    const bundleDifference=rawDiff!==null&&bundle!==null?Math.round((rawDiff-bundle)*100)/100:null;
     if(disc===null||load===null||bill===null||moves===null)vesselTotals.missing++;
-    const add=(target)=>{target.ships++;target.disc+=(disc||0);target.load+=(load||0);target.billed+=(bill||0);target.moves+=(moves||0);target.shift+=(shift||0);target.hc+=(hc||0);};
+    const add=(target)=>{
+      target.ships++;target.disc+=(disc||0);target.load+=(load||0);target.billed+=(bill||0);
+      target.moves+=(moves||0);target.shift+=(shift||0);target.hc+=(hc||0);
+      if(declared){target.bundle+=bundle;target.bundleKnown++;}
+      else if(rawDiff!==null&&Math.abs(rawDiff)>0.01)target.bundleUnknown++;
+      if(bundleDifference!==null&&Math.abs(bundleDifference)>0.01)target.bundleUnexplained+=bundleDifference;
+    };
     add(vesselTotals);
-    const berth=work(byWharf,wharf,()=>({wharf,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0}));
+    const berth=work(byWharf,wharf,()=>({wharf,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0}));
     add(berth);
     const dates=[s._cloudLastDate,s.lastDate,s.workingSheetSource?.compareDate,s.compareDate,s.firstDate].map(v=>String(v||'').slice(0,10));
     const day=dates.find(v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&v.startsWith(month));
-    if(day)add(work(byDay,day,()=>({day,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0})));
+    if(day)add(work(byDay,day,()=>({day,ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleUnexplained:0,bundleList:[]})));
     else vesselTotals.undated++;
+    if(day)byDay.get(day).bundleList.push({no,bundle,bn,fl,rawDiff,bundleDifference});
   }
   const records=makeUniqueRecords(rows,month);
   let crossShift=0,missingTime=0,unmatchedWharf=0;
@@ -237,7 +290,7 @@ function build(month,ships,rows){
     crossShift,missingTime,unmatchedWharf,...stops
   };
 }
-const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:''};
+const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:'',categorySaveWarning:''};
 function el(id){return document.getElementById(id)}
 function options(){
  const select=el('terminalMonth');
@@ -284,10 +337,14 @@ function render(){
  ].join('');
  const wharfBody=el('terminalWharfBody');
  if(wharfBody)wharfBody.innerHTML=stats.byWharf.length?stats.byWharf.map(s=>
-  '<tr><td class="p79-terminal-wharf">'+safe(s.wharf)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td><td>'+fmt(s.shift)+'</td><td>'+fmt(s.hc)+'</td></tr>').join(''):rowMessage(8,'本月沒有可統計的完工船舶');
+  '<tr><td class="p79-terminal-wharf">'+safe(s.wharf)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td class="p79-ter-bundle">'+fmt(s.bundle)+(s.bundleUnknown?' <small>('+fmt(s.bundleUnknown)+' 艘待核)</small>':'')+'</td><td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td><td>'+fmt(s.shift)+'</td><td>'+fmt(s.hc)+'</td></tr>').join(''):rowMessage(9,'本月沒有可統計的完工船舶');
  const dayBody=el('terminalDayBody');
  if(dayBody)dayBody.innerHTML=stats.byDay.length?stats.byDay.map(s=>
-  '<tr><td>'+safe(s.day)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td></tr>').join(''):rowMessage(6,'目前無可歸入本月完工日期的船舶資料');
+  '<tr><td>'+safe(s.day)+'</td><td>'+fmt(s.ships)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td>'+
+   '<td class="p79-ter-bundle" title="'+safe(s.bundleList.filter(x=>x.bundle!==null&&x.bundle>0).map(x=>x.no+'：扣 '+fmt(x.bundle)+(x.bn!==null&&x.fl!==null?'（'+fmt(x.bn)+'BN／'+fmt(x.fl)+'FL）':'')).join('；')||'尚無已填報 Bundle 明細')+'">'+fmt(s.bundle)+(s.bundleUnknown?' <small>('+fmt(s.bundleUnknown)+' 艘待核)</small>':'')+'</td>'+
+   '<td>'+fmt(s.billed)+'</td><td class="em">'+fmt(s.moves)+'</td>'+
+   '<td class="'+(Math.abs(s.bundleUnexplained)>0.01||s.bundleUnknown?'p79-ter-check':'')+'">'+
+   (s.bundleUnknown?'待核對':Math.abs(s.bundleUnexplained)>0.01?(s.bundleUnexplained>0?'+':'')+decimal(s.bundleUnexplained):'—')+'</td></tr>').join(''):rowMessage(8,'目前無可歸入本月完工日期的船舶資料');
  const shiftBody=el('terminalShiftBody');
  if(shiftBody)shiftBody.innerHTML=stats.byShift.length?stats.byShift.map(s=>
   '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
@@ -302,8 +359,13 @@ function render(){
   '<tr><td>'+safe(s.reason)+'</td><td>'+fmt(s.events)+'</td><td class="em">'+decimal(s.minutes)+'</td><td>'+fmt(s.unknown)+'</td><td>'+safe(s.wharfs.join('、'))+'</td><td>'+fmt(s.aqcs)+'</td></tr>').join(''):rowMessage(6,stats.records.length?'目前未辨識到有註記的停工或異常，不能據此判定零停工':'尚未取得作業明細，無法統計停工原因');
  const visible=state.stopCategory?stats.stopDetails.filter(s=>s.category===state.stopCategory):stats.stopDetails;
  const detailBody=el('terminalStopDetailBody');
- if(detailBody)detailBody.innerHTML=visible.length?visible.slice(0,160).map(e=>
-  '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td>'+safe(e.source)+'</td></tr>').join(''):rowMessage(8,stats.records.length?'此分類沒有可辨識的異常紀錄':'尚未取得 WORKING REPORT 明細');
+ if(detailBody)detailBody.innerHTML=visible.length?visible.slice(0,160).map(e=>{
+  const manuallyChosen=eventManualCategory(e.eventKey);
+  const encoded=encodeURIComponent(e.eventKey).replace(/'/g,'%27');
+  const reasonOptions='<option value=""'+(!manuallyChosen?' selected':'')+'>自動：'+safe(e.automaticCategory)+'</option>'+
+   STOP_CATEGORIES.map(c=>'<option value="'+safe(c.label)+'"'+(manuallyChosen===c.label?' selected':'')+'>'+c.icon+' '+safe(c.label)+'</option>').join('');
+  return '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td><select class="p79-ter-reason-select" aria-label="選擇 '+safe(e.date+' '+e.aqc)+' 的異常分類" onchange="P79TerminalOps.setReasonCategory(\''+encoded+'\',this.value)">'+reasonOptions+'</select>'+(manuallyChosen?'<small class="p79-ter-manual">已手動分類</small>':'')+'</td></tr>';
+ }).join(''):rowMessage(8,stats.records.length?'此分類沒有可辨識的異常紀錄':'尚未取得 WORKING REPORT 明細');
  const detailCaption=el('terminalStopDetailCaption');
  if(detailCaption)detailCaption.textContent=(state.stopCategory||'全部原因')+'｜共 '+fmt(visible.length)+' 件'+(visible.length>160?'，僅列最近 160 件':'');
  const status=el('terminalDataStatus');
@@ -326,6 +388,9 @@ function render(){
   if(stats.unmatchedWharf)list.push('有 '+fmt(stats.unmatchedWharf)+' 筆作業明細找不到碼頭對應');
   if(stats.unknownStopEvents)list.push('有 '+fmt(stats.unknownStopEvents)+' 件 Remark 異常沒有可確認的起訖時間，只計次數、不計分鐘');
   if(stats.records.length&&!stats.totalStopEvents)list.push('尚未識別異常註記，不等於確定沒有停工');
+  if(total.bundleUnknown)list.push('有 '+fmt(total.bundleUnknown)+' 艘船的卸船＋裝船與作業量不同，但沒有已知 Bundle 扣除數，請核對來源 WORKING SHEET');
+  if(Math.abs(total.bundleUnexplained)>0.01)list.push('有已填報 Bundle 仍無法完全解釋的櫃數差異；每日表「待核差額」可查看');
+  if(state.categorySaveWarning)list.push(state.categorySaveWarning);
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
  const label=el('terminalMonthCaption');
@@ -370,5 +435,5 @@ async function load(force=false){
  }
 }
 function selectCategory(category){state.stopCategory=state.stopCategory===category?'':category;render();}
-root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory};
+root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory,setReasonCategory,shipBundleMetrics};
 })(window);
