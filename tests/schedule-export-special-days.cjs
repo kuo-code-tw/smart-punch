@@ -39,7 +39,7 @@ const emp={id:'E',name:'測試'};
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱','without IN/OUT, typhoon day must export 颱');
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-22'),'休','ordinary no-punch completed shift remains rest');
 status.state='missing';
-assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'24-08','a single-sided punch retains the night shift in Excel time format');
+assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'打卡待核','a single-sided punch must stay pending, not fabricate a night shift');
 status.state='worked';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'24-08','actual attendance retains night shift in time format');
 shifts['2026-10-23']='颱08-11';
