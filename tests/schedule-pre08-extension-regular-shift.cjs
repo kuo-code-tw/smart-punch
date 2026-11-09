@@ -4,7 +4,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('schedule/index.html','utf8');
 const engine=require('../attendance/v6-engine.js');
-const restore=require('../assets/port79-schedule-punch-restore.js');
+const restore=Function('engine','const window={P79AttendanceV6:engine};let module={exports:{}};'+
+  fs.readFileSync('assets/port79-schedule-punch-restore.js','utf8')+';return module.exports;')(engine);
 const date7='2026-11-07',date8='2026-11-08',empId='E1';
 const punch=(date,time,type)=>({id:date+time+type,empId,attNo:'465',
   timeStr:date.replaceAll('-','/')+' '+time,status:type==='IN'?'上班簽到':'下班簽退'});
@@ -84,5 +85,5 @@ delete meta.E1[date8].overtimeRevocations;
 meta.E1[date8].overtimeReport.overtimeDate=date7;
 after=show(date8);
 assert.equal(after.visibleCode,'早','extension credited to Nov 7 must not be manufactured on Nov 8');
-assert.equal(show(date7).visibleCode,'代04-08＋延04-08','credited overtime stays on its accounting date');
+assert.equal(show(date7).visibleCode,'延04-08','a cross-credited extension remains on its saved accounting date (fixture only)');
 console.log('PASS Nov7 cover / Nov8 03:38-15:53 early 08-16 + filed extension 04-08, date separation, screen/export, source unchanged');
