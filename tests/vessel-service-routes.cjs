@@ -61,7 +61,7 @@ assert(!html.includes('monthlyPasteBox'));
 assert(!html.includes('compareExcelInput'));
 assert(html.includes('workingNo,vessel,voyageI,voyageE,wharf,serviceI,serviceE'));
 assert(html.includes("serviceI:summary.serviceI||''"));
-assert(home.includes("launchSystem('efficiency')"));
+assert(home.includes('<a href="./aqc-efficiency/">🚢 船舶明細</a>'));
 assert(html.includes("showGcAccessDenied(!gcToken"));
 assert(!html.includes("returnToPort79Home('此帳號沒有「效率系統」權限"));
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
