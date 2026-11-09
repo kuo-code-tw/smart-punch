@@ -1195,7 +1195,6 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-terminal .p79-ter-reason-select{display:block;min-width:142px;max-width:100%;padding:8px 10px;border:1px solid #94a3b8;border-radius:9px;background:#f8fafc;color:#0f172a;font:inherit;font-weight:800}
 #view-terminal .p79-ter-reason-select:focus{outline:2px solid #38bdf8;outline-offset:2px}
 #view-terminal .p79-ter-manual{display:block;margin-top:4px;font-size:10px;color:#7c3aed;font-weight:800}
-#view-terminal .p79-ter-columns{grid-template-columns:1fr}
 #view-terminal .p79-ter-table-wrap{container-type:inline-size}
 @container (max-width:900px){
  #view-terminal .p79-ter-table{min-width:0!important;width:100%!important;display:block;white-space:normal!important;text-align:left}
@@ -1220,6 +1219,33 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
  #view-terminal .p79-ter-table tbody tr{grid-template-columns:repeat(2,minmax(0,1fr))}
  #view-terminal .p79-ter-hint{font-size:11px}
  #view-terminal .p79-ter-head .p79-ter-month,#view-terminal .p79-ter-head .p79-ter-month select{min-width:0}
+}
+
+/* Desktop: keep both terminal cards left/right; squeeze the rows, not the cards. */
+@media (min-width:701px){
+ #view-terminal .p79-ter-table-wrap{container-type:normal;overflow-x:hidden;overflow-y:auto}
+ #view-terminal .p79-ter-table{display:table;min-width:0;width:100%;table-layout:fixed;white-space:normal;text-align:center;font-size:11px}
+ #view-terminal .p79-ter-table thead{display:table-header-group}
+ #view-terminal .p79-ter-table tbody{display:table-row-group}
+ #view-terminal .p79-ter-table tbody tr{display:table-row}
+ #view-terminal .p79-ter-table th,#view-terminal .p79-ter-table td{padding:8px 4px;overflow-wrap:anywhere;word-break:normal;white-space:normal;line-height:1.45}
+ #view-terminal .p79-ter-stop-detail{min-width:0}
+ #view-terminal .p79-ter-remark{min-width:0;max-width:none}
+ #view-terminal .p79-ter-columns{column-gap:12px}
+ #view-terminal .p79-ter-columns .p79-ter-box{padding:13px;min-width:0}
+ #view-terminal .p79-ter-columns .p79-ter-box-title{font-size:15px}
+ #view-terminal .p79-ter-columns .p79-ter-hint{font-size:10px}
+ #view-terminal .p79-ter-columns .p79-ter-table{font-size:10.8px}
+ #view-terminal .p79-ter-columns .p79-ter-table th,#view-terminal .p79-ter-columns .p79-ter-table td{padding:8px 3px}
+ #view-terminal .p79-ter-columns .p79-ter-table td:first-child,
+ #view-terminal .p79-ter-columns .p79-ter-table th:first-child{width:19%}
+ #view-terminal .p79-ter-columns .p79-ter-bundle-detail{font-size:10px}
+}
+@media (min-width:1051px){
+ #view-terminal .p79-ter-columns{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:701px) and (max-width:1050px){
+ #view-terminal .p79-ter-columns{grid-template-columns:1fr}
 }
 </style>
 <section id="view-terminal" class="hidden space-y-4" aria-label="碼頭營運統計">
