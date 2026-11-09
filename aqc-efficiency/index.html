@@ -761,6 +761,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 航線資料</button>
+       <button class="tab btn bg-slate-100" data-tab="terminal" onclick="switchTab('terminal',this)">🏗️ 碼頭營運統計</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
       <button class="tab btn bg-slate-100" data-tab="dispatch" onclick="switchTab('dispatch',this)">⚖️ 人員調度與月均效率</button>
@@ -1117,6 +1118,100 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <tbody id="routeDetailBody"></tbody>
     </table></div>
   </div>
+</section>
+
+
+<style id="p79-terminal-ops-style-v1">
+#efficiencyMainTabs .tab[data-tab="terminal"]:not(.active){background:#dcfce7!important;color:#065f46!important;border:1px solid #86efac}
+#view-terminal{--ter-ink:#183049;--ter-muted:#64748b;--ter-line:#dbe7ef;color:var(--ter-ink)}
+#view-terminal .p79-ter-board{border-radius:22px;padding:22px;background:linear-gradient(145deg,#fff 0%,#f6fafb 100%);border:1px solid var(--ter-line);box-shadow:0 10px 28px rgba(15,23,42,.05)}
+#view-terminal .p79-ter-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap}
+#view-terminal .p79-ter-eyebrow{color:#0f766e;font-size:11px;font-weight:900;letter-spacing:.15em}
+#view-terminal .p79-ter-title{font-size:24px;font-weight:900;letter-spacing:-.02em;margin-top:5px}
+#view-terminal .p79-ter-lead{color:var(--ter-muted);font-size:13px;line-height:1.75;max-width:760px;margin-top:7px}
+#view-terminal .p79-ter-month{display:grid;gap:5px;font-size:12px;font-weight:850;color:#475569}
+#view-terminal .p79-ter-month select{min-width:185px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;color:#0f172a}
+#view-terminal .p79-ter-status{display:block;margin:15px 0 17px;padding:10px 14px;border-radius:12px;background:#f1f5f9;font-size:12px;font-weight:750;color:#64748b}
+#view-terminal .p79-ter-status[data-state="cloud"]{background:#dcfce7;color:#166534}
+#view-terminal .p79-ter-status[data-state="loading"]{background:#dbeafe;color:#1d4ed8}
+#view-terminal .p79-ter-status[data-state="mixed"],#view-terminal .p79-ter-status[data-state="local"]{background:#fef3c7;color:#92400e}
+#view-terminal .p79-terminal-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+#view-terminal .p79-terminal-kpi{position:relative;padding:16px 18px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;min-width:0}
+#view-terminal .p79-terminal-kpi:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:16px 16px 0 0;background:var(--kpi-color,#0f766e)}
+#view-terminal .p79-terminal-kpi .kpi-label{font-size:12px;color:#475569;font-weight:800}
+#view-terminal .p79-terminal-kpi .kpi-value{font-size:28px;font-weight:900;color:#0f172a;line-height:1.35;margin:5px 0 2px}
+#view-terminal .p79-terminal-kpi .kpi-sub{font-size:11px;line-height:1.45;color:#64748b}
+#view-terminal .tone-blue{--kpi-color:#2563eb;background:#f5f9ff}
+#view-terminal .tone-cyan{--kpi-color:#0891b2;background:#f3fcff}
+#view-terminal .tone-orange{--kpi-color:#ea580c;background:#fffaf5}
+#view-terminal .tone-green{--kpi-color:#059669;background:#f4fef9}
+#view-terminal .tone-purple{--kpi-color:#7c3aed;background:#faf8ff}
+#view-terminal .tone-rose{--kpi-color:#e11d48;background:#fff7fa}
+#view-terminal .p79-ter-box{border:1px solid var(--ter-line);border-radius:19px;padding:19px;background:#fff;margin-top:16px}
+#view-terminal .p79-ter-box-head{display:flex;gap:10px;justify-content:space-between;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+#view-terminal .p79-ter-box-title{font-size:18px;font-weight:900}
+#view-terminal .p79-ter-hint{font-size:12px;line-height:1.6;color:#64748b}
+#view-terminal .p79-ter-table-wrap{overflow:auto;border-radius:12px;border:1px solid #e2e8f0;max-height:510px}
+#view-terminal .p79-ter-table{width:100%;min-width:740px;white-space:nowrap;text-align:center;border-collapse:collapse;font-size:13px}
+#view-terminal .p79-ter-table th{background:#eaf3f5;color:#315166;padding:11px 12px;font-weight:850;position:sticky;top:0;z-index:1}
+#view-terminal .p79-ter-table td{padding:11px 12px;border-top:1px solid #e7edf3;color:#334155}
+#view-terminal .p79-ter-table tr:nth-child(even){background:#f8fbfc}
+#view-terminal .p79-ter-table tbody tr:hover{background:#eaf8f5}
+#view-terminal .p79-ter-table td.em{font-weight:900;color:#047857}
+#view-terminal .p79-terminal-wharf{font-size:15px;font-weight:900;color:#2563eb!important}
+#view-terminal .p79-terminal-shift{display:inline-flex;align-items:center;padding:4px 9px;border-radius:8px;background:#ecfdf5;color:#047857;font-weight:850}
+#view-terminal .p79-terminal-empty{padding:24px 12px!important;white-space:normal;color:#64748b!important}
+#view-terminal .p79-ter-columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+#view-terminal .p79-ter-columns .p79-ter-box{min-width:0}
+#view-terminal .p79-ter-warnings{font-size:12px;line-height:1.8;color:#9a3412;background:#fff7ed;border-radius:12px;padding:12px;margin-top:16px}
+#view-terminal .p79-ter-notice{font-size:12px;color:#64748b;line-height:1.75;margin-top:12px}
+@media(max-width:1050px){#view-terminal .p79-ter-columns{grid-template-columns:1fr}}
+@media(max-width:800px){#view-terminal .p79-terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#view-terminal .p79-ter-board{padding:12px}#view-terminal .p79-terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#view-terminal .p79-terminal-kpi{padding:13px}#view-terminal .p79-terminal-kpi .kpi-value{font-size:22px}#view-terminal .p79-ter-box{padding:12px}#view-terminal .p79-ter-month,#view-terminal .p79-ter-month select{width:100%}}
+</style>
+<section id="view-terminal" class="hidden space-y-4" aria-label="碼頭營運統計">
+ <div id="terminalDashboardRoot" class="p79-ter-board">
+  <div class="p79-ter-head">
+   <div>
+    <div class="p79-ter-eyebrow">TERMINAL OPERATIONS</div>
+    <h2 class="p79-ter-title">🏗️ 碼頭營運統計</h2>
+    <p class="p79-ter-lead">把船舶完工量、每日／班別 AQC 明細、停工原因集中在同一頁。數字依來源區分，不會將人員回報櫃數誤當成船舶請款櫃數。</p>
+   </div>
+   <label class="p79-ter-month">統計月份<select id="terminalMonth" onchange="P79TerminalOps.load(true)"><option value="">讀取月份</option></select></label>
+  </div>
+  <div id="terminalDataStatus" class="p79-ter-status" role="status" aria-live="polite">正在準備當月資料…</div>
+  <div id="terminalKpi" class="p79-terminal-kpis"></div>
+  <div class="p79-ter-box">
+    <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">⚓ 碼頭別作業統計</h3><span class="p79-ter-hint">船舶主檔｜按完工月份｜WORKING NO. 去重</span></div>
+    <div class="p79-ter-table-wrap">
+     <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>請款櫃數</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
+    </div>
+    <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；請款櫃數與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝請款」。</p>
+  </div>
+  <div class="p79-ter-columns">
+    <div class="p79-ter-box">
+     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日</span></div>
+     <div class="p79-ter-table-wrap">
+      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>請款</th><th>總 Moves</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
+     </div>
+    </div>
+    <div class="p79-ter-box">
+     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🕒 每日／班別作業明細</h3><span class="p79-ter-hint">依作業日期與開始時間分班</span></div>
+     <div class="p79-ter-table-wrap">
+      <table class="p79-ter-table"><thead><tr><th>作業日期</th><th>班別</th><th>明細筆數</th><th>回報 DISC</th><th>回報 LOAD</th><th>H/C</th><th>作業時數</th></tr></thead><tbody id="terminalShiftBody"></tbody></table>
+     </div>
+     <p class="p79-ter-notice">班別為 08–16、16–24、24–08；若一筆作業跨班，櫃數暫歸開始班，尚未按逐櫃時間精確拆分。AQC 明細櫃數不直接等於船舶請款數。</p>
+    </div>
+  </div>
+  <div class="p79-ter-box">
+   <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🛠️ 停工與異常原因統計</h3><span class="p79-ter-hint">由明細的「停工項目／停工時間」實際填報計算</span></div>
+   <div class="p79-ter-table-wrap">
+    <table class="p79-ter-table"><thead><tr><th>停工原因</th><th>填報事件</th><th>累計分鐘</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
+   </div>
+   <p class="p79-ter-notice">停工分鐘為各 AQC 作業紀錄的回報總和，並非已去重的整個碼頭停擺時間；沒有填報不代表沒有停工。</p>
+  </div>
+  <div id="terminalWarnings" class="p79-ter-warnings" role="note"></div>
+ </div>
 </section>
 
 <dialog id="dualAuditDetailDialog" class="p-0 !w-[min(1120px,calc(100vw-18px))]" style="resize:both;overflow:auto;min-width:620px;min-height:360px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);">
@@ -1985,7 +2080,9 @@ function setPort79Year(year){
   populateMonthlyCompareMonth('');
   renderAll();
   if(monthlyActualRows?.length)rebuildMonthlyComparison();
-  if(activeEfficiencyTabName()==='compare'){p79RouteMonthLoadedAt=0;void p79LoadRouteMonth(true);}else Promise.resolve().then(()=>loadEfficiencyCloudScope({year:y},true)).catch(e=>console.warn('年度船舶資料讀取失敗',e));
+  if(activeEfficiencyTabName()==='compare'){p79RouteMonthLoadedAt=0;void p79LoadRouteMonth(true);}
+  else if(activeEfficiencyTabName()==='terminal'){void window.P79TerminalOps?.load(true);}
+  else Promise.resolve().then(()=>loadEfficiencyCloudScope({year:y},true)).catch(e=>console.warn('年度船舶資料讀取失敗',e));
 }
 function shipMasterDateMatchesYear(s,year){
   if(!year)return true;
@@ -2004,6 +2101,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
   if(name==='multi-rod'){window.P79AqcMultiRod?.render();return;}
   if(name==='compare'){renderRouteData();if(typeof p79LoadRouteMonth==='function')void p79LoadRouteMonth();return;}
+  if(name==='terminal'){window.P79TerminalOps?.render();void window.P79TerminalOps?.load();return;}
   if(name==='groups'){populateSelects();renderGroups();renderPeople();return;}
   if(name==='records'){populateSelects();renderRecords();return;}
   if(name==='personstats'){
@@ -2018,7 +2116,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   if(name==='ranking'||name==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();return;}
 }
 function switchTab(name,btn){if(name==='workload'||name==='ranking'){name='weekly';btn=null;}if(name==='groups'||name==='records'){name='personstats';btn=null;}
-  ['dashboard','multi-rod','compare','groups','personstats','weekly','ranking','dispatch','gate'].forEach(x=>{
+  ['dashboard','multi-rod','compare','terminal','groups','personstats','weekly','ranking','dispatch','gate'].forEach(x=>{
     const e=document.getElementById(`view-${x}`);
     if(e)e.classList.toggle('hidden',x!==name&&!(name==='weekly'&&x==='ranking'));
   });
@@ -15248,6 +15346,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
+<script src="./terminal-ops.js?v=20261109-pilot-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
