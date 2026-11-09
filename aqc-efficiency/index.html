@@ -1185,6 +1185,39 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-terminal .p79-ter-remark{max-width:400px;min-width:190px;text-align:left;white-space:normal;word-break:break-word}
 @media(max-width:800px){#view-terminal .p79-ter-stop-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:380px){#view-terminal .p79-ter-stop-kpis{grid-template-columns:1fr}}
+
+#view-terminal .p79-ter-bundle{color:#9333ea!important;font-weight:850}
+#view-terminal .p79-ter-bundle small{font-size:10px;color:#b45309}
+#view-terminal .p79-ter-check{font-weight:850;color:#b45309!important}
+#view-terminal .p79-ter-reason-select{display:block;min-width:142px;max-width:100%;padding:8px 10px;border:1px solid #94a3b8;border-radius:9px;background:#f8fafc;color:#0f172a;font:inherit;font-weight:800}
+#view-terminal .p79-ter-reason-select:focus{outline:2px solid #38bdf8;outline-offset:2px}
+#view-terminal .p79-ter-manual{display:block;margin-top:4px;font-size:10px;color:#7c3aed;font-weight:800}
+#view-terminal .p79-ter-columns{grid-template-columns:1fr}
+#view-terminal .p79-ter-table-wrap{container-type:inline-size}
+@container (max-width:900px){
+ #view-terminal .p79-ter-table{min-width:0!important;width:100%!important;display:block;white-space:normal!important;text-align:left}
+ #view-terminal .p79-ter-table thead{display:none!important}
+ #view-terminal .p79-ter-table tbody{display:block;width:100%}
+ #view-terminal .p79-ter-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;padding:11px 12px;border-bottom:1px solid #dbe4ef;border-radius:11px;margin:8px 0;background:#fff!important;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+ #view-terminal .p79-ter-table tbody tr td{padding:6px 2px;border:0;display:flex;flex-direction:column;gap:3px;white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;min-width:0;max-width:none!important;font-size:12px}
+ #view-terminal .p79-ter-table tbody tr td::before{content:attr(data-label);font-weight:850;font-size:11px;color:#64748b;line-height:1.4}
+ #view-terminal .p79-ter-table tbody tr td:first-child{grid-column:1/-1;font-size:14px;font-weight:850;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+ #view-terminal .p79-ter-table tbody tr td:first-child::before{font-size:11px}
+ #view-terminal .p79-ter-table tbody tr td.p79-ter-remark{grid-column:1/-1}
+ #view-terminal .p79-ter-table tbody tr td:has(.p79-ter-reason-select){grid-column:1/-1}
+ #view-terminal .p79-ter-reason-select{width:100%;min-width:0}
+ #view-terminal .p79-ter-table tbody tr td.p79-terminal-empty{grid-column:1/-1;display:block;padding:15px!important}
+ #view-terminal .p79-ter-table tbody tr td.p79-terminal-empty::before{content:none}
+}
+@media(max-width:1300px){
+ #view-terminal .p79-ter-table-wrap{overflow-x:hidden!important;overflow-y:auto}
+ #view-terminal .p79-ter-board,#view-terminal .p79-ter-box{min-width:0;max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-width:560px){
+ #view-terminal .p79-ter-table tbody tr{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #view-terminal .p79-ter-hint{font-size:11px}
+ #view-terminal .p79-ter-head .p79-ter-month,#view-terminal .p79-ter-head .p79-ter-month select{min-width:0}
+}
 </style>
 <section id="view-terminal" class="hidden space-y-4" aria-label="碼頭營運統計">
  <div id="terminalDashboardRoot" class="p79-ter-board">
@@ -1201,16 +1234,17 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   <div class="p79-ter-box">
     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">⚓ 碼頭別作業統計</h3><span class="p79-ter-hint">船舶主檔｜按完工月份｜WORKING NO. 去重</span></div>
     <div class="p79-ter-table-wrap">
-     <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>作業量</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
+     <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
     </div>
     <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；作業量與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝作業量」。</p>
   </div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
-     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日</span></div>
+     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日｜Bundle 取自 WORKING SHEET 或船舶主檔，不以差額推定</span></div>
      <div class="p79-ter-table-wrap">
-      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>作業量</th><th>總 Moves</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
+      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>待核差額</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
      </div>
+     <p class="p79-ter-notice">原始卸船＋裝船－Bundle 扣除＝作業量；如欄位未提供或仍有差異，顯示「待核對」，不會自行推算成 Bundle。總 Moves 另外含 SHIFT。</p>
     </div>
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🕒 每日／早中晚班作業明細</h3><span class="p79-ter-hint">依作業日期與開始時間分班</span></div>
@@ -1228,9 +1262,9 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
    </div>
    <div class="p79-ter-stop-detail-head"><h4>📋 停工與異常事件明細</h4><span id="terminalStopDetailCaption">全部原因</span></div>
    <div class="p79-ter-table-wrap">
-    <table class="p79-ter-table p79-ter-stop-detail"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>資料來源</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
+    <table class="p79-ter-table p79-ter-stop-detail"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>原因分類（點選修改）</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
    </div>
-   <p class="p79-ter-notice">色卡可篩選下方明細，再次點選同一卡片顯示全部。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
+   <p class="p79-ter-notice">色卡可篩選下方明細，再次點選同一卡片顯示全部。每筆右側可手動選擇原因分類，統計卡片立即更新；手動選擇目前保存在使用中的瀏覽器。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
   </div>
   <div id="terminalWarnings" class="p79-ter-warnings" role="note"></div>
  </div>
@@ -15370,7 +15404,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-remark-shift-sort-v3"></script>
+<script src="./terminal-ops.js?v=20261109-bundle-reason-mobile-v4"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
