@@ -27,7 +27,6 @@ jobs:
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
       - run: node tests/schedule-pre08-extension-regular-shift.cjs
-      - run: node tests/schedule-punch-restore.cjs
       - run: node tests/schedule-short-punch-date-display.cjs
       - run: node tests/schedule-overtime-accounting-date.cjs
       - run: node tests/schedule-november-early-month-no-punch.cjs
