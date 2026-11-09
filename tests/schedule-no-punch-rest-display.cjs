@@ -65,7 +65,7 @@ assert.match(html,/const noPunchRest=\(!hasOfficialOvertimeReport\|\|verifiedNoW
  'formal overtime is protected until its zero-punch status is verified');
 assert.match(html,/p79ScheduleNoPunchRest\(emp.id,dayStr,rosterShift/,
  'screen still invokes the shared no-card resolution');
-assert.match(html,/row\[String\(d\)\]=selected\.visibleCode/,'Excel uses exactly the same resolved day code');
+assert.match(html,/row\[String\(d\)\]=p79ScheduleExcelShiftCode\(selected\.visibleCode\)/,'Excel uses the same day resolution, converting ordinary shift names to time ranges');
 const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(Boolean);
 scripts.forEach(code=>new vm.Script(code));
 console.log('PASS: 10/31 no-punch rest, real punches, single-sided, unverified, official holidays, approved leave, overtime precedence, ongoing night shift, counts and export');

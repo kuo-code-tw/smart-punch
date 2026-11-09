@@ -33,27 +33,28 @@ vm.runInContext(body('p79CompactOvertimeCode','    function p79SubstituteShiftLa
 vm.runInContext(body('p79ScheduleConfirmedOvertime','    // 與排班畫面'),c);
 vm.runInContext(body('p79ScheduleSpecialNoPunchCode','    function p79ScheduleNoPunchRest('),c);
 vm.runInContext(body('p79VisibleRestKind','    function p79VisibleRestDayAudit('),c);
+vm.runInContext(body('p79ScheduleExcelShiftCode','    function p79ScheduleExportDay('),c);
 vm.runInContext(body('p79ScheduleExportDay','    async function exportScheduleToExcel('),c);
 const emp={id:'E',name:'測試'};
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱','without IN/OUT, typhoon day must export 颱');
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-22'),'休','ordinary no-punch completed shift remains rest');
 status.state='missing';
-assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'晚','a single-sided punch cannot be converted to typhoon');
+assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'打卡待核','a single-sided punch must stay pending, not fabricate a night shift');
 status.state='worked';
-assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'晚','actual attendance retains shift');
+assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'24-08','actual attendance retains night shift in time format');
 shifts['2026-10-23']='颱08-11';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱08-11','recorded typhoon overtime code must survive export');
 shifts['2026-10-23']='晚';status.state='rest';
 approved=true;
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'年','approved leave keeps its code');
 approved=false;status.complete=false;
-assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'晚','incomplete attendance evidence must not invent absence');
+assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'打卡待核','incomplete attendance evidence must not invent absence or a verified night shift');
 status.complete=true;status.state='rest';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'休','future absence must not be labeled election');
 now.value='2026-10-26';
 assert.equal(c.p79ScheduleExportDay(emp,'2026-10-25'),'選','verified election-day absence must export 選');
 assert(html.includes("const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||"),'web and export use one shared resolver');
-assert(html.includes('return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;'));
+assert(html.includes('return p79ScheduleExcelShiftCode(p79ScheduleDisplayDay(emp,dayStr,context).visibleCode);'));
 assert(html.includes('const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);'));
 assert(html.includes('await p79ScheduleRestClient().refreshIfStale(yearMonth)'),'export waits for missing attendance evidence when special days exist');
 console.log('PASS: typhoon and election no-punch export, partial/full punches, approved leave, overtime code, evidence guard and web parity');
@@ -66,7 +67,8 @@ for(const state of ['rest','open','worked','missing']){
   assert.equal(c.p79ScheduleSpecialNoPunchCode('E','2026-10-23','晚',null),'');
  }
  c.monthlyScheduleMeta.E={};shifts['2026-10-23']='颱24-01';
- assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),'颱24-01');
+ assert.equal(c.p79ScheduleExportDay(emp,'2026-10-23'),state==='missing'?'打卡待核':'颱24-01',
+  'unverified single-punch day stays pending; only otherwise preserve saved special-period code');
  shifts['2026-10-23']='晚';
 }
 console.log('PASS saved overnight reports override stale no-punch evidence across all attendance states');
