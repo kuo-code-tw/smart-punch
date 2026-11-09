@@ -48,7 +48,7 @@ function shiftOf(t){
   if(!m)return '時間未提供';
   const hh=Number(m[1]),mm=Number(m[2]);
   if(hh>23||mm>59)return '時間未提供';
-  return hh<8?'24–08':hh<16?'08–16':'16–24';
+  return hh<8?'晚班':hh<16?'早班':'中班';
 }
 function timeHours(r){
   const fromValue=measure(r.timeHours);
@@ -231,8 +231,8 @@ function build(month,ships,rows){
   return {
     month,ships:masters,records,
     vesselTotals,byWharf:[...byWharf.values()].sort((a,b)=>b.moves-a.moves||a.wharf.localeCompare(b.wharf)),
-    byDay:[...byDay.values()].sort((a,b)=>a.day.localeCompare(b.day)),
-    byShift:[...byShift.values()].sort((a,b)=>a.day.localeCompare(b.day)||['24–08','08–16','16–24','時間未提供'].indexOf(a.shift)-['24–08','08–16','16–24','時間未提供'].indexOf(b.shift)),
+    byDay:[...byDay.values()].sort((a,b)=>b.day.localeCompare(a.day)),
+    byShift:[...byShift.values()].sort((a,b)=>b.day.localeCompare(a.day)||['早班','中班','晚班','時間未提供'].indexOf(a.shift)-['早班','中班','晚班','時間未提供'].indexOf(b.shift)),
     byStop:stops.byStop,stopDetails:stops.stopDetails,
     crossShift,missingTime,unmatchedWharf,...stops
   };
