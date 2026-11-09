@@ -10,6 +10,9 @@ for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminal
 assert(html.includes('./terminal-ops.js?v=20261109-reason-filter-v5'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(html.includes('<th>Bundle 扣除</th>'));
+assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
+assert(html.includes('#view-terminal .p79-ter-day-table thead th:nth-child(5){width:16%;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important}'),'Bundle 扣除 header stays one line');
+
 assert(html.includes('<th>原因分類（點選修改）</th>'));
 assert(html.includes('@container (max-width:900px)'));
 assert(!js.includes('apiPost(')&&!js.includes('postCloud(')&&!js.includes('gcSyncAll'),'analytics must be read only');
