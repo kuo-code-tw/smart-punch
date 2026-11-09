@@ -362,6 +362,15 @@ function render(){
  const shiftBody=el('terminalShiftBody');
  if(shiftBody)shiftBody.innerHTML=stats.byShift.length?stats.byShift.map(s=>
   '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
+ const reasonFilter=el('terminalReasonFilter');
+ if(reasonFilter){
+  reasonFilter.innerHTML='<option value="">全部原因（'+fmt(stats.totalStopEvents)+' 件）</option>'+
+   STOP_CATEGORIES.map(c=>{
+    const grouped=stats.byStop.find(g=>g.reason===c.label);
+    return '<option value="'+safe(c.label)+'">'+safe(c.label)+'（'+fmt(grouped?.events||0)+' 件）</option>';
+   }).join('');
+  reasonFilter.value=state.stopCategory;
+ }
  const categories=el('terminalStopCategoryKpis');
  if(categories)categories.innerHTML=STOP_CATEGORIES.filter(c=>c.label!=='原因未填'||stats.byStop.some(s=>s.reason==='原因未填')).map(c=>{
    const s=stats.byStop.find(item=>item.reason===c.label);
@@ -378,7 +387,7 @@ function render(){
   const encoded=encodeURIComponent(e.eventKey).replace(/'/g,'%27');
   const reasonOptions='<option value=""'+(!manuallyChosen?' selected':'')+'>自動：'+safe(e.automaticCategory)+'</option>'+
    STOP_CATEGORIES.map(c=>'<option value="'+safe(c.label)+'"'+(manuallyChosen===c.label?' selected':'')+'>'+c.icon+' '+safe(c.label)+'</option>').join('');
-  return '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td><select class="p79-ter-reason-select" aria-label="選擇 '+safe(e.date+' '+e.aqc)+' 的異常分類" onchange="P79TerminalOps.setReasonCategory(\''+encoded+'\',this.value)">'+reasonOptions+'</select>'+(manuallyChosen?'<small class="p79-ter-manual">已手動分類</small>':'')+'</td></tr>';
+  return '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td><select class="p79-ter-reason-select" aria-label="選擇 '+safe(e.date+' '+e.aqc)+' 的異常分類" onchange="P79TerminalOps.setReasonCategory(\''+encoded+'\',this.value)">'+reasonOptions+'</select></td></tr>';
  }).join(''):rowMessage(8,stats.records.length?'此分類沒有可辨識的異常紀錄':'尚未取得 WORKING REPORT 明細');
  const detailCaption=el('terminalStopDetailCaption');
  if(detailCaption)detailCaption.textContent=(state.stopCategory||'全部原因')+'｜共 '+fmt(visible.length)+' 件'+(visible.length>160?'，僅列最近 160 件':'');
@@ -449,6 +458,11 @@ async function load(force=false){
   if(ticket===state.requestSeq){state.inFlight='';render();}
  }
 }
-function selectCategory(category){state.stopCategory=state.stopCategory===category?'':category;render();}
-root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory,setReasonCategory,shipBundleMetrics};
+function filterReason(category){
+ if(category&&!STOP_CATEGORIES.some(c=>c.label===category))return;
+ state.stopCategory=category;
+ render();
+}
+function selectCategory(category){filterReason(state.stopCategory===category?'':category);}
+root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory,filterReason,setReasonCategory,shipBundleMetrics};
 })(window);
