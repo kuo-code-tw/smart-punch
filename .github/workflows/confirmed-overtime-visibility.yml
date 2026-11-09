@@ -13,6 +13,7 @@ on:
       - 'tests/overtime-leave-cover-extension-periods.cjs'
       - 'tests/overtime-extension-cross-midnight-workdate.cjs'
       - 'tests/overtime-edit-action.cjs'
+      - 'tests/overtime-confirmed-report-auto-close.cjs'
       - 'assets/port79-workhours-cache.js'
       - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
@@ -30,6 +31,7 @@ on:
       - 'tests/overtime-leave-cover-extension-periods.cjs'
       - 'tests/overtime-extension-cross-midnight-workdate.cjs'
       - 'tests/overtime-edit-action.cjs'
+      - 'tests/overtime-confirmed-report-auto-close.cjs'
       - 'assets/port79-workhours-cache.js'
       - 'assets/port79-overtime-report.js'
       - '.github/workflows/confirmed-overtime-visibility.yml'
@@ -45,6 +47,7 @@ jobs:
           node-version: '22'
       - name: Verify planned vs official reports
         run: |
+          node tests/overtime-confirmed-report-auto-close.cjs
           node tests/overtime-pending-attendance.cjs
           node tests/overtime-planned-separate-section.cjs
           node tests/overtime-planned-review-action.cjs

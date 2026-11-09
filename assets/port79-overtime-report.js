@@ -623,6 +623,23 @@
   const host=id==='p79OvertimeDialog'&&planned?.open?planned:document.body;
   host.appendChild(el);el.querySelector('#p79OtClose').onclick=()=>el.close();el.showModal();return el;
  }
+ // Closing a verified report must not wait for optional navigation, notifications,
+ // or a slow table refresh. Closing the exact instance also preserves any
+ // underlying planned-review dialog and does not change cloud report data.
+ function closeConfirmedReportDialog(el){
+  if(!el)return;
+  try{if(el.open)el.close();}catch(error){console.warn('已確認申報，關閉視窗時發生問題',error);}
+  try{el.p79Cleanup?.();}catch(error){console.warn('加班視窗清理未完成',error);}
+  try{el.remove?.();}catch(error){console.warn('加班視窗移除未完成',error);}
+ }
+ // A lost network acknowledgment is NOT a verified save. Keep the form and
+ // original report ID available for a safe cloud reread/retry, not a duplicate.
+ function awaitOvertimeSaveConfirmation(task,timeoutMs=90000){
+  let timer;
+  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>
+   reject(Error('雲端儲存回覆超過等候時間，結果尚未確認；已保留原申報 ID。請到加班明細核對後再重試，不要新增重複申報。')),timeoutMs);});
+  return Promise.race([Promise.resolve(task),deadline]).finally(()=>clearTimeout(timer));
+ }
  const inputStyle='box-sizing:border-box;width:100%;min-width:0;max-width:100%;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:white;color:#0f172a';
  function editorRow(row){
   const v=[...row.slice(0,9),ruleType(row)].map(x=>String(x??''));
@@ -1583,20 +1600,23 @@
      const selection=selectionKey();
      const validationRequest={empId,date,overtimeDate:prefill.overtimeDate||date,
       coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
-     const validation=await prepareSaveValidation(validationRequest,!editingOriginal);
+     // Always read the current official rule table during preflight, including
+     // original planned-review edits. Reuse this already verified snapshot
+     // instead of performing a second GET after the Save spinner appears.
+     const validation=await prepareSaveValidation(validationRequest,true);
      // Older GAS stores only the punch/work date. Never silently credit 04-08 to 11/08.
      if(validationRequest.overtimeDate!==date&&validation.cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
       throw Error('正式 GAS 尚未支援跨日加班歸屬日 '+validationRequest.overtimeDate+'（出勤日 '+date+'）；保留代班安排，禁止錯日送出申報。');
      if(selectionKey()!==selection)throw Error('核對期間申報內容已變更，請確認內容後再次儲存');
      // Deleted builtin types remain in GAS only to preserve OLD reports.
      // Reject NEW submissions from stale browser tabs even before backend POST.
-     if(!editingOriginal){
+     {
       const latest=validation.rules,selected=chosen;
       const active=activeReportRows(latest.rows,latest.config);
       const stillActive=typeOptions(latest.config,active).some(option=>option.name===ruleType(selected));
       const known=active.some(row=>JSON.stringify(report(row))===JSON.stringify(report(selected)));
       const transientSpecial=specialTypes.some(([name])=>name===ruleType(selected));
-      if(!stillActive||!known&&!transientSpecial)
+      if(!stillActive||!known&&(editingOriginal||!transientSpecial))
        throw Error('所選加班類型或時段已從雲端刪除、停用或換算已更新，請重新讀取雲端選項後核對。');
      }
      const selectedCategoryNow=chosen?.[0];
@@ -1632,24 +1652,29 @@
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
       const button=stageButton;button.disabled=true;el.querySelector('#p79OtStatus').textContent='正在確認出勤時段並儲存加班…';
       try{
-       await ensureSpecialRule(chosen);
-       const result=await global.p79OvertimeContext.saveReport(draft);
+       // The up-to-date rule was checked above. Do not block confirmed
+       // posting on a redundant network read with another timeout.
+       const result=await awaitOvertimeSaveConfirmation(
+        global.p79OvertimeContext.saveReport(draft));
        verifySavedReport(draft,result);
        if(draft.overtimeDate!==draft.date&&String(result?.report?.overtimeDate||'')!==draft.overtimeDate)
         throw Error('雲端未確認加班歸屬日 '+draft.overtimeDate+'；保留待核對，不可當作已申報。');
        if(draft.plannedReview===true&&result?.report?.planned!==false)throw Error('雲端仍顯示預排，尚未確認轉為正式申報；請重新核對。');
        if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('尚未收到加班儲存確認，已保留申報內容');
-       sessionStorage.removeItem(KEY);el.querySelector('#p79OtStatus').textContent=draft.plannedReview===true?'✅ 原預排已核對為正式申報，沿用同一申報 ID。':editingExisting?'✅ 原申報時段已核對修改，沿用同一申報 ID。':result.report?.planned?'✅ 預排加班已儲存；待實際出勤完成後核算，不會先填入打卡時間。':'✅ 加班申報已儲存，已更新加班管理。';
-       global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));
+       // The cloud explicitly confirmed success (and planned=false for a
+       // formal review). Mark complete and close BEFORE any optional event
+       // listener or leave-handoff navigation can throw, block or reopen UI.
+       completed=true;
+       try{sessionStorage.removeItem(KEY);}catch(error){console.warn('已儲存申報；暫存清理未完成',error);}
+       closeConfirmedReportDialog(el);
+       try{global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));}
+       catch(error){console.warn('申報已儲存；畫面通知未完成',error);}
        if(draft.leaveHandoffId&&typeof global.p79OpenLeaveOvertimeHandoff==='function'){
-        completed=true;
         try{
          const progress=advanceLeaveHandoff(draft);
-         if(progress&&progress.remaining){el.close();await global.p79OpenLeaveOvertimeHandoff();}
-         else if(progress){el.querySelector('#p79OtStatus').textContent='✅ 本次請假代班的加班申報已全部完成。';button.textContent='全部申報完成';el.close();}
-         else el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；待申報清單已變更，請按接續申報核對剩餘項目。';
-        }catch(error){el.querySelector('#p79OtStatus').textContent='✅ 本筆已儲存；接續申報未完成：'+error.message+'。請按接續申報核對剩餘項目。';}
-       }else{completed=true;el.close();}
+         if(progress?.remaining)await global.p79OpenLeaveOvertimeHandoff();
+        }catch(error){console.warn('申報已儲存；接續代班申報需重新開啟',error);}
+       }
 
       }finally{button.disabled=completed}
      }else throw Error('申報儲存模組尚未載入；內容已保留，請重新整理後接續申報。');
