@@ -1194,7 +1194,11 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-terminal .p79-ter-check{font-weight:850;color:#b45309!important}
 #view-terminal .p79-ter-reason-select{display:block;min-width:142px;max-width:100%;padding:8px 10px;border:1px solid #94a3b8;border-radius:9px;background:#f8fafc;color:#0f172a;font:inherit;font-weight:800}
 #view-terminal .p79-ter-reason-select:focus{outline:2px solid #38bdf8;outline-offset:2px}
-#view-terminal .p79-ter-manual{display:block;margin-top:4px;font-size:10px;color:#7c3aed;font-weight:800}
+#view-terminal .p79-ter-stop-filter-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+#view-terminal .p79-ter-stop-filter-controls label{font-size:12px;font-weight:850;color:#475569;white-space:nowrap}
+#view-terminal #terminalReasonFilter{min-width:142px;max-width:100%;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800}
+#view-terminal #terminalReasonFilter:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
+@media(max-width:560px){#view-terminal .p79-ter-stop-filter-controls{width:100%}#view-terminal #terminalReasonFilter{flex:1;min-width:0}}
 #view-terminal .p79-ter-table-wrap{container-type:inline-size}
 @container (max-width:900px){
  #view-terminal .p79-ter-table{min-width:0!important;width:100%!important;display:block;white-space:normal!important;text-align:left}
@@ -1288,11 +1292,18 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
    <div class="p79-ter-table-wrap">
     <table class="p79-ter-table"><thead><tr><th>異常原因</th><th>事件數</th><th>確認分鐘</th><th>未定時事件</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
    </div>
-   <div class="p79-ter-stop-detail-head"><h4>📋 停工與異常事件明細</h4><span id="terminalStopDetailCaption">全部原因</span></div>
+   <div class="p79-ter-stop-detail-head">
+    <h4>📋 停工與異常事件明細</h4>
+    <div class="p79-ter-stop-filter-controls">
+      <label for="terminalReasonFilter">原因分類</label>
+      <select id="terminalReasonFilter" aria-label="篩選停工與異常原因分類" onchange="P79TerminalOps.filterReason(this.value)"><option value="">全部原因</option></select>
+      <span id="terminalStopDetailCaption">全部原因</span>
+    </div>
+   </div>
    <div class="p79-ter-table-wrap">
     <table class="p79-ter-table p79-ter-stop-detail"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>原因分類（點選修改）</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
    </div>
-   <p class="p79-ter-notice">色卡可篩選下方明細，再次點選同一卡片顯示全部。每筆右側可手動選擇原因分類，統計卡片立即更新；手動選擇目前保存在使用中的瀏覽器。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
+   <p class="p79-ter-notice">色卡或上方「原因分類」下拉選單都能篩選下方明細；每筆右側可手動選擇原因分類，統計卡片立即更新；手動選擇目前保存在使用中的瀏覽器。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
   </div>
   <div id="terminalWarnings" class="p79-ter-warnings" role="note"></div>
  </div>
@@ -15432,7 +15443,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-bundle-reason-mobile-v4"></script>
+<script src="./terminal-ops.js?v=20261109-reason-filter-v5"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
