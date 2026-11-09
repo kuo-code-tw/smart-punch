@@ -3,6 +3,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 assert(html.includes('<th>Bundle 扣除</th>'));
+for(const shift of ['shift-early','shift-middle','shift-night'])assert(html.includes('#view-terminal .p79-terminal-shift.'+shift),'three shift colors exist');
+
 assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
 assert(html.includes('#view-terminal .p79-ter-day-table thead th:nth-child(5){width:16%;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important}'),'Bundle 扣除 header stays one line');
 
