@@ -61,5 +61,5 @@ assert.equal(render('missing',true,'早',false).visibleCode,'打卡待核','lone
 assert.equal(render('unknown',false,'早',false).visibleCode,'打卡待核','no official evidence is not fabricated as a rest');
 assert.equal(render('rest',true,'早',false).visibleCode,'休','confirmed no-card workday becomes rest');
 assert.equal(render('worked',true,'休',true).visibleCode,'已出勤','complete punches override a scheduled rest');
-assert.match(html,/row\[String\(d\)\]=selected\.visibleCode/,'Excel must reuse same shown day code');
+assert.match(html,/row\[String\(d\)\]=p79ScheduleExcelShiftCode\(selected\.visibleCode\)/,'Excel must map the same selected day to time notation');
 console.log('PASS October 31 false pending: real 11/1 07:31 scenario, REST precedence, true night shift, uncertain punches, and export');
