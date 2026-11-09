@@ -4,10 +4,10 @@ const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 assert(html.includes('data-tab="terminal"'));
 assert(html.includes('id="view-terminal"'));
-for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalDataStatus']){
+for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-pilot-v1'));
+assert(html.includes('./terminal-ops.js?v=20261109-remark-v2'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(!js.includes('apiPost(')&&!js.includes('postCloud(')&&!js.includes('gcSyncAll'),'analytics must be read only');
 const mkShip=(no,date,wharf,disc,load,billed,moves,shift=0)=>({
