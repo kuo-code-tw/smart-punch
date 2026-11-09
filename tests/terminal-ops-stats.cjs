@@ -7,7 +7,7 @@ assert(html.includes('id="view-terminal"'));
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-reason-filter-v5'));
+assert(html.includes('./terminal-ops.js?v=20261109-shift-colors-v6'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(html.includes('<th>Bundle 扣除</th>'));
 assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
@@ -75,6 +75,11 @@ assert.equal(api.shiftOf('00:10'),'晚班');
 api.render();
 assert(elements.terminalWharfBody.innerHTML.includes('79L'));
 assert(elements.terminalShiftBody.innerHTML.includes('晚班'));
+assert(elements.terminalShiftBody.innerHTML.includes('p79-terminal-shift shift-night'),'night shift uses purple label');
+assert(elements.terminalShiftBody.innerHTML.includes('p79-terminal-shift shift-middle'),'middle shift uses orange label');
+assert(js.includes("s.shift==='早班'?'shift-early'"),'early shift has separate blue class');
+for(const shift of ['shift-early','shift-middle','shift-night'])assert(html.includes('#view-terminal .p79-terminal-shift.'+shift),'all shift colors defined');
+assert(html.includes('p79-ter-day-table thead th:nth-child(5){width:16%;white-space:nowrap!important'),'Bundle heading remains one line');
 assert(elements.terminalStopBody.innerHTML.includes('設備故障'));
 assert(elements.terminalDayBody.innerHTML.includes('p79-ter-bundle'));
 assert(elements.terminalStopDetailBody.innerHTML.includes('setReasonCategory'));
