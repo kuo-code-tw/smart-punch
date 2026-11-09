@@ -7,6 +7,8 @@ on:
       - 'tests/schedule-november-early-month-no-punch.cjs'
       - 'tests/rest-oct31-nextday-punch-isolation.cjs'
       - 'tests/schedule-night-split-auto.cjs'
+      - 'tests/schedule-pre08-extension-regular-shift.cjs'
+      - 'assets/port79-schedule-punch-restore.js'
       - 'tests/schedule-national-zero-quota.cjs'
       - 'assets/port79-schedule-rest-evidence.js'
       - 'assets/port79-rest-allocation.js'
@@ -24,6 +26,10 @@ jobs:
           node-version: '22'
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
+      - run: node tests/schedule-pre08-extension-regular-shift.cjs
+      - run: node tests/schedule-punch-restore.cjs
+      - run: node tests/schedule-short-punch-date-display.cjs
+      - run: node tests/schedule-overtime-accounting-date.cjs
       - run: node tests/schedule-november-early-month-no-punch.cjs
       - run: node tests/schedule-zero-punch-dual-source.cjs
       - run: node tests/schedule-all-staff-zero-punch.cjs
