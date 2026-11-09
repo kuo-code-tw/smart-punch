@@ -20,7 +20,7 @@
 </script>
 
 <!-- v2026.10.01.9.3：Bundle 同一備註內相同格式重複出現必須逐筆計算；修正 WAN HAI 292 N073 12→9 漏扣。 -->
-<!-- v2026.09.30.9.2：完整巡檢統一 WORKING SHEET／月報欄位定義：請款櫃數=DISC+LOAD、總 Moves=請款+SHIFT；所有月報比對畫面共用同一正規化結果。保留 v9.1 日期/序號配對。 -->
+<!-- v2026.09.30.9.2：完整巡檢統一 WORKING SHEET／月報欄位定義：作業量=DISC+LOAD、總 Moves=作業量+SHIFT；所有月報比對畫面共用同一正規化結果。保留 v9.1 日期/序號配對。 -->
 <!-- v2026.09.30.8.9：修正月報子序號 -1/-2 歷史錯位造成「明明有資料卻判找不到」；統一 WORKING NO 排序，並防止雲端合併不同子序號。 -->
 
 <!-- v2026.10.03.2：跨月完工月份強制版。GC_船舶主檔結束日期為最高優先，舊 localStorage/compareMonth 不得擋掉完工月份。 -->
@@ -794,7 +794,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <div id="cumulativeTitle" class="font-black text-lg mb-3">🚢 全部月份累計船舶統計</div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="cumShipCount" class="text-2xl font-black">0</div><div id="cumShipCountSub" class="text-[11px] text-slate-400 mt-1"></div></div>
-        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統總櫃數（請款＋翻艙）</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
+        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統總櫃數（作業量＋翻艙）</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">艙蓋量</div><div id="cumHatches" class="text-2xl font-black">0</div><div id="cumHatchesSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">翻艙量</div><div id="cumShift" class="text-2xl font-black">0</div><div id="cumShiftSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">累計效率</div><div id="cumEfficiency" class="text-2xl font-black">0.00</div><div id="cumEfficiencySub" class="text-[11px] text-slate-400 mt-1"></div></div>
@@ -839,7 +839,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           <span id="shipUpdatedCountBadge" class="ship-change-pill ship-change-updated hidden">🟡 已更新 0</span>
           <button id="markShipChangesSeenBtn" type="button" onclick="markAllShipChangesSeen()" class="hidden btn bg-slate-700 text-white text-[10px]">✓ 標記為已查看</button>
         </div>
-        <input type="hidden" id="dashboardSortField" value="workingNo">
+        <input type="hidden" id="dashboardSortField" value="date">
         <input type="hidden" id="dashboardSortDir" value="desc">
       </div>
       <div id="summaryTableWrap" class="overflow-auto max-h-[64vh]">
@@ -933,7 +933,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           </div>
           <div class="grid grid-cols-4 gap-4 text-right">
             <div>
-              <div class="text-xs font-bold text-slate-500">請款櫃數</div>
+              <div class="text-xs font-bold text-slate-500">作業量</div>
               <div id="recordShipWorkload" class="text-3xl font-black text-indigo-700">0</div>
             </div>
             <div>
@@ -1192,7 +1192,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
    <div>
     <div class="p79-ter-eyebrow">TERMINAL OPERATIONS</div>
     <h2 class="p79-ter-title">🏗️ 碼頭營運統計</h2>
-    <p class="p79-ter-lead">把船舶完工量、每日／班別 AQC 明細、停工原因集中在同一頁。數字依來源區分，不會將人員回報櫃數誤當成船舶請款櫃數。</p>
+    <p class="p79-ter-lead">把船舶完工量、每日／班別 AQC 明細、停工原因集中在同一頁。數字依來源區分，不會將人員回報櫃數誤當成船舶作業量。</p>
    </div>
    <label class="p79-ter-month">統計月份<select id="terminalMonth" onchange="P79TerminalOps.load(true)"><option value="">讀取月份</option></select></label>
   </div>
@@ -1201,23 +1201,23 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   <div class="p79-ter-box">
     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">⚓ 碼頭別作業統計</h3><span class="p79-ter-hint">船舶主檔｜按完工月份｜WORKING NO. 去重</span></div>
     <div class="p79-ter-table-wrap">
-     <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>請款櫃數</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
+     <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>作業量</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
     </div>
-    <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；請款櫃數與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝請款」。</p>
+    <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；作業量與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝作業量」。</p>
   </div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日</span></div>
      <div class="p79-ter-table-wrap">
-      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>請款</th><th>總 Moves</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
+      <table class="p79-ter-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>作業量</th><th>總 Moves</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
      </div>
     </div>
     <div class="p79-ter-box">
-     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🕒 每日／班別作業明細</h3><span class="p79-ter-hint">依作業日期與開始時間分班</span></div>
+     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🕒 每日／早中晚班作業明細</h3><span class="p79-ter-hint">依作業日期與開始時間分班</span></div>
      <div class="p79-ter-table-wrap">
       <table class="p79-ter-table"><thead><tr><th>作業日期</th><th>班別</th><th>明細筆數</th><th>回報 DISC</th><th>回報 LOAD</th><th>H/C</th><th>作業時數</th></tr></thead><tbody id="terminalShiftBody"></tbody></table>
      </div>
-     <p class="p79-ter-notice">班別為 08–16、16–24、24–08；若一筆作業跨班，櫃數暫歸開始班，尚未按逐櫃時間精確拆分。AQC 明細櫃數不直接等於船舶請款數。</p>
+     <p class="p79-ter-notice">班別為早班（08–16）、中班（16–24）、晚班（24–08）；若一筆作業跨班，櫃數暫歸開始班，尚未按逐櫃時間精確拆分。AQC 明細櫃數不直接等於船舶作業量數。</p>
     </div>
   </div>
   <div class="p79-ter-box">
@@ -1553,7 +1553,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <p class="text-xs text-slate-500 mt-1">列出所選司機做過的船；未選司機時列出日期區間內的船。核對使用每艘船全部日期、所有司機的 WORKING REPORT，不受個人或日期篩選截斷。櫃數不含 H/C；有翻艙時另核對作業 Moves。</p>
       <div id="workloadSheetAuditState" class="mt-2 text-sm font-bold" role="status"></div>
       <table class="tbl w-full min-w-[1200px] text-center">
-        <thead><tr><th>WORKING NO.</th><th>船名／航次</th><th>全船司機 DISC</th><th>全船司機 LOAD</th><th>司機櫃數合計</th><th>WORKING SHEET 請款櫃數</th><th>翻艙作業數</th><th>WORKING SHEET 作業 Moves</th><th>櫃數差額</th><th>H/C 明細／原表</th><th>核對結果</th></tr></thead>
+        <thead><tr><th>WORKING NO.</th><th>船名／航次</th><th>全船司機 DISC</th><th>全船司機 LOAD</th><th>司機櫃數合計</th><th>WORKING SHEET 作業量</th><th>翻艙作業數</th><th>WORKING SHEET 作業 Moves</th><th>櫃數差額</th><th>H/C 明細／原表</th><th>核對結果</th></tr></thead>
         <tbody id="workloadSheetAuditBody"></tbody>
       </table>
     </div>
@@ -2540,10 +2540,10 @@ function clearStaleCorrectionsForWorkingSheetImport(master){
   }catch(e){console.warn('清除月報比對修正快取失敗',e);}
 }
 
-// v9.2：把舊版 WORKING SHEET 快照統一成「請款 / SHIFT / 總 Moves」三個不同欄位。
+// v9.2：把舊版 WORKING SHEET 快照統一成「作業量 / SHIFT / 總 Moves」三個不同欄位。
 // 只在原始快照能自我證明數學關係時修正，避免用月報硬改系統資料：
-//   請款 = (DISC + LOAD) - Bundle
-//   總 Moves = 請款 + SHIFT
+//   作業量 = (DISC + LOAD) - Bundle
+//   總 Moves = 作業量 + SHIFT
 function normalizeWorkingSheetBillingSemantics(master){
   if(!master||typeof master!=='object')return master;
   const out={...master};
@@ -2564,8 +2564,8 @@ function normalizeWorkingSheetBillingSemantics(master){
   if(!(rawBill>0))return out;
 
   const bill=Math.max(0,rawBill-bundle);
-  // 有總 Moves 時必須能驗證「請款 + SHIFT = Moves」才自動修正。
-  // 沒有總 Moves 的舊資料則只更新請款，Moves 依統一公式補值。
+  // 有總 Moves 時必須能驗證「作業量 + SHIFT = Moves」才自動修正。
+  // 沒有總 Moves 的舊資料則只更新作業量，Moves 依統一公式補值。
   const expectedMoves=bill+shift;
   if(moves>0 && !nearlyEqual(expectedMoves,moves,0.01))return out;
 
@@ -2991,7 +2991,7 @@ function applyMonthlyParentChildSplit(master,sysBase,actual,month){
 
 // v7.50：首頁月份統計與月報比對共用父/子作業拆分規則。
 // 注意：首頁不套用 normalizeLegacyMonthlyCompareRow()，避免把使用者已確認的
-// WORKING SHEET「實際櫃數」又改回月報請款櫃數；只處理可被父/子作業精確證明的重複量。
+// WORKING SHEET「實際櫃數」又改回月報作業量；只處理可被父/子作業精確證明的重複量。
 function dashboardMonthlyActualRows(month){
   const m=String(month||'').trim();
   if(!m)return [];
@@ -3135,7 +3135,7 @@ function dashboardMonthlyAuditData(month,jobs){
   const extra=matched.extra;
 
   // v9.2：首頁 KPI、差異卡、月報比對頁必須使用同一套正規化。
-  // 過去 monthlyCompare 頁已能把「TTL Moves 誤存成請款櫃數」的舊資料轉回正確值，
+  // 過去 monthlyCompare 頁已能把「TTL Moves 誤存成作業量」的舊資料轉回正確值，
   // 但首頁 KPI 還直接加總 raw ship master，導致同一筆在不同區塊一邊顯示正確、一邊報錯。
   const normalizedPairs=(matched.pairs||[]).map(p=>{
     const normalized=normalizeLegacyMonthlyCompareRow({...p.sys},p.actual)||p.sys;
@@ -3183,7 +3183,7 @@ function dashboardMonthlyDiffDetails(data){
     const voyage=String(s?.voyageE||s?.voyageI||a?.voyage||'').trim();
     const date=String(a?.date||s?.compareDate||s?.firstDate||'').slice(0,10);
     const fields=[
-      {key:'containers',label:'請款櫃數',system:num(s?.totalContainers),monthly:num(a?.containers)},
+      {key:'containers',label:'作業量',system:num(s?.totalContainers),monthly:num(a?.containers)},
       {key:'hatches',label:'H/C',system:num(s?.hatches),monthly:num(a?.hatches)},
       {key:'shiftMoves',label:'翻艙量',system:num(s?.shiftMoves),monthly:num(a?.shiftMoves)},
       {key:'totalMoves',label:'總 Moves',system:num(s?.totalMoves),monthly:num(a?.totalMoves)}
@@ -3202,7 +3202,7 @@ function dashboardMonthlyDiffDetails(data){
   (data.extra||[]).forEach(s=>pushRow('extra',null,s,{}));
 
   const magnitude=r=>(r.changed||[]).reduce((sum,x)=>sum+Math.abs(num(x.diff)),0);
-  return rows.sort((a,b)=>magnitude(b)-magnitude(a) || String(a.actualSerial||a.systemSerial||'').localeCompare(String(b.actualSerial||b.systemSerial||''),'zh-Hant',{numeric:true}));
+  return rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || magnitude(b)-magnitude(a) || String(a.actualSerial||a.systemSerial||'').localeCompare(String(b.actualSerial||b.systemSerial||''),'zh-Hant',{numeric:true}));
 }
 
 function dashboardMonthlyDiffDetailHtml(data){
@@ -3292,7 +3292,7 @@ function renderDashboardMonthlyAudit(month,jobs){
           const vessel=String(a?.vessel||'').trim();
           return `<div class="rounded-xl border border-rose-200 bg-white p-3">
             <div class="font-black text-rose-700">${esc(serial)}｜WAN HAI ${esc(vessel)}</div>
-            <div class="text-xs text-slate-600 mt-1">${esc(a?.date||'')}｜${esc(a?.voyage||'')}｜請款 ${num(a?.containers)}｜H/C ${num(a?.hatches)}｜SHIFT ${num(a?.shiftMoves)}</div>
+            <div class="text-xs text-slate-600 mt-1">${esc(a?.date||'')}｜${esc(a?.voyage||'')}｜作業量 ${num(a?.containers)}｜H/C ${num(a?.hatches)}｜SHIFT ${num(a?.shiftMoves)}</div>
             <button type="button" onclick="createShipFromMonthlyActual('${esc(serial)}')" class="btn bg-rose-600 text-white text-xs mt-2">從月報補建主檔</button>
           </div>`;
         }).join('')}
@@ -3311,8 +3311,8 @@ function renderDashboardMonthlyAudit(month,jobs){
       <div>
         <div class="font-black text-lg">${ok?'✅':'🔎'} ${esc(month)} 月報／系統統計自動核對</div>
         <div class="text-sm text-slate-600 mt-1">
-          月報 ${monthly.count} 筆・請款 ${monthly.containers}・H/C ${monthly.hatches}・SHIFT ${monthly.shiftMoves}
-          ｜系統 ${system.count} 筆・請款櫃數 ${system.containers}・H/C ${system.hatches}・SHIFT ${system.shiftMoves}
+          月報 ${monthly.count} 筆・作業量 ${monthly.containers}・H/C ${monthly.hatches}・SHIFT ${monthly.shiftMoves}
+          ｜系統 ${system.count} 筆・作業量 ${system.containers}・H/C ${system.hatches}・SHIFT ${system.shiftMoves}
         </div>
       </div>
       <button type="button" onclick="openMonthlyCompareDialog()" class="btn bg-slate-800 text-white text-xs">查看月報差異</button>
@@ -3430,7 +3430,7 @@ function filterAndSortDashboardJobs(list){
   const vesselQ=dashboardFilterText('dashboardFilterVessel');
   const wharfQ=dashboardFilterText('dashboardFilterWharf');
   const eff=String(document.getElementById('dashboardEfficiencyFilter')?.value||'');
-  const sortField=String(document.getElementById('dashboardSortField')?.value||'workingNo');
+  const sortField=String(document.getElementById('dashboardSortField')?.value||'date');
   const sortDir=String(document.getElementById('dashboardSortDir')?.value||'desc');
 
   // 船名改為下拉點選；選 WAN HAI 103 就顯示全部 WAN HAI 103。
@@ -3471,7 +3471,7 @@ function setDashboardSort(field){
   renderAll();
 }
 function updateDashboardSortMarks(){
-  const f=String(document.getElementById('dashboardSortField')?.value||'workingNo');
+  const f=String(document.getElementById('dashboardSortField')?.value||'date');
   const d=String(document.getElementById('dashboardSortDir')?.value||'desc');
   document.querySelectorAll('[data-sort-mark]').forEach(el=>{
     el.textContent=el.dataset.sortMark===f?(d==='asc'?'▲':'▼'):'';
@@ -3501,7 +3501,7 @@ function dashboardShiftAuditBadge(x){
   if(status==='current')return base;
   const derived=Math.max(0,num(x?.totalMoves)-num(x?.totalContainers));
   const reason=rule.includes('SHIFT_X2')
-    ? `翻艙數與總Moves-請款不一致（應為 ${derived}）`
+    ? `翻艙數與總Moves-作業量不一致（應為 ${derived}）`
     : `舊版/未標記 SHIFT_X2，請重新匯入原始 WORKING SHEET 核對`;
   return `<span title="${esc(reason)}">${base} <span class="text-amber-600 text-xs">⚠核對</span></span>`;
 }
@@ -3649,7 +3649,7 @@ function dashboardWorkingReportBadge(job){
   const signed=v=>v>0?'+'+v:String(v);
   const label=pending?'待核對':a.status==='match'?'✓ 一致':Math.abs(a.diff||0)>0.01?'⚠ 櫃數差 '+signed(a.diff):'⚠ '+(a.reasons?.[0]||'明細差異');
   const numbers=pending?(a.count?'WR '+a.containers+'／WS 待確認':'司機明細待讀取'):'WR '+a.containers+'／WS '+a.moves;
-  const title=['全船 '+a.count+' 筆 WORKING REPORT；WS 為請款櫃數＋SHIFT。',...a.reasons].join(' ');
+  const title=['全船 '+a.count+' 筆 WORKING REPORT；WS 為作業量＋SHIFT。',...a.reasons].join(' ');
   return `<button type="button" class="vessel-wr-badge audit-${a.status}" aria-label="司機櫃數核對 ${esc(a.workingNo)}" title="${esc(title)}" onclick="openVesselDetail(this.dataset.workingNo,this.dataset.vessel)" data-working-no="${esc(a.workingNo)}" data-vessel="${esc(job?.vessel||'')}"><strong>${esc(label)}</strong><span>${esc(numbers)}</span></button>`;
 }
 function renderVesselWorkingReportComparison(job){
@@ -3657,7 +3657,7 @@ function renderVesselWorkingReportComparison(job){
   const a=dashboardWorkingReportResult(job),label=a.status==='match'?'✓ 司機櫃數一致':a.status==='pending'?'司機櫃數待核對':'⚠ WORKING REPORT 與 WORKING SHEET 不一致';
   const value=v=>v===null?'—':esc(v),signed=v=>v===null?'—':(v>0?'+':'')+v;
   host.className='vessel-wr-detail audit-'+a.status;
-  host.innerHTML=`<div class="vessel-wr-detail-title">${label}</div><div class="vessel-wr-values"><span>WORKING REPORT 全部司機 <b>${a.count?a.containers:'—'}</b> 櫃（${a.count} 筆）</span><span>WORKING SHEET <b>${value(a.moves)}</b> Moves</span><span>差額 <b>${a.count?signed(a.diff):'—'}</b> 櫃</span></div><div>WORKING SHEET：請款 ${value(a.bill)} ＋ SHIFT ${value(a.shift)} ＝ ${value(a.moves)}；司機櫃數依 Bundle 扣除後核對。H/C：司機 ${a.count?a.hc:'—'}／WORKING SHEET ${value(a.sheetHc)}。</div>${a.reasons.length?'<p>'+esc(a.reasons.join('；'))+'</p>':''}`;
+  host.innerHTML=`<div class="vessel-wr-detail-title">${label}</div><div class="vessel-wr-values"><span>WORKING REPORT 全部司機 <b>${a.count?a.containers:'—'}</b> 櫃（${a.count} 筆）</span><span>WORKING SHEET <b>${value(a.moves)}</b> Moves</span><span>差額 <b>${a.count?signed(a.diff):'—'}</b> 櫃</span></div><div>WORKING SHEET：作業量 ${value(a.bill)} ＋ SHIFT ${value(a.shift)} ＝ ${value(a.moves)}；司機櫃數依 Bundle 扣除後核對。H/C：司機 ${a.count?a.hc:'—'}／WORKING SHEET ${value(a.sheetHc)}。</div>${a.reasons.length?'<p>'+esc(a.reasons.join('；'))+'</p>':''}`;
 }
 function dashboardQuantityReconciliation(month,jobs,sourceRows,masters,staffMoves){
   if(!/^\d{4}-\d{2}$/.test(String(month||'')))return null;
@@ -3721,13 +3721,13 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
     const sumMoves=selected.reduce((sum,x)=>sum+num(x.totalContainers)+num(x.shiftMoves),0);
     const diff=round(num(staffMoves)-sumMoves,2);
     const escCell=s=>esc(String(s));
-    const rows=[...byMonth].sort(([a],[b])=>a.localeCompare(b)).map(([m,x])=>
+    const rows=[...byMonth].sort(([a],[b])=>b.localeCompare(a)).map(([m,x])=>
       `<tr class="border-t border-slate-100"><td class="p-2">${escCell(m)}</td><td class="p-2 text-right">${x.count}</td><td class="p-2 text-right">${round(x.bill,2)}</td><td class="p-2 text-right">${round(x.shift,2)}</td><td class="p-2 text-right font-bold">${round(x.bill+x.shift,2)}</td></tr>`).join('');
     host.classList.remove('hidden');
     host.innerHTML=`<details id="dashboardQuantityReconciliationDetails">
       <summary class="cursor-pointer text-sm font-black text-slate-700">🔍 ${escCell(year)} 年全年櫃數核對｜各月加總 ${round(sumMoves,2)}｜人員與系統差 ${dashboardSignedDiff(diff)}</summary>
       <p class="mt-2 text-xs text-slate-600">目前是全年累計，並非單月；以下依畫面已載入的船舶完工月份分列。只讀核對，不修改任何原始資料。</p>
-      <div class="mt-2 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="bg-slate-100"><th class="p-2">月份</th><th class="p-2 text-right">船數</th><th class="p-2 text-right">請款櫃數</th><th class="p-2 text-right">SHIFT</th><th class="p-2 text-right">總 Moves</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="p-2">目前沒有這個年度的船舶資料</td></tr>'}</tbody></table></div>
+      <div class="mt-2 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="bg-slate-100"><th class="p-2">月份</th><th class="p-2 text-right">船數</th><th class="p-2 text-right">作業量</th><th class="p-2 text-right">SHIFT</th><th class="p-2 text-right">總 Moves</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="p-2">目前沒有這個年度的船舶資料</td></tr>'}</tbody></table></div>
       ${Math.abs(diff)>0.01?`<p class="mt-2 text-xs font-bold text-amber-800">⚠ 人員作業與船舶總量目前差 ${dashboardSignedDiff(diff)}；資料可能尚有跨月明細、不同版本或待同步紀錄，差額尚未核銷，不可直接當作零。</p>`:''}
       <p class="mt-1 text-xs text-slate-500">若人員資料與船舶總數不一致，仍須逐船查核 WORKING NO.，不可用人員值覆蓋船舶原始櫃數。</p>
     </details>`;
@@ -3753,7 +3753,7 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
     </summary>
     <div class="mt-3 text-sm text-slate-700">
       <div class="rounded-lg bg-slate-50 p-3">
-        ${line('船舶請款櫃數',audit.bill)}
+        ${line('船舶作業量',audit.bill)}
         ${line('加：SHIFT 翻艙量',audit.shift)}
         ${line('船舶總 Moves',audit.moves)}
         ${line('本月完工船舶有效 WORKING REPORT',audit.currentMoves)}
@@ -3899,7 +3899,7 @@ function renderDashboard(){
   const workload=allShips.reduce((s,x)=>s+num(x.totalContainers),0);
   const hatchTotal=allShips.reduce((s,x)=>s+num(x.hatches),0);
   const shiftTotal=allShips.reduce((s,x)=>s+num(x.shiftMoves),0);
-  // 系統總 Moves 必須與員工作業 Moves 採相同口徑：請款櫃數 + SHIFT 翻艙量。
+  // 系統總 Moves 必須與員工作業 Moves 採相同口徑：作業量 + SHIFT 翻艙量。
   // 不以人員值回填系統；兩邊分別計算，差異時如實提出警示。
   const systemTotalMoves=workload+shiftTotal;
 
@@ -3937,7 +3937,7 @@ function renderDashboard(){
         ?'｜已自動排除 '+monthSafety.versionCopies.length+' 筆編輯版本重複（保留原始紀錄）':'';
       const note=document.createElement('p');
       note.className='text-xs font-semibold text-emerald-700 mt-2';
-      note.textContent='✓ 本月自動核對：'+monthSafety.shipCount+' 艘，請款 '+monthSafety.billing+
+      note.textContent='✓ 本月自動核對：'+monthSafety.shipCount+' 艘，作業量 '+monthSafety.billing+
         '＋ SHIFT '+monthSafety.shift+'＝'+round(monthSafety.billing+monthSafety.shift,2)+
         ' Moves，H/C '+monthSafety.hatches+suffix+
         '。此為系統內部核對，外部 Excel 月報仍須另行比對。';
@@ -3951,7 +3951,7 @@ function renderDashboard(){
     const comparableMonth=/^\d{4}-\d{2}$/.test(selectedMonth)&&!rangeActive&&jobs.length===allDashboardJobs.length;
     const diff=round(c-systemTotalMoves,2);
     const comparison=comparableMonth?(Math.abs(diff)<0.01?'✓ 僅與系統人員明細一致（非月報）':`⚠ 與系統人員明細差 ${dashboardSignedDiff(diff)}`):'';
-    systemSub.textContent=[`請款 ${workload} ＋ SHIFT ${shiftTotal}`,comparison,monthlySourceNote].filter(Boolean).join('｜');
+    systemSub.textContent=[`作業量 ${workload} ＋ SHIFT ${shiftTotal}`,comparison,monthlySourceNote].filter(Boolean).join('｜');
   }
 }
 async function reloadEmployeeData(){
@@ -4267,7 +4267,7 @@ function shiftAuditForMaster(master){
 function shiftAuditBadge(master){
   const a=shiftAuditForMaster(master);
   if(a.ok)return `<span class="text-emerald-600 font-black">${a.shift}</span>`;
-  return `<span class="text-rose-600 font-black" title="翻艙核對異常：主檔 SHIFT ${a.shift}，但總 Moves ${a.moves} - 請款 ${a.bill} = ${a.derived}">⚠ ${a.shift}</span>`;
+  return `<span class="text-rose-600 font-black" title="翻艙核對異常：主檔 SHIFT ${a.shift}，但總 Moves ${a.moves} - 作業量 ${a.bill} = ${a.derived}">⚠ ${a.shift}</span>`;
 }
 
 function renderRecordStats(selectedMaster,baseRows,rows){
@@ -4295,7 +4295,7 @@ function renderRecordStats(selectedMaster,baseRows,rows){
       auditText.textContent=`翻艙核對：${audit.moves} - ${audit.bill} = ${audit.derived}，與主檔 SHIFT ${audit.shift} 一致`;
       auditText.className='text-xs mt-1 text-emerald-600 font-bold';
     }else{
-      auditText.textContent=`⚠ 翻艙異常：總 Moves ${audit.moves} - 請款 ${audit.bill} = ${audit.derived}，但主檔 SHIFT = ${audit.shift}`;
+      auditText.textContent=`⚠ 翻艙異常：總 Moves ${audit.moves} - 作業量 ${audit.bill} = ${audit.derived}，但主檔 SHIFT = ${audit.shift}`;
       auditText.className='text-xs mt-1 text-rose-600 font-bold';
     }
   }
@@ -4310,7 +4310,7 @@ function renderRecordStats(selectedMaster,baseRows,rows){
     a.people.add(String(r.empId||r.name||''));
     return a;
   },{disc:0,load:0,bundle:0,hatches:0,hours:0,people:new Set()});
-  // WORKING REPORT 的 DISC+LOAD 是作業 Moves；若有翻艙，它會大於「請款櫃數」。
+  // WORKING REPORT 的 DISC+LOAD 是作業 Moves；若有翻艙，它會大於「作業量」。
   const detailMoves=stats.disc+stats.load;
   const gph=stats.hours>0?(detailMoves+stats.hatches)/stats.hours:0;
   const put=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
@@ -4677,7 +4677,7 @@ function renderDriverVesselAqcSummary(all,visible){
   }).join('');
 }
 function renderDriverVesselDetailTable(rows){
-  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||`${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`));
+  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||`${b.workDate} ${b.startTime}`.localeCompare(`${a.workDate} ${a.startTime}`));
   let previous=null,index=-1;
   return sorted.map(r=>{
     const aqc=normalizeAqcNo(r.number||r.gcNo),m=workloadRecordMetrics(r);let header='';
@@ -4741,7 +4741,7 @@ function renderVesselDriverView(){
     const no=String(r.workingNo||'').trim();if(!no||map.has(no)||(shipMasters||[]).some(s=>String(s.workingNo||'').trim()===no))return;
     map.set(no,{workingNo:no,vessel:r.shipName||r.vessel||'',voyageE:r.voyageE||r.voyage||'',firstDate:r.workDate});
   });
-  const masters=[...map.values()].sort((a,b)=>String(b.workingNo||'').localeCompare(String(a.workingNo||''),undefined,{numeric:true}));
+  const masters=[...map.values()].sort((a,b)=>String(b.compareDate||b.lastDate||b.firstDate||'').localeCompare(String(a.compareDate||a.lastDate||a.firstDate||''))||String(b.workingNo||'').localeCompare(String(a.workingNo||''),undefined,{numeric:true}));
   const previous=shipSel.value;
   shipSel.innerHTML='<option value="">請選擇船舶</option>'+masters.map(s=>`<option value="${esc(s.workingNo)}">${esc(s.workingNo)}｜${esc(s.vessel||'')} ${esc(s.voyageE||s.voyageI||'')}</option>`).join('');
   shipSel.value=masters.some(s=>String(s.workingNo)===previous)?previous:String(masters[0]?.workingNo||'');
@@ -4815,7 +4815,7 @@ function renderWorkingSheetDriverAudit(){
   const audit=workingSheetDriverSourceResult(ref);
   if(sourceState){
     sourceState.className=`mt-2 text-sm font-bold ${audit.status==='match'?'text-emerald-700':'text-rose-700'}`;
-    sourceState.textContent=`${audit.status==='match'?'來源一致':audit.status==='pending'?'來源待核對':'來源不一致'}｜WORKING REPORT：DISC ${audit.disc}＋LOAD ${audit.load}＝${audit.containers} 櫃，H/C ${audit.hc}｜WORKING SHEET：請款 ${audit.bill??'—'}、翻艙 ${audit.shift??'—'}、作業 Moves ${audit.moves??'—'}、H/C ${audit.sheetHc??'—'}${audit.reasons.length?'｜'+audit.reasons.join('；'):''}`;
+    sourceState.textContent=`${audit.status==='match'?'來源一致':audit.status==='pending'?'來源待核對':'來源不一致'}｜WORKING REPORT：DISC ${audit.disc}＋LOAD ${audit.load}＝${audit.containers} 櫃，H/C ${audit.hc}｜WORKING SHEET：作業量 ${audit.bill??'—'}、翻艙 ${audit.shift??'—'}、作業 Moves ${audit.moves??'—'}、H/C ${audit.sheetHc??'—'}${audit.reasons.length?'｜'+audit.reasons.join('；'):''}`;
   }
   // Match only the exact working number; another voyage or child job must never fill a gap.
   const sys=no?canonicalOperationalRecords((records||[]).filter(r=>String(r.source||'')==='working-report'&&String(r.workingNo||'').trim()===no)):[];
@@ -6809,7 +6809,7 @@ function renderPersonVesselStats(rs){
     g.dates.sort();g.containers=g.disc+g.load;g.eff=g.hours>0?(g.containers+g.hc)/g.hours:0;
     g.dateText=!g.dates.length?'—':(g.dates[0]===g.dates[g.dates.length-1]?g.dates[0]:`${g.dates[0]} ～ ${g.dates[g.dates.length-1]}`);
     return g;
-  }).sort((a,b)=>String(b.dates?.[0]||'').localeCompare(String(a.dates?.[0]||''))||String(a.workingNo).localeCompare(String(b.workingNo),undefined,{numeric:true}));
+  }).sort((a,b)=>String(b.dates?.[b.dates.length-1]||'').localeCompare(String(a.dates?.[a.dates.length-1]||''))||String(a.workingNo).localeCompare(String(b.workingNo),undefined,{numeric:true}));
   if(count)count.textContent=`${arr.length} 艘`;
   body.innerHTML=arr.map(g=>`<tr><td>${esc(g.dateText)}</td><td class="font-bold">${esc(g.workingNo||'—')}</td><td>${esc(g.label)}</td><td>${esc([...g.aqcs].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true})).join('、'))}</td><td>${g.count}</td><td>${g.hours.toFixed(2)}</td><td>${g.disc}</td><td>${g.load}</td><td>${g.hc}</td><td class="font-black text-teal-700">${g.containers}</td><td class="font-black text-indigo-700">${g.eff.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="11" class="text-center text-slate-400 p-5">此區間沒有作業資料</td></tr>';
 }
@@ -7177,7 +7177,8 @@ function renderWeeklyEfficiency(){
     const master=(shipMasters||[]).find(x=>String(x.workingNo||'')===no);
     if(master)s.voyage=[master.voyageI,master.voyageE].filter(Boolean).join(' / ');
   });
-  const ships=[...shipMap.values()].sort((a,b)=>(Number(String(b.no).replace(/\D/g,''))||0)-(Number(String(a.no).replace(/\D/g,''))||0));
+  const latestDate=s=>[...s.dates].filter(Boolean).sort().slice(-1)[0]||'';
+  const ships=[...shipMap.values()].sort((a,b)=>latestDate(b).localeCompare(latestDate(a))||(Number(String(b.no).replace(/\D/g,''))||0)-(Number(String(a.no).replace(/\D/g,''))||0));
   const shipBody=document.getElementById('weeklyShipBody');
   if(shipBody)shipBody.innerHTML=ships.map(s=>{
     const cont=s.disc+s.load;
@@ -7287,7 +7288,7 @@ function clearDashboardFilter(){
   const v=document.getElementById('dashboardFilterVessel');if(v)v.value='';
   const w=document.getElementById('dashboardFilterWharf');if(w)w.value='';
   const e=document.getElementById('dashboardEfficiencyFilter');if(e)e.value='';
-  const sf=document.getElementById('dashboardSortField');if(sf)sf.value='workingNo';
+  const sf=document.getElementById('dashboardSortField');if(sf)sf.value='date';
   const sd=document.getElementById('dashboardSortDir');if(sd)sd.value='desc';
   summaryCurrentPage=1;
   renderAll();
@@ -10364,7 +10365,7 @@ function renderRouteData(){
   const title=document.getElementById('routeDetailTitle');
   if(title)title.textContent=month+'｜'+selected.route+'｜'+selected.shipCalls+' 筆船舶作業';
   const detailBody=document.getElementById('routeDetailBody');
-  if(detailBody)detailBody.innerHTML=selected.details.map(d=>
+  if(detailBody)detailBody.innerHTML=[...selected.details].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.workingNo||'').localeCompare(String(a.workingNo||''),undefined,{numeric:true})).map(d=>
     '<tr>'+[d.workingNo,d.vessel,d.direction,d.voyage,d.quantity===null?'未提供':fmt(d.quantity),d.date,d.sourceFileName]
       .map(v=>'<td>'+esc(v||'—')+'</td>').join('')+'</tr>'
   ).join('');
@@ -10426,7 +10427,7 @@ function parseWorkingSheetSummary(book){
   // BN = bundle 組數、FL = 實際櫃數。
   // 例如 20'*1BN/2FL => 2-1=1
   //      40'*4BN/16FL => 16-4=12
-  // 差額不能當成正常請款櫃數。
+  // 差額不能當成正常作業量。
   const bundleInfo=workingSheetBundleInfo(ws);
   const bundleDeduct=num(bundleInfo.deduct);
 
@@ -10451,21 +10452,21 @@ function parseWorkingSheetSummary(book){
     : (rawBillContainers + shiftMoves);
 
   // v9.2 全表統一欄位定義：
-  //   請款櫃數 = WORKING SHEET 的 DISCHARGE + LOAD
+  //   作業量 = WORKING SHEET 的 DISCHARGE + LOAD
   //   翻艙數   = IN HATCH SHIFT + SHIFT×2
-  //   總 Moves = 請款櫃數 + 翻艙數（若原表有 TTL Moves，拿它做最終核對）
+  //   總 Moves = 作業量 + 翻艙數（若原表有 TTL Moves，拿它做最終核對）
   //
   // 例如 0138 / WAN HAI 293：
-  //   DISC 671 + LOAD 705 = 請款 1376
+  //   DISC 671 + LOAD 705 = 作業量 1376
   //   SHIFT 64
   //   TTL Ctnr / TTL Moves = 1440
   //   1376 + 64 = 1440
-  // 舊版錯把 TTL Ctnr 1440 填進「請款櫃數」，因此月報 1376 會被誤判。
+  // 舊版錯把 TTL Ctnr 1440 填進「作業量」，因此月報 1376 會被誤判。
   //
-  // 全部船舶（包含 Bundle）一律使用同一個「請款」口徑：
+  // 全部船舶（包含 Bundle）一律使用同一個「作業量」口徑：
   //   WORKING SHEET 的 DISC + LOAD 先扣 Bundle，SHIFT 另外計算。
   // 這樣像 0133 / WAN HAI 288：
-  //   (DISC+LOAD 原始量 549) - Bundle 13 = 請款 536；
+  //   (DISC+LOAD 原始量 549) - Bundle 13 = 作業量 536；
   //   再加 SHIFT 2 = 總 Moves 538。
   // 若範本沒有可讀的 DISC/LOAD，才退回 TTL Ctnr - Bundle - SHIFT。
   let totalContainers=0;
@@ -12352,7 +12353,7 @@ async function createShipFromMonthlyActual(serial){
     `WORKING NO.：${workingNo}\n`+
     `船名：${vessel}\n`+
     `航次：${voyage||'—'}\n`+
-    `請款櫃數：${master.totalContainers}\n`+
+    `作業量：${master.totalContainers}\n`+
     `H/C：${master.hatches}\n`+
     `翻艙數：${master.shiftMoves}\n`+
     `總 Moves：${master.totalMoves}\n\n`+
@@ -12418,7 +12419,7 @@ function monthlyDateToIso(value,sheetName=''){
 }
 
 function monthlyMonthFromDate(value,sheetName=''){
-  // 「船邊作業量」是月報/請款月份；只要工作表名稱本身有月份，就以工作表月份為歸屬。
+  // 「船邊作業量」是月報/作業量月份；只要工作表名稱本身有月份，就以工作表月份為歸屬。
   // 例如 115-09 裡的 08/31 仍屬 115年09月，不可被丟到 08 月而漏比對。
   const period=monthlySheetPeriod(sheetName);
   if(period)return period;
@@ -12693,11 +12694,11 @@ function normalizeLegacyMonthlyCompareRow(sys,actual){
   const monthMoves=num(actual?.totalMoves) || (monthBill+monthShift);
 
   // 舊版資料格式相容：
-  // 過去有些船把 TTL Moves 同時寫到「請款櫃數」，SHIFT 則只存原始次數。
+  // 過去有些船把 TTL Moves 同時寫到「作業量」，SHIFT 則只存原始次數。
   // 例如 WAN HAI 176：系統舊值 620 / 19 / 620，月報為 582 / 38 / 620。
   // 只有在數學關係完全成立時才做顯示/比對轉換，不改雲端、不改其他船：
   //   系統總櫃數 == 系統總 Moves
-  //   月報請款 + 月報翻艙 == 同一個總 Moves
+  //   月報作業量 + 月報翻艙 == 同一個總 Moves
   //   且舊 SHIFT 為 0、等於月報 SHIFT、或舊 SHIFT×2 等於月報 SHIFT
   const sameLegacyTotal=sysMoves>0 && nearlyEqual(sysBill,sysMoves,0.01) && nearlyEqual(monthMoves,sysMoves,0.01);
   const monthlyDecomposes=monthBill>=0 && monthShift>=0 && nearlyEqual(monthBill+monthShift,sysMoves,0.01);
@@ -12712,17 +12713,17 @@ function normalizeLegacyMonthlyCompareRow(sys,actual){
   }
 
   // 第二種舊版格式：
-  // 舊程式已把「請款櫃數」算對，但 SHIFT 只存原始值 ×1，
+  // 舊程式已把「作業量」算對，但 SHIFT 只存原始值 ×1，
   // 總 Moves 也只加一次 SHIFT。
   // 例如 WAN HAI 277：
-  //   舊系統 = 請款 368 / SHIFT 6 / Moves 374
-  //   正確值 = 請款 368 / SHIFT 12 / Moves 380
+  //   舊系統 = 作業量 368 / SHIFT 6 / Moves 374
+  //   正確值 = 作業量 368 / SHIFT 12 / Moves 380
   //
   // 只有以下數學關係全部同時成立才相容換算：
-  //   1) 月報請款 == 系統請款
+  //   1) 月報作業量 == 系統作業量
   //   2) 月報 SHIFT == 系統 SHIFT × 2
-  //   3) 舊系統 Moves == 請款 + 舊 SHIFT
-  //   4) 月報 Moves == 請款 + 月報 SHIFT
+  //   3) 舊系統 Moves == 作業量 + 舊 SHIFT
+  //   4) 月報 Moves == 作業量 + 月報 SHIFT
   //
   // 這個條件非常窄，不會把一般真正差異吃掉。
   const legacyRawShiftOnce =
@@ -12846,7 +12847,7 @@ function compareOneMonthlyRow(sys,actual){
     add('航次',[sys.voyageI,sys.voyageE].filter(Boolean).join(' / '),actual.voyage);
 
   if(!hasManual('totalContainers') && !nearlyEqual(sys.totalContainers,actual.containers,0.01))
-    add('請款櫃數',sys.totalContainers,actual.containers);
+    add('作業量',sys.totalContainers,actual.containers);
 
   if(!hasManual('hatches') && !nearlyEqual(sys.hatches,actual.hatches,0.01))
     add('H/C',sys.hatches,actual.hatches);
@@ -12871,6 +12872,7 @@ function monthlyEditableFieldMeta(field){
     '日期':{key:'compareDate',type:'date'},
     '船名':{key:'vessel',type:'text'},
     '航次':{key:'voyageE',type:'text'},
+    '作業量':{key:'totalContainers',type:'number'},
     '請款櫃數':{key:'totalContainers',type:'number'},
     'H/C':{key:'hatches',type:'number'},
     '翻艙數':{key:'shiftMoves',type:'number'},
@@ -13081,7 +13083,7 @@ function openMonthlyCompareError(serial){
   if(row._missingSystem){
     body.innerHTML=`<div class="rounded-xl bg-rose-50 border border-rose-200 p-4">
       <div class="font-black text-rose-700">❌ 系統缺少這筆船舶主檔／WORKING SHEET</div>
-      <div class="text-sm text-slate-600 mt-2">月報：${esc(actual.date||'')}｜WAN HAI ${esc(actual.vessel||'—')}｜${esc(actual.voyage||'')}｜請款 ${num(actual.containers)}｜H/C ${num(actual.hatches)}｜SHIFT ${num(actual.shiftMoves)}</div>
+      <div class="text-sm text-slate-600 mt-2">月報：${esc(actual.date||'')}｜WAN HAI ${esc(actual.vessel||'—')}｜${esc(actual.voyage||'')}｜作業量 ${num(actual.containers)}｜H/C ${num(actual.hatches)}｜SHIFT ${num(actual.shiftMoves)}</div>
       <button type="button" onclick="createShipFromMonthlyActual('${esc(key)}')" class="btn bg-rose-600 text-white text-xs mt-3">從月報補建主檔</button>
     </div>`;
     document.getElementById('monthlyCompareQuickDialog')?.showModal();
@@ -13730,7 +13732,7 @@ function renderVesselQuantityAudit(job, detailRows){
       errors.push(`人員計算 Moves ${audit.detailAdjustedMoves} ≠ 船舶總 Moves ${audit.summaryMoves}`);
     }
     if(!audit.shiftOk){
-      errors.push(`人員 Moves ${audit.detailAdjustedMoves} - 請款櫃數 ${audit.summaryBill} = ${audit.calculatedShift}，但船舶 SHIFT = ${audit.summaryShift}`);
+      errors.push(`人員 Moves ${audit.detailAdjustedMoves} - 作業量 ${audit.summaryBill} = ${audit.calculatedShift}，但船舶 SHIFT = ${audit.summaryShift}`);
     }
     if(!audit.hatchesOk){
       errors.push(`人員 H/C 合計 ${audit.detailHatches}，但船舶 H/C = ${num(job?.hatches)}`);
@@ -13773,7 +13775,7 @@ function renderVesselQuantityAudit(job, detailRows){
           <div class="font-black">${audit.summaryMoves}</div>
         </div>
         <div class="rounded-xl bg-white border p-2">
-          <div class="text-[10px] text-slate-500">請款櫃數</div>
+          <div class="text-[10px] text-slate-500">作業量</div>
           <div class="font-black">${audit.summaryBill}</div>
         </div>
         <div class="rounded-xl bg-white border p-2">
@@ -13991,7 +13993,7 @@ function p79VesselMonthSafetyAudit(month,jobs){
       issues.push('船舶作業量含無效數值：'+no);continue;
     }
     if(Math.abs(num(ship.totalMoves)-num(ship.totalContainers)-num(ship.shiftMoves))>0.01)
-      issues.push('總 Moves ≠ 請款＋SHIFT：'+no);
+      issues.push('總 Moves ≠ 作業量＋SHIFT：'+no);
   }
   const source=(shipMasters||[]).filter(row=>shipMasterDateMatchesMonth(row,target));
   let versionCopies=[];
@@ -14114,7 +14116,7 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     if(!audit.ok)throw Error('月報匯出已停止：'+audit.issues.slice(0,5).join('；'));
     const summed=(items,key)=>round(items.reduce((total,row)=>total+num(row?.[key]),0),2);
     const parity=[
-      ['請款櫃數',summed(rows,'bill'),summed(dashboardRows,'totalContainers')],
+      ['作業量',summed(rows,'bill'),summed(dashboardRows,'totalContainers')],
       ['SHIFT',summed(rows,'shift'),summed(dashboardRows,'shiftMoves')],
       ['H/C',summed(rows,'hc'),summed(dashboardRows,'hatches')]
     ];
@@ -14122,7 +14124,7 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
     if(mismatch)throw Error('匯出與系統統計不一致：'+mismatch[0]+' '+mismatch[1]+'／'+mismatch[2]+'；為避免產生錯誤月報已停止匯出');
     const wrongSplit=rows.find(x=>![x.disc,x.load,x.bill].every(v=>Number.isFinite(Number(v))&&Number(v)>=0)
       ||Math.abs(num(x.disc)+num(x.load)-num(x.bill))>0.01);
-    if(wrongSplit)throw Error('月報匯出已停止：'+wrongSplit.workingNo+' 卸船＋裝船不等於請款櫃數，請先核對 WORKING SHEET');
+    if(wrongSplit)throw Error('月報匯出已停止：'+wrongSplit.workingNo+' 卸船＋裝船不等於作業量，請先核對 WORKING SHEET');
     const signatures=saveVesselMonthlySignatureFields();
     await window.P79VesselMonthlyReport.download({month,company:companyName,rows,signatures,filename:`79W_${Number(month.slice(0,4))-1911}年${Number(month.slice(5))}月份船邊作業量表.xlsx`});
     document.getElementById('vesselMonthlyExportDialog')?.close();
@@ -14138,7 +14140,7 @@ async function exportVesselMonthlyExcel(month=document.getElementById('filterMon
 const EXPORT_FIELDS = {
   ship: [
     ['no','編號'],['serial','序號'],['date','日期'],['ship','船名'],['voyage','航次'],
-    ['disc','卸船櫃數'],['load','裝船櫃數'],['billing','請款櫃數'],['bundle','Bundle扣除'],['hc','翻艙蓋數'],
+    ['disc','卸船櫃數'],['load','裝船櫃數'],['billing','作業量'],['bundle','Bundle扣除'],['hc','翻艙蓋數'],
     ['shift','翻艙數'],['gph','Productivity'],['gphHC','Include HC'],['vph','VPH'],['vphHC','VPH含HC'],['note','備註']
   ],
   detail: [
@@ -14214,7 +14216,7 @@ function buildShipExportRows(){
     // A partial month cache may miss the prior-month drivers; never silently
     // export a smaller split than the completed vessel's billed quantity.
     if(Math.abs(disc+load-billing)>0.01)
-      throw Error('船舶 '+no+' 卸裝櫃數 '+(disc+load)+' 與請款 '+billing+' 不一致，已停止匯出');
+      throw Error('船舶 '+no+' 卸裝櫃數 '+(disc+load)+' 與作業量 '+billing+' 不一致，已停止匯出');
     const dates=rs.map(r=>String(r.workDate||'')).filter(Boolean).sort();
     const date=String(s.compareDate||s.lastDate||master.compareDate||dates[dates.length-1]||'').slice(0,10);
     return {
@@ -15368,7 +15370,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-remark-v2"></script>
+<script src="./terminal-ops.js?v=20261109-remark-shift-sort-v3"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
