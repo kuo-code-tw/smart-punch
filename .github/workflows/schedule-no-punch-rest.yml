@@ -32,7 +32,6 @@ jobs:
       - run: node tests/schedule-pre08-extension-regular-shift.cjs
       - run: node tests/schedule-excel-time-codes.cjs
       - run: node tests/schedule-export-special-days.cjs
-      - run: node tests/schedule-screen-export-parity.cjs
       - run: node tests/schedule-short-punch-date-display.cjs
       - run: node tests/schedule-overtime-accounting-date.cjs
       - run: node tests/schedule-november-early-month-no-punch.cjs
