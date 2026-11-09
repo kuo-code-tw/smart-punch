@@ -361,7 +361,7 @@ function render(){
    (s.bundleUnknown?'待核對':s.bundleMismatch?(Math.abs(s.bundleUnexplained)>0.01?(s.bundleUnexplained>0?'+':'')+decimal(s.bundleUnexplained):'待核對'):'—')+'</td></tr>').join(''):rowMessage(8,'目前無可歸入本月完工日期的船舶資料');
  const shiftBody=el('terminalShiftBody');
  if(shiftBody)shiftBody.innerHTML=stats.byShift.length?stats.byShift.map(s=>
-  '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
+  '<tr><td>'+safe(s.day)+'</td><td><span class="p79-terminal-shift '+(s.shift==='早班'?'shift-early':s.shift==='中班'?'shift-middle':s.shift==='晚班'?'shift-night':'shift-unknown')+'">'+safe(s.shift)+'</span></td><td>'+fmt(s.records)+'</td><td>'+fmt(s.disc)+'</td><td>'+fmt(s.load)+'</td><td>'+fmt(s.hc)+'</td><td>'+decimal(s.hours)+'</td></tr>').join(''):rowMessage(7,'尚未取得當月 AQC／WORKING REPORT 作業明細');
  const reasonFilter=el('terminalReasonFilter');
  if(reasonFilter){
   reasonFilter.innerHTML='<option value="">全部原因（'+fmt(stats.totalStopEvents)+' 件）</option>'+
