@@ -16,6 +16,13 @@ function p79RestQuota(month) {
   return {days,slots,counts:slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0})};
 }
 
+// A month with no national-holiday quota cannot turn historical "國" labels
+// into new national leave. This is a display/accounting guard; confirmed
+// overtime reports and saved source records still require an explicit audit.
+function p79RestVisibleCategory(month,category) {
+  return category==='國'&&!p79RestQuota(month).slots.some(slot=>slot.category==='國')?'休':category;
+}
+
 function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[],quotaExemptReportDates=[]) {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
   // A fully checked no-punch work shift is shown as 休 in the roster. Reconcile it
@@ -24,7 +31,11 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // Caller supplies only evidence-verified no-punch dates; never infer from a
   // blank or pending attendance record inside this pure allocator.
   const observedOff=new Set(observedOffDates),quotaExempt=new Set(quotaExemptReportDates);
+  const noNationalQuota=!quota.slots.some(slot=>slot.category==='國');
+  // A saved bare 國 in a zero-national month was an off-day classification,
+  // not proof that the employee worked. Reclassify in this calculation copy.
   const isRestCandidate=date=>schedule[date]==='休'||
+    (noNationalQuota&&schedule[date]==='國')||
     (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
   // Partial-night rest proof comes only from the official dual-source attendance audit.
   const nightSplit=date=>observedOff.has(date)&&
@@ -39,6 +50,17 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
   quota.counts=quota.slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0});
   if(dates.some(d=>!schedule[d]))throw new Error('本月有未排班日期，請補齊班表後再配對');
+  // Clear stale unapproved national classifications on the calculation copy.
+  // Never rewrite the saved roster or a locked/confirmed report.
+  if(noNationalQuota)for(const date of dates){
+    const item=result[date];
+    if(item?.restCategory!=='國'||item.restCategoryLocked||item.restAllocationLocked||
+       item.restQuotaOvertime||item.overtimeReport||item.overtimeReports?.length||
+       item.overtime||item.forEmpId)continue;
+    for(const field of ['restCategory','restSourceDate','restHolidayName',
+      'restAllocationSource','restPreferredCategory'])delete item[field];
+    if(!Object.keys(item).length)delete result[date];
+  }
   // Remove only fields owned by this allocator; preserve manual overtime and substitutions.
   for(const date of dates) {
     const item=result[date];if(!item||!['auto-v1','roster'].includes(item.restAllocationSource))continue;
@@ -92,7 +114,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // without metadata. Otherwise the grid and monthly ledger count different days.
   for(const date of dates){
     const category=String(schedule[date]||'').trim(),item=result[date]||{};
-    if(!['例','國'].includes(category)||excluded.has(date)||typhoonProtected.has(date)||
+    if(!['例','國'].includes(category)||category==='國'&&noNationalQuota||
+       excluded.has(date)||typhoonProtected.has(date)||
        category==='國'&&nationalBlocked.has(date)||item.restCategory||
        item.restAllocationLocked||item.restCategoryLocked||item.restQuotaOvertime||
        item.overtime||item.overtimeReport||item.overtimeReports?.length||

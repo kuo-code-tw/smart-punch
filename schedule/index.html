@@ -27,7 +27,7 @@
 <!-- PORT79 2026-10-04 SCHEDULE-COLOR-RESTORE：恢復原班別顏色＋放大字體/格子＋交錯列辨識。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
-<script src="../assets/port79-rest-allocation.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261109-zero-national-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1&noWork=20261106"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
@@ -6648,7 +6648,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const {rosterShift,ownApprovedLeave,attendanceState,actualShift,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
-            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime}=selected;
+            visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime,oldNationalLabel}=selected;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6722,6 +6722,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
             pendingDetails.map(item=>item.type+'：'+item.time+'（歸屬工作日 '+item.workday+'）').join('；'):
             '考勤判為單側／配對異常；請檢查相鄰工作日及正式考勤來源'):'';
           const cellTitle = ['目前顯示：'+(nightSplitLabel||shownShift)+'；來源：'+shiftSource,
+            oldNationalLabel?'本月國定假日額度為0，原紀錄帶有國假標記；一般休假於畫面改顯示休，正式申報與鎖定資料保留待管理員核對':'',
             nightSplitLabel?'20:00～24:00 加班（依正式申報及考勤核對）；00:00～08:00 是休假班段，均歸屬 '+dayStr+'；例休國依既有額度，不代表已符合完整24小時法定休息':'',
             pairedProof,pendingProof,
             attendanceRosterConflict?'考勤與原排班不一致：原排'+rosterShift+'、實際'+actualShift+'（此畫面不會改寫正式排班）':'',verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',unworkedOvertime?'已核實整班無出勤，此日加班不計；原申報需由管理員正式取消，保留稽核資料':'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
@@ -6738,7 +6739,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="晚" ${!visibleSubstituteLabel && shownShift==='晚'?'selected':''}>晚</option>
                 <option value="休" ${!visibleSubstituteLabel && shownShift==='休'?'selected':''}>休</option>
                 <option value="例" ${!visibleSubstituteLabel && shownShift==='例'?'selected':''}>例</option>
-                <option value="國" ${!visibleSubstituteLabel && shownShift==='國'?'selected':''}>國</option>
+                ${p79RestQuota(yearMonth).counts.國>0 ? `<option value="國" ${!visibleSubstituteLabel && shownShift==='國'?'selected':''}>國</option>` : ''}
                 ${p79EditorLeaveKinds.map(type=>`<option value="${type}" ${!visibleSubstituteLabel&&shownShift===type?'selected':''}>${type}</option>`).join('')}
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
@@ -7140,6 +7141,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
     let p79OvertimeShiftEditBusy=false;
     async function updateDailyShift(empId,dayStr,val){
       if(val==='__overtime__')return;
+      // Validate before acquiring the edit lock or cancelling a formal report.
+      if(val==='國'&&p79RestQuota(dayStr.slice(0,7)).counts.國===0){
+        alert('此月份沒有國定假日額度，不能新增「國」。請依實際班別選擇「休」或「例」。');
+        renderRoleScheduleView();return;
+      }
       if(P79_SCHEDULE_SPECIAL_LEAVES.includes(val)){
         // Recheck the current cloud policy immediately before a privileged edit.
         await p79ScheduleReadHrLeavePolicy();
@@ -7189,6 +7195,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     function p79SetDailyShift(empId, dayStr, val) {
       if(!p79ScheduleAllowedEditShift(val))return false;
+      if(val==='國'&&p79RestQuota(dayStr.slice(0,7)).counts.國===0){
+        alert('此月份沒有國定假日額度，不能新增「國」。請依實際班別選擇「休」或「例」。');
+        return false;
+      }
       if(approvedLeaveForEmployee(empId,dayStr)||p79LeaveCoverOnDay(empId,dayStr).length)return false;
       if (!requireScheduleEditLock()) return false;
       if(!monthlyScheduleData[empId]) monthlyScheduleData[empId] = {};
@@ -7416,10 +7426,19 @@ async function p79SaveScheduleOvertimeDraft(draft){
         ['例','休','國'].includes(original)?original:'';
       return kind?'20-24＋'+kind:'';
     }
-    function p79VisibleRestKind(shift,substitute='') {
+    function p79VisibleRestKind(shift,substitute='',month='') {
       const value=String(substitute||shift||'').trim();
       const split=/^20-24＋([例休國])$/.exec(value);
-      return split?.[1]||/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
+      const category=split?.[1]||/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
+      // A historic 國 overtime code must not silently consume nonexistent
+      // November national quota. Keep the original report for audit instead.
+      if(month&&category==='國'){
+        const quota=p79RestQuota(month);
+        const nationalCount=quota.counts?.國??
+          (quota.slots||[]).filter(slot=>slot.category==='國').length;
+        if(nationalCount===0)return substitute?'':'休';
+      }
+      return category;
     }
     // Single source of truth for the daily SELECTED value in both roster UI
     // and 試算表 export. The underlying official roster is never rewritten here.
@@ -7445,6 +7464,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // has priority over legacy automated 休/例/國 allocations in the day cell.
       // Legal leave and submitted overtime remain in the original metadata.
       const originalMeta=monthlyScheduleMeta[emp.id]?.[dayStr]||{};
+      const monthQuota=typeof p79RestQuota==='function'?
+        p79RestQuota(dayStr.slice(0,7)):null;
+      const noNationalQuota=!!monthQuota&&
+        (monthQuota.counts?.國??
+          (monthQuota.slots||[]).filter(slot=>slot.category==='國').length)===0;
+      const oldNationalLabel=noNationalQuota&&(
+        rosterShift==='國'||originalMeta.restCategory==='國'||
+        automaticRestMeta[dayStr]?.restCategory==='國'||originalMeta.overtimeReport?.category==='國');
       const pairedWork=p79ScheduleHasVerifiedPunch(emp.id,dayStr,ctx.attendanceEvidence);
       const candidate=pairedWork
         ?ctx.attendanceEvidence.actualShifts?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]:'';
@@ -7500,12 +7527,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
         restQuotaOvertime:false}:hasOfficialOvertimeReport
           ?{...(automaticRestMeta[dayStr]||{}),...originalMeta,...(unworkedOvertime?{overtimeExcluded:true}: {})}
           :automaticRestMeta[dayStr]||{};
+      // The allocation and the grid must agree: never resurrect a stale 國
+      // from manual/imported metadata in a month whose national quota is zero.
+      // The original cloud metadata and approved overtime report are untouched.
+      if(noNationalQuota&&dayMeta?.restCategory==='國')
+        dayMeta={...dayMeta,restCategory:'休',invalidNationalMonth:true};
       if(originalMeta.overtimeReport?.overtimeDate&&originalMeta.overtimeReport.overtimeDate!==dayStr){
         dayMeta={...dayMeta};
         delete dayMeta.overtimeReport;delete dayMeta.overtime;delete dayMeta.forEmpId;delete dayMeta.forName;
       }
       const coverageShift=noPunchRest||unworkedOvertime||punchPending||attendanceUnverified?'':p79CoverageShift(emp.id,dayStr);
-      const displayShift=coverageShift||shiftVal;
+      const displayShift=coverageShift||(noNationalQuota&&shiftVal==='國'?'休':shiftVal);
       const substituteLabel=ownApprovedLeave||noPunchRest||unworkedOvertime?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
       const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
       const specialCandidate=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
@@ -7537,8 +7569,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,visibleCode,nightSplitLabel,
         // Count the category visibly selected in each cell, including timed labels.
         // Cloud-confirmed overtime remains a separate quota deduction.
+        oldNationalLabel,
         visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''
-          :p79VisibleRestKind(shownShift,visibleSubstituteLabel)};
+          :p79VisibleRestKind(shownShift,visibleSubstituteLabel,dayStr.slice(0,7))};
     }
     // On-demand full staff check uses the same precedence as the month grid.
     function p79VisibleRestDayAudit(emp,month,allocation=null) {
@@ -7701,9 +7734,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
           .filter(day=>day.startsWith(month+'-')&&!protectedTyphoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
-        const count=categoryDates.length;
         const displayDates=categoryDates.map(day=>day.slice(-2));
         const limit=Number.isFinite(ledger?.quota?.[category])?ledger.quota[category]:quota[category];
+        // Do not count stale saved/report labels as national leave when quota=0.
+        // Retain those original reports and expose the discrepancy in the tooltip.
+        const invalidNationalCount=category==='國'&&limit===0?categoryDates.length:0;
+        const count=invalidNationalCount?0:categoryDates.length;
         const verified=Number.isFinite(ledger?.remaining?.[category]);
         // Counter and remainder share the actual date cells for this one render.
         // Official reports on OTHER dates consume quota once without double counting.
@@ -7711,7 +7747,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         // Numbers only: actual allocated days / still available days.
-        return '<td data-rest-category="'+category+'" class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+'"><span>'+count+'/'+rest+'</span></td>';
+        const invalidNote=invalidNationalCount?
+          ' title="'+scheduleEscapeHtml('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。')+'"':'';
+        return '<td data-rest-category="'+category+'"'+invalidNote+' class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+'"><span>'+count+'/'+rest+'</span></td>';
       }).join('');
       const days=[...typhoonSet].sort().map(date=>date.slice(-2)).join('、')||'無';
       const typhoonCell=special.typhoon?'<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
