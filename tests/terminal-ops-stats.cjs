@@ -7,8 +7,11 @@ assert(html.includes('id="view-terminal"'));
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-remark-shift-sort-v3'));
+assert(html.includes('./terminal-ops.js?v=20261109-bundle-reason-mobile-v4'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
+assert(html.includes('<th>Bundle 扣除</th>'));
+assert(html.includes('<th>原因分類（點選修改）</th>'));
+assert(html.includes('@container (max-width:900px)'));
 assert(!js.includes('apiPost(')&&!js.includes('postCloud(')&&!js.includes('gcSyncAll'),'analytics must be read only');
 const mkShip=(no,date,wharf,disc,load,billed,moves,shift=0)=>({
  workingNo:no,vessel:no,lastDate:date,wharf,totalContainers:billed,totalMoves:moves,shiftMoves:shift,hatches:2,
@@ -42,12 +45,17 @@ const ctx={window:{},document:{getElementById:id=>elements[id]},console:{warn(){
 };
 vm.createContext(ctx);vm.runInContext(js,ctx);
 const api=ctx.window.P79TerminalOps;assert(api);
+ships[0].workingSheetSource.bundleDeduct=1;
+ships[1].workingSheetSource.bundleDeduct=1;
 const stats=api.build('2026-11',ships,recs);
 assert.equal(stats.vesselTotals.ships,2,'WORKING NO is unique');
 assert.equal(stats.vesselTotals.disc,15);
 assert.equal(stats.vesselTotals.load,27);
 assert.equal(stats.vesselTotals.billed,41,'bill quantity is not raw DISC+LOAD');
 assert.equal(stats.vesselTotals.moves,44,'moves include different source accounting');
+assert.equal(stats.vesselTotals.bundle,1,'verified Bundle deduction from WORKING SHEET');
+assert.equal(stats.byDay.find(x=>x.day==='2026-11-02').bundle,1,'daily Bundle deducted on completion day');
+assert.equal(stats.byDay.find(x=>x.day==='2026-11-02').bundleMismatch,0,'30 original minus Bundle 1 is 29');
 assert.equal(stats.byWharf.length,2);
 assert.equal(stats.byWharf.find(r=>r.wharf==='79L').moves,31);
 assert.equal(stats.byDay.length,2);
@@ -65,6 +73,8 @@ api.render();
 assert(elements.terminalWharfBody.innerHTML.includes('79L'));
 assert(elements.terminalShiftBody.innerHTML.includes('晚班'));
 assert(elements.terminalStopBody.innerHTML.includes('設備故障'));
+assert(elements.terminalDayBody.innerHTML.includes('p79-ter-bundle'));
+assert(elements.terminalStopDetailBody.innerHTML.includes('setReasonCategory'));
 (async()=>{
  let calls=[];
  ctx.apiGetQuick=async(action,args,timeout)=>{
