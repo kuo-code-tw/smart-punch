@@ -1978,7 +1978,7 @@ function renderEfficiencyTabFast(name=activeEfficiencyTabName()){
   populatePort79YearFilters();
   if(name==='dashboard'){populateSelects();renderDashboard();return;}
   if(name==='multi-rod'){window.P79AqcMultiRod?.render();return;}
-  if(name==='compare'){renderRouteData();void p79LoadRouteMonth();return;}
+  if(name==='compare'){renderRouteData();if(typeof p79LoadRouteMonth==='function')void p79LoadRouteMonth();return;}
   if(name==='groups'){populateSelects();renderGroups();renderPeople();return;}
   if(name==='records'){populateSelects();renderRecords();return;}
   if(name==='personstats'){
