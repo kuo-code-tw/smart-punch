@@ -7,7 +7,7 @@ assert(html.includes('id="view-terminal"'));
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-remark-v2'));
+assert(html.includes('./terminal-ops.js?v=20261109-remark-shift-sort-v3'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(!js.includes('apiPost(')&&!js.includes('postCloud(')&&!js.includes('gcSyncAll'),'analytics must be read only');
 const mkShip=(no,date,wharf,disc,load,billed,moves,shift=0)=>({
@@ -53,16 +53,17 @@ assert.equal(stats.byWharf.find(r=>r.wharf==='79L').moves,31);
 assert.equal(stats.byDay.length,2);
 assert.equal(stats.records.length,3,'prefer WORKING REPORT over gc-driver for same ship and deduplicate IDs');
 assert.equal(stats.byShift.length,2,'two occupied date-and-shift combinations');
+assert.deepEqual(Array.from(stats.byShift,x=>x.day),['2026-11-03','2026-11-03','2026-11-02'],'newest date first');
 assert.equal(stats.crossShift,2);
 assert.equal(stats.totalStopEvents,3);
 assert.equal(stats.totalStopMinutes,30,'HH:MM stop times interpreted correctly');
-assert.equal(api.shiftOf('07:59'),'24–08');
-assert.equal(api.shiftOf('08:00'),'08–16');
-assert.equal(api.shiftOf('16:00'),'16–24');
-assert.equal(api.shiftOf('00:10'),'24–08');
+assert.equal(api.shiftOf('07:59'),'晚班');
+assert.equal(api.shiftOf('08:00'),'早班');
+assert.equal(api.shiftOf('16:00'),'中班');
+assert.equal(api.shiftOf('00:10'),'晚班');
 api.render();
 assert(elements.terminalWharfBody.innerHTML.includes('79L'));
-assert(elements.terminalShiftBody.innerHTML.includes('24–08'));
+assert(elements.terminalShiftBody.innerHTML.includes('晚班'));
 assert(elements.terminalStopBody.innerHTML.includes('設備故障'));
 (async()=>{
  let calls=[];
