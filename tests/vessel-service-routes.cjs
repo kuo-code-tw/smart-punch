@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
+function fn(n){const a=html.indexOf('function '+n+'(');assert(a>=0,n);return html.slice(a,html.indexOf('\n}',a)+2);}
+const nodes={routeSearch:{value:''},routeDataBody:{},routeDataCount:{}};
+const c={console,Date,Map,Set,shipManualOverrideCache:{},shipOverrideKey:s=>s.workingNo,XLSX:{utils:{sheet_to_json:ws=>ws}},document:{getElementById:id=>nodes[id]},shipMasters:[],getPort79Year:()=>2026,shipMasterDateMatchesYear:s=>s.firstDate?.startsWith('2026'),esc:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),num:v=>Number(v)||0};
+vm.createContext(c);for(const n of ['parseWorkingSheetService','routeDataRows','renderRouteData','mergeShipMasterOne'])vm.runInContext(fn(n),c);
+const parse=rows=>JSON.parse(JSON.stringify(c.parseWorkingSheetService(rows)));
+assert.deepEqual(parse([['SERVICE(I/E):','','FOC','','JTT']]),{serviceI:'FOC',serviceE:'JTT'});
+assert.deepEqual(parse([['SERVICE ( I / E )： ABC-7 / XYZ9']]),{serviceI:'ABC-7',serviceE:'XYZ9'});
+assert.deepEqual(parse([['SERVICE(I/E):','','NEW99']]),{serviceI:'NEW99',serviceE:'NEW99'});
+assert.deepEqual(parse([['SERVICE(I/E):','','WHARF NO.:','79']]),{serviceI:'',serviceE:''});
+assert.deepEqual(parse([['VOYAGE(I/E):','N1','S2']]),{serviceI:'',serviceE:''});
+const local={workingNo:'526001',serviceI:'ABC',serviceE:'XYZ',workingSheetSource:{importedAt:'2026-11-09T00:00:00Z',serviceI:'ABC',serviceE:'XYZ'}};
+const cloud={workingNo:'526001',serviceI:'OLD',serviceE:'OLD',workingSheetSource:{importedAt:'2026-11-08T00:00:00Z',serviceI:'OLD',serviceE:'OLD'}};
+const merged=c.mergeShipMasterOne(local,cloud);assert.equal(merged.serviceI,'ABC');assert.equal(merged.serviceE,'XYZ');
+const roundTrip=JSON.parse(JSON.stringify(merged));c.shipMasters=[{...roundTrip,firstDate:'2026-11-01',vessel:'<script>test</script>'},{workingNo:'526002',firstDate:'2026-11-02',vessel:'B',serviceI:'FOC',serviceE:'JTT'}];
+c.renderRouteData();assert(nodes.routeDataBody.innerHTML.includes('ABC'));assert(nodes.routeDataBody.innerHTML.includes('&lt;script&gt;'));assert(!nodes.routeDataBody.innerHTML.includes('<script>'));
+nodes.routeSearch.value='xyz';c.renderRouteData();assert.equal(c.routeDataRows().length,1);assert.equal(nodes.routeDataCount.textContent,'共 1 筆');
+assert(!html.includes('compareMonthlyExcel'));assert(!html.includes('parseMonthlyActualRows'));assert(!html.includes('monthlyPasteBox'));assert(!html.includes('compareExcelInput'));
+assert(html.includes('workingNo,vessel,voyageI,voyageE,wharf,serviceI,serviceE'));assert(html.includes("serviceI:summary.serviceI||''"));
+for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
+console.log('PASS SERVICE I/E parsing, arbitrary routes, missing labels, latest-source merge, persistence, filtering, HTML escaping, old importer removal, inline syntax');
