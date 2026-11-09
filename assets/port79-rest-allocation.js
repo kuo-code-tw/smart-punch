@@ -20,7 +20,7 @@ function p79RestQuota(month) {
 // into new national leave. This is a display/accounting guard; confirmed
 // overtime reports and saved source records still require an explicit audit.
 function p79RestVisibleCategory(month,category) {
-  return category==='國'&&p79RestQuota(month).counts.國===0?'休':category;
+  return category==='國'&&!p79RestQuota(month).slots.some(slot=>slot.category==='國')?'休':category;
 }
 
 function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[],quotaExemptReportDates=[]) {
@@ -31,7 +31,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // Caller supplies only evidence-verified no-punch dates; never infer from a
   // blank or pending attendance record inside this pure allocator.
   const observedOff=new Set(observedOffDates),quotaExempt=new Set(quotaExemptReportDates);
-  const noNationalQuota=quota.counts.國===0;
+  const noNationalQuota=!quota.slots.some(slot=>slot.category==='國');
   // A saved bare 國 in a zero-national month was an off-day classification,
   // not proof that the employee worked. Reclassify in this calculation copy.
   const isRestCandidate=date=>schedule[date]==='休'||
