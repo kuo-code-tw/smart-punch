@@ -8,6 +8,9 @@ on:
       - 'tests/rest-oct31-nextday-punch-isolation.cjs'
       - 'tests/schedule-night-split-auto.cjs'
       - 'tests/schedule-pre08-extension-regular-shift.cjs'
+      - 'tests/schedule-excel-time-codes.cjs'
+      - 'tests/schedule-screen-export-parity.cjs'
+      - 'tests/schedule-export-special-days.cjs'
       - 'assets/port79-schedule-punch-restore.js'
       - 'tests/schedule-national-zero-quota.cjs'
       - 'assets/port79-schedule-rest-evidence.js'
@@ -27,6 +30,9 @@ jobs:
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
       - run: node tests/schedule-pre08-extension-regular-shift.cjs
+      - run: node tests/schedule-excel-time-codes.cjs
+      - run: node tests/schedule-export-special-days.cjs
+      - run: node tests/schedule-screen-export-parity.cjs
       - run: node tests/schedule-short-punch-date-display.cjs
       - run: node tests/schedule-overtime-accounting-date.cjs
       - run: node tests/schedule-november-early-month-no-punch.cjs
