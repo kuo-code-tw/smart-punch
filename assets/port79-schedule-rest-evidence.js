@@ -227,10 +227,20 @@ function create(ctx){
      officialByMonth,referenceByMonth,referenceAvailable,timestamp:ctx.timestamp,now:now()
    });
    const employeeCount=people.length;
-   const monthCoverage=employeeCount>0&&
+   // The old "10 distinct work dates" check could never pass before the
+   // 10th of a month. As a result a healthy authenticated November 1–9
+   // roster never showed verified zero-punch rest when the raw source was
+   // unavailable. Scale *only* the month-to-date coverage requirement; keep
+   // the per-day headcount, employee identities, and completed-shift proof.
+   const taipeiToday=new Date(now()+8*3600000).toISOString().slice(0,10);
+   const daysInMonth=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+   const completedDays=month<taipeiToday.slice(0,7)?daysInMonth:
+     month===taipeiToday.slice(0,7)?Math.max(0,Number(taipeiToday.slice(8))-1):0;
+   const requiredActiveDates=Math.min(10,Math.max(2,Math.ceil(completedDays*0.6)));
+   const monthCoverage=employeeCount>0&&completedDays>=2&&
      officialRows.filter(r=>String(r.timeStr||r.time||'').startsWith(month.replace('-','/'))||
        String(r.timeStr||r.time||'').startsWith(month)).length>=Math.max(10,Math.ceil(employeeCount*0.7))&&
-     activeMonthDates.size>=10&&
+     activeMonthDates.size>=requiredActiveDates&&
      distinctMonthIds.size>=Math.min(employeeCount,Math.max(3,Math.ceil(employeeCount*0.20)));
    const dayThreshold=Math.min(employeeCount,Math.max(2,Math.ceil(employeeCount*0.08)));
    const dayCovered=date=>(activeDateIds.get(date)?.size||0)>=dayThreshold;
