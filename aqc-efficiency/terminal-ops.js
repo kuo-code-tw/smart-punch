@@ -23,7 +23,7 @@ function makeUniqueShips(ships,month){
     const no=String(s.workingNo||s.sourceWorkingNo||'').trim();
     const key=no||[s.vessel,s.voyageI,s.voyageE,s.lastDate].join('|');
     const ws=s.workingSheetSource||{};
-    const score=Number(!!s.wharf)+Number(!!s.lastDate)+Number(measure(ws.disc,s.importAudit?.disc,s.disc)!==null)+Number(measure(ws.load,s.importAudit?.load,s.load)!==null)+Number(measure(s.totalMoves)!==null);
+    const score=Number(!!s.wharf)+Number(!!s.lastDate)+Number(measure(ws.disc,s.importAudit?.disc,s.disc)!==null)+Number(measure(ws.load,s.importAudit?.load,s.load)!==null)+Number(measure(s.totalMoves)!==null)+0.1*Number(measure(ws.bundleDeduct,s.bundleDeduct)!==null)+0.1*Number((Array.isArray(s.bundleInfo)?s.bundleInfo:ws.bundleInfo||[]).length>0);
     if(!out.has(key)||score>out.get(key).score)out.set(key,{ship:s,score});
   }
   return [...out.values()].map(x=>x.ship);
@@ -161,7 +161,7 @@ function shipBundleMetrics(ship){
  const detail=Array.isArray(ship.bundleInfo)?ship.bundleInfo:Array.isArray(ws.bundleInfo)?ws.bundleInfo:[];
  const fromDetail=detail.reduce((sum,x)=>sum+Math.max(0,(measure(x.fl,x.FL)||0)-(measure(x.bn,x.BN)||0)),0);
  const calculated=bn!==null&&fl!==null?Math.max(0,fl-bn):detail.length?fromDetail:null;
- const bundle=direct!==null?direct:calculated;
+ const bundle=hasManual?direct:(direct!==null&&direct>0?direct:(calculated!==null&&calculated>0?calculated:direct??calculated));
  return {bundle,bn,fl,declared:bundle!==null};
 }
 const REASON_OVERRIDE_KEY='p79_terminal_reason_overrides_v1';
