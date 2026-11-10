@@ -34,7 +34,7 @@ function setup(mode) {
         sysConfig:JSON.parse(JSON.stringify(base)),defaultConfig:base,
         cloudDirectWriteBusy:0,
         document:{getElementById:id=>inputs[id]||null},
-        getActiveGasUrl:()=>base.gasUrl,
+        getActiveGasUrl:()=>base.gasUrl,getAttendanceEmployeeMasterToken:()=> 'TEST',
         normalizeGasWebAppUrl:x=>x,isValidGasWebAppUrl:()=>true,
         normalizeAdminIds:ids=>ids,requireAdminAction:()=>true,
         p79SettingsSaveFeedback:text=>{message=text},

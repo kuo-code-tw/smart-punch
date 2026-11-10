@@ -79,6 +79,7 @@ assert(accepted.distance <= 120);
 assert.equal(gpsCalls,1,'fast fix in configured site does not require a slow fallback');
 
 (async () => {
+    context.getAttendanceEmployeeMasterToken=()=> 'EMPLOYEE-TEST';
     let capturedUrl='';
     context.fetchGasJsonWithRetry = async url => {
         capturedUrl=url;
@@ -87,8 +88,8 @@ assert.equal(gpsCalls,1,'fast fix in configured site does not require a slow fal
     assert.equal(await context.refreshPunchLocationConfig(),true);
     assert.equal(context.sysConfig.locationName,'新名稱');
     assert.equal(context.sysConfig.extraLocations[0].name,'新增作業區');
-    assert(capturedUrl.includes('action=getData'),'uses the same authoritative read as cloud sync');
-    assert(!capturedUrl.includes('token='),'staff do not need management-only credentials to read GPS settings');
+    assert(capturedUrl.includes('action=getGpsConfig'),'uses lightweight authoritative GPS read');
+    assert(capturedUrl.includes('token=EMPLOYEE-TEST'),'uses employee token without requiring management permission');
 
     // Outdated backend missing an extra site cannot silently certify old settings.
     context.fetchGasJsonWithRetry=async()=>({ok:true,config:{...base}});

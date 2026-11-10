@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let raw=JSON.stringify({companyName:'keep',adminIds:['private'],lat:22,lng:120,radius:100,extraLocations:[{name:'old',lat:22,lng:120,radius:100}]}),writes=0;
+const ctx={SYSTEM_CONFIG_PROPERTY:'config',getSystemConfig_:()=>JSON.parse(raw),Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)})},PropertiesService:{getScriptProperties:()=>({setProperty:(k,s)=>{raw=s;writes++;}})}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('backend/gps-config-v111.gs','utf8'),ctx);
+assert.equal(ctx.p79GpsSaveConfig_({config:{companyName:'changed'}}).config.extraLocations[0].name,'old');
+const site={name:'new',lat:22.555499,lng:120.337724,radius:100};
+ctx.p79GpsSaveConfig_({config:{extraLocations:[site]}});
+assert.equal(ctx.p79GpsConfigOnly_().config.extraLocations[0].name,'new');
+assert.equal(ctx.p79GpsConfigOnly_().config.adminIds,undefined);
+for(const lat of [null,'',91,NaN])assert.throws(()=>ctx.p79GpsSaveConfig_({config:{extraLocations:[{...site,lat}]}}));
+assert.throws(()=>ctx.p79GpsSaveConfig_({config:{extraLocations:Array(6).fill(site)}}));
+assert.throws(()=>ctx.p79GpsSaveConfig_({config:{companyName:'x'.repeat(9000)}}));
+assert.equal(writes,2,'invalid settings never write');
+console.log('PASS: GPS durable readback, omitted sites retained, invalid and oversized data rejected, whitelist excludes private settings');
