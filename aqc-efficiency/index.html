@@ -7783,18 +7783,19 @@ async function apiGet(action,params={}){
   throw lastError||Error('GAS 讀取失敗');
 }
 
-// Only retry read-only requests rejected by the server's synchronization lock.
+// Retry only read-only synchronization-lock and transient transport failures, within one total budget.
 async function p79ReadFullVesselData(action,params={}){
   const deadline=Date.now()+GC_FULL_READ_TIMEOUT_MS;
   for(let attempt=0;;attempt++){
     try{return await apiGetQuick(action,params,Math.max(3000,deadline-Date.now()));}
     catch(error){
       const busy=error?.retryable===true||/船舶雲端資料正在同步|船舶資料正在同步/.test(String(error?.message||''));
-      if(!busy)throw error;
+      const transient=error?.transientRead===true||/AbortError|signal is aborted|aborted without reason|Failed to fetch|NetworkError|讀取逾時|timeout/i.test(String(error?.name||'')+' '+String(error?.message||''));
+      if(!busy&&!transient)throw error;
       error.vesselReadPending=true;
       const delay=Math.min(6000,1500*(attempt+1));
       if(Date.now()+delay+3000>=deadline)throw error;
-      p79SetEfficiencySyncLight('pending','雲端忙碌，等待讀回確認（自動重試 '+(attempt+1)+'）');
+      p79SetEfficiencySyncLight('pending',(busy?'雲端忙碌':'雲端讀取中斷')+'，等待讀回確認（自動重試 '+(attempt+1)+'）');
       await new Promise(resolve=>setTimeout(resolve,delay));
     }
   }
@@ -7874,7 +7875,8 @@ async function apiGetQuick(action,params={},timeoutMs=7000){
     if(!j?.ok){const error=Error(j?.error||'雲端錯誤');error.retryable=j?.retryable===true;throw error;}
     return j;
   }catch(error){
-    if(controller?.signal.aborted)throw Error((action==='gcGetData'?'完整船舶資料':'雲端資料')+'讀取逾時（'+Math.round(Math.max(3000,Number(timeoutMs)||7000)/1000)+'秒），尚未取得完整回覆');
+    if(controller?.signal.aborted){const timeout=Error((action==='gcGetData'?'完整船舶資料':'雲端資料')+'讀取逾時（'+Math.round(Math.max(3000,Number(timeoutMs)||7000)/1000)+'秒），尚未取得完整回覆');timeout.transientRead=true;throw timeout;}
+    if(/AbortError|signal is aborted|aborted without reason|Failed to fetch|NetworkError/i.test(String(error?.name||'')+' '+String(error?.message||''))){const interrupted=Error('雲端讀取中斷，尚未取得完整回覆');interrupted.transientRead=true;throw interrupted;}
     throw error;
   }finally{
     if(timer)clearTimeout(timer);
@@ -8569,7 +8571,8 @@ async function onMonthlyCompareMonthChange(){
 
 function gcLocalSyncState(){return JSON.stringify({groups,assignments,records,shipMasters});}
 async function buildSafeGcSyncPayload(payload={}){
-  const read=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?(action,params)=>p79ReadFullVesselData(action,params):apiGet;
+  // Background saves need the same full-read budget as the manual sync button.
+  const read=(action,params)=>p79ReadFullVesselData(action,params);
   const localPayload={...payload};
   const beforeState=gcLocalSyncState();
   const matchesCurrent=JSON.stringify({
@@ -8587,7 +8590,7 @@ async function buildSafeGcSyncPayload(payload={}){
     // 舊版只要第一支 request 失敗就直接停止匯入後同步，造成「明明 試算表 已讀到卻顯示匯入失敗」。
     let remote=null;
     let scopedError=null;
-    const scope=(typeof p79EfficiencyManualSyncActive!=='undefined'&&p79EfficiencyManualSyncActive)?{}:efficiencyCloudScopeParams();
+    const scope={}; // gcSyncAll replaces full collections; preflight must not use a partial month.
     if(typeof p79EfficiencySyncStep==='function')p79EfficiencySyncStep('讀取完整雲端，核對上傳前資料');
     try{
       remote=await read('gcGetData',scope);
@@ -8695,7 +8698,8 @@ async function buildSafeGcSyncPayload(payload={}){
     err.safeSyncBlocked=true;
     // The preflight is read-only: a synchronization-lock rejection is safe to retry.
     err.preflightBusy=e?.vesselReadPending===true||/船舶雲端資料正在同步|船舶資料正在同步/.test(String(e?.message||e));
-    err.vesselReadPending=err.preflightBusy;
+    err.preflightReadRetryable=e?.transientRead===true||/AbortError|signal is aborted|aborted without reason|Failed to fetch|NetworkError|讀取逾時|timeout/i.test(String(e?.name||'')+' '+String(e?.message||''));
+    err.vesselReadPending=err.preflightBusy||err.preflightReadRetryable;
     err.originalError=e;
     throw err;
   }
@@ -8806,13 +8810,13 @@ async function flushQueue(){
           syncError=String(e?.message||e);
           // Retry only explicit busy rejections. Each retry re-reads and merges cloud data;
           // unknown outcomes, permission errors and transport failures retain their guards.
-          const preflightBusy=!writeAttempted&&e?.safeSyncBlocked===true&&e?.preflightBusy===true;
+          const preflightBusy=!writeAttempted&&e?.safeSyncBlocked===true&&(e?.preflightBusy===true||e?.preflightReadRetryable===true);
           const rejectedBusy=e?.retryable===true&&e?.writeRejected===true&&/正在處理其他資料|正在寫入資料|雲端正忙|同步繁忙/.test(syncError);
           if(preflightBusy||rejectedBusy){
             if(busyRetryId!==item.id){busyRetryId=item.id;busyRetryCount=0;}
             if(busyRetryCount<3){
               const delay=[2000,5000,10000][busyRetryCount++];
-              p79EfficiencySyncStep('雲端忙碌，等待後自動重試','第 '+busyRetryCount+'/3 次；待同步 '+readQueue().length+' 批，原資料保留');
+              p79EfficiencySyncStep(preflightBusy?'上傳前讀取未完成，等待後自動重試':'雲端忙碌，等待後自動重試','第 '+busyRetryCount+'/3 次；待同步 '+readQueue().length+' 批，原資料保留');
               await new Promise(resolve=>setTimeout(resolve,delay));
               continue;
             }
