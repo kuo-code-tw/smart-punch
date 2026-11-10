@@ -27,7 +27,9 @@ assert(backend.includes('LockService.getScriptLock()'),'server import locked');
 assert(backend.includes('incoming.has(r[0])'),'reject duplicate input dates');
 assert(backend.includes('index.get(date)'),'server upserts existing date');
 class Element{
- constructor(id){this.id=id;this.children=[];this.dataset={};this.attrs={};this.hidden=false;this.disabled=false;this.files=[];this.listeners={};this.value='';this.textContent='';}
+ constructor(id){this.id=id;this.children=[];this.dataset={};this.attrs={};this.hidden=false;this.disabled=false;this.files=[];this.listeners={};this.value='';this._text='';}
+ set textContent(v){this._text=v;if(v==='')this.children=[];}
+ get textContent(){return this._text;}
  addEventListener(k,fn){this.listeners[k]=fn;}
  appendChild(x){this.children.push(x);return x;}
  remove(){}
