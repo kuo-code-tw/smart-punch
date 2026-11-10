@@ -157,3 +157,17 @@ body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!
  #view-compare .p79-rm-toggle button{width:34px}
  #view-compare .p79-rm-chart{height:178px}
 }
+
+/* Icon and native disclosure finishing touches */
+#view-compare .p79-rm-brand svg{width:27px;height:27px;color:#fff;display:block}
+#view-compare .p79-rm-nav-icon{display:inline-flex;align-items:center;justify-content:center}
+#view-compare .p79-rm-nav-icon svg{width:23px;height:23px}
+#view-compare .p79-rm-heading-icon{display:grid;place-items:center;width:38px}
+#view-compare .p79-rm-heading-icon svg{width:32px;height:32px}
+#view-compare .p79-rm-kpi-icon svg{width:27px;height:27px}
+#view-compare .p79-rm-side-icon svg{width:28px;height:28px}
+#view-compare .p79-rm-profile svg{width:28px;height:28px}
+#view-compare .p79-rm-search>span{display:flex;align-items:center}
+#view-compare .p79-rm-side-tabs[hidden],
+#view-compare .p79-rm-side-body[hidden],
+#view-compare .p79-rm-side[hidden]{display:none!important}
