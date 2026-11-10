@@ -1,0 +1,132 @@
+{
+  "dataset": "https://data.gov.tw/dataset/99641",
+  "license": "https://data.gov.tw/license",
+  "sources": [
+    {
+      "month": "2026-09",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/2381cf8e-5b07-4b60-8857-9da6075f0e11?DLCount=1",
+      "sha256": "e936ef40e79482defab5fcb5084b7b8183f11b0c2d5d5bb5748223bc1017d764",
+      "rows": 4874
+    },
+    {
+      "month": "2026-08",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/01968b90-2d6e-4916-805f-9f24e0a809da?DLCount=1",
+      "sha256": "65d79631d18f755718c2a6d54e4634bcae10bd57bcb1db2b000bfd03593fedfb",
+      "rows": 4267
+    },
+    {
+      "month": "2026-07",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/c3fa0f96-69b9-43d9-802b-70df7ecf7123?DLCount=1",
+      "sha256": "fa5c18bac2274b2cd962f47bba9485da05036e80306b1cfc9a3c4bfbc70982ef",
+      "rows": 4507
+    },
+    {
+      "month": "2026-06",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/c80d6e04-157c-4c77-a057-3f2da47c2d38?DLCount=1",
+      "sha256": "84cc1e110717cd5e678a340690c6e571fc7fa099cd0a6488cb2fbc11d13905b7",
+      "rows": 5307
+    },
+    {
+      "month": "2026-05",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/7adb9d00-b05c-4b8f-8da5-b13130d07b3b?DLCount=1",
+      "sha256": "aac44a3c21d3df4841941df962598e37db30f26268ea65efe2e46d22ba7d5dff",
+      "rows": 4565
+    },
+    {
+      "month": "2026-04",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/21e405e6-9257-42ce-894e-015fe6bc5e43?DLCount=1",
+      "sha256": "73c8fd8ceccad7f402d9b7b941fa1d05cc7130baf891f60811df60e8a702f916",
+      "rows": 4074
+    },
+    {
+      "month": "2026-03",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/6a991688-dbc0-451e-92e5-49c9be8daf9c?DLCount=1",
+      "sha256": "3fa7f9e0c2908559fa9e799fe49dd348d45df5471dce4d7d811a265172a3bf7b",
+      "rows": 1082
+    },
+    {
+      "month": "2026-02",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/de7294fc-1b5c-4ee9-beb2-ce94c2736a99?DLCount=1",
+      "sha256": "88029ffd7e4bbe0402e37f6149c5d867d5324b12ee2bb3749dcd16ec0c844157",
+      "rows": 2823
+    },
+    {
+      "month": "2026-01",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/8eca53a7-a186-40b9-b562-261083875057?DLCount=1",
+      "sha256": "626c218f681602b57a4b97077ee627af8e312eeed5c6cdf213a2a3265cec96c9",
+      "rows": 3188
+    },
+    {
+      "month": "2025-12",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/3e5ca102-7424-4966-8410-074b0168acc9?DLCount=1",
+      "sha256": "079a95ca324a8ab87d856957ba45bdc11959b853efb12c0e56bebc7aa77613d6",
+      "rows": 3302
+    },
+    {
+      "month": "2025-11",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/f60822e7-71b8-49a6-8ea0-da9922ba5952?DLCount=1",
+      "sha256": "f9cff395263db3fea0ae70064bcb3bc7389d6be7e4486d48e4ca315b6b64fef6",
+      "rows": 3044
+    },
+    {
+      "month": "2025-10",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/bc437edb-2d7c-46a9-9794-015b8fba101c?DLCount=1",
+      "sha256": "dd80348b2fc2fd2b8e57e0aec971e3ddb651b4080546da6bee4804a517be1fe7",
+      "rows": 3631
+    },
+    {
+      "month": "2025-09",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/314721bc-8789-4e68-b949-0e5116f7f6eb?DLCount=1",
+      "sha256": "38c64cff6256ed7481fc9fb3007f5724f430e7ddadc0504078b59689f601323e",
+      "rows": 4384
+    },
+    {
+      "month": "2025-08",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/3692551e-048b-4acb-aa88-4c4a42304e1a?DLCount=1",
+      "sha256": "d9dc796ec42a584a07588948bbdce1ef614bcd79dbea7540bc1917f8e4dc7cd7",
+      "rows": 4890
+    },
+    {
+      "month": "2025-07",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/33925e7f-77be-4e84-9d64-4c5099e39583?DLCount=1",
+      "sha256": "c3071ed9598fd4130c0a3a53cc1f2d62febc890dc6b025e3181e549d865a19de",
+      "rows": 1636
+    },
+    {
+      "month": "2025-06",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/3a768d62-389b-45d3-bdf2-a8c85d439fe7?DLCount=1",
+      "sha256": "3948c847b70d7ace9214ba74dd087ce84da55d3ccff42aa2f299a63a9b6992f6",
+      "rows": 1945
+    },
+    {
+      "month": "2025-05",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/3fbe5d1b-6f64-4d75-9e5a-7483a98df447?DLCount=1",
+      "sha256": "48b8aae03c165f4fa47bab364c5a8ecf2f85f3973c90d3a8e98761f18e0b48d7",
+      "rows": 2073
+    },
+    {
+      "month": "2025-04",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/386e8ed5-c1bf-4ad0-95a4-57575b55b800?DLCount=1",
+      "sha256": "c8ec9bdf3896b63bbd3ed6fdb748358a5c8ee0fcd2ae03634fc02adbe14b57ec",
+      "rows": 1839
+    },
+    {
+      "month": "2025-03",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/a6101739-01cb-4086-9606-3824f24f0fde?DLCount=1",
+      "sha256": "2f6ce500d4f1159549bfe9146340f29f8a6e2a702dd9e6079906fd2c2644716f",
+      "rows": 1390
+    },
+    {
+      "month": "2025-02",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/90e055db-a042-4cdb-8c60-bf49eac6e22c?DLCount=1",
+      "sha256": "b6300506d0296a8ed4aff4c51aee278c19999e38a655ddddfb2ccfe57f26b718",
+      "rows": 978
+    },
+    {
+      "month": "2025-01",
+      "url": "https://www.motcmpb.gov.tw/ServerFile/Get/d9f8cf61-8d33-4216-bef1-c4ef4b3eda83?DLCount=1",
+      "sha256": "fe4a19db6b76958358219a2a4e6c2e95098da70afcce432aec7fdd5c3acfc9fd",
+      "rows": 1064
+    }
+  ]
+}

@@ -36,6 +36,7 @@
 <meta http-equiv="Expires" content="0">
 <!-- BUILD 2026-09-28 V7.33 REAL-WORKBOOK-FIELD-AUDIT + HUMAN-UI -->
 <title>79號碼頭雲端智慧系統｜效率系統</title>
+<script src="../assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -7738,7 +7739,10 @@ function p79VesselChineseDisplay(master){
   const matches=(shipMasters||[]).filter(s=>String(s.vessel||s.shipName||s.name||'').toUpperCase().replace(/[^A-Z0-9]/g,'')===key).map(p79VesselChineseName).filter(Boolean);
   const unique=[...new Set(matches)];
   if(unique.length===1)return unique[0];
-  if(P79_CONFIRMED_VESSEL_NAMES_V110[key])return P79_CONFIRMED_VESSEL_NAMES_V110[key];
+  const directory=typeof P79VesselNameDirectory!=='undefined'?P79VesselNameDirectory:null;
+  const registered=directory?.getChineseName(master?.vessel||master?.shipName||master?.name,master?.imo||master?.imoNumber);
+  if(registered)return registered;
+  if(typeof P79_CONFIRMED_VESSEL_NAMES_V110!=='undefined'&&P79_CONFIRMED_VESSEL_NAMES_V110[key])return P79_CONFIRMED_VESSEL_NAMES_V110[key];
   try{return p79VesselChineseName({localName:JSON.parse(localStorage.getItem('p79_official_vessel_names')||'{}')[key]});}catch{return '';}
 }
 

@@ -67,12 +67,13 @@ function weeklyChart(report){
 // Homepage ship timetable is a separate outside-website source, not the vessel historical snapshot.
 
 function p79ImportedChineseShipName(ship){
- const official=g.P79ManualShipSchedule?.getChineseName?.(ship?.name);
- if(/[\u3400-\u9fff]/u.test(String(official||'')))return String(official).trim();
  const own=[ship?.chineseName,ship?.vesselChineseName,ship?.localName]
   .find(value=>/[\u3400-\u9fff]/u.test(String(value||'')));
- return String(own||'').trim();
+ if(own)return String(own).trim();
+ const official=g.P79VesselNameDirectory?.getChineseName?.(ship?.name,ship?.imo||ship?.imoNumber)||g.P79ManualShipSchedule?.getChineseName?.(ship?.name);
+ return /[\u3400-\u9fff]/u.test(String(official||''))?String(official).trim():'';
 }
+
 let lastVesselsForChineseNames=null;
 function vessels(v){
  lastVesselsForChineseNames=v;

@@ -27,6 +27,7 @@ jobs:
           node-version: '22'
       - name: Test monthly vessel export and completion-month accounting
         run: |
+          node tests/vessel-all-month-name-directory.cjs
           node tests/vessel-completion-export-integrity.cjs
           node tests/vessel-monthly-export.cjs
           node tests/dashboard-monthly-quantity-reconciliation.cjs

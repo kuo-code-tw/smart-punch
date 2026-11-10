@@ -75,7 +75,8 @@ function rememberOfficialChineseNames(allRows,directory){
 function getChineseName(englishName){
  const key=vesselNameKey(englishName);
  if(!key||verifiedShipNames[key]===null)return '';
- const name=verifiedShipNames[key]||readOfficialNameCache()[key]||'';
+ const registered=g.P79VesselNameDirectory?.getChineseName?.(englishName);
+ const name=verifiedShipNames[key]||registered||readOfficialNameCache()[key]||'';
  return /[\u3400-\u9fff]/u.test(String(name))?short(name):'';
 }
 function parseRows(data){
