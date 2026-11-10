@@ -15,6 +15,7 @@ function message(text,kind){
  var el=$('gateMessage');el.textContent=String(text);el.dataset.kind=kind||'info';
  var dialogStatus=$('gateImportDialogStatus');
  if(dialogStatus){dialogStatus.textContent=String(text);dialogStatus.dataset.kind=kind||'info';}
+ if($('gateImportDialog'))$('gateImportDialog').dataset.kind=kind||'info';
 }
 function text(v){return String(v??'').trim();}
 function amount(raw,label){

@@ -15,7 +15,7 @@
   update:function(source,message,kind){
    if(!allowed(source))return;
    var status=d.getElementById('p79GateImportDialogStatus');
-   status.textContent=String(message||'');status.dataset.kind=kind||'info';
+   status.textContent=String(message||'');status.dataset.kind=kind||'info';dialog.dataset.kind=kind||'info';
   }
  };
  d.getElementById('p79GateImportDialogClose').addEventListener('click',function(){dialog.close();});

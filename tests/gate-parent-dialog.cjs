@@ -3,15 +3,19 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8'),child=fs.readFileSync('assets/port79-gate-import.js','utf8');
 assert(html.includes('id="p79GateImportDialog"')&&html.includes('port79-gate-dialog.js'));
 assert(!child.includes('scrollIntoView'),'import must never scroll iframe or parent to find a dialog');
-const frameWindow={},els={p79GateImportFrame:{contentWindow:frameWindow},p79GateImportDialog:{open:false,showModal(){this.open=true;},close(){this.open=false;}},p79GateImportDialogFile:{},p79GateImportDialogStatus:{dataset:{}},p79GateImportDialogClose:{addEventListener(k,fn){this.click=fn;}}};
+const frameWindow={},els={p79GateImportFrame:{contentWindow:frameWindow},p79GateImportDialog:{dataset:{},open:false,showModal(){this.open=true;},close(){this.open=false;}},p79GateImportDialogFile:{},p79GateImportDialogStatus:{dataset:{}},p79GateImportDialogClose:{addEventListener(k,fn){this.click=fn;}}};
 const win={document:{getElementById:id=>els[id]}};
 vm.runInNewContext(fs.readFileSync('assets/port79-gate-dialog.js','utf8'),{window:win});
 win.P79GateDialog.open({},'untrusted');assert.equal(els.p79GateImportDialog.open,false);
 win.P79GateDialog.open(frameWindow,'gate.xlsx');assert.equal(els.p79GateImportDialog.open,true);assert.equal(els.p79GateImportDialogFile.textContent,'gate.xlsx');
-win.P79GateDialog.update(frameWindow,'failed','error');assert.equal(els.p79GateImportDialogStatus.textContent,'failed');
+win.P79GateDialog.update(frameWindow,'failed','error');assert.equal(els.p79GateImportDialogStatus.textContent,'failed');assert.equal(els.p79GateImportDialog.dataset.kind,'error');
 win.P79GateDialog.update({},'untrusted','success');assert.equal(els.p79GateImportDialogStatus.textContent,'failed');
 win.P79GateDialog.close({});assert.equal(els.p79GateImportDialog.open,true);
 win.P79GateDialog.close(frameWindow);assert.equal(els.p79GateImportDialog.open,false);
 win.P79GateDialog.open(frameWindow,'gate.xlsx');
 els.p79GateImportDialogClose.click();assert.equal(els.p79GateImportDialog.open,false);
 console.log('PASS: parent viewport modal opens/updates/closes only for Gate iframe, with no scroll calls');
+
+assert(html.includes('port79-gate-dialog.css'));
+const colors=fs.readFileSync('assets/port79-gate-dialog.css','utf8');
+for(const kind of ['success','error'])assert(colors.includes('[data-kind="'+kind+'"]'));
