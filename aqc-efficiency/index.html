@@ -11183,6 +11183,21 @@ function handleExcelDragLeave(e){
 }
 async function handleExcelDrop(e){
   e.preventDefault(); e.stopPropagation();
+  // Files dropped outside the embedded Gate document must not enter vessel import.
+  if(document.body.classList.contains('p79-gate-management-active')){
+    const files=Array.from(e.dataTransfer?.files||[]);
+    if(files.length!==1){toast('一次只能匯入一份 Gate Excel／CSV 檔案');return;}
+    const frame=document.getElementById('p79GateImportFrame');
+    if(!frame){toast('Gate 匯入頁尚未載入，請重新開啟進出站櫃量管理');return;}
+    toast('已收到 Gate 檔案，正在讀取與核對…');
+    try{
+      const importer=frame.contentWindow?.P79GateImport;
+      if(!importer?.chooseFile)throw Error('Gate 匯入元件尚未載入，請重新整理後再拖入');
+      await importer.chooseFile(files[0]);
+    }catch(error){toast(String(error.message||error));}
+    return;
+  }
+
   excelDragDepth=0;
   setExcelDropActive(false);
   const files=[...(e.dataTransfer?.files||[])].filter(isExcelFile);

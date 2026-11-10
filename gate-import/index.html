@@ -170,7 +170,7 @@ tbody td:last-child{font-weight:750;color:#047857}
 </script>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script defer src="../assets/port79-gate-live.js?v=20261107-gate-dwmy-v1"></script>
-<script defer src="../assets/port79-gate-import.js?v=20261110-gate-drag-autosave-v1"></script>
+<script defer src="../assets/port79-gate-import.js?v=20261110-gate-drag-autosave-v2"></script>
 </head>
 <body><main>
 <header><div><a href="../">‹ 返回 PORT79 首頁</a><h1>🚛 Gate 進出站櫃量 Excel 匯入</h1><p>按日期保存交空、領空、交重、領重、進站拖車車次</p></div><a href="https://docs.google.com/spreadsheets/d/19umma1xq4XCLm68Wzkk-OvcRkKdZ1V88x238djXNiHc/edit" target="_blank" rel="noopener noreferrer" class="action">開啟正式 Google 資料庫</a></header>
@@ -194,6 +194,7 @@ tbody td:last-child{font-weight:750;color:#047857}
   <span aria-hidden="true" class="gate-drop-icon">📥</span>
   <span><strong>將 Gate Excel 拖曳到這裡，或點此選擇檔案</strong><small>支援 XLSX / XLS / CSV · 自動核對每日櫃量並儲存 · 同日期更新、不重複加總</small></span>
  </div>
+ <p id="gateMessage" role="status" aria-live="polite">拖入檔案後，這裡會顯示讀取、核對及儲存結果。</p>
  <div class="grid gate-live-metrics">
   <div class="metric"><span>交空櫃</span><strong id="gateLiveDe">—</strong></div>
   <div class="metric"><span>領空櫃</span><strong id="gateLivePe">—</strong></div>
@@ -212,7 +213,7 @@ tbody td:last-child{font-weight:750;color:#047857}
 <h2>匯入／更新 Gate Excel</h2>
 <p class="hint">直接拖放至上方匯入區，或使用下方選檔。系統自動核對交空、領空、交重、領重與拖車車次；正式雲端服務驗證成功才自動儲存，同日期採覆蓋更新。</p>
 <div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>重新核對預覽</button></div>
-<p id="gateMessage" role="status" aria-live="polite">請先選擇檔案。</p>
+
 </section>
 <section class="panel" id="gateResult" hidden>
 <div class="gate-preview-heading">
