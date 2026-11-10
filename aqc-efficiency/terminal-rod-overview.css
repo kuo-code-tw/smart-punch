@@ -1,0 +1,55 @@
+/* Reference-style 79/80 AQC cards; scoped to terminal page. */
+#view-terminal .p79-ter-legacy-wharf,
+#view-terminal #terminalKpi{display:none!important}
+#view-terminal .p79-ter-eyebrow,
+#view-terminal .p79-ter-lead{display:none}
+#view-terminal .p79-ter-title{color:#10244a;font-size:26px;font-weight:950}
+#view-terminal .p79-ter-head{align-items:center}
+#view-terminal .p79-ter-status{font-size:12px;margin-bottom:9px}
+#view-terminal .p79-rod-dashboard{width:100%;min-width:0;font-size:13px;color:#203252}
+#view-terminal .p79-rod-update{text-align:right;color:#516179;font-size:12px;margin-bottom:7px}
+#view-terminal .p79-rod-summary-scroll{border:1px solid #ccdbee;border-radius:10px;overflow-x:auto;max-width:100%}
+#view-terminal .p79-rod-summary{width:100%;min-width:920px;border-collapse:collapse;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
+#view-terminal .p79-rod-summary th{background:#e3edfc;color:#152f5d;padding:10px 7px;font-weight:950;white-space:nowrap}
+#view-terminal .p79-rod-summary td{padding:12px 7px;border-top:1px solid #d6e0ee;font-weight:750;white-space:nowrap}
+#view-terminal .p79-rod-summary tbody tr:nth-child(even){background:#f5f9fe}
+#view-terminal .p79-rod-primary{color:#0b51a4;font-size:17px;font-weight:950!important}
+#view-terminal .p79-rod-green{color:#078332!important;font-weight:900!important}
+#view-terminal .p79-rod-strong{font-size:16px;font-weight:950!important;color:#122f61!important}
+#view-terminal .p79-rod-caption{font-size:12px;color:#526176;margin:11px 2px 20px;line-height:1.7}
+#view-terminal .p79-rod-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+#view-terminal .p79-rod-card{min-width:0;border:1px solid #cfddea;background:white;border-radius:15px;box-shadow:0 3px 12px rgba(15,45,88,.14);padding:0 11px 13px;overflow:hidden}
+#view-terminal .p79-rod-banner{display:flex;align-items:center;gap:11px;margin:0 -11px 11px;padding:8px 11px;min-height:60px;background:linear-gradient(110deg,#06489f,#156bc0 68%,#45a0e7);color:#fff}
+#view-terminal .p79-rod-title{font-size:23px;font-weight:950;white-space:nowrap;padding-right:10px;border-right:2px solid #ffffffb0;flex-shrink:0}
+#view-terminal .p79-rod-roster{font-size:11px;font-weight:750;line-height:1.5;min-width:0;flex:1}
+#view-terminal .p79-rod-total{display:flex;align-items:center;gap:9px;padding:6px 10px;flex-shrink:0;background:#e8f1ff;border:1px solid #c8e1fb;border-radius:9px;color:#124174;white-space:nowrap}
+#view-terminal .p79-rod-total small{font-size:11px;font-weight:850}
+#view-terminal .p79-rod-total b{font-size:23px;font-weight:950;color:#084c9f;font-variant-numeric:tabular-nums;line-height:1.1}
+#view-terminal .p79-rod-scroll{overflow-x:auto;max-width:100%}
+#view-terminal .p79-rod-table{border-collapse:collapse;width:100%;min-width:505px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
+#view-terminal .p79-rod-table th{background:#e5efff;color:#18345f;font-weight:900;padding:10px 5px;white-space:nowrap}
+#view-terminal .p79-rod-table td{padding:10px 5px;border-top:1px solid #d7e1ed;font-weight:800}
+#view-terminal .p79-rod-table tbody tr:nth-child(even){background:#f7faff}
+#view-terminal .p79-rod-table .p79-rod-name{color:#1157af;font-size:14px;font-weight:950}
+#view-terminal .p79-rod-pill{display:inline-flex;border-radius:999px;padding:3px 9px;font-size:11px;white-space:nowrap;font-weight:900}
+#view-terminal .p79-rod-pill.reported{background:linear-gradient(#25b94c,#0a8c29);color:white}
+#view-terminal .p79-rod-pill.none{background:linear-gradient(#aab3bd,#83909f);color:white}
+#view-terminal .p79-rod-pill.review{background:#fff0b8;color:#935309}
+#view-terminal .p79-rod-muted{color:#8b9bb3!important}
+#view-terminal .p79-rod-table tfoot td{background:#dfecff;border:0;color:#133261;font-size:15px;font-weight:950;padding:12px 6px}
+#view-terminal .p79-rod-table tfoot td:first-child{text-align:left;padding-left:13px}
+#view-terminal .p79-rod-footnote{color:#617089;font-size:11px;line-height:1.75;margin:11px 2px 2px}
+#view-terminal .p79-rod-caution{color:#9a3412;font-size:11px;line-height:1.7}
+@media (max-width:1220px){
+ #view-terminal .p79-rod-banner{flex-wrap:wrap}
+ #view-terminal .p79-rod-roster{order:3;flex-basis:100%}
+ #view-terminal .p79-rod-total{margin-left:auto}
+}
+@media (max-width:950px){#view-terminal .p79-rod-cards{grid-template-columns:1fr}}
+@media (max-width:560px){
+ #view-terminal .p79-rod-card{padding:0 8px 10px}
+ #view-terminal .p79-rod-banner{margin:0 -8px 8px;padding:8px}
+ #view-terminal .p79-rod-title{font-size:20px}
+ #view-terminal .p79-rod-total b{font-size:19px}
+ #view-terminal .p79-rod-summary{font-size:12px}
+}

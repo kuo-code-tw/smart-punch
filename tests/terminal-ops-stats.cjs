@@ -3,11 +3,16 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 assert(html.includes('data-tab="terminal"'));
+
+for(const code of ['7901','7902','7903','7905','8001','8002','8003','8005','8006'])assert(html.includes('terminalRodOverviewMount')&&html.includes('terminal-rod-overview.js'),'AQC cards connected');
+assert(html.includes('terminal-rod-overview.css?v=20261110-dual-v1'));
+assert(js.includes('root.P79TerminalRodOverview?.render(stats,state);'));
+
 assert(html.includes('id="view-terminal"'));
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261109-shift-colors-v6'));
+assert(html.includes('./terminal-ops.js?v=20261110-dual-v1'));
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(html.includes('<th>Bundle 扣除</th>'));
 assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
