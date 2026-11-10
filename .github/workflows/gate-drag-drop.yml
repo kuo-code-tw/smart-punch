@@ -25,5 +25,8 @@ jobs:
       - name: Verify Gate drag/drop, duplicate-date import safety, read-only dashboard
         run: |
           node tests/gate-drag-drop-import.cjs
+          node tests/gate-blank-date.cjs
+          node tests/gate-parent-dialog.cjs
+          node tests/gate-shell-drop.cjs
           node tests/home-gate-import-preview.cjs
           node tests/gate-live-period-dashboard.cjs

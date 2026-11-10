@@ -3,10 +3,15 @@
 var d=g.document,$=id=>d.getElementById(id);
 if(!d||!$('gateFile'))return;
 var book=null,sourceFile=null,days=[],serviceCheck=0,serviceReady=false,selectionId=0,saving=false;
-var previewMode='day',previewPage=0,previewPageSize=8;
+var previewMode='day',previewPage=0,previewPageSize=8,skippedDates=[];
 var names={deliverEmpty:'交空櫃',pickupEmpty:'領空櫃',deliverLoaded:'交重櫃',
  pickupLoaded:'領重櫃',truckEntries:'拖車車次'};
+function parentDialog(){
+ try{return g.parent&&g.parent!==g?g.parent.P79GateDialog:null;}catch(_){return null;}
+}
 function message(text,kind){
+ if(skippedDates.length)text+='\n略過未填日期：'+skippedDates.join('、')+'（未寫入，也未覆蓋既有資料）';
+ var bridge=parentDialog();if(bridge)bridge.update(g,String(text),kind||'info');
  var el=$('gateMessage');el.textContent=String(text);el.dataset.kind=kind||'info';
  var dialogStatus=$('gateImportDialogStatus');
  if(dialogStatus){dialogStatus.textContent=String(text);dialogStatus.dataset.kind=kind||'info';}
@@ -42,13 +47,20 @@ function findGateMatrix(name){
   if(label(pair[0],pair[1])!==pair[2])throw Error('工作表「'+name+'」的分類列與 Gate 報表不符；第 '+(pair[0]+1)+' 列應為「'+pair[2]+'」');
  }
  if(!label(14,0).includes('本日進站卡車數'))throw Error('找不到第15列「本日進站卡車數」');
- var results=[],seen=new Set();
+ var results=[],seen=new Set();skippedDates=[];
  for(var col=2;col<(data[0]?.length||0);col++){
   var header=data[0][col];
   if(text(header)==='')continue;
   var iso=day(header);
   if(seen.has(iso))throw Error('檔案內有重複日期 '+iso);
   seen.add(iso);
+  var countRows=[1,2,3,4,5,6,7,8,9,10,11,14];
+  if(countRows.every(row=>text(data[row]?.[col])==='')){
+   var letters='',column=col+1;
+   while(column){column--;letters=String.fromCharCode(65+column%26)+letters;column=Math.floor(column/26);}
+   if(countRows.some(row=>sheet[letters+(row+1)]?.f))throw Error(iso+' 的公式沒有計算結果，請先在 Excel 重新計算並儲存');
+   skippedDates.push(iso);continue;
+  }
   function n(row){return amount(data[row]?.[col],iso+' 第 '+(row+1)+' 列')}
   var de=n(1)+n(3),dl=n(2)+n(4),pe=n(6)+n(8),pl=n(7)+n(9),
    truck=n(14),total=de+pe+dl+pl;
@@ -145,13 +157,15 @@ async function chooseFile(droppedFile){
  ++serviceCheck;serviceReady=false;
  sourceFile=droppedFile&&typeof droppedFile.arrayBuffer==='function'?
   droppedFile:($('gateFile').files?.[0]||null);
- book=null;days=[];
+ book=null;days=[];skippedDates=[];
  $('gateResult').hidden=true;$('gateSave').disabled=true;$('gatePreview').disabled=true;
  $('gateSheet').disabled=true;$('gateSheet').textContent='';
  if(!sourceFile){message('請先選擇 Gate 檔案');return;}
  var dialog=$('gateImportDialog');
  if($('gateImportDialogFile'))$('gateImportDialogFile').textContent=sourceFile.name;
- if(dialog&&!dialog.open){dialog.showModal?.();dialog.scrollIntoView?.({block:'center'});}
+ var bridge=parentDialog();
+ if(bridge)bridge.open(g,sourceFile.name);
+ else if(dialog&&!dialog.open)dialog.showModal?.();
  message('已收到檔案，正在準備讀取與核對…');
  if(!/\.(xlsx|xls|csv)$/i.test(sourceFile.name))return message('只支援 xlsx、xls 或 csv','error');
  if(sourceFile.size>10*1024*1024)return message('檔案不能超過 10MB','error');

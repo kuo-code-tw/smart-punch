@@ -779,7 +779,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <iframe id="p79GateImportFrame" title="Gate Excel 匯入與歷史資料管理"
       class="w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
       loading="lazy" style="display:block;width:100%;height:800px;min-height:540px;border:1px solid #dbe4ee"
-      data-src="../gate-import/?embed=1"></iframe>
+      data-src="../gate-import/?embed=1&v=20261110-parent-dialog-v4"></iframe>
   </section>
 
   <section id="view-dashboard" class="space-y-4">
@@ -15496,5 +15496,22 @@ window.addEventListener('load',function(){
  }
 });
 </script>
+<dialog id="p79GateImportDialog" aria-labelledby="p79GateImportDialogTitle">
+ <h2 id="p79GateImportDialogTitle">📥 Gate 檔案匯入</h2>
+ <p id="p79GateImportDialogFile"></p>
+ <p id="p79GateImportDialogStatus" role="status" aria-live="polite"></p>
+ <div class="p79-gate-dialog-actions"><button id="p79GateImportDialogClose" type="button" class="btn">關閉</button></div>
+</dialog>
+<style>
+#p79GateImportDialog{position:fixed;inset:0;margin:auto;border:0;border-radius:18px;padding:24px;width:min(560px,calc(100vw - 32px));max-height:75dvh;overflow:auto;box-shadow:0 24px 80px #0f172a44;color:#0f172a;background:white}
+#p79GateImportDialog::backdrop{background:rgba(15,23,42,.5)}
+#p79GateImportDialog h2{margin:0 0 12px;font-size:20px;font-weight:800}
+#p79GateImportDialogFile{overflow-wrap:anywhere;font-weight:700;color:#334155}
+#p79GateImportDialogStatus{line-height:1.8;min-height:80px;white-space:pre-wrap}
+#p79GateImportDialogStatus[data-kind="error"]{color:#b91c1c}
+#p79GateImportDialogStatus[data-kind="success"]{color:#047857}
+.p79-gate-dialog-actions{display:flex;justify-content:flex-end}
+</style>
+<script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v4"></script>
 </body></html>
 
