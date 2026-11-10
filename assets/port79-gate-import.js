@@ -175,9 +175,9 @@ function preview(autoSave){
  if(!book||saving)return;
  try{
   days=findGateMatrix($('gateSheet').value);
-  render(autoSave===true);
   message('每日交領櫃分類、合計及拖車車次均已核對，共 '+days.length+
    ' 天。'+(autoSave===true?'正在確認正式資料庫寫入權限…':''));
+  render(autoSave===true);
  }catch(err){
   days=[];$('gateResult').hidden=true;$('gateSave').disabled=true;
   message('預覽失敗：'+String(err.message||err),'error');
