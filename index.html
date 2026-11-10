@@ -423,19 +423,19 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span id="p79DashPeopleLabel">今日出勤人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月累計出勤天數</span><strong id="p79DashPersonDays">—</strong><small>人日</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月申報加班工時</span><strong id="p79DashOvertimeHours">—</strong><small>小時</small></div></div>
-      <button type="button" class="p79d-kpi p79d-early-alert" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="早班漏卡尚未核對，點擊查看">
+      <button type="button" class="p79d-kpi p79d-early-alert" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="班表出勤尚未核對，點擊查看早中晚班明細">
         <div class="p79d-kpi-icon" aria-hidden="true">⚠</div>
         <div class="p79d-early-body">
-          <span>早班漏卡警示</span>
+          <span>班表出勤待核</span>
           <strong id="p79DashEarlyPunchCount">—</strong><small>待核班次</small>
           <div class="p79d-early-hint" id="p79DashEarlyPunchHint">點擊查看明細 ›</div>
         </div>
       </button>
     </div>
     <dialog id="p79DashEarlyPunchDialog" class="p79d-early-dialog" aria-labelledby="p79EarlyPunchDialogTitle">
-      <div class="p79d-early-dialog-head"><h3 id="p79EarlyPunchDialogTitle">⚠ 早班漏打卡待核明細</h3><button type="button" data-early-close aria-label="關閉早班警示">✕</button></div>
+      <div class="p79d-early-dialog-head"><h3 id="p79EarlyPunchDialogTitle">⚠ 早／中／晚班表出勤待核明細</h3><button type="button" data-early-close aria-label="關閉早班警示">✕</button></div>
       <p id="p79EarlyPunchDialogStatus" role="status" aria-live="polite">開啟時會讀取最新正式考勤與排班資料。</p>
-      <p class="p79d-early-note">僅針對排定早班（08:00–16:00）核對：08:30 後未見上班卡、下班及延長工時結束後 60 分鐘仍未見下班卡才提示。這是待核警示，不是缺勤判定。</p>
+      <p class="p79d-early-note">依正式班表核對早班 08–16、中班 16–24、晚班次日 00–08；上班 30 分鐘後、下班（含核准延長工時）60 分鐘後再比對打卡。已核准整班請假不列漏卡；部分請假與資料不足標示待核對，不認定缺勤。</p>
       <div id="p79EarlyPunchRows">正在準備資料…</div>
       <div class="p79d-early-dialog-actions"><button type="button" data-early-attendance>前往考勤管理核對 ›</button><button type="button" data-early-close>關閉</button></div>
     </dialog>
@@ -1679,8 +1679,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-home-early-punch-alert.js?v=20261110-morning-review-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261108-lashing-completion-v1&homeearly=20261110"></script>
+<script src="./assets/port79-home-early-punch-alert.js?v=20261110-all-shifts-leave-v2"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261108-lashing-completion-v1&allshifts=20261110-leave-v2"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
 <script src="./assets/port79-reference-dashboard.js?v=20261110-all-vessels-v1"></script>
