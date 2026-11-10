@@ -416,6 +416,7 @@ function render(){
   if(state.categorySaveWarning)list.push(state.categorySaveWarning);
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
+ root.P79TerminalRodOverview?.render(stats,state);
  labelCompactTables();
  const label=el('terminalMonthCaption');
  if(label)label.textContent=month.replace('-',' 年 ')+' 月';
