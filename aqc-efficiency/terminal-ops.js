@@ -385,11 +385,14 @@ function render(){
    }).join('');
   reasonFilter.value=state.stopCategory;
  }
+ const stopSourceAvailable=stats.records.length>0;
+ const stopSummary=[['terminalStopTotalEvents',stats.totalStopEvents],['terminalStopConfirmedMinutes',stats.totalStopMinutes],['terminalStopUnknownEvents',stats.unknownStopEvents]];
+ for(const [id,value] of stopSummary){const target=el(id);if(target)target.textContent=stopSourceAvailable?fmt(value):'—';}
  const categories=el('terminalStopCategoryKpis');
  if(categories)categories.innerHTML=STOP_CATEGORIES.filter(c=>c.label!=='原因未填'||stats.byStop.some(s=>s.reason==='原因未填')).map(c=>{
    const s=stats.byStop.find(item=>item.reason===c.label);
    const count=s?.events||0,minutes=s?.minutes||0,unknown=s?.unknown||0;
-   return '<button type="button" class="p79-ter-stop-kpi '+c.tone+(state.stopCategory===c.label?' active':'')+'" aria-pressed="'+(state.stopCategory===c.label)+'" onclick="P79TerminalOps.selectCategory(\''+c.label+'\')"><span class="stop-kpi-name">'+c.icon+' '+safe(c.label)+'</span><strong>'+fmt(count)+' 件</strong><small>確認 '+fmt(minutes)+' 分'+(unknown?'／'+fmt(unknown)+' 件待核對':'')+'</small></button>';
+   return '<button type="button" class="p79-ter-stop-kpi '+c.tone+(state.stopCategory===c.label?' active':'')+'" aria-pressed="'+(state.stopCategory===c.label)+'" onclick="P79TerminalOps.selectCategory(\''+c.label+'\')"><span class="stop-kpi-name">'+c.icon+' '+safe(c.label)+'</span><strong>'+(stopSourceAvailable?fmt(count):'—')+' 件</strong><small>'+(stopSourceAvailable?'確認 '+fmt(minutes)+' 分'+(unknown?'／'+fmt(unknown)+' 件待核對':''):'尚無當月 WORKING REPORT 明細')+'</small></button>';
  }).join('');
  const stopBody=el('terminalStopBody');
  if(stopBody)stopBody.innerHTML=stats.byStop.length?stats.byStop.map(s=>
@@ -401,7 +404,8 @@ function render(){
   const encoded=encodeURIComponent(e.eventKey).replace(/'/g,'%27');
   const reasonOptions='<option value=""'+(!manuallyChosen?' selected':'')+'>自動：'+safe(e.automaticCategory)+'</option>'+
    STOP_CATEGORIES.map(c=>'<option value="'+safe(c.label)+'"'+(manuallyChosen===c.label?' selected':'')+'>'+c.icon+' '+safe(c.label)+'</option>').join('');
-  return '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td>'+safe(e.category)+'</td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'待核對':fmt(e.minutes))+'</td><td><select class="p79-ter-reason-select" aria-label="選擇 '+safe(e.date+' '+e.aqc)+' 的異常分類" onchange="P79TerminalOps.setReasonCategory(\''+encoded+'\',this.value)">'+reasonOptions+'</select></td></tr>';
+  const badgeTone=STOP_CATEGORIES.find(c=>c.label===e.category)?.tone||'tone-gray';
+  return '<tr><td>'+safe(e.date)+'</td><td>'+safe(e.vessel)+'</td><td>'+safe(e.aqc||'—')+'</td><td><span class="p79-stop-category-tag '+badgeTone+'">'+safe(e.category)+'</span></td><td class="p79-ter-remark">'+safe(e.reason)+'</td><td>'+safe(e.start&&e.end?e.start+'–'+e.end:'未註明')+'</td><td class="em">'+(e.minutes===null?'<span class="p79-stop-pending">待核對</span>':fmt(e.minutes))+'</td><td><select class="p79-ter-reason-select" aria-label="選擇 '+safe(e.date+' '+e.aqc)+' 的異常分類" onchange="P79TerminalOps.setReasonCategory(\''+encoded+'\',this.value)">'+reasonOptions+'</select></td></tr>';
  }).join(''):rowMessage(8,stats.records.length?'此分類沒有可辨識的異常紀錄':'尚未取得 WORKING REPORT 明細');
  const detailCaption=el('terminalStopDetailCaption');
  if(detailCaption)detailCaption.textContent=(state.stopCategory||'全部原因')+'｜共 '+fmt(visible.length)+' 件'+(visible.length>160?'，僅列最近 160 件':'');

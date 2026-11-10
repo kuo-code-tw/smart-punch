@@ -1334,13 +1334,22 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <p class="p79-ref-panel-note">長條：每日正式作業量；折線：每日總 Moves；圓環：WORKING SHEET 原始卸／裝比例。此三者分別依各自欄位統計。</p>
     </div>
   </div>
-  <div class="p79-ter-box">
-   <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🛠️ 停工與異常原因統計</h3><span class="p79-ter-hint">以 WORKING REPORT Remark 為主要來源，搭配正式停工填報，依月份自動更新</span></div>
-   <div id="terminalStopCategoryKpis" class="p79-ter-stop-kpis" aria-label="異常分類統計，點選色卡篩選下方明細"></div>
-   <div class="p79-ter-table-wrap">
-    <table class="p79-ter-table"><thead><tr><th>異常原因</th><th>事件數</th><th>確認分鐘</th><th>未定時事件</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
+  <div class="p79-ter-box p79-ter-stop-redesigned" aria-label="停工與異常統計">
+   <div class="p79-ter-box-head p79-stop-section-head">
+     <div><span class="p79-stop-eyebrow">STOPPAGE &amp; EXCEPTIONS</span><h3 class="p79-ter-box-title">🛠️ 停工與異常原因統計</h3></div>
+     <span class="p79-ter-hint">以 WORKING REPORT Remark 為主要來源，搭配正式停工填報，依月份自動更新</span>
    </div>
-   <div class="p79-ter-stop-detail-head">
+   <div class="p79-stop-total-row" aria-label="本月異常事件摘要">
+    <span class="p79-stop-total-pill">異常事件 <strong id="terminalStopTotalEvents">—</strong></span>
+    <span class="p79-stop-total-pill">確認分鐘 <strong id="terminalStopConfirmedMinutes">—</strong></span>
+    <span class="p79-stop-total-pill pending">待確認時間 <strong id="terminalStopUnknownEvents">—</strong></span>
+   </div>
+   <div id="terminalStopCategoryKpis" class="p79-ter-stop-kpis" aria-label="異常分類統計，點選色卡篩選下方明細"></div>
+   <div class="p79-stop-table-title"><span>📊 異常原因統計一覽</span><small>依所選月份的作業紀錄</small></div>
+   <div class="p79-ter-table-wrap p79-stop-overview-wrap">
+    <table class="p79-ter-table p79-stop-overview-table"><thead><tr><th>異常原因</th><th>事件數</th><th>確認分鐘</th><th>未定時事件</th><th>涉及碼頭</th><th>涉及 AQC 台數</th></tr></thead><tbody id="terminalStopBody"></tbody></table>
+   </div>
+   <div class="p79-ter-stop-detail-head p79-stop-detail-toolbar">
     <h4>📋 停工與異常事件明細</h4>
     <div class="p79-ter-stop-filter-controls">
       <label for="terminalReasonFilter">原因分類</label>
@@ -1348,8 +1357,8 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <span id="terminalStopDetailCaption">全部原因</span>
     </div>
    </div>
-   <div class="p79-ter-table-wrap">
-    <table class="p79-ter-table p79-ter-stop-detail"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>原因分類（點選修改）</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
+   <div class="p79-ter-table-wrap p79-stop-detail-wrap">
+    <table class="p79-ter-table p79-ter-stop-detail p79-stop-detail-table"><thead><tr><th>日期</th><th>船名</th><th>AQC</th><th>原因分類</th><th>原始 Remark／填報內容</th><th>事件時段</th><th>確認分鐘</th><th>原因分類（點選修改）</th></tr></thead><tbody id="terminalStopDetailBody"></tbody></table>
    </div>
    <p class="p79-ter-notice">色卡或上方「原因分類」下拉選單都能篩選下方明細；每筆右側可手動選擇原因分類，統計卡片立即更新；手動選擇目前保存在使用中的瀏覽器。未註明起訖時間的事件只計次數、不計分鐘；H/C、OOG、單吊等正常作業不列為故障。此為各船舶／AQC 記錄之事件統計，不等於全碼頭淨停擺時間。</p>
   </div>
@@ -15714,6 +15723,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script src="./terminal-ops.js?v=20261110-matched-tables-v2"></script>
 <script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
 <link rel="stylesheet" href="./terminal-reference-layout.css?v=20261110-reference-v1">
+<link rel="stylesheet" href="./terminal-stop-redesign.css?v=20261110-stop-v1">
 <script src="./terminal-reference-layout.js?v=20261110-reference-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
