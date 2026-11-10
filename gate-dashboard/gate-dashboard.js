@@ -45,7 +45,7 @@ function setPeriod(){
 }
 function previousStat(){return sum(period(mode,moveAnchor(mode,-1)));}
 function comparison(current,previous,label){
- if(!current||!previous)return {text:label+' —',kind:'neutral'};
+ if(current===null||current===undefined||previous===null||previous===undefined)return {text:label+' —',kind:'neutral'};
  if(previous===0)return {text:label+(current===0?' 0.0%':' 新增'),kind:current?'up':'neutral'};
  var diff=100*(current-previous)/previous;
  return {text:label+' '+(diff>0?'▲ +':diff<0?'▼ ':'')+diff.toFixed(1)+'%',kind:diff<0?'down':diff>0?'up':'neutral'};
