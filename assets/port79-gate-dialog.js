@@ -11,6 +11,7 @@
    this.update(source,'已收到檔案，正在讀取與核對…','info');
    if(!dialog.open)dialog.showModal();
   },
+  close:function(source){if(allowed(source))dialog.close();},
   update:function(source,message,kind){
    if(!allowed(source))return;
    var status=d.getElementById('p79GateImportDialogStatus');

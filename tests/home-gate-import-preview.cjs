@@ -20,7 +20,7 @@ assert(!html.includes('id="p79HomeStatTabs"'),'no full-homepage tab switch');
 const efficiency=fs.readFileSync(path.join(root,'aqc-efficiency/index.html'),'utf8');
 assert(!html.includes('id="p79GateImportLink"'),'homepage is read-only');
 assert(efficiency.includes('data-tab="gate"')&&efficiency.includes('id="view-gate"'),'Gate import lives in vessel system');
-assert(efficiency.includes('data-src="../gate-import/?embed=1&v=20261110-parent-dialog-v4"'),'vessel-system Gate tab embeds the import manager');
+assert(efficiency.includes('data-src="../gate-import/?embed=1&v=20261110-parent-dialog-v5"'),'vessel-system Gate tab embeds the import manager');
 assert(importerHTML.includes('id="gateFile"')&&importerHTML.includes('id="gateSave"'));
 assert(importerHTML.includes('cdn.sheetjs.com/xlsx-0.20.3'),'pinned official Excel parser');
 assert(backend.includes('LockService.getScriptLock()'),'server import locked');

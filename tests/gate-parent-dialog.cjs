@@ -10,5 +10,8 @@ win.P79GateDialog.open({},'untrusted');assert.equal(els.p79GateImportDialog.open
 win.P79GateDialog.open(frameWindow,'gate.xlsx');assert.equal(els.p79GateImportDialog.open,true);assert.equal(els.p79GateImportDialogFile.textContent,'gate.xlsx');
 win.P79GateDialog.update(frameWindow,'failed','error');assert.equal(els.p79GateImportDialogStatus.textContent,'failed');
 win.P79GateDialog.update({},'untrusted','success');assert.equal(els.p79GateImportDialogStatus.textContent,'failed');
+win.P79GateDialog.close({});assert.equal(els.p79GateImportDialog.open,true);
+win.P79GateDialog.close(frameWindow);assert.equal(els.p79GateImportDialog.open,false);
+win.P79GateDialog.open(frameWindow,'gate.xlsx');
 els.p79GateImportDialogClose.click();assert.equal(els.p79GateImportDialog.open,false);
 console.log('PASS: parent viewport modal opens/updates/closes only for Gate iframe, with no scroll calls');

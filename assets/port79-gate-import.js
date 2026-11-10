@@ -296,6 +296,12 @@ async function save(){
    ' 天。日、週、月、年統計將自動重新加總。','success');
   // Only a confirmed backend success refreshes the official read-only view.
   void g.P79GateLive?.refresh?.(days[days.length-1].date);
+  var completedSelection=selectionId;
+  g.setTimeout(function(){
+   if(selectionId!==completedSelection)return;
+   var bridge=parentDialog();
+   if(bridge)bridge.close(g);else $('gateImportDialog')?.close?.();
+  },1000);
  }catch(err){
   var raw=String(err.message||err);
   if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)/i.test(raw)){

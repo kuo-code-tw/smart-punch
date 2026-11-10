@@ -10,7 +10,7 @@ const backend=fs.readFileSync(path.join(base,'backend/gate-stats-daily-import.gs
 new vm.Script(js);
 assert(html.includes('id="gateDropZone"'), 'drop target available above official Gate metrics');
 assert(html.indexOf('id="gateDropZone"')<html.indexOf('class="grid gate-live-metrics"'));
-assert(html.includes('gate-drag-autosave-v4'),'import JS cache is refreshed');
+assert(html.includes('gate-drag-autosave-v5'),'import JS cache is refreshed');
 assert(backend.includes('index.get(date)'),'back end continues date upsert instead of addition');
 class Element{
  constructor(id){this.id=id;this.children=[];this.listeners={};this.dataset={};this.attrs={};
@@ -39,6 +39,7 @@ values.forEach((v,i)=>{
 });
 matrix[14][0]='本日進站卡車數';matrix[14][2]=263;matrix[14][3]=981;
 const book={SheetNames:['GATE'],Sheets:{GATE:{}}};
+let closeTimers=[];
 let valid=true,online=true,calls=[],refreshes=0,refreshDate;
 const token='AUTH-GATE';
 const storage={
@@ -47,7 +48,7 @@ const storage={
  port79_gas_url:'https://script.google.com/macros/s/TEST_GATE/exec'
 };
 const win={
- document:doc,sessionStorage:{getItem:k=>storage[k]||null},
+ document:doc,setTimeout:fn=>{closeTimers.push(fn);},sessionStorage:{getItem:k=>storage[k]||null},
  XLSX:{read:()=>book,utils:{sheet_to_json:()=>valid?matrix:[[1]]}},
  P79GateLive:{refresh:async date=>{refreshes++;refreshDate=date;}},
  fetch:async (url,options)=>{
@@ -87,11 +88,15 @@ async function settle(){for(let i=0;i<8;i++)await new Promise(resolve=>setImmedi
  assert(get('gateMessage').textContent.includes('已寫入正式資料庫'),'success only after POST confirmation');
  assert.equal(refreshes,1,'confirmed import refreshes official read-only view');
  assert.equal(refreshDate,'2026-11-02','confirmed import follows final imported month');
+ assert.equal(closeTimers.length,1);closeTimers.shift()();
+ assert.equal(get('gateImportDialog').open,false,'confirmed import automatically closes dialog');
  drop();await settle();
  assert.equal(calls.filter(c=>c.options?.method==='POST').length,2,'reimport sends same dates for server upsert');
  valid=false;drop();await settle();
  assert.equal(calls.filter(c=>c.options?.method==='POST').length,2,'invalid workbook never posts');
  assert(get('gateMessage').textContent.includes('預覽失敗'),'invalid workbook displays a useful error');
+ closeTimers.splice(0).forEach(fn=>fn());
+ assert.equal(get('gateImportDialog').open,true,'old success timer must not close a new failed import');
  valid=true;online=false;drop();await settle();
  assert.equal(calls.filter(c=>c.options?.method==='POST').length,2,'unverified cloud route prevents autosave');
  assert(get('gateMessage').textContent.includes('尚未部署 Gate 匯入服務'));
