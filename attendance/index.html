@@ -8462,6 +8462,29 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if(!status&&button){status=document.createElement('span');status.id='p79SystemSettingsSaveStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.style.cssText='display:inline-block;margin-right:12px;font-size:13px;font-weight:700;white-space:normal;';button.parentElement.insertBefore(status,button);}
             if(status){status.textContent=message;status.style.color=error?'#b91c1c':'#0369a1';}
         }
+        // An aborted POST can still finish in Apps Script. Read back the
+        // official getData config before reporting success or failure.
+        function p79GpsConfigMatchesCloud(cloudConfig, draft) {
+            if (!cloudConfig || typeof cloudConfig !== 'object') return false;
+            const expectedExtras=normalizeExtraLocations(draft.extraLocations);
+            if (cloudConfig.extraLocations==null && expectedExtras.some(site=>site.name)) return false;
+            return String(cloudConfig.locationName||'').trim()===String(draft.locationName||'').trim() &&
+                Number(cloudConfig.lat)===Number(draft.lat) &&
+                Number(cloudConfig.lng)===Number(draft.lng) &&
+                Number(cloudConfig.radius)===Number(draft.radius) &&
+                JSON.stringify(normalizeExtraLocations(cloudConfig.extraLocations))===JSON.stringify(expectedExtras);
+        }
+
+        async function p79ReadBackSavedGpsConfig(draft) {
+            const gasUrl=getActiveGasUrl();
+            const url=gasUrl+(gasUrl.includes('?')?'&':'?')+'action=getData&t='+Date.now();
+            const data=await fetchGasJsonWithRetry(url,'GPS 儲存結果核對',2,20000);
+            if(data?.ok!==true||!data.config)throw new Error(data?.error||'雲端未回傳可核對的定位設定');
+            if(data.config.extraLocations==null&&normalizeExtraLocations(draft.extraLocations).some(site=>site.name))
+                throw new Error('正式 GAS 未回傳額外 GPS 地點欄位，請檢查後端部署版本');
+            return p79GpsConfigMatchesCloud(data.config,draft);
+        }
+
         async function saveSystemSettings() {
             if(p79SystemSettingsSaveBusy)return;
             if (!requireAdminAction('settingsManage', '修改系統與定位設定')) {p79SettingsSaveFeedback('❌ 此帳號沒有修改系統設定權限',true);return {ok:false};}
@@ -8496,30 +8519,51 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const previous=sysConfig;
                 sysConfig=draft;
                 try{saveConfig();}catch(error){sysConfig=previous;throw new Error('本機無法保留設定：'+(error.message||error)+'。欄位已保留，尚未送出雲端');}
-                const result=await postToCloud({action:'syncConfig',config:draft},'');
-                if(result?.ok!==true||result.localOnly)throw new Error(result?.error||'雲端尚未確認儲存；請保留欄位並重試');
-                if(result.config&&JSON.stringify(normalizeExtraLocations(result.config.extraLocations))!==JSON.stringify(draft.extraLocations))throw new Error('雲端回覆的定位設定不一致，尚未確認儲存');
-                // Check what staff phones will actually read, not only the
-                // acknowledgement from syncConfig (which older GAS versions
-                // can send without retaining the extraLocations field).
-                // The real page defines refreshPunchLocationConfig. Keep the
-                // save handler independently testable with small mocked pages.
-                if (typeof refreshPunchLocationConfig === 'function') {
-                    await refreshPunchLocationConfig();
-                    const samePrimary = String(sysConfig.locationName || '').trim() === draft.locationName &&
-                        Number(sysConfig.lat) === draft.lat && Number(sysConfig.lng) === draft.lng &&
-                        Number(sysConfig.radius) === draft.radius;
-                    const sameExtras = JSON.stringify(normalizeExtraLocations(sysConfig.extraLocations)) ===
-                        JSON.stringify(normalizeExtraLocations(draft.extraLocations));
-                    if (!samePrimary || !sameExtras)
-                        throw new Error('雲端讀回的地點與剛才儲存的設定不同，尚未確認同步；請檢查正式 GAS 版本');
+                const payload={action:'syncConfig',config:draft};
+                // Prevent an older queued syncConfig from overwriting the new sites.
+                removeQueuedCloudOperation(payload);
+                let result=null,writeError=null,readBackError=null,confirmed=false;
+                const verifyCloud=async()=>{
+                    try {
+                        const matched=await p79ReadBackSavedGpsConfig(draft);
+                        readBackError=matched?null:new Error('雲端讀回的定位與剛才輸入的設定不同');
+                        return matched;
+                    } catch(error) {
+                        readBackError=error;
+                        return false;
+                    }
+                };
+                cloudDirectWriteBusy++;
+                try {
+                    // Keep the GAS timeout, but AbortError does not prove failure.
+                    try {result=await performCloudRequest({...payload},90000);}
+                    catch(error){writeError=error;}
+                    p79SettingsSaveFeedback('☁️ 已送出設定，正在核對雲端實際儲存結果…');
+                    confirmed=await verifyCloud();
+                    if(!confirmed&&(result?.ok===true||p79IsAbortLikeError(writeError))) {
+                        // An already-running GAS write may appear shortly afterward.
+                        // Do not issue a second potentially conflicting POST.
+                        await new Promise(resolve=>setTimeout(resolve,1500));
+                        confirmed=await verifyCloud();
+                    }
+                } finally {
+                    cloudDirectWriteBusy=Math.max(0,cloudDirectWriteBusy-1);
                 }
+                if(!confirmed) {
+                    const reason=String(result?.error||writeError?.message||readBackError?.message||'雲端資料未確認');
+                    const guidance=p79IsAbortLikeError(writeError)
+                        ? '雲端請求逾時，讀回仍未確認；已保留輸入內容，請先確認雲端版本再重新儲存'
+                        : '雲端沒有回傳一致的 GPS 設定；輸入內容已保留';
+                    throw new Error(guidance+'（'+reason+'）');
+                }
+                removeQueuedCloudOperation(payload);
+                setCloudSyncStatus('🟢 GPS 與系統設定已由雲端讀回確認','success');
                 applySysConfigUI();
                 if (typeof renderAdminRecordsTable === 'function') renderAdminRecordsTable();
                 p79SettingsSaveFeedback('✅ 定位與系統設定已由雲端確認儲存');
                 showToast('定位與系統設定已儲存','success');
                 closeSystemSettings(true);
-                return result;
+                return {...(result||{}),ok:true,verified:true};
             }catch(error){
                 const message=String(error?.message||error||'未知錯誤');
                 p79SettingsSaveFeedback('❌ 尚未確認儲存：'+message,true);
