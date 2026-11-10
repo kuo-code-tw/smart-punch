@@ -91,7 +91,7 @@ assert.equal(timed.length,1,'exact matching interval and filled stop stay one ev
 const audit=auditor.audit(stats,scope);
 assert(audit.alerts.some(a=>a.code==='raw-79'&&a.message.includes('+10')),'79 cross-file discrepancy flagged');
 assert(audit.alerts.some(a=>a.code==='raw-80'&&a.message.includes('+20')),'80 cross-file discrepancy flagged');
-assert(audit.notes.some(n=>n.includes('排除非 79／80 碼頭 1 艘')),'scope exclusion shown');
+assert(audit.notes.some(n=>n.includes('未歸入 79／80 碼頭 1 艘')),'scope exclusion shown');
 assert(audit.notes.some(n=>n.includes('SHIFT 10')),'expected SHIFT accounting described without calling it automatically correct');
 assert(audit.alerts.some(a=>a.code==='scope-conflict'),'source berth/crane conflicts flagged');
 const other=api.build('2026-11',[ship('D','79L',100,112,65,35,10)],[
