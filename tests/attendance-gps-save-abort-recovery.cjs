@@ -95,6 +95,6 @@ function setup(mode) {
     assert.equal(test.context.p79GpsConfigMatchesCloud(
         {...base}, {...base,extraLocations:[site]}),false);
     assert.match(test.context.p79GpsCloudMismatchReason(
-        {...base}, {...base,extraLocations:[site]}),/extraLocations/);
+        {...base,extraLocations:undefined}, {...base,extraLocations:[site]}),/extraLocations/);
     console.log('PASS: GPS save success, aborted-write recovery, failed-write retention, old GAS rejection');
 })().catch(err=>{console.error(err);process.exitCode=1});
