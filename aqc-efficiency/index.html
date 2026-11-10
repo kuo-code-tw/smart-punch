@@ -1295,12 +1295,14 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   <div class="p79-ter-head">
    <div>
     <div class="p79-ter-eyebrow">TERMINAL OPERATIONS</div>
-    <h2 class="p79-ter-title">🏗️ 作業一覽</h2>
+    <h2 class="p79-ter-title">⚓ 碼頭營運統計</h2>
+    <div class="p79-ref-nav">船舶作業｜吊桿（AQC）｜作業量｜班別統計</div>
     <p class="p79-ter-lead">把船舶完工量、每日／班別 AQC 明細、停工原因集中在同一頁。數字依來源區分，不會將人員回報櫃數誤當成船舶作業量。</p>
    </div>
-   <label class="p79-ter-month">統計月份<select id="terminalMonth" onchange="P79TerminalOps.load(true)"><option value="">讀取月份</option></select></label>
+   <div class="p79-ref-toolbar"><span id="terminalReferenceUpdatedAt" class="p79-ref-update" aria-live="polite">↻ 資料時間待確認</span><label class="p79-ter-month">統計月份<select id="terminalMonth" onchange="P79TerminalOps.load(true)"><option value="">讀取月份</option></select></label></div>
   </div>
   <div id="terminalDataStatus" class="p79-ter-status" role="status" aria-live="polite">正在準備當月資料…</div>
+  <div id="terminalReferenceKpis" class="p79-ref-kpis" aria-label="本月營運八項指標"></div>
   <div id="terminalKpi" class="p79-terminal-kpis"></div>
   <div class="p79-ter-box p79-ter-legacy-wharf">
     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">⚓ 碼頭別作業統計</h3><span class="p79-ter-hint">船舶主檔｜按完工月份｜WORKING NO. 去重</span></div>
@@ -1309,6 +1311,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     </div>
     <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；作業量與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝作業量」。</p>
   </div>
+  <h3 class="p79-ref-section">☷ 作業一覽（吊桿別）</h3>
   <div id="terminalRodOverviewMount" aria-label="79與80碼頭作業一覽"></div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
@@ -1324,6 +1327,11 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <table class="p79-ter-table"><thead><tr><th>作業日期</th><th>班別</th><th>明細筆數</th><th>回報 DISC</th><th>回報 LOAD</th><th>H/C</th><th>作業時數</th></tr></thead><tbody id="terminalShiftBody"></tbody></table>
      </div>
      <p class="p79-ter-notice">班別為早班（08–16）、中班（16–24）、晚班（24–08）；若一筆作業跨班，櫃數暫歸開始班，尚未按逐櫃時間精確拆分。AQC 明細櫃數不直接等於船舶作業量數。</p>
+    </div>
+    <div class="p79-ter-box p79-ter-trend-card">
+      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📊 作業量趨勢與結構</h3><span class="p79-ter-hint">依所選月份正式完工資料</span></div>
+      <div id="terminalReferenceTrend" class="p79-ref-trend-body" role="group" aria-label="每日作業趨勢及卸裝櫃數占比"></div>
+      <p class="p79-ref-panel-note">長條：每日正式作業量；折線：每日總 Moves；圓環：WORKING SHEET 原始卸／裝比例。此三者分別依各自欄位統計。</p>
     </div>
   </div>
   <div class="p79-ter-box">
@@ -15705,6 +15713,8 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <link rel="stylesheet" href="./terminal-rod-overview.css?v=20261110-equal-height-v2">
 <script src="./terminal-ops.js?v=20261110-matched-tables-v2"></script>
 <script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
+<link rel="stylesheet" href="./terminal-reference-layout.css?v=20261110-reference-v1">
+<script src="./terminal-reference-layout.js?v=20261110-reference-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
