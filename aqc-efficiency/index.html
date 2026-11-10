@@ -1291,20 +1291,21 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   <div class="p79-ter-head">
    <div>
     <div class="p79-ter-eyebrow">TERMINAL OPERATIONS</div>
-    <h2 class="p79-ter-title">🏗️ 碼頭營運統計</h2>
+    <h2 class="p79-ter-title">🏗️ 作業一覽</h2>
     <p class="p79-ter-lead">把船舶完工量、每日／班別 AQC 明細、停工原因集中在同一頁。數字依來源區分，不會將人員回報櫃數誤當成船舶作業量。</p>
    </div>
    <label class="p79-ter-month">統計月份<select id="terminalMonth" onchange="P79TerminalOps.load(true)"><option value="">讀取月份</option></select></label>
   </div>
   <div id="terminalDataStatus" class="p79-ter-status" role="status" aria-live="polite">正在準備當月資料…</div>
   <div id="terminalKpi" class="p79-terminal-kpis"></div>
-  <div class="p79-ter-box">
+  <div class="p79-ter-box p79-ter-legacy-wharf">
     <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">⚓ 碼頭別作業統計</h3><span class="p79-ter-hint">船舶主檔｜按完工月份｜WORKING NO. 去重</span></div>
     <div class="p79-ter-table-wrap">
      <table class="p79-ter-table"><thead><tr><th>碼頭</th><th>船數</th><th>卸船 DISC</th><th>裝船 LOAD</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>SHIFT</th><th>H/C</th></tr></thead><tbody id="terminalWharfBody"></tbody></table>
     </div>
     <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；作業量與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝作業量」。</p>
   </div>
+  <div id="terminalRodOverviewMount" aria-label="79與80碼頭作業一覽"></div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日｜Bundle 取自 WORKING SHEET 或船舶主檔，不以差額推定</span></div>
@@ -15697,7 +15698,9 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<script src="./terminal-ops.js?v=20261109-shift-colors-v6"></script>
+<link rel="stylesheet" href="./terminal-rod-overview.css?v=20261110-dual-v1">
+<script src="./terminal-ops.js?v=20261110-dual-v1"></script>
+<script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
