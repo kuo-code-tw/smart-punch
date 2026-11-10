@@ -1074,6 +1074,10 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-compare .p79-route-metric{padding:10px 11px;background:#f5f7fa;border-radius:11px}
 #view-compare .p79-route-metric small{display:block;color:#64748b;font-size:11px;font-weight:750;margin-bottom:4px}
 #view-compare .p79-route-metric strong{font-size:19px;color:#334155;font-weight:900}
+#view-compare .p79-route-metric .p79-route-size-breakdown{display:grid;gap:3px;margin-top:7px;padding-top:7px;border-top:1px solid #e2e8f0}
+#view-compare .p79-route-size-line{display:flex;justify-content:space-between;gap:6px;font-size:11px;line-height:1.35;color:#64748b}
+#view-compare .p79-route-size-line b{font-weight:800;color:#334155}
+#view-compare .p79-route-size-note{font-size:10px;line-height:1.35;color:#b45309;margin-top:3px}
 #view-compare .p79-route-grand{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:13px;border:1px solid #bbecd6;border-radius:12px;background:linear-gradient(110deg,#eafbf1,#f5fff9);color:#047857}
 #view-compare .p79-route-grand small{display:block;font-size:12px;font-weight:800}
 #view-compare .p79-route-grand strong{font-size:26px;line-height:1.15;font-weight:900}
@@ -10205,10 +10209,46 @@ function parseWorkingSheetMoveTable(ws){
   const inHatch=chooseSummary(totalInHatch,detailInHatch);
   const shift=chooseSummary(totalShift,detailShift);
 
+  // Only use explicitly labeled 20/40/45-ft columns. Never infer a size from totals.
+  // TOTAL takes precedence over EMPTY+LADEN exactly as the existing overall parser does.
+  const sizeBreakdown={disc:null,load:null};
+  const footSize=value=>{
+    const label=String(value??'').trim().toUpperCase();
+    const matched=label.match(/^(20|40|45)(?=\s*(?:['’′″]|FT\b|FEET\b|呎|尺|GP\b|HC\b|HQ\b|DV\b|DC\b|$))/);
+    return matched?matched[1]:'';
+  };
+  for(const [direction,start,end,expected] of [
+    ['disc',starts.disc,dEnd,disc],['load',starts.load,lEnd,load]
+  ]){
+    const columns={};
+    const labelEnd=Math.min(rows.length,headerRow+4,totalRow>=0?totalRow:rows.length);
+    for(let r=headerRow;r<labelEnd;r++){
+      const header=rows[r]||[];
+      for(let col=start;col<=end;col++){
+        const size=footSize(header[col]);
+        if(size && columns[size]===undefined)columns[size]=col;
+      }
+    }
+    if(!['20','40','45'].every(size=>Number.isInteger(columns[size])) ||
+       new Set(Object.values(columns)).size!==3)continue;
+    const quantities={};
+    for(const size of ['20','40','45']){
+      const col=columns[size];
+      const totalAtSize=totalRow>=0?numericRangeStats(rows[totalRow]||[],col,col):{sum:0,count:0};
+      const detailAtSize=scanRows(col,col,headerRow+1,dataEnd);
+      quantities[size]=chooseSummary(totalAtSize,detailAtSize);
+    }
+    // A mismatch means the source layout is ambiguous: display unavailable, not a false count.
+    if(Math.abs(quantities['20']+quantities['40']+quantities['45']-expected)<0.000001){
+      sizeBreakdown[direction]=quantities;
+    }
+  }
+
   return {
     ok:(disc+load+inHatch+shift)>0,
     source:totalRow>=0?'TOTAL summary (no duplicate count)':'EMPTY+LADEN detail',
     disc,load,inHatch,shift,
+    sizeBreakdown,
     inHatchDetail:detailInHatch.sum,
     inHatchTotal:totalInHatch.sum,
     shiftDetail:detailShift.sum,
@@ -10329,6 +10369,17 @@ function p79RouteQuantity(...values){
   return null;
 }
 function routeStatsForShips(masters){
+  const readSizeCounts=(raw,expected)=>{
+    if(!raw||typeof raw!=='object'||expected===null)return null;
+    const counts={};
+    for(const size of ['20','40','45']){
+      if(!Object.prototype.hasOwnProperty.call(raw,size))return null;
+      const n=p79RouteQuantity(raw[size]);
+      if(n===null)return null;
+      counts[size]=n;
+    }
+    return Math.abs(counts['20']+counts['40']+counts['45']-expected)<0.000001?counts:null;
+  };
   const unique=new Map();
   for(const ship of masters||[]){
     if(!ship||typeof ship!=='object')continue;
@@ -10342,9 +10393,11 @@ function routeStatsForShips(masters){
       serviceI:p79RouteServiceCode(ws.serviceI||ship.serviceI),
       serviceE:p79RouteServiceCode(ws.serviceE||ship.serviceE),
       disc:p79RouteQuantity(ws.disc,ship.importAudit?.disc,ship.disc),
-      load:p79RouteQuantity(ws.load,ship.importAudit?.load,ship.load)
+      load:p79RouteQuantity(ws.load,ship.importAudit?.load,ship.load),
+      sizeBreakdown:ws.sizeBreakdown||ship.importAudit?.sizeBreakdown||null
     };
-    const score=Number(!!job.serviceI)+Number(!!job.serviceE)+Number(job.disc!==null)+Number(job.load!==null);
+    const score=Number(!!job.serviceI)+Number(!!job.serviceE)+Number(job.disc!==null)+Number(job.load!==null)+
+      Number(!!readSizeCounts(job.sizeBreakdown?.disc,job.disc))+Number(!!readSizeCounts(job.sizeBreakdown?.load,job.load));
     if(!unique.has(key)||score>unique.get(key).score)unique.set(key,{job,score});
   }
   const byRoute=new Map();
@@ -10353,7 +10406,9 @@ function routeStatsForShips(masters){
       const code=job['service'+direction]||'未分類';
       if(!byRoute.has(code))byRoute.set(code,{
         route:code,importCalls:0,exportCalls:0,disc:0,load:0,
-        missingDisc:0,missingLoad:0,jobKeys:new Set(),details:[]
+        missingDisc:0,missingLoad:0,
+        discSizes:{'20':0,'40':0,'45':0},loadSizes:{'20':0,'40':0,'45':0},
+        missingDiscSizes:0,missingLoadSizes:0,jobKeys:new Set(),details:[]
       });
       const summary=byRoute.get(code);
       summary.jobKeys.add(job.workingNo||[job.vessel,job.voyageI,job.voyageE,job.date].join('|'));
@@ -10365,6 +10420,12 @@ function routeStatsForShips(masters){
         summary.exportCalls++;
         if(qty===null)summary.missingLoad++;else summary.load+=qty;
       }
+      const sizeCounts=readSizeCounts(job.sizeBreakdown?.[isImport?'disc':'load'],qty);
+      if(sizeCounts){
+        const target=isImport?summary.discSizes:summary.loadSizes;
+        for(const size of ['20','40','45'])target[size]+=sizeCounts[size];
+      }else if(isImport)summary.missingDiscSizes++;
+      else summary.missingLoadSizes++;
       summary.details.push({
         workingNo:job.workingNo,vessel:job.vessel,direction:isImport?'進口':'出口',
         voyage:isImport?job.voyageI:job.voyageE,quantity:qty,date:job.date,sourceFileName:job.sourceFileName
@@ -10375,6 +10436,8 @@ function routeStatsForShips(masters){
     route:row.route,importCalls:row.importCalls,exportCalls:row.exportCalls,
     disc:row.disc,load:row.load,total:row.disc+row.load,
     missingDisc:row.missingDisc,missingLoad:row.missingLoad,shipCalls:row.jobKeys.size,
+    discSizes:row.discSizes,loadSizes:row.loadSizes,
+    missingDiscSizes:row.missingDiscSizes,missingLoadSizes:row.missingLoadSizes,
     details:row.details
   })).sort((a,b)=>a.route==='未分類'?1:b.route==='未分類'?-1:a.route.localeCompare(b.route,'en',{numeric:true}));
 }
@@ -10486,6 +10549,19 @@ function renderRouteData(){
   p79RouteSummaryCache=rows;
   const fmt=n=>Number(n||0).toLocaleString('zh-TW');
   const quantity=(n,missing)=>fmt(n)+(missing?' *':'');
+  const sizeRows=(summary,direction)=>{
+    const isDisc=direction==='disc';
+    const missing=isDisc?summary.missingDiscSizes:summary.missingLoadSizes;
+    const calls=isDisc?summary.importCalls:summary.exportCalls;
+    const sizes=isDisc?summary.discSizes:summary.loadSizes;
+    const known=calls-missing;
+    const lines=['20','40','45'].map(size=>{
+      const count=calls===0?'0':known>0?fmt(sizes[size])+(missing?' *':''):'—';
+      return '<div class="p79-route-size-line"><span>'+size+' 呎</span><b>'+count+'</b></div>';
+    }).join('');
+    return '<div class="p79-route-size-breakdown">'+lines+
+      (missing?'<div class="p79-route-size-note">'+fmt(missing)+' 筆未取得櫃型'+(known?'；* 為已知小計':'')+'</div>':'')+'</div>';
+  };
   const palette=[
     ['#2563eb','#eff6ff'],['#0d9488','#ecfdf5'],['#7c3aed','#f5f3ff'],
     ['#c2410c','#fff7ed'],['#db2777','#fdf2f8'],['#0369a1','#f0f9ff'],
@@ -10502,8 +10578,8 @@ function renderRouteData(){
         '<div class="p79-route-call out"><span class="p79-route-call-label">↗ 出口艘次</span><strong>'+fmt(s.exportCalls)+'</strong></div>'+
       '</div>'+
       '<div class="p79-route-amounts">'+
-        '<div class="p79-route-metric"><small>卸船櫃數</small><strong>'+quantity(s.disc,s.missingDisc)+'</strong></div>'+
-        '<div class="p79-route-metric"><small>裝船櫃數</small><strong>'+quantity(s.load,s.missingLoad)+'</strong></div>'+
+        '<div class="p79-route-metric"><small>卸船櫃數</small><strong>'+quantity(s.disc,s.missingDisc)+'</strong>'+sizeRows(s,'disc')+'</div>'+
+        '<div class="p79-route-metric"><small>裝船櫃數</small><strong>'+quantity(s.load,s.missingLoad)+'</strong>'+sizeRows(s,'load')+'</div>'+
       '</div>'+
       '<div class="p79-route-grand"><div><small>📦 總櫃數</small></div><strong>'+quantity(s.total,s.missingDisc+s.missingLoad)+'</strong></div>'+
       '<button type="button" class="p79-route-detail-button" onclick="p79SelectRoute('+i+')">查看船舶明細（'+fmt(s.shipCalls)+'）<span aria-hidden="true">›</span></button>'+
@@ -10700,6 +10776,7 @@ function parseWorkingSheetSummary(book){
     importAudit:{
       moveSource:moveTable.ok?moveTable.source:'fixed-cell fallback',
       disc:directDisc,load:directLoad,inHatch:directInHatch,shiftRaw:directShift,
+      sizeBreakdown:moveTable.sizeBreakdown||null,
       sheetTtlCtnr, sheetTtlMoves, rawSheetContainers,
       bundleDeduct:num(bundleInfo.deduct)
     }
@@ -11720,6 +11797,7 @@ async function importExcel(file) {
         ruleVersion:workingSheetRuleVersion,
         disc:num(audit.disc),
         load:num(audit.load),
+        sizeBreakdown:audit.sizeBreakdown||null,
         inHatch:num(audit.inHatch),
         shiftRaw:num(audit.shiftRaw),
         totalContainers:num(summary.totalContainers),
