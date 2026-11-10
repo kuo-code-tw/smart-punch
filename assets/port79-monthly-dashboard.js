@@ -487,10 +487,10 @@ async function refreshPendingReviewFromCloud(){
     (root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token||!permissions().attendance)return;
   if(!Array.isArray(data.records))throw Error('雲端考勤明細格式不完整');
   const scheduleData=permissions().schedule?await request('schedule',ym,token,true).catch(()=>null):null;
+  const leaveData=await requestApprovedLeave(token).catch(()=>null);
   const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleData);
   showAttendance(checked);
-  // Early-shift warning is a separate, read-only roster-to-punch audit.
-  root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleData,ym);
+  root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleData,ym,{leaveData});
   if(scheduleData)enrichPendingReview(scheduleData);
   if(checked.boundaryError)pendingReviewError=checked.boundaryError;
   pendingReviewVerifiedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
@@ -568,6 +568,24 @@ function reset(){
  root.P79ReferenceDashboard?.reset();
 }
 function accessError(){return '目前登入身分沒有此類歷史資料的檢視權限，請由權限管理員確認。'}
+// The missing-punch audit must use the same *official* leave source as HR
+// summaries. A failed/unauthorized leave read never means "no approved leave".
+async function requestApprovedLeave(token){
+ const current=session(),role=String(current?.adminRole||current?.role||'').toLowerCase();
+ if(role!=='superadmin'&&!['view','manage'].includes(String(current?.systemPermissions?.leave)))
+  throw Error('目前帳號沒有正式請假紀錄檢視權限');
+ const raw=String(root.sessionStorage.getItem('port79_gas_url')||'');
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(raw))throw Error('請假資料連線未驗證');
+ const url=new URL(raw);url.searchParams.set('action','getLeaveData');url.searchParams.set('token',token);
+ url.searchParams.set('_',String(Date.now()));
+ const controller=new AbortController(),timer=root.setTimeout(()=>controller.abort(),30000);
+ try{
+  const response=await root.fetch(url.toString(),{cache:'no-store',signal:controller.signal}),data=await response.json();
+  if(!response.ok||data?.ok!==true||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords))
+   throw Error(data?.error||'核准請假資料尚未讀齊');
+  return data;
+ }finally{root.clearTimeout(timer);}
+}
 async function request(kind,ym,token,forceCloud){
  const base=String(root.sessionStorage.getItem('port79_gas_url')||'').trim();
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base))throw Error('尚未取得已驗證的資料服務網址');
@@ -659,7 +677,7 @@ async function load(forceCloud=false){
  reset();root.P79ReferenceDashboard?.setGroupRoster(null,ym);statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  statusText('p79DashMessage','正在唯讀查詢 '+selectedMonthTitle()+' 的船舶與考勤資料…');
  const failures=[];
- let scheduleSnapshot=null;
+ let scheduleSnapshot=null,attendanceSnapshot=null,leaveSnapshot=null,attendanceBoundaryError='';
  try{
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
    if(!allowed){statusText(captionId,accessError());if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});renderHomeOvertimeList(null);}continue}
@@ -681,8 +699,8 @@ async function load(forceCloud=false){
       }
       const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleSnapshot);
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().attendance)return;
+      attendanceSnapshot=data;attendanceBoundaryError=String(checked.boundaryError||'');
       render(checked);
-      root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleSnapshot,ym);
       if(scheduleSnapshot)enrichPendingReview(scheduleSnapshot);
     }
     else if(kind==='schedule'&&Array.isArray(data.schedules)){
@@ -696,19 +714,16 @@ async function load(forceCloud=false){
    }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message});renderHomeOvertimeList(null);} }
   }
   try{
-   const leaveRole=String(s.adminRole||s.role||'').toLowerCase();
-   if(leaveRole!=='superadmin'&&!['view','manage'].includes(String(s.systemPermissions?.leave)))throw Error('目前帳號沒有核准請假統計的檢視權限');
-   const raw=String(root.sessionStorage.getItem('port79_gas_url')||'');
-   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(raw))throw Error('請假資料連線未驗證');
-   const u=new URL(raw);u.searchParams.set('action','getLeaveData');u.searchParams.set('token',token);u.searchParams.set('_',String(Date.now()));
-   const controller=new AbortController(),timer=root.setTimeout(()=>controller.abort(),30000);let response,data;
-   try{response=await root.fetch(u.toString(),{cache:'no-store',signal:controller.signal});data=await response.json();}finally{root.clearTimeout(timer);}
-   if(!response.ok||data?.ok!==true||!Array.isArray(data.employees)||!Array.isArray(data.leaveRecords))throw Error(data?.error||'無權限或請假資料尚未讀齊');
+   const data=await requestApprovedLeave(token);
    if(month()!==ym||session()?.empId!==s.empId||(root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
    root.P79ReferenceDashboard?.setLeaveReport(root.P79ApprovedLeaveSummary.aggregate({...data,month:ym}));
+   leaveSnapshot=data;
    // Formal employee HR titles also resolve roles for overtime reports in a schedule-only snapshot.
    if(scheduleSnapshot&&p.schedule)showOvertime(analyzeOvertime({...scheduleSnapshot,employees:data.employees},ym));
   }catch(error){if(month()===ym)root.P79ReferenceDashboard?.setLeaveReport({month:ym,error:'核准請假資料未完成核對：'+String(error.message||error)});}
+  if(month()===ym&&permissions().attendance&&permissions().schedule){
+   root.P79HomeEarlyPunchAlert?.render(attendanceBoundaryError?null:attendanceSnapshot,scheduleSnapshot,ym,{leaveData:leaveSnapshot});
+  }
   loadedKey=ym;
   statusText('p79DashMessage',failures.length?failures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
  }finally{loading=false;if(button)button.disabled=false;if(month()!==ym&&$('systems')?.classList.contains('show')){loadedKey='';root.setTimeout(()=>load(false).catch(()=>{}),0);}}
@@ -728,12 +743,15 @@ function init(){
   const ym=checkMonth(),p=permissions(),account=String(session()?.empId||'');
   const token=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
   if(!p.attendance||!p.schedule||!token)throw Error('沒有正式考勤與排班的完整檢視權限');
-  const attendance=await request('attendance',ym,token,true);
-  const schedule=await request('schedule',ym,token,true);
+  const [attendance,schedule,leaveData]=await Promise.all([
+   request('attendance',ym,token,true),
+   request('schedule',ym,token,true),
+   requestApprovedLeave(token)
+  ]);
   const currentToken=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
   if(month()!==ym||String(session()?.empId||'')!==account||token!==currentToken||!permissions().attendance||!permissions().schedule)
     throw Error('月份或登入身分已變更，請重新開啟警示');
-  return {attendance,schedule,month:ym};
+  return {attendance,schedule,leaveData,month:ym};
  });
  ensurePendingReview();
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
