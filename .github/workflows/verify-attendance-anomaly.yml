@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'attendance/index.html'
+      - 'tests/attendance-gps-save-abort-recovery.cjs'
+      - 'tests/attendance-gps-config-locations.cjs'
       - 'attendance/v6-engine.js'
       - 'work-hours/index.html'
       - 'tests/attendance-oct02-anomaly-filter.cjs'
@@ -34,3 +36,5 @@ jobs:
           node tests/workhours-attendance-filter-consistency.cjs
           node tests/attendance-bounded-render.cjs
           node tests/attendance-month-view.cjs
+          node tests/attendance-gps-config-locations.cjs
+          node tests/attendance-gps-save-abort-recovery.cjs
