@@ -139,7 +139,6 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 
 
 /* 管理首頁：第五格早班漏卡警示。桌面同列壓縮，窄螢幕自適應。 */
-#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 #p79Dashboard .p79d-attendance .p79d-kpi{min-width:0;gap:8px;padding:12px 10px}
 #p79Dashboard .p79d-attendance .p79d-kpi-icon{width:36px;height:36px;flex:0 0 36px;font-size:19px}
 #p79Dashboard .p79d-attendance .p79d-kpi span{font-size:11px;overflow-wrap:anywhere}
@@ -168,6 +167,31 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 #p79Dashboard .p79-early-reason{color:#be123c;font-weight:900}
 #p79Dashboard .p79d-early-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:14px}
 #p79Dashboard .p79d-early-dialog-actions button{padding:9px 13px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:850;cursor:pointer}
-@media(max-width:1200px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:800px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){#p79Dashboard .p79d-attendance .p79d-kpi-icon{flex-basis:30px;width:30px;height:30px;font-size:16px}#p79Dashboard .p79d-attendance .p79d-kpi{padding:9px 7px;gap:6px}}
+
+
+/* 2026-11-10: desktop attendance KPI MUST remain one line of exactly four cards.
+   The fourth card contains two independently clickable mini-cards. */
+#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;overflow-x:auto;align-items:stretch}
+#p79Dashboard .p79d-attendance .p79d-kpi-combined{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;padding:5px;min-width:0;align-items:stretch}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:2px;min-width:0;width:100%;min-height:70px;appearance:none;text-align:left;font:inherit;color:inherit;border:1px solid #dae6f5;border-radius:9px;padding:5px 7px;background:#f5faff;cursor:pointer;box-shadow:none;transform:none}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-kpi-review{background:#fff9f7;border-color:#f1dddd}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert{background:#f8fbff}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-subcard-title{display:block;font-size:11px;line-height:1.25;font-weight:900;color:#224c80;white-space:nowrap}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-subcard-value{display:flex;align-items:baseline;gap:3px;line-height:1.2}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard strong{font-size:clamp(19px,1.65vw,25px);line-height:1.2}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard small{margin-left:0;font-size:10px;white-space:nowrap}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-review-hint,
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-early-hint{display:block;margin:0;font-size:9px;line-height:1.25;white-space:nowrap}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard:hover{transform:none;border-color:#93c5fd;box-shadow:0 2px 9px rgba(37,99,235,.12)}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard:focus-visible{outline:3px solid #2563eb;outline-offset:1px}
+#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="pending"]{background:#fff0ed;border-color:#f3aaa3}
+#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="pending"] strong{color:#b91c1c}
+#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="clear"]{background:#effdf5;border-color:#bbf7d0}
+#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="clear"] strong{color:#047857}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert[data-alert-state="pending"]{background:#fff0ed;border-color:#f3aaa3}
+#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert[data-alert-state="clear"]{background:#effdf5;border-color:#bbf7d0}
+@media(max-width:960px){
+ #p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(4,minmax(205px,1fr));}
+ #p79Dashboard .p79d-attendance .p79d-kpi{min-width:0}
+}

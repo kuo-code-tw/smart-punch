@@ -275,7 +275,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
 }
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-morning-review-v1">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-four-kpis-v2">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -418,8 +418,14 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span id="p79DashPeopleLabel">今日出勤人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月累計出勤天數</span><strong id="p79DashPersonDays">—</strong><small>人日</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月申報加班工時</span><strong id="p79DashOvertimeHours">—</strong><small>小時</small></div></div>
-      <button type="button" class="p79d-kpi p79d-kpi-review" data-review-state="unverified" id="p79DashPendingReviewTrigger" aria-haspopup="dialog" aria-label="點擊查看本月打卡待核的員工、日期及錯誤原因"><div class="p79d-kpi-icon" aria-hidden="true">!</div><div class="p79d-review-body"><span>本月打卡待核</span><strong id="p79DashAnomalies">—</strong><small>班次</small><div class="p79d-review-hint" id="p79DashReviewHint">點擊查看異常原因 ›</div></div><span class="p79d-review-arrow" aria-hidden="true">›</span></button>
-      <button type="button" class="p79d-kpi p79d-early-alert" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="早班漏卡尚未核對，點擊查看"><div class="p79d-kpi-icon" aria-hidden="true">⚠</div><div class="p79d-early-body"><span>本月早班漏卡</span><strong id="p79DashEarlyPunchCount">—</strong><small>待核班次</small><div class="p79d-early-hint" id="p79DashEarlyPunchHint">等待考勤資料 ›</div></div></button>
+      <div class="p79d-kpi p79d-kpi-combined" aria-label="本月打卡待核與早班漏卡">
+        <button type="button" class="p79d-kpi-review p79d-kpi-subcard" data-review-state="unverified" id="p79DashPendingReviewTrigger" aria-haspopup="dialog" aria-label="點擊查看本月打卡待核的員工、日期及錯誤原因">
+          <span class="p79d-subcard-title">打卡待核</span><span class="p79d-subcard-value"><strong id="p79DashAnomalies">—</strong><small>班次</small></span><span class="p79d-review-hint" id="p79DashReviewHint">查看明細 ›</span>
+        </button>
+        <button type="button" class="p79d-early-alert p79d-kpi-subcard" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="早班漏卡尚未核對，點擊查看">
+          <span class="p79d-subcard-title">⚠ 早班漏卡</span><span class="p79d-subcard-value"><strong id="p79DashEarlyPunchCount">—</strong><small>班次</small></span><span class="p79d-early-hint" id="p79DashEarlyPunchHint">查看明細 ›</span>
+        </button>
+      </div>
     </div>
     <dialog id="p79DashEarlyPunchDialog" class="p79d-early-dialog" aria-labelledby="p79EarlyPunchDialogTitle">
       <div class="p79d-early-dialog-head"><h3 id="p79EarlyPunchDialogTitle">⚠ 早班漏打卡待核明細</h3><button type="button" data-early-close aria-label="關閉早班警示">✕</button></div>
