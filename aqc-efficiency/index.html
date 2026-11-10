@@ -9356,7 +9356,7 @@ async function manualCloudSync(){
     const upload=await flushQueue();
     if(!upload?.ok || readQueue().length)throw Error(upload?.error||'仍有 '+readQueue().length+' 筆本機修改等待補傳，尚未完成同步');
     let revisionConfirmed=false;
-    if(!strictReadbackRequired&&!p79EfficiencyReadbackRequired&&!efficiencyHasUnsavedChanges){
+    if(requireSuperAdminAccess()&&!strictReadbackRequired&&!p79EfficiencyReadbackRequired&&!efficiencyHasUnsavedChanges){
       p79EfficiencySyncStep('快速確認雲端版本','沒有待上傳修改');
       try{revisionConfirmed=await vesselRevisionIsCurrent(6000);}
       catch(metaError){console.warn('[vessel manual sync] 快速版本確認失敗，改用完整讀回',metaError);}
