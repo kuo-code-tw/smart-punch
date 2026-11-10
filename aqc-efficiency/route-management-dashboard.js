@@ -247,4 +247,4 @@ function bind(){
 }
 if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 root.P79RouteManager={render,select,toggleExpand,setView,setTab,setType,setSort,monthChanged,sync,exportCsv,monthsEnding};
-})(typeof window!=='undefined'?window:null);
+})(typeof window!=='undefined'?window:globalThis);
