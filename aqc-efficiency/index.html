@@ -7732,6 +7732,14 @@ function p79SetEfficiencySyncLight(state,message=''){
  let pending=0;try{pending=readQueue().length}catch(_){}
  if(state==='success'&&pending){state='pending';message='待同步 '+pending+' 筆';}
  if(state==='success'&&p79EfficiencyManualSyncActive){state='syncing';message='正在讀回確認…';}
+ // One current status: an automatic retry must not retain a previous red failure panel.
+ const details=document.getElementById('efficiencySyncError'),detailText=document.getElementById('efficiencySyncErrorText'),summary=document.getElementById('efficiencySyncErrorSummary');
+ if(details&&(state==='success'||state==='syncing')){details.hidden=true;details.open=false;if(detailText)detailText.textContent='';}
+ if(details&&state==='pending'&&/自動重試/.test(message)){
+   details.hidden=false;details.open=false;details.style.color='#92400e';
+   if(summary)summary.textContent='等待雲端回覆｜正在自動重試';
+   if(detailText)detailText.textContent=message+'\n'+(pending?'待上傳：'+pending+' 批，原資料保留。':'待上傳：0 批；目前正在讀回確認，尚未宣告同步完成。');
+ }
  const colors={idle:['#94a3b8','#f1f5f9','#475569'],syncing:['#f59e0b','#fffbeb','#92400e'],pending:['#f59e0b','#fffbeb','#92400e'],error:['#ef4444','#fef2f2','#b91c1c'],success:['#10b981','#ecfdf5','#047857']};
  const color=colors[state]||colors.idle,host=document.getElementById('efficiencySyncLight'),dot=document.getElementById('efficiencySyncDot'),label=document.getElementById('efficiencySyncLabel');
  if(!host||!dot||!label)return;
@@ -7746,6 +7754,7 @@ function cloudStatus(t,ok=true){const e=document.getElementById('cloudState');e.
  // 中途「已回應」或其他系統讀取成功不代表整次同步完成，不得提前亮綠燈。
 } 
 async function apiGet(action,params={}){
+  if(action==='gcGetData'&&!Object.keys(params||{}).length)return p79ReadFullVesselData(action,params);
   const url=getGasUrl();
   if(!url)throw Error('未設定 GAS URL');
 
@@ -7785,6 +7794,11 @@ async function apiGet(action,params={}){
 
 // Retry only read-only synchronization-lock and transient transport failures, within one total budget.
 async function p79ReadFullVesselData(action,params={}){
+  const requests=p79ReadFullVesselData.requests||(p79ReadFullVesselData.requests=new Map());
+  const key=JSON.stringify([typeof gcToken==='undefined'?'':String(gcToken),action,Object.entries(params||{}).sort(([a],[b])=>a.localeCompare(b))]);
+  if(requests.has(key))return requests.get(key);
+  // Share only a currently running read, never cache across subsequent writes.
+  const task=(async()=>{
   const deadline=Date.now()+GC_FULL_READ_TIMEOUT_MS;
   for(let attempt=0;;attempt++){
     try{return await apiGetQuick(action,params,Math.max(3000,deadline-Date.now()));}
@@ -7799,6 +7813,9 @@ async function p79ReadFullVesselData(action,params={}){
       await new Promise(resolve=>setTimeout(resolve,delay));
     }
   }
+  })();
+  requests.set(key,task);
+  try{return await task;}finally{if(requests.get(key)===task)requests.delete(key);}
 }
 
 const P79_CONFIRMED_VESSEL_NAMES_V110=Object.freeze({WANHAI316:'光春'});
@@ -9350,7 +9367,7 @@ async function manualCloudSync(){
     if(e?.vesselReadPending)p79EfficiencyReadbackRequired=true;
     p79SetEfficiencySyncLight(e?.vesselReadPending?'pending':'error',e?.vesselReadPending?'等待雲端讀回確認':'同步未完成');
     const details=document.getElementById('efficiencySyncError'),detailText=document.getElementById('efficiencySyncErrorText');
-    if(details&&detailText){details.hidden=false;details.open=true;details.style.color='#b91c1c';const summary=document.getElementById('efficiencySyncErrorSummary');if(summary)summary.textContent='查看同步未完成原因';detailText.textContent=reason+'\n未完成階段：'+p79EfficiencySyncCurrentStage+'\n待同步：'+readQueue().length+' 批（原資料保留）\n'+p79EfficiencySyncTrace.map((step,i,all)=>step.stage+'：'+Math.round(((all[i+1]?.at||Date.now())-step.at)/100)/10+' 秒'+(step.info?'｜'+step.info:'')).join('\n');}
+    if(details&&detailText){details.hidden=false;details.open=!e?.vesselReadPending;details.style.color=e?.vesselReadPending?'#92400e':'#b91c1c';const summary=document.getElementById('efficiencySyncErrorSummary');if(summary)summary.textContent=e?.vesselReadPending?'等待雲端讀取｜查看目前狀態':'查看同步未完成原因';detailText.textContent=reason+'\n目前階段：'+p79EfficiencySyncCurrentStage+'\n待上傳：'+readQueue().length+' 批'+(readQueue().length?'（原資料保留）':'；目前等待雲端讀回確認')+'\n'+p79EfficiencySyncTrace.map((step,i,all)=>step.stage+'：'+Math.round(((all[i+1]?.at||Date.now())-step.at)/100)/10+' 秒'+(step.info?'｜'+step.info:'')).join('\n');}
     cloudStatus('雲端同步未完成：'+reason,false);
     toast(e?.vesselReadPending?'雲端忙碌，資料已保留；背景同步將繼續讀回確認':`❌ 雲端同步失敗：${e.message||e}`);
   }finally{

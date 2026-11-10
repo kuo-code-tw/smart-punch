@@ -15,6 +15,8 @@ const manual=html.slice(html.indexOf('async function manualCloudSync('),html.ind
   if(scenario==='upload-failure'){assert(elements.efficiencySyncErrorText.textContent.includes('雲端鎖定'));assert.equal(elements.efficiencySyncError.open,true);}
   if(scenario==='success'){pending=[{}];c.p79SetEfficiencySyncLight('success');assert.equal(elements.efficiencySyncLight.dataset.state,'pending','queue blocks green');}
  }
+ // Reproduce the screenshot: zero queued writes, an old red failure, then an automatic read retry.
+ {const elements=Object.fromEntries(['efficiencySyncLight','efficiencySyncDot','efficiencySyncLabel','efficiencySyncError','efficiencySyncErrorText','efficiencySyncErrorSummary','efficiencyCloudSyncBtn'].map(id=>[id,{style:{setProperty(){}},dataset:{},hidden:false,open:true,textContent:'舊的上傳失敗：待同步 0 批'}]));const c={document:{getElementById:id=>elements[id]},readQueue:()=>[]};vm.createContext(c);vm.runInContext(light,c);c.p79SetEfficiencySyncLight('pending','雲端忙碌，等待讀回確認（自動重試 1）');assert.equal(elements.efficiencySyncError.open,false);assert.equal(elements.efficiencySyncError.style.color,'#92400e');assert(elements.efficiencySyncErrorText.textContent.includes('正在讀回確認'));assert(!elements.efficiencySyncErrorText.textContent.includes('上傳失敗'));c.p79SetEfficiencySyncLight('success');assert.equal(elements.efficiencySyncError.hidden,true);assert.equal(elements.efficiencySyncErrorText.textContent,'')}
  assert(/id="efficiencyCloudSyncBtn"[^>]*><span id="efficiencySyncLight"/.test(html));
  assert(!manual.includes('btn.textContent='));
  console.log('PASS sync stays amber through upload/readback, green only after full success; failures and new writes block green');
