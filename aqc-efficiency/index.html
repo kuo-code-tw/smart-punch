@@ -7789,7 +7789,7 @@ async function p79ReadFullVesselData(action,params={}){
       if(!busy)throw error;
       error.vesselReadPending=true;
       const delay=Math.min(6000,1500*(attempt+1));
-      if(attempt>=5||Date.now()+delay+3000>=deadline)throw error;
+      if(Date.now()+delay+3000>=deadline)throw error;
       p79SetEfficiencySyncLight('pending','雲端忙碌，等待讀回確認（自動重試 '+(attempt+1)+'）');
       await new Promise(resolve=>setTimeout(resolve,delay));
     }
@@ -8689,6 +8689,9 @@ async function buildSafeGcSyncPayload(payload={}){
     console.error('同步前讀取雲端資料失敗，為避免覆蓋舊資料，本次只保留本機並等待安全補傳',e);
     const err=new Error('上傳前讀取雲端失敗：'+String(e?.message||e)+'。本機資料保留，尚未送出覆蓋。');
     err.safeSyncBlocked=true;
+    // The preflight is read-only: a synchronization-lock rejection is safe to retry.
+    err.preflightBusy=e?.vesselReadPending===true||/船舶雲端資料正在同步|船舶資料正在同步/.test(String(e?.message||e));
+    err.vesselReadPending=err.preflightBusy;
     err.originalError=e;
     throw err;
   }
@@ -8799,7 +8802,9 @@ async function flushQueue(){
           syncError=String(e?.message||e);
           // Retry only explicit busy rejections. Each retry re-reads and merges cloud data;
           // unknown outcomes, permission errors and transport failures retain their guards.
-          if(e?.retryable===true&&e?.writeRejected===true&&/正在處理其他資料|正在寫入資料|雲端正忙|同步繁忙/.test(syncError)){
+          const preflightBusy=!writeAttempted&&e?.safeSyncBlocked===true&&e?.preflightBusy===true;
+          const rejectedBusy=e?.retryable===true&&e?.writeRejected===true&&/正在處理其他資料|正在寫入資料|雲端正忙|同步繁忙/.test(syncError);
+          if(preflightBusy||rejectedBusy){
             if(busyRetryId!==item.id){busyRetryId=item.id;busyRetryCount=0;}
             if(busyRetryCount<3){
               const delay=[2000,5000,10000][busyRetryCount++];
