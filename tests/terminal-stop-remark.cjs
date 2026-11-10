@@ -14,11 +14,11 @@ const rows=[
  mk('a2','2026-11-02','7903','AQC故障｜0331-0348 7903 故障跳電'), // same vessel/AQC/period
  mk('b','2026-11-08','7902','系統故障｜0400-0426 CMS當機｜0452-0502 H/C*2'),
  mk('c','2026-11-08','7905','AQC故障｜1323-1416 吊架下降失速'),
- mk('d','2026-11-08','7911','0940-1006 H/C*1；1137-1147 H/C*1｜OOG*1'),
- mk('e','2026-11-08','7912','系統更新停工'), // unknown duration
- mk('f','2026-11-08','7913','2355-0010 AQC故障'), // midnight
- mk('g','2026-11-08','7914','0711-0721 AQC故障',{stopItem1:'設備故障',stopTime1:10}), // explicit duplicate
- mk('oct','2026-10-09','7914','0930-1000 系統故障') // outside month
+ mk('d','2026-11-08','7901','0940-1006 H/C*1；1137-1147 H/C*1｜OOG*1'),
+ mk('e','2026-11-08','7902','系統更新停工'), // unknown duration
+ mk('f','2026-11-08','7903','2355-0010 AQC故障'), // midnight
+ mk('g','2026-11-08','7905','0711-0721 AQC故障',{stopItem1:'設備故障',stopTime1:10}), // explicit duplicate
+ mk('oct','2026-10-09','7905','0930-1000 系統故障') // outside month
 ];
 const ids=['terminalDashboardRoot','terminalMonth','terminalKpi','terminalWharfBody','terminalDayBody',
  'terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody',
@@ -36,6 +36,8 @@ assert.equal(api.remarkCategory('0331-0348 故障跳電'),'設備故障');
 assert.equal(api.remarkCategory('0400-0426 CMS當機'),'系統異常');
 assert.equal(api.remarkCategory('0449-0459 H/C*2'),'');
 assert.equal(api.remarkCategory('0711-0716 OOG*1'),'');
+const excluded=api.scopeTo79and80('2026-11',[],[mk('exclude','2026-11-08','7911','AQC故障')]);
+assert.equal(excluded.records.length,0,'unlisted AQC must not enter 79/80 terminal dashboard');
 const stats=api.build('2026-11',[],rows);
 assert.equal(stats.totalStopEvents,6,'no duplicate report/Remark intervals or regular H/C');
 assert.equal(stats.totalStopMinutes,121,'17+26+53+15+10 minutes, no unknown time added');
@@ -62,7 +64,7 @@ assert.equal(els.terminalReasonFilter.value,'設備故障','color card and dropd
 api.filterReason('');
 assert(els.terminalStopDetailBody.innerHTML.includes('CMS當機'),'all restores all categories');
 // Untrusted remark strings must never be injected as HTML.
-ctx.records=[mk('x','2026-11-08','7999','0331-0348 AQC故障 <img src=x onerror=alert(1)>')];
+ctx.records=[mk('x','2026-11-08','7905','0331-0348 AQC故障 <img src=x onerror=alert(1)>')];
 api.render();
 assert(els.terminalStopDetailBody.innerHTML.includes('&lt;img'));
 assert(!els.terminalStopDetailBody.innerHTML.includes('<img'));
