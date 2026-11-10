@@ -2,7 +2,7 @@
 'use strict';
 var d=g.document,$=id=>d.getElementById(id);
 if(!d||!$('gateFile'))return;
-var book=null,sourceFile=null,days=[],serviceCheck=0,serviceReady=false;
+var book=null,sourceFile=null,days=[],serviceCheck=0,serviceReady=false,selectionId=0,saving=false;
 var previewMode='day',previewPage=0,previewPageSize=8;
 var names={deliverEmpty:'交空櫃',pickupEmpty:'領空櫃',deliverLoaded:'交重櫃',
  pickupLoaded:'領重櫃',truckEntries:'拖車車次'};
@@ -121,7 +121,7 @@ function changePreviewMode(next){
  if(!['day','week','month','year'].includes(next))return;
  previewMode=next;previewPage=0;renderPreviewTable();
 }
-function render(){
+function render(autoSave){
  var totals=Object.fromEntries(Object.keys(names).map(k=>[k,days.reduce((sum,r)=>sum+r[k],0)]));
  var display={gateDe:totals.deliverEmpty,gatePe:totals.pickupEmpty,
   gateDl:totals.deliverLoaded,gatePl:totals.pickupLoaded,
@@ -135,11 +135,15 @@ function render(){
  // Switching preview tabs never triggers uploads. New files always require a fresh
  // authenticated read-route verification before enabling a save.
  $('gateSave').disabled=true;
- void verifyGateService();
+ void verifyGateService(!!autoSave);
 }
-async function chooseFile(){
+async function chooseFile(droppedFile){
+ if(saving){message('上一份 Gate 檔案正在寫入，完成後才能匯入下一份。','error');return;}
+ var selection=++selectionId;
  ++serviceCheck;serviceReady=false;
- sourceFile=$('gateFile').files?.[0]||null;book=null;days=[];
+ sourceFile=droppedFile&&typeof droppedFile.arrayBuffer==='function'?
+  droppedFile:($('gateFile').files?.[0]||null);
+ book=null;days=[];
  $('gateResult').hidden=true;$('gateSave').disabled=true;$('gatePreview').disabled=true;
  $('gateSheet').disabled=true;$('gateSheet').textContent='';
  if(!sourceFile){message('請先選擇 Gate 檔案');return;}
@@ -147,8 +151,9 @@ async function chooseFile(){
  if(sourceFile.size>10*1024*1024)return message('檔案不能超過 10MB','error');
  if(!g.XLSX)return message('Excel 讀取元件無法載入，請檢查網路連線後重新整理','error');
  try{
-  message('正在讀取 Excel 工作表…');
+  message('正在讀取並核對 '+sourceFile.name+' …');
   var bytes=await sourceFile.arrayBuffer();
+  if(selection!==selectionId)return;
   book=g.XLSX.read(bytes,{type:'array',cellHTML:false,cellDates:false});
   if(!book.SheetNames?.length)throw Error('Excel 不含工作表');
   book.SheetNames.forEach(function(name){
@@ -161,15 +166,18 @@ async function chooseFile(){
   })||book.SheetNames[0];
   $('gateSheet').value=first;
   $('gateSheet').disabled=false;$('gatePreview').disabled=false;
-  message('檔案已讀取，請按「讀取並預覽」檢查每天的數字。');
- }catch(err){message('讀取失敗：'+String(err.message||err),'error');}
+  preview(true);
+ }catch(err){
+  if(selection===selectionId)message('讀取失敗：'+String(err.message||err),'error');
+ }
 }
-function preview(){
- if(!book)return;
+function preview(autoSave){
+ if(!book||saving)return;
  try{
   days=findGateMatrix($('gateSheet').value);
-  render();
-  message('每日交領櫃分類、合計及拖車車次均已核對，共 '+days.length+' 天。');
+  render(autoSave===true);
+  message('每日交領櫃分類、合計及拖車車次均已核對，共 '+days.length+
+   ' 天。'+(autoSave===true?'正在確認正式資料庫寫入權限…':''));
  }catch(err){
   days=[];$('gateResult').hidden=true;$('gateSave').disabled=true;
   message('預覽失敗：'+String(err.message||err),'error');
@@ -193,7 +201,7 @@ function gateServiceError(err){
   return '正式 PORT79 Google Apps Script 尚未部署 Gate 匯入服務（gateStatsReadYear／gateStatsImport）。這不是 Excel 格式或前端 action 參數錯誤。請先完成後端部署；現在可以下載整理 CSV，或在 Google 試算表按日期更新。';
  return '無法驗證正式 Gate 資料服務：'+raw.slice(0,180)+'。目前已保留預覽，並暫停雲端寫入。';
 }
-async function verifyGateService(){
+async function verifyGateService(autoSave){
  var id=++serviceCheck;
  serviceReady=false;
  $('gateSave').disabled=true;
@@ -220,6 +228,7 @@ async function verifyGateService(){
   serviceReady=true;
   $('gateSave').disabled=false;
   message('正式 Gate 雲端查詢服務已驗證，可以送出每日資料。相同日期會更新原紀錄，不會重複累加。','success');
+  if(autoSave===true)await save();
  }catch(err){
   if(id!==serviceCheck)return;
   serviceReady=false;
@@ -243,10 +252,11 @@ function auth(){
  return {base,token};
 }
 async function save(){
- if(!days.length||!sourceFile||!serviceReady)return;
+ if(!days.length||!sourceFile||!serviceReady||saving)return;
  var key;
  try{key=auth()}catch(err){message(String(err.message||err),'error');return;}
  var button=$('gateSave');
+ saving=true;
  button.disabled=true;button.textContent='正在傳送至正式資料庫…';
  message('正在傳送 Gate 資料到 PORT79 雲端資料庫，請勿關閉頁面。');
  try{
@@ -255,7 +265,7 @@ async function save(){
   body.set('token',key.token);body.set('gcToken',key.token);
   body.set('fileName',sourceFile.name);
   body.set('rows',JSON.stringify(days));
-  var response=await fetch(key.base,{method:'POST',
+  var response=await g.fetch(key.base,{method:'POST',
    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
    body:body.toString(),redirect:'follow',credentials:'omit'});
   if(!response.ok)throw Error('HTTP '+response.status);
@@ -275,7 +285,7 @@ async function save(){
    message('目前無法確認雲端儲存結果：'+raw.slice(0,160)+
     '。請先開啟正式試算表核對日期，避免不確定時重複操作。','error');
   }
- }finally{button.disabled=!serviceReady;button.textContent='寫入正式資料';}
+ }finally{saving=false;button.disabled=!serviceReady;button.textContent='寫入正式資料';}
 }
 Object.entries({Day:'day',Week:'week',Month:'month',Year:'year'}).forEach(function(pair){
  $('gateMode'+pair[0])?.addEventListener('click',()=>changePreviewMode(pair[1]));
@@ -284,9 +294,36 @@ $('gatePagePrev')?.addEventListener('click',()=>{if(previewPage>0){previewPage--
 $('gatePageNext')?.addEventListener('click',()=>{
  if((previewPage+1)*previewPageSize<groupPreviewRows(days,previewMode).length){previewPage++;renderPreviewTable();}
 });
-$('gateFile').addEventListener('change',chooseFile);
+// Drag/drop works over the entire embedded Gate page; the compact bar is also a file picker.
+var dropZone=$('gateDropZone');
+function stopFileDrop(e){
+ if(!e?.dataTransfer)return false;
+ var types=Array.from(e.dataTransfer.types||[]);
+ if(!types.includes('Files'))return false;
+ e.preventDefault();return true;
+}
+function handleDrop(e){
+ if(!stopFileDrop(e))return;
+ e.stopPropagation?.();
+ dropZone?.classList?.remove?.('is-dragover');
+ var files=Array.from(e.dataTransfer.files||[]);
+ if(files.length!==1){message('一次只能匯入一份 Gate Excel／CSV 檔案。','error');return;}
+ void chooseFile(files[0]);
+}
+dropZone?.addEventListener('click',()=>$('gateFile').click());
+dropZone?.addEventListener('keydown',e=>{
+ if(e.key==='Enter'||e.key===' '){e.preventDefault();$('gateFile').click();}
+});
+dropZone?.addEventListener('dragover',e=>{
+ if(stopFileDrop(e)){e.stopPropagation?.();dropZone?.classList?.add?.('is-dragover');}
+});
+dropZone?.addEventListener('dragleave',()=>dropZone?.classList?.remove?.('is-dragover'));
+dropZone?.addEventListener('drop',handleDrop);
+d.addEventListener?.('dragover',stopFileDrop);
+d.addEventListener?.('drop',handleDrop);
+$('gateFile').addEventListener('change',()=>{void chooseFile();});
 $('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
-$('gatePreview').addEventListener('click',preview);
+$('gatePreview').addEventListener('click',()=>preview(false));
 $('gateDownload').addEventListener('click',csvExport);
 $('gateSave').addEventListener('click',save);
 })(window);
