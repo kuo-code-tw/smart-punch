@@ -1248,6 +1248,10 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 }
 
 
+
+/* Keep the scrollable shift-detail viewport exactly as tall as the completed-ship table. */
+#view-terminal #terminalShiftTableWrap{box-sizing:border-box;overflow-y:auto}
+
 /* Keep the daily Bundle label on one line without widening the two-panel layout. */
 @media (min-width:701px){
  #view-terminal .p79-ter-day-table{table-layout:fixed;min-width:0;width:100%}
@@ -1309,14 +1313,14 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日｜Bundle 取自 WORKING SHEET 或船舶主檔，不以差額推定</span></div>
-     <div class="p79-ter-table-wrap">
+     <div class="p79-ter-table-wrap" id="terminalDayTableWrap">
       <table class="p79-ter-table p79-ter-day-table"><thead><tr><th>完工日期</th><th>船數</th><th>卸船</th><th>裝船</th><th>Bundle 扣除</th><th>作業量</th><th>總 Moves</th><th>待核差額</th></tr></thead><tbody id="terminalDayBody"></tbody></table>
      </div>
      <p class="p79-ter-notice">原始卸船＋裝船－Bundle 扣除＝作業量；如欄位未提供或仍有差異，顯示「待核對」，不會自行推算成 Bundle。總 Moves 另外含 SHIFT。</p>
     </div>
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">🕒 每日／早中晚班作業明細</h3><span class="p79-ter-hint">依作業日期與開始時間分班</span></div>
-     <div class="p79-ter-table-wrap">
+     <div class="p79-ter-table-wrap" id="terminalShiftTableWrap">
       <table class="p79-ter-table"><thead><tr><th>作業日期</th><th>班別</th><th>明細筆數</th><th>回報 DISC</th><th>回報 LOAD</th><th>H/C</th><th>作業時數</th></tr></thead><tbody id="terminalShiftBody"></tbody></table>
      </div>
      <p class="p79-ter-notice">班別為早班（08–16）、中班（16–24）、晚班（24–08）；若一筆作業跨班，櫃數暫歸開始班，尚未按逐櫃時間精確拆分。AQC 明細櫃數不直接等於船舶作業量數。</p>
@@ -15699,7 +15703,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
 <link rel="stylesheet" href="./terminal-rod-overview.css?v=20261110-equal-height-v2">
-<script src="./terminal-ops.js?v=20261110-dual-v1"></script>
+<script src="./terminal-ops.js?v=20261110-matched-tables-v2"></script>
 <script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>

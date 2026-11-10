@@ -12,7 +12,12 @@ assert(html.includes('id="view-terminal"'));
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261110-dual-v1'));
+assert(html.includes('./terminal-ops.js?v=20261110-matched-tables-v2'));
+assert(html.includes('id="terminalDayTableWrap"'),'daily ship table has measured viewport');
+assert(html.includes('id="terminalShiftTableWrap"'),'shift detail table has synced scroll viewport');
+assert(html.includes('#view-terminal #terminalShiftTableWrap{box-sizing:border-box;overflow-y:auto}'),'shift details retain vertical scrolling');
+assert(js.includes('new ResizeObserver(()=>alignTerminalDailyTables())'),'height stays synced on month and viewport updates');
+assert(js.includes('shift.style.height=Math.round(height)'), 'shift table uses the left table measured height');
 assert(html.includes("if(name==='terminal'){window.P79TerminalOps?.render()"));
 assert(html.includes('<th>Bundle 扣除</th>'));
 assert(html.includes('class="p79-ter-table p79-ter-day-table"'),'daily table uses dedicated width rules');
