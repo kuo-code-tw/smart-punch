@@ -139,7 +139,6 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 
 
 /* 管理首頁：第五格早班漏卡警示。桌面同列壓縮，窄螢幕自適應。 */
-#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 #p79Dashboard .p79d-attendance .p79d-kpi{min-width:0;gap:8px;padding:12px 10px}
 #p79Dashboard .p79d-attendance .p79d-kpi-icon{width:36px;height:36px;flex:0 0 36px;font-size:19px}
 #p79Dashboard .p79d-attendance .p79d-kpi span{font-size:11px;overflow-wrap:anywhere}
@@ -168,8 +167,6 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 #p79Dashboard .p79-early-reason{color:#be123c;font-weight:900}
 #p79Dashboard .p79d-early-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:14px}
 #p79Dashboard .p79d-early-dialog-actions button{padding:9px 13px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:850;cursor:pointer}
-@media(max-width:1200px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:800px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){#p79Dashboard .p79d-attendance .p79d-kpi-icon{flex-basis:30px;width:30px;height:30px;font-size:16px}#p79Dashboard .p79d-attendance .p79d-kpi{padding:9px 7px;gap:6px}}
 
 
