@@ -138,21 +138,7 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 }
 
 
-/* 管理首頁：第五格早班漏卡警示。桌面同列壓縮，窄螢幕自適應。 */
-#p79Dashboard .p79d-attendance .p79d-kpi{min-width:0;gap:8px;padding:12px 10px}
-#p79Dashboard .p79d-attendance .p79d-kpi-icon{width:36px;height:36px;flex:0 0 36px;font-size:19px}
-#p79Dashboard .p79d-attendance .p79d-kpi span{font-size:11px;overflow-wrap:anywhere}
-#p79Dashboard .p79d-attendance .p79d-kpi strong{font-size:clamp(20px,1.7vw,28px)}
-#p79Dashboard .p79d-early-alert{cursor:pointer;text-align:left;appearance:none;font:inherit;color:inherit;transition:border-color .2s ease,box-shadow .2s ease;background:#f8fbff}
-#p79Dashboard .p79d-early-alert .p79d-early-body{min-width:0;flex:1}
-#p79Dashboard .p79d-early-alert .p79d-kpi-icon{background:#f1f5f9;color:#64748b}
-#p79Dashboard .p79d-early-alert[data-alert-state="pending"]{background:linear-gradient(120deg,#fff,#fff2ef);border-color:#f0a79b;box-shadow:0 0 0 1px rgba(227,75,54,.05)}
-#p79Dashboard .p79d-early-alert[data-alert-state="pending"] .p79d-kpi-icon{color:#b91c1c;background:#fee2e2}
-#p79Dashboard .p79d-early-alert[data-alert-state="pending"] strong,#p79Dashboard .p79d-early-alert[data-alert-state="pending"] .p79d-early-hint{color:#b91c1c}
-#p79Dashboard .p79d-early-alert[data-alert-state="clear"] .p79d-kpi-icon{color:#067647;background:#dcfce7}
-#p79Dashboard .p79d-early-alert .p79d-early-hint{font-size:10px;line-height:1.3;color:#526c8a;font-weight:800;margin-top:5px}
-#p79Dashboard .p79d-early-alert:hover{border-color:#f59e0b;box-shadow:0 5px 17px rgba(120,88,38,.15)}
-#p79Dashboard .p79d-early-alert:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+
 #p79Dashboard .p79d-early-dialog{position:fixed;margin:auto;inset:0;width:min(960px,94vw);max-width:none;max-height:86vh;overflow:auto;padding:19px;border-radius:16px;border:1px solid #d8e4f1;background:#fff;color:#203b5c;box-shadow:0 16px 60px rgba(14,43,86,.26)}
 #p79Dashboard .p79d-early-dialog::backdrop{background:rgba(10,27,51,.53)}
 #p79Dashboard .p79d-early-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -167,31 +153,77 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 #p79Dashboard .p79-early-reason{color:#be123c;font-weight:900}
 #p79Dashboard .p79d-early-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:14px}
 #p79Dashboard .p79d-early-dialog-actions button{padding:9px 13px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:850;cursor:pointer}
-@media(max-width:420px){#p79Dashboard .p79d-attendance .p79d-kpi-icon{flex-basis:30px;width:30px;height:30px;font-size:16px}#p79Dashboard .p79d-attendance .p79d-kpi{padding:9px 7px;gap:6px}}
 
 
-/* 2026-11-10: desktop attendance KPI MUST remain one line of exactly four cards.
-   The fourth card contains two independently clickable mini-cards. */
-#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;overflow-x:auto;align-items:stretch}
-#p79Dashboard .p79d-attendance .p79d-kpi-combined{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;padding:5px;min-width:0;align-items:stretch}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:2px;min-width:0;width:100%;min-height:70px;appearance:none;text-align:left;font:inherit;color:inherit;border:1px solid #dae6f5;border-radius:9px;padding:5px 7px;background:#f5faff;cursor:pointer;box-shadow:none;transform:none}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-kpi-review{background:#fff9f7;border-color:#f1dddd}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert{background:#f8fbff}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-subcard-title{display:block;font-size:11px;line-height:1.25;font-weight:900;color:#224c80;white-space:nowrap}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-subcard-value{display:flex;align-items:baseline;gap:3px;line-height:1.2}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard strong{font-size:clamp(19px,1.65vw,25px);line-height:1.2}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard small{margin-left:0;font-size:10px;white-space:nowrap}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-review-hint,
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard .p79d-early-hint{display:block;margin:0;font-size:9px;line-height:1.25;white-space:nowrap}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard:hover{transform:none;border-color:#93c5fd;box-shadow:0 2px 9px rgba(37,99,235,.12)}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard:focus-visible{outline:3px solid #2563eb;outline-offset:1px}
-#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="pending"]{background:#fff0ed;border-color:#f3aaa3}
-#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="pending"] strong{color:#b91c1c}
-#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="clear"]{background:#effdf5;border-color:#bbf7d0}
-#p79Dashboard .p79d-attendance .p79d-kpi-review[data-review-state="clear"] strong{color:#047857}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert[data-alert-state="pending"]{background:#fff0ed;border-color:#f3aaa3}
-#p79Dashboard .p79d-attendance .p79d-kpi-subcard.p79d-early-alert[data-alert-state="clear"]{background:#effdf5;border-color:#bbf7d0}
-@media(max-width:960px){
- #p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(4,minmax(205px,1fr));}
- #p79Dashboard .p79d-attendance .p79d-kpi{min-width:0}
+/* 2026-11-10: one clean row of four equal attendance KPI cards.
+   No nested mini-cards, no desktop inner scrollbars, no data-source changes. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis{
+ display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ gap:10px!important;align-items:stretch!important;overflow:visible!important;
+ min-width:0!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79d-kpi{
+ min-width:0!important;min-height:84px!important;height:84px!important;
+ padding:9px 12px!important;box-sizing:border-box!important;overflow:visible!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpi-icon{
+ width:48px!important;height:48px!important;flex:0 0 48px!important;font-size:23px!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert{
+ display:flex!important;align-items:center!important;gap:12px!important;appearance:none;
+ width:100%!important;margin:0!important;text-align:left!important;cursor:pointer!important;
+ border-color:#e2ebf6!important;background:linear-gradient(120deg,#fff,#f9fcff)!important;
+ transition:border-color .15s,box-shadow .15s!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert .p79d-early-body{
+ min-width:0!important;flex:1;display:block;line-height:1.2;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert .p79d-early-body>span{
+ display:block!important;white-space:nowrap!important;font-size:12px!important;font-weight:850!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert .p79d-early-hint{
+ display:block!important;white-space:nowrap!important;font-size:10px!important;
+ line-height:1.3!important;margin-top:2px!important;color:#527193!important;font-weight:750!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert[data-alert-state="pending"]{
+ border-color:#f2a99c!important;background:linear-gradient(120deg,#fff,#fff3f0)!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert[data-alert-state="pending"] .p79d-kpi-icon{
+ color:#b91c1c!important;background:#fee2e2!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert[data-alert-state="pending"] strong{color:#b91c1c!important}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert[data-alert-state="clear"] .p79d-kpi-icon{
+ color:#047857!important;background:#dff8eb!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-early-alert:focus-visible{
+ outline:3px solid #2563eb!important;outline-offset:2px!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-attendance-actions{
+ display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;min-width:0;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance #p79DashPendingReviewTrigger{
+ display:inline-flex;align-items:center;gap:4px;min-width:0;width:auto;height:auto;
+ background:transparent!important;box-shadow:none!important;border:0!important;
+ color:#35699d!important;padding:3px 5px!important;
+ font-size:11px!important;font-weight:800!important;white-space:nowrap;
+ cursor:pointer!important;text-decoration:underline;text-underline-offset:3px;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance #p79DashPendingReviewTrigger strong{
+ font-size:12px!important;color:inherit!important;font-weight:950!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance #p79DashPendingReviewTrigger[data-review-state="pending"]{
+ color:#b91c1c!important;
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance #p79DashPendingReviewTrigger:focus-visible{
+ outline:2px solid #2563eb!important;outline-offset:3px!important;border-radius:4px;
+}
+@media(max-width:760px){
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis{
+  grid-template-columns:repeat(4,minmax(190px,1fr))!important;
+  overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin;
+  overscroll-behavior-x:contain;
+ }
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-section-head{
+  flex-wrap:wrap!important;align-items:flex-start!important;
+ }
 }
