@@ -41,7 +41,7 @@ assert.equal(elements.terminalStopConfirmedMinutes.textContent,String(stats.tota
 assert.equal(elements.terminalStopUnknownEvents.textContent,String(stats.unknownStopEvents),'pending count from original summary');
 assert(elements.terminalStopCategoryKpis.innerHTML.includes('p79-ter-stop-kpi tone-rose'),'category styles');
 assert(elements.terminalStopDetailBody.innerHTML.includes('p79-stop-category-tag tone-rose'),'detail category badge');
-assert(elements.terminalStopDetailBody.innerHTML.includes('class="p79-stop-pending"'),'pending time badge');
+assert(!elements.terminalStopDetailBody.innerHTML.includes('class="p79-stop-pending"'),'timed report resolves a matching untimed Remark');
 assert(elements.terminalStopDetailBody.innerHTML.includes('setReasonCategory'),'original manual classification remains available');
 api.selectCategory('設備故障');
 assert(elements.terminalStopDetailCaption.textContent.includes('設備故障'),'category filter works');
