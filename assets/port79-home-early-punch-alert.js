@@ -154,7 +154,7 @@ function bind(recheck){
    if(host)host.textContent='請確認連線後重新點選卡片。未驗證資料不會顯示為已漏卡。';
   }
  });
- dialog.querySelector('[data-early-close]')?.addEventListener('click',()=>dialog.close());
+ dialog.querySelectorAll('[data-early-close]').forEach(button=>button.addEventListener('click',()=>dialog.close()));
  dialog.querySelector('[data-early-attendance]')?.addEventListener('click',()=>{
   dialog.close();
   if(typeof root.launchSystem==='function')root.launchSystem('attendance');
