@@ -431,6 +431,7 @@ function render(){
   warnings.innerHTML=list.map(s=>'<div>• '+safe(s)+'</div>').join('');
  }
  root.P79TerminalRodOverview?.render(stats,state);
+ root.P79TerminalReference?.render(stats,state);
  labelCompactTables();
  alignTerminalDailyTables();
  const label=el('terminalMonthCaption');

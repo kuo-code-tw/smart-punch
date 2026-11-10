@@ -9,6 +9,12 @@ assert(html.includes('terminal-rod-overview.css?v=20261110-dual-v1'));
 assert(js.includes('root.P79TerminalRodOverview?.render(stats,state);'));
 
 assert(html.includes('id="view-terminal"'));
+assert(html.includes('id="terminalReferenceKpis"'),'eight metric cards placeholder');
+assert(html.includes('id="terminalReferenceTrend"'),'daily trend and mix chart placeholder');
+assert(html.includes('terminal-reference-layout.js?v=20261110-reference-v1'),'reference dashboard JS loaded');
+assert(html.includes('terminal-reference-layout.css?v=20261110-reference-v1'),'reference dashboard CSS loaded');
+assert(js.includes('root.P79TerminalReference?.render(stats,state);'),'render new overview with selected month data');
+
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }

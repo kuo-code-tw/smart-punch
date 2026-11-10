@@ -1,0 +1,52 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm');
+const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
+const js=fs.readFileSync('aqc-efficiency/terminal-reference-layout.js','utf8');
+const css=fs.readFileSync('aqc-efficiency/terminal-reference-layout.css','utf8');
+assert(html.includes('terminal-reference-layout.css?v=20261110-reference-v1'));
+assert(html.includes('terminal-reference-layout.js?v=20261110-reference-v1'));
+assert(html.includes('id="terminalReferenceKpis"'));
+assert(html.includes('id="terminalReferenceTrend"'));
+assert(html.includes('id="terminalRodOverviewMount"'));
+assert(html.includes('id="terminalDayBody"'));
+assert(html.includes('id="terminalShiftBody"'));
+assert(html.includes('id="terminalStopDetailBody"'),'keep legacy anomaly drill-down');
+assert(css.includes('grid-template-columns:1.12fr 1.2fr 1.2fr'),'eight executive metrics layout');
+assert(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))'),'three lower statistic panels');
+assert(css.includes('.p79-rod-summary-scroll'),'retire original duplicated summary table');
+assert(css.includes('@media(max-width:640px)'),'responsive mobile styles');
+assert(!js.includes('apiPost(')&&!js.includes('postCloud(')&&!js.includes('gcSyncAll'),'statistics are read-only');
+const nodes=Object.fromEntries(['terminalReferenceKpis','terminalReferenceTrend','terminalReferenceUpdatedAt'].map(id=>[id,{innerHTML:'',textContent:''}]));
+const ctx={window:{},document:{getElementById:id=>nodes[id]||null},console};
+vm.createContext(ctx);vm.runInContext(js,ctx);
+const render=ctx.window.P79TerminalReference;
+assert(render,'reference module exports');
+const data={
+ month:'2026-11',ships:[{workingNo:'1'},{workingNo:'2'}],
+ vesselTotals:{ships:2,disc:130,load:110,bundle:4,billed:236,moves:250,shift:6,hc:5},
+ byDay:[{day:'2026-11-10',billed:130,moves:142},{day:'2026-11-09',billed:106,moves:108}]
+};
+const metrics=render.calculate(data);
+assert.equal(metrics.metrics.length,8);
+assert.equal(metrics.metrics[0].value,'2');
+assert.equal(metrics.metrics[1].value,'130');
+assert.equal(metrics.metrics[2].value,'110');
+assert.equal(metrics.metrics[3].value,'4');
+assert.equal(metrics.metrics[4].value,'236');
+assert.equal(metrics.metrics[5].value,'250');
+assert.equal(metrics.metrics[6].value,'6');
+assert.equal(metrics.metrics[7].value,'5');
+assert.equal(metrics.days[0].day,'2026-11-09','sort trend by completion date, not data input order');
+render.render(data,{loadedMonth:'2026-11',loadedAt:1794310000000});
+assert.equal((nodes.terminalReferenceKpis.innerHTML.match(/class="p79-ref-metric /g)||[]).length,8);
+assert(nodes.terminalReferenceTrend.innerHTML.includes('11-09'),'chart labels use real dates');
+assert(nodes.terminalReferenceTrend.innerHTML.includes('11-10'),'chart labels use real dates');
+assert(nodes.terminalReferenceTrend.innerHTML.includes('原始卸裝合計'),'donut uses DISC+LOAD');
+assert(nodes.terminalReferenceUpdatedAt.textContent.includes('最後更新'));
+const noShips=render.calculate({ships:[],vesselTotals:{},month:'2026-11',byDay:[]});
+assert(noShips.metrics.every(x=>x.value==='—'),'never fabricate totals without source data');
+render.render({ships:[],vesselTotals:{},month:'2026-10',byDay:[]},{loadedMonth:'',loadedAt:0});
+assert(nodes.terminalReferenceTrend.innerHTML.includes('沒有可顯示'),'show no-data chart notice');
+assert(!nodes.terminalReferenceUpdatedAt.textContent.includes('最後更新'),'no fake cloud timestamp');
+console.log('PASS terminal reference: eight real KPIs, chronological trend, raw-disc/load donut, no fake numbers, layout mounts');
