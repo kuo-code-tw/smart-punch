@@ -27,6 +27,7 @@ async function run(options={}){
     p79EfficiencySyncCurrentStage:'',p79EfficiencySyncPreflightRemote:null,
     p79EfficiencySyncTrace:[],
     requireEfficiencyAccess:()=>true,
+    requireSuperAdminAccess:()=>options.readOnly!==true,
     readQueue:()=>queue,
     flushQueue:async()=>{calls.flush++;queue.splice(0);return{ok:true};},
     vesselRevisionIsCurrent:async()=>{
@@ -62,6 +63,9 @@ async function run(options={}){
   });
   await test('pending upload still requires full readback',{pending:true},({calls})=>{
     assert.equal(calls.meta,0);assert.equal(calls.pull,1);assert(calls.states.includes('success'));
+  });
+  await test('read-only operator keeps full cloud refresh',{readOnly:true},({calls})=>{
+    assert.equal(calls.meta,0);assert.equal(calls.pull,1);
   });
   await test('unconfirmed write still requires full readback',{readback:true},({calls})=>{
     assert.equal(calls.meta,0);assert.equal(calls.pull,1);
