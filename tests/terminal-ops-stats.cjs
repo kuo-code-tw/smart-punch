@@ -5,7 +5,7 @@ const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 assert(html.includes('data-tab="terminal"'));
 
 for(const code of ['7901','7902','7903','7905','8001','8002','8003','8005','8006'])assert(html.includes('terminalRodOverviewMount')&&html.includes('terminal-rod-overview.js'),'AQC cards connected');
-assert(html.includes('terminal-rod-overview.css?v=20261110-dual-v1'));
+assert(html.includes('terminal-rod-overview.css?v=20261110-equal-height-v2'));
 assert(js.includes('root.P79TerminalRodOverview?.render(stats,state);'));
 
 assert(html.includes('id="view-terminal"'));
@@ -18,7 +18,7 @@ assert(js.includes('root.P79TerminalReference?.render(stats,state);'),'render ne
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261110-matched-tables-v2'));
+assert(html.includes('./terminal-ops.js?v=20261111-audit-v3'));
 assert(html.includes('id="terminalDayTableWrap"'),'daily ship table has measured viewport');
 assert(html.includes('id="terminalShiftTableWrap"'),'shift detail table has synced scroll viewport');
 assert(html.includes('#view-terminal #terminalShiftTableWrap{box-sizing:border-box;overflow-y:auto}'),'shift details retain vertical scrolling');
@@ -130,17 +130,17 @@ assert(!elements.terminalStopDetailBody.innerHTML.includes('已手動分類'));
  const old=api.load(true);
  elements.terminalMonth.value='2026-07';
  const next=api.load(true);
- fast({ok:true,shipMasters:[mkShip('07','2026-07-03','82L',3,4,7,8)],records:[mkRecord('07r','07','2026-07-03','08:00','09:00',3,4)]});
+ fast({ok:true,shipMasters:[mkShip('07','2026-07-03','79L',3,4,7,8)],records:[mkRecord('07r','07','2026-07-03','08:00','09:00',3,4)]});
  await next;
- slow({ok:true,shipMasters:[mkShip('08','2026-08-03','81R',9,10,19,21)],records:[mkRecord('08r','08','2026-08-03','08:00','09:00',9,10)]});
+ slow({ok:true,shipMasters:[mkShip('08','2026-08-03','80R',9,10,19,21)],records:[mkRecord('08r','08','2026-08-03','08:00','09:00',9,10)]});
  await old;
- assert(elements.terminalWharfBody.innerHTML.includes('82L'));
- assert(!elements.terminalWharfBody.innerHTML.includes('81R'),'stale response must not overwrite latest month');
+ assert(elements.terminalWharfBody.innerHTML.includes('79L'));
+ assert(!elements.terminalWharfBody.innerHTML.includes('80R'),'stale response must not overwrite latest month');
  elements.terminalMonth.value='2026-06';
  ctx.records=[mkRecord('bad','bad','2026-06-03','08:00','09:00',2,3,[['<script>alert(1)</script>',10]])];
- ctx.shipMasters=[mkShip('bad','2026-06-03','<img src=x onerror=alert(1)>',2,3,5,6)];
+ ctx.shipMasters=[{...mkShip('bad','2026-06-03','79L',2,3,5,6),vessel:'<img src=x onerror=alert(1)>'}];
  api.render();
  assert(elements.terminalStopDetailBody.innerHTML.includes('&lt;script&gt;'),'raw stop text escaped in event details');
- assert(!elements.terminalWharfBody.innerHTML.includes('<img'),'wharf escaped');
+ assert(!elements.terminalStopDetailBody.innerHTML.includes('<img'),'vessel name escaped');
  console.log('PASS terminal ops: month-only cloud, wharf, daily, shift, stoppages, dedup, cache, race, HTML escaping');
 })().catch(error=>{console.error(error);process.exitCode=1});
