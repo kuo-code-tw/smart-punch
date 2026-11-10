@@ -99,7 +99,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
  const details=[],seen=new Set();let unknownDays=0;
  for(const person of roster){
   const dates=person?.schedule||{};
-  const workerId=id(person.empId||person.id)||('ATT:'+att(person.attNo||person.attendanceNo))||('NAME:'+personName(person.name));
+  const workerId=id(person.empId||person.id)||(att(person.attNo||person.attendanceNo)?'ATT:'+att(person.attNo||person.attendanceNo):'')||(personName(person.name)?'NAME:'+personName(person.name):'');
   if(!workerId||workerId==='ATT:'||workerId==='NAME:')continue;
   for(const [date,code] of Object.entries(dates)){
    const period=rosterHours(code);
@@ -160,7 +160,7 @@ function renderDialog(){
  if(!last||!Array.isArray(last.details)){host.innerHTML='<p>目前無法確認班表出勤待核人數，請重新讀取正式考勤與排班。</p>';return;}
  if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
  host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
-  last.details.slice(0,200).map(r=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>早</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
+  last.details.slice(0,200).map(r=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
  '</tbody></table></div>';
  if(last.details.length>200)host.insertAdjacentHTML('beforeend','<p>畫面先顯示前 200 筆，完整資料請至考勤系統核對。</p>');
 }
@@ -173,7 +173,7 @@ function render(attendanceData,scheduleData,month,options={}){
  if(value)value.textContent=last.count===null||last.count===0&&last.unknownDays?'—':String(last.count);
  if(hint)hint.textContent=last.count===null?'資料待核對 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
  btn.setAttribute('aria-label','班表出勤待核：'+(last.count===null?'尚未確認':last.count+' 筆待核')+'，點擊查看明細');
- if($('p79DashEarlyPunchDialog')?.open){status(last.reason||'依已讀取的正式考勤及排班比對');renderDialog();}
+ if($('p79DashEarlyPunchDialog')?.open){status(last.reason||'已核對正式班表、考勤與已核准請假');renderDialog();}
  return last;
 }
 function reset(){
