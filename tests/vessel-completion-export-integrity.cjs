@@ -32,7 +32,7 @@ const ctx={
  normalizeAqcNo:()=>'',effectiveBundleRecord:r=>({rawDisc:r.disc,rawLoad:r.load,bundleDeduct:0})
 };
 vm.createContext(ctx);
-['vesselMonthlyExportRows','buildShipExportRows','buildDetailExportRows'].forEach(n=>vm.runInContext(getFn(n),ctx));
+['shipMasterKey','vesselScopeMaster','vesselMonthlyExportRows','buildShipExportRows','buildDetailExportRows'].forEach(n=>vm.runInContext(getFn(n),ctx));
 const monthly=ctx.vesselMonthlyExportRows('2026-10');
 assert.equal(monthly.length,2);
 assert.deepEqual(monthly.map(x=>[x.disc,x.load,x.bill]),[[178,319,497],[381,390,771]]);

@@ -14,7 +14,7 @@ const c={console,Date,document:{getElementById:id=>elements[id]},shipMasters:[],
 c.window=c;c.P79VesselVersionView=versionView;c.p79EnsureXlsx=async()=>{};c.P79VesselMonthlyReport={savedCompany:()=> 'Test Company',saveCompany:v=>v,
  saveSignatures:values=>values,
  download:async({month,rows,filename,company,signatures})=>writes.push({wb:{sheet:c.buildMonthlyOperationSheet(month,rows)},name:filename,company,signatures})};vm.createContext(c);
-for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','p79VesselMonthSafetyAudit','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
+for(const name of ['monthlyShipNo','shipMasterDateMatchesMonth','shipMasterKey','p79VesselMonthSafetyAudit','vesselMonthlyExportRows','buildMonthlyOperationSheet','saveVesselMonthlySignatureFields','exportVesselMonthlyExcel'])vm.runInContext(fn(name),c);
 c.vesselJobRows=month=>versionView.collapse(c.shipMasters
   .filter(s=>c.shipMasterDateMatchesMonth(s,month))
   .map(c.applyShipManualOverrides)).rows;

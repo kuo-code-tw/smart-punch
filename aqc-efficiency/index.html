@@ -2441,11 +2441,11 @@ function shipCompletionMonth(s,latestByNo=null){
   }
   const no=String(s.workingNo||'').trim();
   if(no){
-    const cached=latestByNo?.get(no);
+    const cached=latestByNo?.get(shipMasterKey(s));
     if(cached)return cached.slice(0,7);
     // 單艘船直接呼叫時仍保留舊資料備援；整月請由 shipCompletionIndex 預先索引，避免 O(船數×明細數)。
     if(!latestByNo){
-      const dates=(records||[]).filter(r=>String(r?.workingNo||'').trim()===no)
+      const dates=(records||[]).filter(r=>shipMasterKey(r)===shipMasterKey(s))
         .map(r=>String(r?.workDate||r?.date||'').slice(0,10)).filter(d=>/^20\d{2}-\d{2}-\d{2}$/.test(d)).sort();
       if(dates.length)return dates[dates.length-1].slice(0,7);
     }
@@ -2460,13 +2460,21 @@ function shipCompletionIndex(masters){
   for(const r of (records||[])){
     const no=String(r?.workingNo||'').trim();
     const date=String(r?.workDate||r?.date||'').slice(0,10);
-    if(no&&/^20\d{2}-\d{2}-\d{2}$/.test(date) && date>(latestByNo.get(no)||''))latestByNo.set(no,date);
+    const key=shipMasterKey(r);
+    if(no&&/^20\d{2}-\d{2}-\d{2}$/.test(date) && date>(latestByNo.get(key)||''))latestByNo.set(key,date);
   }
-  return new Map((masters||[]).filter(s=>String(s?.workingNo||'').trim())
-    .map(s=>[String(s.workingNo).trim(),{master:s,month:shipCompletionMonth(s,latestByNo)}]));
+  const index=new Map(),families=new Map();
+  for(const s of (masters||[])){
+    const no=String(s?.workingNo||'').trim();if(!no)continue;
+    const entry={master:s,month:shipCompletionMonth(s,latestByNo)};
+    index.set(shipMasterKey(s),entry);
+    if(!families.has(no))families.set(no,[]);families.get(no).push(entry);
+  }
+  for(const [no,entries] of families)if(entries.length===1)index.set(no,entries[0]);
+  return index;
 }
 function recordCompletionMonth(r,index){
-  const entry=index?.get(String(r?.workingNo||'').trim());
+  const entry=index?.get(shipMasterKey(r))||(!String(r?.wharf||'').trim()?index?.get(String(r?.workingNo||'').trim()):null);
   if(entry?.month)return entry.month;
   // 舊明細無主檔時僅取明確日期欄位；不覆寫原始作業日。
   const raw=r?.sheetCompareDate||r?.compareDate||r?._cloudLastDate||'';
@@ -2476,7 +2484,8 @@ function recordCompletionMonth(r,index){
 }
 function recordIsCurrentShipDetail(r,index){
   if(String(r?.source||'')!=='working-report')return true;
-  const ids=index?.get(String(r?.workingNo||'').trim())?.master?.workingSheetSource?.reportRecordIds;
+  const entry=index?.get(shipMasterKey(r))||(!String(r?.wharf||'').trim()?index?.get(String(r?.workingNo||'').trim()):null);
+  const ids=entry?.master?.workingSheetSource?.reportRecordIds;
   return !Array.isArray(ids)||!ids.length||!String(r?.id||'')||ids.map(String).includes(String(r.id));
 }
 
@@ -2559,16 +2568,25 @@ function summaryRows(){
 
 function shipOverrideKey(s){
   const no=String(s?.workingNo||'').trim();
-  return no?`NO:${no}`:`SHIP:${String(s?.vessel||'').trim()}|${String(s?.voyageE||s?.voyageI||'').trim()}`;
+  const wharf=String(s?.wharf||'').trim().toUpperCase().replace(/\s+/g,'');
+  return no?`NO:${no}`+(wharf?'|WHARF:'+wharf:''):`SHIP:${String(s?.vessel||'').trim()}|${String(s?.voyageE||s?.voyageI||'').trim()}`;
 }
-function effectiveShipOverrides(s){
+function effectiveShipOverrides(s,scopeMasters=null){
   const embedded=(s?.manualOverrides&&typeof s.manualOverrides==='object')?s.manualOverrides:{};
-  const cached=shipManualOverrideCache?.[shipOverrideKey(s)]||{};
+  const no=String(s?.workingNo||'').trim(),key=shipOverrideKey(s);
+  let cached=shipManualOverrideCache?.[key];
+  const legacy=shipManualOverrideCache?.['NO:'+no];
+  if(!cached&&legacy){
+    const siblings=(Array.isArray(scopeMasters)?scopeMasters:(shipMasters||[])).filter(x=>String(x?.workingNo||'').trim()===no);
+    const unique=new Set(siblings.map(x=>String(x?.wharf||'').trim().toUpperCase().replace(/\s+/g,'')));
+    if(unique.size<=1)cached=legacy;
+  }
+  cached=cached||{};
   return {...embedded,...cached};
 }
-function applyShipManualOverrides(s){
+function applyShipManualOverrides(s,scopeMasters=null){
   if(!s)return s;
-  const o=effectiveShipOverrides(s);
+  const o=effectiveShipOverrides(s,scopeMasters);
   return {...s,...o,manualOverrides:o};
 }
 function setShipManualOverride(master,key,value){
@@ -2717,23 +2735,30 @@ function sanitizeShipMasterMetrics(raw){
 }
 
 function canonicalShipMasters(list){
-  const byNo=new Map(), noNo=[];
+  const byNo=new Map(), noNo=[],knownScopes=new Map();
+  for(const row of (list||[])){
+    const no=String(row?.workingNo||'').trim(),wharf=String(row?.wharf||'').trim().toUpperCase().replace(/\s+/g,'');
+    if(!no||!wharf)continue;
+    if(!knownScopes.has(no))knownScopes.set(no,new Set());knownScopes.get(no).add(wharf);
+  }
   for(const raw of (list||[])){
     const safeRaw=sanitizeShipMasterMetrics(raw);
     const normalizedRaw=normalizeWorkingSheetBillingSemantics(safeRaw);
-    const s=applyShipManualOverrides(normalizedRaw);
+    const s=applyShipManualOverrides(normalizedRaw,list);
     const no=String(s.workingNo||'').trim();
     if(!no){noNo.push(s);continue;}
-    const prev=byNo.get(no);
-    if(!prev){byNo.set(no,s);continue;}
-    // 同一 WORKING NO. 強制視為同一筆；合併後人工修正永遠最高優先。
+    const scopes=knownScopes.get(no);
+    const key=!String(s.wharf||'').trim()&&scopes?.size===1?'NO:'+no+'|WHARF:'+Array.from(scopes)[0]:shipMasterKey(s);
+    const prev=byNo.get(key);
+    if(!prev){byNo.set(key,s);continue;}
+    // 同一 WORKING NO. 且同碼頭才合併；不同碼頭保留獨立作業。
     const merged=mergeShipMasterOne(prev,s);
-    const overrides={...effectiveShipOverrides(prev),...effectiveShipOverrides(s)};
+    const overrides={...effectiveShipOverrides(prev,list),...effectiveShipOverrides(s,list)};
     merged.manualOverrides=overrides;
     Object.keys(overrides).forEach(k=>{
       if(!k.startsWith('_') && overrides[k]!==undefined)merged[k]=overrides[k];
     });
-    byNo.set(no,merged);
+    byNo.set(key,merged);
   }
   return [...byNo.values(),...dedupeShipMasters(noNo)];
 }
@@ -2800,7 +2825,7 @@ function vesselJobRows(monthOverride=''){
     let vessel=String(r.shipName||r.vessel||'').trim();
     const ve=String(r.voyageE||r.voyage||'').trim();
     if(ve&&vessel.endsWith(' '+ve))vessel=vessel.slice(0,-(ve.length+1)).trim();
-    const key=no||`${vessel}|${ve}`;
+    const key=shipMasterKey({...r,vessel});
 
     const next={
       workingNo:no||'—',vessel:vessel||'—',voyageI:r.voyageI||'',voyageE:ve,
@@ -2826,7 +2851,7 @@ function vesselJobRows(monthOverride=''){
   if(recordMap.size){
     const byKey=new Map();
     masters.forEach(m=>{
-      const key=String(m.workingNo||'').trim()||`${String(m.vessel||'').trim()}|${String(m.voyageE||'').trim()}`;
+      const key=shipMasterKey(m);
       byKey.set(key,m);
     });
     recordMap.forEach((m,key)=>{
@@ -3732,8 +3757,9 @@ function markAllShipChangesSeen(){
 
 function dashboardWorkingReportResult(job){
   const no=String(job?.workingNo||'').trim();
-  const ref=driverVesselReference(no,shipMasters,records);
+  const ref=driverVesselReference(no,shipMasters,records,job);
   const audit=workloadSheetAudit(ref.master,ref.rows);
+  if(ref.ambiguous){audit.status='pending';audit.reasons=[...(audit.reasons||[]),'有明細缺少碼頭，無法安全區分同編號作業'];}
   return {...audit,workingNo:no,count:ref.rows.length};
 }
 function dashboardWorkingReportBadge(job){
@@ -3742,7 +3768,7 @@ function dashboardWorkingReportBadge(job){
   const label=pending?'待核對':a.status==='match'?'✓ 一致':Math.abs(a.diff||0)>0.01?'⚠ 櫃數差 '+signed(a.diff):'⚠ '+(a.reasons?.[0]||'明細差異');
   const numbers=pending?(a.count?'WR '+a.containers+'／WS 待確認':'司機明細待讀取'):'WR '+a.containers+'／WS '+a.moves;
   const title=['全船 '+a.count+' 筆 WORKING REPORT；WS 為作業量＋SHIFT。',...a.reasons].join(' ');
-  return `<button type="button" class="vessel-wr-badge audit-${a.status}" aria-label="司機櫃數核對 ${esc(a.workingNo)}" title="${esc(title)}" onclick="openVesselDetail(this.dataset.workingNo,this.dataset.vessel)" data-working-no="${esc(a.workingNo)}" data-vessel="${esc(job?.vessel||'')}"><strong>${esc(label)}</strong><span>${esc(numbers)}</span></button>`;
+  return `<button type="button" class="vessel-wr-badge audit-${a.status}" aria-label="司機櫃數核對 ${esc(a.workingNo)}" title="${esc(title)}" onclick="openVesselDetail(this.dataset.workingNo,this.dataset.vessel,this.dataset.wharf)" data-wharf="${esc(job?.wharf||'')}" data-working-no="${esc(a.workingNo)}" data-vessel="${esc(job?.vessel||'')}"><strong>${esc(label)}</strong><span>${esc(numbers)}</span></button>`;
 }
 function renderVesselWorkingReportComparison(job){
   const host=document.getElementById('vdWorkingReportComparison');if(!host)return;
@@ -3920,7 +3946,7 @@ function renderDashboard(){
     const bundleBn=num(x.bundleBn)||bundleItems.reduce((sum,item)=>sum+num(item?.bn),0);
     const bundleFl=num(x.bundleFl)||bundleItems.reduce((sum,item)=>sum+num(item?.fl),0);
     const bundleDeduct=num(x.bundleDeduct);
-    const vesselBundleRows=recordsForVessel(x.workingNo,x.vessel).filter(r=>num(effectiveBundleRecord(r).bundleDeduct)>0);
+    const vesselBundleRows=recordsForVessel(x.workingNo,x.vessel,x).filter(r=>num(effectiveBundleRecord(r).bundleDeduct)>0);
     const bundleUnit=vesselBundleRows.map(r=>effectiveBundleRecord(r).bundleInfo?.[0]?.unit).find(Boolean)||'FR/FL';
     const bundleDisplay=(x.bundlePresent||bundleDeduct>0||bundleBn>0||bundleFl>0)
       ? ((bundleBn>0||bundleFl>0)
@@ -3938,7 +3964,7 @@ function renderDashboard(){
       <td>${shipChangeStatusBadge(x)}</td>
       <td class="font-bold whitespace-nowrap">${esc(dashboardRocDate(dashboardJobDateValue(x)))}</td>
       ${dashboardChangeCell(x,'workingNo',esc(originalNumericWorkingNo(x.sourceWorkingNo||x.workingNo))+(vesselImportCallNumber(x)>1?'（第'+vesselImportCallNumber(x)+'靠）':''),'font-black text-indigo-700')}
-      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel)" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button><div class="text-xs text-slate-500">中文：${esc(p79VesselChineseDisplay(x)||'未提供')}</div>`)}
+      ${dashboardChangeCell(x,'vessel',`<button class="font-black text-indigo-700 hover:underline text-[0.92rem]" onclick="openVesselDetail('${esc(x.workingNo)}',this.dataset.vessel,this.dataset.wharf)" data-wharf="${esc(x.wharf||'')}" data-vessel="${esc(x.vessel)}">${esc(x.vessel)}</button><div class="text-xs text-slate-500">中文：${esc(p79VesselChineseDisplay(x)||'未提供')}</div>`)}
       ${dashboardChangeCell(x,'voyageI',voyage)}
       ${dashboardChangeCell(x,'wharf',wharf)}
       ${dashboardChangeCell(x,'totalContainers',String(num(x.totalContainers)),'font-bold')}
@@ -4218,7 +4244,7 @@ function baseRecordRows(){
   const master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===shipNo);
   if(!master)return [];
   const year=getPort79Year();
-  return recordsForVessel(master.workingNo,master.vessel).filter(r=>!year||String(r.workDate||'').startsWith(year));
+  return recordsForVessel(master.workingNo,master.vessel,master).filter(r=>!year||String(r.workDate||'').startsWith(year));
 }
 
 function refreshRecordFilterOptions(baseRows){
@@ -4496,8 +4522,10 @@ function timeSlotLabel(r){
 function vesselMasterForRecord(r){
   const no=String(r?.workingNo||r?.workNo||r?.workingNumber||'').trim();
   if(no){
-    const exact=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no);
-    if(exact)return exact;
+    const wharf=String(r?.wharf||'').trim().toUpperCase().replace(/\s+/g,'');
+    const exacts=(shipMasters||[]).filter(s=>String(s.workingNo||'').trim()===no&&(!wharf||String(s.wharf||'').trim().toUpperCase().replace(/\s+/g,'')===wharf));
+    if(exacts.length===1)return exacts[0];
+    if(exacts.length>1)return null;
 
     // 舊資料可能只存 0151，而主檔是 5260151；只有「唯一標準序號」才允許補綁。
     // 一旦 NO. 帶 -1/-2 子序號，就絕對不能退回同船名的父作業。
@@ -4777,12 +4805,49 @@ function renderDriverVesselDetailTable(rows){
     return header+`<tr class="vessel-operation-row"><td><span class="vessel-aqc-pill tone-${index%3}">${esc(aqc||'—')}</span></td><td>${esc(r.workDate||'')}</td><td class="vessel-person-name">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.startTime||'—')} → ${esc(r.endTime||'—')}</td><td>${m.hours.toFixed(2)}</td><td class="vessel-disc">${m.disc}</td><td class="vessel-load">${m.load}</td><td>${m.hc}</td><td class="vessel-total">${m.containers}</td><td class="vessel-eff">${m.eff.toFixed(2)}</td><td><button class="vessel-edit" onclick="openRecordDialog(decodeURIComponent('${encodeURIComponent(String(r.id||'')).replace(/'/g,'%27')}'))">編輯</button></td></tr>`;
   }).join('')||'<tr><td colspan="12" class="vessel-empty">目前篩選沒有明細，請選擇船舶或按「顯示全船全部 AQC」。</td></tr>';
 }
-function driverVesselReference(workingNo,masters,allRows){
-  const no=String(workingNo||'').trim();
-  const master=(masters||[]).find(s=>String(s.workingNo||'').trim()===no)||null;
-  const rows=canonicalOperationalRecords((allRows||[]).filter(r=>String(r.source||'')==='working-report'&&String(r.workingNo||'').trim()===no));
-  return {master,rows};
+function vesselScopeRows(rows,job,masters){
+  if(!job)return {rows:[],ambiguous:(rows||[]).length>0};
+  const norm=v=>String(v||'').trim().toUpperCase().replace(/\s+/g,'');
+  const no=String(job.workingNo||'').trim(),wharf=norm(job.wharf);
+  const siblings=(masters||[]).filter(m=>String(m?.workingNo||'').trim()===no);
+  const wharfs=new Set(siblings.map(m=>norm(m.wharf)).filter(Boolean));
+  let ambiguous=false;
+  const scoped=(rows||[]).filter(r=>{
+    const rw=norm(r.wharf);
+    if(wharf&&rw&&wharf!==rw)return false;
+    if(wharfs.size>1&&(!wharf||!rw)){ambiguous=true;return false;}
+    const rn=norm(r.shipName||r.vessel),jn=norm(job.vessel||job.shipName);
+    const suffixes=[r.voyageI,r.voyageE,r.voyage,r.voyageIE].map(norm).filter(Boolean);
+    if(rn&&jn&&rn!==jn&&!suffixes.some(v=>rn===jn+v))return false;
+    const rv=[r.voyageI,r.voyageE,r.voyage,r.voyageIE].map(norm).filter(Boolean);
+    const jv=[job.voyageI,job.voyageE].map(norm).filter(Boolean);
+    if(rv.length&&jv.length&&!rv.some(v=>jv.includes(v)))return false;
+    const date=String(r.workDate||'').slice(0,10),first=String(job.firstDate||'').slice(0,10),last=String(job.lastDate||'').slice(0,10);
+    if(date&&first&&last&&(date<first||date>last))return false;
+    return true;
+  });
+  return {rows:scoped,ambiguous};
 }
+function vesselScopeMaster(workingNo,masters,scope){
+  const no=String(workingNo||'').trim(),norm=v=>String(v||'').trim().toUpperCase().replace(/\s+/g,'');
+  const wharf=norm(typeof scope==='string'?scope:scope?.wharf);
+  const matches=(masters||[]).filter(s=>String(s.workingNo||'').trim()===no&&(!wharf||norm(s.wharf)===wharf));
+  if(!matches.length)return scope&&typeof scope==='object'?scope:null;
+  if(new Set(matches.map(s=>norm(s.wharf))).size>1)return null;
+  return matches[0];
+}
+function driverVesselReference(workingNo,masters,allRows,scope=null){
+  let selected=workingNo;
+  if(typeof selected==='string'&&selected.startsWith('[')){
+    try{const pair=JSON.parse(selected);if(Array.isArray(pair)&&pair.length===2){selected=pair[0];scope={wharf:String(pair[1]||'')};}}catch(_){}
+  }
+  const no=String(selected||'').trim();
+  const master=vesselScopeMaster(no,masters,scope);
+  const rows=(allRows||[]).filter(r=>String(r.source||'')==='working-report'&&String(r.workingNo||'').trim()===no);
+  const scoped=vesselScopeRows(rows,master,masters);
+  return {master,rows:canonicalOperationalRecords(scoped.rows),ambiguous:scoped.ambiguous};
+}
+
 function driverVesselOperationRows(rows){
   const groups=new Map();
   (rows||[]).forEach(r=>{
@@ -4827,19 +4892,21 @@ function renderVesselDriverView(){
   if(!monthInput||!shipSel)return;
   if(!monthInput.value)monthInput.value=document.getElementById('filterMonth')?.value||isoTodayLocal().slice(0,7);
   const month=monthInput.value,load=document.getElementById('driverVesselLoadState'),source=document.getElementById('driverVesselSourceState');
-  const map=new Map((shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month)).map(s=>[String(s.workingNo||'').trim(),s]));
+  const map=new Map((shipMasters||[]).filter(s=>shipMasterDateMatchesMonth(s,month)).map(s=>[shipMasterKey(s),s]));
   // Historical detail-only payloads are still selectable; missing WORKING SHEET stays pending.
   (records||[]).filter(r=>String(r.source||'')==='working-report'&&String(r.workDate||'').startsWith(month)).forEach(r=>{
-    const no=String(r.workingNo||'').trim();if(!no||map.has(no)||(shipMasters||[]).some(s=>String(s.workingNo||'').trim()===no))return;
-    map.set(no,{workingNo:no,vessel:r.shipName||r.vessel||'',voyageE:r.voyageE||r.voyage||'',firstDate:r.workDate});
+    const no=String(r.workingNo||'').trim(),key=shipMasterKey(r);if(!no||map.has(key)||(shipMasters||[]).some(s=>shipMasterKey(s)===key))return;
+    map.set(key,{workingNo:no,vessel:r.shipName||r.vessel||'',wharf:r.wharf||'',voyageE:r.voyageE||r.voyage||'',firstDate:r.workDate});
   });
   const masters=[...map.values()].sort((a,b)=>String(b.compareDate||b.lastDate||b.firstDate||'').localeCompare(String(a.compareDate||a.lastDate||a.firstDate||''))||String(b.workingNo||'').localeCompare(String(a.workingNo||''),undefined,{numeric:true}));
+  const selectionKey=s=>masters.filter(m=>String(m.workingNo)===String(s.workingNo)).length>1?JSON.stringify([String(s.workingNo),String(s.wharf||'')]):String(s.workingNo);
   const previous=shipSel.value;
-  shipSel.innerHTML='<option value="">請選擇船舶</option>'+masters.map(s=>`<option value="${esc(s.workingNo)}">${esc(s.workingNo)}｜${esc(s.vessel||'')} ${esc(s.voyageE||s.voyageI||'')}</option>`).join('');
-  shipSel.value=masters.some(s=>String(s.workingNo)===previous)?previous:String(masters[0]?.workingNo||'');
+  shipSel.innerHTML='<option value="">請選擇船舶</option>'+masters.map(s=>`<option value="${esc(selectionKey(s))}">${esc(s.workingNo)}｜${esc(s.wharf||'')}｜${esc(s.vessel||'')} ${esc(s.voyageE||s.voyageI||'')}</option>`).join('');
+  shipSel.value=masters.some(s=>selectionKey(s)===previous)?previous:(masters[0]?selectionKey(masters[0]):'');
   const readKey=String(gcToken||'')+'|'+month,read=driverVesselReads.get(readKey);
   if(load)load.textContent=read?.status==='loading'?'更新資料中…':read?.status==='error'?'資料讀取失敗，目前顯示已保存紀錄。請按「重新讀取資料」重試。':read?.status==='partial'?'部分資料未讀取，目前顯示已取得的紀錄。可按「重新讀取資料」重試。':'';
   const ref=driverVesselReference(shipSel.value,masters,records),audit=workloadSheetAudit(ref.master,ref.rows);
+  if(ref.ambiguous){audit.status='pending';audit.reasons=['明細缺少碼頭，無法安全區分同編號作業'];}
   if(source)source.textContent=!shipSel.value?'本月份尚無船舶資料。':`${ref.master?.vessel||''} ${ref.master?.voyageE||ref.master?.voyageI||''}｜${ref.rows.length} 筆 WORKING REPORT｜司機 ${audit.containers} 櫃、H/C ${audit.hc}｜${audit.status==='match'?'與 WORKING SHEET 一致':audit.reasons.join('；')}`;
   ensureOperationScheduleGroups(ref.rows);
   const grouped=driverVesselOperationRows(ref.rows);
@@ -6824,7 +6891,7 @@ function selectWorkloadPerson(encodedId){
 }
 function workloadVesselGroupKey(r){
   const no=String(r?.workingNo||r?.workNo||r?.workingNumber||'').trim();
-  if(no)return `NO:${no}`;
+  if(no){const wharf=String(r?.wharf||'').trim().toUpperCase().replace(/\s+/g,'');return `NO:${no}`+(wharf?'|WHARF:'+wharf:'');}
   const vessel=String(r?.shipName||r?.vessel||'').trim();
   const voyage=String(r?.voyageE||r?.voyageI||r?.voyage||'').trim();
   return `SHIP:${vessel}|${voyage}`;
@@ -8095,7 +8162,7 @@ function shipMasterDateMatchesMonth(s,month){
 }
 function shipMasterKey(s){
   const no=String(s?.workingNo||'').trim();
-  if(no)return `NO:${no}`;
+  if(no){const wharf=String(s?.wharf||'').trim().toUpperCase().replace(/\s+/g,'');return `NO:${no}`+(wharf?'|WHARF:'+wharf:'');}
   return `SHIP:${String(s?.vessel||'').trim()}|${String(s?.voyageE||'').trim()}`;
 }
 function shipMasterQuality(s){
@@ -11821,19 +11888,18 @@ function recordMatchesMasterVoyage(r,master){
   if(!recordVoyages.length || !masterVoyages.length)return true;
   return recordVoyages.some(v=>masterVoyages.includes(v));
 }
-function recordsForVessel(workingNo,vessel){
+function recordsForVessel(workingNo,vessel,scope=null){
   const no=String(workingNo||'').trim();
   const name=String(vessel||'').trim();
-  const master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no)||
-               (!no ? (shipMasters||[]).find(s=>String(s.vessel||'').trim()===name) : null)||
-               null;
+  const master=vesselScopeMaster(no,shipMasters,scope)||(!no?(shipMasters||[]).find(s=>String(s.vessel||'').trim()===name):null)||(!(shipMasters||[]).some(s=>String(s.workingNo||'').trim()===no)?{workingNo:no,vessel:name}:null);
 
   const masterSerial=normalizeMonthlySerial(no);
   const masterName=normalizeShipText(master?.vessel||name);
   const masterToken=vesselLooseToken(masterName);
   const masterSplit=workingNoHasSuffix(no);
 
-  return (records||[]).filter(r=>{
+  const scoped=vesselScopeRows(records,master,shipMasters);
+  return scoped.rows.filter(r=>{
     const rNo=String(r?.workingNo||'').trim();
 
     // 1) 有明確 WORKING NO. 時，先做「嚴格隔離」。
@@ -11926,7 +11992,7 @@ function canonicalOperationalRecords(list){
     const rawMoves=(num(r?.disc)+num(r?.load))||num(r?.containers);
     // 同一人、同船、同日、同 AQC、同起訖時間就是同一作業段；班別文字不同不能讓同一筆重複計算。
     const segment=(st||et)?`${st}|${et}`:`NO_TIME|${rawMoves}|${num(r?.hatches)}|${String(r?.note||'').trim()}`;
-    const key=[vesselKey,person,date,aqc,segment].join('|');
+    const key=[vesselKey,String(r?.wharf||'').trim().toUpperCase().replace(/\s+/g,''),person,date,aqc,segment].join('|');
     const completeness=(directNo?3:0)+(r?.shipName||r?.vessel?2:0)+(st?1:0)+(et?1:0)+(rawMoves>0?2:0)+(num(r?.hatches)>0?1:0);
     const rank=operationalSourceRank(r)*100+completeness;
     const prev=map.get(key);
@@ -11938,17 +12004,17 @@ function canonicalOperationalRecords(list){
   });
   return [...map.values()].map(x=>x.r);
 }
-function officialRecordsForVessel(workingNo,vessel){
-  const rows=recordsForVessel(workingNo,vessel);
+function officialRecordsForVessel(workingNo,vessel,scope=null){
+  const rows=recordsForVessel(workingNo,vessel,scope);
   const wr=rows.filter(r=>String(r?.source||'')==='working-report');
   // 有正式 WORKING REPORT 就以它為船舶明細真值；沒有才退回去重後的舊/人工資料。
   return canonicalOperationalRecords(wr.length?wr:rows);
 }
 
-function findVesselJobExact(workingNo,vessel){
+function findVesselJobExact(workingNo,vessel,scope=null){
   const no=String(workingNo||'').trim();
   if(no && no!=='—'){
-    const exact=(vesselJobRows()||[]).find(x=>String(x?.workingNo||'').trim()===no);
+    const exact=vesselScopeMaster(no,vesselJobRows(),scope);
     if(exact)return exact;
   }
   const name=String(vessel||'').trim();
@@ -11974,6 +12040,7 @@ function linkedChildMasterCandidates(parent){
     if(workingNoRoot(source)!==root && workingNoRoot(stored)!==root)return false;
     if(!workingNoHasSuffix(source) && !workingNoHasSuffix(stored))return false;
     if(normalizeShipText(s?.vessel)!==pv)return false;
+    if(parent.wharf&&s.wharf&&normalizeShipText(parent.wharf)!==normalizeShipText(s.wharf))return false;
     if(!sameVoyageForMasters(parent,s))return false;
 
     // 子作業需在相近月份，避免多年後重複使用相同 NO. 被誤連。
@@ -11995,12 +12062,12 @@ function vesselAuditScore(job,rows){
 }
 function buildVesselAuditContext(job){
   if(!job)return {ownRows:[],auditRows:[],linkedJobs:[]};
-  const ownRows=officialRecordsForVessel(job.workingNo,job.vessel);
+  const ownRows=officialRecordsForVessel(job.workingNo,job.vessel,job);
   const baseQa=vesselQuantityAudit(job,ownRows);
   if(baseQa.ok)return {ownRows,auditRows:ownRows,linkedJobs:[]};
 
   const children=linkedChildMasterCandidates(job)
-    .map(master=>({master,rows:officialRecordsForVessel(master.workingNo,master.vessel)}))
+    .map(master=>({master,rows:officialRecordsForVessel(master.workingNo,master.vessel,master)}))
     .filter(x=>x.rows.length);
 
   if(!children.length)return {ownRows,auditRows:ownRows,linkedJobs:[]};
@@ -12111,7 +12178,7 @@ function nearlyEqual(a,b,tol=0.02){
 }
 function dashboardFullSystemAudit(x){
   const issues=[];
-  const vesselRows=recordsForVessel(x?.workingNo,x?.vessel);
+  const vesselRows=recordsForVessel(x?.workingNo,x?.vessel,x);
   const wrRows=vesselRows.filter(r=>String(r?.source||'')==='working-report');
   const auditContext=buildVesselAuditContext(x);
   const detailRows=auditContext.auditRows;
@@ -12595,7 +12662,7 @@ function vesselJobRowsForMonth(month){
         let vessel=String(r.shipName||r.vessel||'').trim();
         const ve=String(r.voyageE||r.voyage||'').trim();
         if(ve&&vessel.endsWith(' '+ve))vessel=vessel.slice(0,-(ve.length+1)).trim();
-        const key=no||`${vessel}|${ve}`;
+        const key=shipMasterKey({...r,vessel});
         if(!map.has(key))map.set(key,{
           workingNo:no||'—',vessel:vessel||'—',voyageI:r.voyageI||'',voyageE:ve,
           wharf:r.wharf||'',totalContainers:num(r.sheetTotalContainers),hatches:num(r.sheetHatches),
@@ -13352,7 +13419,8 @@ async function saveDashboardShipNote(workingNo,value){
 function shipMasterByWorkingNo(workingNo){
   const no=String(workingNo||'').trim();
   shipMasters=canonicalShipMasters(shipMasters||[]);
-  return (shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no)||null;
+  const matches=(shipMasters||[]).filter(s=>String(s.workingNo||'').trim()===no);
+  return matches.length===1?matches[0]:null;
 }
 
 function openShipEditDialog(workingNo){
@@ -13551,7 +13619,7 @@ async function deleteShipMaster(workingNo){
   const s=shipMasterByWorkingNo(workingNo);
   if(!s)return toast('找不到這筆船舶資料');
 
-  const rs=recordsForVessel(s.workingNo,s.vessel);
+  const rs=recordsForVessel(s.workingNo,s.vessel,s);
   const ok=confirm(
     `確定刪除這艘船？\n\n`+
     `WORKING NO.：${s.workingNo||'—'}\n`+
@@ -13964,15 +14032,15 @@ function renderVesselQuantityAudit(job, detailRows){
 }
 
 const vesselDetailReads=new Map();
-function vesselDetailReadKey(key=activeVesselKey){return String(gcToken||'')+'|'+String(key.workingNo||'').trim()+'|'+String(key.vessel||'').trim();}
+function vesselDetailReadKey(key=activeVesselKey){return String(gcToken||'')+'|'+String(key.workingNo||'').trim()+'|'+String(key.vessel||'').trim()+(key.wharf?'|'+String(key.wharf).trim():'');}
 function vesselDetailReadMonths(key){
-  const no=String(key.workingNo||'').trim(),master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===no)||findVesselJobExact(no,key.vessel)||{};
+  const no=String(key.workingNo||'').trim(),master=vesselScopeMaster(no,shipMasters,key)||findVesselJobExact(no,key.vessel,key)||{};
   const values=[master.firstDate,master.lastDate,master._cloudFirstDate,master._cloudLastDate,master.compareDate,master.compareMonth,master.month].map(v=>String(v||'').slice(0,7)).filter(v=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(v));
   if(!values.length){const selected=document.getElementById('filterMonth')?.value||'';if(/^20\d{2}-(0[1-9]|1[0-2])$/.test(selected))values.push(selected);}
   return [...new Set(values)].slice(0,3);
 }
 function renderVesselDetailLoadState(){
-  const el=document.getElementById('vdDataMessage'),button=document.getElementById('vdDataRetry'),state=vesselDetailReads.get(vesselDetailReadKey()),count=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel).length;
+  const el=document.getElementById('vdDataMessage'),button=document.getElementById('vdDataRetry'),state=vesselDetailReads.get(vesselDetailReadKey()),count=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey).length;
   if(el)el.textContent=state?.status==='loading'?'正在補讀這艘船的雲端與歷史人員明細…':state?.status==='error'?'人員明細讀取未完成，請重新讀取；目前不把未取得的明細當作 0 櫃。':state?.status==='missing'?'已查詢雲端與歷史來源，尚未找到這艘船的人員明細。可重新讀取；船舶摘要仍保留。':state?.status==='partial'?`已取得 ${count} 筆明細，部分來源讀取失敗，可重新讀取補齊。`:count?`已載入 ${count} 筆人員作業明細。`:'人員明細尚未取得，準備補讀。';
   if(button)button.disabled=state?.status==='loading';
 }
@@ -13995,12 +14063,12 @@ async function loadVesselDetailRecords(force=false){
       results.forEach(accept);
     }
     // Some summary scopes omit report details even when the ship master exists.
-    if(!officialRecordsForVessel(target.workingNo,target.vessel).length){
+    if(!officialRecordsForVessel(target.workingNo,target.vessel,target).length){
       const results=await Promise.allSettled([apiGetQuick('gcGetData',{},25000)]);
       if(owner!==String(gcToken||''))return;
       results.forEach(accept);
     }
-    const count=officialRecordsForVessel(target.workingNo,target.vessel).length;
+    const count=officialRecordsForVessel(target.workingNo,target.vessel,target).length;
     vesselDetailReads.set(key,{status:count?(failed?'partial':'ready'):(failed||!valid?'error':'missing'),at:Date.now()});
     if(valid){saveLocal();invalidateWorkloadIndex();}
   }catch(_){if(owner===String(gcToken||''))vesselDetailReads.set(key,{status:'error',at:Date.now()});}
@@ -14010,15 +14078,15 @@ async function loadVesselDetailRecords(force=false){
   }
 }
 
-function openVesselDetail(workingNo,vessel){
-  activeVesselKey={workingNo:String(workingNo||'').trim(),vessel:String(vessel||'').trim()};
+function openVesselDetail(workingNo,vessel,wharf=''){
+  activeVesselKey={workingNo:String(workingNo||'').trim(),vessel:String(vessel||'').trim(),wharf:String(wharf||'').trim()};
   refreshVesselDetailView(true);document.getElementById('vesselDetailDialog').showModal();
-  if(!officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel).length)void loadVesselDetailRecords(false);
+  if(!officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey).length)void loadVesselDetailRecords(false);
 }
 function refreshVesselDetailView(resetFilters=false){
   const previous={};['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>previous[id]=resetFilters?'':document.getElementById(id)?.value||'');
-  const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel);
-  const job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel)||{};
+  const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey);
+  const job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey)||{};
   const auditContext=buildVesselAuditContext(job);
   document.getElementById('vdTitle').textContent=`${job.vessel||activeVesselKey.vessel||'船舶'} ${[job.voyageI,job.voyageE].filter(Boolean).join(' / ')}`.trim();
   document.getElementById('vdMeta').textContent=`NO. ${job.workingNo||'—'} ｜ 碼頭 ${job.wharf||'—'} ｜ ${rs.length?`共 ${rs.length} 筆人員作業紀錄`:'人員明細待讀取'}`;
@@ -14034,7 +14102,7 @@ function refreshVesselDetailView(resetFilters=false){
   renderVesselDetailRows();renderVesselDetailLoadState();
 }
 function vesselDetailFilteredRows(){
-  const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel);
+  const rs=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey);
   const d=document.getElementById('vdDate')?.value||'',a=document.getElementById('vdAqc')?.value||'',p=document.getElementById('vdPerson')?.value||'',q=(document.getElementById('vdSearch')?.value||'').trim().toLowerCase();
   return rs.filter(r=>{
     if(d&&String(r.workDate||'')!==d)return false;
@@ -14046,8 +14114,8 @@ function vesselDetailFilteredRows(){
 }
 function renderVesselDetailRows(){
   const rs=vesselDetailFilteredRows(),body=document.getElementById('vdBody');if(!body)return;
-  const allRows=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel);
-  const job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel)||{};
+  const allRows=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey);
+  const job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey)||{};
   const auditContext=buildVesselAuditContext(job);
   renderVesselQuantityAudit(job,auditContext.auditRows);
   body.innerHTML=rs.map(r=>{
@@ -14094,10 +14162,9 @@ function p79VesselMonthSafetyAudit(month,jobs){
   for(const ship of rows){
     const no=String(ship?.workingNo||'').trim();
     if(!no||no==='—'){issues.push('船舶 WORKING NO. 不完整');continue;}
-    if(byNo.has(no)){
-      issues.push('船舶 WORKING NO. 重複：'+no);
-    }
-    byNo.set(no,ship);
+    const key=shipMasterKey(ship);
+    if(byNo.has(key)){issues.push('船舶 WORKING NO.／碼頭重複：'+no+' / '+String(ship.wharf||''));}
+    byNo.set(key,ship);
     const values=[ship.totalContainers,ship.shiftMoves,ship.totalMoves,ship.hatches];
     if(values.some(v=>!Number.isFinite(Number(v))||Number(v)<0)){
       issues.push('船舶作業量含無效數值：'+no);continue;
@@ -14128,12 +14195,12 @@ function vesselMonthlyExportRows(month=document.getElementById('filterMonth')?.v
   // must not be exported as another completed vessel, while CALL2 remains.
   const jobs=dashboardAdjustJobsForMonthlyReference(vesselJobRows(month),month);
   const mastersByNo=new Map(canonicalShipMasters(shipMasters||[])
-    .map(s=>[String(s.workingNo||'').trim(),s]));
+    .map(s=>[shipMasterKey(s),s]));
   const rows=jobs.map(job=>{
-    const raw=applyShipManualOverrides(mastersByNo.get(String(job.workingNo||'').trim())||job);
+    const raw=applyShipManualOverrides(mastersByNo.get(shipMasterKey(job))||job);
     const s={...raw,...job,workingSheetSource:raw.workingSheetSource||{},
       manualOverrides:raw.manualOverrides||{}},ws=s.workingSheetSource;
-    const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>String(r.source||'')==='working-report');
+    const rs=recordsForVessel(s.workingNo,s.vessel,s).filter(r=>String(r.source||'')==='working-report');
     const metric=(...values)=>{
       for(const v of values){
         if(v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)))return Number(v);
@@ -14316,9 +14383,9 @@ function buildShipExportRows(){
   // Select vessels by completion month, not by individual driver's workDate.
   return vesselJobRows(month).map((s,index)=>{
     const no=String(s.workingNo||'').trim();
-    const master=(shipMasters||[]).find(x=>String(x.workingNo||'').trim()===no)||{};
+    const master=vesselScopeMaster(no,shipMasters,s)||{};
     const ws=master.workingSheetSource||{};
-    const rs=recordsForVessel(s.workingNo,s.vessel).filter(r=>String(r.source||'')==='working-report');
+    const rs=recordsForVessel(s.workingNo,s.vessel,s).filter(r=>String(r.source||'')==='working-report');
     const hasSheetSplit=[ws.disc,ws.load].every(v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)));
     const disc=hasSheetSplit?Math.max(0,num(ws.disc)-num(ws.bundleDeduct)):rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).disc),0);
     const load=hasSheetSplit?num(ws.load):rs.reduce((a,r)=>a+num(recoveredMoveSplit(r).load),0);
@@ -14482,7 +14549,7 @@ async function exportAllVessels() {
 async function exportCurrentVessel() {
   await window.p79EnsureXlsx();
   if(!requireSuperAdminAccess())return;
-  const rs=vesselDetailFilteredRows(),all=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel),job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel)||{};
+  const rs=vesselDetailFilteredRows(),all=officialRecordsForVessel(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey),job=findVesselJobExact(activeVesselKey.workingNo,activeVesselKey.vessel,activeVesselKey)||{};
   const wb=XLSX.utils.book_new(),shipHead=['NO.','船名','航次-I','航次-E','碼頭','總櫃數','H/C','總 Moves','SHIFT','AQC台數','GPH','GPH(含H/C)','VPH','VPH(含H/C)'],detailHead=['NO.','船名','航次-I','航次-E','碼頭','日期','AQC','姓名','組別','開始','結束','時數','艙位/SHIFT','原DISC','原LOAD','Bundle','Bundle扣除','DISC','LOAD','H/C','櫃數','GPH','停工分','備註'];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([shipHead,[job.workingNo,job.vessel,job.voyageI,job.voyageE,job.wharf,job.totalContainers,job.hatches,job.totalMoves,job.shiftMoves,job.aqcCount,job.gph,job.gphHC,job.vph,job.vphHC]]),'船舶摘要');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([detailHead,...operationExportRows(rs.length?rs:all)]),'作業明細');

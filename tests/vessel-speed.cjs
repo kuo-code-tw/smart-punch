@@ -13,7 +13,7 @@ function context(src){
     // Unchanged bundle move calculation is provided as a boundary dependency.
     recordMoveValues:r=>({disc:r.bundleDisc??r.disc,load:r.bundleLoad??r.load})};
   vm.createContext(c);vm.runInContext('const num=v=>Number(v)||0; const round=(v,n=2)=>Number.isFinite(v)?Number(v.toFixed(n)):0;',c);
-  for(const name of ['normalizePersonName','samePersonName','displayPersonName','normalizeAqcNo','normalizeMonthlySerial','monthlyShipNo','normalizeShipText','workingNoHasSuffix','recordMatchesMasterDate','timeDiffHours','effectiveHours','operationalSourceRank','vesselMasterForRecord','canonicalOperationalRecords','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows']){
+  for(const name of ['normalizePersonName','samePersonName','displayPersonName','normalizeAqcNo','normalizeMonthlySerial','monthlyShipNo','normalizeShipText','workingNoHasSuffix','recordMatchesMasterDate','timeDiffHours','effectiveHours','operationalSourceRank','vesselMasterForRecord','canonicalOperationalRecords','shipMasterKey','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows']){
     if(src===before && ['shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail'].includes(name))continue;
     vm.runInContext(fn(src,name),c);
   }

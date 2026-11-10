@@ -27,7 +27,7 @@ const c={
 };
 vm.createContext(c);
 for(const name of [
-  'shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail',
+  'shipMasterKey','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail',
   'shipMasterDateMatchesMonth','shipMasterDateMatchesYear','vesselJobRows',
   'normalizeIsoDateOnly','dashboardJobDateValue','updateDashboardTableFilterState'
 ])vm.runInContext(fn(name),c);

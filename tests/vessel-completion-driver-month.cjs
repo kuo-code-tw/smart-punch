@@ -25,7 +25,7 @@ const doc={filterMonth:{value:'2026-10'},rankingMonth:{value:'2026-10'}},ctx={
  recordMoveValues:r=>({disc:r.disc,load:r.load}),num:v=>Number(v)||0,
  round:(v,p=2)=>Number(Number(v).toFixed(p))
 };vm.createContext(ctx);
-for(const name of ['shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows','monthlyRankingRecords'])vm.runInContext(fn(name),ctx);
+for(const name of ['shipMasterKey','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows','monthlyRankingRecords'])vm.runInContext(fn(name),ctx);
 const total=()=>ctx.summaryRows().reduce((z,r)=>z+r.containers,0);
 const before=JSON.stringify(rows);
 assert.equal(total(),21086,'October includes both September driver segments, retired staff and SHIFT moves but not stale 102');

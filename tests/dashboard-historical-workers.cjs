@@ -24,7 +24,7 @@ const ctx={
   round:(v,p=2)=>Number(Number(v).toFixed(p)),
   records:rows
 };
-vm.createContext(ctx);for(const name of ['shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows'])vm.runInContext(fn(name),ctx);
+vm.createContext(ctx);for(const name of ['shipMasterKey','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail','summaryRows'])vm.runInContext(fn(name),ctx);
 let actual=ctx.summaryRows();
 const get=name=>actual.find(x=>x.name===name);
 assert.equal(actual.length,3,'Two current staff and one former staff have October work');
