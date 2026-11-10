@@ -11,7 +11,7 @@ const in1=punch('E1','上班簽到','08:00:00'),out1=punch('E1','下班簽退','
 const in2=punch('E2','上班簽到','08:00:00'),out2=punch('E2','下班簽退','16:00:00');
 const worker1=()=>({empId:'E1',attNo:'001',name:'早班測試甲',group:'A組',schedule:{'2026-11-10':'早'}});
 const worker2=()=>({empId:'E2',attNo:'002',name:'早班測試乙',schedule:{'2026-11-10':'早'}});
-const verify=(records,clock,people=[worker1(),worker2()])=>alert.analyze({records},{schedules:people},'2026-11',{now:now(clock)});
+const verify=(records,clock,people=[worker1(),worker2()],leaveRecords=[])=>alert.analyze({records},{schedules:people},'2026-11',{now:now(clock),leaveData:{leaveRecords}});
 let report=verify([in2,out2],'08:29:59');assert.equal(report.count,0,'no alert before start grace');
 report=verify([in2,out2],'08:31:00');assert.equal(report.count,1,'missing clock-in appears after 08:30');
 assert.equal(report.details[0].reason,'缺少上班卡');
@@ -42,19 +42,77 @@ report=verify([in2,out2],'17:01:00',duplicateRoster);
 assert.equal(report.count,1,'same roster person/date deduped');
 report=verify([in1,out1,in2,out2],'17:01:00',[worker1(),worker2()]);
 assert.equal(report.count,0);
-report=alert.analyze({records:[]},null,'2026-11',{now:now('17:01:00')});
+report=alert.analyze({records:[]},null,'2026-11',{now:now('17:01:00'),leaveData:{leaveRecords:[]}});
 assert.equal(report.count,null,'unloaded roster is not a misleading zero');
 const emptyData={records:[in2,out2]},rosterData={schedules:[worker1(),worker2()]};
 const before=JSON.stringify([emptyData,rosterData]);
-alert.analyze(emptyData,rosterData,'2026-11',{now:now('17:01:00')});
+alert.analyze(emptyData,rosterData,'2026-11',{now:now('17:01:00'),leaveData:{leaveRecords:[]}});
 assert.equal(JSON.stringify([emptyData,rosterData]),before,'audit never mutates source');
+
+// The official leave feed is required; a failed read must NEVER turn into
+// an apparently confirmed zero or accuse a person with approved leave.
+report=alert.analyze({records:[in2,out2]},{schedules:[worker1(),worker2()]},'2026-11',{now:now('17:01:00')});
+assert.equal(report.count,null,'no official leave response means unverified');
+const officialLeave=(emp='E1',date='2026-11-10',days=1)=>({
+ id:'L-'+emp,empId:emp,status:'已核准',startDate:date,endDate:date,approvedDays:days
+});
+report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[officialLeave()]);
+assert.equal(report.count,0,'approved full-day leave suppresses missing IN and OUT');
+report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[officialLeave('E1','2026-11-10',.5)]);
+assert.equal(report.count,0,'partial approved leave must not be labeled plain missing punches');
+assert.equal(report.unknownDays,1,'partial leave requires human review');
+report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[{...officialLeave(),status:'審核中'}]);
+assert.equal(report.count,1,'pending leave is not the same as approved full-day leave');
+report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[{...officialLeave(),deleted:true}]);
+assert.equal(report.count,1,'revoked/deleted leave is not an approved day off');
+const midPerson={...worker1(),schedule:{'2026-11-10':'中'}};
+report=verify([in2,out2],'16:29:59',[midPerson,worker2()]);
+assert.equal(report.count,0,'middle shift is not late at 16:29');
+report=verify([in2,out2],'16:31:00',[midPerson,worker2()]);
+assert.equal(report.count,1,'middle shift missing IN after 16:30');
+assert.equal(report.details[0].shift,'中');
+const punchAt=(emp,type,value)=>({id:emp+'-'+type+'-'+value,empId:emp,attNo:emp==='E1'?'001':'002',
+ name:emp==='E1'?'早班測試甲':'早班測試乙',status:type==='IN'?'上班簽到':'下班簽退',timeStr:value});
+const midIn=punchAt('E1','IN','2026/11/10 16:04:00');
+const nextDayCoverage=punchAt('E2','IN','2026/11/11 00:30:00');
+report=alert.analyze({records:[midIn,nextDayCoverage]},{schedules:[midPerson]},'2026-11',
+ {now:Date.parse('2026-11-11T01:01:00+08:00'),leaveData:{leaveRecords:[]}});
+assert.equal(report.count,1,'middle shift missing OUT appears after next-day grace');
+assert.equal(report.details[0].reason,'缺少下班卡');
+const night={...worker1(),schedule:{'2026-11-10':'晚'}};
+const nextTime=atTime=>Date.parse('2026-11-11T'+atTime+'+08:00');
+const nightAudit=(records,clock)=>alert.analyze({records},{schedules:[night]},'2026-11',
+ {now:nextTime(clock),leaveData:{leaveRecords:[]}});
+report=nightAudit([nextDayCoverage],'00:29:00');
+assert.equal(report.count,0,'night shift next-day 00:29 is inside check-in grace');
+report=nightAudit([nextDayCoverage],'00:31:00');
+assert.equal(report.count,1,'night shift missing IN is checked against next day');
+assert.equal(report.details[0].shift,'晚');
+assert.equal(report.details[0].date,'2026-11-10','late shift belongs to previous roster date');
+const nightIn=punchAt('E1','IN','2026/11/10 23:35:00');
+const nightOut=punchAt('E1','OUT','2026/11/11 07:55:00');
+report=nightAudit([nightIn,nightOut,nextDayCoverage],'09:01:00');
+assert.equal(report.count,0,'cross-midnight complete late shift is not missing a punch');
+report=nightAudit([nightIn,nextDayCoverage],'08:59:00');
+assert.equal(report.count,0,'night checkout grace lasts to 09:00');
+report=nightAudit([nightIn,nextDayCoverage],'09:01:00');
+assert.equal(report.count,1,'late shift absent checkout is flagged after 09:00');
+assert.equal(report.details[0].reason,'缺少下班卡');
+report=nightAudit([nightIn],'09:01:00');
+assert.equal(report.count,0,'missing next-day official coverage is never proof of absent checkout');
+assert.equal(report.unknownDays,1);
+report=nightAudit([nightIn,nextDayCoverage],'09:01:00');
+// Approved leave outranks any single punch and never counts as missing.
+const onLeave=alert.analyze({records:[nightIn,nextDayCoverage]},{schedules:[night]},'2026-11',
+ {now:nextTime('09:01:00'),leaveData:{leaveRecords:[officialLeave()]}});
+assert.equal(onLeave.count,0,'approved night leave prevents a false late-shift missing OUT claim');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const css=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.css'),'utf8');
 const js=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard.js'),'utf8');
 assert(html.includes('id="p79DashEarlyPunchTrigger"'));
 assert(html.includes('id="p79DashEarlyPunchCount"'));
 assert(html.includes('id="p79DashEarlyPunchDialog"'));
-assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261110-morning-review-v1'));
+assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261110-all-shifts-leave-v2'));
 assert(html.includes('port79-monthly-dashboard.js?v=20261108-lashing-completion-v1'), 'existing dashboard version test remains compatible');
 const block=html.slice(html.indexOf('<section class="p79d-section p79d-attendance"'),html.indexOf('<dialog id="p79DashEarlyPunchDialog"'));
 const head=block.slice(0,block.indexOf('<div class="p79d-kpis">'));
@@ -74,7 +132,10 @@ assert(css.includes('min-height:84px!important;height:84px!important'),'equal KP
 assert(css.includes('repeat(4,minmax(190px,1fr))'),'narrow screens stay in one scrollable row');
 assert(js.includes('root.P79HomeEarlyPunchAlert?.render('),'homepage renders from its official data');
 assert(js.includes('root.P79HomeEarlyPunchAlert?.bind(async()=>'),'card opens fresh official comparison');
+assert(js.includes('requestApprovedLeave(token)'),'homepage and dialog use the official getLeaveData source');
+assert(js.includes('leaveSnapshot=data'),'monthly card waits for approved leave before verification');
+assert(html.includes('早／中／晚班表出勤待核明細'),'dialog covers all scheduled shifts');
 new vm.Script(fs.readFileSync(path.join(__dirname,'../assets/port79-home-early-punch-alert.js'),'utf8'));
 new vm.Script(js);
 delete globalThis.P79AttendanceV6;
-console.log('PASS 早班漏卡警示：08:30 上班、17:00 下班、加班延長、休假排除、空資料保護、重複排班、四張完整卡片同列、警示按鈕獨立及唯讀核對');
+console.log('PASS 早班漏卡警示：08:30 上班、17:00 下班、加班延長、休假排除、空資料保護、重複排班、早中晚班、跨午夜、核准請假排除、四卡同列與唯讀核對');
