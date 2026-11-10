@@ -25,7 +25,7 @@ function sameEmployee(roster,punch,uniqueName){
  const a=id(roster.empId||roster.id),b=id(punch.empId||punch.employeeId);
  const x=att(roster.attNo||roster.attendanceNo||roster.attendanceId);
  const y=att(punch.attNo||punch.attendanceNo);
- if(a&&b&&a===b)return !x||!y||x===y;
+ if(a&&b&&a===b)return true; // Stable employee ID outranks a changed attendance number.
  if(x&&y&&x===y)return !a||!b||a===b;
  if(a&&b||x&&y)return false;
  const n=personName(roster.name||roster.empName);
@@ -118,7 +118,7 @@ function render(attendanceData,scheduleData,month,options={}){
  if(!btn)return last;
  const mode=last.count===null?'unverified':last.count>0?'pending':last.unknownDays?'unverified':'clear';
  btn.dataset.alertState=mode;
- if(value)value.textContent=last.count===null?'—':String(last.count);
+ if(value)value.textContent=last.count===null||last.count===0&&last.unknownDays?'—':String(last.count);
  if(hint)hint.textContent=last.count===null?'資料待核對 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
  btn.setAttribute('aria-label','早班漏卡警示：'+(last.count===null?'尚未確認':last.count+' 筆待核')+'，點擊查看明細');
  if($('p79DashEarlyPunchDialog')?.open){status(last.reason||'依已讀取的正式考勤及排班比對');renderDialog();}
