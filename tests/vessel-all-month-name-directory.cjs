@@ -31,3 +31,9 @@ assert.equal(c.p79VesselChineseDisplay({vessel:'WAN HAI 271',vesselChineseName:'
 assert(html.includes('vesselChineseName:p79VesselChineseDisplay(s)'),'exports use the same directory');
 for(const f of ['index.html','aqc-efficiency/index.html'])assert(fs.readFileSync(f,'utf8').includes('port79-vessel-name-directory.js'));
 console.log('PASS '+resolved+' official names across all month contexts; '+ambiguous+' ambiguous names withheld; IMO, existing names and immutable history preserved');
+
+const boardWindow={P79VesselNameDirectory:api,document:{readyState:'loading',getElementById(){return null;},addEventListener(){}},addEventListener(){}};
+vm.runInNewContext(fs.readFileSync('assets/port79-google-sheet-schedule.js','utf8'),{window:boardWindow,Date,Intl,URL,Promise,Uint32Array});
+const parsed=boardWindow.P79ManualShipSchedule.parseRows(['WAN HAI 271','WAN HAI 371','WAN HAI 315'].map(name=>({name,localName:'',berth:'W79'})));
+assert.deepEqual(Array.from(parsed,r=>r.localName),['百春','登春','貴春']);
+console.log('PASS: public sailing cards and tables also fill missing names from the shared directory');

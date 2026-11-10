@@ -17,7 +17,7 @@ const short=v=>str(v).slice(0,180);
 function officialChineseShipName(record){
  const candidates=[record.localName,record.chineseName,record.VesselName,record.VesselSName];
  const name=candidates.map(short).find(value=>/[\u3400-\u9fff]/u.test(value));
- return name||'';
+ return name||g.P79VesselNameDirectory?.getChineseName?.(record.name||record.englishName||record.VesselEName,record.imo||record.imoNumber)||'';
 }
 // WAN HAI API dates are Taiwan-local wall times (UTC+08), not browser-local times.
 // Only suppress a row when its own published ETD has already passed.
