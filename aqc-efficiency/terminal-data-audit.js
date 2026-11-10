@@ -6,8 +6,11 @@ const differs=(a,b)=>Math.abs(Number(a)-Number(b))>0.01;
 const signed=n=>(n>0?'+':'')+fmt(n);
 function audit(stats,scope){
  const alerts=[],notes=[],totals=stats.vesselTotals||{};
- const ports=root.P79TerminalRodOverview?.calculate(stats)?.ports||{};
+ const rodSummary=root.P79TerminalRodOverview?.calculate(stats);
+ const ports=rodSummary?.ports||{};
  const add=(code,level,message)=>alerts.push({code,level,message});
+ if(rodSummary?.unmatched)add('rod-unmatched','review',fmt(rodSummary.unmatched)+' 筆 WORKING REPORT 明細沒有唯一可辨識的 9 支 AQC 編號，未納入逐桿小計');
+ if(rodSummary?.conflicts)add('rod-berth-conflict','review',fmt(rodSummary.conflicts)+' 筆逐桿明細的 AQC 與碼頭資料矛盾，未納入逐桿小計');
  const portFor=wharf=>{
   const v=String(wharf||'').trim().toUpperCase().replace(/\s+/g,'');
   return /^(79|80)[LR]?$/.exec(v)?.[1]||'';
