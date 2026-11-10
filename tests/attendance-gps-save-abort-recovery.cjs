@@ -56,7 +56,7 @@ function setup(mode) {
         }
     };
     vm.createContext(context);
-    for(const name of ['normalizeExtraLocations','p79IsAbortLikeError','p79GpsConfigMatchesCloud'])
+    for(const name of ['normalizeExtraLocations','p79IsAbortLikeError','p79GpsCloudMismatchReason','p79GpsConfigMatchesCloud'])
         vm.runInContext(extract(name),context);
     vm.runInContext(extract('p79ReadBackSavedGpsConfig',true),context);
     vm.runInContext('let p79SystemSettingsSaveBusy=false;\n'+extract('saveSystemSettings',true),context);
@@ -83,11 +83,18 @@ function setup(mode) {
             assert.equal(test.context.sysConfig.extraLocations[0].lat,site.lat);
         } else {
             assert.match(state.message,/尚未確認儲存/);
+            assert.equal(test.context.sysConfig.extraLocations.length,0,
+                mode+' must not activate unconfirmed GPS sites in local configuration');
+            assert.equal(test.context.sysConfig.locationName,'79號碼頭');
+            if(mode==='outdated-gas')assert.match(state.message,/extraLocations/);
+            if(mode==='timeout-unsaved')assert.match(state.message,/遭中止或逾時/);
         }
     }
     // A malformed or older GAS deployment must not certify missing extra sites.
     const test=setup('outdated-gas');
     assert.equal(test.context.p79GpsConfigMatchesCloud(
         {...base}, {...base,extraLocations:[site]}),false);
+    assert.match(test.context.p79GpsCloudMismatchReason(
+        {...base}, {...base,extraLocations:[site]}),/extraLocations/);
     console.log('PASS: GPS save success, aborted-write recovery, failed-write retention, old GAS rejection');
 })().catch(err=>{console.error(err);process.exitCode=1});
