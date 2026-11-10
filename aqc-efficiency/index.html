@@ -1052,8 +1052,16 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 #view-compare .p79-route-card-name{font-size:24px;font-weight:900;line-height:1.25;color:#132238;overflow-wrap:anywhere}
 #view-compare .p79-route-card-chinese{font-size:13px;font-weight:750;color:#475569;margin-top:3px;line-height:1.4}
 #view-compare .p79-route-list{margin-top:20px;padding-top:18px;border-top:1px solid #dbe7f3}
-#view-compare .p79-route-list-head{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:12px}
-#view-compare .p79-route-list-head h3{font-size:17px;font-weight:900;color:#0f172a}
+#view-compare .p79-route-list-head{display:flex;align-items:center;flex-wrap:wrap;gap:9px;cursor:pointer;list-style:none;padding:8px;margin:-8px -8px 0;border-radius:10px}
+#view-compare .p79-route-list[open] .p79-route-list-head{margin-bottom:12px}
+#view-compare .p79-route-list-head::-webkit-details-marker{display:none}
+#view-compare .p79-route-list-head:hover{background:#f1f5f9}
+#view-compare .p79-route-list-head:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+#view-compare .p79-route-heading{font-size:17px;font-weight:900;color:#0f172a}
+#view-compare .p79-route-toggle{margin-left:auto;font-size:13px;font-weight:800;color:#1d4ed8;white-space:nowrap;background:#eaf1ff;border-radius:9px;padding:7px 11px}
+#view-compare .p79-route-collapse-label{display:none}
+#view-compare .p79-route-list[open] .p79-route-expand-label{display:none}
+#view-compare .p79-route-list[open] .p79-route-collapse-label{display:inline}
 #view-compare .p79-route-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:14px;background:white}
 #view-compare .p79-route-table{width:100%;border-collapse:collapse;text-align:center;min-width:780px;font-size:13px}
 #view-compare .p79-route-table th{background:#eef4fc;color:#334155;font-weight:850;padding:12px 9px;white-space:nowrap}
@@ -1104,8 +1112,12 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <span id="routeMonthStatus" class="p79-route-source" aria-live="polite"></span>
     </div>
     <div id="routeCardsGrid" class="p79-route-grid"></div>
-    <div class="p79-route-list">
-      <div class="p79-route-list-head"><h3>📋 航線對照統計表</h3><span class="text-xs text-slate-500">代碼／中文名稱／當月進出口及櫃數，與上方卡片同步</span></div>
+    <details id="routeSummaryDisclosure" class="p79-route-list">
+      <summary class="p79-route-list-head">
+        <span class="p79-route-heading">📋 航線對照統計表</span>
+        <span class="text-xs text-slate-500">代碼／中文名稱／當月進出口及櫃數，與上方卡片同步</span>
+        <span class="p79-route-toggle" aria-hidden="true"><span class="p79-route-expand-label">展開 ▼</span><span class="p79-route-collapse-label">收合 ▲</span></span>
+      </summary>
       <div class="p79-route-table-wrap">
         <table class="p79-route-table">
           <thead><tr><th>航線代碼</th><th>中文航線名稱</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead>
@@ -1113,9 +1125,9 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           <tfoot id="routeSummaryTableFoot"></tfoot>
         </table>
       </div>
-    </div>
+      <p class="p79-route-help">每筆 WORKING NO. 的進、出口依 SERVICE 分別歸類；卸船、裝船採原始作業量，不將 SHIFT 混入。缺少航線代碼的資料列為「未分類」，不猜測航線。</p>
+    </details>
     <p id="routeStatsWarning"></p>
-    <p class="p79-route-help">每筆 WORKING NO. 的進、出口依 SERVICE 分別歸類；卸船、裝船採原始作業量，不將 SHIFT 混入。缺少航線代碼的資料列為「未分類」，不猜測航線。</p>
   </div>
   <div id="routeDetailPanel" class="card p-4 space-y-3 hidden">
     <div class="flex justify-between gap-3 items-center"><h3 id="routeDetailTitle" class="text-lg font-bold"></h3><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute(-1)">關閉明細</button></div>

@@ -49,4 +49,13 @@ for(const [rows,serviceI,serviceE] of [
 assert.match(html,/id="routeMonthFilter"/);
 assert.match(html,/serviceI:String\(summary\.serviceI\|\|''\)/);
 assert.doesNotMatch(html,/<th>進口航線 SERVICE\(I\)<\/th>/);
-console.log('PASS route-service-summary: I/E grouping, quantities, duplicate prevention, missing values, SERVICE parser');
+const disclosure=extract('<details id="routeSummaryDisclosure"','<p id="routeStatsWarning"');
+assert.ok(disclosure.startsWith('<details id="routeSummaryDisclosure" class="p79-route-list">'));
+assert.ok(!disclosure.split('>')[0].includes(' open'),'Route table starts collapsed');
+assert.ok(disclosure.includes('<summary class="p79-route-list-head">')&&disclosure.includes('航線對照統計表'));
+assert.ok(disclosure.includes('id="routeSummaryTableBody"'),'Rows remain mounted and update while collapsed');
+assert.ok(disclosure.includes('id="routeSummaryTableFoot"'),'Monthly totals remain available when expanded');
+assert.ok(disclosure.includes('p79-route-expand-label">展開')&&disclosure.includes('p79-route-collapse-label">收合'));
+assert.ok(html.includes('#view-compare .p79-route-list-head:focus-visible'),'Keyboard focus remains visible');
+assert.ok(html.indexOf('id="routeDetailPanel"')>html.indexOf('</details>',html.indexOf('id="routeSummaryDisclosure"')),'Ship details stay independent of the collapse');
+console.log('PASS route-service-summary: I/E grouping, quantities, duplicate prevention, missing values, SERVICE parser, default-collapsed table disclosure');
