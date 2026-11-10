@@ -10,7 +10,7 @@ const backend=fs.readFileSync(path.join(base,'backend/gate-stats-daily-import.gs
 new vm.Script(js);
 assert(html.includes('id="gateDropZone"'), 'drop target available above official Gate metrics');
 assert(html.indexOf('id="gateDropZone"')<html.indexOf('class="grid gate-live-metrics"'));
-assert(html.includes('gate-drag-autosave-v2'),'import JS cache is refreshed');
+assert(html.includes('gate-drag-autosave-v3'),'import JS cache is refreshed');
 assert(backend.includes('index.get(date)'),'back end continues date upsert instead of addition');
 class Element{
  constructor(id){this.id=id;this.children=[];this.listeners={};this.dataset={};this.attrs={};
@@ -21,6 +21,8 @@ class Element{
  addEventListener(key,cb){this.listeners[key]=cb;}
  setAttribute(k,v){this.attrs[k]=v;}
  appendChild(x){this.children.push(x);}
+ showModal(){this.open=true;}
+ close(){this.open=false;}
  click(){this.clicked=true;this.listeners.click?.();}
 }
 const els=new Map();
@@ -37,7 +39,7 @@ values.forEach((v,i)=>{
 });
 matrix[14][0]='本日進站卡車數';matrix[14][2]=263;matrix[14][3]=981;
 const book={SheetNames:['GATE'],Sheets:{GATE:{}}};
-let valid=true,online=true,calls=[],refreshes=0;
+let valid=true,online=true,calls=[],refreshes=0,refreshDate;
 const token='AUTH-GATE';
 const storage={
  port79_user_session:JSON.stringify({role:'superadmin',empId:'ADMIN',punchOnly:false}),
@@ -47,7 +49,7 @@ const storage={
 const win={
  document:doc,sessionStorage:{getItem:k=>storage[k]||null},
  XLSX:{read:()=>book,utils:{sheet_to_json:()=>valid?matrix:[[1]]}},
- P79GateLive:{refresh:async()=>{refreshes++;}},
+ P79GateLive:{refresh:async date=>{refreshes++;refreshDate=date;}},
  fetch:async (url,options)=>{
   calls.push({url:String(url),options});
   if(!options||options.method!=='POST'){
@@ -76,11 +78,15 @@ function drop(files=[file]){
 async function settle(){for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));}
 (async()=>{
  drop();await settle();
+ assert.equal(get('gateImportDialog').open,true,'drop opens visible import dialog');
+ assert.equal(get('gateImportDialogFile').textContent,'gate.xlsx');
+ assert(get('gateImportDialogStatus').textContent.includes('已寫入正式資料庫'));
  assert.equal(calls.filter(c=>c.options?.method==='POST').length,1,'valid drop uploads without extra click');
  assert.equal(get('gateTotal').textContent,'1,559');
  assert.equal(get('gateTruck').textContent,'1,244');
  assert(get('gateMessage').textContent.includes('已寫入正式資料庫'),'success only after POST confirmation');
  assert.equal(refreshes,1,'confirmed import refreshes official read-only view');
+ assert.equal(refreshDate,'2026-11-02','confirmed import follows final imported month');
  drop();await settle();
  assert.equal(calls.filter(c=>c.options?.method==='POST').length,2,'reimport sends same dates for server upsert');
  valid=false;drop();await settle();
@@ -94,5 +100,6 @@ async function settle(){for(let i=0;i<8;i++)await new Promise(resolve=>setImmedi
  assert(get('gateMessage').textContent.includes('一次只能匯入'));
  get('gateDropZone').listeners.click();
  assert(get('gateFile').clicked,'clicking the target opens the file selector');
+ get('gateImportDialogClose').click();assert.equal(get('gateImportDialog').open,false);
  console.log('PASS: Gate drag/drop, automatic validated save, read-route guard, upsert-compatible repeat, refresh and errors');
 })().catch(e=>{console.error(e);process.exitCode=1;});

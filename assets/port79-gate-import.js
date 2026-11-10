@@ -8,6 +8,8 @@ var names={deliverEmpty:'交空櫃',pickupEmpty:'領空櫃',deliverLoaded:'交�
  pickupLoaded:'領重櫃',truckEntries:'拖車車次'};
 function message(text,kind){
  var el=$('gateMessage');el.textContent=String(text);el.dataset.kind=kind||'info';
+ var dialogStatus=$('gateImportDialogStatus');
+ if(dialogStatus){dialogStatus.textContent=String(text);dialogStatus.dataset.kind=kind||'info';}
 }
 function text(v){return String(v??'').trim();}
 function amount(raw,label){
@@ -147,6 +149,10 @@ async function chooseFile(droppedFile){
  $('gateResult').hidden=true;$('gateSave').disabled=true;$('gatePreview').disabled=true;
  $('gateSheet').disabled=true;$('gateSheet').textContent='';
  if(!sourceFile){message('請先選擇 Gate 檔案');return;}
+ var dialog=$('gateImportDialog');
+ if($('gateImportDialogFile'))$('gateImportDialogFile').textContent=sourceFile.name;
+ if(dialog&&!dialog.open){dialog.showModal?.();dialog.scrollIntoView?.({block:'center'});}
+ message('已收到檔案，正在準備讀取與核對…');
  if(!/\.(xlsx|xls|csv)$/i.test(sourceFile.name))return message('只支援 xlsx、xls 或 csv','error');
  if(sourceFile.size>10*1024*1024)return message('檔案不能超過 10MB','error');
  if(!g.XLSX)return message('Excel 讀取元件無法載入，請檢查網路連線後重新整理','error');
@@ -275,7 +281,7 @@ async function save(){
   message('已寫入正式資料庫：新增 '+result.added+' 天、更新 '+result.updated+
    ' 天。日、週、月、年統計將自動重新加總。','success');
   // Only a confirmed backend success refreshes the official read-only view.
-  void g.P79GateLive?.refresh?.();
+  void g.P79GateLive?.refresh?.(days[days.length-1].date);
  }catch(err){
   var raw=String(err.message||err);
   if(/未知操作|unknown[ _-]*action|gateStats(ReadYear|Import)/i.test(raw)){
@@ -321,6 +327,7 @@ dropZone?.addEventListener('dragleave',()=>dropZone?.classList?.remove?.('is-dra
 dropZone?.addEventListener('drop',handleDrop);
 d.addEventListener?.('dragover',stopFileDrop);
 d.addEventListener?.('drop',handleDrop);
+$('gateImportDialogClose')?.addEventListener('click',()=>$('gateImportDialog')?.close?.());
 g.P79GateImport={chooseFile:chooseFile};
 $('gateFile').addEventListener('change',()=>chooseFile());
 $('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});

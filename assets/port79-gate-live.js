@@ -91,6 +91,7 @@
  function render(){
   var r=range(mode,anchor);
   if($('gateLivePeriod'))$('gateLivePeriod').textContent=r.label;
+  if($('gateLiveMonth'))$('gateLiveMonth').value=anchor.slice(0,7);
   for(var kind of ['day','week','month','year']){
    $('gateLiveMode'+kind[0].toUpperCase()+kind.slice(1))?.setAttribute('aria-pressed',String(mode===kind));
   }
@@ -186,9 +187,20 @@
    var current=range(mode,anchor),rows=years(current).flatMap(y=>cache.get(y)||[]).filter(v=>v.date>=current.start&&v.date<=current.end);
    if((page+1)*8<detailRows(rows,mode).length){page++;render();}
   });
+  $('gateLiveMonth')?.addEventListener('change',function(){
+   var value=String(this.value||'');
+   if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(value))return;
+   anchor=value+'-01';mode='month';page=0;void load(false);
+  });
   $('gateLiveRefresh')?.addEventListener('click',()=>void load(true));
   render();void load(false);
  }
- g.P79GateLive={range,cleanRows,detailRows,changeMode,move,refresh:()=>load(true)};
+ g.P79GateLive={range,cleanRows,detailRows,changeMode,move,refresh:function(importedDate){
+  if(typeof importedDate==='string'&&/^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(importedDate)){
+   var parsed=new Date(importedDate+'T00:00:00Z');
+   if(Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===importedDate){anchor=importedDate;mode='month';page=0;}
+  }
+  return load(true);
+ }};
  if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(typeof window!=='undefined'?window:globalThis);

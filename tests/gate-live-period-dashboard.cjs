@@ -13,7 +13,7 @@ for(const mode of ['Day','Week','Month','Year']){
  assert(html.includes('id="gateMode'+mode+'"'));
  assert(home.includes('id="p79Gate'+mode+'"'));
 }
-assert(html.includes('port79-gate-live.js?v=20261107-gate-dwmy-v1'));
+assert(html.includes('port79-gate-live.js?v=20261110-gate-month-follow-v2'));
 assert(html.includes('id="gateLiveRows"')&&html.includes('id="gateLivePageNext"'));
 assert(html.includes('#gateLivePanel .scroll{max-height:none;max-width:100%;overflow:visible}'));
 assert(!live.includes('6535')&&!live.includes('5344'),'no official business values embedded');
@@ -67,5 +67,14 @@ vm.runInNewContext(live,{window:win,globalThis:win,Date:Clock,URL,Intl,console},
  assert.equal(requests.length,1,'switching cached periods does not repeat cloud reads');
  await win.P79GateLive.refresh();
  assert.equal(requests.length,2,'explicit refresh re-reads official cloud data');
+ fakeRows.push({date:'2026-10-15',deliverEmpty:2,pickupEmpty:3,deliverLoaded:4,pickupLoaded:5,truckEntries:6});
+ await win.P79GateLive.refresh('2026-10-15');
+ assert.equal(el('gateLiveMonth').value,'2026-10');
+ assert.equal(el('gateLiveTotal').textContent,'14','import of another month changes visible month');
+ el('gateLiveMonth').value='2026-11';el('gateLiveMonth').listeners.change.call(el('gateLiveMonth'));
+ assert.equal(el('gateLiveTotal').textContent,'110','month picker loads selected month only');
+ await win.P79GateLive.refresh('2025-12-31');
+ assert.equal(new URL(requests.at(-1)).searchParams.get('year'),'2025','cross-year import fetches imported year');
+ assert.equal(el('gateLiveMonth').value,'2025-12');
  console.log('PASS: Gate vessel tab reads cloud daily data; four periods, month rollup, truck separation and cache.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
