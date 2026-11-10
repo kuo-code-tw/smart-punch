@@ -335,6 +335,20 @@ function labelCompactTables(){
    });
  });
 }
+// Match the shift-detail scroll viewport to the naturally sized daily-completion table.
+// A ResizeObserver keeps them in sync as the selected month and viewport change.
+let terminalTableResizeObserver=null;
+function alignTerminalDailyTables(){
+ const day=el('terminalDayTableWrap'),shift=el('terminalShiftTableWrap');
+ if(!day||!shift)return;
+ if(!terminalTableResizeObserver&&typeof ResizeObserver==='function'){
+  terminalTableResizeObserver=new ResizeObserver(()=>alignTerminalDailyTables());
+  terminalTableResizeObserver.observe(day);
+ }
+ const height=typeof day.getBoundingClientRect==='function'?day.getBoundingClientRect().height:day.offsetHeight;
+ if(Number.isFinite(height)&&height>0&&shift.style)shift.style.height=Math.round(height)+'px';
+}
+
 function render(){
  const rootNode=el('terminalDashboardRoot');if(!rootNode)return;
  const month=options(),src=currentSources(month),stats=build(month,src.ships,src.records);
@@ -418,6 +432,7 @@ function render(){
  }
  root.P79TerminalRodOverview?.render(stats,state);
  labelCompactTables();
+ alignTerminalDailyTables();
  const label=el('terminalMonthCaption');
  if(label)label.textContent=month.replace('-',' 年 ')+' 月';
 }
