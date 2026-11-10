@@ -489,6 +489,8 @@ async function refreshPendingReviewFromCloud(){
   const scheduleData=permissions().schedule?await request('schedule',ym,token,true).catch(()=>null):null;
   const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleData);
   showAttendance(checked);
+  // Early-shift warning is a separate, read-only roster-to-punch audit.
+  root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleData,ym);
   if(scheduleData)enrichPendingReview(scheduleData);
   if(checked.boundaryError)pendingReviewError=checked.boundaryError;
   pendingReviewVerifiedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
@@ -551,6 +553,7 @@ function showAttendance(a){
  if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ root.P79HomeEarlyPunchAlert?.reset();
  const list=$('p79DashOvertimeRecords'),section=$('p79DashOvertimeList');
  if(list)list.replaceChildren();
  if(section)section.hidden=true;
@@ -679,6 +682,7 @@ async function load(forceCloud=false){
       const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleSnapshot);
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().attendance)return;
       render(checked);
+      root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleSnapshot,ym);
       if(scheduleSnapshot)enrichPendingReview(scheduleSnapshot);
     }
     else if(kind==='schedule'&&Array.isArray(data.schedules)){
@@ -720,6 +724,17 @@ function showWhenAdmin(){
 function init(){
  if(!$('p79Dashboard'))return;
  const selector=$('p79DashMonth');if(selector&&!selector.value)selector.value=isoMonth();
+ root.P79HomeEarlyPunchAlert?.bind(async()=>{
+  const ym=checkMonth(),p=permissions(),account=String(session()?.empId||'');
+  const token=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
+  if(!p.attendance||!p.schedule||!token)throw Error('沒有正式考勤與排班的完整檢視權限');
+  const attendance=await request('attendance',ym,token,true);
+  const schedule=await request('schedule',ym,token,true);
+  const currentToken=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
+  if(month()!==ym||String(session()?.empId||'')!==account||token!==currentToken||!permissions().attendance||!permissions().schedule)
+    throw Error('月份或登入身分已變更，請重新開啟警示');
+  return {attendance,schedule,month:ym};
+ });
  ensurePendingReview();
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  selector?.addEventListener('change',()=>{loadedKey='';reset();statusText('p79DashMessage','正在準備所選月份資料…');statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());showWhenAdmin()});

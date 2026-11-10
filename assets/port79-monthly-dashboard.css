@@ -136,3 +136,38 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
  html body.p79-workspace:has(#p79Dashboard) #p79Dashboard{width:100%;min-width:0}
  html body.p79-workspace:has(#p79Dashboard) #logoutBtn{display:inline-flex!important;align-items:center;justify-content:center;width:auto!important;margin:0!important;padding:8px 12px!important;background:#e7f1ff!important;border:1px solid #cbdff6!important;color:#1b548f!important}
 }
+
+
+/* 管理首頁：第五格早班漏卡警示。桌面同列壓縮，窄螢幕自適應。 */
+#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+#p79Dashboard .p79d-attendance .p79d-kpi{min-width:0;gap:8px;padding:12px 10px}
+#p79Dashboard .p79d-attendance .p79d-kpi-icon{width:36px;height:36px;flex:0 0 36px;font-size:19px}
+#p79Dashboard .p79d-attendance .p79d-kpi span{font-size:11px;overflow-wrap:anywhere}
+#p79Dashboard .p79d-attendance .p79d-kpi strong{font-size:clamp(20px,1.7vw,28px)}
+#p79Dashboard .p79d-early-alert{cursor:pointer;text-align:left;appearance:none;font:inherit;color:inherit;transition:border-color .2s ease,box-shadow .2s ease;background:#f8fbff}
+#p79Dashboard .p79d-early-alert .p79d-early-body{min-width:0;flex:1}
+#p79Dashboard .p79d-early-alert .p79d-kpi-icon{background:#f1f5f9;color:#64748b}
+#p79Dashboard .p79d-early-alert[data-alert-state="pending"]{background:linear-gradient(120deg,#fff,#fff2ef);border-color:#f0a79b;box-shadow:0 0 0 1px rgba(227,75,54,.05)}
+#p79Dashboard .p79d-early-alert[data-alert-state="pending"] .p79d-kpi-icon{color:#b91c1c;background:#fee2e2}
+#p79Dashboard .p79d-early-alert[data-alert-state="pending"] strong,#p79Dashboard .p79d-early-alert[data-alert-state="pending"] .p79d-early-hint{color:#b91c1c}
+#p79Dashboard .p79d-early-alert[data-alert-state="clear"] .p79d-kpi-icon{color:#067647;background:#dcfce7}
+#p79Dashboard .p79d-early-alert .p79d-early-hint{font-size:10px;line-height:1.3;color:#526c8a;font-weight:800;margin-top:5px}
+#p79Dashboard .p79d-early-alert:hover{border-color:#f59e0b;box-shadow:0 5px 17px rgba(120,88,38,.15)}
+#p79Dashboard .p79d-early-alert:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+#p79Dashboard .p79d-early-dialog{position:fixed;margin:auto;inset:0;width:min(960px,94vw);max-width:none;max-height:86vh;overflow:auto;padding:19px;border-radius:16px;border:1px solid #d8e4f1;background:#fff;color:#203b5c;box-shadow:0 16px 60px rgba(14,43,86,.26)}
+#p79Dashboard .p79d-early-dialog::backdrop{background:rgba(10,27,51,.53)}
+#p79Dashboard .p79d-early-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#p79Dashboard .p79d-early-dialog-head h3{font-size:18px;font-weight:950}
+#p79Dashboard .p79d-early-dialog-head button{padding:4px 10px;border-radius:8px;border:1px solid #c9d6e8;background:#f7fbff;cursor:pointer}
+#p79Dashboard .p79d-early-dialog p{font-size:12px;line-height:1.6;margin:9px 0}
+#p79Dashboard .p79d-early-note{color:#627793}
+#p79Dashboard .p79-early-table-scroll{max-height:50vh;overflow:auto}
+#p79Dashboard .p79-early-table-scroll table{width:100%;min-width:740px;border-collapse:collapse;font-size:12px}
+#p79Dashboard .p79-early-table-scroll th,#p79Dashboard .p79-early-table-scroll td{padding:9px 8px;border-bottom:1px solid #e5edf6;text-align:left;white-space:nowrap}
+#p79Dashboard .p79-early-table-scroll th{position:sticky;top:0;background:#eaf3ff}
+#p79Dashboard .p79-early-reason{color:#be123c;font-weight:900}
+#p79Dashboard .p79d-early-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:14px}
+#p79Dashboard .p79d-early-dialog-actions button{padding:9px 13px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:850;cursor:pointer}
+@media(max-width:1200px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){#p79Dashboard .p79d-attendance .p79d-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){#p79Dashboard .p79d-attendance .p79d-kpi-icon{flex-basis:30px;width:30px;height:30px;font-size:16px}#p79Dashboard .p79d-attendance .p79d-kpi{padding:9px 7px;gap:6px}}
