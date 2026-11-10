@@ -9351,19 +9351,20 @@ async function manualCloudSync(){
     // A clean manual refresh only needs the lightweight revision check. Pending
     // changes, uncertain writes and any unconfirmed ACK still require full readback.
     const pendingBeforeUpload=readQueue().length;
-    const strictReadbackRequired=pendingBeforeUpload>0||p79EfficiencyReadbackRequired===true||efficiencyHasUnsavedChanges===true;
+    const readbackPending=()=>typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired===true;
+    const strictReadbackRequired=pendingBeforeUpload>0||readbackPending()||efficiencyHasUnsavedChanges===true;
     p79EfficiencySyncStep('處理待同步資料','待同步 '+pendingBeforeUpload+' 批');
     const upload=await flushQueue();
     if(!upload?.ok || readQueue().length)throw Error(upload?.error||'仍有 '+readQueue().length+' 筆本機修改等待補傳，尚未完成同步');
     let revisionConfirmed=false;
-    if(requireSuperAdminAccess()&&!strictReadbackRequired&&!p79EfficiencyReadbackRequired&&!efficiencyHasUnsavedChanges){
+    if(requireSuperAdminAccess()&&!strictReadbackRequired&&!readbackPending()&&!efficiencyHasUnsavedChanges){
       p79EfficiencySyncStep('快速確認雲端版本','沒有待上傳修改');
       try{revisionConfirmed=await vesselRevisionIsCurrent(6000);}
       catch(metaError){console.warn('[vessel manual sync] 快速版本確認失敗，改用完整讀回',metaError);}
     }
     // Never treat a revision match as completion if a new edit arrived meanwhile.
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
-    if(p79EfficiencyReadbackRequired||efficiencyHasUnsavedChanges)revisionConfirmed=false;
+    if(readbackPending()||efficiencyHasUnsavedChanges)revisionConfirmed=false;
     if(!revisionConfirmed){
       p79EfficiencySyncStep('讀回完整船舶資料，確認同步結果');
       const pulled=await restoreVesselDataFromCloud(false,true);
