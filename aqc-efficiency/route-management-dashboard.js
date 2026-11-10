@@ -56,7 +56,9 @@ function matchTopMonth(month){
  const base=$('routeMonthFilter'),top=$('routeTopMonthFilter');
  if(!base||!top)return;
  if(top.dataset.monthYear!==String(base.dataset.p79Year||'')||top.options.length!==base.options.length){
-  top.innerHTML=base.innerHTML;
+  top.innerHTML=Array.from(base.options||[]).map(option=>
+    '<option value="'+esc(option.value)+'">'+esc(String(option.value||'').replace('-','/'))+'</option>'
+  ).join('');
   top.dataset.monthYear=String(base.dataset.p79Year||'');
  }
  top.value=month;
@@ -136,7 +138,10 @@ function tabMarkup(route,model){
 function renderPanel(selected){
  const panel=$('routeManagerDetailPanel'),code=$('routeManagerDetailCode'),nameEl=$('routeManagerDetailName'),body=$('routeManagerDetailBody');
  if(!panel||!body)return;
- panel.hidden=state.collapsed;
+ const tabs=panel.querySelector('.p79-rm-side-tabs'),collapse=$('routeManagerDetailCollapse');
+ if(tabs)tabs.hidden=state.collapsed;
+ body.hidden=state.collapsed;
+ if(collapse){collapse.setAttribute('aria-expanded',String(!state.collapsed));collapse.textContent=state.collapsed?'+':'−';}
  if(state.collapsed)return;
  if(code)code.textContent=selected?.route||'—';
  if(nameEl)nameEl.textContent=selected?name(selected.route):'選取航線後查看明細';
@@ -233,11 +238,7 @@ function bind(){
   button.addEventListener('click',()=>setTab(button.dataset.rmTab));
  const collapse=$('routeManagerDetailCollapse');
  if(collapse)collapse.addEventListener('click',()=>{
-  state.collapsed=!state.collapsed;
-  if(state.collapsed){
-   const panel=$('routeManagerDetailPanel');if(panel)panel.hidden=true;
-   collapse.setAttribute('aria-expanded','false');
-  }else{collapse.setAttribute('aria-expanded','true');render(state.model);}
+  state.collapsed=!state.collapsed;render(state.model);
  });
  const top=$('routeTopMonthFilter');if(top)top.addEventListener('change',()=>monthChanged(top.value));
  const syncBtn=$('routeManagerSyncBtn');if(syncBtn)syncBtn.addEventListener('click',()=>void sync());
