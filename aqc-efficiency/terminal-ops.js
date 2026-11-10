@@ -337,6 +337,7 @@ function scopeTo79and80(month,ships,rows){
     if(no)byNo.set(no,ship);
   }
   const keptShips=allShips.filter(ship=>!!targetPort(ship.wharf));
+  const unassignedShips=allShips.filter(ship=>!String(ship.wharf||'').trim()).length;
   const keptRecords=[];
   let excludedRecords=0,conflictingRecords=0,unassignedRecords=0;
   for(const row of allRecords){
@@ -352,7 +353,7 @@ function scopeTo79and80(month,ships,rows){
     keptRecords.push(row);
   }
   return {ships:keptShips,records:keptRecords,
-    excludedShips:allShips.length-keptShips.length,excludedRecords,conflictingRecords,unassignedRecords};
+    excludedShips:allShips.length-keptShips.length,unassignedShips,excludedRecords,conflictingRecords,unassignedRecords};
 }
 const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:'',categorySaveWarning:'',manualAliasMap:{}};
 function el(id){return document.getElementById(id)}
