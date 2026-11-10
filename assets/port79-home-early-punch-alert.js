@@ -130,7 +130,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
    const startDay=taipeiToday(started),finishDay=taipeiToday(finished);
    const hasCoverage=coverage.has(startDay)||(coverage.has(date)&&period.start<24);
    if(!hasCoverage&&!hasIn&&!hasOut){unknownDays++;continue;}
-   if(now>=endGrace&&finishDay!==startDay&&!coverage.has(finishDay)&&!hasOut){
+   if(now>=endGrace&&finishDay!==date&&!coverage.has(finishDay)&&!hasOut){
     // A missing next-day feed cannot prove that a valid checkout did not happen.
     unknownDays++;continue;
    }
