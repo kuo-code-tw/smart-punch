@@ -12,7 +12,8 @@ function audit(stats,scope){
   const v=String(wharf||'').trim().toUpperCase().replace(/\s+/g,'');
   return /^(79|80)[LR]?$/.exec(v)?.[1]||'';
  };
- if(scope?.excludedShips)notes.push('本月已排除非 79／80 碼頭 '+fmt(scope.excludedShips)+' 艘船舶');
+ if(scope?.excludedShips)notes.push('本月未歸入 79／80 碼頭 '+fmt(scope.excludedShips)+' 艘船舶（含其他碼頭或碼頭未標示）');
+ if(scope?.unassignedShips)add('scope-no-wharf','review',fmt(scope.unassignedShips)+' 艘船舶未標示碼頭，未列入本頁船數與櫃數');
  if(scope?.excludedRecords)notes.push('本月已排除其他碼頭 '+fmt(scope.excludedRecords)+' 筆作業明細');
  if(scope?.unassignedRecords)add('scope-unassigned','review',fmt(scope.unassignedRecords)+' 筆作業明細沒有可確認的碼頭或 AQC，未列入統計');
  if(scope?.conflictingRecords)add('scope-conflict','review',fmt(scope.conflictingRecords)+' 筆作業明細的碼頭與吊桿編號衝突，未列入統計');
