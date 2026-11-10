@@ -762,7 +762,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
       <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
       <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
-      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 航線資料</button>
+      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 航線資料管理</button>
        <button class="tab btn bg-slate-100" data-tab="terminal" onclick="switchTab('terminal',this)">🏗️ 碼頭營運統計</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
@@ -1099,45 +1099,92 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:1100px){#view-compare .p79-route-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:670px){#view-compare .p79-route-board{padding:13px}#view-compare .p79-route-grid{grid-template-columns:1fr;gap:12px}#view-compare .p79-route-toolbar label{width:100%}#view-compare .p79-route-toolbar input,#view-compare .p79-route-toolbar select{width:100%}}
 </style>
-<section id="view-compare" class="hidden space-y-4">
-  <div class="p79-route-board">
-    <h2 class="p79-route-heading">🧭 航線統計</h2>
-    <p class="p79-route-subtitle">依 WORKING SHEET 的 SERVICE(I/E) 分航線統計；選擇月份後只讀取該月船舶資料，進出口艘次與櫃數分開顯示。</p>
-    <div class="p79-route-toolbar">
-      <label>搜尋航線<input id="routeSearch" placeholder="例如 FOC、JTT" oninput="renderRouteData()" autocomplete="off"></label>
-      <label>統計月份<select id="routeMonthFilter" onchange="p79LoadRouteMonth(true)"></select></label>
-    </div>
-    <div class="p79-route-summary">
-      <span id="routeDataCount" aria-live="polite"></span>
-      <span id="routeMonthStatus" class="p79-route-source" aria-live="polite"></span>
-    </div>
-    <div id="routeCardsGrid" class="p79-route-grid"></div>
-    <details id="routeSummaryDisclosure" class="p79-route-list">
-      <summary class="p79-route-list-head">
-        <span class="p79-route-heading">📋 航線對照統計表</span>
-        <span class="text-xs text-slate-500">代碼／中文名稱／當月進出口及櫃數，與上方卡片同步</span>
-        <span class="p79-route-toggle" aria-hidden="true"><span class="p79-route-expand-label">展開 ▼</span><span class="p79-route-collapse-label">收合 ▲</span></span>
-      </summary>
-      <div class="p79-route-table-wrap">
-        <table class="p79-route-table">
-          <thead><tr><th>航線代碼</th><th>中文航線名稱</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead>
-          <tbody id="routeSummaryTableBody"></tbody>
-          <tfoot id="routeSummaryTableFoot"></tfoot>
-        </table>
+<link rel="stylesheet" href="./route-management-dashboard.css?v=20261110-reference-v1">
+<section id="view-compare" class="hidden" aria-label="航線資料管理">
+  <div class="p79-rm-app">
+    <div class="p79-rm-topbar" role="navigation" aria-label="船舶作業管理系統">
+      <div class="p79-rm-brand"><span aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v7M7 7h10M4 14l8-4 8 4-2 6H6zM3 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1"/></svg></span> 船舶作業管理系統</div>
+      <div class="p79-rm-topnav">
+        <button type="button" aria-current="page"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v17M8 6h8M4 13a8 8 0 0 0 16 0M4 13l-2 3M20 13l2 3"/><circle cx="12" cy="4" r="2"/></svg></span>航線資料管理</button>
+        <button type="button" onclick="switchTab('dashboard')"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v7M7 7h10M4 14l8-4 8 4-2 6H6zM3 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1"/></svg></span>船舶資料</button>
+        <button type="button" onclick="switchTab('personstats')"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></svg></span>作業統計</button>
+        <button type="button" id="routeManagerCompareNav"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20V13h4v7M10 20V5h4v15M17 20V10h4v10M2 20h20"/></svg></span>航線對照統計</button>
+        <button type="button" id="routeManagerExportBtn"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h8l5 5v15H7zM15 2v6h5M10 12h7M10 16h7"/></svg></span>報表輸出</button>
       </div>
-      <p class="p79-route-help">每筆 WORKING NO. 的進、出口依 SERVICE 分別歸類；卸船、裝船採原始作業量，不將 SHIFT 混入。缺少航線代碼的資料列為「未分類」，不猜測航線。</p>
+      <div class="p79-rm-top-actions">
+        <select id="routeTopMonthFilter" class="p79-rm-top-month" aria-label="航線資料月份"></select>
+        <button type="button" id="routeManagerSyncBtn" class="p79-rm-sync">⟳ 同步船舶資料</button>
+        <a class="p79-rm-profile" href="../" title="返回系統首頁" aria-label="返回系統首頁"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-5 3-7 8-7s8 2 8 7"/></svg></a>
+      </div>
+    </div>
+    <div class="p79-rm-main">
+      <div class="p79-rm-heading">
+        <div class="p79-rm-heading-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v17M8 6h8M4 13a8 8 0 0 0 16 0M4 13l-2 3M20 13l2 3"/><circle cx="12" cy="4" r="2"/></svg></div>
+        <div><h2>航線資料管理</h2><p>航線對照、船舶數據與作業統計，支援查詢、篩選與明細檢視</p></div>
+      </div>
+      <div class="p79-rm-kpis" aria-label="當月航線統計">
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v17M8 6h8M4 13a8 8 0 0 0 16 0M4 13l-2 3M20 13l2 3"/><circle cx="12" cy="4" r="2"/></svg></div><div><span class="p79-rm-kpi-label">航線總數</span><div class="p79-rm-kpi-value"><span id="routeManagerTotalRoutes">—</span><small>條</small></div></div></div>
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v7M7 7h10M4 14l8-4 8 4-2 6H6zM3 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1"/></svg></div><div><span class="p79-rm-kpi-label">進口艘次</span><div class="p79-rm-kpi-value"><span id="routeManagerImportCalls">—</span><small>次</small></div></div></div>
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v7M7 7h10M4 14l8-4 8 4-2 6H6zM3 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1"/></svg></div><div><span class="p79-rm-kpi-label">出口艘次</span><div class="p79-rm-kpi-value"><span id="routeManagerExportCalls">—</span><small>次</small></div></div></div>
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 20V8h10v12M4 8h16M9 8V4h6v4M10 12v5M14 12v5"/></svg></div><div><span class="p79-rm-kpi-label">卸船櫃數</span><div class="p79-rm-kpi-value"><span id="routeManagerDisc">—</span><small>櫃</small></div></div></div>
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/></svg></div><div><span class="p79-rm-kpi-label">裝船櫃數</span><div class="p79-rm-kpi-value"><span id="routeManagerLoad">—</span><small>櫃</small></div></div></div>
+        <div class="p79-rm-kpi"><div class="p79-rm-kpi-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 8l10 6 10-6zM2 13l10 6 10-6M2 18l10 5 10-5"/></svg></div><div><span class="p79-rm-kpi-label">總櫃數</span><div class="p79-rm-kpi-value"><span id="routeManagerTotal">—</span><small>櫃</small></div></div></div>
+      </div>
+      <div class="p79-rm-content">
+        <div class="p79-rm-primary">
+          <div class="p79-rm-toolbar">
+            <label class="p79-rm-search"><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg></span><input id="routeSearch" type="search" aria-label="搜尋航線代碼或中文航線名稱" placeholder="搜尋航線代碼、中文航線名稱..." oninput="renderRouteData()" autocomplete="off"></label>
+            <select class="p79-rm-toolbar-select" id="routeMonthFilter" onchange="p79LoadRouteMonth(true)" aria-label="月份"><option>月份</option></select>
+            <select class="p79-rm-toolbar-select p79-rm-type" id="routeTypeFilter" aria-label="航線類型"><option value="all">類型：全部</option><option value="import">有進口艘次</option><option value="export">有出口艘次</option></select>
+            <select class="p79-rm-toolbar-select p79-rm-sort" id="routeSortFilter" aria-label="排序"><option value="code">排序：航線代碼 (A→Z)</option><option value="total">總櫃數 (高→低)</option><option value="import">進口艘次 (高→低)</option><option value="export">出口艘次 (高→低)</option></select>
+            <div class="p79-rm-toggle" aria-label="顯示方式"><button type="button" data-rm-view="table" aria-label="表格模式" aria-pressed="true">☷</button><button type="button" data-rm-view="grid" aria-label="卡片模式" aria-pressed="false">▦</button></div>
+          </div>
+          <div id="routeManagerTableSection" class="p79-rm-table-shell">
+            <table class="p79-rm-table">
+              <thead><tr><th></th><th>航線代碼</th><th>中文航線名稱</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>作業趨勢</th><th>操作</th></tr></thead>
+              <tbody id="routeManagerTableBody"><tr><td colspan="10" class="p79-rm-empty">正在讀取航線資料…</td></tr></tbody>
+              <tfoot id="routeManagerTableFoot"></tfoot>
+            </table>
+          </div>
+          <div id="routeManagerGridShell" class="p79-rm-grid-shell" hidden><div id="routeCardsGrid" class="p79-route-grid"></div></div>
+          <p id="routeManagerStatus" class="p79-rm-footnote" role="status" aria-live="polite">正在讀取當月正式船舶資料…</p>
+          <p class="p79-rm-footnote">每筆 WORKING NO. 依 SERVICE(I/E) 分類；卸船、裝船以 WORKING SHEET 原始作業量計算，不將 SHIFT 混入。缺漏來源不會以推估值補齊。</p>
+        </div>
+        <aside id="routeManagerDetailPanel" class="p79-rm-side" aria-labelledby="routeManagerDetailHeading">
+          <div class="p79-rm-side-head">
+            <div class="p79-rm-side-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v7M7 7h10M4 14l8-4 8 4-2 6H6zM3 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1"/></svg></div>
+            <div><h3 class="p79-rm-side-title" id="routeManagerDetailHeading">航線明細：<span id="routeManagerDetailCode">—</span></h3><div id="routeManagerDetailName" class="p79-rm-side-sub">選擇航線後查看明細</div></div>
+            <button id="routeManagerDetailCollapse" class="p79-rm-collapse" type="button" aria-label="收合航線明細" aria-expanded="true">−</button>
+          </div>
+          <div class="p79-rm-side-tabs" role="tablist" aria-label="航線明細分類">
+            <button type="button" role="tab" data-rm-tab="basic" aria-selected="true">基本資訊</button>
+            <button type="button" role="tab" data-rm-tab="vessels" aria-selected="false">船舶明細</button>
+            <button type="button" role="tab" data-rm-tab="trend" aria-selected="false">作業趨勢</button>
+            <button type="button" role="tab" data-rm-tab="history" aria-selected="false">歷史統計</button>
+          </div>
+          <div id="routeManagerDetailBody" class="p79-rm-side-body">選取航線後顯示資料</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <!-- 舊版欄位 ID 保留：原正式 SERVICE 統計、回歸測試和下載流程仍可共用。 -->
+  <div class="p79-rm-legacy" aria-hidden="true">
+    <span id="routeDataCount"></span>
+    <span id="routeMonthStatus"></span>
+    <details id="routeSummaryDisclosure" class="p79-route-list">
+      <summary class="p79-route-list-head"><span class="p79-route-heading">📋 航線對照統計表</span><span class="p79-route-toggle" aria-hidden="true"><span class="p79-route-expand-label">展開 ▼</span><span class="p79-route-collapse-label">收合 ▲</span></span></summary>
+      <div class="p79-route-table-wrap">
+        <table class="p79-route-table"><thead><tr><th>航線代碼</th><th>中文航線名稱</th><th>進口艘次</th><th>出口艘次</th><th>卸船櫃數</th><th>裝船櫃數</th><th>總櫃數</th><th>船舶明細</th></tr></thead><tbody id="routeSummaryTableBody"></tbody><tfoot id="routeSummaryTableFoot"></tfoot></table>
+      </div>
     </details>
     <p id="routeStatsWarning"></p>
-  </div>
-  <div id="routeDetailPanel" class="card p-4 space-y-3 hidden">
-    <div class="flex justify-between gap-3 items-center"><h3 id="routeDetailTitle" class="text-lg font-bold"></h3><button type="button" class="btn bg-slate-100" onclick="p79SelectRoute(-1)">關閉明細</button></div>
-    <div class="overflow-auto"><table class="tbl w-full text-center min-w-[850px]">
-      <thead><tr><th>WORKING NO.</th><th>船名</th><th>進口／出口</th><th>航次</th><th>櫃數</th><th>作業日期</th><th>來源檔案</th></tr></thead>
-      <tbody id="routeDetailBody"></tbody>
-    </table></div>
+    <div id="routeDetailPanel" class="card p-4 space-y-3 hidden">
+      <div class="flex justify-between gap-3 items-center"><h3 id="routeDetailTitle"></h3></div>
+      <div class="overflow-auto"><table><thead><tr><th>WORKING NO.</th><th>船名</th><th>進口／出口</th><th>航次</th><th>櫃數</th><th>作業日期</th><th>來源檔案</th></tr></thead><tbody id="routeDetailBody"></tbody></table></div>
+    </div>
   </div>
 </section>
-
+<script src="./route-management-dashboard.js?v=20261110-reference-v1"></script>
 
 <style id="p79-terminal-ops-style-v1">
 #efficiencyMainTabs .tab[data-tab="terminal"]:not(.active){background:#dcfce7!important;color:#065f46!important;border:1px solid #86efac}
@@ -10692,6 +10739,7 @@ function renderRouteData(){
     (missing?' 另有 '+fmt(missing)+' 筆進／出口缺少原始櫃數，帶「*」的是已知數值小計。':'');
   const panel=document.getElementById('routeDetailPanel');
   const selected=rows.find(s=>s.route===p79RouteSelected);
+  if(typeof window!=='undefined')window.P79RouteManager?.render({rows,all,month,selected,historyMasters:shipMasters||[]});
   if(panel)panel.classList.toggle('hidden',!selected);
   if(!selected)return;
   const title=document.getElementById('routeDetailTitle');
