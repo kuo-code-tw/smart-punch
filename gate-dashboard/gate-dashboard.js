@@ -126,6 +126,15 @@ function summary(){
  show('overviewDate',anchor);show('overviewMonth',anchor.slice(0,7));show('overviewYear',anchor.slice(0,4));
  overview('Day','day');overview('Month','month');overview('Year','year');
 }
+function sourceStatus(){
+ var dates=Array.from(cache.values()).flat().map(function(row){return row.date;}).sort();
+ var latest=dates[dates.length-1]||'';
+ var p=period(mode,anchor),records=getRows(p);
+ var label=mode==='day'?anchor:mode==='month'?anchor.slice(0,7):anchor.slice(0,4);
+ if(!records)return '正式資料尚未完整讀取，請重新整理';
+ if(records.length===0)return label+' 尚無正式進出站紀錄'+(latest?'；目前最新紀錄為 '+latest:'')+'。尚未匯入不代表 0 櫃。';
+ return '已核對 '+label+' 共 '+records.length+' 個有紀錄的作業日'+(latest?'；目前最新紀錄為 '+latest:'')+'。';
+}
 function render(){
  setPeriod();
  var v=sum(period(mode,anchor)),prev=previousStat();
@@ -148,7 +157,7 @@ async function load(force){
  if(!current.allowed||!current.token){textStatus('請從79碼頭管理首頁登入具有 Gate 統計查看權限的管理員帳號。','error');return;}
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(current.url)){textStatus('正式 Gate 雲端服務尚未設定，請先確認原系統的 GAS 連線。','error');return;}
  var missing=neededYears().filter(function(y){return !cache.has(y);});
- if(!missing.length){textStatus('已顯示正式 Gate 已記錄的資料；空白期間以「—」顯示。','success');return;}
+ if(!missing.length){textStatus(sourceStatus(),getRows(period(mode,anchor))?.length?'success':'info');return;}
  textStatus('正在讀取79碼頭正式 Gate 每日紀錄…','info');
  try{
   await Promise.all(missing.map(async function(year){
@@ -161,7 +170,7 @@ async function load(force){
    if(id===version&&auth().stamp===current.stamp)cache.set(year,cleanRows(data.rows,year));
   }));
   if(id!==version||auth().stamp!==current.stamp)return;
-  render();textStatus('已同步正式 Gate 資料（'+missing.join('、')+' 年）；僅加總來源有紀錄的日期，不以示範資料補值。','success');
+  render();textStatus(sourceStatus()+' 資料來源：正式 Gate 每日紀錄。',getRows(period(mode,anchor))?.length?'success':'info');
  }catch(error){if(id!==version)return;render();textStatus('正式資料讀取失敗：'+String(error&&error.message||error).slice(0,160),'error');}
 }
 function choose(which){if(['day','month','year'].indexOf(which)<0)return;mode=which;void load(false);}
