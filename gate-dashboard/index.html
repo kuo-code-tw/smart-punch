@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#eaf4ff">
+<title>進出站櫃量管理｜79碼頭</title>
+<link rel="stylesheet" href="./gate-dashboard.css?v=20261110-v1">
+<script defer src="./gate-dashboard.js?v=20261110-v1"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../" aria-label="返回79碼頭管理首頁">
+    <span class="brand-icon" aria-hidden="true">⚓</span><strong>進出站櫃量管理</strong>
+  </a>
+  <nav class="topnav" aria-label="功能導覽">
+    <a href="#main">進出站統計</a><a href="#composition">櫃型分布</a><a href="#details">日統計明細</a><a href="../gate-import/">資料匯入</a><a href="#status">資料狀態</a>
+  </nav>
+  <div class="top-meta"><span class="update" id="freshness">↻ 尚未讀取正式資料</span><span class="top-query">查詢日期</span><input type="date" id="topDate" aria-label="查詢日期"></div>
+</header>
+<main id="main">
+  <section class="filterbar" aria-label="統計期間選擇">
+    <div class="pier-pill"><span aria-hidden="true">🚢</span><strong>79碼頭</strong></div>
+    <div class="mode-group" role="group" aria-label="選擇日月年統計">
+      <button class="mode selected" id="modeDay" aria-pressed="true">▣　日統計</button>
+      <button class="mode" id="modeMonth" aria-pressed="false">▦　月統計</button>
+      <button class="mode" id="modeYear" aria-pressed="false">▤　年統計</button>
+    </div>
+    <div class="filter-spacer"></div>
+    <span class="picker-label">▣　統計日期</span>
+    <input type="date" id="periodDate" aria-label="選擇統計日期">
+    <button class="arrow" id="previous" title="上一期間" aria-label="上一期間">‹</button><button class="arrow" id="next" title="下一期間" aria-label="下一期間">›</button>
+    <button class="reload" id="refresh" title="重新讀取正式 Gate 資料" aria-label="重新整理">⟳</button>
+  </section>
+
+  <section class="metrics" aria-label="進出站櫃量關鍵指標">
+    <article class="metric primary"><div class="metric-icon" aria-hidden="true">🚢</div><div class="metric-body"><h3 id="headingTotal">本日總櫃量</h3><div class="metric-number"><strong id="kpiTotal">—</strong><span>櫃</span></div><small id="comparisonTotal">較前日 —</small></div></article>
+    <article class="metric"><div class="metric-icon green" aria-hidden="true">➜</div><div class="metric-body"><h3>進站櫃量 <span>(Gate In)</span></h3><div class="metric-number"><strong id="kpiIn">—</strong><span>櫃</span></div><small id="comparisonIn">較前日 —</small></div></article>
+    <article class="metric"><div class="metric-icon blue" aria-hidden="true">➜</div><div class="metric-body"><h3>出站櫃量 <span>(Gate Out)</span></h3><div class="metric-number"><strong id="kpiOut">—</strong><span>櫃</span></div><small id="comparisonOut">較前日 —</small></div></article>
+    <article class="metric purple-tint"><div class="metric-icon purple" aria-hidden="true">▥</div><div class="metric-body"><h3>重櫃 <span>(Loaded)</span></h3><div class="metric-number"><strong id="kpiLoaded">—</strong><span>櫃</span></div><small id="loadedRatio">占比 —</small></div></article>
+    <article class="metric"><div class="metric-icon cyan" aria-hidden="true">▥</div><div class="metric-body"><h3>空櫃 <span>(Empty)</span></h3><div class="metric-number"><strong id="kpiEmpty">—</strong><span>櫃</span></div><small id="emptyRatio">占比 —</small></div></article>
+    <article class="metric"><div class="metric-icon teal" aria-hidden="true">⇄</div><div class="metric-body"><h3>進出站差異</h3><div class="metric-number"><strong class="positive" id="kpiNet">—</strong><span>櫃</span></div><small>(進站 − 出站)</small></div></article>
+  </section>
+
+  <section class="middle-grid">
+    <article class="panel table-panel">
+      <div class="blue-head"><h2>🚢　79碼頭 <span>進出站櫃量統計（<b id="tablePeriod">本日</b>）</span></h2><div class="head-total">本期總櫃量 <strong id="tableTotal">—</strong></div></div>
+      <div class="table-wrap"><table class="main-table"><thead><tr><th>櫃型</th><th>進站櫃量</th><th>出站櫃量</th><th>總櫃量</th><th>占比</th></tr></thead><tbody>
+      <tr><th>重櫃 (Loaded)</th><td id="rowLoadedIn">—</td><td id="rowLoadedOut">—</td><td class="number-positive" id="rowLoadedTotal">—</td><td id="rowLoadedPct">—</td></tr>
+      <tr><th>空櫃 (Empty)</th><td id="rowEmptyIn">—</td><td id="rowEmptyOut">—</td><td class="number-positive" id="rowEmptyTotal">—</td><td id="rowEmptyPct">—</td></tr>
+      <tr class="total-row"><th>合計</th><td id="rowTotalIn">—</td><td id="rowTotalOut">—</td><td class="number-positive" id="rowTotalAll">—</td><td id="rowTotalPct">—</td></tr>
+      </tbody></table></div>
+      <p class="panel-foot">進站＝交空＋交重；出站＝領空＋領重。依正式 Gate 每日資料加總。</p>
+    </article>
+
+    <article class="panel trend-panel" id="composition">
+      <div class="plain-head"><h2>▥　<span id="trendTitle">進出站櫃量趨勢（近 7 日）</span></h2></div>
+      <div class="trend-content">
+        <div class="chart-column">
+          <div class="chart-legend"><span class="legend-key"><i class="square in"></i>進站櫃量</span><span class="legend-key"><i class="square out"></i>出站櫃量</span><span class="legend-key"><i class="line"></i>總櫃量</span></div>
+          <div id="trendChart" class="chart-view" role="img" aria-label="進出站櫃量趨勢圖">正在讀取正式資料…</div>
+        </div>
+        <div class="donut-column">
+          <div class="donut" id="donut"><div class="donut-inner"><strong id="donutTotal">—</strong><span>櫃</span></div></div>
+          <div class="donut-legend"><div><span><i class="square out"></i>重櫃</span><strong id="donutLoaded">—</strong><small id="donutLoadedPct">—</small></div><div><span><i class="square in"></i>空櫃</span><strong id="donutEmpty">—</strong><small id="donutEmptyPct">—</small></div></div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="bottom-grid" id="details">
+    <article class="panel small-panel">
+      <div class="plain-head"><h2>▣　每日進出站櫃量統計（近 5 日）</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>日期</th><th>進站櫃量</th><th>出站櫃量</th><th>總櫃量</th><th>較前日</th></tr></thead><tbody id="dailyRows"><tr><td colspan="5" class="empty-state">正在讀取正式資料…</td></tr></tbody></table></div>
+    </article>
+    <article class="panel small-panel">
+      <div class="plain-head"><h2>◷　今日／近時段進出站明細（每小時）</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>時段</th><th>進站櫃量</th><th>出站櫃量</th><th>總櫃量</th></tr></thead><tbody><tr><td colspan="4" class="hourly-empty">目前正式 Gate 資料僅有每日合計，尚無每小時明細。<br>為避免誤報，此處不顯示推估櫃量。</td></tr></tbody></table></div>
+    </article>
+    <article class="panel small-panel overview-panel">
+      <div class="plain-head"><h2>▥　統計總覽（進出站櫃量）</h2></div>
+      <div class="overview-grid">
+        <section class="overview"><h3>▣　日統計 <span id="overviewDate">—</span></h3><strong id="summaryDay">—</strong><small>櫃</small><p>進站 <b id="dayIn">—</b><em>｜</em> 出站 <b id="dayOut">—</b></p><p>重櫃 <b id="dayLoaded">—</b><em>｜</em> 空櫃 <b id="dayEmpty">—</b></p></section>
+        <section class="overview"><h3>▦　月統計 <span id="overviewMonth">—</span></h3><strong id="summaryMonth">—</strong><small>櫃</small><p>進站 <b id="monthIn">—</b><em>｜</em> 出站 <b id="monthOut">—</b></p><p>重櫃 <b id="monthLoaded">—</b><em>｜</em> 空櫃 <b id="monthEmpty">—</b></p></section>
+        <section class="overview"><h3>▤　年統計 <span id="overviewYear">—</span></h3><strong id="summaryYear">—</strong><small>櫃</small><p>進站 <b id="yearIn">—</b><em>｜</em> 出站 <b id="yearOut">—</b></p><p>重櫃 <b id="yearLoaded">—</b><em>｜</em> 空櫃 <b id="yearEmpty">—</b></p></section>
+      </div>
+    </article>
+  </section>
+  <div class="statusbar" id="status" role="status" aria-live="polite">正在檢查正式資料存取權限…</div>
+  <footer><span>79碼頭 · Gate 正式資料唯讀統計，無示範櫃量</span><a href="../">返回管理首頁</a><a href="../gate-import/">匯入／更新每日櫃量</a></footer>
+</main>
+</body></html>
