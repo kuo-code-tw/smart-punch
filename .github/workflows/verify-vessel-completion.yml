@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'aqc-efficiency/index.html'
+      - 'tests/vessel-manual-sync-fast-path.cjs'
       - 'tests/vessel-completion-export-integrity.cjs'
       - 'tests/vessel-monthly-export.cjs'
       - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
@@ -28,6 +29,7 @@ jobs:
       - name: Test monthly vessel export and completion-month accounting
         run: |
           node tests/vessel-save-queue.cjs
+          node tests/vessel-manual-sync-fast-path.cjs
           node tests/efficiency-timeout-readback.cjs
           node tests/efficiency-sync-light.cjs
           node tests/vessel-berth-job-isolation.cjs
