@@ -1,0 +1,29 @@
+name: Gate drag-drop and cloud safety regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gate-import/**'
+      - 'assets/port79-gate-import.js'
+      - 'assets/port79-gate-live.js'
+      - 'backend/gate-stats-daily-import.gs'
+      - 'tests/gate-drag-drop-import.cjs'
+      - 'tests/home-gate-import-preview.cjs'
+      - 'tests/gate-live-period-dashboard.cjs'
+      - '.github/workflows/gate-drag-drop.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Gate drag/drop, duplicate-date import safety, read-only dashboard
+        run: |
+          node tests/gate-drag-drop-import.cjs
+          node tests/home-gate-import-preview.cjs
+          node tests/gate-live-period-dashboard.cjs
