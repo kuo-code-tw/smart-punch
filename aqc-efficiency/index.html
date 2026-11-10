@@ -2419,13 +2419,16 @@ async function onDashboardMonthChange(){
   updateDashboardRangeState();
 
   const month=String(document.getElementById('filterMonth')?.value||'').trim();
-  if(/^\d{4}-\d{2}$/.test(month)){
-    await loadEfficiencyCloudScope({month},true);
-  }else{
-    const year=String(getPort79Year()||'').trim();
-    if(/^\d{4}$/.test(year))await loadEfficiencyCloudScope({year},true);
-  }
+  // Apply the chosen month before network I/O; failed/slow reads must not leave the previous month's rows.
   renderAll();
+  try{
+    if(/^\d{4}-\d{2}$/.test(month)){
+      await loadEfficiencyCloudScope({month},true);
+    }else{
+      const year=String(getPort79Year()||'').trim();
+      if(/^\d{4}$/.test(year))await loadEfficiencyCloudScope({year},true);
+    }
+  }finally{renderAll();}
 }
 
 // 月報以船舶完工日歸月，同一 WORKING NO 的司機作業不能拆月。
@@ -7717,9 +7720,8 @@ async function gcLogout(){
 
 let p79EfficiencyManualSyncActive=false,p79EfficiencyReadbackRequired=false,p79EfficiencySyncPreflightRemote=null,p79EfficiencySyncTrace=[],p79EfficiencySyncCurrentStage='尚未開始';
 function p79EfficiencySyncStep(stage,info=''){
- if(!p79EfficiencyManualSyncActive)return;
  p79EfficiencySyncCurrentStage=stage;
- p79EfficiencySyncTrace.push({stage,info,at:Date.now()});
+ if(p79EfficiencyManualSyncActive)p79EfficiencySyncTrace.push({stage,info,at:Date.now()});
  p79SetEfficiencySyncLight('syncing',stage+'…');
 }
 function p79SetEfficiencySyncLight(state,message=''){
@@ -7950,7 +7952,7 @@ function readQueue(){
  try{const q=JSON.parse(localStorage.getItem(STORE.queue)||'[]');return Array.isArray(q)?q:[];}catch{return[];}
 }
 function saveQueue(q){
- if(q.length)p79SetEfficiencySyncLight('pending','待同步 '+q.length+' 筆');
+ if(q.length&&!cloudBusy&&!p79EfficiencyManualSyncActive)p79SetEfficiencySyncLight('pending','待同步 '+q.length+' 批');
  if(!gcQueueReady)return Promise.reject(Error('待同步資料尚未載入，請重試'));
  const snapshot=JSON.parse(JSON.stringify(q)),previous=gcQueueMemory;
  if(gcQueueStorageMode==='local'){
@@ -8622,14 +8624,14 @@ async function buildSafeGcSyncPayload(payload={}){
     const incomingMasters=Array.isArray(localPayload.shipMasters)?localPayload.shipMasters:(shipMasters||[]);
     const freshByNo=new Map();
     incomingMasters.forEach(s=>{
-      const no=String(s?.workingNo||'').trim();
+      const no=shipMasterKey(s);
       const localTime=Date.parse(s?.workingSheetSource?.importedAt||s?.workingSheetImportedAt||'')||0;
-      const remoteTime=remoteMasters.filter(r=>String(r?.workingNo||'').trim()===no).reduce((latest,r)=>Math.max(latest,Date.parse(r?.workingSheetSource?.importedAt||r?.workingSheetImportedAt||'')||0),0);
+      const remoteTime=remoteMasters.filter(r=>shipMasterKey(r)===no).reduce((latest,r)=>Math.max(latest,Date.parse(r?.workingSheetSource?.importedAt||r?.workingSheetImportedAt||'')||0),0);
       if(no && s?.workingSheetImportedAt && localTime>=remoteTime)freshByNo.set(no,s);
     });
 
     const sanitizedRemoteMasters=remoteMasters.map(s=>{
-      const no=String(s?.workingNo||'').trim();
+      const no=shipMasterKey(s);
       if(!freshByNo.has(no))return s;
       const copy={...s};
       delete copy.manualOverrides;
@@ -8638,7 +8640,7 @@ async function buildSafeGcSyncPayload(payload={}){
 
     let mergedMasters=mergeShipMastersPreferComplete(sanitizedRemoteMasters,incomingMasters);
     mergedMasters=mergedMasters.map(s=>{
-      const no=String(s?.workingNo||'').trim();
+      const no=shipMasterKey(s);
       const fresh=freshByNo.get(no);
       if(!fresh)return s;
       // fresh spread 在最後：0 也要能覆蓋舊非 0；新 試算表 的 38 也一定覆蓋舊 19。
@@ -8705,12 +8707,13 @@ async function p79VerifyTimedOutEfficiencyWrite(action,payload,readSnapshot=null
     };
     const compare=(expected,actual,key,fields,exact=false)=>{
       if(!Array.isArray(expected)||!Array.isArray(actual)||exact&&expected.length!==actual.length)return false;
-      const map=new Map(actual.map(row=>[String(row?.[key]||'').trim(),row]));
+      const identity=row=>typeof key==='function'?key(row):String(row?.[key]||'').trim();
+      const map=new Map(actual.map(row=>[identity(row),row]));
       if(map.size!==actual.length)return false;
-      return expected.every(row=>{const other=map.get(String(row?.[key]||'').trim());return !!other&&[...new Set([...fields,...Object.keys(row).filter(key=>!key.startsWith('_'))])].every(field=>row[field]===undefined||equalValue(row[field],other[field]));});
+      return expected.every(row=>{const other=map.get(identity(row));return !!other&&[...new Set([...fields,...Object.keys(row).filter(key=>!key.startsWith('_'))])].every(field=>row[field]===undefined||equalValue(row[field],other[field]));});
     };
     if(!compare(payload.records,remote.records,'id',['workingNo','empId','name','workDate','startTime','endTime','disc','load','hatches','containers','timeHours','rawDisc','rawLoad','bundleDeduct','workingSheetImportedAt'],true))return false;
-    if(!compare(payload.shipMasters,remote.shipMasters,'workingNo',['vessel','voyageI','voyageE','wharf','serviceI','serviceE','totalContainers','hatches','totalMoves','shiftMoves','bundleDeduct','workingSheetImportedAt']))return false;
+    if(!compare(payload.shipMasters,remote.shipMasters,shipMasterKey,['vessel','voyageI','voyageE','wharf','serviceI','serviceE','totalContainers','hatches','totalMoves','shiftMoves','bundleDeduct','workingSheetImportedAt']))return false;
     if(!compare(payload.groups,remote.groups,'id',['name']))return false;
     if(!compare(payload.assignments,remote.assignments,'empId',['groupId']))return false;
     return true;
@@ -8758,23 +8761,34 @@ async function flushQueue(){
     try{
       while(readQueue().length){
         const item=readQueue()[0];
-        if(item.uncertainWrite&&!p79EfficiencyManualSyncActive){syncError='上次寫入逾時、結果未確認；已停止自動重送，請按同步船舶資料先核對';break;}
+        let writeAttempted=false,attemptedPayload=null;
         try{
+          // Reconcile the exact attempted snapshot before merging newer cloud data. Never blindly resend an uncertain background write.
+          if(item.uncertainWrite){
+            const confirmed=await p79VerifyTimedOutEfficiencyWrite(item.action,item.lastSentPayload||item.payload||{});
+            if(confirmed){
+              const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===JSON.stringify(item));
+              if(index>=0){live.splice(index,1);await saveQueue(live);}
+              continue;
+            }
+            if(!p79EfficiencyManualSyncActive)throw Error('上次寫入逾時，讀回尚未吻合；已保留資料並停止重送，請按同步船舶資料核對');
+          }
           let payload=item.payload||{};
           // 所有整批補傳每次都重新讀雲端合併，包含舊版本留下的佇列。
           if(item.action==='gcSyncAll'&&!payload.__destructiveSync)payload=await buildSafeGcSyncPayload(payload);
           else if(item.action==='gcSyncAll'){payload={...payload};delete payload.__destructiveSync;}
           let result;
-          const preflight=(typeof p79EfficiencySyncPreflightRemote!=='undefined'&&p79EfficiencySyncPreflightRemote&&Date.now()-p79EfficiencySyncPreflightRemote.at<5000)?p79EfficiencySyncPreflightRemote.data:null;
-          if(item.uncertainWrite&&await p79VerifyTimedOutEfficiencyWrite(item.action,payload,preflight))result={ok:true,verifiedReadback:true};
-          else{
+          {
             if(typeof p79EfficiencySyncStep==='function')p79EfficiencySyncStep('上傳船舶資料','本次 '+(payload.records?.length||0)+' 筆明細、'+(payload.shipMasters?.length||0)+' 艘船；待同步 '+readQueue().length+' 批');
+            attemptedPayload=JSON.parse(JSON.stringify(payload));
+            writeAttempted=true;
             try{result=await apiPost(item.action,payload);}
             catch(writeError){
               if(/逾時|timeout|Abort|fetch|Network/i.test(String(writeError?.message||writeError))&&await p79VerifyTimedOutEfficiencyWrite(item.action,payload))result={ok:true,verifiedReadback:true};
               else throw writeError;
             }
           }
+          if(!result?.ok)throw Error(result?.error||'雲端未確認寫入成功');
           // 只移除本次已確認的快照，保留上傳期間加入或修改的其他項目。
           const signature=JSON.stringify(item);
           const live=readQueue(),index=live.findIndex(x=>JSON.stringify(x)===signature);
@@ -8794,9 +8808,9 @@ async function flushQueue(){
               continue;
             }
           }
-          if(/逾時|timeout|Abort|fetch|Network/i.test(syncError)){
+          if(writeAttempted&&/逾時|timeout|Abort|fetch|Network/i.test(syncError)){
             const pending=readQueue(),entry=pending.find(row=>row.id===item.id);
-            if(entry){entry.uncertainWrite=true;entry.lastWriteError=syncError;try{await saveQueue(pending)}catch(_){} }
+            if(entry){entry.uncertainWrite=true;entry.lastSentPayload=attemptedPayload;entry.lastWriteError=syncError;try{await saveQueue(pending)}catch(_){} }
           }
           console.warn('待補傳仍未完成，保留佇列',item?.action,e);
           break; // 舊修改未確認前，不能讓新修改越過它再被舊重試覆蓋。
@@ -8805,7 +8819,11 @@ async function flushQueue(){
       const left=readQueue();
       cloudStatus(left.length?`待安全補傳 ${left.length} 筆`:'上傳完成｜等待讀回確認',!left.length);
       if(!left.length)p79EfficiencyReadbackRequired=true;
-      p79SetEfficiencySyncLight(left.length||!p79EfficiencyManualSyncActive?'pending':'syncing',left.length?'待同步 '+left.length+' 筆':'已上傳｜等待讀回確認');
+      p79SetEfficiencySyncLight(left.length?(syncError?'error':'pending'):'syncing',left.length?(syncError?'同步暫停｜保留 '+left.length+' 批':'待同步 '+left.length+' 批'):'已上傳｜等待讀回確認');
+      if(syncError&&left.length){
+        const details=document.getElementById('efficiencySyncError'),text=document.getElementById('efficiencySyncErrorText'),summary=document.getElementById('efficiencySyncErrorSummary');
+        if(details&&text){details.hidden=false;details.open=true;if(summary)summary.textContent='同步暫停原因｜資料已保留';text.textContent=syncError+'\n待同步：'+left.length+' 批。尚未取得雲端確認的資料會繼續保留。';}
+      }
       return {ok:!left.length,pendingCloudSync:!!left.length,error:syncError};
     }finally{cloudBusy=false}
   })();

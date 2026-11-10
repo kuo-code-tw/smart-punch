@@ -27,6 +27,9 @@ jobs:
           node-version: '22'
       - name: Test monthly vessel export and completion-month accounting
         run: |
+          node tests/vessel-save-queue.cjs
+          node tests/efficiency-timeout-readback.cjs
+          node tests/efficiency-sync-light.cjs
           node tests/vessel-berth-job-isolation.cjs
           node tests/dashboard-working-report-audit.cjs
           node tests/vessel-driver-history.cjs
