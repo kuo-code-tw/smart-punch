@@ -321,7 +321,7 @@ dropZone?.addEventListener('dragleave',()=>dropZone?.classList?.remove?.('is-dra
 dropZone?.addEventListener('drop',handleDrop);
 d.addEventListener?.('dragover',stopFileDrop);
 d.addEventListener?.('drop',handleDrop);
-$('gateFile').addEventListener('change',()=>{void chooseFile();});
+$('gateFile').addEventListener('change',()=>chooseFile());
 $('gateSheet').addEventListener('change',()=>{++serviceCheck;serviceReady=false;days=[];$('gateResult').hidden=true;$('gateSave').disabled=true});
 $('gatePreview').addEventListener('click',()=>preview(false));
 $('gateDownload').addEventListener('click',csvExport);
