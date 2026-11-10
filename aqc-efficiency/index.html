@@ -9348,19 +9348,35 @@ async function manualCloudSync(){
       if(Date.now()>=waitUntil)throw Error('背景雲端讀取尚未結束，本次尚未開始上傳；資料已保留，請稍後再按同步');
       await new Promise(resolve=>setTimeout(resolve,120));
     }
-    p79EfficiencySyncStep('處理待同步資料','待同步 '+readQueue().length+' 批');
+    // A clean manual refresh only needs the lightweight revision check. Pending
+    // changes, uncertain writes and any unconfirmed ACK still require full readback.
+    const pendingBeforeUpload=readQueue().length;
+    const readbackPending=()=>typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired===true;
+    const strictReadbackRequired=pendingBeforeUpload>0||readbackPending()||efficiencyHasUnsavedChanges===true;
+    p79EfficiencySyncStep('處理待同步資料','待同步 '+pendingBeforeUpload+' 批');
     const upload=await flushQueue();
     if(!upload?.ok || readQueue().length)throw Error(upload?.error||'仍有 '+readQueue().length+' 筆本機修改等待補傳，尚未完成同步');
-    p79EfficiencySyncStep('讀回完整船舶資料，確認同步結果');
-    const pulled=await restoreVesselDataFromCloud(false,true);
-    if(pulled===false)throw Error('船舶雲端讀取未完成，尚未確認同步');
+    let revisionConfirmed=false;
+    if(!strictReadbackRequired&&!readbackPending()&&!efficiencyHasUnsavedChanges&&requireSuperAdminAccess()){
+      p79EfficiencySyncStep('快速確認雲端版本','沒有待上傳修改');
+      try{revisionConfirmed=await vesselRevisionIsCurrent(6000);}
+      catch(metaError){console.warn('[vessel manual sync] 快速版本確認失敗，改用完整讀回',metaError);}
+    }
+    // Never treat a revision match as completion if a new edit arrived meanwhile.
+    if(readQueue().length)throw Error('同步期間有新修改等待補傳');
+    if(readbackPending()||efficiencyHasUnsavedChanges)revisionConfirmed=false;
+    if(!revisionConfirmed){
+      p79EfficiencySyncStep('讀回完整船舶資料，確認同步結果');
+      const pulled=await restoreVesselDataFromCloud(false,true);
+      if(pulled===false)throw Error('船舶雲端讀取未完成，尚未確認同步');
+    }
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
 
     p79EfficiencyManualSyncActive=false;p79SetEfficiencySyncLight('success');
     const doneDetails=document.getElementById('efficiencySyncError');if(doneDetails){doneDetails.hidden=true;doneDetails.open=false;}
-    cloudStatus('雲端已同步');
+    cloudStatus(revisionConfirmed?'雲端版本已確認｜沒有待上傳修改':'雲端已同步');
     setEfficiencySaveState(false,'本機與雲端資料已完成同步');
-    toast('✅ 雲端同步完成｜已上傳本機變更並取得最新船舶資料');
+    toast(revisionConfirmed?'✅ 船舶雲端版本已確認｜資料無變更，無需重複下載':'✅ 雲端同步完成｜已上傳本機變更並取得最新船舶資料');
   }catch(e){
     console.error(e);
     const reason=String(e?.message||e);
