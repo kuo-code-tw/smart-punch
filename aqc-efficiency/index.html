@@ -1360,6 +1360,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   </div>
   <h3 class="p79-ref-section">☷ 作業一覽（吊桿別）</h3>
   <div id="terminalRodOverviewMount" aria-label="79與80碼頭作業一覽"></div>
+  <div id="terminalReconciliationMount" role="note" aria-live="polite" aria-label="資料來源差異自動核對"></div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
      <div class="p79-ter-box-head"><h3 class="p79-ter-box-title">📆 每日完工船舶作業量</h3><span class="p79-ter-hint">一艘船只歸完工當日｜Bundle 取自 WORKING SHEET 或船舶主檔，不以差額推定</span></div>
@@ -15768,11 +15769,13 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
 <link rel="stylesheet" href="./terminal-rod-overview.css?v=20261110-equal-height-v2">
-<script src="./terminal-ops.js?v=20261110-matched-tables-v2"></script>
+<script src="./terminal-ops.js?v=20261111-audit-v3"></script>
 <script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
 <link rel="stylesheet" href="./terminal-reference-layout.css?v=20261110-reference-v1">
 <link rel="stylesheet" href="./terminal-stop-redesign.css?v=20261110-stop-v1">
 <script src="./terminal-reference-layout.js?v=20261110-reference-v1"></script>
+<link rel="stylesheet" href="./terminal-data-audit.css?v=20261111-audit-v1">
+<script src="./terminal-data-audit.js?v=20261111-audit-v1"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">

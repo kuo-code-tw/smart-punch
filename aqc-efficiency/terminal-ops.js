@@ -139,6 +139,7 @@ function stopEventsForRecord(r){
   }
   const timedCategories=new Set(parsed.filter(e=>e.start&&e.end).map(e=>e.category));
   const events=parsed.filter(e=>e.start||!timedCategories.has(e.category));
+  const filled=[];
   for(let i=1;i<=3;i++){
     const label=String(r['stopItem'+i]||'').trim();
     const detail=String(r['stopRemark'+i]||'').trim();
@@ -146,8 +147,19 @@ function stopEventsForRecord(r){
     if(minutes===null||minutes<=0)continue;
     const category=remarkCategory(label+' '+detail)||'原因未填';
     const matched=events.some(e=>e.category===category&&e.minutes!==null&&Math.abs(e.minutes-minutes)<1);
-    if(!matched)events.push({category,reason:label||detail||'原因未填',minutes,
+    if(!matched)filled.push({category,reason:label||detail||'原因未填',minutes,
       start:'',end:'',source:'停工填報'});
+  }
+  // In one row, a single untimed Remark and a single matching stop report
+  // represent one incident. Multiple same-category events remain separate.
+  for(const report of filled){
+    const notes=events.filter(e=>e.source==='Remark'&&e.category===report.category&&e.minutes===null&&!e.start);
+    const reportsInCategory=filled.filter(e=>e.category===report.category);
+    if(notes.length===1&&reportsInCategory.length===1){
+      notes[0].minutes=report.minutes;
+      notes[0].source='Remark＋停工填報';
+      notes[0].legacyPeriods=['填報:'+report.minutes+':'+report.reason];
+    }else events.push(report);
   }
   return events;
 }
@@ -185,6 +197,8 @@ function setReasonCategory(encodedKey,category){
  const map=reasonOverrides();
  if(category)map[key]=category;
  else delete map[key];
+ // Remove the previous duplicate-event override when editing the merged event.
+ for(const alias of (state.manualAliasMap||{})[key]||[])delete map[alias];
  let saved=true;
  try{
   if(typeof localStorage==='undefined')saved=false;
@@ -197,7 +211,7 @@ function setReasonCategory(encodedKey,category){
 
 function buildStopSummary(records,wharfByNo,masters){
   const vesselByNo=new Map(masters.map(s=>[String(s.workingNo||s.sourceWorkingNo||'').trim(),String(s.vessel||'').trim()]));
-  const byStop=new Map(),unique=new Map(),affected=new Set();
+  const byStop=new Map(),unique=new Map(),affected=new Set(),manualAliasMap={};
   const work=(key)=>{if(!byStop.has(key))byStop.set(key,{reason:key,events:0,minutes:0,unknown:0,wharfs:new Set(),aqcs:new Set()});return byStop.get(key)};
   for(const r of records){
     const no=String(r.workingNo||'').trim(),day=String(r.workDate||'').slice(0,10);
@@ -210,8 +224,11 @@ function buildStopSummary(records,wharfByNo,masters){
         '未註時間:'+entry.reason.replace(/\s+/g,'').toLowerCase();
       const key=[no,day,aqc,entry.category,period].join('|');
       if(unique.has(key))continue;
-      const event={...entry,date:day,workingNo:no,aqc,wharf,vessel,eventKey:key,automaticCategory:entry.category};
-      event.category=eventManualCategory(key)||entry.category;
+      const legacyKeys=(entry.legacyPeriods||[]).map(p=>[no,day,aqc,entry.category,p].join('|'));
+      const manual=eventManualCategory(key)||legacyKeys.map(eventManualCategory).find(Boolean)||'';
+      if(legacyKeys.length)manualAliasMap[key]=legacyKeys;
+      const event={...entry,date:day,workingNo:no,aqc,wharf,vessel,eventKey:key,automaticCategory:entry.category,manualCategory:manual};
+      event.category=manual||entry.category;
       unique.set(key,event);
       affected.add(String(r.id||[no,day,aqc,r.startTime,r.endTime].join('|')));
       const group=work(event.category);
@@ -228,7 +245,7 @@ function buildStopSummary(records,wharfByNo,masters){
   }));
   return {byStop:categories,stopDetails:details,totalStopEvents:details.length,
     totalStopMinutes:details.reduce((sum,e)=>sum+(e.minutes||0),0),
-    unknownStopEvents:details.filter(e=>e.minutes===null).length,stoppedRows:affected.size};
+    unknownStopEvents:details.filter(e=>e.minutes===null).length,stoppedRows:affected.size,manualAliasMap};
 }
 
 function build(month,ships,rows){
@@ -292,7 +309,53 @@ function build(month,ships,rows){
     crossShift,missingTime,unmatchedWharf,...stops
   };
 }
-const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:'',categorySaveWarning:''};
+
+/* Consistent 79/80 scope across KPI, daily, shift and stoppage summaries. */
+function targetPort(raw){
+  const s=String(raw??'').trim().toUpperCase().replace(/\s+/g,'');
+  const m=s.match(/^(79|80)(?:[LR]|碼頭)?$/);
+  return m?m[1]:'';
+}
+function recordAqcPort(r){
+  const values=[r.number,r.gcNo,r.aqc,r.aqcNo,r.craneNo];
+  for(const value of values){
+    const raw=String(value??'').toUpperCase();
+    if(!raw.trim())continue;
+    const ports=[...raw.matchAll(/(?:^|[^\d])(?:AQC[\s#-]*)?(79(?:01|02|03|05)|80(?:01|02|03|05|06))(?!\d)/g)].map(m=>m[1].slice(0,2));
+    const unique=[...new Set(ports)];
+    if(unique.length===1)return unique[0];
+    if(unique.length>1)return '';
+  }
+  return '';
+}
+function scopeTo79and80(month,ships,rows){
+  const allShips=makeUniqueShips(ships,month);
+  const allRecords=makeUniqueRecords(rows,month);
+  const byNo=new Map();
+  for(const ship of allShips){
+    const no=String(ship.workingNo||ship.sourceWorkingNo||'').trim();
+    if(no)byNo.set(no,ship);
+  }
+  const keptShips=allShips.filter(ship=>!!targetPort(ship.wharf));
+  const unassignedShips=allShips.filter(ship=>!String(ship.wharf||'').trim()).length;
+  const keptRecords=[];
+  let excludedRecords=0,conflictingRecords=0,unassignedRecords=0;
+  for(const row of allRecords){
+    const no=String(row.workingNo||'').trim();
+    const master=byNo.get(no);
+    const rawWharf=String(row.wharf||'').trim();
+    const masterWharf=String(master?.wharf||'').trim();
+    const direct=targetPort(rawWharf),fromMaster=targetPort(masterWharf),fromCrane=recordAqcPort(row);
+    if((rawWharf&&!direct)||(masterWharf&&!fromMaster)){excludedRecords++;continue}
+    const ports=[direct,fromMaster,fromCrane].filter(Boolean);
+    if(new Set(ports).size>1){conflictingRecords++;continue}
+    if(!ports.length){unassignedRecords++;continue}
+    keptRecords.push(row);
+  }
+  return {ships:keptShips,records:keptRecords,
+    excludedShips:allShips.length-keptShips.length,unassignedShips,excludedRecords,conflictingRecords,unassignedRecords};
+}
+const state={loadedMonth:'',loadedAt:0,ships:[],records:[],mode:'local',message:'',error:'',requestSeq:0,inFlight:'',stopCategory:'',categorySaveWarning:'',manualAliasMap:{}};
 function el(id){return document.getElementById(id)}
 function options(){
  const select=el('terminalMonth');
@@ -351,7 +414,9 @@ function alignTerminalDailyTables(){
 
 function render(){
  const rootNode=el('terminalDashboardRoot');if(!rootNode)return;
- const month=options(),src=currentSources(month),stats=build(month,src.ships,src.records);
+ const month=options(),src=currentSources(month),scoped=scopeTo79and80(month,src.ships,src.records),stats=build(month,scoped.ships,scoped.records);
+ stats.scope=scoped;
+ state.manualAliasMap=stats.manualAliasMap||{};
  const total=stats.vesselTotals,hasShips=stats.ships.length>0;
  const htmlMetric=(label,value,sub,tone)=>'<div class="p79-terminal-kpi '+tone+'"><div class="kpi-label">'+label+'</div><div class="kpi-value">'+value+'</div><div class="kpi-sub">'+sub+'</div></div>';
  const kpi=el('terminalKpi');
@@ -400,7 +465,7 @@ function render(){
  const visible=state.stopCategory?stats.stopDetails.filter(s=>s.category===state.stopCategory):stats.stopDetails;
  const detailBody=el('terminalStopDetailBody');
  if(detailBody)detailBody.innerHTML=visible.length?visible.slice(0,160).map(e=>{
-  const manuallyChosen=eventManualCategory(e.eventKey);
+  const manuallyChosen=e.manualCategory||eventManualCategory(e.eventKey);
   const encoded=encodeURIComponent(e.eventKey).replace(/'/g,'%27');
   const reasonOptions='<option value=""'+(!manuallyChosen?' selected':'')+'>自動：'+safe(e.automaticCategory)+'</option>'+
    STOP_CATEGORIES.map(c=>'<option value="'+safe(c.label)+'"'+(manuallyChosen===c.label?' selected':'')+'>'+c.icon+' '+safe(c.label)+'</option>').join('');
@@ -436,6 +501,7 @@ function render(){
  }
  root.P79TerminalRodOverview?.render(stats,state);
  root.P79TerminalReference?.render(stats,state);
+ root.P79TerminalDataAudit?.render(stats,scoped);
  labelCompactTables();
  alignTerminalDailyTables();
  const label=el('terminalMonthCaption');
@@ -485,5 +551,5 @@ function filterReason(category){
  render();
 }
 function selectCategory(category){filterReason(state.stopCategory===category?'':category);}
-root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory,filterReason,setReasonCategory,shipBundleMetrics};
+root.P79TerminalOps={render,load,build,options,shiftOf,makeUniqueRecords,makeUniqueShips,remarkCategory,stopEventsForRecord,selectCategory,filterReason,setReasonCategory,shipBundleMetrics,scopeTo79and80,targetPort,recordAqcPort};
 })(window);
