@@ -54,7 +54,9 @@ const doc={
  addEventListener(){},
  querySelectorAll(){return[];}
 };
-const root={document:doc,console,setTimeout(){},Date};
+const root={document:doc,console,setTimeout(){},Date,
+ shipMasterDateMatchesMonth:(ship,month)=>String(ship.lastDate||ship.firstDate||'').slice(0,7)===month,
+ routeStatsForShips:ships=>[{route:'CIX',disc:ships.reduce((n,x)=>n+(x.disc||0),0),load:ships.reduce((n,x)=>n+(x.load||0),0)}]};
 vm.createContext(root);vm.runInContext(script,root);
 const api=root.P79RouteManager;
 assert(api,'manager API must load');
@@ -78,7 +80,7 @@ assert(nodes.routeManagerTableBody.innerHTML.includes('⌕ 查看明細'));
 assert(nodes.routeManagerTableFoot.innerHTML.includes('當月合計'));
 assert(nodes.routeManagerDetailCode.textContent==='CIX','first route selected by default like reference');
 assert(nodes.routeManagerDetailBody.innerHTML.includes('近 6 個月櫃數趨勢'));
-assert(nodes.routeManagerDetailBody.innerHTML.includes('未載入的歷史月份以空白顯示'),'never invent historical bars');
+assert(nodes.routeManagerDetailBody.innerHTML.includes('未載入或未確認的歷史月份以空白顯示'),'never invent historical bars');
 assert(nodes.routeManagerTableSection.hidden===false&&nodes.routeManagerGridShell.hidden===true);
 api.setView('grid');
 assert(nodes.routeManagerTableSection.hidden===true&&nodes.routeManagerGridShell.hidden===false);
@@ -94,5 +96,27 @@ assert(nodes.routeManagerDetailBody.innerHTML.includes('2026-06'),'history spans
 api.setType('import');
 assert(nodes.routeManagerTableBody.innerHTML.includes('CL1'));
 assert(!html.includes('<img src="./route-management-dashboard'),'rendered page must not be a flat mock image');
+
+const crossMonth={compareMonth:'2026-10',compareDate:'2026-10-31',lastDate:'2026-11-01',serviceI:'CIX',serviceE:'CIX',disc:100,load:50};
+const octModel={month:'2026-10',rows:[rows[0]],all:[rows[0]],selected:rows[0],historyMasters:[crossMonth]};
+api.render(octModel);
+assert(nodes.routeManagerDetailBody.innerHTML.includes('2026/10'),'trend includes October');
+assert(nodes.routeManagerDetailBody.innerHTML.includes('未載入或未確認'),'history source remains visibly qualified');
+const novemberModel={month:'2026-11',rows,all:rows,selected:rows[0],historyMasters:[crossMonth]};
+api.render(novemberModel);
+api.setTab('history');
+assert(nodes.routeManagerDetailBody.innerHTML.includes('2026-10'),'history displays October row');
+assert(nodes.routeManagerDetailBody.innerHTML.includes('未載入'),'October must not get cross-month vessel from stale compareMonth');
+const unknownQty={
+ ...rows[0],details:[{vessel:'D-1',date:'2026-11-03',direction:'進口',quantity:null},
+ {vessel:'D-2',date:'2026-11-03',direction:'出口',quantity:819}],
+ missingDisc:1
+};
+api.setTab('vessels');
+api.render({month:'2026-11',rows:[unknownQty],all:[unknownQty],selected:unknownQty,historyMasters:[]});
+assert(nodes.routeManagerDetailBody.innerHTML.includes('未提供'),'missing quantity must not display zero');
+assert(nodes.routeManagerStatus.textContent.includes('已知小計'),'total with missing source must be qualified');
+assert(nodes.routeManagerStatus.textContent.includes('資料核對異常'),'a mismatch between details and summary must be visible');
+
 new vm.Script(script);
 console.log('PASS route management reference layout: six KPIs, one-table + right detail, month, search/source guard, trend/no fabricated data, 4 tabs, sorting, grid toggle and one-time selected route');
