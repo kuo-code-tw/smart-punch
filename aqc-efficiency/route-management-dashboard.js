@@ -26,9 +26,14 @@ function trendRows(model,code){
   let found=null;
   if(m===model.month)found=model.all.find(row=>row.route===code);
   else{
+   // Historical work is assigned to the SAME authoritative completion-month
+   // rule used by the production vessel dashboard, never stale compareMonth.
    const ships=(model.historyMasters||[]).filter(s=>{
-    const d=String(s.compareMonth||s.compareDate||s._cloudLastDate||s.lastDate||s.firstDate||s.workingSheetSource?.compareDate||'');
-    return d.slice(0,7)===m;
+    if(typeof root.shipMasterDateMatchesMonth==='function')
+      return root.shipMasterDateMatchesMonth(s,m);
+    const done=String(s._cloudLastDate||s.lastDate||s.workingSheetSource?.lashingDateTime||
+     s.workingSheetSource?.lashingDate||s.workingSheetSource?.endDate||s.compareDate||s.firstDate||'');
+    return done.slice(0,7)===m;
    });
    if(ships.length&&typeof root.routeStatsForShips==='function')
      found=root.routeStatsForShips(ships).find(row=>row.route===code);
@@ -43,7 +48,7 @@ function sparkBars(summary,month){
  for(const d of summary.details||[]){
   const date=String(d.date||'');
   if(!date.startsWith(month+'-'))continue;
-  const day=Number(date.slice(8,10)),quantity=Number(d.quantity);
+  const day=Number(date.slice(8,10)),quantity=d.quantity===null||d.quantity===undefined||d.quantity===''?NaN:Number(d.quantity);
   if(!Number.isFinite(day)||day<1||!Number.isFinite(quantity))continue;
   buckets[Math.min(7,Math.floor((day-1)*8/monthDays))]+=quantity;count++;
  }
@@ -80,7 +85,7 @@ function renderTable(rows,month,selected){
  const body=$('routeManagerTableBody'),foot=$('routeManagerTableFoot');if(!body||!foot)return;
  body.innerHTML=rows.length?rows.map(row=>{
   const k=esc(row.route),chosen=selected?.route===row.route,expanded=state.expanded.has(row.route);
-  const summary=(row.details||[]).slice(0,8).map(d=>esc(d.vessel||d.workingNo||'—')+'（'+esc(d.direction)+' '+fmt(d.quantity)+' 櫃）').join('　•　');
+  const summary=(row.details||[]).slice(0,8).map(d=>esc(d.vessel||d.workingNo||'—')+'（'+esc(d.direction)+' '+(d.quantity===null||d.quantity===undefined?'未提供':fmt(d.quantity))+' 櫃）').join('　•　');
   return '<tr class="'+(chosen?'p79-rm-selected':'')+'">'+
    '<td><button type="button" class="p79-rm-row-arrow" data-expand-route="'+k+'" aria-label="'+(expanded?'收合':'展開')+' '+k+' 船舶明細">'+(expanded?'⌄':'›')+'</button></td>'+
    '<td class="p79-rm-route-code">'+k+'</td><td class="p79-rm-name">'+esc(name(row.route))+'</td>'+
@@ -101,7 +106,7 @@ function fact(label,value,symbol){
 function chart(code,model){
  const data=trendRows(model,code),peak=Math.max(1,...data.map(d=>Math.max(d.disc||0,d.load||0)));
  const upper=Math.max(100,Math.ceil(peak/500)*500),ticks=[upper,upper*.75,upper*.5,upper*.25,0];
- const note=data.some(d=>d.disc===null)?'未載入的歷史月份以空白顯示，不用假數據補齊。':'依已載入的正式船舶作業量統計。';
+ const note=data.some(d=>d.disc===null)?'未載入或未確認的歷史月份以空白顯示；本月為當月來源，過去月份為已載入快取，需另行雲端核對。':'本月為當月來源，過去月份為已載入快取，需另行雲端核對。';
  return '<div class="p79-rm-chart-panel">'+
   '<div class="p79-rm-chart-heading">近 6 個月櫃數趨勢 <span class="p79-rm-legend"><span><b style="background:#247ef2"></b>卸船櫃數</span><span><b style="background:#ff902d"></b>裝船櫃數</span></span></div>'+
   '<div class="p79-rm-chart"><div class="p79-rm-axis">'+ticks.map(v=>'<span>'+fmt(v)+'</span>').join('')+'</div>'+
@@ -115,7 +120,7 @@ function tabMarkup(route,model){
  if(state.tab==='vessels'){
   return '<div class="p79-rm-detail-rows"><table><thead><tr><th>作業日期</th><th>船名</th><th>I/E</th><th>航次</th><th>櫃數</th></tr></thead><tbody>'+
    [...route.details].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(d=>'<tr>'+
-    [d.date,d.vessel,d.direction,d.voyage,d.quantity===null?'—':fmt(d.quantity)].map(v=>'<td>'+esc(v||'—')+'</td>').join('')+
+    [d.date,d.vessel,d.direction,d.voyage,d.quantity===null||d.quantity===undefined?'未提供':fmt(d.quantity)].map(v=>'<td>'+esc(v??'—')+'</td>').join('')+
    '</tr>').join('')+'</tbody></table></div>'+chart(route.route,model);
  }
  if(state.tab==='trend')return chart(route.route,model);
@@ -163,9 +168,22 @@ function render(model){
  renderTable(rows,model.month,chosen);
  renderPanel(chosen);
  const status=$('routeManagerStatus');if(status){
-  const current=$('routeMonthStatus');
-  status.textContent=current?.textContent||'正在讀取船舶資料';
-  status.dataset.state=current?.dataset?.state||'loading';
+  const current=$('routeMonthStatus'),source=current?.textContent||'正在讀取船舶資料';
+  const missingDisc=sums(model.all,'missingDisc'),missingLoad=sums(model.all,'missingLoad');
+  const unknown=model.all.find(r=>r.route==='未分類');
+  const detailMismatch=model.all.filter(r=>{
+   const details=r.details||[];
+   const disc=details.filter(d=>d.direction==='進口'&&d.quantity!==null&&d.quantity!==undefined).reduce((n,d)=>n+num(d.quantity),0);
+   const load=details.filter(d=>d.direction==='出口'&&d.quantity!==null&&d.quantity!==undefined).reduce((n,d)=>n+num(d.quantity),0);
+   return Math.abs(disc-num(r.disc))>0.00001||Math.abs(load-num(r.load))>0.00001||
+    Math.abs(num(r.total)-num(r.disc)-num(r.load))>0.00001;
+  });
+  const notes=[];
+  if(missingDisc||missingLoad)notes.push('注意：有 '+fmt(missingDisc)+' 筆卸船、'+fmt(missingLoad)+' 筆裝船缺少原始櫃數，畫面合計為已知小計');
+  if(unknown)notes.push('有 '+fmt(num(unknown.importCalls)+num(unknown.exportCalls))+' 筆進出口 SERVICE 未分類');
+  if(detailMismatch.length)notes.push('資料核對異常：'+detailMismatch.map(r=>r.route).join('、')+' 的櫃數與船舶明細不一致');
+  status.textContent=source+(notes.length?'｜'+notes.join('；'):'');
+  status.dataset.state=detailMismatch.length?'error':notes.length?'warning':current?.dataset?.state||'loading';
  }
  const table=$('routeManagerTableSection'),grid=$('routeManagerGridShell');
  if(table)table.hidden=state.view!=='table';
