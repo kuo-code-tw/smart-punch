@@ -2469,7 +2469,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.11.10.114';
+        const APP_VERSION='2026.11.10.115';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -8464,15 +8464,27 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         // An aborted POST can still finish in Apps Script. Read back the
         // official getData config before reporting success or failure.
+        function p79GpsCloudMismatchReason(cloudConfig, draft) {
+            if (!cloudConfig || typeof cloudConfig !== 'object') return '雲端沒有回傳正式設定資料';
+            const expected=normalizeExtraLocations(draft.extraLocations);
+            if (cloudConfig.extraLocations==null && expected.some(site=>site.name))
+                return '正式 GAS 的 getData 未回傳 extraLocations 欄位；需更新正式 Apps Script';
+            if (String(cloudConfig.locationName||'').trim()!==String(draft.locationName||'').trim())
+                return '主要地點名稱與雲端不同';
+            for (const field of ['lat','lng','radius']) {
+                if (Number(cloudConfig[field])!==Number(draft[field]))
+                    return '主要地點的'+({lat:'緯度',lng:'經度',radius:'允許半徑'}[field])+'與雲端不同';
+            }
+            const actual=normalizeExtraLocations(cloudConfig.extraLocations);
+            for (let i=0;i<expected.length;i++) {
+                if (JSON.stringify(actual[i])!==JSON.stringify(expected[i]))
+                    return '第 '+(i+1)+' 個額外 GPS 地點尚未在雲端讀回相同的名稱／經緯度／半徑';
+            }
+            return '';
+        }
+
         function p79GpsConfigMatchesCloud(cloudConfig, draft) {
-            if (!cloudConfig || typeof cloudConfig !== 'object') return false;
-            const expectedExtras=normalizeExtraLocations(draft.extraLocations);
-            if (cloudConfig.extraLocations==null && expectedExtras.some(site=>site.name)) return false;
-            return String(cloudConfig.locationName||'').trim()===String(draft.locationName||'').trim() &&
-                Number(cloudConfig.lat)===Number(draft.lat) &&
-                Number(cloudConfig.lng)===Number(draft.lng) &&
-                Number(cloudConfig.radius)===Number(draft.radius) &&
-                JSON.stringify(normalizeExtraLocations(cloudConfig.extraLocations))===JSON.stringify(expectedExtras);
+            return p79GpsCloudMismatchReason(cloudConfig,draft)==='';
         }
 
         async function p79ReadBackSavedGpsConfig(draft) {
@@ -8480,9 +8492,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const url=gasUrl+(gasUrl.includes('?')?'&':'?')+'action=getData&t='+Date.now();
             const data=await fetchGasJsonWithRetry(url,'GPS 儲存結果核對',2,20000);
             if(data?.ok!==true||!data.config)throw new Error(data?.error||'雲端未回傳可核對的定位設定');
-            if(data.config.extraLocations==null&&normalizeExtraLocations(draft.extraLocations).some(site=>site.name))
-                throw new Error('正式 GAS 未回傳額外 GPS 地點欄位，請檢查後端部署版本');
-            return p79GpsConfigMatchesCloud(data.config,draft);
+            const mismatch=p79GpsCloudMismatchReason(data.config,draft);
+            if(mismatch)throw new Error(mismatch);
+            return true;
         }
 
         async function saveSystemSettings() {
@@ -8516,9 +8528,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 p79SystemSettingsSaveBusy=true;
                 if(button){button.disabled=true;button.textContent='儲存中…';}
                 p79SettingsSaveFeedback('☁️ 正在儲存定位設定，等待雲端確認…');
-                const previous=sysConfig;
-                sysConfig=draft;
-                try{saveConfig();}catch(error){sysConfig=previous;throw new Error('本機無法保留設定：'+(error.message||error)+'。欄位已保留，尚未送出雲端');}
+                // Never publish a GPS geofence locally until GAS has confirmed
+                // and getData has returned the same values. Inputs stay in the
+                // modal after failure, but phones must not trust unsaved sites.
                 const payload={action:'syncConfig',config:draft};
                 // Prevent an older queued syncConfig from overwriting the new sites.
                 removeQueuedCloudOperation(payload);
@@ -8550,11 +8562,16 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     cloudDirectWriteBusy=Math.max(0,cloudDirectWriteBusy-1);
                 }
                 if(!confirmed) {
-                    const reason=String(result?.error||writeError?.message||readBackError?.message||'雲端資料未確認');
-                    const guidance=p79IsAbortLikeError(writeError)
-                        ? '雲端請求逾時，讀回仍未確認；已保留輸入內容，請先確認雲端版本再重新儲存'
-                        : '雲端沒有回傳一致的 GPS 設定；輸入內容已保留';
-                    throw new Error(guidance+'（'+reason+'）');
+                    const details=[];
+                    if(writeError)details.push('寫入請求：'+(p79IsAbortLikeError(writeError)?'遭中止或逾時':String(writeError.message||writeError)));
+                    if(result?.ok===false)details.push('GAS 回覆：'+String(result.error||'儲存失敗'));
+                    if(readBackError)details.push('雲端讀回：'+String(readBackError.message||readBackError));
+                    throw new Error('GPS 地點尚未同步，正式設定未變更；輸入欄位已保留。'+(details.length?'（'+details.join('；')+'）':''));
+                }
+                // The newly entered site becomes effective only after readback.
+                sysConfig=draft;
+                try {saveConfig();} catch(error) {
+                    console.warn('雲端已確認 GPS 設定，但本機快取無法更新',error);
                 }
                 removeQueuedCloudOperation(payload);
                 setCloudSyncStatus('🟢 GPS 與系統設定已由雲端讀回確認','success');
