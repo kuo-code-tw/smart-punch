@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 const script=fs.readFileSync('assets/port79-gate-home.js','utf8');
 new vm.Script(script);
-assert(html.includes('port79-gate-home.js?v=20261107-phone-gate-quantities-v1'),
+assert(html.includes('port79-gate-home.js?v=20261111-admin-phone-no-gate-v2'),
  'mobile fix must load a fresh JS version');
 assert(html.includes('id="p79-mobile-gate-quantities-20261107"'),
  'mobile Gate six-tile layout is present');
@@ -47,9 +47,12 @@ function run(allowed){
 (async()=>{
  const allowed=run(true);
  await new Promise(resolve=>setImmediate(resolve));
- assert.equal(allowed.get('p79HomeGateTab').attrs['aria-selected'],'true',
-  'mobile starts directly on Gate volume, not imported vessels');
- assert.equal(allowed.get('p79HomeGatePanel').hidden,false,'Gate totals are visible');
+ assert.notEqual(allowed.get('p79HomeGateTab').attrs['aria-selected'],'true',
+  'administrator phone must not automatically select Gate');
+ assert.equal(allowed.calls(),0,'hidden Gate must not request cloud data on initial mobile load');
+ allowed.win.P79GateStatsHome.switchTab('gate');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(allowed.get('p79HomeGatePanel').hidden,false,'Gate statistics remain functional when explicitly opened on desktop');
  assert.equal(allowed.get('p79GateDeliverEmpty').textContent,'11');
  assert.equal(allowed.get('p79GatePickupEmpty').textContent,'22');
  assert.equal(allowed.get('p79GateDeliverLoaded').textContent,'33');
@@ -61,9 +64,11 @@ function run(allowed){
  assert.equal(allowed.get('p79GateTotalContainers').textContent,'100','daily switch reads last published daily record');
  const denied=run(false);
  await new Promise(resolve=>setImmediate(resolve));
+ denied.win.P79GateStatsHome.switchTab('gate');
+ await new Promise(resolve=>setImmediate(resolve));
  assert.equal(denied.calls(),0,'non-viewer cannot query Gate cloud');
  assert.equal(denied.get('p79GateTotalContainers').textContent,'—');
  assert(denied.get('p79GateStatus').textContent.includes('權限'),
   'denied user sees an explanation, never an invented number');
- console.log('PASS: mobile admin Gate is visible and reads six real field totals; permissions remain enforced.');
+ console.log('PASS: administrator phone does not auto-open Gate; manual desktop Gate still reads six authorized totals.');
 })().catch(err=>{console.error(err);process.exitCode=1;});
