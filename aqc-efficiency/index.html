@@ -1723,13 +1723,20 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 
 
     </div>
-    <div class="p79pr-details" data-section-key="view-weekly-5"><div><span>所有人員作業紀錄</span></div>
-<div class="p79pr-detail-card">
-      <h3>▤ 全部人員作業紀錄明細 <small>日期・姓名・組別・WORKING NO.・AQC・時數與櫃數</small></h3>
-      <div id="personnelRecordCount" class="text-sm text-slate-500 mb-3" role="status"></div>
-      <table class="p79pr-data-table"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
+    <div class="p79pr-details" data-section-key="view-weekly-5">
+      <div class="p79pr-legacy-detail-label" aria-hidden="true"><span>所有人員作業紀錄</span></div>
+      <details id="p79PersonnelRecordDisclosure" class="p79pr-detail-card">
+        <summary class="p79pr-detail-toggle">
+          <span class="p79pr-detail-heading">▤ 全部人員作業紀錄明細</span>
+          <span class="p79pr-detail-description">日期・姓名・組別・WORKING NO.・AQC・時數與櫃數</span>
+          <span id="personnelRecordCount" role="status" aria-live="polite"></span>
+          <span class="p79pr-toggle-pill"><span class="p79pr-label-closed">展開明細</span><span class="p79pr-label-open">收合明細</span></span>
+        </summary>
+        <div class="p79pr-detail-table-scroll">
+          <table class="p79pr-data-table"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
+        </div>
+      </details>
     </div>
-</div>
 <section id="view-workload" class="hidden space-y-4">
     <input id="workloadStart" type="hidden"><input id="workloadEnd" type="hidden">
     <div id="workloadPersonMeta" class="card p-4 font-bold"></div>
@@ -15806,7 +15813,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <link rel="stylesheet" href="./vessel-tab-palette.css?v=20261109-v115">
-<link rel="stylesheet" href="./personnel-reference-dashboard.css?v=20261111-scroll-all-v2">
+<link rel="stylesheet" href="./personnel-reference-dashboard.css?v=20261111-fold-records-v3">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 <script>
 /* Gate management shows the designed dashboard and keeps the original importer. */
