@@ -9,7 +9,7 @@
 #view-terminal .p79-rod-dashboard{width:100%;min-width:0;font-size:13px;color:#203252}
 #view-terminal .p79-rod-update{text-align:right;color:#516179;font-size:12px;margin-bottom:7px}
 #view-terminal .p79-rod-summary-scroll{border:1px solid #ccdbee;border-radius:10px;overflow-x:auto;max-width:100%}
-#view-terminal .p79-rod-summary{width:100%;min-width:920px;border-collapse:collapse;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
+#view-terminal .p79-rod-summary{width:100%;min-width:1070px;border-collapse:collapse;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
 #view-terminal .p79-rod-summary th{background:#e3edfc;color:#152f5d;padding:10px 7px;font-weight:950;white-space:nowrap}
 #view-terminal .p79-rod-summary td{padding:12px 7px;border-top:1px solid #d6e0ee;font-weight:750;white-space:nowrap}
 #view-terminal .p79-rod-summary tbody tr:nth-child(even){background:#f5f9fe}
@@ -53,3 +53,11 @@
  #view-terminal .p79-rod-total b{font-size:19px}
  #view-terminal .p79-rod-summary{font-size:12px}
 }
+
+/* SHIFT is a berth-level operational count; never added to the container total or apportioned per crane. */
+#view-terminal .p79-rod-port-metrics{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto;min-width:0}
+#view-terminal .p79-rod-flip{display:flex;align-items:center;gap:7px;padding:6px 9px;background:#fff4dc;border:1px solid #f4d79f;border-radius:9px;color:#80540e;white-space:nowrap}
+#view-terminal .p79-rod-flip small{font-size:10px;font-weight:850}
+#view-terminal .p79-rod-flip b{font-size:22px;line-height:1.1;font-weight:950;font-variant-numeric:tabular-nums}
+#view-terminal .p79-rod-flip-quantity{color:#9b5b10;font-weight:950}
+@media(max-width:560px){#view-terminal .p79-rod-port-metrics{width:100%;flex-wrap:wrap;justify-content:space-between}#view-terminal .p79-rod-flip b{font-size:19px}}
