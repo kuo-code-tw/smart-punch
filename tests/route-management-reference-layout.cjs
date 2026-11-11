@@ -32,7 +32,7 @@ assert.match(css,/p79-rm-chart-panel/);
 assert.match(css,/body:has\(#view-compare:not\(\.hidden\)\) #efficiencyHeader/,'screenshot nav replaces old header only on route view');
 assert(!css.includes('background-image:url('),'screen must be functional HTML, not a pasted screenshot');
 assert(html.includes('route-management-dashboard.css?v=20261110-reference-v1'));
-assert(html.includes('route-management-dashboard.js?v=20261110-reference-v1'));
+assert(html.includes('route-management-dashboard.js?v=20261111-nct-name-v2'));
 assert(html.includes('WORKING NO.')&&html.includes('SERVICE'),'live working-sheet data still drives statistics');
 const node=()=>({dataset:{},innerHTML:'',textContent:'',hidden:false,style:{},options:[],value:'',
   setAttribute(name,value){this[name]=value;},querySelector(){return null;},querySelectorAll(){return []},
@@ -118,5 +118,15 @@ assert(nodes.routeManagerDetailBody.innerHTML.includes('未提供'),'missing qua
 assert(nodes.routeManagerStatus.textContent.includes('已知小計'),'total with missing source must be qualified');
 assert(nodes.routeManagerStatus.textContent.includes('資料核對異常'),'a mismatch between details and summary must be visible');
 
+const nctRow={route:'NCT',importCalls:1,exportCalls:1,disc:395,load:372,total:767,
+  missingDisc:0,missingLoad:0,details:[
+   {vessel:'WAN HAI 171',date:'2026-11-10',direction:'進口',quantity:395},
+   {vessel:'WAN HAI 171',date:'2026-11-10',direction:'出口',quantity:372}
+  ]};
+api.setTab('basic');
+api.render({month:'2026-11',rows:[nctRow],all:[nctRow],selected:nctRow,historyMasters:[]});
+assert(nodes.routeManagerTableBody.innerHTML.includes('中國大陸華北－台灣航線'),'NCT manager row uses verified name');
+assert(nodes.routeManagerDetailBody.innerHTML.includes('中國大陸華北－台灣航線'),'NCT detail uses verified name');
+assert(!nodes.routeManagerTableBody.innerHTML.includes('中文名稱待補'));
 new vm.Script(script);
 console.log('PASS route management reference layout: six KPIs, one-table + right detail, month, search/source guard, trend/no fabricated data, 4 tabs, sorting, grid toggle and one-time selected route');

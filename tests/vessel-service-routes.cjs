@@ -67,6 +67,14 @@ assert(!fake.routeCardsGrid.innerHTML.includes('<script>'));
 fake.routeSearch.value='foc';c.renderRouteData();
 assert(!fake.routeCardsGrid.innerHTML.includes('>ABC<'));
 assert.equal(fake.routeDataCount.textContent,'2026 年 11 月｜1 條航線｜進口 2 艘次｜出口 1 艘次');
+assert.equal(c.p79RouteChineseName('NCT'),'中國大陸華北－台灣航線');
+c.shipMasters.push({workingNo:'526004',firstDate:'2026-11-03',vessel:'WAN HAI 171',
+  serviceI:'NCT',serviceE:'NCT',workingSheetSource:{disc:10,load:12}});
+fake.routeSearch.value='nct';
+c.renderRouteData();
+assert(fake.routeCardsGrid.innerHTML.includes('中國大陸華北－台灣航線'));
+assert(fake.routeSummaryTableBody.innerHTML.includes('中國大陸華北－台灣航線'));
+assert(!fake.routeCardsGrid.innerHTML.includes('中文名稱待補'),'known NCT service must display its verified name');
 assert(!html.includes('compareMonthlyExcel'));
 assert(!html.includes('parseMonthlyActualRows'));
 assert(!html.includes('monthlyPasteBox'));

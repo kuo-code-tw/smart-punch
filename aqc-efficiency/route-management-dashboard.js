@@ -6,7 +6,7 @@ const $=id=>root.document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const fmt=v=>Number(v||0).toLocaleString('zh-TW',{maximumFractionDigits:2});
 const state={model:null,sort:'code',type:'all',view:'table',tab:'basic',collapsed:false,expanded:new Set(),selected:''};
-const names={CIX:'中國－印度快線',CL1:'中國－呂宋一線',FOC:'福州－廈門－台灣航線',HPH:'台灣－海防航線',JST:'日本關西－泰國航線',JSV:'日本關西－越南航線',JTT:'日本關東－泰國航線',MHT:'民答那峨－香港－台灣航線',TPI:'台灣－中國大陸－印尼航線'};
+const names={CIX:'中國－印度快線',CL1:'中國－呂宋一線',FOC:'福州－廈門－台灣航線',HPH:'台灣－海防航線',JST:'日本關西－泰國航線',JSV:'日本關西－越南航線',JTT:'日本關東－泰國航線',MHT:'民答那峨－香港－台灣航線',NCT:'中國大陸華北－台灣航線',TPI:'台灣－中國大陸－印尼航線'};
 const name=code=>typeof root.p79RouteChineseName==='function'?root.p79RouteChineseName(code):names[code]||'中文名稱待補';
 const num=v=>Number(v)||0;
 const sums=(list,key)=>list.reduce((n,row)=>n+num(row[key]),0);
