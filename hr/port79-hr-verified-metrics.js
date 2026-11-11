@@ -68,7 +68,7 @@ function approvedLeaveCount(rows,month,staffIds){
 }
 function officialOvertime(scheduleRows,month,staffIds){
  if(!validMonth(month)||!Array.isArray(scheduleRows))return{ready:false,reason:'班表月份或資料格式不完整'};
- const allow=new Set(staffIds||[]),ids=new Set(),issues=[];
+ const allow=new Set(staffIds||[]),seen=new Map(),issues=[];
  let hours=0,count=0,planned=0;
  for(const row of scheduleRows){
   const person=id(row.empId||row.id);
@@ -83,8 +83,12 @@ function officialOvertime(scheduleRows,month,staffIds){
    if(!d||!d.startsWith(month+'-'))continue;
    const recordId=norm(r.id);
    if(!recordId){issues.push(person+' 加班申報缺少ID');continue}
-   if(ids.has(recordId))continue;
-   ids.add(recordId);
+   const fingerprint=JSON.stringify({person,day:d,planned:r.planned===true,hours:r.declaredHours??r.rule?.declaredHours,status:norm(r.status)});
+   if(seen.has(recordId)){
+    if(seen.get(recordId)!==fingerprint)issues.push(recordId+' 加班申報內容不一致');
+    continue;
+   }
+   seen.set(recordId,fingerprint);
    if(r.planned===true){planned++;continue}
    const value=Number(r.declaredHours??r.rule?.declaredHours);
    if(!Number.isFinite(value)||value<0||value>24){issues.push(recordId+' 時數待核');continue}
