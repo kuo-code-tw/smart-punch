@@ -27,7 +27,7 @@ assert(gateCSS.includes('#p79Dashboard.p79-gate-view-active'),'Gate CSS also sco
 const versions={
  'port79-reference-dashboard.css':'20261109-home-overtime-name-center-v1',
  'port79-gate-home.css':'20261107-gate-equal-height-v2',
- 'port79-gate-home.js':'20261107-phone-gate-quantities-v1'
+ 'port79-gate-home.js':'20261111-admin-phone-no-gate-v2'
 };
 for(const [file,version] of Object.entries(versions)){
  assert(html.includes(file+'?v='+version),'cache bust updated for '+file);
