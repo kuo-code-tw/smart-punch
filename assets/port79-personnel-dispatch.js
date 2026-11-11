@@ -156,10 +156,10 @@ async function readDispatchSources(month,read){
 const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,readDispatchSources};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
-let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:undefined};const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
+let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:[]},selectedKeys=null;const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
 const el=id=>document.getElementById(id),fmt=v=>v===null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),safe=v=>esc(String(v??''));
 function month(){return el('dispatchMonth')?.value||'';}
-function resetContext(){const token=String(gcToken||'');if(owner!==token||planMonth!==month()){plan={};latest=[];settings={counts:{},lockedGroups:undefined};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='';owner=token;planMonth=month();}}
+function resetContext(){const token=String(gcToken||'');if(owner!==token||planMonth!==month()){plan={};latest=[];settings={counts:{},lockedGroups:[]};selectedKeys=null;if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='';owner=token;planMonth=month();}}
 function sourceRows(){return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&String(r.workDate||'').slice(0,7)===month()));}
 function render(){
  if(!el('dispatchBody'))return;
@@ -189,31 +189,79 @@ function render(){
  const search=normalizePersonName(el('dispatchName').value),sort=el('dispatchSort').value;
  const shown=latest.filter(p=>!search||normalizePersonName(p.name).includes(search)).slice().sort((a,b)=>sort==='hours'?b.hours-a.hours:sort==='containers'?b.containers-a.containers:((b.eff??-1)-(a.eff??-1)));
  el('dispatchBody').innerHTML=shown.map(p=>`<tr><td class="font-bold">${safe(p.name)}</td><td>${safe(p.empId||'—')}</td><td>${safe(p.confirmed&&p.group?p.group+'組':'待核對')}</td><td>${fmt(p.containers)}</td><td>${fmt(p.hours)}</td><td class="font-bold text-teal-700">${fmt(p.eff)}</td><td>${fmt(p.hc)}</td><td>${p.count}</td><td>${safe(p.eff===0?'效率為 0，不列入計算':!p.count?'尚無作業資料':p.invalid?'櫃數或時數待核對':!p.confirmed||!p.group?'排班身分／組別待核對':policy.movable.has(p.key)?'可調組人員，可供試算':'保留組，整組不動')}</td><td><select aria-label="${safe(p.name)}的試算組別" data-dispatch-key="${safe(p.key)}" ${!ready||!policy.movable.has(p.key)?'disabled':''}><option value="">維持原組</option>${codes.map(g=>`<option value="${g}" ${policy.locked.has(g)?'disabled':''} ${plan[p.key]===g?'selected':''}>${g}組</option>`).join('')}</select></td></tr>`).join('')||'<tr><td colspan="10">此月份或搜尋條件尚無人員資料</td></tr>';
- renderSettings();renderRecommendation(rows);renderScenario();if(!state&&owner)void load(false);
+ renderSettings();renderRoster();renderRecommendation(rows);renderScenario();if(!state&&owner)void load(false);
+}
+function chosenKeys(policy=movementPolicy(latest,settings)){
+ return selectedKeys===null?new Set(policy.movable):new Set([...selectedKeys].filter(key=>policy.movable.has(key)));
 }
 function renderSettings(){
- const box=el('dispatchGroupSettings');if(!box)return;if(el('dispatchGenerateButton')){el('dispatchGenerateButton').disabled=generating;el('dispatchGenerateButton').textContent=generating?'正在讀取並產生名單…':'產生調任名單';}
- const policy=movementPolicy(latest,settings),groups=summarize(latest).groups;
- box.innerHTML=groups.map(g=>`<div class="rounded-xl border border-slate-200 p-3"><div class="font-bold">${g.group}組｜${fmt(g.eff)} 櫃／小時</div><label class="flex items-center gap-2 mt-2"><input type="checkbox" data-dispatch-lock="${g.group}" ${policy.locked.has(g.group)?'checked':''} ${!ready?'disabled':''}>保留本組（勾選＝不調動）</label><label class="flex items-center gap-2 mt-2">取出人數 <input type="number" min="0" max="20" step="1" style="width:80px" aria-label="${g.group}組取出人數" data-dispatch-count="${g.group}" value="${settings.counts[g.group]??2}" ${!ready||policy.locked.has(g.group)?'disabled':''}></label></div>`).join('');
+ const box=el('dispatchGroupSettings');if(!box)return;
+ const button=el('dispatchGenerateButton');
+ if(button){button.disabled=generating;button.textContent=generating?'正在計算最佳化編組…':'計算效率最佳化編組';}
+ const policy=movementPolicy(latest,settings),groups=summarize(latest).groups,chosen=chosenKeys(policy);
+ box.innerHTML=groups.map(g=>{
+  const people=latest.filter(p=>p.group===g.group&&p.confirmed),eligible=people.filter(p=>policy.movable.has(p.key)),selected=eligible.filter(p=>chosen.has(p.key));
+  return `<div class="rounded-xl border border-slate-200 p-3">
+   <div class="font-bold">${g.group}組｜${fmt(g.eff)} 櫃／小時</div>
+   <p class="p79d-group-stat">名冊 ${people.length} 人　可參與 ${eligible.length} 人<br>已勾選 ${selected.length} 人</p>
+   <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-dispatch-lock="${g.group}" ${policy.locked.has(g.group)?'checked':''} ${!ready?'disabled':''}>保留本組（不調入、不調出）</label>
+  </div>`;
+ }).join('');
+}
+function renderRoster(){
+ const box=el('dispatchGroupRoster');if(!box)return;
+ const policy=movementPolicy(latest,settings),chosen=chosenKeys(policy);
+ box.innerHTML=codes.map(group=>{
+  const people=latest.filter(p=>p.confirmed&&p.group===group).sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant-u-co-stroke'));
+  const checked=people.filter(p=>chosen.has(p.key)).length;
+  const available=people.filter(p=>policy.movable.has(p.key)).length;
+  return `<section class="p79d-roster-group" aria-label="${group}組完整名冊">
+   <header class="p79d-roster-head"><strong>${group} 組｜共 ${people.length} 人</strong><span>可選 ${available} · 已選 ${checked}</span></header>
+   <div class="p79d-roster-actions">
+    <button type="button" data-dispatch-select-all="${group}" ${!ready||!available?'disabled':''}>勾選本組全部可用人員</button>
+    <button type="button" data-dispatch-select-none="${group}" ${!ready?'disabled':''}>清除本組</button>
+   </div>
+   <div class="p79d-roster-list">${people.map(p=>{
+    const movable=policy.movable.has(p.key),status=!p.confirmed?'組別待核對':policy.locked.has(group)?'保留組':p.invalid?'作業資料異常':p.eff===0?'零效率不列入':!p.count?'尚無作業紀錄':!p.eligible?'有效時數不足':'可參與';
+    return `<label class="p79d-roster-person ${movable?'':'p79d-roster-unavailable'}" title="${safe(status)}">
+       <input type="checkbox" data-dispatch-select="${safe(p.key)}" ${chosen.has(p.key)?'checked':''} ${!ready||!movable?'disabled':''}>
+       <span class="p79d-roster-name">${safe(p.name)}<small>${safe(p.empId||'無工號')}</small></span>
+       <span class="p79d-roster-eff">${p.eff===null?'—':fmt(p.eff)} <small>${movable?'櫃／時':status}</small></span>
+      </label>`;
+   }).join('')||'<p class="p79d-roster-empty">此組目前沒有可確認的在職 AQC 人員。</p>'}</div>
+  </section>`;
+ }).join('');
+ const pending=latest.filter(p=>!p.confirmed||!codes.includes(p.group));
+ const boxPending=el('dispatchUnassigned');
+ if(boxPending){boxPending.innerHTML=pending.length?`<details class="p79d-pending"><summary>另有 ${pending.length} 名人員的排班組別／身分待核對（未歸入四組）</summary><div>${pending.map(p=>`${safe(p.name)}（${safe(p.empId||'無工號')}）`).join('、')}</div></details>`:'';}
+ const count=el('dispatchRosterSelection');
+ if(count)count.textContent=`A～D 組共 ${latest.filter(p=>p.confirmed&&codes.includes(p.group)).length} 人，已選 ${chosen.size} 名可參與效率最佳化。未勾選的人維持原組。`;
 }
 function renderRecommendation(rows){
  const box=el('dispatchRecommendation');if(!box)return;
  const dates=[...new Set(rows.map(r=>String(r.workDate||'').slice(0,10)).filter(Boolean))].sort();
- const coverage=dates.length?`資料範圍 ${dates[0]} ～ ${dates[dates.length-1]}，共 ${dates.length} 個有作業紀錄的日期。`:'';
- if(!ready){const details=readDetails.get(owner+'|'+month())||[],failed=details.filter(item=>!item.ok);box.innerHTML=`<p>${reads.get(owner+'|'+month())==='loading'?'正在確認雲端作業、在職名冊及排班組別，請稍候。':'資料尚未完成確認；可直接按「產生調任名單」重新讀取。'}</p>${failed.length?'<ul class="mt-2">'+failed.map(item=>`<li>${safe(item.label)}：${safe(item.error)}</li>`).join('')+'</ul>':''}`;return;}
- const suggestion=recommendSwap(latest,{...settings,allowNonImproving:true}),policy=movementPolicy(latest,settings);
- const rule=`整組保留：${[...policy.locked].map(g=>g+'組').join('、')||'未設定'}。每個可調組依設定人數取效率較低的有效人員，其他人員維持原組。`;
- if(!suggestion.plan){
-  const candidates=latest.filter(p=>policy.movable.has(p.key)&&p.hours>=10&&p.count-(p.zeroRecords||0)>=5);
-  const selected=codes.flatMap(group=>candidates.filter(p=>p.group===group).sort((a,b)=>a.eff-b.eff||b.hours-a.hours||a.key.localeCompare(b.key)).slice(0,settings.counts[group]??2));
-  box.innerHTML=`<p class="font-bold text-amber-800">${safe(suggestion.reason)}</p><p class="text-sm mt-2">${safe(rule)}</p><p class="text-sm mt-2">${safe(coverage)}</p><h4 class="font-bold mt-3">目前候選名單（尚未安排調入組）</h4><div class="overflow-auto"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>原組</th><th>作業櫃數</th><th>時數</th><th>效率</th></tr></thead><tbody>${selected.map(p=>`<tr><td>${safe(p.name)}</td><td>${p.group}組</td><td>${fmt(p.containers)}</td><td>${fmt(p.hours)}</td><td>${fmt(p.eff)}</td></tr>`).join('')||'<tr><td colspan="5">沒有可調人員；請確認是否將所有組都勾成保留。</td></tr>'}</tbody></table></div><button type="button" class="btn bg-slate-100 mt-3" disabled>確認帶入試算（尚無可用方案）</button>`;return;
+ const coverage=dates.length?`作業資料範圍：${dates[0]} ～ ${dates[dates.length-1]}，共 ${dates.length} 個有紀錄的日期。`:'目前沒有有效作業日期。';
+ if(!ready){
+  const details=readDetails.get(owner+'|'+month())||[],failed=details.filter(item=>!item.ok);
+  box.innerHTML=`<p>${reads.get(owner+'|'+month())==='loading'?'正在讀取作業、在職名冊與排班組別。':'來源尚未完整核對；請重新讀取後再最佳化。'}</p>${failed.length?'<ul class="mt-2">'+failed.map(item=>`<li>${safe(item.label)}：${safe(item.error)}</li>`).join('')+'</ul>':''}`;
+  return;
  }
- box.innerHTML=`${suggestion.warning?`<p class="font-bold text-amber-800">${safe(suggestion.warning)}</p>`:''}<p class="font-bold text-teal-800">${suggestion.recommended===false?'試排名單':'建議'} ${suggestion.moves.map(m=>`${safe(m.person.name)}：${m.from}組 → ${m.to}組`).join('；')}。其餘人員維持原組。</p>
- <p class="text-sm mt-2">${safe(rule)}依作業量與時數試算，各組人數不變；四組效率差距由 <strong>${fmt(suggestion.before.gap)}</strong> 變為 <strong>${fmt(suggestion.after.gap)}</strong> 櫃／小時。</p>
- <div class="overflow-auto mt-3"><table class="tbl w-full text-center"><thead><tr><th>人員</th><th>原組 → 建議組</th><th>作業櫃數</th><th>作業時數</th><th>個人月均效率</th></tr></thead><tbody>${suggestion.moves.map(m=>`<tr><td>${safe(m.person.name)}</td><td>${m.from}組 → ${m.to}組</td><td>${fmt(m.person.containers)}</td><td>${fmt(m.person.hours)}</td><td>${fmt(m.person.eff)}</td></tr>`).join('')}</tbody></table></div>
- <p class="text-sm mt-2">${safe(coverage)}依已匯入資料提出暫定建議，不代表整月資料齊全。只比較可調組中 AQC 同職稱、名冊確認且至少 5 筆作業／10 小時的人員。依設定人數取各組較低效率人員，再搜尋改善可調組效率差距的多人互調方案；保留組不調入、不調出，各組人數不變。此為試算建議，未保證全域最佳。</p>
- <button type="button" class="btn bg-teal-700 text-white mt-3" onclick="P79PersonnelDispatch.useRecommendation()">確認名單並帶入試算</button>`;
+ const selected=chosenKeys();
+ const suggestion=optimizeGroups(latest,{selectedKeys:selected,lockedGroups:settings.lockedGroups});
+ const policy=movementPolicy(latest,settings);
+ const rule=`已勾選 ${selected.size} 人，保留組：${[...policy.locked].map(g=>g+'組').join('、')||'無'}；未選的人不調動，所有組別人數維持不變。`;
+ if(!suggestion.plan){
+  box.innerHTML=`<p class="font-bold text-amber-800">${safe(suggestion.reason)}</p><p class="text-sm mt-2">${safe(rule)}</p><p class="text-sm mt-2">${safe(coverage)}</p>`;
+  return;
+ }
+ box.innerHTML=`<p class="font-bold text-teal-800">建議調動 ${suggestion.moves.length} 人｜原效率差距 ${fmt(suggestion.before.gap)} → ${fmt(suggestion.after.gap)} 櫃／小時</p>
+  <p class="text-sm mt-2">${safe(rule)}${suggestion.optimal?'本次選取人數適用完整排列搜尋，已找到此限制下的最佳編組。':'本次選取人數較多，已以多次搜尋找出較佳方案，並非保證全域最佳。'}</p>
+  <div class="overflow-auto mt-3"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>原組 → 建議組</th><th>有效櫃數</th><th>有效時數</th><th>月均效率</th></tr></thead>
+   <tbody>${suggestion.moves.map(m=>`<tr><td>${safe(m.person.name)}</td><td>${m.from}組 → ${m.to}組</td><td>${fmt(m.person.containers)}</td><td>${fmt(m.person.hours)}</td><td>${fmt(m.person.eff)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="text-sm mt-2">${safe(coverage)}歷史資料用於比較組別均衡程度，無法保證未來實際產能；H/C 不併入櫃數。</p>
+  <button type="button" class="btn bg-teal-700 text-white mt-3" onclick="P79PersonnelDispatch.useRecommendation()">確認名單並帶入試算</button>`;
 }
+
 function renderScenario(){
  const policy=movementPolicy(latest,settings),allowedPlan=Object.fromEntries(Object.entries(plan).filter(([key,target])=>policy.movable.has(key)&&!policy.locked.has(target)));
  const before=summarize(latest),after=summarize(latest,ready?allowedPlan:{}),moves=latest.filter(p=>policy.movable.has(p.key)&&allowedPlan[p.key]&&allowedPlan[p.key]!==p.group);
@@ -259,11 +307,30 @@ api.generateRecommendation=async()=>{
  try{if(!ready)await load(true);render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
  finally{generating=false;renderSettings();}
 };
-api.useRecommendation=()=>{if(!ready)return;const suggestion=recommendSwap(latest,{...settings,allowNonImproving:true});if(suggestion.plan){plan={...suggestion.plan};render();el('dispatchConfirmState').textContent=`已確認 ${suggestion.moves.length} 人，已帶入下方試算；尚未修改正式排班。`;el('dispatchGroupBody')?.scrollIntoView({behavior:'smooth',block:'nearest'});}};
+api.useRecommendation=()=>{if(!ready)return;const suggestion=optimizeGroups(latest,{selectedKeys:chosenKeys(),lockedGroups:settings.lockedGroups});if(suggestion.plan){plan={...suggestion.plan};render();el('dispatchConfirmState').textContent=`已確認 ${suggestion.moves.length} 人，已帶入下方試算；尚未修改正式排班。`;el('dispatchGroupBody')?.scrollIntoView({behavior:'smooth',block:'nearest'});}};
 api.render=render;api.load=load;api.rows=sourceRows;api.clear=()=>{plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='已清除試算，正式排班未變更。';render();};
 document.addEventListener('change',event=>{
  const group=event.target?.dataset?.dispatchLock,countGroup=event.target?.dataset?.dispatchCount;
- if(group&&ready){const locked=movementPolicy(latest,settings).locked;event.target.checked?locked.add(group):locked.delete(group);settings.lockedGroups=[...locked];plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='設定已變更，請重新確認名單。';render();return;}
+ if(group&&ready){const locked=new Set(settings.lockedGroups||[]);event.target.checked?locked.add(group):locked.delete(group);settings.lockedGroups=[...locked];plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='設定已變更，請重新確認名單。';render();return;}
  if(countGroup&&ready){const n=Number(event.target.value);if(!Number.isInteger(n)||n<0||n>20){event.target.value=settings.counts[countGroup]??2;return;}settings.counts[countGroup]=n;plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='人數已變更，請重新確認名單。';render();return;}
+ const selectedKey=event.target?.dataset?.dispatchSelect;
+ if(selectedKey){
+  if(!ready)return;
+  const policy=movementPolicy(latest,settings);
+  if(!policy.movable.has(selectedKey))return;
+  selectedKeys=chosenKeys(policy);
+  if(event.target.checked)selectedKeys.add(selectedKey);else selectedKeys.delete(selectedKey);
+  plan={};render();return;
+ }
  const key=event.target?.dataset?.dispatchKey;if(!key)return;const p=latest.find(p=>p.key===key),target=event.target.value;if(!ready||!p?.eligible||!movementPolicy(latest,settings).movable.has(key)||movementPolicy(latest,settings).locked.has(target)||target&&!codes.includes(target))return;if(target&&target!==p.group)plan[key]=target;else delete plan[key];renderScenario();});
+document.addEventListener('click',event=>{
+ const groupAll=event.target?.dataset?.dispatchSelectAll,groupNone=event.target?.dataset?.dispatchSelectNone;
+ const group=groupAll||groupNone;if(!group||!codes.includes(group)||!ready)return;
+ const policy=movementPolicy(latest,settings);
+ selectedKeys=chosenKeys(policy);
+ for(const p of latest)if(p.group===group&&policy.movable.has(p.key)){
+  if(groupAll)selectedKeys.add(p.key);else selectedKeys.delete(p.key);
+ }
+ plan={};render();
+});
 })(typeof window!=='undefined'?window:globalThis);
