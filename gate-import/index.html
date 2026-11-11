@@ -36,6 +36,7 @@ html[data-gate-embed="1"]{background:transparent}
 html[data-gate-embed="1"] body{background:transparent!important;padding:0!important}
 html[data-gate-embed="1"] main{max-width:none!important;width:100%}
 html[data-gate-embed="1"] header{display:none!important}
+html[data-gate-embed="1"] #gateLivePanel{display:none!important}
 html[data-gate-embed="1"] .panel{box-shadow:none;border-radius:14px;border-color:#deebf6;margin:0 0 12px}
 .metric{transition:background-color .15s ease,transform .15s ease}
 .metric:nth-child(1){background:#eef5ff;border-color:#bfdbfe}.metric:nth-child(1) strong{color:#1d4ed8}
@@ -199,11 +200,6 @@ tbody td:last-child{font-weight:750;color:#047857}
   <button type="button" id="gateLiveNext" aria-label="下一期間">›</button>
   <button type="button" id="gateLiveRefresh" class="gate-live-refresh" aria-label="重新讀取正式資料" title="重新讀取正式資料">↻</button>
  </div>
- <div id="gateDropZone" class="gate-drop-zone" role="button" tabindex="0" aria-label="拖曳或選取 Gate Excel CSV 檔案">
-  <span aria-hidden="true" class="gate-drop-icon">📥</span>
-  <span><strong>將 Gate Excel 拖曳到這裡，或點此選擇檔案</strong><small>支援 XLSX / XLS / CSV · 自動核對每日櫃量並儲存 · 同日期更新、不重複加總</small></span>
- </div>
- <p id="gateMessage" role="status" aria-live="polite">拖入檔案後，這裡會顯示讀取、核對及儲存結果。</p>
  <div class="grid gate-live-metrics">
   <div class="metric"><span>交空櫃</span><strong id="gateLiveDe">—</strong></div>
   <div class="metric"><span>領空櫃</span><strong id="gateLivePe">—</strong></div>
@@ -220,7 +216,13 @@ tbody td:last-child{font-weight:750;color:#047857}
 
 <section class="panel">
 <h2>匯入／更新 Gate Excel</h2>
-<p class="hint">直接拖放至上方匯入區，或使用下方選檔。系統自動核對交空、領空、交重、領重與拖車車次；正式雲端服務驗證成功才自動儲存，同日期採覆蓋更新。</p>
+<p class="hint">將 Gate Excel 拖曳至下方或選擇檔案。系統會核對交空、領空、交重、領重及拖車車次，依日期覆蓋正式資料、不重複加總。</p>
+<div id="gateDropZone" class="gate-drop-zone" role="button" tabindex="0" aria-label="拖曳或選取 Gate Excel CSV 檔案">
+  <span aria-hidden="true" class="gate-drop-icon">📥</span>
+  <span><strong>將 Gate Excel 拖曳到這裡，或點此選擇檔案</strong><small>支援 XLSX / XLS / CSV · 自動核對每日櫃量並儲存 · 同日期更新、不重複加總</small></span>
+ </div>
+ <p id="gateMessage" role="status" aria-live="polite">拖入檔案後，這裡會顯示讀取、核對及儲存結果。</p>
+ 
 <div class="controls"><input type="file" id="gateFile" accept=".xlsx,.xls,.csv" aria-label="選擇 Gate Excel 或 CSV"><label for="gateSheet">工作表</label><select id="gateSheet" aria-label="選擇 Gate 報表工作表" disabled></select><button type="button" id="gatePreview" disabled>重新核對預覽</button></div>
 
 </section>
