@@ -90,3 +90,24 @@
 
 /* Keep the management section locator for permissions, without showing a duplicate page heading. */
 #view-weekly .p79pr-section>.p79pr-legacy-header{display:none!important}
+
+/* A/B/C/D: show every employee within a consistent-height independently scrollable list. */
+#view-weekly .p79pr-group-scroll{
+  height:205px;max-height:205px;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior-y:contain;scrollbar-gutter:stable;
+  scrollbar-width:thin;scrollbar-color:#7eaccf #edf4fa;
+  background:#fff;outline-offset:-2px;
+}
+#view-weekly .p79pr-group-scroll:focus-visible{outline:2px solid #4b8dce}
+#view-weekly .p79pr-group-scroll::-webkit-scrollbar{width:9px}
+#view-weekly .p79pr-group-scroll::-webkit-scrollbar-track{background:#edf4fa;border-radius:7px}
+#view-weekly .p79pr-group-scroll::-webkit-scrollbar-thumb{background:#83afd0;border:2px solid #edf4fa;border-radius:8px}
+#view-weekly .p79pr-group-scroll table{margin-bottom:0}
+#view-weekly .p79pr-group-scroll thead th{
+  position:sticky;top:0;z-index:2;box-shadow:0 1px 0 #dce8f3
+}
+#view-weekly .p79pr-scroll-hint{
+  padding:5px 10px 8px;text-align:center;color:#69839b;
+  font-size:10px;font-weight:650;line-height:1.3
+}
+@media(max-width:670px){#view-weekly .p79pr-group-scroll{height:225px;max-height:225px}}
