@@ -19,7 +19,7 @@ for(const label of ['Day','Week','Month','Year'])assert(toolbar.includes('id="p7
 assert(toolbar.includes('id="p79GatePeriod"')&&toolbar.includes('id="p79GatePrev"')&&toolbar.includes('id="p79GateNext"'));
 assert(!gate.includes('class="p79-gate-caption"'),'remove needless caption occupying vertical space');
 assert(html.includes('port79-gate-home.css?v=20261107-gate-equal-height-v2'));
-assert(html.includes('port79-gate-home.js?v=20261107-phone-gate-quantities-v1'));
+assert(html.includes('port79-gate-home.js?v=20261111-admin-phone-no-gate-v2'));
 const patch=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate same height as the vessel efficiency trend.'));
 assert(patch.includes('grid-auto-rows:260px!important'),'260px desktop row');
 assert(patch.includes('grid-auto-rows:275px!important'),'275px phone row');
