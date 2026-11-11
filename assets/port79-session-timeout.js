@@ -112,25 +112,20 @@ function tick(){
  if(last&&Date.now()-last>=minutes*60000)expire();
 }
 function makeUI(){
- if(!isHr||document.getElementById('p79IdleSettingsButton'))return;
- const anchor=document.getElementById('orgSettingsBtn');
- if(!anchor)return;
- const button=document.createElement('button');button.id='p79IdleSettingsButton';button.type='button';button.className='btn';
- button.innerHTML='🔒 <span class="txt">登入安全設定</span>';
- anchor.insertAdjacentElement('afterend',button);
+ if(!isHr||document.getElementById('p79IdleSettingsDialog'))return;
  const dialog=document.createElement('dialog');dialog.id='p79IdleSettingsDialog';dialog.setAttribute('aria-label','自動登出時間設定');
- dialog.innerHTML='<form method="dialog" class="p79-idle-form"><div class="p79-idle-title"><div><h2>🔒 登入安全設定</h2><p>人資管理 → 系統設定 → 自動登出</p></div><button type="submit" class="p79-idle-close" aria-label="關閉">✕</button></div><div class="p79-idle-body"><label for="p79IdleMinutes">連續沒有操作時，自動登出</label><select id="p79IdleMinutes"><option value="5">5 分鐘（預設）</option><option value="10">10 分鐘</option><option value="15">15 分鐘</option><option value="20">20 分鐘</option><option value="30">30 分鐘</option><option value="60">60 分鐘</option><option value="120">120 分鐘</option><option value="custom">自訂時間</option></select><div id="p79IdleCustomRow" hidden><label for="p79IdleCustom">自訂分鐘數（1～120 分鐘）</label><input id="p79IdleCustom" type="number" min="1" max="120" step="1" value="5" inputmode="numeric"></div><div class="p79-idle-summary" id="p79IdlePreview">全部公司、全部單位、全部人員：連續 5 分鐘未操作，自動登出並返回首頁。</div><p class="p79-idle-hint">滑鼠、鍵盤、捲動、觸控操作會重新計時；系統背景資料更新不列入操作。</p><p id="p79IdleStatus" role="status" class="p79-idle-status"></p></div><div class="p79-idle-actions"><button type="button" id="p79IdleSave" class="btn primary">儲存設定</button><button type="submit" class="btn">取消</button></div></form>';
+ dialog.innerHTML='<form method="dialog" class="p79-idle-form"><div class="p79-idle-title"><div><h2>🔒 閒置自動登出</h2><p>人資管理 → 功能選單 → 系統與安全</p></div><button type="submit" class="p79-idle-close" aria-label="關閉">✕</button></div><div class="p79-idle-body"><label for="p79IdleMinutes">連續沒有操作時，自動登出</label><select id="p79IdleMinutes"><option value="5">5 分鐘（預設）</option><option value="10">10 分鐘</option><option value="15">15 分鐘</option><option value="20">20 分鐘</option><option value="30">30 分鐘</option><option value="60">60 分鐘</option><option value="120">120 分鐘</option><option value="custom">自訂時間</option></select><div id="p79IdleCustomRow" hidden><label for="p79IdleCustom">自訂分鐘數（1～120 分鐘）</label><input id="p79IdleCustom" type="number" min="1" max="120" step="1" value="5" inputmode="numeric"></div><div class="p79-idle-summary" id="p79IdlePreview">全部公司、全部單位、全部人員：連續 5 分鐘未操作，自動登出並返回首頁。</div><p class="p79-idle-hint">滑鼠、鍵盤、捲動、觸控操作會重新計時；系統背景資料更新不列入操作。</p><p id="p79IdleStatus" role="status" class="p79-idle-status"></p></div><div class="p79-idle-actions"><button type="button" id="p79IdleSave" class="btn primary">儲存設定</button><button type="submit" class="btn">取消</button></div></form>';
  const style=document.createElement('style');style.textContent='#p79IdleSettingsDialog{border:0;border-radius:18px;max-width:min(520px,calc(100vw - 24px));width:100%;padding:0;background:var(--panel,#fff);color:var(--text,#111827);box-shadow:0 25px 70px #0005}#p79IdleSettingsDialog::backdrop{background:#0f172a88}.p79-idle-form{margin:0}.p79-idle-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 22px;border-bottom:1px solid #cbd5e1}.p79-idle-title h2{margin:0;font-size:20px}.p79-idle-title p{margin:6px 0 0;color:var(--muted,#64748b);font-size:12px}.p79-idle-close{border:0;background:none;color:inherit;font-size:22px;cursor:pointer}.p79-idle-body{padding:22px;display:grid;gap:12px}.p79-idle-body label{font-size:14px;font-weight:800}.p79-idle-body select,.p79-idle-body input{width:100%;padding:11px;border:1px solid #94a3b8;border-radius:9px;background:var(--card,#fff);color:inherit;font-size:15px}.p79-idle-summary{padding:15px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1e40af;line-height:1.6;font-weight:750}.p79-idle-hint{margin:0;color:var(--muted,#64748b);font-size:12px;line-height:1.7}.p79-idle-status{min-height:19px;margin:0;font-size:12px}.p79-idle-actions{padding:16px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #cbd5e1}@media(prefers-color-scheme:dark){#p79IdleSettingsDialog .p79-idle-summary{background:#172554;color:#bfdbfe;border-color:#1e40af}}';
  document.head.append(style);document.body.append(dialog);
  const select=dialog.querySelector('#p79IdleMinutes'),custom=dialog.querySelector('#p79IdleCustom'),save=dialog.querySelector('#p79IdleSave');
  select.addEventListener('change',refreshPreview);custom.addEventListener('input',refreshPreview);
- button.addEventListener('click',async()=>{
+ window.Port79IdleLogout.openSettings=async()=>{
   select.value=[5,10,15,20,30,60,120].includes(minutes)?String(minutes):'custom';
   custom.value=String(minutes);save.disabled=!canManage();
   setStatus(canManage()?'正在確認雲端時間設定…':'只有超級管理員能調整全系統自動登出時間',false);
   refreshPreview();dialog.showModal();
   if(canManage()){await syncCloud(true);select.value=[5,10,15,20,30,60,120].includes(minutes)?String(minutes):'custom';custom.value=String(minutes);refreshPreview();}
- });
+ };
  save.addEventListener('click',saveUI);
 }
 function chosen(){
@@ -172,7 +167,7 @@ function idleNotice(){
   if(status){status.textContent='因連續 '+minutes+' 分鐘沒有操作，系統已自動登出。請重新登入。';status.classList.add('warning');}
  }catch(e){}
 }
-window.Port79IdleLogout={currentMinutes:()=>minutes,sync:()=>syncCloud(true)};
+window.Port79IdleLogout={currentMinutes:()=>minutes,sync:()=>syncCloud(true),openSettings:()=>{if(!isHr)return;makeUI();return window.Port79IdleLogout.openSettings();}};
 function start(){
  readCache();idleNotice();makeUI();
  ['pointerdown','keydown','wheel','touchstart','scroll','input'].forEach(type=>window.addEventListener(type,activity,{passive:true,capture:true}));

@@ -4,7 +4,7 @@
  window.__port79IdleTimeoutLoader=true;
  const source=document.currentScript?.src||new URL('assets/port79-management-workspace.js',location.href).href;
  const s=document.createElement('script');
- s.src=new URL('port79-session-timeout.js?v=20261111-production-v1',source).href;
+ s.src=new URL('port79-session-timeout.js?v=20261111-hr-menu-v2',source).href;
  s.async=true;
  s.onerror=()=>{console.error('登入逾時控制元件載入失敗');};
  document.head.appendChild(s);

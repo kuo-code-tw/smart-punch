@@ -4,7 +4,7 @@
  window.__port79IdleTimeoutLoader=true;
  const source=document.currentScript?.src||new URL('assets/port79-seven-top.js',location.href).href;
  const s=document.createElement('script');
- s.src=new URL('port79-session-timeout.js?v=20261111-production-v1',source).href;
+ s.src=new URL('port79-session-timeout.js?v=20261111-hr-menu-v2',source).href;
  s.async=true;
  s.onerror=()=>{console.error('登入逾時控制元件載入失敗');};
  document.head.appendChild(s);
@@ -154,6 +154,7 @@ function actionAllowed(sys,action){
  if(['global-theme','logout-system'].includes(action))return true;
  const level=systemLevel(sys);if(level==='none')return false;
  const manage=['add','import','attendance-import','balance-import','leave-edit','schedule-continue','schedule-lock','schedule-takeover','schedule-mode','reset-cloud','org','permissions','overtime-options','settings','clearDeleted'];
+ if(action==='idle-settings')return sys==='hr'&&roleText()==='超級管理員';
  if(action==='schedule-takeover')return roleText()==='超級管理員';
  return !manage.includes(action)||level==='manage';
 }
@@ -226,7 +227,7 @@ const MENU={
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入請假可休天數'],['balance-export','📤 匯出請假可休天數']],
  schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入排班'],['export','📤 匯出排班'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入船舶資料'],['monthly-export','📥 匯出船舶月作業量表'],['compare','🧭 航線資料'],['year','📆 年份顯示']],
- hr:[['import','📥 匯入人資名冊'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出人資名冊'],['year','📆 年份顯示']],
+ hr:[['idle-settings','🔒 閒置自動登出'],['import','📥 匯入人資名冊'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出人資名冊'],['year','📆 年份顯示']],
  history:[]
 };
 function scheduleLockMenuState(){
@@ -311,6 +312,10 @@ function toggleMenu(e){
 
 async function runAction(sys,a){closeMenu();try{
  if(!actionAllowed(sys,a))return alert('沒有此功能的操作權限，請聯絡管理員確認授權');
+ if(a==='idle-settings'){
+   if(!window.Port79IdleLogout?.openSettings)throw new Error('自動登出設定尚未載入，請重新整理後再試');
+   return window.Port79IdleLogout.openSettings();
+ }
  if(a==='workflow')return openWorkflow(sys);
  if(a==='overtime-options')return await window.P79Overtime?.openRules?.();
  if(a==='global-theme')return toggleGlobalTheme();
@@ -377,12 +382,18 @@ async function runAction(sys,a){closeMenu();try{
 
 function buildMenu(sys){
  const menu=document.createElement('div');menu.id='p79SevenStandardMenu';menu.className='p79-seven-standard-menu';
+ if(sys==='hr')menu.classList.add('p79-hr-compact-menu');
  const account=userInfo();
- const accountTitle=document.createElement('div');accountTitle.className='menu-title';accountTitle.textContent='登入資訊';menu.appendChild(accountTitle);
+ const accountTitle=document.createElement('div');accountTitle.className='menu-title';accountTitle.textContent='登入資訊';if(sys!=='hr')menu.appendChild(accountTitle);
  const accountInfo=document.createElement('div');accountInfo.className='p79-seven-account-info';accountInfo.textContent='👤 '+account.name+'｜'+account.role;menu.appendChild(accountInfo);
  const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
  // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
- const GROUPS=[
+ const GROUPS=sys==='hr'?[
+  ['人員資料',['add','import','export']],
+  ['系統與安全',['idle-settings','org','overtime-options','permissions','logs']],
+  ['顯示與工具',['year','global-theme','data-cache','workflow']],
+  ['', ['logout-system']]
+ ]:[
   ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','schedule-continue','import','export','monthly-export']],
   ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
   ['權限管理',['permissions','leave-edit']],
@@ -405,7 +416,7 @@ function buildMenu(sys){
  GROUPS.forEach(([heading,actions])=>{
    const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['workflow','data-cache','global-theme','logout-system'].includes(a)));
    if(!included.length)return;
-   const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);
+   if(heading){const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);}
    included.forEach(a=>{
      if(a==='workflow')addAction(a,'📖 操作流程','common');
      else if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');

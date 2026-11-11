@@ -470,3 +470,13 @@ body[data-p79-system] #p79UnifiedShellV103{display:none!important}
 @media(max-width:1150px){
   #p79SevenStatus{justify-content:flex-start;}
 }
+
+/* HR: three compact groups; keep the security setting in the active menu. */
+#p79SevenMenuWrap>.p79-hr-compact-menu{width:min(350px,calc(100vw - 24px));max-height:calc(100dvh - 90px);padding:10px}
+#p79SevenMenuWrap>.p79-hr-compact-menu.open{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 5px}
+#p79SevenMenuWrap>.p79-hr-compact-menu :is(.menu-title,.p79-seven-account-info,.sep){grid-column:1/-1}
+#p79SevenMenuWrap>.p79-hr-compact-menu .menu-title{margin:5px 0 1px;padding:5px 8px;background:transparent;color:#64748b}
+#p79SevenMenuWrap>.p79-hr-compact-menu button[data-action]{min-width:0;min-height:36px;margin:0;padding:8px;font-size:12px;line-height:1.4;white-space:normal}
+#p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="idle-settings"]{grid-column:1/-1;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:13px;min-height:40px}
+#p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="logout-system"]{grid-column:1/-1;margin-top:7px}
+html[data-theme="dark"] #p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="idle-settings"]{background:#172554;color:#bfdbfe;border-color:#1e40af}
