@@ -111,3 +111,40 @@
   font-size:10px;font-weight:650;line-height:1.3
 }
 @media(max-width:670px){#view-weekly .p79pr-group-scroll{height:225px;max-height:225px}}
+
+/* The full WORKING REPORT personnel records collapse by default; CSS does not affect data rendering. */
+#view-weekly .p79pr-details > .p79pr-legacy-detail-label{display:none!important}
+#view-weekly .p79pr-detail-card{display:block;width:100%;border:0;padding:0}
+#view-weekly .p79pr-detail-toggle{
+  cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:13px 16px;list-style:none;user-select:none;
+  background:#f7fbff;color:#0d3260;border-bottom:0;
+}
+#view-weekly .p79pr-detail-toggle::-webkit-details-marker{display:none}
+#view-weekly .p79pr-detail-toggle:focus-visible{outline:3px solid #4f91d1;outline-offset:-3px}
+#view-weekly .p79pr-detail-toggle:hover{background:#edf6ff}
+#view-weekly .p79pr-detail-toggle .p79pr-detail-heading{display:flex;gap:9px;align-items:center;font-size:15px;font-weight:950;white-space:nowrap}
+#view-weekly .p79pr-detail-toggle .p79pr-detail-description{font-size:10px;color:#73859c;font-weight:650}
+#view-weekly .p79pr-detail-toggle #personnelRecordCount{
+  margin:0!important;margin-left:auto!important;color:#47718f!important;
+  font-size:11px!important;font-weight:650;line-height:1.4;
+}
+#view-weekly .p79pr-detail-toggle .p79pr-toggle-pill{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:6px 10px;border:1px solid #b8d4ee;border-radius:8px;
+  background:#e7f2ff;color:#125a9d;font-size:11px;font-weight:900;
+}
+#view-weekly .p79pr-detail-toggle .p79pr-toggle-pill::after{content:"⌄";display:inline-block;font-size:14px;line-height:1;transition:transform .15s}
+#view-weekly .p79pr-detail-card[open] .p79pr-detail-toggle{border-bottom:1px solid #d4e2ef;background:#edf6ff}
+#view-weekly .p79pr-detail-card[open] .p79pr-toggle-pill::after{transform:rotate(180deg)}
+#view-weekly .p79pr-detail-card .p79pr-label-open{display:none}
+#view-weekly .p79pr-detail-card[open] .p79pr-label-open{display:inline}
+#view-weekly .p79pr-detail-card[open] .p79pr-label-closed{display:none}
+#view-weekly .p79pr-detail-table-scroll{overflow:auto;max-height:min(62vh,680px);overscroll-behavior:contain}
+#view-weekly .p79pr-detail-table-scroll .p79pr-data-table thead th{position:sticky;top:0;z-index:3}
+@media(max-width:700px){
+  #view-weekly .p79pr-detail-toggle{gap:7px}
+  #view-weekly .p79pr-detail-toggle #personnelRecordCount{width:100%;order:3;margin-left:0!important}
+  #view-weekly .p79pr-detail-toggle .p79pr-detail-description{display:none}
+  #view-weekly .p79pr-detail-toggle .p79pr-toggle-pill{margin-left:auto}
+}
