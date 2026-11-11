@@ -7,7 +7,7 @@
 var doc=g.document;if(!doc)return;
 var $=function(id){return doc.getElementById(id);};
 var keys=['deliverEmpty','pickupEmpty','deliverLoaded','pickupLoaded','truckEntries'];
-var cache=new Map(),anchor=today(),mode='day',version=0,stamp='';
+var cache=new Map(),anchor=today(),mode='day',version=0,stamp='',firstConfirmedLoad=true;
 var nf=new Intl.NumberFormat('zh-TW');
 function fmt(n){return n===null||n===undefined?'—':nf.format(n);}
 function show(id,value){var e=$(id);if(e)e.textContent=value;}
@@ -170,16 +170,24 @@ async function load(force){
    if(id===version&&auth().stamp===current.stamp)cache.set(year,cleanRows(data.rows,year));
   }));
   if(id!==version||auth().stamp!==current.stamp)return;
+  // Initial day view should open the newest genuinely recorded day, not an
+  // unimported current date. Manual date selections remain untouched.
+  if(firstConfirmedLoad&&mode==='day'&&!sum(period('day',anchor))){
+    var found=Array.from(cache.values()).flat().map(function(row){return row.date;})
+      .filter(function(date){return date<=anchor;}).sort();
+    if(found.length)anchor=found[found.length-1];
+  }
+  firstConfirmedLoad=false;
   render();textStatus(sourceStatus()+' 資料來源：正式 Gate 每日紀錄。',getRows(period(mode,anchor))?.length?'success':'info');
  }catch(error){if(id!==version)return;render();textStatus('正式資料讀取失敗：'+String(error&&error.message||error).slice(0,160),'error');}
 }
-function choose(which){if(['day','month','year'].indexOf(which)<0)return;mode=which;void load(false);}
-function handleDate(v){if(!validDate(v))return;anchor=v;void load(false);}
+function choose(which){if(['day','month','year'].indexOf(which)<0)return;firstConfirmedLoad=false;mode=which;void load(false);}
+function handleDate(v){if(!validDate(v))return;firstConfirmedLoad=false;anchor=v;void load(false);}
 function attach(){
  ['Day','Month','Year'].forEach(function(x){$('mode'+x)?.addEventListener('click',function(){choose(x.toLowerCase());});});
  ['periodDate','topDate'].forEach(function(x){$(x)?.addEventListener('change',function(){handleDate(this.value);});});
- $('previous')?.addEventListener('click',function(){anchor=moveAnchor(mode,-1);void load(false);});
- $('next')?.addEventListener('click',function(){anchor=moveAnchor(mode,1);void load(false);});
+ $('previous')?.addEventListener('click',function(){firstConfirmedLoad=false;anchor=moveAnchor(mode,-1);void load(false);});
+ $('next')?.addEventListener('click',function(){firstConfirmedLoad=false;anchor=moveAnchor(mode,1);void load(false);});
  $('refresh')?.addEventListener('click',function(){void load(true);});
  render();void load(false);
 }
