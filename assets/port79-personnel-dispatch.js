@@ -113,7 +113,7 @@ function render(){
  };
  Object.entries(kpiValues).forEach(([id,value])=>{const target=el(id);if(target)target.textContent=value;});
  const readyPill=el('dispatchReadyPill');
- if(readyPill){readyPill.dataset.ready=ready?'true':'false';readyPill.textContent=ready?'資料已確認':state==='loading'?'整月讀取中':state==='partial'?'部分資料未完成':state==='error'?'資料讀取失敗':'資料待確認';}
+ if(readyPill){if(readyPill.dataset)readyPill.dataset.ready=ready?'true':'false';readyPill.textContent=ready?'資料已確認':state==='loading'?'整月讀取中':state==='partial'?'部分資料未完成':state==='error'?'資料讀取失敗':'資料待確認';}
 
  const policy=movementPolicy(latest,settings);
  for(const key of Object.keys(plan))if(!policy.movable.has(key)||policy.locked.has(plan[key]))delete plan[key];
