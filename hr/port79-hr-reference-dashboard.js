@@ -33,6 +33,11 @@ function isCloudReady(){try{return typeof p79HrCloudDataReady!=='undefined'&&p79
 function authorized(action){try{return typeof canHr==='function'&&canHr(action)}catch(e){return false}}
 function header(){
  var shell=byId('p79HrShellV103');if(!shell)return false;
+ shell.dataset.p79Layout='reference';
+ // The shared seven-system shell hides legacy headers before this page mounts.
+ // Restore the HR header after that pass; retain its shared session/cache code.
+ shell.style.setProperty('display','block','important');
+ shell.removeAttribute('aria-hidden');
  shell.innerHTML=[
  '<div class="p79r-top">',
  '<a class="p79r-brand" href="../" aria-label="返回碼頭營運系統首頁"><span class="p79r-symbol">🚢</span><span class="p79r-name">碼頭營運統計</span></a>',
@@ -209,8 +214,8 @@ function renderDashboard(){
  var records=readEmployees(),ready=isCloudReady(),anchor=periodDate();
  var data=updateCounts(records,anchor,ready);
  updateDepartments(data.active);
- updateAlerts(records,anchor,data);
- updateHistory(records,anchor);
+ if(ready||records.length){updateAlerts(records,anchor,data);updateHistory(records,anchor)}
+ else{text('p79rAlerts','等待人資主檔核對…');text('p79rHistoryChart','等待到離職紀錄…')}
  var now=new Date(),source=ready?'雲端已同步':records.length?'本機資料待核對':'資料待同步';
  if(ready)lastCloudRefresh=ymd(now)+' '+now.toLocaleTimeString('zh-TW',{hour12:false});
  text('p79rUpdated',source+(lastCloudRefresh?'｜'+lastCloudRefresh:''));

@@ -525,7 +525,10 @@ function p79NormalizeLegacyTop(sys){
  const m=META[sys]||META.attendance;
  // 以單一共用頂部為準；保留舊頁面的事件與資料節點，不刪除業務區塊。
  const selectors=['#p79LeaveTop','#p79HrShellV103','#p79UnifiedShell','#p79UnifiedShellV102','#p79UnifiedShellV103','#p79EfficiencyTop','#p79ScheduleTop'];
- selectors.forEach(sel=>{const el=document.querySelector(sel);if(el){el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true')}});
+ selectors.forEach(sel=>{const el=document.querySelector(sel);if(el){
+   if(sys==='hr'&&el.dataset.p79Layout==='reference')return;
+   el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true')
+ }});
  document.body?.setAttribute('data-p79-system',sys);
  document.title=m[1]+'｜79號碼頭雲端智慧系統';
 }

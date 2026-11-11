@@ -2147,6 +2147,9 @@ function currentOfficialJobTitle(e){
 
 function isAqcEmployee(e){
   if(!e)return false;
+  // 現職名冊先依正式人資狀態過濾；離職／留停者即使仍保留 AQC 職稱也不可計入目前人數。
+  const employmentState=String(e.employmentStatus||e.employeeStatus||e.employment_status||e['在職狀態']||e['員工狀態']||e.status||'').trim().normalize('NFKC').toLowerCase();
+  if(/^(?:resigned|terminated|retired|inactive|quit|leave|loa|離職|已離職|退休|退職|資遣|解雇|解僱|留職停薪|留停)$/.test(employmentState))return false;
 
   // v2026.09.26.25：
   // 「目前職稱」優先於舊部門、歷史作業、舊分組文字。
@@ -5095,6 +5098,10 @@ function renderVesselDriverView(){
   if(body)body.innerHTML=shown.map(g=>`<tr><td class="font-bold">${esc(g.name)}</td><td>${esc(g.group)}</td><td>${esc(g.aqc)}</td><td>${g.count}</td><td>${g.hours.toFixed(2)}</td><td>${g.disc}</td><td>${g.load}</td><td>${g.hc}</td><td class="font-black">${g.containers}</td><td>${g.eff.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="10" class="p-5 text-slate-400">目前沒有司機明細；可讀取此月份的雲端／歷史明細。</td></tr>';
   const detail=document.getElementById('driverVesselRecordBody');
   if(detail)detail.innerHTML=renderDriverVesselDetailTable(visibleRows);
+  // Dashboard presentation uses canonical ship rows; auditing stays unfiltered.
+  if(typeof window!=='undefined'&&window.P79DriverDashboard?.render){
+    window.P79DriverDashboard.render({master:ref.master,allRows:ref.rows,visibleRows,audit,ambiguous:ref.ambiguous,month,readStatus:read?.status||''});
+  }
   if(document.getElementById('integratedRecordDetails'))openIntegratedRecordDetails();
   if(!read&&String(gcToken||''))void loadDriverVesselMonth(false);
 }
@@ -15839,7 +15846,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
-<script src="../assets/port79-personnel-dispatch.js?v=20261111-oneclick-balanced-v5"></script>
+<script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6"></script>
 <script src="../assets/port79-full-refresh.js?v=20261105.1"></script>
 <style id="p79-vessel-desktop-fullwidth-v20261019">
 @media(min-width:1000px){
@@ -15945,5 +15952,7 @@ window.addEventListener('load',function(){
 </style>
 <script src="./personnel-reference-dashboard.js?v=20261111-scroll-all-v2"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
+<link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261111-v2">
+<script src="./driver-workstation-dashboard.js?v=20261111-v2"></script>
 </body></html>
 

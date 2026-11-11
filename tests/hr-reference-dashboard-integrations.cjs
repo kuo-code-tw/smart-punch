@@ -37,6 +37,14 @@ test('existing human-resources editing, status and permission functions stay int
   assert(html.includes(id),id);
  }
 });
+test('shared navigation preserves the mounted horizontal HR header',()=>{
+ const shared=fs.readFileSync('assets/port79-seven-top.js','utf8');
+ const source=shared.slice(shared.indexOf('function p79NormalizeLegacyTop(sys){'),shared.indexOf('\nfunction mount(){',shared.indexOf('function p79NormalizeLegacyTop(sys){')));
+ const header={dataset:{p79Layout:'reference'},style:{setProperty(){throw Error('HR header was hidden')}},setAttribute(){throw Error('HR header made inaccessible')}};
+ const ctx={META:{hr:['','人資管理']},document:{querySelector:q=>q==='#p79HrShellV103'?header:null,body:{setAttribute(){}},title:''}};
+ vm.createContext(ctx);vm.runInContext(source+';p79NormalizeLegacyTop("hr")',ctx);
+ assert(css.includes('html body.p79-workspace.p79r-ready{padding:0!important'));
+});
 test('valid local and ROC dates only',()=>{
  assert.equal(M.date('115/11/11'),'2026-11-11');
  assert.equal(M.date('2026-11-11'),'2026-11-11');
@@ -88,7 +96,7 @@ test('partial official data must not produce false zero or attendance rate',()=>
 });
 test('HR dashboard can toggle existing employee table',()=>{
  const els={};const e=id=>els[id]||(els[id]={value:'',textContent:'',innerHTML:'',dataset:{},
-   remove(){},addEventListener(){},querySelectorAll(){return []},classList:{add(){},toggle(){}}});
+   remove(){},removeAttribute(){},style:{setProperty(){}},addEventListener(){},querySelectorAll(){return []},classList:{add(){},toggle(){}}});
  const main=e('main');main.querySelector=()=>null;main.insertBefore=x=>{els[x.id]=x};
  main.appendChild=x=>{els[x.id]=x};
  const doc={readyState:'complete',getElementById:id=>els[id]||null,
@@ -125,6 +133,7 @@ async function cloud(){
   fetch:async raw=>{
    const url=new URL(raw),action=url.searchParams.get('action');calls.push(action);
    assert.equal(url.searchParams.get('token'),'TEST');
+   if(action==='getLeaveData')assert.equal(url.searchParams.has('month'),false,'use the existing full leave ledger contract');
    const data=action==='getLeaveData'?{ok:true,employees:persons,leaveRecords:leaves.slice(0,1)}:
      action==='getScheduleDataSecure'?{ok:true,schedules:schedule}:
      action==='getAttendanceMainDirect'?{ok:true,records:[{empId:'A01',type:'上班打卡',timeStr:'2026-11-11 07:55:00'}]}:
@@ -138,9 +147,15 @@ async function cloud(){
  assert.equal(e('p79rLeaves').textContent,'1');
  assert.equal(e('p79rOvertime').textContent,'2.0 小時');
  assert.equal(calls.length,3);
+ let attempts=0;const successfulFetch=c.fetch;
+ c.fetch=async raw=>{if(new URL(raw).searchParams.get('action')==='getLeaveData'&&attempts++===0)throw Error('temporary network failure');return successfulFetch(raw)};
+ await w.P79HrStatistics.refresh();
+ assert.equal(attempts,2,'one bounded read retry after a transient failure');
+ assert.equal(e('p79rLeaves').textContent,'1');
+ assert.equal(calls.length,6);
  account={empId:'OTHER',adminRole:'admin',systemPermissions:{hr:'view',attendance:'none',leave:'none',schedule:'none',workhours:'none'}};
  await w.P79HrStatistics.refresh();
- assert.equal(calls.length,3,'must not query forbidden module on account switch');
+ assert.equal(calls.length,6,'must not query forbidden module on account switch');
  assert.equal(e('p79rAttendance').textContent,'—');
 }
 cloud().then(()=>{passed++;console.log('PASS authorized read-only source bridge and permission switching');
