@@ -10,7 +10,7 @@ for(const name of tabs){
  assert(navBlock.includes("switchTab('"+name+"',this)"),name+' keeps original click action');
 }
 assert(html.includes('id="efficiencySharedYear"'),'shared year picker preserved');
-assert(html.includes('route-management-dashboard.css?v=20261111-aligned-tabs-v2'),'route stylesheet cache version updated');
+assert(html.includes('route-management-dashboard.css?v=20261111-compact-row-v3'),'compact toolbar stylesheet cache version updated');
 assert(html.includes('id="routeTopMonthFilter"'),'route-specific month picker preserved');
 assert(html.includes('id="routeManagerSyncBtn"'),'route-specific vessel sync preserved');
 assert(html.includes('id="routeManagerCompareNav"'),'route-specific comparison control preserved');
@@ -24,8 +24,25 @@ assert(!css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{'
 assert(css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:12px 12px 24px!important;margin:0 auto!important}'),'route main area uses the same outer vertical padding');
 assert(!css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}'),'no special zero-padding route layout');
 assert(css.includes('#view-compare .p79-rm-brand{display:none!important}'),'duplicate blue system brand removed');
-assert(css.includes('#view-compare .p79-rm-topnav>button:nth-child(-n+3){display:none!important}'),'duplicate route, vessel and stats tabs removed');
+const routeStart=html.indexOf('<section id="view-compare"');
+const toolbarStart=html.indexOf('class="p79-rm-topbar"',routeStart);
+const toolbarEnd=html.indexOf('class="p79-rm-main"',toolbarStart);
+const routeBar=html.slice(toolbarStart,toolbarEnd);
+assert(routeStart>=0&&toolbarStart>routeStart&&toolbarEnd>toolbarStart,'route toolbar is before route main');
+const heading=routeBar.indexOf('<h2>航線資料管理</h2>');
+const compare=routeBar.indexOf('id="routeManagerCompareNav"');
+const exportButton=routeBar.indexOf('id="routeManagerExportBtn"');
+const month=routeBar.indexOf('id="routeTopMonthFilter"');
+const sync=routeBar.indexOf('id="routeManagerSyncBtn"');
+const profile=routeBar.indexOf('class="p79-rm-profile"');
+assert(heading>=0&&heading<compare&&compare<exportButton&&exportButton<month&&month<sync&&sync<profile,
+ 'title, two route buttons, month, sync and profile appear in one toolbar in order');
+assert(!html.slice(toolbarEnd,toolbarEnd+220).includes('class="p79-rm-heading"'),'no duplicate title beneath toolbar');
+assert(!css.includes('#view-compare .p79-rm-topnav>button:nth-child(-n+3){display:none!important}'),'no buttons accidentally hidden by old nth-child rule');
+assert(css.includes('flex-wrap:nowrap!important;gap:9px!important;min-height:0!important;height:auto!important'),'toolbar stays one row');
+assert(css.includes('overflow-x:auto!important;overflow-y:hidden!important'),'narrow viewport can scroll toolbar');
+assert(css.includes('#view-compare .p79-rm-main{padding-top:6px!important}'),'no wasted heading gap');
 assert(css.includes('#view-compare .p79-rm-topnav>button{'),'route comparison/export remain visible as compact actions');
 assert(css.includes('#view-compare .p79-rm-top-actions{'),'month, sync and profile remain visible as utility actions');
 assert(css.includes('@media(max-width:960px)'),'mobile layout keeps horizontal menu scrolling');
-console.log('PASS route menu: restored original 8 colored tabs and preserved route-only controls');
+console.log('PASS route menu: eight colored global tabs and compact single-row route toolbar with original controls');
