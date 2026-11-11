@@ -55,6 +55,8 @@ function header(){
  '<button type="button" onclick="window.p79HrMenuAction(\'refresh\')">↻ 重新同步</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'add\')">＋ 新增員工</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'org\')">⚙️ 部門／單位／職稱</button>',
+ '<button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>',
+ '<button type="button" onclick="window.p79HrMenuAction(\'cleanupDevices\')">🧹 清理免綁裝置</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'permissions\')">🔐 權限總覽</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'logs\')">🧾 登入紀錄</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'export\')">📥 匯出人資名冊</button>',
