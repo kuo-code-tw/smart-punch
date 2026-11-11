@@ -9,7 +9,7 @@ const js=fs.readFileSync(path.join(base,'assets/port79-gate-import.js'),'utf8');
 const backend=fs.readFileSync(path.join(base,'backend/gate-stats-daily-import.gs'),'utf8');
 new vm.Script(js);
 assert(html.includes('id="gateDropZone"'), 'drop target available above official Gate metrics');
-assert(html.indexOf('id="gateDropZone"')<html.indexOf('class="grid gate-live-metrics"'));
+assert(html.indexOf('id="gateDropZone"')>html.indexOf('<h2>匯入／更新 Gate Excel</h2>')&&html.indexOf('id="gateDropZone"')<html.indexOf('id="gateFile"'),'drop zone is preserved inside collapsible Excel importer, rather than obsolete Gate cards');
 assert(html.includes('gate-drag-autosave-v6'),'import JS cache is refreshed');
 assert(backend.includes('index.get(date)'),'back end continues date upsert instead of addition');
 class Element{
