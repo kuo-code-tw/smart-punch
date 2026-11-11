@@ -31,9 +31,6 @@ function status(e,asOf){
 function readEmployees(){try{return typeof employees!=='undefined'&&Array.isArray(employees)?employees:[]}catch(e){return []}}
 function isCloudReady(){try{return typeof p79HrCloudDataReady!=='undefined'&&p79HrCloudDataReady}catch(e){return false}}
 function authorized(action){try{return typeof canHr==='function'&&canHr(action)}catch(e){return false}}
-function warnUnavailable(name){
- alert(name+'：目前的人資主檔未提供此功能所需的正式資料來源、計算規則和操作權限，暫不開放直接操作；不會產生虛構資料或異動既有資料。');
-}
 function header(){
  var shell=byId('p79HrShellV103');if(!shell)return false;
  shell.innerHTML=[
@@ -46,9 +43,7 @@ function header(){
  '<a href="../schedule/" data-route="schedule">排班管理</a>',
  '<a href="../leave/" data-route="leave">請假管理</a>',
  '<a href="../work-hours/" data-route="workhours">加班管理</a>',
- '<button type="button" data-hr-view="payroll" title="授權薪資試算（尚非正式結算）">薪資作業</button>',
  '<a href="../aqc-efficiency/" data-route="efficiency" title="現有船舶與人員作業效率系統">績效管理</a>',
- '<button type="button" data-hr-view="training" title="教育訓練暫存台帳與 CSV 匯入匯出">教育訓練</button>',
  '</nav>',
  '<div class="p79r-controls">',
  '<span class="p79r-sync" id="p79rUpdated">資料待同步</span>',
@@ -70,9 +65,6 @@ function header(){
  var date=byId('p79rWorkDate'); if(date){date.value=ymd(new Date());date.addEventListener('change',renderDashboard)}
  shell.querySelectorAll('[data-hr-view]').forEach(function(b){
    b.addEventListener('click',function(){window.p79HrDashboardGo(b.dataset.hrView)})
- });
- shell.querySelectorAll('[data-not-ready]').forEach(function(b){
-   b.addEventListener('click',function(){warnUnavailable(b.textContent.trim())})
  });
  // Existing system pages enforce their own role and fine-grained permissions.
  shell.querySelectorAll('a[data-route]').forEach(function(a){
@@ -99,7 +91,7 @@ function mountDashboard(){
  card('☑','今日出勤率','p79rAttendance','以考勤系統為準',''),
  card('📅','本月請假人次','p79rLeaves','以請假系統為準','green'),
  card('◷','本月加班時數','p79rOvertime','以加班核定為準','purple'),
- card('↪','本月離職率','p79rTurnover','需正式期初人數','amber'),
+ card('⏸','留職停薪','p79rLeaveStatus','依現有人資主檔','amber'),
  '</div>',
  '<div class="p79r-grid-top">',
  panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>正式</th><th>約聘</th><th>派遣</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
@@ -144,7 +136,8 @@ function updateCounts(records,anchor,ready){
  text('p79rActiveSub',isCloudReady()?'雲端主檔已核對':'快取／待雲端核對');
  text('p79rHiresSub',month+' 到職紀錄');
  text('p79rLeaversSub',month+' 生效離職');
- text('p79rAttendance','—');text('p79rLeaves','—');text('p79rOvertime','—');text('p79rTurnover','—');
+ text('p79rLeaveStatus',ready||records.length?n(records.filter(function(e){return status(e,today)==='leave'}).length):'—');
+ text('p79rAttendance','—');text('p79rLeaves','—');text('p79rOvertime','—');
  return {active:active,resigned:resigned,hires:hires,leavers:leavers};
 }
 function workerKind(e){
