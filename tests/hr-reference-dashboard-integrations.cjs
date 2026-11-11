@@ -90,4 +90,46 @@ test('training requires authenticated HR staff and CSV stays user-controlled',()
  assert(operations.includes('exportCsv('));
  assert(operations.includes('資料只保留在目前頁面'));
 });
+test('dashboard, employee table, payroll and training views switch without runtime errors',()=>{
+ const nodes={};const mk=(id)=>({id,dataset:{},style:{},hidden:false,innerHTML:'',textContent:'',value:'',
+   addEventListener(){},remove(){},querySelector(){return null},querySelectorAll(){return []},
+   classList:{add(){},remove(){},toggle(){}}});
+ const known=['p79HrShellV103','p79rPayrollForm','p79rPayrollResult','p79rPayrollEmployee',
+  'p79rPayrollMonth','p79rPayrollExport','p79rPayrollClear','p79rTrainingForm',
+  'p79rTrainingResult','p79rTrainingEmployee','p79rTrainingExport','p79rTrainingImport',
+  'p79rTrainingClear','fStatus','p79rWorkDate'];
+ known.forEach(id=>{nodes[id]=mk(id)});
+ const main=mk('main');
+ main.querySelector=()=>null;
+ main.insertBefore=element=>{nodes[element.id]=element};
+ main.appendChild=element=>{nodes[element.id]=element};
+ const doc={readyState:'complete',getElementById:id=>nodes[id]||null,
+  createElement:()=>mk(''),querySelector:query=>query==='main.wrap'?main:null,
+  querySelectorAll:()=>[],body:{dataset:{},classList:{add(){}}}};
+ const ss={getItem(key){
+  if(key==='port79_user_session')return JSON.stringify({empId:'ADMIN01',adminRole:'superadmin'});
+  if(key==='port79_user_token')return 'test-token';
+  return null
+ }};
+ const window={P79HrVerifiedMetrics:M,scrollTo(){},p79HrCloseMenu(){}};
+ const ctx={window,document:doc,location:{hash:''},sessionStorage:ss,employees:[],
+  p79HrCloudDataReady:false,alert(){},console,Intl,Date};
+ vm.createContext(ctx);
+ vm.runInContext(dashboard,ctx);
+ vm.runInContext(operations,ctx);
+ assert.equal(typeof window.p79HrDashboardGo,'function');
+ window.p79HrDashboardGo('payroll');
+ assert.equal(doc.body.dataset.p79HrView,'payroll');
+ assert.equal(nodes.p79rOppayroll.hidden,false);
+ assert(nodes.p79rOppayroll.innerHTML.includes('薪資作業'));
+ window.p79HrDashboardGo('training');
+ assert.equal(doc.body.dataset.p79HrView,'training');
+ assert.equal(nodes.p79rOptraining.hidden,false);
+ assert(nodes.p79rOptraining.innerHTML.includes('教育訓練'));
+ window.p79HrDashboardGo('employees');
+ assert.equal(doc.body.dataset.p79HrView,'employees');
+ assert.equal(nodes.p79rOppayroll.hidden,true);
+ assert.equal(nodes.p79rOptraining.hidden,true);
+});
+
 console.log(JSON.stringify({passed,failed:0,scope:'HR dashboard synthetic fixtures, no cloud writes'}));
