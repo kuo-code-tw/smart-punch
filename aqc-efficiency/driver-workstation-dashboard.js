@@ -30,6 +30,10 @@
     x.gph = x.hours > 0 ? fixed((x.containers + x.hc) / x.hours) : null;
     return x;
   }
+  function driverName(r) {
+    if (typeof displayPersonName === 'function') return String(displayPersonName(r.name) || '未填');
+    return String(r.name || '未填');
+  }
   function dayRows(rows) {
     var map = new Map();
     (rows || []).forEach(function (r) {
@@ -38,8 +42,30 @@
       if (!map.has(date)) map.set(date, []);
       map.get(date).push(r);
     });
-    return Array.from(map, function (entry) { return { date: entry[0], totals: sum(entry[1]) }; })
-      .sort(function (a, b) { return b.date.localeCompare(a.date); });
+    return Array.from(map, function (entry) {
+      var rs = entry[1];
+      return { date:entry[0], totals:sum(rs),
+        aqcs:Array.from(new Set(rs.map(aqcName))).sort(function (a,b) {return a.localeCompare(b,undefined,{numeric:true});}),
+        drivers:Array.from(new Set(rs.map(driverName))).sort(function (a,b) {return a.localeCompare(b,'zh-Hant');}) };
+    }).sort(function (a,b) {return b.date.localeCompare(a.date);});
+  }
+  function detailRows(rows) {
+    return (rows || []).map(function (r) {
+      var m = metric(r);
+      return {
+        date: String(r.workDate || '').slice(0,10),
+        workingNo: String(r.workingNo || ''),
+        vessel: String(r.shipName || r.vessel || ''),
+        voyage: String(r.voyageE || r.voyageI || r.voyage || ''),
+        aqc:aqcName(r),
+        group:typeof operationGroupForRecord === 'function' ? String(operationGroupForRecord(r) || '') : String(r.group || ''),
+        driver:driverName(r),
+        period:String(r.startTime || '未填') + ' ～ ' + String(r.endTime || '未填'),
+        disc:m.disc,load:m.load,bundle:bundle(r),hc:m.hc,
+        containers:fixed(m.disc+m.load),hours:m.hours,
+        gph:m.hours>0?fixed((m.disc+m.load+m.hc)/m.hours):null
+      };
+    }).sort(function (a,b) {return b.date.localeCompare(a.date) || a.aqc.localeCompare(b.aqc,undefined,{numeric:true}) || a.driver.localeCompare(b.driver,'zh-Hant');});
   }
   function byAqc(rows) {
     var map = new Map();
@@ -59,11 +85,11 @@
   }
   function build(input) {
     var all = input.allRows || [], shown = input.visibleRows || [];
-    var full = sum(all), visible = sum(shown), days = dayRows(shown), cranes = byAqc(all);
+    var full = sum(all), visible = sum(shown), days = dayRows(shown), cranes = byAqc(all), visibleCranes = byAqc(shown), details = detailRows(shown);
     var cranesTotal = fixed(cranes.reduce(function (s, a) { return s + a.totals.containers; }, 0));
     var daysTotal = fixed(days.reduce(function (s, a) { return s + a.totals.containers; }, 0));
     var integrity = Math.abs(cranesTotal - full.containers) < .01 && Math.abs(daysTotal - visible.containers) < .01;
-    return { full: full, visible: visible, days: days, cranes: cranes, integrity: integrity, status: integrity ? auditStatus(input) : 'mismatch' };
+    return { full: full, visible: visible, days: days, cranes: cranes, visibleCranes: visibleCranes, details: details, integrity: integrity, status: integrity ? auditStatus(input) : 'mismatch' };
   }
   function ensure() {
     var view = document.getElementById('view-personstats');
@@ -93,8 +119,18 @@
     var audit = document.createElement('div'); audit.id = 'p79driverAudit'; audit.className = 'p79driver-audit';
     if (oldKpis) card.insertBefore(audit, oldKpis); else card.appendChild(audit);
     var bottom = document.createElement('div'); bottom.className = 'p79driver-bottom'; bottom.id = 'p79driverBottom';
-    bottom.innerHTML = '<section class="p79driver-panel"><h3>▦ 每日司機作業量</h3><div class="p79driver-table-scroll"><table class="p79driver-day-table"><thead><tr><th>日期</th><th>作業筆數</th><th>司機人數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>總櫃數</th><th>Time</th></tr></thead><tbody id="p79driverDayBody"></tbody></table></div></section>' +
-      '<section class="p79driver-panel"><h3>▥ 作業量趨勢與結構</h3><div class="p79driver-charts"><div id="p79driverTrend" class="p79driver-trend"></div><div id="p79driverComposition" class="p79driver-composition"></div></div></section>';
+    bottom.innerHTML =
+      '<section class="p79driver-panel"><div class="p79driver-panel-heading"><h3>▦ 每日司機作業量｜日期合計</h3><span id="p79driverScopeLabel"></span></div>' +
+      '<p class="p79driver-explain">依目前選取的船舶、組別、姓名、AQC、日期統計；每列是一個<strong>有作業紀錄的日期</strong>，不是整個碼頭當日總量。總櫃數＝卸櫃＋裝櫃，不含 H/C。</p>' +
+      '<div class="p79driver-table-scroll"><table class="p79driver-day-table"><thead><tr><th>作業日期</th><th>作業 AQC</th><th>司機姓名</th><th>作業筆數</th><th>卸櫃 DISC</th><th>裝櫃 LOAD</th><th>Bundle 扣除</th><th>H/C</th><th>總櫃數</th><th>作業時數</th><th>平均 GPH</th></tr></thead><tbody id="p79driverDayBody"></tbody><tfoot id="p79driverDayFoot"></tfoot></table></div></section>' +
+      '<section class="p79driver-panel"><div class="p79driver-panel-heading"><h3>▤ WORKING REPORT｜逐筆來源明細</h3><span id="p79driverDetailCount"></span></div>' +
+      '<p class="p79driver-explain">每一列都是原始司機作業紀錄。可核對 WORKING NO.、船名／航次、AQC、司機、起迄時段及櫃數；上方「全船司機作業明細」可直接編輯。此表<strong>不會新增或修改原始資料</strong>。</p>' +
+      '<div class="p79driver-table-scroll p79driver-detail-scroll"><table class="p79driver-day-table p79driver-detail-table"><thead><tr><th>日期</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>組別</th><th>司機姓名</th><th>作業起迄</th><th>卸櫃</th><th>裝櫃</th><th>Bundle</th><th>H/C</th><th>總櫃數</th><th>Time</th><th>GPH</th></tr></thead><tbody id="p79driverDetailBody"></tbody></table></div></section>' +
+      '<section class="p79driver-panel"><h3>▥ 作業量分析與計算說明</h3><div class="p79driver-analysis-grid">' +
+      '<div class="p79driver-analysis-card"><h4 id="p79driverTrendTitle">每日櫃數與效率</h4><div id="p79driverTrend" class="p79driver-trend"></div><p id="p79driverTrendHelp" class="p79driver-analysis-help"></p></div>' +
+      '<div class="p79driver-analysis-card"><h4>依 AQC 吊桿統計</h4><div id="p79driverCraneBars"></div></div>' +
+      '<div class="p79driver-analysis-card"><h4>卸／裝櫃結構與效率</h4><div id="p79driverComposition" class="p79driver-composition"></div><div id="p79driverCalculation"></div></div>' +
+      '</div></section>';
     tableCard.insertAdjacentElement('afterend', bottom);
     var h = tableCard.querySelector('h2'); if (h) h.textContent = '全船司機作業明細（AQC 分組）';
     var foot = document.createElement('div'); foot.className = 'p79driver-source-foot';
@@ -104,7 +140,13 @@
   }
   function trendMarkup(days) {
     var data = days.slice(0, 7).reverse(), width = 570, base = 202, top = 30, left = 50, chartWidth = 480;
-    if (!data.length) return '<p class="p79driver-empty">目前沒有作業日期，無法繪製趨勢。</p>';
+    if (!data.length) return '<p class="p79driver-empty">此篩選範圍沒有作業日期，沒有可分析的資料。</p>';
+    if (data.length === 1) {
+      var one = data[0], v = one.totals;
+      return '<div class="p79driver-one-day"><div class="p79driver-one-day-date">' + html(one.date) + '（唯一作業日）</div>' +
+        '<strong>' + fmt(v.containers) + ' <small>櫃</small></strong><div>卸櫃 ' + fmt(v.disc) + ' ｜ 裝櫃 ' + fmt(v.load) + ' ｜ H/C ' + fmt(v.hc) + '</div>' +
+        '<div>作業 ' + fmt(v.hours) + ' 小時 ｜ 平均效率 ' + fmt(v.gph) + ' GPH</div></div>';
+    }
     var peak = Math.max(1, ...data.map(function (x) { return x.totals.containers; }));
     var maxGph = Math.max(1, ...data.map(function (x) { return x.totals.gph || 0; }));
     var span = chartWidth / data.length;
@@ -122,6 +164,16 @@
     var grid = [0, .25, .5, .75, 1].map(function (v) { var y = base - v * (base - top); return '<line x1="50" y1="' + y + '" x2="540" y2="' + y + '" stroke="#e4ebf4"/><text x="42" y="' + (y + 4) + '" text-anchor="end" font-size="12" fill="#64748b">' + fmt(fixed(peak * v)) + '</text>'; }).join('');
     return '<div class="p79driver-chart-legend"><span><i class="p79driver-legend-bar"></i>總櫃數</span><span><i class="p79driver-legend-line"></i>效率 GPH</span></div>' +
       '<svg viewBox="0 0 ' + width + ' 235" role="img" aria-label="' + html('近 ' + data.length + ' 個有作業日期的櫃數與效率趨勢') + '">' + grid + bars + line + dots + '</svg>';
+  }
+  function craneBarsMarkup(cranes) {
+    if (!cranes.length) return '<p class="p79driver-empty">沒有 AQC 明細。</p>';
+    var max = Math.max(1, ...cranes.map(function (c) {return c.totals.containers;}));
+    return '<div class="p79driver-crane-list">' + cranes.map(function (c) {
+      var x = c.totals, pct = fixed(x.containers/max*100);
+      return '<div class="p79driver-crane-row"><div class="p79driver-crane-label"><b>AQC ' + html(c.aqc) + '</b><strong>' + fmt(x.containers) + ' 櫃</strong></div>' +
+        '<div class="p79driver-crane-track"><div style="width:' + pct + '%"></div></div>' +
+        '<small>卸 ' + fmt(x.disc) + '／裝 ' + fmt(x.load) + ' ｜ H/C ' + fmt(x.hc) + ' ｜ ' + fmt(x.hours) + ' 小時 ｜ GPH ' + fmt(x.gph) + '</small></div>';
+    }).join('') + '</div>' + (cranes.length===1?'<p class="p79driver-analysis-help">目前只有 1 台 AQC 有紀錄，無法進行吊桿間比較。</p>':'');
   }
   function compositionMarkup(totals) {
     if (totals.containers <= 0) return '<p class="p79driver-empty">目前沒有卸櫃或裝櫃資料。</p>';
@@ -162,14 +214,29 @@
         return '<div class="p79driver-aqc-card"><header>⚓ AQC' + html(c.aqc) + '</header><div class="p79driver-aqc-metrics"><span>作業筆數<b>' + fmt(a.count) + '</b></span><span>卸櫃<b>' + fmt(a.disc) + '</b></span><span>裝櫃<b>' + fmt(a.load) + '</b></span><span>總櫃數<b>' + fmt(a.containers) + '</b></span><span>作業時數<b>' + fmt(a.hours) + '</b></span><span>GPH<b>' + fmt(a.gph) + '</b></span></div><small>全船 WORKING REPORT｜H/C ' + fmt(a.hc) + '</small></div>';
       }).join('') || '<div class="p79driver-empty">目前船舶沒有可顯示的 AQC 作業明細。</div>';
     }
+    document.getElementById('p79driverScopeLabel').textContent = '目前篩選：' + fmt(d.count) + ' 筆、' + fmt(model.days.length) + ' 個作業日、' + fmt(d.people) + ' 位司機';
     document.getElementById('p79driverDayBody').innerHTML = model.days.map(function (entry) {
       var x = entry.totals;
-      return '<tr><td>' + html(entry.date) + '</td><td>' + fmt(x.count) + '</td><td>' + fmt(x.people) + '</td><td>' + fmt(x.disc) + '</td><td>' + fmt(x.load) + '</td><td>' + fmt(x.hc) + '</td><td class="em">' + fmt(x.containers) + '</td><td>' + fmt(x.hours) + '</td></tr>';
-    }).join('') || '<tr><td colspan="8" class="p79driver-empty">篩選範圍沒有作業資料。</td></tr>';
+      var aqcs = entry.aqcs.map(function (a) {return 'AQC '+html(a);}).join('、');
+      var drivers = entry.drivers.map(html).join('、');
+      return '<tr><td class="p79driver-cell-strong">' + html(entry.date) + '</td><td>' + aqcs + '</td><td>' + drivers + '</td><td>' + fmt(x.count) + '</td><td>' + fmt(x.disc) + '</td><td>' + fmt(x.load) + '</td><td>' + fmt(x.bundle) + '</td><td>' + fmt(x.hc) + '</td><td class="em">' + fmt(x.containers) + '</td><td>' + fmt(x.hours) + '</td><td>' + fmt(x.gph) + '</td></tr>';
+    }).join('') || '<tr><td colspan="11" class="p79driver-empty">目前條件下沒有任何作業紀錄。請檢查船舶、AQC、姓名或日期範圍。</td></tr>';
+    document.getElementById('p79driverDayFoot').innerHTML = model.days.length ? '<tr><td>篩選合計</td><td>' + fmt(model.visibleCranes.length) + ' 台 AQC</td><td>' + fmt(d.people) + ' 人</td><td>' + fmt(d.count) + '</td><td>' + fmt(d.disc) + '</td><td>' + fmt(d.load) + '</td><td>' + fmt(d.bundle) + '</td><td>' + fmt(d.hc) + '</td><td class="em">' + fmt(d.containers) + '</td><td>' + fmt(d.hours) + '</td><td>' + fmt(d.gph) + '</td></tr>' : '';
+    var limited = model.details.slice(0, 200);
+    document.getElementById('p79driverDetailCount').textContent = '目前篩選：' + fmt(model.details.length) + ' 筆' + (model.details.length>200?'（列出最近 200 筆；上方可查完整明細）':'');
+    document.getElementById('p79driverDetailBody').innerHTML = limited.map(function (r) {
+      var vessel = [r.vessel, r.voyage].filter(Boolean).join('／');
+      return '<tr><td>' + html(r.date || '未填') + '</td><td class="p79driver-cell-strong">' + html(r.workingNo || '—') + '</td><td>' + html(vessel || '—') + '</td><td>AQC ' + html(r.aqc) + '</td><td>' + html(r.group || '—') + '</td><td class="p79driver-cell-strong">' + html(r.driver) + '</td><td>' + html(r.period) + '</td><td>' + fmt(r.disc) + '</td><td>' + fmt(r.load) + '</td><td>' + fmt(r.bundle) + '</td><td>' + fmt(r.hc) + '</td><td class="em">' + fmt(r.containers) + '</td><td>' + fmt(r.hours) + '</td><td>' + fmt(r.gph) + '</td></tr>';
+    }).join('') || '<tr><td colspan="14" class="p79driver-empty">本範圍沒有 WORKING REPORT 司機作業資料。</td></tr>';
+    var single = model.days.length === 1;
+    document.getElementById('p79driverTrendTitle').textContent = single ? '單日作業摘要（不是趨勢）' : '每日櫃數與 GPH 趨勢';
     document.getElementById('p79driverTrend').innerHTML = trendMarkup(model.days);
+    document.getElementById('p79driverTrendHelp').textContent = !model.days.length ? '未取得日期資料。' : single ? '只有 1 個有作業紀錄的日期，不能畫成多日趨勢；上方已列出這一天的原始司機作業明細。' : '僅比較最近 ' + Math.min(model.days.length,7) + ' 個有紀錄的日期；沒有作業紀錄的日期不會自動視為 0。';
+    document.getElementById('p79driverCraneBars').innerHTML = craneBarsMarkup(model.visibleCranes);
     document.getElementById('p79driverComposition').innerHTML = compositionMarkup(d);
+    document.getElementById('p79driverCalculation').innerHTML = '<div class="p79driver-calc"><b>本次計算</b><div>總櫃數 = ' + fmt(d.disc) + '（卸）＋' + fmt(d.load) + '（裝）＝ <strong>' + fmt(d.containers) + ' 櫃</strong></div><div>H/C 為 ' + fmt(d.hc) + '，不計入總櫃數。</div><div>GPH =（' + fmt(d.containers) + '＋' + fmt(d.hc) + '）÷ ' + fmt(d.hours) + ' 小時＝ <strong>' + fmt(d.gph) + '</strong></div><small>Bundle 扣除：' + fmt(d.bundle) + '（已反映於 WORKING REPORT 的 DISC／LOAD，不會再次扣除）</small></div>';
   }
-  root.P79DriverDashboard = { render: render, build: build, sum: sum, dayRows: dayRows, byAqc: byAqc };
+  root.P79DriverDashboard = { render: render, build: build, sum: sum, dayRows: dayRows, byAqc: byAqc, detailRows: detailRows, trendMarkup: trendMarkup, craneBarsMarkup: craneBarsMarkup };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure);
   else ensure();
 })(window);
