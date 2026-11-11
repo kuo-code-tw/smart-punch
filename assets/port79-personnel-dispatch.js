@@ -2,12 +2,17 @@
 'use strict';
 const codes=['A','B','C','D'];
 function groupCode(v){const m=String(v||'').trim().toUpperCase().match(/^([ABCD])(?:組)?$/);return m?m[1]:'';}
+function isCurrentEmployee(e){
+ if(!e)return false;
+ const state=String(e.employmentStatus||e.employeeStatus||e.employment_status||e['在職狀態']||e['員工狀態']||e.status||'').trim().normalize('NFKC').toLowerCase();
+ return !/^(?:resigned|terminated|retired|inactive|quit|leave|loa|離職|已離職|退休|退職|資遣|解雇|解僱|留職停薪|留停)$/.test(state);
+}
 function buildMonth({month,records=[],roster=[],employees=null,metrics,normalize=v=>String(v||'').replace(/\s+/g,'')}){
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return [];
  const employmentById=new Map(),employmentByName=new Map();
- const departed=p=>/^(resigned|terminated|retired|離職|已離職|退休)$/i.test(String(p?.employmentStatus||p?.['在職狀態']||'').trim());
+ // 判定以最新人資狀態為準；曾離職但已恢復在職者不可僅因舊離職日被排除。
  if(Array.isArray(employees))for(const e of employees){const id=String(e.empId||e.employeeId||e.id||'').trim().toUpperCase(),name=normalize(e.name||e.employeeName||'');if(id)employmentById.set(id,e);if(name){if(!employmentByName.has(name))employmentByName.set(name,[]);employmentByName.get(name).push(e);}}
- const allowed=r=>{if(!Array.isArray(employees))return !departed(r);const id=String(r.empId||r.employeeId||(r.source?'':r.id)||'').trim().toUpperCase(),matches=employmentByName.get(normalize(r.name||''))||[];const e=id&&!id.startsWith('NAME:')?employmentById.get(id):matches.length===1?matches[0]:null;return !!e&&!departed(e);};
+ const allowed=r=>{if(!Array.isArray(employees))return isCurrentEmployee(r);const id=String(r.empId||r.employeeId||(r.source?'':r.id)||'').trim().toUpperCase(),matches=employmentByName.get(normalize(r.name||''))||[];const e=id&&!id.startsWith('NAME:')?employmentById.get(id):matches.length===1?matches[0]:null;return !!e&&isCurrentEmployee(e);};
  const persons=new Map(),names=new Map();
  const idOf=v=>{const id=String(v||'').trim().toUpperCase();return id&&!id.startsWith('NAME:')?id:'';};
  function add(key,name,empId,group='',confirmed=false){if(!persons.has(key))persons.set(key,{key,name,empId,group:groupCode(group),confirmed,count:0,containers:0,hours:0,hc:0,invalid:0,zeroRecords:0,zeroHours:0});return persons.get(key);}
@@ -164,7 +169,7 @@ function collectDispatchRoster(store,month,employees=[]){
  if(!store?.has(month)||!Array.isArray(employees))return result;
  for(const e of employees){
   const id=String(e.empId||e.employeeId||e.id||'').trim().toUpperCase(),name=String(e.name||e.employeeName||'').trim();
-  if(!id||!name||seen.has(id)||id==='ADMIN')continue;
+  if(!id||!name||seen.has(id)||id==='ADMIN'||!isCurrentEmployee(e))continue;
   const role=String(e.jobTitle||e.deptDetail||e.role||e.dept||'').normalize('NFKC').trim().toUpperCase();
   const looksAqc=/^AQC(?:$|[\s(（／/・·:\-]|司機|操作|人員)/.test(role);
   const lookup=typeof store.lookup==='function'?store.lookup(month,{empId:id,name}):null;
@@ -183,7 +188,7 @@ async function readDispatchSources(month,read){
  ];
  return Promise.all(sources.map(async source=>{try{const data=await read(source.action,source.params);if(data?.ok!==true||data.retryable||!source.valid(data))throw Error(data?.error||'回傳資料格式不完整');return {...source,ok:true,data};}catch(error){const raw=String(error?.message||error);return {...source,ok:false,error:error?.name==='AbortError'?'連線逾時':/failed to fetch|network/i.test(raw)?'網路連線失敗':raw.slice(0,160)};}}));
 }
-const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,collectDispatchRoster,readDispatchSources};
+const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,collectDispatchRoster,readDispatchSources,isCurrentEmployee};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
 let plan={},owner='',planMonth='',latest=[],ready=false,previewAllowed=false,settings={counts:{},lockedGroups:[]},selectedKeys=null,suggestionResult=null;const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;

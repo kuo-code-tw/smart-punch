@@ -2147,6 +2147,9 @@ function currentOfficialJobTitle(e){
 
 function isAqcEmployee(e){
   if(!e)return false;
+  // 現職名冊先依正式人資狀態過濾；離職／留停者即使仍保留 AQC 職稱也不可計入目前人數。
+  const employmentState=String(e.employmentStatus||e.employeeStatus||e.employment_status||e['在職狀態']||e['員工狀態']||e.status||'').trim().normalize('NFKC').toLowerCase();
+  if(/^(?:resigned|terminated|retired|inactive|quit|leave|loa|離職|已離職|退休|退職|資遣|解雇|解僱|留職停薪|留停)$/.test(employmentState))return false;
 
   // v2026.09.26.25：
   // 「目前職稱」優先於舊部門、歷史作業、舊分組文字。
@@ -15839,7 +15842,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
-<script src="../assets/port79-personnel-dispatch.js?v=20261111-oneclick-balanced-v5"></script>
+<script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6"></script>
 <script src="../assets/port79-full-refresh.js?v=20261105.1"></script>
 <style id="p79-vessel-desktop-fullwidth-v20261019">
 @media(min-width:1000px){
