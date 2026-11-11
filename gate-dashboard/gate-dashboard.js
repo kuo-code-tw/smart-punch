@@ -183,5 +183,6 @@ function attach(){
  $('refresh')?.addEventListener('click',function(){void load(true);});
  render();void load(false);
 }
+g.P79GateDashboard={refresh:function(){return load(true);},setDate:function(date){handleDate(date);},setMode:choose};
 if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',attach,{once:true});else attach();
 })(window);
