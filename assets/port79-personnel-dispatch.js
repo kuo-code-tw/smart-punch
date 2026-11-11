@@ -201,7 +201,7 @@ function render(){
 // Editing the roster is independent of source completeness. Safe optimization previews
 // are possible from a confirmed schedule roster plus four measurable group efficiencies.
 // Partial cloud coverage must be shown clearly and never treated as verified results.
-previewAllowed=(state==='ready'||state==='partial')&&!!store?.has(month())&&summarize(latest).gap!==null;
+previewAllowed=state!=='loading'&&!!store?.has(month())&&summarize(latest).gap!==null;
  el('dispatchLoadState').textContent=(state==='loading'?'正在讀取整月即時及歷史作業資料…':state==='ready'?'整月即時、歷史來源與最新在職名冊已讀取。':state==='partial'?'部分來源讀取失敗，資料或在職名冊暫不完整，請重新讀取。':state==='error'?'雲端讀取失敗，目前顯示本機資料，請重新讀取。':'尚未讀取整月資料。')+(store?.has(month())?'':' 排班名冊尚未確認。');
  renderOperationScheduleStatus(rows.length?rows:[{workDate:month()+'-01'}]);
  const total=latest.filter(p=>p.eff!==0).reduce((s,p)=>({containers:s.containers+p.containers,hours:s.hours+p.hours,invalid:s.invalid+p.invalid}),{containers:0,hours:0,invalid:0});
@@ -285,7 +285,7 @@ function renderRecommendation(rows){
   return;
  }
  const selected=chosenKeys();
- if(!suggestionResult){box.innerHTML='<p class="font-bold text-sky-800">請先從四組完整名冊勾選人員，再按「計算效率最佳化編組」，查看最佳化名單及前後效率。</p>';return;}
+ if(!suggestionResult){box.innerHTML='<p class="font-bold text-sky-800">預設已勾選全部可調人員；你可以自行取消勾選，或直接按「一鍵自動最佳化 A～D 組」，立即查看平均效率較均衡的四組新名單。</p>';return;}
  const suggestion=suggestionResult;
  const policy=movementPolicy(latest,settings);
  const rule=`已勾選 ${selected.size} 人（有效可優化 ${[...selected].filter(k=>policy.movable.has(k)).length} 人），保留組：${[...policy.locked].map(g=>g+'組').join('、')||'無'}；未選的人不調動，所有組別人數維持不變。`;
