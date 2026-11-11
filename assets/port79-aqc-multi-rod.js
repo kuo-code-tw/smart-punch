@@ -98,6 +98,8 @@
   $('multiRodExport').addEventListener('click',exportExcel);
   $('multiRodRefresh').addEventListener('click',()=>{void sync(true);void syncSource(true)});
   $('multiRodImport').addEventListener('click',importLegacy);
+  // The daily distinct-crane dashboard is the primary view; legacy audit remains available.
+  g.P79AqcDaily?.mount();
 
  }
  function candidates(){
@@ -232,7 +234,7 @@
  }
  function render(){
   mount();if(!$(ID))return;current();
-  if(!canView()){$('multiRodBody').innerHTML='';return;}
+  if(!canView()){$('multiRodBody').innerHTML='';g.P79AqcDaily?.render();return;}
   const result=concurrentResult(),list=g.P79AqcConcurrent?.groupSegments(result.rows)||result.rows,allShips=new Set(list.flatMap(r=>r.ships.map(s=>s.workingNo||s.ship+'|'+s.voyage)));
   $('multiRodAdd').disabled=!editAllowed('records.create');
   $('multiRodImport').hidden=!legacyRows().length;$('multiRodImport').disabled=!editAllowed('records.create');
@@ -273,6 +275,7 @@
     '<td><div class="text-xs '+(r.needsReview?'text-amber-800':'text-sky-800')+'">'+sourceLabel+'</div>'+detail+'</td></tr>';
   }).join('')||'<tr><td colspan="5" class="p-6 text-slate-500">'+
    (result.rawIntervals?'查詢期間內有 AQC 作業，但沒有同一時間合計達到 '+esc(val('multiRodMin')||4)+' 桿的時段。':'此日期沒有足夠的 AQC 起訖資料可判讀；先顯示快取，可按「重新核對雲端」補讀資料。')+'</td></tr>';
+  g.P79AqcDaily?.render();
  }
  async function exportExcel(){
   if(!canView()){notice('沒有查看效率資料的權限',true);return}
