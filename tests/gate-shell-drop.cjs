@@ -14,6 +14,6 @@ const event=files=>({dataTransfer:{files},preventDefault(){},stopPropagation(){}
  await ctx.handleExcelDrop(event([csv,xlsx]));assert.equal(received.length,2);assert.match(notices.at(-1),/一次只能/);
  frame={contentWindow:{}};await ctx.handleExcelDrop(event([csv]));assert.match(notices.at(-1),/尚未載入/);assert.equal(vessel.length,0);
  active=false;await ctx.handleExcelDrop(event([xlsx]));assert.equal(vessel.length,1);
- assert(gate.indexOf('id="gateMessage"')<gate.indexOf('class="grid gate-live-metrics"'),'status immediately follows drop target');
+ assert(gate.indexOf('id="gateMessage"')>gate.indexOf('id="gateDropZone"')&&gate.indexOf('id="gateMessage"')<gate.indexOf('id="gateFile"'),'import status immediately follows drop zone inside upload panel');
  console.log('PASS: outer Gate drop forwards CSV/Excel to Gate only; loading and file-count errors visible; vessel drop preserved');
 })().catch(e=>{console.error(e);process.exitCode=1});
