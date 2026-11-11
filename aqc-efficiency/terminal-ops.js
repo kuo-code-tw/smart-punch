@@ -252,6 +252,7 @@ function build(month,ships,rows){
   const masters=makeUniqueShips(ships,month);
   const byWharf=new Map(),byDay=new Map(),byShift=new Map();
   const wharfByNo=new Map();
+  const bundleByShip=[];
   const vesselTotals={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,hc:0,bundle:0,bundleKnown:0,bundleUnknown:0,bundleMismatch:0,bundleUnexplained:0,missing:0,undated:0};
   const work=(map,key,init)=>{if(!map.has(key))map.set(key,init());return map.get(key)};
   for(const s of masters){
@@ -263,6 +264,8 @@ function build(month,ships,rows){
     const bill=measure(s.totalContainers,ws.totalContainers),moves=measure(s.totalMoves,ws.totalMoves);
     const shift=measure(s.shiftMoves,ws.shiftMoves),hc=measure(s.hatches,ws.hatches);
     const {bundle,bn,fl,declared}=shipBundleMetrics(s);
+    // Attribute the deduction only to the vessel's berth; never distribute a monthly Bundle total across ports.
+    if(bundle!==null&&bundle>0)bundleByShip.push({workingNo:no,vessel:String(s.vessel||''),wharf,bundle});
     const rawDiff=disc!==null&&load!==null&&bill!==null?Math.round((disc+load-bill)*100)/100:null;
     const bundleDifference=rawDiff!==null&&bundle!==null?Math.round((rawDiff-bundle)*100)/100:null;
     if(disc===null||load===null||bill===null||moves===null)vesselTotals.missing++;
@@ -301,7 +304,7 @@ function build(month,ships,rows){
   }
   const stops=buildStopSummary(records,wharfByNo,masters);
   return {
-    month,ships:masters,records,
+    month,ships:masters,records,bundleByShip,
     vesselTotals,byWharf:[...byWharf.values()].sort((a,b)=>b.moves-a.moves||a.wharf.localeCompare(b.wharf)),
     byDay:[...byDay.values()].sort((a,b)=>b.day.localeCompare(a.day)),
     byShift:[...byShift.values()].sort((a,b)=>b.day.localeCompare(a.day)||['早班','中班','晚班','時間未提供'].indexOf(a.shift)-['早班','中班','晚班','時間未提供'].indexOf(b.shift)),
