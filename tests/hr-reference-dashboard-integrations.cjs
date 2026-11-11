@@ -20,11 +20,11 @@ test('only existing systems shown; payroll/training add-ons absent',()=>{
  assert(!dashboard.includes('薪資作業'));
  assert(!dashboard.includes('教育訓練'));
  assert(!dashboard.includes('績效管理'),'efficiency must have actual system name');
- for(const path of ['../attendance/','../schedule/','../leave/','../work-hours/','../aqc-efficiency/']){
+ for(const path of ['../attendance/','../schedule/','../leave/','../work-hours/','../aqc-efficiency/','../history-data/']){
   assert(dashboard.includes('href="'+path+'"'),path);
   assert(fs.existsSync('hr/'+path+'index.html'),'real target must exist '+path);
  }
- for(const phrase of ['員工資料','考勤管理','排班管理','請假管理','加班管理','船舶效率']){
+ for(const phrase of ['員工資料','考勤管理','排班管理','請假管理','工時／加班','船舶效率','歷史資料']){
   assert(dashboard.includes(phrase),phrase);
  }
 });
