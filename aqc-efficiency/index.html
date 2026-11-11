@@ -673,6 +673,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:640px){#view-gate>div:first-child{padding:12px!important}#view-gate h2{font-size:18px!important}}
 </style>
 <link rel="stylesheet" href="../assets/port79-gate-dialog.css?v=20261110-dialog-colors-v1">
+<link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-layout-v1">
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -1796,37 +1797,85 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   </section>
   </section>
 
-<section id="view-dispatch" class="hidden space-y-4">
- <div class="card p-4 space-y-3">
-  <h2 class="font-black text-xl">⚖️ 人員調度與月均效率</h2>
-  <p class="text-sm text-slate-600">依當月 WORKING REPORT 的 DISC＋LOAD 總櫃數與作業總時數比較，月均效率＝總櫃數 ÷ 總時數；H/C 另列，不混入櫃數效率。效率為 0 的作業與時數不列入平均，零效率及已離職人員不納入調任；離職人員也不列入本頁作業量、時數與效率統計。</p>
-  <div class="flex flex-wrap items-end gap-3">
-   <div><label for="dispatchMonth" class="block font-bold text-sm">月份</label><input id="dispatchMonth" type="month" onchange="P79PersonnelDispatch.render();P79PersonnelDispatch.load(true)"></div>
-   <div><label for="dispatchName" class="block font-bold text-sm">姓名</label><input id="dispatchName" type="search" placeholder="搜尋姓名" oninput="P79PersonnelDispatch.render()"></div>
-   <div><label for="dispatchSort" class="block font-bold text-sm">比較依據</label><select id="dispatchSort" onchange="P79PersonnelDispatch.render()"><option value="eff">月均效率</option><option value="containers">作業總櫃數</option><option value="hours">作業總時數</option></select></div>
-   <button type="button" class="btn bg-sky-100 text-sky-800" onclick="P79PersonnelDispatch.load(true)">重新讀取整月資料</button>
-   <button type="button" class="btn bg-slate-100" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button>
+<section id="view-dispatch" class="hidden space-y-4 p79d">
+  <div class="p79d-hero">
+    <div class="p79d-hero-top">
+      <div>
+        <div class="p79d-eyebrow">PERSONNEL DISPATCH / AQC OPERATIONS</div>
+        <h2>人員調度 <span style="font-weight:500;opacity:.75">／</span> 月均效率</h2>
+        <p>以 A～D 組的有效作業紀錄比較月均效率，從組別設定、調任名單到前後比較集中在同一頁。</p>
+      </div>
+      <div class="p79d-safety">安全試算・不會修改正式排班</div>
+    </div>
+    <div class="p79d-steps" aria-label="調度試算流程">
+      <div class="p79d-step"><b>01</b><span>讀取當月資料</span></div>
+      <div class="p79d-step"><b>02</b><span>設定可調組別</span></div>
+      <div class="p79d-step"><b>03</b><span>確認調任名單</span></div>
+      <div class="p79d-step"><b>04</b><span>比較調度結果</span></div>
+    </div>
   </div>
-  <div id="dispatchLoadState" class="text-sm" role="status"></div><div id="dispatchScheduleGroupState" class="text-sm" role="status"></div>
-  <div id="dispatchSummary" class="rounded-xl bg-teal-50 text-teal-900 p-3 font-bold"></div>
- </div>
- <div class="card p-4 border border-teal-200">
-  <h3 class="font-black text-lg mb-2">建議調任方案</h3>
-  <p class="text-sm mb-3">預設保留效率最高組（同分一起保留）；可自行勾選保留組別。其餘組預設各取 2 名，可調整 0～20 名，0 代表不取人。</p><div id="dispatchGroupSettings" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3"></div>
-  <div class="flex flex-wrap gap-3 items-center mb-3"><button id="dispatchGenerateButton" type="button" class="btn bg-indigo-600 text-white" onclick="P79PersonnelDispatch.generateRecommendation()">產生調任名單</button><span>勾選＝本組整組不調動；取消勾選＝參與調度。</span></div><div id="dispatchConfirmState" class="font-bold text-teal-700 mb-2" role="status"></div>
-  <div id="dispatchRecommendation" role="status">讀取資料後自動顯示建議。</div>
- </div>
- <div class="card p-4">
-  <h3 class="font-bold mb-2">A、B、C、D 組調動前後比較</h3>
-  <p class="text-sm mb-3">試算假設人員帶著相同的歷史作業量與時數調組，用來比較各組組成；不代表未來實際產能，也不會修改排班。工作種類、船況及時數多寡會影響效率，請搭配原始櫃數與時數判斷。</p>
-  <div class="overflow-auto"><table class="tbl w-full text-center"><thead><tr><th>組別</th><th>人數（原 → 試算）</th><th>總櫃數（原 → 試算）</th><th>總時數（原 → 試算）</th><th>櫃／小時（原 → 試算）</th></tr></thead><tbody id="dispatchGroupBody"></tbody></table></div>
-  <div class="flex flex-wrap items-center gap-3 mt-3"><p id="dispatchScenarioState" class="text-sm" role="status"></p><button type="button" class="btn bg-slate-100" onclick="P79PersonnelDispatch.clear()">清除試算</button></div>
-  <p id="dispatchMoves" class="text-sm text-indigo-700 mt-2"></p>
- </div>
- <div class="card p-4 overflow-auto">
-  <h3 class="font-bold mb-3">人員作業量、時數與調動試算</h3>
-  <table class="tbl w-full text-center" style="min-width:1060px"><thead><tr><th>姓名</th><th>工號</th><th>排班組別</th><th>作業量（櫃）</th><th>作業時數</th><th>月均效率</th><th>H/C</th><th>作業筆數</th><th>資料狀態</th><th>試算調入組別</th></tr></thead><tbody id="dispatchBody"></tbody></table>
- </div>
+
+  <div class="p79d-kpis" aria-label="人員調度統計摘要">
+    <div class="p79d-kpi"><span class="p79d-kpi-label">在職名冊人數</span><strong id="dispatchKpiPeople">—</strong><small>本月對照人員</small></div>
+    <div class="p79d-kpi"><span class="p79d-kpi-label">有效作業櫃數</span><strong id="dispatchKpiContainers">—</strong><small>DISC + LOAD，不含 H/C</small></div>
+    <div class="p79d-kpi"><span class="p79d-kpi-label">有效作業時數</span><strong id="dispatchKpiHours">—</strong><small>零效率紀錄時數不列入</small></div>
+    <div class="p79d-kpi"><span class="p79d-kpi-label">整體月均效率</span><strong id="dispatchKpiEff">—</strong><small>櫃／小時</small></div>
+    <div class="p79d-kpi"><span class="p79d-kpi-label">待核對作業筆數</span><strong id="dispatchKpiIssues">—</strong><small>櫃數或時數異常</small></div>
+  </div>
+
+  <div class="card p79d-panel">
+    <div class="p79d-panel-head">
+      <div><h3><span class="p79d-numb">01</span> 資料月份與查詢</h3><p>先確認整月作業、在職名冊與排班組別已讀取完成。</p></div>
+      <span id="dispatchReadyPill" class="p79d-load-tag" data-ready="false">資料待確認</span>
+    </div>
+    <div class="p79d-fields">
+      <div class="p79d-field"><label for="dispatchMonth">統計月份</label><input id="dispatchMonth" type="month" onchange="P79PersonnelDispatch.render();P79PersonnelDispatch.load(true)"></div>
+      <div class="p79d-field"><label for="dispatchName">搜尋人員</label><input id="dispatchName" type="search" placeholder="輸入姓名篩選下方明細" oninput="P79PersonnelDispatch.render()"></div>
+      <div class="p79d-field"><label for="dispatchSort">人員排序依據</label><select id="dispatchSort" onchange="P79PersonnelDispatch.render()"><option value="eff">月均效率</option><option value="containers">作業總櫃數</option><option value="hours">作業總時數</option></select></div>
+      <div class="p79d-field"><label>資料更新</label><div class="p79d-actions"><button type="button" class="btn p79d-action" onclick="P79PersonnelDispatch.load(true)">↻ 重新讀取整月</button><button type="button" class="btn p79d-action" onclick="retryOperationScheduleGroups()">↻ 更新排班組別</button></div></div>
+    </div>
+    <div class="p79d-status" role="status"><div id="dispatchLoadState"></div><div id="dispatchScheduleGroupState"></div></div>
+    <div id="dispatchSummary" class="p79d-summary"></div>
+    <details class="p79d-definition"><summary>查看效率計算與資料口徑</summary><p>月均效率＝WORKING REPORT 的 DISC＋LOAD 櫃數 ÷ 有效作業時數；H/C 獨立顯示、不計入櫃數效率。零效率紀錄及其時數不納入平均。已離職人員不納入統計或調任，缺少身分、組別或有效資料者不列入調任。</p></details>
+  </div>
+
+  <div class="card p79d-panel">
+    <div class="p79d-panel-head">
+      <div><h3><span class="p79d-numb">02</span> A～D 組別與調任設定</h3><p>每組先決定是否保留，再指定可以取出的人數。保留組整組不調入、不調出。</p></div>
+    </div>
+    <div class="p79d-group-hint">ⓘ 預設保留效率最高的組別（同分一起保留）；其餘組預設每組取 2 人，可調整為 0～20 人。這是效率互調試算，不是直接改組。</div>
+    <div id="dispatchGroupSettings"></div>
+    <div class="p79d-command"><button id="dispatchGenerateButton" type="button" class="btn p79d-primary" onclick="P79PersonnelDispatch.generateRecommendation()">產生調任名單</button><span>確認資料後，系統會依設定尋找可行的跨組互調方案。</span></div>
+    <div id="dispatchConfirmState" role="status"></div>
+    <div id="dispatchRecommendation" role="status">讀取資料後自動顯示建議。</div>
+  </div>
+
+  <div class="p79d-compare-grid">
+    <div class="card p79d-panel">
+      <div class="p79d-panel-head"><div><h3><span class="p79d-numb">03</span> 調度前後效率比較</h3><p>同一份歷史作業量與時數重新組合，比較各組效率，不預測未來產能。</p></div></div>
+      <div id="dispatchGroupVisual" class="p79d-visual" aria-label="四組原始與試算效率圖示"></div>
+      <div class="p79d-table-wrap" style="max-height:none"><table class="tbl w-full text-center"><thead><tr><th>組別</th><th>人數（原 → 試算）</th><th>櫃數（原 → 試算）</th><th>時數（原 → 試算）</th><th>櫃／小時（原 → 試算）</th></tr></thead><tbody id="dispatchGroupBody"></tbody></table></div>
+      <div class="flex flex-wrap items-center gap-3 mt-3"><p id="dispatchScenarioState" role="status"></p><button type="button" class="btn p79d-action" onclick="P79PersonnelDispatch.clear()">清除試算</button></div>
+      <p id="dispatchMoves" class="mt-2"></p>
+    </div>
+    <aside class="card p79d-panel">
+      <div class="p79d-panel-head"><div><h3>調度判讀提醒</h3><p>避免把試算結果誤認為實際調度結果</p></div></div>
+      <ul class="p79d-side-list">
+        <li><strong>維持人數平衡：</strong>自動建議以跨組互換為原則，各組人數不變。</li>
+        <li><strong>資料不完整：</strong>來源有缺漏時，不可直接產生正式建議。</li>
+        <li><strong>保留優勢組：</strong>勾選保留後，不接受人員調入或調出。</li>
+        <li><strong>效率不等於產能：</strong>工作類型、船況與有效時數，都會影響比較結果。</li>
+      </ul>
+      <div class="p79d-side-warning">✓ 試算名單只在本畫面比較，不會改寫考勤、正式班表或 AQC 作業紀錄。</div>
+    </aside>
+  </div>
+
+  <div class="card p79d-panel">
+    <div class="p79d-panel-head"><div><h3><span class="p79d-numb">04</span> 全員作業明細與手動試算</h3><p>查看每位人員的工號、組別、有效作業資料及可調資格；可調者可單獨試選調入組。</p></div></div>
+    <p class="p79d-table-caption">表格可左右捲動；標題列會固定。搜尋與排序請使用上方「資料月份與查詢」區塊。</p>
+    <div class="p79d-table-wrap"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>工號</th><th>排班組別</th><th>作業櫃數</th><th>作業時數</th><th>月均效率</th><th>H/C</th><th>作業筆數</th><th>資料狀態</th><th>試算調入組別</th></tr></thead><tbody id="dispatchBody"></tbody></table></div>
+  </div>
+  <div class="p79d-footer">月均效率與調任僅用於管理比較，正式排班、出勤與請假資料維持原狀。</div>
 </section>
 
 <section id="view-ranking" class="hidden space-y-4">
