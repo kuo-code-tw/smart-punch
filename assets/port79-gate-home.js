@@ -235,11 +235,9 @@ function switchTab(which){
    switchTab(next);
    $(next==='gate'?'p79HomeGateTab':'p79HomeOperationsTab')?.focus();
   });
-  // Some phone sessions are restored before this script initializes.
-  // Always open the official Gate totals when the admin-phone UI is active.
-  if(d.documentElement?.classList?.contains?.('p79-admin-phone-two-panels'))
-   switchTab('gate');
-  else render();
+  // Ordinary administrator phones no longer show the Gate panel.
+  // Keep the default operations tab without requesting Gate data in the background.
+  render();
  }
  g.P79GateStatsHome={setYearRows,normalize,rangeFor,aggregateFor:function(rows,yr,selectedMode,selectedAnchor){
   var anchor=String(selectedAnchor||yr+'-01-01');
