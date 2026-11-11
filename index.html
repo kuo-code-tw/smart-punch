@@ -1111,14 +1111,14 @@ function p79IsAdminPhoneDevice(){
 }
 function p79SyncAdminPhonePanels(session){
   const role=String(session?.adminRole||session?.role||'').toLowerCase();
-  // Ordinary administrators retain Gate totals along with WAN HAI and current shift.
-  // Superadministrators retain the complete original dashboard and navigation.
   const actualRole=String(session?.actualAdminRole||role).toLowerCase();
+  // Mobile homepage for ordinary administrators: WAN HAI ship schedule + current shift only.
+  // Superadmin, desktop and ordinary employee sessions keep their existing views.
   const phone=role==='admin'&&actualRole!=='superadmin'&&
     !session?.punchOnly&&p79IsAdminPhoneDevice();
   document.documentElement.classList.toggle('p79-admin-phone-two-panels',phone);
-  // Only the efficiency trend remains hidden on administrator phones.
-  for(const selector of ['.p79d-ship-panels > .p79d-trend']){
+  for(const selector of ['.p79d-ship-panels > .p79d-trend',
+                         '.p79d-ship-panels > .p79d-gate-flip']){
     const card=document.querySelector('#p79Dashboard '+selector);
     if(!card)continue;
     if(phone){
@@ -1133,17 +1133,9 @@ function p79SyncAdminPhonePanels(session){
       card.style.removeProperty('display');
     }
   }
-  // Previous mobile versions explicitly hid the flip card with inline styles.
-  const gateCard=document.querySelector('#p79Dashboard .p79d-ship-panels > .p79d-gate-flip');
-  if(gateCard?.dataset.p79PhoneHidden==='1'){
-    delete gateCard.dataset.p79PhoneHidden;
-    gateCard.hidden=false;
-    gateCard.removeAttribute('aria-hidden');
-    gateCard.style.removeProperty('display');
-  }
-  // On phones open official Gate statistics automatically, not vessel imports.
-  if(phone&&document.getElementById?.('p79HomeGateTab')?.getAttribute('aria-selected')!=='true'){
-    window.P79GateStatsHome?.switchTab?.('gate');
+  // A prior desktop session might have left Gate selected; do not fetch Gate on admin phones.
+  if(phone&&document.getElementById?.('p79HomeGateTab')?.getAttribute('aria-selected')==='true'){
+    window.P79GateStatsHome?.switchTab?.('operations');
   }
 }
 window.addEventListener('resize',()=>p79SyncAdminPhonePanels(currentSession));
@@ -1754,7 +1746,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:auto!important;
     width:100%!important;min-width:0!important;gap:0!important;margin:0!important;padding:0!important;
   }
-  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule):not(.p79d-gate-flip),
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule),
   html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-attendance-panels>:not(.p79r-current-shift-card){
     display:none!important;
   }
@@ -1773,7 +1765,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     display:block!important;flex:1 1 auto!important;width:100%!important;height:auto!important;
     min-height:120px!important;max-height:60dvh!important;overflow-y:auto!important;
   }
-  /* Hide efficiency trend only; Gate quantities remain visible. */
+  /* Keep only the WAN HAI schedule on ordinary administrator phones. */
   html.p79-admin-phone-two-panels #p79Dashboard .p79d-ship-panels > .p79d-trend{
     display:none!important;visibility:hidden!important;height:0!important;
     min-height:0!important;max-height:0!important;margin:0!important;
@@ -1846,7 +1838,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:auto!important;
     width:100%!important;min-width:0!important;gap:0!important;margin:0!important;padding:0!important;
   }
-  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule):not(.p79d-gate-flip),
+  html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels>:not(.p79d-ship-schedule),
   html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-attendance-panels>:not(.p79r-current-shift-card){
     display:none!important;
   }
@@ -1865,7 +1857,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     display:block!important;flex:1 1 auto!important;width:100%!important;height:auto!important;
     min-height:120px!important;max-height:60dvh!important;overflow-y:auto!important;
   }
-  /* Hide efficiency trend only; Gate quantities remain visible. */
+  /* Keep only the WAN HAI schedule on ordinary administrator phones. */
   html.p79-admin-phone-two-panels body.p79-workspace #p79Dashboard .p79d-ship-panels > .p79d-trend{
     display:none!important;visibility:hidden!important;height:0!important;
     min-height:0!important;max-height:0!important;margin:0!important;
@@ -1877,58 +1869,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 <!-- 2026-11-07: Keep authenticated Gate quantities visible in admin mobile home. -->
 <style id="p79-mobile-gate-quantities-20261107">
+/* Admin phone: no entry/exit Gate statistics. Leave desktop and superadmin intact. */
 @media screen {
  html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
- #p79Dashboard .p79d-ship-panels {
-   grid-template-columns:minmax(0,1fr)!important;
-   grid-auto-rows:auto!important;
-   align-items:stretch!important;
-   gap:10px!important;
- }
- html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
  #p79Dashboard .p79d-ship-panels > article.p79d-panel.p79d-ranking.p79d-gate-flip {
-   display:flex!important;visibility:visible!important;
-   flex-direction:column!important;
-   grid-column:1/-1!important;grid-row:auto!important;
-   width:100%!important;min-width:0!important;
-   height:auto!important;min-height:320px!important;max-height:none!important;
-   padding:10px!important;margin:0!important;
-   align-self:stretch!important;overflow:visible!important;
- }
- html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
- #p79Dashboard .p79d-gate-flip #p79HomeGatePanel.p79-gate-section {
-   display:flex!important;flex:1 1 auto!important;flex-direction:column!important;
-   height:auto!important;min-height:0!important;max-height:none!important;
-   overflow:visible!important;
- }
- html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
- #p79Dashboard .p79d-gate-flip #p79HomeGatePanel[hidden] {
-   display:none!important;
- }
- html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
- #p79Dashboard .p79d-gate-flip .p79-gate-metrics {
-   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
-   grid-template-rows:repeat(3,minmax(57px,auto))!important;
-   grid-auto-rows:minmax(57px,auto)!important;
-   flex:1 1 auto!important;min-height:171px!important;
-   height:auto!important;max-height:none!important;overflow:visible!important;
- }
- html.p79-admin-phone-two-panels body.p79-workspace:has(#systems.show):has(#p79Dashboard)
- #p79Dashboard .p79d-gate-flip .p79-gate-metrics > div {
-   min-height:57px!important;padding:5px 3px!important;
- }
- html.p79-admin-phone-two-panels #p79Dashboard .p79d-gate-flip #p79HomeOperationsTab {
-   display:none!important;
- }
- html.p79-admin-phone-two-panels #p79Dashboard .p79d-gate-flip #p79HomeGateTab {
-   display:inline-flex!important;visibility:visible!important;
- }
- html.p79-admin-phone-two-panels #p79Dashboard .p79d-gate-flip .p79-gate-footer {
-   min-height:18px!important;overflow:visible!important;
- }
- html.p79-admin-phone-two-panels #p79Dashboard .p79d-gate-flip #p79GateStatus {
-   white-space:normal!important;overflow-wrap:anywhere!important;
-   overflow:visible!important;text-overflow:clip!important;line-height:1.45!important;
+   display:none!important;visibility:hidden!important;
+   height:0!important;min-height:0!important;max-height:0!important;
+   margin:0!important;padding:0!important;border:0!important;
+   overflow:hidden!important;
  }
 }
 </style>
