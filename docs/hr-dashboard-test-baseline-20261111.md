@@ -3,7 +3,7 @@
 ## 結果
 - 來源：GitHub Actions 基準比對 [Verify attendance integration regressions against main baseline](https://github.com/kuo-code-tw/smart-punch/actions/runs/43022921042)
 - 主分支失敗：99 項；本次新版候選分支失敗：99 項；相對主分支新增失敗：**0 項**。
-- 新的人資專項測試 `tests/hr-reference-dashboard-integrations.cjs` 通過 11/11（模擬資料）；尚無登入後完整的瀏覽器端對接驗收。
+- 人資專項測試 `tests/hr-reference-dashboard-integrations.cjs` 檢查現有員工、考勤、請假、排班、效率連結及資料核對；尚需以最新 CI 結果和登入後操作確認。
 - 此報告只歸類既有失敗，**不是已修復或通過的聲明**。
 
 ## 失敗案例依領域歸類
@@ -124,5 +124,5 @@
 ## 上線前必要確認
 1. 對照正式資料執行權限/身份切換/連結點擊檢查。
 2. 考勤與班表時間跨日比對、請假核准、加班申報去重及月結來源核實。
-3. 薪資與訓練需要正式後端資料表、寫入授權與審計流程，不可把暫存試算誤認為正式記錄。
+3. 本次以現有系統為範圍：不新增薪資、教育訓練等新模組；考勤、請假、排班、加班僅讀取原有正式資料。
 4. 原有 99 項失敗應依風險逐一修復；不要透過跳過測試來假裝綠燈。
