@@ -153,7 +153,7 @@
     if (!model.integrity) reason.push('目前明細的 AQC 或每日小計加總不一致');
     var auditTitle = model.status === 'match' ? '櫃數核對一致' : model.status === 'mismatch' ? '資料差異，請先處理' : '核對尚未完成';
     document.getElementById('p79driverAudit').dataset.status = model.status;
-    document.getElementById('p79driverAudit').innerHTML = '<div><strong>' + auditTitle + '</strong><span>WORKING REPORT 全船 ' + fmt(model.full.containers) + ' 櫃 ｜ WORKING SHEET 總 Moves ' + fmt(audit.moves) + ' ｜ 差額 ' + fmt(audit.diff) + ' ｜ Bundle ' + fmt(audit.bundle) + '／' + fmt(master.workingSheetSource && master.workingSheetSource.bundleDeduct) + ' ｜ H/C ' + fmt(audit.hc) + '／' + fmt(audit.sheetHc) + '</span></div>' +
+    document.getElementById('p79driverAudit').innerHTML = '<div><strong>' + auditTitle + '</strong><span>WORKING REPORT 全船 ' + fmt(model.full.containers) + ' 櫃 ｜ WORKING SHEET 請款 ' + fmt(audit.bill) + ' ＋ SHIFT ' + fmt(audit.shift) + ' ＝ 總 Moves ' + fmt(audit.moves) + ' ｜ 差額 ' + fmt(audit.diff) + ' ｜ Bundle ' + fmt(audit.bundle) + '／' + fmt(master.workingSheetSource && master.workingSheetSource.bundleDeduct) + ' ｜ H/C ' + fmt(audit.hc) + '／' + fmt(audit.sheetHc) + '</span></div>' +
       (reason.length ? '<div class="p79driver-audit-reasons">' + html(reason.join('；')) + '</div>' : '<div class="p79driver-audit-reasons">全船核對不受組別、姓名、AQC 與日期篩選影響。</div>');
     var host = document.getElementById('driverVesselAqcSummary');
     if (host) {
