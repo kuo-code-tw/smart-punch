@@ -280,13 +280,34 @@ function analyzeAttendance(data,month,boundaryRecords,reviewOptions={}){
  return {recordCount:records.length,peopleCount:uniquePeople.size,personDays:peopleDays.size,
    punchIn,punchOut,other,weeks,today,todayCount:todayPeople.size,todayOnDuty:[...todayPeople].filter(id=>/上班|簽到|clock.?in|check.?in/i.test(todayLatest.get(id)?.status||'')).length,weeklyPeople:seenWeeks.map(s=>s.size),pendingShifts:pendingDetails===null?null:pendingDetails.length,pendingDetails};
 }
+function p79HomeScheduleObject(row){
+ if(row?.schedule&&typeof row.schedule==='object'&&!Array.isArray(row.schedule))return row.schedule;
+ for(const value of [row?.schedule,row?.scheduleJson,row?.fullScheduleJSON,row?.fullScheduleJson]){
+  if(typeof value!=='string'||!value.trim())continue;
+  try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))return parsed;}catch(_){}
+ }
+ return {};
+}
+function p79HomeOvertimeDate(raw,report,month){
+ const date=String(report?.overtimeDate||raw||'').trim().replaceAll('/','-');
+ if(/^20\d{2}-\d{2}-\d{2}$/.test(date)){
+  const parsed=Date.parse(date+'T00:00:00Z');
+  return Number.isFinite(parsed)&&new Date(parsed).toISOString().slice(0,10)===date?date:'';
+ }
+ if(/^\d{1,2}$/.test(date)){
+  const day=Number(date),candidate=month+'-'+String(day).padStart(2,'0');
+  const parsed=Date.parse(candidate+'T00:00:00Z');
+  if(day>=1&&day<=31&&Number.isFinite(parsed)&&new Date(parsed).toISOString().slice(0,10)===candidate)return candidate;
+ }
+ return '';
+}
 function analyzeOvertime(data,month){
  if(!data||!Array.isArray(data.schedules))throw Error('排班月份資料不完整');
  const titles=new Map(),roster=new Map(),people=new Map(),seen=new Set(),details=[];let hours=0,count=0;
  const key=v=>String(v??'').trim().toUpperCase();
  const ensure=title=>{if(!titles.has(title))titles.set(title,{title,hours:0,count:0});return titles.get(title);};
  for(const e of data.employees||[]){
-  const title=String(e.jobTitle||e.deptDetail||'').trim();
+  const title=String(e.jobTitle||e.deptDetail||e.position||e.role||'').trim();
   if(!title)continue;
   const id=key(e.empId||e.id);
   if(id){
@@ -296,13 +317,15 @@ function analyzeOvertime(data,month){
   ensure(title);
  }
  for(const row of data.schedules){
+  const schedule=p79HomeScheduleObject(row),personnel=schedule.__personnel||{};
   const title=roster.get(key(row.empId||row.id))||
-    String(row.jobTitle||row.deptDetail||row.position||'').trim()||'未設定職稱';
+    String(row.jobTitle||row.deptDetail||row.position||row.role||personnel.jobTitle||personnel.role||'').trim()||'未設定職稱';
   const item=ensure(title);
-  for(const [date,meta] of Object.entries(row.schedule?.__meta||{})){
-   if(!date.startsWith(month+'-'))continue;
+  for(const [rawDate,meta] of Object.entries(schedule.__meta||{})){
    const r=meta?.overtimeReport;
-   if(!r?.id||seen.has(String(r.id))||r.deleted===true||r.revoked===true||
+   const date=p79HomeOvertimeDate(rawDate,r,month);
+   if(!date.startsWith(month+'-')||!r?.id||seen.has(String(r.id))||
+      r.deleted===true||r.revoked===true||meta?.overtimeExcluded===true||
       /撤銷|刪除|取消|revoked|cancel/i.test(String(r.status||'')))continue;
    const h=num(r.declaredHours??r.rule?.declaredHours);
    if(h===null||h<0)continue;
@@ -310,7 +333,7 @@ function analyzeOvertime(data,month){
    const person=people.get(key(row.empId||row.id))||{};
    details.push({
     id:String(r.id),date,empId:key(row.empId||row.id),
-    name:person.name||String(row.name||row.empName||'').trim()||'—',
+    name:person.name||String(row.name||row.empName||personnel.name||'').trim()||'—',
     dept:person.dept||String(row.dept||row.department||'').trim(),
     title,code:String(r.code||''),typeName:String(r.typeName||''),
     declaredHours:h,planned:r.planned===true,
