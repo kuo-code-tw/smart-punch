@@ -4,6 +4,10 @@ on:
     branches: [main]
     paths:
       - 'gate-import/**'
+      - 'gate-dashboard/**'
+      - 'aqc-efficiency/index.html'
+      - 'tests/gate-shell-drop.cjs'
+      - 'tests/gate-parent-dialog.cjs'
       - 'assets/port79-gate-import.js'
       - 'assets/port79-gate-live.js'
       - 'backend/gate-stats-daily-import.gs'
