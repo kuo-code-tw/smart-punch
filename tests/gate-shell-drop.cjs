@@ -2,6 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8'),gate=fs.readFileSync('gate-import/index.html','utf8');
 const start=html.indexOf('async function handleExcelDrop(e){'),end=html.indexOf('\nasync function importExcelFiles',start);
+assert(html.indexOf('id="p79GateDashboardFrame"')<html.indexOf('id="p79GateImportFrame"'),'approved redesigned dashboard must appear before the collapsible upload tool');
 assert(start>=0&&end>start);
 let active=true,received=[],vessel=[],notices=[],frame={contentWindow:{P79GateImport:{chooseFile:async f=>received.push(f)}}};
 const ctx={document:{body:{classList:{contains:()=>active}},getElementById:()=>frame},toast:t=>notices.push(t),excelDragDepth:0,setExcelDropActive(){},isExcelFile:f=>/\.xlsx?$/i.test(f.name),setExcelDropStatus(){},importExcelFiles:async f=>vessel.push(f)};
