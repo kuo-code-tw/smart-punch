@@ -176,6 +176,8 @@
  }
  function init(){
   if(ready||!$('gateLivePanel'))return;
+  // The official management dashboard is now rendered above the collapsed importer.
+  if(d.documentElement.getAttribute('data-gate-embed')==='1')return;
   ready=true;anchor=today();
   Object.entries({Day:'day',Week:'week',Month:'month',Year:'year'}).forEach(([title,key])=>{
    $('gateLiveMode'+title)?.addEventListener('click',()=>changeMode(key));
