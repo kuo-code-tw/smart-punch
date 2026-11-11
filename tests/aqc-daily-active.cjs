@@ -41,4 +41,21 @@ assert(!renderSource.includes("dailyAqcStart').value="),'rerender must not reset
 assert(!renderSource.includes("dailyAqcEnd').value="),'rerender must not reset user-selected end');
 assert(source.includes("dailyAqcStart').addEventListener('change',render)"));
 assert(source.includes("dailyAqcEnd').addEventListener('change',render)"));
+// UI rows and CSV must list only verifiable working days through the current date, latest first.
+const visible=ctx.window.P79AqcDaily.visibleWorkingDays;
+const monthReport=c([
+ record('7901','2026-11-04T08:00:00','2026-11-04T12:00:00'),
+ record('8002','2026-11-05T09:00:00','2026-11-05T11:00:00'),
+ record('7902','2026-11-10T09:00:00','2026-11-10T11:00:00'),
+ record('8003','2026-11-12T09:00:00','2026-11-12T11:00:00')
+],'2026-11-01','2026-11-30');
+assert.deepEqual([...visible(monthReport,'all','2026-11-11').map(x=>x.date)],['2026-11-10','2026-11-05','2026-11-04']);
+assert.deepEqual([...visible(monthReport,'79','2026-11-11').map(x=>x.date)],['2026-11-10','2026-11-04']);
+assert.deepEqual([...visible(monthReport,'80','2026-11-11').map(x=>x.date)],['2026-11-05']);
+assert.equal(visible(monthReport,'all','2026-11-03').length,0);
+assert.equal(visible(monthReport,'all','2026-11-12').length,4);
+assert(!visible(monthReport,'all','2026-11-11').some(x=>x.date>'2026-11-11'||x.visible<=0));
+assert(source.includes("chart(display.slice().reverse(),port)"),'trend remains chronological');
+assert(source.includes("visibleWorkingDays(latest,port).map(d=>[d.date"),'CSV uses the same filtered and descending dates as the table');
+assert(source.includes("未列出不代表已確認停工"),'no-data days are not declared idle');
 console.log('PASS AQC daily active: true physical AQC dedup, day split, midnight boundary, physical inventories, permissions-safe pure compute and range limits');
