@@ -22,8 +22,8 @@ function isResigned(e,day){
  return ['resigned','離職','terminated','inactive'].includes(s)||!!(termination&&termination<=day);
 }
 function isWorking(e,day){
- const s=norm(e.employmentStatus||e.status).toLowerCase();
- return !isResigned(e,day)&&!['leave','留職停薪','留停','loa'].includes(s);
+ const s=norm(e.employmentStatus||e.status).toLowerCase(),started=date(e.startDate||e.reportingDate);
+ return (!started||started<=day)&&!isResigned(e,day)&&!['leave','留職停薪','留停','loa'].includes(s);
 }
 function safeMoney(raw){
  if(raw===''||raw===undefined||raw===null)return null;
