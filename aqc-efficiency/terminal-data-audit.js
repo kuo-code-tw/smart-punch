@@ -32,8 +32,8 @@ function audit(stats,scope){
  const byPort={};
  for(const wharf of stats.byWharf||[]){
   const code=portFor(wharf.wharf);if(!code)continue;
-  if(!byPort[code])byPort[code]={ships:0,disc:0,load:0,billed:0,moves:0,shift:0};
-  for(const key of ['ships','disc','load','billed','moves','shift'])byPort[code][key]+=Number(wharf[key]||0);
+  if(!byPort[code])byPort[code]={ships:0,disc:0,load:0,billed:0,moves:0,shift:0,bundle:0,bundleUnknown:0,bundleMismatch:0};
+  for(const key of ['ships','disc','load','billed','moves','shift','bundle','bundleUnknown','bundleMismatch'])byPort[code][key]+=Number(wharf[key]||0);
  }
  for(const code of ['79','80']){
   const master=byPort[code],rod=ports[code];
@@ -50,16 +50,33 @@ function audit(stats,scope){
   }
   if(rod.noRecords)notes.push(code+'碼頭有 '+fmt(rod.noRecords)+' 支吊桿本月無逐桿紀錄，請確認是否待命或來源未同步');
   const raw=master.disc+master.load;
-  if(differs(rod.rodQuantity,raw))
-    add('raw-'+code,'review',code+'碼頭 WORKING REPORT 逐桿合計 '+fmt(rod.rodQuantity)+'，WORKING SHEET 原始卸＋裝 '+fmt(raw)+'，差 '+signed(rod.rodQuantity-raw)+' 櫃');
-  const billDiff=rod.rodQuantity-master.billed;
-  if(differs(rod.rodQuantity,master.billed)){
-    if(!differs(billDiff,master.shift))
-      notes.push(code+'碼頭逐桿合計比正式作業量多 '+fmt(billDiff)+' 櫃，與 SHIFT '+fmt(master.shift)+' 相同；可能是逐桿已回報的翻艙作業差異；SHIFT 不得再加進碼頭櫃數，也不得分攤至各支吊桿，仍需逐筆核對來源');
-    else if(!differs(rod.rodQuantity,master.moves))
-      notes.push(code+'碼頭逐桿櫃數與總 Moves 相同、但與正式作業量不同，需注意統計口徑');
-    else
-      add('billed-'+code,'review',code+'碼頭逐桿合計 '+fmt(rod.rodQuantity)+'，正式作業量 '+fmt(master.billed)+'，差 '+signed(billDiff)+' 櫃');
+  const expectedBilled=raw-master.bundle;
+  const expectedMoves=expectedBilled+master.shift;
+  const bundleReconciled=!master.bundleUnknown&&!master.bundleMismatch&&!differs(expectedBilled,master.billed);
+  const movesReconciled=!differs(master.moves,master.billed+master.shift);
+  const rodsReconciled=!differs(rod.rodQuantity,master.moves);
+  // Raw DISC+LOAD is gross. Do not flag its difference from a net/SHIFT-inclusive
+  // WORKING REPORT as unexplained when verified Bundle and SHIFT fully account for it.
+  if(bundleReconciled&&movesReconciled&&rodsReconciled){
+    if(master.bundle>0){
+      notes.push(code+'碼頭原始卸＋裝 '+fmt(raw)+' − 已填報 Bundle '+fmt(master.bundle)+' ＝正式作業量 '+fmt(master.billed)+'；另列 SHIFT '+fmt(master.shift)+'，總 Moves '+fmt(master.moves)+'；逐桿 '+fmt(rod.rodQuantity)+' 與總 Moves 相符。Bundle 不再重複扣除。');
+    }else if(master.shift>0){
+      notes.push(code+'碼頭逐桿 '+fmt(rod.rodQuantity)+' 與正式總 Moves 相符（作業量 '+fmt(master.billed)+'＋SHIFT '+fmt(master.shift)+'）；SHIFT 不得再次加總。');
+    }
+  }else{
+    if(differs(rod.rodQuantity,raw)){
+      add('raw-'+code,'review',code+'碼頭逐桿回報 '+fmt(rod.rodQuantity)+'、原始卸＋裝 '+fmt(raw)+'；按已填報 Bundle '+fmt(master.bundle)+' 與 SHIFT '+fmt(master.shift)+' 計算，預期 '+fmt(expectedMoves)+'，與逐桿差 '+signed(rod.rodQuantity-expectedMoves)+'，需核對來源及欄位完整性');
+    }
+    const billDiff=rod.rodQuantity-master.billed;
+    if(differs(rod.rodQuantity,master.billed)){
+      if(!differs(billDiff,master.shift)&&movesReconciled){
+        notes.push(code+'碼頭逐桿與正式作業量差 '+fmt(billDiff)+'，等於 SHIFT；但仍有其他來源口徑未對齊，需逐船核對');
+      }else if(!differs(rod.rodQuantity,master.moves)&&movesReconciled){
+        notes.push(code+'碼頭逐桿與總 Moves 相同，但原始卸裝／Bundle 或來源欄位尚有差異待核');
+      }else{
+        add('billed-'+code,'review',code+'碼頭逐桿合計 '+fmt(rod.rodQuantity)+'，正式作業量 '+fmt(master.billed)+'，差 '+signed(billDiff)+' 櫃；SHIFT '+fmt(master.shift)+'（另列）');
+      }
+    }
   }
  }
  return {alerts,notes,verdict:alerts.length?fmt(alerts.length)+' 項資料需核對':'目前未發現可判定的來源差異（僅限已有的資料欄位）'};
@@ -67,15 +84,19 @@ function audit(stats,scope){
 function render(stats,scope){
  const mount=document.getElementById('terminalReconciliationMount');
  if(!mount)return;
+ const wasOpen=!!mount.querySelector?.('details.p79-audit-panel')?.open;
  const result=audit(stats,scope);
  const item=a=>'<li class="p79-audit-item"><span class="p79-audit-symbol">!</span><span>'+a.message+'</span></li>';
  const infos=result.notes.length?'<div class="p79-audit-notes">'+result.notes.map(v=>'<div>• '+v+'</div>').join('')+'</div>':'';
- mount.innerHTML='<section class="p79-audit-panel" aria-label="碼頭資料差異核對">'+
-  '<div class="p79-audit-head"><div><span class="p79-audit-eyebrow">SOURCE RECONCILIATION</span><h3>🔎 資料差異自動核對</h3></div>'+
-  '<strong class="p79-audit-count">'+result.verdict+'</strong></div>'+
+ mount.innerHTML='<details class="p79-audit-panel" '+(wasOpen?'open':'')+' aria-label="碼頭資料差異核對">'+
+  '<summary class="p79-audit-head" aria-label="展開或收合資料差異核對">'+
+  '<div><span class="p79-audit-eyebrow">SOURCE RECONCILIATION</span><h3>🔎 資料差異自動核對</h3></div>'+
+  '<span class="p79-audit-head-right"><strong class="p79-audit-count">'+result.verdict+'</strong><span class="p79-audit-toggle" aria-hidden="true"></span></span></summary>'+
+  '<div class="p79-audit-content">'+
   (result.alerts.length?'<ul class="p79-audit-list">'+result.alerts.map(item).join('')+'</ul>':
    '<p class="p79-audit-clear">'+(stats.ships.length||stats.records.length?'已檢查現有資料；下列範圍與口徑說明仍需留意':'尚無正式資料可核對')+'</p>')+
-  infos+'<p class="p79-audit-foot">只比對所選月份、79／80 碼頭；異常代表來源差異或資料不足，不會自動更改 WORKING SHEET、WORKING REPORT、船舶主檔或人工分類。</p></section>';
+  infos+'<p class="p79-audit-foot">只比對所選月份、79／80 碼頭；異常代表來源差異或資料不足，不會自動更改 WORKING SHEET、WORKING REPORT、船舶主檔或人工分類。</p></div></details>';
 }
+
 root.P79TerminalDataAudit={audit,render};
 })(window);
