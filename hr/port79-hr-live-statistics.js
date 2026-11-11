@@ -3,7 +3,7 @@
 'use strict';
 const M=window.P79HrVerifiedMetrics;
 if(!M)return;
-const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastRefresh=0;
+const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastRefresh=0,lastAuthIdentity='';
 function sess(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function access(key,action){
  const s=sess(),role=String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase();
@@ -15,7 +15,12 @@ function access(key,action){
 }
 function emp(){try{return typeof employees!=='undefined'&&Array.isArray(employees)?employees:[]}catch(e){return []}}
 function ready(){try{return typeof p79HrCloudDataReady!=='undefined'&&p79HrCloudDataReady}catch(e){return false}}
-function token(){return sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||''}
+function activeToken(){
+ const found=sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'';
+ // The HR page itself owns the verified management token; never mix login identities.
+ try{if(typeof token!=='undefined'&&token&&found&&String(token)!==String(found))return ''}catch(e){return ''}
+ return found;
+}
 function apiBase(){
  let val='';
  try{val=String(sessionStorage.getItem('port79_gas_url')|| (typeof GAS_URL!=='undefined'?GAS_URL:'')).trim()}catch(e){}
@@ -23,7 +28,7 @@ function apiBase(){
 }
 function selection(){return M.date($('p79rWorkDate')?.value)||M.date(new Date().toISOString().slice(0,10))}
 function todayTaipei(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
-function identity(){const s=sess();return String(s?.empId||'')+'|'+token()+'|'+selection()}
+function identity(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+selection()}
 function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=msg}
 function setVal(id,num,sub){
  const el=$(id);if(el)el.textContent=num;
@@ -105,7 +110,9 @@ function reset(msg){
 }
 async function refresh(force){
  if(!ready())return;
- const day=selection(),month=day.slice(0,7),auth=token(),startIdentity=identity();
+ const day=selection(),month=day.slice(0,7),auth=activeToken(),startIdentity=identity();
+ if(lastAuthIdentity&&lastAuthIdentity!==String(sess()?.empId||'')+'|'+auth){cache.clear();loadId++;inFlightKey=''}
+ lastAuthIdentity=String(sess()?.empId||'')+'|'+auth;
  if(!auth||!apiBase()||!sess())return reset('沒有已驗證的雲端登入權杖');
  const scope={attendance:access('attendance','records.view'),schedule:access('schedule','records.view'),
  leave:access('leave','records.view'),workhours:access('workhours','overtime.view')};
