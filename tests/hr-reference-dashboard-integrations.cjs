@@ -46,7 +46,7 @@ test('payroll calculation is opt-in and never inserts official pay rates',()=>{
  assert(!operations.includes('localStorage.setItem'));
 });
 const people=['A01','A02','A03'],leave=[
- {id:'L1',empId:'A02',status:'已核准',startDate:'2026-11-11',endDate:'2026-11-11',leaveType:'特休'},
+ {id:'L1',empId:'A02',status:'已核准',startDate:'2026-11-11',endDate:'2026-11-11',approvedDays:1,leaveType:'特休'},
  {id:'L2',empId:'A03',status:'已退回',startDate:'2026-11-11',endDate:'2026-11-11'},
  {id:'L3',empId:'A01',status:'已核准',startDate:'2026-11-01',endDate:'2026-11-02',revoked:true}
 ];
@@ -70,6 +70,17 @@ test('attendance denominator respects leave and scheduled workday, no name-only 
  const rows=[{empId:'A01',type:'上班打卡',timeStr:'2026-11-11 07:56:00'}];
  const r=M.attendanceRate({records:rows,schedules,leaveRecords:leave,employees:people.map(empId=>({empId,employmentStatus:'active'})),day:'2026-11-11'});
  assert.equal(r.ready,true);assert.equal(r.expected,1);assert.equal(r.clocked,1);assert.equal(r.percent,100);
+ const partial=M.attendanceRate({
+  records:rows,schedules,leaveRecords:[{...leave[0],approvedDays:.5}],
+  employees:people.map(empId=>({empId,employmentStatus:'active'})),day:'2026-11-11'
+ });
+ assert.equal(partial.ready,true);assert.equal(partial.expected,2);assert.equal(partial.percent,50,'half-day leave must not erase a scheduled day');
+ const unknown=M.attendanceRate({
+  records:rows,schedules,leaveRecords:[{...leave[0],approvedDays:undefined}],
+  employees:people.map(empId=>({empId,employmentStatus:'active'})),day:'2026-11-11'
+ });
+ assert.equal(unknown.ready,false,'missing approved duration cannot be treated as all-day leave');
+
 });
 test('attendance fail-closed on incomplete schedules and date mismatch',()=>{
  const args={records:[],schedules:schedules.slice(0,1),leaveRecords:[],employees:people.map(empId=>({empId})),day:'2026-11-11'};
@@ -144,7 +155,7 @@ async function testLiveStatisticsWithMockedCloud(){
   {empId:'A01',schedule:{'2026-11-11':'早',__meta:{'2026-11-11':{overtimeReport:{id:'O1',declaredHours:2,status:'已申報'}}}}},
   {empId:'A02',schedule:{'2026-11-11':'早',__meta:{}}}
  ];
- const leaveRecords=[{id:'L1',empId:'A02',status:'已核准',startDate:'2026-11-11',endDate:'2026-11-11'}];
+ const leaveRecords=[{id:'L1',empId:'A02',status:'已核准',startDate:'2026-11-11',endDate:'2026-11-11',approvedDays:1}];
  const requests=[];
  let account={empId:'ADMIN',adminRole:'superadmin'};
  const storage={getItem(key){
