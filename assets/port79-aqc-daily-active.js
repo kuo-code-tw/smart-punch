@@ -37,7 +37,12 @@ function calculate(raw,start,end){
  return {days:days.map(d=>({date:d.date,p79:[...d.ports[79]].sort(),p80:[...d.ports[80]].sort(),n79:d.ports[79].size,n80:d.ports[80].size,total:d.ports[79].size+d.ports[80].size,sources:[...d.sources]})),
   distinct79:[...distinct[79]].sort(),distinct80:[...distinct[80]].sort(),activeDays:days.filter(d=>d.ports[79].size+d.ports[80].size>0).length,intervalCount};
 }
-function windowDefault(){const last=taipeiDate(Date.now());return {end:last,start:taipeiDate(dayMs(last)-7*86400000)};}
+function monthWindow(date){
+ if(!dateOk(date))throw Error('無效的月份日期');
+ const month=date.slice(0,7),[year,m]=month.split('-').map(Number);
+ return {start:month+'-01',end:new Date(Date.UTC(year,m,0)).toISOString().slice(0,10)};
+}
+function windowDefault(){return monthWindow(taipeiDate(Date.now()));}
 function chart(rows,port){
  const list=rows.slice(-31),w=640,h=280,l=38,r=13,t=24,b=44,iw=w-l-r,ih=h-t-b;
  if(!list.length)return '<div class="p79-daily-empty">沒有可繪製的日期</div>';
@@ -179,5 +184,5 @@ function exportCsv(){
  const csv='\uFEFF'+values.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='AQC每日動用桿數_'+$('dailyAqcStart').value+'_'+$('dailyAqcEnd').value+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-g.P79AqcDaily={calculate,unitOf,mount,render};
+g.P79AqcDaily={calculate,unitOf,monthWindow,mount,render};
 })(window);
