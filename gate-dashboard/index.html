@@ -6,7 +6,22 @@
 <meta name="theme-color" content="#eaf4ff">
 <title>進出站櫃量管理｜79碼頭</title>
 <link rel="stylesheet" href="./gate-dashboard.css?v=20261110-v1">
-<script defer src="./gate-dashboard.js?v=20261110-v1"></script>
+<script defer src="./gate-dashboard.js?v=20261111-official-ui-v2"></script>
+<script>
+(function(){
+  if(new URLSearchParams(location.search).get('embed')!=='1'||window.parent===window)return;
+  document.documentElement.classList.add('p79-gate-dashboard-embedded');
+  function notify(){
+    var height=Math.ceil(document.documentElement.scrollHeight);
+    if(height>200)window.parent.postMessage({type:'p79-gate-dashboard-resize',height:height},location.origin);
+  }
+  window.addEventListener('DOMContentLoaded',function(){
+    if(window.ResizeObserver)new ResizeObserver(notify).observe(document.body);
+    notify();
+  });
+  window.addEventListener('load',notify);
+})();
+</script>
 </head>
 <body>
 <header class="topbar">
