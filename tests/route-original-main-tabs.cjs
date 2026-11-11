@@ -10,14 +10,19 @@ for(const name of tabs){
  assert(navBlock.includes("switchTab('"+name+"',this)"),name+' keeps original click action');
 }
 assert(html.includes('id="efficiencySharedYear"'),'shared year picker preserved');
+assert(html.includes('route-management-dashboard.css?v=20261111-aligned-tabs-v2'),'route stylesheet cache version updated');
 assert(html.includes('id="routeTopMonthFilter"'),'route-specific month picker preserved');
 assert(html.includes('id="routeManagerSyncBtn"'),'route-specific vessel sync preserved');
 assert(html.includes('id="routeManagerCompareNav"'),'route-specific comparison control preserved');
 assert(html.includes('id="routeManagerExportBtn"'),'route-specific report export preserved');
 assert(html.includes('class="p79-rm-profile"'),'route home shortcut preserved');
 assert(!css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{display:none!important}'),'route no longer hides the main tabs');
-assert(css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{'),'route-specific main menu visible');
-assert(css.includes('display:flex!important;position:sticky!important;top:0!important'),'shared navigation sticky and aligned at top');
+assert(html.includes('id="efficiencyHeader"'),'single shared header remains in document');
+assert(html.includes('id="efficiencyMainTabs"'),'single shared navigation remains in document');
+assert(!css.includes('#efficiencyHeader{display:none!important}'),'route must retain the same page header');
+assert(!css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{'),'route must not reposition the shared navigation');
+assert(css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:12px 12px 24px!important;margin:0 auto!important}'),'route main area uses the same outer vertical padding');
+assert(!css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}'),'no special zero-padding route layout');
 assert(css.includes('#view-compare .p79-rm-brand{display:none!important}'),'duplicate blue system brand removed');
 assert(css.includes('#view-compare .p79-rm-topnav>button:nth-child(-n+3){display:none!important}'),'duplicate route, vessel and stats tabs removed');
 assert(css.includes('#view-compare .p79-rm-topnav>button{'),'route comparison/export remain visible as compact actions');
