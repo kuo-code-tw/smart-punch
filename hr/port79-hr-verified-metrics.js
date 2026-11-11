@@ -1,4 +1,4 @@
-/* Pure, read-only HR aggregation helpers. No payroll or attendance writes. */
+/* Pure, read-only checks for existing HR, attendance, leave and scheduling records. */
 (function(root,factory){
  const api=factory();
  if(typeof module==='object'&&module.exports)module.exports=api;
@@ -24,19 +24,6 @@ function isResigned(e,day){
 function isWorking(e,day){
  const s=norm(e.employmentStatus||e.status).toLowerCase(),started=date(e.startDate||e.reportingDate);
  return (!started||started<=day)&&!isResigned(e,day)&&!['leave','留職停薪','留停','loa'].includes(s);
-}
-function safeMoney(raw){
- if(raw===''||raw===undefined||raw===null)return null;
- const s=String(raw).trim();
- if(!/^\d+(?:\.\d{1,2})?$/.test(s))return null;
- const n=Number(s);return Number.isSafeInteger(Math.round(n*100))&&n<=100000000?n:null;
-}
-function payDraft({base,allowance,overtime,deductions}={}){
- const vals=[base,allowance,overtime,deductions].map(safeMoney);
- if(vals.some(v=>v===null))return{ok:false,error:'薪資試算欄位請填 0 或非負數，最多保留小數兩位'};
- const [basic,extra,ot,less]=vals,gross=Math.round((basic+extra+ot)*100)/100,net=Math.round((gross-less)*100)/100;
- if(net<0)return{ok:false,error:'扣款金額不得超過總應發金額'};
- return{ok:true,gross,net,base:basic,allowance:extra,overtime:ot,deductions:less,authoritative:false};
 }
 function approvedLeaveCount(rows,month,staffIds){
  if(!validMonth(month)||!Array.isArray(rows))return{ready:false,reason:'請假月份或資料格式不完整'};
@@ -155,5 +142,5 @@ function attendanceRate({records=[],schedules=[],leaveRecords=[],employees=[],da
  if(!expected.size)return{ready:true,expected:0,clocked:0,percent:null,reason:'該日無應出勤人員'};
  return{ready:true,expected:expected.size,clocked:clocked.size,percent:Math.round(clocked.size/expected.size*1000)/10};
 }
-return{date,isWorking,isResigned,payDraft,approvedLeaveCount,officialOvertime,attendanceRate};
+return{date,isWorking,isResigned,approvedLeaveCount,officialOvertime,attendanceRate};
 });
