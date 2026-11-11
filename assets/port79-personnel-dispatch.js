@@ -75,6 +75,75 @@ function recommendSwap(persons,{minHours=10,minRecords=5,counts={},lockedGroups,
  if(best.value>=score(before)-1e-9)return {before,reason:'固定保留組並依指定人數試算後，沒有改善可調組效率差距的方案；建議調整人數或維持現況。'};
  return best;
 }
+function optimizeGroups(persons,{selectedKeys=null,lockedGroups=[]}={}){
+ const before=summarize(persons),locked=new Set((Array.isArray(lockedGroups)?lockedGroups:[]).filter(g=>codes.includes(g)));
+ if(before.gap===null)return {before,reason:'四組須都有有效作業時數，才能比較最佳化結果。請先核對資料。'};
+ const available=persons.filter(p=>p.confirmed&&codes.includes(p.group)&&p.eligible&&p.eff>0&&!locked.has(p.group));
+ const selectedSet=selectedKeys===null?null:new Set(selectedKeys instanceof Set?[...selectedKeys]:Array.isArray(selectedKeys)?selectedKeys:[]);
+ const selected=available.filter(p=>selectedSet===null||selectedSet.has(p.key));
+ if(selected.length<2||new Set(selected.map(p=>p.group)).size<2)return {before,reason:'請從至少兩個未保留的組別勾選可調人員（每組至少一人）。',selectedCount:selected.length};
+ const groups=before.groups.map(g=>g.group),counts=Object.fromEntries(groups.map(g=>[g,0]));
+ selected.forEach(p=>counts[p.group]++);
+ const movableGroups=groups.filter(g=>counts[g]>0);
+ const baseC=before.groups.map(g=>g.containers),baseH=before.groups.map(g=>g.hours);
+ const positions=Object.fromEntries(groups.map((g,i)=>[g,i]));
+ selected.forEach(p=>{const i=positions[p.group];baseC[i]-=p.containers;baseH[i]-=p.hours;});
+ const initial=selected.map(p=>p.group),caps=counts;
+ function objective(assignment){
+  const cs=baseC.slice(),hs=baseH.slice();let moves=0;
+  for(let i=0;i<selected.length;i++){const g=assignment[i],slot=positions[g];cs[slot]+=selected[i].containers;hs[slot]+=selected[i].hours;if(g!==selected[i].group)moves++;}
+  const rates=cs.map((v,i)=>hs[i]>0?v/hs[i]:NaN);
+  if(rates.some(v=>!Number.isFinite(v)))return {gap:Infinity,variance:Infinity,moves};
+  const gap=Math.max(...rates)-Math.min(...rates),avg=rates.reduce((a,b)=>a+b,0)/rates.length;
+  return {gap,variance:rates.reduce((a,b)=>a+(b-avg)*(b-avg),0),moves};
+ }
+ function better(a,b){
+  if(!b)return true;
+  if(a.gap<b.gap-1e-8)return true;if(a.gap>b.gap+1e-8)return false;
+  if(a.variance<b.variance-1e-8)return true;if(a.variance>b.variance+1e-8)return false;
+  return a.moves<b.moves;
+ }
+ let best=initial.slice(),bestScore=objective(best);
+ const exact=selected.length<=9;
+ if(exact){
+  const remaining={...caps},candidate=Array(selected.length);
+  function explore(i){
+   if(i===selected.length){const val=objective(candidate);if(better(val,bestScore)){bestScore=val;best=candidate.slice();}return;}
+   for(const g of movableGroups){if(!remaining[g])continue;remaining[g]--;candidate[i]=g;explore(i+1);remaining[g]++;}
+  }
+  explore(0);
+ }else{
+  // 大量人員使用多起點、可重現的兩人交換搜尋；不宣稱全域最佳。
+  const n=selected.length,restarts=n>100?4:9;
+  let random=20261111+selected.reduce((a,p)=>a+p.key.length,0);
+  function rnd(){random=(Math.imul(random,1664525)+1013904223)>>>0;return random/4294967296;}
+  for(let seed=0;seed<restarts;seed++){
+   const assignment=initial.slice();
+   if(seed){const steps=Math.min(n*2,seed*4);for(let k=0;k<steps;k++){const i=Math.floor(rnd()*n),j=Math.floor(rnd()*n);if(assignment[i]!==assignment[j]){const tmp=assignment[i];assignment[i]=assignment[j];assignment[j]=tmp;}}}
+   let current=objective(assignment);
+   for(let step=0;step<Math.min(70,n*2);step++){
+    let swap=null,improved=current;
+    for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+     if(assignment[i]===assignment[j])continue;
+     const a=assignment[i],b=assignment[j];assignment[i]=b;assignment[j]=a;
+     const val=objective(assignment);
+     assignment[i]=a;assignment[j]=b;
+     if(better(val,improved)){improved=val;swap=[i,j];}
+    }
+    if(!swap)break;
+    const [i,j]=swap,tmp=assignment[i];assignment[i]=assignment[j];assignment[j]=tmp;current=improved;
+   }
+   if(better(current,bestScore)){bestScore=current;best=assignment.slice();}
+  }
+ }
+ const plan={};selected.forEach((p,i)=>{if(best[i]!==p.group)plan[p.key]=best[i];});
+ const after=summarize(persons,plan),moves=selected.filter(p=>plan[p.key]).map(p=>({person:p,from:p.group,to:plan[p.key]}));
+ const baselineScore=objective(initial);
+ if(!moves.length||!(bestScore.gap<baselineScore.gap-1e-8||Math.abs(bestScore.gap-baselineScore.gap)<=1e-8&&bestScore.variance<baselineScore.variance-1e-8))
+  return {before,after:before,reason:'已完成比較：在目前選取人員與保留組的限制下，未找到能改善四組效率差距的調動，建議維持現有編組。',selectedCount:selected.length,optimal:exact};
+ return {before,after,plan,moves,locked:[...locked],selectedCount:selected.length,optimal:exact,goal:'minimize-group-efficiency-gap'};
+}
+
 async function readDispatchSources(month,read){
  const sources=[
   {key:'live',label:'即時船舶作業',action:'gcGetData',params:{month},valid:d=>Array.isArray(d.records)||Array.isArray(d.shipMasters)},
@@ -84,7 +153,7 @@ async function readDispatchSources(month,read){
  ];
  return Promise.all(sources.map(async source=>{try{const data=await read(source.action,source.params);if(data?.ok!==true||data.retryable||!source.valid(data))throw Error(data?.error||'回傳資料格式不完整');return {...source,ok:true,data};}catch(error){const raw=String(error?.message||error);return {...source,ok:false,error:error?.name==='AbortError'?'連線逾時':/failed to fetch|network/i.test(raw)?'網路連線失敗':raw.slice(0,160)};}}));
 }
-const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,readDispatchSources};
+const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,readDispatchSources};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
 let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:undefined};const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
