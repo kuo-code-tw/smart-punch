@@ -23,8 +23,9 @@ function status(e,asOf){
   var raw=String(e.employmentStatus||'').trim().toLowerCase();
   var st=['resigned','離職','terminated','inactive'].includes(raw)?'resigned':
     ['leave','留職停薪','留停','loa'].includes(raw)?'leave':'active';
-  var termination=parseDate(e.terminationDate);
+  var termination=parseDate(e.terminationDate),started=parseDate(e.startDate||e.reportingDate);
   if(st==='active'&&termination&&termination<=asOf)return 'resigned';
+  if(st==='active'&&started&&started>asOf)return 'not-started';
   return st;
 }
 function readEmployees(){try{return typeof employees!=='undefined'&&Array.isArray(employees)?employees:[]}catch(e){return []}}
@@ -134,7 +135,7 @@ function updateCounts(records,anchor,ready){
  var today=ymd(new Date());
  var active=records.filter(function(e){return status(e,today)==='active'});
  var resigned=records.filter(function(e){return status(e,today)==='resigned'});
- var hires=records.filter(function(e){var date=parseDate(e.startDate);return date&&date.slice(0,7)===month});
+ var hires=records.filter(function(e){var date=parseDate(e.startDate||e.reportingDate);return date&&date.slice(0,7)===month&&date<=anchor&&date<=today});
  var leavers=resigned.filter(function(e){var date=parseDate(e.terminationDate);return date&&date.slice(0,7)===month&&date<=anchor});
  text('p79rActive',ready||records.length?n(active.length):'—');
  text('p79rActiveDonut',ready||records.length?n(active.length):'—');
