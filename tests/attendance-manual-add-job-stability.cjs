@@ -21,6 +21,9 @@ assert.doesNotMatch(initPreface, /addModalDeptSelect|onAddModalDeptChange/, 'bac
 function fn(name) {
     const start = html.indexOf('        function ' + name + '(');
     assert(start >= 0, name + ' is present');
+    const lineEnd = html.indexOf('\n', start);
+    const firstLine = html.slice(start, lineEnd);
+    if (firstLine.endsWith('}')) return firstLine;
     const close = html.indexOf('\n        }', start);
     assert(close > start, name + ' can be extracted');
     return html.slice(start, close + 10);
