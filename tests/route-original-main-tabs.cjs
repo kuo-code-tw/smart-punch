@@ -10,6 +10,7 @@ for(const name of tabs){
  assert(navBlock.includes("switchTab('"+name+"',this)"),name+' keeps original click action');
 }
 assert(html.includes('id="efficiencySharedYear"'),'shared year picker preserved');
+assert(html.includes('route-management-dashboard.css?v=20261111-aligned-tabs-v2'),'route stylesheet cache version updated');
 assert(html.includes('id="routeTopMonthFilter"'),'route-specific month picker preserved');
 assert(html.includes('id="routeManagerSyncBtn"'),'route-specific vessel sync preserved');
 assert(html.includes('id="routeManagerCompareNav"'),'route-specific comparison control preserved');
