@@ -55,7 +55,7 @@ function audit(stats,scope){
   const billDiff=rod.rodQuantity-master.billed;
   if(differs(rod.rodQuantity,master.billed)){
     if(!differs(billDiff,master.shift))
-      notes.push(code+'碼頭逐桿合計比正式作業量多 '+fmt(billDiff)+' 櫃，與 SHIFT '+fmt(master.shift)+' 相同；此為可能的統計口徑差異，仍以正式來源為準');
+      notes.push(code+'碼頭逐桿合計比正式作業量多 '+fmt(billDiff)+' 櫃，與 SHIFT '+fmt(master.shift)+' 相同；可能是逐桿已回報的翻艙作業差異；SHIFT 不得再加進碼頭櫃數，也不得分攤至各支吊桿，仍需逐筆核對來源');
     else if(!differs(rod.rodQuantity,master.moves))
       notes.push(code+'碼頭逐桿櫃數與總 Moves 相同、但與正式作業量不同，需注意統計口徑');
     else
