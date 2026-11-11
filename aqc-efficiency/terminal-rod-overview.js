@@ -30,14 +30,18 @@ function calculate(stats){
   if(no&&port)masterPort.set(no,port);
  }
  for(const code of Object.keys(RODS))ports[code]={
-  code,ships:0,billed:0,disc:0,load:0,moves:0,shift:0,shiftMissing:false,
-  rods:RODS[code].map(name=>({name,records:0,disc:0,load:0,discOK:true,loadOK:true}))
+  code,ships:0,billed:0,disc:0,load:0,moves:0,shift:0,bundle:0,bundleShips:[],shiftMissing:false,
+  rods:RODS[code].map(name=>({name,records:0,disc:0,load:0,hc:0,discOK:true,loadOK:true,hcOK:true}))
  };
  for(const s of stats.byWharf||[]){
   const code=portOf(s.wharf),port=ports[code];
   if(!port)continue;
   port.ships+=s.ships||0;port.billed+=s.billed||0;
-  port.disc+=s.disc||0;port.load+=s.load||0;port.moves+=s.moves||0;port.shift+=s.shift||0;
+  port.disc+=s.disc||0;port.load+=s.load||0;port.moves+=s.moves||0;port.shift+=s.shift||0;port.bundle+=s.bundle||0;
+ }
+ for(const entry of stats.bundleByShip||[]){
+  const port=ports[portOf(entry.wharf)];
+  if(port&&number(entry.bundle)>0)port.bundleShips.push(entry);
  }
  for(const ship of stats.ships||[]){
   const port=ports[portOf(ship.wharf)];
@@ -54,14 +58,16 @@ function calculate(stats){
   const row=port.rods.find(x=>x.name===name);
   if(!row){unmatched++;continue}
   row.records++;
-  const disc=number(r.disc),load=number(r.load);
+  const disc=number(r.disc),load=number(r.load),hc=number(r.hatches??r.hc??r.hatchCount);
   if(disc===null)row.discOK=false;else row.disc+=disc;
   if(load===null)row.loadOK=false;else row.load+=load;
+  if(hc===null)row.hcOK=false;else row.hc+=hc;
  }
  for(const port of Object.values(ports)){
   for(const rod of port.rods){
    rod.discValue=rod.records&&rod.discOK?rod.disc:null;
    rod.loadValue=rod.records&&rod.loadOK?rod.load:null;
+   rod.hcValue=rod.records&&rod.hcOK?rod.hc:null;
    rod.quantity=rod.discValue!==null&&rod.loadValue!==null?rod.discValue+rod.loadValue:null;
    rod.status=!rod.records?'none':rod.quantity===null?'review':'reported';
   }
@@ -73,6 +79,8 @@ function calculate(stats){
   port.rodQuantity=port.rods.reduce((sum,r)=>sum+(r.quantity||0),0);
   port.rodDisc=port.rods.reduce((sum,r)=>sum+(r.discValue||0),0);
   port.rodLoad=port.rods.reduce((sum,r)=>sum+(r.loadValue||0),0);
+  port.rodHc=port.rods.reduce((sum,r)=>sum+(r.hcValue||0),0);
+  port.hcIncomplete=port.rods.some(r=>r.records&&r.hcValue===null);
  }
  return {ports,unmatched,conflicts};
 }
@@ -83,7 +91,8 @@ function markup(){
    '<header class="p79-rod-banner"><strong class="p79-rod-title">⚓ '+code+'碼頭</strong><span class="p79-rod-roster">吊桿：'+names+'</span>'+
    '<div class="p79-rod-port-metrics"><span class="p79-rod-total"><small>本月作業櫃數</small><b id="terminalPort'+code+'Total">—</b></span>'+ 
    '<span class="p79-rod-flip"><small>翻艙 SHIFT（另列）</small><b id="terminalPort'+code+'Flip">—</b></span></div></header>'+
-   '<div class="p79-rod-scroll"><table class="p79-rod-table"><thead><tr><th>吊桿編號</th><th>狀態</th><th>作業櫃數</th><th>進口櫃</th><th>出口櫃</th><th>轉運櫃</th></tr></thead>'+
+   '<p class="p79-rod-bundle-origin" id="terminalPort'+code+'BundleInfo"></p>'+ 
+   '<div class="p79-rod-scroll"><table class="p79-rod-table"><thead><tr><th>吊桿編號</th><th>狀態</th><th>作業櫃數</th><th>進口櫃</th><th>出口櫃</th><th>轉運櫃</th><th>艙蓋 H/C</th></tr></thead>'+
    '<tbody id="terminalRod'+code+'Body"></tbody><tfoot id="terminalRod'+code+'Foot"></tfoot></table></div></section>';
  };
  return '<div class="p79-rod-dashboard"><div class="p79-rod-update" id="terminalOverviewUpdate" aria-live="polite">資料更新：—</div>'+
@@ -92,7 +101,7 @@ function markup(){
   '</tr></thead><tbody id="terminalOverviewBody"></tbody></table></div>'+
   '<p class="p79-rod-caption">ⓘ 統計範圍：79／80 碼頭｜按所選月份／WORKING NO. 去重｜「有紀錄」表示本月有回報，非即時設備狀態</p>'+
   '<div class="p79-rod-cards">'+card('79')+card('80')+'</div>'+
-  '<p class="p79-rod-footnote">碼頭「本月作業櫃數」維持船舶主檔原數，不另加 SHIFT。翻艙 SHIFT 是船舶主檔的額外作業次數，只在碼頭彙總另列，不能直接視為新增實櫃；逐桿維持 WORKING REPORT 原始 DISC／LOAD，不加、不扣、不分攤翻艙。兩種來源差異需核對口徑，不能直接湊數；缺資料顯示「—」。</p>'+
+  '<p class="p79-rod-footnote">碼頭「本月作業櫃數」取船舶主檔正式作業量，Bundle 依所屬船舶與靠泊碼頭歸屬，SHIFT 另列、不重複加總。逐桿作業櫃數維持 WORKING REPORT 原始 DISC／LOAD，艙蓋 H/C 依各支 AQC 的 WORKING REPORT 加總，互不混算；缺資料顯示「—」。</p>'+
   '<div class="p79-rod-caution" id="terminalOverviewCaution" role="note"></div></div>';
 }
 function render(stats,state){
@@ -111,14 +120,16 @@ function render(stats,state){
   const port=s.ports[code],body=document.getElementById('terminalRod'+code+'Body');
   document.getElementById('terminalPort'+code+'Total').textContent=amt(port.billed,port.ships>0);
   document.getElementById('terminalPort'+code+'Flip').textContent=amt(port.shift,port.ships>0&&!port.shiftMissing);
+  const origin=port.bundleShips.map(x=>String(x.workingNo||'無 WORKING NO.')+'（'+fmt(x.bundle)+'）').join('、');
+  document.getElementById('terminalPort'+code+'BundleInfo').textContent=port.ships>0?'Bundle 扣除 '+fmt(port.bundle)+' 櫃'+(origin?'｜船舶 WORKING NO. '+origin:'｜本月該碼頭無已填報扣除量'):'尚無船舶來源可核對 Bundle';
   const val=(v,cls='')=>'<td class="'+(v===null?'p79-rod-muted ': '')+cls+'">'+(v===null?'—':fmt(v))+'</td>';
   body.innerHTML=port.rods.map(r=>{
    const label=r.status==='reported'?'有紀錄':r.status==='review'?'待核對':'未有紀錄';
    return '<tr><td class="p79-rod-name">'+r.name+'</td><td><span class="p79-rod-pill '+r.status+'">'+label+'</span></td>'+
-    val(r.quantity,'p79-rod-strong')+val(r.discValue)+val(r.loadValue,'p79-rod-green')+'<td class="p79-rod-muted">—</td></tr>';
+    val(r.quantity,'p79-rod-strong')+val(r.discValue)+val(r.loadValue,'p79-rod-green')+'<td class="p79-rod-muted">—</td>'+val(r.hcValue)+'</tr>';
   }).join('');
   const has=port.hasRodData&&!port.incomplete;
-  document.getElementById('terminalRod'+code+'Foot').innerHTML='<tr><td colspan="2">'+code+'碼頭 逐桿小計</td><td>'+amt(port.rodQuantity,has)+'</td><td>'+amt(port.rodDisc,has)+'</td><td class="p79-rod-green">'+amt(port.rodLoad,has)+'</td><td>—</td></tr>';
+  document.getElementById('terminalRod'+code+'Foot').innerHTML='<tr><td colspan="2">'+code+'碼頭 逐桿小計</td><td>'+amt(port.rodQuantity,has)+'</td><td>'+amt(port.rodDisc,has)+'</td><td class="p79-rod-green">'+amt(port.rodLoad,has)+'</td><td>—</td><td>'+amt(port.rodHc,has&&!port.hcIncomplete)+'</td></tr>';
  }
  const stamp=state.loadedMonth===stats.month&&state.loadedAt?
    '↻ 資料更新：'+new Date(state.loadedAt).toLocaleString('zh-TW',{hour12:false}):
