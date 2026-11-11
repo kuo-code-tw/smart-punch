@@ -190,7 +190,6 @@ body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!
  display:flex!important;align-items:center!important;gap:7px!important;
  height:auto!important;overflow-x:auto!important;scrollbar-width:thin;
 }
-#view-compare .p79-rm-topnav>button:nth-child(-n+3){display:none!important}
 #view-compare .p79-rm-topnav>button{
  height:36px!important;min-width:0!important;
  padding:0 12px!important;border:1px solid #d5e4f4!important;
@@ -231,4 +230,89 @@ body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!
   order:1!important;width:100%!important;flex-wrap:wrap!important;
   justify-content:flex-end!important;
  }
+}
+
+
+/* Compact formal single-line route toolbar, 2026-11-11.
+ * Keep the global colored navigation above unchanged. This is the route-specific
+ * title/actions bar immediately below it; no duplicate second heading row. */
+#view-compare .p79-rm-topbar{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ flex-wrap:nowrap!important;gap:9px!important;min-height:0!important;height:auto!important;
+ width:100%!important;box-sizing:border-box!important;
+ margin:0!important;padding:7px 12px!important;
+ background:transparent!important;border:0!important;box-shadow:none!important;
+ overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-heading{
+ order:0!important;display:flex!important;align-items:center!important;
+ gap:7px!important;flex:0 0 auto!important;min-width:0!important;
+ margin:0!important;padding:0!important;min-height:0!important;
+ white-space:nowrap!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-heading-icon{
+ flex:0 0 23px!important;width:23px!important;height:23px!important;
+ color:#0676d4!important;display:grid!important;place-items:center!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-heading-icon svg{
+ width:23px!important;height:23px!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-heading h2{
+ display:block!important;font-size:17px!important;font-weight:950!important;
+ letter-spacing:0!important;line-height:1.2!important;margin:0!important;
+ color:#112f5b!important;white-space:nowrap!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-topnav{
+ order:1!important;display:flex!important;align-items:center!important;
+ gap:7px!important;flex:0 0 auto!important;min-width:0!important;
+ width:auto!important;height:auto!important;overflow:visible!important;
+ padding:0!important;margin:0!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-topnav>button{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ gap:6px!important;flex:0 0 auto!important;
+ height:34px!important;min-height:34px!important;min-width:0!important;
+ padding:0 10px!important;margin:0!important;
+ font-size:11.5px!important;font-weight:850!important;
+ white-space:nowrap!important;border-radius:8px!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-top-actions{
+ order:2!important;display:flex!important;align-items:center!important;
+ flex:0 0 auto!important;flex-wrap:nowrap!important;
+ gap:7px!important;min-width:0!important;width:auto!important;height:auto!important;
+ margin:0 0 0 auto!important;padding:0!important;justify-content:flex-end!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-top-month{
+ width:130px!important;min-width:130px!important;height:34px!important;
+ min-height:34px!important;padding:0 8px!important;font-size:12px!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-sync{
+ height:34px!important;min-height:34px!important;white-space:nowrap!important;
+ padding:0 11px!important;font-size:11.5px!important;font-weight:850!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-profile{
+ width:34px!important;height:34px!important;min-width:34px!important;
+ flex:0 0 34px!important;
+}
+#view-compare .p79-rm-topbar .p79-rm-profile svg{
+ width:20px!important;height:20px!important;
+}
+#view-compare .p79-rm-main{padding-top:6px!important}
+@media(max-width:960px){
+ #view-compare .p79-rm-topbar{
+  flex-wrap:nowrap!important;gap:7px!important;
+  padding:7px 9px!important;
+ }
+ #view-compare .p79-rm-topbar .p79-rm-topnav{
+  order:1!important;flex:0 0 auto!important;height:auto!important;
+ }
+ #view-compare .p79-rm-topbar .p79-rm-top-actions{
+  order:2!important;flex:0 0 auto!important;width:auto!important;
+  flex-wrap:nowrap!important;margin-left:auto!important;
+ }
+}
+@media(max-width:640px){
+ #view-compare .p79-rm-topbar .p79-rm-heading h2{font-size:15px!important}
+ #view-compare .p79-rm-topbar .p79-rm-top-month{width:112px!important;min-width:112px!important}
+ #view-compare .p79-rm-topbar .p79-rm-topnav>button{padding:0 8px!important}
 }
