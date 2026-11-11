@@ -89,13 +89,16 @@ function optimizeGroups(persons,{selectedKeys=null,lockedGroups=[]}={}){
  const positions=Object.fromEntries(groups.map((g,i)=>[g,i]));
  selected.forEach(p=>{const i=positions[p.group];baseC[i]-=p.containers;baseH[i]-=p.hours;});
  const initial=selected.map(p=>p.group),caps=counts;
- function objective(assignment){
-  const cs=baseC.slice(),hs=baseH.slice();let moves=0;
-  for(let i=0;i<selected.length;i++){const g=assignment[i],slot=positions[g];cs[slot]+=selected[i].containers;hs[slot]+=selected[i].hours;if(g!==selected[i].group)moves++;}
+ function scoreTotals(cs,hs,moves){
   const rates=cs.map((v,i)=>hs[i]>0?v/hs[i]:NaN);
   if(rates.some(v=>!Number.isFinite(v)))return {gap:Infinity,variance:Infinity,moves};
   const gap=Math.max(...rates)-Math.min(...rates),avg=rates.reduce((a,b)=>a+b,0)/rates.length;
   return {gap,variance:rates.reduce((a,b)=>a+(b-avg)*(b-avg),0),moves};
+ }
+ function objective(assignment){
+  const cs=baseC.slice(),hs=baseH.slice();let moves=0;
+  for(let i=0;i<selected.length;i++){const g=assignment[i],slot=positions[g];cs[slot]+=selected[i].containers;hs[slot]+=selected[i].hours;if(g!==selected[i].group)moves++;}
+  return scoreTotals(cs,hs,moves);
  }
  function better(a,b){
   if(!b)return true;
@@ -120,18 +123,28 @@ function optimizeGroups(persons,{selectedKeys=null,lockedGroups=[]}={}){
   for(let seed=0;seed<restarts;seed++){
    const assignment=initial.slice();
    if(seed){const steps=Math.min(n*2,seed*4);for(let k=0;k<steps;k++){const i=Math.floor(rnd()*n),j=Math.floor(rnd()*n);if(assignment[i]!==assignment[j]){const tmp=assignment[i];assignment[i]=assignment[j];assignment[j]=tmp;}}}
-   let current=objective(assignment);
+   // 用每組櫃數／時數的增量計算候選交換，避免大型名冊反覆重算全體資料。
+   const cs=baseC.slice(),hs=baseH.slice();let moves=0;
+   for(let i=0;i<n;i++){const slot=positions[assignment[i]];cs[slot]+=selected[i].containers;hs[slot]+=selected[i].hours;if(assignment[i]!==selected[i].group)moves++;}
+   let current=scoreTotals(cs,hs,moves);
    for(let step=0;step<Math.min(70,n*2);step++){
     let swap=null,improved=current;
     for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
-     if(assignment[i]===assignment[j])continue;
-     const a=assignment[i],b=assignment[j];assignment[i]=b;assignment[j]=a;
-     const val=objective(assignment);
-     assignment[i]=a;assignment[j]=b;
+     const a=assignment[i],b=assignment[j];if(a===b)continue;
+     const ai=positions[a],bi=positions[b],first=selected[i],second=selected[j];
+     const dc=second.containers-first.containers,dh=second.hours-first.hours;
+     cs[ai]+=dc;cs[bi]-=dc;hs[ai]+=dh;hs[bi]-=dh;
+     const nextMoves=moves-(a!==first.group)-(b!==second.group)+(b!==first.group)+(a!==second.group);
+     const val=scoreTotals(cs,hs,nextMoves);
+     cs[ai]-=dc;cs[bi]+=dc;hs[ai]-=dh;hs[bi]+=dh;
      if(better(val,improved)){improved=val;swap=[i,j];}
     }
     if(!swap)break;
-    const [i,j]=swap,tmp=assignment[i];assignment[i]=assignment[j];assignment[j]=tmp;current=improved;
+    const [i,j]=swap,a=assignment[i],b=assignment[j],ai=positions[a],bi=positions[b],first=selected[i],second=selected[j];
+    const dc=second.containers-first.containers,dh=second.hours-first.hours;
+    cs[ai]+=dc;cs[bi]-=dc;hs[ai]+=dh;hs[bi]-=dh;
+    moves=moves-(a!==first.group)-(b!==second.group)+(b!==first.group)+(a!==second.group);
+    assignment[i]=b;assignment[j]=a;current=improved;
    }
    if(better(current,bestScore)){bestScore=current;best=assignment.slice();}
   }
