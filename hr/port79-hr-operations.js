@@ -3,16 +3,28 @@
 'use strict';
 const MET=window.P79HrVerifiedMetrics;
 if(!MET)return;
-const $=id=>document.getElementById(id);let training=[],drafts=[],mounted=false;
+const $=id=>document.getElementById(id);let training=[],drafts=[],mounted=false,lastSessionIdentity='';
 const elEscape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=v=>String(v??'').trim();
 function roster(){try{return typeof employees!=='undefined'&&Array.isArray(employees)?employees:[]}catch(e){return []}}
 function session(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function role(){const s=session();return String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase()}
 function access(view){
- if(view==='payroll')return role()==='superadmin'||session()?.finePermissions?.hr?.['payroll.view']===true;
- if(view==='training')return role()==='superadmin'||session()?.finePermissions?.hr?.['people.view']===true;
+ const s=session(),r=role();
+ if(!s||!['admin','superadmin'].includes(r)||s.punchOnly)return false;
+ if(r==='superadmin')return true;
+ if(!['view','manage'].includes(String(s.systemPermissions?.hr||'')))return false;
+ if(view==='payroll')return s.finePermissions?.hr?.['payroll.view']===true;
+ if(view==='training')return s.finePermissions?.hr?.['people.view']===true;
  return false;
+}
+function clearIfIdentityChanged(){
+ const s=session(),key=String(s?.empId||'')+'|'+String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'');
+ if(lastSessionIdentity&&key!==lastSessionIdentity){
+  drafts=[];training=[];
+  for(const type of ['payroll','training']){const p=$('p79rOp'+type);if(p){p.dataset.installed='0';p.innerHTML=''}}
+ }
+ lastSessionIdentity=key;
 }
 function lookup(id){
  const e=roster().find(e=>norm(e.empId).toUpperCase()===norm(id).toUpperCase());return e||null;
@@ -64,10 +76,11 @@ function trainingHtml(){
 }
 function show(v){
  if(!mounted)return;
+ clearIfIdentityChanged();
  for(const k of ['payroll','training']){const panel=$('p79rOp'+k);if(panel)panel.hidden=v!==k}
  if(!['payroll','training'].includes(v))return;
  const panel=$('p79rOp'+v);
- if(!access(v)){panel.innerHTML='<section class="p79r-panel p79r-ops"><h2 class="p79r-title">'+(v==='payroll'?'薪資作業':'教育訓練')+'</h2><p class="p79r-warning">此帳號未取得對應資料權限，無法操作。</p></section>';return}
+ if(!access(v)){panel.dataset.installed='0';panel.innerHTML='<section class="p79r-panel p79r-ops"><h2 class="p79r-title">'+(v==='payroll'?'薪資作業':'教育訓練')+'</h2><p class="p79r-warning">此帳號未取得對應資料權限，無法操作。</p></section>';return}
  if(panel.dataset.installed==='1'){
   const select=$('p79r'+(v==='payroll'?'Payroll':'Training')+'Employee');
   if(select)select.innerHTML=employeesOptions(v);
