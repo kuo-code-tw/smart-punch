@@ -1,3 +1,14 @@
+/* PORT79 IDLE-LOGOUT SHARED LOADER 2026-11-11 */
+(function(){
+ if(window.__port79IdleTimeoutLoader)return;
+ window.__port79IdleTimeoutLoader=true;
+ const source=document.currentScript?.src||new URL('assets/port79-seven-top.js',location.href).href;
+ const s=document.createElement('script');
+ s.src=new URL('port79-session-timeout.js?v=20261111-production-v1',source).href;
+ s.async=true;
+ s.onerror=()=>{console.error('登入逾時控制元件載入失敗');};
+ document.head.appendChild(s);
+})();
 (function(){
 'use strict';
 
