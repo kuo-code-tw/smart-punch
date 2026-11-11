@@ -127,6 +127,14 @@ function analyze(attendanceData,scheduleData,month,options={}){
    const ins=matched.filter(s=>s.clockIn),outs=matched.filter(s=>s.clockOut);
    const hasIn=ins.length>0,hasOut=outs.length>0;
    if(hasIn&&hasOut)continue;
+   // Share the scheduling calendar's independently confirmed rest status.
+   // A saved old 早/中/晚 label is not proof that a zero-punch day was duty.
+   const rest=options.restEvidence,restKey=workerId+'|'+date;
+   if(rest?.complete===true&&rest.absenceConfirmedDays?.[restKey]===true&&
+      rest.days?.[restKey]?.state==='rest')continue;
+   // Once the entire shift has ended, zero punches alone cannot prove a
+   // missed duty. Preserve true one-sided punches, not phantom full-day gaps.
+   if(!hasIn&&!hasOut&&now>=endGrace){unknownDays++;continue;}
    const startDay=taipeiToday(started),finishDay=taipeiToday(finished);
    const hasCoverage=coverage.has(startDay)||(coverage.has(date)&&period.start<24);
    if(!hasCoverage&&!hasIn&&!hasOut){unknownDays++;continue;}
@@ -150,7 +158,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
   }
  }
  details.sort((a,b)=>b.date.localeCompare(a.date)||a.shift.localeCompare(b.shift,'zh-TW')||a.name.localeCompare(b.name,'zh-TW'));
- return {count:details.length,details,unknownDays,reason:unknownDays?'部分日期、核准部分請假或跨日考勤資料不足，未列入漏卡人數':''};
+ return {count:details.length,details,unknownDays,reason:unknownDays?'部分日期休息狀態或跨日考勤尚未核實；整班無卡不直接認定漏卡，已核實休息日不列警示':''};
 }
 let last=null,refresh=null,bound=false;
 const $=key=>root.document?.getElementById(key);
@@ -198,7 +206,7 @@ function bind(recheck){
    if(!dialog.open)return;
    if(!next||!Array.isArray(next.attendance?.records)||!Array.isArray(next.schedule?.schedules)||!Array.isArray(next.leaveData?.leaveRecords))
      throw Error('正式考勤、排班或核准請假資料未讀齊');
-   render(next.attendance,next.schedule,next.month,{leaveData:next.leaveData});
+   render(next.attendance,next.schedule,next.month,{leaveData:next.leaveData,restEvidence:next.restEvidence});
    status(last?.reason||'最新正式資料核對完成；所有紀錄僅供人工確認。');
   }catch(e){
    if(!dialog.open)return;

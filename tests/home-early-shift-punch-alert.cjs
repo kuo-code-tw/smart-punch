@@ -17,8 +17,18 @@ report=verify([in2,out2],'08:31:00');assert.equal(report.count,1,'missing clock-
 assert.equal(report.details[0].reason,'缺少上班卡');
 assert.equal(report.details[0].name,'早班測試甲');
 assert.equal(report.details[0].shift,'早');
-report=verify([in2,out2],'17:01:00');assert.equal(report.count,1,'both punches absent after end grace');
-assert.equal(report.details[0].reason,'上下班皆無卡');
+report=verify([in2,out2],'17:01:00');assert.equal(report.count,0,'zero-punch completed day is not proven missed duty');
+assert.equal(report.unknownDays,1,'zero-punch day stays unverified until calendar rest audit');
+const confirmedRest={complete:true,absenceConfirmedDays:{'E1|2026-11-10':true},days:{'E1|2026-11-10':{state:'rest'}}};
+report=alert.analyze({records:[in2,out2]},{schedules:[worker1(),worker2()]},'2026-11',
+ {now:now('17:01:00'),leaveData:{leaveRecords:[]},restEvidence:confirmedRest});
+assert.equal(report.count,0,'confirmed rest does not become a missing punch');
+assert.equal(report.unknownDays,0,'confirmed rest clears the pending uncertainty');
+report=alert.analyze({records:[in2,out2]},{schedules:[worker1(),worker2()]},'2026-11',
+ {now:now('17:01:00'),leaveData:{leaveRecords:[]},
+ restEvidence:{...confirmedRest,days:{'E1|2026-11-10':{state:'unknown'}}}});
+assert.equal(report.count,0,'disputed rest not alleged missing');
+assert.equal(report.unknownDays,1,'disputed rest stays unverified');
 report=verify([in1,in2,out2],'16:59:59');assert.equal(report.count,0,'never flag a checkout before 17:00');
 report=verify([in1,in2,out2],'17:01:00');assert.equal(report.count,1);
 assert.equal(report.details[0].reason,'缺少下班卡');
@@ -38,8 +48,8 @@ assert.equal(report.count,0,'approved overtime extends checkout window');
 report=verify([in1,in2,out2],'21:01:00',[extended,worker2()]);
 assert.equal(report.count,1,'extension is reviewed after 60-min grace');
 const duplicateRoster=[worker1(),{...worker1()},worker2()];
-report=verify([in2,out2],'17:01:00',duplicateRoster);
-assert.equal(report.count,1,'same roster person/date deduped');
+report=verify([in2,out2],'08:31:00',duplicateRoster);
+assert.equal(report.count,1,'current-shift person/date deduped');
 report=verify([in1,out1,in2,out2],'17:01:00',[worker1(),worker2()]);
 assert.equal(report.count,0);
 report=alert.analyze({records:[]},null,'2026-11',{now:now('17:01:00'),leaveData:{leaveRecords:[]}});
@@ -61,9 +71,9 @@ assert.equal(report.count,0,'approved full-day leave suppresses missing IN and O
 report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[officialLeave('E1','2026-11-10',.5)]);
 assert.equal(report.count,0,'partial approved leave must not be labeled plain missing punches');
 assert.equal(report.unknownDays,1,'partial leave requires human review');
-report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[{...officialLeave(),status:'審核中'}]);
+report=verify([in2,out2],'08:31:00',[worker1(),worker2()],[{...officialLeave(),status:'審核中'}]);
 assert.equal(report.count,1,'pending leave is not the same as approved full-day leave');
-report=verify([in2,out2],'17:01:00',[worker1(),worker2()],[{...officialLeave(),deleted:true}]);
+report=verify([in2,out2],'08:31:00',[worker1(),worker2()],[{...officialLeave(),deleted:true}]);
 assert.equal(report.count,1,'revoked/deleted leave is not an approved day off');
 const midPerson={...worker1(),schedule:{'2026-11-10':'中'}};
 report=verify([in2,out2],'16:29:59',[midPerson,worker2()]);
@@ -112,7 +122,7 @@ const js=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard
 assert(html.includes('id="p79DashEarlyPunchTrigger"'));
 assert(html.includes('id="p79DashEarlyPunchCount"'));
 assert(html.includes('id="p79DashEarlyPunchDialog"'));
-assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261110-all-shifts-leave-v2'));
+assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1'));
 assert(html.includes('port79-monthly-dashboard.js?v=20261108-lashing-completion-v1'), 'existing dashboard version test remains compatible');
 const block=html.slice(html.indexOf('<section class="p79d-section p79d-attendance"'),html.indexOf('<dialog id="p79DashEarlyPunchDialog"'));
 const head=block.slice(0,block.indexOf('<div class="p79d-kpis">'));
@@ -131,6 +141,9 @@ assert(!css.includes('p79d-kpi-combined'),'old nested-card layout fully removed'
 assert(css.includes('min-height:84px!important;height:84px!important'),'equal KPI heights, content fits');
 assert(css.includes('repeat(4,minmax(190px,1fr))'),'narrow screens stay in one scrollable row');
 assert(js.includes('root.P79HomeEarlyPunchAlert?.render('),'homepage renders from its official data');
+assert(js.includes('P79ScheduleRestEvidence.create('),'home uses same rest audit');
+assert(js.includes("requestOfficialAttendanceAudit('getAttendanceMonthRaw'"),'home verifies independent raw punches');
+assert(html.includes('port79-schedule-rest-evidence.js?v=20261111-home-rest-proof-v1'),'home loads shared audit');
 assert(js.includes('root.P79HomeEarlyPunchAlert?.bind(async()=>'),'card opens fresh official comparison');
 assert(js.includes('requestApprovedLeave(token)'),'homepage and dialog use the official getLeaveData source');
 assert(js.includes('leaveSnapshot=data'),'monthly card waits for approved leave before verification');

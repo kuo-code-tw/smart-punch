@@ -490,7 +490,7 @@ async function refreshPendingReviewFromCloud(){
   const leaveData=await requestApprovedLeave(token).catch(()=>null);
   const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleData);
   showAttendance(checked);
-  root.P79HomeEarlyPunchAlert?.render(checked.boundaryError?null:data,scheduleData,ym,{leaveData});
+  await renderVerifiedHomePunch(checked.boundaryError?null:data,scheduleData,ym,leaveData,token);
   if(scheduleData)enrichPendingReview(scheduleData);
   if(checked.boundaryError)pendingReviewError=checked.boundaryError;
   pendingReviewVerifiedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
@@ -667,6 +667,71 @@ async function reconcileAttendanceBoundary(data,ym,token,forceCloud,scheduleData
   return {...initial,pendingDetails:null,pendingShifts:null,boundaryError:String(error?.message||error)};
  }
 }
+// Same authenticated rest auditor used by the scheduling calendar. Read-only:
+// do not write punches, roster, approved leave or overtime reports.
+async function verifiedHomeRestEvidence(scheduleData,ym,token){
+ if(!Array.isArray(scheduleData?.schedules)||!root.P79ScheduleRestEvidence?.create||
+    !root.P79RestAttendance||!root.P79SchedulePunchRestore?.displayShiftFromClockIn||
+    !root.P79AttendanceV6?.buildShifts||!root.P79AttendanceV6?.normalizeTime)return null;
+ const norm=v=>String(v??'').trim().toUpperCase();
+ const master=new Map((scheduleData.employees||[]).map(p=>[norm(p.empId||p.id),p]));
+ const schedules=scheduleData.schedules.filter(r=>norm(r.empId||r.id)&&r.schedule&&typeof r.schedule==='object')
+  .map(r=>({...r,empId:norm(r.empId||r.id)}));
+ const people=schedules.map(row=>{
+  const p=master.get(row.empId)||{};
+  return {id:row.empId,name:row.name||p.name||'',
+   attNo:row.attNo||row.attendanceNo||p.attNo||p.attendanceNo||'',
+   startDate:row.startDate||p.startDate||''};
+ });
+ if(!people.length)return null;
+ const authenticated=()=>root.sessionStorage.getItem('port79_user_token')||
+  root.sessionStorage.getItem('port79_admin_token')||'';
+ const clock=record=>{
+  const n=root.P79AttendanceV6.normalizeTime(String(record?.timeStr||
+    record?.['出勤時間']||record?.datetime||''));
+  if(!/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(n))return NaN;
+  return Date.parse(n.replaceAll('/','-').replace(' ','T')+'+08:00');
+ };
+ const client=root.P79ScheduleRestEvidence.create({
+  token:()=>authenticated()===token?token:'',
+  employees:()=>people,schedules:()=>schedules,
+  dateEligible:(person,date)=>{
+   const start=String(person.startDate||'').replaceAll('/','-').slice(0,10);
+   return !/^\d{4}-\d{2}-\d{2}$/.test(start)||date>=start;
+  },
+  buildShifts:rows=>root.P79AttendanceV6.buildShifts(rows),
+  timestamp:clock,leaveDates:()=>[],
+  shiftForSession:row=>root.P79SchedulePunchRestore.displayShiftFromClockIn(row.clockIn,row.clockOut),
+  now:()=>Date.now(),update:()=>{},
+  read:async month=>{
+   const [main,raw]=await Promise.allSettled([
+    requestOfficialAttendanceAudit('getAttendanceMainDirect',month,token),
+    requestOfficialAttendanceAudit('getAttendanceMonthRaw',month,token)
+   ]);
+   if(authenticated()!==token)throw Error('核對期間登入身分已改變');
+   if(main.status!=='fulfilled'&&raw.status!=='fulfilled')
+    throw Error('正式考勤與原始打卡來源皆未讀齊');
+   const rawOk=raw.status==='fulfilled'&&raw.value.records.length>0;
+   if(main.status!=='fulfilled'||main.value.records.length===0&&rawOk)
+    return {...raw.value,absenceReferenceRecords:null,
+     absenceReferenceError:'正式主表未完整取得，原始資料僅能依完整度核實'};
+   return {...main.value,absenceReferenceRecords:raw.status==='fulfilled'?raw.value.records:null,
+    absenceReferenceError:raw.status==='fulfilled'?'':'原始打卡來源未完整取得'};
+  }
+ });
+ try{
+  const evidence=await client.refresh(ym);
+  return authenticated()===token&&evidence?.complete===true?evidence:null;
+ }catch(error){return null;} // Unknown evidence never becomes missing or writes.
+}
+async function renderVerifiedHomePunch(attendance,schedule,ym,leaveData,token){
+ const restEvidence=attendance&&schedule&&leaveData
+  ?await verifiedHomeRestEvidence(schedule,ym,token):null;
+ if(month()!==ym||!session()||!permissions().attendance||!permissions().schedule)return;
+ if((root.sessionStorage.getItem('port79_user_token')||
+     root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
+ root.P79HomeEarlyPunchAlert?.render(attendance,schedule,ym,{leaveData,restEvidence});
+}
 async function load(forceCloud=false){
  if(loading)return;
  const s=session(),p=permissions();if(!s||(!p.vessel&&!p.attendance))return;
@@ -722,7 +787,7 @@ async function load(forceCloud=false){
    if(scheduleSnapshot&&p.schedule)showOvertime(analyzeOvertime({...scheduleSnapshot,employees:data.employees},ym));
   }catch(error){if(month()===ym)root.P79ReferenceDashboard?.setLeaveReport({month:ym,error:'核准請假資料未完成核對：'+String(error.message||error)});}
   if(month()===ym&&permissions().attendance&&permissions().schedule){
-   root.P79HomeEarlyPunchAlert?.render(attendanceBoundaryError?null:attendanceSnapshot,scheduleSnapshot,ym,{leaveData:leaveSnapshot});
+   await renderVerifiedHomePunch(attendanceBoundaryError?null:attendanceSnapshot,scheduleSnapshot,ym,leaveSnapshot,token);
   }
   loadedKey=ym;
   statusText('p79DashMessage',failures.length?failures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
@@ -751,7 +816,8 @@ function init(){
   const currentToken=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
   if(month()!==ym||String(session()?.empId||'')!==account||token!==currentToken||!permissions().attendance||!permissions().schedule)
     throw Error('月份或登入身分已變更，請重新開啟警示');
-  return {attendance,schedule,leaveData,month:ym};
+  const restEvidence=await verifiedHomeRestEvidence(schedule,ym,token);
+  return {attendance,schedule,leaveData,restEvidence,month:ym};
  });
  ensurePendingReview();
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
