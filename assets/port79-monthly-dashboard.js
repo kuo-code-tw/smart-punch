@@ -415,7 +415,7 @@ function renderHomeOvertimeList(data){
  statusText('p79DashOvertimeCount','共 '+rows.length+' 筆（含預排）');
  if(!rows.length){
   const tr=root.document.createElement('tr'),td=root.document.createElement('td');
-  td.colSpan=7;td.textContent='本月沒有可查詢的加班申報紀錄';
+  td.colSpan=7;td.textContent=data?.sourceWarning?'即時加班資料尚未核對完成；歷史快照目前無可顯示紀錄':'本月沒有可查詢的加班申報紀錄';
   tr.append(td);list.append(tr);return;
  }
  for(const item of rows.slice(0,100)){
@@ -431,7 +431,7 @@ function renderHomeOvertimeList(data){
 }
 function showOvertime(a){
  setMetric('p79DashOvertimeHours',fmt(a.hours,1));
- statusText('p79DashScheduleSource','· 加班依正式申報紀錄統計');
+ statusText('p79DashScheduleSource',a.sourceWarning?'· 加班目前使用歷史快照（即時來源待核對）':'· 加班依正式申報紀錄統計');
  renderHomeOvertimeList(a);
  root.P79ReferenceDashboard?.setOvertimeReport(a);
 }
@@ -620,6 +620,34 @@ async function request(kind,ym,token,forceCloud){
   return data;
  });
 }
+// 本月加班必須以正式雲端班表為主，不能只讀可能尚未更新的歷史月份快照。
+async function requestHomeCurrentSchedule(ym,token){
+ const base=String(root.sessionStorage.getItem('port79_gas_url')||'').trim();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base))throw Error('尚未取得已驗證的班表服務網址');
+ const url=new URL(base);
+ url.searchParams.set('action','getScheduleDataSecure');
+ url.searchParams.set('gcToken',token);
+ url.searchParams.set('month',ym);
+ url.searchParams.set('_',String(Date.now()));
+ const controller=new AbortController(),timer=root.setTimeout(()=>controller.abort(),25000);
+ try{
+  const response=await root.fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:controller.signal});
+  const data=await response.json();
+  if(!response.ok||data?.ok!==true||!Array.isArray(data.schedules)||
+     data.month&&String(data.month)!==ym)throw Error(data?.error||'正式班表回傳資料不完整或月份不符');
+  return {...data,month:ym,p79HomeScheduleSource:'live'};
+ }finally{root.clearTimeout(timer);}
+}
+async function requestHomeOvertimeSchedule(ym,token,forceCloud=false){
+ if(ym!==taipeiDay().slice(0,7))return request('schedule',ym,token,forceCloud);
+ try{return await requestHomeCurrentSchedule(ym,token);}
+ catch(error){
+  // 即時來源失敗時保留歷史月份唯讀備援，但不允許把快照零筆說成當月確定無加班。
+  const fallback=await request('schedule',ym,token,true);
+  return {...fallback,p79HomeScheduleSource:'history-fallback',
+   p79HomeLiveWarning:'正式即時班表未核對完成：'+String(error?.message||error)};
+ }
+}
 // 每月 1 日的下班卡可能對應上月最後一天的夜班上班卡。
 // 歷史 API 的跨月鄰界讀取失敗時，不可把「未找到本月上班卡」直接認定為異常。
 // 這裡只做唯讀跨月複查；其他首頁指標仍只依原月份資料計算。
@@ -770,7 +798,7 @@ async function load(forceCloud=false){
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
    if(!allowed){statusText(captionId,accessError());if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});renderHomeOvertimeList(null);}continue}
    try{
-    const data=kind==='schedule'&&scheduleSnapshot?scheduleSnapshot:await request(kind,ym,token,kind==='attendance'?true:forceCloud);
+    const data=kind==='schedule'?(scheduleSnapshot||await requestHomeOvertimeSchedule(ym,token,forceCloud)):await request(kind,ym,token,kind==='attendance'?true:forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
     if(kind==='vessel'&&Array.isArray(data.shipMasters)){
      const report=analyzeVessels(data),range=weeklyWindow(ym);
@@ -783,7 +811,7 @@ async function load(forceCloud=false){
     }
     else if(kind==='attendance'&&Array.isArray(data.records)){
       if(p.schedule&&!scheduleSnapshot){
-       try{scheduleSnapshot=await request('schedule',ym,token,true);}catch(_){scheduleSnapshot=null;}
+       try{scheduleSnapshot=await requestHomeOvertimeSchedule(ym,token,true);}catch(_){scheduleSnapshot=null;}
       }
       const checked=await verifyAttendancePendingWithOfficial(data,ym,token,scheduleSnapshot);
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().attendance)return;
@@ -794,7 +822,7 @@ async function load(forceCloud=false){
     else if(kind==='schedule'&&Array.isArray(data.schedules)){
       scheduleSnapshot=data;
       enrichPendingReview(data);
-      render(analyzeOvertime(data,ym));
+      render({...analyzeOvertime(data,ym),sourceWarning:data.p79HomeLiveWarning||'',sourceMode:data.p79HomeScheduleSource||'history'});
       // Read-only roster grouping for the people-efficiency leaderboard.
       root.P79ReferenceDashboard?.setGroupRoster(data,ym);
     }
@@ -807,7 +835,7 @@ async function load(forceCloud=false){
    root.P79ReferenceDashboard?.setLeaveReport(root.P79ApprovedLeaveSummary.aggregate({...data,month:ym}));
    leaveSnapshot=data;
    // Formal employee HR titles also resolve roles for overtime reports in a schedule-only snapshot.
-   if(scheduleSnapshot&&p.schedule)showOvertime(analyzeOvertime({...scheduleSnapshot,employees:data.employees},ym));
+   if(scheduleSnapshot&&p.schedule)showOvertime({...analyzeOvertime({...scheduleSnapshot,employees:data.employees},ym),sourceWarning:scheduleSnapshot.p79HomeLiveWarning||'',sourceMode:scheduleSnapshot.p79HomeScheduleSource||'history'});
   }catch(error){if(month()===ym)root.P79ReferenceDashboard?.setLeaveReport({month:ym,error:'核准請假資料未完成核對：'+String(error.message||error)});}
   if(month()===ym&&permissions().attendance&&permissions().schedule){
    await renderVerifiedHomePunch(attendanceBoundaryError?null:attendanceSnapshot,scheduleSnapshot,ym,leaveSnapshot,token);
