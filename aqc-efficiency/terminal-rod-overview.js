@@ -30,14 +30,14 @@ function calculate(stats){
   if(no&&port)masterPort.set(no,port);
  }
  for(const code of Object.keys(RODS))ports[code]={
-  code,ships:0,billed:0,disc:0,load:0,moves:0,shift:0,bundle:0,bundleShips:[],shiftMissing:false,
+  code,ships:0,billed:0,disc:0,load:0,moves:0,shift:0,hc:0,bundle:0,bundleShips:[],shiftMissing:false,hcMissing:false,
   rods:RODS[code].map(name=>({name,records:0,disc:0,load:0,hc:0,discOK:true,loadOK:true,hcOK:true}))
  };
  for(const s of stats.byWharf||[]){
   const code=portOf(s.wharf),port=ports[code];
   if(!port)continue;
   port.ships+=s.ships||0;port.billed+=s.billed||0;
-  port.disc+=s.disc||0;port.load+=s.load||0;port.moves+=s.moves||0;port.shift+=s.shift||0;port.bundle+=s.bundle||0;
+  port.disc+=s.disc||0;port.load+=s.load||0;port.moves+=s.moves||0;port.shift+=s.shift||0;port.hc+=s.hc||0;port.bundle+=s.bundle||0;
  }
  for(const entry of stats.bundleByShip||[]){
   const port=ports[portOf(entry.wharf)];
@@ -46,6 +46,7 @@ function calculate(stats){
  for(const ship of stats.ships||[]){
   const port=ports[portOf(ship.wharf)];
   if(port&&number(ship.shiftMoves)===null&&number(ship.workingSheetSource?.shiftMoves)===null)port.shiftMissing=true;
+  if(port&&number(ship.hatches)===null&&number(ship.workingSheetSource?.hatches)===null)port.hcMissing=true;
  }
  let unmatched=0,conflicts=0;
  for(const r of stats.records||[]){
@@ -97,7 +98,7 @@ function markup(){
  };
  return '<div class="p79-rod-dashboard"><div class="p79-rod-update" id="terminalOverviewUpdate" aria-live="polite">資料更新：—</div>'+
   '<div class="p79-rod-summary-scroll"><table class="p79-rod-summary"><thead><tr>'+
-  '<th>碼頭</th><th>吊桿數</th><th>有紀錄(支)</th><th>無紀錄(支)</th><th>待核(支)</th><th>本月作業櫃數</th><th>翻艙 SHIFT（不加總）</th><th>進口櫃</th><th>出口櫃</th><th>轉運櫃</th><th>合計</th>'+
+  '<th>碼頭</th><th>吊桿數</th><th>有紀錄(支)</th><th>無紀錄(支)</th><th>待核(支)</th><th>本月作業櫃數</th><th>翻艙 SHIFT（不加總）</th><th>進口櫃</th><th>出口櫃</th><th>轉運櫃</th><th>合計</th><th>艙蓋 H/C</th>'+
   '</tr></thead><tbody id="terminalOverviewBody"></tbody></table></div>'+
   '<p class="p79-rod-caption">ⓘ 統計範圍：79／80 碼頭｜按所選月份／WORKING NO. 去重｜「有紀錄」表示本月有回報，非即時設備狀態</p>'+
   '<div class="p79-rod-cards">'+card('79')+card('80')+'</div>'+
@@ -114,7 +115,7 @@ function render(stats,state){
   const p=s.ports[code],has=p.ships>0;
   return '<tr data-port="'+code+'"><td class="p79-rod-primary">'+code+'</td><td>'+p.rods.length+'</td>'+
    '<td class="p79-rod-green">'+p.recorded+'</td><td>'+p.noRecords+'</td><td>'+p.needsReview+'</td>'+
-   '<td class="p79-rod-strong">'+amt(p.billed,has)+'</td><td class="p79-rod-flip-quantity">'+amt(p.shift,has&&!p.shiftMissing)+'</td><td>'+amt(p.disc,has)+'</td><td class="p79-rod-green">'+amt(p.load,has)+'</td><td>—</td><td class="p79-rod-strong">'+amt(p.billed,has)+'</td></tr>';
+   '<td class="p79-rod-strong">'+amt(p.billed,has)+'</td><td class="p79-rod-flip-quantity">'+amt(p.shift,has&&!p.shiftMissing)+'</td><td>'+amt(p.disc,has)+'</td><td class="p79-rod-green">'+amt(p.load,has)+'</td><td>—</td><td class="p79-rod-strong">'+amt(p.billed,has)+'</td><td>'+amt(p.hc,has&&!p.hcMissing)+'</td></tr>';
  }).join('');
  for(const code of ['79','80']){
   const port=s.ports[code],body=document.getElementById('terminalRod'+code+'Body');
@@ -138,7 +139,11 @@ function render(stats,state){
  const warnings=[];
  if(s.unmatched)warnings.push(s.unmatched+' 筆作業紀錄未能對應到指定的 9 支 AQC（不納入逐桿小計）');
  if(s.conflicts)warnings.push(s.conflicts+' 筆作業紀錄的碼頭與 AQC 編號不一致（待核）');
- for(const code of ['79','80'])if(s.ports[code].shiftMissing)warnings.push(code+'碼頭有船舶缺少 SHIFT 來源，翻艙數量暫不顯示');
+ for(const code of ['79','80']){
+  if(s.ports[code].shiftMissing)warnings.push(code+'碼頭有船舶缺少 SHIFT 來源，翻艙數量暫不顯示');
+  if(s.ports[code].hcMissing)warnings.push(code+'碼頭有船舶缺少艙蓋 H/C 主檔來源，碼頭 H/C 總量暫不顯示');
+  if(s.ports[code].hcIncomplete)warnings.push(code+'碼頭有逐桿 H/C 欄位缺漏，相關逐桿艙蓋數顯示「—」');
+ }
  document.getElementById('terminalOverviewCaution').textContent=warnings.join('；');
 }
 root.P79TerminalRodOverview={render,calculate,portOf,craneOf,RODS};
