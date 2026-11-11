@@ -78,3 +78,40 @@
 @media (max-width:1150px) {#view-dispatch .p79d-fields{grid-template-columns:repeat(3,minmax(0,1fr))}#view-dispatch .p79d-field:last-child{grid-column:1/-1}#view-dispatch .p79d-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}#view-dispatch .p79d-compare-grid{grid-template-columns:1fr}}
 @media (max-width:760px) {#view-dispatch .p79d-hero{padding:22px 18px 16px}#view-dispatch .p79d-hero-top{flex-wrap:wrap}#view-dispatch .p79d-hero h2{font-size:23px!important}#view-dispatch .p79d-steps{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:17px}#view-dispatch .p79d-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#view-dispatch .p79d-kpi{padding:12px;min-height:90px}#view-dispatch .p79d-kpi strong{font-size:23px}#view-dispatch .p79d-panel{padding:15px!important}#view-dispatch .p79d-fields{grid-template-columns:repeat(2,minmax(0,1fr))}#view-dispatch .p79d-field:last-child{grid-column:1/-1}#view-dispatch #dispatchGroupSettings{grid-template-columns:repeat(2,minmax(0,1fr))}#view-dispatch .p79d-visual{grid-template-columns:1fr 1fr}}
 @media (max-width:420px) {#view-dispatch .p79d-steps{gap:5px}#view-dispatch .p79d-step{padding:6px;gap:5px;font-size:11px}#view-dispatch .p79d-step b{width:22px;height:22px;flex-basis:22px}#view-dispatch .p79d-fields{grid-template-columns:1fr}#view-dispatch .p79d-field:last-child{grid-column:auto}#view-dispatch #dispatchGroupSettings{grid-template-columns:1fr 1fr;gap:7px}#view-dispatch #dispatchGroupSettings>div{padding:10px!important}#view-dispatch .p79d-visual{grid-template-columns:1fr}}
+
+/* 全員自由挑選最佳化參與者 */
+#view-dispatch .p79d-group-stat{color:#63778b;font-size:12px;line-height:1.7;margin:9px 0;}
+#view-dispatch .p79d-roster-toolbar{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:19px 0 12px;border-top:1px solid #e5edf3;padding-top:18px;}
+#view-dispatch .p79d-roster-toolbar h4{font-weight:900;font-size:17px;color:#153958;}
+#view-dispatch .p79d-roster-toolbar p{color:#527387;font-size:12px;font-weight:750;}
+#view-dispatch .p79d-roster-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;margin-bottom:16px;}
+#view-dispatch .p79d-roster-group{border:1px solid #dce6ee;border-radius:15px;background:#fff;min-width:0;overflow:hidden;}
+#view-dispatch .p79d-roster-group:nth-child(1) .p79d-roster-head{background:#eaf3ff;border-bottom:3px solid #3b82f6;}
+#view-dispatch .p79d-roster-group:nth-child(2) .p79d-roster-head{background:#e9fbf7;border-bottom:3px solid #14b8a6;}
+#view-dispatch .p79d-roster-group:nth-child(3) .p79d-roster-head{background:#f6f0ff;border-bottom:3px solid #a78bfa;}
+#view-dispatch .p79d-roster-group:nth-child(4) .p79d-roster-head{background:#fff8e8;border-bottom:3px solid #f59e0b;}
+#view-dispatch .p79d-roster-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;padding:13px 14px;font-size:13px;}
+#view-dispatch .p79d-roster-head strong{font-size:15px;color:#153958;font-weight:900;}
+#view-dispatch .p79d-roster-head span{color:#547185;font-size:11px;font-weight:850;}
+#view-dispatch .p79d-roster-actions{display:flex;gap:6px;padding:9px;background:#f9fbfc;border-bottom:1px solid #e7edf3;}
+#view-dispatch .p79d-roster-actions button{flex:1;min-width:0;border:1px solid #bcd6e3;background:#edf7fa;border-radius:9px;padding:8px 5px;color:#22627b;font-size:11px;font-weight:850;cursor:pointer;line-height:1.25;}
+#view-dispatch .p79d-roster-actions button:last-child{background:#fff;color:#64748b;}
+#view-dispatch .p79d-roster-actions button:disabled{opacity:.45;cursor:not-allowed;}
+#view-dispatch .p79d-roster-list{max-height:350px;overflow-y:auto;scrollbar-gutter:stable;}
+#view-dispatch .p79d-roster-person{display:flex!important;align-items:center;gap:10px;padding:10px 12px;min-height:54px;border-bottom:1px solid #ecf1f5;font-size:12px!important;font-weight:700!important;cursor:pointer;color:#243c54!important;}
+#view-dispatch .p79d-roster-person:nth-child(even){background:#fafcfe;}
+#view-dispatch .p79d-roster-person:hover{background:#eef7fb;}
+#view-dispatch .p79d-roster-person>input{width:18px;height:18px;min-height:18px;flex:0 0 18px;accent-color:#008e8a;cursor:pointer;}
+#view-dispatch .p79d-roster-person>input:disabled{cursor:not-allowed;opacity:.5;}
+#view-dispatch .p79d-roster-name{min-width:0;flex:1 1 auto;line-height:1.35;overflow-wrap:anywhere;}
+#view-dispatch .p79d-roster-name small{display:block;color:#90a1b0;font-size:10px;margin-top:3px;font-weight:650;}
+#view-dispatch .p79d-roster-eff{text-align:right;white-space:nowrap;font-weight:900;font-size:13px;font-variant-numeric:tabular-nums;color:#0a7b7d;}
+#view-dispatch .p79d-roster-eff small{display:block;font-size:10px;font-weight:650;color:#7891a1;}
+#view-dispatch .p79d-roster-unavailable .p79d-roster-name{color:#8b99a6;}
+#view-dispatch .p79d-roster-unavailable .p79d-roster-eff{color:#91a0ae;}
+#view-dispatch .p79d-roster-empty{padding:16px 12px;font-size:12px;color:#718096;}
+#view-dispatch .p79d-pending{background:#fff8e9;border:1px solid #f3d7a2;border-radius:10px;padding:10px 12px;margin-bottom:15px;color:#926824;font-size:12px;line-height:1.6;}
+#view-dispatch .p79d-pending summary{font-weight:850;cursor:pointer;}
+#view-dispatch .p79d-pending div{padding-top:8px;overflow-wrap:anywhere;}
+@media(max-width:1250px){#view-dispatch .p79d-roster-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:680px){#view-dispatch .p79d-roster-grid{grid-template-columns:1fr;}#view-dispatch .p79d-roster-list{max-height:270px;}#view-dispatch .p79d-roster-actions button{font-size:12px;}#view-dispatch .p79d-roster-person{min-height:47px;}}
