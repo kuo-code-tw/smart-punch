@@ -11,7 +11,8 @@ const code=[
  between('function shipMasterToSummary(s)','// 2026-09-24：gcSyncAll'),
  between('function renderVesselSummary(v)','function reportTime(v)')
 ].join('\n');
-const nodes=new Map(),saved=[],card={shown:false,classList:{add(v){if(v==='hidden')this.shown=false;},remove(v){if(v==='hidden')this.shown=true;}}};
+const nodes=new Map(),saved=[],card={shown:false};
+card.classList={add(v){if(v==='hidden')card.shown=false;},remove(v){if(v==='hidden')card.shown=true;}};
 const element=id=>id==='vesselSummaryCard'?card:(nodes.has(id)?nodes.get(id):(nodes.set(id,{textContent:''}),nodes.get(id)));
 const ctx={Date,Array,String,Math,Number,shipMasters:[],lastVesselSummary:null,
  document:{getElementById:element},num:x=>Number(x)||0,
