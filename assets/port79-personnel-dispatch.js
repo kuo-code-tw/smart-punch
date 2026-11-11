@@ -156,10 +156,10 @@ async function readDispatchSources(month,read){
 const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,readDispatchSources};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
-let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:[]},selectedKeys=null;const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
+let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:[]},selectedKeys=null,suggestionResult=null;const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
 const el=id=>document.getElementById(id),fmt=v=>v===null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:2}),safe=v=>esc(String(v??''));
 function month(){return el('dispatchMonth')?.value||'';}
-function resetContext(){const token=String(gcToken||'');if(owner!==token||planMonth!==month()){plan={};latest=[];settings={counts:{},lockedGroups:[]};selectedKeys=null;if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='';owner=token;planMonth=month();}}
+function resetContext(){const token=String(gcToken||'');if(owner!==token||planMonth!==month()){plan={};latest=[];settings={counts:{},lockedGroups:[]};selectedKeys=null;suggestionResult=null;if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='';owner=token;planMonth=month();}}
 function sourceRows(){return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&String(r.workDate||'').slice(0,7)===month()));}
 function render(){
  if(!el('dispatchBody'))return;
@@ -247,7 +247,8 @@ function renderRecommendation(rows){
   return;
  }
  const selected=chosenKeys();
- const suggestion=optimizeGroups(latest,{selectedKeys:selected,lockedGroups:settings.lockedGroups});
+ if(!suggestionResult){box.innerHTML='<p class="font-bold text-sky-800">請先從四組完整名冊勾選人員，再按「計算效率最佳化編組」，查看最佳化名單及前後效率。</p>';return;}
+ const suggestion=suggestionResult;
  const policy=movementPolicy(latest,settings);
  const rule=`已勾選 ${selected.size} 人，保留組：${[...policy.locked].map(g=>g+'組').join('、')||'無'}；未選的人不調動，所有組別人數維持不變。`;
  if(!suggestion.plan){
@@ -288,7 +289,7 @@ async function load(force=true){
  if(!requireEfficiencyAccess())return false;resetContext();const requested=month(),token=String(gcToken||''),key=token+'|'+requested;
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(requested))return false;
  if(inflight.has(key))return inflight.get(key);if(!force&&reads.has(key))return reads.get(key)==='ready';
- reads.set(key,'loading');readDetails.delete(key);
+ reads.set(key,'loading');readDetails.delete(key);suggestionResult=null;
  const task=Promise.resolve().then(async()=>{
   const results=await readDispatchSources(requested,async(action,params)=>{try{return await apiGetQuick(action,params,25000);}catch(error){if(!/忙碌|稍後|逾時|timeout|abort|network|fetch|HTTP 5/i.test(String(error?.message||error)))throw error;await new Promise(resolve=>setTimeout(resolve,700));if(token!==String(gcToken||''))throw Error('登入已變更');return apiGetQuick(action,params,25000);}});
   if(token!==String(gcToken||''))return false;
@@ -304,14 +305,14 @@ async function load(force=true){
 }
 api.generateRecommendation=async()=>{
  if(generating)return;generating=true;render();
- try{if(!ready)await load(true);render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+ try{if(!ready)await load(true);if(ready)suggestionResult=optimizeGroups(latest,{selectedKeys:chosenKeys(),lockedGroups:settings.lockedGroups});render();el('dispatchRecommendation')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
  finally{generating=false;renderSettings();}
 };
-api.useRecommendation=()=>{if(!ready)return;const suggestion=optimizeGroups(latest,{selectedKeys:chosenKeys(),lockedGroups:settings.lockedGroups});if(suggestion.plan){plan={...suggestion.plan};render();el('dispatchConfirmState').textContent=`已確認 ${suggestion.moves.length} 人，已帶入下方試算；尚未修改正式排班。`;el('dispatchGroupBody')?.scrollIntoView({behavior:'smooth',block:'nearest'});}};
+api.useRecommendation=()=>{if(!ready||!suggestionResult)return;const suggestion=suggestionResult;if(suggestion.plan){plan={...suggestion.plan};render();el('dispatchConfirmState').textContent=`已確認 ${suggestion.moves.length} 人，已帶入下方試算；尚未修改正式排班。`;el('dispatchGroupBody')?.scrollIntoView({behavior:'smooth',block:'nearest'});}};
 api.render=render;api.load=load;api.rows=sourceRows;api.clear=()=>{plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='已清除試算，正式排班未變更。';render();};
 document.addEventListener('change',event=>{
  const group=event.target?.dataset?.dispatchLock,countGroup=event.target?.dataset?.dispatchCount;
- if(group&&ready){const locked=new Set(settings.lockedGroups||[]);event.target.checked?locked.add(group):locked.delete(group);settings.lockedGroups=[...locked];plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='設定已變更，請重新確認名單。';render();return;}
+ if(group&&ready){const locked=new Set(settings.lockedGroups||[]);event.target.checked?locked.add(group):locked.delete(group);settings.lockedGroups=[...locked];plan={};suggestionResult=null;if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='設定已變更，請重新確認名單。';render();return;}
  if(countGroup&&ready){const n=Number(event.target.value);if(!Number.isInteger(n)||n<0||n>20){event.target.value=settings.counts[countGroup]??2;return;}settings.counts[countGroup]=n;plan={};if(el('dispatchConfirmState'))el('dispatchConfirmState').textContent='人數已變更，請重新確認名單。';render();return;}
  const selectedKey=event.target?.dataset?.dispatchSelect;
  if(selectedKey){
@@ -320,7 +321,7 @@ document.addEventListener('change',event=>{
   if(!policy.movable.has(selectedKey))return;
   selectedKeys=chosenKeys(policy);
   if(event.target.checked)selectedKeys.add(selectedKey);else selectedKeys.delete(selectedKey);
-  plan={};render();return;
+  plan={};suggestionResult=null;render();return;
  }
  const key=event.target?.dataset?.dispatchKey;if(!key)return;const p=latest.find(p=>p.key===key),target=event.target.value;if(!ready||!p?.eligible||!movementPolicy(latest,settings).movable.has(key)||movementPolicy(latest,settings).locked.has(target)||target&&!codes.includes(target))return;if(target&&target!==p.group)plan[key]=target;else delete plan[key];renderScenario();});
 document.addEventListener('click',event=>{
@@ -331,6 +332,6 @@ document.addEventListener('click',event=>{
  for(const p of latest)if(p.group===group&&policy.movable.has(p.key)){
   if(groupAll)selectedKeys.add(p.key);else selectedKeys.delete(p.key);
  }
- plan={};render();
+ plan={};suggestionResult=null;render();
 });
 })(typeof window!=='undefined'?window:globalThis);
