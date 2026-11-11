@@ -87,3 +87,6 @@
 @media(max-width:1350px){#view-weekly .p79pr-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}#view-weekly .p79pr-groups{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1100px){#view-weekly .p79pr-toolbar{flex-wrap:wrap}#view-weekly .p79pr-toolbar-right{flex-wrap:wrap;margin-left:0}#view-weekly .p79pr-panels{grid-template-columns:1fr 1fr}#view-weekly .p79pr-panel:last-child{grid-column:1/-1}}
 @media(max-width:670px){#view-weekly .p79pr-kpis,#view-weekly .p79pr-groups{grid-template-columns:repeat(2,minmax(0,1fr))}#view-weekly .p79pr-panels{grid-template-columns:1fr}#view-weekly .p79pr-panel:last-child{grid-column:auto}#view-weekly .p79pr-lead{display:none}#view-weekly .p79pr-toolbar-right{width:100%}#view-weekly .p79pr-section-title{align-items:flex-start;flex-direction:column}#view-weekly .p79pr-detail-card h3{flex-wrap:wrap}}
+
+/* Keep the management section locator for permissions, without showing a duplicate page heading. */
+#view-weekly .p79pr-section>.p79pr-legacy-header{display:none!important}
