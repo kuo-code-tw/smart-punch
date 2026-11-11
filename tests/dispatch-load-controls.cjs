@@ -13,6 +13,6 @@ const {readDispatchSources}=require('../assets/port79-personnel-dispatch.js');
  c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/port79-personnel-dispatch.js'),'utf8'),c);
  c.P79PersonnelDispatch.render();await c.P79PersonnelDispatch.load(true);assert.equal(node('dispatchGenerateButton').disabled,false);assert.match(node('dispatchRecommendation').innerHTML,/歷史作業明細/);assert.match(node('dispatchRecommendation').innerHTML,/來源未就緒/);
  failHistory=false;const generation=c.P79PersonnelDispatch.generateRecommendation();assert.equal(node('dispatchGenerateButton').disabled,true);await generation;assert.equal(node('dispatchGenerateButton').disabled,false);assert.match(node('dispatchRecommendation').innerHTML,/確認名單並帶入試算/);assert.ok(readCount>=8);assert.equal(ready,true);
- c.P79PersonnelDispatch.useRecommendation();assert.match(node('dispatchConfirmState').textContent,/已確認 6 人/);
- console.log('PASS actual UI module stays clickable after partial failure, reports exact source, retries all sources including schedule, generates six-person list, re-enables button and confirms the plan');
+ c.P79PersonnelDispatch.useRecommendation();assert.match(node('dispatchConfirmState').textContent,/已確認 [0-9]+ 人/);assert.match(node('dispatchGroupRoster').innerHTML,/A 組｜共 2 人/);assert.match(node('dispatchGroupRoster').innerHTML,/data-dispatch-select=/);
+ console.log('PASS actual UI module stays clickable after partial failure, reports exact source, retries all sources including schedule, optimizes selectable A-D roster, re-enables button and confirms the plan');
 })().catch(e=>{console.error(e);process.exitCode=1;});
