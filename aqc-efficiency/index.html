@@ -1642,43 +1642,58 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   </form>
 </dialog>
 
-  <section id="view-weekly" class="hidden space-y-4">
-    <div class="p79-section" data-section-key="personnel-groups"><div><span>人員作業量與效率</span></div>
-<div class="card p-4">
-      <p class="text-sm text-slate-500 mb-3">選日期及姓名，查看 A、B、C、D 組作業量與效率排名（效率高到低；同分並列）。可選任意日期區間；本周以星期日至星期六計算。</p>
-      <div class="flex flex-wrap gap-3 items-end">
-        <div class="min-w-[260px] max-w-[360px] flex-1">
-          <label class="text-xs font-bold">日期區間</label>
-          <details id="weeklyDateRangePicker" class="relative">
-            <summary class="list-none flex items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2 cursor-pointer select-none">
-              <span id="weeklyDateRangeSummary" class="text-slate-700">全部日期</span>
-              <span class="text-slate-400 text-xs">▼</span>
-            </summary>
-            <div class="absolute left-0 top-full z-30 mt-2 w-full min-w-[300px] rounded-2xl border bg-white p-3 shadow-2xl">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label class="text-xs font-bold">開始日期</label><input id="weeklyStart" type="date" class="block w-full border rounded-xl px-3 py-2" onchange="applyWeeklyDateRange()"></div>
-                <div><label class="text-xs font-bold">結束日期</label><input id="weeklyEnd" type="date" class="block w-full border rounded-xl px-3 py-2" onchange="applyWeeklyDateRange()"></div>
+  <section id="view-weekly" class="hidden space-y-4 p79pr-root">
+    <div class="p79-section p79pr-section" data-section-key="personnel-groups">
+      <div class="p79pr-legacy-header"><span>人員統計</span></div>
+      <div class="p79pr-shell">
+        <div class="p79pr-toolbar">
+          <div class="p79pr-heading"><span class="p79pr-heading-icon">👥</span>人員統計</div>
+          <span class="p79pr-lead">人員作業量｜A・B・C・D 組別｜效率排名</span>
+          <div class="p79pr-toolbar-right">
+            <details id="weeklyDateRangePicker">
+              <summary title="選擇作業日期區間"><span id="weeklyDateRangeSummary">全部日期</span><span aria-hidden="true">▼</span></summary>
+              <div class="p79pr-calendar-pop">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label for="weeklyStart" class="text-xs font-bold">開始日期</label><input id="weeklyStart" type="date" onchange="applyWeeklyDateRange()" class="block w-full border rounded-xl px-3 py-2"></div>
+                  <div><label for="weeklyEnd" class="text-xs font-bold">結束日期</label><input id="weeklyEnd" type="date" onchange="applyWeeklyDateRange()" class="block w-full border rounded-xl px-3 py-2"></div>
+                </div>
+                <div class="p79pr-calendar-actions">
+                  <button type="button" class="btn bg-slate-100 text-xs" onclick="shiftPersonnelWeek(-1)">上一周</button>
+                  <button type="button" class="btn bg-slate-100 text-xs" onclick="setCurrentWeek()">本周（日～六）</button>
+                  <button type="button" class="btn bg-slate-100 text-xs" onclick="shiftPersonnelWeek(1)">下一周</button>
+                  <button type="button" class="btn bg-slate-100 text-xs" onclick="clearWeeklyRange()">全部日期</button>
+                  <button type="button" class="p79pr-action" onclick="applyWeeklyDateRange(true,true)">套用</button>
+                </div>
               </div>
-              <div class="mt-3 flex justify-end gap-2">
-                <button type="button" onclick="clearWeeklyRange();document.getElementById('weeklyDateRangePicker')?.removeAttribute('open')" class="btn bg-slate-100 text-slate-700 text-sm">清除</button>
-                <button type="button" onclick="applyWeeklyDateRange(true,true)" class="btn bg-indigo-600 text-white text-sm">套用</button>
-              </div>
-            </div>
-          </details>
+            </details>
+            <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderWeeklyEfficiency()"><option value="">全部組別</option></select>
+            <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderWeeklyEfficiency()"><option value="">全部人員</option></select>
+            <button type="button" class="p79pr-action" onclick="renderWeeklyEfficiency()">↻ 更新統計</button>
+          </div>
         </div>
-        <button onclick="shiftPersonnelWeek(-1)" class="btn bg-slate-100 text-sm">上一周</button><button onclick="setCurrentWeek()" class="btn bg-slate-100 text-sm">本周（日～六）</button><button onclick="shiftPersonnelWeek(1)" class="btn bg-slate-100 text-sm">下一周</button>
-        <button onclick="clearWeeklyRange()" class="btn bg-slate-100 text-sm">全部日期</button>
-        <div><label class="text-xs font-bold">姓名（筆畫排序）</label><select id="personStatPerson" class="block w-full border rounded-xl px-3 py-2 bg-white min-h-[42px]" onchange="renderWeeklyEfficiency()">
-            <option value="">全部人員</option>
-          </select></div>
+        <div class="p79pr-filter-status"><span id="weeklyScheduleGroupState" role="status"></span><span id="p79prFreshness" role="status" aria-live="polite"></span><button type="button" class="text-sky-700 underline" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
+        <div id="weeklyGroupButtons" hidden></div>
+        <div class="p79pr-kpis" aria-label="人員作業量八大統計">
+          <div class="p79pr-kpi navy"><span class="p79pr-icon">♟</span><div class="p79pr-inner"><div class="p79pr-name">作業人數</div><div class="p79pr-value" id="p79prPeople">—</div><div class="p79pr-hint">不重複人員</div></div></div>
+          <div class="p79pr-kpi "><span class="p79pr-icon">▤</span><div class="p79pr-inner"><div class="p79pr-name">作業筆數</div><div class="p79pr-value" id="p79prCount">—</div><div class="p79pr-hint">WORKING REPORT</div></div></div>
+          <div class="p79pr-kpi "><span class="p79pr-icon">◷</span><div class="p79pr-inner"><div class="p79pr-name">總作業時數</div><div class="p79pr-value" id="p79prHours">—</div><div class="p79pr-hint">小時</div></div></div>
+          <div class="p79pr-kpi "><span class="p79pr-icon">⇩</span><div class="p79pr-inner"><div class="p79pr-name">卸櫃 DISC</div><div class="p79pr-value" id="p79prDisc">—</div><div class="p79pr-hint">逐筆明細合計</div></div></div>
+          <div class="p79pr-kpi "><span class="p79pr-icon">⇧</span><div class="p79pr-inner"><div class="p79pr-name">裝櫃 LOAD</div><div class="p79pr-value" id="p79prLoad">—</div><div class="p79pr-hint">逐筆明細合計</div></div></div>
+          <div class="p79pr-kpi purple"><span class="p79pr-icon">▥</span><div class="p79pr-inner"><div class="p79pr-name">H/C</div><div class="p79pr-value" id="p79prHC">—</div><div class="p79pr-hint">效率計算納入</div></div></div>
+          <div class="p79pr-kpi mint"><span class="p79pr-icon">⚓</span><div class="p79pr-inner"><div class="p79pr-name">作業櫃數</div><div class="p79pr-value" id="p79prContainers">—</div><div class="p79pr-hint">DISC + LOAD</div></div></div>
+          <div class="p79pr-kpi orange"><span class="p79pr-icon">◉</span><div class="p79pr-inner"><div class="p79pr-name">整體效率</div><div class="p79pr-value" id="p79prEff">—</div><div class="p79pr-hint">(櫃數 + H/C) / 時數</div></div></div>
+        </div>
+        <div class="p79pr-section-title"><span>▦ A／B／C／D 組別作業一覽</span><small>依所選日期區間統計｜每組顯示效率前三名（同分並列）</small></div>
+        <div id="p79prGroups" class="p79pr-groups" aria-live="polite"></div>
+        <div id="p79prGroupWarning" class="p79pr-group-alert" role="status" hidden></div>
+        <div class="p79pr-panels">
+          <section class="p79pr-panel"><div class="p79pr-panel-title">▥ 每日人員作業量與效率趨勢 <span class="sub">所選日期區間</span></div><div id="p79prDailyChart"></div></section>
+          <section class="p79pr-panel"><div class="p79pr-panel-title">▥ A／B／C／D 組別效率比較 <span class="sub">組別加權效率</span></div><div id="p79prCompareChart"></div></section>
+          <section class="p79pr-panel"><div class="p79pr-panel-title">♟ 人員效率排行 <span class="sub">TOP 5｜同分並列</span></div><table class="p79pr-rank-table"><thead><tr><th>排名</th><th>姓名</th><th>組別</th><th>作業櫃數</th><th>效率</th></tr></thead><tbody id="p79prRankBody"></tbody></table></section>
+        </div>
+        <div id="personnelGroupCards" hidden></div><div id="personnelUnassigned" hidden></div>
       </div>
-
-      <div class="flex flex-wrap items-center gap-2 mt-3 mb-3"><span id="weeklyScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
-      <select id="weeklyGroupFilter" hidden><option value="">全部組別</option></select><div id="weeklyGroupButtons" hidden></div>
-      <div id="personnelGroupCards" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
-      <div id="personnelUnassigned" class="mt-3" role="status"></div>
     </div>
-</div>
 
     <div class="p79-section hidden" data-section-key="view-weekly-2"><div><span>人員作業摘要</span></div>
 <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1708,11 +1723,11 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 
 
     </div>
-    <div class="p79-section hidden" data-section-key="view-weekly-5"><div><span>所有人員作業紀錄</span></div>
-<div class="card p-4 overflow-auto">
-      <h3 class="text-lg font-black mb-2">所有人員作業紀錄</h3>
+    <div class="p79pr-details" data-section-key="view-weekly-5"><div><span>所有人員作業紀錄</span></div>
+<div class="p79pr-detail-card">
+      <h3>▤ 全部人員作業紀錄明細 <small>日期・姓名・組別・WORKING NO.・AQC・時數與櫃數</small></h3>
       <div id="personnelRecordCount" class="text-sm text-slate-500 mb-3" role="status"></div>
-      <table class="tbl w-full min-w-[1500px] text-center"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
+      <table class="p79pr-data-table"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
     </div>
 </div>
 <section id="view-workload" class="hidden space-y-4">
@@ -7491,6 +7506,7 @@ function renderWeeklyEfficiency(){
   }
   renderPersonnelGroupCards(filteredPersons);
   renderPersonnelRecords(rs);
+  window.P79PersonnelReference?.render({rows:rs,persons:filteredPersons,metrics:workloadRecordMetrics,groupCode:personnelGroupCode});
 }
 
 function renderAll(){
@@ -15790,6 +15806,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <link rel="stylesheet" href="./vessel-tab-palette.css?v=20261109-v115">
+<link rel="stylesheet" href="./personnel-reference-dashboard.css?v=20261111-approved-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 <script>
 /* Gate management shows the designed dashboard and keeps the original importer. */
@@ -15838,6 +15855,7 @@ window.addEventListener('load',function(){
 #p79GateImportDialogStatus[data-kind="success"]{color:#047857}
 .p79-gate-dialog-actions{display:flex;justify-content:flex-end}
 </style>
+<script src="./personnel-reference-dashboard.js?v=20261111-approved-v1"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 </body></html>
 
