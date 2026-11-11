@@ -30,6 +30,6 @@ for(const name of ['currentOfficialJobTitle','isAqcEmployee','people'])vm.runInC
 assert.equal(ctx.isAqcEmployee(employees[1]),false,'AQC job title must not override resignation');
 assert.equal(ctx.isAqcEmployee(employees[2]),false,'inactive must not count as employed');
 assert.equal(ctx.isAqcEmployee(employees[3]),false,'staff on long-term leave are not available for dispatch');
-assert.deepEqual(ctx.people().map(p=>p.empId).sort(),['A1','E1'],'current AQC staff count must use employment state');
+assert.deepEqual(Array.from(ctx.people(),p=>p.empId).sort(),['A1','E1'],'current AQC staff count must use employment state');
 assert.match(html,/personnel-dispatch\.js\?v=20261111-current-roster-v6/,'new JS must bypass stale browser cache');
 console.log('PASS HR status filtering across current AQC roster, dispatch headcount, optional names, historical records, and restored staff');
