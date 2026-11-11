@@ -43,7 +43,7 @@ function header(){
  '<a href="../schedule/" data-route="schedule">排班管理</a>',
  '<a href="../leave/" data-route="leave">請假管理</a>',
  '<a href="../work-hours/" data-route="workhours">加班管理</a>',
- '<a href="../aqc-efficiency/" data-route="efficiency" title="現有船舶與人員作業效率系統">績效管理</a>',
+ '<a href="../aqc-efficiency/" data-route="efficiency" title="原有船舶與人員效率統計系統">船舶效率</a>',
  '</nav>',
  '<div class="p79r-controls">',
  '<span class="p79r-sync" id="p79rUpdated">資料待同步</span>',
