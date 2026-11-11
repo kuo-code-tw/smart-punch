@@ -132,4 +132,56 @@ test('dashboard, employee table, payroll and training views switch without runti
  assert.equal(nodes.p79rOptraining.hidden,true);
 });
 
-console.log(JSON.stringify({passed,failed:0,scope:'HR dashboard synthetic fixtures, no cloud writes'}));
+async function testLiveStatisticsWithMockedCloud(){
+ const elements={};const element=id=>elements[id]||(elements[id]={
+  value:id==='p79rWorkDate'?'2026-11-11':'',textContent:'',style:{},closest:()=>({style:{}})});
+ const document={getElementById:element,addEventListener(){}};
+ const source=[
+  {empId:'A01',name:'一',employmentStatus:'active'},
+  {empId:'A02',name:'二',employmentStatus:'active'}
+ ];
+ const roster=[
+  {empId:'A01',schedule:{'2026-11-11':'早',__meta:{'2026-11-11':{overtimeReport:{id:'O1',declaredHours:2,status:'已申報'}}}}},
+  {empId:'A02',schedule:{'2026-11-11':'早',__meta:{}}}
+ ];
+ const leaveRecords=[{id:'L1',empId:'A02',status:'已核准',startDate:'2026-11-11',endDate:'2026-11-11'}];
+ const requests=[];
+ let account={empId:'ADMIN',adminRole:'superadmin'};
+ const storage={getItem(key){
+  if(key==='port79_user_session')return JSON.stringify(account);
+  if(key==='port79_user_token')return 'MATCH';
+  if(key==='port79_gas_url')return 'https://script.google.com/macros/s/TEST/exec';
+  return null
+ }};
+ const window={P79HrVerifiedMetrics:M,p79HrDashRender(){}};
+ const context={document,window,sessionStorage:storage,employees:source,
+  p79HrCloudDataReady:true,token:'MATCH',console,Date,Intl,URL,AbortController,
+  setTimeout,clearTimeout,fetch:async raw=>{
+   const url=new URL(raw),action=url.searchParams.get('action');
+   requests.push(action);
+   assert.equal(url.searchParams.get('token'),'MATCH');
+   let data;
+   if(action==='getLeaveData')data={ok:true,employees:source,leaveRecords};
+   else if(action==='getScheduleDataSecure')data={ok:true,schedules:roster};
+   else if(action==='getAttendanceMainDirect')data={ok:true,records:[{empId:'A01',type:'上班',timeStr:'2026-11-11 07:58:00'}]};
+   else throw Error('Unexpected action '+action);
+   return{ok:true,text:async()=>JSON.stringify(data)}
+  }};
+ vm.createContext(context);
+ vm.runInContext(bridge,context);
+ await window.P79HrStatistics.refresh();
+ assert.deepEqual(requests.sort(),['getAttendanceMainDirect','getLeaveData','getScheduleDataSecure'].sort());
+ assert.equal(element('p79rAttendance').textContent,'100.0%');
+ assert.equal(element('p79rLeaves').textContent,'1');
+ assert.equal(element('p79rOvertime').textContent,'2.0 小時');
+ const before=requests.length;
+ account={empId:'OTHER',adminRole:'admin',systemPermissions:{hr:'manage',attendance:'none',leave:'none',schedule:'none',workhours:'none'}};
+ await window.P79HrStatistics.refresh();
+ assert.equal(requests.length,before,'no forbidden cloud reads after identity change');
+ assert.equal(element('p79rAttendance').textContent,'—');
+ passed++;console.log('PASS authorized live statistics and forbidden account fail-closed (mocked cloud)');
+}
+testLiveStatisticsWithMockedCloud().then(()=>{
+ console.log(JSON.stringify({passed,failed:0,scope:'HR dashboard synthetic fixtures and mocked authorized cloud; no production writes'}));
+}).catch(e=>{console.error(e);process.exitCode=1});
+
