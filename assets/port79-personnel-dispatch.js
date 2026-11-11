@@ -157,6 +157,23 @@ function optimizeGroups(persons,{selectedKeys=null,lockedGroups=[]}={}){
  return {before,after,plan,moves,locked:[...locked],selectedCount:selected.length,optimal:exact,goal:'minimize-group-efficiency-gap'};
 }
 
+function collectDispatchRoster(store,month,employees=[]){
+ const base=store?.has(month)&&typeof store.personnel==='function'?store.personnel(month):[];
+ const result=Array.isArray(base)?base.slice():[];
+ const seen=new Set(result.map(p=>String(p.empId||p.id||'').trim().toUpperCase()).filter(Boolean));
+ if(!store?.has(month)||!Array.isArray(employees))return result;
+ for(const e of employees){
+  const id=String(e.empId||e.employeeId||e.id||'').trim().toUpperCase(),name=String(e.name||e.employeeName||'').trim();
+  if(!id||!name||seen.has(id)||id==='ADMIN')continue;
+  const role=String(e.jobTitle||e.deptDetail||e.role||e.dept||'').normalize('NFKC').trim().toUpperCase();
+  const looksAqc=/^AQC(?:$|[\s(（／/・·:\-]|司機|操作|人員)/.test(role);
+  const lookup=typeof store.lookup==='function'?store.lookup(month,{empId:id,name}):null;
+  // 排班核對結果為唯一可靠的組別來源；HR 的職稱只用於補列待核對人員。
+  if(lookup?.status!=='ok'&&!looksAqc)continue;
+  result.push({empId:id,name,group:lookup?.status==='ok'?lookup.group:''});seen.add(id);
+ }
+ return result;
+}
 async function readDispatchSources(month,read){
  const sources=[
   {key:'live',label:'即時船舶作業',action:'gcGetData',params:{month},valid:d=>Array.isArray(d.records)||Array.isArray(d.shipMasters)},
@@ -166,7 +183,7 @@ async function readDispatchSources(month,read){
  ];
  return Promise.all(sources.map(async source=>{try{const data=await read(source.action,source.params);if(data?.ok!==true||data.retryable||!source.valid(data))throw Error(data?.error||'回傳資料格式不完整');return {...source,ok:true,data};}catch(error){const raw=String(error?.message||error);return {...source,ok:false,error:error?.name==='AbortError'?'連線逾時':/failed to fetch|network/i.test(raw)?'網路連線失敗':raw.slice(0,160)};}}));
 }
-const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,readDispatchSources};
+const api={buildMonth,summarize,groupCode,recommendSwap,movementPolicy,optimizeGroups,collectDispatchRoster,readDispatchSources};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 root.P79PersonnelDispatch=api;
 let plan={},owner='',planMonth='',latest=[],ready=false,settings={counts:{},lockedGroups:[]},selectedKeys=null,suggestionResult=null;const reads=new Map(),readDetails=new Map(),inflight=new Map();let generating=false;
@@ -178,7 +195,7 @@ function render(){
  if(!el('dispatchBody'))return;
  const input=el('dispatchMonth'),year=getPort79Year();if(!input.value)input.value=isoTodayLocal().startsWith(year+'-')?isoTodayLocal().slice(0,7):year+'-01';resetContext();
  const rows=sourceRows(),store=currentOperationScheduleStore();ensureOperationScheduleGroups(rows.length?rows:[{workDate:month()+'-01'}]);
- const roster=store?.has(month())?store.personnel(month()):[];
+ const roster=collectDispatchRoster(store,month(),Array.isArray(systemEmployees)?systemEmployees:[]);
  latest=buildMonth({month:month(),records:rows,roster,employees:Array.isArray(systemEmployees)?systemEmployees:[],metrics:workloadRecordMetrics,normalize:normalizePersonName});
  const state=reads.get(owner+'|'+month());ready=state==='ready'&&!!store?.has(month());
  el('dispatchLoadState').textContent=(state==='loading'?'正在讀取整月即時及歷史作業資料…':state==='ready'?'整月即時、歷史來源與最新在職名冊已讀取。':state==='partial'?'部分來源讀取失敗，資料或在職名冊暫不完整，請重新讀取。':state==='error'?'雲端讀取失敗，目前顯示本機資料，請重新讀取。':'尚未讀取整月資料。')+(store?.has(month())?'':' 排班名冊尚未確認。');
