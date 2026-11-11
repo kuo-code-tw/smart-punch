@@ -25,21 +25,25 @@
   function renderGroups(persons,groupCode){
     const host=document.getElementById('p79prGroups');if(!host)return;
     const groups=['A','B','C','D'];
+    // Keep each group's independent scroll position when filters or live data re-render.
+    const scrollPositions=new Map(Array.from(host.querySelectorAll('.p79pr-group-scroll')).map(el=>[el.dataset.group,el.scrollTop]));
     host.innerHTML=groups.map((g,idx)=>{
       const list=rank(persons.filter(p=>groupCode(p.group)===g));
       const total=list.reduce((a,p)=>{a.hours+=n(p.hours);a.containers+=n(p.containers);a.hc+=n(p.hc);return a},{hours:0,containers:0,hc:0});
       const eff=total.hours>0?(total.containers+total.hc)/total.hours:null;
-      const leaders=list.filter(p=>p.refRank!==null&&p.refRank<=3);
+      // Display every matching employee, not only the top three; keep ranking order.
       return '<section class="p79pr-group" aria-label="'+g+' 組">'+
         '<header class="p79pr-group-head"><b>♟ '+g+' 組</b><span>'+list.length+' 人</span></header>'+
         '<div class="p79pr-gstats"><div><div class="num">'+fmt.format(total.containers)+'</div><div class="lbl">櫃數</div></div>'+
         '<div><div class="num">'+h(total.hours)+'</div><div class="lbl">時數</div></div>'+
         '<div><div class="num">'+fmt.format(total.hc)+'</div><div class="lbl">H/C</div></div></div>'+
         '<div class="p79pr-eff"><span>組別平均效率</span><strong>'+(eff===null?'—':f(eff))+'</strong></div>'+
+        '<div class="p79pr-group-scroll" data-group="'+g+'" role="region" tabindex="0" aria-label="'+g+' 組完整人員名單，可使用滑鼠滾輪上下捲動">'+
         '<table><thead><tr><th>姓名</th><th>櫃數</th><th>時數</th><th>效率</th></tr></thead><tbody>'+
-        (leaders.length?leaders.map(p=>'<tr><td title="'+safe(p.name)+'">'+safe(p.name)+'</td><td>'+fmt.format(p.containers)+'</td><td>'+h(p.hours)+'</td><td>'+f(p.eff)+'</td></tr>').join(''):'<tr><td colspan="4">此條件沒有有效作業資料</td></tr>')+
-        '</tbody></table></section>';
+        (list.length?list.map(p=>'<tr><td title="'+safe(p.name)+'">'+safe(p.name)+'</td><td>'+fmt.format(p.containers)+'</td><td>'+h(p.hours)+'</td><td>'+(n(p.hours)>0?f(p.eff):'—')+'</td></tr>').join(''):'<tr><td colspan="4">此條件沒有作業人員資料</td></tr>')+
+        '</tbody></table></div><div class="p79pr-scroll-hint">↕ 往下捲動查看全部 '+list.length+' 人</div></section>';
     }).join('');
+    host.querySelectorAll('.p79pr-group-scroll').forEach(el=>{el.scrollTop=scrollPositions.get(el.dataset.group)||0;});
     const extra=persons.filter(p=>!groupCode(p.group));
     const warning=document.getElementById('p79prGroupWarning');
     if(warning){warning.hidden=!extra.length;warning.textContent=extra.length?'組別待核對：'+extra.length+' 人尚未能對應正式 A／B／C／D 排班組別，仍納入上方總數與作業明細。':'';}
