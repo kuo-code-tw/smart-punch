@@ -43,9 +43,9 @@ function makeSelect() {
     return select;
 }
 const employees = [
-    { empId: 'AN1150002', name: '黃信興', dept: '第二事業處', jobTitle: '指揮手' },
-    { empId: 'AP0790007', name: '吳顯文', dept: '第二事業部', jobTitle: '指揮手' },
-    { empId: 'AP1110001', name: '測試員', dept: '第二事業部', jobTitle: '司機' }
+    { empId: 'EMP0001', name: '甲員', dept: '單位甲', jobTitle: '指揮手' },
+    { empId: 'EMP0002', name: '乙員', dept: '單位乙', jobTitle: '指揮手' },
+    { empId: 'EMP0003', name: '丙員', dept: '單位乙', jobTitle: '司機' }
 ];
 const nodes = {
     addModalJobSelect: makeSelect(),
@@ -73,18 +73,18 @@ context.initAddModalDropdownsFast();
 nodes.addModalJobSelect.value = '指揮手';
 context.p79AddModalJobChanged();
 assert.equal(nodes.addModalJobSelect.value, '指揮手');
-assert.deepEqual(nodes.addModalEmpSelect.options.map(opt => opt.value), ['AP0790007', 'AN1150002'].sort((a,b) => employees.find(x=>x.empId===a).name.localeCompare(employees.find(x=>x.empId===b).name,'zh-Hant-TW-u-co-stroke')), 'same job contains all departments');
-nodes.addModalEmpSelect.value = 'AN1150002';
+assert.deepEqual(nodes.addModalEmpSelect.options.map(opt => opt.value), ['EMP0002', 'EMP0001'].sort((a,b) => employees.find(x=>x.empId===a).name.localeCompare(employees.find(x=>x.empId===b).name,'zh-Hant-TW-u-co-stroke')), 'same job contains all departments');
+nodes.addModalEmpSelect.value = 'EMP0001';
 context.p79AddModalEmployeeChanged();
 context.p79AddRefreshJobs();
 context.p79AddRefreshEmployeeOptions();
 assert.equal(nodes.addModalJobSelect.value, '指揮手', 'background style refresh should preserve chosen title');
-assert.equal(nodes.addModalEmpSelect.value, 'AN1150002', 'refresh should preserve chosen employee');
+assert.equal(nodes.addModalEmpSelect.value, 'EMP0001', 'refresh should preserve chosen employee');
 context.initAddModalDropdownsFast(employees[1]);
 assert.equal(nodes.addModalJobSelect.value, '指揮手', 'row-based manual add chooses original employee job');
-assert.equal(nodes.addModalEmpSelect.value, 'AP0790007', 'row-based manual add chooses correct employee');
-nodes.addRecordModal.dataset.p79LockedEmployeeKey = 'AP0790007';
+assert.equal(nodes.addModalEmpSelect.value, 'EMP0002', 'row-based manual add chooses correct employee');
+nodes.addRecordModal.dataset.p79LockedEmployeeKey = 'EMP0002';
 nodes.addModalJobSelect.value = '司機';
 context.p79AddModalJobChanged();
-assert.equal(nodes.addModalEmpSelect.value, 'AP0790007', 'locked pairing preserves employee even if job is inconsistent');
+assert.equal(nodes.addModalEmpSelect.value, 'EMP0002', 'locked pairing preserves employee even if job is inconsistent');
 console.log('PASS manual punch: left job / right employee, no department, cross-department jobs, stable selections, row identity protection');
