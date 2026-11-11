@@ -11,3 +11,26 @@
 #view-terminal .p79-audit-foot{color:#74839a;font-size:10px;line-height:1.7;margin-top:9px}
 @media(max-width:900px){#view-terminal .p79-audit-list,#view-terminal .p79-audit-notes{grid-template-columns:1fr}}
 @media(max-width:580px){#view-terminal .p79-audit-panel{padding:12px}}
+
+
+/* Compact, accessible reconciliation accordion: keep warning count visible even when closed. */
+#view-terminal details.p79-audit-panel{display:block;padding:0;margin:12px 0 14px;overflow:hidden}
+#view-terminal details.p79-audit-panel>.p79-audit-head{
+ cursor:pointer;list-style:none;display:flex;gap:12px;min-height:66px;
+ padding:12px 16px;border-bottom:0;background:linear-gradient(100deg,#eff7ff,#fff);
+}
+#view-terminal details.p79-audit-panel>.p79-audit-head::-webkit-details-marker{display:none}
+#view-terminal details.p79-audit-panel>.p79-audit-head::marker{content:''}
+#view-terminal details.p79-audit-panel>.p79-audit-head:focus-visible{outline:3px solid #409aff;outline-offset:-3px}
+#view-terminal details.p79-audit-panel[open]>.p79-audit-head{border-bottom:1px solid #d9e7f7}
+#view-terminal .p79-audit-head-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#view-terminal .p79-audit-toggle{display:inline-flex;align-items:center;font-size:12px;font-weight:800;color:#2464a5}
+#view-terminal .p79-audit-toggle::before{content:'展開明細 ▾'}
+#view-terminal details[open] .p79-audit-toggle::before{content:'收合明細 ▴'}
+#view-terminal .p79-audit-content{padding:6px 16px 14px}
+@media(max-width:580px){
+ #view-terminal details.p79-audit-panel{padding:0}
+ #view-terminal details.p79-audit-panel>.p79-audit-head{padding:10px 12px}
+ #view-terminal .p79-audit-content{padding:6px 12px 12px}
+ #view-terminal .p79-audit-head-right{margin-left:0}
+}
