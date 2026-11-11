@@ -806,7 +806,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <div id="cumulativeTitle" class="font-black text-lg mb-3">🚢 全部月份累計船舶統計</div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">作業筆數</div><div id="cumShipCount" class="text-2xl font-black">0</div><div id="cumShipCountSub" class="text-[11px] text-slate-400 mt-1"></div></div>
-        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統總櫃數（作業量＋翻艙）</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
+        <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">系統總 Moves（作業量＋SHIFT）</div><div id="cumWorkload" class="text-2xl font-black">0</div><div id="cumWorkloadSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">艙蓋量</div><div id="cumHatches" class="text-2xl font-black">0</div><div id="cumHatchesSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">翻艙量</div><div id="cumShift" class="text-2xl font-black">0</div><div id="cumShiftSub" class="text-[11px] text-slate-400 mt-1"></div></div>
         <div class="rounded-xl bg-slate-50 p-4"><div class="text-xs text-slate-500">累計效率</div><div id="cumEfficiency" class="text-2xl font-black">0.00</div><div id="cumEfficiencySub" class="text-[11px] text-slate-400 mt-1"></div></div>
@@ -3962,7 +3962,7 @@ function renderDashboardQuantityReconciliation(month,jobs,sourceRows,masters,sta
       `<tr class="border-t border-slate-100"><td class="p-2">${escCell(m)}</td><td class="p-2 text-right">${x.count}</td><td class="p-2 text-right">${round(x.bill,2)}</td><td class="p-2 text-right">${round(x.shift,2)}</td><td class="p-2 text-right font-bold">${round(x.bill+x.shift,2)}</td></tr>`).join('');
     host.classList.remove('hidden');
     host.innerHTML=`<details id="dashboardQuantityReconciliationDetails">
-      <summary class="cursor-pointer text-sm font-black text-slate-700">🔍 ${escCell(year)} 年全年櫃數核對｜各月加總 ${round(sumMoves,2)}｜人員與系統差 ${dashboardSignedDiff(diff)}</summary>
+      <summary class="cursor-pointer text-sm font-black text-slate-700">🔍 ${escCell(year)} 年全年 Moves 核對｜各月加總 ${round(sumMoves,2)}｜人員與系統差 ${dashboardSignedDiff(diff)}</summary>
       <p class="mt-2 text-xs text-slate-600">目前是全年累計，並非單月；以下依畫面已載入的船舶完工月份分列。只讀核對，不修改任何原始資料。</p>
       <div class="mt-2 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="bg-slate-100"><th class="p-2">月份</th><th class="p-2 text-right">船數</th><th class="p-2 text-right">作業量</th><th class="p-2 text-right">SHIFT</th><th class="p-2 text-right">總 Moves</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="p-2">目前沒有這個年度的船舶資料</td></tr>'}</tbody></table></div>
       ${Math.abs(diff)>0.01?`<p class="mt-2 text-xs font-bold text-amber-800">⚠ 人員作業與船舶總量目前差 ${dashboardSignedDiff(diff)}；資料可能尚有跨月明細、不同版本或待同步紀錄，差額尚未核銷，不可直接當作零。</p>`:''}
@@ -15801,14 +15801,14 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<link rel="stylesheet" href="./terminal-rod-overview.css?v=20261110-equal-height-v2">
+<link rel="stylesheet" href="./terminal-rod-overview.css?v=20261111-shift-separate-v1">
 <script src="./terminal-ops.js?v=20261111-audit-v3"></script>
-<script src="./terminal-rod-overview.js?v=20261110-dual-v1"></script>
+<script src="./terminal-rod-overview.js?v=20261111-shift-separate-v1"></script>
 <link rel="stylesheet" href="./terminal-reference-layout.css?v=20261110-reference-v1">
 <link rel="stylesheet" href="./terminal-stop-redesign.css?v=20261110-stop-v1">
 <script src="./terminal-reference-layout.js?v=20261110-reference-v1"></script>
 <link rel="stylesheet" href="./terminal-data-audit.css?v=20261111-audit-v1">
-<script src="./terminal-data-audit.js?v=20261111-audit-v1"></script>
+<script src="./terminal-data-audit.js?v=20261111-shift-separate-v2"></script>
 <script defer src="../assets/port79-aqc-concurrent.js?v=20261028-ship-pair-groups-v8"></script>
 <script defer src="../assets/port79-aqc-multi-rod.js?v=20261028-one-line-toolbar-v11"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
