@@ -61,3 +61,13 @@
 #view-terminal .p79-rod-flip b{font-size:22px;line-height:1.1;font-weight:950;font-variant-numeric:tabular-nums}
 #view-terminal .p79-rod-flip-quantity{color:#9b5b10;font-weight:950}
 @media(max-width:560px){#view-terminal .p79-rod-port-metrics{width:100%;flex-wrap:wrap;justify-content:space-between}#view-terminal .p79-rod-flip b{font-size:19px}}
+
+
+/* Keep Bundle traceable to its WORKING NO. and show per-AQC hatch covers separately. */
+#view-terminal .p79-rod-bundle-origin{
+  margin:0 0 10px;padding:7px 10px;border:1px solid #d8e7fa;
+  border-radius:8px;background:#f3f8ff;color:#26537d;
+  font-size:11px;line-height:1.6;font-weight:750;overflow-wrap:anywhere
+}
+#view-terminal .p79-rod-table{min-width:600px}
+#view-terminal .p79-rod-table th:last-child,#view-terminal .p79-rod-table td:last-child{color:#7754a4;font-weight:900}
