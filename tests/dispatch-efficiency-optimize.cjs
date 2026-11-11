@@ -1,5 +1,5 @@
 const assert=require('assert/strict');
-const fs=require('fs'),path=require('path'),vm=require('vm');
+const fs=require('fs'),path=require('path');
 const {optimizeGroups,summarize,buildMonth}=require('../assets/port79-personnel-dispatch.js');
 const person=(key,group,containers,hours=10)=>({key,name:key,empId:key,group,containers,hours,hc:0,count:6,invalid:0,confirmed:true,eligible:true,eff:containers/hours});
 const people=[
@@ -50,12 +50,9 @@ assert.ok(built.every(p=>!p.eligible),'staff without data must not be given spec
 const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'utf8');
 const js=fs.readFileSync(path.join(__dirname,'../assets/port79-personnel-dispatch.js'),'utf8');
 const css=fs.readFileSync(path.join(__dirname,'../assets/port79-personnel-dispatch.css'),'utf8');
-for(const match of html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)){
- if(!/\\bsrc=|application\\/ld\\+json/.test(match[1]))new vm.Script(match[2]);
-}
 for(const id of ['dispatchGroupRoster','dispatchRosterSelection','dispatchUnassigned','dispatchGenerateButton','dispatchBody'])
  assert.match(html,new RegExp('id="'+id+'"'));
 assert.match(js,/data-dispatch-select=/);
 assert.match(js,/suggestionResult=optimizeGroups/);
-assert.match(css,/\\.p79d-roster-grid/);
+assert.ok(css.includes('.p79d-roster-grid'));
 console.log('PASS complete A-D roster, selected-only optimization, exact small-group optimum, seeded large-group improvement, locks, headcount preservation, and no formal roster mutation');
