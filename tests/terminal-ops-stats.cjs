@@ -5,7 +5,7 @@ const js=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 assert(html.includes('data-tab="terminal"'));
 
 for(const code of ['7901','7902','7903','7905','8001','8002','8003','8005','8006'])assert(html.includes('terminalRodOverviewMount')&&html.includes('terminal-rod-overview.js'),'AQC cards connected');
-assert(html.includes('terminal-rod-overview.css?v=20261110-equal-height-v2'));
+assert(html.includes('terminal-rod-overview.css?v=20261111-hc-bundle-v1'));
 assert(js.includes('root.P79TerminalRodOverview?.render(stats,state);'));
 
 assert(html.includes('id="view-terminal"'));
@@ -18,7 +18,7 @@ assert(js.includes('root.P79TerminalReference?.render(stats,state);'),'render ne
 for(const id of ['terminalMonth','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalReasonFilter','terminalDataStatus']){
   assert(html.includes('id="'+id+'"'),id);
 }
-assert(html.includes('./terminal-ops.js?v=20261111-audit-v3'));
+assert(html.includes('./terminal-ops.js?v=20261111-bundle-by-vessel-hc-v1'));
 assert(html.includes('id="terminalDayTableWrap"'),'daily ship table has measured viewport');
 assert(html.includes('id="terminalShiftTableWrap"'),'shift detail table has synced scroll viewport');
 assert(html.includes('#view-terminal #terminalShiftTableWrap{box-sizing:border-box;overflow-y:auto}'),'shift details retain vertical scrolling');
