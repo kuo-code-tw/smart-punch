@@ -663,6 +663,13 @@ body.p79-gate-management-active #efficiencyMainTabs>.p79-efficiency-tab-year {di
 #efficiencyMainTabs [data-tab="gate"].active {background:#dcfce7!important;color:#166534!important}
 html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!important;color:#dcfce7!important}
 #view-gate #p79GateImportFrame {max-width:100%;overflow:hidden}
+#view-gate #p79GateDashboardFrame {max-width:100%;overflow:hidden;box-shadow:none;border-radius:0}
+#view-gate .p79-gate-import-fold{background:#fff;border:1px solid #c9ddf4;border-radius:13px;box-shadow:0 3px 9px #87aace33;overflow:hidden;margin-top:10px}
+#view-gate .p79-gate-import-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;background:linear-gradient(100deg,#0363af,#0b88d0);color:white;font-size:17px;font-weight:900}
+#view-gate .p79-gate-import-fold>summary::-webkit-details-marker{display:none}
+#view-gate .p79-gate-import-fold>summary::after{content:'＋';margin-left:auto;font-size:24px}
+#view-gate .p79-gate-import-fold[open]>summary::after{content:'−'}
+#view-gate .p79-gate-import-fold>summary small{font-size:12px;font-weight:700;color:#e1f2ff}
 @media(max-width:640px){#view-gate>div:first-child{padding:12px!important}#view-gate h2{font-size:18px!important}}
 </style>
 <link rel="stylesheet" href="../assets/port79-gate-dialog.css?v=20261110-dialog-colors-v1">
@@ -773,15 +780,18 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
   </section>
 
-  <section id="view-gate" class="hidden space-y-3" aria-label="Gate 進出站櫃量匯入與資料管理">
-    <div class="card flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
-      <div><h2 class="text-xl font-black text-slate-900">🚛 進出站櫃量管理</h2>
-      <p class="text-sm text-slate-500">這裡匯入 Gate Excel、核對每日進出櫃量，並管理月度／年度累計；首頁只顯示統計。</p></div>
-    </div>
-    <iframe id="p79GateImportFrame" title="Gate Excel 匯入與歷史資料管理"
-      class="w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
-      loading="lazy" style="display:block;width:100%;height:800px;min-height:540px;border:1px solid #dbe4ee"
-      data-src="../gate-import/?embed=1&v=20261110-parent-dialog-v6"></iframe>
+  <section id="view-gate" class="hidden space-y-3" aria-label="79碼頭進出站櫃量管理（日／月／年）">
+    <iframe id="p79GateDashboardFrame" title="79碼頭進出站櫃量管理：空重櫃、每日每月每年統計"
+      class="p79-gate-redesign-frame w-full" loading="eager"
+      style="display:block;width:100%;height:900px;min-height:840px;border:0;background:transparent"
+      data-src="../gate-dashboard/?embed=1&v=20261111-official-redesign-v3"></iframe>
+    <details id="p79GateImportDisclosure" class="p79-gate-import-fold">
+      <summary>📥 匯入／更新 Gate Excel <small>展開上傳檔案、逐日核對與儲存到正式資料庫</small></summary>
+      <iframe id="p79GateImportFrame" title="Gate Excel 匯入與歷史資料管理"
+        class="w-full rounded-xl border border-slate-200 bg-white" loading="eager"
+        style="display:block;width:100%;height:800px;min-height:540px;border:1px solid #dbe4ee"
+        data-src="../gate-import/?embed=1&v=20261111-import-fold-v3"></iframe>
+    </details>
   </section>
 
   <section id="view-dashboard" class="space-y-4">
@@ -2325,8 +2335,10 @@ function switchTab(name,btn){if(name==='workload'||name==='ranking'){name='weekl
   tabBtn?.classList.add('active');
   document.body.classList.toggle('p79-gate-management-active',name==='gate');
   if(name==='gate'){
-    const frame=document.getElementById('p79GateImportFrame');
-    if(frame&&!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
+    ['p79GateDashboardFrame','p79GateImportFrame'].forEach(id=>{
+      const frame=document.getElementById(id);
+      if(frame&&!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
+    });
     return;
   }
   renderEfficiencyTabFast(name);
@@ -11480,7 +11492,10 @@ async function handleExcelDrop(e){
     const files=Array.from(e.dataTransfer?.files||[]);
     if(files.length!==1){toast('一次只能匯入一份 Gate Excel／CSV 檔案');return;}
     const frame=document.getElementById('p79GateImportFrame');
+    const importDisclosure=document.getElementById('p79GateImportDisclosure');
+    if(importDisclosure)importDisclosure.open=true;
     if(!frame){toast('Gate 匯入頁尚未載入，請重新開啟進出站櫃量管理');return;}
+    if(!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
     toast('已收到 Gate 檔案，正在讀取與核對…');
     try{
       const importer=frame.contentWindow?.P79GateImport;
@@ -15782,13 +15797,22 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <link rel="stylesheet" href="./vessel-tab-palette.css?v=20261109-v115">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
 <script>
-/* Gate manager stays in the vessel system; responsive iframe height is origin-checked. */
+/* Gate management shows the designed dashboard and keeps the original importer. */
 window.addEventListener('message',function(ev){
- if(ev.origin!==location.origin||ev.data?.type!=='p79-gate-embed-resize')return;
- const frame=document.getElementById('p79GateImportFrame');
+ if(ev.origin!==location.origin)return;
+ if(ev.data?.type==='p79-gate-data-updated'){
+   const updated=document.getElementById('p79GateImportFrame');
+   if(updated&&ev.source===updated.contentWindow)
+     document.getElementById('p79GateDashboardFrame')?.contentWindow?.P79GateDashboard?.refresh?.();
+   return;
+ }
+ const frame=ev.data?.type==='p79-gate-dashboard-resize'
+   ?document.getElementById('p79GateDashboardFrame')
+   :ev.data?.type==='p79-gate-embed-resize'
+   ?document.getElementById('p79GateImportFrame'):null;
  if(!frame||ev.source!==frame.contentWindow)return;
  const h=Number(ev.data.height);
- if(Number.isFinite(h)&&h>=360&&h<=2400)frame.style.height=Math.ceil(h+8)+'px';
+ if(Number.isFinite(h)&&h>=300&&h<=3500)frame.style.height=Math.ceil(h+8)+'px';
 });
 window.addEventListener('load',function(){
  if(new URLSearchParams(location.search).get('tab')==='gate'&&typeof switchTab==='function'){
