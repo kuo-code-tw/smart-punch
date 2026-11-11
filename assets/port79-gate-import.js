@@ -297,6 +297,10 @@ async function save(){
    ' 天。日、週、月、年統計將自動重新加總。','success');
   // Only a confirmed backend success refreshes the official read-only view.
   void g.P79GateLive?.refresh?.(days[days.length-1].date);
+  // Notify the approved dashboard in the parent vessel-system tab after confirmed cloud save.
+  if(g.parent&&g.parent!==g){
+   try{g.parent.postMessage({type:'p79-gate-data-updated'},g.location.origin);}catch(_){}
+  }
   var completedSelection=selectionId;
   g.setTimeout(function(){
    if(selectionId!==completedSelection)return;
