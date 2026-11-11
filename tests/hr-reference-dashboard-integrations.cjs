@@ -34,6 +34,7 @@ test('current staff excludes inactive, leave and effective resignations',()=>{
  assert.equal(M.isWorking({employmentStatus:'leave'},'2026-11-11'),false);
  assert.equal(M.isWorking({employmentStatus:'resigned'},'2026-11-11'),false);
  assert.equal(M.isWorking({employmentStatus:'active'},'2026-11-11'),true);
+ assert.equal(M.isWorking({employmentStatus:'active',startDate:'2026-11-12'},'2026-11-11'),false);
 });
 test('payroll calculation is opt-in and never inserts official pay rates',()=>{
  const c=M.payDraft({base:45000,allowance:3000,overtime:2500.5,deductions:5500});
@@ -62,6 +63,8 @@ const schedules=[
 test('overtime counts verified non-planned reports without double counting',()=>{
  const res=M.officialOvertime(schedules,'2026-11',people);
  assert.equal(res.ready,true);assert.equal(res.hours,2);assert.equal(res.planned,1);
+ const mismatch=[...schedules,{empId:'A01',schedule:{__meta:{'2026-11-11':{overtimeReport:{id:'OT01',declaredHours:6,status:'已申報'}}}}}];
+ assert.equal(M.officialOvertime(mismatch,'2026-11',people).ready,false,'conflicting duplicate report must fail closed');
 });
 test('attendance denominator respects leave and scheduled workday, no name-only match',()=>{
  const rows=[{empId:'A01',type:'上班打卡',timeStr:'2026-11-11 07:56:00'}];
