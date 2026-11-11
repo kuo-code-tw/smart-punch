@@ -673,7 +673,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:640px){#view-gate>div:first-child{padding:12px!important}#view-gate h2{font-size:18px!important}}
 </style>
 <link rel="stylesheet" href="../assets/port79-gate-dialog.css?v=20261110-dialog-colors-v1">
-<link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-optimization-v2">
+<link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-optimization-v3">
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -1843,7 +1843,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <div class="p79d-panel-head">
       <div><h3><span class="p79d-numb">02</span> 完整人員名冊與可調組別</h3><p>四組人員逐一列出，勾選可以參與最佳化的人員；未勾選者維持原組。</p></div>
     </div>
-    <div class="p79d-group-hint">ⓘ 預設四組都可以參與：你能勾選任意有可靠效率資料的人員，也可將整組設為保留；全部在職人員都會列在下方。未勾選、資料不足與保留組的人不會被自動調動。</div>
+    <div class="p79d-group-hint">ⓘ 預設四組都可以參與：四組全部在職人員都能自由勾選；有有效作業資料的人可參與自動效率最佳化，資料不足者仍可勾選但不會被當作有可靠效率數據的人自動調動。也可將整組設為保留。</div>
     <div id="dispatchGroupSettings"></div>
     <div class="p79d-roster-toolbar"><h4>四組全部在職人員（自由挑選）</h4><p id="dispatchRosterSelection" role="status">載入人員名冊後可逐人勾選。</p></div>
     <div id="dispatchGroupRoster" class="p79d-roster-grid" aria-label="四組全部在職人員勾選名單"></div>
