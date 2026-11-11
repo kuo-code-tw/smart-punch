@@ -43,6 +43,15 @@ function monthWindow(date){
  return {start:month+'-01',end:new Date(Date.UTC(year,m,0)).toISOString().slice(0,10)};
 }
 function windowDefault(){return monthWindow(taipeiDate(Date.now()));}
+// Table and CSV show only days with verifiable activity in the selected terminal,
+// newest first. No entries does NOT prove the terminal was idle.
+function visibleWorkingDays(report,port='all',asOf=taipeiDate(Date.now())){
+ if(!dateOk(asOf))throw Error('目前日期不正確');
+ return (Array.isArray(report?.days)?report.days:[])
+  .filter(row=>row.date<=asOf&&(port==='79'?row.n79:port==='80'?row.n80:row.total)>0)
+  .map(row=>({...row,visible:port==='79'?row.n79:port==='80'?row.n80:row.total}))
+  .sort((a,b)=>b.date.localeCompare(a.date));
+}
 function chart(rows,port){
  const list=rows.slice(-31),w=640,h=280,l=38,r=13,t=24,b=44,iw=w-l-r,ih=h-t-b;
  if(!list.length)return '<div class="p79-daily-empty">沒有可繪製的日期</div>';
@@ -137,7 +146,7 @@ function mount(){
   <section class="p79-daily-panel"><h3>▥　每日動到桿數趨勢</h3><div class="p79-daily-legend"><span><i class="navy"></i>79 碼頭</span><span><i class="sky"></i>80 碼頭</span><span><i class="yellow"></i>合計</span></div><div class="p79-daily-chart" id="dailyAqcChart"></div></section>
  </div>
  <section class="p79-daily-panel p79-daily-roster"><h3>♜　期間內動到的桿號總覽（去重）</h3><div class="p79-daily-roster-row"><b>79 碼頭</b><span id="dailyAqc79Summary"></span><div id="dailyAqc79Units"></div></div><div class="p79-daily-roster-row"><b>80 碼頭</b><span id="dailyAqc80Summary"></span><div id="dailyAqc80Units"></div></div></section>
- <p class="p79-daily-note">統計口徑：每日依 WORKING SHEET／WORKING REPORT 有 AQC 編號及起訖時間的作業區間，按實體吊桿去重；同桿多班、多船只計一次。跨午夜作業計入實際涵蓋日期。人工只填「幾桿」而沒有 AQC 編號，不推定是哪一桿；未載入資料的日期不能視為確定停工。</p>`;
+ <p class="p79-daily-note">統計口徑：每日依 WORKING SHEET／WORKING REPORT 有 AQC 編號及起訖時間的作業區間，按實體吊桿去重；同桿多班、多船只計一次。跨午夜作業計入實際涵蓋日期。明細與匯出只列出截至今天有可驗證作業的日期，新到舊排序；未顯示日期不代表已確認停工。</p>`;
  root.insertBefore(area,old);
  const legacy=document.createElement('details');legacy.id='p79DailyLegacy';legacy.className='p79-daily-legacy';
  const summary=document.createElement('summary');summary.textContent='進階來源核對／原同時多桿作業及人工修正';legacy.appendChild(summary);
@@ -158,21 +167,23 @@ function render(){
  const start=$('dailyAqcStart').value,end=$('dailyAqcEnd').value,port=$('dailyAqcPort').value;
  try{
   latest=calculate(currentSource(),start,end);
-  const display=latest.days.map(row=>({...row,visible:port==='79'?row.n79:port==='80'?row.n80:row.total}));
-  const distinct79=port==='80'?[]:latest.distinct79,distinct80=port==='79'?[]:latest.distinct80;
-  $('dailyAqcDays').textContent=fmt(display.filter(row=>row.visible>0).length);
+  const display=visibleWorkingDays(latest,port);
+  const distinct79=port==='80'?[]:[...new Set(display.flatMap(row=>row.p79))].sort();
+  const distinct80=port==='79'?[]:[...new Set(display.flatMap(row=>row.p80))].sort();
+  $('dailyAqcDays').textContent=fmt(display.length);
   $('dailyAqcTotal').textContent=fmt(distinct79.length+distinct80.length);
   $('dailyAqc79').textContent=port==='80'?'—':fmt(distinct79.length);
   $('dailyAqc80').textContent=port==='79'?'—':fmt(distinct80.length);
   const zero=row=>row?'': '<span class="p79-daily-unverified">— 尚無可驗證紀錄</span>';
-  $('dailyAqcRows').innerHTML=display.map(row=>'<tr><td>'+esc(row.date)+'</td><td>'+(port==='80'?'—':row.n79?'<b>'+row.n79+' 桿</b><small>（'+esc(row.p79.join('、'))+'）</small>':zero(false))+'</td><td>'+(port==='79'?'—':row.n80?'<b>'+row.n80+' 桿</b><small>（'+esc(row.p80.join('、'))+'）</small>':zero(false))+'</td><td class="total">'+(row.visible?row.visible+' 桿':'—')+'</td></tr>').join('');
-  $('dailyAqcChart').innerHTML=chart(latest.days,port);
+  $('dailyAqcRows').innerHTML=display.map(row=>'<tr><td>'+esc(row.date)+'</td><td>'+(port==='80'?'—':row.n79?'<b>'+row.n79+' 桿</b><small>（'+esc(row.p79.join('、'))+'）</small>':zero(false))+'</td><td>'+(port==='79'?'—':row.n80?'<b>'+row.n80+' 桿</b><small>（'+esc(row.p80.join('、'))+'）</small>':zero(false))+'</td><td class="total">'+row.visible+' 桿</td></tr>').join('')||'<tr><td colspan="4" class="p79-daily-unverified" style="padding:22px;text-align:center">此篩選期間尚無可驗證的 AQC 作業日期</td></tr>';
+  // Trend charts keep conventional old-to-new chronology; the list is newest-to-oldest.
+  $('dailyAqcChart').innerHTML=chart(display.slice().reverse(),port);
   for(const p of ['79','80']){
    const arr=p==='79'?distinct79:distinct80;
    $('dailyAqc'+p+'Summary').textContent=arr.length+' 支';
    $('dailyAqc'+p+'Units').innerHTML=arr.length?arr.map(n=>'<span class="p79-daily-unit">'+esc(n)+'</span>').join(''):'<span class="p79-daily-unverified">目前沒有足夠來源確認桿號</span>';
   }
-  $('dailyAqcStatus').textContent='資料口徑：有明確桿號與作業時間的來源區間；已辨識 '+fmt(latest.intervalCount)+' 段。無紀錄的日期顯示「—」，不推定為 0 支。';
+  $('dailyAqcStatus').textContent='已顯示 '+fmt(display.length)+' 個有作業日期（最新日期在上）；尚未到來及沒有可驗證 AQC 紀錄的日期不列出。未列出不代表已確認停工。';
   $('dailyAqcStatus').className='p79-daily-status';
  }catch(err){latest=null;$('dailyAqcStatus').textContent=err.message;$('dailyAqcStatus').className='p79-daily-status error';}
 }
@@ -180,9 +191,9 @@ function exportCsv(){
  if(!canExport()){$('dailyAqcStatus').textContent='目前帳號沒有匯出權限';return;}
  if(!latest){render();if(!latest)return;}
  const port=$('dailyAqcPort').value;
- const values=[['日期','79碼頭動用桿數','79碼頭AQC桿號','80碼頭動用桿數','80碼頭AQC桿號','全碼頭合計（當日去重）'],...latest.days.map(d=>[d.date,port==='80'?'':d.n79||'',port==='80'?'':d.p79.join('、'),port==='79'?'':d.n80||'',port==='79'?'':d.p80.join('、'),(port==='79'?d.n79:port==='80'?d.n80:d.total)||''])];
+ const values=[['日期','79碼頭動用桿數','79碼頭AQC桿號','80碼頭動用桿數','80碼頭AQC桿號','全碼頭合計（當日去重）'],...visibleWorkingDays(latest,port).map(d=>[d.date,port==='80'?'':d.n79||'',port==='80'?'':d.p79.join('、'),port==='79'?'':d.n80||'',port==='79'?'':d.p80.join('、'),d.visible])];
  const csv='\uFEFF'+values.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='AQC每日動用桿數_'+$('dailyAqcStart').value+'_'+$('dailyAqcEnd').value+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-g.P79AqcDaily={calculate,unitOf,monthWindow,mount,render};
+g.P79AqcDaily={calculate,unitOf,monthWindow,visibleWorkingDays,mount,render};
 })(window);
