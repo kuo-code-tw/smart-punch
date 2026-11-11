@@ -5,7 +5,7 @@ const terminal=fs.readFileSync('aqc-efficiency/terminal-ops.js','utf8');
 const rods=fs.readFileSync('aqc-efficiency/terminal-rod-overview.js','utf8');
 const css=fs.readFileSync('aqc-efficiency/terminal-rod-overview.css','utf8');
 assert(html.includes('id="terminalRodOverviewMount"'),'overview anchor in live tab');
-assert(html.includes('terminal-rod-overview.js?v=20261111-hc-bundle-v1'),'versioned JS loaded');
+assert(html.includes('terminal-rod-overview.js?v=20261111-hc-bundle-v2'),'versioned JS loaded');
 assert(html.includes('terminal-rod-overview.css?v=20261111-hc-bundle-v1'),'versioned CSS loaded');
 assert(css.includes('gap:16px;align-items:stretch}'),'desktop berth card grid stretches both cards equally');
 assert(css.includes('.p79-rod-card{display:flex;flex-direction:column;'),'both cards are vertical flex containers');
