@@ -89,7 +89,7 @@ function officialOvertime(scheduleRows,month,staffIds){
     continue;
    }
    seen.set(recordId,fingerprint);
-   if(r.planned===true){planned++;continue}
+   if(r.planned===true||/預排|待排|尚未申報/.test(norm(r.status))){planned++;continue}
    const value=Number(r.declaredHours??r.rule?.declaredHours);
    if(!Number.isFinite(value)||value<0||value>24){issues.push(recordId+' 時數待核');continue}
    hours+=value;count++;
@@ -119,7 +119,21 @@ function attendanceRate({records=[],schedules=[],leaveRecords=[],employees=[],da
   if(norm(r.status)!=='已核准'||r.deleted||r.cancelled||r.canceled||r.revoked||r.deletedAt||r.cancelledAt||r.canceledAt)continue;
   const start=date(r.startDate||r.startTime),end=date(r.endDate||r.endTime)||start;
   if(!start||!end){return{ready:false,reason:'核准請假日期待核'}}
-  if(start<=day&&day<=end)approved.add(id(r.empId||r.employeeId));
+  if(start<=day&&day<=end){
+   let taken;
+   const daily=r.approvedDailyDays||r.dailyDays;
+   if(daily&&typeof daily==='object'&&!Array.isArray(daily)){
+    taken=Number(daily[day]??0);
+    if(!Number.isFinite(taken)||taken<0||taken>1)return{ready:false,reason:'每日核准請假時數不完整'};
+   }else{
+    const days=(Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000+1;
+    const total=Number(r.approvedDays??r.days??r.dayCount);
+    if(!Number.isFinite(total)||total<=0||total>days)return{ready:false,reason:'核准請假天數尚未確認'};
+    if(days>1&&total!==days)return{ready:false,reason:'跨日半日請假缺少每日明細'};
+    taken=total/days;
+   }
+   if(taken===1)approved.add(id(r.empId||r.employeeId));
+  }
  }
  const expected=new Set();
  for(const e of active){
