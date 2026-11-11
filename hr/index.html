@@ -184,6 +184,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 @media(max-width:480px){#editor .grid{grid-template-columns:1fr}}
 </style>
 <script defer src="../assets/port79-session-timeout.js?v=20261111-hr-idle-dialog-v3"></script>
+<link rel="stylesheet" href="./port79-hr-reference-dashboard.css?v=20261111-reference-v1">
 </head>
 <!-- v2026.09.28.8.1：人員異動紀錄可安全清除＋GAS 舊網址自動回退；保留目前人員主檔與既有修正結果。 -->
 <body data-p79-system="hr">
@@ -1149,6 +1150,7 @@ function render(){
   $('stAdmins').textContent=employees.filter(e=>['admin','superadmin'].includes(String(e.adminRole))).length;
   $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>e.dept).filter(Boolean)).size;
   $('stHrManagers').textContent=ps.filter(p=>p.hr==='manage').length;
+  try{window.p79HrDashRender?.()}catch(e){console.warn('人資儀表板刷新失敗',e)}
 }
 function p79ToggleJobScopes(k){const el=document.getElementById('scope_jobs_'+k);if(el)el.style.display=document.getElementById('scope_'+k)?.value==='assigned'?'flex':'none';}
 function p79UpdateOvertimeManagementDisplay(){
@@ -1623,6 +1625,7 @@ window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.a
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261111-hr-menu-v2"></script>
+<script src="./port79-hr-reference-dashboard.js?v=20261111-reference-v1"></script>
 </body></html>
 
 
