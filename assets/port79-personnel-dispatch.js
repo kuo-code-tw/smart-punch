@@ -103,6 +103,18 @@ function render(){
  renderOperationScheduleStatus(rows.length?rows:[{workDate:month()+'-01'}]);
  const total=latest.filter(p=>p.eff!==0).reduce((s,p)=>({containers:s.containers+p.containers,hours:s.hours+p.hours,invalid:s.invalid+p.invalid}),{containers:0,hours:0,invalid:0});
  el('dispatchSummary').textContent=`${month()}｜${latest.length} 人｜作業量 ${fmt(total.containers)} 櫃｜作業時數 ${fmt(total.hours)} 小時｜月均效率 ${fmt(total.hours>0&&!total.invalid?total.containers/total.hours:null)} 櫃／小時${total.invalid?'｜'+total.invalid+' 筆作業資料待核對':''}｜已排除 ${latest.reduce((n,p)=>n+(p.zeroRecords||0),0)} 筆零效率作業（時數不計入平均）`;
+ // 版面專用統計；只呈現既有資料，不變更計算或調任規則。
+ const kpiValues={
+  dispatchKpiPeople:String(latest.length),
+  dispatchKpiContainers:fmt(total.containers),
+  dispatchKpiHours:fmt(total.hours),
+  dispatchKpiEff:fmt(total.hours>0&&!total.invalid?total.containers/total.hours:null),
+  dispatchKpiIssues:fmt(latest.reduce((sum,p)=>sum+(p.invalid||0),0))
+ };
+ Object.entries(kpiValues).forEach(([id,value])=>{const target=el(id);if(target)target.textContent=value;});
+ const readyPill=el('dispatchReadyPill');
+ if(readyPill){readyPill.dataset.ready=ready?'true':'false';readyPill.textContent=ready?'資料已確認':state==='loading'?'整月讀取中':state==='partial'?'部分資料未完成':state==='error'?'資料讀取失敗':'資料待確認';}
+
  const policy=movementPolicy(latest,settings);
  for(const key of Object.keys(plan))if(!policy.movable.has(key)||policy.locked.has(plan[key]))delete plan[key];
  const search=normalizePersonName(el('dispatchName').value),sort=el('dispatchSort').value;
@@ -136,6 +148,21 @@ function renderRecommendation(rows){
 function renderScenario(){
  const policy=movementPolicy(latest,settings),allowedPlan=Object.fromEntries(Object.entries(plan).filter(([key,target])=>policy.movable.has(key)&&!policy.locked.has(target)));
  const before=summarize(latest),after=summarize(latest,ready?allowedPlan:{}),moves=latest.filter(p=>policy.movable.has(p.key)&&allowedPlan[p.key]&&allowedPlan[p.key]!==p.group);
+ const chart=el('dispatchGroupVisual');
+ if(chart){
+  const max=Math.max(1,...before.groups.flatMap((g,i)=>[g.eff||0,after.groups[i].eff||0]));
+  const percent=value=>Math.max(0,Math.min(100,Math.round((value||0)/max*100)));
+  chart.innerHTML=before.groups.map((g,i)=>{
+   const next=after.groups[i];
+   return `<div class="p79d-bar-card" data-group="${g.group}">
+      <div class="p79d-bar-head"><span>${g.group} 組</span><strong>${fmt(g.eff)} → ${fmt(next.eff)}</strong></div>
+      <div class="p79d-bar-rail" title="原始效率"><div class="p79d-bar-fill" style="width:${percent(g.eff)}%;opacity:.38"></div></div>
+      <div class="p79d-bar-rail" style="margin-top:5px" title="試算效率"><div class="p79d-bar-fill" style="width:${percent(next.eff)}%"></div></div>
+      <div class="p79d-bar-foot">上：原始　下：試算｜櫃／小時</div>
+    </div>`;
+  }).join('');
+ }
+
  el('dispatchGroupBody').innerHTML=before.groups.map((g,i)=>{const next=after.groups[i];return `<tr><td class="font-bold">${g.group}組</td><td>${g.people} → ${next.people}</td><td>${fmt(g.containers)} → ${fmt(next.containers)}</td><td>${fmt(g.hours)} → ${fmt(next.hours)}</td><td>${fmt(g.eff)} → ${fmt(next.eff)}</td></tr>`;}).join('');
  el('dispatchScenarioState').textContent=!ready?'完成整月資料與排班名冊讀取後，才可選擇調動人員試算。':`已選 ${moves.length} 人｜四組效率差距 ${fmt(before.gap)} → ${fmt(after.gap)} 櫃／小時。${before.excluded?'另有 '+before.excluded+' 人因身分或組別未確認，未納入各組比較。':''}`;
  el('dispatchMoves').textContent=ready&&moves.length?moves.map(p=>`${p.name}：${p.group}組 → ${plan[p.key]}組（${fmt(p.containers)} 櫃／${fmt(p.hours)} 小時）`).join('；'):'尚未選擇調動人員。';
