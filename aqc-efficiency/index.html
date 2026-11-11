@@ -819,7 +819,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 
     <div id="vesselSummaryCard" class="card p-4 hidden">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div><div class="text-xs text-slate-500">本次匯入船舶</div><div id="vsVessel" class="text-xl font-black">—</div></div>
+        <div><div class="text-xs text-slate-500">最新匯入船舶</div><div id="vsVessel" class="text-xl font-black">—</div><div id="vsImportMeta" class="text-xs text-slate-500" role="status" aria-live="polite"></div></div>
         <div id="vsWharf" class="pill bg-slate-100 text-slate-700">—</div>
       </div>
       <div class="grid grid-cols-2 lg:grid-cols-10 gap-3 text-center">
@@ -8657,8 +8657,38 @@ function shipMasterToSummary(s){
     wharf:s.wharf||'',totalContainers:num(s.totalContainers),hatches:num(s.hatches),
     totalMoves:num(s.totalMoves),bundleDeduct:num(s.bundleDeduct),bundlePresent:!!s.bundlePresent,
     shiftMoves:num(s.shiftMoves),aqcs:s.aqcs||[],
-    gph:num(s.gph),gphHC:num(s.gphHC),vph:num(s.vph),vphHC:num(s.vphHC)
+    gph:num(s.gph),gphHC:num(s.gphHC),vph:num(s.vph),vphHC:num(s.vphHC),
+    workingSheetImportedAt:String(s.workingSheetImportedAt||s.workingSheetSource?.importedAt||''),
+    sourceFileName:String(s.sourceFileName||s.workingSheetSource?.sourceFileName||'')
   };
+}
+function vesselSummaryImportTime(s){
+  const value=String(s?.workingSheetImportedAt||s?.workingSheetSource?.importedAt||'').trim();
+  const stamp=Date.parse(value);
+  // 排除遺失、錯誤與時間戳級的主檔欄位；只使用有效 ISO 匯入時間。
+  return Number.isFinite(stamp)&&stamp>0&&/^20\d{2}-\d{2}-\d{2}T/.test(value)?stamp:0;
+}
+function latestVesselMasterForSummary(items){
+  const valid=(Array.isArray(items)?items:[]).filter(x=>x&&String(x.workingNo||'').trim());
+  if(!valid.length)return null;
+  // 「最新匯入」依來源的真實匯入時間判斷；歷史資料若沒有時間，才用主序號／CALL 子序號。
+  // 絕不可把 5260196-CALL2 去符號變成 52601962，錯認為大於 5260218。
+  return valid.slice().sort((a,b)=>{
+    const at=vesselSummaryImportTime(a),bt=vesselSummaryImportTime(b);
+    if(at!==bt)return bt-at;
+    return compareWorkingNoDesc(a,b);
+  })[0];
+}
+function updateLatestVesselSummaryFromMasters(){
+  const latest=latestVesselMasterForSummary(shipMasters||[]);
+  if(!latest)return lastVesselSummary;
+  const summary=shipMasterToSummary(latest);
+  const old=lastVesselSummary;
+  lastVesselSummary=summary;
+  if(!old||String(old.workingNo||'')!==String(summary.workingNo||'')||String(old.workingSheetImportedAt||'')!==String(summary.workingSheetImportedAt||'')){
+    p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(summary));
+  }
+  return summary;
 }
 // 2026-09-24：gcSyncAll 是整批覆寫，若本機只有一艘船就會把雲端舊船全部洗掉。
 // 除了明確刪除操作外，所有 gcSyncAll 都先把最新雲端資料合併回本機，再送整批同步。
@@ -9350,15 +9380,8 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
       console.warn('船舶篩選重設失敗',filterErr);
     }
 
-    // 最新船舶摘要也重新建立，不再只剩一張「本次匯入」卡片。
-    if(shipMasters.length){
-      lastVesselSummary=shipMasterToSummary(
-        [...shipMasters].sort(compareWorkingNoDesc)[0]
-      )||lastVesselSummary;
-      if(lastVesselSummary){
-        p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
-      }
-    }
+    // 雲端資料合併後依匯入時間重新選最新；不能用舊的 WORKING NO. 排序覆蓋新匯入。
+    updateLatestVesselSummaryFromMasters();
 
     invalidateWorkloadIndex();
     renderVesselSummary();
@@ -11038,10 +11061,18 @@ function parseWorkingReportProductivity(book,summary){
   };
 }
 function renderVesselSummary(v){
-  lastVesselSummary=v||lastVesselSummary;
+  // 明確的新匯入立即顯示；一般重繪與背景雲端拉取則重新確認主檔最新匯入時間。
+  if(v)lastVesselSummary=v;
+  else updateLatestVesselSummaryFromMasters();
   const card=document.getElementById('vesselSummaryCard');if(!card)return;
   if(!lastVesselSummary){card.classList.add('hidden');return}
   card.classList.remove('hidden');const x=lastVesselSummary;
+  const meta=document.getElementById('vsImportMeta');
+  if(meta){
+    const timestamp=vesselSummaryImportTime(x);
+    const when=timestamp?new Date(timestamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'匯入時間待核對';
+    meta.textContent='主檔匯入時間：'+when;
+  }
   document.getElementById('vsVessel').textContent=x.vessel||'—';
   const wn=document.getElementById('vsWorkingNo');if(wn)wn.textContent=x.workingNo||'—';
   document.getElementById('vsVoyage').textContent=[x.voyageI,x.voyageE].filter(Boolean).join(' / ')||'—';
@@ -12056,14 +12087,15 @@ async function importExcel(file) {
     shipMasters.push(master);
     shipMasters=canonicalShipMasters(shipMasters);
     [...new Set(imported.map(r=>r.name))].forEach(name=>{const p=people().find(x=>samePersonName(x.name,name)),id=p?.empId||`NAME:${name}`;if(!assignments.some(a=>a.empId===id))assignments.push({empId:id,name,groupId:p?personGroupId(p):''})});
-    lastVesselSummary=summary;p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(summary));
+    lastVesselSummary={...summary,workingSheetImportedAt,sourceFileName:String(file?.name||'')};
+    p79EfficiencyWriteOptional('ship_stats_last_vessel_summary',JSON.stringify(lastVesselSummary));
     setExcelImportStage('寫入本機資料',78);
     saveLocal();
     p79EfficiencyWriteOptional('gc_last_full_working_report_backup',JSON.stringify({
       at:Date.now(),workingNo:summary.workingNo,vessel:summary.vessel,records:imported,master
     }));
     // 批次匯入期間先不重算整份月報，全部檔案完成後統一重算一次。
-    renderVesselSummary(summary);
+    renderVesselSummary(lastVesselSummary);
     toast(`已匯入 ${summary.vessel||'船舶'}：${imported.length} 筆 AQC 作業明細`);
     // 匯入佇列中還有檔案時，只先寫本機，不要每一份都重送整包雲端資料。
     // 最後由 importExcelFiles() 統一同步一次，速度會快很多。
@@ -15237,14 +15269,8 @@ async function initGcPage(){
   const startupMonth=document.getElementById('filterMonth');
   if(startupMonth){startupMonth.dataset.p79MonthInitialized='0';startupMonth.value='';}
   try{lastVesselSummary=JSON.parse(localStorage.getItem('ship_stats_last_vessel_summary')||'null')}catch{}
-  if(shipMasters.length){
-    lastVesselSummary=shipMasterToSummary(
-      [...shipMasters].sort((a,b)=>
-        (Number(String(b.workingNo||'').replace(/\D/g,''))||0)-
-        (Number(String(a.workingNo||'').replace(/\D/g,''))||0)
-      )[0]
-    )||lastVesselSummary;
-  }
+  // 啟動時也必須走同一套匯入時間／CALL 子序號的正確排序。
+  updateLatestVesselSummaryFromMasters();
   renderVesselSummary();
   const psm=document.getElementById('personStatMonth');
   if(psm)psm.value=document.getElementById('filterMonth')?.value||'';
