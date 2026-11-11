@@ -11495,7 +11495,6 @@ async function handleExcelDrop(e){
     const importDisclosure=document.getElementById('p79GateImportDisclosure');
     if(importDisclosure)importDisclosure.open=true;
     if(!frame){toast('Gate 匯入頁尚未載入，請重新開啟進出站櫃量管理');return;}
-    if(!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
     toast('已收到 Gate 檔案，正在讀取與核對…');
     try{
       const importer=frame.contentWindow?.P79GateImport;
