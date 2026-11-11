@@ -1343,19 +1343,6 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
  #view-terminal .p79-ter-columns{grid-template-columns:1fr}
 }
 </style>
-<style id="p79-terminal-collapsible-20261111">
-#view-terminal .p79-ter-fold{border:1px solid #d6e4f6;border-radius:14px;background:#fff;overflow:hidden;margin:12px 0}
-#view-terminal .p79-ter-fold-head{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:14px 16px!important;margin:0!important;background:linear-gradient(105deg,#e7f3ff,#fff);font-weight:850;color:#103d73}
-#view-terminal .p79-ter-fold-head::-webkit-details-marker{display:none}
-#view-terminal .p79-ter-fold-head::marker{content:''}
-#view-terminal .p79-ter-fold-head:focus-visible{outline:3px solid #3c91f4;outline-offset:-3px}
-#view-terminal .p79-ter-fold-hint{font-size:12px;color:#1a70b9;white-space:nowrap}
-#view-terminal .p79-ter-fold-hint::before{content:'點擊展開 ▾'}
-#view-terminal .p79-ter-fold[open] .p79-ter-fold-hint::before{content:'點擊收合 ▴'}
-#view-terminal .p79-ter-fold[open]>.p79-ter-fold-head{border-bottom:1px solid #d6e4f6}
-#view-terminal .p79-ter-fold>#terminalRodOverviewMount{padding:12px}
-@media(max-width:580px){#view-terminal .p79-ter-fold-head{padding:12px!important;font-size:14px}#view-terminal .p79-ter-fold>#terminalRodOverviewMount{padding:8px}}
-</style>
 <section id="view-terminal" class="hidden space-y-4" aria-label="碼頭營運統計">
  <div id="terminalDashboardRoot" class="p79-ter-board">
   <div class="p79-ter-head">
@@ -1377,10 +1364,8 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     </div>
     <p class="p79-ter-notice">卸／裝為 WORKING SHEET 原始量；作業量與總 Moves 按正式主檔欄位，受 Bundle、SHIFT 等口徑影響，不強制假設「卸＋裝＝作業量」。</p>
   </div>
-  <details id="terminalRodOverviewFold" class="p79-ter-fold">
-   <summary class="p79-ref-section p79-ter-fold-head">☷ 作業一覽（吊桿別）<span class="p79-ter-fold-hint" aria-hidden="true"></span></summary>
-   <div id="terminalRodOverviewMount" aria-label="79與80碼頭作業一覽"></div>
-  </details>
+  <h3 class="p79-ref-section">☷ 作業一覽（吊桿別）</h3>
+  <div id="terminalRodOverviewMount" aria-label="79與80碼頭作業一覽"></div>
   <div id="terminalReconciliationMount" role="note" aria-live="polite" aria-label="資料來源差異自動核對"></div>
   <div class="p79-ter-columns">
     <div class="p79-ter-box">
@@ -15895,9 +15880,9 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 #view-multi-rod #multiRodToolbar input,
 #view-multi-rod #multiRodToolbar select{height:32px!important;font-size:12px!important}
 </style>
-<link rel="stylesheet" href="./terminal-rod-overview.css?v=20261111-shift-separate-v1">
-<script src="./terminal-ops.js?v=20261111-audit-v3"></script>
-<script src="./terminal-rod-overview.js?v=20261111-shift-separate-v1"></script>
+<link rel="stylesheet" href="./terminal-rod-overview.css?v=20261111-hc-bundle-v1">
+<script src="./terminal-ops.js?v=20261111-bundle-by-vessel-hc-v1"></script>
+<script src="./terminal-rod-overview.js?v=20261111-hc-bundle-v1"></script>
 <link rel="stylesheet" href="./terminal-reference-layout.css?v=20261110-reference-v1">
 <link rel="stylesheet" href="./terminal-stop-redesign.css?v=20261110-stop-v1">
 <script src="./terminal-reference-layout.js?v=20261110-reference-v1"></script>
