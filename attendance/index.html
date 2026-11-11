@@ -2080,22 +2080,15 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                 <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-3" id="p79AddJobEmployeeRow">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 選擇部門</label>
-                    <select id="addModalDeptSelect" onchange="onAddModalDeptChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold">
-                    </select>
+                    <label for="addModalJobSelect" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 選擇職稱</label>
+                    <select id="addModalJobSelect" onchange="p79AddModalJobChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 選擇員工姓名</label>
-                    <select id="addModalEmpSelect" onchange="p79AddModalEmployeeChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold">
-                    </select>
+                    <label for="addModalEmpSelect" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 選擇員工姓名</label>
+                    <select id="addModalEmpSelect" onchange="p79AddModalEmployeeChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
                 </div>
-            </div>
-
-            <div class="mt-2">
-                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 選擇職稱</label>
-                <select id="addModalJobSelect" onchange="p79AddModalJobChanged()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold"></select>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -12892,12 +12885,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 liveDeptFilter.value = liveDepts.includes(currentVal) ? currentVal : 'ALL';
             }
 
-            const addModalDeptSelect = document.getElementById('addModalDeptSelect');
-            if (addModalDeptSelect) {
-                const modalDepts = [...new Set(attendanceEmployees.map(e => e.dept || '一般'))];
-                addModalDeptSelect.innerHTML = modalDepts.map(d => `<option value="${d}">${d}</option>`).join('');
-                onAddModalDeptChange();
-            }
+            // 新增補打卡視窗有獨立的職稱／姓名狀態。
+            // 背景重新整理考勤／人資資料時，禁止重設使用者已選的職稱與姓名。
 
             const today = new Date();
             const currentYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -17389,15 +17378,13 @@ function getManualPairRecordAnchor(record) {
         function p79AddJob(e){return String(e?.jobTitle||e?.deptDetail||'').trim()||'未設定職稱';}
         function p79AddEmployeesSorted(list){return list.slice().sort((a,b)=>p79AddStrokeSorter.compare(String(a?.name||''),String(b?.name||''))||String(a?.empId||'').localeCompare(String(b?.empId||'')));}
         function p79AddRefreshEmployeeOptions(preferred=''){
-            const dept=document.getElementById('addModalDeptSelect')?.value||'';
             const job=document.getElementById('addModalJobSelect')?.value||'';
             const select=document.getElementById('addModalEmpSelect');if(!select)return;
             const previous=preferred||select.value;
-            const employees=getAdminAttendanceEmployees();
-            const list=p79AddEmployeesSorted(employees.filter(e=>String(e?.dept||'一般')===dept&&(!job||p79AddJob(e)===job)));
-            // 同列補卡的原始員工不能因部門別名／職稱欄位不同而從選單消失。
+            const list=p79AddEmployeesSorted(getAdminAttendanceEmployees().filter(e=>!job||p79AddJob(e)===job));
+            // 從指定考勤列開啟時，原員工身份要保留；職稱與主檔不一致亦不得誤換員工。
             const locked=String(document.getElementById('addRecordModal')?.dataset?.p79LockedEmployeeKey||'');
-            const required=preferred||locked;
+            const required=locked||preferred;
             const selectedEmployee=required?findAttendanceEmployeeByOptionValue(required):null;
             if(selectedEmployee&&!list.some(e=>attendanceEmployeeOptionValue(e)===required))list.unshift(selectedEmployee);
             select.innerHTML=list.map(e=>{const id=attendanceEmployeeOptionValue(e);return id?'<option value="'+escapeHtml(id)+'">'+escapeHtml(attendanceEmployeeDisplayLabel(e))+'</option>':'';}).join('');
@@ -17405,12 +17392,12 @@ function getManualPairRecordAnchor(record) {
             else if(previous&&list.some(e=>attendanceEmployeeOptionValue(e)===previous))select.value=previous;
         }
         function p79AddRefreshJobs(preferred=''){
-            const dept=document.getElementById('addModalDeptSelect')?.value||'';
             const select=document.getElementById('addModalJobSelect');if(!select)return;
-            const current=preferred||select.value;
-            const jobs=[...new Set(getAdminAttendanceEmployees().filter(e=>String(e?.dept||'一般')===dept).map(p79AddJob))].sort(p79AddStrokeSorter.compare);
+            const selected=preferred||select.value;
+            // 不再受部門限制；由全部可操作員工統一建立職稱清單。
+            const jobs=[...new Set(getAdminAttendanceEmployees().map(p79AddJob))].sort(p79AddStrokeSorter.compare);
             select.innerHTML='<option value="">全部職稱</option>'+jobs.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
-            if(jobs.includes(current))select.value=current;
+            if(jobs.includes(selected))select.value=selected;
         }
         function p79AddModalJobChanged(){p79AddRefreshEmployeeOptions();p79AddModalEmployeeChanged();}
         function p79AddModalEmployeeChanged(){
@@ -17423,12 +17410,7 @@ function getManualPairRecordAnchor(record) {
             }
         }
         function initAddModalDropdownsFast(preferredEmployee=null){
-            const select=document.getElementById('addModalDeptSelect');if(!select)return;
-            const list=getAdminAttendanceEmployees();
-            const depts=[...new Set(list.map(e=>String(e?.dept||'一般').trim()||'一般'))].sort(p79AddStrokeSorter.compare);
-            const desired=String(preferredEmployee?.dept||select.value||depts[0]||'一般');
-            select.innerHTML=depts.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
-            if(depts.includes(desired))select.value=desired;
+            // 獨立初始化：不建立部門選單，也不觸發整頁 initDropdowns()。
             p79AddRefreshJobs(preferredEmployee?p79AddJob(preferredEmployee):'');
             p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(preferredEmployee));
         }
@@ -17627,11 +17609,7 @@ function getManualPairRecordAnchor(record) {
 
             // 補卡視窗只更新自己需要的兩個下拉，不再重跑整頁 initDropdowns()。
             initAddModalDropdownsFast(emp);
-            const deptSelect = document.getElementById('addModalDeptSelect');
             const empSelect = document.getElementById('addModalEmpSelect');
-            if (deptSelect) deptSelect.value = emp.dept || deptSelect.value || '一般';
-            p79AddRefreshJobs(p79AddJob(emp));
-            p79AddRefreshEmployeeOptions(attendanceEmployeeOptionValue(emp));
             if (empSelect) {
                 empSelect.value = attendanceEmployeeOptionValue(emp);
                 if(empSelect.value!==attendanceEmployeeOptionValue(emp)){
