@@ -673,7 +673,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:640px){#view-gate>div:first-child{padding:12px!important}#view-gate h2{font-size:18px!important}}
 </style>
 <link rel="stylesheet" href="../assets/port79-gate-dialog.css?v=20261110-dialog-colors-v1">
-<link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-optimization-v3">
+<link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-auto-balance-v4">
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -1810,7 +1810,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <div class="p79d-step"><b>01</b><span>讀取當月資料</span></div>
       <div class="p79d-step"><b>02</b><span>勾選完整名冊</span></div>
       <div class="p79d-step"><b>03</b><span>計算最佳化編組</span></div>
-      <div class="p79d-step"><b>04</b><span>確認試算結果</span></div>
+      <div class="p79d-step"><b>04</b><span>查看自動編組結果</span></div>
     </div>
   </div>
 
@@ -1847,14 +1847,14 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <div class="p79d-roster-toolbar"><h4>四組全部在職人員（自由挑選）</h4><p id="dispatchRosterSelection" role="status">載入人員名冊後可逐人勾選。</p></div>
     <div id="dispatchGroupRoster" class="p79d-roster-grid" aria-label="四組全部在職人員勾選名單"></div>
     <div id="dispatchUnassigned"></div>
-    <div class="p79d-command"><button id="dispatchGenerateButton" type="button" class="btn p79d-primary" onclick="P79PersonnelDispatch.generateRecommendation()">計算效率最佳化編組</button><span>僅針對已勾選人員，維持四組總人數不變；比較四組櫃／小時效率差距。</span></div>
+    <div class="p79d-command"><button id="dispatchGenerateButton" type="button" class="btn p79d-primary" onclick="P79PersonnelDispatch.generateRecommendation()">一鍵自動最佳化 A～D 組</button><span>預設納入全部可調人員，也可自由取消勾選；按一次就自動產生四組均衡編組，並直接帶入下方試算，不會修改正式排班。</span></div>
     <div id="dispatchConfirmState" role="status"></div>
-    <div id="dispatchRecommendation" role="status">讀取資料後自動顯示建議。</div>
+    <div id="dispatchRecommendation" role="status">按「一鍵自動最佳化 A～D 組」就能直接排列並顯示四組新名單。</div>
   </div>
 
   <div class="p79d-compare-grid">
     <div class="card p79d-panel">
-      <div class="p79d-panel-head"><div><h3><span class="p79d-numb">03</span> 編組前後效率比較</h3><p>同一份歷史作業量與時數重新組合，比較各組效率，不預測未來產能。</p></div></div>
+      <div class="p79d-panel-head"><div><h3><span class="p79d-numb">03</span> 一鍵最佳化前後效率比較</h3><p>同一份歷史作業量與時數重新組合，比較各組效率，不預測未來產能。</p></div></div>
       <div id="dispatchGroupVisual" class="p79d-visual" aria-label="四組原始與試算效率圖示"></div>
       <div class="p79d-table-wrap" style="max-height:none"><table class="tbl w-full text-center"><thead><tr><th>組別</th><th>人數（原 → 試算）</th><th>櫃數（原 → 試算）</th><th>時數（原 → 試算）</th><th>櫃／小時（原 → 試算）</th></tr></thead><tbody id="dispatchGroupBody"></tbody></table></div>
       <div class="flex flex-wrap items-center gap-3 mt-3"><p id="dispatchScenarioState" role="status"></p><button type="button" class="btn p79d-action" onclick="P79PersonnelDispatch.clear()">清除試算</button></div>
@@ -1864,7 +1864,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <div class="p79d-panel-head"><div><h3>調度判讀提醒</h3><p>避免把試算結果誤認為實際調度結果</p></div></div>
       <ul class="p79d-side-list">
         <li><strong>維持人數平衡：</strong>自動建議以跨組互換為原則，各組人數不變。</li>
-        <li><strong>資料不完整：</strong>來源有缺漏時，不可直接產生正式建議。</li>
+        <li><strong>資料未齊：</strong>若部分來源未核對完成，仍可用已確認組別及有效效率先試算，但會標示暫時方案，不得直接當成正式結果。</li>
         <li><strong>保留任意組別：</strong>你可以指定 A～D 任一組維持不變，不接受調入或調出。</li>
         <li><strong>效率不等於產能：</strong>工作類型、船況與有效時數，都會影響比較結果。</li>
       </ul>
