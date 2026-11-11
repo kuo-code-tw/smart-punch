@@ -290,15 +290,33 @@ function renderRecommendation(rows){
  const policy=movementPolicy(latest,settings);
  const rule=`已勾選 ${selected.size} 人（有效可優化 ${[...selected].filter(k=>policy.movable.has(k)).length} 人），保留組：${[...policy.locked].map(g=>g+'組').join('、')||'無'}；未選的人不調動，所有組別人數維持不變。`;
  if(!suggestion.plan){
-  box.innerHTML=`<p class="font-bold text-amber-800">${safe(suggestion.reason)}</p><p class="text-sm mt-2">${safe(rule)}</p><p class="text-sm mt-2">${safe(coverage)}</p>`;
+  box.innerHTML=`<p class="font-bold text-amber-800">${safe(suggestion.reason)}</p><p class="text-sm mt-2">${safe(rule)}</p><p class="text-sm mt-2">${safe(coverage)}</p>${!ready?'<p class="text-sm text-amber-700 mt-2">注意：有資料來源尚未完整核對，此結果僅供暫時試算。</p>':''}`;
   return;
  }
- box.innerHTML=`<p class="font-bold text-teal-800">建議調動 ${suggestion.moves.length} 人｜原效率差距 ${fmt(suggestion.before.gap)} → ${fmt(suggestion.after.gap)} 櫃／小時</p>
-  <p class="text-sm mt-2">${safe(rule)}${suggestion.optimal?'本次選取人數適用完整排列搜尋，已找到此限制下的最佳編組。':'本次選取人數較多，已以多次搜尋找出較佳方案，並非保證全域最佳。'}</p>
-  <div class="overflow-auto mt-3"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>原組 → 建議組</th><th>有效櫃數</th><th>有效時數</th><th>月均效率</th></tr></thead>
-   <tbody>${suggestion.moves.map(m=>`<tr><td>${safe(m.person.name)}</td><td>${m.from}組 → ${m.to}組</td><td>${fmt(m.person.containers)}</td><td>${fmt(m.person.hours)}</td><td>${fmt(m.person.eff)}</td></tr>`).join('')}</tbody></table></div>
-  <p class="text-sm mt-2">${safe(coverage)}歷史資料用於比較組別均衡程度，無法保證未來實際產能；H/C 不併入櫃數。</p>
-  <button type="button" class="btn bg-teal-700 text-white mt-3" onclick="P79PersonnelDispatch.useRecommendation()">確認名單並帶入試算</button>`;
+ const roster=suggestion.after.groups.map(g=>{
+   const members=latest.filter(p=>p.confirmed&&(suggestion.plan[p.key]||p.group)===g.group)
+    .sort((a,b)=>(b.eff??-1)-(a.eff??-1)||a.name.localeCompare(b.name,'zh-Hant'));
+   return `<section class="p79d-optimized-group" data-group="${g.group}">
+     <header><strong>${g.group} 組 <small>｜${members.length} 人</small></strong><span>${fmt(g.eff)} 櫃／時</span></header>
+     <ol>${members.map(p=>{
+       const moved=p.group!==g.group;
+       return `<li class="${moved?'p79d-member-moved':''}"><span>${safe(p.name)} <small>${safe(p.empId||'')}</small></span>
+         <span>${moved?'<b>由 '+safe(p.group)+' 組調入</b>':'原組保留'}</span></li>`;
+     }).join('')}</ol>
+   </section>`;
+ }).join('');
+ const warning=ready?'已完整讀取當月資料。':'目前只有部分來源核對完成，以下是依畫面已載入資料所做的暫時試算，請先核對正式雲端資料再採用。';
+ box.innerHTML=`<div class="p79d-optimize-summary">
+    <strong>已自動排列四組人員｜調動 ${suggestion.moves.length} 人</strong>
+    <span>四組效率差距 ${fmt(suggestion.before.gap)} → ${fmt(suggestion.after.gap)} 櫃／小時</span>
+   </div>
+   <p class="p79d-optimization-note">${safe(warning)} ${safe(rule)} ${suggestion.optimal?'此選取規模已完整比較可行編組。':'本次為多次搜尋所得較均衡方案，不保證是數學上的全域最佳。'}</p>
+   <h4 class="p79d-optimize-heading">最佳化後 A～D 組全員配置（已帶入下方試算）</h4>
+   <div class="p79d-optimized-grid">${roster}</div>
+   <details class="p79d-optimized-moves"><summary>查看調動明細（${suggestion.moves.length} 人）</summary>
+   <div class="overflow-auto mt-3"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>原組 → 新組</th><th>有效櫃數</th><th>有效時數</th><th>月均效率</th></tr></thead>
+   <tbody>${suggestion.moves.map(m=>`<tr><td>${safe(m.person.name)}</td><td>${m.from}組 → ${m.to}組</td><td>${fmt(m.person.containers)}</td><td>${fmt(m.person.hours)}</td><td>${fmt(m.person.eff)}</td></tr>`).join('')}</tbody></table></div></details>
+   <p class="text-sm mt-2">${safe(coverage)}此為歷史效率重新分組的試算，不保證未來實際產能；H/C 不併入櫃數，正式班表與考勤不變。</p>`;
 }
 
 function renderScenario(){
