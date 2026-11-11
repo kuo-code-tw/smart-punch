@@ -124,7 +124,10 @@ function p79IsEmployeeOvertimeTitle(value){
  if(!title||title==='未設定職稱')return false;
  return !/(?:系統管理員|主任|課長|科長|副理|襄理|經理|協理|處長|部長|總監|總裁|副總|董事|執行長|廠長|所長|股長|主管)/.test(title);
 }
-function p79EmployeeOvertimeRows(rows){return rows.filter(row=>p79IsEmployeeOvertimeTitle(row?.title));}
+function p79EmployeeOvertimeRows(rows){
+ // 只有真正有加班申報時數的職稱才繪圖；零筆人資職稱不能誤作統計。
+ return rows.filter(row=>p79IsEmployeeOvertimeTitle(row?.title)&&Number(row?.hours)>0&&Number(row?.count)>0);
+}
 function renderAttendancePage(){
  const ot=chartPage===0;
  const title=$('p79DashAttendanceChartTitle');
@@ -142,10 +145,21 @@ function renderAttendancePage(){
  if(!Array.isArray(report.rows)){empty(el.id,ot?'職稱加班資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
  const rows=ot?p79EmployeeOvertimeRows(report.rows):report.rows;
  const pending=!ot?(report.issues||[]).length:0;
- if(!rows.length){empty(el.id,(ot?'本月沒有一般員工職稱的加班申報資料':'本月無可核對的核准請假')+(pending?'（'+pending+' 筆資料待核）':''));return;}
+ if(!rows.length){
+  if(ot){
+   const count=Number(report.count)||0,hours=Number(report.hours)||0;
+   const msg=report.sourceWarning
+    ?'本月即時加班來源尚未核對完成；歷史快照目前沒有可確認的一般員工職稱時數。請重新整理首頁，或至加班管理核對正式申報。'
+    :count>0
+      ?'已讀取 '+fmt(count)+' 筆加班申報（'+fmt(hours,2)+' 小時），但沒有符合本圖的一般員工職稱。請核對職稱是否未設定或被歸為主管。'
+      :'本月正式班表尚無有效加班申報；如果加班管理已有資料，請重新整理並核對首頁資料來源。';
+   empty(el.id,msg);return;
+  }
+  empty(el.id,'本月無可核對的核准請假'+(pending?'（'+pending+' 筆資料待核）':''));return;
+ }
  const valueKey=ot?'hours':'days',unit=ot?'小時':'天';
  const max=Math.max(1,...rows.map(r=>Number(r[valueKey])||0));
- const summary=ot?'依正式有效加班申報統計（含待審核），非薪資結算工時':(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
+ const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
  el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+(ot?'一般員工職稱加班申報時數':'各職稱已核准請假天數'))+'">'+
   rows.map(r=>{
    const v=Number(r[valueKey])||0;
