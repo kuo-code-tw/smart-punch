@@ -17,6 +17,11 @@
   }
   window.addEventListener('DOMContentLoaded',function(){
     if(window.ResizeObserver)new ResizeObserver(notify).observe(document.body);
+    var importLink=document.getElementById('gateDashboardImportLink');
+    if(importLink)importLink.addEventListener('click',function(e){
+      e.preventDefault();
+      window.parent.postMessage({type:'p79-gate-open-import'},location.origin);
+    });
     notify();
   });
   window.addEventListener('load',notify);
@@ -29,7 +34,7 @@
     <span class="brand-icon" aria-hidden="true">⚓</span><strong>進出站櫃量管理</strong>
   </a>
   <nav class="topnav" aria-label="功能導覽">
-    <a href="#main">進出站統計</a><a href="#composition">櫃型分布</a><a href="#details">日統計明細</a><a href="../gate-import/">資料匯入</a><a href="#status">資料狀態</a>
+    <a href="#main">進出站統計</a><a href="#composition">櫃型分布</a><a href="#details">日統計明細</a><a href="../gate-import/" id="gateDashboardImportLink">資料匯入</a><a href="#status">資料狀態</a>
   </nav>
   <div class="top-meta"><span class="update" id="freshness">↻ 尚未讀取正式資料</span><span class="top-query">查詢日期</span><input type="date" id="topDate" aria-label="查詢日期"></div>
 </header>
