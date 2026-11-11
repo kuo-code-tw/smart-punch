@@ -28,4 +28,17 @@ assert.equal(ctx.window.P79AqcDaily.unitOf('AQC 08002'),'8002');
 assert.throws(()=>c(raw,'2026-11-10','2026-11-09'),/起訖日期/);
 assert.throws(()=>c(raw,'2026-11-01','2027-02-02'),/93 天/);
 assert.deepEqual([...c([], '2026-11-11','2026-11-11').days.map(x=>x.total)],[0]);
+// Default display is the complete current calendar month, not a rolling seven-day window.
+const monthWindow=ctx.window.P79AqcDaily.monthWindow;
+assert.deepEqual({...monthWindow('2026-11-11')},{start:'2026-11-01',end:'2026-11-30'});
+assert.deepEqual({...monthWindow('2026-02-11')},{start:'2026-02-01',end:'2026-02-28'});
+assert.deepEqual({...monthWindow('2028-02-11')},{start:'2028-02-01',end:'2028-02-29'});
+assert.deepEqual({...monthWindow('2026-12-31')},{start:'2026-12-01',end:'2026-12-31'});
+assert.equal(c([],monthWindow('2026-11-11').start,monthWindow('2026-11-11').end).days.length,30);
+assert.equal(c([],monthWindow('2028-02-11').start,monthWindow('2028-02-11').end).days.length,29);
+const renderSource=source.slice(source.indexOf('function render(){'),source.indexOf('function exportCsv(){'));
+assert(!renderSource.includes("dailyAqcStart').value="),'rerender must not reset user-selected start');
+assert(!renderSource.includes("dailyAqcEnd').value="),'rerender must not reset user-selected end');
+assert(source.includes("dailyAqcStart').addEventListener('change',render)"));
+assert(source.includes("dailyAqcEnd').addEventListener('change',render)"));
 console.log('PASS AQC daily active: true physical AQC dedup, day split, midnight boundary, physical inventories, permissions-safe pure compute and range limits');
