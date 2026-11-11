@@ -51,7 +51,7 @@ function header(){
  '</nav>',
  '<div class="p79r-controls">',
  '<span class="p79r-sync" id="p79rUpdated">資料待同步</span>',
- '<label class="p79r-date">作業日期 <input id="p79rWorkDate" type="date" aria-label="統計月份的參考日期"></label>',
+ '<label class="p79r-date" title="日期用於到離職月份與趨勢；在職人數為目前主檔">作業日期 <input id="p79rWorkDate" type="date" aria-label="到離職月份的參考日期"></label>',
  '<div class="p79v103-menu-wrap p79r-more">',
  '<button type="button" onclick="window.p79HrToggleMenu(event)" aria-label="其他人資功能">☰ 更多</button>',
  '<div id="p79HrSystemMenu" class="p79v103-menu">',
@@ -131,8 +131,9 @@ function mountDashboard(){
 function periodDate(){var el=byId('p79rWorkDate');return parseDate(el&&el.value)||ymd(new Date())}
 function updateCounts(records,anchor,ready){
  var month=anchor.slice(0,7);
- var active=records.filter(function(e){return status(e,anchor)==='active'});
- var resigned=records.filter(function(e){return status(e,anchor)==='resigned'});
+ var today=ymd(new Date());
+ var active=records.filter(function(e){return status(e,today)==='active'});
+ var resigned=records.filter(function(e){return status(e,today)==='resigned'});
  var hires=records.filter(function(e){var date=parseDate(e.startDate);return date&&date.slice(0,7)===month});
  var leavers=resigned.filter(function(e){var date=parseDate(e.terminationDate);return date&&date.slice(0,7)===month&&date<=anchor});
  text('p79rActive',ready||records.length?n(active.length):'—');
@@ -224,11 +225,14 @@ window.p79HrDashboardGo=function(view){
   el.classList.toggle('active',el.dataset.hrView===currentView);
  });
  if(currentView==='employees'&&byId('fStatus')){byId('fStatus').value='active';if(typeof render==='function')render()}
- window.scrollTo({top:0,behavior:'instant'});
+ window.scrollTo({top:0,behavior:'auto'});
 };
 window.p79HrDashRender=renderDashboard;
 function mount(){
  if(mounted)return;
+ document.getElementById('p79UnifiedShell')?.remove();
+ document.getElementById('p79UnifiedShellV102')?.remove();
+ document.getElementById('p79UnifiedShellV103')?.remove();
  if(!header()||!mountDashboard())return;
  mounted=true;
  document.body.classList.add('p79r-ready');
