@@ -1,7 +1,6 @@
 /* Port79 航線資料管理：依核准設計稿構成。僅在 #view-compare 顯示時啟用。 */
 body:has(#view-compare:not(.hidden)){background:#f8fbff!important}
-body:has(#view-compare:not(.hidden)) #efficiencyHeader{display:none!important}
-body:has(#view-compare:not(.hidden)) #efficiencyPageMain{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}
+body:has(#view-compare:not(.hidden)) #efficiencyPageMain{max-width:none!important;width:100%!important;padding:12px 12px 24px!important;margin:0 auto!important}
 body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!important;background:#f9fbff!important;color:#122b51;font-family:system-ui,"Microsoft JhengHei","Noto Sans TC",sans-serif}
 #view-compare .p79-rm-app{width:100%;min-height:100vh;background:linear-gradient(#fbfdff,#f8fbff);color:#11294d;--rm-blue:#1673e9;--rm-border:#d8e5f6;--rm-soft:#eff6ff}
 #view-compare .p79-rm-app *{box-sizing:border-box}
@@ -175,21 +174,8 @@ body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!
 /* 2026-11-11: restore the eight existing colored global tabs (the original
    ship operations navigation) on the route page. Keep route-only controls
    immediately below it, rather than replacing the shared navigation. */
-body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{
- display:flex!important;position:sticky!important;top:0!important;z-index:40!important;
- width:calc(100% - 24px)!important;max-width:none!important;
- margin:10px 12px 0!important;padding:9px 10px!important;
- border:1px solid #d9e3ee!important;border-radius:15px!important;
- background:#fff!important;box-shadow:0 2px 8px #0e428014!important;
-}
-body:has(#view-compare:not(.hidden)) #efficiencyMainTabs>.p79-efficiency-tab-scroll{
- display:flex!important;flex:1 1 auto!important;min-width:0!important;
- overflow-x:auto!important;align-items:center!important;
- scrollbar-width:thin;scrollbar-color:#cfdfef transparent;
-}
-body:has(#view-compare:not(.hidden)) #efficiencyMainTabs>.p79-efficiency-tab-year{
- display:flex!important;flex:0 0 auto!important;
-}
+/* The shared #efficiencyMainTabs is styled once by the standard page layout.
+   Do not reset its top/margin/padding when switching to route management. */
 #view-compare .p79-rm-topbar{
  height:auto!important;min-height:0!important;display:flex!important;
  align-items:center!important;justify-content:space-between!important;
@@ -235,10 +221,6 @@ body:has(#view-compare:not(.hidden)) #efficiencyMainTabs>.p79-efficiency-tab-yea
 }
 #view-compare .p79-rm-profile svg{width:22px!important;height:22px!important}
 @media(max-width:960px){
- body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{
-  width:calc(100% - 14px)!important;margin:7px 7px 0!important;
-  padding:7px!important;border-radius:12px!important;top:0!important;
- }
  #view-compare .p79-rm-topbar{
   padding:9px 9px 0!important;
  }
