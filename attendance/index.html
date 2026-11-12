@@ -1096,6 +1096,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
   display: block !important;
 }
 </style>
+<link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
+<script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="port79-employee-only bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="attendance">
@@ -1487,7 +1489,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label>
                             <select id="liveDeptFilter" onchange="onLiveDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                <option value="ALL">全部部門</option>
+                                <option value="ALL">全部原部門</option>
                             </select>
                         </div>
                         <div>
@@ -1586,7 +1588,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
+                        <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 部門</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部原部門</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">👤 姓名</label><select id="overtimeEmployeeFilter" onchange="onOvertimeEmployeeChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
                     </div>
@@ -1631,7 +1633,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                     <div class="p-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                         <div class="flex flex-wrap items-end gap-2">
                             <div class="min-w-[110px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">公司</label><select id="leaveBalanceCompanyFilter" onchange="onLeaveBalanceCompanyChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部公司</option></select></div>
-                            <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveBalanceDeptFilter" onchange="onLeaveBalanceDeptChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
+                            <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveBalanceDeptFilter" onchange="onLeaveBalanceDeptChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部原部門</option></select></div>
                             <div class="min-w-[140px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveBalanceJobTitleFilter" onchange="onLeaveBalanceJobTitleChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                             <div class="min-w-[180px] flex-[2]"><label class="block text-[10px] font-semibold text-slate-500 mb-1">工號或姓名</label><input id="leaveBalanceKeywordFilter" type="search" placeholder="輸入工號或姓名" oninput="onLeaveBalanceKeywordChange()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div>
                             <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">未休狀態</label><select id="leaveBalanceRemainingFilter" onchange="renderAdminLeaveBalanceTable()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部狀態</option><option value="HAS">有未休天數</option><option value="ZERO">已休完（0天）</option></select></div>
@@ -1662,7 +1664,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 
                 <div class="p-3 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
                     <div class="flex flex-wrap items-end gap-2">
-                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveDeptFilter" onchange="onLeaveDeptFilterChange(true, true)" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
+                        <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">部門</label><select id="leaveDeptFilter" onchange="onLeaveDeptFilterChange(true, true)" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部原部門</option></select></div>
                         <div class="min-w-[130px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">職稱</label><select id="leaveJobTitleFilter" onchange="onLeaveJobTitleFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div class="min-w-[150px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">員工</label><select id="leaveEmpFilter" onchange="onLeaveEmployeeFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部員工</option></select></div>
                         <div class="min-w-[120px] flex-1"><label class="block text-[10px] font-semibold text-slate-500 mb-1">狀態</label><select id="leaveStatusFilter" onchange="onLeaveStatusFilterChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部狀態</option><option value="待審核">待審核</option><option value="已核准">已核准</option><option value="已駁回">已駁回</option></select></div>
@@ -1715,7 +1717,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                 <div class="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">📅 統計年月</label><input id="attendanceStatsMonth" type="month" onchange="onAttendanceStatsMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"></div>
-                        <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">🏢 部門</label><select id="attendanceStatsDept" onchange="onAttendanceStatsDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部部門</option></select></div>
+                        <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">🏢 部門</label><select id="attendanceStatsDept" onchange="onAttendanceStatsDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部原部門</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">💼 職稱</label><select id="attendanceStatsJobTitle" onchange="onAttendanceStatsJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
                         <div><label class="block text-[10px] font-semibold text-slate-500 mb-1">👤 姓名</label><select id="attendanceStatsEmployee" onchange="renderAttendanceStatsTable()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部姓名</option></select></div>
                         <button type="button" onclick="resetAttendanceStatsFilters()" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-semibold">↺ 清除篩選</button>
@@ -3877,6 +3879,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         }
 
         function canCurrentAdminViewDataRow(row) {
+            if(window.p79OrgScope&&!window.p79OrgScope.matches(row))return false;
             if (!isAdminLoggedIn || isCurrentViewerSuperAdmin()) return true;
             const rowId = String(row && row.empId || '').trim().toUpperCase();
             const target = employees.find(emp => String(emp.empId || '').trim().toUpperCase() === rowId);
@@ -3885,7 +3888,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         }
 
         function getAdminVisibleEmployees() {
-            return employees.filter(canCurrentAdminViewEmployee);
+            return employees.filter(canCurrentAdminViewEmployee).filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e));
         }
 
         function showToast(message, type = 'success') {
@@ -9424,7 +9427,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 .filter(emp => company === 'ALL' || getLeaveBalanceCompany(emp) === company)
                 .map(emp => String(emp.dept || emp.leaveBalance.sourceDept || '')).filter(Boolean))]
                 .sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-            deptEl.innerHTML = '<option value="ALL">全部部門</option>' + depts.map(v => `<option value="${v}">${v}</option>`).join('');
+            deptEl.innerHTML = '<option value="ALL">全部原部門</option>' + depts.map(v => `<option value="${v}">${v}</option>`).join('');
             deptEl.value = depts.includes(currentDept) ? currentDept : 'ALL';
             onLeaveBalanceDeptChange(shouldRender, false);
         }
@@ -12028,7 +12031,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 .map(emp => String(emp.dept || '一般').trim())
                 .filter(Boolean))]
                 .sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
-            deptSelect.innerHTML = '<option value="ALL">全部部門</option>' + departments.map(dept => `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`).join('');
+            deptSelect.innerHTML = '<option value="ALL">全部原部門</option>' + departments.map(dept => `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`).join('');
             deptSelect.value = departments.includes(currentDept) ? currentDept : 'ALL';
             refreshManualLeaveJobTitles();
         }
@@ -12247,7 +12250,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             if (!deptSelect || !jobTitleSelect) return;
             const currentDept = deptSelect.value || 'ALL';
             const depts = [...new Set(sourceRows.map(row => row.dept).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-            deptSelect.innerHTML = '<option value="ALL">全部部門</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+            deptSelect.innerHTML = '<option value="ALL">全部原部門</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
             deptSelect.value = depts.includes(currentDept) ? currentDept : 'ALL';
             onLeaveDeptFilterChange(false, false);
         }
@@ -12872,7 +12875,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const recordDeptFilter = document.getElementById('recordDeptFilter');
             if (recordDeptFilter) {
                 const currentVal = recordDeptFilter.value || 'ALL';
-                recordDeptFilter.innerHTML = '<option value="ALL">全部部門</option>' + recordDepts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+                recordDeptFilter.innerHTML = '<option value="ALL">全部原部門</option>' + recordDepts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
                 recordDeptFilter.value = recordDepts.includes(currentVal) ? currentVal : 'ALL';
             }
 
@@ -12881,7 +12884,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const currentVal = liveDeptFilter.value || 'ALL';
                 const liveDepts = [...new Set(visibleEmployees.map(e => String(e.dept || '一般')).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
-                liveDeptFilter.innerHTML = '<option value="ALL">全部部門</option>' + liveDepts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+                liveDeptFilter.innerHTML = '<option value="ALL">全部原部門</option>' + liveDepts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
                 liveDeptFilter.value = liveDepts.includes(currentVal) ? currentVal : 'ALL';
             }
 
@@ -18327,7 +18330,7 @@ function getManualPairRecordAnchor(record) {
             const dept = document.getElementById('overtimeDeptFilter')?.value || 'ALL';
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
-            let rows = buildOvertimeStatisticsRows().filter(row =>
+            let rows = buildOvertimeStatisticsRows().filter(row => !window.p79OrgScope||window.p79OrgScope.matches(row)).filter(row =>
                 (month === 'ALL' || row.monthKey === month) &&
                 (dept === 'ALL' || row.dept === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle) &&
@@ -25554,6 +25557,7 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <script src="../assets/port79-attendance-date-overtime-menu.js?v=20261028-cloud-readback-v3&reviewBuild=20261030-v5"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
+<script>window.Port79OrgContext.configure({system:'attendance',people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 </body>
 </html>
 

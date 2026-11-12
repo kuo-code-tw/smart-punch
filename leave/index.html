@@ -274,6 +274,8 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
 #employeeLeaveReauth{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;line-height:1.6}
 #employeeLeaveReauth[hidden]{display:none!important}
 </style>
+<link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
+<script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body data-p79-system="leave">
@@ -354,19 +356,19 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
       </div>
       <div class="toolbar">
         <div class="field"><label for="filterMonth">請假月份</label><select id="filterMonth" onchange="renderAdmin()"><option value="">全部月份</option></select></div>
-        <div class="field"><label>部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部部門</option></select></div>
+        <div class="field"><label>原部門</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部原部門</option></select></div>
         <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
       </div>
       <div id="adminLeaveSummary" class="note" role="status" style="margin:5px 0 12px;font-weight:650"></div>
       <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button>
       <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
-      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>部門</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
+      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>原部門</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
 
     <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
       <summary style="cursor:pointer;font-size:18px;font-weight:700;padding:6px 0">🏖️ 員工年假剩餘天數 <span class="note">（點選展開／收合）</span></summary>
-      <p id="adminBalanceMonthSummary" class="note" role="status"></p><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
+      <p id="adminBalanceMonthSummary" class="note" role="status"></p><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>原部門</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
     </details>
   </section>
 </main>
@@ -621,7 +623,7 @@ async function submitLeave(){
  catch(e){setStatus('送出失敗：'+(e?.message||e),'error')}
  finally{btn.disabled=false;btn.textContent='📤 送出請假申請'}
 }
-function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=ds.includes(cur)?cur:'';populateLeaveAdminJobs()}
+function populateDepartments(){const sel=$('filterDept');const cur=sel.value;const ds=[...new Set(employees.map(e=>String(e.dept||'').trim()).filter(Boolean))].sort();sel.innerHTML='<option value="">全部原部門</option>'+ds.map(d=>`<option>${esc(d)}</option>`).join('');sel.value=ds.includes(cur)?cur:'';populateLeaveAdminJobs()}
 function normalizeLeaveFilterDate(v){const s=String(v||'').trim().replace(/\//g,'-');const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:''}
 // 管理員請假審核按請假的實際日期月份顯示，不使用送件日或資料建立時間。
 function p79LeaveCurrentTaiwanMonth(){
@@ -716,7 +718,7 @@ function renderAdmin(){
  $('adminCreateLeaveBtn')?.classList.toggle('hidden',leaveAccess!=='manage');
  populateLeaveAdminMonths();
  const month=$('filterMonth').value,dept=$('filterDept').value,job=$('filterJob').value,status=$('filterStatus').value;
- let rows=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,month)&&(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'待審核').trim()===status));
+ let rows=leaveRecords.filter(l=>!window.p79OrgScope||window.p79OrgScope.matches(l)).filter(l=>p79LeaveMatchesMonth(l,month)&&(!dept||String(l.dept||'')===dept)&&(!job||p79LeaveJobForRecord(l)===job)&&(!status||String(l.status||'待審核').trim()===status));
  p79LeaveComparisonRows=rows;
  const distinctPeople=new Set(rows.map(l=>String(l.empId||l.attNo||l.name||'').trim().toUpperCase()).filter(Boolean)).size;
  const summary=$('adminLeaveSummary');
@@ -766,7 +768,7 @@ function renderAdmin(){
 function renderAdminBalances(){
  if(!$('adminBalancePanel')?.open)return;
  const body=$('adminBalanceBody');if(!body)return;const kw=String($('balanceKeyword')?.value||'').trim().toLowerCase();
- const rows=employees.filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
+ const rows=employees.filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e)).filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${e.dept||''}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
  const summary=leaveBalanceMonthSummary(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))));
  if($('adminBalanceMonthSummary'))$('adminBalanceMonthSummary').textContent=summary.text;
  body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(e.dept||b.sourceDept||'')}</td><td>${esc(b.asOf||'--')}${summary.latest&&normalizeLeaveBalanceMonth(b.asOf)<summary.latest?'<div class="note" style="color:#b45309;font-weight:700">待更新</div>':''}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b><div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(e,info))}</div></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
@@ -2255,6 +2257,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 </style>
 
 <script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3"></script>
+<script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
 </body>
 </html>
 

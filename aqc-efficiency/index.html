@@ -674,6 +674,8 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 </style>
 <link rel="stylesheet" href="../assets/port79-gate-dialog.css?v=20261110-dialog-colors-v1">
 <link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-auto-balance-v4">
+<link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
+<script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -918,7 +920,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           <div><label class="text-xs font-bold">組別</label><select id="peopleGroupFilter" class="border rounded-xl px-3 py-2" onchange="renderPeople()"></select></div>
         </div>
         <div class="overflow-auto max-h-[62vh]">
-          <table class="tbl w-full min-w-[1050px] text-center"><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>職稱</th><th>目前組別</th><th>調任日期</th><th>調組</th></tr></thead><tbody id="peopleBody"></tbody></table>
+          <table class="tbl w-full min-w-[1050px] text-center"><thead><tr><th>工號</th><th>姓名</th><th>原部門</th><th>職稱</th><th>目前組別</th><th>調任日期</th><th>調組</th></tr></thead><tbody id="peopleBody"></tbody></table>
         </div>
       </div>
     </div>
@@ -2171,7 +2173,7 @@ function isAqcEmployee(e){
 function people(){
   const map=new Map();
   // 現職名單只來自人資主檔；不能用歷史 WORKING REPORT 反推在職員工。
-  (systemEmployees||[]).filter(isAqcEmployee).forEach(e=>{
+  (systemEmployees||[]).filter(isAqcEmployee).filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e)).forEach(e=>{
     const id=String(
       e.empId||e.employeeId||e.id||e['工號']||
       e.attNo||e.attendanceNo||e.attendanceId||e['考勤號碼']||''
@@ -4430,7 +4432,7 @@ function baseRecordRows(){
   const master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===shipNo);
   if(!master)return [];
   const year=getPort79Year();
-  return recordsForVessel(master.workingNo,master.vessel,master).filter(r=>!year||String(r.workDate||'').startsWith(year));
+  return recordsForVessel(master.workingNo,master.vessel,master).filter(r=>!window.p79OrgScope||window.p79OrgScope.matches(r)).filter(r=>!year||String(r.workDate||'').startsWith(year));
 }
 
 function refreshRecordFilterOptions(baseRows){
@@ -4516,7 +4518,7 @@ function clearRecordShipFilter(){
 }
 
 function filteredRecords(){
-  let rows=[...baseRecordRows()];
+  let rows=[...baseRecordRows()].filter(r=>!window.p79OrgScope||window.p79OrgScope.matches(r));
   if(!rows.length)return [];
 
   const group=String(document.getElementById('recordGroupFilter')?.value||'').trim();
@@ -7269,7 +7271,7 @@ const monthlyRankingReads=new Map();
 function monthlyRankingRecords(){
   const month=document.getElementById('rankingMonth')?.value||'';
   const index=shipCompletionIndex(shipMasters||[]);
-  return canonicalOperationalRecords((records||[]).filter(r=>r.source==='working-report'&&recordCompletionMonth(r,index)===month&&recordIsCurrentShipDetail(r,index)))
+  return canonicalOperationalRecords((records||[]).filter(r=>(!window.p79OrgScope||window.p79OrgScope.matches(r))&&r.source==='working-report'&&recordCompletionMonth(r,index)===month&&recordIsCurrentShipDetail(r,index)))
     .map(r=>({...r,originalWorkDate:r.workDate,workDate:month+'-01'}));
 }
 async function loadMonthlyRanking(force=false){
@@ -7347,6 +7349,7 @@ function weeklyFilteredRecords(baseOnly=false){
   const end=document.getElementById('weeklyEnd')?.value||'';
   const year=getPort79Year();
   return canonicalOperationalRecords((records||[]).filter(r=>{
+    if(window.p79OrgScope&&!window.p79OrgScope.matches(r))return false;
     const d=String(r.workDate||'').trim();
     if(!d||String(r.source||'')!=='working-report')return false;
     if(!baseOnly){
@@ -16070,5 +16073,6 @@ window.addEventListener('load',function(){
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261111-v2">
 <script src="./driver-workstation-dashboard.js?v=20261111-v2"></script>
+<script>window.Port79OrgContext.configure({system:'efficiency',people:()=>systemEmployees,render:()=>renderAll()});</script>
 </body></html>
 

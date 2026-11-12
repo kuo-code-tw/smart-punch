@@ -1533,7 +1533,9 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #p79ScheduleQuickBar .p79-quick-guide{grid-column:1/-1!important;grid-row:3!important;font-size:12px!important}
 @media(max-width:1050px){#p79ScheduleQuickBar{grid-template-columns:minmax(0,1fr)!important}#p79ScheduleQuickBar .p79-quick-month,#p79ScheduleQuickBar .p79-quick-actions{grid-column:1!important;justify-content:flex-start!important}#p79ScheduleQuickBar .p79-quick-actions{grid-row:2!important}#p79ScheduleQuickBar .p79-official-message{grid-row:3!important}#p79ScheduleQuickBar .p79-quick-guide{grid-row:4!important}}
 @media(max-width:600px){#p79ScheduleQuickBar{padding:8px!important}#p79ScheduleQuickBar .p79-quick-actions>button{font-size:11px!important;padding:5px 8px!important}#p79ScheduleQuickBar .p79-quick-legend>div{right:auto!important;left:0!important}}
-</style></head>
+</style><link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
+<script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
+</head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
 
@@ -4036,6 +4038,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
     function cloneScheduleEmployee(emp) {
       return {
+        ...emp,
         id: String(emp?.id || '').trim().toUpperCase(),
         name: String(emp?.name || ''),
         dept: String(emp?.dept || '').trim(),
@@ -4297,6 +4300,7 @@ function p79EmployeeDateEligible(emp,date) {
         const cloudEmployees = (data.employees || [])
           .filter(emp => String(emp.empId || '').toUpperCase() !== 'ADMIN' && (emp.empId || emp.name))
           .map(emp => ({
+            ...emp,
             id: String(emp.empId || '').trim().toUpperCase(),
             name: emp.name || '',
             dept: String(emp.dept || '').trim(),
@@ -6462,7 +6466,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const attendanceSnapshot={attendanceEvidence};
       const typhoonToday=scheduleTaipeiTodayKey();
 
-      let roleEmps = employees.filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
+      let roleEmps = employees.filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e)).filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
       // A closed month shows its saved roster, not new hires without any rows in it.
       if(yearMonth<scheduleTaipeiTodayKey().slice(0,7)){
         roleEmps=roleEmps.filter(e=>Object.keys(monthlyScheduleData[e.id]||{})
@@ -6946,7 +6950,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         roleCounts[e.role] = (roleCounts[e.role] || 0) + 1;
       });
 
-      let filteredEmps = [...employees];
+      let filteredEmps = employees.filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e));
       if (mgmtRoleFilter !== 'ALL') {
         filteredEmps = filteredEmps.filter(e => e.role === mgmtRoleFilter);
       }
@@ -9415,6 +9419,7 @@ window.p79ShowCombinedShiftInfo=function(button){
 #app-main-container .p79-month-schedule-table .p79-rest-count-compact .p79-rest-deficit{display:block!important;color:#b45309!important;font-weight:900!important;font-size:10px!important}
 #app-main-container .p79-month-schedule-table .p79-rest-election{background:#eef2ff!important;color:#4338ca!important;font-weight:900!important}
 </style>
+<script>window.Port79OrgContext.configure({system:'schedule',people:()=>employeeMasterBase.length?employeeMasterBase:employees,render:()=>{renderRoleScheduleView();renderEmployeeManagementView();}});</script>
 </body>
 </html>
 
