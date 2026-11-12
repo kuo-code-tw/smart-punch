@@ -147,6 +147,13 @@ function scopeIssues(payload,scope){
  .filter(([,ok,r])=>!ok||r?.status!=='fulfilled')
  .map(([n,ok,r])=>n+'：'+(ok?r?'讀取失敗（'+readFailure(r)+'）':'讀取中':'缺少檢視權限'));
 }
+function punchCoverage(data,staff,day){
+ const details=M.attendanceDetails({records:attendanceRows(data),shifts:data.shifts||[],employees:staff,day,leaveRecords:[],schedules:[]});
+ return {count:details.filter(r=>r.clockIn.length>0).length,total:details.length};
+}
+function renderPendingTrend(day,reason){
+ content('p79rAttendanceTrend',Array.from({length:7},(_,i)=>dateOffset(day,i-6)).map(d=>'<div class="p79r-trend-row" title="'+esc(reason)+'"><span>'+d.slice(5)+'</span><div class="p79r-trend-track p79r-trend-pending"></div><b>待核對</b></div>').join('')+'<div class="p79r-live-error">'+esc(reason)+'</div>');
+}
 function panels(payload,scope,day,leave,ot,attendance){
  const month=day.slice(0,7),staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),take=r=>ids.has(String(r.empId||r.employeeId||'').trim().toUpperCase());
  if(leave?.ready)summaryChart('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
@@ -180,10 +187,22 @@ function panels(payload,scope,day,leave,ot,attendance){
     if(staff.filter(e=>M.isWorking(e,d)).some(e=>!known.has(String(e.empId||'').trim().toUpperCase())))calc={ready:false,reason:'請假資料範圍未完整涵蓋人員'};
     else calc=M.attendanceRate({employees:staff,records:attendanceRows(a),schedules:officialSchedules(s),leaveRecords:leaves,day:d});
     if(d>todayTaipei())calc={ready:false,reason:'未來日期'};
+    else if(!calc.ready){const observed=punchCoverage(a,staff,d);if(observed.total)calc={...calc,punchPercent:observed.count/observed.total*100};}
     return {day:d,...calc};});
-   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar" style="width:'+(r.ready&&r.percent!==null?r.percent:0)+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):'待核對')+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算比率。</div>');
-  }catch(e){note('p79rAttendanceTrend',e.message)}
- }else note('p79rAttendanceTrend','考勤、排班或核准請假未取得，出勤率暫無法核對');
+   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar'+(!r.ready&&r.punchPercent!==undefined?' p79r-trend-provisional':'')+'" style="width:'+(r.ready&&r.percent!==null?r.percent:(r.punchPercent??0))+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):(r.punchPercent===undefined?'待核對':r.punchPercent.toFixed(1)+'%*'))+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算正式出勤率；* 為打卡人數／在職人數，並非正式出勤率。</div>');
+   }catch(e){renderPendingTrend(day,'出勤率核對失敗：'+e.message)}
+ }else{
+  const issue=scopeIssues(payload,scope).join('；')||'正式來源仍待核對';
+  if(a&&scope.attendance){
+   try{
+    const daily=Array.from({length:7},(_,i)=>{const d=dateOffset(day,i-6);return {day:d,...punchCoverage(a,staff,d)}});
+    content('p79rAttendanceTrend','<div class="p79r-live-note">以下是打卡覆蓋率（已打上班卡／在職人員），不是正式應到出勤率。</div>'+daily.map(r=>{
+      const percent=r.day>todayTaipei()||!r.total?null:r.count/r.total*100;
+      return '<div class="p79r-trend-row" title="'+esc(r.count+' / '+r.total+' 位有上班打卡')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar p79r-trend-provisional" style="width:'+(percent??0).toFixed(1)+'%"></div></div><b>'+(percent===null?'待核對':percent.toFixed(1)+'%*')+'</b></div>';
+    }).join('')+'<div class="p79r-live-error">正式出勤率尚未核對：'+esc(issue)+'</div>');
+   }catch(e){renderPendingTrend(day,'正式出勤率未核對：'+issue+'；打卡覆蓋率也無法計算：'+e.message)}
+  }else renderPendingTrend(day,'正式出勤率尚未核對：'+issue);
+ }
 }
 function display(payload,scope,day){
  if(!payload)return;
