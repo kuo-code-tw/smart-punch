@@ -1993,6 +1993,8 @@ let shipManualOverrideCache={};
 const GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 let gcToken="";
 let groups=[], assignments=[], records=[], shipMasters=[], systemEmployees=[], cloudBusy=false;
+// 每次進站需經專用人資 API 核對；舊 localStorage / 船舶快照不可冒充最新在職名冊。
+let p79AqcHeadcountVerified=false;
 const SHIP_CHANGE_SEEN_STORE='gc_ship_change_seen_v1';
 const SHIP_CHANGE_FIELDS={
   workingNo:'NO.',vessel:'船名',voyageI:'航次I',voyageE:'航次E',wharf:'碼頭',
@@ -2168,9 +2170,7 @@ function isAqcEmployee(e){
 }
 function people(){
   const map=new Map();
-  const byName=new Map();
-
-  // 正式人資主檔優先。只要職稱/部門任一處含 AQC 即視為 AQC 人員。
+  // 現職名單只來自人資主檔；不能用歷史 WORKING REPORT 反推在職員工。
   (systemEmployees||[]).filter(isAqcEmployee).forEach(e=>{
     const id=String(
       e.empId||e.employeeId||e.id||e['工號']||
@@ -2186,49 +2186,20 @@ function people(){
       jobTitle:String(e.jobTitle||e.deptDetail||e.role||e.title||e.position||e['職務']||e['職稱']||'').trim()
     };
     map.set(p.empId,p);
-    byName.set(normalizePersonName(name),p.empId);
   });
 
-  // v2026.09.28.7.37：組別/人員頁只顯示目前人資主檔中的現職 AQC。
-  // 只要正式人資主檔已成功載入，就不再用歷史 WORKING REPORT 補回現職人員。
-  // 這可避免已調職／離職的人因為以前做過 AQC 作業而重新出現在組別管理。
-  const hasOfficialRoster=Array.isArray(systemEmployees) && systemEmployees.length>0;
-  if(hasOfficialRoster){
-    return [...map.values()];
-  }
-
-  // 僅在人資主檔完全無法讀取時，才暫時用歷史 WORKING REPORT 備援。
-  (records||[]).filter(r=>String(r.source||'')==='working-report').forEach(r=>{
-    const name=String(r.name||'').trim();
-    if(!name)return;
-    const nk=normalizePersonName(name);
-    if(byName.has(nk))return;
-
-    const sys=findOfficialEmployeeByName(name);
-
-    // 如果正式「人資主檔」已經有這個人，就完全以目前職稱為準。
-    // 已調任 ARMG / F/L / 指揮手等非 AQC 職稱的人，
-    // 即使舊 WORKING REPORT 還有 AQC 作業紀錄，也不能重新補回 AQC 名單。
-    if(sys && !isAqcEmployee(sys)) return;
-
-    const sysId=String(
-      sys?.empId||sys?.employeeId||sys?.id||sys?.['工號']||
-      sys?.attNo||sys?.attendanceNo||sys?.attendanceId||sys?.['考勤號碼']||''
-    ).trim();
-    const id=sysId||String(r.empId||'').trim()||`NAME:${nk}`;
-
-    map.set(id,{
-      empId:id,
-      name:String(sys?.name||sys?.employeeName||sys?.['姓名']||name).trim(),
-      dept:String(sys?.dept||sys?.department||sys?.unit||sys?.['部門']||'').trim(),
-      jobTitle:String(sys?.jobTitle||sys?.deptDetail||sys?.role||sys?.title||sys?.position||sys?.['職務']||sys?.['職稱']||'').trim()
-    });
-    byName.set(nk,id);
-  });
-
+  // 不用歷史 WORKING REPORT 補回現職名冊；它包含早已離職的員工。
+  // 雲端人資尚未核對時由 KPI 顯示「—」，不能把這段歷史作業當成現職人數。
   return [...map.values()];
 }
-
+function updateCurrentAqcHeadcount(){
+  const el=document.getElementById('kpiPeople');
+  if(!el)return;
+  el.textContent=p79AqcHeadcountVerified?String(people().length):'—';
+  el.title=p79AqcHeadcountVerified
+    ?'依最新人資主檔計算目前在職 AQC 人員（不含離職、退休及留停）'
+    :'最新人資名冊尚未核對，暫不顯示可能過期的現職人數';
+}
 function displayPersonName(v){
   return String(v||'')
     .replace(/\s*[（(]\s*(?:AQC|ARMG|F\s*\/\s*L|FL|GC|QC|RTG|RMG|領班|指揮手)\s*[）)]\s*/g,'')
@@ -2297,8 +2268,10 @@ async function ensureEmployeeDataForGroups(){
     const direct=await apiGet('gcGetEmployees');
     if(Array.isArray(direct?.employees)&&direct.employees.length){
       systemEmployees=direct.employees.map(normalizeCloudEmployee).filter(Boolean);
+      p79AqcHeadcountVerified=true;
       saveLocal();
       renderPeople();
+      updateCurrentAqcHeadcount();
       updateEmployeeDataState('人資員工主檔');
     }
   }catch(e){
@@ -4157,7 +4130,7 @@ function renderDashboard(){
 
   const arr=summaryRows();
   // 「現有人員」是即時人資在職名單；月份歷史作業人數不能讓離職員工復職。
-  document.getElementById('kpiPeople').textContent=people().length;
+  updateCurrentAqcHeadcount();
   const h=arr.reduce((s,x)=>s+x.totalHours,0);
   const c=arr.reduce((s,x)=>s+x.containers,0);
   const hc=arr.reduce((s,x)=>s+x.hatches,0);
@@ -4259,6 +4232,7 @@ async function reloadEmployeeData(){
     }
 
     systemEmployees=direct.employees.map(normalizeCloudEmployee).filter(Boolean);
+    p79AqcHeadcountVerified=true;
     saveLocal();
     renderAll();
     updateEmployeeDataState('人資員工主檔');
@@ -9356,6 +9330,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     let employeeSource='本機備援';
     if(Array.isArray(d?.systemEmployees)&&d.systemEmployees.length){
       systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
+      p79AqcHeadcountVerified=false;
       employeeSource='系統同步員工主檔';
     }
 
@@ -9402,8 +9377,10 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
         const next=Array.isArray(direct?.employees)?direct.employees.map(normalizeCloudEmployee).filter(Boolean):[];
         if(next.length){
           systemEmployees=next;
+          p79AqcHeadcountVerified=true;
           saveLocal();
           invalidateWorkloadIndex();
+          updateCurrentAqcHeadcount();
           const active=activeEfficiencyTabName();
           if(active==='groups'||active==='workload'||active==='personstats')renderEfficiencyTabFast(active);
           updateEmployeeDataState('人資員工主檔');
@@ -9484,6 +9461,7 @@ async function syncFromCloud(force=false){
    let employeeSource='本機備援';
    if(Array.isArray(d?.systemEmployees)&&d.systemEmployees.length){
      systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
+     p79AqcHeadcountVerified=false;
      employeeSource='系統同步員工主檔';
    }
 
@@ -9501,7 +9479,8 @@ async function syncFromCloud(force=false){
        const direct=await apiGet('gcGetEmployees');
        const next=Array.isArray(direct?.employees)?direct.employees.map(normalizeCloudEmployee).filter(Boolean):[];
        if(next.length){
-         systemEmployees=next;invalidateWorkloadIndex();saveLocal();
+         systemEmployees=next;p79AqcHeadcountVerified=true;invalidateWorkloadIndex();saveLocal();
+         updateCurrentAqcHeadcount();
          const active=activeEfficiencyTabName();
          if(active==='groups'||active==='workload'||active==='personstats')renderEfficiencyTabFast(active);
          updateEmployeeDataState('人資員工主檔');

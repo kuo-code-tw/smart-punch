@@ -35,7 +35,7 @@ assert.equal(get('孫逸樺').historical,true);
 assert.equal(get('孫逸樺').groupId,'','Former workers must not get active roster group assignments');
 assert.equal(get('現職甲').containers,43,'The same current staff ID with an AQC name suffix must be merged');
 assert.equal(ctx.people().length,2,'Active roster must not be modified');
-assert(html.includes("document.getElementById('kpiPeople').textContent=people().length;"),'Current staff KPI must stay separate');
+assert(html.includes("updateCurrentAqcHeadcount();"),'Current staff KPI must update from verified HR headcount, not working-report history');
 const noMutation=JSON.stringify(rows);
 actual=ctx.summaryRows();
 assert.equal(JSON.stringify(rows),noMutation,'Read-only stats must never mutate source records');
