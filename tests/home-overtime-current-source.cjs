@@ -77,7 +77,7 @@ async function readCurrent(reader,archive,ym='2026-11'){
  window.P79ReferenceDashboard.setOvertimeReport({month:'2026-11',count:2,hours:6,rows:[{title:'指揮手',count:2,hours:6}]});
  assert.match(node('p79DashAttendanceBars').innerHTML,/指揮手/);
  assert.match(node('p79DashAttendanceBars').innerHTML,/6 小時/);
- assert(home.includes('20261112-converted-home-v1'));
+ assert(home.includes('20261112-converted-home-v2'));
  assert(home.includes('20261111-overtime-no-false-empty-v1'));
  console.log('PASS home overtime: live current source, history fallback warning, JSON metadata, HR title, date keys, no false empty state');
 })().catch(error=>{console.error(error);process.exitCode=1});
