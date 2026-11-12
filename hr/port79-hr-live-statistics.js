@@ -3,7 +3,7 @@
 'use strict';
 const M=window.P79HrVerifiedMetrics;
 if(!M)return;
-const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastRefresh=0,lastAuthIdentity='';
+const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastAuthIdentity='';
 function sess(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function access(key,action){
  const s=sess(),role=String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase();
@@ -28,14 +28,14 @@ function apiBase(){
 }
 function selection(){return M.date($('p79rWorkDate')?.value)||M.date(new Date().toISOString().slice(0,10))}
 function todayTaipei(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
-function identity(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+selection()}
+function identity(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+apiBase()+'|'+JSON.stringify([s?.adminRole,s?.systemPermissions,s?.finePermissions])+'|'+selection()}
 function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=msg}
 function readFailure(result){
  const e=result?.reason;
  if(e?.name==='AbortError')return '雲端回應逾時';
  if(/權限|授權|登入|token/i.test(String(e?.message||'')))return '雲端授權未確認';
  if(/fetch|network/i.test(String(e?.message||'')))return '雲端連線未完成';
- return '雲端資料未確認';
+ return String(e?.message||'雲端資料未確認').slice(0,180);
 }
 function setVal(id,num,sub){
  const el=$(id);if(el)el.textContent=num;
@@ -58,6 +58,7 @@ async function get(action,month,auth,ms=30000){
   if(/^\s*<!doctype html|^\s*<html/i.test(body))throw Error('正式服務返回登入頁，而非授權 JSON');
   const data=JSON.parse(body);
   if(data?.ok!==true)throw Error(data?.error||'資料來源未授權或回傳失敗');
+  if(data.partial===true||data.complete===false||data.incomplete===true)throw Error('正式資料回應不完整，請重新同步');
   if(data.month&&String(data.month)!==month)throw Error('正式資料月份不一致');
   return data;
  }finally{clearTimeout(timer)}
@@ -74,6 +75,57 @@ function attendanceRows(result){
  if(!result||!Array.isArray(result.records))throw Error('正式打卡紀錄不完整');
  return result.records;
 }
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function content(id,html){const el=$(id);if(el)el.innerHTML=html}
+function note(id,message){content(id,'<div class="p79r-live-error">'+esc(message)+'</div>')}
+function dateOffset(day,offset){return new Date(Date.parse(day+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10)}
+function monthOffset(month,offset){const d=new Date(month+'-15T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+offset);return d.toISOString().slice(0,7)}
+function list(id,total,rows,unit,empty){content(id,'<div class="p79r-live-total">'+esc(total)+' '+esc(unit)+'</div><div class="p79r-live-list">'+(rows.length?rows.map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+esc(value)+' '+esc(unit)+'</b></div>').join(''):'<div class="p79r-note">'+esc(empty)+'</div>')+'</div>')}
+function prepareAttendance(data){
+ if(!window.P79AttendanceV6?.buildShifts)throw Error('打卡配對元件尚未載入');
+ const staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),attMap=new Map();
+ for(const e of staff){const k=String(e.attNo||'').replace(/^0+/,'');if(k)attMap.set(k,attMap.has(k)?null:e)}
+ const punches=attendanceRows(data).map(r=>{const key=String(r.empId||r.employeeId||'').trim().toUpperCase();let employeeId=key;
+  if(key&&!ids.has(key))return null;
+  if(!key){const e=attMap.get(String(r.attNo||r.attendanceNo||'').replace(/^0+/,''));if(!e)return null;employeeId=e.empId}
+  return {...r,empId:employeeId,status:r.status||r.type||r.action};
+ }).filter(Boolean);
+ const shifts=window.P79AttendanceV6.buildShifts(punches),workdays=new Map();
+ const key=r=>String(r.id||[r.empId,r.attNo,r.timeStr,r.status].join('|'));
+ for(const shift of shifts)if(shift.clockIn)workdays.set(key(shift.clockIn),M.date(shift.accountingDateKey||shift.dateKey));
+ return {...data,shifts,records:punches.map(r=>({...r,accountingDate:workdays.get(key(r))||undefined}))};
+}
+function panels(payload,scope,day,leave,ot,attendance){
+ const month=day.slice(0,7),staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),take=r=>ids.has(String(r.empId||r.employeeId||'').trim().toUpperCase());
+ if(leave?.ready)list('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
+ else note('p79rLeaveSummary',$('p79rLeavesSub')?.textContent||'核准請假資料待核對');
+ if(ot?.ready){list('p79rOvertimeSummary',ot.hours.toFixed(1),Object.entries(ot.byType||{}).map(([k,v])=>[k,v.toFixed(1)]),'小時','本月沒有正式加班申報');const el=$('p79rOvertimeSummary');if(el)el.innerHTML+='<div class="p79r-live-note">正式申報，不含預排／撤銷；另有 '+ot.planned+' 筆預排。</div>'}
+ else note('p79rOvertimeSummary',$('p79rOvertimeSub')?.textContent||'正式加班申報待核對');
+ const a=payload.attendance?.status==='fulfilled'?payload.attendance.value:null,s=payload.schedule?.status==='fulfilled'?payload.schedule.value:null,l=payload.leave?.status==='fulfilled'?payload.leave.value:null;
+ let rows=null,paired=[];
+ if(scope.attendance&&a){
+  try{
+   paired=a.shifts||[];
+   const punches=attendanceRows(a);
+   rows=M.attendanceDetails({records:punches,shifts:paired,employees:staff,day,leaveRecords:l&&scope.leave?leaveRows(l).filter(take):[],schedules:s&&scope.schedule?officialSchedules(s):[]});
+   const fields=['姓名','單位','職稱','班別','上班打卡','下班打卡','狀態'];
+   content('p79rAttendanceDetails','<div class="p79r-live-note">'+esc(day)+'｜'+rows.length+' 位人員；日期依正式跨日配對。'+(!scope.leave||!l?' 請假資料未取得。':'')+(!scope.schedule||!s?' 班表資料未取得。':'')+'</div><table><thead><tr>'+fields.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+[r.name||r.empId,r.unit||'未設定',(typeof p79IsJobTitleHidden==='function'&&p79IsJobTitleHidden(r.jobTitle))?'已隱藏':r.jobTitle||'未設定',r.shift||'未排班',r.clockIn.join('、')||'—',r.clockOut.join('、')||'—',r.state].map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>');
+  }catch(e){note('p79rAttendanceDetails',e.message)}
+ }else note('p79rAttendanceDetails',scope.attendance?'正式打卡讀取失敗：'+readFailure(payload.attendance):'目前帳號沒有考勤資料檢視權限');
+ if(rows){const counts={};rows.forEach(r=>counts[r.state]=(counts[r.state]||0)+1);content('p79rAttendanceBreakdown','<div class="p79r-live-note">'+esc(day)+'｜'+(attendance?.ready?(attendance.expected+' 人應到／'+attendance.clocked+' 人已簽到'):'應到人數待班表與請假核對')+'</div>'+Object.entries(counts).map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+value+' 人</b></div>').join(''))}
+ else note('p79rAttendanceBreakdown','正式考勤尚未確認，無法顯示出勤分布');
+ if(scope.attendance&&scope.schedule&&scope.leave&&a&&s&&l){
+  try{
+   const leaves=leaveRows(l).filter(take),known=new Set(l.employees.map(e=>String(e.empId||'').trim().toUpperCase()));
+   const timeline=Array.from({length:7},(_,i)=>{const d=dateOffset(day,i-6);let calc;
+    if(staff.filter(e=>M.isWorking(e,d)).some(e=>!known.has(String(e.empId||'').trim().toUpperCase())))calc={ready:false,reason:'請假資料範圍未完整涵蓋人員'};
+    else calc=M.attendanceRate({employees:staff,records:attendanceRows(a),schedules:officialSchedules(s),leaveRecords:leaves,day:d});
+    if(d>todayTaipei())calc={ready:false,reason:'未來日期'};
+    return {day:d,...calc};});
+   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar" style="width:'+(r.ready&&r.percent!==null?r.percent:0)+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):'待核對')+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算比率。</div>');
+  }catch(e){note('p79rAttendanceTrend',e.message)}
+ }else note('p79rAttendanceTrend','考勤、排班或核准請假未取得，出勤率暫無法核對');
+}
 function display(payload,scope,day){
  if(!payload)return;
  const month=day.slice(0,7);
@@ -83,7 +135,7 @@ function display(payload,scope,day){
  const attendanceResult=payload.attendance?.status==='fulfilled'?payload.attendance.value:null;
  let leave=null,ot=null,attendance=null;
  if(scope.leave&&leaveResult){
-  try{leave=M.approvedLeaveCount(leaveRows(leaveResult),month,staffIds);
+  try{leave=M.approvedLeaveCount(leaveRows(leaveResult).filter(r=>staffIds.includes(String(r.empId||r.employeeId||'').trim().toUpperCase())),month,staffIds);
    if(leave.ready)setVal('p79rLeaves',String(leave.count),'正式核准請假申請數（依可檢視範圍）');
    else sourceText('p79rLeaves','核准請假紀錄未完全核對');
   }catch(e){sourceText('p79rLeaves','核准請假資料不完整')}
@@ -97,10 +149,14 @@ function display(payload,scope,day){
  }else if(scope.schedule&&scope.workhours)sourceText('p79rOvertime','正式加班申報讀取失敗：'+readFailure(payload.schedule));
  else sourceText('p79rOvertime','需要班表與工時資料檢視權限');
  if(scope.attendance&&scope.schedule&&scope.leave&&attendanceResult&&scheduleResult&&leaveResult){
-  try{attendance=M.attendanceRate({
+  try{
+   const known=new Set(leaveResult.employees.map(e=>String(e.empId||'').trim().toUpperCase()));
+   if(all.filter(e=>M.isWorking(e,day)).some(e=>!known.has(String(e.empId||'').trim().toUpperCase())))throw Error('請假授權範圍未涵蓋全部人員');
+   attendance=M.attendanceRate({
     records:attendanceRows(attendanceResult),schedules:officialSchedules(scheduleResult),
-    leaveRecords:leaveRows(leaveResult),employees:all,day
+    leaveRecords:leaveRows(leaveResult).filter(r=>staffIds.includes(String(r.empId||r.employeeId||'').trim().toUpperCase())),employees:all,day
    });
+   if(day>todayTaipei())attendance={ready:false,reason:'未來日期尚無實際出勤率'};
    if(attendance.ready){
     setVal('p79rAttendance',attendance.percent===null?'—':attendance.percent.toFixed(1)+'%',
       attendance.expected+' 人應到／'+attendance.clocked+' 人已打上班卡（當日）');
@@ -110,8 +166,11 @@ function display(payload,scope,day){
   }catch(e){sourceText('p79rAttendance','當日打卡與班表未核對完成')}
  }else if(scope.attendance&&scope.schedule&&scope.leave)sourceText('p79rAttendance','正式打卡／班表／請假尚未讀齊');
  else sourceText('p79rAttendance','需要考勤、排班與請假檢視權限');
+ panels(payload,scope,day,leave,ot,attendance);
 }
 function reset(msg){
+ const donut=$('p79rActiveDonut')?.closest?.('.p79r-donut');if(donut)donut.style.background='#e1edf8';
+ for(const id of ['p79rAttendanceDetails','p79rAttendanceTrend','p79rAttendanceBreakdown','p79rLeaveSummary','p79rOvertimeSummary'])note(id,msg||'正式資料核對中…');
  setVal('p79rAttendance','—',msg||'等待正式考勤');
  setVal('p79rLeaves','—',msg||'等待核准請假');
  setVal('p79rOvertime','—',msg||'等待正式加班申報');
@@ -126,28 +185,38 @@ async function refresh(force){
  leave:access('leave','records.view'),workhours:access('workhours','overtime.view')};
  const key=startIdentity+'|'+month;
  if(inFlightKey===key)return;
+ if(force)cache.delete(key);
  const hit=cache.get(key);
  if(!force&&hit&&Date.now()-hit.at<120000){display(hit.data,scope,day);return}
- if(!force&&Date.now()-lastRefresh<1000)return;
- lastRefresh=Date.now();inFlightKey=key;const current=++loadId;
+ inFlightKey=key;const current=++loadId;
  reset('正式資料核對中…');
- const read=async(key,enabled,action)=>{
+ const readOne=async(enabled,action,requestedMonth)=>{
   if(!enabled)throw Error('目前沒有資料檢視權限');
-  try{return await get(action,month,auth)}catch(error){
+  try{return await get(action,requestedMonth,auth)}catch(error){
    // A bounded read retry matches the existing leave page's slow-cloud flow.
    // Never retry after an account/date change or an authorization failure.
    if(current!==loadId||identity()!==startIdentity||/權限|授權|登入|token/i.test(String(error.message)))throw error;
-   return get(action,month,auth);
+   return get(action,requestedMonth,auth);
   }
  };
- const result=await Promise.allSettled([
-  read('leave',scope.leave,'getLeaveData'),
-  read('schedule',scope.schedule,'getScheduleDataSecure'),
-  read('attendance',scope.attendance,'getAttendanceMainDirect')
+ const months=[...new Set([month,dateOffset(day,-6).slice(0,7)])];
+ const attMonths=[...new Set([...months,dateOffset(day,1).slice(0,7)])];
+ const scheduleMonths=[...new Set([...months,monthOffset(month,1)])];
+ const join=async(enabled,action,selected,field)=>{
+  const data=await Promise.all(selected.map(m=>readOne(enabled,action,m)));
+  if(data.some(d=>!Array.isArray(d[field])))throw Error('正式'+field+'資料不完整');
+  return {ok:true,[field]:data.flatMap(d=>d[field]),employees:data.flatMap(d=>d.employees||[])};
+ };
+ const data={};
+ const publish=(key,value)=>{if(current===loadId&&identity()===startIdentity&&ready()){if(key==='attendance'&&value.status==='fulfilled'){try{value={status:'fulfilled',value:prepareAttendance(value.value)}}catch(reason){value={status:'rejected',reason}}}data[key]=value;display(data,scope,day)}};
+ const task=(key,promise)=>promise.then(value=>publish(key,{status:'fulfilled',value}),reason=>publish(key,{status:'rejected',reason}));
+ await Promise.all([
+  task('leave',readOne(scope.leave,'getLeaveData',month)),
+  task('schedule',join(scope.schedule,'getScheduleDataSecure',scheduleMonths,'schedules')),
+  task('attendance',join(scope.attendance,'getAttendanceMonthData',attMonths,'records'))
  ]);
+ if(current===loadId)inFlightKey='';
  if(current!==loadId||identity()!==startIdentity||!ready())return;
- inFlightKey='';
- const data={leave:result[0],schedule:result[1],attendance:result[2]};
  cache.set(key,{at:Date.now(),data});
  if(cache.size>8)cache.delete(cache.keys().next().value);
  display(data,scope,day);
@@ -156,16 +225,19 @@ const original=window.p79HrDashRender;
 window.p79HrDashRender=function(){
  original?.();
  const day=selection(),key=identity()+'|'+day.slice(0,7),entry=cache.get(key);
- if(entry){display(entry.data,{
+ if(entry&&Date.now()-entry.at<120000){display(entry.data,{
   attendance:access('attendance','records.view'),schedule:access('schedule','records.view'),
   leave:access('leave','records.view'),workhours:access('workhours','overtime.view')
  },day)}
  if(ready())void refresh(false);
 };
 window.P79HrStatistics={refresh:()=>refresh(true),access,selection,todayTaipei};
+window.addEventListener?.('focus',()=>{if(ready())void refresh(false)});
 document.addEventListener('DOMContentLoaded',function(){
  const date=$('p79rWorkDate');
  if(date)date.addEventListener('change',function(){loadId++;inFlightKey='';reset('正在更換統計日期');void refresh(true)});
  if(ready())void refresh(false);
+ const refreshButton=document.querySelector?.('[onclick*="loadEmployees(true)"]');
+ refreshButton?.addEventListener('click',()=>{cache.clear();void refresh(true)});
 });
 })();

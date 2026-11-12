@@ -42,7 +42,7 @@ test('unit job titles expand while legacy departments are not treated as units',
  assert(dashboard.includes('p79DashConfiguredTitles().forEach(register)'));
  assert(!dashboard.includes('function workerKind('));
  assert(css.includes('p79r-dept-scroller'));
- assert(html.includes('20261112-dynamic-job-titles-v2'));
+ assert(/port79-hr-reference-dashboard\.js\?v=/.test(html),'dashboard script must carry a cache version');
  assert(html.includes('window.p79HrDashRender?.(); // A new title appears immediately'));
  const from=dashboard.indexOf('function p79DashTitle('),to=dashboard.indexOf('function updateAlerts(',from);
  assert(from>=0&&to>from);
@@ -79,6 +79,7 @@ test('unit job titles expand while legacy departments are not treated as units',
  // Once an employee gets the title, counts change without touching application code.
  ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
  assert(body.innerHTML.includes('<td>7</td><td>100.0%</td>'),'grand total stays accurate across two units');
+
  // Removing a title from settings should not hide it while active employees still have it.
  ctx.orgSettings.jobTitles=ctx.orgSettings.jobTitles.filter(x=>x!=='新職稱');
  ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
@@ -197,7 +198,7 @@ async function cloud(){
   if(k==='port79_gas_url')return 'https://script.google.com/macros/s/TEST/exec';
   return null
  }};
- const calls=[],w={P79HrVerifiedMetrics:M,p79HrDashRender(){}};
+ const calls=[],w={P79AttendanceV6:require('../attendance/v6-engine.js'),P79HrVerifiedMetrics:M,p79HrDashRender(){}};
  const c={window:w,document:doc,sessionStorage:storage,employees:persons,
   p79HrCloudDataReady:true,token:'TEST',Date,Intl,URL,AbortController,setTimeout,clearTimeout,console,
   fetch:async raw=>{
@@ -206,7 +207,7 @@ async function cloud(){
    if(action==='getLeaveData')assert.equal(url.searchParams.has('month'),false,'use the existing full leave ledger contract');
    const data=action==='getLeaveData'?{ok:true,employees:persons,leaveRecords:leaves.slice(0,1)}:
      action==='getScheduleDataSecure'?{ok:true,schedules:schedule}:
-     action==='getAttendanceMainDirect'?{ok:true,records:[{empId:'A01',type:'上班打卡',timeStr:'2026-11-11 07:55:00'}]}:
+     action==='getAttendanceMonthData'?{ok:true,records:[{empId:'A01',type:'上班打卡',timeStr:'2026-11-11 07:55:00'}]}:
      null;
    assert(data,'unexpected action');
    return{ok:true,text:async()=>JSON.stringify(data)};
@@ -216,16 +217,16 @@ async function cloud(){
  assert.equal(e('p79rAttendance').textContent,'100.0%');
  assert.equal(e('p79rLeaves').textContent,'1');
  assert.equal(e('p79rOvertime').textContent,'2.0 小時');
- assert.equal(calls.length,3);
+ assert.equal(calls.length,4);
  let attempts=0;const successfulFetch=c.fetch;
  c.fetch=async raw=>{if(new URL(raw).searchParams.get('action')==='getLeaveData'&&attempts++===0)throw Error('temporary network failure');return successfulFetch(raw)};
  await w.P79HrStatistics.refresh();
  assert.equal(attempts,2,'one bounded read retry after a transient failure');
  assert.equal(e('p79rLeaves').textContent,'1');
- assert.equal(calls.length,6);
+ assert.equal(calls.length,8);
  account={empId:'OTHER',adminRole:'admin',systemPermissions:{hr:'view',attendance:'none',leave:'none',schedule:'none',workhours:'none'}};
  await w.P79HrStatistics.refresh();
- assert.equal(calls.length,6,'must not query forbidden module on account switch');
+ assert.equal(calls.length,8,'must not query forbidden module on account switch');
  assert.equal(e('p79rAttendance').textContent,'—');
 }
 cloud().then(()=>{passed++;console.log('PASS authorized read-only source bridge and permission switching');
