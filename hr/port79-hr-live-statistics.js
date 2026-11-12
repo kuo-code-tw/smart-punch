@@ -80,7 +80,33 @@ function content(id,html){const el=$(id);if(el)el.innerHTML=html}
 function note(id,message){content(id,'<div class="p79r-live-error">'+esc(message)+'</div>')}
 function dateOffset(day,offset){return new Date(Date.parse(day+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10)}
 function monthOffset(month,offset){const d=new Date(month+'-15T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+offset);return d.toISOString().slice(0,7)}
-function list(id,total,rows,unit,empty){content(id,'<div class="p79r-live-total">'+esc(total)+' '+esc(unit)+'</div><div class="p79r-live-list">'+(rows.length?rows.map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+esc(value)+' '+esc(unit)+'</b></div>').join(''):'<div class="p79r-note">'+esc(empty)+'</div>')+'</div>')}
+function summaryChart(id,total,rawRows,unit,empty){
+ const rows=(rawRows||[]).map(([label,value])=>[String(label||'其他'),Number(value)]).filter(([,value])=>Number.isFinite(value)&&value>0);
+ const amount=unit==='小時'?Number(total).toFixed(1):String(Number(total)||0);
+ const heading='<div class="p79r-live-total">'+esc(amount)+' '+esc(unit)+'</div>';
+ if(!rows.length){content(id,heading+'<div class="p79r-breakdown-empty">'+esc(empty)+'</div>');return}
+ const sum=rows.reduce((n,[,v])=>n+v,0),colors=['#2563eb','#0d9488','#8b5cf6','#e59c27','#e35b7b','#0891b2','#64748b','#65a30d'];
+ let start=0;
+ const sectors=rows.map(([,value],i)=>{
+  const end=i===rows.length-1?100:start+value/sum*100;
+  const segment=colors[i%colors.length]+' '+start.toFixed(3)+'% '+end.toFixed(3)+'%';
+  start=end;
+  return segment;
+ }).join(',');
+ const legend=rows.map(([label,value],i)=>{
+  const percent=(value/sum*100).toFixed(1)+'%',display=unit==='小時'?value.toFixed(1):String(value);
+  return '<div class="p79r-breakdown-item"><span class="p79r-breakdown-dot" style="background:'+colors[i%colors.length]+'"></span><span class="p79r-breakdown-label">'+esc(label)+'</span><b>'+esc(percent)+'</b><small>'+esc(display)+' '+esc(unit)+'</small></div>';
+ }).join('');
+ content(id,heading+'<div class="p79r-breakdown"><div class="p79r-breakdown-donut" role="img" aria-label="'+esc((unit==='人次'?'請假':'加班')+'分類占比圖')+'" style="background:conic-gradient('+sectors+')"><div class="p79r-breakdown-center"><b>100%</b><span>分類占比</span></div></div><div class="p79r-breakdown-legend">'+legend+'</div></div>');
+}
+function hiddenJobTitle(value){
+ try{
+  if(typeof p79IsJobTitleHidden==='function')return !!p79IsJobTitleHidden(value);
+  const hidden=typeof orgSettings!=='undefined'&&Array.isArray(orgSettings.hiddenJobTitles)?orgSettings.hiddenJobTitles:[];
+  const key=v=>String(v??'').normalize('NFKC').replace(/[\\s\\/_-]+/g,'').toUpperCase();
+  return !!key(value)&&hidden.some(v=>key(v)===key(value));
+ }catch(e){return false}
+}
 function prepareAttendance(data){
  if(!window.P79AttendanceV6?.buildShifts)throw Error('打卡配對元件尚未載入');
  const staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),attMap=new Map();
@@ -97,9 +123,9 @@ function prepareAttendance(data){
 }
 function panels(payload,scope,day,leave,ot,attendance){
  const month=day.slice(0,7),staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),take=r=>ids.has(String(r.empId||r.employeeId||'').trim().toUpperCase());
- if(leave?.ready)list('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
+ if(leave?.ready)summaryChart('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
  else note('p79rLeaveSummary',$('p79rLeavesSub')?.textContent||'核准請假資料待核對');
- if(ot?.ready){list('p79rOvertimeSummary',ot.hours.toFixed(1),Object.entries(ot.byType||{}).map(([k,v])=>[k,v.toFixed(1)]),'小時','本月沒有正式加班申報');const el=$('p79rOvertimeSummary');if(el)el.innerHTML+='<div class="p79r-live-note">正式申報，不含預排／撤銷；另有 '+ot.planned+' 筆預排。</div>'}
+ if(ot?.ready){summaryChart('p79rOvertimeSummary',ot.hours,Object.entries(ot.byType||{}),'小時','本月沒有正式加班申報');const el=$('p79rOvertimeSummary');if(el)el.innerHTML+='<div class="p79r-live-note">正式申報，不含預排／撤銷；另有 '+ot.planned+' 筆預排。</div>'}
  else note('p79rOvertimeSummary',$('p79rOvertimeSub')?.textContent||'正式加班申報待核對');
  const a=payload.attendance?.status==='fulfilled'?payload.attendance.value:null,s=payload.schedule?.status==='fulfilled'?payload.schedule.value:null,l=payload.leave?.status==='fulfilled'?payload.leave.value:null;
  let rows=null,paired=[];
@@ -108,8 +134,13 @@ function panels(payload,scope,day,leave,ot,attendance){
    paired=a.shifts||[];
    const punches=attendanceRows(a);
    rows=M.attendanceDetails({records:punches,shifts:paired,employees:staff,day,leaveRecords:l&&scope.leave?leaveRows(l).filter(take):[],schedules:s&&scope.schedule?officialSchedules(s):[]});
+   // Hide rows from the dashboard only. Official attendance totals and source records stay intact.
+   const visibleRows=rows.filter(r=>!hiddenJobTitle(r.jobTitle));
    const fields=['姓名','單位','職稱','班別','上班打卡','下班打卡','狀態'];
-   content('p79rAttendanceDetails','<div class="p79r-live-note">'+esc(day)+'｜'+rows.length+' 位人員；日期依正式跨日配對。'+(!scope.leave||!l?' 請假資料未取得。':'')+(!scope.schedule||!s?' 班表資料未取得。':'')+'</div><table><thead><tr>'+fields.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+[r.name||r.empId,r.unit||'未設定',(typeof p79IsJobTitleHidden==='function'&&p79IsJobTitleHidden(r.jobTitle))?'已隱藏':r.jobTitle||'未設定',r.shift||'未排班',r.clockIn.join('、')||'—',r.clockOut.join('、')||'—',r.state].map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>');
+   const scopeText=visibleRows.length===rows.length
+     ?rows.length+' 位人員'
+     :visibleRows.length+' 位顯示人員（正式統計含 '+rows.length+' 位，隱藏職稱不列入明細）';
+   content('p79rAttendanceDetails','<div class="p79r-live-note">'+esc(day)+'｜'+scopeText+'；日期依正式跨日配對。'+(!scope.leave||!l?' 請假資料未取得。':'')+(!scope.schedule||!s?' 班表資料未取得。':'')+'</div><table><thead><tr>'+fields.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+(visibleRows.length?visibleRows.map(r=>'<tr>'+[r.name||r.empId,r.unit||'未設定',r.jobTitle||'未設定',r.shift||'未排班',r.clockIn.join('、')||'—',r.clockOut.join('、')||'—',r.state].map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="7">目前沒有可顯示的人員</td></tr>')+'</tbody></table>');
   }catch(e){note('p79rAttendanceDetails',e.message)}
  }else note('p79rAttendanceDetails',scope.attendance?'正式打卡讀取失敗：'+readFailure(payload.attendance):'目前帳號沒有考勤資料檢視權限');
  if(rows){const counts={};rows.forEach(r=>counts[r.state]=(counts[r.state]||0)+1);content('p79rAttendanceBreakdown','<div class="p79r-live-note">'+esc(day)+'｜'+(attendance?.ready?(attendance.expected+' 人應到／'+attendance.clocked+' 人已簽到'):'應到人數待班表與請假核對')+'</div>'+Object.entries(counts).map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+value+' 人</b></div>').join(''))}
