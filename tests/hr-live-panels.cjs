@@ -10,6 +10,8 @@ const rows=[{empId:'A',schedule:{'2026-10-31':'早'}},{empId:'B',schedule:{'2026
 assert.equal(M.attendanceRate({employees:staff,schedules:rows,day:'2026-10-31'}).expected,1);
 assert.equal(M.attendanceRate({employees:staff,schedules:rows,day:'2026-11-02'}).ready,false);
 assert.equal(M.approvedLeaveCount([],'2026-11',['A','B']).count,0);
+const multi=M.attendanceDetails({employees:staff,day:'2026-11-01',shifts:[{empId:'A',dateKey:'2026/11/01',clockIn:{timeStr:'08:00'},clockOut:{timeStr:'12:00'}},{empId:'A',dateKey:'2026/11/01',clockIn:{timeStr:'16:00'}}]});assert(multi.find(r=>r.empId==='A').state.includes('待簽退'));
+
 const src=fs.readFileSync('hr/port79-hr-live-statistics.js','utf8');
 async function run({denied=false,failed=false,stale=false,day='2026-11-01'}={}){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:id==='p79rWorkDate'?day:'',innerHTML:'',textContent:'',style:{},closest:()=>({style:{}})});return nodes.get(id)};

@@ -159,15 +159,18 @@ function attendanceDetails({records=[],shifts=[],employees=[],leaveRecords=[],sc
   const e=person(shift),row=e&&rows.get(id(e.empId));if(!row)continue;
   if(shift.clockIn)row.clockIn.push(norm(shift.clockIn.timeStr||shift.clockIn.datetime));
   if(shift.clockOut)row.clockOut.push(norm(shift.clockOut.timeStr||shift.clockOut.datetime));
+  if(shift.clockIn&&!shift.clockOut)row.openIn=true;
+  if(shift.clockOut&&!shift.clockIn)row.orphanOut=true;
   if(shift.timePrecisionIssue||shift.attendanceCheckRequired||shift.overlapIssue)row.pending=true;
  }
  for(const row of rows.values()){
   if(row.pending)row.state='打卡待核';
-  else if(row.clockIn.length&&row.clockOut.length)row.state='已出勤';
+  else if(row.orphanOut)row.state='缺上班卡待核';
+  else if(row.clockIn.length&&row.clockOut.length)row.state=row.openIn?'已出勤／另有待簽退班次':'已出勤';
   else if(row.clockIn.length)row.state='已簽到／待簽退';
   else if(row.clockOut.length)row.state='缺上班卡待核';
   else if(!row.leave&&/^(例|休|國|颱|選|休息日|例假|國定假日)$/.test(row.shift||''))row.state='排定休假';
-  if(row.clockIn.length&&!row.pending&&/^(例|休|國|颱|選|休息日|例假|國定假日)$/.test(row.shift||''))row.state='休假日有出勤';
+  if(row.clockIn.length&&!row.pending&&/^(例|休|國|颱|選|休息日|例假|國定假日)$/.test(row.shift||''))row.state='休假日有出勤'+(row.openIn?'／待簽退':row.orphanOut?'／另缺上班卡':'');
   if(row.leave&&row.clockIn.length)row.state+='／另有核准請假';
  }
  return [...rows.values()].sort((a,b)=>a.unit.localeCompare(b.unit,'zh-TW')||a.name.localeCompare(b.name,'zh-TW'));
