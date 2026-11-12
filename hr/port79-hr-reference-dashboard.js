@@ -38,18 +38,15 @@ function header(){
  // Restore the HR header after that pass; retain its shared session/cache code.
  shell.style.setProperty('display','block','important');
  shell.removeAttribute('aria-hidden');
+ // The global workspace provides system navigation. Keep only the two HR
+ // subviews and HR-specific operations as an inline toolbar inside main.
+ var contentHost=document.querySelector('main.wrap');
+ if(contentHost&&shell.parentElement!==contentHost)contentHost.prepend(shell);
  shell.innerHTML=[
- '<div class="p79r-top">',
- '<a class="p79r-brand" href="../" aria-label="返回碼頭營運系統首頁"><span class="p79r-symbol">🚢</span><span class="p79r-name">碼頭營運統計</span></a>',
+ '<div class="p79r-top" role="group" aria-label="人資頁面操作">',
  '<nav class="p79r-nav" aria-label="人資管理功能">',
  '<button type="button" class="active" data-hr-view="dashboard">人資管理</button>',
  '<button type="button" data-hr-view="employees">員工資料</button>',
- '<a href="../attendance/" data-route="attendance">考勤管理</a>',
- '<a href="../schedule/" data-route="schedule">排班管理</a>',
- '<a href="../leave/" data-route="leave">請假管理</a>',
- '<a href="../work-hours/" data-route="workhours">工時／加班</a>',
- '<a href="../aqc-efficiency/" data-route="efficiency" title="原有船舶與人員效率統計系統">船舶效率</a>',
- '<a href="../history-data/" data-route="history">歷史資料</a>',
  '</nav>',
  '<div class="p79r-controls">',
  '<span class="p79r-sync" id="p79rUpdated">資料待同步</span>',
@@ -73,10 +70,6 @@ function header(){
  var date=byId('p79rWorkDate'); if(date){date.value=ymd(new Date());date.addEventListener('change',renderDashboard)}
  shell.querySelectorAll('[data-hr-view]').forEach(function(b){
    b.addEventListener('click',function(){window.p79HrDashboardGo(b.dataset.hrView)})
- });
- // Existing system pages enforce their own role and fine-grained permissions.
- shell.querySelectorAll('a[data-route]').forEach(function(a){
-   a.addEventListener('click',function(){window.p79HrCloseMenu&&window.p79HrCloseMenu()})
  });
  return true;
 }
