@@ -422,7 +422,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     <div class="p79d-kpis">
       <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span id="p79DashPeopleLabel">今日出勤人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月累計出勤天數</span><strong id="p79DashPersonDays">—</strong><small>人日</small></div></div>
-      <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月申報加班工時</span><strong id="p79DashOvertimeHours">—</strong><small>小時</small></div></div>
+      <div class="p79d-kpi"><div class="p79d-kpi-icon">◷</div><div><span>本月換算後加班工時</span><strong id="p79DashOvertimeHours">—</strong><small id="p79DashOvertimeUnit">小時</small></div></div>
       <button type="button" class="p79d-kpi p79d-early-alert" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="班表出勤尚未核對，點擊查看早中晚班明細">
         <div class="p79d-kpi-icon" aria-hidden="true">⚠</div>
         <div class="p79d-early-body">
@@ -464,8 +464,8 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
       <p style="font-size:12px;color:#64748b;margin:8px 0">首頁只顯示有權限範圍內的雲端加班明細；預排尚待核對，不等於正式核准。新增、修改或刪除請到「加班管理」。</p>
       <div class="p79d-table-scroll" style="overflow-x:auto;max-height:340px">
         <table style="width:100%;min-width:760px;text-align:left;border-collapse:collapse;font-size:13px">
-          <thead><tr><th>日期</th><th>姓名</th><th>部門</th><th>職稱</th><th>加班時段</th><th>申報時數</th><th>狀態</th></tr></thead>
-          <tbody id="p79DashOvertimeRecords"><tr><td colspan="7">等待加班資料</td></tr></tbody>
+          <thead><tr><th>日期</th><th>姓名</th><th>部門</th><th>職稱</th><th>加班時段</th><th>申報時數</th><th>換算時數</th><th>狀態</th></tr></thead>
+          <tbody id="p79DashOvertimeRecords"><tr><td colspan="8">等待加班資料</td></tr></tbody>
         </table>
       </div>
     </article>
