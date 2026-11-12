@@ -203,7 +203,7 @@ function renderAttendancePage(){
     :count>0
       ?'已讀取 '+fmt(count)+' 筆加班申報（'+fmt(hours,2)+' 小時），但沒有符合本圖的一般員工職稱。請核對職稱是否未設定或被歸為主管。'
       :'本月正式班表尚無有效加班申報；如果加班管理已有資料，請重新整理並核對首頁資料來源。';
-   if(!report.sourceWarning&&count===0&&hours===0)el.innerHTML=p79RenderOvertimeDonut([],overtimeSummary);
+   if(!report.sourceWarning&&count===0&&hours===0)el.innerHTML=p79RenderOvertimeDonut([],overtimeSummary,{metric:overtimeChartMode==='actual'?'實際時數':'換算時數',centerFirst:'本月已申報',centerSecond:overtimeChartMode==='actual'?'實際時數':'換算時數'});
    else empty(el.id,msg);
    return;
   }
