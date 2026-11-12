@@ -75,7 +75,7 @@ function run(){
   assert.equal(ctx.dashboardQuantityReconciliation('',jobs,records,masters,20909),null);
   ctx.renderDashboardQuantityReconciliation('',jobs,records,masters,20909);
   assert.equal(host.visible,true,'year-view audit is intentionally visible even without a month selected');
-  assert(host.innerHTML.includes('2026 年全年櫃數核對'));
+  assert(host.innerHTML.includes('2026 年全年 Moves 核對'));
   const missing=ctx.dashboardQuantityReconciliation('2026-10',[jobs[0]],[records[1]],[],381);
   assert.equal(missing.missingIdLists,1,'Missing source linkage must be flagged');
   const malicious=ctx.dashboardQuantityReconciliation('2026-10',jobs,[...records,rec('<img onerror=alert(1)>','B','2026-10-26',5)],masters,21086);
@@ -83,7 +83,7 @@ function run(){
   assert(!host.innerHTML.includes('<img onerror='),'Record IDs must be escaped in HTML');
   assert(host.innerHTML.includes('&lt;img'));
   assert(html.includes('>人員作業櫃數</div>'));
-  assert(html.includes('>系統總櫃數（作業量＋翻艙）</div>'));
+  assert(html.includes('>系統總 Moves（作業量＋SHIFT）</div>'));
   assert(html.includes("setCum('cumWorkload',systemTotalMoves);"),'System KPI must display billing plus SHIFT, not billing alone');
   assert(html.includes('const systemTotalMoves=workload+shiftTotal;'),'System Moves derives only from ship billing and SHIFT');
   assert(html.includes('✓ 僅與系統人員明細一致（非月報）'),'Equality must distinguish system detail from external Excel');

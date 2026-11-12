@@ -853,7 +853,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           <span id="shipUpdatedCountBadge" class="ship-change-pill ship-change-updated hidden">🟡 已更新 0</span>
           <button id="markShipChangesSeenBtn" type="button" onclick="markAllShipChangesSeen()" class="hidden btn bg-slate-700 text-white text-[10px]">✓ 標記為已查看</button>
         </div>
-        <input type="hidden" id="dashboardSortField" value="importedAt">
+        <input type="hidden" id="dashboardSortField" value="workingNo">
         <input type="hidden" id="dashboardSortDir" value="desc">
       </div>
       <div id="summaryTableWrap" class="overflow-auto max-h-[64vh]">
@@ -864,7 +864,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
               <th class="min-w-[110px] cursor-pointer select-none" onclick="setDashboardSort('compare')">月報比對 <span data-sort-mark="compare"></span></th>
               <th class="min-w-[150px]" title="全船 WORKING REPORT 司機櫃數，對照原始 WORKING SHEET">司機櫃數核對</th>
               <th class="min-w-[92px]">資料狀態</th>
-              <th class="min-w-[96px] cursor-pointer select-none" onclick="setDashboardSort('date')" title="預設顯示最新匯入的船舶；點這裡可改按完工日期排序">完工日期 <span data-sort-mark="date"></span></th>
+              <th class="min-w-[96px] cursor-pointer select-none" onclick="setDashboardSort('date')" title="預設依 NO. 由大到小排序；點這裡可改按完工日期排序">完工日期 <span data-sort-mark="date"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('workingNo')">NO. <span data-sort-mark="workingNo"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vessel')">船名 <span data-sort-mark="vessel"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('voyage')">航次(I/E) <span data-sort-mark="voyage"></span></th>
@@ -3719,8 +3719,9 @@ function p79FocusLatestImportedVessel(force=false){
   select.value=month;
   const sort=document.getElementById('dashboardSortField');
   const dir=document.getElementById('dashboardSortDir');
-  if(sort)sort.value='importedAt';
-  if(dir)dir.value='desc';
+  // 新船匯入時恢復 NO. 排序；背景同步不得覆蓋使用者手動選擇的排序。
+  if(force && sort)sort.value='workingNo';
+  if(force && dir)dir.value='desc';
   summaryCurrentPage=1;
   summaryLastFilterMonth='';
   return true;
@@ -3730,7 +3731,7 @@ function filterAndSortDashboardJobs(list){
   const vesselQ=dashboardFilterText('dashboardFilterVessel');
   const wharfQ=dashboardFilterText('dashboardFilterWharf');
   const eff=String(document.getElementById('dashboardEfficiencyFilter')?.value||'');
-  const sortField=String(document.getElementById('dashboardSortField')?.value||'importedAt');
+  const sortField=String(document.getElementById('dashboardSortField')?.value||'workingNo');
   const sortDir=String(document.getElementById('dashboardSortDir')?.value||'desc');
 
   // 船名改為下拉點選；選 WAN HAI 103 就顯示全部 WAN HAI 103。
@@ -3775,7 +3776,7 @@ function setDashboardSort(field){
   renderAll();
 }
 function updateDashboardSortMarks(){
-  const f=String(document.getElementById('dashboardSortField')?.value||'importedAt');
+  const f=String(document.getElementById('dashboardSortField')?.value||'workingNo');
   const d=String(document.getElementById('dashboardSortDir')?.value||'desc');
   document.querySelectorAll('[data-sort-mark]').forEach(el=>{
     el.textContent=el.dataset.sortMark===f?(d==='asc'?'▲':'▼'):'';
@@ -7725,7 +7726,7 @@ function clearDashboardFilter(){
   const v=document.getElementById('dashboardFilterVessel');if(v)v.value='';
   const w=document.getElementById('dashboardFilterWharf');if(w)w.value='';
   const e=document.getElementById('dashboardEfficiencyFilter');if(e)e.value='';
-  const sf=document.getElementById('dashboardSortField');if(sf)sf.value='date';
+  const sf=document.getElementById('dashboardSortField');if(sf)sf.value='workingNo';
   const sd=document.getElementById('dashboardSortDir');if(sd)sd.value='desc';
   summaryCurrentPage=1;
   renderAll();
