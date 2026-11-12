@@ -1,10 +1,11 @@
 /* HR dashboard reference layout: standalone visual layer, no changes to master-data forms. */
 body.p79r-ready{background:#eef5fd!important;color:#122348!important}
-html body.p79-workspace.p79r-ready{padding:0!important;--p79-w-width:0px}
-html body.p79-workspace.p79r-ready #p79SevenTop.p79-workspace-sidebar,
-html body.p79-workspace.p79r-ready #p79WorkspaceTopbar,
-html body.p79-workspace.p79r-ready #p79WorkspaceStatus{display:none!important}
-html body.p79-workspace.p79r-ready #p79HrShellV103{display:block!important;position:sticky!important;top:0!important}
+html body.p79-workspace.p79r-ready{padding:78px 0 0!important;--p79-w-width:0px;--p79-hr-toolbar-height:76px}
+html body.p79-workspace.p79r-ready :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{display:none!important}
+html body.p79-workspace.p79r-ready #p79WorkspaceTopbar{display:flex!important;left:0!important}
+html body.p79-workspace.p79r-ready #p79WorkspaceStatus{display:block!important}
+html body.p79-workspace.p79r-ready #p79HrShellV103{display:block!important;position:sticky!important;top:var(--p79-hr-toolbar-height)!important;z-index:10000!important}
+@media(max-width:900px){html body.p79-workspace.p79r-ready{padding:66px 0 0!important;--p79-hr-toolbar-height:66px}html body.p79-workspace.p79r-ready #p79WorkspaceTopbar .p79-toolbar-user{display:flex!important}}
 body.p79r-ready main.wrap{max-width:none!important;width:100%!important;padding:12px 16px 22px!important}
 #p79HrShellV103{background:linear-gradient(115deg,#fafdff,#eaf4ff 60%,#f9fcff)!important;border-bottom:1px solid #c7d8e8!important;box-shadow:0 2px 10px #23477513!important;color:#142246!important}
 #p79HrShellV103 .p79r-top{display:flex;align-items:center;gap:16px;padding:10px 18px;min-height:65px;max-width:none;margin:0 auto}
