@@ -18,23 +18,36 @@ const P79_ORG_LEVELS=Object.freeze([
  ['sections','單位'],['jobTitles','職稱']
 ]);
 function p79OrgValue(employee,kind){
- const e=employee&&typeof employee==='object'?employee:{};
- const nested=[e.orgHierarchy,e.organization,e.orgPath].filter(v=>v&&typeof v==='object'&&!Array.isArray(v));
- const keys={
+ const person=employee&&typeof employee==='object'?employee:{};
+ const sources=[person,person.orgHierarchy,person.organization,person.orgPath]
+   .filter(v=>v&&typeof v==='object'&&!Array.isArray(v));
+ const aliases={
   headquarters:['headquarters','headquarter','headOffice'],
   divisions:['division','businessDivision','divisions'],
   offices:['office','businessOffice','offices'],
-  sections:['section','orgUnit','sections','unit'],
+  sections:['section','orgUnit','sections'],
   jobTitles:['jobTitle','deptDetail']
  }[kind]||[];
- for(const source of [e,...nested]){
-  for(const key of keys){
-   const v=source[key];
-   if(typeof v==='string'&&(v.trim()||key===keys[0]))return v.trim();
+ let explicit=false;
+ for(const source of sources)for(const field of aliases){
+  if(!Object.prototype.hasOwnProperty.call(source,field))continue;
+  explicit=true;
+  const result=typeof source[field]==='string'?source[field].trim():'';
+  if(result){
+   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))continue;
+   return result;
   }
  }
- // 舊欄位只有名稱明確寫出「事業部／事業處／總公司」時才能兼容顯示。
- const legacy=String(e.dept||'').trim();
+ if(explicit)return '';
+ if(kind==='sections'){
+  for(const source of sources){
+   const legacy=typeof source.unit==='string'?source.unit.trim():'';
+   if(legacy&&!/(?:總公司|事業部|事業處)$/.test(legacy))return legacy;
+  }
+  return '';
+ }
+ // Legacy parent levels only match explicit organization-type suffixes.
+ const legacy=String(person.dept??'').trim();
  if(kind==='divisions'&&/事業部$/.test(legacy))return legacy;
  if(kind==='offices'&&/事業處$/.test(legacy))return legacy;
  if(kind==='headquarters'&&/總公司$/.test(legacy))return legacy;
