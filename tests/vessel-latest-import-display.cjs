@@ -17,8 +17,12 @@ const fields={
 const old={workingNo:'5260218',vessel:'WAN HAI 175',firstDate:'2026-11-10',lastDate:'2026-11-11',workingSheetImportedAt:'2026-11-11T01:00:00Z'};
 const fresh={workingNo:'5260219',vessel:'WAN HAI 105',firstDate:'2026-10-29',lastDate:'2026-10-31',workingSheetImportedAt:'2026-11-12T02:01:00Z',
   workingSheetSource:{importedAt:'2026-11-12T02:01:00Z',totalContainers:816,hatches:26,totalMoves:816,shiftMoves:0,ruleVersion:'SHIFT_X2'}};
+const FixedDate=class extends Date {
+  constructor(...args){super(...(args.length?args:[Date.parse('2026-11-12T02:02:00Z')]));}
+  static now(){return Date.parse('2026-11-12T02:02:00Z');}
+};
 const ctx={
-  console,Date,Math,Number,String,Set,Array,
+  console,Date:FixedDate,Math,Number,String,Set,Array,
   document:{getElementById:id=>fields[id]},
   shipMasters:[old,fresh],shipManualOverrideCache:{},summaryCurrentPage:2,summaryLastFilterMonth:'prior',
   p79DashboardMonthSelectionExplicit:false,
