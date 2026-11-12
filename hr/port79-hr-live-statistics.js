@@ -51,7 +51,7 @@ async function get(action,month,auth,ms=30000){
  // Leave's existing endpoint returns the full ledger; filter dates locally.
  if(action!=='getLeaveData')url.searchParams.set('month',month);
  url.searchParams.set('token',auth);
- url.searchParams.set('gcToken',auth);
+ if(action!=='getLeaveData')url.searchParams.set('gcToken',auth);
  url.searchParams.set('_',String(Date.now()));
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
  try{
@@ -106,6 +106,12 @@ function showWeek({records,schedules,leaves,employees,day}){
  '<p class="p79r-note">已核對 '+completed.length+'/7 日；缺資料的日期顯示「—」，不推估。</p>'+
  '<a class="p79r-link" href="../attendance/">查看考勤明細 ›</a>';
 }
+function missingSources(scope,payload){
+ const services=[['attendance','考勤'],['schedule','排班'],['leave','請假']];
+ const issues=services.filter(([key])=>!scope[key]||payload?.[key]?.status!=='fulfilled')
+ .map(([key,label])=>label+'：'+(!scope[key]?'此帳號無檢視權限':readFailure(payload?.[key])));
+ return issues.length?'尚未讀齊：'+issues.join('；'):'';
+}
 function resetDonut(){
  const center=$('p79rActiveDonut'),label=$('p79rDonutLabel'),note=$('p79rDonutNote');
  if(label)label.textContent='在職人數';
@@ -119,7 +125,7 @@ function originalViewUnavailable(scope,payload){
  else panel('p79rMonthlyLeavePanel',{detail:'目前帳號沒有請假檢視權限',href:'../leave/',label:'請假管理'});
  if(scope.schedule&&scope.workhours)panel('p79rMonthlyOvertimePanel',{detail:readFailure(payload.schedule),href:'../work-hours/',label:'工時／加班'});
  else panel('p79rMonthlyOvertimePanel',{detail:'需要排班及工時檢視權限',href:'../work-hours/',label:'工時／加班'});
- panel('p79rWeekAttendance',{detail:'需考勤、班表和請假三種正式資料完成核對',href:'../attendance/',label:'考勤管理'});
+ panel('p79rWeekAttendance',{detail:missingSources(scope,payload)||'需考勤、班表和請假三種正式資料完成核對',href:'../attendance/',label:'考勤管理'});
  panel('p79rDayAttendanceDetail',{detail:'請從考勤系統核對真實打卡與補登資料',href:'../attendance/',label:'查看打卡明細'});
 }
 function display(payload,scope,day){
@@ -179,8 +185,7 @@ function display(payload,scope,day){
    showWeek({records:attendanceRows(attendanceResult),schedules:officialSchedules(scheduleResult),
      leaves:leaveRows(leaveResult),employees:all,day});
   }catch(e){sourceText('p79rAttendance','當日打卡與班表未核對完成')}
- }else if(scope.attendance&&scope.schedule&&scope.leave)sourceText('p79rAttendance','正式打卡／班表／請假尚未讀齊');
- else sourceText('p79rAttendance','需要考勤、排班與請假檢視權限');
+ }else sourceText('p79rAttendance',missingSources(scope,payload)||'考勤、班表與請假尚未核對完整');
 }
 function reset(msg){
  resetDonut();
