@@ -1674,7 +1674,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
         <div class="p79pr-filter-status"><span id="weeklyScheduleGroupState" role="status"></span><span id="p79prFreshness" role="status" aria-live="polite"></span><button type="button" class="text-sky-700 underline" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
         <div id="weeklyGroupButtons" hidden></div>
         <div class="p79pr-kpis" aria-label="人員作業量八大統計">
-          <div class="p79pr-kpi navy"><span class="p79pr-icon">♟</span><div class="p79pr-inner"><div class="p79pr-name">作業人數</div><div class="p79pr-value" id="p79prPeople">—</div><div class="p79pr-hint">不重複人員</div></div></div>
+          <div class="p79pr-kpi navy"><span class="p79pr-icon">♟</span><div class="p79pr-inner"><div class="p79pr-name">作業人數</div><div class="p79pr-value" id="p79prPeople">—</div><div class="p79pr-hint">人資在職 AQC · 本期有作業</div></div></div>
           <div class="p79pr-kpi "><span class="p79pr-icon">▤</span><div class="p79pr-inner"><div class="p79pr-name">作業筆數</div><div class="p79pr-value" id="p79prCount">—</div><div class="p79pr-hint">WORKING REPORT</div></div></div>
           <div class="p79pr-kpi "><span class="p79pr-icon">◷</span><div class="p79pr-inner"><div class="p79pr-name">總作業時數</div><div class="p79pr-value" id="p79prHours">—</div><div class="p79pr-hint">小時</div></div></div>
           <div class="p79pr-kpi "><span class="p79pr-icon">⇩</span><div class="p79pr-inner"><div class="p79pr-name">卸櫃 DISC</div><div class="p79pr-value" id="p79prDisc">—</div><div class="p79pr-hint">逐筆明細合計</div></div></div>
@@ -7443,7 +7443,88 @@ function renderPersonnelGroupCards(persons){
   if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-2"><div class="font-bold text-amber-800 text-xs mb-2">組別待核對（${unassigned.length} 人，含未載入或未對應排班）</div>${table(unassigned)}</div>`:'';
 }
 
+
+// Personnel overview must not infer current AQC membership from historical WORKING REPORT.
+let p79PersonnelRosterReadPromise=null,p79PersonnelRosterReadAt=0;
+function p79VerifiedAqcReportView(sourceRows){
+  const rows=Array.isArray(sourceRows)?sourceRows:[];
+  if(p79AqcHeadcountVerified!==true)return {verified:false,rows:[],persons:[],rosterCount:0,excluded:rows.length};
+  const official=Array.isArray(systemEmployees)?systemEmployees:[];
+  const employeeId=e=>String(e?.empId||e?.employeeId||e?.id||e?.['工號']||e?.attNo||e?.attendanceNo||e?.attendanceId||e?.['考勤號碼']||'').trim().toUpperCase();
+  const employeeName=e=>String(e?.name||e?.employeeName||e?.['姓名']||'').trim();
+  const normName=e=>normalizePersonName(displayPersonName(employeeName(e)));
+  const allNames=new Map(),activeIds=new Map(),activeNames=new Map(),statusById=new Map();
+  for(const e of official){
+    const id=employeeId(e),name=normName(e),identity=id||('NAME:'+name);
+    if(!name)continue;
+    if(!allNames.has(name))allNames.set(name,new Set());
+    allNames.get(name).add(identity);
+    if(id){
+      if(!statusById.has(id))statusById.set(id,new Set());
+      statusById.get(id).add(isAqcEmployee(e)?'aqc':'not-aqc');
+    }
+    if(!isAqcEmployee(e))continue;
+    const entry={id:identity,name:employeeName(e)};
+    if(id)activeIds.set(id,entry);
+    if(!activeNames.has(name))activeNames.set(name,new Map());
+    activeNames.get(name).set(identity,entry);
+  }
+  const rosterIds=new Set([...activeNames.values()].flatMap(m=>[...m.keys()]).filter(id=>!statusById.has(id)||statusById.get(id).size===1));
+  const persons=new Map(),matched=[];
+  for(const r of rows){
+    const name=normalizePersonName(displayPersonName(r?.name||''));
+    const rawId=String(r?.empId||r?.employeeId||'').trim().toUpperCase();
+    const hasRealId=!!rawId&&!rawId.startsWith('NAME:');
+    let e=hasRealId?activeIds.get(rawId):null;
+    if(hasRealId&&statusById.get(rawId)?.size>1)e=null;
+    if(!hasRealId&&name&&allNames.get(name)?.size===1&&activeNames.get(name)?.size===1){
+      e=[...activeNames.get(name).values()][0];
+      if(statusById.get(e.id)?.size>1)e=null;
+    }
+    // Never reassign a known, but inactive/wrong employee ID via name matching.
+    if(!e)continue;
+    const row={...r,empId:e.id,name:e.name};
+    matched.push(row);
+    const key=e.id,measure=workloadRecordMetrics(row),date=String(row.workDate||'');
+    const group=operationGroupForRecord(row),validGroup=!!personnelGroupCode(group);
+    if(!persons.has(key))persons.set(key,{empId:e.id.startsWith('NAME:')?'':e.id,name:e.name,group,groupDate:'',hasVerifiedGroup:false,rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
+    const person=persons.get(key);
+    if((validGroup&&(!person.hasVerifiedGroup||date>=person.groupDate))||(!person.hasVerifiedGroup&&date>=person.groupDate)){
+      person.groupDate=date;person.group=group;person.hasVerifiedGroup=validGroup;
+    }
+    person.rows.push(row);
+    person.hours+=measure.hours;person.disc+=measure.disc;person.load+=measure.load;person.hc+=measure.hc;person.containers+=measure.containers;
+  }
+  return {verified:true,rows:matched,persons:[...persons.values()].map(p=>({...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0})),rosterCount:rosterIds.size,excluded:rows.length-matched.length};
+}
+function p79EnsureFreshOfficialAqcRoster(){
+  if(typeof requireEfficiencyAccess!=='function'||!requireEfficiencyAccess()||!String(gcToken||''))return;
+  if(p79PersonnelRosterReadPromise)return;
+  // Revalidate the actual HR endpoint upon entering personnel statistics and periodically thereafter.
+  if(Date.now()-p79PersonnelRosterReadAt<(p79AqcHeadcountVerified?60000:10000))return;
+  p79PersonnelRosterReadAt=Date.now();
+  p79AqcHeadcountVerified=false;
+  p79PersonnelRosterReadPromise=(async()=>{
+    try{
+      const result=await apiGet('gcGetEmployees');
+      if(!Array.isArray(result?.employees)||!result.employees.length)throw Error('人資 API 沒有回傳可驗證名冊');
+      systemEmployees=result.employees.map(normalizeCloudEmployee).filter(Boolean);
+      p79AqcHeadcountVerified=true;
+      saveLocal();
+      updateCurrentAqcHeadcount();
+      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      return true;
+    }catch(error){
+      p79AqcHeadcountVerified=false;
+      console.warn('人員統計人資名冊核對失敗',error);
+      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      return false;
+    }finally{p79PersonnelRosterReadPromise=null;}
+  })();
+}
+
 function renderWeeklyEfficiency(){
+  if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
   ensureOperationScheduleGroups(weeklyFilteredRecords(true));
@@ -7584,7 +7665,10 @@ function renderWeeklyEfficiency(){
   }
   renderPersonnelGroupCards(filteredPersons);
   renderPersonnelRecords(rs);
-  window.P79PersonnelReference?.render({rows:rs,persons:filteredPersons,metrics:workloadRecordMetrics,groupCode:personnelGroupCode});
+  if(typeof p79VerifiedAqcReportView==='function'&&typeof window!=='undefined'){
+    const hrView=p79VerifiedAqcReportView(rs);
+    window.P79PersonnelReference?.render({rows:hrView.rows,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
+  }
 }
 
 function renderAll(){
@@ -9377,9 +9461,10 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     // gcGetData 已經帶回當下的員工清單；先用這份立即顯示，不再為了第二支人資請求卡住船舶資料畫面。
     let employeeSource='本機備援';
     if(Array.isArray(d?.systemEmployees)&&d.systemEmployees.length){
-      systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
-      p79AqcHeadcountVerified=false;
-      employeeSource='系統同步員工主檔';
+      if(!p79AqcHeadcountVerified){
+        systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
+        employeeSource='系統同步員工主檔（尚待人資核對）';
+      }
     }
 
     if(d?.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
@@ -9509,9 +9594,10 @@ async function syncFromCloud(force=false){
    }
    let employeeSource='本機備援';
    if(Array.isArray(d?.systemEmployees)&&d.systemEmployees.length){
-     systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
-     p79AqcHeadcountVerified=false;
-     employeeSource='系統同步員工主檔';
+     if(!p79AqcHeadcountVerified){
+       systemEmployees=d.systemEmployees.map(normalizeCloudEmployee).filter(Boolean);
+       employeeSource='系統同步員工主檔（尚待人資核對）';
+     }
    }
 
    if(d.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
@@ -15980,7 +16066,7 @@ window.addEventListener('load',function(){
 #p79GateImportDialogStatus[data-kind="success"]{color:#047857}
 .p79-gate-dialog-actions{display:flex;justify-content:flex-end}
 </style>
-<script src="./personnel-reference-dashboard.js?v=20261111-scroll-all-v2"></script>
+<script src="./personnel-reference-dashboard.js?v=20261112-verified-aqc-v1"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261111-v2">
 <script src="./driver-workstation-dashboard.js?v=20261111-v2"></script>
