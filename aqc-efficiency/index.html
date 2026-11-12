@@ -7443,7 +7443,87 @@ function renderPersonnelGroupCards(persons){
   if(other)other.innerHTML=unassigned.length?`<div class="border border-amber-200 rounded-xl p-2"><div class="font-bold text-amber-800 text-xs mb-2">組別待核對（${unassigned.length} 人，含未載入或未對應排班）</div>${table(unassigned)}</div>`:'';
 }
 
+
+// Personnel overview must not infer current AQC membership from historical WORKING REPORT.
+let p79PersonnelRosterReadPromise=null,p79PersonnelRosterReadAt=0;
+function p79VerifiedAqcReportView(sourceRows){
+  const rows=Array.isArray(sourceRows)?sourceRows:[];
+  if(p79AqcHeadcountVerified!==true)return {verified:false,rows:[],persons:[],rosterCount:0,excluded:rows.length};
+  const official=Array.isArray(systemEmployees)?systemEmployees:[];
+  const employeeId=e=>String(e?.empId||e?.employeeId||e?.id||e?.['工號']||e?.attNo||e?.attendanceNo||e?.attendanceId||e?.['考勤號碼']||'').trim().toUpperCase();
+  const employeeName=e=>String(e?.name||e?.employeeName||e?.['姓名']||'').trim();
+  const normName=e=>normalizePersonName(displayPersonName(employeeName(e)));
+  const allNames=new Map(),activeIds=new Map(),activeNames=new Map(),statusById=new Map();
+  for(const e of official){
+    const id=employeeId(e),name=normName(e),identity=id||('NAME:'+name);
+    if(!name)continue;
+    if(!allNames.has(name))allNames.set(name,new Set());
+    allNames.get(name).add(identity);
+    if(id){
+      if(!statusById.has(id))statusById.set(id,new Set());
+      statusById.get(id).add(isAqcEmployee(e)?'aqc':'not-aqc');
+    }
+    if(!isAqcEmployee(e))continue;
+    const entry={id:identity,name:employeeName(e)};
+    if(id)activeIds.set(id,entry);
+    if(!activeNames.has(name))activeNames.set(name,new Map());
+    activeNames.get(name).set(identity,entry);
+  }
+  const rosterIds=new Set([...activeNames.values()].flatMap(m=>[...m.keys()]).filter(id=>!statusById.has(id)||statusById.get(id).size===1));
+  const persons=new Map(),matched=[];
+  for(const r of rows){
+    const name=normalizePersonName(displayPersonName(r?.name||''));
+    const rawId=String(r?.empId||r?.employeeId||'').trim().toUpperCase();
+    const hasRealId=!!rawId&&!rawId.startsWith('NAME:');
+    let e=hasRealId?activeIds.get(rawId):null;
+    if(hasRealId&&statusById.get(rawId)?.size>1)e=null;
+    if(!hasRealId&&name&&allNames.get(name)?.size===1&&activeNames.get(name)?.size===1){
+      e=[...activeNames.get(name).values()][0];
+      if(statusById.get(e.id)?.size>1)e=null;
+    }
+    // Never reassign a known, but inactive/wrong employee ID via name matching.
+    if(!e)continue;
+    const row={...r,empId:e.id.startsWith('NAME:')?e.id:e.id,name:e.name};
+    matched.push(row);
+    const key=e.id,measure=workloadRecordMetrics(row),date=String(row.workDate||'');
+    const group=operationGroupForRecord(row),validGroup=!!personnelGroupCode(group);
+    if(!persons.has(key))persons.set(key,{empId:e.id.startsWith('NAME:')?'':e.id,name:e.name,group,groupDate:'',hasVerifiedGroup:false,rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
+    const person=persons.get(key);
+    if((validGroup&&(!person.hasVerifiedGroup||date>=person.groupDate))||(!person.hasVerifiedGroup&&date>=person.groupDate)){
+      person.groupDate=date;person.group=group;person.hasVerifiedGroup=validGroup;
+    }
+    person.rows.push(row);
+    person.hours+=measure.hours;person.disc+=measure.disc;person.load+=measure.load;person.hc+=measure.hc;person.containers+=measure.containers;
+  }
+  return {verified:true,rows:matched,persons:[...persons.values()].map(p=>({...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0})),rosterCount:rosterIds.size,excluded:rows.length-matched.length};
+}
+function p79EnsureFreshOfficialAqcRoster(){
+  if(typeof requireEfficiencyAccess!=='function'||!requireEfficiencyAccess()||!String(gcToken||''))return;
+  if(p79PersonnelRosterReadPromise)return;
+  // Revalidate the actual HR endpoint upon entering personnel statistics and periodically thereafter.
+  if(Date.now()-p79PersonnelRosterReadAt<60000)return;
+  p79PersonnelRosterReadAt=Date.now();
+  p79PersonnelRosterReadPromise=(async()=>{
+    try{
+      const result=await apiGet('gcGetEmployees');
+      if(!Array.isArray(result?.employees)||!result.employees.length)throw Error('人資 API 沒有回傳可驗證名冊');
+      systemEmployees=result.employees.map(normalizeCloudEmployee).filter(Boolean);
+      p79AqcHeadcountVerified=true;
+      saveLocal();
+      updateCurrentAqcHeadcount();
+      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      return true;
+    }catch(error){
+      p79AqcHeadcountVerified=false;
+      console.warn('人員統計人資名冊核對失敗',error);
+      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      return false;
+    }finally{p79PersonnelRosterReadPromise=null;}
+  })();
+}
+
 function renderWeeklyEfficiency(){
+  p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
   ensureOperationScheduleGroups(weeklyFilteredRecords(true));
@@ -7584,7 +7664,8 @@ function renderWeeklyEfficiency(){
   }
   renderPersonnelGroupCards(filteredPersons);
   renderPersonnelRecords(rs);
-  window.P79PersonnelReference?.render({rows:rs,persons:filteredPersons,metrics:workloadRecordMetrics,groupCode:personnelGroupCode});
+  const hrView=p79VerifiedAqcReportView(rs);
+  window.P79PersonnelReference?.render({rows:hrView.rows,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
 }
 
 function renderAll(){
