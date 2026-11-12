@@ -102,7 +102,7 @@ function mountDashboard(){
  card('⏸','留職停薪','p79rLeaveStatus','依現有人資主檔','amber'),
  '</div>',
  '<div class="p79r-grid-top">',
- panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>指揮手</th><th>AQC</th><th>ARMG</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
+ panel('各單位人員統計（在職）','<div class="p79r-dept-scroller" role="region" tabindex="0" aria-label="職稱統計表，可水平捲動"><table aria-label="各單位依職稱統計在職人數"><thead><tr id="p79rDeptHead"><th>單位</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="3">讀取人資主檔中…</td></tr></tbody></table></div>'),
  panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span>在職人數<br><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" style="text-align:center">出勤／請假／未出勤人數需要考勤即時資料，不能以在職人數推估。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
  panel('出勤率趨勢（近7日）','<div class="p79r-empty"><div class="big">—</div><div>尚未接入考勤日結數據</div><a class="p79r-link" href="../attendance/">前往考勤管理查看正式統計 ›</a></div>'),
  '</div>',
@@ -148,35 +148,66 @@ function updateCounts(records,anchor,ready){
  text('p79rAttendance','—');text('p79rLeaves','—');text('p79rOvertime','—');
  return {active:active,resigned:resigned,hires:hires,leavers:leavers};
 }
-function workerTitle(e){
- // HR's actual job title fields; do not use employmentType, which is optional.
- var raw=String(e.jobTitle||e.deptDetail||'').normalize('NFKC').trim().toUpperCase();
- var key=raw.replace(/[\s\/_-]+/g,'');
- if(key==='指揮手')return 'commander';
- if(key==='AQC')return 'aqc';
- if(key==='ARMG')return 'armg';
- return 'other';
+// The list of titles comes from HR organization settings and the currently active HR roster.
+function p79DashTitle(value){
+ var label=String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ');
+ if(/^AR\s*[\/_-]?\s*MG$/i.test(label))return 'ARMG';
+ if(/^F\s*[\/_-]?\s*L$/i.test(label))return 'F/L';
+ if(/^AQC$/i.test(label))return 'AQC';
+ return label;
+}
+function p79DashTitleKey(value){
+ return p79DashTitle(value).replace(/\s+/g,'').toUpperCase();
+}
+function p79DashConfiguredTitles(){
+ // orgSettings is the live HR configuration variable in hr/index.html.
+ try{return typeof orgSettings!=='undefined'&&Array.isArray(orgSettings.jobTitles)?orgSettings.jobTitles:[]}
+ catch(e){return []}
 }
 function updateDepartments(active){
- var byDept=new Map();
+ var missingKey='__P79_UNSET_TITLE__';
+ var labels=new Map(),titleTotals=new Map(),byDept=new Map();
+ function register(raw){
+   var label=p79DashTitle(raw);
+   if(!label)return '';
+   var key=p79DashTitleKey(label);
+   if(!labels.has(key))labels.set(key,label);
+   return key;
+ }
+ // Include configured titles even if nobody currently holds the title (show zero).
+ p79DashConfiguredTitles().forEach(register);
  active.forEach(function(e){
    var name=String(e.dept||e.unit||'未設定單位').trim()||'未設定單位';
-   if(!byDept.has(name))byDept.set(name,{total:0,commander:0,aqc:0,armg:0,other:0,missing:0});
-   var obj=byDept.get(name);obj.total++;
-   var kind=workerTitle(e);obj[kind]++;
-   if(kind==='other'&&!String(e.jobTitle||e.deptDetail||'').trim())obj.missing++;
+   if(!byDept.has(name))byDept.set(name,{total:0,counts:new Map()});
+   var unit=byDept.get(name);unit.total++;
+   var rawTitle=e.jobTitle||e.deptDetail||'';
+   var key=register(rawTitle)||missingKey;
+   if(key===missingKey&&!labels.has(key))labels.set(key,'未填職稱');
+   unit.counts.set(key,(unit.counts.get(key)||0)+1);
+   titleTotals.set(key,(titleTotals.get(key)||0)+1);
  });
+ // All titles are shown as their own column, including newly introduced titles.
+ var titles=Array.from(labels.entries()).sort(function(a,b){
+   if(a[0]===missingKey)return 1;
+   if(b[0]===missingKey)return -1;
+   return (titleTotals.get(b[0])||0)-(titleTotals.get(a[0])||0)||
+     a[1].localeCompare(b[1],'zh-TW',{numeric:true});
+ });
+ var head=byId('p79rDeptHead'),tbody=byId('p79rDepts');
+ if(!head||!tbody)return;
+ head.innerHTML='<th>單位</th>'+titles.map(function(t){return '<th>'+esc(t[1])+'</th>'}).join('')+'<th>合計</th><th>占比</th>';
+ var columnCount=titles.length+3;
+ if(!active.length){tbody.innerHTML='<tr><td colspan="'+columnCount+'">目前沒有可核對的在職員工</td></tr>';return}
  var departments=Array.from(byDept.entries()).sort(function(a,b){return b[1].total-a[1].total||a[0].localeCompare(b[0],'zh-TW')});
- var tbody=byId('p79rDepts');if(!tbody)return;
- if(!departments.length){tbody.innerHTML='<tr><td colspan="6">目前沒有可核對的在職員工</td></tr>';return}
- var sum={total:0,commander:0,aqc:0,armg:0,other:0,missing:0};
  tbody.innerHTML=departments.map(function(item){
-   var o=item[1],pct=(o.total/active.length*100).toFixed(1)+'%';
-   Object.keys(sum).forEach(function(k){sum[k]+=o[k]});
-   return '<tr><td>'+esc(item[0])+'</td><td>'+n(o.commander)+'</td><td>'+n(o.aqc)+'</td><td>'+n(o.armg)+'</td><td><b>'+n(o.total)+'</b></td><td>'+pct+'</td></tr>';
+   var unit=item[1],pct=(unit.total/active.length*100).toFixed(1)+'%';
+   return '<tr><td>'+esc(item[0])+'</td>'+titles.map(function(t){
+     return '<td>'+n(unit.counts.get(t[0])||0)+'</td>';
+   }).join('')+'<td><b>'+n(unit.total)+'</b></td><td>'+pct+'</td></tr>';
  }).join('')+
- '<tr style="background:#e4f1ff;font-weight:900"><td>合計</td><td>'+n(sum.commander)+'</td><td>'+n(sum.aqc)+'</td><td>'+n(sum.armg)+'</td><td>'+n(sum.total)+'</td><td>100.0%</td></tr>'+
- (sum.other?'<tr><td colspan="6" style="text-align:left;font-size:12px">其他職稱 '+n(sum.other)+' 人（含未填職稱 '+n(sum.missing)+' 人），已計入合計</td></tr>':'');
+ '<tr style="background:#e4f1ff;font-weight:900"><td>合計</td>'+
+ titles.map(function(t){return '<td>'+n(titleTotals.get(t[0])||0)+'</td>'}).join('')+
+ '<td>'+n(active.length)+'</td><td>100.0%</td></tr>';
 }
 function updateAlerts(records,anchor,data){
  var recent=records.filter(function(e){var date=parseDate(e.terminationDate);return status(e,anchor)==='resigned'&&date&&date<=anchor&&date>=ymd(new Date(new Date(anchor+'T12:00:00').getTime()-6*86400000))}).length;
