@@ -14,7 +14,7 @@ const multi=M.attendanceDetails({employees:staff,day:'2026-11-01',shifts:[{empId
 
 const src=fs.readFileSync('hr/port79-hr-live-statistics.js','utf8');
 async function run({denied=false,failed=false,stale=false,day='2026-11-01',hiddenTitles=[]}={}){
- const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:id==='p79rWorkDate'?day:'',innerHTML:'',textContent:'',style:{},closest:()=>({style:{}})});return nodes.get(id)};
+ const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:id==='p79rWorkDate'?day:'',innerHTML:'',textContent:'',style:{},closest:()=>({style:{},classList:{toggle(){}},setAttribute(){}})});return nodes.get(id)};
  const session=denied?{empId:'viewer',adminRole:'admin',systemPermissions:{hr:'view'}}:{empId:'admin',adminRole:'superadmin'};
  const requests=[],doc={getElementById:node,addEventListener(){}},window={P79HrVerifiedMetrics:M,P79AttendanceV6:E};
  const box={window,document:doc,orgSettings:{hiddenJobTitles:hiddenTitles},employees:staff,p79HrCloudDataReady:true,token:'TEST',Date,Intl,URL,AbortController,setTimeout,clearTimeout,console,sessionStorage:{getItem:k=>k==='port79_user_token'?'TEST':k==='port79_user_session'?JSON.stringify(session):k==='port79_gas_url'?'https://script.google.com/macros/s/TEST/exec':null},fetch:async url=>{const u=new URL(url),action=u.searchParams.get('action'),month=u.searchParams.get('month');requests.push([action,month]);if(stale)box.token='OTHER';let data;
@@ -31,6 +31,9 @@ async function run({denied=false,failed=false,stale=false,day='2026-11-01',hidde
  assert(x.node('p79rLeaveSummary').innerHTML.includes('100.0%'));
  assert(x.node('p79rLeaveSummary').innerHTML.includes('conic-gradient'));
  assert(x.node('p79rOvertimeSummary').innerHTML.includes('p79r-breakdown-donut'));assert.equal((x.node('p79rAttendanceTrend').innerHTML.match(/p79r-trend-row/g)||[]).length,7);
+ assert.equal(x.node('p79rDonutCaption').textContent,'正式出勤率');
+ assert.equal(x.node('p79rActiveDonut').textContent,'100.0%');
+ assert(x.node('p79rDonutSource').textContent.includes('1 人應到'),'the percentage must use the official expected denominator');
  assert(x.requests.some(([a,m])=>a==='getAttendanceMonthData'&&m==='2026-10'));assert(!x.requests.some(([a,m])=>a==='getScheduleDataSecure'&&m==='2026-12'),'future month schedule is unnecessary');
  x=await run({hiddenTitles:['指揮手']});
  assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'),'hidden title must not expose employee in the dashboard');
@@ -41,7 +44,16 @@ async function run({denied=false,failed=false,stale=false,day='2026-11-01',hidde
  x=await run({hiddenTitles:['指揮手','行政']});
  assert(x.node('p79rAttendanceDetails').innerHTML.includes('目前沒有可顯示的人員'));
  x=await run({failed:true});assert(x.node('p79rLeaveSummary').innerHTML.includes('連線'));assert(!x.node('p79rLeaveSummary').innerHTML.includes('0 人次'));assert(x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'));
+ assert.equal(x.node('p79rDonutCaption').textContent,'打卡覆蓋率');
+ assert.equal(x.node('p79rActiveDonut').textContent,'50.0%','observed 1 of 2 staff is not a fabricated official attendance rate');
+ assert(x.node('p79rDonutSource').textContent.includes('非正式出勤率'));
+ assert(x.node('p79rAttendanceTrend').innerHTML.includes('打卡覆蓋率'));
+ assert(x.node('p79rAttendanceTrend').innerHTML.includes('核准請假：讀取失敗'));
+ assert.equal((x.node('p79rAttendanceTrend').innerHTML.match(/p79r-trend-row/g)||[]).length,7);
  x=await run({denied:true});assert.equal(x.requests.length,0);assert(x.node('p79rAttendanceDetails').innerHTML.includes('權限'));assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'));
+ assert.equal(x.node('p79rActiveDonut').textContent,'—','missing permission must not show fake 0%');
+ assert(x.node('p79rAttendanceTrend').innerHTML.includes('沒有資料檢視權限'));
+ assert(!x.node('p79rAttendanceTrend').innerHTML.includes('50.0%'));
  x=await run({stale:true});assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'));assert(!x.node('p79rLeaveSummary').innerHTML.includes('事假'));
- console.log('PASS HR panels: cross-month reads, paired night shift, roster denominator, empty ledger, classifications, escaping, scope filtering, partial outage and denied access');
+ console.log('PASS HR panels: accurate formal and provisional ratios, visible source failures, no unauthorized percentages, cross-month reads, roster scope and chart output');
 })().catch(e=>{console.error(e);process.exitCode=1});
