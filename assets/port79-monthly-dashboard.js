@@ -326,7 +326,9 @@ function analyzeOvertime(data,month){
    const r=meta?.overtimeReport;
    const date=p79HomeOvertimeDate(rawDate,r,month);
    if(!date.startsWith(month+'-')||!r?.id||seen.has(String(r.id))||
-      r.deleted===true||r.revoked===true||meta?.overtimeExcluded===true||
+      r.deleted===true||r.isDeleted===true||r.revoked===true||r.cancelled===true||r.canceled===true||
+      !!r.deletedAt||!!r.cancelledAt||!!r.canceledAt||meta?.overtimeExcluded===true||
+      (meta?.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId||'')===String(r.id))||
       /撤銷|刪除|取消|revoked|cancel/i.test(String(r.status||'')))continue;
    const h=num(r.declaredHours??r.rule?.declaredHours);
    if(h===null||h<0)continue;
