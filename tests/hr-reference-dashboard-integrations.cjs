@@ -90,6 +90,18 @@ test('unit job titles expand while legacy departments are not treated as units',
  ctx.updateDepartments([...active,{dept:'第二事業處',unit:'碼頭作業課',jobTitle:'ARMG'}]);
  assert.equal((head.innerHTML.match(/<th>ARMG<\/th>/g)||[]).length,1);
 });
+test('hidden HR titles do not appear in statistics, without changing headcounts',()=>{
+ const from=dashboard.indexOf('function p79DashTitle('),to=dashboard.indexOf('function updateAlerts(',from);
+ const head={innerHTML:''},body={innerHTML:''},ctx={Map,Set,Intl,orgSettings:{jobTitles:['AQC','領班'],hiddenJobTitles:['領班']},
+ byId:id=>id==='p79rDepts'?body:id==='p79rDeptHead'?head:null,esc:x=>String(x),n:x=>String(x)};
+ vm.createContext(ctx);vm.runInContext(dashboard.slice(from,to),ctx);
+ ctx.updateDepartments([{dept:'第二事業處',jobTitle:'AQC'},{dept:'第二事業處',jobTitle:'領班'}]);
+ assert(!head.innerHTML.includes('<th>領班</th>'));
+ assert(body.innerHTML.includes('<td>2</td><td>100.0%</td>'));
+ assert(body.innerHTML.includes('另有 1 位在職人員的職稱已隱藏'));
+ ctx.orgSettings.hiddenJobTitles=[];ctx.updateDepartments([{dept:'第二事業處',jobTitle:'AQC'},{dept:'第二事業處',jobTitle:'領班'}]);
+ assert(head.innerHTML.includes('<th>領班</th>'));
+});
 test('shared navigation preserves the mounted horizontal HR header',()=>{
  const shared=fs.readFileSync('assets/port79-seven-top.js','utf8');
  const source=shared.slice(shared.indexOf('function p79NormalizeLegacyTop(sys){'),shared.indexOf('\nfunction mount(){',shared.indexOf('function p79NormalizeLegacyTop(sys){')));

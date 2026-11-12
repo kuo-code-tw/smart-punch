@@ -33,7 +33,7 @@
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261109-month-to-date-no-card-v1"></script>
-<script src="../assets/port79-schedule-transfer-roles.js?v=20261021-role-picker"></script>
+<script src="../assets/port79-schedule-transfer-roles.js?v=20261112-title-visibility-v1"></script>
 <script id="p79-default-light-v20261001">
 (function(){
   try{
@@ -2709,6 +2709,39 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
     const MAIN_ROLES = ['領班', '指揮手', 'AQC', 'ARMG', 'F/L'];
     const ALL_ROLE_ORDER = ['領班', '指揮手', 'AQC', 'ARMG', 'F/L', '課長', '主任', '副理'];
+    // Authorized, read-only HR visibility; NEVER alter schedule/personnel source records.
+    let p79ScheduleHiddenJobTitles=new Set(),p79ScheduleTitleVisibilityCheckedAt=0;
+    function p79ScheduleTitleKey(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s\/_-]+/g,'').toUpperCase()}
+    function p79ScheduleTitleHidden(role){return p79ScheduleHiddenJobTitles.has(p79ScheduleTitleKey(role))}
+    function p79ScheduleTitleLabel(role){return p79ScheduleTitleHidden(role)?'其他職稱':String(role||'其他職稱')}
+    window.P79ScheduleTitleHidden=p79ScheduleTitleHidden;
+    async function p79ScheduleReadHiddenJobTitles(){
+      const auth=currentPort79SsoToken();
+      if(!auth)return false;
+      p79ScheduleTitleVisibilityCheckedAt=Date.now();
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),14000);
+      try{
+        const url=new URL(GAS_URL);
+        for(const [key,value] of Object.entries({action:'getData',token:auth,gcToken:auth,_:Date.now()}))url.searchParams.set(key,value);
+        const response=await fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:controller.signal});
+        if(!response.ok)throw Error('HTTP '+response.status);
+        const data=await response.json();
+        if(data?.ok!==true||!data.config||typeof data.config!=='object')throw Error('職稱顯示設定無法核對');
+        const raw=data.config.hrOrgOptionsV2?.hiddenJobTitles;
+        if(raw!==undefined&&!Array.isArray(raw))throw Error('隱藏職稱設定格式錯誤');
+        if(auth!==currentPort79SsoToken())return false;
+        p79ScheduleHiddenJobTitles=new Set((raw||[]).map(p79ScheduleTitleKey).filter(Boolean));
+        if(p79ScheduleTitleHidden(activeRoleTab)){
+          activeRoleTab='';
+          try{sessionStorage.removeItem('port79_schedule_active_role_tab')}catch(e){}
+        }
+        if(p79ScheduleTitleHidden(mgmtRoleFilter))mgmtRoleFilter='ALL';
+        if(document.getElementById('main-role-tabs-container'))buildRoleTabsAndRender();
+        return true;
+      }catch(e){console.warn('排班職稱隱藏設定暫不可用，原始班表不受影響',e);return false}
+      finally{clearTimeout(timer)}
+    }
+
 
     let availableGroups = ['不分組', '不輪班'];
     let scheduleRoleGroupOptions = {};
@@ -3356,14 +3389,14 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
           : '';
         const activeBadge=scheduleDutyBadge(x.shift,x.emp?.id,true,x.dateKey);
 
-        return `<div class="today-person-row" title="${scheduleEscapeHtml(x.emp?.name||'')}｜${scheduleEscapeHtml(x.emp?.role||'')}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}">
+        return `<div class="today-person-row" title="${scheduleEscapeHtml(x.emp?.name||'')}｜${scheduleEscapeHtml(p79ScheduleTitleLabel(x.emp?.role))}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}">
           <div class="today-person-name">
             <span>${scheduleEscapeHtml(x.emp?.name||'—')}</span>
             ${activeBadge}
             ${leaveBadge}
             <span class="today-person-badges">${badges.join('')}</span>
           </div>
-          <div class="today-person-meta">${scheduleEscapeHtml(x.emp?.role||'—')}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}</div>
+          <div class="today-person-meta">${scheduleEscapeHtml(p79ScheduleTitleLabel(x.emp?.role))}｜${scheduleEscapeHtml(x.emp?.group||'不分組')}</div>
         </div>`;
       };
 
@@ -3371,7 +3404,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
         if(!list.length)return '<div class="text-sm text-slate-400 py-2">目前無人</div>';
         const byRole=new Map();
         list.forEach(x=>{
-          const role=String(x.emp?.role||'其他');
+          const role=p79ScheduleTitleLabel(x.emp?.role);
           if(!byRole.has(role))byRole.set(role,[]);
           byRole.get(role).push(x);
         });
@@ -3677,6 +3710,8 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       }
 
       setCurrentMonthDefault();
+      void p79ScheduleReadHiddenJobTitles();
+      window.addEventListener('focus',()=>{if(Date.now()-p79ScheduleTitleVisibilityCheckedAt>60000)void p79ScheduleReadHiddenJobTitles()});
       // Read this logged-in employee's HR leave permission without blocking the roster.
       void p79ScheduleReadHrLeavePolicy().then(()=>{
         if(employees.length&&p79ScheduleHasOfficialData()&&!port79ScheduleDirty)
@@ -5443,7 +5478,7 @@ function p79EmployeeDateEligible(emp,date) {
       if (!container) return;
 
       // 若儲存的是舊職稱，才清除；正常單位切換不可自行歸零。
-      if (activeRoleTab && activeRoleTab !== 'ALL' && activeRoleTab !== 'EMP_MGMT' && !MAIN_ROLES.includes(activeRoleTab)) {
+      if (activeRoleTab && activeRoleTab !== 'ALL' && activeRoleTab !== 'EMP_MGMT' && (!MAIN_ROLES.includes(activeRoleTab)||p79ScheduleTitleHidden(activeRoleTab))) {
         activeRoleTab = '';
         try { sessionStorage.removeItem('port79_schedule_active_role_tab'); } catch (e) {}
       }
@@ -5461,7 +5496,7 @@ function p79EmployeeDateEligible(emp,date) {
 
       html += `<div class="h-6 w-px bg-slate-300 mx-1"></div>`;
 
-      MAIN_ROLES.forEach(rName => {
+      MAIN_ROLES.filter(rName=>!p79ScheduleTitleHidden(rName)).forEach(rName => {
         const count = employees.filter(e => e.role === rName).length;
         const isActive = (activeRoleTab === rName);
 
@@ -5528,7 +5563,7 @@ function p79EmployeeDateEligible(emp,date) {
                 <i class="fa-solid fa-hand-pointer"></i>
               </div>
               <div class="text-base font-black text-slate-700">請先選擇上方單位</div>
-              <div class="mt-2 text-sm text-slate-400">選擇「領班、指揮手、AQC、ARMG、F/L」後才載入該單位排班表；需要時也可手動選「全部人員」。</div>
+              <div class="mt-2 text-sm text-slate-400">選擇上方可見的職稱後才載入該職稱排班表；也可選「全部人員」。</div>
             </div>`;
         }
         return;
@@ -5547,6 +5582,7 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     function switchRoleTab(roleName, event) {
+      if(p79ScheduleTitleHidden(roleName))return;
       try {
         event?.preventDefault?.();
         event?.stopPropagation?.();
@@ -5618,11 +5654,11 @@ function p79EmployeeDateEligible(emp,date) {
     }
 
     function getRoleOptionsHtml(selectedRole) {
-      let html = '';
-      ALL_ROLE_ORDER.forEach(r => {
-        html += `<option value="${r}" ${selectedRole===r?'selected':''}>${r}</option>`;
-      });
-      return html;
+      const roles=[...new Set([...ALL_ROLE_ORDER,selectedRole].filter(Boolean))];
+      return roles.filter(r=>!p79ScheduleTitleHidden(r)||r===selectedRole).map(r=>{
+        const label=p79ScheduleTitleHidden(r)?'（原職稱已隱藏）':r;
+        return `<option value="${scheduleEscapeHtml(r)}" ${selectedRole===r?'selected':''}>${scheduleEscapeHtml(label)}</option>`;
+      }).join('');
     }
 
     function scheduleEscapeHtml(value) {
@@ -6941,7 +6977,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         </button>
       `;
 
-      ALL_ROLE_ORDER.forEach(rKey => {
+      ALL_ROLE_ORDER.filter(rKey=>!p79ScheduleTitleHidden(rKey)).forEach(rKey => {
         if (roleCounts[rKey]) {
           const isActive = (mgmtRoleFilter === rKey);
           roleFilterBtnsHtml += `
@@ -7988,7 +8024,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
       document.getElementById('emp-edit-original-id').value = "";
       document.getElementById('emp-id-input').value = "";
       document.getElementById('emp-name-input').value = "";
-      document.getElementById('emp-role-input').value = "AQC";
+      const roleInput=document.getElementById('emp-role-input');
+      const firstVisibleRole=ALL_ROLE_ORDER.find(r=>!p79ScheduleTitleHidden(r))||'';
+      roleInput.innerHTML=getRoleOptionsHtml(firstVisibleRole);
+      roleInput.value=firstVisibleRole;
       document.getElementById('emp-lock-input').value = "ROTATION";
 
       const groupSelect = document.getElementById('emp-group-input');
@@ -8004,7 +8043,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
       document.getElementById('emp-edit-original-id').value = emp.id;
       document.getElementById('emp-id-input').value = emp.id;
       document.getElementById('emp-name-input').value = emp.name;
-      document.getElementById('emp-role-input').value = emp.role;
+      const roleInput=document.getElementById('emp-role-input');
+      roleInput.innerHTML=getRoleOptionsHtml(emp.role);
+      roleInput.value=emp.role;
       document.getElementById('emp-lock-input').value = emp.lockType || 'ROTATION';
 
       const groupSelect = document.getElementById('emp-group-input');

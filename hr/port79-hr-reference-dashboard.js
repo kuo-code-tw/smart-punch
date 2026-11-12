@@ -164,13 +164,19 @@ function p79DashConfiguredTitles(){
  try{return typeof orgSettings!=='undefined'&&Array.isArray(orgSettings.jobTitles)?orgSettings.jobTitles:[]}
  catch(e){return []}
 }
+function p79DashHiddenTitles(){
+ try{return new Set((typeof orgSettings!=='undefined'&&Array.isArray(orgSettings.hiddenJobTitles)?orgSettings.hiddenJobTitles:[]).map(p79DashTitleKey))}
+ catch(e){return new Set()}
+}
 function updateDepartments(active){
  var missingKey='__P79_UNSET_TITLE__';
+ var hidden=p79DashHiddenTitles(),hiddenCount=0;
  var labels=new Map(),titleTotals=new Map(),byDept=new Map();
  function register(raw){
    var label=p79DashTitle(raw);
    if(!label)return '';
    var key=p79DashTitleKey(label);
+   if(hidden.has(key))return '';
    if(!labels.has(key))labels.set(key,label);
    return key;
  }
@@ -182,6 +188,7 @@ function updateDepartments(active){
    if(!byDept.has(name))byDept.set(name,{total:0,counts:new Map()});
    var unit=byDept.get(name);unit.total++;
    var rawTitle=e.jobTitle||e.deptDetail||'';
+   if(hidden.has(p79DashTitleKey(rawTitle))){hiddenCount++;return}
    var key=register(rawTitle)||missingKey;
    if(key===missingKey&&!labels.has(key))labels.set(key,'未填職稱');
    unit.counts.set(key,(unit.counts.get(key)||0)+1);
@@ -208,7 +215,8 @@ function updateDepartments(active){
  }).join('')+
  '<tr style="background:#e4f1ff;font-weight:900"><td>合計</td>'+
  titles.map(function(t){return '<td>'+n(titleTotals.get(t[0])||0)+'</td>'}).join('')+
- '<td>'+n(active.length)+'</td><td>100.0%</td></tr>';
+ '<td>'+n(active.length)+'</td><td>100.0%</td></tr>'+
+ (hiddenCount?'<tr><td colspan="'+columnCount+'" style="text-align:left;font-size:12px">另有 '+n(hiddenCount)+' 位在職人員的職稱已隱藏（仍計入合計）</td></tr>':'');
 }
 function updateAlerts(records,anchor,data){
  var recent=records.filter(function(e){var date=parseDate(e.terminationDate);return status(e,anchor)==='resigned'&&date&&date<=anchor&&date>=ymd(new Date(new Date(anchor+'T12:00:00').getTime()-6*86400000))}).length;
