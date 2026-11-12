@@ -718,7 +718,13 @@ async function init(){
   const cachedOk=p79ApplyHrSession(cached);
   if(cachedOk){$('status').textContent='☁️ 已取得登入權限｜正在確認雲端人資權限…';}
 
-  if(cachedOk)void p79HydrateHrComputerCache();
+  if(cachedOk){
+    void p79HydrateHrComputerCache();
+    // Fetch the read-only roster in parallel with cached-session verification;
+    // apply it only after cloud authorization has been checked.
+    p79HrPrefetchPromise=p79FetchHrEmployeesCloud();
+    p79HrPrefetchPromise.catch(()=>{});
+  }
   let cloudOk=false;
   try{
     // 權限確認最多等 7 秒；不要讓整個人資頁面一直停在驗證狀態。
@@ -743,6 +749,7 @@ async function init(){
   }
 }
 let p79HrLoadPromise=null;
+let p79HrPrefetchPromise=null;
 let p79HrCloudDataReady=false;
 
 function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
@@ -773,7 +780,8 @@ async function loadEmployees(show){
   if(p79HrLoadPromise)return p79HrLoadPromise;
   p79HrLoadPromise=(async()=>{
     try{
-      const cloudRead=p79FetchHrEmployeesCloud();cloudRead.catch(()=>{});
+      const cloudRead=p79HrPrefetchPromise||p79FetchHrEmployeesCloud();
+      p79HrPrefetchPromise=null;cloudRead.catch(()=>{});
       $('status').textContent='☁️ 正在同步人資主檔...';
 
       let d;
@@ -1751,7 +1759,7 @@ window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.a
 <script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 <script src="./port79-hr-verified-metrics.js?v=20261112-live-panels-v1"></script>
 <script src="./port79-hr-reference-dashboard.js?v=20261112-title-visibility-v3&panels=20261112-live&org=20261112-unit-source-v2&nav=20261112-single-toolbar-v2"></script>
-<script src="./port79-hr-live-statistics.js?v=20261112-live-panels-v1"></script>
+<script src="./port79-hr-live-statistics.js?v=20261112-source-fast-v2"></script>
 
 </body></html>
 
