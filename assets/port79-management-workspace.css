@@ -138,3 +138,12 @@ html body.p79-workspace[data-p79-system="workhours"] :is(.p79-stats-table-wrap,.
 
 }
 @media print{#p79WorkspaceTopbar,#p79WorkspaceSidebar,.p79-workspace-sidebar,#p79WorkspaceStatus,.p79-workspace-hero,.p79-nav-backdrop,#p79WorkspaceSearch{display:none!important}}
+
+
+/* Unified seven-system feature menu: allow task groups to use two readable columns. */
+@media screen and (min-width:560px){
+ html body.p79-workspace #p79SevenStandardMenu{width:min(420px,calc(100vw - 32px))!important}
+}
+@media screen and (max-width:559px){
+ html body.p79-workspace #p79SevenStandardMenu{width:min(370px,calc(100vw - 16px))!important}
+}
