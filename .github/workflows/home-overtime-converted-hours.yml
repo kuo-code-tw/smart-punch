@@ -1,0 +1,37 @@
+name: Verify homepage converted overtime totals
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'assets/port79-monthly-dashboard.js'
+      - 'assets/port79-reference-dashboard.js'
+      - 'tests/home-overtime-converted-hours.cjs'
+      - 'tests/home-overtime-current-source.cjs'
+      - 'tests/home-overtime-employee-titles.cjs'
+      - '.github/workflows/home-overtime-converted-hours.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'assets/port79-monthly-dashboard.js'
+      - 'assets/port79-reference-dashboard.js'
+      - 'tests/home-overtime-converted-hours.cjs'
+      - '.github/workflows/home-overtime-converted-hours.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify saved conversion totals, statuses and current/history sources
+        run: |
+          node tests/home-overtime-converted-hours.cjs
+          node tests/home-overtime-current-source.cjs
+          node tests/home-overtime-list-and-roster-periods.cjs
+          node tests/home-overtime-employee-titles.cjs
+          node tests/home-overtime-name-alignment.cjs
