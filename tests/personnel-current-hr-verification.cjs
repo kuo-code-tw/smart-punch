@@ -39,7 +39,7 @@ c.p79AqcHeadcountVerified=true;
 result=c.p79VerifiedAqcReportView(rows);
 assert.equal(result.verified,true);
 assert.equal(result.rosterCount,3,'HR has three current AQC employees, not all historical workers');
-assert.deepEqual(result.rows.map(r=>r.id),['r1','r2','r3'],'only verified active AQC identities may contribute');
+assert.equal(JSON.stringify(Array.from(result.rows,r=>r.id)),JSON.stringify(['r1','r2','r3']),'only verified active AQC identities may contribute');
 assert.equal(result.persons.length,2,'working headcount is current roster members with report rows');
 assert.equal(result.persons.find(p=>p.empId==='A1').containers,24,'name-only records uniquely matching active HR IDs are aggregated');
 assert.equal(result.persons.find(p=>p.empId==='B1').containers,12);
