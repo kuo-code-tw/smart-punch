@@ -185,6 +185,8 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </style>
 <script defer src="../assets/port79-session-timeout.js?v=20261112-save-confirmation"></script>
 <link rel="stylesheet" href="./port79-hr-reference-dashboard.css?v=20261112-live-panels-v1">
+<style id="hr-org-hierarchy-filters-20261112">.filters{grid-template-columns:repeat(5,minmax(0,1fr));}.filters .wide-search{grid-column:span 2;}@media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr));}.filters .wide-search{grid-column:span 2;}}@media(max-width:550px){.filters{grid-template-columns:1fr;}.filters .wide-search{grid-column:span 1;}}</style>
+
 </head>
 <!-- v2026.09.28.8.1：人員異動紀錄可安全清除＋GAS 舊網址自動回退；保留目前人員主檔與既有修正結果。 -->
 <body data-p79-system="hr">
@@ -208,7 +210,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="stat"><div class="k">離職人員</div><div class="v" id="stResigned">0</div></div>
     <div class="stat"><div class="k">留職停薪</div><div class="v" id="stLeave">0</div></div>
     <div class="stat"><div class="k">管理員／超級管理員</div><div class="v" id="stAdmins">0</div></div>
-    <div class="stat"><div class="k">部門數</div><div class="v" id="stDepts">0</div></div>
+    <div class="stat"><div class="k">單位數</div><div class="v" id="stDepts">0</div></div>
     <div class="stat"><div class="k">可管理人資</div><div class="v" id="stHrManagers">0</div></div>
   </div>
   <section class="card">
@@ -222,10 +224,13 @@ body[data-p79-system="hr"]>header.top{display:none!important}
       <button class="btn" onclick="openEmploymentHistory()">🔄 異動紀錄</button>
     </div>
     <div class="filters">
-      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、部門、單位、職稱、電話、離職原因" oninput="render()">
+      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、總公司、事業部、事業處、單位、職稱、原部門" oninput="render()">
       <select id="fStatus" onchange="render()"><option value="active">在職人員</option><option value="">全部狀態</option><option value="resigned">離職人員</option><option value="leave">留職停薪</option></select>
-      <select id="fDept" onchange="render()"><option value="">全部部門</option></select>
+      <select id="fHQ" onchange="render()"><option value="">全部總公司</option></select>
+      <select id="fDivision" onchange="render()"><option value="">全部事業部</option></select>
+      <select id="fOffice" onchange="render()"><option value="">全部事業處</option></select>
       <select id="fUnit" onchange="render()"><option value="">全部單位</option></select>
+      <select id="fDept" onchange="render()"><option value="">全部原部門</option></select>
       <select id="fJob" onchange="render()"><option value="">全部職稱</option></select>
       <select id="fRole" onchange="render()"><option value="">全部角色</option><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select>
       <details id="hrDateRangePicker" style="position:relative">
@@ -239,8 +244,11 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     </div>
     <div class="tablewrap"><table><thead><tr>
       <th>編輯</th><th>#</th><th>狀態</th><th>考勤號</th><th>工號</th><th>姓名</th>
-      <th><button class="thlink" onclick="focusFilter('fDept')">部門 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fHQ')">總公司 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fDivision')">事業部 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fOffice')">事業處 🔎</button></th>
       <th><button class="thlink" onclick="focusFilter('fUnit')">單位 🔎</button></th>
+      <th><button class="thlink" onclick="focusFilter('fDept')">原部門 🔎</button></th>
       <th><button class="thlink" onclick="focusFilter('fJob')">職稱 🔎</button></th>
       <th>電話</th><th>到職日</th><th>離職日</th><th>生日</th><th>特休剩餘</th><th>裝置</th><th>綁定打卡 ☑</th><th>角色</th>
       <th><button class="thlink" onclick="openPermissionOverview('attendance')">考勤 🔎</button></th>
@@ -255,7 +263,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </main>
 <dialog id="historyDialog"><div class="modal">
   <div class="modalhead">
-    <div><b>🔄 人員異動紀錄</b><div class="muted">包含部門／單位／職稱調動，以及在職／離職／留停狀態變更。清除紀錄只會刪除歷程，不會變更目前已修正完成的人員資料。</div></div>
+    <div><b>🔄 人員異動紀錄</b><div class="muted">包含原部門／單位／職稱調動，以及在職／離職／留停狀態變更。清除紀錄只會刪除歷程，不會變更目前已修正完成的人員資料。</div></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn danger hidden" id="clearEmployeeHistoryBtn" onclick="clearEmployeeHistory()">🗑 清除異動紀錄</button>
       <button class="btn" onclick="historyDialog.close()">關閉</button>
@@ -291,13 +299,13 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <select id="permLevelFilter" onchange="renderPermissionOverview()">
       <option value="">全部權限</option><option value="manage">管理</option><option value="view">查看</option><option value="none">無權限</option>
     </select>
-    <input id="permSearch" placeholder="搜尋工號、姓名、部門、單位、職稱" oninput="renderPermissionOverview()">
+    <input id="permSearch" placeholder="搜尋工號、姓名、原部門、單位、職稱" oninput="renderPermissionOverview()">
     <button class="btn" onclick="document.getElementById('permSearch').value='';document.getElementById('permLevelFilter').value='';renderPermissionOverview()">清除</button>
   </div>
   <div id="permissionCapabilities" class="permission-summary"></div>
   <div class="tablewrap" style="max-height:58vh;margin-top:10px">
     <table style="min-width:1250px">
-      <thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>單位</th><th>職稱</th><th>系統</th><th>權限</th><th>可以查看</th><th>可以修改／執行</th><th>操作</th></tr></thead>
+      <thead><tr><th>工號</th><th>姓名</th><th>原部門</th><th>單位</th><th>職稱</th><th>系統</th><th>權限</th><th>可以查看</th><th>可以修改／執行</th><th>操作</th></tr></thead>
       <tbody id="permissionBody"></tbody>
     </table>
   </div>
@@ -305,7 +313,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 
 <dialog id="orgDialog" class="org-dialog"><div class="modal">
   <div class="modalhead">
-    <div><b>⚙️ 總公司／事業部／事業處／單位／職稱管理</b><div class="muted">組織四層：總公司 → 事業部 → 事業處 → 單位；另外管理職稱；各欄均可新增與移除選項。</div></div>
+    <div><b>⚙️ 總公司／事業部／事業處／單位／職稱管理</b><div class="muted">組織四層：總公司 → 事業部 → 事業處 → 單位；職稱另列。此處管理選單名稱，既有人員的舊部門歸屬不會被自動改寫；未填的層級顯示「—」。</div></div>
     <button class="btn" onclick="orgDialog.close()">關閉</button>
   </div>
   <div class="orggrid">
@@ -337,8 +345,8 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   <input id="origEmpId" type="hidden">
   <div class="field"><label>考勤號碼</label><input id="attNo" inputmode="numeric"></div><div class="field"><label>工號 *</label><input id="empId" required></div><div class="field"><label>姓名 *</label><input id="name" required></div>
   <div class="field">
-    <label class="field-picker-label">部門 <button type="button" class="picker-btn" onclick="openMasterPicker('departments','dept')">點選／篩選</button></label>
-    <input id="dept" list="deptOptions" autocomplete="off" placeholder="可輸入文字篩選部門">
+    <label class="field-picker-label">原部門（舊雲端欄位） <button type="button" class="picker-btn" onclick="openMasterPicker('departments','dept')">點選／篩選</button></label>
+    <input id="dept" list="deptOptions" autocomplete="off" placeholder="可輸入原部門名稱">
     <datalist id="deptOptions"></datalist>
   </div>
   <div class="field">
@@ -460,7 +468,7 @@ const FINE_CATALOG={
  leave:[['apply','提出請假'],['own.view','查看自己的申請'],['records.view','查看請假紀錄'],['approve','核准'],['reject','退回'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出請假'],['balance.view','查看假別餘額'],['balance.edit','修改假別餘額']],
  schedule:[['own.view','查看自己的班表'],['records.view','查看班表'],['records.create','新增排班'],['records.edit','修改排班'],['records.delete','刪除排班'],['records.export','匯出排班'],['import','匯入排班'],['support.manage','調任/支援']],
  efficiency:[['records.view','查看效率資料'],['monthly.view','查看月報'],['records.create','新增'],['records.edit','修改'],['records.delete','刪除'],['records.export','匯出船舶效率'],['import','匯入船舶效率'],['monthly.edit','修改月報'],['sync','同步']],
- hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人資名冊'],['employment.edit','在職/離職/留停'],['org.view','查看部門/單位/職稱'],['org.manage','管理部門/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
+ hr:[['people.view','查看人員'],['people.create','新增人員'],['people.edit','修改人員'],['people.export','匯出人資名冊'],['employment.edit','在職/離職/留停'],['org.view','查看總公司/事業部/事業處/單位/職稱'],['org.manage','管理總公司/事業部/事業處/單位/職稱'],['permissions.view','查看權限'],['permissions.manage','修改權限'],['device.unbind','解除裝置'],['audit.view','查看操作紀錄'],['audit.export','匯出操作紀錄'],['audit.clear','清除登入/登出與人員異動紀錄']],
  history:[['attendance.view','查看考勤歷史'],['schedule.view','查看排班歷史'],['vessel.view','查看船舶歷史']]
 };
 function p79AssignedJobTitle(value){
@@ -502,7 +510,7 @@ const PERMISSION_CAPS={
   },
   hr:{
     view:{see:['查看人資主檔','查看離職／異動紀錄','查看系統權限'],edit:['不可新增或修改人員']},
-    manage:{see:['查看全部人資資料與權限'],edit:['新增／修改人員','辦理離職／復職','管理部門／職稱／單位','管理一般人員資料']}
+    manage:{see:['查看全部人資資料與權限'],edit:['新增／修改人員','辦理離職／復職','管理總公司／事業部／事業處／單位／職稱','管理一般人員資料']}
   },
   history:{
     view:{see:['依細項權限查看考勤／排班／船舶歷史'],edit:['不可修改歷史資料']},
@@ -525,7 +533,7 @@ function normalizeOrgSettings(raw){
     headquarters:uniqSorted(raw.headquarters),
     divisions:options('divisions',/事業部$/),
     offices:options('offices',/事業處$/),
-    sections:options('sections',/課$/)
+    sections:options('sections',/(?:課|組|室|中心)$/)
   };
 }
 
@@ -783,6 +791,27 @@ async function loadEmployees(show){
   })();
   return p79HrLoadPromise;
 }
+// 原部門不應被無條件推定成事業部或事業處。
+function p79HrOrgValue(e,kind){
+ if(window.Port79OrgHierarchy?.getValue)return window.Port79OrgHierarchy.getValue(e,kind);
+ const source=e&&typeof e==='object'?e:{};
+ const aliases={
+  headquarters:['headquarters','headquarter','headOffice'],
+  divisions:['division','businessDivision','divisions'],
+  offices:['office','businessOffice','offices'],
+  sections:['section','orgUnit','sections','unit'],
+  jobTitles:['jobTitle','deptDetail']
+ }[kind]||[];
+ for(const item of [source,source.orgHierarchy,source.organization,source.orgPath]){
+  if(!item||typeof item!=='object')continue;
+  for(const key of aliases)if(typeof item[key]==='string'&&item[key].trim())return item[key].trim();
+ }
+ const legacy=String(source.dept||'').trim();
+ if(kind==='headquarters'&&/總公司$/.test(legacy))return legacy;
+ if(kind==='divisions'&&/事業部$/.test(legacy))return legacy;
+ if(kind==='offices'&&/事業處$/.test(legacy))return legacy;
+ return '';
+}
 function populateFilters(){
   const fill=(id,label,vals)=>{
     const el=$(id),cur=el?.value||'';
@@ -790,8 +819,11 @@ function populateFilters(){
     el.innerHTML=`<option value="">全部${label}</option>`+uniqSorted(vals).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
     if([...el.options].some(o=>o.value===cur))el.value=cur;
   };
-  fill('fDept','部門',mergedOrgValues('departments'));
-  fill('fUnit','單位',mergedOrgValues('units'));
+  fill('fHQ','總公司',[...mergedOrgValues('headquarters'),...employees.map(e=>p79HrOrgValue(e,'headquarters'))]);
+  fill('fDivision','事業部',[...mergedOrgValues('divisions'),...employees.map(e=>p79HrOrgValue(e,'divisions'))]);
+  fill('fOffice','事業處',[...mergedOrgValues('offices'),...employees.map(e=>p79HrOrgValue(e,'offices'))]);
+  fill('fUnit','單位',[...mergedOrgValues('sections'),...mergedOrgValues('units'),...employees.map(e=>p79HrOrgValue(e,'sections'))]);
+  fill('fDept','原部門',[...mergedOrgValues('departments'),...employees.map(e=>e.dept)]);
   fill('fJob','職稱',mergedOrgValues('jobTitles'));
   const dl=(id,vals)=>{const el=$(id);if(el)el.innerHTML=uniqSorted(vals).map(v=>`<option value="${esc(v)}"></option>`).join('')};
   dl('deptOptions',mergedOrgValues('departments'));
@@ -800,7 +832,7 @@ function populateFilters(){
 }
 function updateHrDateRangeSummary(){const a=$('hrDateFrom')?.value||'',b=$('hrDateTo')?.value||'';if(a&&b&&a>b)$('hrDateTo').value=a;const aa=$('hrDateFrom')?.value||'',bb=$('hrDateTo')?.value||'',el=$('hrDateRangeSummary');if(el){const t=!aa&&!bb?'全部日期':aa&&bb?`${aa} ～ ${bb}`:aa?`${aa} 起`:`至 ${bb}`;el.innerHTML=`📅 到職日期範圍 <span style="font-size:11px;color:var(--muted)">${esc(t)}</span>`;}}
 function clearHrDateRange(){if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
-function resetFilters(){$('q').value='';$('fStatus').value='active';$('fDept').value='';$('fUnit').value='';$('fJob').value='';$('fRole').value='';if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
+function resetFilters(){$('q').value='';$('fStatus').value='active';$('fHQ').value='';$('fDivision').value='';$('fOffice').value='';$('fDept').value='';$('fUnit').value='';$('fJob').value='';$('fRole').value='';if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
 function setStatusView(status){$('fStatus').value=status;render()}
 function openEmploymentHistory(){
   const clearBtn=$('clearEmployeeHistoryBtn');
@@ -809,7 +841,7 @@ function openEmploymentHistory(){
   employees.forEach(e=>{
     (Array.isArray(e.transferHistory)?e.transferHistory:[]).forEach(h=>{
       rows.push({
-        at:h.changedAt||'',empId:e.empId||'',name:e.name||'',type:'部門／單位／職稱調動',
+        at:h.changedAt||'',empId:e.empId||'',name:e.name||'',type:'原部門／單位／職稱調動',
         from:`${h.fromDept||'—'} / ${h.fromUnit||'—'} / ${h.fromJobTitle||'—'}`,
         to:`${h.toDept||'—'} / ${h.toUnit||'—'} / ${h.toJobTitle||'—'}`,
         reason:'',by:h.changedBy||''
@@ -1086,7 +1118,7 @@ async function p79SaveEditorLeavePermission(empId,originalEmpId,selected,touched
 
 function openMasterPicker(kind,targetId){
   pickerKind=kind;pickerTarget=targetId;
-  const label=kind==='departments'?'部門':kind==='units'?'單位':'職稱';
+  const label=kind==='departments'?'原部門':kind==='units'?'單位':'職稱';
   $('pickerTitle').textContent='選擇'+label;
   $('pickerSearch').value='';
   renderMasterPicker();
@@ -1095,7 +1127,7 @@ function openMasterPicker(kind,targetId){
 function renderMasterPicker(){
   const q=$('pickerSearch').value.trim().toLowerCase();
   const vals=mergedOrgValues(pickerKind).filter(v=>!q||v.toLowerCase().includes(q));
-  $('pickerResults').innerHTML=vals.map(v=>`<button type="button" class="picker-option" onclick="chooseMasterValue(${JSON.stringify(v).replace(/"/g,'&quot;')})">${esc(v)}</button>`).join('')||'<div class="muted">沒有符合的選項，可先到「部門／職稱／單位」新增。</div>';
+  $('pickerResults').innerHTML=vals.map(v=>`<button type="button" class="picker-option" onclick="chooseMasterValue(${JSON.stringify(v).replace(/"/g,'&quot;')})">${esc(v)}</button>`).join('')||'<div class="muted">沒有符合的選項，可先到「總公司／事業部／事業處／單位／職稱」管理新增。</div>';
 }
 function chooseMasterValue(value){
   const el=$(pickerTarget);if(el)el.value=value;
@@ -1153,14 +1185,14 @@ function renderPermissionOverview(){
 }
 
 function render(){
-  const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,d=$('fDept').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
+  const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,hq=$('fHQ').value,div=$('fDivision').value,off=$('fOffice').value,d=$('fDept').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
   const dateFrom=$('hrDateFrom')?.value||'',dateTo=$('hrDateTo')?.value||'';
   let list=employees.filter(e=>{
     const empStatus=normalizeEmploymentStatus(e.employmentStatus);
-    const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${e.dept||''} ${e.unit||''} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
+    const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${p79HrOrgValue(e,'headquarters')} ${p79HrOrgValue(e,'divisions')} ${p79HrOrgValue(e,'offices')} ${p79HrOrgValue(e,'sections')} ${e.dept||''} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
     const empStart=String(e.startDate||'').slice(0,10).replace(/\//g,'-');
     const dateOk=(!dateFrom&&!dateTo)||!!empStart&&(!dateFrom||empStart>=dateFrom)&&(!dateTo||empStart<=dateTo);
-    return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!d||e.dept===d)&&(!u||String(e.unit||'')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
+    return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!hq||p79HrOrgValue(e,'headquarters')===hq)&&(!div||p79HrOrgValue(e,'divisions')===div)&&(!off||p79HrOrgValue(e,'offices')===off)&&(!d||e.dept===d)&&(!u||p79HrOrgValue(e,'sections')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
   });
   list.sort((a,b)=>{
     const sa=normalizeEmploymentStatus(a.employmentStatus),sb=normalizeEmploymentStatus(b.employmentStatus),rank={active:0,leave:1,resigned:2};
@@ -1173,7 +1205,7 @@ function render(){
       <td>${can?`<button class="btn" onclick="openEditor('${esc(e.empId)}')">編輯</button>`:'<span class="muted">查看</span>'}</td>
       <td>${i+1}</td><td><span class="empstatus ${employmentClass(stt)}">${employmentLabel(stt)}</span></td>
       <td>${esc(e.attNo||'')}</td><td><b>${esc(e.empId)}</b></td><td><b>${esc(e.name)}</b></td>
-      <td>${esc(e.dept||'')}</td><td>${esc(e.unit||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
+      <td>${esc(p79HrOrgValue(e,'headquarters')||'—')}</td><td>${esc(p79HrOrgValue(e,'divisions')||'—')}</td><td>${esc(p79HrOrgValue(e,'offices')||'—')}</td><td>${esc(p79HrOrgValue(e,'sections')||'—')}</td><td>${esc(e.dept||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
       <td>${esc(e.startDate||'')}${e.reportingDate?`<div class="muted">報到 ${esc(e.reportingDate)}</div>`:''}</td><td>${stt==='resigned'?esc(e.terminationDate||'—'):'—'}</td><td>${esc(e.birthday||'')}</td>
       <td><b>${lb.remaining==null?'—':esc(lb.remaining)+' 天'}</b></td>
       <td>${e.deviceBound?'<span class="pill">已綁定</span>':'—'}</td>
@@ -1191,13 +1223,13 @@ function render(){
       <td><span class="pill">${roleLabel(String(e.adminRole||'employee'))}</span></td>
       ${SYS.map(k=>`<td><button type="button" class="permclick ${p[k]}" onclick="openPermissionDetail('${esc(e.empId)}','${k}')" title="點擊查看${LABEL[k]}權限細項">${permLabel(p[k])}</button></td>`).join('')}
     </tr>`;
-  }).join('')||'<tr><td colspan="24" class="muted">沒有符合條件的人員</td></tr>';
+  }).join('')||'<tr><td colspan="27" class="muted">沒有符合條件的人員</td></tr>';
   const ps=employees.map(normalizePerms);
   $('stActive').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='active').length;
   $('stResigned').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='resigned').length;
   $('stLeave').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='leave').length;
   $('stAdmins').textContent=employees.filter(e=>['admin','superadmin'].includes(String(e.adminRole))).length;
-  $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>e.dept).filter(Boolean)).size;
+  $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>p79HrOrgValue(e,'sections')).filter(Boolean)).size;
   $('stHrManagers').textContent=ps.filter(p=>p.hr==='manage').length;
   try{window.p79HrDashRender?.()}catch(e){console.warn('人資儀表板刷新失敗',e)}
 }
@@ -1517,7 +1549,7 @@ async function clearSessionLogs(){
 }
 
 async function exportEmployees() {
-  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',部門:e.dept||'',單位:e.unit||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',總公司:p79HrOrgValue(e,'headquarters'),事業部:p79HrOrgValue(e,'divisions'),事業處:p79HrOrgValue(e,'offices'),單位:p79HrOrgValue(e,'sections'),原部門:e.dept||'',職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
 init();
 </script>
 
@@ -1596,7 +1628,7 @@ function mount(){
         
         
         <button type="button" id="p79HrAddPersonMenu" onclick="window.p79HrMenuAction('add')">＋ 新增人員</button>
-        <button type="button" onclick="window.p79HrMenuAction('org')">⚙️ 部門／職稱／單位</button>
+        <button type="button" onclick="window.p79HrMenuAction('org')">⚙️ 總公司／事業部／事業處／單位／職稱</button>
         <button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>
         <button type="button" onclick="window.p79HrMenuAction('cleanupDevices')">🧹 清除免綁員工殘留裝置</button>
         <div class="p79v103-menu-sep"></div>
@@ -1605,7 +1637,7 @@ function mount(){
         <button class="danger" type="button" onclick="window.p79HrMenuAction('logout')">↪ 登出</button>
       </div>
     </div></div>
-  </div><div class="p79v103-status">● ${roleText()}｜員工主檔・部門職稱・權限設定</div>`;
+  </div><div class="p79v103-status">● ${roleText()}｜員工主檔・四層組織・職稱權限</div>`;
   document.body.insertBefore(el,document.body.firstChild);
 }
 window.p79HrToggleMenu=function(e){e?.stopPropagation();document.getElementById('p79HrSystemMenu')?.classList.toggle('open')};

@@ -174,10 +174,11 @@ function updateDepartments(active){
    if(!labels.has(key))labels.set(key,label);
    return key;
  }
+ // 只以真正的「單位」欄位分組；不可把原部門／事業處當成單位。
  // Include configured titles even if nobody currently holds the title (show zero).
  p79DashConfiguredTitles().forEach(register);
  active.forEach(function(e){
-   var name=String(e.dept||e.unit||'未設定單位').trim()||'未設定單位';
+   var name=String((typeof window==='object'&&window.Port79OrgHierarchy?.getValue(e,'sections'))||e.section||e.unit||'未設定單位').trim()||'未設定單位';
    if(!byDept.has(name))byDept.set(name,{total:0,counts:new Map()});
    var unit=byDept.get(name);unit.total++;
    var rawTitle=e.jobTitle||e.deptDetail||'';

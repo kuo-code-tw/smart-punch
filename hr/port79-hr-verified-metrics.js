@@ -150,7 +150,7 @@ function attendanceDetails({records=[],shifts=[],employees=[],leaveRecords=[],sc
  const normalizeAtt=v=>norm(v).replace(/^0+/,''),people=employees.filter(e=>isWorking(e,day)),byEmp=new Map(people.map(e=>[id(e.empId),e])),byAtt=new Map();
  for(const e of people){const k=normalizeAtt(e.attNo);if(k)byAtt.set(k,byAtt.has(k)?null:e)}
  function person(r){return byEmp.get(id(r.empId||r.employeeId))||byAtt.get(normalizeAtt(r.attNo||r.attendanceNo))}
- const rows=new Map(people.map(e=>[id(e.empId),{empId:id(e.empId),name:norm(e.name),unit:norm(e.section||e.unit||e.dept),jobTitle:norm(e.jobTitle||e.deptDetail),clockIn:[],clockOut:[],state:'尚無打卡',leave:false}]));
+ const rows=new Map(people.map(e=>[id(e.empId),{empId:id(e.empId),name:norm(e.name),unit:norm(e.section||e.unit),jobTitle:norm(e.jobTitle||e.deptDetail),clockIn:[],clockOut:[],state:'尚無打卡',leave:false}]));
  const approved=leaveRecords.filter(r=>['已核准','已核準'].includes(norm(r.status))&&!r.deleted&&!r.revoked&&!r.cancelled&&!r.canceled&&!r.deletedAt&&!r.cancelledAt&&date(r.startDate||r.startTime)<=day&&(date(r.endDate||r.endTime)||date(r.startDate||r.startTime))>=day);
  for(const l of approved){const e=person(l),row=e&&rows.get(id(e.empId));if(row){row.leave=true;row.state='已核准請假'}}
  for(const r of schedules){const row=rows.get(id(r.empId));if(row&&Object.prototype.hasOwnProperty.call(r.schedule||{},day))row.shift=norm(r.schedule[day])}
