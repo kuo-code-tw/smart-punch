@@ -106,6 +106,50 @@ function showWeek({records,schedules,leaves,employees,day}){
  '<p class="p79r-note">已核對 '+completed.length+'/7 日；缺資料的日期顯示「—」，不推估。</p>'+
  '<a class="p79r-link" href="../attendance/">查看考勤明細 ›</a>';
 }
+function showActualPunchRows(records,employees,day,rate){
+ const node=$('p79rDayAttendanceDetail');
+ if(!node||!Array.isArray(records)||!Array.isArray(employees))return;
+ const valid=employees.filter(e=>M.isWorking(e,day)&&String(e.empId||'').trim());
+ const ids=new Map(valid.map(e=>[String(e.empId).trim().toUpperCase(),e]));
+ const attNos=new Map();
+ for(const e of valid){
+  const no=String(e.attNo||e.attendanceNo||'').trim().replace(/^0+/,'');
+  if(!no)continue;
+  if(attNos.has(no))attNos.set(no,null);
+  else attNos.set(no,e);
+ }
+ const found=new Map();
+ for(const row of records){
+  const raw=String(row.timeStr||row['出勤時間']||row.datetime||row.dateTime||row.clockTime||'').trim();
+  if(M.date(raw)!==day)continue; // Original recorded calendar day, never infer a night-shift accounting date.
+  const direction=String(row.type||row.action||row.status||'');
+  const inbound=/上班|簽到|clock.?in|check.?in/i.test(direction);
+  const outbound=/下班|簽退|clock.?out|check.?out/i.test(direction);
+  if(!inbound&&!outbound)continue;
+  const direct=String(row.empId||row.employeeId||'').trim().toUpperCase();
+  const no=String(row.attNo||row.attendanceNo||'').trim().replace(/^0+/,'');
+  const employee=ids.get(direct)||(no?attNos.get(no):null);
+  if(!employee)continue; // No name-based guessing or ambiguous attendance-number matching.
+  const key=String(employee.empId).trim().toUpperCase();
+  if(!found.has(key))found.set(key,{person:employee,inside:'',outside:''});
+  const item=found.get(key),displayTime=(raw.match(/(?:\s|T)(\d{2}:\d{2})(?::\d{2})?(?:$|[+\-Z])/i)||[])[1]||raw;
+  if(inbound&&(!item.inside||raw<item.insideRaw)){item.inside=displayTime;item.insideRaw=raw}
+  if(outbound&&(!item.outside||raw>item.outsideRaw)){item.outside=displayTime;item.outsideRaw=raw}
+ }
+ if(!found.size){
+  panel('p79rDayAttendanceDetail',{value:'—',detail:'正式資料未找到當日可對應的上／下班打卡；不代表全員未出勤',href:'../attendance/',label:'查看考勤紀錄'});
+  return;
+ }
+ const sorted=[...found].sort((a,b)=>a[0].localeCompare(b[0],'zh-TW',{numeric:true}));
+ const note=rate?.ready?('應到 '+rate.expected+' 人、已打上班卡 '+rate.clocked+' 人；'):'';
+ node.className='';
+ node.innerHTML='<div class="p79r-note" style="margin:4px 0 10px">'+clean(note)+'只列當日有實際打卡的已授權人員；凌晨跨日晚班請以考勤系統配對結果為準。</div>'+
+ '<div style="overflow:auto;max-height:220px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>上班卡</th><th>下班卡</th></tr></thead><tbody>'+
+ sorted.slice(0,20).map(([id,item])=>'<tr><td>'+clean(id)+'</td><td>'+clean(item.person.name||'')+'</td><td>'+
+ clean(item.person.dept||'')+'</td><td>'+clean(item.inside||'—')+'</td><td>'+clean(item.outside||'—')+'</td></tr>').join('')+
+ '</tbody></table></div><div class="p79r-note" style="margin-top:8px">找到 '+sorted.length+' 位有打卡紀錄的人員'+(sorted.length>20?'（僅顯示前20位）':'')+
+ '。<a class="p79r-link" href="../attendance/">到考勤管理查看全部 ›</a></div>';
+}
 function missingSources(scope,payload){
  const services=[['attendance','考勤'],['schedule','排班'],['leave','請假']];
  const issues=services.filter(([key])=>!scope[key]||payload?.[key]?.status!=='fulfilled')
@@ -186,6 +230,9 @@ function display(payload,scope,day){
      leaves:leaveRows(leaveResult),employees:all,day});
   }catch(e){sourceText('p79rAttendance','當日打卡與班表未核對完成')}
  }else sourceText('p79rAttendance',missingSources(scope,payload)||'考勤、班表與請假尚未核對完整');
+ if(scope.attendance&&attendanceResult){
+  try{showActualPunchRows(attendanceRows(attendanceResult),all,day,attendance)}catch(error){console.warn('人資首頁打卡明細顯示未完成',error)}
+ }
 }
 function reset(msg){
  resetDonut();
