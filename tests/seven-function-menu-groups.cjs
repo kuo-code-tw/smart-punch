@@ -14,7 +14,7 @@ assert.equal(groupActions.size,groupActionMatches.length,'one action must have e
 for(const system of systems){
  const row=menuSource.match(new RegExp('(?:^|\\n)\\s*'+system+':\\[([^\\n]*)'));
  assert(row,'system missing: '+system);
- const ids=[...row[1].matchAll(/\\['([^']+)'/g)].map(x=>x[1]);
+ const ids=[...row[1].matchAll(/\['([^']+)'/g)].map(x=>x[1]);
  for(const id of ids)assert(groupActions.has(id),system+': action '+id+' is missing from menu groups');
 }
 for(const id of ['workflow','data-cache','global-theme','logout-system'])assert(groupActions.has(id));
@@ -22,10 +22,10 @@ for(const group of ['常用作業','統計與查詢','匯入與匯出','管理�
  assert(groupsSource.includes(group),'missing shared category '+group);
 }
 assert(grouped.includes('actionAllowed(sys,a)'),'permissions must still filter menu actions');
-assert(grouped.includes("window.p79LogoutToSevenSystemHome()"),'logout must retain original handler');
-assert(grouped.includes("runAction(sys,a)"),'existing actions must retain original handler');
+assert(grouped.includes('window.p79LogoutToSevenSystemHome()'),'logout must retain original handler');
+assert(grouped.includes('runAction(sys,a)'),'existing actions must retain original handler');
 assert(grouped.includes('menu.appendChild(accountInfo)'),'logged-in identity must remain');
-assert(!grouped.includes('menu.classList.add(\'p79-hr-compact-menu\')'),'HR should use same structure');
+assert(!grouped.includes("menu.classList.add('p79-hr-compact-menu')"),'HR should use same structure');
 for(const selector of ['.p79-menu-sections','.p79-menu-items','data-group="maintenance"'])
  assert(css.includes(selector),'missing grouped menu style '+selector);
 assert(workspaceCss.includes('Unified seven-system feature menu'),'workspace dropdown sizing missing');
@@ -34,4 +34,4 @@ for(const page of ['attendance','work-hours','leave','schedule','aqc-efficiency'
  const version=(html.match(/menu=20261112-clean-v1/g)||[]).length;
  assert.equal(version,3,page+' should refresh common JS/CSS plus workspace stylesheet');
 }
-console.log('PASS unified task-grouped menus across 7 systems; 33 original actions retained, permissions and handlers unchanged, all 7 pages cache-busted');
+console.log('PASS unified task-grouped menus across 7 systems; existing actions retained, permissions and handlers unchanged, all 7 pages cache-busted');
