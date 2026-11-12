@@ -184,7 +184,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 @media(max-width:480px){#editor .grid{grid-template-columns:1fr}}
 </style>
 <script defer src="../assets/port79-session-timeout.js?v=20261112-save-confirmation"></script>
-<link rel="stylesheet" href="./port79-hr-reference-dashboard.css?v=20261112-job-title-scroll-v1">
+<link rel="stylesheet" href="./port79-hr-reference-dashboard.css?v=20261112-live-panels-v1">
 </head>
 <!-- v2026.09.28.8.1：人員異動紀錄可安全清除＋GAS 舊網址自動回退；保留目前人員主檔與既有修正結果。 -->
 <body data-p79-system="hr">
@@ -734,6 +734,7 @@ function p79ApplyHrEmployeesPayload(d,show=false,source='cloud'){
   populateFilters();
   render();
   if(source!=='cache')migrateLegacyAttendanceOrgSettings();
+  if(show&&source==='cloud')void window.P79HrStatistics?.refresh();
   $('addBtn')?.classList.toggle('hidden',!canHr('people.create'));
   if($('p79HrAddPersonToolbar')){$('p79HrAddPersonToolbar').disabled=!canHr('people.create');$('p79HrAddPersonToolbar').title=canHr('people.create')?'新增人員':'此帳號沒有新增人員權限';}
   $('orgSettingsBtn')?.classList.toggle('hidden',hrAccess!=='manage');
@@ -1676,9 +1677,10 @@ window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.a
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261111-hr-menu-v2"></script>
-<script src="./port79-hr-verified-metrics.js?v=20261111-stats-v1"></script>
-<script src="./port79-hr-reference-dashboard.js?v=20261112-dynamic-job-titles-v2"></script>
-<script src="./port79-hr-live-statistics.js?v=20261111-login-verified-v4"></script>
+<script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
+<script src="./port79-hr-verified-metrics.js?v=20261112-live-panels-v1"></script>
+<script src="./port79-hr-reference-dashboard.js?v=20261112-dynamic-job-titles-v2&panels=20261112-live"></script>
+<script src="./port79-hr-live-statistics.js?v=20261112-live-panels-v1"></script>
 </body></html>
 
 
