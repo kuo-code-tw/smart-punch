@@ -106,7 +106,15 @@ function showWeek({records,schedules,leaves,employees,day}){
  '<p class="p79r-note">已核對 '+completed.length+'/7 日；缺資料的日期顯示「—」，不推估。</p>'+
  '<a class="p79r-link" href="../attendance/">查看考勤明細 ›</a>';
 }
+function resetDonut(){
+ const center=$('p79rActiveDonut'),label=$('p79rDonutLabel'),note=$('p79rDonutNote');
+ if(label)label.textContent='在職人數';
+ if(center)center.textContent=$('p79rActive')?.textContent||'—';
+ const circle=center?.closest('.p79r-donut');if(circle)circle.style.background='conic-gradient(#dfeaf6 100%,#dfeaf6 0)';
+ if(note)note.innerHTML='尚未完成當日考勤、排班、請假核對；目前僅顯示人資在職人數。<a class="p79r-link" href="../attendance/">查看考勤</a>';
+}
 function originalViewUnavailable(scope,payload){
+ resetDonut();
  if(scope.leave)panel('p79rMonthlyLeavePanel',{detail:readFailure(payload.leave),href:'../leave/',label:'請假管理'});
  else panel('p79rMonthlyLeavePanel',{detail:'目前帳號沒有請假檢視權限',href:'../leave/',label:'請假管理'});
  if(scope.schedule&&scope.workhours)panel('p79rMonthlyOvertimePanel',{detail:readFailure(payload.schedule),href:'../work-hours/',label:'工時／加班'});
@@ -160,6 +168,10 @@ function display(payload,scope,day){
       href:'../attendance/',label:'查看考勤與補登'});
     const donut=$('p79rActiveDonut')?.closest('.p79r-donut');
     if(donut)donut.style.background='conic-gradient(#2b85e9 '+(attendance.percent??0)+'%,#e1edf8 0)';
+    const center=$('p79rActiveDonut'),label=$('p79rDonutLabel'),note=$('p79rDonutNote');
+    if(label)label.textContent='已打卡／應到';
+    if(center)center.textContent=attendance.clocked+' / '+attendance.expected;
+    if(note)note.innerHTML='依當日正式班表與核准請假核對；上班打卡不代表已完成下班。<a class="p79r-link" href="../attendance/">查看考勤</a>';
    }else{
     sourceText('p79rAttendance',attendance.reason||'當日打卡核對尚未完成');
     panel('p79rDayAttendanceDetail',{detail:attendance.reason||'缺少完整正式打卡與班表',href:'../attendance/',label:'查看考勤'});
@@ -171,6 +183,7 @@ function display(payload,scope,day){
  else sourceText('p79rAttendance','需要考勤、排班與請假檢視權限');
 }
 function reset(msg){
+ resetDonut();
  setVal('p79rAttendance','—',msg||'等待正式考勤');
  setVal('p79rLeaves','—',msg||'等待核准請假');
  setVal('p79rOvertime','—',msg||'等待正式加班申報');
