@@ -551,12 +551,16 @@ function storedToken(){return String(readHash()||sessionStorage.getItem('port79_
 async function restoreAdmin(){
  if(p79LeaveEmployeeEntry()){adminToken='';return false;}
  adminToken=storedToken();if(!adminToken)return false;
+ const verifyingToken=adminToken;
  let last;
  for(let i=0;i<2;i++){
   try{
    setStatus(i===0?'🔐 正在驗證管理員身分…':'🔐 雲端較慢，正在重新驗證管理員身分…','info');
-   const d=await jsonFetch(GAS_URL+'?action=gcGetSyncMeta&gcToken='+encodeURIComponent(adminToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+   // Verify identity through the existing read-only session endpoint. Bulk admin sync must not own SSO.
+   const d=await jsonFetch(GAS_URL+'?action=getSessionMeta&token='+encodeURIComponent(verifyingToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+   if(p79LeaveEmployeeEntry()||adminToken!==verifyingToken||storedToken()!==verifyingToken)return false;
    if(!d?.ok)throw new Error(d?.error||'SSO 驗證失敗');
+   if(d.punchOnly===true)throw new Error('打卡登入不可進入管理員後台');
    const role=String(d.adminRole||'').toLowerCase();if(!['admin','superadmin'].includes(role))throw new Error('沒有管理員權限');
    const p=perms({systemPermissions:d.systemPermissions},role);leaveAccess=p.leave;
    if(leaveAccess==='none')throw new Error('此帳號沒有請假系統權限');
@@ -569,6 +573,7 @@ async function restoreAdmin(){
    if(i===0)await new Promise(r=>setTimeout(r,900));
   }
  }
+ if(p79LeaveEmployeeEntry()||adminToken!==verifyingToken||storedToken()!==verifyingToken)return false;
  adminSession=null;adminToken='';
  setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
  return false;
