@@ -440,48 +440,51 @@ async function runAction(sys,a){closeMenu();try{
 
 function buildMenu(sys){
  const menu=document.createElement('div');menu.id='p79SevenStandardMenu';menu.className='p79-seven-standard-menu';
- if(sys==='hr')menu.classList.add('p79-hr-compact-menu');
  const account=userInfo();
- const accountTitle=document.createElement('div');accountTitle.className='menu-title';accountTitle.textContent='登入資訊';if(sys!=='hr')menu.appendChild(accountTitle);
- const accountInfo=document.createElement('div');accountInfo.className='p79-seven-account-info';accountInfo.textContent='👤 '+account.name+'｜'+account.role;menu.appendChild(accountInfo);
- const accountSep=document.createElement('div');accountSep.className='sep';menu.appendChild(accountSep);
- // 七大系統共用固定排序：資料管理→系統設定→權限管理→紀錄查詢→進階工具→顯示設定→登出。
- const GROUPS=sys==='hr'?[
-  ['人員資料',['add','import','export']],
-  ['系統與安全',['idle-settings','org','overtime-options','permissions','logs']],
-  ['顯示與工具',['year','global-theme','data-cache','workflow']],
-  ['', ['logout-system']]
- ]:[
-  ['資料管理',['overtime-reload','overtime-export','add','attendance-import','attendance-export','balance-import','balance-export','schedule-continue','import','export','monthly-export']],
-  ['系統設定',['overtime-options','settings','schedule-lock','schedule-takeover','schedule-mode','org','reset-cloud']],
-  ['權限管理',['permissions','leave-edit']],
-  ['紀錄查詢',['stats','overtime-summary','overtime-application','project-bonus','overtime-print','overtime-policy','logs','attendance-compare','compare']],
-  ['操作說明',['workflow']],
-  ['進階工具',['clearDeleted','data-cache']],
-  ['顯示設定',['year','global-theme']],
-  ['登出系統',['logout-system']]
+ const accountInfo=document.createElement('div');accountInfo.className='p79-seven-account-info';
+ accountInfo.textContent='👤 '+account.name+'｜'+account.role;menu.appendChild(accountInfo);
+ // 七大系統使用相同分類及順序；只呈現本系統具權限的原有功能。
+ // 不增加操作步驟，不變更按鈕的 action、事件或權限判斷。
+ const GROUPS=[
+  ['常用作業',['add','leave-edit','schedule-mode','schedule-continue','overtime-application','overtime-reload','compare']],
+  ['統計與查詢',['attendance-compare','stats','overtime-summary','project-bonus','overtime-policy','logs']],
+  ['匯入與匯出',['attendance-import','attendance-export','balance-import','balance-export','import','export','monthly-export','overtime-export','overtime-print']],
+  ['管理與設定',['settings','schedule-lock','schedule-takeover','org','permissions','idle-settings','overtime-options']],
+  ['進階維護',['clearDeleted','reset-cloud']],
+  ['顯示與協助',['year','data-cache','global-theme','workflow']],
+  ['帳號',['logout-system']]
  ];
  const items=new Map((MENU[sys]||[]).map(entry=>[entry[0],entry]));
- function addAction(a,label,cls){
-   const b=document.createElement('button');
-   b.type='button';b.dataset.action=a;b.textContent=label;
-   if(sys==='workhours'&&a==='overtime-reload')b.id='p79ReloadOvertimeButton';
-   if(cls)String(cls).split(/\s+/).filter(Boolean).forEach(c=>b.classList.add(c));
-   if(a==='logout-system')b.classList.add('danger');
-   b.addEventListener('click',()=>a==='logout-system'?window.p79LogoutToSevenSystemHome():runAction(sys,a));
-   menu.appendChild(b);
+ const shared=new Set(['workflow','data-cache','global-theme','logout-system']);
+ const seen=new Set();
+ const sections=document.createElement('div');sections.className='p79-menu-sections';menu.appendChild(sections);
+ function addAction(parent,a,label,cls){
+   const button=document.createElement('button');
+   button.type='button';button.dataset.action=a;button.textContent=label;
+   if(sys==='workhours'&&a==='overtime-reload')button.id='p79ReloadOvertimeButton';
+   if(cls)String(cls).split(/\s+/).filter(Boolean).forEach(c=>button.classList.add(c));
+   if(a==='logout-system')button.classList.add('danger');
+   button.addEventListener('click',()=>a==='logout-system'?window.p79LogoutToSevenSystemHome():runAction(sys,a));
+   parent.appendChild(button);
  }
  GROUPS.forEach(([heading,actions])=>{
-   const included=actions.filter(a=>actionAllowed(sys,a)&&(a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||['workflow','data-cache','global-theme','logout-system'].includes(a)));
+   const included=actions.filter(a=>!seen.has(a)&&actionAllowed(sys,a)&&
+     (a!=='schedule-takeover'||roleText()==='超級管理員')&&(items.has(a)||shared.has(a)));
    if(!included.length)return;
-   if(heading){const title=document.createElement('div');title.className='menu-title';title.textContent=heading;menu.appendChild(title);}
+   const section=document.createElement('section');section.className='p79-menu-section';
+   if(heading==='進階維護')section.dataset.group='maintenance';
+   if(heading==='帳號')section.dataset.group='account';
+   const title=document.createElement('h3');title.className='menu-title';title.textContent=heading;section.appendChild(title);
+   const actionsBox=document.createElement('div');actionsBox.className='p79-menu-items';section.appendChild(actionsBox);
    included.forEach(a=>{
-     if(a==='workflow')addAction(a,'📖 操作流程','common');
-     else if(a==='data-cache')addAction(a,'☁️ 資料快取中心','common');
-     else if(a==='global-theme')addAction(a,'🌙 全系統顯示模式','common theme');
-     else if(a==='logout-system')addAction(a,'↪ 登出系統','danger');
-     else {const [,label,cls]=items.get(a);addAction(a,sys==='schedule'&&a==='schedule-lock'?scheduleLockMenuLabel():label,cls)}
+     seen.add(a);
+     if(a==='workflow')addAction(actionsBox,a,'📖 操作流程','common');
+     else if(a==='data-cache')addAction(actionsBox,a,'☁️ 資料快取中心','common');
+     else if(a==='global-theme')addAction(actionsBox,a,'🌙 全系統顯示模式','common theme');
+     else if(a==='logout-system')addAction(actionsBox,a,'↪ 登出系統','danger');
+     else {const [,label,cls]=items.get(a);addAction(actionsBox,a,sys==='schedule'&&a==='schedule-lock'?scheduleLockMenuLabel():label,cls)}
    });
+   sections.appendChild(section);
  });
  updateThemeMenuLabel();
  return menu;
