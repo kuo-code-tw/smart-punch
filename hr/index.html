@@ -818,6 +818,19 @@ function p79HrOrgValue(e,kind){
  if(kind==='offices'&&/事業處$/.test(legacy))return legacy;
  return '';
 }
+// 即使七系統共用腳本尚未載入，首次開啟人資也必須依組織由大到小排序。
+function p79HrCompareOrgPeople(a,b){
+ if(window.Port79OrgHierarchy?.comparePeople)return window.Port79OrgHierarchy.comparePeople(a,b);
+ for(const kind of ['headquarters','divisions','offices','sections','jobTitles']){
+  const left=p79HrOrgValue(a,kind),right=p79HrOrgValue(b,kind);
+  if(left===right)continue;
+  if(!left)return 1;
+  if(!right)return -1;
+  const order=left.localeCompare(right,'zh-Hant',{numeric:true});
+  if(order)return order;
+ }
+ return String(a?.empId||'').localeCompare(String(b?.empId||''),'zh-Hant',{numeric:true});
+}
 function populateFilters(){
   const fill=(id,label,vals)=>{
     const el=$(id),cur=el?.value||'';
@@ -1195,7 +1208,7 @@ function renderPermissionOverview(){
   });
   rows.sort((a,b)=>{
     // 權限總覽也依組織由大到小排列；同一員工再依權限顯示。
-    const org=window.Port79OrgHierarchy?.comparePeople?.(a.e,b.e)??0;
+    const org=p79HrCompareOrgPeople(a.e,b.e);
     const rank={manage:0,view:1,none:2};
     return org||(rank[a.level]-rank[b.level])||String(a.k).localeCompare(String(b.k));
   });
@@ -1219,7 +1232,7 @@ function render(){
     return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!hq||p79HrOrgValue(e,'headquarters')===hq)&&(!div||p79HrOrgValue(e,'divisions')===div)&&(!off||p79HrOrgValue(e,'offices')===off)&&(!d||e.dept===d)&&(!u||p79HrOrgValue(e,'sections')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
   });
   // 人資名冊優先按總公司、事業部、事業處、單位，再以職稱及工號排序。
-  list.sort((a,b)=>window.Port79OrgHierarchy?.comparePeople?.(a,b)??String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
+  list.sort((a,b)=>p79HrCompareOrgPeople(a,b));
   $('body').innerHTML=list.map((e,i)=>{
     const p=normalizePerms(e),lb=e.leaveBalance||{},can=hrAccess==='manage',stt=normalizeEmploymentStatus(e.employmentStatus);
     const rowClass=stt==='resigned'?'row-resigned':stt==='leave'?'row-leave':'';
@@ -1571,7 +1584,7 @@ async function clearSessionLogs(){
 }
 
 async function exportEmployees() {
-  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.slice().sort((a,b)=>window.Port79OrgHierarchy?.comparePeople?.(a,b)??String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true})).map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',總公司:p79HrOrgValue(e,'headquarters'),事業部:p79HrOrgValue(e,'divisions'),事業處:p79HrOrgValue(e,'offices'),單位:p79HrOrgValue(e,'sections'),職稱:e.jobTitle||e.deptDetail||'',原部門:e.dept||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.slice().sort((a,b)=>p79HrCompareOrgPeople(a,b)).map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',總公司:p79HrOrgValue(e,'headquarters'),事業部:p79HrOrgValue(e,'divisions'),事業處:p79HrOrgValue(e,'offices'),單位:p79HrOrgValue(e,'sections'),職稱:e.jobTitle||e.deptDetail||'',原部門:e.dept||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
 init();
 </script>
 
