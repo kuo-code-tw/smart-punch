@@ -3,7 +3,8 @@
 'use strict';
 const M=window.P79HrVerifiedMetrics;
 if(!M)return;
-const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastAuthIdentity='';
+const $=id=>document.getElementById(id),cache=new Map(),sourceCache=new Map(),sourceInflight=new Map(),timings=[];
+const CACHE_TTL_MS=120000;let loadId=0,inFlightKey='',lastAuthority='';
 function sess(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function access(key,action){
  const s=sess(),role=String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase();
@@ -28,7 +29,8 @@ function apiBase(){
 }
 function selection(){return M.date($('p79rWorkDate')?.value)||M.date(new Date().toISOString().slice(0,10))}
 function todayTaipei(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
-function identity(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+apiBase()+'|'+JSON.stringify([s?.adminRole,s?.systemPermissions,s?.finePermissions])+'|'+selection()}
+function authority(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+apiBase()+'|'+JSON.stringify([s?.adminRole,s?.systemPermissions,s?.finePermissions])}
+function identity(){return authority()+'|'+selection()}
 function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=msg}
 function readFailure(result){
  const e=result?.reason;
@@ -50,7 +52,8 @@ async function get(action,month,auth,ms=30000){
  url.searchParams.set('token',auth);
  url.searchParams.set('gcToken',auth);
  url.searchParams.set('_',String(Date.now()));
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+ const started=Date.now(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+ let outcome='error';
  try{
   const response=await fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:controller.signal});
   if(!response.ok)throw Error('正式資料來源 HTTP '+response.status);
@@ -60,8 +63,13 @@ async function get(action,month,auth,ms=30000){
   if(data?.ok!==true)throw Error(data?.error||'資料來源未授權或回傳失敗');
   if(data.partial===true||data.complete===false||data.incomplete===true)throw Error('正式資料回應不完整，請重新同步');
   if(data.month&&String(data.month)!==month)throw Error('正式資料月份不一致');
-  return data;
- }finally{clearTimeout(timer)}
+  outcome='ok';return data;
+ }finally{
+  clearTimeout(timer);
+  // Local, redacted source timings: no tokens, URLs, personnel or source payloads.
+  timings.push({source:action,month:action==='getLeaveData'?'all':month,ms:Date.now()-started,result:outcome});
+  if(timings.length>30)timings.shift();
+ }
 }
 function leaveRows(result){
  if(!result||!Array.isArray(result.employees)||!Array.isArray(result.leaveRecords))throw Error('核准請假或人資名冊不完整');
@@ -208,31 +216,48 @@ function reset(msg){
 }
 async function refresh(force){
  if(!ready())return;
- const day=selection(),month=day.slice(0,7),auth=activeToken(),startIdentity=identity();
- if(lastAuthIdentity&&lastAuthIdentity!==String(sess()?.empId||'')+'|'+auth){cache.clear();loadId++;inFlightKey=''}
- lastAuthIdentity=String(sess()?.empId||'')+'|'+auth;
+ const day=selection(),month=day.slice(0,7),auth=activeToken(),startIdentity=identity(),authorityKey=authority();
+ if(lastAuthority&&lastAuthority!==authorityKey){cache.clear();sourceCache.clear();sourceInflight.clear();loadId++;inFlightKey=''}
+ lastAuthority=authorityKey;
  if(!auth||!apiBase()||!sess())return reset('沒有已驗證的雲端登入權杖');
  const scope={attendance:access('attendance','records.view'),schedule:access('schedule','records.view'),
  leave:access('leave','records.view'),workhours:access('workhours','overtime.view')};
  const key=startIdentity+'|'+month;
  if(inFlightKey===key)return;
- if(force)cache.delete(key);
+ if(force){cache.clear();sourceCache.clear()}
  const hit=cache.get(key);
- if(!force&&hit&&Date.now()-hit.at<120000){display(hit.data,scope,day);return}
+ if(!force&&hit&&Date.now()-hit.at<CACHE_TTL_MS){display(hit.data,scope,day);return}
  inFlightKey=key;const current=++loadId;
  reset('正式資料核對中…');
  const readOne=async(enabled,action,requestedMonth)=>{
   if(!enabled)throw Error('目前沒有資料檢視權限');
-  try{return await get(action,requestedMonth,auth)}catch(error){
-   // A bounded read retry matches the existing leave page's slow-cloud flow.
-   // Never retry after an account/date change or an authorization failure.
-   if(current!==loadId||identity()!==startIdentity||/權限|授權|登入|token/i.test(String(error.message)))throw error;
-   return get(action,requestedMonth,auth);
-  }
+  // Reuse month responses across day changes; never persist private ledgers.
+  const cacheKey=authorityKey+'|'+action+'|'+(action==='getLeaveData'?'all':requestedMonth);
+  const cached=sourceCache.get(cacheKey);
+  if(!force&&cached&&Date.now()-cached.at<CACHE_TTL_MS)return cached.value;
+  if(!force&&sourceInflight.has(cacheKey))return sourceInflight.get(cacheKey);
+  const work=(async()=>{
+   try{return await get(action,requestedMonth,auth,15000)}catch(error){
+    // Never retry authorization denial or a request for a former account/date.
+    if(current!==loadId||identity()!==startIdentity||/權限|授權|登入|token/i.test(String(error.message)))throw error;
+    return get(action,requestedMonth,auth,20000);
+   }
+  })();
+  sourceInflight.set(cacheKey,work);
+  try{
+   const value=await work;
+   if(authority()===authorityKey){
+    sourceCache.set(cacheKey,{at:Date.now(),value});
+    if(sourceCache.size>18)sourceCache.delete(sourceCache.keys().next().value);
+   }
+   return value;
+  }finally{if(sourceInflight.get(cacheKey)===work)sourceInflight.delete(cacheKey)}
  };
  const months=[...new Set([month,dateOffset(day,-6).slice(0,7)])];
  const attMonths=[...new Set([...months,dateOffset(day,1).slice(0,7)])];
- const scheduleMonths=[...new Set([...months,monthOffset(month,1)])];
+ // Future-month schedules do not affect the selected day or prior six days.
+ // Attendance alone needs the next month when a night shift crosses month-end.
+ const scheduleMonths=months;
  const join=async(enabled,action,selected,field)=>{
   const data=await Promise.all(selected.map(m=>readOne(enabled,action,m)));
   if(data.some(d=>!Array.isArray(d[field])))throw Error('正式'+field+'資料不完整');
@@ -256,13 +281,14 @@ const original=window.p79HrDashRender;
 window.p79HrDashRender=function(){
  original?.();
  const day=selection(),key=identity()+'|'+day.slice(0,7),entry=cache.get(key);
- if(entry&&Date.now()-entry.at<120000){display(entry.data,{
+ if(entry&&Date.now()-entry.at<CACHE_TTL_MS){display(entry.data,{
   attendance:access('attendance','records.view'),schedule:access('schedule','records.view'),
   leave:access('leave','records.view'),workhours:access('workhours','overtime.view')
  },day)}
  if(ready())void refresh(false);
 };
-window.P79HrStatistics={refresh:()=>refresh(true),access,selection,todayTaipei};
+window.P79HrStatistics={refresh:()=>refresh(true),access,selection,todayTaipei,
+ getTimings:()=>timings.map(row=>({...row}))};
 window.addEventListener?.('focus',()=>{if(ready())void refresh(false)});
 document.addEventListener('DOMContentLoaded',function(){
  const date=$('p79rWorkDate');
