@@ -43,8 +43,10 @@ test('shared navigation preserves the mounted horizontal HR header',()=>{
  const header={dataset:{p79Layout:'reference'},style:{setProperty(){throw Error('HR header was hidden')}},setAttribute(){throw Error('HR header made inaccessible')}};
  const ctx={META:{hr:['','人資管理']},document:{querySelector:q=>q==='#p79HrShellV103'?header:null,body:{setAttribute(){}},title:''}};
  vm.createContext(ctx);vm.runInContext(source+';p79NormalizeLegacyTop("hr")',ctx);
- assert(css.includes('html body.p79-workspace.p79r-ready{padding:78px 0 0!important'));
- assert(css.includes('#p79WorkspaceTopbar{display:flex!important;left:0!important}'));
+ assert(css.includes('html body.p79-workspace.p79r-ready{padding:78px 0 0 var(--p79-w-width)!important'));
+ assert(css.includes('#p79WorkspaceTopbar{display:flex!important;left:var(--p79-w-width)!important}'));
+ assert(!css.includes('--p79-w-width:0px'));
+ assert(!css.includes('.p79-workspace-sidebar{display:none!important}'));
  assert(css.includes('#p79WorkspaceStatus{display:block!important}'));
  assert(css.includes('top:var(--p79-hr-toolbar-height)!important'));
 });
