@@ -1,8 +1,7 @@
 /* HR dashboard reference layout: standalone visual layer, no changes to master-data forms. */
 body.p79r-ready{background:#eef5fd!important;color:#122348!important}
-html body.p79-workspace.p79r-ready{padding:78px 0 0!important;--p79-w-width:0px;--p79-hr-toolbar-height:76px}
-html body.p79-workspace.p79r-ready :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{display:none!important}
-html body.p79-workspace.p79r-ready #p79WorkspaceTopbar{display:flex!important;left:0!important}
+html body.p79-workspace.p79r-ready{padding:78px 0 0 var(--p79-w-width)!important;--p79-hr-toolbar-height:76px}
+html body.p79-workspace.p79r-ready #p79WorkspaceTopbar{display:flex!important;left:var(--p79-w-width)!important}
 html body.p79-workspace.p79r-ready #p79WorkspaceStatus{display:block!important}
 html body.p79-workspace.p79r-ready #p79HrShellV103{display:block!important;position:sticky!important;top:var(--p79-hr-toolbar-height)!important;z-index:10000!important}
 @media(max-width:900px){html body.p79-workspace.p79r-ready{padding:66px 0 0!important;--p79-hr-toolbar-height:66px}html body.p79-workspace.p79r-ready #p79WorkspaceTopbar .p79-toolbar-user{display:flex!important}}
