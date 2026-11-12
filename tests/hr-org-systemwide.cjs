@@ -45,8 +45,8 @@ assert(hr.includes('單位數'));
 assert(hr.includes('① 🏛️ 總公司')&&hr.includes('② 🏢 事業部')&&hr.includes('③ 🏬 事業處')&&hr.includes('④ 🧭 單位'));
 const names=['總公司 🔎','事業部 🔎','事業處 🔎','單位 🔎','職稱 🔎','原部門 🔎'].map(x=>hr.indexOf('>'+x+'</button>'));
 assert(names.every(x=>x>=0)&&names.every((x,i)=>!i||x>names[i-1]),'table columns follow hierarchy largest to smallest');
-assert(hr.includes('list.sort((a,b)=>window.Port79OrgHierarchy?.comparePeople?.(a,b)'),'HR list sorting follows hierarchy');
-assert(hr.includes('employees.slice().sort((a,b)=>window.Port79OrgHierarchy?.comparePeople?.(a,b)'),'export sorted by hierarchy');
+assert(hr.includes('list.sort((a,b)=>p79HrCompareOrgPeople(a,b)'),'HR list sorting follows hierarchy');
+assert(hr.includes('employees.slice().sort((a,b)=>p79HrCompareOrgPeople(a,b)'),'export sorted by hierarchy');
 
 assert(hr.includes("事業處:p79HrOrgValue(e,'offices')"),'export includes official level');
 const dash=fs.readFileSync('hr/port79-hr-reference-dashboard.js','utf8');
