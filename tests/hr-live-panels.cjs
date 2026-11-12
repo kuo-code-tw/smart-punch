@@ -31,7 +31,7 @@ async function run({denied=false,failed=false,stale=false,day='2026-11-01',hidde
  assert(x.node('p79rLeaveSummary').innerHTML.includes('100.0%'));
  assert(x.node('p79rLeaveSummary').innerHTML.includes('conic-gradient'));
  assert(x.node('p79rOvertimeSummary').innerHTML.includes('p79r-breakdown-donut'));assert.equal((x.node('p79rAttendanceTrend').innerHTML.match(/p79r-trend-row/g)||[]).length,7);
- assert(x.requests.some(([a,m])=>a==='getAttendanceMonthData'&&m==='2026-10'));assert(x.requests.some(([a,m])=>a==='getScheduleDataSecure'&&m==='2026-12'));
+ assert(x.requests.some(([a,m])=>a==='getAttendanceMonthData'&&m==='2026-10'));assert(!x.requests.some(([a,m])=>a==='getScheduleDataSecure'&&m==='2026-12'),'future month schedule is unnecessary');
  x=await run({hiddenTitles:['指揮手']});
  assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'),'hidden title must not expose employee in the dashboard');
  assert(x.node('p79rAttendanceDetails').innerHTML.includes('乙'));
