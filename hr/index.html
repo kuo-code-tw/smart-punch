@@ -321,7 +321,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="orgbox"><h3>🏢 事業部</h3><div style="display:flex;gap:6px"><input id="newDivision" placeholder="新增事業部"><button class="btn primary" onclick="addOrgItem('divisions','newDivision')">新增</button></div><div id="divisionList" class="orglist"></div></div>
     <div class="orgbox"><h3>🏬 事業處</h3><div style="display:flex;gap:6px"><input id="newOffice" placeholder="新增事業處"><button class="btn primary" onclick="addOrgItem('offices','newOffice')">新增</button></div><div id="officeList" class="orglist"></div></div>
     <div class="orgbox"><h3>🧭 單位</h3><div style="display:flex;gap:6px"><input id="newSection" placeholder="新增單位（課／組／室／中心）"><button class="btn primary" onclick="addOrgItem('sections','newSection')">新增</button></div><div id="sectionList" class="orglist"></div></div>
-    <div class="orgbox"><h3>🎖️ 職稱</h3><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
+    <div class="orgbox"><h3>🎖️ 職稱</h3><div class="muted" style="font-size:11px;margin-bottom:7px">按「隱藏」可從統計及排班選項移除職稱顯示，不會刪除人員或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
   </div>
   <details class="legacy-org-settings">
     <summary>舊系統相容選項（原部門／單位）</summary>
@@ -332,7 +332,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     </div>
   </details>
   <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
-  <div class="footer"><div class="muted">移除選項不會刪除員工或歷史資料；儲存後須雲端讀回一致。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
+  <div class="footer"><div class="muted">隱藏不會刪除人員、排班與歷史資料；職稱可隨時重新顯示，儲存後須雲端讀回一致。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
 </div></dialog>
 
 <dialog id="masterPickerDialog"><div class="modal">
@@ -457,8 +457,8 @@ const APP_VERSION='2026.10.16.101';
 const DEFAULT_GAS_URL="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec";
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 let employees=[],session=null,token='',hrAccess='none',editing=null;
-let orgSettings={departments:[],jobTitles:[],units:[],headquarters:[],divisions:[],offices:[],sections:[]};
-let orgDraft={departments:[],jobTitles:[],units:[],headquarters:[],divisions:[],offices:[],sections:[]};
+let orgSettings={departments:[],jobTitles:[],hiddenJobTitles:[],units:[],headquarters:[],divisions:[],offices:[],sections:[]};
+let orgDraft={departments:[],jobTitles:[],hiddenJobTitles:[],units:[],headquarters:[],divisions:[],offices:[],sections:[]};
 let pickerKind='',pickerTarget='';
 const SYS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
 const LABEL={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
@@ -529,6 +529,7 @@ function normalizeOrgSettings(raw){
   return{
     departments:uniqSorted(raw.departments),
     jobTitles:uniqSorted(raw.jobTitles),
+    hiddenJobTitles:uniqSorted(raw.hiddenJobTitles).filter(v=>uniqSorted(raw.jobTitles).includes(v)),
     units:uniqSorted(raw.units),
     headquarters:uniqSorted(raw.headquarters),
     divisions:options('divisions',/事業部$/),
@@ -569,7 +570,7 @@ function p79ParseCanonicalOrgOptions(config){
   const extended=config[P79_HR_ORG_OPTIONS_V2_KEY];
   if(legacy===undefined)return null;
   if(!legacy||!['departments','jobTitles','units'].every(k=>Array.isArray(legacy[k])))throw new Error('舊版組織選項格式不完整');
-  if(extended!==undefined&&(!extended||(!['divisions','offices','sections'].every(k=>Array.isArray(extended[k]))||('headquarters' in extended&&!Array.isArray(extended.headquarters)))))
+  if(extended!==undefined&&(!extended||(!['divisions','offices','sections'].every(k=>Array.isArray(extended[k]))||('headquarters' in extended&&!Array.isArray(extended.headquarters))||('hiddenJobTitles' in extended&&!Array.isArray(extended.hiddenJobTitles)))))
     throw new Error('四層組織選項格式不完整');
   return normalizeOrgSettings({...legacy,...(extended||{})});
 }
@@ -585,10 +586,17 @@ async function migrateLegacyAttendanceOrgSettings(){
   return;
 }
 
+function p79JobTitleKey(value){
+  return String(value==null?'':value).normalize('NFKC').replace(/[\s\/_-]+/g,'').toUpperCase();
+}
+function p79IsJobTitleHidden(value,hiddenList=orgSettings.hiddenJobTitles){
+  const key=p79JobTitleKey(value);
+  return !!key&&Array.isArray(hiddenList)&&hiddenList.some(title=>p79JobTitleKey(title)===key);
+}
 function mergedOrgValues(kind){
-  // 人資組織設定是唯一選單來源。
-  // 既有人員仍可保留舊值，但不再把舊值自動回灌成可選項目。
-  return uniqSorted(orgSettings[kind]||[]);
+  // 隱藏職稱不可再供新選擇；原有員工、歷史紀錄與權限範圍維持不變。
+  const values=uniqSorted(orgSettings[kind]||[]);
+  return kind==='jobTitles'?values.filter(v=>!p79IsJobTitleHidden(v)):values;
 }
 function normalizePhone(v){
   let s=String(v??'').trim();
@@ -876,6 +884,7 @@ function openOrgSettings(){if(!canHr('org.view'))return alert('沒有查看組�
   orgDraft={
     departments:uniqSorted(orgSettings.departments).slice(),
     jobTitles:uniqSorted(orgSettings.jobTitles).slice(),
+    hiddenJobTitles:uniqSorted(orgSettings.hiddenJobTitles).slice(),
     units:uniqSorted(orgSettings.units).slice(),
     headquarters:uniqSorted(orgSettings.headquarters).slice(),
     divisions:uniqSorted(orgSettings.divisions).slice(),
@@ -889,7 +898,11 @@ function openOrgSettings(){if(!canHr('org.view'))return alert('沒有查看組�
 function renderOrgSettings(){
   const draw=(kind,id)=>{
     const el=$(id);if(!el)return;
-    el.innerHTML=(orgDraft[kind]||[]).map(v=>`<div class="orgitem"><span>${esc(v)}</span><button class="small-danger" onclick="removeOrgItem('${kind}',${JSON.stringify(v).replace(/"/g,'&quot;')})">移除</button></div>`).join('')||'<div class="muted">尚未建立</div>';
+    el.innerHTML=(orgDraft[kind]||[]).map(v=>{
+      const hidden=kind==='jobTitles'&&p79IsJobTitleHidden(v,orgDraft.hiddenJobTitles);
+      const toggle=kind==='jobTitles'?`<button type="button" class="p79-org-visibility" style="border:0;background:transparent;color:${hidden?'#0369a1':'#64748b'};font-weight:900;cursor:pointer" onclick="toggleOrgJobTitleVisibility(${JSON.stringify(v).replace(/"/g,'&quot;')})">${hidden?'顯示':'隱藏'}</button>`:'';
+      return `<div class="orgitem" ${hidden?'style="opacity:.65"':''}><span>${esc(v)}${hidden?'（已隱藏）':''}</span><span style="display:flex;gap:8px;align-items:center">${toggle}<button type="button" class="small-danger" onclick="removeOrgItem('${kind}',${JSON.stringify(v).replace(/"/g,'&quot;')})">移除</button></span></div>`;
+    }).join('')||'<div class="muted">尚未建立</div>';
   };
   draw('headquarters','headquartersList');draw('divisions','divisionList');draw('offices','officeList');draw('sections','sectionList');draw('jobTitles','jobTitleList');
   draw('departments','departmentList');draw('units','unitList');
@@ -900,8 +913,19 @@ function addOrgItem(kind,inputId){
   orgDraft[kind]=uniqSorted([...(orgDraft[kind]||[]),v]);
   input.value='';renderOrgSettings();
 }
+function toggleOrgJobTitleVisibility(value){
+  if(!canHr('org.manage'))return;
+  const key=p79JobTitleKey(value);
+  if(!key||(orgDraft.jobTitles||[]).every(v=>p79JobTitleKey(v)!==key))return;
+  const hidden=orgDraft.hiddenJobTitles||[];
+  orgDraft.hiddenJobTitles=p79IsJobTitleHidden(value,hidden)
+    ?hidden.filter(v=>p79JobTitleKey(v)!==key)
+    :uniqSorted([...hidden,value]);
+  renderOrgSettings();
+}
 function removeOrgItem(kind,value){
   orgDraft[kind]=(orgDraft[kind]||[]).filter(v=>v!==value);
+  if(kind==='jobTitles')orgDraft.hiddenJobTitles=(orgDraft.hiddenJobTitles||[]).filter(v=>p79JobTitleKey(v)!==p79JobTitleKey(value));
   renderOrgSettings();
 }
 async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修改組織設定權限');
@@ -914,7 +938,7 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
     p79OrgSaveStatus('正在核對及儲存組織設定…');
     const draft=normalizeOrgSettings(orgDraft);
     const legacy={departments:draft.departments,units:draft.units,jobTitles:draft.jobTitles};
-    const extended={headquarters:draft.headquarters,divisions:draft.divisions,offices:draft.offices,sections:draft.sections};
+    const extended={headquarters:draft.headquarters,divisions:draft.divisions,offices:draft.offices,sections:draft.sections,hiddenJobTitles:draft.hiddenJobTitles};
     const orgConfig={[P79_HR_ORG_OPTIONS_KEY]:legacy,[P79_HR_ORG_OPTIONS_V2_KEY]:extended,departments:draft.departments,jobTitles:draft.jobTitles};
     if(new TextEncoder().encode(JSON.stringify(orgConfig)).length>8800)throw new Error('組織設定容量不足，尚未儲存');
     p79OrgSaveStatus('正在儲存組織選項（1/2）…');
@@ -1711,8 +1735,9 @@ window.p79OvertimeContext={gasUrl:()=>GAS_URL,canEditRules:()=>String(session?.a
 <script src="../assets/port79-management-workspace.js?v=20261111-hr-menu-v2"></script>
 <script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 <script src="./port79-hr-verified-metrics.js?v=20261112-live-panels-v1"></script>
-<script src="./port79-hr-reference-dashboard.js?v=20261112-dynamic-job-titles-v2&panels=20261112-live"></script>
+<script src="./port79-hr-reference-dashboard.js?v=20261112-title-visibility-v3&panels=20261112-live"></script>
 <script src="./port79-hr-live-statistics.js?v=20261112-live-panels-v1"></script>
+
 </body></html>
 
 
