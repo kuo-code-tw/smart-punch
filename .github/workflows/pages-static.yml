@@ -72,7 +72,11 @@ jobs:
             pushd "$folder" >/dev/null
             for test_file in tests/*.cjs; do
               count=$((count+1))
-              if timeout --signal=TERM --kill-after=5s 30s node "$test_file" > /tmp/port79-last-test.log 2>&1; then
+              # The vessel cloud readback regression exercises a 90-second timeout budget;
+              # keep assertions intact and allow that one fixture to finish rather than kill it at 30s.
+              local test_budget=30s
+              if [[ "$test_file" == "tests/efficiency-timeout-readback.cjs" ]]; then test_budget=120s; fi
+              if timeout --signal=TERM --kill-after=5s "$test_budget" node "$test_file" > /tmp/port79-last-test.log 2>&1; then
                 :
               else
                 fails=$((fails+1))
