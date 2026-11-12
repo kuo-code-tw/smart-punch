@@ -96,7 +96,7 @@ function mountDashboard(){
  '</div>',
  '<div class="p79r-grid-top">',
  panel('各單位人員統計（在職）','<div class="p79r-dept-scroller" role="region" tabindex="0" aria-label="職稱統計表，可水平捲動"><table aria-label="各單位依職稱統計在職人數"><thead><tr id="p79rDeptHead"><th>單位</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="3">讀取人資主檔中…</td></tr></tbody></table></div>'),
- panel('當日出勤狀態（授權範圍）','<div class="p79r-donut"><div><span>在職人數<br><b id="p79rActiveDonut">—</b></span></div></div><div id="p79rAttendanceBreakdown" class="p79r-note" role="status">正在核對正式考勤…</div>'),
+ panel('當日出勤狀態（授權範圍）','<div class="p79r-donut p79r-donut-pending"><div><span><small id="p79rDonutCaption">待核對</small><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-donut-source" id="p79rDonutSource" role="status">等待正式考勤資料</div><div id="p79rAttendanceBreakdown" class="p79r-note" role="status">正在核對正式考勤…</div>'),
  panel('出勤率趨勢（近7日）','<div id="p79rAttendanceTrend" role="status">正在讀取正式班表與打卡紀錄…</div>'),
  '</div>',
  '<div class="p79r-grid-mid">',
@@ -131,7 +131,7 @@ function updateCounts(records,anchor,ready){
  var hires=records.filter(function(e){var date=parseDate(e.startDate||e.reportingDate);return date&&date.slice(0,7)===month&&date<=anchor&&date<=today});
  var leavers=resigned.filter(function(e){var date=parseDate(e.terminationDate);return date&&date.slice(0,7)===month&&date<=anchor});
  text('p79rActive',ready||records.length?n(active.length):'—');
- text('p79rActiveDonut',ready||records.length?n(active.length):'—');
+ // The attendance donut displays a verified rate or an explicitly labelled punch proportion, never a roster headcount.
  text('p79rHires',ready||records.length?n(hires.length):'—');
  text('p79rLeavers',ready||records.length?n(leavers.length):'—');
  text('p79rActiveSub',isCloudReady()?'雲端主檔已核對':'快取／待雲端核對');

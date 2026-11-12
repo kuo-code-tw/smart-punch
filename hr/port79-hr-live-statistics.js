@@ -129,6 +129,31 @@ function prepareAttendance(data){
  for(const shift of shifts)if(shift.clockIn)workdays.set(key(shift.clockIn),M.date(shift.accountingDateKey||shift.dateKey));
  return {...data,shifts,records:punches.map(r=>({...r,accountingDate:workdays.get(key(r))||undefined}))};
 }
+function setDonut(punched,total,mode,message){
+ const amount=$('p79rActiveDonut'),caption=$('p79rDonutCaption'),ring=amount?.closest?.('.p79r-donut');
+ if(!amount||!ring||!caption)return;
+ const ready=Number.isFinite(punched)&&Number.isFinite(total)&&total>0;
+ const ratio=ready?Math.max(0,Math.min(100,punched/total*100)):null;
+ amount.textContent=ready?ratio.toFixed(1)+'%':'—';
+ caption.textContent=mode==='official'?'正式出勤率':mode==='observed'?'打卡覆蓋率':'待核對';
+ ring.classList?.toggle?.('p79r-donut-pending',!ready);
+ ring.classList?.toggle?.('p79r-donut-observed',ready&&mode==='observed');
+ ring.style.background=ready?'conic-gradient(#2563eb 0% '+ratio.toFixed(1)+'%,#dbeafe '+ratio.toFixed(1)+'% 100%)':'repeating-conic-gradient(#dde8f5 0 13deg,#edf3fa 13deg 26deg)';
+ ring.setAttribute?.('role','img');ring.setAttribute?.('aria-label',caption.textContent+' '+amount.textContent);
+ const status=$('p79rDonutSource');if(status)status.textContent=message||'';
+}
+function scopeIssues(payload,scope){
+ return [['考勤',scope.attendance,payload.attendance],['排班',scope.schedule,payload.schedule],['核准請假',scope.leave,payload.leave]]
+ .filter(([,ok,r])=>!ok||r?.status!=='fulfilled')
+ .map(([n,ok,r])=>n+'：'+(ok?r?'讀取失敗（'+readFailure(r)+'）':'讀取中':'缺少檢視權限'));
+}
+function punchCoverage(data,staff,day){
+ const details=M.attendanceDetails({records:attendanceRows(data),shifts:data.shifts||[],employees:staff,day,leaveRecords:[],schedules:[]});
+ return {count:details.filter(r=>r.clockIn.length>0).length,total:details.length};
+}
+function renderPendingTrend(day,reason){
+ content('p79rAttendanceTrend',Array.from({length:7},(_,i)=>dateOffset(day,i-6)).map(d=>'<div class="p79r-trend-row" title="'+esc(reason)+'"><span>'+d.slice(5)+'</span><div class="p79r-trend-track p79r-trend-pending"></div><b>待核對</b></div>').join('')+'<div class="p79r-live-error">'+esc(reason)+'</div>');
+}
 function panels(payload,scope,day,leave,ot,attendance){
  const month=day.slice(0,7),staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),take=r=>ids.has(String(r.empId||r.employeeId||'').trim().toUpperCase());
  if(leave?.ready)summaryChart('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
@@ -151,7 +176,9 @@ function panels(payload,scope,day,leave,ot,attendance){
    content('p79rAttendanceDetails','<div class="p79r-live-note">'+esc(day)+'｜'+scopeText+'；日期依正式跨日配對。'+(!scope.leave||!l?' 請假資料未取得。':'')+(!scope.schedule||!s?' 班表資料未取得。':'')+'</div><table><thead><tr>'+fields.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+(visibleRows.length?visibleRows.map(r=>'<tr>'+[r.name||r.empId,r.unit||'未設定',r.jobTitle||'未設定',r.shift||'未排班',r.clockIn.join('、')||'—',r.clockOut.join('、')||'—',r.state].map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="7">目前沒有可顯示的人員</td></tr>')+'</tbody></table>');
   }catch(e){note('p79rAttendanceDetails',e.message)}
  }else note('p79rAttendanceDetails',scope.attendance?'正式打卡讀取失敗：'+readFailure(payload.attendance):'目前帳號沒有考勤資料檢視權限');
- if(rows){const counts={};rows.forEach(r=>counts[r.state]=(counts[r.state]||0)+1);content('p79rAttendanceBreakdown','<div class="p79r-live-note">'+esc(day)+'｜'+(attendance?.ready?(attendance.expected+' 人應到／'+attendance.clocked+' 人已簽到'):'應到人數待班表與請假核對')+'</div>'+Object.entries(counts).map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+value+' 人</b></div>').join(''))}
+ if(rows){const counts={};rows.forEach(r=>counts[r.state]=(counts[r.state]||0)+1);
+  const punched=rows.filter(r=>r.clockIn.length>0).length;
+  if(!attendance?.ready)setDonut(punched,rows.length,'observed',punched+' 位有上班打卡／'+rows.length+' 位在職人員。此為打卡覆蓋率，非正式出勤率。');content('p79rAttendanceBreakdown','<div class="p79r-live-note">'+esc(day)+'｜'+(attendance?.ready?(attendance.expected+' 人應到／'+attendance.clocked+' 人已簽到'):'應到人數待班表與請假核對')+'</div>'+Object.entries(counts).map(([label,value])=>'<div class="p79r-live-row"><span>'+esc(label)+'</span><b>'+value+' 人</b></div>').join(''))}
  else note('p79rAttendanceBreakdown','正式考勤尚未確認，無法顯示出勤分布');
  if(scope.attendance&&scope.schedule&&scope.leave&&a&&s&&l){
   try{
@@ -160,10 +187,22 @@ function panels(payload,scope,day,leave,ot,attendance){
     if(staff.filter(e=>M.isWorking(e,d)).some(e=>!known.has(String(e.empId||'').trim().toUpperCase())))calc={ready:false,reason:'請假資料範圍未完整涵蓋人員'};
     else calc=M.attendanceRate({employees:staff,records:attendanceRows(a),schedules:officialSchedules(s),leaveRecords:leaves,day:d});
     if(d>todayTaipei())calc={ready:false,reason:'未來日期'};
+    else if(!calc.ready){const observed=punchCoverage(a,staff,d);if(observed.total)calc={...calc,punchPercent:observed.count/observed.total*100};}
     return {day:d,...calc};});
-   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar" style="width:'+(r.ready&&r.percent!==null?r.percent:0)+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):'待核對')+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算比率。</div>');
-  }catch(e){note('p79rAttendanceTrend',e.message)}
- }else note('p79rAttendanceTrend','考勤、排班或核准請假未取得，出勤率暫無法核對');
+   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar'+(!r.ready&&r.punchPercent!==undefined?' p79r-trend-provisional':'')+'" style="width:'+(r.ready&&r.percent!==null?r.percent:(r.punchPercent??0))+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):(r.punchPercent===undefined?'待核對':r.punchPercent.toFixed(1)+'%*'))+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算正式出勤率；* 為打卡人數／在職人數，並非正式出勤率。</div>');
+   }catch(e){renderPendingTrend(day,'出勤率核對失敗：'+e.message)}
+ }else{
+  const issue=scopeIssues(payload,scope).join('；')||'正式來源仍待核對';
+  if(a&&scope.attendance){
+   try{
+    const daily=Array.from({length:7},(_,i)=>{const d=dateOffset(day,i-6);return {day:d,...punchCoverage(a,staff,d)}});
+    content('p79rAttendanceTrend','<div class="p79r-live-note">以下是打卡覆蓋率（已打上班卡／在職人員），不是正式應到出勤率。</div>'+daily.map(r=>{
+      const percent=r.day>todayTaipei()||!r.total?null:r.count/r.total*100;
+      return '<div class="p79r-trend-row" title="'+esc(r.count+' / '+r.total+' 位有上班打卡')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar p79r-trend-provisional" style="width:'+(percent??0).toFixed(1)+'%"></div></div><b>'+(percent===null?'待核對':percent.toFixed(1)+'%*')+'</b></div>';
+    }).join('')+'<div class="p79r-live-error">正式出勤率尚未核對：'+esc(issue)+'</div>');
+   }catch(e){renderPendingTrend(day,'正式出勤率未核對：'+issue+'；打卡覆蓋率也無法計算：'+e.message)}
+  }else renderPendingTrend(day,'正式出勤率尚未核對：'+issue);
+ }
 }
 function display(payload,scope,day){
  if(!payload)return;
@@ -199,16 +238,15 @@ function display(payload,scope,day){
    if(attendance.ready){
     setVal('p79rAttendance',attendance.percent===null?'—':attendance.percent.toFixed(1)+'%',
       attendance.expected+' 人應到／'+attendance.clocked+' 人已打上班卡（當日）');
-    const donut=$('p79rActiveDonut')?.closest('.p79r-donut');
-    if(donut)donut.style.background='conic-gradient(#2b85e9 '+(attendance.percent??0)+'%,#e1edf8 0)';
+     setDonut(attendance.clocked,attendance.expected,'official',attendance.expected+' 人應到／'+attendance.clocked+' 人已打上班卡');
    }else sourceText('p79rAttendance',attendance.reason||'當日打卡核對尚未完成');
-  }catch(e){sourceText('p79rAttendance','當日打卡與班表未核對完成')}
- }else if(scope.attendance&&scope.schedule&&scope.leave)sourceText('p79rAttendance','正式打卡／班表／請假尚未讀齊');
- else sourceText('p79rAttendance','需要考勤、排班與請假檢視權限');
+  }catch(e){sourceText('p79rAttendance','正式出勤率未核對完成：'+String(e.message||e).slice(0,100))}
+ }else if(scope.attendance&&scope.schedule&&scope.leave)sourceText('p79rAttendance','正式資料未讀齊：'+scopeIssues(payload,scope).join('；'));
+ else sourceText('p79rAttendance','需要檢視權限：'+scopeIssues(payload,scope).join('；'));
  panels(payload,scope,day,leave,ot,attendance);
 }
 function reset(msg){
- const donut=$('p79rActiveDonut')?.closest?.('.p79r-donut');if(donut)donut.style.background='#e1edf8';
+ setDonut(null,null,'pending',msg||'等待核對正式考勤');
  for(const id of ['p79rAttendanceDetails','p79rAttendanceTrend','p79rAttendanceBreakdown','p79rLeaveSummary','p79rOvertimeSummary'])note(id,msg||'正式資料核對中…');
  setVal('p79rAttendance','—',msg||'等待正式考勤');
  setVal('p79rLeaves','—',msg||'等待核准請假');
