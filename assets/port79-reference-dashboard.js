@@ -128,6 +128,44 @@ function p79EmployeeOvertimeRows(rows){
  // 只有真正有加班申報時數的職稱才繪圖；零筆人資職稱不能誤作統計。
  return rows.filter(row=>p79IsEmployeeOvertimeTitle(row?.title)&&Number(row?.hours)>0&&Number(row?.count)>0);
 }
+/* Donut visualization of the existing, permission-scoped employee overtime rows.
+ * The source's approval, exclusion and historical-fallback rules stay untouched. */
+function p79OvertimeDonutGroups(rows){
+ const byTitle=new Map();
+ for(const row of rows||[]){
+  const title=String(row?.title||'').trim(),hours=Number(row?.hours);
+  if(title&&Number.isFinite(hours)&&hours>0)byTitle.set(title,(byTitle.get(title)||0)+hours);
+ }
+ const ranked=[...byTitle].map(([title,hours])=>({title,hours}))
+  .sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-Hant',{numeric:true}));
+ const shown=ranked.slice(0,5),rest=ranked.slice(5),total=ranked.reduce((sum,r)=>sum+r.hours,0);
+ if(rest.length)shown.push({title:'其他',hours:rest.reduce((sum,r)=>sum+r.hours,0),members:rest.map(r=>r.title)});
+ const palette=['#147dff','#19b9eb','#36c638','#ff9900','#8b5cf6','#94a3b8'];
+ return {total,groups:shown.map((r,i)=>({...r,color:rest.length&&i===shown.length-1?'#94a3b8':palette[i],percent:total?r.hours/total*100:0}))};
+}
+function p79RenderOvertimeDonut(rows,summary){
+ const model=p79OvertimeDonutGroups(rows),total=model.total,groups=model.groups;
+ const hours=v=>fmt(v,Number.isInteger(v)?0:2),length=2*Math.PI*70;
+ let offset=0;
+ const pieces=groups.map(r=>{
+  const size=length*r.hours/total,dash=Math.max(0,size-Math.min(1.1,size/6)),start=-offset;
+  offset+=size;
+  const tip=r.title+'：'+hours(r.hours)+' 小時（'+r.percent.toFixed(1)+'%）';
+  return '<circle cx="100" cy="100" r="70" fill="none" stroke="'+r.color+'" stroke-width="35" stroke-dasharray="'+dash.toFixed(4)+' '+(length-dash).toFixed(4)+'" stroke-dashoffset="'+start.toFixed(4)+'" transform="rotate(-90 100 100)" tabindex="0" aria-label="'+esc(tip)+'"><title>'+esc(tip)+'</title></circle>';
+ }).join('');
+ let midpoint=0;
+ const labels=groups.map(r=>{
+  const angle=(midpoint+r.percent/2)/100*2*Math.PI-Math.PI/2;
+  midpoint+=r.percent;
+  if(r.percent<6||(groups.length>4&&r.percent<12))return '';
+  return '<text x="'+(100+70*Math.cos(angle)).toFixed(2)+'" y="'+(100+70*Math.sin(angle)).toFixed(2)+'" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="800" font-size="'+(r.percent<10?9:11)+'" pointer-events="none">'+r.percent.toFixed(1)+'%</text>';
+ }).join('');
+ const ring='<div class="p79r-ot-ring"><svg class="p79r-ot-ring-svg" viewBox="0 0 200 200" role="img" aria-label="'+esc('本月員工職稱加班時數 '+hours(total)+' 小時')+'"><circle cx="100" cy="100" r="70" fill="none" stroke="#e7eff8" stroke-width="35"/>'+pieces+labels+'</svg><div class="p79r-ot-center"><span>本月加班</span><span>總時數</span><strong>'+hours(total)+'</strong><small>小時</small></div></div>';
+ const legend=groups.length?'<div class="p79r-ot-legend" aria-label="職稱加班時數占比"><div class="p79r-ot-legend-head"><span>職稱</span><span>加班時數</span><span>占比</span></div>'+
+  groups.map(r=>'<div class="p79r-ot-legend-row" title="'+esc(r.title+'：'+hours(r.hours)+' 小時（'+r.percent.toFixed(1)+'%）')+'"><span class="p79r-ot-title"><i style="background:'+r.color+'"></i>'+esc(r.title)+'</span><b>'+hours(r.hours)+' 小時</b><b>'+r.percent.toFixed(1)+'%</b></div>').join('')+'</div>':
+  '<div class="p79r-ot-no-data">本月尚無有效加班資料</div>';
+ return '<div class="p79r-ot-donut" role="group" aria-label="本月員工職稱加班時數統計"><div class="p79r-ot-donut-layout">'+ring+legend+'</div><div class="p79r-ot-note">'+esc(summary)+'</div></div>';
+}
 function renderAttendancePage(){
  const ot=chartPage===0;
  const title=$('p79DashAttendanceChartTitle');
@@ -145,6 +183,7 @@ function renderAttendancePage(){
  if(!Array.isArray(report.rows)){empty(el.id,ot?'職稱加班資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
  const rows=ot?p79EmployeeOvertimeRows(report.rows):report.rows;
  const pending=!ot?(report.issues||[]).length:0;
+ const overtimeSummary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時不列入'):'';
  if(!rows.length){
   if(ot){
    const count=Number(report.count)||0,hours=Number(report.hours)||0;
@@ -153,10 +192,13 @@ function renderAttendancePage(){
     :count>0
       ?'已讀取 '+fmt(count)+' 筆加班申報（'+fmt(hours,2)+' 小時），但沒有符合本圖的一般員工職稱。請核對職稱是否未設定或被歸為主管。'
       :'本月正式班表尚無有效加班申報；如果加班管理已有資料，請重新整理並核對首頁資料來源。';
-   empty(el.id,msg);return;
+   if(!report.sourceWarning&&count===0&&hours===0)el.innerHTML=p79RenderOvertimeDonut([],overtimeSummary);
+   else empty(el.id,msg);
+   return;
   }
   empty(el.id,'本月無可核對的核准請假'+(pending?'（'+pending+' 筆資料待核）':''));return;
  }
+ if(ot){el.innerHTML=p79RenderOvertimeDonut(rows,overtimeSummary);return;}
  const valueKey=ot?'hours':'days',unit=ot?'小時':'天';
  const max=Math.max(1,...rows.map(r=>Number(r[valueKey])||0));
  const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
