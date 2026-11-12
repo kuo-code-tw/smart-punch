@@ -5,6 +5,12 @@ const M=window.P79HrVerifiedMetrics;
 if(!M)return;
 const $=id=>document.getElementById(id),cache=new Map(),sourceCache=new Map(),sourceInflight=new Map(),timings=[];
 const CACHE_TTL_MS=120000;let loadId=0,inFlightKey='',lastAuthority='';
+const RECOVERY_DELAYS=[5000,15000,30000];let recoveryTimer=null,recoveryKey='',recoveryAttempts=0;
+function cancelRecovery(){if(recoveryTimer!==null)clearTimeout(recoveryTimer);recoveryTimer=null}
+function transient(error){
+ if(/權限|授權|登入|token/i.test(String(error?.message||'')))return false;
+ return error?.retryable===true||error?.name==='AbortError'||/fetch|network|逾時|雲端.*(?:忙碌|更新|處理|寫入|同步)|請稍後/i.test(String(error?.message||''));
+}
 function sess(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function access(key,action){
  const s=sess(),role=String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase();
@@ -37,7 +43,8 @@ function readFailure(result){
  if(e?.name==='AbortError')return '雲端回應逾時';
  if(/權限|授權|登入|token/i.test(String(e?.message||'')))return '雲端授權未確認';
  if(/fetch|network/i.test(String(e?.message||'')))return '雲端連線未完成';
- return String(e?.message||'雲端資料未確認').slice(0,180);
+ const message=String(e?.message||'雲端資料未確認').replace(/[，,；;]?\s*請稍後自動重試/g,'').slice(0,140);
+ return message+(e?.retryAt?'；稍後自動重試':e?.retryExhausted?'；請按重新整理重試':'');
 }
 function setVal(id,num,sub){
  const el=$(id);if(el)el.textContent=num;
@@ -56,11 +63,11 @@ async function get(action,month,auth,ms=30000){
  let outcome='error';
  try{
   const response=await fetch(url.toString(),{cache:'no-store',redirect:'follow',signal:controller.signal});
-  if(!response.ok)throw Error('正式資料來源 HTTP '+response.status);
+  if(!response.ok)throw Object.assign(Error('正式資料來源 HTTP '+response.status),{retryable:response.status===429||response.status>=500});
   const body=await response.text();
   if(/^\s*<!doctype html|^\s*<html/i.test(body))throw Error('正式服務返回登入頁，而非授權 JSON');
   const data=JSON.parse(body);
-  if(data?.ok!==true)throw Error(data?.error||'資料來源未授權或回傳失敗');
+  if(data?.ok!==true)throw Object.assign(Error(data?.error||'資料來源未授權或回傳失敗'),{retryable:data?.retryable===true,retryAfterMs:Number(data?.retryAfterMs)||0});
   if(data.partial===true||data.complete===false||data.incomplete===true)throw Error('正式資料回應不完整，請重新同步');
   if(data.month&&String(data.month)!==month)throw Error('正式資料月份不一致');
   outcome='ok';return data;
@@ -262,11 +269,17 @@ async function refresh(force){
  leave:access('leave','records.view'),workhours:access('workhours','overtime.view')};
  const key=startIdentity+'|'+month;
  if(inFlightKey===key)return;
+ if(force||recoveryKey!==key){cancelRecovery();recoveryKey=key;recoveryAttempts=0}
  if(force){cache.clear();sourceCache.clear()}
  const hit=cache.get(key);
- if(!force&&hit&&Date.now()-hit.at<CACHE_TTL_MS){display(hit.data,scope,day);return}
+ if(!force&&hit&&Date.now()-hit.at<CACHE_TTL_MS){
+  display(hit.data,scope,day);
+  // A rejected source is not a successful two-minute snapshot. Wait only for its recovery deadline.
+  if(hit.complete||!hit.retryAt||Date.now()<hit.retryAt)return;
+ }
+ cancelRecovery();
  inFlightKey=key;const current=++loadId;
- reset('正式資料核對中…');
+ if(!hit)reset('正式資料核對中…');
  const readOne=async(enabled,action,requestedMonth)=>{
   if(!enabled)throw Error('目前沒有資料檢視權限');
   // Reuse month responses across day changes; never persist private ledgers.
@@ -277,8 +290,11 @@ async function refresh(force){
   const work=(async()=>{
    try{return await get(action,requestedMonth,auth,15000)}catch(error){
     // Never retry authorization denial or a request for a former account/date.
-    if(current!==loadId||identity()!==startIdentity||/權限|授權|登入|token/i.test(String(error.message)))throw error;
-    return get(action,requestedMonth,auth,20000);
+    if(current!==loadId||identity()!==startIdentity||!transient(error))throw error;
+    const delay=Math.min(4000,Math.max(1000,Number(error.retryAfterMs)||1000));
+    await new Promise(resolve=>setTimeout(resolve,delay));
+    if(current!==loadId||identity()!==startIdentity||!ready())throw error;
+    return get(action,requestedMonth,auth,15000);
    }
   })();
   sourceInflight.set(cacheKey,work);
@@ -301,7 +317,7 @@ async function refresh(force){
   if(data.some(d=>!Array.isArray(d[field])))throw Error('正式'+field+'資料不完整');
   return {ok:true,[field]:data.flatMap(d=>d[field]),employees:data.flatMap(d=>d.employees||[])};
  };
- const data={};
+ const data=hit?{...hit.data}:{};
  const publish=(key,value)=>{if(current===loadId&&identity()===startIdentity&&ready()){if(key==='attendance'&&value.status==='fulfilled'){try{value={status:'fulfilled',value:prepareAttendance(value.value)}}catch(reason){value={status:'rejected',reason}}}data[key]=value;display(data,scope,day)}};
  const task=(key,promise)=>promise.then(value=>publish(key,{status:'fulfilled',value}),reason=>publish(key,{status:'rejected',reason}));
  await Promise.all([
@@ -311,7 +327,18 @@ async function refresh(force){
  ]);
  if(current===loadId)inFlightKey='';
  if(current!==loadId||identity()!==startIdentity||!ready())return;
- cache.set(key,{at:Date.now(),data});
+ const failures=['leave','schedule','attendance'].filter(name=>scope[name]&&data[name]?.status==='rejected');
+ const recoverable=failures.filter(name=>transient(data[name].reason));
+ const retryAt=recoverable.length&&recoveryAttempts<RECOVERY_DELAYS.length?Date.now()+RECOVERY_DELAYS[recoveryAttempts++]:0;
+ for(const name of recoverable){data[name].reason.retryAt=retryAt;data[name].reason.retryExhausted=!retryAt;}
+ cache.set(key,{at:Date.now(),data,complete:failures.length===0,retryAt});
+ if(retryAt){
+  recoveryTimer=setTimeout(()=>{
+   recoveryTimer=null;
+   if(current===loadId&&identity()===startIdentity&&ready()&&document.visibilityState!=='hidden')void refresh(false);
+  },Math.max(0,retryAt-Date.now()));
+  recoveryTimer?.unref?.();
+ }
  if(cache.size>8)cache.delete(cache.keys().next().value);
  display(data,scope,day);
 }
@@ -328,6 +355,8 @@ window.p79HrDashRender=function(){
 window.P79HrStatistics={refresh:()=>refresh(true),access,selection,todayTaipei,
  getTimings:()=>timings.map(row=>({...row}))};
 window.addEventListener?.('focus',()=>{if(ready())void refresh(false)});
+window.addEventListener?.('pagehide',()=>{cancelRecovery();loadId++;inFlightKey=''});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='hidden'&&ready())void refresh(false)});
 document.addEventListener('DOMContentLoaded',function(){
  const date=$('p79rWorkDate');
  if(date)date.addEventListener('change',function(){loadId++;inFlightKey='';reset('正在更換統計日期');void refresh(true)});
