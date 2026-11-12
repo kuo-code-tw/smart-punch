@@ -102,7 +102,7 @@ function mountDashboard(){
  card('⏸','留職停薪','p79rLeaveStatus','依現有人資主檔','amber'),
  '</div>',
  '<div class="p79r-grid-top">',
- panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>正式</th><th>約聘</th><th>派遣</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
+ panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>指揮手</th><th>AQC</th><th>ARMG</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
  panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span>在職人數<br><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" style="text-align:center">出勤／請假／未出勤人數需要考勤即時資料，不能以在職人數推估。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
  panel('出勤率趨勢（近7日）','<div class="p79r-empty"><div class="big">—</div><div>尚未接入考勤日結數據</div><a class="p79r-link" href="../attendance/">前往考勤管理查看正式統計 ›</a></div>'),
  '</div>',
@@ -148,29 +148,35 @@ function updateCounts(records,anchor,ready){
  text('p79rAttendance','—');text('p79rLeaves','—');text('p79rOvertime','—');
  return {active:active,resigned:resigned,hires:hires,leavers:leavers};
 }
-function workerKind(e){
- var value=String(e.employmentType||e.contractType||e.staffType||'').trim().toLowerCase();
- if(/^(正職|正式|正社員|regular|permanent|full.time)$/.test(value))return 'regular';
- if(/^(約聘|契約|合約|contract|contractor|fixed.term)$/.test(value))return 'contract';
- if(/^(派遣|外包|dispatch|agency|temporary)$/.test(value))return 'dispatch';
- return '';
+function workerTitle(e){
+ // HR's actual job title fields; do not use employmentType, which is optional.
+ var raw=String(e.jobTitle||e.deptDetail||'').normalize('NFKC').trim().toUpperCase();
+ var key=raw.replace(/[\s\/_-]+/g,'');
+ if(key==='指揮手')return 'commander';
+ if(key==='AQC')return 'aqc';
+ if(key==='ARMG')return 'armg';
+ return 'other';
 }
 function updateDepartments(active){
- var byDept={};
+ var byDept=new Map();
  active.forEach(function(e){
-   var name=String(e.dept||'未設定部門').trim()||'未設定部門';
-   if(!byDept[name])byDept[name]={total:0,regular:0,contract:0,dispatch:0,unknown:0};
-   var obj=byDept[name];obj.total++;var kind=workerKind(e);if(kind)obj[kind]++;else obj.unknown++;
+   var name=String(e.dept||e.unit||'未設定單位').trim()||'未設定單位';
+   if(!byDept.has(name))byDept.set(name,{total:0,commander:0,aqc:0,armg:0,other:0,missing:0});
+   var obj=byDept.get(name);obj.total++;
+   var kind=workerTitle(e);obj[kind]++;
+   if(kind==='other'&&!String(e.jobTitle||e.deptDetail||'').trim())obj.missing++;
  });
- var departments=Object.entries(byDept).sort(function(a,b){return b[1].total-a[1].total||a[0].localeCompare(b[0],'zh-TW')});
+ var departments=Array.from(byDept.entries()).sort(function(a,b){return b[1].total-a[1].total||a[0].localeCompare(b[0],'zh-TW')});
  var tbody=byId('p79rDepts');if(!tbody)return;
  if(!departments.length){tbody.innerHTML='<tr><td colspan="6">目前沒有可核對的在職員工</td></tr>';return}
- var visible=departments.slice(0,8);
- function typeCell(o,k){return o.unknown?'—':n(o[k])}
- tbody.innerHTML=visible.map(function(item){
+ var sum={total:0,commander:0,aqc:0,armg:0,other:0,missing:0};
+ tbody.innerHTML=departments.map(function(item){
    var o=item[1],pct=(o.total/active.length*100).toFixed(1)+'%';
-   return '<tr><td>'+esc(item[0])+'</td><td>'+typeCell(o,'regular')+'</td><td>'+typeCell(o,'contract')+'</td><td>'+typeCell(o,'dispatch')+'</td><td><b>'+n(o.total)+'</b></td><td>'+pct+'</td></tr>';
- }).join('')+'<tr style="background:#e4f1ff;font-weight:900"><td>合計'+(departments.length>8?'（前8單位）':'')+'</td><td colspan="3">'+(active.some(function(e){return !workerKind(e)})?'類別資料未完整提供':'全部類別已核對')+'</td><td>'+n(visible.reduce(function(sum,item){return sum+item[1].total},0))+'</td><td>'+(visible.reduce(function(sum,item){return sum+item[1].total},0)/active.length*100).toFixed(1)+'%</td></tr>';
+   Object.keys(sum).forEach(function(k){sum[k]+=o[k]});
+   return '<tr><td>'+esc(item[0])+'</td><td>'+n(o.commander)+'</td><td>'+n(o.aqc)+'</td><td>'+n(o.armg)+'</td><td><b>'+n(o.total)+'</b></td><td>'+pct+'</td></tr>';
+ }).join('')+
+ '<tr style="background:#e4f1ff;font-weight:900"><td>合計</td><td>'+n(sum.commander)+'</td><td>'+n(sum.aqc)+'</td><td>'+n(sum.armg)+'</td><td>'+n(sum.total)+'</td><td>100.0%</td></tr>'+
+ (sum.other?'<tr><td colspan="6" style="text-align:left;font-size:12px">其他職稱 '+n(sum.other)+' 人（含未填職稱 '+n(sum.missing)+' 人），已計入合計</td></tr>':'');
 }
 function updateAlerts(records,anchor,data){
  var recent=records.filter(function(e){var date=parseDate(e.terminationDate);return status(e,anchor)==='resigned'&&date&&date<=anchor&&date>=ymd(new Date(new Date(anchor+'T12:00:00').getTime()-6*86400000))}).length;

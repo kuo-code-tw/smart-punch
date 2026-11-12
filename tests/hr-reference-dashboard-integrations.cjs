@@ -37,6 +37,28 @@ test('existing human-resources editing, status and permission functions stay int
   assert(html.includes(id),id);
  }
 });
+test('department counts use HR titles and retain all active staff',()=>{
+ assert(dashboard.includes('<th>指揮手</th><th>AQC</th><th>ARMG</th>'));
+ assert(!dashboard.includes('function workerKind('));
+ const from=dashboard.indexOf('function workerTitle('),to=dashboard.indexOf('function updateAlerts(',from);
+ assert(from>=0&&to>from);
+ const tbody={innerHTML:''};
+ const ctx={Map,Intl,byId:id=>id==='p79rDepts'?tbody:null,esc:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;'),n:v=>String(v)};
+ vm.createContext(ctx);
+ vm.runInContext(dashboard.slice(from,to),ctx);
+ const active=[
+   {dept:'第二事業處',jobTitle:'指揮手'},
+   {dept:'第二事業處',jobTitle:'aqc'},
+   {dept:'第二事業處',deptDetail:'AR/MG'},
+   {dept:'第二事業處',jobTitle:'F/L'},
+   {dept:'第二事業處'},
+   {dept:'第二事業部',jobTitle:'AQC'}
+ ];
+ ctx.updateDepartments(active);
+ assert(tbody.innerHTML.includes('<td>第二事業處</td><td>1</td><td>1</td><td>1</td><td><b>5</b></td><td>83.3%</td>'));
+ assert(tbody.innerHTML.includes('<td>合計</td><td>1</td><td>2</td><td>1</td><td>6</td><td>100.0%</td>'));
+ assert(tbody.innerHTML.includes('其他職稱 2 人（含未填職稱 1 人）'));
+});
 test('shared navigation preserves the mounted horizontal HR header',()=>{
  const shared=fs.readFileSync('assets/port79-seven-top.js','utf8');
  const source=shared.slice(shared.indexOf('function p79NormalizeLegacyTop(sys){'),shared.indexOf('\nfunction mount(){',shared.indexOf('function p79NormalizeLegacyTop(sys){')));
