@@ -323,7 +323,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="orgbox"><h3>② 🏢 事業部</h3><div style="display:flex;gap:6px"><input id="newDivision" placeholder="新增事業部"><button class="btn primary" onclick="addOrgItem('divisions','newDivision')">新增</button></div><div id="divisionList" class="orglist"></div></div>
     <div class="orgbox"><h3>③ 🏬 事業處</h3><div style="display:flex;gap:6px"><input id="newOffice" placeholder="新增事業處"><button class="btn primary" onclick="addOrgItem('offices','newOffice')">新增</button></div><div id="officeList" class="orglist"></div></div>
     <div class="orgbox"><h3>④ 🧭 單位</h3><div style="display:flex;gap:6px"><input id="newSection" placeholder="新增單位（課／組／室／中心）"><button class="btn primary" onclick="addOrgItem('sections','newSection')">新增</button></div><div id="sectionList" class="orglist"></div></div>
-    <div class="orgbox"><h3>🎖️ 職稱（非組織層級）</h3><div class="muted" style="font-size:11px;margin-bottom:7px">勾選「隱藏」會自動儲存，取消勾選就恢復顯示；不刪除員工或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
+    <div class="orgbox"><h3>🎖️ 職稱（非組織層級）</h3><div class="muted" style="font-size:11px;margin-bottom:7px">勾選完成後按「儲存組織設定」統一套用；取消勾選可恢復顯示，不刪除員工或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
   </div>
   <details class="legacy-org-settings">
     <summary>舊系統相容選項（原部門／單位）</summary>
@@ -334,7 +334,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     </div>
   </details>
   <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
-  <div class="footer"><div class="muted">勾選職稱會自動儲存；其他組織資料仍使用「儲存組織設定」。隱藏不會刪除人員、排班與歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
+  <div class="footer"><div class="muted">可一次勾選多個職稱，再按「儲存組織設定」統一儲存。隱藏不會刪除人員、排班與歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
 </div></dialog>
 
 <dialog id="masterPickerDialog"><div class="modal">
@@ -580,7 +580,7 @@ function p79ParseCanonicalOrgOptions(config){
   return normalizeOrgSettings({...legacy,...(extended||{})});
 }
 async function p79ReadCanonicalOrgOptions(){
-  const d=await apiGet('getData',60000);
+  const d=await apiGet('hrGetOrgOptions',20000);
   const settings=p79ParseCanonicalOrgOptions(d.config);
   if(settings)p79RememberOrgOptions(settings);else p79CanonicalOrgOptions=null;
   return d.config;
@@ -931,32 +931,6 @@ function addOrgItem(kind,inputId){
   orgDraft[kind]=uniqSorted([...(orgDraft[kind]||[]),v]);
   input.value='';renderOrgSettings();
 }
-let p79OrgTitleAutoSaveTimer=null;
-function p79QueueOrgTitleAutoSave(){
-  if(p79OrgTitleAutoSaveTimer!==null)clearTimeout(p79OrgTitleAutoSaveTimer);
-  p79OrgTitleAutoSaveTimer=setTimeout(()=>{
-    p79OrgTitleAutoSaveTimer=null;
-    void p79PersistOrgTitleCheckboxes();
-  },500);
-}
-async function p79PersistOrgTitleCheckboxes(){
-  if(!canHr('org.manage')||hrAccess!=='manage')return;
-  if($('saveOrgBtn')?.disabled){
-    p79OrgTitleAutoSaveTimer=setTimeout(()=>{
-      p79OrgTitleAutoSaveTimer=null;
-      void p79PersistOrgTitleCheckboxes();
-    },500);
-    return;
-  }
-  const snapshot=JSON.stringify(normalizeOrgSettings(orgDraft));
-  const saved=await saveOrgSettings(true);
-  if(snapshot!==JSON.stringify(normalizeOrgSettings(orgDraft))){
-    p79OrgSaveStatus('正在同步最新勾選的職稱…');
-    p79QueueOrgTitleAutoSave();
-  }else if(saved){
-    p79OrgSaveStatus('✅ 職稱隱藏設定已自動儲存；排班重新載入後同步');
-  }
-}
 function setOrgJobTitleHidden(value,checked){
   if(!canHr('org.manage')||hrAccess!=='manage')return;
   const key=p79JobTitleKey(value);
@@ -966,8 +940,7 @@ function setOrgJobTitleHidden(value,checked){
     ?uniqSorted([...hidden.filter(v=>p79JobTitleKey(v)!==key),value])
     :hidden.filter(v=>p79JobTitleKey(v)!==key);
   renderOrgSettings();
-  p79OrgSaveStatus('正在自動儲存職稱隱藏設定…');
-  p79QueueOrgTitleAutoSave();
+  p79OrgSaveStatus('勾選已暫存；全部選好後，請按「儲存組織設定」統一儲存。');
 }
 function removeOrgItem(kind,value){
   orgDraft[kind]=(orgDraft[kind]||[]).filter(v=>v!==value);
@@ -978,7 +951,9 @@ async function saveOrgSettings(keepOpen=false){if(!canHr('org.manage'))return al
   if(hrAccess!=='manage')return;
   if($('saveOrgBtn').disabled)return;
   const originalLabel=$('saveOrgBtn').textContent;
+  const editingControls=[...(orgDialog.querySelectorAll?.('input,button')||[])].map(el=>[el,el.disabled]);
   try{
+    editingControls.forEach(([el])=>el.disabled=true);
     $('saveOrgBtn').disabled=true;
     $('saveOrgBtn').textContent='正在儲存…';
     p79OrgSaveStatus('正在核對及儲存組織設定…');
@@ -987,25 +962,15 @@ async function saveOrgSettings(keepOpen=false){if(!canHr('org.manage'))return al
     const extended={headquarters:draft.headquarters,divisions:draft.divisions,offices:draft.offices,sections:draft.sections,hiddenJobTitles:draft.hiddenJobTitles};
     const orgConfig={[P79_HR_ORG_OPTIONS_KEY]:legacy,[P79_HR_ORG_OPTIONS_V2_KEY]:extended,departments:draft.departments,jobTitles:draft.jobTitles};
     if(new TextEncoder().encode(JSON.stringify(orgConfig)).length>8800)throw new Error('組織設定容量不足，尚未儲存');
-    p79OrgSaveStatus('正在儲存組織選項（1/2）…');
-    await p79RetryOrgSave(()=>({action:'hrSaveOrgSettings',settings:legacy}));
-    p79OrgSaveStatus('正在儲存並核對共用設定（2/2）…');
+    p79OrgSaveStatus('正在儲存全部組織與職稱選項…');
     let result;
     try{
-      result=await p79RetryOrgSave(async()=>{
-        // Only one full read on the normal path; refresh again only after an explicit lock rejection.
-        const latest=await p79ReadCanonicalOrgOptions();
-        const merged={...latest,...orgConfig};
-        if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
-        return {action:'saveConfig',config:merged};
-      });
+      result=await p79RetryOrgSave(()=>({action:'hrSaveOrgOptions',settings:legacy,extendedSettings:extended}));
     }catch(e){
       if(!/abort|fetch|network|連線|逾時|timeout/i.test(String(e?.message||e)))throw e;
-      // A cancelled reply does not establish a failed write. Read only; never resend uncertain writes.
-      p79OrgSaveStatus('連線回應中斷，正在核對雲端儲存結果…');
+      // An interrupted reply is uncertain: verify with a small read, never replay that write.
+      p79OrgSaveStatus('正在核對雲端儲存結果…');
     }
-    // V111 saveConfig returns config after server-side persistence/readback verification.
-    // Older replies and interrupted responses retain an independent verification read.
     const confirmedConfig=result?.config??await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
     const confirmed=p79ParseCanonicalOrgOptions(confirmedConfig);
     if(JSON.stringify(confirmed)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
@@ -1016,7 +981,7 @@ async function saveOrgSettings(keepOpen=false){if(!canHr('org.manage'))return al
     $('status').textContent='✅ 總公司／事業部／事業處／單位／職稱選項已儲存並完成雲端讀回；原部門與單位仍保持相容';
     return true;
   }catch(e){p79OrgSaveStatus('尚未完成組織設定儲存：'+(e.message||e)+'。你的修改仍保留，請保留視窗並稍後再試。',true);return false;}
-  finally{$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
+  finally{editingControls.forEach(([el,disabled])=>el.disabled=disabled);$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
 }
 function p79OrgSaveStatus(text,error=false){
   const el=$('orgSaveStatus');if(!el)return;
@@ -1024,7 +989,7 @@ function p79OrgSaveStatus(text,error=false){
 }
 function p79OrgSaveIsLockBusy(error){
   if(error?.retryable===false)return false;
-  return /雲端目前正在(?:處理其他資料|寫入資料)|(?:資料鎖|寫入鎖).*(?:忙碌|占用|佔用)|^(?:LOCK_BUSY|WRITE_LOCK_BUSY)$/i.test(String(error?.message||error||'')) || ['LOCK_BUSY','WRITE_LOCK_BUSY'].includes(String(error?.code||''));
+  return /雲端目前正在(?:處理其他資料|寫入資料)|(?:資料鎖|寫入鎖).*(?:忙碌|占用|佔用)|^(?:LOCK_BUSY|WRITE_LOCK_BUSY)$/i.test(String(error?.message||error||'')) || ['LOCK_BUSY','WRITE_LOCK_BUSY','ORG_CONFIG_BUSY'].includes(String(error?.code||''));
 }
 async function p79RetryOrgOperation(operation){
   for(let attempt=0;attempt<4;attempt++){
