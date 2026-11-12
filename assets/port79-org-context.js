@@ -15,10 +15,10 @@ function value(e,kind){
  for(const source of sources)for(const field of official){
   if(!Object.prototype.hasOwnProperty.call(source,field))continue;
   explicitlyDefined=true;
-  const result=norm(source[field]);
+  const result=typeof source[field]==='string'?norm(source[field]):'';
   if(result){
    // Values clearly identifying a parent organization are not units.
-   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))return '';
+   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))continue;
    return result;
   }
  }
@@ -26,7 +26,7 @@ function value(e,kind){
  if(kind==='sections'){
   // Read a legacy unit only when no official unit field was ever supplied.
   for(const source of sources){
-   const legacyUnit=norm(source.unit);
+   const legacyUnit=typeof source.unit==='string'?norm(source.unit):'';
    if(legacyUnit&&!/(?:總公司|事業部|事業處)$/.test(legacyUnit))return legacyUnit;
   }
   return '';
