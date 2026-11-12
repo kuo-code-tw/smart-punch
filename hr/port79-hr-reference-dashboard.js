@@ -216,7 +216,7 @@ function renderDashboard(){
  updateDepartments(data.active);
  if(ready||records.length){updateAlerts(records,anchor,data);updateHistory(records,anchor)}
  else{text('p79rAlerts','等待人資主檔核對…');text('p79rHistoryChart','等待到離職紀錄…')}
- var now=new Date(),source=ready?'雲端已同步':records.length?'本機資料待核對':'資料待同步';
+ var now=new Date(),source=ready?'人資主檔已同步（其他系統另行核對）':records.length?'人資快取待雲端核對':'人資主檔待同步';
  if(ready)lastCloudRefresh=ymd(now)+' '+now.toLocaleTimeString('zh-TW',{hour12:false});
  text('p79rUpdated',source+(lastCloudRefresh?'｜'+lastCloudRefresh:''));
 }
