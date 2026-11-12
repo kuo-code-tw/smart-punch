@@ -109,7 +109,7 @@ function showWeek({records,schedules,leaves,employees,day}){
 function showActualPunchRows(records,employees,day,rate){
  const node=$('p79rDayAttendanceDetail');
  if(!node||!Array.isArray(records)||!Array.isArray(employees))return;
- const valid=employees.filter(e=>M.isWorking(e,day)&&String(e.empId||'').trim());
+ const valid=employees.filter(e=>String(e.empId||'').trim()); // Historical raw punch evidence can belong to now-resigned employees.
  const ids=new Map(valid.map(e=>[String(e.empId).trim().toUpperCase(),e]));
  const attNos=new Map();
  for(const e of valid){
