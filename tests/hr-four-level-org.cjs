@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const html=fs.readFileSync('hr/index.html','utf8');
 function fn(name){let a=html.indexOf('function '+name+'(');assert(a>=0);if(html.slice(a-6,a)==='async ')a-=6;const line=html.slice(a,html.indexOf('\n',a));return line.endsWith('}')?line:html.slice(a,html.indexOf('\n}',a)+2)}
 const c={Set,Array,String,Object,JSON,localStorage:{setItem(){}},GAS_URL:'test',session:{empId:'TEST'},P79_HR_ORG_OPTIONS_KEY:'hrOrgOptionsV1',P79_HR_ORG_OPTIONS_V2_KEY:'hrOrgOptionsV2'};vm.createContext(c);
-for(const n of ['uniqSorted','normalizeOrgSettings','p79OrgOptionsCacheKey','p79RememberOrgOptions','p79ReadCanonicalOrgOptions'])vm.runInContext(fn(n),c);
+for(const n of ['uniqSorted','normalizeOrgSettings','p79OrgOptionsCacheKey','p79RememberOrgOptions','p79ParseCanonicalOrgOptions','p79ReadCanonicalOrgOptions'])vm.runInContext(fn(n),c);
 (async()=>{
  const legacy={departments:['第二事業處','第二事業部','79W作業課'],units:['79W倉庫課'],jobTitles:['AQC','指揮手','新增職稱']};
  const initial=c.normalizeOrgSettings(legacy);assert.deepEqual(Array.from(initial.divisions),['第二事業部']);assert.deepEqual(Array.from(initial.offices),['第二事業處']);assert.deepEqual(Array.from(initial.sections),['79W作業課','79W倉庫課']);assert.equal(initial.departments.length,3);assert.equal(initial.jobTitles.length,3);assert.equal(initial.headquarters.length,0);
