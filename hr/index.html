@@ -312,7 +312,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 
 <dialog id="orgDialog" class="org-dialog"><div class="modal">
   <div class="modalhead">
-    <div><b>⚙️ 總公司／事業部／事業處／單位／職稱管理</b><div class="muted">組織四層：總公司 → 事業部 → 事業處 → 單位；另外管理職稱；各欄均可新增與移除選項。</div></div>
+    <div><b>⚙️ 總公司／事業部／事業處／單位／職稱管理</b><div class="muted">組織四層：總公司 → 事業部 → 事業處 → 單位；職稱另列。此處管理選單名稱，既有人員的舊部門歸屬不會被自動改寫；未填的層級顯示「—」。</div></div>
     <button class="btn" onclick="orgDialog.close()">關閉</button>
   </div>
   <div class="orggrid">
@@ -532,7 +532,7 @@ function normalizeOrgSettings(raw){
     headquarters:uniqSorted(raw.headquarters),
     divisions:options('divisions',/事業部$/),
     offices:options('offices',/事業處$/),
-    sections:options('sections',/課$/)
+    sections:options('sections',/(?:課|組|室|中心)$/)
   };
 }
 
@@ -1116,7 +1116,7 @@ async function p79SaveEditorLeavePermission(empId,originalEmpId,selected,touched
 
 function openMasterPicker(kind,targetId){
   pickerKind=kind;pickerTarget=targetId;
-  const label=kind==='departments'?'部門':kind==='units'?'單位':'職稱';
+  const label=kind==='departments'?'原部門':kind==='units'?'單位':'職稱';
   $('pickerTitle').textContent='選擇'+label;
   $('pickerSearch').value='';
   renderMasterPicker();
@@ -1125,7 +1125,7 @@ function openMasterPicker(kind,targetId){
 function renderMasterPicker(){
   const q=$('pickerSearch').value.trim().toLowerCase();
   const vals=mergedOrgValues(pickerKind).filter(v=>!q||v.toLowerCase().includes(q));
-  $('pickerResults').innerHTML=vals.map(v=>`<button type="button" class="picker-option" onclick="chooseMasterValue(${JSON.stringify(v).replace(/"/g,'&quot;')})">${esc(v)}</button>`).join('')||'<div class="muted">沒有符合的選項，可先到「部門／職稱／單位」新增。</div>';
+  $('pickerResults').innerHTML=vals.map(v=>`<button type="button" class="picker-option" onclick="chooseMasterValue(${JSON.stringify(v).replace(/"/g,'&quot;')})">${esc(v)}</button>`).join('')||'<div class="muted">沒有符合的選項，可先到「總公司／事業部／事業處／單位／職稱」管理新增。</div>';
 }
 function chooseMasterValue(value){
   const el=$(pickerTarget);if(el)el.value=value;
