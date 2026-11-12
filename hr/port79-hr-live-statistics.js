@@ -179,6 +179,12 @@ function display(payload,scope,day){
  const leaveResult=payload.leave?.status==='fulfilled'?payload.leave.value:null;
  const scheduleResult=payload.schedule?.status==='fulfilled'?payload.schedule.value:null;
  const attendanceResult=payload.attendance?.status==='fulfilled'?payload.attendance.value:null;
+ const sync=$('p79rUpdated');
+ if(sync){
+  const sources=[['attendance','考勤'],['schedule','排班'],['leave','請假']];
+  sync.textContent='人資主檔已同步｜'+sources.map(([key,label])=>
+   label+(scope[key]?(payload[key]?.status==='fulfilled'?'已讀':'待核'):'無權限')).join('／');
+ }
  let leave=null,ot=null,attendance=null;
  originalViewUnavailable(scope,payload);
  if(scope.leave&&leaveResult){
