@@ -4039,7 +4039,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         }
 
         function getAdminVisibleEmployees() {
-            return employees.filter(canCurrentAdminViewEmployee).filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e));
+            return employees.filter(canCurrentAdminViewEmployee).filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e));
         }
 
         function showToast(message, type = 'success') {

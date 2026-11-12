@@ -2173,7 +2173,7 @@ function isAqcEmployee(e){
 function people(){
   const map=new Map();
   // 現職名單只來自人資主檔；不能用歷史 WORKING REPORT 反推在職員工。
-  (systemEmployees||[]).filter(isAqcEmployee).filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e)).forEach(e=>{
+  (systemEmployees||[]).filter(isAqcEmployee).filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e)).forEach(e=>{
     const id=String(
       e.empId||e.employeeId||e.id||e['工號']||
       e.attNo||e.attendanceNo||e.attendanceId||e['考勤號碼']||''
@@ -4432,7 +4432,7 @@ function baseRecordRows(){
   const master=(shipMasters||[]).find(s=>String(s.workingNo||'').trim()===shipNo);
   if(!master)return [];
   const year=getPort79Year();
-  return recordsForVessel(master.workingNo,master.vessel,master).filter(r=>!window.p79OrgScope||window.p79OrgScope.matches(r)).filter(r=>!year||String(r.workDate||'').startsWith(year));
+  return recordsForVessel(master.workingNo,master.vessel,master).filter(r=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(r)).filter(r=>!year||String(r.workDate||'').startsWith(year));
 }
 
 function refreshRecordFilterOptions(baseRows){
@@ -4518,7 +4518,7 @@ function clearRecordShipFilter(){
 }
 
 function filteredRecords(){
-  let rows=[...baseRecordRows()].filter(r=>!window.p79OrgScope||window.p79OrgScope.matches(r));
+  let rows=[...baseRecordRows()].filter(r=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(r));
   if(!rows.length)return [];
 
   const group=String(document.getElementById('recordGroupFilter')?.value||'').trim();
@@ -7271,7 +7271,7 @@ const monthlyRankingReads=new Map();
 function monthlyRankingRecords(){
   const month=document.getElementById('rankingMonth')?.value||'';
   const index=shipCompletionIndex(shipMasters||[]);
-  return canonicalOperationalRecords((records||[]).filter(r=>(!window.p79OrgScope||window.p79OrgScope.matches(r))&&r.source==='working-report'&&recordCompletionMonth(r,index)===month&&recordIsCurrentShipDetail(r,index)))
+  return canonicalOperationalRecords((records||[]).filter(r=>(typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(r))&&r.source==='working-report'&&recordCompletionMonth(r,index)===month&&recordIsCurrentShipDetail(r,index)))
     .map(r=>({...r,originalWorkDate:r.workDate,workDate:month+'-01'}));
 }
 async function loadMonthlyRanking(force=false){

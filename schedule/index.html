@@ -6466,7 +6466,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const attendanceSnapshot={attendanceEvidence};
       const typhoonToday=scheduleTaipeiTodayKey();
 
-      let roleEmps = employees.filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e)).filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
+      let roleEmps = employees.filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e)).filter(e=>scheduleEmployeeEligibleForMonth(e,currentScheduleMonthKey())&&(activeRoleTab==='ALL'||e.role===activeRoleTab));
       // A closed month shows its saved roster, not new hires without any rows in it.
       if(yearMonth<scheduleTaipeiTodayKey().slice(0,7)){
         roleEmps=roleEmps.filter(e=>Object.keys(monthlyScheduleData[e.id]||{})
@@ -6950,7 +6950,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         roleCounts[e.role] = (roleCounts[e.role] || 0) + 1;
       });
 
-      let filteredEmps = employees.filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e));
+      let filteredEmps = employees.filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e));
       if (mgmtRoleFilter !== 'ALL') {
         filteredEmps = filteredEmps.filter(e => e.role === mgmtRoleFilter);
       }

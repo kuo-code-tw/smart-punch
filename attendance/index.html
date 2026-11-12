@@ -3888,7 +3888,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
         }
 
         function getAdminVisibleEmployees() {
-            return employees.filter(canCurrentAdminViewEmployee).filter(e=>!window.p79OrgScope||window.p79OrgScope.matches(e));
+            return employees.filter(canCurrentAdminViewEmployee).filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e));
         }
 
         function showToast(message, type = 'success') {
@@ -18330,7 +18330,7 @@ function getManualPairRecordAnchor(record) {
             const dept = document.getElementById('overtimeDeptFilter')?.value || 'ALL';
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
-            let rows = buildOvertimeStatisticsRows().filter(row => !window.p79OrgScope||window.p79OrgScope.matches(row)).filter(row =>
+            let rows = buildOvertimeStatisticsRows().filter(row => typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(row)).filter(row =>
                 (month === 'ALL' || row.monthKey === month) &&
                 (dept === 'ALL' || row.dept === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle) &&
