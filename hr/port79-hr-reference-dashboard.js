@@ -157,7 +157,7 @@ function p79DashTitle(value){
  return label;
 }
 function p79DashTitleKey(value){
- return p79DashTitle(value).replace(/\s+/g,'').toUpperCase();
+ return p79DashTitle(value).replace(/[\s\/_-]+/g,'').toUpperCase();
 }
 function p79DashConfiguredTitles(){
  // orgSettings is the live HR configuration variable in hr/index.html.

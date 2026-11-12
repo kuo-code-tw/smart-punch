@@ -785,7 +785,7 @@ async function loadEmployees(show){
       }
 
       p79ApplyHrEmployeesPayload(d,show,'cloud');
-      void p79ReadCanonicalOrgOptions().then(()=>{populateFilters();render();}).catch(console.warn);
+      void p79ReadCanonicalOrgOptions().then(()=>{populateFilters();render();window.p79HrDashRender?.();}).catch(console.warn);
       return true;
     }catch(e){
 
