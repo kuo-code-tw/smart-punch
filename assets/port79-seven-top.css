@@ -480,3 +480,67 @@ body[data-p79-system] #p79UnifiedShellV103{display:none!important}
 #p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="idle-settings"]{grid-column:1/-1;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:13px;min-height:40px}
 #p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="logout-system"]{grid-column:1/-1;margin-top:7px}
 html[data-theme="dark"] #p79SevenMenuWrap>.p79-hr-compact-menu button[data-action="idle-settings"]{background:#172554;color:#bfdbfe;border-color:#1e40af}
+
+
+/* 2026-11-12: 七大系統統一分類。保留每個原有功能，採一次點選的卡片式選單。 */
+#p79SevenMenuWrap>.p79-seven-standard-menu{
+ width:min(420px,calc(100vw - 24px));max-height:min(80dvh,720px);padding:12px;
+ scrollbar-width:thin;scrollbar-color:#b9cce3 transparent;
+}
+#p79SevenStandardMenu .p79-menu-sections{display:grid;gap:9px}
+#p79SevenStandardMenu .p79-menu-section{
+ border:1px solid #dce7f2;border-radius:12px;padding:9px;background:#f8fbff;
+}
+#p79SevenStandardMenu .p79-menu-section .menu-title{
+ margin:0 0 7px;padding:2px 5px 6px;background:transparent;border-bottom:1px solid #e0eaf4;
+ color:#425b76;font-size:12px;font-weight:900;letter-spacing:.02em;
+}
+#p79SevenStandardMenu .p79-menu-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+#p79SevenStandardMenu .p79-menu-items button[data-action]{
+ display:flex!important;align-items:center;width:100%;min-width:0;min-height:40px;
+ margin:0;padding:8px 10px;white-space:normal;line-height:1.4;
+ background:#fff;color:#243c56;border:1px solid #e1eaf4;border-radius:9px;
+ font-size:12px;font-weight:750;text-align:left;overflow-wrap:anywhere;
+}
+#p79SevenStandardMenu .p79-menu-items button[data-action]:hover{
+ background:#eaf3ff;color:#155bb5;border-color:#a9cafa;
+}
+#p79SevenStandardMenu .p79-menu-items button[data-action]:focus-visible{
+ outline:2px solid #2563eb;outline-offset:2px;
+}
+#p79SevenStandardMenu .p79-menu-items button:only-child,
+#p79SevenStandardMenu .p79-menu-items button[data-action="schedule-lock"],
+#p79SevenStandardMenu .p79-menu-items button[data-action="schedule-takeover"]{grid-column:1/-1}
+#p79SevenStandardMenu .p79-menu-section[data-group="maintenance"]{
+ background:#fffaf1;border-color:#f7dfb6;
+}
+#p79SevenStandardMenu .p79-menu-section[data-group="account"]{
+ background:transparent;border:0;border-top:1px solid #dce7f2;border-radius:0;padding:7px 1px 0;
+}
+#p79SevenStandardMenu .p79-menu-section[data-group="account"] .menu-title{display:none}
+#p79SevenStandardMenu .p79-menu-items button[data-action="logout-system"]{
+ background:#fff1f2!important;color:#be123c!important;border-color:#fecdd3!important;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-section{
+ background:#162c46;border-color:#34506d;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-section .menu-title{
+ color:#c3d6ec;border-color:#34506d;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-items button[data-action]{
+ background:#1d3652;color:#e1ecfa;border-color:#395571;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-items button[data-action]:hover{
+ background:#264b73;color:#fff;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-section[data-group="maintenance"]{
+ background:#3a2a24;border-color:#86623f;
+}
+html[data-theme="dark"] #p79SevenStandardMenu .p79-menu-section[data-group="account"]{
+ background:transparent;border-color:#34506d;
+}
+@media(max-width:520px){
+ #p79SevenMenuWrap>.p79-seven-standard-menu{width:calc(100vw - 20px);padding:9px;max-height:calc(100dvh - 86px)}
+ #p79SevenStandardMenu .p79-menu-items{grid-template-columns:1fr}
+ #p79SevenStandardMenu .p79-menu-items button[data-action]{min-height:38px}
+}
