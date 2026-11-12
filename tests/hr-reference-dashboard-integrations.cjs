@@ -43,7 +43,10 @@ test('shared navigation preserves the mounted horizontal HR header',()=>{
  const header={dataset:{p79Layout:'reference'},style:{setProperty(){throw Error('HR header was hidden')}},setAttribute(){throw Error('HR header made inaccessible')}};
  const ctx={META:{hr:['','人資管理']},document:{querySelector:q=>q==='#p79HrShellV103'?header:null,body:{setAttribute(){}},title:''}};
  vm.createContext(ctx);vm.runInContext(source+';p79NormalizeLegacyTop("hr")',ctx);
- assert(css.includes('html body.p79-workspace.p79r-ready{padding:0!important'));
+ assert(css.includes('html body.p79-workspace.p79r-ready{padding:78px 0 0!important'));
+ assert(css.includes('#p79WorkspaceTopbar{display:flex!important;left:0!important}'));
+ assert(css.includes('#p79WorkspaceStatus{display:block!important}'));
+ assert(css.includes('top:var(--p79-hr-toolbar-height)!important'));
 });
 test('valid local and ROC dates only',()=>{
  assert.equal(M.date('115/11/11'),'2026-11-11');
