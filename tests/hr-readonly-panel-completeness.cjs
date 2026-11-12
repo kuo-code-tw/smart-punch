@@ -4,7 +4,7 @@ const html=fs.readFileSync('hr/port79-hr-reference-dashboard.js','utf8');
 const live=fs.readFileSync('hr/port79-hr-live-statistics.js','utf8');
 const M=require('../hr/port79-hr-verified-metrics.js');
 for(const s of [html,live])new Function(s);
-for(const id of ['p79rWeekAttendance','p79rDayAttendanceDetail','p79rMonthlyLeavePanel','p79rMonthlyOvertimePanel'])
+for(const id of ['p79rWeekAttendance','p79rDayAttendanceDetail','p79rMonthlyLeavePanel','p79rMonthlyOvertimePanel','p79rDonutLabel','p79rDonutNote'])
  assert(html.includes('id="'+id+'"'),'real source panel '+id);
 assert(!html.includes('薪資作業')&&!html.includes('教育訓練'),'no unrelated modules');
 const nodes={};function element(id){return nodes[id]||(nodes[id]={id,textContent:'',innerHTML:'',value:id==='p79rWorkDate'?'2026-11-12':'',className:'',style:{},
@@ -28,6 +28,7 @@ const fetch=async (address)=>{
  const url=new URL(address),action=url.searchParams.get('action');
  assert.equal(url.searchParams.get('token'),'fixture-token');
  if(actor.adminRole!=='superadmin'){unauthorizedRequests++;throw Error('forbidden read')}
+ if(action==='getLeaveData')assert.equal(url.searchParams.has('gcToken'),false,'match original leave API');
  if(action==='getLeaveData'&&failLeave)return{ok:true,text:async()=>JSON.stringify({ok:false,error:'雲端忙碌',retryable:true})};
  const data=action==='getLeaveData'?{ok:true,employees,leaveRecords}:
   action==='getScheduleDataSecure'?{ok:true,schedules}:
@@ -47,18 +48,23 @@ vm.createContext(ctx);vm.runInContext(live,ctx);
  assert.match(element('p79rMonthlyOvertimePanel').innerHTML,/3.0 小時/);
  assert.match(element('p79rDayAttendanceDetail').innerHTML,/1 \/ 1 人/);
  assert.match(element('p79rWeekAttendance').innerHTML,/11-12/);
+ assert.equal(element('p79rDonutLabel').textContent,'已打卡／應到');
+ assert.equal(element('p79rActiveDonut').textContent,'1 / 1');
  console.log('PASS verified official sources populate all four summary panels');
  failLeave=true;await window.P79HrStatistics.refresh();
  assert.equal(element('p79rLeaves').textContent,'—');
  assert.equal(element('p79rAttendance').textContent,'—','incomplete official leave must not invent an attendance rate');
  assert.equal(element('p79rOvertime').textContent,'3.0 小時','leave timeout must not erase verified overtime');
  assert.match(element('p79rMonthlyLeavePanel').innerHTML,/雲端服務忙碌/);
- assert.match(element('p79rWeekAttendance').innerHTML,/三種正式資料/);
+ assert.match(element('p79rWeekAttendance').innerHTML,/請假：雲端服務忙碌/);
+ assert.equal(element('p79rDonutLabel').textContent,'在職人數');
+ assert.equal(element('p79rActiveDonut').textContent,'—');
  console.log('PASS source failure is explained, no fake zero and other verified data retained');
  actor={empId:'VIEWER',adminRole:'admin',systemPermissions:{hr:'view',attendance:'none',leave:'none',schedule:'none',workhours:'none'}};
  await window.P79HrStatistics.refresh();
  assert.equal(unauthorizedRequests,0,'forbidden account cannot query raw data');
  assert.equal(element('p79rAttendance').textContent,'—');
  assert.match(element('p79rMonthlyLeavePanel').innerHTML,/沒有請假檢視權限/);
+ assert.match(element('p79rWeekAttendance').innerHTML,/考勤：此帳號無檢視權限/);
  console.log('PASS account switching hides restricted statistics without cloud reads');
 })().catch(error=>{console.error(error);process.exitCode=1});
