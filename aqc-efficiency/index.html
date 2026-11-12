@@ -851,7 +851,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
           <span id="shipUpdatedCountBadge" class="ship-change-pill ship-change-updated hidden">🟡 已更新 0</span>
           <button id="markShipChangesSeenBtn" type="button" onclick="markAllShipChangesSeen()" class="hidden btn bg-slate-700 text-white text-[10px]">✓ 標記為已查看</button>
         </div>
-        <input type="hidden" id="dashboardSortField" value="date">
+        <input type="hidden" id="dashboardSortField" value="importedAt">
         <input type="hidden" id="dashboardSortDir" value="desc">
       </div>
       <div id="summaryTableWrap" class="overflow-auto max-h-[64vh]">
@@ -862,7 +862,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
               <th class="min-w-[110px] cursor-pointer select-none" onclick="setDashboardSort('compare')">月報比對 <span data-sort-mark="compare"></span></th>
               <th class="min-w-[150px]" title="全船 WORKING REPORT 司機櫃數，對照原始 WORKING SHEET">司機櫃數核對</th>
               <th class="min-w-[92px]">資料狀態</th>
-              <th class="min-w-[96px] cursor-pointer select-none" onclick="setDashboardSort('date')">日期 <span data-sort-mark="date"></span></th>
+              <th class="min-w-[96px] cursor-pointer select-none" onclick="setDashboardSort('date')" title="預設顯示最新匯入的船舶；點這裡可改按完工日期排序">完工日期 <span data-sort-mark="date"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('workingNo')">NO. <span data-sort-mark="workingNo"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('vessel')">船名 <span data-sort-mark="vessel"></span></th>
               <th class="cursor-pointer select-none" onclick="setDashboardSort('voyage')">航次(I/E) <span data-sort-mark="voyage"></span></th>
@@ -2554,6 +2554,7 @@ function clearDashboardDateRange(){
 }
 
 async function onDashboardMonthChange(){
+  p79DashboardMonthSelectionExplicit=true;
   const s=document.getElementById('dashboardStartDate');
   const e=document.getElementById('dashboardEndDate');
   if(s)s.value='';
@@ -3688,12 +3689,46 @@ function dashboardRocDate(v){
   return `${roc}/${m[2]}/${m[3]}`;
 }
 
+
+let p79DashboardMonthSelectionExplicit=false;
+// 新船匯入後直接切至其實際完工月份，保留所有歷史資料及跨月歸屬。
+// 背景雲端讀取只在使用者未自行選月份、且最近 48 小時確有新匯入時自動聚焦。
+function p79FocusLatestImportedVessel(force=false){
+  const latest=latestVesselMasterForSummary(shipMasters||[]);
+  const imported=latest?vesselSummaryImportTime(latest):0;
+  const month=latest?shipCompletionMonth(latest):'';
+  const select=document.getElementById('filterMonth');
+  if(!select||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return false;
+  if(![...select.options].some(o=>o.value===month))return false;
+  if(!force){
+    if(p79DashboardMonthSelectionExplicit||dashboardDateRange().active)return false;
+    const age=Date.now()-imported;
+    if(!imported||age<0||age>48*60*60*1000)return false;
+    const now=new Date();
+    const currentMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    if(select.value&&select.value!==currentMonth)return false;
+  }else{
+    ['dashboardStartDate','dashboardEndDate','dashboardFilterVessel','dashboardFilterWharf','dashboardEfficiencyFilter'].forEach(id=>{
+      const field=document.getElementById(id);if(field)field.value='';
+    });
+    updateDashboardRangeState();
+    p79DashboardMonthSelectionExplicit=false;
+  }
+  select.value=month;
+  const sort=document.getElementById('dashboardSortField');
+  const dir=document.getElementById('dashboardSortDir');
+  if(sort)sort.value='importedAt';
+  if(dir)dir.value='desc';
+  summaryCurrentPage=1;
+  summaryLastFilterMonth='';
+  return true;
+}
 function filterAndSortDashboardJobs(list){
   let out=[...(list||[])];
   const vesselQ=dashboardFilterText('dashboardFilterVessel');
   const wharfQ=dashboardFilterText('dashboardFilterWharf');
   const eff=String(document.getElementById('dashboardEfficiencyFilter')?.value||'');
-  const sortField=String(document.getElementById('dashboardSortField')?.value||'date');
+  const sortField=String(document.getElementById('dashboardSortField')?.value||'importedAt');
   const sortDir=String(document.getElementById('dashboardSortDir')?.value||'desc');
 
   // 船名改為下拉點選；選 WAN HAI 103 就顯示全部 WAN HAI 103。
@@ -3709,7 +3744,11 @@ function filterAndSortDashboardJobs(list){
   const numeric=new Set(['totalContainers','hatches','totalMoves','bundleDeduct','shiftMoves','aqcCount','gph','gphHC','vph','vphHC']);
   out.sort((a,b)=>{
     let c=0;
-    if(sortField==='workingNo')c=workingNoNumber(a?.workingNo)-workingNoNumber(b?.workingNo);
+    if(sortField==='importedAt'){
+      c=vesselSummaryImportTime(a)-vesselSummaryImportTime(b);
+      if(c===0)c=dashboardJobDateValue(a).localeCompare(dashboardJobDateValue(b));
+    }
+    else if(sortField==='workingNo')c=workingNoNumber(a?.workingNo)-workingNoNumber(b?.workingNo);
     else if(sortField==='date')c=dashboardJobDateValue(a).localeCompare(dashboardJobDateValue(b));
     else if(sortField==='compare')c=dashboardCompareStatus(a).localeCompare(dashboardCompareStatus(b));
     else if(sortField==='voyage')c=`${a?.voyageI||''}/${a?.voyageE||''}`.localeCompare(`${b?.voyageI||''}/${b?.voyageE||''}`,'zh-Hant',{numeric:true});
@@ -3734,7 +3773,7 @@ function setDashboardSort(field){
   renderAll();
 }
 function updateDashboardSortMarks(){
-  const f=String(document.getElementById('dashboardSortField')?.value||'date');
+  const f=String(document.getElementById('dashboardSortField')?.value||'importedAt');
   const d=String(document.getElementById('dashboardSortDir')?.value||'desc');
   document.querySelectorAll('[data-sort-mark]').forEach(el=>{
     el.textContent=el.dataset.sortMark===f?(d==='asc'?'▲':'▼'):'';
@@ -3755,7 +3794,7 @@ function updateDashboardTableFilterState(shown,total){
   const scope=/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)
     ?month.replace('-','年')+'月完工船舶'
     :(/^20\d{2}$/.test(year)?year+'年完工船舶':'年度船舶');
-  e.textContent=scope+`｜顯示 ${shown} / ${total} 艘`;
+  e.textContent=scope+`｜顯示 ${shown} / ${total} 艘`+(document.getElementById('dashboardSortField')?.value==='importedAt'?'｜最新匯入優先':'');
 }
 function dashboardShiftAuditBadge(x){
   const status=dashboardShiftDataStatus(x);
@@ -8355,7 +8394,9 @@ function shipMasterQuality(s){
 function mergeShipMasterOne(local,cloud){
   if(!local)return cloud;
   if(!cloud)return local;
-  const out={...local,...cloud};
+  // 舊雲端主檔尚未更新時，不得覆蓋較新已匯入的日期/航次/碼頭。
+  const localNewer=vesselSummaryImportTime(local)>vesselSummaryImportTime(cloud);
+  const out=localNewer?{...cloud,...local}:{...local,...cloud};
   const textFields=[
     'workingNo','vessel','vesselChineseName','voyageI','voyageE','wharf','serviceI','serviceE','firstDate','lastDate','note',
     'unlashingDateTime','lashingDateTime','compareDate','compareMonth','compareDateSource'
@@ -8415,6 +8456,11 @@ function mergeShipMasterOne(local,cloud){
     if(!k.startsWith('_') && out.manualOverrides[k]!==undefined)out[k]=out.manualOverrides[k];
   });
 
+  if(localNewer){
+    // 月份過濾優先讀取 _cloudLastDate，必須同步移除過期雲端權威日期。
+    out._cloudFirstDate=String(out.firstDate||'');
+    out._cloudLastDate=String(out.lastDate||'');
+  }
   return out;
 }
 
@@ -8703,7 +8749,7 @@ function mergeEfficiencyCloudData(d){
     const cloudByNo=new Map(cloudMasters.map(x=>[String(x?.workingNo||'').trim(),x]));
     shipMasters=(shipMasters||[]).map(x=>{
       const c=cloudByNo.get(String(x?.workingNo||'').trim());
-      return c?{...x,_cloudFirstDate:String(c.firstDate||''),_cloudLastDate:String(c.lastDate||'')}:x;
+      return c?{...x,_cloudFirstDate:String((vesselSummaryImportTime(c)>=vesselSummaryImportTime(x)?c:x).firstDate||''),_cloudLastDate:String((vesselSummaryImportTime(c)>=vesselSummaryImportTime(x)?c:x).lastDate||'')}:x;
     });
   }
   if(Array.isArray(d?.records)&&d.records.length){
@@ -8745,6 +8791,7 @@ async function loadEfficiencyCloudScope(params,showStatus=false){
     saveLocal();
     invalidateWorkloadIndex();
     populateSelects();
+    p79FocusLatestImportedVessel(false);
     renderEfficiencyTabFast();
     if(showStatus)cloudStatus(`雲端最新｜明細 ${Array.isArray(d?.records)?d.records.length:0} 筆`);
     return true;
@@ -9344,6 +9391,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     // 先刷新月份選項；若目前條件下 0 艘、但雲端主檔實際有資料，就自動回到「全部月份」。
     try{
       populateSelects();
+      p79FocusLatestImportedVessel(false);
       const visibleBeforeReset=vesselJobRows();
       if(shipMasters.length>0 && visibleBeforeReset.length===0){
         const monthEl=document.getElementById('filterMonth');
@@ -9467,6 +9515,7 @@ async function syncFromCloud(force=false){
 
    if(d.revision)p79EfficiencyWriteOptional(STORE.rev,String(d.revision));
    await p79ReadCompleteWorkingReportOnMismatch();
+   p79FocusLatestImportedVessel(false);
    saveLocal();
    invalidateWorkloadIndex();
    renderEfficiencyTabFast();
@@ -11664,6 +11713,7 @@ async function importExcelFiles(fileList){
     );
     setExcelImportStage('完成最後整理',99);
     refreshMonthlyCompareAfterSystemChange();
+    if(excelQueueStats.success>0)p79FocusLatestImportedVessel(true);
     renderVesselSummary();
     renderEfficiencyTabFast('dashboard');
     if(activeEfficiencyTabName()==='personstats')renderVesselDriverView();

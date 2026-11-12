@@ -20,6 +20,7 @@ jobs:
         run: |
           node tests/vessel-dashboard-month-scope-20261102.cjs
           node tests/vessel-month-selection.cjs
+          node tests/vessel-latest-import-display.cjs
           node tests/vessel-completion-driver-month.cjs
           node tests/vessel-monthly-export.cjs
           node tests/vessel-monthly-layout.cjs
