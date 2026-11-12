@@ -178,7 +178,7 @@ function updateDepartments(active){
  // Include configured titles even if nobody currently holds the title (show zero).
  p79DashConfiguredTitles().forEach(register);
  active.forEach(function(e){
-   var name=String(window.Port79OrgHierarchy?.getValue(e,'sections')||e.section||e.unit||'未設定單位').trim()||'未設定單位';
+   var name=String((typeof window==='object'&&window.Port79OrgHierarchy?.getValue(e,'sections'))||e.section||e.unit||'未設定單位').trim()||'未設定單位';
    if(!byDept.has(name))byDept.set(name,{total:0,counts:new Map()});
    var unit=byDept.get(name);unit.total++;
    var rawTitle=e.jobTitle||e.deptDetail||'';
