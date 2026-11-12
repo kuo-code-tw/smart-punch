@@ -217,16 +217,16 @@ async function cloud(){
  assert.equal(e('p79rAttendance').textContent,'100.0%');
  assert.equal(e('p79rLeaves').textContent,'1');
  assert.equal(e('p79rOvertime').textContent,'2.0 小時');
- assert.equal(calls.length,4);
+ assert.equal(calls.length,3,'single-month day needs one leave, one schedule and one attendance request');
  let attempts=0;const successfulFetch=c.fetch;
  c.fetch=async raw=>{if(new URL(raw).searchParams.get('action')==='getLeaveData'&&attempts++===0)throw Error('temporary network failure');return successfulFetch(raw)};
  await w.P79HrStatistics.refresh();
  assert.equal(attempts,2,'one bounded read retry after a transient failure');
  assert.equal(e('p79rLeaves').textContent,'1');
- assert.equal(calls.length,8);
+ assert.equal(calls.length,6);
  account={empId:'OTHER',adminRole:'admin',systemPermissions:{hr:'view',attendance:'none',leave:'none',schedule:'none',workhours:'none'}};
  await w.P79HrStatistics.refresh();
- assert.equal(calls.length,8,'must not query forbidden module on account switch');
+ assert.equal(calls.length,6,'must not query forbidden module on account switch');
  assert.equal(e('p79rAttendance').textContent,'—');
 }
 cloud().then(()=>{passed++;console.log('PASS authorized read-only source bridge and permission switching');
