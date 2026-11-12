@@ -1,0 +1,35 @@
+name: Verify HR dashboard fast official source loading
+on:
+  pull_request:
+    paths:
+      - 'hr/index.html'
+      - 'hr/port79-hr-live-statistics.js'
+      - 'hr/port79-hr-reference-dashboard.js'
+      - 'hr/port79-hr-verified-metrics.js'
+      - 'tests/hr-live-source-cache.cjs'
+      - 'tests/hr-live-panels.cjs'
+      - 'tests/hr-reference-dashboard-integrations.cjs'
+      - '.github/workflows/hr-dashboard-fast-loading.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'hr/index.html'
+      - 'hr/port79-hr-live-statistics.js'
+      - 'tests/hr-live-source-cache.cjs'
+      - '.github/workflows/hr-dashboard-fast-loading.yml'
+permissions:
+  contents: read
+jobs:
+  hr-fast-loading:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: HR cloud source cache, permissions, day/month boundaries and live panels
+        run: |
+          node tests/hr-live-source-cache.cjs
+          node tests/hr-live-panels.cjs
+          node tests/hr-reference-dashboard-integrations.cjs
