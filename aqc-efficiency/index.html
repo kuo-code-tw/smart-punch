@@ -7524,7 +7524,7 @@ function p79EnsureFreshOfficialAqcRoster(){
 }
 
 function renderWeeklyEfficiency(){
-  p79EnsureFreshOfficialAqcRoster();
+  if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
   ensureOperationScheduleGroups(weeklyFilteredRecords(true));
@@ -7665,8 +7665,10 @@ function renderWeeklyEfficiency(){
   }
   renderPersonnelGroupCards(filteredPersons);
   renderPersonnelRecords(rs);
-  const hrView=p79VerifiedAqcReportView(rs);
-  window.P79PersonnelReference?.render({rows:hrView.rows,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
+  if(typeof p79VerifiedAqcReportView==='function'&&typeof window!=='undefined'){
+    const hrView=p79VerifiedAqcReportView(rs);
+    window.P79PersonnelReference?.render({rows:hrView.rows,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
+  }
 }
 
 function renderAll(){
