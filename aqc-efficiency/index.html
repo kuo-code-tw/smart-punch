@@ -8395,7 +8395,8 @@ function mergeShipMasterOne(local,cloud){
   if(!local)return cloud;
   if(!cloud)return local;
   // 舊雲端主檔尚未更新時，不得覆蓋較新已匯入的日期/航次/碼頭。
-  const localNewer=vesselSummaryImportTime(local)>vesselSummaryImportTime(cloud);
+  const importedAt=row=>{const ts=Date.parse(String(row?.workingSheetImportedAt||row?.workingSheetSource?.importedAt||''));return Number.isFinite(ts)?ts:0;};
+  const localNewer=importedAt(local)>importedAt(cloud);
   const out=localNewer?{...cloud,...local}:{...local,...cloud};
   const textFields=[
     'workingNo','vessel','vesselChineseName','voyageI','voyageE','wharf','serviceI','serviceE','firstDate','lastDate','note',
