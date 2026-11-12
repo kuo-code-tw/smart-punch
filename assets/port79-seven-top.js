@@ -32,16 +32,16 @@ function p79OrgValue(employee,kind){
  for(const source of sources)for(const field of aliases){
   if(!Object.prototype.hasOwnProperty.call(source,field))continue;
   explicit=true;
-  const result=String(source[field]??'').trim();
+  const result=typeof source[field]==='string'?source[field].trim():'';
   if(result){
-   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))return '';
+   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))continue;
    return result;
   }
  }
  if(explicit)return '';
  if(kind==='sections'){
   for(const source of sources){
-   const legacy=String(source.unit??'').trim();
+   const legacy=typeof source.unit==='string'?source.unit.trim():'';
    if(legacy&&!/(?:總公司|事業部|事業處)$/.test(legacy))return legacy;
   }
   return '';
