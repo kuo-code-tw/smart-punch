@@ -59,7 +59,7 @@ assert.match(notes.p79DashOvertimeUnreported,/1 筆／8.0 小時/);
 vm.runInContext("setOvertimeDisplayMode('converted')",context);
 assert.equal(metrics.p79DashOvertimeHours,'待換算','no partial converted total shown as complete');
 assert.equal(metrics.p79DashOvertimeUnit,'','no trailing hours suffix on pending status');
-assert.match(notes.p79DashScheduleSource,/1 筆正式申報缺少已儲存換算值/);
+assert.match(notes.p79DashScheduleSource,/其中 1 筆缺換算值/);
 assert.equal(shown,a);
 context.data={...a,missingConversion:0};vm.runInContext('showOvertime(data)',context);
 assert.equal(metrics.p79DashOvertimeHours,'18.7');
