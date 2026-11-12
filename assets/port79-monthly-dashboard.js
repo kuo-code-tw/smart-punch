@@ -627,6 +627,8 @@ function showAttendance(a){
  if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ lastOvertimeData=null;
+ statusText('p79DashOvertimeUnreported','未申報／預排資料待讀取');
  root.P79HomeEarlyPunchAlert?.reset();
  const list=$('p79DashOvertimeRecords'),section=$('p79DashOvertimeList');
  if(list)list.replaceChildren();
