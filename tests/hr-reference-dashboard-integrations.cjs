@@ -15,18 +15,21 @@ test('all UI/metric files parse and scripts are referenced in HR',()=>{
  assert(html.includes('window.p79HrDashRender?.()'));
  assert(css.includes('p79r-kpis'));
 });
-test('only existing systems shown; payroll/training add-ons absent',()=>{
+test('global system navigation is not duplicated by the HR local toolbar',()=>{
  assert(!html.includes('port79-hr-operations.js'),'new operations must not load');
  assert(!dashboard.includes('薪資作業'));
  assert(!dashboard.includes('教育訓練'));
- assert(!dashboard.includes('績效管理'),'efficiency must have actual system name');
- for(const path of ['../attendance/','../schedule/','../leave/','../work-hours/','../aqc-efficiency/','../history-data/']){
-  assert(dashboard.includes('href="'+path+'"'),path);
-  assert(fs.existsSync('hr/'+path+'index.html'),'real target must exist '+path);
+ assert(!dashboard.includes('績效管理'),'efficiency must use its official system name');
+ const shared=fs.readFileSync('assets/port79-management-workspace.js','utf8');
+ for(const path of ['attendance/','schedule/','leave/','work-hours/','aqc-efficiency/','history-data/']){
+  assert(shared.includes(path),'workspace retains route '+path);
+  assert(fs.existsSync(path+'index.html'),'real target exists '+path);
  }
- for(const phrase of ['員工資料','考勤管理','排班管理','請假管理','工時／加班','船舶效率','歷史資料']){
-  assert(dashboard.includes(phrase),phrase);
- }
+ const header=dashboard.slice(dashboard.indexOf('function header(){'),dashboard.indexOf('function card('));
+ assert(!header.includes('data-route='),'no redundant cross-system route links');
+ assert(!header.includes('碼頭營運統計</span>'),'no second system brand');
+ assert(header.includes('data-hr-view="dashboard"')&&header.includes('data-hr-view="employees"'),'both HR-only tabs still work');
+ assert(header.includes('p79rWorkDate')&&header.includes('p79HrSystemMenu'),'date and HR actions preserved');
 });
 test('existing human-resources editing, status and permission functions stay intact',()=>{
  for(const identifier of ['function openEditor(', 'function resignCurrent(', 'function restoreCurrent(',
