@@ -103,13 +103,13 @@ function mountDashboard(){
  '</div>',
  '<div class="p79r-grid-top">',
  panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>正式</th><th>約聘</th><th>派遣</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
- panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span>在職人數<br><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" style="text-align:center">出勤／請假／未出勤人數需要考勤即時資料，不能以在職人數推估。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
- panel('出勤率趨勢（近7日）','<div class="p79r-empty"><div class="big">—</div><div>尚未接入考勤日結數據</div><a class="p79r-link" href="../attendance/">前往考勤管理查看正式統計 ›</a></div>'),
+ panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span><span id="p79rDonutLabel">在職人數</span><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" id="p79rDonutNote" style="text-align:center">尚未完成當日考勤、排班、請假核對；目前僅顯示人資在職人數。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
+ panel('出勤率趨勢（近7日）','<div id="p79rWeekAttendance" class="p79r-empty"><div class="big">—</div><div>等待考勤、排班與請假核對</div><a class="p79r-link" href="../attendance/">查看正式考勤 ›</a></div>'),
  '</div>',
  '<div class="p79r-grid-mid">',
- panel('今日人員出勤明細','<div class="p79r-panel-head"><span class="p79r-note">完整打卡與核准資料由考勤系統提供</span><a class="p79r-link" href="../attendance/">查看出勤明細 ›</a></div><div class="p79r-empty"><div class="big">☑</div><div>請從考勤管理讀取真實打卡及補登資料</div></div>'),
- panel('本月請假統計（人次）','<div class="p79r-empty"><div class="big">—</div><div>請假核准資料尚未接入</div><a class="p79r-link" href="../leave/">查看請假管理 ›</a></div>'),
- panel('本月加班統計（小時）','<div class="p79r-empty"><div class="big">—</div><div>加班資料尚未接入</div><a class="p79r-link" href="../work-hours/">查看加班管理 ›</a></div>'),
+ panel('今日人員出勤明細','<div class="p79r-panel-head"><span class="p79r-note">僅顯示經核對的在勤摘要；人員打卡明細以原考勤頁為準</span><a class="p79r-link" href="../attendance/">查看出勤明細 ›</a></div><div id="p79rDayAttendanceDetail" class="p79r-empty"><div class="big">—</div><div>等待正式打卡與班表核對</div></div>'),
+ panel('本月請假統計（人次）','<div id="p79rMonthlyLeavePanel" class="p79r-empty"><div class="big">—</div><div>等待正式核准請假資料</div><a class="p79r-link" href="../leave/">查看請假管理 ›</a></div>'),
+ panel('本月加班統計（小時）','<div id="p79rMonthlyOvertimePanel" class="p79r-empty"><div class="big">—</div><div>等待正式加班申報資料</div><a class="p79r-link" href="../work-hours/">查看加班管理 ›</a></div>'),
  '</div>',
  '<div class="p79r-grid-bottom">',
  panel('重要提醒','<div id="p79rAlerts" role="status">正在核對人員資料…</div>'),
@@ -216,7 +216,7 @@ function renderDashboard(){
  updateDepartments(data.active);
  if(ready||records.length){updateAlerts(records,anchor,data);updateHistory(records,anchor)}
  else{text('p79rAlerts','等待人資主檔核對…');text('p79rHistoryChart','等待到離職紀錄…')}
- var now=new Date(),source=ready?'雲端已同步':records.length?'本機資料待核對':'資料待同步';
+ var now=new Date(),source=ready?'人資主檔已同步（其他系統另行核對）':records.length?'人資快取待雲端核對':'人資主檔待同步';
  if(ready)lastCloudRefresh=ymd(now)+' '+now.toLocaleTimeString('zh-TW',{hour12:false});
  text('p79rUpdated',source+(lastCloudRefresh?'｜'+lastCloudRefresh:''));
 }

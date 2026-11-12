@@ -31,11 +31,14 @@ function todayTaipei(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ta
 function identity(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+selection()}
 function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=msg}
 function readFailure(result){
- const e=result?.reason;
- if(e?.name==='AbortError')return '雲端回應逾時';
- if(/權限|授權|登入|token/i.test(String(e?.message||'')))return '雲端授權未確認';
- if(/fetch|network/i.test(String(e?.message||'')))return '雲端連線未完成';
- return '雲端資料未確認';
+ const e=result?.reason,m=String(e?.message||'');
+ if(e?.name==='AbortError'||/timeout|逾時/i.test(m))return '雲端回應逾時，請重新同步';
+ if(/權限|授權|登入|token/i.test(m))return '正式來源授權未確認，請重新登入';
+ if(/忙碌|retryable|quota|lock/i.test(m))return '雲端服務忙碌，請稍後重新同步';
+ if(/fetch|network|連線/i.test(m))return '雲端連線未完成，請檢查網路';
+ if(/JSON|Unexpected token|資料格式|SyntaxError|網頁而非|登入頁/i.test(m))return '來源回傳格式不符，請到原系統查核';
+ if(/不完整|月份/i.test(m))return '原始資料不完整或月份不符';
+ return '雲端請求失敗，請至原系統確認資料';
 }
 function setVal(id,num,sub){
  const el=$(id);if(el)el.textContent=num;
@@ -48,7 +51,7 @@ async function get(action,month,auth,ms=30000){
  // Leave's existing endpoint returns the full ledger; filter dates locally.
  if(action!=='getLeaveData')url.searchParams.set('month',month);
  url.searchParams.set('token',auth);
- url.searchParams.set('gcToken',auth);
+ if(action!=='getLeaveData')url.searchParams.set('gcToken',auth);
  url.searchParams.set('_',String(Date.now()));
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
  try{
@@ -74,6 +77,101 @@ function attendanceRows(result){
  if(!result||!Array.isArray(result.records))throw Error('正式打卡紀錄不完整');
  return result.records;
 }
+function clean(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function panel(id,{value='—',detail='正式來源尚未核對',href,label}={}){
+ const root=$(id);if(!root)return;
+ root.innerHTML='<div class="big">'+clean(value)+'</div><div>'+clean(detail)+'</div>'+
+  (href?'<a class="p79r-link" href="'+href+'">'+clean(label||'查看原始資料')+' ›</a>':'');
+}
+function showWeek({records,schedules,leaves,employees,day}){
+ const host=$('p79rWeekAttendance');if(!host)return;
+ const end=Date.parse(day+'T12:00:00Z'),bars=[];
+ if(!Number.isFinite(end))return;
+ for(let n=6;n>=0;n--){
+  const key=new Date(end-n*86400000).toISOString().slice(0,10);
+  if(key.slice(0,7)!==day.slice(0,7)){bars.push({date:key,percent:null});continue}
+  const item=M.attendanceRate({records,schedules,leaveRecords:leaves,employees,day:key});
+  bars.push({date:key,percent:item.ready?item.percent:null,reason:item.reason});
+ }
+ const completed=bars.filter(b=>b.percent!==null);
+ if(!completed.length){
+  const msg=bars.find(b=>b.reason)?.reason||'缺少可核對的每日出勤率';
+  panel('p79rWeekAttendance',{detail:msg,href:'../attendance/',label:'前往考勤管理'});return
+ }
+ host.className='';
+ host.innerHTML='<div class="p79r-chart" style="margin:8px 3px 0;min-height:155px">'+
+ bars.map(b=>'<div class="p79r-chartcol"><div class="p79r-chartnum">'+(b.percent===null?'—':b.percent+'%')+
+ '</div><div class="p79r-chartbar" style="height:'+(b.percent===null?0:Math.max(2,Math.round(b.percent*1.1)))+
+ 'px"></div><div class="p79r-chartlabel">'+clean(b.date.slice(5))+'</div></div>').join('')+'</div>'+
+ '<p class="p79r-note">已核對 '+completed.length+'/7 日；缺資料的日期顯示「—」，不推估。</p>'+
+ '<a class="p79r-link" href="../attendance/">查看考勤明細 ›</a>';
+}
+function showActualPunchRows(records,employees,day,rate){
+ const node=$('p79rDayAttendanceDetail');
+ if(!node||!Array.isArray(records)||!Array.isArray(employees))return;
+ const valid=employees.filter(e=>String(e.empId||'').trim()); // Historical raw punch evidence can belong to now-resigned employees.
+ const ids=new Map(valid.map(e=>[String(e.empId).trim().toUpperCase(),e]));
+ const attNos=new Map();
+ for(const e of valid){
+  const no=String(e.attNo||e.attendanceNo||'').trim().replace(/^0+/,'');
+  if(!no)continue;
+  if(attNos.has(no))attNos.set(no,null);
+  else attNos.set(no,e);
+ }
+ const found=new Map();
+ for(const row of records){
+  const raw=String(row.timeStr||row['出勤時間']||row.datetime||row.dateTime||row.clockTime||'').trim();
+  if(M.date(raw)!==day)continue; // Original recorded calendar day, never infer a night-shift accounting date.
+  const direction=String(row.type||row.action||row.status||'');
+  const inbound=/上班|簽到|clock.?in|check.?in/i.test(direction);
+  const outbound=/下班|簽退|clock.?out|check.?out/i.test(direction);
+  if(!inbound&&!outbound)continue;
+  const direct=String(row.empId||row.employeeId||'').trim().toUpperCase();
+  const no=String(row.attNo||row.attendanceNo||'').trim().replace(/^0+/,'');
+  const employee=ids.get(direct)||(no?attNos.get(no):null);
+  if(!employee)continue; // No name-based guessing or ambiguous attendance-number matching.
+  const key=String(employee.empId).trim().toUpperCase();
+  if(!found.has(key))found.set(key,{person:employee,inside:'',outside:''});
+  const item=found.get(key),displayTime=(raw.match(/(?:\s|T)(\d{2}:\d{2})(?::\d{2})?(?:$|[+\-Z])/i)||[])[1]||raw;
+  if(inbound&&(!item.inside||raw<item.insideRaw)){item.inside=displayTime;item.insideRaw=raw}
+  if(outbound&&(!item.outside||raw>item.outsideRaw)){item.outside=displayTime;item.outsideRaw=raw}
+ }
+ if(!found.size){
+  panel('p79rDayAttendanceDetail',{value:'—',detail:'正式資料未找到當日可對應的上／下班打卡；不代表全員未出勤',href:'../attendance/',label:'查看考勤紀錄'});
+  return;
+ }
+ const sorted=[...found].sort((a,b)=>a[0].localeCompare(b[0],'zh-TW',{numeric:true}));
+ const note=rate?.ready?('應到 '+rate.expected+' 人、已打上班卡 '+rate.clocked+' 人；'):'';
+ node.className='';
+ node.innerHTML='<div class="p79r-note" style="margin:4px 0 10px">'+clean(note)+'只列當日有實際打卡的已授權人員；凌晨跨日晚班請以考勤系統配對結果為準。</div>'+
+ '<div style="overflow:auto;max-height:220px"><table><thead><tr><th>工號</th><th>姓名</th><th>部門</th><th>上班卡</th><th>下班卡</th></tr></thead><tbody>'+
+ sorted.slice(0,20).map(([id,item])=>'<tr><td>'+clean(id)+'</td><td>'+clean(item.person.name||'')+'</td><td>'+
+ clean(item.person.dept||'')+'</td><td>'+clean(item.inside||'—')+'</td><td>'+clean(item.outside||'—')+'</td></tr>').join('')+
+ '</tbody></table></div><div class="p79r-note" style="margin-top:8px">找到 '+sorted.length+' 位有打卡紀錄的人員'+(sorted.length>20?'（僅顯示前20位）':'')+
+ '。<a class="p79r-link" href="../attendance/">到考勤管理查看全部 ›</a></div>';
+}
+function missingSources(scope,payload){
+ const services=[['attendance','考勤'],['schedule','排班'],['leave','請假']];
+ const issues=services.filter(([key])=>!scope[key]||payload?.[key]?.status!=='fulfilled')
+ .map(([key,label])=>label+'：'+(!scope[key]?'此帳號無檢視權限':readFailure(payload?.[key])));
+ return issues.length?'尚未讀齊：'+issues.join('；'):'';
+}
+function resetDonut(){
+ const center=$('p79rActiveDonut'),label=$('p79rDonutLabel'),note=$('p79rDonutNote');
+ if(label)label.textContent='在職人數';
+ if(center)center.textContent=$('p79rActive')?.textContent||'—';
+ const circle=center?.closest('.p79r-donut');if(circle)circle.style.background='conic-gradient(#dfeaf6 100%,#dfeaf6 0)';
+ if(note)note.innerHTML='尚未完成當日考勤、排班、請假核對；目前僅顯示人資在職人數。<a class="p79r-link" href="../attendance/">查看考勤</a>';
+}
+function originalViewUnavailable(scope,payload){
+ resetDonut();
+ if(scope.leave)panel('p79rMonthlyLeavePanel',{detail:readFailure(payload.leave),href:'../leave/',label:'請假管理'});
+ else panel('p79rMonthlyLeavePanel',{detail:'目前帳號沒有請假檢視權限',href:'../leave/',label:'請假管理'});
+ if(scope.schedule&&scope.workhours)panel('p79rMonthlyOvertimePanel',{detail:readFailure(payload.schedule),href:'../work-hours/',label:'工時／加班'});
+ else panel('p79rMonthlyOvertimePanel',{detail:'需要排班及工時檢視權限',href:'../work-hours/',label:'工時／加班'});
+ panel('p79rWeekAttendance',{detail:missingSources(scope,payload)||'需考勤、班表和請假三種正式資料完成核對',href:'../attendance/',label:'考勤管理'});
+ panel('p79rDayAttendanceDetail',{detail:'請從考勤系統核對真實打卡與補登資料',href:'../attendance/',label:'查看打卡明細'});
+}
 function display(payload,scope,day){
  if(!payload)return;
  const month=day.slice(0,7);
@@ -81,17 +179,34 @@ function display(payload,scope,day){
  const leaveResult=payload.leave?.status==='fulfilled'?payload.leave.value:null;
  const scheduleResult=payload.schedule?.status==='fulfilled'?payload.schedule.value:null;
  const attendanceResult=payload.attendance?.status==='fulfilled'?payload.attendance.value:null;
+ const sync=$('p79rUpdated');
+ if(sync){
+  const sources=[['attendance','考勤'],['schedule','排班'],['leave','請假']];
+  sync.textContent='人資主檔已同步｜'+sources.map(([key,label])=>
+   label+(scope[key]?(payload[key]?.status==='fulfilled'?'已讀':'待核'):'無權限')).join('／');
+ }
  let leave=null,ot=null,attendance=null;
+ originalViewUnavailable(scope,payload);
  if(scope.leave&&leaveResult){
   try{leave=M.approvedLeaveCount(leaveRows(leaveResult),month,staffIds);
-   if(leave.ready)setVal('p79rLeaves',String(leave.count),'正式核准請假申請數（依可檢視範圍）');
-   else sourceText('p79rLeaves','核准請假紀錄未完全核對');
+   if(leave.ready){
+    setVal('p79rLeaves',String(leave.count),'正式核准請假申請數（依可檢視範圍）');
+    const kinds=Object.entries(leave.typeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    panel('p79rMonthlyLeavePanel',{value:String(leave.count)+' 人次',
+      detail:kinds.length?kinds.map(k=>k[0]+' '+k[1]+' 人次').join('／'):'本月已確認沒有核准請假申請',
+      href:'../leave/',label:'查看正式請假'});
+   }
+   else {sourceText('p79rLeaves','核准請假紀錄未完全核對');panel('p79rMonthlyLeavePanel',{detail:'部分核准請假紀錄需要人工核對',href:'../leave/',label:'查看請假管理'})}
   }catch(e){sourceText('p79rLeaves','核准請假資料不完整')}
  }else if(scope.leave)sourceText('p79rLeaves','正式請假資料暫不可用：'+readFailure(payload.leave));
  else sourceText('p79rLeaves','目前帳號沒有請假資料檢視權限');
  if(scope.schedule&&scope.workhours&&scheduleResult){
   try{ot=M.officialOvertime(officialSchedules(scheduleResult),month,staffIds);
-   if(ot.ready)setVal('p79rOvertime',ot.hours.toFixed(1)+' 小時','正式申報，不含預排／撤銷');
+   if(ot.ready){
+    setVal('p79rOvertime',ot.hours.toFixed(1)+' 小時','正式申報，不含預排／撤銷');
+    panel('p79rMonthlyOvertimePanel',{value:ot.hours.toFixed(1)+' 小時',detail:
+      '已申報 '+ot.count+' 筆；另有預排 '+ot.planned+' 筆不計入',href:'../work-hours/',label:'查看正式加班申報'});
+   }
    else sourceText('p79rOvertime','申報資料含待核或不完整紀錄');
   }catch(e){sourceText('p79rOvertime','正式班表資料不完整')}
  }else if(scope.schedule&&scope.workhours)sourceText('p79rOvertime','正式加班申報讀取失敗：'+readFailure(payload.schedule));
@@ -104,17 +219,36 @@ function display(payload,scope,day){
    if(attendance.ready){
     setVal('p79rAttendance',attendance.percent===null?'—':attendance.percent.toFixed(1)+'%',
       attendance.expected+' 人應到／'+attendance.clocked+' 人已打上班卡（當日）');
+    panel('p79rDayAttendanceDetail',{value:attendance.clocked+' / '+attendance.expected+' 人',
+      detail:attendance.expected?'已打上班卡／已核對應到人數（非完整下班確認）':'當日正式班表沒有應到人員',
+      href:'../attendance/',label:'查看考勤與補登'});
     const donut=$('p79rActiveDonut')?.closest('.p79r-donut');
     if(donut)donut.style.background='conic-gradient(#2b85e9 '+(attendance.percent??0)+'%,#e1edf8 0)';
-   }else sourceText('p79rAttendance',attendance.reason||'當日打卡核對尚未完成');
+    const center=$('p79rActiveDonut'),label=$('p79rDonutLabel'),note=$('p79rDonutNote');
+    if(label)label.textContent='已打卡／應到';
+    if(center)center.textContent=attendance.clocked+' / '+attendance.expected;
+    if(note)note.innerHTML='依當日正式班表與核准請假核對；上班打卡不代表已完成下班。<a class="p79r-link" href="../attendance/">查看考勤</a>';
+   }else{
+    sourceText('p79rAttendance',attendance.reason||'當日打卡核對尚未完成');
+    panel('p79rDayAttendanceDetail',{detail:attendance.reason||'缺少完整正式打卡與班表',href:'../attendance/',label:'查看考勤'});
+   }
+   showWeek({records:attendanceRows(attendanceResult),schedules:officialSchedules(scheduleResult),
+     leaves:leaveRows(leaveResult),employees:all,day});
   }catch(e){sourceText('p79rAttendance','當日打卡與班表未核對完成')}
- }else if(scope.attendance&&scope.schedule&&scope.leave)sourceText('p79rAttendance','正式打卡／班表／請假尚未讀齊');
- else sourceText('p79rAttendance','需要考勤、排班與請假檢視權限');
+ }else sourceText('p79rAttendance',missingSources(scope,payload)||'考勤、班表與請假尚未核對完整');
+ if(scope.attendance&&attendanceResult){
+  try{showActualPunchRows(attendanceRows(attendanceResult),all,day,attendance)}catch(error){console.warn('人資首頁打卡明細顯示未完成',error)}
+ }
 }
 function reset(msg){
+ resetDonut();
  setVal('p79rAttendance','—',msg||'等待正式考勤');
  setVal('p79rLeaves','—',msg||'等待核准請假');
  setVal('p79rOvertime','—',msg||'等待正式加班申報');
+ panel('p79rWeekAttendance',{detail:msg||'等待正式資料核對',href:'../attendance/'});
+ panel('p79rDayAttendanceDetail',{detail:msg||'等待正式打卡核對',href:'../attendance/'});
+ panel('p79rMonthlyLeavePanel',{detail:msg||'等待正式核准資料',href:'../leave/'});
+ panel('p79rMonthlyOvertimePanel',{detail:msg||'等待加班申報核對',href:'../work-hours/'});
 }
 async function refresh(force){
  if(!ready())return;
