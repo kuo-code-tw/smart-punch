@@ -30,7 +30,7 @@ function p79OrgValue(employee,kind){
  for(const source of [e,...nested]){
   for(const key of keys){
    const v=source[key];
-   if(typeof v==='string'&&v.trim())return v.trim();
+   if(typeof v==='string'&&(v.trim()||key===keys[0]))return v.trim();
   }
  }
  // 舊欄位只有名稱明確寫出「事業部／事業處／總公司」時才能兼容顯示。

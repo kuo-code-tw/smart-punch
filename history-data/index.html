@@ -53,6 +53,8 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 }
 </style>
 <link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261024-unified-status-icons&menuhover=20261026a">
+<link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
+<script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
 </head>
 <body data-p79-system="history">
 <header class="top"><div class="topin"><div class="brand"><div class="logo">🗄️</div><div><div class="title">歷史資料中心</div><div class="sub">考勤歷史・排班歷史・船舶歷史｜已讀月份會保存在本機</div></div></div><nav class="nav"><a href="../attendance/">🕒 考勤</a><a href="../work-hours/">📊 工時統計</a><a href="../leave/">📝 請假</a><a href="../schedule/">📅 排班</a><a href="../aqc-efficiency/">🚢 效率</a><a href="../hr/">👥 人資</a><a class="active" href="./">🗄️ 歷史資料</a><a href="../">⌂ 首頁</a></nav></div></header>
@@ -78,7 +80,25 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 'use strict';
 const GAS_DEFAULT='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 const $=id=>document.getElementById(id);let type='attendance';
-let historyLoaded=null;
+let historyLoaded=null,historyOrgPeople=[],historyOrgColumns=null,historyOrgRawRows=[];
+const orgHistory=window.Port79OrgContext.configure({system:'history',historical:true,people:()=>historyOrgPeople,render:()=>redrawHistoryOrganization()});
+function setHistoryOrganization(d,rows){
+ const people=Array.isArray(d.employees)?d.employees:rows;
+ const seen=new Set();historyOrgPeople=people.filter(r=>{const id=String(r.empId||r.employeeId||'').trim().toUpperCase();if(!id||seen.has(id))return false;seen.add(id);return true});
+ orgHistory.sync();
+}
+function historyScopedRows(rows){
+ if(historyLoaded?.type!=='vessel')return orgHistory.filter(rows);
+ if(!Object.values(orgHistory.selection()).some(Boolean))return rows;
+ const keys=new Set(orgHistory.filter(historyLoaded.records||[]).map(r=>String(r.workingNo||'').trim()).filter(Boolean));
+ return rows.filter(r=>keys.has(String(r.workingNo||'').trim()));
+}
+function redrawHistoryOrganization(){
+ if(!historyLoaded)return;
+ if(historyLoaded.type==='schedule'){$('result').innerHTML=window.P79HistorySchedule.html(window.P79HistorySchedule.model(orgHistory.filter(historyLoaded.rows),historyLoaded.month));return}
+ if(historyOrgColumns)table(historyOrgColumns,historyOrgRawRows);
+}
+
 let historyXlsxPromise=null;
 const scheduleStyle=document.createElement('style');scheduleStyle.textContent=window.P79HistorySchedule.css;document.head.appendChild(scheduleStyle);
 function historyXlsx(){
@@ -119,21 +139,22 @@ function historyNormalizeExcelRow(r,kind){
   return r;
 }
 function historyWorkbookRows(kind,items){
-  const cols=historyExcelColumns(kind);
+  const orgCols=kind==='vessel'||typeof window==='undefined'||!window.Port79OrgContext?[]:window.Port79OrgContext.levels.map(([key,label])=>[key,label]);
+  const cols=[...orgCols,...historyExcelColumns(kind)];items=typeof historyScopedRows==='function'?historyScopedRows(items):items;
   const ordered=kind==='attendance'?[...(items||[])].sort((a,b)=>historyAttendanceTime(b).localeCompare(historyAttendanceTime(a))):(items||[]);
   return [cols.map(c=>c[1]),...ordered.map(r=>{
     const v=historyNormalizeExcelRow(r,kind);
-    return cols.map(([k])=>v[k]??'');
+    return cols.map(([k])=>orgCols.some(([key])=>key===k)?orgHistory.value(r,k)||'':v[k]??'');
   })];
 }
 function historySaveExcel(items,kind,month,suffix){
   return historyXlsx().then(XLSX=>{
-    const report=kind==='schedule'?window.P79HistorySchedule.model(items,month):null;
+    const report=kind==='schedule'?window.P79HistorySchedule.model(orgHistory.filter(items),month):null;
     const ws=XLSX.utils.aoa_to_sheet(report?window.P79HistorySchedule.values(report):historyWorkbookRows(kind,items));
     ws['!cols']=report?[{wch:16},{wch:12},{wch:12},{wch:10},{wch:14},...Array.from({length:report.headers.length-5},()=>({wch:8}))]:historyExcelColumns(kind).map(()=>({wch:18}));
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,kind==='vessel'?'船舶總表':'歷史資料');
     if(kind==='vessel'&&!suffix&&historyLoaded?.type==='vessel'&&historyLoaded.month===month){
-      const details=historyLoaded.records||[],keys=[...new Set(details.flatMap(r=>Object.keys(r)))],labels={id:'ID',empId:'工號',name:'姓名',workingNo:'WORKING NO',vessel:'船名',shipName:'船名主檔',voyageI:'航次I',voyageE:'航次E',workDate:'日期',shift:'時段',startTime:'開始時間',endTime:'結束時間',containers:'櫃數',disc:'卸船櫃數',load:'裝船櫃數',hatches:'艙蓋數',note:'備註',wharf:'碼頭'};
+      const details=orgHistory.filter(historyLoaded.records||[]),keys=[...new Set(details.flatMap(r=>Object.keys(r)))],labels={id:'ID',empId:'工號',name:'姓名',workingNo:'WORKING NO',vessel:'船名',shipName:'船名主檔',voyageI:'航次I',voyageE:'航次E',workDate:'日期',shift:'時段',startTime:'開始時間',endTime:'結束時間',containers:'櫃數',disc:'卸船櫃數',load:'裝船櫃數',hatches:'艙蓋數',note:'備註',wharf:'碼頭'};
       const detailRows=[keys.map(k=>labels[k]||k),...details.map(r=>keys.map(k=>r[k]&&typeof r[k]==='object'?JSON.stringify(r[k]):r[k]??''))];
       const detailSheet=XLSX.utils.aoa_to_sheet(detailRows);detailSheet['!cols']=keys.map(()=>({wch:18}));XLSX.utils.book_append_sheet(wb,detailSheet,'作業明細');
     }
@@ -193,14 +214,14 @@ function progressPhase(p){if(p<18)return['建立雲端連線…','正在連接 G
 function paintProgress(p,text,detail){progressValue=Math.max(0,Math.min(100,Math.round(p)));$('progressBox').classList.add('show');$('progressFill').style.width=progressValue+'%';$('progressPct').textContent=progressValue+'%';const phase=progressPhase(progressValue);$('progressText').textContent=text||phase[0];$('progressDetail').textContent=detail||phase[1]}
 function startProgress(month){if(progressTimer)clearInterval(progressTimer);progressValue=5;progressStartedAt=Date.now();paintProgress(progressValue,'開始讀取 '+month,'準備向 Google Drive 讀取資料');progressTimer=setInterval(()=>{const elapsed=Date.now()-progressStartedAt;let target=8+Math.min(82,Math.floor(elapsed/260));if(target>90)target=90;if(target>progressValue)paintProgress(target)},260)}
 function finishProgress(ok,detail){if(progressTimer){clearInterval(progressTimer);progressTimer=null}paintProgress(ok?100:progressValue,ok?'讀取完成':'讀取失敗',detail||'');if(ok)setTimeout(()=>{$('progressBox').classList.remove('show')},1400)}
-function table(cols,rows){if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+function table(cols,rows){historyOrgColumns=cols;historyOrgRawRows=rows;rows=historyScopedRows(rows);const extra=historyLoaded?.type==='vessel'?[]:window.Port79OrgContext.levels.map(([key,label])=>({label,get:r=>orgHistory.value(r,key)||'—'}));cols=[...extra,...cols];if(!rows.length){$('result').innerHTML='<div class="empty">這個月份沒有資料</div>';return}$('result').innerHTML=`<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(fmt(typeof c.get==='function'?c.get(r):r[c.key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
 function recordTime(r){const v=r.timeStr??r.datetime??r.dateTime??r.timestamp??r.time??r.fullTime??r.attendanceTime??r.clockTime??r['完整考勤時間']??r['考勤時間']??'';if(v instanceof Date)return v.toLocaleString('zh-TW',{hour12:false});return v}
-async function loadAttendance(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'attendance',month},{forceCloud}),rows=d.records;if(!Array.isArray(rows)||d.month&&d.month!==month)throw Error('考勤歷史未完整讀取或月份不符，請重新讀取');historyLoaded={type:'attendance',month,rows};$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
-async function loadSchedule(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'schedule',month},{forceCloud});if(!Array.isArray(d.schedules)||String(d.month||month)!==month)throw Error('歷史班表月份不符或尚未讀取完整');const rows=d.schedules,report=window.P79HistorySchedule.model(rows,month);historyLoaded={type:'schedule',month,rows};$('historyExportExcel').disabled=false;pills([month,`${report.rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);$('result').innerHTML=window.P79HistorySchedule.html(report)}
+async function loadAttendance(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'attendance',month},{forceCloud}),rows=d.records;if(!Array.isArray(rows)||d.month&&d.month!==month)throw Error('考勤歷史未完整讀取或月份不符，請重新讀取');historyLoaded={type:'attendance',month,rows};setHistoryOrganization(d,rows);$('historyExportExcel').disabled=false;pills([`${month}`,`${rows.length} 筆考勤`,d.sourceLabel||'Google Drive']);table([{label:'工號',get:r=>r.empId||r.employeeId||r.id||''},{label:'姓名',get:r=>r.name||r.employeeName||''},{label:'原部門',get:r=>r.dept||r.department||''},{label:'日期/時間',get:recordTime},{label:'狀態',get:r=>r.type||r.status||r.action||''}],rows)}
+async function loadSchedule(month,forceCloud=false){const d=await api('historyGetMonthData',{type:'schedule',month},{forceCloud});if(!Array.isArray(d.schedules)||String(d.month||month)!==month)throw Error('歷史班表月份不符或尚未讀取完整');const rows=d.schedules;historyLoaded={type:'schedule',month,rows};setHistoryOrganization(d,rows);const report=window.P79HistorySchedule.model(orgHistory.filter(rows),month);$('historyExportExcel').disabled=false;pills([month,`${report.rows.length} 名人員班表`,d.sourceLabel||'Google Drive']);$('result').innerHTML=window.P79HistorySchedule.html(report)}
 async function loadVessel(month,forceCloud=false){
   const d=await api('historyGetMonthData',{type:'vessel',month},{forceCloud}),masters=Array.isArray(d.shipMasters)?d.shipMasters:[],records=Array.isArray(d.records)?d.records:[];
   pills([month,`${masters.length} 艘船舶`,`${records.length} 筆作業明細`,d.sourceLabel||'Google Drive']);
-  const rows=masters.map(r=>historyNormalizeExcelRow(r,'vessel'));historyLoaded={type:'vessel',month,rows,records};$('historyExportExcel').disabled=false;
+  const rows=masters.map(r=>historyNormalizeExcelRow(r,'vessel'));historyLoaded={type:'vessel',month,rows,records};setHistoryOrganization(d,records);$('historyExportExcel').disabled=false;
   table(historyExcelColumns('vessel').map(([key,label])=>({label,get:r=>r[key]??''})),rows)
 }
 async function load(requireFresh=false){historyLoaded=null;$('historyExportExcel').disabled=true;$('historyImportPreview').hidden=true;const m=$('month').value;if(!/^\d{4}-\d{2}$/.test(m))return;setStatus(`讀取 ${m} 中…`);$('loadBtn').disabled=true;startProgress(m);try{if(type==='attendance')await loadAttendance(m,requireFresh);else if(type==='schedule')await loadSchedule(m,requireFresh);else await loadVessel(m,requireFresh);setStatus(requireFresh===true?`${m} 已從雲端重新載入`:`${m} 已完成；下次同月份會優先使用本機保存資料`);finishProgress(true,`${m} 資料已整理完成`)}catch(e){setStatus(`讀取失敗：${e.message||e}`);$('result').innerHTML=`<div class="empty">${esc(e.message||e)}</div>`;finishProgress(false,e.message||String(e));if(requireFresh===true)throw e;}finally{$('loadBtn').disabled=false}}
