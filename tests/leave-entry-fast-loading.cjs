@@ -12,7 +12,7 @@ function setup({admin=true,cache=null}={}){
  window:{Port79DataCache:{getDisplaySnapshot:async()=>cache}},storedToken:()=>token,leaveRequestToken:()=>token,p79LeaveEmployeeEntry:()=>false,
  $:id=>nodes[id],setStatus:m=>statuses.push(m),populateDepartments(){},renderAll(){renders.push(c.leaveRecords.map(l=>l.id))},p79ShowPendingLeavePrompt(){},p79ReconcileLeaveHandoff:async()=>{},p79LeaveMatchesMonth:()=>true,p79LeaveAuthError:m=>/auth/.test(m),p79EmployeeLeaveReauth(){c.reauth=true},p79RenewEmployeeLeaveSession:async()=>false,
  jsonFetch:(url,options,timeout)=>{const d=deferred();calls.push({url,options,timeout,...d});return d.promise;}};
- vm.createContext(c);for(const name of ['p79StartLeaveRead','p79PrepareLeaveEntryRead','p79HydrateLeaveComputerCache','loadCloud'])vm.runInContext(fn(name),c);
+ vm.createContext(c);for(const name of ['p79StartLeaveRead','p79PrepareLeaveEntryRead','p79HydrateLeaveComputerCache','loadCloud','postCloud'])vm.runInContext(fn(name),c);
  return{c,calls,statuses,renders,data,setToken:v=>token=v};
 }
 (async()=>{
@@ -42,6 +42,11 @@ function setup({admin=true,cache=null}={}){
  x=setup();const old=x.c.loadCloud();const fresh=x.c.loadCloud(false,true);assert.equal(x.calls.length,2);assert.equal(x.calls[1].timeout,22000);
  x.calls[1].reject(Error('readback failed'));await assert.rejects(fresh,/readback failed/);x.calls[0].resolve(x.data);assert.equal(await old,false);assert.equal(x.renders.length,0);
  x=setup();const staleFresh=x.c.loadCloud(false,true);x.setToken('other-account');x.calls[0].resolve(x.data);await assert.rejects(staleFresh,/尚未確認/);
+ // An approval/submission invalidates pre-write reads, including normal refreshes that follow it.
+ x=setup();const beforeWrite=x.c.loadCloud();const save=x.c.postCloud({action:'addLeave',leave:{id:'NEW'}});
+ x.calls[1].resolve({ok:true});await save;const afterWrite=x.c.loadCloud();assert.equal(x.calls.length,3);
+ x.calls[0].resolve(x.data);assert.equal(await beforeWrite,false);
+ x.calls[2].resolve({...x.data,leaveRecords:[{id:'NEW'}]});assert.equal(await afterWrite,true);assert.equal(x.c.leaveRecords[0].id,'NEW');
  // Slow disk data cannot replace a newer cloud response.
  x=setup();const disk=deferred();x.c.window.Port79DataCache.getDisplaySnapshot=()=>disk.promise;
  const fast=x.c.loadCloud();x.calls[0].resolve(x.data);assert.equal(await fast,true);

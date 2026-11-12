@@ -433,6 +433,7 @@ let p79LeaveLoadGeneration=0;
 const p79LeaveReads=new Map();
 // Share only active, equivalent reads. A post-write verification always gets a fresh request.
 function p79StartLeaveRead(token,requireFresh=false){
+ if(requireFresh)p79LeaveReads.clear();
  const key=GAS_URL+'|'+String(token)+'|'+requireFresh;
  if(!requireFresh&&p79LeaveReads.has(key))return p79LeaveReads.get(key);
  const read=jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},requireFresh?22000:18000)
@@ -541,6 +542,8 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null,entryR
  if(canApply())setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
 }
 async function postCloud(payload){
+ // A write must never reuse or apply a read started before that write.
+ p79LeaveReads.clear();p79LeaveLoadGeneration++;
  const userToken=leaveRequestToken();
  if(userToken){payload.token=userToken;if(adminToken)payload.gcToken=adminToken}
  // Freeze the request and ID; only an explicit pre-write rejection permits resend.
@@ -549,7 +552,7 @@ async function postCloud(payload){
   const remaining=deadline-Date.now();
   if(remaining<3000)throw Error('雲端仍忙碌，原內容已保留，尚未確認儲存');
   const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'},Math.min(remaining,['updateLeaveBalances','saveLeaveCoverAssignment'].includes(payload.action)?45000:25000));
-  if(d?.ok===true)return d;
+  if(d?.ok===true){p79LeaveReads.clear();p79LeaveLoadGeneration++;return d;}
   if(d?.ok===false&&d.retryable===true&&d.rejectedBeforeWrite===true&&attempt<5){
    const delay=Math.min(6000,Math.max(1000,Number(d.retryAfterMs)||1500)*(attempt+1));
    if(Date.now()+delay+3000>=deadline)throw Error(d.error||'雲端仍忙碌，原內容已保留');

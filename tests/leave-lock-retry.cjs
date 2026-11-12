@@ -19,7 +19,7 @@ function routerTest(available,action='addLeave'){
 (async()=>{
  routerTest(false);routerTest(true);routerTest(true,'scheduleHeartbeatEditLock');
  let calls=[],clock=0,responses=[],payload={action:'addLeave',leave:{id:'SAME-ID'}};
- const c={Date:{now:()=>clock},JSON,Number,Math,Error,Promise,GAS_URL:'test',leaveRequestToken:()=> 'token',adminToken:'',setStatus(){},setTimeout(f,ms){clock+=ms;f();},jsonFetch:async(_url,opt)=>{calls.push(opt.body);payload.leave.id='CHANGED-AFTER-START';const r=responses.shift();if(r instanceof Error)throw r;return r;}};
+ const c={p79LeaveReads:new Map(),p79LeaveLoadGeneration:0,Date:{now:()=>clock},JSON,Number,Math,Error,Promise,GAS_URL:'test',leaveRequestToken:()=> 'token',adminToken:'',setStatus(){},setTimeout(f,ms){clock+=ms;f();},jsonFetch:async(_url,opt)=>{calls.push(opt.body);payload.leave.id='CHANGED-AFTER-START';const r=responses.shift();if(r instanceof Error)throw r;return r;}};
  vm.createContext(c);vm.runInContext(fn(html,'postCloud'),c);
  const busy={ok:false,retryable:true,rejectedBeforeWrite:true,error:'busy'};
  responses=[busy,busy,{ok:true}];assert((await c.postCloud(payload)).ok);assert.equal(calls.length,3);assert(calls.every(x=>x===calls[0]));assert.equal(JSON.parse(calls[0]).leave.id,'SAME-ID');
