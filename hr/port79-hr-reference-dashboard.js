@@ -103,7 +103,7 @@ function mountDashboard(){
  '</div>',
  '<div class="p79r-grid-top">',
  panel('各單位人員統計（在職）','<table aria-label="各部門在職人數"><thead><tr><th>單位</th><th>正式</th><th>約聘</th><th>派遣</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="6">讀取人資主檔中…</td></tr></tbody></table>'),
- panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span>在職人數<br><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" style="text-align:center">出勤／請假／未出勤人數需要考勤即時資料，不能以在職人數推估。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
+ panel('今日出勤狀態（全公司）','<div class="p79r-donut"><div><span><span id="p79rDonutLabel">在職人數</span><b id="p79rActiveDonut">—</b></span></div></div><div class="p79r-note" id="p79rDonutNote" style="text-align:center">尚未完成當日考勤、排班、請假核對；目前僅顯示人資在職人數。<a class="p79r-link" href="../attendance/">查看考勤</a></div>'),
  panel('出勤率趨勢（近7日）','<div id="p79rWeekAttendance" class="p79r-empty"><div class="big">—</div><div>等待考勤、排班與請假核對</div><a class="p79r-link" href="../attendance/">查看正式考勤 ›</a></div>'),
  '</div>',
  '<div class="p79r-grid-mid">',
