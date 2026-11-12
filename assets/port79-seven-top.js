@@ -12,6 +12,38 @@
 (function(){
 'use strict';
 
+// 七大系統統一的組織層級。不能把舊「部門」無條件推定為事業部／事業處。
+const P79_ORG_LEVELS=Object.freeze([
+ ['headquarters','總公司'],['divisions','事業部'],['offices','事業處'],
+ ['sections','單位'],['jobTitles','職稱']
+]);
+function p79OrgValue(employee,kind){
+ const e=employee&&typeof employee==='object'?employee:{};
+ const nested=[e.orgHierarchy,e.organization,e.orgPath].filter(v=>v&&typeof v==='object'&&!Array.isArray(v));
+ const keys={
+  headquarters:['headquarters','headquarter','headOffice'],
+  divisions:['division','businessDivision','divisions'],
+  offices:['office','businessOffice','offices'],
+  sections:['section','orgUnit','sections','unit'],
+  jobTitles:['jobTitle','deptDetail']
+ }[kind]||[];
+ for(const source of [e,...nested]){
+  for(const key of keys){
+   const v=source[key];
+   if(typeof v==='string'&&v.trim())return v.trim();
+  }
+ }
+ // 舊欄位只有名稱明確寫出「事業部／事業處／總公司」時才能兼容顯示。
+ const legacy=String(e.dept||'').trim();
+ if(kind==='divisions'&&/事業部$/.test(legacy))return legacy;
+ if(kind==='offices'&&/事業處$/.test(legacy))return legacy;
+ if(kind==='headquarters'&&/總公司$/.test(legacy))return legacy;
+ return '';
+}
+window.Port79OrgHierarchy=Object.freeze({
+ levels:P79_ORG_LEVELS,getValue:p79OrgValue,
+ path(employee){return P79_ORG_LEVELS.map(([key,label])=>({key,label,value:p79OrgValue(employee,key)}))}
+});
 const GLOBAL_THEME_KEY='port79_global_theme_v1';
 // 所有子系統共用安全登出：返回首頁時強制回到帳號／密碼登入畫面。
 const PORT79_LOGOUT_SESSION_KEYS=[
@@ -100,7 +132,7 @@ const META={
  leave:['📝','請假管理','請假申請・審核・特休資訊'],
  schedule:['📅','排班管理','人員班表・組別・今日出勤'],
  efficiency:['🚢','船舶管理','船舶作業・效率統計・月報比對'],
- hr:['👥','人資管理','員工主檔・部門職稱・權限設定'],
+ hr:['👥','人資管理','總公司・事業部・事業處・單位・職稱'],
  history:['🗄️','歷史資料管理','考勤・排班・船舶歷史查詢']
 };
 const NAV=[
@@ -227,7 +259,7 @@ const MENU={
  leave:[['leave-edit','✎ 編輯／審核模式'],['balance-import','📥 匯入請假可休天數'],['balance-export','📤 匯出請假可休天數']],
  schedule:[['schedule-continue','📅 延續到下個月'],['schedule-lock','🔒 排班計畫鎖定'],['schedule-takeover','🚨 踢除管理員並接管編輯權'],['schedule-mode','📅 排班模式'],['import','📥 匯入排班'],['export','📤 匯出排班'],['reset-cloud','↻ 重設雲端排班']],
  efficiency:[['import','📥 匯入船舶資料'],['monthly-export','📥 匯出船舶月作業量表'],['compare','🧭 航線資料'],['year','📆 年份顯示']],
- hr:[['idle-settings','🔒 閒置自動登出'],['import','📥 匯入人資名冊'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 部門／職稱／單位'],['export','📥 匯出人資名冊'],['year','📆 年份顯示']],
+ hr:[['idle-settings','🔒 閒置自動登出'],['import','📥 匯入人資名冊'],['add','＋ 新增人員'],['overtime-options','⚙️ 加班選項管理'],['permissions','🔐 權限總覽'],['logs','🧾 登入紀錄'],['org','⚙️ 總公司／事業部／事業處／單位／職稱'],['export','📥 匯出人資名冊'],['year','📆 年份顯示']],
  history:[]
 };
 function scheduleLockMenuState(){
@@ -273,7 +305,7 @@ const WORKFLOWS={
  schedule:{title:'排班系統',steps:[['選擇月份','選月份、單位與組別，確認人員名單。離職人員不列操作名單，歷史資料保留。'],['調任支援','在人員名冊修改單位或組別。系統先取得編輯權，保留既有每日班別；他人持鎖時不得修改。'],['修改班別','選擇早／中／晚／例／休／國／颱等班別；颱為颱風假，不扣例休國。連結請假或代班時先處理連動。'],['儲存與核對','確認雲端儲存成功。人工班別保留；無卡待核表示需核對考勤，不能視為已出勤。']]},
  leave:{title:'請假系統',steps:[['填寫申請','選擇人員、假別與起迄時間，核對天數。'],['送出申請','確認內容後送出，等待核准。'],['審核與安排','管理人員核對申請並審核；需要代班時逐日安排人員及時段。'],['變更或取消','從原申請處理修改／取消，確認排班及代班連動結果。']]},
  efficiency:{title:'船舶效率系統',steps:[['選擇資料','依月份、船舶或人員查詢作業。'],['維護作業','有管理權限時填寫船名、作業時間與裝卸櫃數。'],['儲存核對','確認儲存成功，再核對船名、人員與櫃數合計。'],['匯出報表','從功能選單選擇匯出或每月作業量表，確認月份及範圍。']]},
- hr:{title:'人資系統',steps:[['查詢人員','以姓名、工號、部門與在職狀態查詢。'],['維護主檔','有權限時新增／修改到職、報到、部門與職稱，確認後儲存。'],['離職與復職','使用辦理離職／恢復在職，核對日期；歷史紀錄會保留。'],['設定權限','依工作需要設定各系統查看或管理權限，儲存後確認生效。']]},
+ hr:{title:'人資系統',steps:[['查詢人員','以姓名、工號、組織歸屬及在職狀態查詢；舊部門欄位保留供核對。'],['維護主檔','組織層級依總公司、事業部、事業處、單位及職稱；既有舊欄位需保留對照。'],['離職與復職','使用辦理離職／恢復在職，核對日期；歷史紀錄會保留。'],['設定權限','依工作需要設定各系統查看或管理權限，儲存後確認生效。']]},
  history:{title:'歷史資料管理',steps:[['選擇期間','選擇月份及要查看的資料類型。'],['讀取歷史','按讀取並等待完成；讀取失敗時依提示重新讀取。'],['立即備份','需要保存目前月份時使用立即備份，等待各資料類型的完成結果。'],['查看與匯出','核對班表、考勤或船舶內容，再選擇匯出；備份不代表刪除現有資料。']]}
 };
 function openWorkflow(sys){
