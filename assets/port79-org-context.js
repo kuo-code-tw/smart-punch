@@ -39,41 +39,32 @@ function index(people){const ids=new Map(),numbers=new Map();for(const e of peop
 function resolve(row,lookup){row=row||{};const id=key(row.empId||row.employeeId);if(id)return lookup.ids.get(id)||null;const own=lookup.ids.get(key(row.id));if(own)return own;return lookup.numbers.get(att(row.attNo||row.attendanceNo))||null;}
 function matches(row,selection,lookup){if(!levels.some(([k])=>selection?.[k]))return true;const person=resolve(row,lookup);if(!person)return false;return levels.every(([k])=>!selection[k]||value(person,k)===selection[k]);}
 function organization(e){return Object.fromEntries(levels.map(([k])=>[k,value(e,k)]));}
+// The hierarchy helpers remain shared by HR, scheduling, leave, efficiency and
+// history, but the former full-width organization filter is no longer mounted.
+// Retain a live authorized-roster lookup for dependent code such as history views.
 function configure(config){
- const win=window,doc=document,selection={},getPeople=()=>{const rows=config.people?.();return Array.isArray(rows)?rows:[]};let lookup=index([]),signature='',viewer='',bar;
- const esc=v=>norm(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function session(){try{const u=JSON.parse(sessionStorage.getItem('port79_user_session')||'null'),a=JSON.parse(sessionStorage.getItem('admin_session')||'null');if(u?.punchOnly||sessionStorage.getItem('port79_entry_mode')==='punch')return u;if(['admin','superadmin'].includes(norm(u?.adminRole||u?.role).toLowerCase()))return u;return sessionStorage.getItem('aqc_admin_logged_in')==='1'&&['admin','superadmin'].includes(norm(a?.adminRole||a?.role).toLowerCase())?a:u}catch(e){return null}}
- function permitted(){const s=session();return s&&!s.punchOnly&&['admin','superadmin'].includes(norm(s.adminRole||s.role).toLowerCase())}
- function render(){config.render?.();win.dispatchEvent(new CustomEvent('p79:org-filter',{detail:{system:config.system,selection:{...selection}}}));}
- function sync(){
-  const s=session(),who=key(s?.empId)+'|'+String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'');
-  if(viewer!==who){viewer=who;for(const [k]of levels)selection[k]='';signature=''}
-  if(!bar)return;
-  bar.hidden=!permitted();if(bar.hidden)return;
-  const people=getPeople();lookup=index(people);
-  const next=JSON.stringify(people.map(e=>[key(e.empId||e.id),...levels.map(([k])=>value(e,k))]));if(next===signature)return;signature=next;
-  levels.forEach(([kind,label],i)=>{
-   const select=bar.querySelector('[data-org-level="'+kind+'"]');
-   const pool=people.filter(e=>levels.slice(0,i).every(([parent])=>!selection[parent]||value(e,parent)===selection[parent]));
-   const options=[...new Set(pool.map(e=>value(e,kind)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
-   if(selection[kind]&&!options.includes(selection[kind]))selection[kind]='';
-   select.innerHTML='<option value="">全部'+label+'</option>'+options.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');select.value=selection[kind]||'';
-  });
-  const incomplete=people.filter(e=>levels.some(([k])=>!value(e,k))).length;
-  bar.querySelector('[data-org-summary]').textContent=(config.historical?'依歷史快照歸屬':'依人資主檔歸屬')+'｜'+people.length+' 位授權人員｜符合篩選 '+people.filter(e=>matches(e,selection,lookup)).length+' 位'+(incomplete?'｜'+incomplete+' 位組織層級未完整設定':'');
- }
- function mount(){
-  if(bar)return;const host=config.container?.()||doc.querySelector('main');if(!host)return;
-  bar=doc.createElement('section');bar.id='p79OrganizationScope';bar.className='p79-org-scope';bar.setAttribute('aria-label','四層組織篩選');
-  bar.innerHTML='<div class="p79-org-controls">'+levels.map(([k,label])=>'<label>'+label+'<select data-org-level="'+k+'" aria-label="組織篩選：'+label+'"><option value="">全部'+label+'</option></select></label>').join('')+'<button type="button" data-org-clear>清除篩選</button></div><div data-org-summary class="p79-org-note"></div>';
-  host.prepend(bar);
-  bar.querySelectorAll('[data-org-level]').forEach(el=>el.addEventListener('change',()=>{const at=levels.findIndex(([k])=>k===el.dataset.orgLevel);selection[el.dataset.orgLevel]=el.value;levels.slice(at+1).forEach(([k])=>selection[k]='');signature='';sync();render()}));
-  bar.querySelector('[data-org-clear]').addEventListener('click',()=>{for(const[k]of levels)selection[k]='';signature='';sync();render()});sync();
- }
- const context={matches:row=>matches(row,selection,lookup),person:row=>resolve(row,lookup),value:(row,k)=>value(resolve(row,lookup)||row,k),filter:rows=>(rows||[]).filter(row=>matches(row,selection,lookup)),sync,selection:()=>({...selection}),organization:row=>organization(resolve(row,lookup)||row)};
+ const win=window,doc=document;
+ const selection=Object.fromEntries(levels.map(([kind])=>[kind,'']));
+ const getPeople=()=>{
+  try{const rows=config.people?.();return Array.isArray(rows)?rows:[]}
+  catch(e){return []}
+ };
+ let lookup=index([]);
+ function sync(){lookup=index(getPeople())}
+ const context={
+  matches:row=>matches(row,selection,lookup),
+  person:row=>resolve(row,lookup),
+  value:(row,kind)=>value(resolve(row,lookup)||row,kind),
+  filter:rows=>(rows||[]).filter(row=>matches(row,selection,lookup)),
+  sync,
+  selection:()=>({...selection}),
+  organization:row=>organization(resolve(row,lookup)||row)
+ };
  win.p79OrgScope=context;
- if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
- const timer=setInterval(()=>{if(doc.visibilityState!=='hidden')sync()},1500);win.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
+ sync();
+ // Follow roster refreshes without creating controls or mutating source records.
+ const timer=setInterval(()=>{if(doc.visibilityState!=='hidden')sync()},1500);
+ win.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
  return context;
 }
 return{levels,fields,value,index,resolve,matches,organization,configure};
