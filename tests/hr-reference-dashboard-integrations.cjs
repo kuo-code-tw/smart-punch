@@ -114,7 +114,10 @@ test('shared navigation preserves the mounted horizontal HR header',()=>{
  assert(!css.includes('--p79-w-width:0px'));
  assert(!css.includes('.p79-workspace-sidebar{display:none!important}'));
  assert(css.includes('#p79WorkspaceStatus{display:block!important}'));
- assert(css.includes('top:var(--p79-hr-toolbar-height)!important'));
+ assert(css.includes('#p79HrShellV103{display:block!important;position:static!important;top:auto!important'));
+ assert(dashboard.includes("contentHost.prepend(shell)"),'HR-only controls must be inside main content');
+ assert(!dashboard.includes('碼頭營運統計</span>'),'duplicate full system branding must be removed');
+ assert(!dashboard.includes('data-route="attendance"'),'global links must not be duplicated in the HR toolbar');
 });
 test('valid local and ROC dates only',()=>{
  assert.equal(M.date('115/11/11'),'2026-11-11');
@@ -168,7 +171,7 @@ test('partial official data must not produce false zero or attendance rate',()=>
 test('HR dashboard can toggle existing employee table',()=>{
  const els={};const e=id=>els[id]||(els[id]={value:'',textContent:'',innerHTML:'',dataset:{},
    remove(){},removeAttribute(){},style:{setProperty(){}},addEventListener(){},querySelectorAll(){return []},classList:{add(){},toggle(){}}});
- const main=e('main');main.querySelector=()=>null;main.insertBefore=x=>{els[x.id]=x};
+ const main=e('main');main.querySelector=()=>null;main.prepend=x=>{els[x.id]=x};main.insertBefore=x=>{els[x.id]=x};
  main.appendChild=x=>{els[x.id]=x};
  const doc={readyState:'complete',getElementById:id=>els[id]||null,
   createElement:()=>({id:'',innerHTML:'',querySelectorAll(){return []}}),
