@@ -148,7 +148,7 @@ function p79RenderOvertimeDonut(rows,summary,options={}){
  const unit=options.unit||'小時',metric=options.metric||'換算時數',
        centerFirst=options.centerFirst||'本月換算',centerSecond=options.centerSecond||'加班工時',
        chartTitle=options.chartTitle||'本月員工職稱加班時數統計';
- const hours=v=>fmt(v,Number.isInteger(v)?0:2),length=2*Math.PI*70;
+ const hours=v=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:2}):'—',length=2*Math.PI*70;
  let offset=0;
  const pieces=groups.map(r=>{
   const size=length*r.hours/total,dash=Math.max(0,size-Math.min(1.1,size/6)),start=-offset;
