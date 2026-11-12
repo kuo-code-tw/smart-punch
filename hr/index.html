@@ -320,7 +320,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="orgbox"><h3>② 🏢 事業部</h3><div style="display:flex;gap:6px"><input id="newDivision" placeholder="新增事業部"><button class="btn primary" onclick="addOrgItem('divisions','newDivision')">新增</button></div><div id="divisionList" class="orglist"></div></div>
     <div class="orgbox"><h3>③ 🏬 事業處</h3><div style="display:flex;gap:6px"><input id="newOffice" placeholder="新增事業處"><button class="btn primary" onclick="addOrgItem('offices','newOffice')">新增</button></div><div id="officeList" class="orglist"></div></div>
     <div class="orgbox"><h3>④ 🧭 單位</h3><div style="display:flex;gap:6px"><input id="newSection" placeholder="新增單位（課／組／室／中心）"><button class="btn primary" onclick="addOrgItem('sections','newSection')">新增</button></div><div id="sectionList" class="orglist"></div></div>
-    <div class="orgbox"><h3>🎖️ 職稱（非組織層級）</h3><div class="muted" style="font-size:11px;margin-bottom:7px">按「隱藏」可從統計及排班選項移除職稱顯示，不會刪除人員或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
+    <div class="orgbox"><h3>🎖️ 職稱（非組織層級）</h3><div class="muted" style="font-size:11px;margin-bottom:7px">勾選「隱藏」會自動儲存，取消勾選就恢復顯示；不刪除員工或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
   </div>
   <details class="legacy-org-settings">
     <summary>舊系統相容選項（原部門／單位）</summary>
@@ -331,7 +331,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     </div>
   </details>
   <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
-  <div class="footer"><div class="muted">隱藏不會刪除人員、排班與歷史資料；職稱可隨時重新顯示，儲存後須雲端讀回一致。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
+  <div class="footer"><div class="muted">勾選職稱會自動儲存；其他組織資料仍使用「儲存組織設定」。隱藏不會刪除人員、排班與歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
 </div></dialog>
 
 <dialog id="masterPickerDialog"><div class="modal">
@@ -911,7 +911,7 @@ function renderOrgSettings(){
     const el=$(id);if(!el)return;
     el.innerHTML=(orgDraft[kind]||[]).map(v=>{
       const hidden=kind==='jobTitles'&&p79IsJobTitleHidden(v,orgDraft.hiddenJobTitles);
-      const toggle=kind==='jobTitles'?`<button type="button" class="p79-org-visibility" style="border:0;background:transparent;color:${hidden?'#0369a1':'#64748b'};font-weight:900;cursor:pointer" onclick="toggleOrgJobTitleVisibility(${JSON.stringify(v).replace(/"/g,'&quot;')})">${hidden?'顯示':'隱藏'}</button>`:'';
+      const toggle=kind==='jobTitles'?'<label class="p79-org-visibility" style="display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-weight:800;color:#475569"><input type="checkbox" aria-label="隱藏職稱 '+esc(v)+'" onchange="setOrgJobTitleHidden('+JSON.stringify(v).replace(/"/g,'&quot;')+',this.checked)" '+(hidden?'checked':'')+' '+(!canHr('org.manage')?'disabled':'')+'><span>隱藏</span></label>':'';
       return `<div class="orgitem" ${hidden?'style="opacity:.65"':''}><span>${esc(v)}${hidden?'（已隱藏）':''}</span><span style="display:flex;gap:8px;align-items:center">${toggle}<button type="button" class="small-danger" onclick="removeOrgItem('${kind}',${JSON.stringify(v).replace(/"/g,'&quot;')})">移除</button></span></div>`;
     }).join('')||'<div class="muted">尚未建立</div>';
   };
@@ -924,22 +924,50 @@ function addOrgItem(kind,inputId){
   orgDraft[kind]=uniqSorted([...(orgDraft[kind]||[]),v]);
   input.value='';renderOrgSettings();
 }
-function toggleOrgJobTitleVisibility(value){
-  if(!canHr('org.manage'))return;
+let p79OrgTitleAutoSaveTimer=null;
+function p79QueueOrgTitleAutoSave(){
+  if(p79OrgTitleAutoSaveTimer!==null)clearTimeout(p79OrgTitleAutoSaveTimer);
+  p79OrgTitleAutoSaveTimer=setTimeout(()=>{
+    p79OrgTitleAutoSaveTimer=null;
+    void p79PersistOrgTitleCheckboxes();
+  },500);
+}
+async function p79PersistOrgTitleCheckboxes(){
+  if(!canHr('org.manage')||hrAccess!=='manage')return;
+  if($('saveOrgBtn')?.disabled){
+    p79OrgTitleAutoSaveTimer=setTimeout(()=>{
+      p79OrgTitleAutoSaveTimer=null;
+      void p79PersistOrgTitleCheckboxes();
+    },500);
+    return;
+  }
+  const snapshot=JSON.stringify(normalizeOrgSettings(orgDraft));
+  const saved=await saveOrgSettings(true);
+  if(snapshot!==JSON.stringify(normalizeOrgSettings(orgDraft))){
+    p79OrgSaveStatus('正在同步最新勾選的職稱…');
+    p79QueueOrgTitleAutoSave();
+  }else if(saved){
+    p79OrgSaveStatus('✅ 職稱隱藏設定已自動儲存；排班重新載入後同步');
+  }
+}
+function setOrgJobTitleHidden(value,checked){
+  if(!canHr('org.manage')||hrAccess!=='manage')return;
   const key=p79JobTitleKey(value);
   if(!key||(orgDraft.jobTitles||[]).every(v=>p79JobTitleKey(v)!==key))return;
   const hidden=orgDraft.hiddenJobTitles||[];
-  orgDraft.hiddenJobTitles=p79IsJobTitleHidden(value,hidden)
-    ?hidden.filter(v=>p79JobTitleKey(v)!==key)
-    :uniqSorted([...hidden,value]);
+  orgDraft.hiddenJobTitles=checked
+    ?uniqSorted([...hidden.filter(v=>p79JobTitleKey(v)!==key),value])
+    :hidden.filter(v=>p79JobTitleKey(v)!==key);
   renderOrgSettings();
+  p79OrgSaveStatus('正在自動儲存職稱隱藏設定…');
+  p79QueueOrgTitleAutoSave();
 }
 function removeOrgItem(kind,value){
   orgDraft[kind]=(orgDraft[kind]||[]).filter(v=>v!==value);
   if(kind==='jobTitles')orgDraft.hiddenJobTitles=(orgDraft.hiddenJobTitles||[]).filter(v=>p79JobTitleKey(v)!==p79JobTitleKey(value));
   renderOrgSettings();
 }
-async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修改組織設定權限');
+async function saveOrgSettings(keepOpen=false){if(!canHr('org.manage'))return alert('沒有修改組織設定權限');
   if(hrAccess!=='manage')return;
   if($('saveOrgBtn').disabled)return;
   const originalLabel=$('saveOrgBtn').textContent;
@@ -976,10 +1004,11 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
     if(JSON.stringify(confirmed)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
     p79RememberOrgOptions(confirmed);
     orgSettings=draft;
-    populateFilters();orgDialog.close();
+    populateFilters();if(!keepOpen)orgDialog.close();
     window.p79HrDashRender?.(); // A new title appears immediately, even if headcount is zero.
     $('status').textContent='✅ 總公司／事業部／事業處／單位／職稱選項已儲存並完成雲端讀回；原部門與單位仍保持相容';
-  }catch(e){p79OrgSaveStatus('尚未完成組織設定儲存：'+(e.message||e)+'。你的修改仍保留，請保留視窗並稍後再試。',true);}
+    return true;
+  }catch(e){p79OrgSaveStatus('尚未完成組織設定儲存：'+(e.message||e)+'。你的修改仍保留，請保留視窗並稍後再試。',true);return false;}
   finally{$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
 }
 function p79OrgSaveStatus(text,error=false){
