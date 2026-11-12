@@ -37,7 +37,7 @@ test('existing human-resources editing, status and permission functions stay int
   assert(html.includes(id),id);
  }
 });
-test('department job titles automatically expand from official settings and active HR roster',()=>{
+test('unit job titles expand while legacy departments are not treated as units',()=>{
  assert(dashboard.includes('id="p79rDeptHead"'));
  assert(dashboard.includes('p79DashConfiguredTitles().forEach(register)'));
  assert(!dashboard.includes('function workerKind('));
@@ -54,16 +54,19 @@ test('department job titles automatically expand from official settings and acti
  vm.createContext(ctx);
  vm.runInContext(dashboard.slice(from,to),ctx);
  const active=[
-   {dept:'第二事業處',jobTitle:'指揮手'},
-   {dept:'第二事業處',jobTitle:'aqc'},
-   {dept:'第二事業處',deptDetail:'AR/MG'},
-   {dept:'第二事業處',jobTitle:'F/L'},
-   {dept:'第二事業處'},
-   {dept:'第二事業部',jobTitle:'AQC'}
+   {dept:'第二事業處',unit:'碼頭作業課',jobTitle:'指揮手'},
+   {dept:'第二事業處',unit:'碼頭作業課',jobTitle:'aqc'},
+   {dept:'第二事業處',unit:'碼頭作業課',deptDetail:'AR/MG'},
+   {dept:'第二事業處',unit:'碼頭作業課',jobTitle:'F/L'},
+   {dept:'第二事業處',unit:'碼頭作業課'},
+   {dept:'第二事業部',unit:'裝卸中心',jobTitle:'AQC'}
  ];
  ctx.updateDepartments(active);
  for(const label of ['指揮手','AQC','ARMG','F/L','領班','未填職稱'])assert(head.innerHTML.includes('<th>'+label+'</th>'),label);
- assert(body.innerHTML.includes('<td>第二事業處</td>'));
+ assert(body.innerHTML.includes('<td>碼頭作業課</td>'));
+ assert(body.innerHTML.includes('<td>裝卸中心</td>'));
+ assert(!body.innerHTML.includes('<td>第二事業處</td>'));
+ assert(!body.innerHTML.includes('<td>第二事業部</td>'));
  assert(body.innerHTML.includes('<td><b>5</b></td><td>83.3%</td>'));
  assert(body.innerHTML.includes('<td><b>1</b></td><td>16.7%</td>'));
  assert(body.innerHTML.includes('<td>6</td><td>100.0%</td>'));
@@ -74,17 +77,17 @@ test('department job titles automatically expand from official settings and acti
  assert(body.innerHTML.includes('<td>合計</td>'));
  assert(body.innerHTML.includes('<td>0</td>'),'new configured title starts at zero');
  // Once an employee gets the title, counts change without touching application code.
- ctx.updateDepartments([...active,{dept:'第二事業部',jobTitle:'新職稱'}]);
- assert(body.innerHTML.includes('<td><b>7</b></td><td>100.0%</td>'));
+ ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
+ assert(body.innerHTML.includes('<td>7</td><td>100.0%</td>'),'grand total stays accurate across two units');
  // Removing a title from settings should not hide it while active employees still have it.
  ctx.orgSettings.jobTitles=ctx.orgSettings.jobTitles.filter(x=>x!=='新職稱');
- ctx.updateDepartments([...active,{dept:'第二事業部',jobTitle:'新職稱'}]);
+ ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
  assert(head.innerHTML.includes('<th>新職稱</th>'));
  // Inactive titles that are neither configured nor held by staff disappear.
  ctx.updateDepartments(active);
  assert(!head.innerHTML.includes('<th>新職稱</th>'));
  // Two legacy spellings for ARMG must merge into one column.
- ctx.updateDepartments([...active,{dept:'第二事業處',jobTitle:'ARMG'}]);
+ ctx.updateDepartments([...active,{dept:'第二事業處',unit:'碼頭作業課',jobTitle:'ARMG'}]);
  assert.equal((head.innerHTML.match(/<th>ARMG<\/th>/g)||[]).length,1);
 });
 test('shared navigation preserves the mounted horizontal HR header',()=>{
