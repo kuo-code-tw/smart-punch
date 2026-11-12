@@ -60,6 +60,7 @@ jobs:
           node tests/dashboard-working-report-audit.cjs
           node tests/vessel-dashboard-month-scope-20261102.cjs
           node tests/vessel-completion-export-integrity.cjs
+          node tests/personnel-current-hr-verification.cjs
       - name: Verify no new production regressions against previous main
         shell: bash
         run: |
