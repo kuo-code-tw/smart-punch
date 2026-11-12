@@ -401,10 +401,11 @@ function setStatus(msg,type='info'){
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('leave_theme',t);$('themeBtn').textContent=t==='dark'?'☀️ 淺色':'🌙 暗色'};setTheme(localStorage.getItem('leave_theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));$('themeBtn').onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
 
 async function jsonFetch(url,opt={},timeout=25000){
+ const started=Date.now();let succeeded=false;
  const c=typeof AbortController!=='undefined'?new AbortController():null;let timed=false;const t=c?setTimeout(()=>{timed=true;try{c.abort()}catch{}},timeout):null;
- try{const r=await fetch(url,{...opt,signal:c?.signal});const raw=await r.text();if(!r.ok)throw new Error('HTTP '+r.status);if(/^<!doctype|<html/i.test(raw.trim()))throw new Error('GAS 回傳網頁而不是 JSON');return JSON.parse(raw)}
+ try{const r=await fetch(url,{...opt,signal:c?.signal});const raw=await r.text();if(!r.ok)throw new Error('HTTP '+r.status);if(/^<!doctype|<html/i.test(raw.trim()))throw new Error('GAS 回傳網頁而不是 JSON');const data=JSON.parse(raw);succeeded=data?.ok!==false;return data}
  catch(e){if(timed||String(e?.name)==='AbortError'||/abort/i.test(String(e?.message||e)))throw new Error('雲端回應逾時，請再試一次');throw e}
- finally{if(t)clearTimeout(t)}
+ finally{if(t)clearTimeout(t);try{const action=new URL(url,location.href).searchParams.get('action')||'write';const timings=window.p79LeaveLoadTimings||(window.p79LeaveLoadTimings=[]);timings.push({action,elapsedMs:Date.now()-started,ok:succeeded,timedOut:timed});if(timings.length>30)timings.shift();}catch{}}
 }
 function p79LeaveEmployeeEntry(){
  return new URLSearchParams(location.search).get('mode')==='employee';
@@ -428,6 +429,24 @@ function leaveRequestToken(){
  return String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
 }
 let p79LeaveCloudDataReady=false;
+let p79LeaveLoadGeneration=0;
+const p79LeaveReads=new Map();
+// Share only active, equivalent reads. A post-write verification always gets a fresh request.
+function p79StartLeaveRead(token,requireFresh=false){
+ if(requireFresh)p79LeaveReads.clear();
+ const key=GAS_URL+'|'+String(token)+'|'+requireFresh;
+ if(!requireFresh&&p79LeaveReads.has(key))return p79LeaveReads.get(key);
+ const read=jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},requireFresh?22000:18000)
+  .then(data=>({data}),error=>({error}));
+ if(!requireFresh){p79LeaveReads.set(key,read);void read.then(()=>{if(p79LeaveReads.get(key)===read)p79LeaveReads.delete(key);});}
+ return read;
+}
+function p79PrepareLeaveEntryRead(){
+ // Both endpoints validate the token server-side. Never paint the speculative response before SSO.
+ if(p79LeaveEmployeeEntry())return null;
+ const token=storedToken();
+ return token?{token,result:p79StartLeaveRead(token)}:null;
+}
 async function p79HydrateLeaveComputerCache(canApply=()=>true){
  try{
   if(!adminSession||p79LeaveCloudDataReady)return false;
@@ -458,72 +477,73 @@ function p79ShowPendingLeavePrompt(){
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  document.body.appendChild(dialog);dialog.showModal();
 }
-async function loadCloud(show=false,requireFresh=false,identityReady=null){
- let last,renewed=false;
+async function loadCloud(show=false,requireFresh=false,identityReady=null,entryRead=null){
  if(identityReady)await identityReady;
- let cloudFinished=false;
- if(!show&&!requireFresh&&adminSession&&!employees.length){
-  void p79HydrateLeaveComputerCache(()=>!cloudFinished);
- }
- for(let i=0;i<3;i++){
-  try{
-   if(show||i>0)setStatus(i===0?'☁️ 正在讀取請假雲端資料…':`☁️ 雲端較慢，正在重試 ${i+1}/3…`,'info');
-   let userToken=leaveRequestToken();
-   if(!userToken&&!adminSession&&!renewed){renewed=true;if(await p79RenewEmployeeLeaveSession())userToken=leaveRequestToken();}
-   if(!userToken&&!adminSession){p79EmployeeLeaveReauth();return false;}
-   let d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
-   if(!d?.ok&&!adminSession&&p79LeaveAuthError(d?.error)&&!renewed){
-    renewed=true;
-    if(await p79RenewEmployeeLeaveSession())d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+ // An unsuccessful manager verification must not fall through to employee mode with its token.
+ if(entryRead&&(!adminSession||entryRead.token!==leaveRequestToken()))return false;
+ const generation=++p79LeaveLoadGeneration;
+ const session=adminSession;
+ let token=leaveRequestToken(),cloudFinished=false,last;
+ const endpoint=GAS_URL,storedIdentity=session?storedToken():'';
+ const canApply=()=>generation===p79LeaveLoadGeneration&&adminSession===session&&leaveRequestToken()===token&&GAS_URL===endpoint&&(!session||storedToken()===storedIdentity);
+ // Disk hydration runs alongside the cloud read; fresh cloud always wins.
+ const preview=!show&&!requireFresh&&adminSession&&!employees.length
+  ?p79HydrateLeaveComputerCache(()=>!cloudFinished&&canApply()):Promise.resolve(false);
+ try{
+  if(show)setStatus('☁️ 正在讀取請假雲端資料…','info');
+  let renewed=false;
+  if(!token&&!adminSession){renewed=true;if(await p79RenewEmployeeLeaveSession())token=leaveRequestToken();}
+  if(!token&&!adminSession){p79EmployeeLeaveReauth();return false;}
+  let result=!requireFresh&&entryRead?.token===token?await entryRead.result:await p79StartLeaveRead(token,requireFresh);
+  if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
+  if(result.error)throw result.error;
+  let d=result.data;
+  if(!d?.ok&&!adminSession&&p79LeaveAuthError(d?.error)&&!renewed){
+   if(await p79RenewEmployeeLeaveSession()){
+    token=leaveRequestToken();result=await p79StartLeaveRead(token,requireFresh);
+    if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
+    if(result.error)throw result.error;
+    d=result.data;
    }
-   if(d?.retryable){last=new Error(d.error||'雲端忙碌');if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));continue}
-   if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
-   cloudFinished=true;p79LeaveCloudDataReady=true;
-   employees=Array.isArray(d.employees)?d.employees:[];
-   leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
-   window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
-   window.p79LeaveCoverCancellations=Array.isArray(d.leaveCoverCancellations)?d.leaveCoverCancellations:[];
-   if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
-   populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);
-   const displayedMonth=$('filterMonth')?.value||'';
-   const displayedLabel=displayedMonth?displayedMonth.slice(0,4)+'年'+Number(displayedMonth.slice(5,7))+'月':'全部月份';
-   const displayedLeaveCount=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,displayedMonth)).length;
-   setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜'+displayedLabel+'請假 '+displayedLeaveCount+' 筆'):'☁️ 員工請假申請模式已就緒','');return true;
-  }catch(e){
-   last=e;
-   if(i<2)await new Promise(r=>setTimeout(r,700*(i+1)));
   }
- }
+  if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
+  cloudFinished=true;p79LeaveCloudDataReady=true;
+  employees=Array.isArray(d.employees)?d.employees:[];
+  leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
+  window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
+  window.p79LeaveCoverCancellations=Array.isArray(d.leaveCoverCancellations)?d.leaveCoverCancellations:[];
+  if(!adminSession&&employees.length===1){currentEmployee=employees[0];$('employeeLeaveReauth').hidden=true;}
+  populateDepartments();renderAll();p79ShowPendingLeavePrompt();if(adminSession)void p79ReconcileLeaveHandoff().catch(console.warn);
+  const displayedMonth=$('filterMonth')?.value||'';
+  const displayedLabel=displayedMonth?displayedMonth.slice(0,4)+'年'+Number(displayedMonth.slice(5,7))+'月':'全部月份';
+  const displayedLeaveCount=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,displayedMonth)).length;
+  setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜'+displayedLabel+'請假 '+displayedLeaveCount+' 筆'):'☁️ 員工請假申請模式已就緒','');return true;
+ }catch(e){last=e;}
+ // A failed update keeps the display; cached rows never count as confirmed readback.
+ if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
+ if(requireFresh){cloudFinished=true;throw last||new Error('無法讀回最新雲端資料，尚未確認匯入成功');}
+ await preview;
+ if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
  cloudFinished=true;
- if(requireFresh)throw last||new Error('無法讀回最新雲端資料，尚未確認匯入成功');
- // getLeaveData 太慢時，先用最近一次本機快取，避免整頁變空白。
- try{
-   const snap=await window.Port79DataCache?.getDisplaySnapshot?.('leave');
-   const d=snap?.data;
-   if(d?.ok && Array.isArray(d.employees)){
-     employees=d.employees;
-     if(adminSession&&Array.isArray(d.leaveRecords))leaveRecords=d.leaveRecords;
-     populateDepartments();renderAll();
-     setStatus('☁️ 雲端較慢｜已先顯示最近一次請假資料','warn');
-     return true;
+ if(adminSession&&employees.length){
+  setStatus('☁️ 雲端同步未完成｜保留目前顯示資料，請稍後重新整理','warn');return false;
+ }
+ // No full-data preview is available. Try the lightweight roster once, without a retry chain.
+ if(adminSession){
+  try{
+   const hr=await jsonFetch(GAS_URL+'?action=hrGetEmployees&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},8000);
+   if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
+   if(hr?.ok&&Array.isArray(hr.employees)){
+    employees=hr.employees;populateDepartments();renderAll();
+    setStatus('☁️ 已載入人員與年假基準資料｜請假紀錄尚未同步，餘額待核對','warn');return false;
    }
- }catch(e){console.warn('請假快取備援失敗',e)}
-
- // 再用較輕的人資端點先把員工與年假/可休天數載入；請假紀錄稍後可按重新整理補抓。
- try{
-   const userToken=leaveRequestToken();
-   const hr=await jsonFetch(GAS_URL+'?action=hrGetEmployees&token='+encodeURIComponent(userToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
-   if(hr?.ok && Array.isArray(hr.employees)){
-     employees=hr.employees;
-     populateDepartments();renderAll();
-     setStatus('☁️ 請假紀錄雲端較慢｜已先載入人員與年假資料，可按「重新整理」再抓請假紀錄','warn');
-     return true;
-   }
- }catch(e){console.warn('人資備援讀取失敗',e)}
-
- setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
+  }catch(e){console.warn('人資備援讀取失敗',e);}
+ }
+ if(canApply())setStatus('雲端連線失敗：'+(last?.message||last),'error');return false;
 }
 async function postCloud(payload){
+ // A write must never reuse or apply a read started before that write.
+ p79LeaveReads.clear();p79LeaveLoadGeneration++;
  const userToken=leaveRequestToken();
  if(userToken){payload.token=userToken;if(adminToken)payload.gcToken=adminToken}
  // Freeze the request and ID; only an explicit pre-write rejection permits resend.
@@ -532,7 +552,7 @@ async function postCloud(payload){
   const remaining=deadline-Date.now();
   if(remaining<3000)throw Error('雲端仍忙碌，原內容已保留，尚未確認儲存');
   const d=await jsonFetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'},Math.min(remaining,['updateLeaveBalances','saveLeaveCoverAssignment'].includes(payload.action)?45000:25000));
-  if(d?.ok===true)return d;
+  if(d?.ok===true){p79LeaveReads.clear();p79LeaveLoadGeneration++;return d;}
   if(d?.ok===false&&d.retryable===true&&d.rejectedBeforeWrite===true&&attempt<5){
    const delay=Math.min(6000,Math.max(1000,Number(d.retryAfterMs)||1500)*(attempt+1));
    if(Date.now()+delay+3000>=deadline)throw Error(d.error||'雲端仍忙碌，原內容已保留');
@@ -554,11 +574,13 @@ async function restoreAdmin(){
  const verifyingToken=adminToken;
  let last;
  for(let i=0;i<2;i++){
+  let retryable=true;
   try{
    setStatus(i===0?'🔐 正在驗證管理員身分…':'🔐 雲端較慢，正在重新驗證管理員身分…','info');
    // Verify identity through the existing read-only session endpoint. Bulk admin sync must not own SSO.
-   const d=await jsonFetch(GAS_URL+'?action=getSessionMeta&token='+encodeURIComponent(verifyingToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},20000);
+   const d=await jsonFetch(GAS_URL+'?action=getSessionMeta&token='+encodeURIComponent(verifyingToken)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},i===0?10000:5000);
    if(p79LeaveEmployeeEntry()||adminToken!==verifyingToken||storedToken()!==verifyingToken)return false;
+   retryable=d?.retryable===true;
    if(!d?.ok)throw new Error(d?.error||'SSO 驗證失敗');
    if(d.punchOnly===true)throw new Error('打卡登入不可進入管理員後台');
    const role=String(d.adminRole||'').toLowerCase();if(!['admin','superadmin'].includes(role))throw new Error('沒有管理員權限');
@@ -570,7 +592,8 @@ async function restoreAdmin(){
    switchMode('admin');p79UpdateLeaveHandoffBanner();return true;
   }catch(e){
    last=e;console.warn('管理員 SSO 第 '+(i+1)+' 次驗證失敗',e);
-   if(i===0)await new Promise(r=>setTimeout(r,900));
+   if(!retryable)break;
+   if(i===0)await new Promise(r=>setTimeout(r,400));
   }
  }
  if(p79LeaveEmployeeEntry()||adminToken!==verifyingToken||storedToken()!==verifyingToken)return false;
@@ -1268,8 +1291,9 @@ function renderAll(){if(currentEmployee){const fresh=employees.find(e=>String(e.
  if(!$('leaveStart').value)$('leaveStart').value=today;
  if(!$('leaveEnd').value)$('leaveEnd').value=today;
  updateDays();
+ const entryRead=p79PrepareLeaveEntryRead();
  const identityReady=restoreAdmin();
- const dataReady=loadCloud(false,false,identityReady);
+ const dataReady=loadCloud(false,false,identityReady,entryRead);
  const sso=await identityReady;await dataReady;
  if(!sso&&$('employeeLeaveReauth').hidden){const id=sessionStorage.getItem('port79_leave_emp_id');if(id){const e=employees.find(x=>String(x.empId||'').toUpperCase()===String(id).toUpperCase());if(e){currentEmployee=e;showEmployee()}}}
 

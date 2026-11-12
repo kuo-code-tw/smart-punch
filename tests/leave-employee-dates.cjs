@@ -11,7 +11,7 @@ const init=html.slice(begin,finish+6);
 function run(start='',end=''){
  const elements={leaveStart:{value:start},leaveEnd:{value:end},leaveDays:{value:''}};
  let loaded=false;
- const c={Intl,Date,$:id=>elements[id],restoreAdmin:()=>new Promise(()=>{}),loadCloud:()=>{loaded=true;return new Promise(()=>{});},updateDays:()=>{elements.leaveDays.value=elements.leaveStart.value===elements.leaveEnd.value?'1':'2';}};
+ const c={p79PrepareLeaveEntryRead:()=>null,Intl,Date,$:id=>elements[id],restoreAdmin:()=>new Promise(()=>{}),loadCloud:()=>{loaded=true;return new Promise(()=>{});},updateDays:()=>{elements.leaveDays.value=elements.leaveStart.value===elements.leaveEnd.value?'1':'2';}};
  vm.runInNewContext(init,c);
  assert(loaded);
  return elements;
