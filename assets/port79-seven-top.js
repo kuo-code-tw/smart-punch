@@ -40,8 +40,21 @@ function p79OrgValue(employee,kind){
  if(kind==='headquarters'&&/總公司$/.test(legacy))return legacy;
  return '';
 }
+// 由最大組織一路比到最小組織，職稱只作為最後的次排序。
+const P79_ORG_SORT_KEYS=['headquarters','divisions','offices','sections','jobTitles'];
+function p79OrgComparePeople(a,b){
+ for(const key of P79_ORG_SORT_KEYS){
+  const left=p79OrgValue(a,key),right=p79OrgValue(b,key);
+  if(left===right)continue;
+  if(!left)return 1; // 未設定的歸屬放在已設定的同層項目之後
+  if(!right)return -1;
+  const order=left.localeCompare(right,'zh-Hant',{numeric:true});
+  if(order)return order;
+ }
+ return String(a?.empId||'').localeCompare(String(b?.empId||''),'zh-Hant',{numeric:true});
+}
 window.Port79OrgHierarchy=Object.freeze({
- levels:P79_ORG_LEVELS,getValue:p79OrgValue,
+ levels:P79_ORG_LEVELS,getValue:p79OrgValue,comparePeople:p79OrgComparePeople,
  path(employee){return P79_ORG_LEVELS.map(([key,label])=>({key,label,value:p79OrgValue(employee,key)}))}
 });
 const GLOBAL_THEME_KEY='port79_global_theme_v1';
