@@ -59,7 +59,7 @@ function header(){
  '<div id="p79HrSystemMenu" class="p79v103-menu">',
  '<button type="button" onclick="window.p79HrMenuAction(\'refresh\')">↻ 重新同步</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'add\')">＋ 新增員工</button>',
- '<button type="button" onclick="window.p79HrMenuAction(\'org\')">⚙️ 部門／單位／職稱</button>',
+ '<button type="button" onclick="window.p79HrMenuAction(\'org\')">⚙️ 總公司／事業部／事業處／單位／職稱</button>',
  '<button type="button" onclick="P79Overtime.openRules()">📋 加班換算表</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'cleanupDevices\')">🧹 清理免綁裝置</button>',
  '<button type="button" onclick="window.p79HrMenuAction(\'permissions\')">🔐 權限總覽</button>',
@@ -174,10 +174,11 @@ function updateDepartments(active){
    if(!labels.has(key))labels.set(key,label);
    return key;
  }
+ // 只以真正的「單位」欄位分組；不可把原部門／事業處當成單位。
  // Include configured titles even if nobody currently holds the title (show zero).
  p79DashConfiguredTitles().forEach(register);
  active.forEach(function(e){
-   var name=String(e.dept||e.unit||'未設定單位').trim()||'未設定單位';
+   var name=String(window.Port79OrgHierarchy?.getValue(e,'sections')||e.section||e.unit||'未設定單位').trim()||'未設定單位';
    if(!byDept.has(name))byDept.set(name,{total:0,counts:new Map()});
    var unit=byDept.get(name);unit.total++;
    var rawTitle=e.jobTitle||e.deptDetail||'';
