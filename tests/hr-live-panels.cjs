@@ -52,7 +52,7 @@ async function run({denied=false,failed=false,stale=false,day='2026-11-01',hidde
  assert.equal((x.node('p79rAttendanceTrend').innerHTML.match(/p79r-trend-row/g)||[]).length,7);
  x=await run({denied:true});assert.equal(x.requests.length,0);assert(x.node('p79rAttendanceDetails').innerHTML.includes('權限'));assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'));
  assert.equal(x.node('p79rActiveDonut').textContent,'—','missing permission must not show fake 0%');
- assert(x.node('p79rAttendanceTrend').innerHTML.includes('沒有資料檢視權限'));
+ assert(x.node('p79rAttendanceTrend').innerHTML.includes('缺少檢視權限'));
  assert(!x.node('p79rAttendanceTrend').innerHTML.includes('50.0%'));
  x=await run({stale:true});assert(!x.node('p79rAttendanceDetails').innerHTML.includes('&lt;甲&gt;'));assert(!x.node('p79rLeaveSummary').innerHTML.includes('事假'));
  console.log('PASS HR panels: accurate formal and provisional ratios, visible source failures, no unauthorized percentages, cross-month reads, roster scope and chart output');
