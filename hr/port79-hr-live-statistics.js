@@ -136,10 +136,10 @@ function setDonut(punched,total,mode,message){
  const ratio=ready?Math.max(0,Math.min(100,punched/total*100)):null;
  amount.textContent=ready?ratio.toFixed(1)+'%':'—';
  caption.textContent=mode==='official'?'正式出勤率':mode==='observed'?'打卡覆蓋率':'待核對';
- ring.classList.toggle('p79r-donut-pending',!ready);
- ring.classList.toggle('p79r-donut-observed',ready&&mode==='observed');
+ ring.classList?.toggle?.('p79r-donut-pending',!ready);
+ ring.classList?.toggle?.('p79r-donut-observed',ready&&mode==='observed');
  ring.style.background=ready?'conic-gradient(#2563eb 0% '+ratio.toFixed(1)+'%,#dbeafe '+ratio.toFixed(1)+'% 100%)':'repeating-conic-gradient(#dde8f5 0 13deg,#edf3fa 13deg 26deg)';
- ring.setAttribute('role','img');ring.setAttribute('aria-label',caption.textContent+' '+amount.textContent);
+ ring.setAttribute?.('role','img');ring.setAttribute?.('aria-label',caption.textContent+' '+amount.textContent);
  const status=$('p79rDonutSource');if(status)status.textContent=message||'';
 }
 function scopeIssues(payload,scope){
