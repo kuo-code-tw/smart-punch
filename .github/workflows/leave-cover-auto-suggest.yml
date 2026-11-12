@@ -33,3 +33,7 @@ jobs:
           node tests/leave-approved-cover-roster.cjs
           node tests/leave-handoff-dedupe.cjs
           node tests/leave-admin-month-filter.cjs
+          node tests/leave-entry-fast-loading.cjs
+          node tests/leave-admin-sso-readonly.cjs
+          node tests/leave-employee-session.cjs
+          node tests/leave-employee-dates.cjs
