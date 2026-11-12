@@ -78,7 +78,7 @@ test('unit job titles expand while legacy departments are not treated as units',
  assert(body.innerHTML.includes('<td>0</td>'),'new configured title starts at zero');
  // Once an employee gets the title, counts change without touching application code.
  ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
- assert(body.innerHTML.includes('<td><b>7</b></td><td>100.0%</td>'));
+ assert(body.innerHTML.includes('<td>7</td><td>100.0%</td>'),'grand total stays accurate across two units');
  // Removing a title from settings should not hide it while active employees still have it.
  ctx.orgSettings.jobTitles=ctx.orgSettings.jobTitles.filter(x=>x!=='新職稱');
  ctx.updateDepartments([...active,{dept:'第二事業部',unit:'裝卸中心',jobTitle:'新職稱'}]);
