@@ -143,13 +143,14 @@ function renderAttendancePage(){
  if(!report||report.month!==attendanceMonth){empty(el.id,ot?'正在讀取正式加班申報與職稱資料…':'正在讀取已核准請假與職稱資料…');return;}
  if(report.error){empty(el.id,report.error);return;}
  if(!Array.isArray(report.rows)){empty(el.id,ot?'職稱加班資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
- const rows=ot?p79EmployeeOvertimeRows(report.rows):report.rows;
+ const rows=ot?p79EmployeeOvertimeRows(report.convertedRows||report.rows):report.rows;
  const pending=!ot?(report.issues||[]).length:0;
  if(!rows.length){
   if(ot){
-   const count=Number(report.count)||0,hours=Number(report.hours)||0;
+   const count=Number(report.officialCount??report.count)||0,hours=Number(report.convertedHours??report.hours)||0;
    const msg=report.sourceWarning
     ?'本月即時加班來源尚未核對完成；歷史快照目前沒有可確認的一般員工職稱時數。請重新整理首頁，或至加班管理核對正式申報。'
+    :report.missingConversion>0?'本月有 '+report.missingConversion+' 筆正式加班申報缺少已儲存換算時數；不可將缺漏當成 0 小時。請到加班管理核對。'
     :count>0
       ?'已讀取 '+fmt(count)+' 筆加班申報（'+fmt(hours,2)+' 小時），但沒有符合本圖的一般員工職稱。請核對職稱是否未設定或被歸為主管。'
       :'本月正式班表尚無有效加班申報；如果加班管理已有資料，請重新整理並核對首頁資料來源。';
@@ -159,11 +160,13 @@ function renderAttendancePage(){
  }
  const valueKey=ot?'hours':'days',unit=ot?'小時':'天';
  const max=Math.max(1,...rows.map(r=>Number(r[valueKey])||0));
- const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
+ const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':
+  report.missingConversion>0?'已有 '+report.missingConversion+' 筆正式申報缺換算值；圖表僅顯示已儲存換算時數，總數尚未完整核對':
+  '依正式申報中已儲存換算時數統計（不含預排），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
  el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+(ot?'一般員工職稱加班申報時數':'各職稱已核准請假天數'))+'">'+
   rows.map(r=>{
    const v=Number(r[valueKey])||0;
-   const hint=ot?' title="'+esc('有效申報 '+r.count+' 筆')+'"':'';
+   const hint=ot?' title="'+esc('正式申報 '+r.count+' 筆'+(r.missingConversion?'；待換算 '+r.missingConversion+' 筆':''))+'"':'';
    return '<div class="p79r-leave-row"><span title="'+esc(r.title)+'">'+esc(r.title)+'</span><div><i style="width:'+Math.max(0,Math.min(100,v/max*100))+'%"></i></div><b'+hint+'>'+fmt(v,Number.isInteger(v)?0:2)+' '+unit+'</b></div>';
   }).join('')+'<small>'+esc(summary)+'</small></div>';
 }
