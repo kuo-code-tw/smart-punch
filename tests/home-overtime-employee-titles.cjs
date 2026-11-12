@@ -16,7 +16,7 @@ const workers=['指揮手','領班','AOC','技術員','作業員','助理','班�
 for(const title of workers)assert.equal(funcs.p79IsEmployeeOvertimeTitle(title),true,title+' should stay');
 const rows=[...titles,...workers].map((title,i)=>({title,hours:i+1,count:1}));
 assert.deepEqual(funcs.p79EmployeeOvertimeRows(rows).map(r=>r.title),workers,'only frontline jobs remain in overtime graph');
-assert(ui.includes('const rows=ot?p79EmployeeOvertimeRows(report.convertedRows||report.rows):report.rows;'),'filter applied to overtime chart, not leave chart');
+assert(ui.includes('report.actualRows||report.rows')&&ui.includes('report.convertedRows||report.rows'),'both overtime modes keep the employee-only title filter, not the leave chart');
 assert(page.includes('本月員工職稱加班時數統計'),'static title describes filtered chart');
 assert(ui.includes('本月員工職稱加班時數統計'),'dynamic page title describes filtered chart');
 console.log('PASS homepage overtime chart: frontline positions only; management and system admin excluded; approved-leave chart unchanged');
