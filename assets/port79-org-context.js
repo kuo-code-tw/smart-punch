@@ -5,9 +5,35 @@ const levels=[['headquarters','總公司'],['divisions','事業部'],['offices',
 const fields={headquarters:['headquarters','headquarter','headOffice'],divisions:['division','businessDivision','divisions'],offices:['office','businessOffice','offices'],sections:['section','orgUnit','sections','unit']};
 const norm=v=>String(v??'').trim(),key=v=>norm(v).toUpperCase(),att=v=>norm(v).replace(/^0+/,'');
 function value(e,kind){
- e=e||{};const keys=fields[kind]||[];
- for(const source of [e,e.orgHierarchy,e.organization,e.orgPath].filter(Boolean))for(const k of keys){if(typeof source[k]==='string'){if(source[k].trim()||k===keys[0])return source[k].trim()}}
- const legacy=norm(e.dept);return kind==='headquarters'&&/總公司$/.test(legacy)||kind==='divisions'&&/事業部$/.test(legacy)||kind==='offices'&&/事業處$/.test(legacy)?legacy:'';
+ // Read the official four-level organization first. An explicit blank means
+ // "not assigned" and must not resurrect a stale legacy unit/department.
+ const person=e&&typeof e==='object'?e:{};
+ const sources=[person,person.orgHierarchy,person.organization,person.orgPath]
+   .filter(v=>v&&typeof v==='object'&&!Array.isArray(v));
+ const official=kind==='sections'?fields.sections.filter(k=>k!=='unit'):(fields[kind]||[]);
+ let explicitlyDefined=false;
+ for(const source of sources)for(const field of official){
+  if(!Object.prototype.hasOwnProperty.call(source,field))continue;
+  explicitlyDefined=true;
+  const result=norm(source[field]);
+  if(result){
+   // Values clearly identifying a parent organization are not units.
+   if(kind==='sections'&&/(?:總公司|事業部|事業處)$/.test(result))return '';
+   return result;
+  }
+ }
+ if(explicitlyDefined)return '';
+ if(kind==='sections'){
+  // Read a legacy unit only when no official unit field was ever supplied.
+  for(const source of sources){
+   const legacyUnit=norm(source.unit);
+   if(legacyUnit&&!/(?:總公司|事業部|事業處)$/.test(legacyUnit))return legacyUnit;
+  }
+  return '';
+ }
+ // A legacy department may only identify a parent if its full suffix is explicit.
+ const legacy=norm(person.dept);
+ return kind==='headquarters'&&/總公司$/.test(legacy)||kind==='divisions'&&/事業部$/.test(legacy)||kind==='offices'&&/事業處$/.test(legacy)?legacy:'';
 }
 function index(people){const ids=new Map(),numbers=new Map();for(const e of people||[]){const id=key(e.empId||e.employeeId||e.id);if(id)ids.set(id,ids.has(id)?null:e);const no=att(e.attNo||e.attendanceNo);if(no)numbers.set(no,numbers.has(no)?null:e)}return{ids,numbers};}
 function resolve(row,lookup){row=row||{};const id=key(row.empId||row.employeeId);if(id)return lookup.ids.get(id)||null;const own=lookup.ids.get(key(row.id));if(own)return own;return lookup.numbers.get(att(row.attNo||row.attendanceNo))||null;}
@@ -39,7 +65,7 @@ function configure(config){
  function mount(){
   if(bar)return;const host=config.container?.()||doc.querySelector('main');if(!host)return;
   bar=doc.createElement('section');bar.id='p79OrganizationScope';bar.className='p79-org-scope';bar.setAttribute('aria-label','四層組織篩選');
-  bar.innerHTML='<div class="p79-org-heading">組織篩選：總公司 → 事業部 → 事業處 → 單位</div><div class="p79-org-controls">'+levels.map(([k,label])=>'<label>'+label+'<select data-org-level="'+k+'" aria-label="組織篩選：'+label+'"><option value="">全部'+label+'</option></select></label>').join('')+'<button type="button" data-org-clear>清除篩選</button></div><div data-org-summary class="p79-org-note"></div>';
+  bar.innerHTML='<div class="p79-org-controls">'+levels.map(([k,label])=>'<label>'+label+'<select data-org-level="'+k+'" aria-label="組織篩選：'+label+'"><option value="">全部'+label+'</option></select></label>').join('')+'<button type="button" data-org-clear>清除篩選</button></div><div data-org-summary class="p79-org-note"></div>';
   host.prepend(bar);
   bar.querySelectorAll('[data-org-level]').forEach(el=>el.addEventListener('change',()=>{const at=levels.findIndex(([k])=>k===el.dataset.orgLevel);selection[el.dataset.orgLevel]=el.value;levels.slice(at+1).forEach(([k])=>selection[k]='');signature='';sync();render()}));
   bar.querySelector('[data-org-clear]').addEventListener('click',()=>{for(const[k]of levels)selection[k]='';signature='';sync();render()});sync();
