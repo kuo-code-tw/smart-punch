@@ -63,11 +63,22 @@ assert(markup.includes('即時加班來源尚未核對完成')&&!markup.includes
 window.P79ReferenceDashboard.setOvertimeReport({month:'2026-11',count:2,hours:6,rows:[{title:'未設定職稱',hours:6,count:2}]});
 assert(get('p79DashAttendanceBars').innerHTML.includes('已讀取 2 筆加班申報'),'management/unmapped-only source not disguised as zero');
 
-window.P79ReferenceDashboard.setLeaveReport({month:'2026-11',rows:[{title:'ARMG',days:2}],issues:[]});
+window.P79ReferenceDashboard.setLeaveReport({month:'2026-11',rows:[{title:'ARMG',days:1.5},{title:'F/L',days:0.5}],issues:[]});
 window.__chartPageTest(1);
 markup=get('p79DashAttendanceBars').innerHTML;
-assert(markup.includes('p79r-leave-bars')&&markup.includes('p79r-leave-row'),'second-page leave chart unchanged');
-assert(!markup.includes('p79r-ot-donut'),'donut does not replace leave chart');
+assert(markup.includes('p79r-ot-donut')&&markup.includes('p79r-ot-donut-layout'),'second page also uses the same donut layout');
+assert(markup.includes('本月核准')&&markup.includes('請假天數')&&markup.includes('<strong>2</strong>'),'leave donut shows summed approved days');
+assert(markup.includes('ARMG：1.5 天（75.0%）')&&markup.includes('F/L：0.5 天（25.0%）'),'leave donut uses real approved day shares');
+assert(markup.includes('核准請假天數')&&markup.includes('1.5 天'),'leave tooltip and legend say days, never hours');
+window.P79ReferenceDashboard.setLeaveReport({month:'2026-11',rows:[],issues:[]});
+markup=get('p79DashAttendanceBars').innerHTML;
+assert(markup.includes('p79r-ot-donut')&&markup.includes('本月尚無已核准請假'),'verified empty leave makes a zero ring');
+window.P79ReferenceDashboard.setLeaveReport({month:'2026-11',rows:[],issues:['pending leave']});
+markup=get('p79DashAttendanceBars').innerHTML;
+assert(!markup.includes('p79r-ot-donut')&&markup.includes('待核對'),'unverified leave must not show false zero');
+window.P79ReferenceDashboard.setLeaveReport({month:'2026-11',rows:[{title:'<img src=x onerror=alert(1)>',days:2}],issues:[]});
+markup=get('p79DashAttendanceBars').innerHTML;
+assert(!markup.includes('<img')&&markup.includes('&lt;img'),'leave donut escapes malicious titles');
 assert.equal(get('p79DashChartPage').textContent,'第2頁／共2頁');
 window.__chartPageTest(0);
 assert(get('p79DashAttendanceChartTitle').innerHTML.includes('本月員工職稱加班時數統計'),'back to overtime page');
@@ -76,4 +87,4 @@ assert(style.includes('#p79DashAttendancePages .p79r-ot-donut'),'only target car
 assert(style.includes('@container (max-width:400px)'),'mobile layout stacks under a narrow card');
 assert(style.includes('html[data-theme="dark"] #p79DashAttendancePages'),'dark theme remains legible');
 assert(home.includes('donut=20261112-v1'),'cache versions change for shipped JS and CSS');
-console.log('PASS homepage overtime donut: total, 4 colors, percents, tooltip, top 5 + Other, escaping, empty/error states, existing pagination, unchanged leave page and responsive style');
+console.log('PASS both pagination donut charts: overtime totals/colors/percentages and approved-leave days/percentages, error states, escaping and responsive layout');

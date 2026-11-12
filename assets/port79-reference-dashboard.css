@@ -1253,3 +1253,20 @@ html[data-theme="dark"] #p79DashAttendancePages .p79r-ot-legend-head{background:
 html[data-theme="dark"] #p79DashAttendancePages .p79r-ot-legend-row{color:#e3eeff;border-color:#36526f}
 html[data-theme="dark"] #p79DashAttendancePages .p79r-ot-legend-row:hover{background:#294663}
 html[data-theme="dark"] #p79DashAttendancePages .p79r-ot-note{color:#ffcc81}
+
+/* The reference layout fixed every metric card at 76px; keep the row even while adding the mode switch. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79d-kpi{height:auto!important;min-height:122px!important;align-items:center!important}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79-ot-hours-kpi{align-items:flex-start!important}
+/* 2026-11-12: compact, shared actual/converted controls for official overtime. */
+#p79Dashboard .p79-ot-hours-kpi{align-items:flex-start;min-height:120px}
+#p79Dashboard .p79-ot-hours-body{min-width:0;flex:1}
+#p79Dashboard .p79-ot-hour-value{display:flex;align-items:baseline;gap:4px}
+#p79Dashboard .p79-ot-hour-switch{display:inline-flex;align-items:center;gap:2px;margin-top:6px;padding:2px;border:1px solid #bfdbfe;border-radius:9px;background:#f2f7ff}
+#p79Dashboard .p79-ot-hour-switch button{font:inherit;font-size:12px;line-height:1.35;font-weight:700;color:#385778;background:transparent;border:0;border-radius:7px;padding:5px 8px;cursor:pointer;white-space:nowrap}
+#p79Dashboard .p79-ot-hour-switch button.active{background:#136de8;color:white;box-shadow:0 1px 3px #103b7b24}
+#p79Dashboard .p79-ot-hour-switch button:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
+#p79Dashboard .p79-ot-unreported{margin-top:6px;font-size:11px;line-height:1.45;color:#516a86;white-space:normal}
+html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch{background:#17304c;border-color:#446382}
+html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button{color:#c9dcf3}
+html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button.active{background:#2563eb;color:#fff}
+html[data-theme="dark"] #p79Dashboard .p79-ot-unreported{color:#bed3eb}

@@ -31,6 +31,9 @@ assert.equal(a.count,5,'one report ID counted once, deleted and revoked excluded
 assert.equal(a.declaredSubmittedHours,15,'submitted raw hours must exclude plans');
 assert.equal(a.officialCount,4,'four formally submitted unique reports');
 assert.equal(a.plannedCount,1);
+assert.equal(a.plannedHours,8,'unsubmitted plans are separately totaled');
+assert.equal(a.actualRows.find(r=>r.title==='AQC').hours,12);
+assert.equal(a.actualRows.find(r=>r.title==='F/L').hours,3);
 assert.equal(a.convertedHours,18.72,'save-persisted conversion values 6.02+12.70+0 only');
 assert.equal(a.missingConversion,1,'missing saved conversion never inferred from current tariff');
 assert.equal(a.details.find(r=>r.id==='P').convertedHours,null,'planned has no official conversion');
@@ -41,7 +44,8 @@ const showStart=src.indexOf('function showOvertime('),showEnd=src.indexOf('funct
 assert(showStart>=0&&showEnd>showStart);
 const metrics={},notes={};let shown=null;
 const context={
- data:a,fmt:(n,d=0)=>Number(n).toFixed(d),
+ data:a,overtimeDisplayMode:'actual',lastOvertimeData:null,$:()=>null,
+ fmt:(n,d=0)=>Number(n).toFixed(d),
  setMetric:(id,value)=>{metrics[id]=value;},
  statusText:(id,value)=>{notes[id]=value;},
  renderHomeOvertimeList:()=>{},
@@ -50,20 +54,24 @@ const context={
 vm.createContext(context);
 const showSource=src.slice(showStart,showEnd);
 vm.runInContext(showSource+'\nshowOvertime(data)',context);
-assert.equal(metrics.p79DashOvertimeHours,'待換算','no partial 18.7h figure as confirmed converted grand total');
+assert.equal(metrics.p79DashOvertimeHours,'15.0','actual default must show officially reported raw hours even when conversion is missing');
+assert.match(notes.p79DashOvertimeUnreported,/1 筆／8.0 小時/);
+vm.runInContext("setOvertimeDisplayMode('converted')",context);
+assert.equal(metrics.p79DashOvertimeHours,'待換算','no partial converted total shown as complete');
 assert.equal(metrics.p79DashOvertimeUnit,'','no trailing hours suffix on pending status');
-assert.match(notes.p79DashScheduleSource,/1 筆正式申報缺少已儲存換算值/);
+assert.match(notes.p79DashScheduleSource,/其中 1 筆缺換算值/);
 assert.equal(shown,a);
 context.data={...a,missingConversion:0};vm.runInContext('showOvertime(data)',context);
 assert.equal(metrics.p79DashOvertimeHours,'18.7');
 assert.equal(metrics.p79DashOvertimeUnit,'小時');
-assert.match(notes.p79DashScheduleSource,/原始 15.0 小時 → 換算後 18.7 小時/);
+assert.match(notes.p79DashScheduleSource,/實際 15.0 小時 → 換算 18.7 小時/);
 context.data={...a,sourceWarning:'history fallback'};vm.runInContext('showOvertime(data)',context);
 assert.equal(metrics.p79DashOvertimeHours,'待核對','unverified live source cannot claim converted value');
-assert(home.includes('本月換算後加班工時'));
+assert(home.includes('本月已申報實際時數'));
+assert(home.includes('data-overtime-mode="actual"')&&home.includes('data-overtime-mode="converted"'));
 assert(home.includes('<th>申報時數</th><th>換算時數</th>'));
 assert(src.includes("item.planned?'預排':item.convertedHours===null?'待換算'"));
-assert(chart.includes('report.convertedRows||report.rows'),'job-title chart must use same official conversion source');
+assert(chart.includes('report.actualRows||report.rows')&&chart.includes('report.convertedRows||report.rows'),'both modes must use submitted per-title rows');
 for(const script of home.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
  if(!/\bsrc=|application\/json|importmap/i.test(script[1])&&script[2].trim())new vm.Script(script[2]);
 }

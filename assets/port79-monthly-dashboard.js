@@ -304,9 +304,9 @@ function p79HomeOvertimeDate(raw,report,month){
 function analyzeOvertime(data,month){
  if(!data||!Array.isArray(data.schedules))throw Error('排班月份資料不完整');
  const titles=new Map(),roster=new Map(),people=new Map(),seen=new Set(),details=[];
- let hours=0,count=0,declaredSubmittedHours=0,convertedHours=0,missingConversion=0,officialCount=0,plannedCount=0;
+ let hours=0,count=0,declaredSubmittedHours=0,convertedHours=0,missingConversion=0,officialCount=0,plannedCount=0,plannedHours=0;
  const key=v=>String(v??'').trim().toUpperCase();
- const ensure=title=>{if(!titles.has(title))titles.set(title,{title,hours:0,count:0,convertedHours:0,officialCount:0,missingConversion:0});return titles.get(title);};
+ const ensure=title=>{if(!titles.has(title))titles.set(title,{title,hours:0,count:0,actualHours:0,convertedHours:0,officialCount:0,missingConversion:0});return titles.get(title);};
  for(const e of data.employees||[]){
   const title=String(e.jobTitle||e.deptDetail||e.position||e.role||'').trim();
   if(!title)continue;
@@ -338,9 +338,9 @@ function analyzeOvertime(data,month){
    const planned=r.planned===true||/預排|尚未申報|待排/.test(String(r.status||''));
    const savedConverted=num(r.convertedHours);
    const converted=!planned&&savedConverted!==null&&savedConverted>=0?savedConverted:null;
-   if(planned)plannedCount++;
+   if(planned){plannedCount++;plannedHours+=h;}
    else{
-    officialCount++;item.officialCount++;declaredSubmittedHours+=h;
+    officialCount++;item.officialCount++;declaredSubmittedHours+=h;item.actualHours+=h;
     if(converted===null){missingConversion++;item.missingConversion++;}
     else{convertedHours+=converted;item.convertedHours+=converted;}
    }
@@ -356,7 +356,8 @@ function analyzeOvertime(data,month){
   }
  }
  const titleRows=[...titles.values()];
- return {month,hours,count,declaredSubmittedHours,convertedHours,missingConversion,officialCount,plannedCount,
+ return {month,hours,count,declaredSubmittedHours,convertedHours,missingConversion,officialCount,plannedCount,plannedHours,
+  actualRows:titleRows.filter(r=>r.officialCount>0).map(r=>({title:r.title,hours:r.actualHours,count:r.officialCount})).sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW')),
   rows:titleRows.sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW')),
   convertedRows:titleRows.filter(r=>r.officialCount>0).map(r=>({title:r.title,hours:r.convertedHours,count:r.officialCount,missingConversion:r.missingConversion}))
    .sort((a,b)=>b.hours-a.hours||a.title.localeCompare(b.title,'zh-TW')),
@@ -366,6 +367,7 @@ const api={analyzeVessels,analyzeAttendance,analyzeOvertime,attendanceDate,impor
 if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
+let overtimeDisplayMode='actual',lastOvertimeData=null;
 let loadedKey='',loading=false,sessionStamp='',pendingReviewItems=null,pendingReviewMonth='',pendingReviewDialog=null,pendingReviewSelection=-1,lastPendingReadAt=0,pendingReviewRefreshing=false,pendingReviewError='',pendingReviewVerifiedAt='';
 function session(){try{return JSON.parse(root.sessionStorage.getItem('port79_user_session')||'null')}catch(_){return null}}
 function permissions(){
@@ -449,16 +451,40 @@ function renderHomeOvertimeList(data){
   '共 '+rows.length+' 筆（含預排）；首頁先顯示最新100筆，完整明細請到加班管理');
 }
 function showOvertime(a){
- const unverified=!!a.sourceWarning,missing=Number(a.missingConversion)||0;
- // Never present a partial converted sum or a historical fallback as confirmed.
- setMetric('p79DashOvertimeHours',unverified?'待核對':missing?'待換算':fmt(a.convertedHours,1));
- setMetric('p79DashOvertimeUnit',unverified||missing?'':'小時');
- const note=unverified?'· 即時班表尚未核對，換算總數暫不可確認':
-  missing?'· '+missing+' 筆正式申報缺少已儲存換算值；目前確認 '+fmt(a.convertedHours,2)+' 小時，總數待換算':
-  '· 正式申報 '+a.officialCount+' 筆：原始 '+fmt(a.declaredSubmittedHours,1)+' 小時 → 換算後 '+fmt(a.convertedHours,1)+' 小時；預排 '+a.plannedCount+' 筆未計入';
+ lastOvertimeData=a;
+ const unverified=!!a.sourceWarning,missing=Number(a.missingConversion)||0,actual=overtimeDisplayMode==='actual';
+ const value=unverified?'待核對':actual?fmt(a.declaredSubmittedHours,1):missing?'待換算':fmt(a.convertedHours,1);
+ setMetric('p79DashOvertimeHours',value);
+ setMetric('p79DashOvertimeUnit',unverified||!actual&&missing?'':'小時');
+ statusText('p79DashOvertimeLabel',actual?'本月已申報實際時數':'本月已申報換算時數');
+ statusText('p79DashOvertimeUnreported',unverified?'未申報／預排資料待核對':
+  '另計：未申報／預排（已有紀錄） '+a.plannedCount+' 筆／'+fmt(a.plannedHours,1)+' 小時（不計入）');
+ const note=unverified?'· 即時班表未核對；正式加班總數暫不可確認':
+  missing?'· 已申報 '+a.officialCount+' 筆：實際 '+fmt(a.declaredSubmittedHours,1)+' 小時；其中 '+missing+' 筆缺換算值，換算總數待核對':
+  '· 已申報 '+a.officialCount+' 筆：實際 '+fmt(a.declaredSubmittedHours,1)+' 小時 → 換算 '+fmt(a.convertedHours,1)+' 小時；另列未申報／預排 '+a.plannedCount+' 筆';
  statusText('p79DashScheduleSource',note);
+ const buttons=$('p79DashOvertimeMode');
+ buttons?.querySelectorAll?.('[data-overtime-mode]').forEach(btn=>{
+  const active=btn.dataset.overtimeMode===overtimeDisplayMode;
+  btn.classList.toggle('active',active);
+  btn.setAttribute('aria-pressed',String(active));
+ });
  renderHomeOvertimeList(a);
+ root.P79ReferenceDashboard?.setOvertimeMode?.(overtimeDisplayMode);
  root.P79ReferenceDashboard?.setOvertimeReport(a);
+}
+function setOvertimeDisplayMode(mode){
+ if(!['actual','converted'].includes(mode)||mode===overtimeDisplayMode)return;
+ overtimeDisplayMode=mode;
+ if(lastOvertimeData)showOvertime(lastOvertimeData);
+ else{
+  $('p79DashOvertimeMode')?.querySelectorAll?.('[data-overtime-mode]').forEach(btn=>{
+   const active=btn.dataset.overtimeMode===mode;
+   btn.classList.toggle('active',active);btn.setAttribute('aria-pressed',String(active));
+  });
+  statusText('p79DashOvertimeLabel',mode==='actual'?'本月已申報實際時數':'本月已申報換算時數');
+  root.P79ReferenceDashboard?.setOvertimeMode?.(mode);
+ }
 }
 function ensurePendingReview(){
  if(pendingReviewDialog)return;
@@ -601,6 +627,8 @@ function showAttendance(a){
  if(pendingReviewDialog?.open)renderPendingReview();
 }
 function reset(){
+ lastOvertimeData=null;
+ statusText('p79DashOvertimeUnreported','未申報／預排資料待讀取');
  root.P79HomeEarlyPunchAlert?.reset();
  const list=$('p79DashOvertimeRecords'),section=$('p79DashOvertimeList');
  if(list)list.replaceChildren();
@@ -880,6 +908,10 @@ function showWhenAdmin(){
 function init(){
  if(!$('p79Dashboard'))return;
  const selector=$('p79DashMonth');if(selector&&!selector.value)selector.value=isoMonth();
+ $('p79DashOvertimeMode')?.addEventListener('click',event=>{
+  const target=event.target?.closest?.('[data-overtime-mode]');
+  if(target)setOvertimeDisplayMode(target.dataset.overtimeMode);
+ });
  root.P79HomeEarlyPunchAlert?.bind(async()=>{
   const ym=checkMonth(),p=permissions(),account=String(session()?.empId||'');
   const token=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
