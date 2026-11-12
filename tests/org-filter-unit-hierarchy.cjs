@@ -18,6 +18,7 @@ const checks=[
  [{section:'79W作業課',unit:'舊倉庫組'},'79W作業課','official unit wins'],
  [{unit:'79W作業課'},'79W作業課','valid legacy-only unit stays readable'],
  [{unit:'第二事業處'},'','business office is not a unit'],
+ [{section:'第二事業處',orgHierarchy:{section:'79W作業課'}},'79W作業課','skip mislabeled parent and use nested official unit'],
  [{section:'第二事業處',unit:'79W作業課'},'','badly classified official office is not a unit'],
  [{orgHierarchy:{section:'63W總務會計課'},dept:'第二事業處'},'63W總務會計課','nested official unit is respected']
 ];
