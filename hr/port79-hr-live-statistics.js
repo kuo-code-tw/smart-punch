@@ -103,7 +103,7 @@ function hiddenJobTitle(value){
  try{
   if(typeof p79IsJobTitleHidden==='function')return !!p79IsJobTitleHidden(value);
   const hidden=typeof orgSettings!=='undefined'&&Array.isArray(orgSettings.hiddenJobTitles)?orgSettings.hiddenJobTitles:[];
-  const key=v=>String(v??'').normalize('NFKC').replace(/[\\s\\/_-]+/g,'').toUpperCase();
+  const key=v=>String(v??'').normalize('NFKC').replace(/[\s\/_-]+/g,'').toUpperCase();
   return !!key(value)&&hidden.some(v=>key(v)===key(value));
  }catch(e){return false}
 }
