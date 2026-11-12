@@ -8,6 +8,7 @@ on:
       - 'tests/home-overtime-converted-hours.cjs'
       - 'tests/home-overtime-current-source.cjs'
       - 'tests/home-overtime-employee-titles.cjs'
+      - 'tests/home-overtime-title-donut.cjs'
       - '.github/workflows/home-overtime-converted-hours.yml'
   push:
     branches: [main]
@@ -34,4 +35,5 @@ jobs:
           node tests/home-overtime-current-source.cjs
           node tests/home-overtime-list-and-roster-periods.cjs
           node tests/home-overtime-employee-titles.cjs
+          node tests/home-overtime-title-donut.cjs
           node tests/home-overtime-name-alignment.cjs
