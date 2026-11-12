@@ -44,7 +44,7 @@ assert.equal(ctx.filterAndSortDashboardJobs(jobs)[0].workingNo,'5260218','manual
 fields.dashboardSortField.value='importedAt';
 assert.equal(ctx.p79FocusLatestImportedVessel(true),true,'confirmed import focuses newest job');
 assert.equal(fields.filterMonth.value,'2026-10','import chooses actual completion month, not upload month');
-assert.equal(fields.dashboardSortField.value,'importedAt');
+assert.equal(fields.dashboardSortField.value,'workingNo','new import restores descending NO. order');
 assert.equal(ctx.summaryCurrentPage,1);
 fields.filterMonth.value='2026-11';
 ctx.p79DashboardMonthSelectionExplicit=true;
