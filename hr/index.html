@@ -555,17 +555,20 @@ function p79RememberOrgOptions(settings){
   orgSettings=p79CanonicalOrgOptions;
   try{localStorage.setItem(p79OrgOptionsCacheKey(),JSON.stringify(p79CanonicalOrgOptions));}catch(ignore){}
 }
+function p79ParseCanonicalOrgOptions(config){
+  if(!config||typeof config!=='object')throw new Error('組織設定來源不完整');
+  const legacy=config[P79_HR_ORG_OPTIONS_KEY];
+  const extended=config[P79_HR_ORG_OPTIONS_V2_KEY];
+  if(legacy===undefined)return null;
+  if(!legacy||!['departments','jobTitles','units'].every(k=>Array.isArray(legacy[k])))throw new Error('舊版組織選項格式不完整');
+  if(extended!==undefined&&(!extended||(!['divisions','offices','sections'].every(k=>Array.isArray(extended[k]))||('headquarters' in extended&&!Array.isArray(extended.headquarters)))))
+    throw new Error('四層組織選項格式不完整');
+  return normalizeOrgSettings({...legacy,...(extended||{})});
+}
 async function p79ReadCanonicalOrgOptions(){
   const d=await apiGet('getData',60000);
-  if(!d.config||typeof d.config!=='object')throw new Error('組織設定來源不完整');
-  const legacy=d.config[P79_HR_ORG_OPTIONS_KEY];
-  const extended=d.config[P79_HR_ORG_OPTIONS_V2_KEY];
-  if(legacy!==undefined){
-    if(!legacy||!['departments','jobTitles','units'].every(k=>Array.isArray(legacy[k])))throw new Error('舊版組織選項格式不完整');
-    if(extended!==undefined&&(!extended||(!['divisions','offices','sections'].every(k=>Array.isArray(extended[k]))||('headquarters' in extended&&!Array.isArray(extended.headquarters)))))
-      throw new Error('四層組織選項格式不完整');
-    p79RememberOrgOptions({...legacy,...(extended||{})});
-  }else{p79CanonicalOrgOptions=null;}
+  const settings=p79ParseCanonicalOrgOptions(d.config);
+  if(settings)p79RememberOrgOptions(settings);else p79CanonicalOrgOptions=null;
   return d.config;
 }
 async function migrateLegacyAttendanceOrgSettings(){
@@ -879,19 +882,31 @@ async function saveOrgSettings(){if(!canHr('org.manage'))return alert('沒有修
     const draft=normalizeOrgSettings(orgDraft);
     const legacy={departments:draft.departments,units:draft.units,jobTitles:draft.jobTitles};
     const extended={headquarters:draft.headquarters,divisions:draft.divisions,offices:draft.offices,sections:draft.sections};
-    const currentConfig=await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
-    const config={...currentConfig,[P79_HR_ORG_OPTIONS_KEY]:legacy,[P79_HR_ORG_OPTIONS_V2_KEY]:extended,departments:draft.departments,jobTitles:draft.jobTitles};
-    if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+    const orgConfig={[P79_HR_ORG_OPTIONS_KEY]:legacy,[P79_HR_ORG_OPTIONS_V2_KEY]:extended,departments:draft.departments,jobTitles:draft.jobTitles};
+    if(new TextEncoder().encode(JSON.stringify(orgConfig)).length>8800)throw new Error('組織設定容量不足，尚未儲存');
+    p79OrgSaveStatus('正在儲存組織選項（1/2）…');
     await p79RetryOrgSave(()=>({action:'hrSaveOrgSettings',settings:legacy}));
-    await p79RetryOrgSave(async()=>{
-      // 等候資料鎖期間可能有其他設定更新，每次重試都重新合併最新設定。
-      const latest=await p79ReadCanonicalOrgOptions();
-      const merged={...latest,[P79_HR_ORG_OPTIONS_KEY]:legacy,[P79_HR_ORG_OPTIONS_V2_KEY]:extended,departments:draft.departments,jobTitles:draft.jobTitles};
-      if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
-      return {action:'saveConfig',config:merged};
-    });
-    await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
-    if(JSON.stringify(p79CanonicalOrgOptions)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
+    p79OrgSaveStatus('正在儲存並核對共用設定（2/2）…');
+    let result;
+    try{
+      result=await p79RetryOrgSave(async()=>{
+        // Only one full read on the normal path; refresh again only after an explicit lock rejection.
+        const latest=await p79ReadCanonicalOrgOptions();
+        const merged={...latest,...orgConfig};
+        if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('共用設定容量不足，尚未儲存');
+        return {action:'saveConfig',config:merged};
+      });
+    }catch(e){
+      if(!/abort|fetch|network|連線|逾時|timeout/i.test(String(e?.message||e)))throw e;
+      // A cancelled reply does not establish a failed write. Read only; never resend uncertain writes.
+      p79OrgSaveStatus('連線回應中斷，正在核對雲端儲存結果…');
+    }
+    // V111 saveConfig returns config after server-side persistence/readback verification.
+    // Older replies and interrupted responses retain an independent verification read.
+    const confirmedConfig=result?.config??await p79RetryOrgOperation(()=>p79ReadCanonicalOrgOptions());
+    const confirmed=p79ParseCanonicalOrgOptions(confirmedConfig);
+    if(JSON.stringify(confirmed)!==JSON.stringify(draft))throw new Error('組織選項讀回不一致，請保留視窗並重試');
+    p79RememberOrgOptions(confirmed);
     orgSettings=draft;
     populateFilters();orgDialog.close();
     window.p79HrDashRender?.(); // A new title appears immediately, even if headcount is zero.
