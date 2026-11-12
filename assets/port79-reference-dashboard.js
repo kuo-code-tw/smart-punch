@@ -160,8 +160,8 @@ function p79RenderOvertimeDonut(rows,summary){
   if(r.percent<6||(groups.length>4&&r.percent<12))return '';
   return '<text x="'+(100+70*Math.cos(angle)).toFixed(2)+'" y="'+(100+70*Math.sin(angle)).toFixed(2)+'" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="800" font-size="'+(r.percent<10?9:11)+'" pointer-events="none">'+r.percent.toFixed(1)+'%</text>';
  }).join('');
- const ring='<div class="p79r-ot-ring"><svg class="p79r-ot-ring-svg" viewBox="0 0 200 200" role="img" aria-label="'+esc('本月員工職稱加班時數 '+hours(total)+' 小時')+'"><circle cx="100" cy="100" r="70" fill="none" stroke="#e7eff8" stroke-width="35"/>'+pieces+labels+'</svg><div class="p79r-ot-center"><span>本月加班</span><span>總時數</span><strong>'+hours(total)+'</strong><small>小時</small></div></div>';
- const legend=groups.length?'<div class="p79r-ot-legend" aria-label="職稱加班時數占比"><div class="p79r-ot-legend-head"><span>職稱</span><span>加班時數</span><span>占比</span></div>'+
+ const ring='<div class="p79r-ot-ring"><svg class="p79r-ot-ring-svg" viewBox="0 0 200 200" role="img" aria-label="'+esc('本月員工職稱加班時數 '+hours(total)+' 小時')+'"><circle cx="100" cy="100" r="70" fill="none" stroke="#e7eff8" stroke-width="35"/>'+pieces+labels+'</svg><div class="p79r-ot-center"><span>本月換算</span><span>加班工時</span><strong>'+hours(total)+'</strong><small>小時</small></div></div>';
+ const legend=groups.length?'<div class="p79r-ot-legend" aria-label="職稱加班時數占比"><div class="p79r-ot-legend-head"><span>職稱</span><span>換算時數</span><span>占比</span></div>'+
   groups.map(r=>'<div class="p79r-ot-legend-row" title="'+esc(r.title+'：'+hours(r.hours)+' 小時（'+r.percent.toFixed(1)+'%）')+'"><span class="p79r-ot-title"><i style="background:'+r.color+'"></i>'+esc(r.title)+'</span><b>'+hours(r.hours)+' 小時</b><b>'+r.percent.toFixed(1)+'%</b></div>').join('')+'</div>':
   '<div class="p79r-ot-no-data">本月尚無有效加班資料</div>';
  return '<div class="p79r-ot-donut" role="group" aria-label="本月員工職稱加班時數統計"><div class="p79r-ot-donut-layout">'+ring+legend+'</div><div class="p79r-ot-note">'+esc(summary)+'</div></div>';
@@ -181,12 +181,14 @@ function renderAttendancePage(){
  if(!report||report.month!==attendanceMonth){empty(el.id,ot?'正在讀取正式加班申報與職稱資料…':'正在讀取已核准請假與職稱資料…');return;}
  if(report.error){empty(el.id,report.error);return;}
  if(!Array.isArray(report.rows)){empty(el.id,ot?'職稱加班資料尚未讀齊':'職稱請假資料尚未讀齊');return;}
- const rows=ot?p79EmployeeOvertimeRows(report.rows):report.rows;
+ const rows=ot?p79EmployeeOvertimeRows(report.convertedRows||report.rows):report.rows;
  const pending=!ot?(report.issues||[]).length:0;
- const overtimeSummary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時不列入'):'';
+ const overtimeSummary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':
+  '依正式申報已儲存換算時數統計（含待審核、不含預排），非薪資結算工時') :'';
+ if(ot&&report.missingConversion>0){empty(el.id,'本月有 '+report.missingConversion+' 筆正式申報尚無已儲存換算值，總數待換算；避免顯示不完整的職稱占比。');return;}
  if(!rows.length){
   if(ot){
-   const count=Number(report.count)||0,hours=Number(report.hours)||0;
+   const count=Number(report.officialCount??report.count)||0,hours=Number(report.convertedHours??report.hours)||0;
    const msg=report.sourceWarning
     ?'本月即時加班來源尚未核對完成；歷史快照目前沒有可確認的一般員工職稱時數。請重新整理首頁，或至加班管理核對正式申報。'
     :count>0
@@ -201,11 +203,11 @@ function renderAttendancePage(){
  if(ot){el.innerHTML=p79RenderOvertimeDonut(rows,overtimeSummary);return;}
  const valueKey=ot?'hours':'days',unit=ot?'小時':'天';
  const max=Math.max(1,...rows.map(r=>Number(r[valueKey])||0));
- const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式有效加班申報統計（含待審核），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
+ const summary=ot?(report.sourceWarning?'目前為歷史月份快照；即時班表尚未核對完成，時數僅供參考':'依正式申報已儲存換算值統計（含待審核，不含預排），非薪資結算工時'):(pending?pending+' 筆請假資料待核，未計入統計':'僅統計已核准請假');
  el.innerHTML='<div class="p79r-leave-bars" role="img" aria-label="'+esc(attendanceMonth+(ot?'一般員工職稱加班申報時數':'各職稱已核准請假天數'))+'">'+
   rows.map(r=>{
    const v=Number(r[valueKey])||0;
-   const hint=ot?' title="'+esc('有效申報 '+r.count+' 筆')+'"':'';
+   const hint=ot?' title="'+esc('正式申報 '+r.count+' 筆')+'"':'';
    return '<div class="p79r-leave-row"><span title="'+esc(r.title)+'">'+esc(r.title)+'</span><div><i style="width:'+Math.max(0,Math.min(100,v/max*100))+'%"></i></div><b'+hint+'>'+fmt(v,Number.isInteger(v)?0:2)+' '+unit+'</b></div>';
   }).join('')+'<small>'+esc(summary)+'</small></div>';
 }
