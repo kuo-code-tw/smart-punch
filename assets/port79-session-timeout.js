@@ -3,6 +3,8 @@
 'use strict';
 if(window.Port79IdleLogout) return;
 const DEFAULT_MINUTES=5, MIN=1, MAX=120;
+const REQUEST_TIMEOUT_MS=60000;
+let saving=false;
 const CONFIG_FIELD='p79_hr_idle_logout_minutes_v1';
 const CACHE_KEY='port79_idle_logout_config_v1';
 const ACTIVITY_KEY='port79_idle_last_activity_v1';
@@ -62,7 +64,7 @@ function getGas(){
  const raw=String(sessionStorage.getItem('port79_gas_url')||GAS_FALLBACK).trim();
  try{const url=new URL(raw);return url.origin==='https://script.google.com'&&/^\/macros\/s\/[\w-]+\/exec$/.test(url.pathname)?url.href:GAS_FALLBACK;}catch(e){return GAS_FALLBACK;}
 }
-async function request(url,options={},timeoutMs=14000){
+async function request(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
   const res=await fetch(url,{cache:'no-store',redirect:'follow',...options,signal:controller.signal});
@@ -70,26 +72,36 @@ async function request(url,options={},timeoutMs=14000){
   const data=await res.json();
   if(!data?.ok)throw new Error(data?.error||'雲端設定讀取失敗');
   return data;
+ }catch(e){
+  if(controller.signal.aborted||e?.name==='AbortError'||e instanceof TypeError){
+   const error=new Error(controller.signal.aborted?'雲端連線逾時（'+Math.round(timeoutMs/1000)+' 秒）':'雲端連線中斷，請檢查網路');
+   error.uncertain=true;throw error;
+  }
+  throw e;
  }finally{clearTimeout(timer);}
 }
 async function readCloud(){
  const token=getToken();if(!token)throw new Error('登入憑證不存在，請重新登入');
  const url=getGas(),query=url+'?action=getData&token='+encodeURIComponent(token)+'&t='+Date.now();
- const data=await request(query,{},18000);
+ let data;
+ for(let attempt=0;attempt<2;attempt++){
+  try{data=await request(query);break;}catch(e){if(!e.uncertain||attempt===1)throw e;}
+ }
  if(!data.config||typeof data.config!=='object')throw new Error('雲端共用設定格式不完整');
  return data.config;
 }
 async function syncCloud(force=false){
- if(fetching||!observeLogin())return;
+ if(saving||fetching||!observeLogin())return;
  if(!force&&Date.now()-lastFetch<110000)return;
  fetching=true;lastFetch=Date.now();
  try{
   const cfg=await readCloud(),found=cfg[CONFIG_FIELD];
   const n=number(found);
   if(found!==undefined&&n===null)throw new Error('雲端登出時間格式錯誤');
+  if(saving)return;
   remember(n??DEFAULT_MINUTES);
   setStatus('雲端設定已同步',false);
- }catch(e){setStatus('使用上次設定；雲端同步待確認',false);console.warn('自動登出設定同步未完成：',e);}
+ }catch(e){if(!saving)setStatus('使用上次設定；雲端同步待確認',false);console.warn('自動登出設定同步未完成：',e);}
  finally{fetching=false;}
 }
 function role(){
@@ -142,21 +154,27 @@ function refreshPreview(){
 }
 function setStatus(message,error){const el=document.getElementById('p79IdleStatus');if(el){el.textContent=message;el.style.color=error?'#dc2626':'#047857';}}
 async function saveUI(){
+ if(saving)return;
  if(!canManage())return setStatus('只有超級管理員可以儲存全系統設定',true);
  const n=chosen();if(n===null)return setStatus('請輸入 1～120 的整數分鐘數',true);
+ saving=true;
  const btn=document.getElementById('p79IdleSave');btn.disabled=true;setStatus('正在儲存到雲端共用設定…',false);
  try{
   const config=await readCloud(),merged={...config,[CONFIG_FIELD]:n};
   if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('雲端設定容量不足，尚未儲存');
   const token=getToken();
-  await request(getGas(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveConfig',config:merged,token,userToken:token})},20000);
-  const confirmed=await readCloud();
-  if(number(confirmed[CONFIG_FIELD])!==n)throw new Error('雲端讀回時間與本次修改不一致，請重試');
+  let writeError;
+  try{await request(getGas(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveConfig',config:merged,token,userToken:token})});}
+  catch(e){if(!e.uncertain)throw e;writeError=e;setStatus('儲存回應中斷，正在讀回雲端確認結果…',false);}
+  let confirmed;
+  try{confirmed=await readCloud();}
+  catch(e){throw new Error('尚未確認儲存結果：'+e.message+'；請重新開啟設定核對，勿連續重送');}
+  if(number(confirmed[CONFIG_FIELD])!==n)throw new Error((writeError?writeError.message+'；':'')+'雲端目前尚未確認本次時間，請稍後重新開啟設定核對');
   remember(n);lastFetch=Date.now();
   setStatus('✅ 已儲存到雲端；其他人員重新同步後生效',false);
   tick();
- }catch(e){setStatus('❌ 尚未儲存：'+(e?.message||e),true);}
- finally{btn.disabled=!canManage();}
+ }catch(e){setStatus('❌ '+(e?.message||e),true);}
+ finally{saving=false;btn.disabled=!canManage();}
 }
 function idleNotice(){
  if(!isHome)return;
