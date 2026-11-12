@@ -15,3 +15,6 @@ assert.throws(()=>c.p79PreserveEmployeeOrganization_({},{headquarters:{}},{},tru
 for(const page of ['attendance','work-hours','leave','schedule','aqc-efficiency','history-data','hr']){const s=fs.readFileSync(page+'/index.html','utf8');assert(s.includes('port79-org-context.js'),page);if(page!=='hr')assert(s.includes('Port79OrgContext.configure'),page)}
 const hr=fs.readFileSync('hr/index.html','utf8');for(const k of ['personHQ','personDivision','personOffice'])assert(hr.includes('id="'+k+'"'));assert(hr.includes('雲端組織歸屬讀回不一致'));
 console.log('PASS unified organization: precise IDs, ambiguous IDs, four-level matching, legacy safety, explicit clearing, old-client preservation, HR audit and seven page integration');
+
+// Both attendance-derived pages use a section rather than main; the toolbar must mount inside the authorized admin view.
+for(const page of ['attendance','work-hours'])assert(fs.readFileSync(page+'/index.html','utf8').includes("container:()=>document.getElementById('viewAdmin')"));

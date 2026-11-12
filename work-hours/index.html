@@ -17883,7 +17883,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261101-workhours-bleed-fix-v3">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
-<script>window.Port79OrgContext.configure({system:'workhours',people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
+<script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 </body>
 </html>
 

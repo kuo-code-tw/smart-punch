@@ -25557,7 +25557,7 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <script src="../assets/port79-attendance-date-overtime-menu.js?v=20261028-cloud-readback-v3&reviewBuild=20261030-v5"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1">
 <script src="../assets/port79-management-workspace.js?v=20261101-unified-sidebar-v2"></script>
-<script>window.Port79OrgContext.configure({system:'attendance',people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
+<script>window.Port79OrgContext.configure({system:'attendance',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 </body>
 </html>
 
