@@ -3,7 +3,7 @@
 'use strict';
 const M=window.P79HrVerifiedMetrics;
 if(!M)return;
-const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastRefresh=0,lastAuthIdentity='';
+const $=id=>document.getElementById(id),cache=new Map();let loadId=0,inFlightKey='',lastAuthIdentity='';
 function sess(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(e){return null}}
 function access(key,action){
  const s=sess(),role=String(s?.adminRole||s?.role||s?.actualAdminRole||'').toLowerCase();
@@ -188,8 +188,7 @@ async function refresh(force){
  if(force)cache.delete(key);
  const hit=cache.get(key);
  if(!force&&hit&&Date.now()-hit.at<120000){display(hit.data,scope,day);return}
- if(!force&&Date.now()-lastRefresh<1000)return;
- lastRefresh=Date.now();inFlightKey=key;const current=++loadId;
+ inFlightKey=key;const current=++loadId;
  reset('正式資料核對中…');
  const readOne=async(enabled,action,requestedMonth)=>{
   if(!enabled)throw Error('目前沒有資料檢視權限');
@@ -216,8 +215,8 @@ async function refresh(force){
   task('schedule',join(scope.schedule,'getScheduleDataSecure',scheduleMonths,'schedules')),
   task('attendance',join(scope.attendance,'getAttendanceMonthData',attMonths,'records'))
  ]);
+ if(current===loadId)inFlightKey='';
  if(current!==loadId||identity()!==startIdentity||!ready())return;
- inFlightKey='';
  cache.set(key,{at:Date.now(),data});
  if(cache.size>8)cache.delete(cache.keys().next().value);
  display(data,scope,day);
