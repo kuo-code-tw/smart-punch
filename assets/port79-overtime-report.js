@@ -761,10 +761,10 @@
    // Show all cloud periods as real editable rows. Preserve raw legacy
    // builtin identity so a label does not create a duplicate new rule.
    el.querySelector('.p79-ot-table-help').insertAdjacentHTML('beforebegin','<details style="margin:12px 0;padding:12px;border:1px solid #bfdbfe;border-radius:8px"><summary style="cursor:pointer;font-weight:700">加班規則說明（依本表設定）</summary><div id="p79OtRuleGuide"></div></details>');
-   // Only present this recovery action if this same browser has authentic
-   // formerly saved rules and the latest cloud reply is entirely empty.
+   // Keep diagnostics visible even when the browser has NO eligible backup:
+   // hiding the button made a missing recovery source look like a broken UI.
    el.querySelector('#p79OtReload').insertAdjacentHTML('afterend',
-    '<button id="p79OtRecoverLocal" type="button" hidden style="background:#fff7ed;border:1px solid #fb923c;color:#9a3412;padding:8px;border-radius:8px">找回本機舊加班設定</button>');
+    '<button id="p79OtRecoverLocal" type="button" style="background:#fff7ed;border:1px solid #fb923c;color:#9a3412;padding:8px;border-radius:8px">檢查／找回舊加班設定</button>');
    const recoverButton=el.querySelector('#p79OtRecoverLocal');
    let recoveryDraft=null;
    const body=el.querySelector('#p79OtRuleRows');
@@ -1014,13 +1014,26 @@
     
    };
    recoverButton.onclick=()=>{
-    if(!cloudReady||saving||reading||!recoveryDraft||!global.p79OvertimeContext?.canEditRules?.())return;
+    if(reading||saving){el.querySelector('#p79OtStatus').textContent='目前正在核對雲端設定，請先完成本次讀取後再檢查。';return;}
+    if(!cloudReady){el.querySelector('#p79OtStatus').textContent='❌ 尚未成功讀取正式雲端設定，不能安全還原。請先按「重新讀取雲端」，確認資料來源及登入狀態。';return;}
+    if(!global.p79OvertimeContext?.canEditRules?.()){el.querySelector('#p79OtStatus').textContent='目前帳號僅能查看。修改加班規則需具備授權管理權限；不會擅自變更雲端。';return;}
+    if(!recoveryDraft){
+     const cloudRules=allCloudRows.length;
+     const enabledTypes=customTypes.length;
+     const archives=JSON.parse(loadedArchived||'[]').length;
+     const hidden=JSON.parse(loadedHidden||'[]').length;
+     const removed=JSON.parse(loadedDeleted||'[]').length;
+     el.querySelector('#p79OtStatus').textContent=cloudRules?
+      '已核對雲端有 '+cloudRules+' 筆歷史加班時段，但目前啟用類型 '+enabledTypes+' 個、封存標記 '+archives+' 筆、隱藏標記 '+hidden+' 筆。這些資料仍可能存在；未經核對不能自動啟用或用預設表覆蓋。':
+      '已核對正式雲端目前回傳 0 筆加班時段；此瀏覽器也找不到可驗證的同來源舊設定快照。仍有歷史加班異動資料可供比對，但不能直接當作正式啟用設定。請保留現狀，不要儲存空白表；已刪除類型標記 '+removed+' 個。';
+     return;
+    }
     if(!global.confirm('找到這台電腦先前已儲存的加班規則 '+recoveryDraft.rows.length+' 筆。\\n要先載入畫面供核對嗎？\\n此操作不會寫入雲端，確認規則與換算時數後，仍須按下方「儲存加班類型與出勤時段」。'))return;
     rows=validate(recoveryDraft.rows);customTypes=recoveryDraft.types.map(pair=>pair.slice());
     roleTypeDefaults=recoveryDraft.roleDefaults.map(pair=>pair.slice());
     body.innerHTML=rows.map(row=>editorRow(row)).join('');
     refreshRuleCount();renderAddedTypeList();renderRoleTypeDefaults();
-    recoverButton.hidden=true;recoveryDraft=null;
+    recoveryDraft=null;
     el.querySelector('#p79OtStatus').textContent='已從這台電腦載入 '+rows.length+' 筆舊加班時段（尚未寫入雲端）。請逐筆核對換算時數，再按下方原有「儲存加班類型與出勤時段」。';
    };
    const reload=async()=>{
@@ -1049,7 +1062,8 @@
      loadedTypeDraft=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
      recoveryDraft=recoverableOvertimeOptions(loaded.config);
-     recoverButton.hidden=!recoveryDraft||!global.p79OvertimeContext?.canEditRules?.();
+     // Never hide the recovery/diagnostic control just because no snapshot exists.
+     recoverButton.disabled=false;
      body.innerHTML=rows.map(row=>editorRow(row)).join('');
      refreshRuleCount();
      renderAddedTypeList();renderRoleTypeDefaults();
@@ -1064,7 +1078,7 @@
       '已讀取雲端 '+rows.length+' 筆加班時段｜可供新申報 '+activeRows.length+' 筆'+
       (archivedVisible?'｜其中 '+archivedVisible+' 筆仍封存。若要重新開放，請核對表格內容並按最下方「儲存加班類型與出勤時段」。':'')+
       '；原換算時數會保留。':
-      recoveryDraft?'⚠ 雲端目前回傳零筆加班類型與時段，但這台電腦找到 '+recoveryDraft.rows.length+' 筆先前已儲存的時段。可選「找回本機舊加班設定」核對後再儲存；不會自行覆蓋雲端。':
+      recoveryDraft?'⚠ 雲端目前回傳零筆加班類型與時段，但這台電腦找到 '+recoveryDraft.rows.length+' 筆先前已儲存的時段。可按「檢查／找回舊加班設定」核對後再儲存；不會自行覆蓋雲端。':
       '⚠ 雲端沒有回傳可編輯的加班時段，且此瀏覽器尚無可核對的舊設定備份。請勿用空白表格覆蓋；需檢查 Apps Script 正式設定來源。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
