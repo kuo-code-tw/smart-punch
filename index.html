@@ -1462,7 +1462,7 @@ function renderHomeYardSummary(session){
   $('p79HomeYardEmptyCap').textContent=fmt(emptyCap);
   $('p79HomeYardHeavyPct').textContent=(Number(latest.heavyTotal)/heavyCap*100).toFixed(2)+'%';
   $('p79HomeYardEmptyPct').textContent=(Number(latest.emptyTotal)/emptyCap*100).toFixed(2)+'%';
-  note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 尺=1 TEU、40 尺=2 TEU（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
+  note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40 呎=2 TEU（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲位管理確認 Excel 與容量設定。';}
 }
 window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
