@@ -2,3 +2,13 @@
 .p79-all-backup[hidden]{display:none!important}.p79-all-backup-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.p79-all-backup h2{font-size:17px;margin:0 0 5px}.p79-all-backup p{font-size:12px;line-height:1.65;margin:8px 0;color:var(--muted,#64748b)}
 .p79-all-backup button{padding:12px 18px;border:0;border-radius:10px;background:#16734b;color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer}.p79-all-backup button:disabled{opacity:.65;cursor:wait}.p79-all-backup progress{width:100%;height:12px;accent-color:#16734b}.p79-all-backup ul{list-style:none;padding:0;margin:8px 0}.p79-all-backup li{padding:8px 0;border-bottom:1px solid var(--border,#e2e8f0);font-size:13px;line-height:1.7;overflow-wrap:anywhere}.p79-all-backup li a{margin-left:12px;color:#2563eb}.p79-all-backup [role=status]{font-size:13px;font-weight:700;margin-top:10px}
 @media(max-width:650px){.p79-all-backup button{width:100%}.p79-all-backup li a{display:block;margin-left:0}}
+
+/* Homepage: one compact action immediately beneath the History Database card.
+ * No backup notes or report boxes appear until the action is used. */
+#systems #p79AllBackupPanel.p79-all-backup{display:flex;flex-direction:column;align-items:flex-end;gap:0;width:100%;margin:10px 0 0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+#systems #p79AllBackupPanel[hidden],#p79AllBackupFeedback[hidden]{display:none!important}
+#systems #p79AllBackupButton{width:auto;min-width:138px;min-height:42px;margin:0;padding:10px 18px;border:0;border-radius:9px;background:#16734b;color:#fff;font:inherit;font-size:14px;font-weight:750;cursor:pointer}
+#systems #p79AllBackupButton:disabled{opacity:.6;cursor:not-allowed}
+#systems #p79AllBackupFeedback{align-self:stretch;margin-top:10px;padding:12px 14px;border:1px solid var(--border,#e2e8f0);border-radius:10px;background:var(--card,#fff)}
+#systems #p79AllBackupFeedback [role=status]{margin:0 0 8px}
+@media(max-width:650px){#systems #p79AllBackupButton{width:100%}}
