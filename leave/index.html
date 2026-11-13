@@ -835,7 +835,7 @@ function p79LeaveSavedOvertimePeriod(report){
  const result={label:original,originalCode:'',warning:''};
  if(String(report?.category||'')!=='延'||!['before','after'].includes(String(report?.position||'')))return result;
  const parse=v=>{
-  const match=String(v??'').trim().match(/^(\\d{1,2})(?::(\\d{2}))?$/);
+  const match=String(v??'').trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
   if(!match)return null;
   const hour=Number(match[1]),min=Number(match[2]||0);
   if(hour>24||min>59||(hour===24&&min!==0))return null;
