@@ -12,6 +12,16 @@ function setup(options={}){
  }};const context={window,URL,AbortController,TextEncoder,console};vm.runInNewContext(code,context);return {window,store,local,nodes,requests,fail:v=>fail=v,hold:v=>hold=v};
 }
 (async()=>{
+ const homepage=fs.readFileSync('index.html','utf8');
+ const historyPosition=homepage.indexOf('id="cardHistory"');
+ const backupPosition=homepage.indexOf('id="p79AllBackupPanel"');
+ const preservePosition=homepage.indexOf('class="p79-modern-home-preserve"');
+ a(historyPosition>=0&&historyPosition<backupPosition&&backupPosition<preservePosition,'one backup button belongs below the History Database card in the main homepage');
+ a.equal((homepage.match(/id="p79AllBackupButton"/g)||[]).length,1,'only one backup button remains');
+ a.match(homepage,/<button type="button" id="p79AllBackupButton">備份資料庫<\/button>/,'the requested concise button label is exact');
+ a(!homepage.includes('p79AllBackupHeading'),'old backup title and note card removed');
+ a.match(homepage,/id="p79AllBackupFeedback" hidden/,'no notes, progress or results before the backup button is clicked');
+ a.match(code,/if\(feedback\)feedback.hidden=false/,'click reveals verified feedback without adding default homepage notes');
  let t=setup();await t.window.Port79AllBackup.start();a.equal(t.requests.length,14);a.equal(new Set(t.requests.slice(1).map(x=>x.type)).size,13);a.match(t.nodes.get('p79AllBackupStatus').textContent,/全部分類已備份並核對完成/);
  t=setup({fail:'leave'});await t.window.Port79AllBackup.start();a.match(t.nodes.get('p79AllBackupStatus').textContent,/12\/13/);const id=t.requests.find(x=>x.type==='leave').requestId;t.fail('');await t.window.Port79AllBackup.start();a.equal(t.requests.filter(x=>x.type==='leave').length,2);a.equal(t.requests.at(-1).requestId,id);a.equal(t.requests.filter(x=>x.type==='attendance').length,1);a.match(t.nodes.get('p79AllBackupStatus').textContent,/全部分類已備份/);
  t=setup({old:true});await t.window.Port79AllBackup.start();a.equal(t.requests.length,1);a.match(t.nodes.get('p79AllBackupStatus').textContent,/尚未啟用/);
