@@ -1323,3 +1323,17 @@ html[data-theme="dark"] #p79Dashboard .p79-ot-unreported{color:#bed3eb!important
   grid-column:1/-1!important
  }
 }
+
+/* 2026-11-13: all FOUR attendance overview cards share the same top and bottom
+ * edges. Previously only the overtime card had 94px height while its siblings
+ * kept the old 76px fixed height; include the fourth alert BUTTON as well. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis{
+ align-items:stretch!important;
+ grid-auto-rows:94px!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79d-kpi{
+ box-sizing:border-box!important;
+ height:94px!important;min-height:94px!important;max-height:94px!important;
+ align-self:stretch!important;
+ padding:8px 10px!important
+}

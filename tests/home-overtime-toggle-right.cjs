@@ -21,7 +21,7 @@ assert(scope.includes('justify-self:end!important')&&scope.includes('grid-area:n
 assert(scope.includes('flex-direction:row!important')&&scope.includes('flex-wrap:nowrap!important'));
 assert(scope.includes('height:94px!important;min-height:94px!important'));
 assert(!scope.includes('grid-template-areas:"label label" "number number"'),'switch cannot fall below the number');
-assert(html.includes('layout=20261113-buttons-right-contained-v3'),'browser must load the corrected stylesheet');
+assert(html.includes('layout=20261113-equal-attendance-kpi-v4'),'browser must load the latest equal-height stylesheet');
 assert(scope.includes('width:auto!important;min-width:0!important;max-width:100%!important'),
  'KPI inner body must shrink after subtracting the left icon width');
 assert(scope.includes('flex:1 1 0%!important')&&!scope.includes('width:100%!important;min-width:205px!important;flex:1 0 auto!important'),
@@ -36,4 +36,13 @@ assert(scope.includes('@media (max-width:700px)')&&scope.includes('grid-column:1
  'mobile overtime KPI spans both columns so the switch remains visible');
 assert(js.includes("setOvertimeDisplayMode(mode)")&&js.includes("btn.dataset.overtimeMode===overtimeDisplayMode"),
  'display-only change leaves mode-toggle logic untouched');
+const equalHeight=css.slice(css.lastIndexOf('/* 2026-11-13: all FOUR attendance overview cards'));
+assert(equalHeight.includes('grid-auto-rows:94px!important'),'attendance grid uses a uniform 94px row height');
+assert(equalHeight.includes('.p79d-attendance .p79d-kpis>.p79d-kpi{'),'all four cards, including the last alert button, share the same height rule');
+assert(equalHeight.includes('height:94px!important;min-height:94px!important;max-height:94px!important'),
+ 'all cards have exactly the same 94px height, not 76px versus 94px');
+assert(equalHeight.includes('box-sizing:border-box!important')&&equalHeight.includes('align-self:stretch!important'),
+ 'same outer height includes padding and border and keeps top/bottom aligned');
+assert(html.includes('layout=20261113-equal-attendance-kpi-v4'),'new stylesheet version reaches browser');
+assert(html.includes('class="p79d-kpi p79d-early-alert"'),'fourth alert card receives the same shared KPI rule');
 console.log('PASS home overtime KPI layout: number on left, actual/converted controls on right, unreported summary below, existing mode logic intact');
