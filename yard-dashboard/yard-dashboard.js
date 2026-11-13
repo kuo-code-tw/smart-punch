@@ -538,6 +538,10 @@ function init(){
  enableEmbed();
  bindExcelDrop();
  accountId=identity();allowanceEditable=canEditAllowedCounts();
+ $('yardAllowanceSave').disabled=!allowanceEditable;
+ $('yardAllowanceClear').disabled=!allowanceEditable;
+ $('yardHeavyAllowed').disabled=!allowanceEditable;
+ $('yardEmptyAllowed').disabled=!allowanceEditable;
  if(!accountId){
   $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入船舶作業管理';
   $('yardEmpty').querySelector('p').textContent='堆場數據需由有權限的管理員從正式首頁進入，未登入不提供讀取或匯入。';
