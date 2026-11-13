@@ -49,6 +49,6 @@ assert(html.includes('const report=employeeRow.schedule?.__meta?.[entry.date]?.o
  'dialog must read authenticated cloud report before formatting');
 assert(html.includes("cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')"),
  'planned and formal identity must be preserved');
-for(const m of html.matchAll(/<script\b([^>]*)>([\s\\S]*?)<\/script>/g))
+for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
  if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
 console.log('PASS leave saved overtime: 20-08 full-work code yields verified 延20-24 actual 4h, original cloud code retained, no incorrect auto-fix, night shifts and immutable reports');
