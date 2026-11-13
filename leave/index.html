@@ -827,6 +827,42 @@ function renderAdminBalances(){
  body.innerHTML=rows.length?rows.map(e=>{const b=e.leaveBalance||{},info=leaveBalanceInfo(e);return `<tr><td><b>${esc(e.empId||'')}</b></td><td>${esc(e.name||b.sourceName||'')}</td><td>${esc(p79LeaveUnitOfPerson(e)||'—')}</td><td>${esc(b.asOf||'--')}${summary.latest&&normalizeLeaveBalanceMonth(b.asOf)<summary.latest?'<div class="note" style="color:#b45309;font-weight:700">待更新</div>':''}</td><td>${fmtDay(b.carryOver)} 天</td><td>${fmtDay(b.annual)} 天</td><td>${fmtDay(info.used)} 天</td><td><b style="color:${Number(info.effectiveRemaining)>0?'#059669':'#e11d48'}">${fmtDay(info.effectiveRemaining)} 天</b><div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(e,info))}</div></td></tr>`}).join(''):'<tr><td colspan="8">尚未匯入員工年假餘額資料</td></tr>';
 }
 
+// Saved leave-cover overtime codes may span an ENTIRE shift (e.g. 延20-08)
+// while the before-shift overtime itself is just 20-24. Present only the
+// verified overtime sub-period; retain the cloud code and all amounts unchanged.
+function p79LeaveSavedOvertimePeriod(report){
+ const original=String(report?.code||'').trim();
+ const result={label:original,originalCode:'',warning:''};
+ if(String(report?.category||'')!=='延'||!['before','after'].includes(String(report?.position||'')))return result;
+ const parse=v=>{
+  const match=String(v??'').trim().match(/^(\\d{1,2})(?::(\\d{2}))?$/);
+  if(!match)return null;
+  const hour=Number(match[1]),min=Number(match[2]||0);
+  if(hour>24||min>59||(hour===24&&min!==0))return null;
+  return {minute:hour*60+min,label:String(hour).padStart(2,'0')+(min?':'+String(min).padStart(2,'0'):'')};
+ };
+ const from=parse(report.overtimeStart),to=parse(report.overtimeEnd);
+ if(!from||!to||from.minute===to.minute){
+  result.warning='⚠ 雲端缺少可核對的加班起迄時間，暫保留原申報代碼';
+  return result;
+ }
+ const interval=(to.minute-from.minute+1440)%1440;
+ const duration=interval/60;
+ if(!interval||interval>12*60){
+  result.warning='⚠ 雲端加班起迄區間異常，請核對原申報';
+  return result;
+ }
+ const declared=Number(report.declaredHours);
+ if(report.declaredHours==null||String(report.declaredHours).trim()===''||!Number.isFinite(declared)||Math.abs(declared-duration)>0.01){
+  result.warning='⚠ 雲端加班區間 '+from.label+'-'+to.label+'（'+duration+' 小時）與原申報時數不符，需核對原報單';
+  return result;
+ }
+ // 4h overtime is 20-24 even if the legacy report code includes
+ // an additional 8h normal night shift and therefore reads 延20-08.
+ result.label='延'+from.label+'-'+to.label;
+ if(result.label!==original)result.originalCode=original;
+ return result;
+}
 let p79SavedCoverReportBusy=false;
 async function p79ReportSavedLeaveCover(id){
  if(leaveAccess!=='manage')return;
@@ -911,10 +947,12 @@ async function p79ReportSavedLeaveCover(id){
        cell.textContent='⚠ 已有雲端申報，但尚未確認 '+entry.overtimeDate+' 的加班歸屬；保留原報單 ID，不重複新增。';
        unverified++;continue;
       }
-      const fields=[report.typeName||report.category||'',report.code||'',
+      const period=p79LeaveSavedOvertimePeriod(report);
+      const fields=[report.typeName||report.category||'',period.label||report.code||'',
        report.declaredHours!=null?'申報 '+report.declaredHours+' 小時':'',
        report.convertedHours!=null&&String(report.convertedHours)!==''?'換算 '+report.convertedHours+' 小時':'',
-       report.note||''].filter(Boolean);
+       period.originalCode?'原申報代碼 '+period.originalCode+'（包含正常班；未修改雲端報單）':'',
+       period.warning||'',report.note||''].filter(Boolean);
       cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')+fields.join('｜');
       reported++;
      }else if(entry.mode==='rest'){
