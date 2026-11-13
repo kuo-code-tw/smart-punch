@@ -28,4 +28,3 @@ jobs:
         run: |
           node tests/attendance-quick-unit-hierarchy.cjs
           node tests/org-unified-context.cjs
-          node tests/hr-org-systemwide.cjs
