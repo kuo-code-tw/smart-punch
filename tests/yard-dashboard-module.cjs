@@ -65,8 +65,8 @@ const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:
 assert.match(trend,/>TEU<\/text>/);
 assert.doesNotMatch(trend,/>3,000<\/text>/,'small inventory cannot be flattened by a fixed 3,000 TEU axis');
 assert.match(html,/當日櫃別明細/,'historical selector must not label all dates as today');
-assert.match(html,/yard-dashboard\.js\?v=20261113-v2/,'new dashboard script must invalidate old cache');
-assert.match(page,/20261113-yard-v2/,'embedded iframe must invalidate old page cache');
+assert.match(html,/yard-dashboard\.js\?v=20261113-drop-v1/,'new dashboard script must invalidate old cache');
+assert.match(page,/20261113-yard-drop-v1/,'embedded iframe must invalidate old page cache');
 assert.match(source,/STORAGE_PREFIX/);
 assert.doesNotMatch(source,/window\.P79YardSeed|yard-seed\.js/);
 assert.match(html,/yardHeavyDonut/);assert.match(html,/yardEmptyDonut/);

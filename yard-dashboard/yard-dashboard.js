@@ -26,6 +26,7 @@ const fmt=n=>Number(n).toLocaleString('zh-TW',{maximumFractionDigits:2});
 const pct=n=>Number(n).toFixed(2)+'%';
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],selectedDate='',view='overview',fileName='',updatedAt='',accountId='',storageKey='';
+let importBusy=false;
 function identity(){
  let s=null,admin=null;
  try{s=JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
@@ -122,9 +123,11 @@ function persist(){
 }
 async function importFile(file){
  if(!file)return;
+ if(importBusy)return message('Excel 正在匯入與核對中，請完成本次匯入後再試。','info');
  if(!/\.xlsx?$/i.test(file.name))return message('僅支援 .xlsx / .xls 堆場報表','error');
  if(file.size>12*1024*1024)return message('檔案超過 12 MB，請先檢查檔案內容','error');
  if(!g.XLSX)return message('Excel 解析元件尚未載入，請確認網路後重新整理','error');
+ importBusy=true;
  message('正在核對 Excel 的每日櫃數、TEU、容量及使用率…');
  try{
   const book=g.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false,cellHTML:false});
@@ -139,7 +142,7 @@ async function importFile(file){
   const saved=persist();render();
   if(saved)message('Excel 核對通過：已匯入 '+imported.length+' 天（'+imported[0].date+' 至 '+imported[imported.length-1].date+'）。資料已存此瀏覽器，未同步雲端。','success');
  }catch(err){message('匯入失敗：'+String(err.message||err),'error')}
- finally{if($('yardFile'))$('yardFile').value='';}
+ finally{importBusy=false;if($('yardFile'))$('yardFile').value='';}
 }
 function bar(id,n){const el=$(id);if(el)el.style.width=Math.max(0,Math.min(100,n))+'%'}
 function donutGradient(segments,total){
@@ -315,6 +318,41 @@ function exportCsv(){
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
  const a=d.createElement('a');a.href=url;a.download='PORT79-yard-'+rows[0].date+'-'+rows[rows.length-1].date+'.csv';d.body.appendChild(a);a.click();a.remove();g.setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function isExcelFileDrag(event){
+ const transfer=event?.dataTransfer;
+ return Array.from(transfer?.types||[]).includes('Files')||Number(transfer?.files?.length)>0;
+}
+function bindExcelDrop(){
+ const overlay=$('yardDropOverlay');
+ let depth=0;
+ const hide=()=>{depth=0;if(overlay)overlay.hidden=true;};
+ d.addEventListener('dragenter',event=>{
+  if(!isExcelFileDrag(event))return;
+  event.preventDefault();depth++;
+  if(overlay&&accountId)overlay.hidden=false;
+ });
+ d.addEventListener('dragover',event=>{
+  if(!isExcelFileDrag(event))return;
+  event.preventDefault();
+  if(event.dataTransfer)event.dataTransfer.dropEffect='copy';
+  if(overlay&&accountId)overlay.hidden=false;
+ });
+ d.addEventListener('dragleave',event=>{
+  if(!isExcelFileDrag(event))return;
+  depth=Math.max(0,depth-1);
+  if(!depth)hide();
+ });
+ d.addEventListener('drop',event=>{
+  if(!isExcelFileDrag(event))return;
+  event.preventDefault();hide();
+  if(!accountId)return message('請先登入有權限的管理員帳號，再匯入堆場 Excel。','error');
+  const files=Array.from(event.dataTransfer?.files||[]);
+  if(files.length!==1)return message('每次只能拖入一個 Excel 檔案，請重新選擇。','error');
+  void importFile(files[0]);
+ });
+ d.addEventListener('dragend',hide);
+ g.addEventListener?.('blur',hide);
+}
 function enableEmbed(){
  if(new URLSearchParams(g.location.search).get('embed')!=='1'||g.parent===g)return;
  d.documentElement.classList.add('yard-embedded');
@@ -324,6 +362,7 @@ function enableEmbed(){
 }
 function init(){
  enableEmbed();
+ bindExcelDrop();
  accountId=identity();
  if(!accountId){
   $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入船舶作業管理';

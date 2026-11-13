@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f7fd">
 <title>堆場儲位管理｜79號碼頭雲端智慧系統</title>
-<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-v1">
+<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-drop-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="./yard-dashboard.js?v=20261113-v2"></script>
+<script defer src="./yard-dashboard.js?v=20261113-drop-v1"></script>
 </head>
 <body>
 <main class="yard-shell">
@@ -26,10 +26,11 @@
     <button type="button" data-yard-view="plugs" aria-pressed="false">♧ 冷凍插座</button>
     <button type="button" data-yard-view="long" aria-pressed="false">▣ 長期儲存與歷史</button>
   </nav>
+  <div class="yard-drop-hint" id="yardDropHint"><span aria-hidden="true">⇩</span><span>可直接把 <strong>.xlsx／.xls</strong> 檔案拖曳到這個頁面匯入，也能使用「匯入 Excel」按鈕（單檔最大 12 MB）。</span></div>
   <div class="yard-status" id="yardStatus" role="status" aria-live="polite" data-tone="info">尚未匯入堆場 Excel；不使用示意數字或推估資料。</div>
   <section id="yardEmpty" class="yard-empty" hidden aria-label="尚無堆場資料">
     <span aria-hidden="true">▥</span><h2>請先匯入堆場報表</h2>
-    <p>支援與 yard.xlsx 相同格式，逐日核對重櫃、空櫃、儲位、冷凍插座和 Long-Stay；資料只保存在目前瀏覽器的登入帳號下，尚未啟用雲端同步。</p>
+    <p>直接將 yard.xlsx 拖曳到此頁面，或使用下方按鈕選取。系統會逐日核對重櫃、空櫃、儲位、冷凍插座和 Long-Stay；資料只保存在目前瀏覽器的登入帳號下，尚未啟用雲端同步。</p>
     <button type="button" id="yardEmptyImport" class="yard-btn import">選取 Excel 檔案</button>
   </section>
   <div id="yardContent" hidden>
@@ -55,5 +56,8 @@
     <div class="yard-source-foot"><span id="yardSource">資料來源待確認</span><span>場存是每日結存，不得將不同日期或 Long-Stay 與總場存重複相加。</span></div>
   </div>
 </main>
+<div id="yardDropOverlay" class="yard-drop-overlay" hidden aria-hidden="true">
+  <div class="yard-drop-panel"><span aria-hidden="true">⇩</span><strong>放開滑鼠即可匯入 Excel</strong><small>支援 .xlsx／.xls，單檔最大 12 MB</small></div>
+</div>
 </body>
 </html>

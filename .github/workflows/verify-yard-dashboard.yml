@@ -5,12 +5,14 @@ on:
       - 'yard-dashboard/**'
       - 'aqc-efficiency/index.html'
       - 'tests/yard-dashboard-module.cjs'
+      - 'tests/yard-drag-drop.cjs'
       - '.github/workflows/verify-yard-dashboard.yml'
   pull_request:
     paths:
       - 'yard-dashboard/**'
       - 'aqc-efficiency/index.html'
       - 'tests/yard-dashboard-module.cjs'
+      - 'tests/yard-drag-drop.cjs'
       - '.github/workflows/verify-yard-dashboard.yml'
 jobs:
   yard-validation:
@@ -19,4 +21,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Test spreadsheet totals, privacy and navigation
-        run: node tests/yard-dashboard-module.cjs
+        run: |
+          node tests/yard-dashboard-module.cjs
+          node tests/yard-drag-drop.cjs
