@@ -148,7 +148,7 @@ function p79RenderOvertimeDonut(rows,summary,options={}){
  const unit=options.unit||'小時',metric=options.metric||'換算時數',
        centerFirst=options.centerFirst||'本月換算',centerSecond=options.centerSecond||'加班工時',
        chartTitle=options.chartTitle||'本月員工職稱加班時數統計';
- const hours=v=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:2}):'—',length=2*Math.PI*70;
+ const hours=v=>Number.isFinite(v)?v.toLocaleString('zh-TW',{minimumFractionDigits:options.fixedDigits??0,maximumFractionDigits:2}):'—',length=2*Math.PI*70;
  let offset=0;
  const pieces=groups.map(r=>{
   const size=length*r.hours/total,dash=Math.max(0,size-Math.min(1.1,size/6)),start=-offset;
@@ -203,7 +203,7 @@ function renderAttendancePage(){
     :count>0
       ?'已讀取 '+fmt(count)+' 筆加班申報（'+fmt(hours,2)+' 小時），但沒有符合本圖的一般員工職稱。請核對職稱是否未設定或被歸為主管。'
       :'本月正式班表尚無有效加班申報；如果加班管理已有資料，請重新整理並核對首頁資料來源。';
-   if(!report.sourceWarning&&count===0&&hours===0)el.innerHTML=p79RenderOvertimeDonut([],overtimeSummary,{metric:overtimeChartMode==='actual'?'實際時數':'換算時數',centerFirst:'本月已申報',centerSecond:overtimeChartMode==='actual'?'實際時數':'換算時數'});
+   if(!report.sourceWarning&&count===0&&hours===0)el.innerHTML=p79RenderOvertimeDonut([],overtimeSummary,{metric:overtimeChartMode==='actual'?'實際時數':'換算時數',centerFirst:'本月已申報',centerSecond:overtimeChartMode==='actual'?'實際時數':'換算時數',fixedDigits:overtimeChartMode==='converted'?2:0});
    else empty(el.id,msg);
    return;
   }
@@ -213,7 +213,7 @@ function renderAttendancePage(){
  if(ot){
   const options=overtimeChartMode==='actual'
    ?{metric:'實際時數',centerFirst:'本月已申報',centerSecond:'實際時數'}
-   :{metric:'換算時數',centerFirst:'本月已申報',centerSecond:'換算時數'};
+   :{metric:'換算時數',centerFirst:'本月已申報',centerSecond:'換算時數',fixedDigits:2};
   el.innerHTML=p79RenderOvertimeDonut(rows,overtimeSummary,options);return;
  }
  el.innerHTML=p79RenderLeaveDonut(rows,pending?pending+' 筆核准請假資料待核，暫不列入已核准天數合計':'僅統計已核准請假');

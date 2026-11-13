@@ -29,6 +29,7 @@ win.P79ReferenceDashboard.setOvertimeMode('converted');
 html=node('p79DashAttendanceBars').innerHTML;
 assert.match(html,/<strong>7.52<\/strong>/);
 assert.match(html,/AQC：6.02 小時（80.1%）/);
+assert.match(html,/F\/L：1.50 小時（19.9%）/,'converted job-title values must show two decimals');
 assert.match(node('p79DashAttendanceChartTitle').innerHTML,/換算/);
 win.P79ReferenceDashboard.setLeaveReport({month:'2026-11',issues:[],rows:[{title:'AQC',days:1.5},{title:'F/L',days:0.5}]});
 win.__chartPage(1);
@@ -40,6 +41,15 @@ assert.match(html,/F\/L：0.5 天（25.0%）/);
 assert.match(node('p79DashChartPage').textContent,/第2頁/);
 win.__chartPage(0);
 assert.match(node('p79DashAttendanceBars').innerHTML,/<strong>7.52<\/strong>/,'returning to page one retains converted mode');
+win.P79ReferenceDashboard.setOvertimeReport({
+ month:'2026-11',officialCount:2,declaredSubmittedHours:120,convertedHours:120,missingConversion:0,
+ actualRows:[{title:'AQC',hours:80,count:1},{title:'F/L',hours:40,count:1}],
+ convertedRows:[{title:'AQC',hours:80,count:1},{title:'F/L',hours:40,count:1}],rows:[{title:'AQC',hours:120,count:1}]
+});
+html=node('p79DashAttendanceBars').innerHTML;
+assert.match(html,/<strong>120\.00<\/strong>/,'whole converted monthly chart total must show .00');
+assert.match(html,/AQC：80\.00 小時（66\.7%）/,'whole per-title converted hours need .00');
+assert.match(html,/F\/L：40\.00 小時（33\.3%）/,'whole converted tooltip values need .00');
 assert(page.includes('data-overtime-mode="actual"')&&page.includes('data-overtime-mode="converted"'));
 assert(page.includes('id="p79DashOvertimeUnreported"'),'unreported subtotal remains separate');
 assert(css.includes('height:94px!important;min-height:94px!important'),'overtime card supports value with buttons alongside it');
