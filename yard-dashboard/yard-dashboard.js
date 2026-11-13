@@ -193,79 +193,117 @@ function allowedCountValue(value){
  if(!t||!Number.isSafeInteger(n)||n<1||n>100000000)throw Error('容許櫃量須為 1～100,000,000 的正整數（櫃）');
  return n;
 }
-// Source Excel counts include 20ft and 40ft each as ONE box; special and long stay overlap.
-function containerCounts(r){
+function allowedTeuValue(value){
+ if(value===null||value===undefined||String(value).trim()==='')return null;
+ const n=Number(String(value).trim());
+ if(!Number.isSafeInteger(n)||n<1||n>200000000)throw Error('容許 TEU 上限須為 1～200,000,000 的正整數；不設定請留空');
+ return n;
+}
+// Both 20ft and 40ft count as one container; each contributes 1 or 2 TEU respectively.
+// Do not add special containers or Long-Stay, which may overlap the base categories.
+function containerBreakdown(r){
  if(!r)return null;
- const sum=keys=>{
+ const total=keys=>{
   const a=keys.map(k=>r[k]);
   if(a.some(v=>v===undefined||v===null||!Number.isSafeInteger(Number(v))||Number(v)<0))return null;
   return a.reduce((n,v)=>n+Number(v),0);
  };
- return {heavy:sum(['imp20','imp40','exp20','exp40','trans20','trans40','reefer20','reefer40']),
-  empty:sum(['genEmpty20','genEmpty40','reeferEmpty20','reeferEmpty40'])};
+ const heavy20=total(['imp20','exp20','trans20','reefer20']);
+ const heavy40=total(['imp40','exp40','trans40','reefer40']);
+ const empty20=total(['genEmpty20','reeferEmpty20']);
+ const empty40=total(['genEmpty40','reeferEmpty40']);
+ const make=(n20,n40)=>n20===null||n40===null?
+  {count:null,teu:null,twenty:n20,forty:n40}:
+  {count:n20+n40,teu:n20+2*n40,twenty:n20,forty:n40};
+ return {heavy:make(heavy20,heavy40),empty:make(empty20,empty40)};
+}
+function containerCounts(r){
+ const b=containerBreakdown(r);
+ return b?{heavy:b.heavy.count,empty:b.empty.count}:null;
 }
 function compareAllowedCounts(r,limits=allowedCounts){
- const a=containerCounts(r);if(!a)return null;
- const out={};
- for(const k of ['heavy','empty']){
-  const limit=limits?.[k]??null,actual=a[k];
-  const remaining=actual!==null&&Number.isSafeInteger(limit)&&limit>0?limit-actual:null;
-  out[k]={actual,limit,remaining,exceeded:remaining!==null&&remaining<0};
+ const b=containerBreakdown(r);if(!b)return null;
+ const result={};
+ for(const key of ['heavy','empty']){
+  const value=b[key],actual=value.count,teuActual=value.teu;
+  const limit=Number.isSafeInteger(limits?.[key])&&limits[key]>0?limits[key]:null;
+  const teuLimit=Number.isSafeInteger(limits?.[key+'Teu'])&&limits[key+'Teu']>0?limits[key+'Teu']:null;
+  const remaining=actual===null||limit===null?null:limit-actual;
+  const teuRemaining=teuActual===null||teuLimit===null?null:teuLimit-teuActual;
+  result[key]={actual,limit,remaining,exceeded:remaining!==null&&remaining<0,
+   twenty:value.twenty,forty:value.forty,teuActual,teuLimit,teuRemaining,teuExceeded:teuRemaining!==null&&teuRemaining<0};
  }
- return out;
+ return result;
 }
 function restoreAllowedCounts(){
- allowedCounts={heavy:null,empty:null};
+ allowedCounts={heavy:null,empty:null,heavyTeu:null,emptyTeu:null};
  try{
   const raw=g.localStorage.getItem(ALLOWANCE_STORAGE_PREFIX+accountId);
   if(!raw)return;
-  const x=JSON.parse(raw);
-  allowedCounts={heavy:allowedCountValue(x?.heavy),empty:allowedCountValue(x?.empty)};
- }catch(e){message('容許櫃量設定無法核對，已停止套用；Excel 資料保持不變：'+String(e.message||e),'error')}
+  const data=JSON.parse(raw);
+  allowedCounts={heavy:allowedCountValue(data?.heavy),empty:allowedCountValue(data?.empty),
+    heavyTeu:allowedTeuValue(data?.heavyTeu),emptyTeu:allowedTeuValue(data?.emptyTeu)};
+ }catch(e){message('容許櫃量／TEU 設定無法核對，已停止套用；Excel 資料保持不變：'+String(e.message||e),'error')}
 }
-function setAllowedCounts(heavy,empty){
+function setAllowedCounts(heavy,empty,heavyTeu=null,emptyTeu=null){
  if(!accountId||!allowanceEditable)throw Error('請先登入具修改權限的管理員，才能儲存容許櫃量');
  const next={heavy:allowedCountValue(heavy),empty:allowedCountValue(empty)};
+ const ht=allowedTeuValue(heavyTeu),et=allowedTeuValue(emptyTeu);
+ if(ht!==null)next.heavyTeu=ht;
+ if(et!==null)next.emptyTeu=et;
  try{g.localStorage.setItem(ALLOWANCE_STORAGE_PREFIX+accountId,JSON.stringify(next))}
- catch(e){throw Error('容許櫃量儲存失敗，原設定保持不變：'+String(e.message||e))}
- allowedCounts=next;return next;
+ catch(e){throw Error('容許櫃量／TEU 儲存失敗，原設定保持不變：'+String(e.message||e))}
+ allowedCounts={heavy:next.heavy,empty:next.empty,heavyTeu:ht,emptyTeu:et};return next;
 }
 function clearAllowedCounts(){
  if(!accountId||!allowanceEditable)throw Error('請先登入具修改權限的管理員，才能清除容許櫃量');
  try{g.localStorage.removeItem(ALLOWANCE_STORAGE_PREFIX+accountId)}
  catch(e){throw Error('清除失敗，原設定保持不變：'+String(e.message||e))}
- allowedCounts={heavy:null,empty:null};
+ allowedCounts={heavy:null,empty:null,heavyTeu:null,emptyTeu:null};
 }
 function allowedSummary(k,c){
  if(!c||c.actual===null)return 'Excel 櫃數無法核對';
  if(c.limit===null)return '容許上限：未設定';
  return c.exceeded?'容許 '+fmt(c.limit)+' 櫃｜超量 '+fmt(-c.remaining)+' 櫃':'容許 '+fmt(c.limit)+' 櫃｜剩餘 '+fmt(c.remaining)+' 櫃';
 }
+function allowedTeuSummary(c){
+ if(!c||c.teuActual===null)return '換算 TEU：無法核對';
+ const actual=fmt(c.teuActual)+' TEU';
+ if(c.teuLimit===null)return '換算 '+actual+'｜TEU 上限未設定';
+ return c.teuExceeded?'換算 '+actual+'｜上限 '+fmt(c.teuLimit)+' TEU，超量 '+fmt(-c.teuRemaining)+' TEU'
+   :'換算 '+actual+'｜上限 '+fmt(c.teuLimit)+' TEU，剩餘 '+fmt(c.teuRemaining)+' TEU';
+}
 function renderAllowedSettings(r){
  $('yardHeavyAllowed').value=allowedCounts.heavy===null?'':String(allowedCounts.heavy);
  $('yardEmptyAllowed').value=allowedCounts.empty===null?'':String(allowedCounts.empty);
+ $('yardHeavyAllowedTeu').value=allowedCounts.heavyTeu===null?'':String(allowedCounts.heavyTeu);
+ $('yardEmptyAllowedTeu').value=allowedCounts.emptyTeu===null?'':String(allowedCounts.emptyTeu);
  $('yardAllowanceClear').disabled=!allowanceEditable||allowedCounts.heavy===null&&allowedCounts.empty===null;
  $('yardAllowanceSave').disabled=!allowanceEditable;
- $('yardHeavyAllowed').disabled=!allowanceEditable;
- $('yardEmptyAllowed').disabled=!allowanceEditable;
+ for(const id of ['yardHeavyAllowed','yardEmptyAllowed','yardHeavyAllowedTeu','yardEmptyAllowedTeu'])$(id).disabled=!allowanceEditable;
  const c=compareAllowedCounts(r);
+ $('yardAllowanceTeuBreakdown').textContent=c
+  ?'重櫃：20 尺 '+fmt(c.heavy.twenty)+' ×1 ＋ 40 尺 '+fmt(c.heavy.forty)+' ×2 ＝ '+fmt(c.heavy.teuActual)+' TEU；空櫃：20 尺 '+fmt(c.empty.twenty)+' ×1 ＋ 40 尺 '+fmt(c.empty.forty)+' ×2 ＝ '+fmt(c.empty.teuActual)+' TEU。'
+  :'TEU 換算：20 尺櫃數 × 1 ＋ 40 尺櫃數 × 2；匯入資料後自動計算。';
  $('yardAllowanceStatus').textContent=(allowanceEditable?'':'此帳號僅能查看，需修改權限才可儲存上限。')+(c
-  ?'所選日期 '+r.date+'｜重櫃 '+(c.heavy.actual===null?'無法核對':fmt(c.heavy.actual)+' 櫃')+'：'+allowedSummary('heavy',c.heavy)+'；空櫃 '+(c.empty.actual===null?'無法核對':fmt(c.empty.actual)+' 櫃')+'：'+allowedSummary('empty',c.empty)
-  :'可先設定上限，匯入 Excel 後自動比對每天的實際櫃數。');
+  ?'所選日期 '+r.date+'｜重櫃 '+(c.heavy.actual===null?'無法核對':fmt(c.heavy.actual)+' 櫃')+'：'+allowedSummary('heavy',c.heavy)+'；'+allowedTeuSummary(c.heavy)+'。空櫃 '+(c.empty.actual===null?'無法核對':fmt(c.empty.actual)+' 櫃')+'：'+allowedSummary('empty',c.empty)+'；'+allowedTeuSummary(c.empty)
+  :'可先設定櫃數及 TEU 上限，匯入 Excel 後自動比對每一天的實際數量。');
 }
 function renderAllowedSummary(r){
  const c=compareAllowedCounts(r);
- for(const [key,id,name] of [['heavy','yardHeavyCount','yardHeavyLimitSummary'],['empty','yardEmptyCount','yardEmptyLimitSummary']]){
-  $(id).textContent=c?.[key].actual===null||!c?'—':fmt(c[key].actual);
+ for(const [key,id,name,teuName] of [['heavy','yardHeavyCount','yardHeavyLimitSummary','yardHeavyTeuSummary'],['empty','yardEmptyCount','yardEmptyLimitSummary','yardEmptyTeuSummary']]){
+  $(id).textContent=!c||c[key].actual===null?'—':fmt(c[key].actual);
   $(name).textContent=allowedSummary(key,c?.[key]);
   $(name).dataset.exceeded=String(!!c?.[key].exceeded);
+  $(teuName).textContent=allowedTeuSummary(c?.[key]);
+  $(teuName).dataset.exceeded=String(!!c?.[key].teuExceeded);
  }
 }
 function saveAllowedFromInputs(){
  try{
-  setAllowedCounts($('yardHeavyAllowed').value,$('yardEmptyAllowed').value);
-  render();message('已儲存重櫃與空櫃容許櫃量（櫃），超量警示已更新。Excel 原始 TEU、櫃數未修改。','success');
- }catch(e){message('容許櫃量設定失敗：'+String(e.message||e),'error')}
+  setAllowedCounts($('yardHeavyAllowed').value,$('yardEmptyAllowed').value,$('yardHeavyAllowedTeu').value,$('yardEmptyAllowedTeu').value);
+  render();message('已儲存重櫃、空櫃容許櫃數及 TEU 上限；按 20 尺＝1 TEU、40 尺＝2 TEU 換算。Excel 原始數據未修改。','success');
+ }catch(e){message('容許櫃量／TEU 設定失敗：'+String(e.message||e),'error')}
 }
 
 function restore(){
@@ -397,6 +435,8 @@ function alertNotices(r,period,limits=allowedCounts){
   const counts=compareAllowedCounts(x,limits);
   if(counts?.heavy.exceeded)notices.push(day+'：重櫃實際 '+fmt(counts.heavy.actual)+' 櫃，超過容許上限 '+fmt(counts.heavy.limit)+' 櫃（超出 '+fmt(-counts.heavy.remaining)+' 櫃）');
   if(counts?.empty.exceeded)notices.push(day+'：空櫃實際 '+fmt(counts.empty.actual)+' 櫃，超過容許上限 '+fmt(counts.empty.limit)+' 櫃（超出 '+fmt(-counts.empty.remaining)+' 櫃）');
+  if(counts?.heavy.teuExceeded)notices.push(day+'：重櫃 20／40 尺換算 '+fmt(counts.heavy.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.heavy.teuLimit)+' TEU（超出 '+fmt(-counts.heavy.teuRemaining)+' TEU）');
+  if(counts?.empty.teuExceeded)notices.push(day+'：空櫃 20／40 尺換算 '+fmt(counts.empty.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.empty.teuLimit)+' TEU（超出 '+fmt(-counts.empty.teuRemaining)+' TEU）');
   if(x.heavyTotal>x.heavyCap)notices.push(day+'：重櫃場存 '+fmt(x.heavyTotal)+' TEU，超過容量 '+fmt(x.heavyCap)+' TEU');
   if(x.emptyTotal>x.emptyCap)notices.push(day+'：空櫃場存 '+fmt(x.emptyTotal)+' TEU，超過容量 '+fmt(x.emptyCap)+' TEU');
   if(x.heavyPlug20Pct>100)notices.push(day+'：20 呎冷凍重櫃插座 '+pct(x.heavyPlug20Pct)+'（超過容量）');
@@ -542,6 +582,8 @@ function init(){
  $('yardAllowanceClear').disabled=!allowanceEditable;
  $('yardHeavyAllowed').disabled=!allowanceEditable;
  $('yardEmptyAllowed').disabled=!allowanceEditable;
+ $('yardHeavyAllowedTeu').disabled=!allowanceEditable;
+ $('yardEmptyAllowedTeu').disabled=!allowanceEditable;
  if(!accountId){
   $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入船舶作業管理';
   $('yardEmpty').querySelector('p').textContent='堆場數據需由有權限的管理員從正式首頁進入，未登入不提供讀取或匯入。';
@@ -567,6 +609,6 @@ function init(){
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,containerCounts,compareAllowedCounts,allowedCountValue,setAllowedCounts,clearAllowedCounts,historyTable,capacityValue,effectiveRecord,setCapacityOverride};
+g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,containerCounts,containerBreakdown,compareAllowedCounts,allowedCountValue,allowedTeuValue,setAllowedCounts,clearAllowedCounts,historyTable,capacityValue,effectiveRecord,setCapacityOverride};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);

@@ -13,13 +13,18 @@ assert.match(html,/重櫃容許上限（櫃）/);
 assert.match(html,/空櫃容許上限（櫃）/);
 assert.match(html,/id="yardAllowanceSave"/);
 assert.match(html,/id="yardAllowanceClear"/);
+assert.match(html,/id="yardHeavyAllowedTeu"/);
+assert.match(html,/id="yardEmptyAllowedTeu"/);
+assert.match(html,/20 尺＝1 TEU、40 尺＝2 TEU/);
 assert.doesNotMatch(html,/id="yardManualHeavyCap"|id="yardManualEmptyCap"/,'TEU override inputs must not be shown as box count controls');
-assert.match(html,/yard-dashboard\.js\?v=20261113-allowed-count-v1/);
-assert.match(html,/yard-dashboard\.css\?v=20261113-allowed-count-v1/);
-assert.match(parent,/20261113-yard-allowed-count-v1/);
+assert.match(html,/yard-dashboard\.js\?v=20261113-box-teu-v1/);
+assert.match(html,/yard-dashboard\.css\?v=20261113-box-teu-v1/);
+assert.match(parent,/20261113-yard-box-teu-v1/);
 assert.match(css,/\.yard-allowed-summary/);
 assert.match(home,/id="p79HomeYardHeavyCount"/);
 assert.match(home,/id="p79HomeYardEmptyCount"/);
+assert.match(home,/id="p79HomeYardHeavyTeu"/);
+assert.match(home,/id="p79HomeYardEmptyTeu"/);
 assert.match(home,/YARD_HOME_ALLOWED_PREFIX='p79_yard_allowed_container_counts_v1_'/);
 
 function fixture(date='2026-11-13'){
@@ -70,6 +75,24 @@ assert.doesNotThrow(()=>a.validateRecord(source),'fixture is consistent with Exc
 assert.deepEqual(JSON.parse(JSON.stringify(a.containerCounts(source))),{heavy:24,empty:28},
  '20/40 both count as one box and special/LongStay not double counted');
 assert.equal(source.heavyTotal,29,'TEU is distinct from heavy container count');
+const converted=JSON.parse(JSON.stringify(a.containerBreakdown(source)));
+assert.deepEqual(converted,{heavy:{count:24,teu:29,twenty:19,forty:5},
+ empty:{count:28,teu:34,twenty:22,forty:6}},'20ft*1+40ft*2 produces TEU without double counting');
+assert.equal(a.allowedTeuValue(''),null,'TEU limit can be omitted');
+assert.equal(a.allowedTeuValue('12000'),12000);
+for(const bad of ['0','-1','3.14','abc','200000001'])assert.throws(()=>a.allowedTeuValue(bad),/TEU 上限/);
+const teuCheck=a.compareAllowedCounts(source,{heavy:24,empty:28,heavyTeu:28,emptyTeu:30});
+assert.equal(teuCheck.heavy.exceeded,false,'box counts may fit while TEU exceeds');
+assert.equal(teuCheck.empty.exceeded,false);
+assert.equal(teuCheck.heavy.teuActual,29);
+assert.equal(teuCheck.empty.teuActual,34);
+assert.equal(teuCheck.heavy.teuExceeded,true);
+assert.equal(teuCheck.empty.teuExceeded,true);
+assert.equal(teuCheck.heavy.teuRemaining,-1);
+assert.equal(teuCheck.empty.teuRemaining,-4);
+const teuWarnings=a.alertNotices(source,[source],{heavy:30,empty:40,heavyTeu:28,emptyTeu:30}).join(' ');
+assert.match(teuWarnings,/重櫃 20／40 尺換算 29 TEU，超過容許 TEU 上限 28 TEU/);
+assert.match(teuWarnings,/空櫃 20／40 尺換算 34 TEU，超過容許 TEU 上限 30 TEU/);
 for(const invalid of ['','1.2','0','-4','abc','100000001']){
  assert.throws(()=>a.allowedCountValue(invalid),/正整數/);
 }
@@ -98,6 +121,8 @@ b.node('yardEmptyAllowed').value='25';
 b.node('yardAllowanceSave').handlers.click();
 assert.deepEqual(JSON.parse(b.store.get(limitKey)),{heavy:20,empty:25});
 assert.match(b.node('yardStatus').textContent,/已儲存/);
+assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 尺 19 ×1 ＋ 40 尺 5 ×2 ＝ 29 TEU/);
+assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 尺 22 ×1 ＋ 40 尺 6 ×2 ＝ 34 TEU/);
 assert.match(b.node('yardAllowanceStatus').textContent,/超量/);
 b.tabs.find(t=>t.dataset.yardView==='overview').handlers.click();
 assert.equal(b.node('yardHeavyCount').textContent,'24');
@@ -105,6 +130,25 @@ assert.equal(b.node('yardEmptyCount').textContent,'28');
 assert.match(b.node('yardHeavyLimitSummary').textContent,/超量 4 櫃/);
 assert.match(b.node('yardEmptyLimitSummary').textContent,/超量 3 櫃/);
 assert.match(b.node('yardAlerts').innerHTML,/超過容許上限/);
+assert.match(b.node('yardHeavyTeuSummary').textContent,/換算 29 TEU/);
+assert.match(b.node('yardEmptyTeuSummary').textContent,/換算 34 TEU/);
+b.tabs.find(t=>t.dataset.yardView==='allowance').handlers.click();
+b.node('yardHeavyAllowedTeu').value='28';
+b.node('yardEmptyAllowedTeu').value='30';
+b.node('yardAllowanceSave').handlers.click();
+assert.deepEqual(JSON.parse(b.store.get(limitKey)),{heavy:20,empty:25,heavyTeu:28,emptyTeu:30});
+b.tabs.find(t=>t.dataset.yardView==='overview').handlers.click();
+assert.match(b.node('yardHeavyTeuSummary').textContent,/超量 1 TEU/);
+assert.match(b.node('yardEmptyTeuSummary').textContent,/超量 4 TEU/);
+assert.equal(b.node('yardHeavyTeuSummary').dataset.exceeded,'true');
+assert.match(b.node('yardAlerts').innerHTML,/超過容許 TEU 上限/);
+b.tabs.find(t=>t.dataset.yardView==='allowance').handlers.click();
+b.node('yardHeavyAllowedTeu').value='0';
+b.node('yardAllowanceSave').handlers.click();
+assert.match(b.node('yardStatus').textContent,/設定失敗/);
+assert.equal(JSON.parse(b.store.get(limitKey)).heavyTeu,28,'invalid TEU does not overwrite saved settings');
+b.node('yardHeavyAllowedTeu').value='';b.node('yardAllowanceSave').handlers.click();
+assert.deepEqual(JSON.parse(b.store.get(limitKey)),{heavy:20,empty:25,emptyTeu:30},'blank optional TEU disables only that limit');
 assert.equal(b.node('yardHeavyCap').textContent,'100','Excel TEU capacity unchanged');
 const imported=JSON.parse(b.store.get('p79_yard_private_v1_TEST-ADMIN'));
 assert.equal(imported.rows[0].heavyCap,100);
@@ -125,8 +169,14 @@ assert.equal(empty.node('yardAllowedSettings').hidden,false,'setting possible be
 empty.node('yardHeavyAllowed').value='200';empty.node('yardEmptyAllowed').value='300';
 empty.node('yardAllowanceSave').handlers.click();
 assert.equal(JSON.parse(empty.store.get(limitKey)).heavy,200);
+empty.node('yardHeavyAllowedTeu').value='400';
+empty.node('yardEmptyAllowedTeu').value='550';
+empty.node('yardAllowanceSave').handlers.click();
+assert.deepEqual(JSON.parse(empty.store.get(limitKey)),{heavy:200,empty:300,heavyTeu:400,emptyTeu:550});
 const viewer=browser({role:'admin',efficiency:'view'});
 assert.equal(viewer.node('yardAllowanceSave').disabled,true,'view-only manager cannot edit terminal maximums');
+assert.equal(viewer.node('yardHeavyAllowedTeu').disabled,true,'view-only manager cannot change TEU');
+assert.equal(viewer.node('yardEmptyAllowedTeu').disabled,true);
 assert.throws(()=>viewer.api.setAllowedCounts(20,30),/修改權限/);
 assert.equal(viewer.store.has(limitKey),false);
 const locked=browser({authorized:false});
@@ -140,7 +190,7 @@ const nodes=new Map(),getNode=id=>nodes.get(id)||(nodes.set(id,{textContent:''})
 let token='TOKEN',reads=0;
 const homeStore=new Map([
  ['p79_yard_private_v1_TEST-ADMIN',JSON.stringify({rows:[source],fileName:'yard.xlsx'})],
- [limitKey,JSON.stringify({heavy:20,empty:25})]
+ [limitKey,JSON.stringify({heavy:20,empty:25,heavyTeu:28,emptyTeu:30})]
 ]);
 const context={window:{addEventListener(){}},getToken:()=>token,currentSession:null,$:getNode,console,
  YARD_HOME_STORAGE_PREFIX:'p79_yard_private_v1_',YARD_HOME_ALLOWED_PREFIX:'p79_yard_allowed_container_counts_v1_',
@@ -155,6 +205,8 @@ assert.equal(getNode('p79HomeYardHeavyCount').textContent,'24 櫃');
 assert.equal(getNode('p79HomeYardEmptyCount').textContent,'28 櫃');
 assert.match(getNode('p79HomeYardHeavyLimit').textContent,/超出 4 櫃/);
 assert.match(getNode('p79HomeYardEmptyLimit').textContent,/超出 3 櫃/);
+assert.match(getNode('p79HomeYardHeavyTeu').textContent,/換算 29 TEU｜上限 28，超出 1 TEU/);
+assert.match(getNode('p79HomeYardEmptyTeu').textContent,/換算 34 TEU｜上限 30，超出 4 TEU/);
 assert.equal(getNode('p79HomeYardHeavyCap').textContent,'100','homepage uses Excel TEU, not obsolete manual overrides');
 token='';assert.equal(context.canViewHomeYard(admin),false);
 console.log('PASS Yard allowed boxes: global count limits, 20/40 counts, alerts, UI save/clear, auth, no-Excel setup, home summary, Excel untouched');

@@ -54,3 +54,10 @@
 .yard-allowed-summary>p{font-size:11px;color:#5b7390;margin:0;line-height:1.65}
 @media(max-width:850px){.yard-allowed-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.yard-allowed-summary>p{grid-column:1/-1}}
 @media(max-width:560px){.yard-allowed-settings{padding:14px}.yard-allowed-editor label{max-width:none}.yard-allowed-editor .yard-btn{flex:1 1 45%}}
+
+/* Distinguish the derived 20ft/40ft TEU calculation from physical box counts. */
+.yard-teu-breakdown{margin:12px 0;padding:12px 14px;border:1px solid #b8d4ea;border-radius:10px;background:#eaf5ff;color:#174b78;font-size:13px;font-weight:800;line-height:1.7}
+.yard-allowed-summary div p[id$="TeuSummary"]{font-size:12px;margin-top:5px;color:#286e92}
+.yard-allowed-summary div p[id$="TeuSummary"][data-exceeded="true"]{color:#b91c1c;font-weight:950}
+.yard-allowed-editor label[for$="AllowedTeu"]{color:#075a85}
+.yard-allowed-editor label[for$="AllowedTeu"] input{border-color:#78b3d9;background:#faffff}
