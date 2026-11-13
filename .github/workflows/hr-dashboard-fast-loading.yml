@@ -38,3 +38,4 @@ jobs:
           node tests/hr-reference-dashboard-integrations.cjs
           node tests/hr-busy-source-recovery.cjs
           node tests/hr-org-dialog-existing-options.cjs
+          node tests/hr-four-level-org.cjs
