@@ -485,6 +485,6 @@ function init(){
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,capacityValue,effectiveRecord,setCapacityOverride};
+g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,capacityValue,effectiveRecord,setCapacityOverride,historyTable};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
