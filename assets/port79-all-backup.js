@@ -55,7 +55,15 @@ async function start(){
  }catch(e){if(!c||same(c))message(String(e.message||e).slice(0,240));}
  finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='全部系統備份到歷史資料庫';}if(batch?.items.every(i=>i.result))batch=null;}else refresh();}
 }
-function refresh(){const panel=$('p79AllBackupPanel');if(panel)panel.hidden=!allowed(session());if(!allowed(session())){if(controller)controller.abort();batch=null;}}
+function refresh(){
+ const s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
+ const isManager=!!s&&!s.punchOnly&&['admin','superadmin'].includes(role)&&!!token();
+ const canRun=allowed(s),panel=$('p79AllBackupPanel'),button=$('p79AllBackupButton');
+ if(panel)panel.hidden=!isManager;
+ if(button){button.disabled=!canRun||busy;button.title=canRun?'執行前會先核對雲端是否支援全部分類':'僅最高管理員可以執行全系統備份';}
+ if(isManager&&!canRun)message('這裡是全系統歷史備份入口；僅最高管理員可以操作。請以最高管理員身分登入後執行。');
+ if(!canRun){if(controller)controller.abort();batch=null;}
+}
 function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',start);refresh();}
 g.Port79AllBackup={start,refresh,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
