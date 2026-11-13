@@ -1,0 +1,31 @@
+name: Verify attendance unit hierarchy quick filter
+on:
+  pull_request:
+    paths:
+      - 'attendance/index.html'
+      - 'assets/port79-org-context.js'
+      - 'tests/attendance-quick-unit-hierarchy.cjs'
+      - '.github/workflows/attendance-unit-hierarchy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'attendance/index.html'
+      - 'assets/port79-org-context.js'
+      - 'tests/attendance-quick-unit-hierarchy.cjs'
+      - '.github/workflows/attendance-unit-hierarchy.yml'
+permissions:
+  contents: read
+jobs:
+  unit-filter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ensure attendance units cannot inherit division or department names
+        run: |
+          node tests/attendance-quick-unit-hierarchy.cjs
+          node tests/org-unified-context.cjs
+          node tests/hr-org-systemwide.cjs
