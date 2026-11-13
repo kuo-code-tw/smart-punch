@@ -497,7 +497,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
   </section>
   <section id="p79HomeYardPanel" class="p79d-section p79-home-yard" aria-labelledby="p79HomeYardHeading" hidden>
     <div class="p79d-section-head">
-      <h2 id="p79HomeYardHeading">▥ 碼頭儲位管理 <span id="p79HomeYardDate">—</span></h2>
+      <h2 id="p79HomeYardHeading">▥ 碼頭儲量管理 <span id="p79HomeYardDate">—</span></h2>
       <div class="p79d-heading-actions"><button type="button" onclick="launchSystem('yard')">查看儲位／設定容量 ›</button></div>
     </div>
     <div class="p79-home-yard-layout">
@@ -640,7 +640,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         <button id="cardLeave" class="system-card leave" type="button" onclick="launchSystem('leave')"><span class="icon">📝</span><span class="name">請假系統</span><span class="desc">請假申請、年假剩餘天數、我的請假與審核</span><span class="badge"></span></button>
         <button id="cardSchedule" class="system-card schedule" type="button" onclick="launchSystem('schedule')"><span class="icon">🗓️</span><span class="name">排班系統</span><span class="desc">班表查看與排班管理</span><span class="badge"></span></button>
         <button id="cardEfficiency" class="system-card efficiency" type="button" onclick="launchSystem('efficiency')"><span class="icon">📊</span><span class="name">效率系統</span><span class="desc">船舶、AQC、月報與效率資料</span><span class="badge"></span></button>
-        <button id="cardYard" class="system-card yard" type="button" onclick="launchSystem('yard')" hidden><span class="icon">▥</span><span class="name">碼頭儲位管理</span><span class="desc">重櫃／空櫃場存、容量設定、插座、長期儲存及 Excel 匯入</span><span class="badge"></span></button>
+        <button id="cardYard" class="system-card yard" type="button" onclick="launchSystem('yard')" hidden><span class="icon">▥</span><span class="name">碼頭儲量管理</span><span class="desc">重櫃／空櫃場存、容量設定、插座、長期儲存及 Excel 匯入</span><span class="badge"></span></button>
         <button id="cardHr" class="system-card hr" type="button" onclick="launchSystem('hr')"><span class="icon">👥</span><span class="name">人資管理系統</span><span class="desc">唯一人員主檔、部門職稱、特休、裝置綁定與五大系統權限</span><span class="badge"></span></button>
         <button id="cardHistory" class="system-card history" type="button" onclick="location.href='./history-data/'"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
       </div>
@@ -1567,7 +1567,7 @@ function renderHomeYardSummary(session){
   const saved=JSON.parse(localStorage.getItem(YARD_HOME_STORAGE_PREFIX+name)||'null');
   const rows=Array.isArray(saved?.rows)?saved.rows:[];
   const latest=rows.filter(r=>r&&/^20\d\d-\d\d-\d\d$/.test(String(r.date))&&Number(r.heavyCap)>0&&Number(r.emptyCap)>0&&Number(r.heavyTotal)>=0&&Number(r.emptyTotal)>=0).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
-  if(!latest){note.textContent='此帳號尚未在本瀏覽器匯入 Excel。請進入「碼頭儲位管理」匯入後查看；不使用示意數字。';return;}
+  if(!latest){note.textContent='此帳號尚未在本瀏覽器匯入 Excel。請進入「碼頭儲量管理」匯入後查看；不使用示意數字。';return;}
   // TEU capacity remains verified original Excel; max permitted box counts are separate settings.
   const heavyCap=Number(latest.heavyCap),emptyCap=Number(latest.emptyCap);
   const fmt=n=>Number(n).toLocaleString('zh-TW',{maximumFractionDigits:2});
@@ -1646,7 +1646,7 @@ function renderHomeYardSummary(session){
   $('p79HomeYardHeavyPct').textContent=(Number(latest.heavyTotal)/heavyCap*100).toFixed(2)+'%';
   $('p79HomeYardEmptyPct').textContent=(Number(latest.emptyTotal)/emptyCap*100).toFixed(2)+'%';
   note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
- }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲位管理確認 Excel 與容量設定。';}
+ }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
 window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
 function launchSystem(target){if(!currentSession)return;const role=String(currentSession.adminRole||'employee').toLowerCase();
