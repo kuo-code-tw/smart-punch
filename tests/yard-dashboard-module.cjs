@@ -81,6 +81,14 @@ assert.match(css,/\.yard-history-table th\{[^}]*text-align:center;[^}]*\}/,'hist
 assert.match(css,/\.yard-history-table td\{[^}]*text-align:center;[^}]*\}/,'historical values and dates align center');
 assert.doesNotMatch(css,/\.yard-history-table td:first-child\{text-align:left\}/,'date cannot override center alignment');
 assert.match(html,/yard-dashboard\.css\?v=20261113-container-ft-v1/,'updated CSS must invalidate cache');
+// Chinese container length unit is 呎 (ft); 尺 remains valid only in unrelated words such as 尺寸.
+for(const [name,content] of [['Yard labels',html],['Yard feedback',source],['Homepage summary',fs.readFileSync(path.join(root,'index.html'),'utf8')]]){
+ assert.doesNotMatch(content,/(?:20|40|20\/40|20／40)\s*尺/,'20/40-foot containers must use 呎 in '+name);
+}
+assert.match(html,/20 呎櫃＝1 TEU，40 呎櫃＝2 TEU/);
+assert.match(source,/自動換算：20 呎 /);
+assert.match(source,/40 呎 /);
+assert.match(page,/20261113-yard-container-ft-v1/,'embedded Yard page version must refresh after terminology fix');
 assert.match(source,/STORAGE_PREFIX/);
 assert.doesNotMatch(source,/window\.P79YardSeed|yard-seed\.js/);
 assert.match(html,/yardHeavyDonut/);assert.match(html,/yardEmptyDonut/);
