@@ -1,0 +1,22 @@
+name: Verify yard inventory dashboard
+on:
+  push:
+    paths:
+      - 'yard-dashboard/**'
+      - 'aqc-efficiency/index.html'
+      - 'tests/yard-dashboard-module.cjs'
+      - '.github/workflows/verify-yard-dashboard.yml'
+  pull_request:
+    paths:
+      - 'yard-dashboard/**'
+      - 'aqc-efficiency/index.html'
+      - 'tests/yard-dashboard-module.cjs'
+      - '.github/workflows/verify-yard-dashboard.yml'
+jobs:
+  yard-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Test spreadsheet totals, privacy and navigation
+        run: node tests/yard-dashboard-module.cjs
