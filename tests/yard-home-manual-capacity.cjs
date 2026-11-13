@@ -21,11 +21,11 @@ for(const id of ['Heavy','Empty','Reefer']){
 }
 assert.match(html,/id="yardReeferCount"/);
 assert.match(html,/id="yardReeferTeuSummary"/);
-assert.match(html,/20 尺櫃＝1 TEU，40 尺櫃＝2 TEU/);
+assert.match(html,/20 呎櫃＝1 TEU，40 呎櫃＝2 TEU/);
 assert.doesNotMatch(html,/id="yardManualHeavyCap"|id="yardManualEmptyCap"/,'TEU override inputs must not be shown as box count controls');
-assert.match(html,/yard-dashboard\.js\?v=20261113-auto-reefer-v1/);
-assert.match(html,/yard-dashboard\.css\?v=20261113-auto-reefer-v1/);
-assert.match(parent,/20261113-yard-auto-reefer-v1/);
+assert.match(html,/yard-dashboard\.js\?v=20261113-container-ft-v1/);
+assert.match(html,/yard-dashboard\.css\?v=20261113-container-ft-v1/);
+assert.match(parent,/20261113-yard-container-ft-v1/);
 assert.match(css,/\.yard-allowed-summary/);
 assert.match(home,/id="p79HomeYardHeavyCount"/);
 assert.match(home,/id="p79HomeYardEmptyCount"/);
@@ -98,7 +98,7 @@ for(const bad of ['-1','1.5','abc','100000001'])assert.throws(()=>a.allowedSizeL
 assert.throws(()=>a.allowedSizeLimit('0','0'),/合計必須大於 0/);
 assert.equal(a.compareAllowedCounts(source,{heavy:24,empty:28,reefer:6,reeferTeu:7}).reefer.teuExceeded,true,'reefer TEU can exceed while reefer boxes are within limit');
 assert.match(a.alertNotices(source,[source],{heavy:30,empty:40,reefer:5,reeferTeu:7}).join(' '),/冷凍櫃實際 6 櫃，超過容許上限 5 櫃/);
-assert.match(a.alertNotices(source,[source],{heavy:30,empty:40,reefer:5,reeferTeu:7}).join(' '),/冷凍櫃 20／40 尺換算 8 TEU，超過容許 TEU 上限 7 TEU/);
+assert.match(a.alertNotices(source,[source],{heavy:30,empty:40,reefer:5,reeferTeu:7}).join(' '),/冷凍櫃 20／40 呎換算 8 TEU，超過容許 TEU 上限 7 TEU/);
 assert.doesNotMatch(a.alertNotices(source,[source],{heavy:30,empty:40}).join(' '),/冷凍櫃.*超過容許/,'backwards compatible when no reefer limits are configured');
 for(const bad of ['0','-1','3.14','abc','200000001'])assert.throws(()=>a.allowedTeuValue(bad),/TEU 上限/);
 const teuCheck=a.compareAllowedCounts(source,{heavy:24,empty:28,heavyTeu:28,emptyTeu:30});
@@ -111,8 +111,8 @@ assert.equal(teuCheck.empty.teuExceeded,true);
 assert.equal(teuCheck.heavy.teuRemaining,-1);
 assert.equal(teuCheck.empty.teuRemaining,-4);
 const teuWarnings=a.alertNotices(source,[source],{heavy:30,empty:40,heavyTeu:28,emptyTeu:30}).join(' ');
-assert.match(teuWarnings,/重櫃 20／40 尺換算 29 TEU，超過容許 TEU 上限 28 TEU/);
-assert.match(teuWarnings,/空櫃 20／40 尺換算 34 TEU，超過容許 TEU 上限 30 TEU/);
+assert.match(teuWarnings,/重櫃 20／40 呎換算 29 TEU，超過容許 TEU 上限 28 TEU/);
+assert.match(teuWarnings,/空櫃 20／40 呎換算 34 TEU，超過容許 TEU 上限 30 TEU/);
 for(const invalid of ['','1.2','0','-4','abc','100000001']){
  assert.throws(()=>a.allowedCountValue(invalid),/正整數/);
 }
@@ -141,8 +141,8 @@ b.node('yardEmptyAllowed').value='25';
 b.node('yardAllowanceSave').handlers.click();
 assert.deepEqual(JSON.parse(b.store.get(limitKey)),{heavy:20,empty:25});
 assert.match(b.node('yardStatus').textContent,/已儲存/);
-assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 尺 19 ×1 ＋ 40 尺 5 ×2 ＝ 29 TEU/);
-assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 尺 22 ×1 ＋ 40 尺 6 ×2 ＝ 34 TEU/);
+assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 呎 19 ×1 ＋ 40 呎 5 ×2 ＝ 29 TEU/);
+assert.match(b.node('yardAllowanceTeuBreakdown').textContent,/20 呎 22 ×1 ＋ 40 呎 6 ×2 ＝ 34 TEU/);
 assert.match(b.node('yardAllowanceStatus').textContent,/超量/);
 b.tabs.find(t=>t.dataset.yardView==='overview').handlers.click();
 assert.equal(b.node('yardHeavyCount').textContent,'24');
@@ -229,7 +229,7 @@ assert.equal(automatic.node('yardReeferCount').textContent,'6');
 assert.match(automatic.node('yardReeferLimitSummary').textContent,/超量 1 櫃/);
 assert.match(automatic.node('yardReeferTeuSummary').textContent,/超量 1 TEU/);
 assert.match(automatic.node('yardAlerts').innerHTML,/冷凍櫃實際 6 櫃/);
-assert.match(automatic.node('yardAlerts').innerHTML,/冷凍櫃 20／40 尺換算 8 TEU/);
+assert.match(automatic.node('yardAlerts').innerHTML,/冷凍櫃 20／40 呎換算 8 TEU/);
 assert.equal(automatic.node('yardHeavyCap').textContent,'100','derived size limits must not change Excel TEU source');
 assert.equal(JSON.parse(automatic.store.get('p79_yard_private_v1_TEST-ADMIN')).rows[0].heavyTotal,29);
 const restored=browser({initialLimits:JSON.parse(automatic.store.get(limitKey))});
