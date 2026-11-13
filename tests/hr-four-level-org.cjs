@@ -9,6 +9,12 @@ for(const n of ['uniqSorted','normalizeOrgSettings','p79OrgOptionsCacheKey','p79
  const extended={headquarters:['總公司甲','總公司乙'],divisions:[],offices:['自訂事業處'],sections:['倉庫組','行政室','維修中心']};c.apiGet=async()=>({config:{hrOrgOptionsV1:legacy,hrOrgOptionsV2:extended,unrelated:'keep'}});await c.p79ReadCanonicalOrgOptions();assert.equal(c.p79CanonicalOrgOptions.divisions.length,0);assert.deepEqual(Array.from(c.p79CanonicalOrgOptions.sections),['行政室','倉庫組','維修中心']);assert.equal(c.p79CanonicalOrgOptions.headquarters.length,2);assert.deepEqual(Array.from(c.p79CanonicalOrgOptions.offices),['自訂事業處']);assert.equal(c.orgSettings.jobTitles.length,3);
  c.apiGet=async()=>({config:{hrOrgOptionsV1:legacy,hrOrgOptionsV2:{divisions:[],offices:[],sections:[]}}});await c.p79ReadCanonicalOrgOptions();assert.equal(c.p79CanonicalOrgOptions.headquarters.length,0);assert.equal(c.p79CanonicalOrgOptions.sections.length,0);
  c.apiGet=async()=>({config:{hrOrgOptionsV1:legacy,hrOrgOptionsV2:{divisions:[]}}});await assert.rejects(c.p79ReadCanonicalOrgOptions(),/格式不完整/);
+ c.apiGet=async()=>({config:{departments:['原部門'],jobTitles:['領班'],units:['原單位']}});
+ await c.p79ReadCanonicalOrgOptions();
+ assert.deepEqual(Array.from(c.orgSettings.jobTitles),['領班'],'older saved titles must be restored from config');
+ assert.deepEqual(Array.from(c.orgSettings.departments),['原部門']);
+ assert.deepEqual(Array.from(c.orgSettings.units),['原單位']);
+
  for(const id of ['headquartersList','newHeadquarters','divisionList','officeList','sectionList','jobTitleList','newDivision','newOffice','newSection','newJobTitle'])assert(html.includes('id="'+id+'"'),id);
  assert(html.includes('repeat(5,minmax(0,1fr))'));assert(html.includes("apiPost(await makePayload(),60000)"));
  console.log('PASS four-level migration suggestions, explicit empty lists, dynamic titles, malformed config, five-column controls and save timeout');
