@@ -30,6 +30,7 @@ const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 let rows=[],selectedDate='',view='overview',fileName='',updatedAt='',accountId='',storageKey='';
 let capacityOverrides=Object.create(null);
 let allowedCounts={heavy:null,empty:null};
+let allowanceEditable=false;
 let importBusy=false;
 function identity(){
  let s=null,admin=null;
@@ -43,6 +44,11 @@ function identity(){
  if(!allowed)return '';
  const id=String(sess.empId||sess.employeeId||sess.id||sess.accountId||sess.email||sess.username||'').trim();
  return id ? encodeURIComponent(id.slice(0,120)) : '';
+}
+function canEditAllowedCounts(){
+ let s=null;try{s=JSON.parse(g.sessionStorage.getItem('port79_user_session')||g.sessionStorage.getItem('admin_session')||'null')}catch(_){}
+ const role=String(s?.adminRole||s?.role||'').toLowerCase();
+ return !!identity()&&(role==='superadmin'||role==='admin'&&['manage','edit'].includes(String(s?.systemPermissions?.efficiency||'').toLowerCase()));
 }
 function message(t,tone){const n=$('yardStatus');if(n){n.textContent=t;n.dataset.tone=tone||'info';}}
 function parseDate(value){
@@ -218,14 +224,14 @@ function restoreAllowedCounts(){
  }catch(e){message('容許櫃量設定無法核對，已停止套用；Excel 資料保持不變：'+String(e.message||e),'error')}
 }
 function setAllowedCounts(heavy,empty){
- if(!accountId)throw Error('請先登入有權限的管理員');
+ if(!accountId||!allowanceEditable)throw Error('請先登入具修改權限的管理員，才能儲存容許櫃量');
  const next={heavy:allowedCountValue(heavy),empty:allowedCountValue(empty)};
  try{g.localStorage.setItem(ALLOWANCE_STORAGE_PREFIX+accountId,JSON.stringify(next))}
  catch(e){throw Error('容許櫃量儲存失敗，原設定保持不變：'+String(e.message||e))}
  allowedCounts=next;return next;
 }
 function clearAllowedCounts(){
- if(!accountId)throw Error('請先登入有權限的管理員');
+ if(!accountId||!allowanceEditable)throw Error('請先登入具修改權限的管理員，才能清除容許櫃量');
  try{g.localStorage.removeItem(ALLOWANCE_STORAGE_PREFIX+accountId)}
  catch(e){throw Error('清除失敗，原設定保持不變：'+String(e.message||e))}
  allowedCounts={heavy:null,empty:null};
@@ -238,11 +244,14 @@ function allowedSummary(k,c){
 function renderAllowedSettings(r){
  $('yardHeavyAllowed').value=allowedCounts.heavy===null?'':String(allowedCounts.heavy);
  $('yardEmptyAllowed').value=allowedCounts.empty===null?'':String(allowedCounts.empty);
- $('yardAllowanceClear').disabled=allowedCounts.heavy===null&&allowedCounts.empty===null;
+ $('yardAllowanceClear').disabled=!allowanceEditable||allowedCounts.heavy===null&&allowedCounts.empty===null;
+ $('yardAllowanceSave').disabled=!allowanceEditable;
+ $('yardHeavyAllowed').disabled=!allowanceEditable;
+ $('yardEmptyAllowed').disabled=!allowanceEditable;
  const c=compareAllowedCounts(r);
- $('yardAllowanceStatus').textContent=c
+ $('yardAllowanceStatus').textContent=(allowanceEditable?'':'此帳號僅能查看，需修改權限才可儲存上限。')+(c
   ?'所選日期 '+r.date+'｜重櫃 '+(c.heavy.actual===null?'無法核對':fmt(c.heavy.actual)+' 櫃')+'：'+allowedSummary('heavy',c.heavy)+'；空櫃 '+(c.empty.actual===null?'無法核對':fmt(c.empty.actual)+' 櫃')+'：'+allowedSummary('empty',c.empty)
-  :'可先設定上限，匯入 Excel 後自動比對每天的實際櫃數。';
+  :'可先設定上限，匯入 Excel 後自動比對每天的實際櫃數。');
 }
 function renderAllowedSummary(r){
  const c=compareAllowedCounts(r);
@@ -528,7 +537,7 @@ function enableEmbed(){
 function init(){
  enableEmbed();
  bindExcelDrop();
- accountId=identity();
+ accountId=identity();allowanceEditable=canEditAllowedCounts();
  if(!accountId){
   $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入船舶作業管理';
   $('yardEmpty').querySelector('p').textContent='堆場數據需由有權限的管理員從正式首頁進入，未登入不提供讀取或匯入。';
@@ -537,7 +546,7 @@ function init(){
   return;
  }
  storageKey=STORAGE_PREFIX+accountId;
- restore();restoreCapacityOverrides();restoreAllowedCounts();render();
+ restore();restoreAllowedCounts();render();
  if(rows.length)message('已載入目前登入帳號在本瀏覽器儲存的 '+rows.length+' 天資料（'+safe(fileName)+'）。尚未同步雲端。','success');
  $('yardImport').addEventListener('click',()=>$('yardFile').click());
  $('yardEmptyImport').addEventListener('click',()=>$('yardFile').click());
