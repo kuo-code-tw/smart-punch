@@ -393,7 +393,7 @@ function saveAllowedFromInputs(){
   const fields={},sizeValues={};
   for(const key of ['heavy','empty','reefer']){
    const prefix='yard'+key[0].toUpperCase()+key.slice(1)+'Allowed';
-   const v20=$(prefix+'20').value,v40=$(prefix+'40').value;
+   const v20=$(prefix+'20').value,v40=$(prefix+'40').value,v45=key==='reefer'?'':$(prefix+'45').value;
    const size=allowedSizeLimit(v20,v40,v45);
    if(size)sizeValues[key]={twenty:size.twenty,forty:size.forty,...(Object.prototype.hasOwnProperty.call(size,'fortyfive')?{fortyfive:size.fortyfive}:{})};
    fields[key]=size?size.count:$(prefix).value;
