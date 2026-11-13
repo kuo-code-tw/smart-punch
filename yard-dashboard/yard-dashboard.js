@@ -202,12 +202,18 @@ function renderDaily(r){
  '<tr class="emptytotal"><td>空櫃合計</td><td>'+fmt(r.genEmpty20+r.reeferEmpty20)+'</td><td>'+fmt(r.genEmpty40+r.reeferEmpty40)+'</td><td>'+fmt(r.emptyTotal)+'</td></tr>'
  ].join('');
 }
+function trendAxisMax(list){
+ const peak=Math.max(0,...list.map(r=>Math.max(Number(r.heavyTotal)||0,Number(r.emptyTotal)||0)));
+ if(!(peak>0))return 1;
+ const raw=peak/4, magnitude=10**Math.floor(Math.log10(raw));
+ const tick=[1,1.25,1.5,2,2.5,3,4,5,6,8,10].find(v=>v*magnitude>=raw)*magnitude;
+ return Number((4*tick).toPrecision(12));
+}
 function trendSvg(list){
  const W=850,H=255,L=55,R=20,T=14,B=42,iw=W-L-R,ih=H-T-B;
- const max=Math.max(1000,...list.map(r=>Math.max(r.heavyTotal,r.emptyTotal)));
- const cap=Math.ceil(max/3000)*3000, Y=n=>T+ih-(n/cap)*ih;
+ const cap=trendAxisMax(list), Y=n=>T+ih-(n/cap)*ih;
  const X=i=>L+(list.length===1?iw/2:i*iw/(list.length-1));
- let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="重櫃藍色與空櫃綠色庫存折線圖">';
+ let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="重櫃藍色與空櫃綠色庫存折線圖"><text x="'+L+'" y="10" fill="#64758a" font-size="11">TEU</text>';
  for(let i=0;i<=4;i++){const val=cap*i/4,y=Y(val);svg+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#e1e9f4"/><text x="'+(L-9)+'" y="'+(y+4)+'" text-anchor="end" fill="#64758a" font-size="11">'+fmt(val)+'</text>';}
  const steps=list.length>22?Math.ceil(list.length/14):1;
  list.forEach((r,i)=>{if(i%steps===0||i===list.length-1)svg+='<text x="'+X(i)+'" y="'+(H-15)+'" text-anchor="middle" fill="#55657c" font-size="11">'+Number(r.date.slice(-2))+'/'+Number(r.date.slice(5,7))+'</text>';});
@@ -337,6 +343,6 @@ function init(){
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices};
+g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
