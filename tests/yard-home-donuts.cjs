@@ -41,6 +41,10 @@ const ids=['p79HomeYardPanel','p79HomeYardHeavyRing','p79HomeYardEmptyRing','p79
 for(const id of ids)assert.match(html,new RegExp('id="'+id+'"'),'must include '+id);
 assert.match(html,/class="p79-yard-kpis"/);
 assert.match(html,/class="p79-yard-panels"/);
+assert.match(html,/\.p79-yard-kpis\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}/,'five compact KPI cards on wide screens');
+assert.match(html,/@media\(max-width:1400px\)/,'responsive card layout');
+for(const id of ['p79HomeYardEmptyCapTop','p79HomeYardEmptyCapacitySize20Count','p79HomeYardEmptyCapacitySize40Teu','p79HomeYardEmptyCapacitySize45Teu','p79HomeYardEmptyCapacitySizeReefer20Count','p79HomeYardEmptyCapacitySizeReefer40Count'])
+ assert.match(html,new RegExp('id="'+id+'"'),'empty-capacity card includes '+id);
 assert.match(html,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
 assert.match(html,/@media\(max-width:1180px\)/);
 assert.match(html,/@media\(max-width:620px\)/);
@@ -55,6 +59,7 @@ assert.equal(b.node('p79HomeYardHeavy').textContent,'10,349');
 assert.equal(b.node('p79HomeYardEmpty').textContent,'1,926.25');
 assert.equal(b.node('p79HomeYardHeavyCap').textContent,'19,200');
 assert.equal(b.node('p79HomeYardEmptyCap').textContent,'5,350');
+assert.equal(b.node('p79HomeYardEmptyCapTop').textContent,'5,350','empty card uses actual imported emptyCap');
 assert.equal(b.node('p79HomeYardHeavyChartPct').textContent,'53.90%');
 assert.equal(b.node('p79HomeYardEmptyChartPct').textContent,'36.00%');
 assert.equal(b.node('p79HomeYardHeavyUsed').textContent,'10,349 TEU');
@@ -99,6 +104,19 @@ assert.equal(withSizes.node('p79HomeYardCapacitySize40Teu').textContent,'1,000 T
 assert.equal(withSizes.node('p79HomeYardCapacitySize45Teu').textContent,'24 TEU','45ft capacity uses 2 TEU');
 assert.equal(withSizes.node('p79HomeYardCapacitySizeReefer40Teu').textContent,'30 TEU');
 assert.equal(withSizes.node('p79HomeYardHeavyCap').textContent,'19,200','manual size caps do not alter imported Excel capacity');
+assert.equal(withSizes.node('p79HomeYardEmptyCapTop').textContent,'5,350','heavy limit does not alter empty Excel capacity');
+assert.equal(withSizes.node('p79HomeYardEmptyCapacitySize20Count').textContent,'—','unconfigured empty capacity is unknown');
+assert.equal(withSizes.node('p79HomeYardEmptyCapacitySizeReefer20Count').textContent,'—','shared reefer quota is not automatically empty-only');
+const withEmptySizes=build({allowed:{empty20:420,empty40:210,empty45:17,reefer20:9,reefer40:6}});
+withEmptySizes.context.renderHomeYardSummary(session);
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapTop').textContent,'5,350','Excel empty capacity remains authoritative');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize20Count').textContent,'420 櫃');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize20Teu').textContent,'420 TEU');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize40Count').textContent,'210 櫃');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize40Teu').textContent,'420 TEU');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize45Count').textContent,'17 櫃');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySize45Teu').textContent,'34 TEU','45ft uses two TEU');
+assert.equal(withEmptySizes.node('p79HomeYardEmptyCapacitySizeReefer20Teu').textContent,'—','shared reefer allowance is not an empty-only quota');
 const over=build({allowed:{heavy:300,empty:200,reefer:20,reeferTeu:12}});
 over.context.renderHomeYardSummary(session);
 assert.equal(over.node('p79HomeYardReeferChartPct').textContent,'166.67%','do not hide over-100 utilization');
@@ -110,6 +128,8 @@ assert.match(over.node('p79HomeYardReeferRing').style.background,/360deg/,'visua
 const missing=build({record:null});
 missing.context.renderHomeYardSummary(session);
 assert.equal(missing.node('p79HomeYardHeavy').textContent,'—');
+assert.equal(missing.node('p79HomeYardEmptyCapTop').textContent,'—');
+assert.equal(missing.node('p79HomeYardEmptyCapacitySize45Teu').textContent,'—');
 assert.equal(missing.node('p79HomeYardHeavyChartPct').textContent,'—');
 assert.equal(missing.node('p79HomeYardReeferChartPct').textContent,'—');
 assert.match(missing.node('p79HomeYardSource').textContent,/尚未在本瀏覽器匯入/);

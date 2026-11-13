@@ -282,7 +282,9 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
 .p79-home-yard .p79d-section-head{margin-bottom:12px}
 .p79-home-yard .p79d-section-head h2{font-weight:900}
 .p79-home-yard-layout{display:flex;flex-direction:column;gap:12px}
-.p79-yard-kpis,.p79-yard-panels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.p79-yard-kpis,.p79-yard-panels{display:grid;gap:11px}
+.p79-yard-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.p79-yard-panels{grid-template-columns:repeat(4,minmax(0,1fr))}
 .p79-yard-kpi{position:relative;min-width:0;min-height:106px;padding:14px 16px;border-radius:13px;border:1px solid #d6e4f4;background:#f3f8ff;color:var(--yard-navy);overflow:hidden}
 .p79-yard-kpi.kpi-heavy{background:linear-gradient(115deg,#e8f2ff,#f5f9ff)}
 .p79-yard-kpi.kpi-empty{background:linear-gradient(115deg,#e5f8ed,#f4fbf5)}
@@ -351,6 +353,7 @@ html[data-theme="dark"] .p79-yard-panel-head small,html[data-theme="dark"] .p79-
 html[data-theme="dark"] .p79-yard-donut::before{background:var(--panel,#19263a)}
 html[data-theme="dark"] .p79-yard-donut-center,html[data-theme="dark"] .p79-yard-count-line strong{color:#f3f7fd}
 html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
+@media(max-width:1400px) and (min-width:1181px){.p79-yard-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1180px){.p79-yard-kpis,.p79-yard-panels{grid-template-columns:repeat(2,minmax(0,1fr))}.p79-yard-donut-body{min-height:140px}}
 @media(max-width:620px){.p79-home-yard .p79d-section-head{flex-wrap:wrap;gap:5px}.p79-yard-kpis{gap:8px}.p79-yard-kpi{min-height:98px;padding:12px}.p79-yard-kpi>strong{font-size:21px;margin-right:10px}.p79-yard-kpi-icon{right:9px;top:9px;font-size:18px}.p79-yard-panels{grid-template-columns:minmax(0,1fr);gap:9px}.p79-yard-donut-body{min-height:144px}.p79-yard-counts{padding:10px}}
 @media(max-width:360px){.p79-yard-kpis{grid-template-columns:minmax(0,1fr)}}
@@ -503,6 +506,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         <article class="p79-yard-kpi kpi-empty"><span>空櫃場存</span><strong><span id="p79HomeYardEmpty">—</span> <small>TEU</small></strong><small>使用率 <b id="p79HomeYardEmptyPct">—</b></small><span class="p79-yard-kpi-icon" aria-hidden="true">▤</span><div class="p79-yard-size-table" role="group" aria-label="尺寸分類"><div class="p79-yard-size-head"><span>櫃型</span><span>櫃數</span><span>TEU</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">20呎</span><span id="p79HomeYardEmptySize20Count">—</span><span id="p79HomeYardEmptySize20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">40呎</span><span id="p79HomeYardEmptySize40Count">—</span><span id="p79HomeYardEmptySize40Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">45呎</span><span id="p79HomeYardEmptySize45Count">—</span><span id="p79HomeYardEmptySize45Teu">—</span></div><div class="p79-yard-size-row subtotal"><span class="p79-yard-size-label">已知小計</span><span id="p79HomeYardEmptySizeTotalCount">—</span><span id="p79HomeYardEmptySizeTotalTeu">—</span></div></div><small class="p79-yard-kpi-foot">45呎須獨立來源；未提供顯示 —，換算 2 TEU／櫃</small></article>
         <article class="p79-yard-kpi kpi-reefer"><span>冷凍櫃場存</span><strong><span id="p79HomeYardReeferTop">—</span> <small>櫃</small></strong><small>20／40 呎換算 <b id="p79HomeYardReeferTopTeu">—</b> TEU</small><span class="p79-yard-kpi-icon" aria-hidden="true">▣</span><div class="p79-yard-size-table" role="group" aria-label="尺寸分類"><div class="p79-yard-size-head"><span>櫃型</span><span>櫃數</span><span>TEU</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍20呎</span><span id="p79HomeYardReeferSize20Count">—</span><span id="p79HomeYardReeferSize20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍40呎</span><span id="p79HomeYardReeferSize40Count">—</span><span id="p79HomeYardReeferSize40Teu">—</span></div><div class="p79-yard-size-row subtotal"><span class="p79-yard-size-label">小計</span><span id="p79HomeYardReeferSizeTotalCount">—</span><span id="p79HomeYardReeferSizeTotalTeu">—</span></div></div><small class="p79-yard-kpi-foot">冷凍櫃是重／空櫃內含分類，不重複加總</small></article>
         <article class="p79-yard-kpi kpi-capacity"><span>重櫃容量</span><strong><span id="p79HomeYardHeavyCap">—</span> <small>TEU</small></strong><small>依已匯入 Excel 原始容量</small><span class="p79-yard-kpi-icon" aria-hidden="true">▥</span><div class="p79-yard-size-table" role="group" aria-label="尺寸分類"><div class="p79-yard-size-head"><span>櫃型</span><span>容許櫃量</span><span>TEU</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">20呎</span><span id="p79HomeYardCapacitySize20Count">—</span><span id="p79HomeYardCapacitySize20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">40呎</span><span id="p79HomeYardCapacitySize40Count">—</span><span id="p79HomeYardCapacitySize40Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">45呎</span><span id="p79HomeYardCapacitySize45Count">—</span><span id="p79HomeYardCapacitySize45Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍20呎</span><span id="p79HomeYardCapacitySizeReefer20Count">—</span><span id="p79HomeYardCapacitySizeReefer20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍40呎</span><span id="p79HomeYardCapacitySizeReefer40Count">—</span><span id="p79HomeYardCapacitySizeReefer40Teu">—</span></div></div><small class="p79-yard-kpi-foot">分項為設定的容許量，不是 Excel 容量分攤</small></article>
+        <article class="p79-yard-kpi kpi-capacity kpi-empty-capacity"><span>空櫃容量</span><strong><span id="p79HomeYardEmptyCapTop">—</span> <small>TEU</small></strong><small>依已匯入 Excel 原始容量</small><span class="p79-yard-kpi-icon" aria-hidden="true">▥</span><div class="p79-yard-size-table" role="group" aria-label="空櫃容許量尺寸分類"><div class="p79-yard-size-head"><span>櫃型</span><span>容許櫃量</span><span>TEU</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">20呎</span><span id="p79HomeYardEmptyCapacitySize20Count">—</span><span id="p79HomeYardEmptyCapacitySize20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">40呎</span><span id="p79HomeYardEmptyCapacitySize40Count">—</span><span id="p79HomeYardEmptyCapacitySize40Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">45呎</span><span id="p79HomeYardEmptyCapacitySize45Count">—</span><span id="p79HomeYardEmptyCapacitySize45Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍20呎</span><span id="p79HomeYardEmptyCapacitySizeReefer20Count">—</span><span id="p79HomeYardEmptyCapacitySizeReefer20Teu">—</span></div><div class="p79-yard-size-row"><span class="p79-yard-size-label">冷凍40呎</span><span id="p79HomeYardEmptyCapacitySizeReefer40Count">—</span><span id="p79HomeYardEmptyCapacitySizeReefer40Teu">—</span></div></div><small class="p79-yard-kpi-foot">分項來自空櫃容許量設定；冷凍空櫃無獨立上限時顯示 —</small></article>
       </div>
       <div class="p79-yard-panels" aria-label="儲位甜甜圈圖與櫃數">
         <article class="p79-yard-panel heavy">
@@ -1543,8 +1547,8 @@ function p79SetHomeYardDonut(kind,used,capacity,color){
  return ratio;
 }
 function renderHomeYardSummary(session){
-  for(const [kind,sizes] of Object.entries({Heavy:['20','40','45','Total'],Empty:['20','40','45','Total'],Reefer:['20','40','Total'],Capacity:['20','40','45','Reefer20','Reefer40']}))for(const size of sizes)for(const fld of ['Count','Teu'])$('p79HomeYard'+kind+'Size'+size+fld).textContent='—';
- const ids=['p79HomeYardHeavy','p79HomeYardEmpty','p79HomeYardHeavyCap','p79HomeYardEmptyCap','p79HomeYardHeavyPct','p79HomeYardEmptyPct','p79HomeYardHeavyCount','p79HomeYardEmptyCount','p79HomeYardReeferCount','p79HomeYardReeferTop','p79HomeYardReeferTopTeu','p79HomeYardHeavyCapChart'];
+  for(const [kind,sizes] of Object.entries({Heavy:['20','40','45','Total'],Empty:['20','40','45','Total'],Reefer:['20','40','Total'],Capacity:['20','40','45','Reefer20','Reefer40'],EmptyCapacity:['20','40','45','Reefer20','Reefer40']}))for(const size of sizes)for(const fld of ['Count','Teu'])$('p79HomeYard'+kind+'Size'+size+fld).textContent='—';
+ const ids=['p79HomeYardHeavy','p79HomeYardEmpty','p79HomeYardHeavyCap','p79HomeYardEmptyCap','p79HomeYardEmptyCapTop','p79HomeYardHeavyPct','p79HomeYardEmptyPct','p79HomeYardHeavyCount','p79HomeYardEmptyCount','p79HomeYardReeferCount','p79HomeYardReeferTop','p79HomeYardReeferTopTeu','p79HomeYardHeavyCapChart'];
  ids.forEach(id=>{const el=$(id);if(el)el.textContent='—';});
  $('p79HomeYardDate').textContent='—';
  const note=$('p79HomeYardSource');
@@ -1610,6 +1614,10 @@ function renderHomeYardSummary(session){
    const capFor=key=>Number.isSafeInteger(allowance?.[key])&&allowance[key]>=0&&allowance[key]<=100000000?allowance[key]:null;
    for(const [size,key,mult] of [['20','heavy20',1],['40','heavy40',2],['45','heavy45',2],['Reefer20','reefer20',1],['Reefer40','reefer40',2]])
     showSize('Capacity',size,capFor(key),mult);
+   // Shared reefer allowance has no heavy-vs-empty split; do not show it as
+   // an empty-only limit. Only independent empty20/40/45 limits are populated.
+   for(const [size,key,mult] of [['20','empty20',1],['40','empty40',2],['45','empty45',2]])
+    showSize('EmptyCapacity',size,capFor(key),mult);
   const teuSummary=(key,value,id)=>{
    const permitted=allowance?.[key+'Teu'];
    const max=Number.isSafeInteger(permitted)&&permitted>0&&permitted<=200000000?permitted:null;
@@ -1634,6 +1642,7 @@ function renderHomeYardSummary(session){
   $('p79HomeYardEmpty').textContent=fmt(latest.emptyTotal);
   $('p79HomeYardHeavyCap').textContent=fmt(heavyCap);
   $('p79HomeYardEmptyCap').textContent=fmt(emptyCap);
+   $('p79HomeYardEmptyCapTop').textContent=fmt(emptyCap);
   $('p79HomeYardHeavyPct').textContent=(Number(latest.heavyTotal)/heavyCap*100).toFixed(2)+'%';
   $('p79HomeYardEmptyPct').textContent=(Number(latest.emptyTotal)/emptyCap*100).toFixed(2)+'%';
   note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
