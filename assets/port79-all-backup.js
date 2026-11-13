@@ -36,10 +36,10 @@ function render(){
  if(!batch)return;const list=$('p79AllBackupResults');if(!list)return;list.replaceChildren();for(const item of batch.items){const li=d.createElement('li'),name=d.createElement('strong'),state=d.createElement('span');name.textContent=item.label+'：';state.textContent=item.result?(item.result.unchanged?'無異動，已核對既有備份':`已備份 ${Number(item.result.rows||0).toLocaleString('zh-TW')} 筆`):item.error?'未完成：'+item.error:item.running?'備份及讀回核對中…':'等待備份';li.append(name,state);if(item.result){const a=d.createElement('a');a.href=item.result.backupUrl;a.target='_blank';a.rel='noopener';a.textContent='開啟歷史資料';li.append(a);}list.append(li);}
  const done=batch.items.filter(i=>i.result).length,failed=batch.items.some(i=>i.error),progress=$('p79AllBackupProgress');if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
  message(done===batch.items.length?'全部分類已備份並核對完成。':busy?`備份進度 ${done}/${batch.items.length}；完成的項目會保留。`:failed?`已完成 ${done}/${batch.items.length}；按「重試未完成項目」繼續。`:'尚未取得全部分類的完成確認。');
- const btn=$('p79AllBackupButton');if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'全部系統備份到歷史資料庫';}
+ const btn=$('p79AllBackupButton');if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
 async function start(){
- if(busy||!allowed(session()))return;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
+ if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
  try{
   const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');
   const yard=await yardSnapshot(c.actor),fingerprint=await digest(new TextEncoder().encode(JSON.stringify(yard))),originals=(await records()).filter(r=>r.actor===c.actor&&!r.receipt);
@@ -53,7 +53,7 @@ async function start(){
    }catch(e){if(!same(c))throw e;item.error=String(e.message||e).slice(0,240);}finally{item.running=false;}render();
   }
  }catch(e){if(!c||same(c))message(String(e.message||e).slice(0,240));}
- finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='全部系統備份到歷史資料庫';}if(batch?.items.every(i=>i.result))batch=null;}else refresh();}
+ finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result))batch=null;}else refresh();}
 }
 function refresh(){
  const s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
@@ -62,7 +62,7 @@ function refresh(){
  if(panel)panel.hidden=!isManager;
  if(button){button.disabled=!canRun||busy;button.title=canRun?'執行前會先核對雲端是否支援全部分類':'僅最高管理員可以執行全系統備份';}
  if(isManager&&!canRun)message('這裡是全系統歷史備份入口；僅最高管理員可以操作。請以最高管理員身分登入後執行。');
- if(!canRun){if(controller)controller.abort();batch=null;}
+ if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
 function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',start);refresh();}
 g.Port79AllBackup={start,refresh,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
