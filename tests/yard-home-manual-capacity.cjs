@@ -140,6 +140,8 @@ const dataStore=new Map([
 const context={
  window:{addEventListener(){}},
  currentSession:null,
+ YARD_HOME_STORAGE_PREFIX:'p79_yard_private_v1_',
+ YARD_HOME_CAPACITY_PREFIX:'p79_yard_capacity_overrides_v1_',
  getToken:()=>activeToken,
  $:hnode,
  localStorage:{getItem:key=>{reads++;return dataStore.get(key)||null;}},
