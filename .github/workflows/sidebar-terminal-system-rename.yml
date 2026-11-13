@@ -1,0 +1,41 @@
+name: Verify terminal system sidebar name
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-seven-top.js'
+      - 'tests/sidebar-terminal-system-rename.cjs'
+      - '.github/workflows/sidebar-terminal-system-rename.yml'
+      - 'attendance/index.html'
+      - 'schedule/index.html'
+      - 'aqc-efficiency/index.html'
+      - 'hr/index.html'
+      - 'work-hours/index.html'
+      - 'leave/index.html'
+      - 'history-data/index.html'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-seven-top.js'
+      - 'tests/sidebar-terminal-system-rename.cjs'
+      - '.github/workflows/sidebar-terminal-system-rename.yml'
+      - 'attendance/index.html'
+      - 'schedule/index.html'
+      - 'aqc-efficiency/index.html'
+      - 'hr/index.html'
+      - 'work-hours/index.html'
+      - 'leave/index.html'
+      - 'history-data/index.html'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node tests/sidebar-terminal-system-rename.cjs
+          node tests/seven-top-status-icons.cjs
