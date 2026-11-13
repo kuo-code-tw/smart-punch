@@ -21,6 +21,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
+<link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v114">
+<script defer src="assets/port79-all-backup.js?v=20261113-v114"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
 *{box-sizing:border-box}
@@ -423,6 +425,11 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <div id="p79PublicShipBoard" data-gas-url="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec" aria-live="polite">等待官方船期…</div>
     </section>
     <div id="systems" class="system-wrap">
+      <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-labelledby="p79AllBackupHeading">
+        <div class="p79-all-backup-head"><div><h2 id="p79AllBackupHeading">全系統歷史備份</h2><p>依各分類資料夾保存；已備份且沒有變動的歷史資料會沿用，減少重複處理。</p></div><button type="button" id="p79AllBackupButton">全部系統備份到歷史資料庫</button></div>
+        <p>包含出勤、排班、加班、請假、人資、工時、效率、船舶、船期、進出站、航線及目前帳號在此瀏覽器的儲量資料。備份不會刪除或切換正式資料。</p>
+        <div id="p79AllBackupStatus" role="status" aria-live="polite">按下按鈕後開始逐項備份，並顯示各分類的核對結果。</div><progress id="p79AllBackupProgress" value="0" max="13" hidden aria-label="歷史備份進度"></progress><ul id="p79AllBackupResults" aria-label="各系統備份結果"></ul>
+      </section>
       <!-- 純展示區：保留全部原有系統卡片、事件綁定、權限檢查與資料連線。 -->
       <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
         <div>
@@ -1228,6 +1235,7 @@ function clearSession(){
   // v2026.10.06 HOME-SECOND-LOGIN-FIX：
   // 登出後完整重置登入身分判斷狀態，避免第二次登入時密碼欄維持 disabled。
   currentSession=null;
+  window.Port79AllBackup?.refresh();
   loginBusy=false;
   passwordTouched=false;
 
@@ -1305,6 +1313,7 @@ function showSession(session){
   $('sessionBar').classList.add('show');
   $('loginBox').style.display='none';
   $('systems').classList.add('show');
+  window.Port79AllBackup?.refresh();
 
   SYSTEM_KEYS.forEach(k=>{
     const btn=$('card'+k.charAt(0).toUpperCase()+k.slice(1));

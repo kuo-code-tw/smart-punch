@@ -440,7 +440,12 @@ async function importFile(file){
   rows=[...existing.values()].sort((a,b)=>a.date.localeCompare(b.date));
   fileName=file.name;updatedAt=new Date().toISOString();selectedDate=imported[imported.length-1].date;
   const saved=persist();render();
-  if(saved)message('Excel 核對通過：已匯入 '+imported.length+' 天（'+imported[0].date+' 至 '+imported[imported.length-1].date+'）。資料已存此瀏覽器，未同步雲端。','success');
+  if(saved){
+   let originalSaved=false;
+   try{if(g.Port79AllBackup?.rememberYardImport){await g.Port79AllBackup.rememberYardImport(file);originalSaved=true;}}
+   catch(error){message('每日資料已匯入，但Excel原檔未保存：'+String(error.message||error)+'。請保留原檔並重新匯入。','error');return;}
+   message('Excel 核對通過：已匯入 '+imported.length+' 天（'+imported[0].date+' 至 '+imported[imported.length-1].date+'）。資料已存此瀏覽器'+(originalSaved?'，原始Excel也已保存':'')+'；請至首頁按「全部系統備份到歷史資料庫」完成雲端備份。','success');
+  }
  }catch(err){message('匯入失敗：'+String(err.message||err),'error')}
  finally{importBusy=false;if($('yardFile'))$('yardFile').value='';}
 }
