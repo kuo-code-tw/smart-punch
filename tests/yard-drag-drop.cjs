@@ -80,10 +80,10 @@ const flush=async()=>{for(let n=0;n<6;n++)await new Promise(done=>setTimeout(don
 (async()=>{
  assert.match(html,/yardDropOverlay/,'drop feedback overlay available');
  assert.match(html,/yardDropHint/,'visible drop instruction available');
- assert.match(html,/yard-dashboard\.js\?v=20261113-drop-v1/,'script cache revision');
- assert.match(html,/yard-dashboard\.css\?v=20261113-center-v1/,'style cache revision');
+ assert.match(html,/yard-dashboard\.js\?v=20261113-manualcap-v1/,'script cache revision');
+ assert.match(html,/yard-dashboard\.css\?v=20261113-manualcap-v1/,'style cache revision');
  assert.match(css,/yard-drop-overlay\[hidden\]\{display:none!important\}/,'hidden overlay does not block page');
- assert.match(parent,/20261113-yard-center-v1/,'embedded iframe refreshes cached Yard page');
+ assert.match(parent,/20261113-yard-manualcap-v1/,'embedded iframe refreshes cached Yard page');
 
  const b=createBrowser();
  b.setMatrix(workbook(b.api.fieldRows));
