@@ -22,7 +22,7 @@
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v114">
-<script defer src="assets/port79-all-backup.js?v=20261113-v115-visible"></script>
+<script defer src="assets/port79-all-backup.js?v=20261113-v116-roles"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
 *{box-sizing:border-box}
@@ -428,7 +428,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-labelledby="p79AllBackupHeading">
         <div class="p79-all-backup-head"><div><h2 id="p79AllBackupHeading">全系統歷史備份</h2><p>依各分類資料夾保存；已備份且沒有變動的歷史資料會沿用，減少重複處理。</p></div><button type="button" id="p79AllBackupButton">全部系統備份到歷史資料庫</button></div>
         <p>包含出勤、排班、加班、請假、人資、工時、效率、船舶、船期、進出站、航線及目前帳號在此瀏覽器的儲量資料。備份不會刪除或切換正式資料。</p>
-        <div id="p79AllBackupStatus" role="status" aria-live="polite">按下按鈕後開始逐項備份，並顯示各分類的核對結果。</div><progress id="p79AllBackupProgress" value="0" max="13" hidden aria-label="歷史備份進度"></progress><ul id="p79AllBackupResults" aria-label="各系統備份結果"></ul>
+        <div id="p79AllBackupStatus" role="status" aria-live="polite">按下後先確認正式雲端是否支援全部 13 類備份；只有完成備份並讀回驗證的項目才會標記成功，未啟用時不會寫入資料。</div><progress id="p79AllBackupProgress" value="0" max="13" hidden aria-label="歷史備份進度"></progress><ul id="p79AllBackupResults" aria-label="各系統備份結果"></ul>
       </section>
       <!-- 純展示區：保留全部原有系統卡片、事件綁定、權限檢查與資料連線。 -->
       <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
