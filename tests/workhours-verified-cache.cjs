@@ -157,6 +157,9 @@ await test('actual page hydrators keep previews pending, deduplicate calculation
  state.cacheBundleLoad=true;state.promise=new Promise(()=>{});state.cacheMutationStamp='';
  assert.equal(await c.recentRoster(month,'TOKEN',''),null,'bundle-backed table never awaits its own promise');
 });
+await test('integration cache mirror stays aligned with the production disk-read behavior',async()=>{
+ assert.equal(fs.readFileSync('integration-test/data-cache.js','utf8').trimEnd(),fs.readFileSync('assets/port79-data-cache.js','utf8').trimEnd());
+});
 console.log('VERIFIED WORKHOURS CACHE: '+passed+' scenarios passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
 
