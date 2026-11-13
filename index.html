@@ -22,7 +22,7 @@
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v114">
-<script defer src="assets/port79-all-backup.js?v=20261113-v114"></script>
+<script defer src="assets/port79-all-backup.js?v=20261113-v115-visible"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
 *{box-sizing:border-box}
@@ -891,7 +891,7 @@ function updateThemeText(){$('themeToggle').textContent=document.documentElement
 $('themeToggle').onclick=()=>{const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);localStorage.setItem('port79_theme',next);updateThemeText()};initTheme();
 
 function normLevel(v,f='none'){v=String(v??'').toLowerCase();return ['none','view','manage'].includes(v)?v:f}
-function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));if(role==='admin'&&Object.prototype.hasOwnProperty.call(raw,'history'))out.history=normLevel(raw.history,'none');return out}
+function normalizePermissions(raw,role){role=String(role||'employee').toLowerCase();if(role==='superadmin')return{attendance:'manage',workhours:'manage',leave:'manage',schedule:'manage',efficiency:'manage',hr:'manage',history:'manage'};raw=raw&&typeof raw==='object'?raw:{};const defaults=role==='admin'?{attendance:'view',leave:'none',schedule:'none',efficiency:'none',hr:'none'}:{attendance:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none'};const out={};SYSTEM_KEYS.forEach(k=>out[k]=normLevel(raw[k],defaults[k]));if(role==='admin'&&Object.prototype.hasOwnProperty.call(raw,'history'))out.history=normLevel(raw.history,'none');return out}
 
 function normalizeDetectedVersion(raw){
   const s=String(raw||'').trim();
