@@ -40,7 +40,18 @@
         <article class="yard-kpi empty"><div class="yard-kpi-symbol" aria-hidden="true">▤</div><div class="yard-kpi-body"><span>空櫃場存</span><strong><b id="yardEmptyTotal">—</b><small>TEU</small></strong></div><div class="yard-kpi-ratio"><span>使用率</span><strong id="yardEmptyRate">—</strong><div class="yard-track"><i id="yardEmptyBar"></i></div></div></article>
         <article class="yard-kpi capacity"><div class="yard-kpi-symbol" aria-hidden="true">▱</div><div class="yard-kpi-body"><span>重櫃儲位容量</span><strong><b id="yardHeavyCap">—</b><small>TEU</small></strong><div class="yard-kpi-tip">依當日有效容量</div></div></article>
         <article class="yard-kpi long"><div class="yard-kpi-symbol" aria-hidden="true">▣</div><div class="yard-kpi-body"><span>Long-Stay（長期存放）</span><strong><b id="yardLongTotal">—</b><small>TEU</small></strong><div class="yard-kpi-tip">場存內含分類・不重複加總</div></div></article>
+        <article class="yard-kpi capacity empty-capacity"><div class="yard-kpi-symbol" aria-hidden="true">▱</div><div class="yard-kpi-body"><span>空櫃儲位容量</span><strong><b id="yardEmptyCap">—</b><small>TEU</small></strong><div class="yard-kpi-tip">依所選日期有效容量</div></div></article>
       </div>
+      <section id="yardCapacityPanel" class="yard-capacity-panel" aria-labelledby="yardCapacityTitle">
+        <div class="yard-capacity-intro"><h2 id="yardCapacityTitle">儲位容量手動設定 <small id="yardCapacityDate">—</small></h2><p>僅調整所選日期的容量 TEU 與使用率；原始 Excel 報表不會被修改。</p></div>
+        <div class="yard-capacity-fields">
+          <label for="yardManualHeavyCap">重櫃容量 TEU<input id="yardManualHeavyCap" type="number" inputmode="decimal" min="0.01" max="100000000" step="0.01" required></label>
+          <label for="yardManualEmptyCap">空櫃容量 TEU<input id="yardManualEmptyCap" type="number" inputmode="decimal" min="0.01" max="100000000" step="0.01" required></label>
+          <button id="yardCapacitySave" type="button" class="yard-btn import">儲存容量</button>
+          <button id="yardCapacityReset" type="button" class="yard-btn export">還原 Excel 容量</button>
+        </div>
+        <p id="yardCapacitySource" class="yard-capacity-source">原始容量以 Excel 報表為準，手動值保存在本機此帳號。</p>
+      </section>
       <div class="yard-topgrid">
         <article class="yard-card"><h2>重櫃櫃種分布 <small id="yardHeavySub">—</small></h2><div class="yard-donut-group"><div class="yard-donut" id="yardHeavyDonut" role="img" aria-label="重櫃種類甜甜圈圖"><div class="yard-donut-center"><strong id="yardHeavyCenter">—</strong><small>TEU</small></div></div><div id="yardHeavyLegend" class="yard-legend"></div></div></article>
         <article class="yard-card"><h2>空櫃櫃種分布 <small id="yardEmptySub">—</small></h2><div class="yard-donut-group"><div class="yard-donut" id="yardEmptyDonut" role="img" aria-label="空櫃種類甜甜圈圖"><div class="yard-donut-center"><strong id="yardEmptyCenter">—</strong><small>TEU</small></div></div><div id="yardEmptyLegend" class="yard-legend"></div></div><p class="yard-panel-note">特殊空櫃為另列分類，未重複加入空櫃總量。</p></article>
