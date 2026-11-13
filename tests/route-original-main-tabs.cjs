@@ -2,9 +2,12 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const css=fs.readFileSync('aqc-efficiency/route-management-dashboard.css','utf8');
-const tabs=['dashboard','multi-rod','compare','terminal','personstats','weekly','dispatch','gate'];
+const tabs=['dashboard','compare','terminal','yard','gate','multi-rod','personstats','weekly','dispatch'];
 const navBlock=html.slice(html.indexOf('<section id="efficiencyMainTabs"'),html.indexOf('</section>',html.indexOf('<section id="efficiencyMainTabs"')));
-assert.equal((navBlock.match(/data-tab="/g)||[]).length,8,'original eight shared tabs remain');
+assert.equal((navBlock.match(/data-tab="/g)||[]).length,9,'all nine shared tabs remain');
+assert.deepEqual([...navBlock.matchAll(/data-tab="([^"]+)"/g)].map(m=>m[1]),tabs,'terminal tabs grouped on the left; all navigation actions retain their identities');
+for(const label of ['碼頭船舶作業管理','碼頭航線管理','碼頭營運統計','碼頭儲量管理','碼頭進出站管理'])assert(navBlock.includes(label),'terminal label '+label+' stays visible');
+for(const oldLabel of ['船舶作業明細','航線資料管理','進出站櫃量管理'])assert(!navBlock.includes(oldLabel),'old navigation label '+oldLabel+' must be removed');
 for(const name of tabs){
  assert(navBlock.includes('data-tab="'+name+'"'),'original '+name+' tab in main tab bar');
  assert(navBlock.includes("switchTab('"+name+"',this)"),name+' keeps original click action');
@@ -29,7 +32,7 @@ const toolbarStart=html.indexOf('class="p79-rm-topbar"',routeStart);
 const toolbarEnd=html.indexOf('class="p79-rm-main"',toolbarStart);
 const routeBar=html.slice(toolbarStart,toolbarEnd);
 assert(routeStart>=0&&toolbarStart>routeStart&&toolbarEnd>toolbarStart,'route toolbar is before route main');
-const heading=routeBar.indexOf('<h2>航線資料管理</h2>');
+const heading=routeBar.indexOf('<h2>碼頭航線管理</h2>');
 const compare=routeBar.indexOf('id="routeManagerCompareNav"');
 const exportButton=routeBar.indexOf('id="routeManagerExportBtn"');
 const month=routeBar.indexOf('id="routeTopMonthFilter"');
@@ -45,4 +48,4 @@ assert(css.includes('#view-compare .p79-rm-main{padding-top:6px!important}'),'no
 assert(css.includes('#view-compare .p79-rm-topnav>button{'),'route comparison/export remain visible as compact actions');
 assert(css.includes('#view-compare .p79-rm-top-actions{'),'month, sync and profile remain visible as utility actions');
 assert(css.includes('@media(max-width:960px)'),'mobile layout keeps horizontal menu scrolling');
-console.log('PASS route menu: eight colored global tabs and compact single-row route toolbar with original controls');
+console.log('PASS route menu: nine shared tabs, terminal-first labels and compact single-row route toolbar with original controls');
