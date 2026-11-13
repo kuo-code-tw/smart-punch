@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f7fd">
 <title>碼頭儲位管理｜79號碼頭雲端智慧系統</title>
-<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-allowed-count-v1">
+<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-box-teu-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="./yard-dashboard.js?v=20261113-allowed-count-v1"></script>
+<script defer src="./yard-dashboard.js?v=20261113-box-teu-v1"></script>
 </head>
 <body>
 <main class="yard-shell">
@@ -30,15 +30,18 @@
   <div class="yard-drop-hint" id="yardDropHint"><span aria-hidden="true">⇩</span><span>可直接把 <strong>.xlsx／.xls</strong> 檔案拖曳到這個頁面匯入，也能使用「匯入 Excel」按鈕（單檔最大 12 MB）。</span></div>
   <div class="yard-status" id="yardStatus" role="status" aria-live="polite" data-tone="info">尚未匯入堆場 Excel；不使用示意數字或推估資料。</div>
   <section id="yardAllowedSettings" class="yard-allowed-settings" aria-labelledby="yardAllowedTitle" hidden>
-    <div class="yard-allowed-head"><div><h2 id="yardAllowedTitle">碼頭空／重櫃容許櫃量設定</h2><p>設定碼頭最多可容許存放的實際櫃數，單位為「櫃」，不是 TEU。此上限適用所有匯入日期，用來判斷是否超量；不修改 Excel 的櫃數或 TEU。</p></div></div>
+    <div class="yard-allowed-head"><div><h2 id="yardAllowedTitle">碼頭空／重櫃容許櫃量與 TEU 設定</h2><p>櫃數上限與 TEU 上限可分別設定。系統依 <strong>20 尺＝1 TEU、40 尺＝2 TEU</strong> 換算實際 TEU，分別檢查是否超量；不修改 Excel 原始數據。</p></div></div>
     <div class="yard-allowed-editor">
       <label for="yardHeavyAllowed">重櫃容許上限（櫃）<input id="yardHeavyAllowed" type="number" inputmode="numeric" min="1" max="100000000" step="1" placeholder="請輸入重櫃上限"></label>
       <label for="yardEmptyAllowed">空櫃容許上限（櫃）<input id="yardEmptyAllowed" type="number" inputmode="numeric" min="1" max="100000000" step="1" placeholder="請輸入空櫃上限"></label>
+      <label for="yardHeavyAllowedTeu">重櫃容許上限（TEU，可選填）<input id="yardHeavyAllowedTeu" type="number" inputmode="numeric" min="1" max="200000000" step="1" placeholder="輸入重櫃 TEU 上限"></label>
+      <label for="yardEmptyAllowedTeu">空櫃容許上限（TEU，可選填）<input id="yardEmptyAllowedTeu" type="number" inputmode="numeric" min="1" max="200000000" step="1" placeholder="輸入空櫃 TEU 上限"></label>
       <button type="button" class="yard-btn import" id="yardAllowanceSave">儲存容許櫃量</button>
       <button type="button" class="yard-btn export" id="yardAllowanceClear">清除設定</button>
     </div>
+    <div class="yard-teu-breakdown" id="yardAllowanceTeuBreakdown" aria-live="polite">TEU 換算：20 尺櫃數 × 1 ＋ 40 尺櫃數 × 2</div>
     <p id="yardAllowanceStatus" class="yard-allowed-status" role="status" aria-live="polite">目前尚未設定。</p>
-    <p class="yard-allowed-note">重櫃實際櫃數＝進口、出口、轉口、冷凍重櫃的 20／40 呎櫃數合計；空櫃實際櫃數＝一般與冷凍空櫃的 20／40 呎櫃數合計。特殊櫃與 Long-Stay 可能包含在上述分類，不重複計入。設定僅儲存在此登入帳號的目前瀏覽器，尚未雲端同步。</p>
+    <p class="yard-allowed-note">重櫃實際櫃數＝進口、出口、轉口、冷凍重櫃的 20／40 呎櫃數合計；空櫃實際櫃數＝一般與冷凍空櫃的 20／40 呎櫃數合計。換算 TEU 依 20 尺 ×1、40 尺 ×2 獨立計算；若原 Excel 特殊櫃／其他調整造成 TEU 不同，仍保留 Excel 原值，換算值另行標示。特殊櫃與 Long-Stay 不重複計入。設定僅儲存在此登入帳號的目前瀏覽器，尚未雲端同步。</p>
   </section>
   <section id="yardEmpty" class="yard-empty" hidden aria-label="尚無堆場資料">
     <span aria-hidden="true">▥</span><h2>請先匯入堆場報表</h2>
@@ -55,9 +58,9 @@
         <article class="yard-kpi capacity empty-capacity"><div class="yard-kpi-symbol" aria-hidden="true">▱</div><div class="yard-kpi-body"><span>空櫃儲位容量</span><strong><b id="yardEmptyCap">—</b><small>TEU</small></strong><div class="yard-kpi-tip">依所選日期有效容量</div></div></article>
       </div>
       <section class="yard-allowed-summary" aria-label="碼頭容許櫃量與實際櫃數">
-        <div><span>重櫃實際櫃數</span><b id="yardHeavyCount">—</b><small>櫃</small><p id="yardHeavyLimitSummary">容許上限：未設定</p></div>
-        <div><span>空櫃實際櫃數</span><b id="yardEmptyCount">—</b><small>櫃</small><p id="yardEmptyLimitSummary">容許上限：未設定</p></div>
-        <p>容許櫃量以實際櫃數比較；Excel 原有的 TEU 容量與使用率照原報表顯示。到右側「容許櫃量設定」輸入上限。</p>
+        <div><span>重櫃實際櫃數</span><b id="yardHeavyCount">—</b><small>櫃</small><p id="yardHeavyLimitSummary">容許上限：未設定</p><p id="yardHeavyTeuSummary">換算 TEU：—</p></div>
+        <div><span>空櫃實際櫃數</span><b id="yardEmptyCount">—</b><small>櫃</small><p id="yardEmptyLimitSummary">容許上限：未設定</p><p id="yardEmptyTeuSummary">換算 TEU：—</p></div>
+        <p>櫃數以實際櫃數比較；TEU 依 20 尺＝1、40 尺＝2 換算後與 TEU 上限比較。Excel 原有 TEU 容量與使用率照原報表顯示。</p>
       </section>
       <div class="yard-topgrid">
         <article class="yard-card"><h2>重櫃櫃種分布 <small id="yardHeavySub">—</small></h2><div class="yard-donut-group"><div class="yard-donut" id="yardHeavyDonut" role="img" aria-label="重櫃種類甜甜圈圖"><div class="yard-donut-center"><strong id="yardHeavyCenter">—</strong><small>TEU</small></div></div><div id="yardHeavyLegend" class="yard-legend"></div></div></article>
