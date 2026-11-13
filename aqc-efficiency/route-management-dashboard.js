@@ -236,7 +236,7 @@ function exportCsv(){
  for(const r of actualRows())lines.push([r.route,name(r.route),r.importCalls,r.exportCalls,r.disc,r.load,r.total]);
  const csv='\ufeff'+lines.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=root.document.createElement('a');
- a.href=url;a.download='航線資料管理_'+state.model.month+'.csv';root.document.body.appendChild(a);a.click();a.remove();
+ a.href=url;a.download='碼頭航線管理_'+state.model.month+'.csv';root.document.body.appendChild(a);a.click();a.remove();
  root.setTimeout(()=>URL.revokeObjectURL(url),1200);
 }
 function bind(){
