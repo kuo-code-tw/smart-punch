@@ -13,6 +13,7 @@ assert.match(html,/重櫃容許上限（櫃）/);
 assert.match(html,/空櫃容許上限（櫃）/);
 assert.match(html,/id="yardAllowanceSave"/);
 assert.match(html,/id="yardAllowanceClear"/);
+for(const type of ['Heavy','Empty'])assert.match(html,new RegExp('id="yard'+type+'Allowed45"'),'45ft limit input exists');
 assert.match(html,/id="yardHeavyAllowedTeu"/);
 assert.match(html,/id="yardEmptyAllowedTeu"/);
 for(const id of ['Heavy','Empty','Reefer']){
@@ -21,11 +22,11 @@ for(const id of ['Heavy','Empty','Reefer']){
 }
 assert.match(html,/id="yardReeferCount"/);
 assert.match(html,/id="yardReeferTeuSummary"/);
-assert.match(html,/20 呎櫃＝1 TEU，40 呎櫃＝2 TEU/);
+assert.match(html,/20 呎櫃＝1 TEU，40／45 呎櫃＝2 TEU/);
 assert.doesNotMatch(html,/id="yardManualHeavyCap"|id="yardManualEmptyCap"/,'TEU override inputs must not be shown as box count controls');
-assert.match(html,/yard-dashboard\.js\?v=20261113-container-ft-v1/);
-assert.match(html,/yard-dashboard\.css\?v=20261113-container-ft-v1/);
-assert.match(parent,/20261113-yard-container-ft-v1/);
+assert.match(html,/yard-dashboard\.js\?v=20261113-home-size-cards-v1/);
+assert.match(html,/yard-dashboard\.css\?v=20261113-home-size-cards-v1/);
+assert.match(parent,/20261113-yard-home-size-cards-v1/);
 assert.match(css,/\.yard-allowed-summary/);
 assert.match(home,/id="p79HomeYardHeavyCount"/);
 assert.match(home,/id="p79HomeYardEmptyCount"/);
@@ -92,6 +93,8 @@ assert.deepEqual(converted,{heavy:{count:24,teu:29,twenty:19,forty:5},
 assert.equal(a.allowedTeuValue(''),null,'TEU limit can be omitted');
 assert.equal(a.allowedTeuValue('12000'),12000);
 assert.equal(a.allowedSizeLimit('',''),null);
+assert.deepEqual(JSON.parse(JSON.stringify(a.allowedSizeLimit('1','2','3'))),{twenty:1,forty:2,fortyfive:3,count:6,teu:11},'45ft counts as 2 TEU');
+assert.equal(a.allowedSizeLimit('0','0','1').teu,2);
 assert.deepEqual(JSON.parse(JSON.stringify(a.allowedSizeLimit('20','40'))),{twenty:20,forty:40,count:60,teu:100});
 assert.deepEqual(JSON.parse(JSON.stringify(a.allowedSizeLimit('0','7'))),{twenty:0,forty:7,count:7,teu:14});
 for(const bad of ['-1','1.5','abc','100000001'])assert.throws(()=>a.allowedSizeLimit(bad,'3'),/容許櫃數/);
