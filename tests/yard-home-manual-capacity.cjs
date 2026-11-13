@@ -274,7 +274,7 @@ const homeStore=new Map([
  ['p79_yard_private_v1_TEST-ADMIN',JSON.stringify({rows:[source],fileName:'yard.xlsx'})],
  [limitKey,JSON.stringify({heavy:20,empty:25,heavyTeu:28,emptyTeu:30,reefer:5,reeferTeu:7})]
 ]);
-const context={window:{addEventListener(){}},getToken:()=>token,currentSession:null,$:getNode,console,
+const context={window:{addEventListener(){}},document:{getElementById:getNode},getToken:()=>token,currentSession:null,$:getNode,console,
  YARD_HOME_STORAGE_PREFIX:'p79_yard_private_v1_',YARD_HOME_ALLOWED_PREFIX:'p79_yard_allowed_container_counts_v1_',
  localStorage:{getItem:k=>{reads++;return homeStore.get(k)||null}}};
 vm.createContext(context);vm.runInContext(home.slice(begin,end),context,{timeout:5000});
