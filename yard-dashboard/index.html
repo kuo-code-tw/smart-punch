@@ -5,7 +5,7 @@
 <title>堆場儲位管理｜79號碼頭雲端智慧系統</title>
 <link rel="stylesheet" href="./yard-dashboard.css?v=20261113-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="./yard-dashboard.js?v=20261113-v1"></script>
+<script defer src="./yard-dashboard.js?v=20261113-v2"></script>
 </head>
 <body>
 <main class="yard-shell">
@@ -47,7 +47,7 @@
       </div>
       <div class="yard-bottomgrid">
         <article class="yard-card yard-trend"><h2>每日重櫃與空櫃庫存趨勢 <small id="yardTrendPeriod">—</small></h2><div id="yardTrendChart" class="yard-trend-svg" role="img" aria-label="每日重櫃與空櫃趨勢折線圖"></div><div class="yard-chart-key"><span><i class="color-heavy"></i>重櫃場存</span><span><i class="color-empty"></i>空櫃場存</span></div></article>
-        <article class="yard-card"><div class="yard-card-row"><h2>今日櫃別明細 <small id="yardTableDate">—</small></h2><span>單位：櫃／TEU</span></div><div class="yard-tablewrap"><table class="yard-table"><thead><tr><th>項目</th><th>20 呎（櫃）</th><th>40 呎（櫃）</th><th>合計（TEU）</th></tr></thead><tbody id="yardDailyRows"></tbody></table></div></article>
+        <article class="yard-card"><div class="yard-card-row"><h2>當日櫃別明細 <small id="yardTableDate">—</small></h2><span>單位：櫃／TEU</span></div><div class="yard-tablewrap"><table class="yard-table"><thead><tr><th>項目</th><th>20 呎（櫃）</th><th>40 呎（櫃）</th><th>合計（TEU）</th></tr></thead><tbody id="yardDailyRows"></tbody></table></div></article>
       </div>
       <section class="yard-alerts" aria-labelledby="yardAlertTitle"><h2 id="yardAlertTitle">⚠ 異常提醒</h2><div id="yardAlerts" class="yard-alert-list"></div></section>
     </section>

@@ -142,14 +142,22 @@ async function importFile(file){
  finally{if($('yardFile'))$('yardFile').value='';}
 }
 function bar(id,n){const el=$(id);if(el)el.style.width=Math.max(0,Math.min(100,n))+'%'}
+function donutGradient(segments,total){
+ const colors=['#287ef2','#ff861c','#22964f','#9048dc','#15a9b6'];
+ if(!(total>0))return '#e1ebfa';
+ let angle=0;
+ const stops=[];
+ segments.forEach((s,i)=>{
+  if(!(s.value>0))return;
+  const start=angle;angle+=s.value/total*100;
+  // Keep each category's original color even when prior categories are zero.
+  stops.push(colors[i%colors.length]+' '+start.toFixed(4)+'% '+angle.toFixed(4)+'%');
+ });
+ return stops.length?'conic-gradient('+stops.join(',')+')':'#e1ebfa';
+}
 function donut(id,centerId,legendId,segments,total){
  const colors=['#287ef2','#ff861c','#22964f','#9048dc','#15a9b6'];
- let angle=0;
- const stops=segments.filter(s=>s.value>0).map((s,i)=>{
-  const start=angle;angle+=s.value/total*100;
-  return colors[i%colors.length]+' '+start.toFixed(4)+'% '+angle.toFixed(4)+'%';
- });
- $(id).style.background='conic-gradient('+stops.join(',')+')';
+ $(id).style.background=donutGradient(segments,total);
  $(centerId).textContent=fmt(total);
  $(legendId).innerHTML=segments.map((s,i)=>{
   const share=total>0?s.value/total*100:0;
@@ -194,12 +202,18 @@ function renderDaily(r){
  '<tr class="emptytotal"><td>空櫃合計</td><td>'+fmt(r.genEmpty20+r.reeferEmpty20)+'</td><td>'+fmt(r.genEmpty40+r.reeferEmpty40)+'</td><td>'+fmt(r.emptyTotal)+'</td></tr>'
  ].join('');
 }
+function trendAxisMax(list){
+ const peak=Math.max(0,...list.map(r=>Math.max(Number(r.heavyTotal)||0,Number(r.emptyTotal)||0)));
+ if(!(peak>0))return 1;
+ const raw=peak/4, magnitude=10**Math.floor(Math.log10(raw));
+ const tick=[1,1.25,1.5,2,2.5,3,4,5,6,8,10].find(v=>v*magnitude>=raw)*magnitude;
+ return Number((4*tick).toPrecision(12));
+}
 function trendSvg(list){
  const W=850,H=255,L=55,R=20,T=14,B=42,iw=W-L-R,ih=H-T-B;
- const max=Math.max(1000,...list.map(r=>Math.max(r.heavyTotal,r.emptyTotal)));
- const cap=Math.ceil(max/3000)*3000, Y=n=>T+ih-(n/cap)*ih;
+ const cap=trendAxisMax(list), Y=n=>T+ih-(n/cap)*ih;
  const X=i=>L+(list.length===1?iw/2:i*iw/(list.length-1));
- let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="重櫃藍色與空櫃綠色庫存折線圖">';
+ let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="重櫃藍色與空櫃綠色庫存折線圖"><text x="'+L+'" y="10" fill="#64758a" font-size="11">TEU</text>';
  for(let i=0;i<=4;i++){const val=cap*i/4,y=Y(val);svg+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#e1e9f4"/><text x="'+(L-9)+'" y="'+(y+4)+'" text-anchor="end" fill="#64758a" font-size="11">'+fmt(val)+'</text>';}
  const steps=list.length>22?Math.ceil(list.length/14):1;
  list.forEach((r,i)=>{if(i%steps===0||i===list.length-1)svg+='<text x="'+X(i)+'" y="'+(H-15)+'" text-anchor="middle" fill="#55657c" font-size="11">'+Number(r.date.slice(-2))+'/'+Number(r.date.slice(5,7))+'</text>';});
@@ -210,15 +224,23 @@ function trendSvg(list){
  }
  svg+='</svg>';return svg;
 }
-function alerts(r,period){
+function alertNotices(r,period){
  const notices=[];
- const over=period.filter(x=>x.heavyPlug20Pct>100||x.heavyPlug40Pct>100);
- over.forEach(x=>{if(x.heavyPlug20Pct>100)notices.push(x.date.slice(5).replace('-','/')+'：20 呎冷凍重櫃插座 '+pct(x.heavyPlug20Pct)+'（超過容量）');
- if(x.heavyPlug40Pct>100)notices.push(x.date.slice(5).replace('-','/')+'：40 呎冷凍重櫃插座 '+pct(x.heavyPlug40Pct)+'（超過容量）');});
+ for(const x of period){
+  const day=x.date.slice(5).replace('-','/');
+  if(x.heavyTotal>x.heavyCap)notices.push(day+'：重櫃場存 '+fmt(x.heavyTotal)+' TEU，超過容量 '+fmt(x.heavyCap)+' TEU');
+  if(x.emptyTotal>x.emptyCap)notices.push(day+'：空櫃場存 '+fmt(x.emptyTotal)+' TEU，超過容量 '+fmt(x.emptyCap)+' TEU');
+  if(x.heavyPlug20Pct>100)notices.push(day+'：20 呎冷凍重櫃插座 '+pct(x.heavyPlug20Pct)+'（超過容量）');
+  if(x.heavyPlug40Pct>100)notices.push(day+'：40 呎冷凍重櫃插座 '+pct(x.heavyPlug40Pct)+'（超過容量）');
+ }
  for(let i=1;i<period.length;i++)for(const [key,label] of [['heavyCap','重櫃容量'],['emptyCap','空櫃容量']])
    if(period[i][key]!==period[i-1][key])notices.push(period[i].date.slice(5).replace('-','/')+'：'+label+'由 '+fmt(period[i-1][key])+' 調整為 '+fmt(period[i][key])+' TEU');
  const diff=r.genEmptyTeu-(r.genEmpty20+2*r.genEmpty40);
  if(Math.abs(diff)>0.02)notices.push(r.date.slice(5).replace('-','/')+'：一般空櫃原檔小計與 20／40 呎基本換算相差 '+fmt(diff)+' TEU，保留原檔數值');
+ return notices;
+}
+function alerts(r,period){
+ const notices=alertNotices(r,period);
  if(!notices.length){
   $('yardAlerts').innerHTML='<span>已核對現有匯入資料，暫無需提醒的數量或容量異常。</span>';
   $('yardAlerts').parentElement.classList.add('clear');
@@ -256,7 +278,7 @@ function renderDetail(r,list){
    '<h3 class="yard-detail-subhead">每日重櫃插座使用率</h3>'+historyTable(list,['heavyPlug20Cap','reefer20','heavyPlug20Pct','heavyPlug40Cap','reefer40','heavyPlug40Pct'],['20容量','20櫃數','20使用率％','40容量','40櫃數','40使用率％']);
  } else if(view==='long'){
   title='▣ Long-Stay 長期儲存與歷史｜'+r.date;subtitle='進口、出口、轉口長期重櫃之 TEU 合計；屬重櫃總場存的分類，絕不可再次加總到重櫃場存。';
-  inner='<div class="yard-detail-grid"><div><div class="yard-detail-split"><span>進口 Long-Stay</span><b>'+fmt(r.longImpTeu)+' TEU</b></div><div class="yard-detail-split"><span>出口 Long-Stay</span><b>'+fmt(r.longExpTeu)+' TEU</b></div><div class="yard-detail-split"><span>轉口 Long-Stay</span><b>'+fmt(r.longTransTeu)+' TEU</b></div><hr><div class="yard-detail-split"><span>Long-Stay 合計</span><b>'+fmt(r.longTotal)+' TEU</b></div></div><div><div class="yard-detail-split"><span>重櫃場存</span><b>'+fmt(r.heavyTotal)+' TEU</b></div><div class="yard-detail-split"><span>Long-Stay 占重櫃</span><b>'+pct(r.longTotal/r.heavyTotal*100)+'</b></div><p class="yard-discrepancy">此比率為同日長期存放重櫃占比，不是儲位使用率。</p></div></div>'+
+  inner='<div class="yard-detail-grid"><div><div class="yard-detail-split"><span>進口 Long-Stay</span><b>'+fmt(r.longImpTeu)+' TEU</b></div><div class="yard-detail-split"><span>出口 Long-Stay</span><b>'+fmt(r.longExpTeu)+' TEU</b></div><div class="yard-detail-split"><span>轉口 Long-Stay</span><b>'+fmt(r.longTransTeu)+' TEU</b></div><hr><div class="yard-detail-split"><span>Long-Stay 合計</span><b>'+fmt(r.longTotal)+' TEU</b></div></div><div><div class="yard-detail-split"><span>重櫃場存</span><b>'+fmt(r.heavyTotal)+' TEU</b></div><div class="yard-detail-split"><span>Long-Stay 占重櫃</span><b>'+(r.heavyTotal>0?pct(r.longTotal/r.heavyTotal*100):'—')+'</b></div><p class="yard-discrepancy">此比率為同日長期存放重櫃占比，不是儲位使用率。</p></div></div>'+
    '<h3 class="yard-detail-subhead">每日 Long-Stay 歷史紀錄</h3>'+historyTable(list,['longImpTeu','longExpTeu','longTransTeu','longTotal'],['進口TEU','出口TEU','轉口TEU','Long-Stay總TEU']);
  } 
  $('yardDetailBody').innerHTML=detailCard(title,subtitle,inner);
@@ -321,6 +343,6 @@ function init(){
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS};
+g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
