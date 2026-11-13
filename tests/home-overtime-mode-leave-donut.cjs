@@ -42,5 +42,6 @@ win.__chartPage(0);
 assert.match(node('p79DashAttendanceBars').innerHTML,/<strong>7.52<\/strong>/,'returning to page one retains converted mode');
 assert(page.includes('data-overtime-mode="actual"')&&page.includes('data-overtime-mode="converted"'));
 assert(page.includes('id="p79DashOvertimeUnreported"'),'unreported subtotal remains separate');
-assert(css.includes('min-height:122px!important'),'reference fixed 76px KPI height must be overridden');
+assert(css.includes('min-height:76px!important'),'single-line metric returns to 76px compact height');
+assert(css.includes('flex-wrap:nowrap!important')&&css.includes('min-width:max-content!important'),'card never wraps into multiple rows');
 console.log('PASS homepage actual/converted donut toggle, distinct submitted data, approved leave page donut, pagination and mobile KPI layout');
