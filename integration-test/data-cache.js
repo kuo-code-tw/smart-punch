@@ -475,7 +475,8 @@ async function getSystemSnapshot(sys){
 async function getDisplaySnapshot(sys,options={}){
  const scope=displayScope(),viewer=viewerKey(),credential=token();
  let timer,row;
- try{row=await Promise.race([getSystemSnapshot(sys),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1500)})]);}finally{clearTimeout(timer)}
+ const timeoutMs=Math.min(10000,Math.max(1500,Number(options.timeoutMs)||1500));
+ try{row=await Promise.race([getSystemSnapshot(sys),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),timeoutMs)})]);}finally{clearTimeout(timer)}
  if(!row||!credential||viewer!==viewerKey()||credential!==token()||scope!==displayScope()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
  if(row.displayScope!==undefined&&row.displayScope!==scope)return null;
  if(row.cacheEndpoint&&row.cacheEndpoint!==gasUrl())return null;
@@ -947,4 +948,5 @@ async function openCenter(){const b=ensureModal();b.classList.add('open');await 
 
 window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
+
 
