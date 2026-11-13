@@ -77,5 +77,9 @@ device.localStorage.setItem('sp_config_v5',JSON.stringify({
 }));
 assert.equal(restored.recoverableOvertimeOptions({}),null,
  'local config from a different deployment cannot be transplanted');
+assert(src.includes('id="p79OtRecoverLocal" type="button" style='),'always display recovery/diagnostic control even if local backup does not exist');
+assert(!src.includes('recoverButton.hidden=!recoveryDraft'),'missing local backup is diagnosed, not hidden');
+assert(src.includes('已核對正式雲端目前回傳 0 筆加班時段'),'empty cloud must display a clear no-backup message');
+assert(src.includes('if(!cloudReady){el.querySelector'),'a failed cloud read must not activate local recovery');
 new vm.Script(src);
 console.log('PASS legacy cloud rates and safe same-device recovery: exact rates, explicit user save, no cross-source restore or deleted-rule revival');
