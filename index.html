@@ -432,8 +432,8 @@ html[data-theme="dark"] .p79-home-yard-stat.heavy,html[data-theme="dark"] .p79-h
       <article class="p79-home-yard-stat empty"><span>空櫃場存</span><strong id="p79HomeYardEmpty">—</strong><small>TEU · 使用率 <b id="p79HomeYardEmptyPct">—</b></small></article>
       <article class="p79-home-yard-stat"><span>重櫃容量</span><strong id="p79HomeYardHeavyCap">—</strong><small>TEU</small></article>
       <article class="p79-home-yard-stat"><span>空櫃容量（Excel）</span><strong id="p79HomeYardEmptyCap">—</strong><small>TEU</small></article>
-      <article class="p79-home-yard-stat allowed-heavy"><span>重櫃實際／容許櫃數</span><strong id="p79HomeYardHeavyCount">—</strong><small id="p79HomeYardHeavyLimit">容許：未設定（櫃）</small></article>
-      <article class="p79-home-yard-stat allowed-empty"><span>空櫃實際／容許櫃數</span><strong id="p79HomeYardEmptyCount">—</strong><small id="p79HomeYardEmptyLimit">容許：未設定（櫃）</small></article>
+      <article class="p79-home-yard-stat allowed-heavy"><span>重櫃實際／容許櫃數</span><strong id="p79HomeYardHeavyCount">—</strong><small id="p79HomeYardHeavyLimit">容許：未設定（櫃）</small><small id="p79HomeYardHeavyTeu">換算 TEU：—</small></article>
+      <article class="p79-home-yard-stat allowed-empty"><span>空櫃實際／容許櫃數</span><strong id="p79HomeYardEmptyCount">—</strong><small id="p79HomeYardEmptyLimit">容許：未設定（櫃）</small><small id="p79HomeYardEmptyTeu">換算 TEU：—</small></article>
     </div>
     <p class="p79-home-yard-source" id="p79HomeYardSource">僅顯示目前登入帳號在此瀏覽器已匯入的有效資料；尚未同步雲端。</p>
   </section>
@@ -1403,6 +1403,7 @@ function renderHomeYardSummary(session){
  $('p79HomeYardDate').textContent='—';
  const note=$('p79HomeYardSource');
  $('p79HomeYardHeavyLimit').textContent='容許：未設定（櫃）';$('p79HomeYardEmptyLimit').textContent='容許：未設定（櫃）';
+ $('p79HomeYardHeavyTeu').textContent='換算 TEU：—';$('p79HomeYardEmptyTeu').textContent='換算 TEU：—';
  if(!canViewHomeYard(session)){note.textContent='僅有權限的管理員可檢視碼頭儲位數據。';return;}
  const id=String(session.empId||session.employeeId||session.id||session.accountId||session.email||session.username||'').trim();
  if(!id){note.textContent='管理員帳號無法識別，不顯示任何儲位資料。';return;}
@@ -1431,6 +1432,22 @@ function renderHomeYardSummary(session){
   };
   summary('heavy',heavyCount,'p79HomeYardHeavyCount','p79HomeYardHeavyLimit');
   summary('empty',emptyCount,'p79HomeYardEmptyCount','p79HomeYardEmptyLimit');
+  // Physical 20ft and 40ft counts convert at 1 and 2 TEU respectively.
+  const teuActual=(twentyKeys,fortyKeys)=>{
+   const twenty=count(twentyKeys),forty=count(fortyKeys);
+   return twenty===null||forty===null?null:twenty+2*forty;
+  };
+  const heavyTeu=teuActual(['imp20','exp20','trans20','reefer20'],['imp40','exp40','trans40','reefer40']);
+  const emptyTeu=teuActual(['genEmpty20','reeferEmpty20'],['genEmpty40','reeferEmpty40']);
+  const teuSummary=(key,value,id)=>{
+   const permitted=allowance?.[key+'Teu'];
+   const max=Number.isSafeInteger(permitted)&&permitted>0&&permitted<=200000000?permitted:null;
+   $(id).textContent=value===null?'換算 TEU：無法核對':max===null
+    ?'換算 '+fmt(value)+' TEU｜上限未設定'
+    :'換算 '+fmt(value)+' TEU｜上限 '+fmt(max)+'，'+(value>max?'超出 '+fmt(value-max):'剩餘 '+fmt(max-value))+' TEU';
+  };
+  teuSummary('heavy',heavyTeu,'p79HomeYardHeavyTeu');
+  teuSummary('empty',emptyTeu,'p79HomeYardEmptyTeu');
   $('p79HomeYardDate').textContent=latest.date;
   $('p79HomeYardHeavy').textContent=fmt(latest.heavyTotal);
   $('p79HomeYardEmpty').textContent=fmt(latest.emptyTotal);
@@ -1438,7 +1455,7 @@ function renderHomeYardSummary(session){
   $('p79HomeYardEmptyCap').textContent=fmt(emptyCap);
   $('p79HomeYardHeavyPct').textContent=(Number(latest.heavyTotal)/heavyCap*100).toFixed(2)+'%';
   $('p79HomeYardEmptyPct').textContent=(Number(latest.emptyTotal)/emptyCap*100).toFixed(2)+'%';
-  note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜TEU 容量依 Excel；容許櫃數由管理員設定。只在目前登入帳號及此瀏覽器儲存，尚未雲端同步。';
+  note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 尺=1 TEU、40 尺=2 TEU（換算值）；Excel 原始 TEU 不變。容許櫃數及 TEU 上限由管理員設定，僅存於此瀏覽器。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲位管理確認 Excel 與容量設定。';}
 }
 window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
