@@ -12864,21 +12864,6 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 console.info('[V5.10.8 考勤姓名檢視]', attendanceNameAudit);
             }
             const visibleEmployees = getAdminVisibleEmployees();
-            const attendanceEmployees = getAdminAttendanceEmployees();
-            const recordDepts = [...new Set(
-                attendanceEmployees
-                    .filter(e => String(e?.empId || '').trim().toUpperCase() !== 'ADMIN')
-                    .map(e => String(e?.dept || '一般').trim() || '一般')
-                    .filter(Boolean)
-            )].sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
-
-            const recordDeptFilter = document.getElementById('recordDeptFilter');
-            if (recordDeptFilter) {
-                const currentVal = recordDeptFilter.value || 'ALL';
-                recordDeptFilter.innerHTML = '<option value="ALL">全部原部門</option>' + recordDepts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-                recordDeptFilter.value = recordDepts.includes(currentVal) ? currentVal : 'ALL';
-            }
-
             const liveDeptFilter = document.getElementById('liveDeptFilter');
             if (liveDeptFilter) {
                 const currentVal = liveDeptFilter.value || 'ALL';
@@ -12963,6 +12948,33 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             renderAdminRecordsTable();
         }
 
+        // Unified organization "unit" is the fourth level. Never silently
+        // reuse a division/office/company name from legacy dept as a unit.
+        // A verified employee's explicit blank unit also overrides stale punch metadata.
+        function p79AttendanceSectionValue(employee, row = null) {
+            const person = employee && typeof employee === 'object' ? employee : row;
+            if (!person || typeof person !== 'object') return '';
+            const shared = window.Port79OrgContext?.value;
+            if (typeof shared === 'function') {
+                const section = shared(person, 'sections');
+                if (section) return String(section).trim();
+                const sources = [person, person.orgHierarchy, person.organization, person.orgPath]
+                    .filter(source => source && typeof source === 'object');
+                const hasSection = sources.some(source =>
+                    ['section', 'sections', 'orgUnit', 'unit'].some(key =>
+                        Object.prototype.hasOwnProperty.call(source, key)
+                    )
+                );
+                if (hasSection) return '';
+            }
+            const values = [person.section, person.sections, person.orgUnit, person.unit, person.deptUnit];
+            for (const value of values) {
+                const name = typeof value === 'string' ? value.trim() : '';
+                if (name && !/(?:總公司|事業部|事業處)$/.test(name)) return name;
+            }
+            return '';
+        }
+
         function updateRecordEmployeeFilterOptions() {
             // V5.10.8：考勤篩選人員 = 人資員工主檔 + 所有已存在考勤身份聯集。
             // 主檔暫時漏掉的人（例如考勤已有姓名/考勤號）仍必須出現在姓名選單。
@@ -12979,9 +12991,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const currentName = nameSelect.value || 'ALL';
 
             const depts = [...new Set(
-                visibleEmployees
-                    .map(e => String(e?.unit || e?.deptUnit || e?.orgUnit || e?.dept || '一般').trim() || '一般')
-                    .filter(Boolean)
+                visibleEmployees.map(e => p79AttendanceSectionValue(e)).filter(Boolean)
             )].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
 
             deptSelect.innerHTML =
@@ -12991,7 +13001,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
 
             const selectedDept = deptSelect.value || 'ALL';
             let candidates = visibleEmployees.filter(e =>
-                selectedDept === 'ALL' || String(e?.unit || e?.deptUnit || e?.orgUnit || e?.dept || '一般') === selectedDept
+                selectedDept === 'ALL' || p79AttendanceSectionValue(e) === selectedDept
             );
 
             const jobs = [...new Set(
@@ -16273,7 +16283,7 @@ function getManualPairRecordAnchor(record) {
                 if (!p79RecordWithinAttendanceViewWindow(r, monthFilter, dateFrom, dateTo)) return false;
                 const emp = findEmployeeForAttendanceDisplay(r, visibleEmployees)
                     || findEmployeeForAttendanceIdentity(r, visibleEmployees);
-                const currentDept = emp?.unit || emp?.deptUnit || emp?.orgUnit || emp?.dept || r.unit || r.dept || '一般';
+                const currentDept = p79AttendanceSectionValue(emp, r);
                 if (deptFilter !== 'ALL' && currentDept !== deptFilter) return false;
                 if (jobTitleFilter !== 'ALL' && String(emp?.jobTitle || emp?.deptDetail || '') !== jobTitleFilter) return false;
                 if (nameFilter !== 'ALL') {
@@ -16424,13 +16434,7 @@ function getManualPairRecordAnchor(record) {
                     || findEmployeeForAttendanceIdentity(row, visibleEmployees);
 
                 const displayDept = String(displayEmp?.dept || row.dept || '一般').trim() || '一般';
-                const displayUnit = String(
-                    displayEmp?.unit ||
-                    displayEmp?.deptUnit ||
-                    displayEmp?.orgUnit ||
-                    row.unit ||
-                    ''
-                ).trim();
+                const displayUnit = p79AttendanceSectionValue(displayEmp, row);
                 const displayJobTitle = String(
                     displayEmp?.jobTitle ||
                     displayEmp?.deptDetail ||
