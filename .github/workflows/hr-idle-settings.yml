@@ -1,0 +1,28 @@
+name: Verify HR idle logout settings
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-session-timeout.js'
+      - 'tests/idle-settings-save.cjs'
+      - 'hr/index.html'
+      - '.github/workflows/hr-idle-settings.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-session-timeout.js'
+      - 'tests/idle-settings-save.cjs'
+      - 'hr/index.html'
+      - '.github/workflows/hr-idle-settings.yml'
+permissions:
+  contents: read
+jobs:
+  verify-idle-settings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test idle session timeout cloud saves
+        run: node tests/idle-settings-save.cjs
