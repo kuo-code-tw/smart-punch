@@ -770,16 +770,15 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
   </div>
   <section id="efficiencyMainTabs" class="card p-3 sm:p-4">
     <div class="p79-efficiency-tab-scroll flex flex-nowrap overflow-x-auto gap-2 items-center">
-      <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 船舶作業明細</button>
-      <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
-      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 航線資料管理</button>
-       <button class="tab btn bg-slate-100" data-tab="terminal" onclick="switchTab('terminal',this)">🏗️ 碼頭營運統計</button>
+      <button class="tab active btn bg-slate-100" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 碼頭船舶作業管理</button>
+      <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 碼頭航線管理</button>
+      <button class="tab btn bg-slate-100" data-tab="terminal" onclick="switchTab('terminal',this)">🏗️ 碼頭營運統計</button>
       <button class="tab btn bg-slate-100" data-tab="yard" onclick="switchTab('yard',this)">▥ 碼頭儲量管理</button>
+      <button class="tab btn bg-emerald-50 text-emerald-800" data-tab="gate" onclick="switchTab('gate',this)">🚛 碼頭進出站管理</button>
+      <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
       <button class="tab btn bg-slate-100" data-tab="dispatch" onclick="switchTab('dispatch',this)">⚖️ 人員調度與月均效率</button>
-      <button class="tab btn bg-emerald-50 text-emerald-800" data-tab="gate" onclick="switchTab('gate',this)">🚛 進出站櫃量管理</button>
-
     </div>
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
   </section>
@@ -791,8 +790,8 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       data-src="../yard-dashboard/?embed=1&v=20261113-yard-home-size-cards-v1"></iframe>
   </section>
 
-  <section id="view-gate" class="hidden space-y-3" aria-label="79碼頭進出站櫃量管理（日／月／年）">
-    <iframe id="p79GateDashboardFrame" title="79碼頭進出站櫃量管理：空重櫃、每日每月每年統計"
+  <section id="view-gate" class="hidden space-y-3" aria-label="碼頭進出站管理（日／月／年）">
+    <iframe id="p79GateDashboardFrame" title="碼頭進出站管理：空重櫃、每日每月每年統計"
       class="p79-gate-redesign-frame w-full" loading="eager"
       style="display:block;width:100%;height:900px;min-height:840px;border:0;background:transparent"
       data-src="../gate-dashboard/?embed=1&v=20261111-official-redesign-v3"></iframe>
@@ -1120,12 +1119,12 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 @media(max-width:670px){#view-compare .p79-route-board{padding:13px}#view-compare .p79-route-grid{grid-template-columns:1fr;gap:12px}#view-compare .p79-route-toolbar label{width:100%}#view-compare .p79-route-toolbar input,#view-compare .p79-route-toolbar select{width:100%}}
 </style>
 <link rel="stylesheet" href="./route-management-dashboard.css?v=20261111-compact-row-v3">
-<section id="view-compare" class="hidden" aria-label="航線資料管理">
+<section id="view-compare" class="hidden" aria-label="碼頭航線管理">
   <div class="p79-rm-app">
-    <div class="p79-rm-topbar" role="region" aria-label="航線資料管理工具列">
+    <div class="p79-rm-topbar" role="region" aria-label="碼頭航線管理工具列">
       <div class="p79-rm-heading">
         <div class="p79-rm-heading-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v17M8 6h8M4 13a8 8 0 0 0 16 0M4 13l-2 3M20 13l2 3"/><circle cx="12" cy="4" r="2"/></svg></div>
-        <h2>航線資料管理</h2>
+        <h2>碼頭航線管理</h2>
       </div>
       <div class="p79-rm-topnav" role="group" aria-label="航線查詢與報表">
         <button type="button" id="routeManagerCompareNav"><span class="p79-rm-nav-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20V13h4v7M10 20V5h4v15M17 20V10h4v10M2 20h20"/></svg></span>航線對照統計</button>
@@ -11743,7 +11742,7 @@ async function handleExcelDrop(e){
     const frame=document.getElementById('p79GateImportFrame');
     const importDisclosure=document.getElementById('p79GateImportDisclosure');
     if(importDisclosure)importDisclosure.open=true;
-    if(!frame){toast('Gate 匯入頁尚未載入，請重新開啟進出站櫃量管理');return;}
+    if(!frame){toast('Gate 匯入頁尚未載入，請重新開啟碼頭進出站管理');return;}
     toast('已收到 Gate 檔案，正在讀取與核對…');
     try{
       const importer=frame.contentWindow?.P79GateImport;
