@@ -37,7 +37,7 @@ function fixture(date='2026-11-13'){
  return r;
 }
 const source=fixture();
-function browser({authorized=true,data=[source]}={}){
+function browser({authorized=true,data=[source],role='superadmin',efficiency='manage'}={}){
  const handlers=new Map(),nodes=new Map(),store=new Map();
  const tabs=['overview','heavy','empty','plugs','long','allowance'].map(v=>({dataset:{yardView:v},handlers:{},classList:{toggle(){}},
    addEventListener(n,fn){this.handlers[n]=fn},setAttribute(){}}));
@@ -57,7 +57,7 @@ function browser({authorized=true,data=[source]}={}){
   documentElement:{classList:{add(){}}},
   addEventListener:(k,fn)=>{if(!handlers.has(k))handlers.set(k,[]);handlers.get(k).push(fn)}};
  const w={document:d,location:{search:''},parent:null,addEventListener(){},confirm:()=>true,
-  sessionStorage:{getItem:k=>!authorized?null:k==='port79_user_session'?JSON.stringify({empId:'TEST-ADMIN',adminRole:'superadmin'}):k==='port79_user_token'?'TOKEN':null},
+  sessionStorage:{getItem:k=>!authorized?null:k==='port79_user_session'?JSON.stringify({empId:'TEST-ADMIN',adminRole:role,systemPermissions:{efficiency}}):k==='port79_user_token'?'TOKEN':null},
   localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
   XLSX:{SSF:{parse_date_code(){return null}},utils:{sheet_to_json(){return []}}}};
  w.parent=w;
@@ -79,6 +79,10 @@ assert.equal(c.heavy.exceeded,true);
 assert.equal(c.heavy.remaining,-4);
 assert.equal(c.empty.exceeded,false);
 assert.equal(c.empty.remaining,12);
+const another=fixture('2026-11-12');another.imp20=15;another.impTeu=19;another.heavyTotal=34;another.heavyPct=34;
+const anotherCompare=a.compareAllowedCounts(another,{heavy:20,empty:40});
+assert.equal(anotherCompare.heavy.actual,29,'same allowed limit applies across dates');
+assert.equal(anotherCompare.heavy.exceeded,true);
 assert.match(a.alertNotices(source,[source],{heavy:20,empty:25}).join(' '),/重櫃實際 24 櫃/);
 assert.match(a.alertNotices(source,[source],{heavy:20,empty:25}).join(' '),/空櫃實際 28 櫃/);
 assert.doesNotMatch(a.alertNotices(source,[source],{heavy:30,empty:40}).join(' '),/超過容許上限/);
@@ -121,6 +125,10 @@ assert.equal(empty.node('yardAllowedSettings').hidden,false,'setting possible be
 empty.node('yardHeavyAllowed').value='200';empty.node('yardEmptyAllowed').value='300';
 empty.node('yardAllowanceSave').handlers.click();
 assert.equal(JSON.parse(empty.store.get(limitKey)).heavy,200);
+const viewer=browser({role:'admin',efficiency:'view'});
+assert.equal(viewer.node('yardAllowanceSave').disabled,true,'view-only manager cannot edit terminal maximums');
+assert.throws(()=>viewer.api.setAllowedCounts(20,30),/修改權限/);
+assert.equal(viewer.store.has(limitKey),false);
 const locked=browser({authorized:false});
 assert.throws(()=>locked.api.setAllowedCounts(20,30),/請先登入/);
 assert.equal(locked.store.has(limitKey),false);
