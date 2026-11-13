@@ -1,0 +1,32 @@
+name: Verify leave and overtime unit hierarchy
+on:
+  pull_request:
+    paths:
+      - 'leave/index.html'
+      - 'work-hours/index.html'
+      - 'assets/port79-org-context.js'
+      - 'tests/leave-overtime-fourth-level-units.cjs'
+      - '.github/workflows/leave-overtime-unit-filters.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'leave/index.html'
+      - 'work-hours/index.html'
+      - 'assets/port79-org-context.js'
+      - 'tests/leave-overtime-fourth-level-units.cjs'
+      - '.github/workflows/leave-overtime-unit-filters.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check both unit filters, detail rows, cloud source and immutable records
+        run: |
+          node tests/leave-overtime-fourth-level-units.cjs
+          node tests/org-unified-context.cjs
