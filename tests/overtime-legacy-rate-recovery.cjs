@@ -32,5 +32,37 @@ assert(src.includes('loadedTypes=JSON.stringify(loaded.config[TYPECONFIG]||[])')
  'concurrent admin modifications must be compared to real cloud setting, not the migration preview');
 assert(src.includes('const archiveKeys=[...new Set(archived.map(ruleKey))]'),
  'deleting removes future filing options but preserves audit and historical conversion rows');
+const store=new Map(),device={
+ localStorage:{getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,value)},
+ p79OvertimeContext:{gasUrl:()=> 'https://script.google.com/macros/s/official/exec'}
+};
+vm.runInNewContext(src,{window:device,Date,Intl,Set,Map,TextEncoder});
+const restored=device.P79Overtime;
+const savedConfig={...legacy};
+assert.equal(restored.rememberOvertimeOptions(savedConfig,'verified-cloud'),true,
+ 'only previously configured rule sets are backed up');
+assert.equal(restored.rememberOvertimeOptions({},'empty-cloud'),false,
+ 'empty cloud does not overwrite a good backup');
+const recovered=restored.recoverableOvertimeOptions({
+ overtimeConversionRowsV1:[],overtimeReportTypesV1:[]
+});
+assert(recovered,'valid prior settings can be offered for explicit rescue when cloud is empty');
+assert.equal(recovered.rows.length,3);
+assert.equal(recovered.rows[0][3],'6.02','recover original conversion values without inferred rates');
+assert.equal(recovered.types.length,2,'restore saved categories only, no invented types');
+assert.equal(store.size,1,'no changes to cloud/attendance storage');
+assert.equal(restored.recoverableOvertimeOptions({
+ overtimeConversionRowsV1:[],overtimeReportTypesV1:[],overtimeArchivedRuleKeysV1:['builtin:休息日加班|休08-16']
+}),null,'intentional archive blocks old-device recovery');
+assert.equal(restored.recoverableOvertimeOptions({
+ overtimeConversionRowsV1:saved,overtimeReportTypesV1:[['平日延時加班','延']]
+}),null,'live cloud rules take precedence');
+device.p79OvertimeContext.gasUrl=()=> 'https://script.google.com/macros/s/other/exec';
+assert.equal(restored.recoverableOvertimeOptions({}),null,
+ 'never transfer private settings between different deployments');
+device.p79OvertimeContext.gasUrl=()=> 'https://script.google.com/macros/s/official/exec';
+assert.equal(restored.rememberOvertimeOptions({overtimeConversionRowsV1:[saved[2]]},'partial'),true);
+assert.equal(restored.recoverableOvertimeOptions({}).rows.length,3,
+ 'later partial reads do not replace richer prior rules');
 new vm.Script(src);
-console.log('PASS legacy saved overtime periods/6.02 conversions recovered, deletion and archive guards retained, no built-in auto-install');
+console.log('PASS legacy cloud rates and safe same-device recovery: exact rates, explicit user save, no cross-source restore or deleted-rule revival');
