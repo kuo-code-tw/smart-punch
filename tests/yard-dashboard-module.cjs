@@ -46,6 +46,16 @@ const parsed=api.parseBook({SheetNames:['Yard'],Sheets:{Yard:mockSheet}});
 assert.equal(parsed.length,1);assert.equal(parsed[0].heavyTotal,490);
 assert.equal(parsed[0].longTotal,60);
 assert.throws(()=>{matrix[19][2]=999;api.parseBook({SheetNames:['Yard'],Sheets:{Yard:mockSheet}}) },/不一致/);
+// Zero-stock dates must not create an invalid conic gradient or a NaN share.
+assert.equal(api.donutGradient([{label:'進口',value:0}],0),'#e1ebfa');
+assert.match(api.donutGradient([{label:'進口',value:0},{label:'出口',value:7}],7),/#ff861c 0\.0000% 100\.0000%/,'second category must retain its legend color');
+const normal={...r,heavyTotal:490,heavyCap:1000,emptyTotal:100,emptyCap:500};
+assert.equal(api.alertNotices(normal,[normal]).length,0,'normal yard capacity has no alerts');
+const overCapacity={...normal,heavyTotal:1001,emptyTotal:501};
+const warning=api.alertNotices(overCapacity,[overCapacity]);
+assert.ok(warning.some(s=>s.includes('重櫃場存')&&s.includes('超過容量')));
+assert.ok(warning.some(s=>s.includes('空櫃場存')&&s.includes('超過容量')));
+assert.match(source,/r\.heavyTotal>0\?pct\(r\.longTotal\/r\.heavyTotal\*100\):'—'/,'zero heavy stock renders an undefined Long-Stay share as a dash');
 assert.match(source,/STORAGE_PREFIX/);
 assert.doesNotMatch(source,/window\.P79YardSeed|yard-seed\.js/);
 assert.match(html,/yardHeavyDonut/);assert.match(html,/yardEmptyDonut/);
