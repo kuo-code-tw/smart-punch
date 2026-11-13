@@ -400,13 +400,67 @@
   const scoped=people.filter(e=>!department||dept(e)===department);
   return {departments:unique(people.map(dept)),jobTitles:unique(scoped.map(title)),employees:scoped.filter(e=>!jobTitle||title(e)===jobTitle)};
  }
- async function loadRules(){const d=await rpc('getOvertimeConfig');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');return {config:d.config,rows:validate(normalizeStored(d.config[CONFIG]))};}
+ // Preserve a last known-good, same-endpoint snapshot of real cloud-saved
+ // overtime options before an empty/partial response can erase browser config.
+ // This is a local recovery candidate only; it NEVER creates or saves rules.
+ const RECOVERY_STORAGE='p79_overtime_options_last_good_v1';
+ const RECOVERY_FIELDS=[CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG,HIDDEN_MANAGER_RULES];
+ function overtimeRecoverySnapshot(config){
+  if(!config||typeof config!=='object'||!Array.isArray(config[CONFIG]))return null;
+  const rows=validate(config[CONFIG]);
+  if(!rows.length||!typeOptions(config,rows).length||!activeReportRows(rows,config).length)return null;
+  const result={};
+  for(const key of RECOVERY_FIELDS)if(Object.prototype.hasOwnProperty.call(config,key))
+   result[key]=JSON.parse(JSON.stringify(config[key]));
+  return result;
+ }
+ function rememberOvertimeOptions(config,source='cloud'){
+  try{
+   const snapshot=overtimeRecoverySnapshot(config);
+   const url=String(global.p79OvertimeContext?.gasUrl?.()||'').trim();
+   if(!snapshot||!url||!global.localStorage)return false;
+   const previous=JSON.parse(global.localStorage.getItem(RECOVERY_STORAGE)||'null');
+   // Do not replace a richer previous snapshot merely because this read has
+   // fewer rows: this recovery record is not an authoritative live setting.
+   if(previous?.url===url&&
+      Array.isArray(previous?.config?.[CONFIG])&&
+      previous.config[CONFIG].length>snapshot[CONFIG].length)return true;
+   global.localStorage.setItem(RECOVERY_STORAGE,JSON.stringify({
+    url,at:Date.now(),source,config:snapshot
+   }));
+   return true;
+  }catch(error){return false;}
+ }
+ function recoverableOvertimeOptions(cloudConfig){
+  try{
+   const url=String(global.p79OvertimeContext?.gasUrl?.()||'').trim();
+   if(!url||!global.localStorage||!cloudConfig||typeof cloudConfig!=='object')return null;
+   // Never override a current active rule, an intentional archive/deletion, or
+   // a source mismatch. Recovery requires an administrator confirmation and
+   // the existing guarded Save + cloud readback.
+   if(normalizeStored(cloudConfig[CONFIG]).length||typeOptions(cloudConfig).length||
+      [DELETED_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES].some(key=>
+       Array.isArray(cloudConfig[key])&&cloudConfig[key].length))return null;
+   const saved=JSON.parse(global.localStorage.getItem(RECOVERY_STORAGE)||'null');
+   if(saved?.url!==url)return null;
+   const snapshot=overtimeRecoverySnapshot(saved.config);
+   if(!snapshot)return null;
+   const allowed=new Set(activeReportRows(snapshot[CONFIG],snapshot).map(ruleKey));
+   const rows=validate(snapshot[CONFIG]).filter(row=>allowed.has(ruleKey(row)));
+   const types=typeOptions(snapshot,rows).map(({name,category})=>[name,category]);
+   if(!rows.length||!types.length)return null;
+   return {rows,types,at:saved.at,source:saved.source,
+    roleDefaults:normalizeRoleTypeDefaults(snapshot)};
+  }catch(error){return null;}
+ }
+ async function loadRules(){const d=await rpc('getOvertimeConfig');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');const rows=validate(normalizeStored(d.config[CONFIG]));rememberOvertimeOptions(d.config,'getOvertimeConfig');return {config:d.config,rows};}
  // Replace ONLY the cloud-owned overtime fields. Shallow Object.assign leaves
  // old archive flags behind when the authoritative cloud no longer has them.
  // Other context settings, such as permissions or local page data, stay intact.
  function syncCloudOvertimeConfig(cloudConfig){
   const current=global.p79OvertimeContext?.config?.();
   if(!current)return null;
+  rememberOvertimeOptions(current,'before-cloud-overwrite');
   for(const key of [CONFIG,TYPECONFIG,DELETED_CONFIG,ARCHIVED_CONFIG,ROLE_DEFAULTS_CONFIG,HIDDEN_MANAGER_RULES]){
    if(!Object.prototype.hasOwnProperty.call(cloudConfig,key))delete current[key];
   }
@@ -668,6 +722,7 @@
   const el=dialog('加班選項管理','<p id="p79OtStatus">正在讀取已儲存的選項…</p>','p79OvertimeOptionsDialog');
   try{
    const cached=global.p79OvertimeContext?.config?.();
+   rememberOvertimeOptions(cached,'existing-browser-settings');
    let removedBuiltinNames=deletedBuiltins(cached||{});
    let rows=cached&&Object.prototype.hasOwnProperty.call(cached,CONFIG)?managerVisibleRules(normalizeStored(cached[CONFIG]),cached):[];
    let allCloudRows=reportRules();
@@ -689,6 +744,12 @@
    // Show all cloud periods as real editable rows. Preserve raw legacy
    // builtin identity so a label does not create a duplicate new rule.
    el.querySelector('.p79-ot-table-help').insertAdjacentHTML('beforebegin','<details style="margin:12px 0;padding:12px;border:1px solid #bfdbfe;border-radius:8px"><summary style="cursor:pointer;font-weight:700">加班規則說明（依本表設定）</summary><div id="p79OtRuleGuide"></div></details>');
+   // Only present this recovery action if this same browser has authentic
+   // formerly saved rules and the latest cloud reply is entirely empty.
+   el.querySelector('#p79OtReload').insertAdjacentHTML('afterend',
+    '<button id="p79OtRecoverLocal" type="button" hidden style="background:#fff7ed;border:1px solid #fb923c;color:#9a3412;padding:8px;border-radius:8px">找回本機舊加班設定</button>');
+   const recoverButton=el.querySelector('#p79OtRecoverLocal');
+   let recoveryDraft=null;
    const body=el.querySelector('#p79OtRuleRows');
    const readEditorRow=tr=>{
     const row=Array.from({length:10},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value??'');
@@ -935,6 +996,16 @@
      select.disabled=!ready||!global.p79OvertimeContext?.canEditRules?.());
     
    };
+   recoverButton.onclick=()=>{
+    if(!cloudReady||saving||reading||!recoveryDraft||!global.p79OvertimeContext?.canEditRules?.())return;
+    if(!global.confirm('找到這台電腦先前已儲存的加班規則 '+recoveryDraft.rows.length+' 筆。\\n要先載入畫面供核對嗎？\\n此操作不會寫入雲端，確認規則與換算時數後，仍須按下方「儲存加班類型與出勤時段」。'))return;
+    rows=validate(recoveryDraft.rows);customTypes=recoveryDraft.types.map(pair=>pair.slice());
+    roleTypeDefaults=recoveryDraft.roleDefaults.map(pair=>pair.slice());
+    body.innerHTML=rows.map(row=>editorRow(row)).join('');
+    refreshRuleCount();renderAddedTypeList();renderRoleTypeDefaults();
+    recoverButton.hidden=true;recoveryDraft=null;
+    el.querySelector('#p79OtStatus').textContent='已從這台電腦載入 '+rows.length+' 筆舊加班時段（尚未寫入雲端）。請逐筆核對換算時數，再按下方原有「儲存加班類型與出勤時段」。';
+   };
    const reload=async()=>{
     if(reading)return;
     let dirty=false;try{dirty=cloudReady&&(
@@ -960,6 +1031,8 @@
      loadedTypes=JSON.stringify(loaded.config[TYPECONFIG]||[]);
      loadedTypeDraft=JSON.stringify(customTypes);
      loadedVisibleRows=JSON.stringify(validate(rows));
+     recoveryDraft=recoverableOvertimeOptions(loaded.config);
+     recoverButton.hidden=!recoveryDraft||!global.p79OvertimeContext?.canEditRules?.();
      body.innerHTML=rows.map(row=>editorRow(row)).join('');
      refreshRuleCount();
      renderAddedTypeList();renderRoleTypeDefaults();
@@ -974,7 +1047,8 @@
       '已讀取雲端 '+rows.length+' 筆加班時段｜可供新申報 '+activeRows.length+' 筆'+
       (archivedVisible?'｜其中 '+archivedVisible+' 筆仍封存。若要重新開放，請核對表格內容並按最下方「儲存加班類型與出勤時段」。':'')+
       '；原換算時數會保留。':
-      '雲端尚未讀到可編輯的加班時段；請先確認資料來源，不要以空白表格覆蓋。';
+      recoveryDraft?'⚠ 雲端目前回傳零筆加班類型與時段，但這台電腦找到 '+recoveryDraft.rows.length+' 筆先前已儲存的時段。可選「找回本機舊加班設定」核對後再儲存；不會自行覆蓋雲端。':
+      '⚠ 雲端沒有回傳可編輯的加班時段，且此瀏覽器尚無可核對的舊設定備份。請勿用空白表格覆蓋；需檢查 Apps Script 正式設定來源。';
     }catch(error){el.querySelector('#p79OtStatus').textContent='❌ '+error.message+'。目前內容尚未核對，不會用它覆蓋雲端。';}
     finally{reading=false;el.querySelector('#p79OtReload').disabled=false;}
    };
@@ -1683,7 +1757,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
