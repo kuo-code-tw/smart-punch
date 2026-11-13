@@ -1309,3 +1309,17 @@ html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch{background:#17304c!imp
 html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button{color:#c9dcf3!important}
 html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button.active{background:#2563eb!important;color:#fff!important}
 html[data-theme="dark"] #p79Dashboard .p79-ot-unreported{color:#bed3eb!important}
+
+/* Narrow viewport: ensure enough width for the number and both inline buttons.
+ * Below 1250px the attendance KPIs are two columns; on small phones, only
+ * the overtime KPI spans both columns. This keeps adjacent cards separate. */
+@media (max-width:1250px){
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important
+ }
+}
+@media (max-width:700px){
+ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79-ot-hours-kpi{
+  grid-column:1/-1!important
+ }
+}
