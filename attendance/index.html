@@ -1081,7 +1081,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 </style>
 
 <style id="p79-overtime-rest-visible-hover-v2">
-/* 全部人員：已有班別代碼時，加班欄平常只顯示 國08-16／休08-16 等代碼。
+/* 全部人員：已有正式加班申報代碼時，加班欄平常只顯示 國08-16／休08-16 等代碼。
    申報時數、已申報、預排與稽核資訊僅於滑鼠移入或鍵盤聚焦時顯示。
    尚未有正式代碼的實際超時估算仍可辨識，避免遺漏未申報加班。 */
 #adminRecordsTableBody td[data-p79-overtime-hours] { cursor: help; }
@@ -15578,8 +15578,8 @@ function getManualPairRecordAnchor(record) {
             const cover=(state.covers||[]).find(a=>date>=a.startDate && date<=a.endDate && (a.workerIds||[]).some(x=>String(x).trim().toUpperCase()===id));
             const substitute=!!cover || !!report&&(!!reportMeta.forEmpId||reportMeta.type==='substitute');
             // Quota allocation and legacy overtime flags are not saved declarations.
-            // Only a live report ID or a current leave-cover assignment may supply a label.
-            if(!report&&!cover)return null;
+            // Only an active saved overtime report may display a code in the overtime column. Leave-cover arrangements alone are not overtime.
+            if(!report)return null;
             const ranges={早:['08:00','16:00'],中:['16:00','00:00'],晚:['00:00','08:00']};
             const target=state.rows.find(r=>String(r.empId||'').trim().toUpperCase()===String(cover?.leaveEmpId||meta.forEmpId||'').trim().toUpperCase())?.schedule||{};
             const shift=ranges[roster[date]]?roster[date]:target[date];
@@ -15651,14 +15651,14 @@ function getManualPairRecordAnchor(record) {
             const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             // 沒有雲端加班代碼時，仍辨識真正打卡超時，不將未申報視為已申報。
             const estimatedText=estimate>0?'<div class="p79-overtime-primary-visible">估算 '+formatDurationMinutes(estimate)+'</div>':'';
-            if(!planned)return estimatedText;
+            if(!planned)return estimatedText||'—';
             const code=String(planned.label||'').trim();
             const visibleCode=p79AttendanceOvertimeOnlyCode(planned);
             const changed=!!planned.reviewState;
             const declared=planned.report?'<span class="ml-1 inline-flex rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">已申報</span>':'';
             const reviewBadge=changed?'<span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">'+(planned.reviewState==='tentative'?'暫估／未簽退':'完整打卡已核對／待同步')+'</span>':'';
             const original=changed?'<div class="text-[10px] text-amber-800">原雲端申報：'+escapeText(planned.originalCode)+'（尚未改寫）</div>':'';
-            // 有班別時任何職稱一律只顯示班別代碼：國、休、例、代、延等都適用。
+            // 只有正式申報的班別代碼才顯示在加班欄：國、休、例、代、延等都適用。
             const visible=visibleCode?'<div class="p79-overtime-code-visible text-cyan-700 dark:text-cyan-300">'+escapeText(visibleCode)+'</div>':estimatedText;
             // 所有申報狀態和時數都移到 hover / focus 區；不得重複顯示在主欄。
             const hours=Number(planned.minutes);
