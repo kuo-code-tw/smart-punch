@@ -9,6 +9,7 @@ on:
       - 'tests/hr-live-source-cache.cjs'
       - 'tests/hr-busy-source-recovery.cjs'
       - 'tests/hr-live-panels.cjs'
+      - 'tests/hr-org-dialog-existing-options.cjs'
       - 'tests/hr-reference-dashboard-integrations.cjs'
       - '.github/workflows/hr-dashboard-fast-loading.yml'
   push:
@@ -36,3 +37,4 @@ jobs:
           node tests/hr-live-panels.cjs
           node tests/hr-reference-dashboard-integrations.cjs
           node tests/hr-busy-source-recovery.cjs
+          node tests/hr-org-dialog-existing-options.cjs
