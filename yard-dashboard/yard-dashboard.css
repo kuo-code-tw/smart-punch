@@ -30,3 +30,27 @@
 .yard-capacity-history-cell small{display:block;margin-top:3px;font-size:10px;color:#687d97}
 @media(max-width:1450px){.yard-capacity-fields{margin-left:0}.yard-capacity-source{text-align:left}}
 @media(max-width:600px){.yard-capacity-panel{padding:12px}.yard-capacity-fields{justify-content:flex-start}.yard-capacity-fields label{flex:1 1 40%}.yard-capacity-fields input{width:100%}}
+
+/* Independent maximum box count thresholds, separate from Excel TEU. */
+.yard-tabs{flex-wrap:wrap}
+.yard-allowed-settings{background:linear-gradient(135deg,#f6faff,#eef7ff);border:1px solid #a8c5e5;border-radius:16px;padding:22px;margin:14px 0 20px;color:#1b3658}
+.yard-allowed-settings[hidden],.yard-allowed-summary[hidden]{display:none!important}
+.yard-allowed-head h2{margin:0;font-weight:900;font-size:21px;color:#183c64}
+.yard-allowed-head p{color:#536c85;line-height:1.65;font-size:13px}
+.yard-allowed-editor{display:flex;align-items:flex-end;flex-wrap:wrap;gap:13px;margin:19px 0 10px}
+.yard-allowed-editor label{font-size:13px;font-weight:900;color:#214366;display:flex;flex-direction:column;gap:7px;flex:1 1 180px;max-width:240px}
+.yard-allowed-editor input{width:100%;height:43px;border:1px solid #9db8d3;border-radius:10px;padding:8px 11px;background:#fff;color:#183b63;text-align:center;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.yard-allowed-editor .yard-btn{min-height:43px}
+.yard-allowed-status{font-size:13px;font-weight:850;line-height:1.6;color:#2b567e}
+.yard-allowed-note{font-size:11px;line-height:1.7;color:#59718a}
+.yard-allowed-summary{display:grid;grid-template-columns:1fr 1fr minmax(170px,.9fr);align-items:center;gap:12px;margin:0 0 14px;padding:12px;border:1px solid #d2e1f2;border-radius:13px;background:#f7fbff}
+.yard-allowed-summary>div{border-left:4px solid #2a8de8;border-radius:9px;background:#fff;padding:11px 14px;min-width:0}
+.yard-allowed-summary>div:nth-child(2){border-left-color:#26a060}
+.yard-allowed-summary span{font-size:12px;color:#4e6884;font-weight:900}
+.yard-allowed-summary b{font-size:21px;color:#142e50;font-weight:950;margin-left:8px;font-variant-numeric:tabular-nums}
+.yard-allowed-summary small{color:#586f89;font-size:12px;margin-left:3px}
+.yard-allowed-summary div p{font-size:12px;font-weight:850;color:#426480;margin:5px 0 0}
+.yard-allowed-summary div p[data-exceeded="true"]{color:#b91c1c}
+.yard-allowed-summary>p{font-size:11px;color:#5b7390;margin:0;line-height:1.65}
+@media(max-width:850px){.yard-allowed-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.yard-allowed-summary>p{grid-column:1/-1}}
+@media(max-width:560px){.yard-allowed-settings{padding:14px}.yard-allowed-editor label{max-width:none}.yard-allowed-editor .yard-btn{flex:1 1 45%}}

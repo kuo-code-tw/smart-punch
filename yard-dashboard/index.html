@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f7fd">
 <title>碼頭儲位管理｜79號碼頭雲端智慧系統</title>
-<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-manualcap-v1">
+<link rel="stylesheet" href="./yard-dashboard.css?v=20261113-allowed-count-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="./yard-dashboard.js?v=20261113-manualcap-v1"></script>
+<script defer src="./yard-dashboard.js?v=20261113-allowed-count-v1"></script>
 </head>
 <body>
 <main class="yard-shell">
@@ -25,9 +25,21 @@
     <button type="button" data-yard-view="empty" aria-pressed="false">▥ 空櫃管理</button>
     <button type="button" data-yard-view="plugs" aria-pressed="false">♧ 冷凍插座</button>
     <button type="button" data-yard-view="long" aria-pressed="false">▣ 長期儲存與歷史</button>
+    <button type="button" data-yard-view="allowance" aria-pressed="false">▥ 容許櫃量設定</button>
   </nav>
   <div class="yard-drop-hint" id="yardDropHint"><span aria-hidden="true">⇩</span><span>可直接把 <strong>.xlsx／.xls</strong> 檔案拖曳到這個頁面匯入，也能使用「匯入 Excel」按鈕（單檔最大 12 MB）。</span></div>
   <div class="yard-status" id="yardStatus" role="status" aria-live="polite" data-tone="info">尚未匯入堆場 Excel；不使用示意數字或推估資料。</div>
+  <section id="yardAllowedSettings" class="yard-allowed-settings" aria-labelledby="yardAllowedTitle" hidden>
+    <div class="yard-allowed-head"><div><h2 id="yardAllowedTitle">碼頭空／重櫃容許櫃量設定</h2><p>設定碼頭最多可容許存放的實際櫃數，單位為「櫃」，不是 TEU。此上限適用所有匯入日期，用來判斷是否超量；不修改 Excel 的櫃數或 TEU。</p></div></div>
+    <div class="yard-allowed-editor">
+      <label for="yardHeavyAllowed">重櫃容許上限（櫃）<input id="yardHeavyAllowed" type="number" inputmode="numeric" min="1" max="100000000" step="1" placeholder="請輸入重櫃上限"></label>
+      <label for="yardEmptyAllowed">空櫃容許上限（櫃）<input id="yardEmptyAllowed" type="number" inputmode="numeric" min="1" max="100000000" step="1" placeholder="請輸入空櫃上限"></label>
+      <button type="button" class="yard-btn import" id="yardAllowanceSave">儲存容許櫃量</button>
+      <button type="button" class="yard-btn export" id="yardAllowanceClear">清除設定</button>
+    </div>
+    <p id="yardAllowanceStatus" class="yard-allowed-status" role="status" aria-live="polite">目前尚未設定。</p>
+    <p class="yard-allowed-note">重櫃實際櫃數＝進口、出口、轉口、冷凍重櫃的 20／40 呎櫃數合計；空櫃實際櫃數＝一般與冷凍空櫃的 20／40 呎櫃數合計。特殊櫃與 Long-Stay 可能包含在上述分類，不重複計入。設定僅儲存在此登入帳號的目前瀏覽器，尚未雲端同步。</p>
+  </section>
   <section id="yardEmpty" class="yard-empty" hidden aria-label="尚無堆場資料">
     <span aria-hidden="true">▥</span><h2>請先匯入堆場報表</h2>
     <p>直接將 yard.xlsx 拖曳到此頁面，或使用下方按鈕選取。系統會逐日核對重櫃、空櫃、儲位、冷凍插座和 Long-Stay；資料只保存在目前瀏覽器的登入帳號下，尚未啟用雲端同步。</p>
@@ -42,15 +54,10 @@
         <article class="yard-kpi long"><div class="yard-kpi-symbol" aria-hidden="true">▣</div><div class="yard-kpi-body"><span>Long-Stay（長期存放）</span><strong><b id="yardLongTotal">—</b><small>TEU</small></strong><div class="yard-kpi-tip">場存內含分類・不重複加總</div></div></article>
         <article class="yard-kpi capacity empty-capacity"><div class="yard-kpi-symbol" aria-hidden="true">▱</div><div class="yard-kpi-body"><span>空櫃儲位容量</span><strong><b id="yardEmptyCap">—</b><small>TEU</small></strong><div class="yard-kpi-tip">依所選日期有效容量</div></div></article>
       </div>
-      <section id="yardCapacityPanel" class="yard-capacity-panel" aria-labelledby="yardCapacityTitle">
-        <div class="yard-capacity-intro"><h2 id="yardCapacityTitle">儲位容量手動設定 <small id="yardCapacityDate">—</small></h2><p>僅調整所選日期的容量 TEU 與使用率；原始 Excel 報表不會被修改。</p></div>
-        <div class="yard-capacity-fields">
-          <label for="yardManualHeavyCap">重櫃容量 TEU<input id="yardManualHeavyCap" type="number" inputmode="decimal" min="0.01" max="100000000" step="0.01" required></label>
-          <label for="yardManualEmptyCap">空櫃容量 TEU<input id="yardManualEmptyCap" type="number" inputmode="decimal" min="0.01" max="100000000" step="0.01" required></label>
-          <button id="yardCapacitySave" type="button" class="yard-btn import">儲存容量</button>
-          <button id="yardCapacityReset" type="button" class="yard-btn export">還原 Excel 容量</button>
-        </div>
-        <p id="yardCapacitySource" class="yard-capacity-source">原始容量以 Excel 報表為準，手動值保存在本機此帳號。</p>
+      <section class="yard-allowed-summary" aria-label="碼頭容許櫃量與實際櫃數">
+        <div><span>重櫃實際櫃數</span><b id="yardHeavyCount">—</b><small>櫃</small><p id="yardHeavyLimitSummary">容許上限：未設定</p></div>
+        <div><span>空櫃實際櫃數</span><b id="yardEmptyCount">—</b><small>櫃</small><p id="yardEmptyLimitSummary">容許上限：未設定</p></div>
+        <p>容許櫃量以實際櫃數比較；Excel 原有的 TEU 容量與使用率照原報表顯示。到右側「容許櫃量設定」輸入上限。</p>
       </section>
       <div class="yard-topgrid">
         <article class="yard-card"><h2>重櫃櫃種分布 <small id="yardHeavySub">—</small></h2><div class="yard-donut-group"><div class="yard-donut" id="yardHeavyDonut" role="img" aria-label="重櫃種類甜甜圈圖"><div class="yard-donut-center"><strong id="yardHeavyCenter">—</strong><small>TEU</small></div></div><div id="yardHeavyLegend" class="yard-legend"></div></div></article>
