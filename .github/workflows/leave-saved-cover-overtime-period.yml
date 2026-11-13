@@ -1,0 +1,29 @@
+name: Verify saved leave cover overtime period
+on:
+  pull_request:
+    paths:
+      - 'leave/index.html'
+      - 'tests/leave-saved-cover-overtime-period.cjs'
+      - '.github/workflows/leave-saved-cover-overtime-period.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'leave/index.html'
+      - 'tests/leave-saved-cover-overtime-period.cjs'
+      - '.github/workflows/leave-saved-cover-overtime-period.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Protect historical report and show correct overtime sub-period
+        run: |
+          node tests/leave-saved-cover-overtime-period.cjs
+          node tests/overtime-night-leave-cover-individual-workday.cjs
+          node tests/overtime-leave-handoff-nextday-preplan.cjs
