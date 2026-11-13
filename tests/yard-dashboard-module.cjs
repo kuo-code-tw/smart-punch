@@ -66,8 +66,8 @@ const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:
 assert.match(trend,/>TEU<\/text>/);
 assert.doesNotMatch(trend,/>3,000<\/text>/,'small inventory cannot be flattened by a fixed 3,000 TEU axis');
 assert.match(html,/當日櫃別明細/,'historical selector must not label all dates as today');
-assert.match(html,/yard-dashboard\.js\?v=20261113-manualcap-v1/,'new dashboard script must invalidate old cache');
-assert.match(page,/20261113-yard-manualcap-v1/,'embedded iframe must invalidate old page cache');
+assert.match(html,/yard-dashboard\.js\?v=20261113-allowed-count-v1/,'new dashboard script must invalidate old cache');
+assert.match(page,/20261113-yard-allowed-count-v1/,'embedded iframe must invalidate old page cache');
 // Consistent product naming and center alignment across all history tables.
 assert.match(html,/<title>碼頭儲位管理｜/);
 assert.match(html,/<h1>碼頭儲位管理<\/h1>/);
@@ -80,7 +80,7 @@ assert.doesNotMatch(page,/堆場儲位管理/);
 assert.match(css,/\.yard-history-table th\{[^}]*text-align:center;[^}]*\}/,'history headings align center');
 assert.match(css,/\.yard-history-table td\{[^}]*text-align:center;[^}]*\}/,'historical values and dates align center');
 assert.doesNotMatch(css,/\.yard-history-table td:first-child\{text-align:left\}/,'date cannot override center alignment');
-assert.match(html,/yard-dashboard\.css\?v=20261113-manualcap-v1/,'updated CSS must invalidate cache');
+assert.match(html,/yard-dashboard\.css\?v=20261113-allowed-count-v1/,'updated CSS must invalidate cache');
 assert.match(source,/STORAGE_PREFIX/);
 assert.doesNotMatch(source,/window\.P79YardSeed|yard-seed\.js/);
 assert.match(html,/yardHeavyDonut/);assert.match(html,/yardEmptyDonut/);
