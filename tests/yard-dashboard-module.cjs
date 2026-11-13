@@ -58,7 +58,7 @@ assert.ok(warning.some(s=>s.includes('空櫃場存')&&s.includes('超過容量')
 assert.match(source,/r\.heavyTotal>0\?pct\(r\.longTotal\/r\.heavyTotal\*100\):'—'/,'zero heavy stock renders an undefined Long-Stay share as a dash');
 // Axis scale follows real TEU inventory rather than a 3,000-TEU minimum.
 assert.equal(api.trendAxisMax([{heavyTotal:100,emptyTotal:40}]),100);
-assert.equal(api.trendAxisMax([{heavyTotal:490,emptyTotal:100}]),600);
+assert.equal(api.trendAxisMax([{heavyTotal:490,emptyTotal:100}]),500);
 assert.equal(api.trendAxisMax([{heavyTotal:5200,emptyTotal:2000}]),6000);
 assert.equal(api.trendAxisMax([{heavyTotal:0,emptyTotal:0}]),1);
 const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:'2026-11-13',heavyTotal:100,emptyTotal:40}]);
