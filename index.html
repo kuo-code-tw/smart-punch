@@ -422,7 +422,7 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
     <div class="p79d-kpis">
       <div class="p79d-kpi"><div class="p79d-kpi-icon">👥</div><div><span id="p79DashPeopleLabel">今日出勤人數</span><strong id="p79DashAttendancePeople">—</strong><small>人</small></div></div>
       <div class="p79d-kpi"><div class="p79d-kpi-icon">▤</div><div><span>本月累計出勤天數</span><strong id="p79DashPersonDays">—</strong><small>人日</small></div></div>
-      <div class="p79d-kpi p79-ot-hours-kpi"><div class="p79d-kpi-icon">◷</div><div class="p79-ot-hours-body"><span id="p79DashOvertimeLabel">本月已申報實際時數</span><div class="p79-ot-hour-value"><strong id="p79DashOvertimeHours">—</strong><small id="p79DashOvertimeUnit">小時</small></div><div id="p79DashOvertimeMode" class="p79-ot-hour-switch" role="group" aria-label="已申報加班時數顯示模式"><button type="button" class="active" data-overtime-mode="actual" aria-pressed="true">實際時數</button><button type="button" data-overtime-mode="converted" aria-pressed="false">換算時數</button></div><div id="p79DashOvertimeUnreported" class="p79-ot-unreported">未申報／預排資料待讀取</div></div></div>
+      <div class="p79d-kpi p79-ot-hours-kpi"><div class="p79d-kpi-icon">◷</div><div class="p79-ot-hours-body"><span id="p79DashOvertimeLabel" title="本月已申報實際時數">本月申報加班</span><div class="p79-ot-hour-value"><strong id="p79DashOvertimeHours">—</strong><small id="p79DashOvertimeUnit">小時</small></div><div id="p79DashOvertimeMode" class="p79-ot-hour-switch" role="group" aria-label="已申報加班時數顯示模式"><button type="button" class="active" data-overtime-mode="actual" aria-pressed="true">實際時數</button><button type="button" data-overtime-mode="converted" aria-pressed="false">換算時數</button></div><div id="p79DashOvertimeUnreported" class="p79-ot-unreported" title="未申報／預排資料待讀取">未報待讀</div></div></div>
       <button type="button" class="p79d-kpi p79d-early-alert" id="p79DashEarlyPunchTrigger" data-alert-state="unverified" aria-haspopup="dialog" aria-controls="p79DashEarlyPunchDialog" aria-label="班表出勤尚未核對，點擊查看早中晚班明細">
         <div class="p79d-kpi-icon" aria-hidden="true">⚠</div>
         <div class="p79d-early-body">
@@ -1675,8 +1675,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
 <script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1"></script>
-<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1&donut=20261112-v1&ot=20261112-switch-leave-donut-v1">
+<script src="./assets/port79-monthly-dashboard.js?v=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1"></script>
+<link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1&donut=20261112-v1&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
 <script src="./assets/port79-reference-dashboard.js?v=20261111-overtime-no-false-empty-v1&donut=20261112-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261110-all-vessels-v1"></script>
