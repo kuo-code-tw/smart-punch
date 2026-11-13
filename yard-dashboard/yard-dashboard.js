@@ -205,17 +205,20 @@ function allowedTeuValue(value){
 }
 // Supports legacy total-only limits. As soon as any 20ft/40ft field is filled,
 // the size breakdown becomes the authoritative source of both limit fields.
-function allowedSizeLimit(raw20,raw40){
- const a=String(raw20??'').trim(),b=String(raw40??'').trim();
- if(!a&&!b)return null;
- const parse=(str)=>{
+// The optional third size preserves legacy 20/40-foot calls.
+function allowedSizeLimit(raw20,raw40,raw45){
+ const a=String(raw20??'').trim(),b=String(raw40??'').trim(),c=String(raw45??'').trim();
+ if(!a&&!b&&!c)return null;
+ const parse=str=>{
   const n=str===''?0:Number(str);
-  if(!Number.isSafeInteger(n)||n<0||n>100000000)throw Error('20／40 呎容許櫃數須為 0～100,000,000 的整數');
+  if(!Number.isSafeInteger(n)||n<0||n>100000000)throw Error('20／40／45 呎容許櫃數須為 0～100,000,000 的整數');
   return n;
  };
- const twenty=parse(a),forty=parse(b),count=twenty+forty,teu=twenty+2*forty;
- if(count<1||count>100000000||teu>200000000)throw Error('20／40 呎合計必須大於 0，且容許櫃數不超過 100,000,000');
- return {twenty,forty,count,teu};
+ const twenty=parse(a),forty=parse(b),fortyfive=parse(c),count=twenty+forty+fortyfive,teu=twenty+2*forty+2*fortyfive;
+ if(count<1||count>100000000||teu>200000000)throw Error('20／40／45 呎合計必須大於 0，且容許櫃數不超過 100,000,000');
+ const result={twenty,forty,count,teu};
+ if(c!=='')result.fortyfive=fortyfive;
+ return result;
 }
 // Physical stock: reefer heavy and reefer empty form a monitored *subset*
 // of heavy and empty, never an extra additive category.
@@ -257,7 +260,7 @@ function compareAllowedCounts(r,limits=allowedCounts){
 }
 function blankAllowedCounts(){
  return {heavy:null,empty:null,reefer:null,heavyTeu:null,emptyTeu:null,reeferTeu:null,
-  heavy20:null,heavy40:null,empty20:null,empty40:null,reefer20:null,reefer40:null};
+  heavy20:null,heavy40:null,heavy45:null,empty20:null,empty40:null,empty45:null,reefer20:null,reefer40:null};
 }
 function restoreAllowedCounts(){
  allowedCounts=blankAllowedCounts();
@@ -272,11 +275,12 @@ function restoreAllowedCounts(){
   next.reefer=optionalAllowedCountValue(data.reefer);
   for(const key of ['heavy','empty','reefer']){
    next[key+'Teu']=allowedTeuValue(data[key+'Teu']);
-   const size=allowedSizeLimit(data[key+'20'],data[key+'40']);
+   const size=allowedSizeLimit(data[key+'20'],data[key+'40'],key==='reefer'?null:data[key+'45']);
    if(size){
     next[key+'20']=size.twenty;
     next[key+'40']=size.forty;
-    next[key]=size.count;
+    if(Object.prototype.hasOwnProperty.call(size,'fortyfive')&&key!=='reefer')next[key+'45']=size.fortyfive;
+     next[key]=size.count;
     next[key+'Teu']=size.teu;
    }
   }
@@ -292,11 +296,12 @@ function setAllowedCounts(heavy,empty,heavyTeu=null,emptyTeu=null,reefer=null,re
  for(const key of ['heavy','empty','reefer']){
   const size=sizeValues?.[key];
   if(!size)continue;
-  const parsed=allowedSizeLimit(size.twenty,size.forty);
+  const parsed=allowedSizeLimit(size.twenty,size.forty,key==='reefer'?null:size.fortyfive);
   if(!parsed)continue;
   next[key+'20']=parsed.twenty;
   next[key+'40']=parsed.forty;
-  next[key]=parsed.count;
+  if(Object.prototype.hasOwnProperty.call(parsed,'fortyfive')&&key!=='reefer')next[key+'45']=parsed.fortyfive;
+   next[key]=parsed.count;
   next[key+'Teu']=parsed.teu;
  }
  try{g.localStorage.setItem(ALLOWANCE_STORAGE_PREFIX+accountId,JSON.stringify(next))}
@@ -324,17 +329,17 @@ function allowedTeuSummary(c){
 }
 function refreshAllowedAuto(key){
  const prefix='yard'+key[0].toUpperCase()+key.slice(1)+'Allowed';
- const v20=$(prefix+'20').value,v40=$(prefix+'40').value;
+ const v20=$(prefix+'20').value,v40=$(prefix+'40').value,v45=key==='reefer'?'':$(prefix+'45').value;
  const preview=$(prefix+'Preview'),total=$(prefix),teu=$(prefix+'Teu');
  try{
-  const size=allowedSizeLimit(v20,v40);
+  const size=allowedSizeLimit(v20,v40,v45);
   total.readOnly=!!size;teu.readOnly=!!size;
   if(!size){
-   preview.textContent='未填尺寸時，可自行輸入總櫃數與 TEU 上限；只有總櫃數無法判斷 20／40 呎比例。';
+   preview.textContent='未填尺寸時，可自行輸入總櫃數與 TEU 上限；只有總櫃數無法判斷尺寸比例。';
    return null;
   }
   total.value=String(size.count);teu.value=String(size.teu);
-  preview.textContent='自動換算：20 呎 '+fmt(size.twenty)+' 櫃 ×1 ＋ 40 呎 '+fmt(size.forty)+' 櫃 ×2 ＝ '+fmt(size.teu)+' TEU；合計 '+fmt(size.count)+' 櫃。';
+  preview.textContent='自動換算：20 呎 '+fmt(size.twenty)+' 櫃 ×1 ＋ 40 呎 '+fmt(size.forty)+' 櫃 ×2 '+(key==='reefer'?'':'＋ 45 呎 '+fmt(size.fortyfive??0)+' 櫃 ×2 ')+'＝ '+fmt(size.teu)+' TEU；合計 '+fmt(size.count)+' 櫃。';
   return size;
  }catch(e){
   total.readOnly=false;teu.readOnly=false;
@@ -349,8 +354,9 @@ function renderAllowedSettings(r){
   $(prefix+'Teu').value=allowedCounts[key+'Teu']===null?'':String(allowedCounts[key+'Teu']);
   $(prefix+'20').value=allowedCounts[key+'20']===null?'':String(allowedCounts[key+'20']);
   $(prefix+'40').value=allowedCounts[key+'40']===null?'':String(allowedCounts[key+'40']);
+   if(key!=='reefer')$(prefix+'45').value=allowedCounts[key+'45']===null?'':String(allowedCounts[key+'45']);
   refreshAllowedAuto(key);
-  for(const id of [prefix,prefix+'Teu',prefix+'20',prefix+'40'])$(id).disabled=!allowanceEditable;
+  for(const id of [prefix,prefix+'Teu',prefix+'20',prefix+'40',...(key==='reefer'?[]:[prefix+'45'])])$(id).disabled=!allowanceEditable;
  }
  $('yardAllowanceClear').disabled=!allowanceEditable||['heavy','empty','reefer'].every(k=>allowedCounts[k]===null||k==='reefer'&&allowedCounts[k]===null);
  $('yardAllowanceSave').disabled=!allowanceEditable;
@@ -388,14 +394,14 @@ function saveAllowedFromInputs(){
   for(const key of ['heavy','empty','reefer']){
    const prefix='yard'+key[0].toUpperCase()+key.slice(1)+'Allowed';
    const v20=$(prefix+'20').value,v40=$(prefix+'40').value;
-   const size=allowedSizeLimit(v20,v40);
-   if(size)sizeValues[key]={twenty:size.twenty,forty:size.forty};
+   const size=allowedSizeLimit(v20,v40,v45);
+   if(size)sizeValues[key]={twenty:size.twenty,forty:size.forty,...(Object.prototype.hasOwnProperty.call(size,'fortyfive')?{fortyfive:size.fortyfive}:{})};
    fields[key]=size?size.count:$(prefix).value;
    fields[key+'Teu']=size?size.teu:$(prefix+'Teu').value;
   }
   setAllowedCounts(fields.heavy,fields.empty,fields.heavyTeu,fields.emptyTeu,
    fields.reefer,fields.reeferTeu,sizeValues);
-  render();message('已儲存重櫃／空櫃／冷凍櫃容許櫃數及 TEU，20 呎＝1 TEU、40 呎＝2 TEU 自動換算；原 Excel 不變。','success');
+  render();message('已儲存重櫃／空櫃／冷凍櫃容許櫃數及 TEU，20 呎＝1 TEU、40／45 呎＝2 TEU 自動換算；原 Excel 不變。','success');
  }catch(e){message('容許櫃量／TEU 設定失敗：'+String(e.message||e),'error')}
 }
 
@@ -680,7 +686,7 @@ function init(){
  $('yardHeavyAllowedTeu').disabled=!allowanceEditable;
  $('yardEmptyAllowedTeu').disabled=!allowanceEditable;
  for(const k of ['Heavy','Empty','Reefer']){
-  for(const suffix of ['20','40']){
+  for(const suffix of (k==='Reefer'?['20','40']:['20','40','45'])){
    const input=$('yard'+k+'Allowed'+suffix);
    input.disabled=!allowanceEditable;
    input.addEventListener('input',()=>refreshAllowedAuto(k.toLowerCase()));
