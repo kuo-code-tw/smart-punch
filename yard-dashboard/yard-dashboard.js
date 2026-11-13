@@ -695,7 +695,7 @@ function init(){
  $('yardReeferAllowed').disabled=!allowanceEditable;
  $('yardReeferAllowedTeu').disabled=!allowanceEditable;
  if(!accountId){
-  $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入船舶作業管理';
+  $('yardEmpty').hidden=false;$('yardEmpty').querySelector('h2').textContent='請先登入碼頭系統管理';
   $('yardEmpty').querySelector('p').textContent='堆場數據需由有權限的管理員從正式首頁進入，未登入不提供讀取或匯入。';
   $('yardImport').disabled=true;$('yardEmptyImport').disabled=true;$('yardExport').disabled=true;
   message('目前登入身分未驗證，堆場資料不會公開顯示。','error');
