@@ -45,7 +45,7 @@ function mockBrowser({authorized=true,initialData=[base]}={}){
  function node(id){
   if(!nodes.has(id))nodes.set(id,{
    id,hidden:false,disabled:false,textContent:'',innerHTML:'',value:'',
-   style:{},dataset:{},addEventListener(){},setAttribute(){},
+   style:{},dataset:{},handlers:{},addEventListener(type,fn){this.handlers[type]=fn},setAttribute(){},
    classList:{add(){},remove(){},toggle(){}},
    parentElement:{classList:{add(){},remove(){}}},
    querySelector:part=>node(id+' '+part)
@@ -95,6 +95,23 @@ const changed=api.setCapacityOverride('2026-11-13',{heavyCap:200,emptyCap:80});
 assert.equal(changed.heavyCap,200);
 assert.equal(changed.emptyCap,80);
 assert.equal(b.node('yardHeavyCap').textContent,'100','explicit render needed to repaint page');
+// Wire the actual page controls, not just the exposed calculation helper.
+b.node('yardManualHeavyCap').value='275.5';
+b.node('yardManualEmptyCap').value='125';
+assert.equal(typeof b.node('yardCapacitySave').handlers.click,'function');
+b.node('yardCapacitySave').handlers.click();
+assert.equal(b.node('yardHeavyCap').textContent,'275.5');
+assert.equal(b.node('yardEmptyCap').textContent,'125');
+assert.match(b.node('yardStatus').textContent,/已儲存於此瀏覽器/);
+assert.equal(typeof b.node('yardDetailBody').handlers.change,'function');
+const inline={value:'333',dataset:{yardCapKey:'heavyCap',yardCapDate:'2026-11-13'},matches:selector=>selector==='input[data-yard-cap-key]'};
+b.node('yardDetailBody').handlers.change({target:inline});
+assert.equal(b.node('yardHeavyCap').textContent,'333');
+assert.equal(b.node('yardEmptyCap').textContent,'125','editing heavy history must preserve empty capacity');
+b.node('yardCapacityReset').handlers.click();
+assert.equal(b.node('yardHeavyCap').textContent,'100');
+assert.equal(b.node('yardEmptyCap').textContent,'100');
+assert.equal(b.node('yardCapacityReset').disabled,true);
 const capKey='p79_yard_capacity_overrides_v1_TEST-ADMIN';
 let saved=JSON.parse(b.store.get(capKey));
 assert.equal(saved['2026-11-13'].heavyCap,200);
