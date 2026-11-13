@@ -9,7 +9,9 @@ const d=g.document,$=id=>d.getElementById(id);
 function session(){try{return JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');}catch(_){return null;}}
 function token(){return String(g.sessionStorage.getItem('port79_user_token')||g.sessionStorage.getItem('port79_admin_token')||'');}
 function endpoint(){const raw=String(g.sessionStorage.getItem('port79_gas_url')||'');const url=new URL(raw);if(url.protocol!=='https:'||url.hostname!=='script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname))throw Error('備份連線網址不正確，請重新登入');return url.href;}
-function allowed(s){return !!s&&!s.punchOnly&&String(s.adminRole||s.role||'').toLowerCase()==='superadmin'&&s.systemPermissions?.history==='manage'&&!!token();}
+// Highest administrators have history management access on the home page; old login
+// sessions omitted history from systemPermissions. Server authorization remains authoritative.
+function allowed(s){return !!s&&!s.punchOnly&&String(s.adminRole||s.role||'').toLowerCase()==='superadmin'&&!!token();}
 function same(c){try{const s=session();return allowed(s)&&s.empId===c.actor&&token()===c.token&&endpoint()===c.endpoint;}catch(_){return false;}}
 function message(text){const n=$('p79AllBackupStatus');if(n)n.textContent=text;}
 function link(value){const u=new URL(value);if(u.protocol!=='https:'||!['docs.google.com','drive.google.com'].includes(u.hostname)||!/^\/(spreadsheets\/d|file\/d)\/[A-Za-z0-9_-]+(?:\/|$)/.test(u.pathname))throw Error('備份回傳的檔案連結無法核對');return u.href;}
