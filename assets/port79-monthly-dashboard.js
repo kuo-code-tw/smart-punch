@@ -453,7 +453,7 @@ function renderHomeOvertimeList(data){
 function showOvertime(a){
  lastOvertimeData=a;
  const unverified=!!a.sourceWarning,missing=Number(a.missingConversion)||0,actual=overtimeDisplayMode==='actual';
- const value=unverified?'待核對':actual?fmt(a.declaredSubmittedHours,1):missing?'待換算':fmt(a.convertedHours,1);
+ const value=unverified?'待核對':actual?fmt(a.declaredSubmittedHours,1):missing?'待換算':fmt(a.convertedHours,2);
  setMetric('p79DashOvertimeHours',value);
  setMetric('p79DashOvertimeUnit',unverified||!actual&&missing?'':'小時');
  statusText('p79DashOvertimeLabel','本月申報加班');
@@ -465,7 +465,7 @@ function showOvertime(a){
  $('p79DashOvertimeLabel')?.setAttribute?.('title',actual?'本月已申報實際時數':'本月已申報換算時數');
  const note=unverified?'· 即時班表未核對；正式加班總數暫不可確認':
   missing?'· 已申報 '+a.officialCount+' 筆：實際 '+fmt(a.declaredSubmittedHours,1)+' 小時；其中 '+missing+' 筆缺換算值，換算總數待核對':
-  '· 已申報 '+a.officialCount+' 筆：實際 '+fmt(a.declaredSubmittedHours,1)+' 小時 → 換算 '+fmt(a.convertedHours,1)+' 小時；另列未申報／預排 '+a.plannedCount+' 筆';
+  '· 已申報 '+a.officialCount+' 筆：實際 '+fmt(a.declaredSubmittedHours,1)+' 小時 → 換算 '+fmt(a.convertedHours,2)+' 小時；另列未申報／預排 '+a.plannedCount+' 筆';
  statusText('p79DashScheduleSource',note);
  const buttons=$('p79DashOvertimeMode');
  buttons?.querySelectorAll?.('[data-overtime-mode]').forEach(btn=>{
