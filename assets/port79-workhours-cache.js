@@ -3,6 +3,18 @@
 // Explicit, account-scoped month bundles. Generic no-store/auth/mutation reads
 // keep their existing semantics; save/revoke/export audit routes never use this.
 const flights=new Map(),metaFlights=new Map(),metaMemo=new Map(),memory=new Map();
+// Every consumer of a shared read receives its display preview, including a
+// table opened while startup is already checking the same month.
+const observers=new Map();
+function observe(k,options){
+ let entry=observers.get(k);if(!entry){entry={listeners:new Set(),preview:null,roster:null,invalidated:null};observers.set(k,entry);}
+ entry.listeners.add(options);
+ if(entry.preview&&options.force!==true)deliver(options.onPreview,entry.preview);
+ if(entry.invalidated)deliver(options.onInvalidate,entry.invalidated);
+ if(entry.roster)deliver(options.onRoster,entry.roster);
+}
+function deliver(callback,value){try{if(callback)callback(copy(value));}catch(_){}}
+function publish(k,type,value){const entry=observers.get(k);if(!entry)return;if(type==='onPreview')entry.preview=value;if(type==='onRoster')entry.roster=value;if(type==='onInvalidate'){entry.preview=null;entry.roster=null;entry.invalidated=value;}for(const options of entry.listeners){if(type==='onPreview'&&options.force===true)continue;deliver(options[type],value);}}
 let generation=0,startupFlight=null;
 const copy=x=>JSON.parse(JSON.stringify(x));
 function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3)memory.delete(memory.keys().next().value);}
@@ -29,7 +41,7 @@ function valid(b,month,s){
 }
 async function saved(s,month){
  const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>=stamp)return memory.get(k);
- let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),1500);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+ let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),10000);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
 }
 function compatible(b,m){
  const r=m.revisions,revision=[r.schedule,r.leave,r.employees,b.month].join(':');
@@ -37,17 +49,18 @@ function compatible(b,m){
 }
 function load(month,options={}){
  const s=identity(),k=key(s,month)+'|'+s.token+'|'+s.stamp+'|'+s.generation;
+ observe(k,options);
  if(flights.has(k))return flights.get(k).then(b=>{assert(s);return copy(b);});
  const p=(async()=>{
   const metaRead=meta(s,month,options.force===true);metaRead.catch(()=>{});
   const prior=await saved(s,month);assert(s);
   // Preview is explicitly marked unverified; no accounting/save operation gets
   // this result. UI still filters people through the current authenticated scope.
-  if(prior&&options.onPreview&&options.force!==true)options.onPreview({...copy(prior),preview:true,source:'本機快取，背景核對中'});
+  if(prior)publish(k,'onPreview',{...copy(prior),preview:true,source:'本機快取，背景核對中'});
   let before=await metaRead;assert(s);
   if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);return hit;}
   // A scope/HR revision change must immediately stop showing old scoped data.
-  if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)options.onInvalidate?.();
+  if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)publish(k,'onInvalidate',month);
   for(let attempt=0;attempt<2;attempt++){
    // GAS can hold a shared document lock for schedule reads. Fetching the roster,
    // multiple raw months and config together can exhaust its 8-second lock wait.
@@ -62,6 +75,9 @@ function load(month,options={}){
    const roster=sharedRoster?.ok===true&&sharedRoster.month===month&&Array.isArray(sharedRoster.employees)&&Array.isArray(sharedRoster.schedules)
     ? sharedRoster : await request(s,'getScheduleDataSecure',month);
    assert(s);
+   // Authenticated roster rows can be displayed before the cross-month raw
+   // punches finish. They remain a preview until the final version check.
+   publish(k,'onRoster',{month,roster,preview:true,source:'雲端班表已讀取，考勤核對中'});
    const batches=[];
    for(let offset=0;offset<months.length;offset+=2){
     const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
@@ -82,7 +98,7 @@ function load(month,options={}){
    return b;
   }
   throw Error('雲端資料持續更新，未確認快取版本；請重新讀取');
- })().finally(()=>flights.delete(k));flights.set(k,p);return p.then(b=>{assert(s);return copy(b);});
+ })().finally(()=>{flights.delete(k);observers.delete(k);});flights.set(k,p);return p.then(b=>{assert(s);return copy(b);});
 }
 function invalidate(){generation++;metaMemo.clear();memory.clear();startupFlight=null;}
 function startup(){
@@ -93,9 +109,10 @@ function startup(){
   // The existing full download is a read-only preview, never a verified raw
   // month or a write source. The versioned bundle supplies authoritative data.
   let finished=false;
-  void Promise.resolve((g.Port79DataCache?.getDisplaySnapshot||g.Port79DataCache?.getSystemSnapshot)?.('workhours')).then(row=>{assert(s);if(!finished&&row?.data?.fullDatabase)context().applyFull?.(row.data);}).catch(()=>{});
-  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
+  void Promise.resolve((g.Port79DataCache?.getDisplaySnapshot||g.Port79DataCache?.getSystemSnapshot)?.('workhours',{timeoutMs:10000})).then(row=>{assert(s);if(!finished&&row?.data?.fullDatabase)context().applyFull?.(row.data);}).catch(()=>{});
+  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onRoster:b=>context().applyRoster?.(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
  })().finally(()=>{if(startupFlight===flight)startupFlight=null;});return flight.promise;
 }
 g.P79WorkhoursCache={load,startup,invalidate,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
 })(window);
+

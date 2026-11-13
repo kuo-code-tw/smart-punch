@@ -61,5 +61,102 @@ await test('a late full database preview cannot repaint a completed verified mon
  const n=setup(),disk=deferred();let full=0;n.win.Port79DataCache.getSystemSnapshot=()=>disk.promise;n.win.P79WorkhoursCacheContext.applyFull=()=>full++;
  assert(await n.api.startup());disk.resolve({data:{fullDatabase:true,records:[{id:'obsolete'}]}});await new Promise(r=>setImmediate(r));assert.equal(full,0);
 });
+await test('folder reads slower than 1.5 seconds still preview and reuse the saved month',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),read=n.win.Port79DataCache.get,previews=[];
+ n.win.Port79DataCache.get=async key=>{await new Promise(r=>setTimeout(r,1650));return read(key)};
+ const b=await n.api.load(month,{onPreview:x=>previews.push(x)});
+ assert.equal(previews.length,1);assert.equal(previews[0].preview,true);
+ assert.equal(b.source,'本機有效快取');assert.equal(n.calls.length,1,'slow disk must not cause full cloud downloads');
+});
+await test('consumers joining startup receive the local preview before cloud validation finishes',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),held=n.hold('getOvertimeReportCacheMeta');
+ const startup=n.api.startup();await new Promise(r=>setImmediate(r));
+ const previews=[],table=n.api.load(month,{onPreview:b=>previews.push(b)});
+ assert.equal(previews.length,1,'late subscriber immediately receives existing preview');
+ assert.equal(previews[0].preview,true);assert.equal(n.calls.length,1);
+ held.resolve();await Promise.all([startup,table]);
+});
+await test('authenticated roster rows appear before a cold raw attendance read finishes',async()=>{
+ const n=setup(),held=n.hold('getAttendanceMonthRaw'),rosters=[];
+ const pending=n.api.load(month,{onRoster:b=>rosters.push(b)});await new Promise(r=>setImmediate(r));
+ assert.equal(rosters.length,1);assert.equal(rosters[0].roster.month,month);assert.equal(rosters[0].preview,true);
+ assert.equal(n.disk.size,0,'early roster is not a verified saved bundle');
+ const late=[],joined=n.api.load(month,{onRoster:b=>late.push(b)});assert.equal(late.length,1);
+ held.resolve();const b=await pending;await joined;assert.equal(b.preview,false);
+ assert.equal(n.calls.filter(x=>x.action==='getScheduleDataSecure').length,1);
+});
+await test('refresh subscribers do not receive an in-flight local preview',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),held=n.hold('getOvertimeReportCacheMeta');
+ const first=n.api.load(month);await new Promise(r=>setImmediate(r));let previews=0;
+ const refresh=n.api.load(month,{force:true,onPreview:()=>previews++});assert.equal(previews,0);
+ held.resolve();await Promise.all([first,refresh]);
+});
+await test('a preview callback failure cannot break other consumers or the verified read',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),held=n.hold('getOvertimeReportCacheMeta');
+ const first=n.api.load(month,{onPreview:()=>{throw Error('bad UI callback')}});await new Promise(r=>setImmediate(r));
+ let good=0;const second=n.api.load(month,{onPreview:()=>good++});assert.equal(good,1);
+ held.resolve();assert.equal((await first).preview,false);assert.equal((await second).preview,false);
+});
+await test('visible table joins startup instead of downloading another schedule or waiting on itself',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk),held=n.hold('getOvertimeReportCacheMeta');
+ const startup=n.api.startup();await new Promise(r=>setImmediate(r));
+ const start=html.indexOf('        function p79LoadWorkOvertimeMonths('),end=html.indexOf('\n        function p79MergeWorkOvertimeSnapshot',start);
+ assert(start>=0&&end>start);let legacyReads=0,previewRows=0,verifiedRows=0;
+ const states=new Map(),page={window:n.win,Map,Set,Date,Intl,Promise,AbortController,encodeURIComponent,
+  document:{getElementById:()=>({dataset:{p79MonthInitialized:'1'},value:month})},
+  currentPort79SsoToken:()=> 'TOKEN',normalizeScheduleDateKey:v=>v,getAttendanceDateKey:v=>v,p79WorkhoursIsEditing:()=>false,
+  p79WorkOvertimeMonths:states,p79WorkOvertimeLoadLanes:[Promise.resolve()],p79WorkOvertimeNextLane:0,
+  p79WorkOvertimeLoadQueue:Promise.resolve(),lastAttendanceCloudRevision:'',
+  fetch:async()=>{legacyReads++;throw Error('legacy cloud route called')}
+ };
+ // Match the actual page guard: the bundle must not await its own table promise.
+ n.win.P79WorkhoursCacheContext.recentRoster=async()=>{const s=states.get(month);if(s?.cacheBundleLoad)return null;throw Error('missing shared-read guard')};
+ n.win.P79WorkhoursCacheContext.applyBundle=(b,state)=>{if(!state)return;state.ready=true;state.pending=b.preview;state.rows=b.roster.schedules;b.preview?previewRows++:verifiedRows++};
+ n.win.P79WorkhoursCacheContext.applyRoster=()=>{};
+ vm.createContext(page);vm.runInContext(html.slice(start,end),page);page.p79LoadWorkOvertimeMonths([]);
+ const state=states.get(month);assert.equal(previewRows,1,'table displays the existing local rows while metadata is held');
+ assert.equal(state.pending,true);assert.equal(legacyReads,0);
+ held.resolve();await Promise.all([startup,state.promise]);
+ assert.equal(verifiedRows,1);assert.equal(state.pending,false);assert.equal(state.cacheBundleLoad,false);
+ assert.equal(n.calls.filter(c=>c.action==='getScheduleDataSecure'&&c.month===month).length,0);
+ assert.equal(legacyReads,0);
+ await page.p79WorkOvertimeLoadQueue;
+});
+await test('late subscribers cannot replay a preview invalidated by a changed scope',async()=>{
+ const seed=setup();await seed.api.load(month);const n=setup(seed.disk);n.scope('new-scope');
+ const held=n.hold('getAttendanceMonthRaw'),first=n.api.load(month);await new Promise(r=>setImmediate(r));
+ let previews=0,invalidations=0;const second=n.api.load(month,{onPreview:()=>previews++,onInvalidate:()=>invalidations++});
+ assert.equal(previews,0);assert.equal(invalidations,1);
+ held.resolve();await Promise.all([first,second]);
+});
+await test('actual page hydrators keep previews pending, deduplicate calculation and defer during edits',async()=>{
+ const start=html.indexOf('window.P79WorkhoursCacheContext={'),end=html.indexOf('\n};',start)+3;
+ let editing=false,calculations=0;const states=new Map(),page={window:{},Date,Set,Map,Array,String,Number,
+  currentPort79SsoToken:()=> 'TOKEN',hasValidHomepageAdminSession:()=>true,p79WorkhoursIsEditing:()=>editing,
+  p79WorkOvertimeMonths:states,employees:[],records:[],schedules:[],leaveRecords:[],sysConfig:{},
+  mergeCloudEmployees:x=>x,normalizeEmployeeIdentifiers:x=>x,normalizeAttendanceRecordIdentifiers:x=>x,
+  isLocallyDeletedAttendanceRecord:()=>false,attendanceRecordMonthKey:r=>r.month,
+  mergeAttendanceRecordCollections:(a,b)=>[...a,...b],applyPendingOperationsToCloudData:x=>x,
+  p79BuildWorkRestAttendance:()=>{calculations++;return {attendanceEvidence:{complete:true}}},
+  lastAttendanceCloudRevision:'',lastCloudLoadSuccessAt:0,p79DeferredOvertimeDisplay:false,
+  p79OvertimeCalculationCache:null,p79WorkOvertimeRenderTimer:null,initDropdowns(){},renderOvertimeStats(){},
+  setTimeout:()=>1,clearTimeout(){}
+ };
+ vm.createContext(page);vm.runInContext(html.slice(start,end),page);const c=page.window.P79WorkhoursCacheContext;
+ const bundle={month,version:'v1',roster:{employees:[],schedules:[{empId:'A1',month,schedule:{}}],overtimeLinkedDelete:true},raw:{[month]:{month,records:[]}},config:{config:{}},meta:{revisions:{attendance:'A1'}}};
+ c.applyBundle({...bundle,preview:true});const state=states.get(month);
+ assert.equal(state.pending,true);assert.equal(state.canDelete,false);
+ c.applyBundle({...bundle,preview:true},state);assert.equal(calculations,1,'startup/table preview pair computes once');
+ c.applyBundle({...bundle,preview:false});assert.equal(state.pending,false);assert.equal(state.canDelete,true);
+ c.applyBundle({...bundle,preview:false},state);assert.equal(calculations,2,'startup/table confirmation pair computes once');
+ state.pending=true;c.applyBundle({...bundle,preview:false},state);assert.equal(state.pending,false,'same-version refresh must clear loading');
+ editing=true;const rows=state.rows;c.applyBundle({...bundle,version:'v2',preview:false},state);
+ assert.equal(state.rows,rows);assert.equal(state.at,0);assert.equal(page.p79DeferredOvertimeDisplay,true);
+ editing=false;c.applyRoster({month,roster:bundle.roster,source:'核對中'},state);
+ assert.equal(state.cachePreview,true);assert.equal(state.canDelete,false);assert.equal(state.pending,true);
+ state.cacheBundleLoad=true;state.promise=new Promise(()=>{});state.cacheMutationStamp='';
+ assert.equal(await c.recentRoster(month,'TOKEN',''),null,'bundle-backed table never awaits its own promise');
+});
 console.log('VERIFIED WORKHOURS CACHE: '+passed+' scenarios passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
+

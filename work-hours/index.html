@@ -525,7 +525,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261028-folder-native-display-v1"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261113-workhours-local-first-v1"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 
 <style id="p79-work-hours-page-css">
@@ -2719,7 +2719,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.11.02.117';
+        const APP_VERSION='2026.11.13.118';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -13341,6 +13341,23 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 const state={...(previous?.token===token&&previous.ready?previous:{}),token,at:Date.now(),pending:true,ready:previous?.token===token&&previous.ready===true,revision:previous?.revision||null,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[],leaveRecords:previous?.token===token?previous.leaveRecords||[]:[],attendanceEvidence:previous?.token===token?previous.attendanceEvidence:null,error:'',restEvidenceError:'',officialPayload:null,cacheMutationStamp:typeof sessionStorage==='undefined'?'':String(sessionStorage.getItem('port79_cache_mutated_at')||'')};p79WorkOvertimeMonths.set(month,state);
                 const load=async()=>{
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
+                    // Use the same account/month read as startup. A local bundle
+                    // paints immediately; cloud roster rows paint before raw evidence.
+                    if(typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()){
+                        state.cacheBundleLoad=true;
+                        try{
+                            const current=()=>currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state;
+                            const bundle=await window.P79WorkhoursCache.load(month,{force,
+                                onPreview:b=>{if(current())window.P79WorkhoursCacheContext.applyBundle(b,state);},
+                                onRoster:b=>{if(current())window.P79WorkhoursCacheContext.applyRoster(b,state);},
+                                onInvalidate:()=>{if(current())window.P79WorkhoursCacheContext.invalidatePreview(month);}
+                            });
+                            if(current())window.P79WorkhoursCacheContext.applyBundle(bundle,state);
+                        }catch(e){
+                            if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.failed(month,e);
+                        }finally{state.cacheBundleLoad=false;}
+                        return;
+                    }
                     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
                     try{
                         // Read the authoritative monthly overtime roster first.
@@ -17515,7 +17532,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 
-<script src="../assets/port79-workhours-cache.js?v=20261103-secure-roster-share-v1"></script>
+<script src="../assets/port79-workhours-cache.js?v=20261113-local-first-shared-v1"></script>
 <script>
 // One read service for main table, monthly report and amendment/accounting views.
 window.P79WorkhoursCacheContext={
@@ -17526,7 +17543,7 @@ window.P79WorkhoursCacheContext={
  // Share same-session secure roster reads rather than fetching an identical month twice.
  recentRoster:async(month,token,stamp)=>{
   const state=p79WorkOvertimeMonths.get(month);
-  if(!state||state.token!==token||state.cacheMutationStamp!==stamp||Date.now()-state.at>30000)return null;
+  if(!state||state.cacheBundleLoad||state.token!==token||state.cacheMutationStamp!==stamp||Date.now()-state.at>30000)return null;
   if(state.pending&&state.promise)await state.promise.catch(()=>{});
   if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state||state.pending||state.error||state.cachePreview)return null;
   const payload=state.officialPayload;
@@ -17545,12 +17562,23 @@ window.P79WorkhoursCacheContext={
   records=mergeAttendanceRecordCollections(incoming,Array.isArray(records)?records:[]);
   initDropdowns();p79OvertimeCalculationCache=null;renderOvertimeStats();return {ok:true,preview:true,recordCount:incoming.length};
  },
+ applyRoster:(bundle,target=null)=>{
+  if(!hasValidHomepageAdminSession()||!currentPort79SsoToken()||p79WorkhoursIsEditing())return;
+  const token=currentPort79SsoToken(),month=bundle.month,roster=bundle.roster;
+  const state=target||p79WorkOvertimeMonths.get(month)||{token,rows:[],covers:[],leaveRecords:[]};
+  if(state.token!==token||target&&p79WorkOvertimeMonths.get(month)!==target)return;
+  if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
+  Object.assign(state,{token,at:Date.now(),ready:true,pending:true,cachePreview:true,source:bundle.source,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:false,error:'',restEvidenceLoaded:false});
+  p79WorkOvertimeMonths.set(month,state);p79OvertimeCalculationCache=null;initDropdowns();
+  clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
+ },
  applyBundle:(bundle,target=null)=>{
   if(!hasValidHomepageAdminSession()||!currentPort79SsoToken())return;
   const token=currentPort79SsoToken(),month=bundle.month;
   const state=target||p79WorkOvertimeMonths.get(month)||{token,rows:[],covers:[],leaveRecords:[]};
   if(state.token!==token||target&&p79WorkOvertimeMonths.get(month)!==target)return;
   if(p79WorkhoursIsEditing()){state.pending=false;state.at=0;p79DeferredOvertimeDisplay=true;return;}
+  if(state.ready&&!state.error&&state.appliedCacheBundle===bundle.version&&state.cachePreview===(bundle.preview===true)&&state.at>0&&(bundle.preview||!state.pending))return;
   const roster=bundle.roster;
   if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
   const raw=Object.values(bundle.raw||{}),loadedMonths=new Set(raw.map(x=>x.month));
@@ -17567,10 +17595,11 @@ window.P79WorkhoursCacheContext={
   Object.assign(state,{token,at:Date.now(),ready:true,pending:bundle.preview===true,cachePreview:bundle.preview===true,source:bundle.source,revision:roster.revision,loadedCloudRevision:lastAttendanceCloudRevision,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:!bundle.preview&&roster.overtimeLinkedDelete===true,error:'',restEvidenceError:'',restEvidencePending:false,restEvidenceLoaded:!bundle.preview,restEvidenceRevision:lastAttendanceCloudRevision});
   p79WorkOvertimeMonths.set(month,state);
   state.attendanceEvidence=p79BuildWorkRestAttendance(month,roster,incoming,!bundle.preview).attendanceEvidence;
+  state.appliedCacheBundle=bundle.version;
   p79OvertimeCalculationCache=null;initDropdowns();
   clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
  },
- invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.canDelete=false;}p79OvertimeCalculationCache=null;},
+ invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.canDelete=false;state.appliedCacheBundle=null;}p79OvertimeCalculationCache=null;},
  failed:(month,error)=>{const state=p79WorkOvertimeMonths.get(month)||{token:currentPort79SsoToken(),rows:[]};state.at=Date.now();state.pending=false;state.error=String(error?.message||error);state.canDelete=false;p79WorkOvertimeMonths.set(month,state);renderOvertimeStats();}
 };
 window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
@@ -17924,3 +17953,4 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <script>
 window.p79ProjectBonusContext={canOpen:p79CanExportOvertimeApplication,account:()=>String(currentEmp?.empId||'')+'|'+getActiveGasUrl(),session:currentPort79SsoToken,employees:()=>p79WorkhoursEligibleEmployees(),month:()=>window.p79MonthlyRestContext.month(),snapshot:month=>p79AccountingReportSnapshotV108(month),ensureXlsx:()=>window.p79EnsureXlsx()};
 </script>
+
