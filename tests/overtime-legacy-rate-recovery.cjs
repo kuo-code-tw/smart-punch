@@ -64,5 +64,18 @@ device.p79OvertimeContext.gasUrl=()=> 'https://script.google.com/macros/s/offici
 assert.equal(restored.rememberOvertimeOptions({overtimeConversionRowsV1:[saved[2]]},'partial'),true);
 assert.equal(restored.recoverableOvertimeOptions({}).rows.length,3,
  'later partial reads do not replace richer prior rules');
+store.clear();
+device.localStorage.setItem('sp_config_v5',JSON.stringify({
+ ...savedConfig,gasUrl:'https://script.google.com/macros/s/official/exec'
+}));
+assert.equal(restored.recoverableOvertimeOptions({
+ overtimeConversionRowsV1:[],overtimeReportTypesV1:[]
+})?.rows.length,3,'earlier sp_config_v5 is a valid recovery source only for the same endpoint');
+store.clear();
+device.localStorage.setItem('sp_config_v5',JSON.stringify({
+ ...savedConfig,gasUrl:'https://script.google.com/macros/s/unrelated/exec'
+}));
+assert.equal(restored.recoverableOvertimeOptions({}),null,
+ 'local config from a different deployment cannot be transplanted');
 new vm.Script(src);
 console.log('PASS legacy cloud rates and safe same-device recovery: exact rates, explicit user save, no cross-source restore or deleted-rule revival');
