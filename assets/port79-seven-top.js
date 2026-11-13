@@ -164,7 +164,7 @@ const META={
 const NAV=[
  ['attendance','🕒','考勤管理','../attendance/'],
  ['schedule','📅','排班管理','../schedule/'],
- ['efficiency','🚢','船舶作業管理','../aqc-efficiency/'],
+ ['efficiency','🚢','碼頭系統管理','../aqc-efficiency/'],
  ['hr','👥','人資管理','../hr/'],
  ['workhours','📊','工時與加班管理','../work-hours/'],
  ['leave','📝','請假管理','../leave/'],
