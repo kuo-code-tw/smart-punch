@@ -62,9 +62,11 @@ assert.equal(metrics.p79DashOvertimeUnit,'','no trailing hours suffix on pending
 assert.match(notes.p79DashScheduleSource,/其中 1 筆缺換算值/);
 assert.equal(shown,a);
 context.data={...a,missingConversion:0};vm.runInContext('showOvertime(data)',context);
-assert.equal(metrics.p79DashOvertimeHours,'18.7');
+assert.equal(metrics.p79DashOvertimeHours,'18.72','converted KPI must retain two decimal places');
 assert.equal(metrics.p79DashOvertimeUnit,'小時');
-assert.match(notes.p79DashScheduleSource,/實際 15.0 小時 → 換算 18.7 小時/);
+assert.match(notes.p79DashScheduleSource,/實際 15.0 小時 → 換算 18.72 小時/);
+context.data={...a,convertedHours:120,sourceWarning:''};vm.runInContext('showOvertime(data)',context);
+assert.equal(metrics.p79DashOvertimeHours,'120.00','whole converted hours still display .00');
 context.data={...a,sourceWarning:'history fallback'};vm.runInContext('showOvertime(data)',context);
 assert.equal(metrics.p79DashOvertimeHours,'待核對','unverified live source cannot claim converted value');
 assert(home.includes('本月申報加班'));
