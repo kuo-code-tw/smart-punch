@@ -61,3 +61,19 @@
 .yard-allowed-summary div p[id$="TeuSummary"][data-exceeded="true"]{color:#b91c1c;font-weight:950}
 .yard-allowed-editor label[for$="AllowedTeu"]{color:#075a85}
 .yard-allowed-editor label[for$="AllowedTeu"] input{border-color:#78b3d9;background:#faffff}
+
+/* Editable 20'/40' allocations calculate total boxes and TEU immediately. */
+.yard-allowed-editor{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+.yard-allowed-type{background:#fff;border:1px solid #ccdfec;border-radius:12px;padding:14px;min-width:0}
+.yard-allowed-type:nth-child(3){border-color:#9ed6cb;background:linear-gradient(135deg,#f1fffb,#fff)}
+.yard-allowed-type h3{margin:0 0 5px;font-size:16px;font-weight:900;color:#1a426d}
+.yard-allowed-type p{margin:0 0 12px;color:#526d88;font-size:11px;line-height:1.6}
+.yard-allowed-type-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.yard-allowed-type-fields label{width:100%;max-width:none;min-width:0;flex:none;font-size:12px}
+.yard-allowed-type-fields input{width:100%;max-width:100%;font-size:14px}
+.yard-allowed-type-fields input[readonly]{background:#ecf6ff;border-color:#86bde2;color:#0a578f}
+.yard-allowed-computed{margin-top:11px;min-height:38px;color:#0b6e75;font-weight:850;font-size:12px;line-height:1.65}
+.yard-allowed-actions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.yard-reefer-summary{border-left-color:#009b99!important}
+@media(max-width:1150px){.yard-allowed-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.yard-allowed-type:last-of-type{grid-column:1/-1}}
+@media(max-width:700px){.yard-allowed-editor{grid-template-columns:1fr}.yard-allowed-type:last-of-type{grid-column:auto}.yard-allowed-type-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
