@@ -21,7 +21,7 @@ for(const id of ['Heavy','Empty','Reefer']){
 }
 assert.match(html,/id="yardReeferCount"/);
 assert.match(html,/id="yardReeferTeuSummary"/);
-assert.match(html,/20 尺＝1 TEU、40 尺＝2 TEU/);
+assert.match(html,/20 尺櫃＝1 TEU，40 尺櫃＝2 TEU/);
 assert.doesNotMatch(html,/id="yardManualHeavyCap"|id="yardManualEmptyCap"/,'TEU override inputs must not be shown as box count controls');
 assert.match(html,/yard-dashboard\.js\?v=20261113-auto-reefer-v1/);
 assert.match(html,/yard-dashboard\.css\?v=20261113-auto-reefer-v1/);
