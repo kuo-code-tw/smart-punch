@@ -21,7 +21,7 @@ assert(scope.includes('justify-self:end!important')&&scope.includes('grid-area:n
 assert(scope.includes('flex-direction:row!important')&&scope.includes('flex-wrap:nowrap!important'));
 assert(scope.includes('height:94px!important;min-height:94px!important'));
 assert(!scope.includes('grid-template-areas:"label label" "number number"'),'switch cannot fall below the number');
-assert(html.includes('layout=20261113-buttons-right-contained-v3'),'browser must load the corrected stylesheet');
+assert(html.includes('layout=20261113-equal-attendance-kpi-v4'),'browser must load the latest equal-height stylesheet');
 assert(scope.includes('width:auto!important;min-width:0!important;max-width:100%!important'),
  'KPI inner body must shrink after subtracting the left icon width');
 assert(scope.includes('flex:1 1 0%!important')&&!scope.includes('width:100%!important;min-width:205px!important;flex:1 0 auto!important'),
