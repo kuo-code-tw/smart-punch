@@ -431,10 +431,27 @@
    return true;
   }catch(error){return false;}
  }
+
+ // Older browser builds stored the actual cloud configuration in sp_config_v5.
+ // Read-only migration is allowed ONLY for the exact same GAS Web App URL.
+ function findLegacyLocalOvertimeBackup(){
+  try{
+   const url=String(global.p79OvertimeContext?.gasUrl?.()||'').trim();
+   if(!url||!global.localStorage)return false;
+   let found=false;
+   for(const key of ['sp_config_v5','sp_config_v4','sp_config_v3']){
+    const candidate=JSON.parse(global.localStorage.getItem(key)||'null');
+    if(!candidate||String(candidate.gasUrl||'').trim()!==url)continue;
+    if(rememberOvertimeOptions(candidate,'legacy-'+key))found=true;
+   }
+   return found;
+  }catch(error){return false;}
+ }
  function recoverableOvertimeOptions(cloudConfig){
   try{
    const url=String(global.p79OvertimeContext?.gasUrl?.()||'').trim();
    if(!url||!global.localStorage||!cloudConfig||typeof cloudConfig!=='object')return null;
+   findLegacyLocalOvertimeBackup();
    // Never override a current active rule, an intentional archive/deletion, or
    // a source mismatch. Recovery requires an administrator confirmation and
    // the existing guarded Save + cloud readback.
