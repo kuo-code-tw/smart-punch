@@ -1270,3 +1270,46 @@ html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch{background:#17304c;bor
 html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button{color:#c9dcf3}
 html[data-theme="dark"] #p79Dashboard .p79-ot-hour-switch button.active{background:#2563eb;color:#fff}
 html[data-theme="dark"] #p79Dashboard .p79-ot-unreported{color:#bed3eb}
+
+/* 2026-11-13: the homepage overtime metric is ONE compact horizontal row.
+ * Keep icon, metric, view toggle and separate unsubmitted subtotal visible.
+ * Small phones may scroll horizontally rather than wrap to multiple rows. */
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79d-kpi{
+ height:76px!important;min-height:76px!important;align-items:center!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79d-attendance .p79d-kpis>.p79-ot-hours-kpi{
+ display:flex!important;flex-direction:row!important;align-items:center!important;flex-wrap:nowrap!important;
+ gap:6px!important;padding:7px 9px!important;overflow-x:auto;overflow-y:hidden;
+ scrollbar-width:none
+}
+#p79Dashboard .p79-ot-hours-kpi::-webkit-scrollbar{display:none}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hours-kpi>.p79d-kpi-icon{
+ flex:0 0 34px!important;width:34px!important;height:34px!important;font-size:21px!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hours-body{
+ display:flex!important;align-items:center!important;flex-direction:row!important;
+ gap:6px!important;flex:1 0 auto!important;min-width:max-content!important;white-space:nowrap
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hours-body #p79DashOvertimeLabel{
+ font-size:11px!important;line-height:1.2!important;white-space:nowrap!important;flex:0 0 auto
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hour-value{
+ display:inline-flex!important;align-items:baseline!important;gap:1px!important;white-space:nowrap!important;flex:0 0 auto
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hour-value strong{
+ font-size:clamp(20px,1.8vw,27px)!important;line-height:1.1!important;white-space:nowrap!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hour-value small{
+ font-size:10px!important;white-space:nowrap!important;margin:0!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hour-switch{
+ display:inline-flex!important;flex:0 0 auto!important;align-items:center!important;
+ gap:1px!important;padding:2px!important;margin:0!important;border-radius:7px!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-hour-switch button{
+ padding:4px 5px!important;font-size:10px!important;line-height:1.15!important;border-radius:5px!important
+}
+html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79-ot-unreported{
+ display:inline-block!important;flex:0 0 auto!important;margin:0!important;
+ font-size:10px!important;line-height:1.2!important;white-space:nowrap!important
+}
