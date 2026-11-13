@@ -4,6 +4,12 @@
 if(window.Port79IdleLogout) return;
 const DEFAULT_MINUTES=5, MIN=1, MAX=120;
 const REQUEST_TIMEOUT_MS=60000;
+const BUSY_RETRY_DELAYS_MS=[700,1500,3000,5000];
+function isCloudBusy(error){
+ const message=String(error?.message||error||'');
+ return /雲端目前正在(?:寫入資料|處理其他資料)|(?:資料鎖|寫入鎖).*(?:忙碌|占用|佔用)|(?:LOCK_BUSY|WRITE_LOCK_BUSY|ORG_CONFIG_BUSY)/i.test(message);
+}
+function waitForCloud(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 let saving=false;
 const CONFIG_FIELD='p79_hr_idle_logout_minutes_v1';
 const CACHE_KEY='port79_idle_logout_config_v1';
@@ -84,8 +90,13 @@ async function readCloud(){
  const token=getToken();if(!token)throw new Error('登入憑證不存在，請重新登入');
  const url=getGas(),query=url+'?action=getData&token='+encodeURIComponent(token)+'&t='+Date.now();
  let data;
- for(let attempt=0;attempt<2;attempt++){
-  try{data=await request(query);break;}catch(e){if(!e.uncertain||attempt===1)throw e;}
+ for(let attempt=0;attempt<=BUSY_RETRY_DELAYS_MS.length;attempt++){
+  try{data=await request(query);break;}
+  catch(e){
+   const busy=isCloudBusy(e);
+   if((!busy&&!e.uncertain)||attempt>=(busy?BUSY_RETRY_DELAYS_MS.length:1))throw e;
+   if(busy)await waitForCloud(BUSY_RETRY_DELAYS_MS[attempt]);
+  }
  }
  if(!data.config||typeof data.config!=='object')throw new Error('雲端共用設定格式不完整');
  return data.config;
@@ -160,12 +171,26 @@ async function saveUI(){
  saving=true;
  const btn=document.getElementById('p79IdleSave');btn.disabled=true;setStatus('正在儲存到雲端共用設定…',false);
  try{
-  const config=await readCloud(),merged={...config,[CONFIG_FIELD]:n};
-  if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('雲端設定容量不足，尚未儲存');
+  let config=await readCloud();
   const token=getToken();
   let writeError;
-  try{await request(getGas(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveConfig',config:merged,token,userToken:token})});}
-  catch(e){if(!e.uncertain)throw e;writeError=e;setStatus('儲存回應中斷，正在讀回雲端確認結果…',false);}
+  for(let attempt=0;attempt<=BUSY_RETRY_DELAYS_MS.length;attempt++){
+   const merged={...config,[CONFIG_FIELD]:n};
+   if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('雲端設定容量不足，尚未儲存');
+   try{
+    await request(getGas(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveConfig',config:merged,token,userToken:token})});
+    break;
+   }catch(e){
+    if(e.uncertain){writeError=e;setStatus('儲存回應中斷，正在讀回雲端確認結果…',false);break;}
+    if(!isCloudBusy(e)||attempt===BUSY_RETRY_DELAYS_MS.length)throw e;
+    setStatus('雲端正在處理其他資料，正在自動重試（'+(attempt+1)+'/'+BUSY_RETRY_DELAYS_MS.length+'）…',false);
+    await waitForCloud(BUSY_RETRY_DELAYS_MS[attempt]);
+    // Before resending, re-read shared config so unrelated settings are not overwritten.
+    // If the earlier write actually succeeded, do not send a duplicate.
+    config=await readCloud();
+    if(number(config[CONFIG_FIELD])===n)break;
+   }
+  }
   let confirmed;
   try{confirmed=await readCloud();}
   catch(e){throw new Error('尚未確認儲存結果：'+e.message+'；請重新開啟設定核對，勿連續重送');}
