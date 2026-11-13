@@ -774,7 +774,7 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
       <button class="tab btn bg-slate-100" data-tab="multi-rod" onclick="switchTab('multi-rod',this)">⚓ AQC 多桿作業</button>
       <button class="tab btn bg-slate-100" data-tab="compare" onclick="switchTab('compare',this)">🧭 航線資料管理</button>
        <button class="tab btn bg-slate-100" data-tab="terminal" onclick="switchTab('terminal',this)">🏗️ 碼頭營運統計</button>
-      <button class="tab btn bg-slate-100" data-tab="yard" onclick="switchTab('yard',this)">▥ 堆場儲位管理</button>
+      <button class="tab btn bg-slate-100" data-tab="yard" onclick="switchTab('yard',this)">▥ 碼頭儲位管理</button>
       <button class="tab btn bg-slate-100" data-tab="personstats" onclick="switchTab('personstats',this)">📝 司機作業</button>
       <button class="tab btn bg-slate-100" data-tab="weekly" onclick="switchTab('weekly',this)">👥 人員統計</button>
       <button class="tab btn bg-slate-100" data-tab="dispatch" onclick="switchTab('dispatch',this)">⚖️ 人員調度與月均效率</button>
@@ -784,11 +784,11 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
     <label class="p79-efficiency-tab-year" for="efficiencySharedYear">年份 <select id="efficiencySharedYear" aria-label="效率系統年份" class="port79-year-select" onchange="setPort79Year(this.value)"></select></label>
   </section>
 
-  <section id="view-yard" class="hidden space-y-3" aria-label="堆場儲位管理">
-    <iframe id="p79YardDashboardFrame" title="堆場儲位管理：場存、使用率、冷凍插座及Long-Stay"
+  <section id="view-yard" class="hidden space-y-3" aria-label="碼頭儲位管理">
+    <iframe id="p79YardDashboardFrame" title="碼頭儲位管理：場存、使用率、冷凍插座及Long-Stay"
       class="w-full" loading="lazy"
       style="display:block;width:100%;height:1000px;min-height:740px;border:0;background:transparent"
-      data-src="../yard-dashboard/?embed=1&v=20261113-yard-drop-v1"></iframe>
+      data-src="../yard-dashboard/?embed=1&v=20261113-yard-center-v1"></iframe>
   </section>
 
   <section id="view-gate" class="hidden space-y-3" aria-label="79碼頭進出站櫃量管理（日／月／年）">
