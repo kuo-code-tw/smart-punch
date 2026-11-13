@@ -275,19 +275,72 @@ html[data-theme="dark"] .p79-login-keypad{background:#0f172a;border-color:#33415
 }
 </style>
 <style id="p79-home-yard-20261113">
+/* Compact Yard homepage dashboard. Dynamic ring data is populated only from validated browser-local Excel. */
 .system-card.yard{border-left:4px solid #078f75}
 .p79-home-yard[hidden]{display:none!important}
-.p79-home-yard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.p79-home-yard-stat{min-width:0;padding:14px 16px;border:1px solid var(--border);border-radius:13px;background:var(--panel);display:flex;flex-direction:column;gap:6px}
-.p79-home-yard-stat.heavy{background:linear-gradient(120deg,#e8f1ff,#f4f8ff)}
-.p79-home-yard-stat.empty{background:linear-gradient(120deg,#e2f8e9,#f4fcf6)}
-html[data-theme="dark"] .p79-home-yard-stat.heavy,html[data-theme="dark"] .p79-home-yard-stat.empty{background:var(--panel)}
-.p79-home-yard-stat.allowed-reefer{border-left:4px solid #009b99}
-.p79-home-yard-stat>span{font-size:12px;font-weight:850;color:var(--muted)}
-.p79-home-yard-stat>strong{font-size:24px;font-weight:950;font-variant-numeric:tabular-nums;color:var(--text)}
-.p79-home-yard-stat>small{font-size:11px;font-weight:800;color:var(--muted)}
-.p79-home-yard-source{font-size:11px;color:var(--muted);line-height:1.5;margin:9px 0 0}
-@media(max-width:850px){.p79-home-yard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.p79-home-yard{--yard-navy:#122b53;--yard-blue:#0876d8;--yard-green:#28a451;--yard-purple:#8046c8;--yard-muted:#526581}
+.p79-home-yard .p79d-section-head{margin-bottom:12px}
+.p79-home-yard .p79d-section-head h2{font-weight:900}
+.p79-home-yard-layout{display:flex;flex-direction:column;gap:12px}
+.p79-yard-kpis,.p79-yard-panels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.p79-yard-kpi{position:relative;min-width:0;min-height:106px;padding:14px 16px;border-radius:13px;border:1px solid #d6e4f4;background:#f3f8ff;color:var(--yard-navy);overflow:hidden}
+.p79-yard-kpi.kpi-heavy{background:linear-gradient(115deg,#e8f2ff,#f5f9ff)}
+.p79-yard-kpi.kpi-empty{background:linear-gradient(115deg,#e5f8ed,#f4fbf5)}
+.p79-yard-kpi.kpi-reefer{background:linear-gradient(115deg,#f0edff,#faf7ff)}
+.p79-yard-kpi.kpi-capacity{background:linear-gradient(115deg,#fff9ed,#fffefa)}
+.p79-yard-kpi>span{display:block;font-weight:850;font-size:13px;letter-spacing:.02em}
+.p79-yard-kpi>strong{display:block;margin:10px 46px 5px 0;font-size:clamp(21px,2vw,28px);font-weight:950;font-variant-numeric:tabular-nums;line-height:1.05;white-space:nowrap}
+.p79-yard-kpi>strong small{font-size:12px;font-weight:750}
+.p79-yard-kpi>small{display:block;color:var(--yard-muted);font-size:11px;line-height:1.5;font-weight:650}
+.p79-yard-kpi-icon{position:absolute;right:15px;top:35px;color:var(--yard-blue);font-size:29px;opacity:.78}
+.kpi-empty .p79-yard-kpi-icon{color:var(--yard-green)}
+.kpi-reefer .p79-yard-kpi-icon{color:var(--yard-purple)}
+.kpi-capacity .p79-yard-kpi-icon{color:#cf9419}
+.p79-yard-panel{min-width:0;overflow:hidden;border:1px solid #d5e2f2;border-radius:13px;background:var(--panel,#fff);color:var(--yard-navy)}
+.p79-yard-panel-head{min-height:39px;display:flex;align-items:center;gap:6px;padding:9px 12px;background:linear-gradient(100deg,#f5f9ff,#edf5ff);border-bottom:1px solid #e2eaf4}
+.p79-yard-panel-head b{font-size:13px;font-weight:900;white-space:nowrap}
+.p79-yard-panel-head .p79-yard-panel-icon{font-size:17px;color:var(--yard-blue);line-height:1}
+.p79-yard-panel-head small{margin-left:auto;text-align:right;font-size:10px;font-weight:750;color:#3b506c;line-height:1.3}
+.p79-yard-panel.empty .p79-yard-panel-icon{color:var(--yard-green)}
+.p79-yard-panel.reefer .p79-yard-panel-icon{color:var(--yard-purple)}
+.p79-yard-donut-body{display:flex;align-items:center;gap:12px;padding:14px 12px;min-height:156px}
+.p79-yard-donut{--yard-ring:#e2e7ed;--yard-ring-pct:0%;position:relative;flex:0 0 114px;width:114px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--yard-ring) var(--yard-ring-pct),#e0e5eb 0)}
+.p79-yard-donut::before{content:"";position:absolute;inset:16px;border-radius:50%;background:var(--panel,#fff)}
+.p79-yard-donut-center{z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--yard-navy);text-align:center}
+.p79-yard-donut-center b{font-size:17px;font-weight:950;white-space:nowrap;font-variant-numeric:tabular-nums}
+.p79-yard-donut-center small{font-size:11px;font-weight:750}
+.p79-yard-breakdown{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.p79-yard-breakdown>div{display:flex;align-items:center;gap:5px;font-size:11px;min-width:0}
+.p79-yard-breakdown .legend{flex:0 0 10px;width:10px;height:10px;border-radius:3px;background:var(--yard-blue)}
+.p79-yard-panel.empty .legend{background:var(--yard-green)}
+.p79-yard-panel.reefer .legend{background:var(--yard-purple)}
+.p79-yard-breakdown .legend.free{background:#dce2e9}
+.p79-yard-breakdown .label{white-space:nowrap;color:#36506f;font-weight:750}
+.p79-yard-breakdown .num{margin-left:auto;text-align:right;font-weight:900;font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
+.p79-yard-breakdown>div.total{margin-top:2px;padding-top:7px;border-top:1px solid #ced8e5}
+.p79-yard-breakdown>p{margin:0;font-size:10px;color:#a33333;line-height:1.3;font-weight:750}
+.p79-yard-counts{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.p79-yard-count-line{display:grid;grid-template-columns:61px minmax(0,1fr);gap:10px;align-items:center;border-bottom:1px solid #e3eaf3;padding:5px 0}
+.p79-yard-count-line:last-child{border-bottom:0}
+.p79-yard-count-line>span{display:grid;place-items:center;min-height:32px;font-size:12px;font-weight:900;border-radius:7px;background:#e9f2ff;color:var(--yard-navy)}
+.p79-yard-count-line.empty>span{background:#e3f8eb}
+.p79-yard-count-line.reefer>span{background:#f0e8ff}
+.p79-yard-count-line strong{font-size:16px;font-variant-numeric:tabular-nums;font-weight:950;color:var(--yard-navy)}
+.p79-yard-count-line small{display:block;color:#4f6381;font-size:10px;line-height:1.4;margin-top:2px}
+.p79-yard-count-line .p79-yard-count-right{min-width:0}
+.p79-yard-over-warning{color:#b42332!important}
+.p79-home-yard-source{font-size:10px;color:var(--muted,#5a708d);line-height:1.5;margin:10px 2px 0}
+html[data-theme="dark"] .p79-yard-kpi{background:#23324a;border-color:#42526d;color:#f2f5fb}
+html[data-theme="dark"] .p79-yard-kpi>small{color:#d1d8e4}
+html[data-theme="dark"] .p79-yard-panel{background:var(--panel,#19263a);color:#f4f6fa}
+html[data-theme="dark"] .p79-yard-panel-head{background:#263750;border-color:#43546b}
+html[data-theme="dark"] .p79-yard-panel-head small,html[data-theme="dark"] .p79-yard-breakdown .label,html[data-theme="dark"] .p79-yard-count-line small{color:#d4ddea}
+html[data-theme="dark"] .p79-yard-donut::before{background:var(--panel,#19263a)}
+html[data-theme="dark"] .p79-yard-donut-center,html[data-theme="dark"] .p79-yard-count-line strong{color:#f3f7fd}
+html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
+@media(max-width:1180px){.p79-yard-kpis,.p79-yard-panels{grid-template-columns:repeat(2,minmax(0,1fr))}.p79-yard-donut-body{min-height:140px}}
+@media(max-width:620px){.p79-home-yard .p79d-section-head{flex-wrap:wrap;gap:5px}.p79-yard-kpis{gap:8px}.p79-yard-kpi{min-height:98px;padding:12px}.p79-yard-kpi>strong{font-size:21px;margin-right:10px}.p79-yard-kpi-icon{right:9px;top:9px;font-size:18px}.p79-yard-panels{grid-template-columns:minmax(0,1fr);gap:9px}.p79-yard-donut-body{min-height:144px}.p79-yard-counts{padding:10px}}
+@media(max-width:360px){.p79-yard-kpis{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
 <link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3">
@@ -427,17 +480,71 @@ html[data-theme="dark"] .p79-home-yard-stat.heavy,html[data-theme="dark"] .p79-h
     <p id="p79DashShipSource" class="p79d-source">船舶統計待讀取；每月資料由原歷史資料功能提供。</p>
   </section>
   <section id="p79HomeYardPanel" class="p79d-section p79-home-yard" aria-labelledby="p79HomeYardHeading" hidden>
-    <div class="p79d-section-head"><h2 id="p79HomeYardHeading">▥ 碼頭儲位管理 <span id="p79HomeYardDate">—</span></h2><div class="p79d-heading-actions"><button type="button" onclick="launchSystem('yard')">查看儲位／設定容量 ›</button></div></div>
-    <div class="p79-home-yard-grid" aria-label="碼頭重櫃空櫃場存與容量">
-      <article class="p79-home-yard-stat heavy"><span>重櫃場存</span><strong id="p79HomeYardHeavy">—</strong><small>TEU · 使用率 <b id="p79HomeYardHeavyPct">—</b></small></article>
-      <article class="p79-home-yard-stat empty"><span>空櫃場存</span><strong id="p79HomeYardEmpty">—</strong><small>TEU · 使用率 <b id="p79HomeYardEmptyPct">—</b></small></article>
-      <article class="p79-home-yard-stat"><span>重櫃容量</span><strong id="p79HomeYardHeavyCap">—</strong><small>TEU</small></article>
-      <article class="p79-home-yard-stat"><span>空櫃容量（Excel）</span><strong id="p79HomeYardEmptyCap">—</strong><small>TEU</small></article>
-      <article class="p79-home-yard-stat allowed-heavy"><span>重櫃實際／容許櫃數</span><strong id="p79HomeYardHeavyCount">—</strong><small id="p79HomeYardHeavyLimit">容許：未設定（櫃）</small><small id="p79HomeYardHeavyTeu">換算 TEU：—</small></article>
-      <article class="p79-home-yard-stat allowed-empty"><span>空櫃實際／容許櫃數</span><strong id="p79HomeYardEmptyCount">—</strong><small id="p79HomeYardEmptyLimit">容許：未設定（櫃）</small><small id="p79HomeYardEmptyTeu">換算 TEU：—</small></article>
-      <article class="p79-home-yard-stat allowed-reefer"><span>冷凍櫃實際／容許櫃數</span><strong id="p79HomeYardReeferCount">—</strong><small id="p79HomeYardReeferLimit">容許：未設定（櫃）</small><small id="p79HomeYardReeferTeu">換算 TEU：—</small><small>含冷凍重櫃＋冷凍空櫃，不重複加總</small></article>
+    <div class="p79d-section-head">
+      <h2 id="p79HomeYardHeading">▥ 碼頭儲位管理 <span id="p79HomeYardDate">—</span></h2>
+      <div class="p79d-heading-actions"><button type="button" onclick="launchSystem('yard')">查看儲位／設定容量 ›</button></div>
     </div>
-    <p class="p79-home-yard-source" id="p79HomeYardSource">僅顯示目前登入帳號在此瀏覽器已匯入的有效資料；尚未同步雲端。</p>
+    <div class="p79-home-yard-layout">
+      <div class="p79-yard-kpis" aria-label="碼頭儲位主要指標">
+        <article class="p79-yard-kpi kpi-heavy"><span>重櫃場存</span><strong id="p79HomeYardHeavy">—</strong><small>TEU · 使用率 <b id="p79HomeYardHeavyPct">—</b></small><span class="p79-yard-kpi-icon" aria-hidden="true">▥</span></article>
+        <article class="p79-yard-kpi kpi-empty"><span>空櫃場存</span><strong id="p79HomeYardEmpty">—</strong><small>TEU · 使用率 <b id="p79HomeYardEmptyPct">—</b></small><span class="p79-yard-kpi-icon" aria-hidden="true">▤</span></article>
+        <article class="p79-yard-kpi kpi-reefer"><span>冷凍櫃場存</span><strong><span id="p79HomeYardReeferTop">—</span> <small>櫃</small></strong><small>20／40 呎換算 <b id="p79HomeYardReeferTopTeu">—</b> TEU</small><span class="p79-yard-kpi-icon" aria-hidden="true">▣</span></article>
+        <article class="p79-yard-kpi kpi-capacity"><span>重櫃容量</span><strong><span id="p79HomeYardHeavyCap">—</span> <small>TEU</small></strong><small>依已匯入 Excel 原始容量</small><span class="p79-yard-kpi-icon" aria-hidden="true">▥</span></article>
+      </div>
+      <div class="p79-yard-panels" aria-label="儲位甜甜圈圖與櫃數">
+        <article class="p79-yard-panel heavy">
+          <div class="p79-yard-panel-head"><span class="p79-yard-panel-icon" aria-hidden="true">▥</span><b>重櫃儲位</b><small>容量 <span id="p79HomeYardHeavyCapChart">—</span> TEU</small></div>
+          <div class="p79-yard-donut-body">
+            <div class="p79-yard-donut" id="p79HomeYardHeavyRing" role="img" aria-label="重櫃使用率待匯入">
+              <div class="p79-yard-donut-center"><b id="p79HomeYardHeavyChartPct">—</b><small>使用率</small></div>
+            </div>
+            <div class="p79-yard-breakdown">
+              <div><i class="legend" aria-hidden="true"></i><span class="label">已使用</span><b class="num" id="p79HomeYardHeavyUsed">—</b></div>
+              <div><i class="legend free" aria-hidden="true"></i><span class="label">可用</span><b class="num" id="p79HomeYardHeavyFree">—</b></div>
+              <div class="total"><span class="label">容量</span><b class="num" id="p79HomeYardHeavyCapTotal">—</b></div>
+              <p id="p79HomeYardHeavyWarning" hidden></p>
+            </div>
+          </div>
+        </article>
+        <article class="p79-yard-panel empty">
+          <div class="p79-yard-panel-head"><span class="p79-yard-panel-icon" aria-hidden="true">▤</span><b>空櫃儲位</b><small>Excel <span id="p79HomeYardEmptyCap">—</span> TEU</small></div>
+          <div class="p79-yard-donut-body">
+            <div class="p79-yard-donut" id="p79HomeYardEmptyRing" role="img" aria-label="空櫃使用率待匯入">
+              <div class="p79-yard-donut-center"><b id="p79HomeYardEmptyChartPct">—</b><small>使用率</small></div>
+            </div>
+            <div class="p79-yard-breakdown">
+              <div><i class="legend" aria-hidden="true"></i><span class="label">已使用</span><b class="num" id="p79HomeYardEmptyUsed">—</b></div>
+              <div><i class="legend free" aria-hidden="true"></i><span class="label">可用</span><b class="num" id="p79HomeYardEmptyFree">—</b></div>
+              <div class="total"><span class="label">容量</span><b class="num" id="p79HomeYardEmptyCapTotal">—</b></div>
+              <p id="p79HomeYardEmptyWarning" hidden></p>
+            </div>
+          </div>
+        </article>
+        <article class="p79-yard-panel reefer">
+          <div class="p79-yard-panel-head"><span class="p79-yard-panel-icon" aria-hidden="true">▣</span><b>冷凍櫃儲位</b><small>換算 TEU 上限 <span id="p79HomeYardReeferCapChart">未設定</span></small></div>
+          <div class="p79-yard-donut-body">
+            <div class="p79-yard-donut" id="p79HomeYardReeferRing" role="img" aria-label="冷凍櫃 TEU 上限尚未設定">
+              <div class="p79-yard-donut-center"><b id="p79HomeYardReeferChartPct">—</b><small>使用率</small></div>
+            </div>
+            <div class="p79-yard-breakdown">
+              <div><i class="legend" aria-hidden="true"></i><span class="label">已使用</span><b class="num" id="p79HomeYardReeferUsed">—</b></div>
+              <div><i class="legend free" aria-hidden="true"></i><span class="label">可用</span><b class="num" id="p79HomeYardReeferFree">—</b></div>
+              <div class="total"><span class="label">換算上限</span><b class="num" id="p79HomeYardReeferCapTotal">未設定</b></div>
+              <p id="p79HomeYardReeferWarning" hidden></p>
+            </div>
+          </div>
+        </article>
+        <article class="p79-yard-panel count">
+          <div class="p79-yard-panel-head"><span class="p79-yard-panel-icon" aria-hidden="true">▣</span><b>櫃數統計（實際／容許）</b></div>
+          <div class="p79-yard-counts">
+            <div class="p79-yard-count-line heavy"><span>重櫃</span><div class="p79-yard-count-right"><strong id="p79HomeYardHeavyCount">—</strong><small id="p79HomeYardHeavyLimit">容許：未設定（櫃）</small><small id="p79HomeYardHeavyTeu">換算 TEU：—</small></div></div>
+            <div class="p79-yard-count-line empty"><span>空櫃</span><div class="p79-yard-count-right"><strong id="p79HomeYardEmptyCount">—</strong><small id="p79HomeYardEmptyLimit">容許：未設定（櫃）</small><small id="p79HomeYardEmptyTeu">換算 TEU：—</small></div></div>
+            <div class="p79-yard-count-line reefer"><span>冷凍櫃</span><div class="p79-yard-count-right"><strong id="p79HomeYardReeferCount">—</strong><small id="p79HomeYardReeferLimit">容許：未設定（櫃）</small><small id="p79HomeYardReeferTeu">換算 TEU：—</small></div></div>
+          </div>
+        </article>
+      </div>
+    </div>
+    <p class="p79-home-yard-source" id="p79HomeYardSource">此帳號在目前瀏覽器尚未匯入 Excel；不使用示意數字。</p>
   </section>
   <section class="p79d-section p79d-attendance" aria-labelledby="p79dAttendanceHeading">
     <div class="p79d-section-head"><h2 id="p79dAttendanceHeading">👥 考勤人力總覽 <span id="p79DashMonthLabel2"></span></h2>
