@@ -56,6 +56,17 @@ const warning=api.alertNotices(overCapacity,[overCapacity]);
 assert.ok(warning.some(s=>s.includes('重櫃場存')&&s.includes('超過容量')));
 assert.ok(warning.some(s=>s.includes('空櫃場存')&&s.includes('超過容量')));
 assert.match(source,/r\.heavyTotal>0\?pct\(r\.longTotal\/r\.heavyTotal\*100\):'—'/,'zero heavy stock renders an undefined Long-Stay share as a dash');
+// Axis scale follows real TEU inventory rather than a 3,000-TEU minimum.
+assert.equal(api.trendAxisMax([{heavyTotal:100,emptyTotal:40}]),100);
+assert.equal(api.trendAxisMax([{heavyTotal:490,emptyTotal:100}]),600);
+assert.equal(api.trendAxisMax([{heavyTotal:5200,emptyTotal:2000}]),6000);
+assert.equal(api.trendAxisMax([{heavyTotal:0,emptyTotal:0}]),1);
+const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:'2026-11-13',heavyTotal:100,emptyTotal:40}]);
+assert.match(trend,/>TEU<\/text>/);
+assert.doesNotMatch(trend,/>3,000<\/text>/,'small inventory cannot be flattened by a fixed 3,000 TEU axis');
+assert.match(html,/當日櫃別明細/,'historical selector must not label all dates as today');
+assert.match(html,/yard-dashboard\.js\?v=20261113-v2/,'new dashboard script must invalidate old cache');
+assert.match(page,/20261113-yard-v2/,'embedded iframe must invalidate old page cache');
 assert.match(source,/STORAGE_PREFIX/);
 assert.doesNotMatch(source,/window\.P79YardSeed|yard-seed\.js/);
 assert.match(html,/yardHeavyDonut/);assert.match(html,/yardEmptyDonut/);
