@@ -210,11 +210,11 @@ function allowedSizeLimit(raw20,raw40){
  if(!a&&!b)return null;
  const parse=(str)=>{
   const n=str===''?0:Number(str);
-  if(!Number.isSafeInteger(n)||n<0||n>100000000)throw Error('20／40 尺容許櫃數須為 0～100,000,000 的整數');
+  if(!Number.isSafeInteger(n)||n<0||n>100000000)throw Error('20／40 呎容許櫃數須為 0～100,000,000 的整數');
   return n;
  };
  const twenty=parse(a),forty=parse(b),count=twenty+forty,teu=twenty+2*forty;
- if(count<1||count>100000000||teu>200000000)throw Error('20／40 尺合計必須大於 0，且容許櫃數不超過 100,000,000');
+ if(count<1||count>100000000||teu>200000000)throw Error('20／40 呎合計必須大於 0，且容許櫃數不超過 100,000,000');
  return {twenty,forty,count,teu};
 }
 // Physical stock: reefer heavy and reefer empty form a monitored *subset*
@@ -330,11 +330,11 @@ function refreshAllowedAuto(key){
   const size=allowedSizeLimit(v20,v40);
   total.readOnly=!!size;teu.readOnly=!!size;
   if(!size){
-   preview.textContent='未填尺寸時，可自行輸入總櫃數與 TEU 上限；只有總櫃數無法判斷 20／40 尺比例。';
+   preview.textContent='未填尺寸時，可自行輸入總櫃數與 TEU 上限；只有總櫃數無法判斷 20／40 呎比例。';
    return null;
   }
   total.value=String(size.count);teu.value=String(size.teu);
-  preview.textContent='自動換算：20 尺 '+fmt(size.twenty)+' 櫃 ×1 ＋ 40 尺 '+fmt(size.forty)+' 櫃 ×2 ＝ '+fmt(size.teu)+' TEU；合計 '+fmt(size.count)+' 櫃。';
+  preview.textContent='自動換算：20 呎 '+fmt(size.twenty)+' 櫃 ×1 ＋ 40 呎 '+fmt(size.forty)+' 櫃 ×2 ＝ '+fmt(size.teu)+' TEU；合計 '+fmt(size.count)+' 櫃。';
   return size;
  }catch(e){
   total.readOnly=false;teu.readOnly=false;
@@ -358,15 +358,15 @@ function renderAllowedSettings(r){
  $('yardAllowanceTeuBreakdown').textContent=c
   ?['heavy','empty','reefer'].map((key,i)=>{
     const v=c[key],name=['重櫃','空櫃','冷凍櫃'][i];
-    return name+'：20 尺 '+fmt(v.twenty)+' ×1 ＋ 40 尺 '+fmt(v.forty)+' ×2 ＝ '+fmt(v.teuActual)+' TEU';
+    return name+'：20 呎 '+fmt(v.twenty)+' ×1 ＋ 40 呎 '+fmt(v.forty)+' ×2 ＝ '+fmt(v.teuActual)+' TEU';
    }).join('；')+'。冷凍櫃已包含於重／空櫃，不重複相加。'
-  :'Excel 實際 TEU：20 尺 ×1 ＋ 40 尺 ×2；匯入資料後自動計算。';
+  :'Excel 實際 TEU：20 呎 ×1 ＋ 40 呎 ×2；匯入資料後自動計算。';
  $('yardAllowanceStatus').textContent=(allowanceEditable?'':'此帳號僅能查看，需修改權限才可儲存上限。')+(c
   ?'所選日期 '+r.date+'｜'+['heavy','empty','reefer'].map((key,i)=>{
     const v=c[key],name=['重櫃','空櫃','冷凍櫃'][i];
     return name+' '+(v.actual===null?'無法核對':fmt(v.actual)+' 櫃')+'：'+allowedSummary(key,v)+'；'+allowedTeuSummary(v);
    }).join('。')
-  :'可先設定 20／40 尺容許櫃數，會自動換算總櫃數及 TEU；匯入 Excel 後對照實際占用。');
+  :'可先設定 20／40 呎容許櫃數，會自動換算總櫃數及 TEU；匯入 Excel 後對照實際占用。');
 }
 function renderAllowedSummary(r){
  const c=compareAllowedCounts(r);
@@ -395,7 +395,7 @@ function saveAllowedFromInputs(){
   }
   setAllowedCounts(fields.heavy,fields.empty,fields.heavyTeu,fields.emptyTeu,
    fields.reefer,fields.reeferTeu,sizeValues);
-  render();message('已儲存重櫃／空櫃／冷凍櫃容許櫃數及 TEU，20 尺＝1 TEU、40 尺＝2 TEU 自動換算；原 Excel 不變。','success');
+  render();message('已儲存重櫃／空櫃／冷凍櫃容許櫃數及 TEU，20 呎＝1 TEU、40 呎＝2 TEU 自動換算；原 Excel 不變。','success');
  }catch(e){message('容許櫃量／TEU 設定失敗：'+String(e.message||e),'error')}
 }
 
@@ -528,10 +528,10 @@ function alertNotices(r,period,limits=allowedCounts){
   const counts=compareAllowedCounts(x,limits);
   if(counts?.heavy.exceeded)notices.push(day+'：重櫃實際 '+fmt(counts.heavy.actual)+' 櫃，超過容許上限 '+fmt(counts.heavy.limit)+' 櫃（超出 '+fmt(-counts.heavy.remaining)+' 櫃）');
   if(counts?.empty.exceeded)notices.push(day+'：空櫃實際 '+fmt(counts.empty.actual)+' 櫃，超過容許上限 '+fmt(counts.empty.limit)+' 櫃（超出 '+fmt(-counts.empty.remaining)+' 櫃）');
-  if(counts?.heavy.teuExceeded)notices.push(day+'：重櫃 20／40 尺換算 '+fmt(counts.heavy.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.heavy.teuLimit)+' TEU（超出 '+fmt(-counts.heavy.teuRemaining)+' TEU）');
-  if(counts?.empty.teuExceeded)notices.push(day+'：空櫃 20／40 尺換算 '+fmt(counts.empty.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.empty.teuLimit)+' TEU（超出 '+fmt(-counts.empty.teuRemaining)+' TEU）');
+  if(counts?.heavy.teuExceeded)notices.push(day+'：重櫃 20／40 呎換算 '+fmt(counts.heavy.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.heavy.teuLimit)+' TEU（超出 '+fmt(-counts.heavy.teuRemaining)+' TEU）');
+  if(counts?.empty.teuExceeded)notices.push(day+'：空櫃 20／40 呎換算 '+fmt(counts.empty.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.empty.teuLimit)+' TEU（超出 '+fmt(-counts.empty.teuRemaining)+' TEU）');
   if(counts?.reefer.exceeded)notices.push(day+'：冷凍櫃實際 '+fmt(counts.reefer.actual)+' 櫃，超過容許上限 '+fmt(counts.reefer.limit)+' 櫃（超出 '+fmt(-counts.reefer.remaining)+' 櫃）');
-  if(counts?.reefer.teuExceeded)notices.push(day+'：冷凍櫃 20／40 尺換算 '+fmt(counts.reefer.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.reefer.teuLimit)+' TEU（超出 '+fmt(-counts.reefer.teuRemaining)+' TEU）');
+  if(counts?.reefer.teuExceeded)notices.push(day+'：冷凍櫃 20／40 呎換算 '+fmt(counts.reefer.teuActual)+' TEU，超過容許 TEU 上限 '+fmt(counts.reefer.teuLimit)+' TEU（超出 '+fmt(-counts.reefer.teuRemaining)+' TEU）');
   if(x.heavyTotal>x.heavyCap)notices.push(day+'：重櫃場存 '+fmt(x.heavyTotal)+' TEU，超過容量 '+fmt(x.heavyCap)+' TEU');
   if(x.emptyTotal>x.emptyCap)notices.push(day+'：空櫃場存 '+fmt(x.emptyTotal)+' TEU，超過容量 '+fmt(x.emptyCap)+' TEU');
   if(x.heavyPlug20Pct>100)notices.push(day+'：20 呎冷凍重櫃插座 '+pct(x.heavyPlug20Pct)+'（超過容量）');
