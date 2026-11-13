@@ -943,7 +943,11 @@ async function openOrgSettings(){
   renderOrgSettings();
   orgDialog.showModal();
   const controls=[...(orgDialog.querySelectorAll?.('input,button')||[])].filter(el=>el!==$('saveOrgBtn')&&el.getAttribute?.('onclick')!=='orgDialog.close()');
-  const before=controls.map(el=>[el,!!el.disabled]);
+  // Reopening before an earlier cloud request finishes must not strand inputs disabled.
+  const before=controls.map(el=>{
+    if(!Object.prototype.hasOwnProperty.call(el,'_p79OrgPriorDisabled'))el._p79OrgPriorDisabled=!!el.disabled;
+    return [el,el._p79OrgPriorDisabled];
+  });
   controls.forEach(el=>{el.disabled=true;});
   $('saveOrgBtn').disabled=true;
   p79OrgSaveStatus('正在讀取雲端已儲存的組織設定；現有人員使用的名稱會另外顯示，不需要重新輸入。');
@@ -964,7 +968,7 @@ async function openOrgSettings(){
     p79OrgSaveStatus('雲端組織選項讀取失敗：'+String(error?.message||error)+'。目前僅顯示已載入的設定與人員現用名稱；為避免覆蓋舊設定，已暫停儲存。',true);
   }finally{
     if(request===p79OrgDialogReadSeq&&orgDialog.open){
-      before.forEach(([el,disabled])=>{el.disabled=disabled;});
+      before.forEach(([el,disabled])=>{el.disabled=disabled;delete el._p79OrgPriorDisabled;});
       $('saveOrgBtn').disabled=!verified||!canHr('org.manage');
     }
   }
