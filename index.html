@@ -21,8 +21,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
-<link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v114">
-<script defer src="assets/port79-all-backup.js?v=20261113-v116-roles"></script>
+<link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v117-one-button">
+<script defer src="assets/port79-all-backup.js?v=20261113-v117-one-button"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
 *{box-sizing:border-box}
@@ -425,11 +425,6 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <div id="p79PublicShipBoard" data-gas-url="https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec" aria-live="polite">等待官方船期…</div>
     </section>
     <div id="systems" class="system-wrap">
-      <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-labelledby="p79AllBackupHeading">
-        <div class="p79-all-backup-head"><div><h2 id="p79AllBackupHeading">全系統歷史備份</h2><p>依各分類資料夾保存；已備份且沒有變動的歷史資料會沿用，減少重複處理。</p></div><button type="button" id="p79AllBackupButton">全部系統備份到歷史資料庫</button></div>
-        <p>包含出勤、排班、加班、請假、人資、工時、效率、船舶、船期、進出站、航線及目前帳號在此瀏覽器的儲量資料。備份不會刪除或切換正式資料。</p>
-        <div id="p79AllBackupStatus" role="status" aria-live="polite">按下後先確認正式雲端是否支援全部 13 類備份；只有完成備份並讀回驗證的項目才會標記成功，未啟用時不會寫入資料。</div><progress id="p79AllBackupProgress" value="0" max="13" hidden aria-label="歷史備份進度"></progress><ul id="p79AllBackupResults" aria-label="各系統備份結果"></ul>
-      </section>
       <!-- 純展示區：保留全部原有系統卡片、事件綁定、權限檢查與資料連線。 -->
       <section class="p79-modern-home-intro" aria-label="智慧管理總覽">
         <div>
@@ -651,6 +646,14 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         <button id="cardHr" class="system-card hr" type="button" onclick="launchSystem('hr')"><span class="icon">👥</span><span class="name">人資管理系統</span><span class="desc">唯一人員主檔、部門職稱、特休、裝置綁定與五大系統權限</span><span class="badge"></span></button>
         <button id="cardHistory" class="system-card history" type="button" onclick="location.href='./history-data/'"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
       </div>
+      <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-label="備份資料庫">
+        <button type="button" id="p79AllBackupButton">備份資料庫</button>
+        <div id="p79AllBackupFeedback" hidden>
+          <div id="p79AllBackupStatus" role="status" aria-live="polite"></div>
+          <progress id="p79AllBackupProgress" value="0" max="13" hidden aria-label="備份進度"></progress>
+          <ul id="p79AllBackupResults" aria-label="備份結果"></ul>
+        </div>
+      </section>
       <div class="p79-modern-home-preserve"><span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班維持現行介面與流程</strong><small>本次只調整管理畫面外觀。登入、刷卡、權限、資料連結及雲端資料均保持原狀。</small></div></div>
       <div class="note">所有系統的人員資料與權限統一由「人資管理系統」維護；歷史月份集中由「歷史資料中心」查詢，避免平常切換系統重複下載大量舊資料。</div>
 
