@@ -23,11 +23,13 @@ const FIELD_ROWS={
 const RATE_FIELDS=new Set(['heavyPct','emptyPct','heavyPlug20Pct','heavyPlug40Pct','emptyPlug20Pct','emptyPlug40Pct']);
 const STORAGE_PREFIX='p79_yard_private_v1_';
 const CAPACITY_STORAGE_PREFIX='p79_yard_capacity_overrides_v1_';
+const ALLOWANCE_STORAGE_PREFIX='p79_yard_allowed_container_counts_v1_';
 const fmt=n=>Number(n).toLocaleString('zh-TW',{maximumFractionDigits:2});
 const pct=n=>Number(n).toFixed(2)+'%';
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],selectedDate='',view='overview',fileName='',updatedAt='',accountId='',storageKey='';
 let capacityOverrides=Object.create(null);
+let allowedCounts={heavy:null,empty:null};
 let importBusy=false;
 function identity(){
  let s=null,admin=null;
@@ -179,6 +181,84 @@ function saveCapacityPatch(date,patch){
   render();message('容量設定失敗：'+String(error.message||error),'error');
  }
 }
+
+function allowedCountValue(value){
+ const t=String(value??'').trim(),n=Number(t);
+ if(!t||!Number.isSafeInteger(n)||n<1||n>100000000)throw Error('容許櫃量須為 1～100,000,000 的正整數（櫃）');
+ return n;
+}
+// Source Excel counts include 20ft and 40ft each as ONE box; special and long stay overlap.
+function containerCounts(r){
+ if(!r)return null;
+ const sum=keys=>{
+  const a=keys.map(k=>r[k]);
+  if(a.some(v=>v===undefined||v===null||!Number.isSafeInteger(Number(v))||Number(v)<0))return null;
+  return a.reduce((n,v)=>n+Number(v),0);
+ };
+ return {heavy:sum(['imp20','imp40','exp20','exp40','trans20','trans40','reefer20','reefer40']),
+  empty:sum(['genEmpty20','genEmpty40','reeferEmpty20','reeferEmpty40'])};
+}
+function compareAllowedCounts(r,limits=allowedCounts){
+ const a=containerCounts(r);if(!a)return null;
+ const out={};
+ for(const k of ['heavy','empty']){
+  const limit=limits?.[k]??null,actual=a[k];
+  const remaining=actual!==null&&Number.isSafeInteger(limit)&&limit>0?limit-actual:null;
+  out[k]={actual,limit,remaining,exceeded:remaining!==null&&remaining<0};
+ }
+ return out;
+}
+function restoreAllowedCounts(){
+ allowedCounts={heavy:null,empty:null};
+ try{
+  const raw=g.localStorage.getItem(ALLOWANCE_STORAGE_PREFIX+accountId);
+  if(!raw)return;
+  const x=JSON.parse(raw);
+  allowedCounts={heavy:allowedCountValue(x?.heavy),empty:allowedCountValue(x?.empty)};
+ }catch(e){message('容許櫃量設定無法核對，已停止套用；Excel 資料保持不變：'+String(e.message||e),'error')}
+}
+function setAllowedCounts(heavy,empty){
+ if(!accountId)throw Error('請先登入有權限的管理員');
+ const next={heavy:allowedCountValue(heavy),empty:allowedCountValue(empty)};
+ try{g.localStorage.setItem(ALLOWANCE_STORAGE_PREFIX+accountId,JSON.stringify(next))}
+ catch(e){throw Error('容許櫃量儲存失敗，原設定保持不變：'+String(e.message||e))}
+ allowedCounts=next;return next;
+}
+function clearAllowedCounts(){
+ if(!accountId)throw Error('請先登入有權限的管理員');
+ try{g.localStorage.removeItem(ALLOWANCE_STORAGE_PREFIX+accountId)}
+ catch(e){throw Error('清除失敗，原設定保持不變：'+String(e.message||e))}
+ allowedCounts={heavy:null,empty:null};
+}
+function allowedSummary(k,c){
+ if(!c||c.actual===null)return 'Excel 櫃數無法核對';
+ if(c.limit===null)return '容許上限：未設定';
+ return c.exceeded?'容許 '+fmt(c.limit)+' 櫃｜超量 '+fmt(-c.remaining)+' 櫃':'容許 '+fmt(c.limit)+' 櫃｜剩餘 '+fmt(c.remaining)+' 櫃';
+}
+function renderAllowedSettings(r){
+ $('yardHeavyAllowed').value=allowedCounts.heavy===null?'':String(allowedCounts.heavy);
+ $('yardEmptyAllowed').value=allowedCounts.empty===null?'':String(allowedCounts.empty);
+ $('yardAllowanceClear').disabled=allowedCounts.heavy===null&&allowedCounts.empty===null;
+ const c=compareAllowedCounts(r);
+ $('yardAllowanceStatus').textContent=c
+  ?'所選日期 '+r.date+'｜重櫃 '+(c.heavy.actual===null?'無法核對':fmt(c.heavy.actual)+' 櫃')+'：'+allowedSummary('heavy',c.heavy)+'；空櫃 '+(c.empty.actual===null?'無法核對':fmt(c.empty.actual)+' 櫃')+'：'+allowedSummary('empty',c.empty)
+  :'可先設定上限，匯入 Excel 後自動比對每天的實際櫃數。';
+}
+function renderAllowedSummary(r){
+ const c=compareAllowedCounts(r);
+ for(const [key,id,name] of [['heavy','yardHeavyCount','yardHeavyLimitSummary'],['empty','yardEmptyCount','yardEmptyLimitSummary']]){
+  $(id).textContent=c?.[key].actual===null||!c?'—':fmt(c[key].actual);
+  $(name).textContent=allowedSummary(key,c?.[key]);
+  $(name).dataset.exceeded=String(!!c?.[key].exceeded);
+ }
+}
+function saveAllowedFromInputs(){
+ try{
+  setAllowedCounts($('yardHeavyAllowed').value,$('yardEmptyAllowed').value);
+  render();message('已儲存重櫃與空櫃容許櫃量（櫃），超量警示已更新。Excel 原始 TEU、櫃數未修改。','success');
+ }catch(e){message('容許櫃量設定失敗：'+String(e.message||e),'error')}
+}
+
 function restore(){
  try{
   const obj=JSON.parse(g.localStorage.getItem(storageKey)||'null');
@@ -301,10 +381,13 @@ function trendSvg(list){
  }
  svg+='</svg>';return svg;
 }
-function alertNotices(r,period){
+function alertNotices(r,period,limits=allowedCounts){
  const notices=[];
  for(const x of period){
   const day=x.date.slice(5).replace('-','/');
+  const counts=compareAllowedCounts(x,limits);
+  if(counts?.heavy.exceeded)notices.push(day+'：重櫃實際 '+fmt(counts.heavy.actual)+' 櫃，超過容許上限 '+fmt(counts.heavy.limit)+' 櫃（超出 '+fmt(-counts.heavy.remaining)+' 櫃）');
+  if(counts?.empty.exceeded)notices.push(day+'：空櫃實際 '+fmt(counts.empty.actual)+' 櫃，超過容許上限 '+fmt(counts.empty.limit)+' 櫃（超出 '+fmt(-counts.empty.remaining)+' 櫃）');
   if(x.heavyTotal>x.heavyCap)notices.push(day+'：重櫃場存 '+fmt(x.heavyTotal)+' TEU，超過容量 '+fmt(x.heavyCap)+' TEU');
   if(x.emptyTotal>x.emptyCap)notices.push(day+'：空櫃場存 '+fmt(x.emptyTotal)+' TEU，超過容量 '+fmt(x.emptyCap)+' TEU');
   if(x.heavyPlug20Pct>100)notices.push(day+'：20 呎冷凍重櫃插座 '+pct(x.heavyPlug20Pct)+'（超過容量）');
@@ -343,11 +426,11 @@ function renderDetail(r,list){
   title='▥ 重櫃管理｜'+r.date;subtitle='分類小計依 Excel 原始 TEU 欄，20／40 呎為櫃數。特殊重櫃與 Long-Stay 為另列分類，不重複加總。';
   inner='<div class="yard-detail-grid"><div>'+historyTable([r],['imp20','imp40','impTeu','expTeu','transTeu','reeferTeu','heavyTotal'],['進口20櫃','進口40櫃','進口TEU','出口TEU','轉口TEU','冷凍TEU','重櫃合計TEU'])+'</div><div>'+
    '<div class="yard-detail-split"><span>進口重櫃</span><b>'+fmt(r.impTeu)+' TEU</b></div><div class="yard-detail-split"><span>出口重櫃</span><b>'+fmt(r.expTeu)+' TEU</b></div><div class="yard-detail-split"><span>轉口重櫃</span><b>'+fmt(r.transTeu)+' TEU</b></div><div class="yard-detail-split"><span>冷凍重櫃</span><b>'+fmt(r.reeferTeu)+' TEU</b></div><hr><div class="yard-detail-split"><span>特殊重櫃（另列）</span><b>'+fmt(r.specialHeavyCount)+' 櫃 / '+fmt(r.specialHeavyTeu)+' TEU</b></div></div></div>'+
-   '<h3 class="yard-detail-subhead">逐日重櫃趨勢</h3><p class="yard-capacity-note">最右欄可直接輸入當日容量 TEU，按 Enter 或離開欄位即儲存；不修改 Excel 原始報表。</p>'+historyTable(list,['impTeu','expTeu','transTeu','reeferTeu','heavyTotal','heavyCap','heavyPct'],['進口TEU','出口TEU','轉口TEU','冷凍TEU','場存TEU','容量TEU','使用率％'],'heavyCap');
+   '<h3 class="yard-detail-subhead">逐日重櫃趨勢</h3>'+historyTable(list,['impTeu','expTeu','transTeu','reeferTeu','heavyTotal','heavyCap','heavyPct'],['進口TEU','出口TEU','轉口TEU','冷凍TEU','場存TEU','容量TEU','使用率％']);
  } else if(view==='empty'){
   title='▥ 空櫃管理｜'+r.date;subtitle='一般空櫃＋冷凍空櫃＝空櫃總量；特殊空櫃為另列資訊，可能與總場存重疊，不另加總。';
   inner='<div class="yard-detail-grid"><div><div class="yard-detail-split"><span>一般空櫃</span><b>'+fmt(r.genEmptyTeu)+' TEU</b></div><div class="yard-detail-split"><span>冷凍空櫃</span><b>'+fmt(r.reeferEmptyTeu)+' TEU</b></div><div class="yard-detail-split"><span>空櫃合計</span><b>'+fmt(r.emptyTotal)+' TEU</b></div></div><div><div class="yard-detail-split"><span>儲位容量</span><b>'+fmt(r.emptyCap)+' TEU</b></div><div class="yard-detail-split"><span>儲位使用率</span><b>'+pct(r.emptyPct)+'</b></div><div class="yard-detail-split"><span>特殊空櫃（另列）</span><b>'+fmt(r.specialEmptyTeu)+' TEU</b></div></div></div>'+
-   '<h3 class="yard-detail-subhead">逐日空櫃趨勢</h3><p class="yard-capacity-note">最右欄可直接輸入當日容量 TEU，按 Enter 或離開欄位即儲存；不修改 Excel 原始報表。</p>'+historyTable(list,['genEmptyTeu','reeferEmptyTeu','emptyTotal','emptyCap','emptyPct','specialEmptyTeu'],['一般TEU','冷凍TEU','總場存TEU','容量TEU','使用率％','特殊櫃TEU'],'emptyCap');
+   '<h3 class="yard-detail-subhead">逐日空櫃趨勢</h3>'+historyTable(list,['genEmptyTeu','reeferEmptyTeu','emptyTotal','emptyCap','emptyPct','specialEmptyTeu'],['一般TEU','冷凍TEU','總場存TEU','容量TEU','使用率％','特殊櫃TEU']);
  } else if(view==='plugs'){
   title='♧ 冷凍插座｜'+r.date;subtitle='重櫃插座：使用櫃數可由同日冷凍重櫃數驗證；空櫃／PTI 插座只有原 Excel 使用率，不能假設 PTI 櫃數就是使用插座數。';
   inner='<h3 class="yard-detail-subhead">冷凍重櫃插座</h3><div class="yard-tablewrap"><table class="yard-table plugs"><thead><tr><th>櫃型</th><th>插座容量</th><th>冷凍重櫃數</th><th>使用率</th></tr></thead><tbody>'+
@@ -364,29 +447,24 @@ function renderDetail(r,list){
  } 
  $('yardDetailBody').innerHTML=detailCard(title,subtitle,inner);
 }
-function renderCapacityEditor(raw,r){
- $('yardCapacityDate').textContent=raw.date;
- $('yardManualHeavyCap').value=String(r.heavyCap);
- $('yardManualEmptyCap').value=String(r.emptyCap);
- $('yardCapacitySource').textContent='Excel 原始容量：重櫃 '+fmt(raw.heavyCap)+' TEU、空櫃 '+fmt(raw.emptyCap)+' TEU｜目前重櫃 '+(r._manualHeavyCap?'手動設定':'Excel')+'、空櫃 '+(r._manualEmptyCap?'手動設定':'Excel')+'。手動容量僅儲存於本機此帳號。';
- $('yardCapacityReset').disabled=!(r._manualHeavyCap||r._manualEmptyCap);
-}
 function render(){
  $('yardMonth').innerHTML=[...new Set(rows.map(r=>r.date.slice(0,7)))].reverse().map(m=>'<option value="'+m+'">'+m.replace('-',' 年 ')+' 月</option>').join('');
  if(!selectedDate&&rows.length)selectedDate=rows[rows.length-1].date;
  if(selectedDate){$('yardDate').value=selectedDate;$('yardMonth').value=selectedDate.slice(0,7)}
  const raw=rows.find(x=>x.date===selectedDate);
- const r=effectiveRecord(raw);
- $('yardEmpty').hidden=!!r;$('yardContent').hidden=!r;
+ const r=raw; // Keep original Excel TEU and percentages; deprecated TEU overrides remain saved but are not applied.
+ const allowanceMode=view==='allowance';
+ $('yardAllowedSettings').hidden=!allowanceMode;
+ $('yardEmpty').hidden=!!r||allowanceMode;$('yardContent').hidden=!r||allowanceMode;
+ if(allowanceMode){renderAllowedSettings(r);return;}
  if(!r){
   $('yardEmpty').querySelector('h2').textContent=rows.length?'此日期尚未匯入資料':'請先匯入堆場報表';
   return;
  }
- const list=rows.filter(x=>x.date.slice(0,7)===r.date.slice(0,7)&&x.date<=r.date).map(x=>effectiveRecord(x));
- renderCapacityEditor(raw,r);
+ const list=rows.filter(x=>x.date.slice(0,7)===r.date.slice(0,7)&&x.date<=r.date);
  $('yardOverview').hidden=view!=='overview';$('yardDetails').hidden=view==='overview';
  if(view==='overview'){
-  renderKpis(r);renderDonuts(r);renderPlugs(r);renderDaily(r);
+  renderKpis(r);renderDonuts(r);renderPlugs(r);renderDaily(r);renderAllowedSummary(r);
   $('yardTrendChart').innerHTML=trendSvg(list);
   $('yardTrendPeriod').textContent='('+list[0].date.slice(5).replace('-','/')+'－'+r.date.slice(5).replace('-','/')+')';
   alerts(r,list);
@@ -394,7 +472,7 @@ function render(){
  $('yardSource').textContent='資料來源：'+fileName+'｜當日 '+r.date+'｜共 '+rows.length+' 天｜僅目前瀏覽器，非雲端同步';
 }
 function setView(next){
- if(!['overview','heavy','empty','plugs','long'].includes(next))return;
+ if(!['overview','heavy','empty','plugs','long','allowance'].includes(next))return;
  view=next;d.querySelectorAll('[data-yard-view]').forEach(btn=>{const active=btn.dataset.yardView===view;btn.classList.toggle('selected',active);btn.setAttribute('aria-pressed',String(active));});
  render();
 }
@@ -459,32 +537,23 @@ function init(){
   return;
  }
  storageKey=STORAGE_PREFIX+accountId;
- restore();restoreCapacityOverrides();render();
+ restore();restoreCapacityOverrides();restoreAllowedCounts();render();
  if(rows.length)message('已載入目前登入帳號在本瀏覽器儲存的 '+rows.length+' 天資料（'+safe(fileName)+'）。尚未同步雲端。','success');
  $('yardImport').addEventListener('click',()=>$('yardFile').click());
  $('yardEmptyImport').addEventListener('click',()=>$('yardFile').click());
  $('yardFile').addEventListener('change',e=>void importFile(e.target.files?.[0]));
  $('yardExport').addEventListener('click',exportCsv);
- $('yardCapacitySave').addEventListener('click',()=>{
-  saveCapacityPatch(selectedDate,{heavyCap:$('yardManualHeavyCap').value,emptyCap:$('yardManualEmptyCap').value});
- });
- $('yardCapacityReset').addEventListener('click',()=>saveCapacityPatch(selectedDate,{heavyCap:null,emptyCap:null}));
- $('yardDetailBody').addEventListener('change',event=>{
-  const input=event.target;
-  if(!input||!input.matches?.('input[data-yard-cap-key]'))return;
-  const date=input.dataset.yardCapDate,key=input.dataset.yardCapKey;
-  if(!['heavyCap','emptyCap'].includes(key))return;
-  saveCapacityPatch(date,{[key]:input.value});
- });
- $('yardDetailBody').addEventListener('keydown',event=>{
-  if(event.key==='Enter'&&event.target?.matches?.('input[data-yard-cap-key]')){
-   event.preventDefault();event.target.blur();
-  }
+ $('yardAllowanceSave').addEventListener('click',saveAllowedFromInputs);
+ $('yardAllowanceClear').addEventListener('click',()=>{
+  if(allowedCounts.heavy===null&&allowedCounts.empty===null)return;
+  if(!g.confirm('確定清除空櫃與重櫃的容許櫃量上限？Excel 原檔不會修改。'))return;
+  try{clearAllowedCounts();render();message('已清除容許櫃量設定，Excel 原始數字未變。','success');}
+  catch(e){message('清除失敗：'+String(e.message||e),'error')}
  });
  $('yardDate').addEventListener('change',e=>{selectedDate=e.target.value;render();});
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,capacityValue,effectiveRecord,setCapacityOverride,historyTable};
+g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,containerCounts,compareAllowedCounts,allowedCountValue,setAllowedCounts,clearAllowedCounts,historyTable,capacityValue,effectiveRecord,setCapacityOverride};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
