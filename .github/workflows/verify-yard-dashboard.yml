@@ -6,6 +6,8 @@ on:
       - 'aqc-efficiency/index.html'
       - 'tests/yard-dashboard-module.cjs'
       - 'tests/yard-drag-drop.cjs'
+      - 'tests/yard-home-manual-capacity.cjs'
+      - 'index.html'
       - '.github/workflows/verify-yard-dashboard.yml'
   pull_request:
     paths:
@@ -13,6 +15,8 @@ on:
       - 'aqc-efficiency/index.html'
       - 'tests/yard-dashboard-module.cjs'
       - 'tests/yard-drag-drop.cjs'
+      - 'tests/yard-home-manual-capacity.cjs'
+      - 'index.html'
       - '.github/workflows/verify-yard-dashboard.yml'
 jobs:
   yard-validation:
@@ -24,3 +28,4 @@ jobs:
         run: |
           node tests/yard-dashboard-module.cjs
           node tests/yard-drag-drop.cjs
+          node tests/yard-home-manual-capacity.cjs
