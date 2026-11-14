@@ -1,0 +1,26 @@
+/* Compact homepage drag-and-drop imports, no alternate parser or save route. */
+#p79HomeDropImport{margin:16px 0 18px;padding:16px 18px;border:1px solid #dce8f5;border-radius:15px;background:var(--panel,#fff);box-shadow:0 5px 20px #21508b0d}
+#p79HomeDropImport[hidden],#p79HomeImportFrame[hidden]{display:none!important}
+#p79HomeDropImport>h2{font-size:16px;font-weight:850;margin:0 0 13px;color:var(--text,#173c65)}
+#p79HomeDropGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.p79-home-drop-zone{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;min-height:116px;padding:15px 10px;border:2px dashed #98bcdf;border-radius:13px;background:#f2f8ff;text-align:center;cursor:pointer;outline:0;transition:background .15s,border-color .15s}
+.p79-home-drop-zone[data-p79-drop-kind=yard]{background:#effaf5;border-color:#8ccfb2}
+.p79-home-drop-zone[data-p79-drop-kind=vessel]{background:#f2f2ff;border-color:#aaa8e9}
+.p79-home-drop-zone:hover,.p79-home-drop-zone:focus-visible,.p79-home-drop-zone.p79-import-over{background:#e1f1ff;border-color:#126db8;box-shadow:0 0 0 3px #bdddff88}
+.p79-home-drop-zone .p79-drop-icon{font-size:27px;line-height:1}
+.p79-home-drop-zone strong{font-size:15px;font-weight:850;color:#183d60}
+.p79-home-drop-zone small{font-size:12px;color:#647e9e}
+.p79-home-drop-zone input{display:none!important}
+#p79HomeImportDialog{width:min(1140px,calc(100vw - 24px));height:min(88vh,940px);max-width:1140px;max-height:940px;padding:0;border:0;border-radius:16px;background:#fff;color:#183c5b;box-shadow:0 20px 75px #101f3d55}
+#p79HomeImportDialog::backdrop{background:rgba(10,28,51,.56)}
+#p79HomeImportDialog[open]{display:flex;flex-direction:column}
+#p79HomeImportDialog .p79-import-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;background:#edf5ff;border-bottom:1px solid #d5e5f5;flex:none}
+#p79HomeImportTitle{margin:0;font-size:17px;font-weight:850}
+#p79HomeImportClose{min-width:62px;min-height:36px;border-radius:8px;background:#fff;border:1px solid #bfd3e6;color:#244b70;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+#p79HomeImportStatus{margin:0;padding:11px 17px;border-bottom:1px solid #e1eaf5;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;flex:none}
+#p79HomeImportStatus[data-tone=error]{color:#b42332;background:#fff4f1}
+#p79HomeImportStatus[data-tone=success]{color:#146c45;background:#edfcf3}
+#p79HomeImportFrame{display:block;min-height:0;flex:1 1 auto;width:100%;height:70vh;border:0;background:#f7fbff}
+@media(max-width:700px){#p79HomeDropGrid{grid-template-columns:1fr}#p79HomeDropImport{padding:12px}#p79HomeImportDialog{height:94vh;width:calc(100vw - 10px)}.p79-home-drop-zone{min-height:86px}}
+html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
+html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
