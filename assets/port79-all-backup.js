@@ -34,6 +34,24 @@ async function recoverReceipt(c,item){
  if(!same(c))throw Error('登入身分已變更，已停止核對');
  throw Error('暫時無法取得雲端確認，請重試此分類；已完成的備份會自動沿用');
 }
+async function backupWithRetry(c,item,payload){
+ // Only an explicit pre-write lock refusal is safe to re-submit automatically.
+ // A lost response is looked up instead, since the server may still be writing.
+ for(let attempt=0;attempt<8;attempt++){
+  if(!same(c))throw Error('登入身分已變更，已停止備份');
+  try{return await request(c,payload,false);}catch(e){
+   if(e.serverError&&e.message==='其他資料正在儲存，請重試此分類'&&attempt<7){
+    item.waiting=true;render();
+    message(item.label+'：等待其他資料儲存完成，將自動繼續（'+(attempt+1)+'/7）');
+    await new Promise(resolve=>g.setTimeout(resolve,Math.min(15000,3000*(attempt+1))));
+    item.waiting=false;
+    continue;
+   }
+   if(!c.receiptLookup||!e.receiptCheck||!same(c))throw e;
+   return await recoverReceipt(c,item);
+  }
+ }
+}
 async function digest(bytes){const hash=await g.crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');}
 async function yardSnapshot(actor){
  const suffix=encodeURIComponent(String(actor).slice(0,120));let data=null,capacity={},allowance={};
@@ -53,7 +71,7 @@ function render(){
  for(const item of batch.items){
   const kind=item.result?'done':item.error?'error':item.running?'running':'pending';
   const title=item.type==='yardFile'?'儲量原檔':item.label;
-  const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.running?'備份及讀回核對中…':'等待備份';
+  const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.waiting?'等待資料儲存，自動繼續中…':item.running?'備份及讀回核對中…':'等待備份';
   const detail=(item.type==='yardFile'?(item.original?.name||'Excel原檔')+' · ':'')+summary;
   const li=d.createElement('li');
   li.className='p79-backup-light p79-backup-'+kind;
@@ -156,7 +174,7 @@ async function start(onlyId=null){
   if(onlyId&&!batch.items.some(item=>item.id===onlyId&&!item.result))throw Error('此分類不在待重試清單，請重新執行備份');
   for(const item of batch.items){if(item.result||(onlyId&&item.id!==onlyId))continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
    try{const payload={type:item.type,requestId:item.id};if(item.type==='yard')payload.yard=yard;if(item.original)payload.original={name:item.original.name,hash:item.original.hash,base64:base64(item.original.bytes)};
-    let result;try{result=await request(c,payload,false);}catch(e){if(!c.receiptLookup||!e.receiptCheck||!same(c))throw e;result=await recoverReceipt(c,item);}if(result?.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
+    const result=await backupWithRetry(c,item,payload);if(result?.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
     if(item.original){item.original.receipt={backupId:result.backupId,backupUrl:result.backupUrl};await put(item.original);}
     if(item.type==='yard'&&yard&&same(c)){try{g.localStorage.setItem('p79_yard_backup_receipt_v1_'+encodeURIComponent(c.actor),JSON.stringify({fingerprint,backupUrl:result.backupUrl,backupAt:result.backupAt,updatedAt:yard.updatedAt}));}catch(_){}}
    }catch(e){if(!same(c))throw e;item.error=String(e.message||e).slice(0,240);}finally{item.running=false;}render();
