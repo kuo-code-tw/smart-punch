@@ -21,10 +21,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
-<link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-compact-cards-errors-v3">
+<link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-tabsafe-backup-v4">
 <link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261114-unified-import-review-v4">
 <script defer src="assets/port79-home-drop-import.js?v=20261114-unified-import-review-v4"></script>
-<script defer src="assets/port79-all-backup.js?v=20261114-compact-cards-errors-v3"></script>
+<script defer src="assets/port79-all-backup.js?v=20261114-tabsafe-backup-v4"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
 *{box-sizing:border-box}
@@ -663,7 +663,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         <button id="cardEfficiency" class="system-card efficiency" type="button" onclick="launchSystem('efficiency')"><span class="icon">📊</span><span class="name">效率系統</span><span class="desc">船舶、AQC、月報與效率資料</span><span class="badge"></span></button>
         <button id="cardYard" class="system-card yard" type="button" onclick="launchSystem('yard')" hidden><span class="icon">▥</span><span class="name">碼頭儲量管理</span><span class="desc">重櫃／空櫃場存、容量設定、插座、長期儲存及 Excel 匯入</span><span class="badge"></span></button>
         <button id="cardHr" class="system-card hr" type="button" onclick="launchSystem('hr')"><span class="icon">👥</span><span class="name">人資管理系統</span><span class="desc">唯一人員主檔、部門職稱、特休、裝置綁定與五大系統權限</span><span class="badge"></span></button>
-        <button id="cardHistory" class="system-card history" type="button" onclick="location.href='./history-data/'"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
+        <button id="cardHistory" class="system-card history" type="button" onclick="p79NavigateWhileBackingUp('./history-data/')"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
       </div>
       <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-label="備份資料庫">
         <button type="button" id="p79AllBackupButton">備份資料庫</button>
@@ -1697,16 +1697,45 @@ function renderHomeYardSummary(session){
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
 window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
+/* A backup batch currently runs on this page. Preserve its page lifetime when a
+ * manager opens another system; server-owned background jobs are still required
+ * for backups to survive closing the original browser tab. */
+function p79NavigateWhileBackingUp(href){
+ const url=new URL(href,location.href).href;
+ if(window.Port79AllBackup?.isBusy?.()){
+  const other=window.open(url,'_blank');
+  if(other){try{other.opener=null;}catch(ignore){}return;}
+  alert('備份仍在執行。瀏覽器阻止開啟新分頁，請允許彈出視窗，或等備份完成後再切換。');
+  return;
+ }
+ location.href=url;
+}
+window.p79NavigateWhileBackingUp=p79NavigateWhileBackingUp;
+document.addEventListener('click',function(event){
+ if(!window.Port79AllBackup?.isBusy?.()||event.defaultPrevented||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+ const anchor=event.target.closest?.('a[href]');
+ if(!anchor||anchor.hasAttribute('download')||anchor.target==='_blank')return;
+ let target;try{target=new URL(anchor.href,location.href);}catch(ignore){return;}
+ if(target.origin!==location.origin)return;
+ if(target.pathname===location.pathname&&target.search===location.search&&target.hash)return;
+ event.preventDefault();
+ p79NavigateWhileBackingUp(target.href);
+},true);
+window.addEventListener('beforeunload',function(event){
+ if(!window.Port79AllBackup?.isBusy?.())return;
+ event.preventDefault();
+ event.returnValue='';
+});
 function launchSystem(target){if(!currentSession)return;const role=String(currentSession.adminRole||'employee').toLowerCase();
  if(target==='yard'){
   if(!canViewHomeYard(currentSession))return;
-  location.href=YARD_HOME_PATH;
+  p79NavigateWhileBackingUp(YARD_HOME_PATH);
   return;
  }
   // 員工從既有排班卡片進入考勤頁的「我的班表」，絕不進入排班管理介面。
   // 考勤頁只呼叫 getMyScheduleMonth；GAS 依登入 Token 的 empId 限定本人。
-  if(role==='employee'&&target==='schedule'){location.href=(PATHS.attendance||'./attendance/')+'#empScheduleCard';return;}
-  let level=normalizePermissions(currentSession.systemPermissions,role)[target]||'none';if(role==='employee'&&(target==='workhours'||target==='efficiency'||target==='hr'))level='none';if(level==='none')return;const path=PATHS[target]||'./';if(role==='employee'&&(target==='attendance'||target==='leave')){location.href=path;return}location.href=buildSsoHref(path)}
+  if(role==='employee'&&target==='schedule'){p79NavigateWhileBackingUp((PATHS.attendance||'./attendance/')+'#empScheduleCard');return;}
+  let level=normalizePermissions(currentSession.systemPermissions,role)[target]||'none';if(role==='employee'&&(target==='workhours'||target==='efficiency'||target==='hr'))level='none';if(level==='none')return;const path=PATHS[target]||'./';if(role==='employee'&&(target==='attendance'||target==='leave')){p79NavigateWhileBackingUp(path);return}p79NavigateWhileBackingUp(buildSsoHref(path))}
 window.launchSystem=launchSystem;
 
 async function restore(){
