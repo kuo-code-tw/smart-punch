@@ -104,12 +104,12 @@ async function deliver(kind,files,id){
  }
 }
 function start(kind,list){
- if(!canUse()){notify('請使用最高管理員登入後匯入','error');return;}
- if(working){notify('前一批檔案仍在處理中，請先核對結果','error');return;}
+ if(!canUse()){return;}
+ if(working){if(!dialog.open)dialog.showModal();notify('前一批檔案仍在處理中，請先核對結果','error');return;}
  var files;
  try{files=guardFiles(kind,list);}catch(e){
   var spec=specs[kind];label.textContent=spec?.name||'匯入資料';
-  dialog.showModal();
+  if(!dialog.open)dialog.showModal();
   notify(String(e.message||e),'error');
   return;
  }
