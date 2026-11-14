@@ -11855,6 +11855,20 @@ window.P79VesselHomeImport={
  importFiles:async function(files){
   if(!Array.isArray(files)&&!(files&&typeof files.length==='number'))
     throw Error('沒有可匯入的船舶 Excel');
+  if(!p79EfficiencyAuthReady||!canManageEfficiency())
+    throw Error('船舶系統尚未完成最高管理員身分核對，未執行匯入');
+  // The ordinary vessel page hydrates cloud data asynchronously after the
+  // iframe load event. Do not import into an incomplete master list.
+  for(let step=0;step<120&&port79ShipAutoSyncBusy;step++)
+   await new Promise(resolve=>setTimeout(resolve,250));
+  if(port79ShipAutoSyncBusy||p79EfficiencyManualSyncActive)
+   throw Error('雲端船舶資料仍在同步，請完成後重新拖入檔案');
+  await ensureGcQueueReady();
+  if(readQueue().length)
+   throw Error('本機已有尚未確認同步的船舶資料，請先處理，避免覆蓋');
+  cloudStatus('首頁匯入｜正在核對最新船舶主檔...',false);
+  const ready=await restoreVesselDataFromCloud(false,true);
+  if(!ready)throw Error('尚未取得正式雲端完整船舶主檔，已安全停止匯入');
   await importExcelFiles(files);
   return {
    processed:excelQueueStats.processed,
