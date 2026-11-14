@@ -75,7 +75,7 @@ function homeNavAllowed(key,source){
 function openBackupFromSidebar(event){
  if(!home)return; // Other management pages navigate back to the homepage backup panel.
  event.preventDefault();
- window.Port79AllBackup?.refresh?.();
+ window.Port79AllBackup?.show?.();
  const panel=d.getElementById('p79AllBackupPanel');
  if(!panel||panel.hidden)return;
  try{history.replaceState(history.state,'',location.pathname+location.search+'#p79AllBackupPanel');}catch(_){}
@@ -165,7 +165,7 @@ function sync(){frame=0;const on=enabled();d.body.classList.toggle('p79-workspac
  // A menu link from another management page may arrive before the homepage is visible.
  if(home&&location.hash==='#p79AllBackupPanel'&&!backupDeepLinkHandled){
   const panel=d.getElementById('p79AllBackupPanel');
-  if(panel&&!panel.hidden){backupDeepLinkHandled=true;requestAnimationFrame(()=>panel.scrollIntoView({block:'start'}));}
+  if(panel&&!panel.hidden){window.Port79AllBackup?.show?.();backupDeepLinkHandled=true;requestAnimationFrame(()=>panel.scrollIntoView({block:'start'}));}
  }
 }
 function queue(){if(!frame)frame=requestAnimationFrame(sync);}
