@@ -17,6 +17,8 @@ assert.match(html,/port79-home-drop-import.js\?v=/);
 assert.match(html,/port79-home-drop-import.css\?v=/);
 assert.match(yard,/g\.P79YardDashboard=\{importFile,/);
 assert.match(vessel,/window\.P79VesselHomeImport=\{/);
+assert.match(vessel,/p79VesselHomeImportInitialized=true/,'embedded vessel import defers writes until startup hydration');
+assert.match(vessel,/restoreVesselDataFromCloud\(false,true\)/,'import must read complete authoritative vessel data before change');
 assert.match(vessel,/homeImport'\)==='1'/);
 assert.match(source,/child\.P79GateImport\.chooseFile\(files\[0\]\)/);
 assert.match(source,/child\.P79YardDashboard\.importFile\(files\[0\]\)/);
@@ -80,13 +82,14 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
  gateMessage.textContent='正在核對';
  frame.contentDocument={getElementById:id=>id==='gateMessage'?gateMessage:null};
  frame.contentWindow={
-  location:{origin:host.location.origin},
+  location:{origin:host.location.origin,pathname:'/smart-punch/gate-import/'},
   P79GateImport:{chooseFile:async file=>{seen=file;gateMessage.textContent='已寫入正式資料庫：新增 1 天';gateMessage.dataset.kind='success';}}
  };
  drag('gate',[file('gate.xlsx')]);
  assert.match(frame.src,/gate-import\/\?embed=1&homeImport=1/);
  frame.onload();await flush();
  assert.equal(seen.name,'gate.xlsx');
+ frame.onload();await flush();assert.equal(seen.name,'gate.xlsx','duplicate load events must never rerun the same import');
  assert.match(status.textContent,/已寫入正式資料庫/);
  assert.equal(status.dataset.tone,'success');
 
@@ -94,7 +97,7 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
  const yardStatus=fakeElement();
  frame.contentDocument={getElementById:id=>id==='yardStatus'?yardStatus:null};
  frame.contentWindow={
-  location:{origin:host.location.origin},
+  location:{origin:host.location.origin,pathname:'/smart-punch/yard-dashboard/'},
   P79YardDashboard:{importFile:async f=>{
    seen=f;yardStatus.textContent='已保存於此瀏覽器，尚未同步雲端';
    yardStatus.dataset.tone='success';
@@ -110,7 +113,7 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
  seen=null;
  frame.contentDocument={getElementById:()=>null};
  frame.contentWindow={
-  location:{origin:host.location.origin},
+  location:{origin:host.location.origin,pathname:'/smart-punch/aqc-efficiency/'},
   P79VesselHomeImport:{importFiles:async files=>{seen=files;return {processed:2,success:2,failed:0};}}
  };
  drag('vessel',[file('ship1.xlsx'),file('ship2.xls')]);
