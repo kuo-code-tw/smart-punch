@@ -21,6 +21,7 @@
 #p79HomeImportStatus{position:relative;z-index:1;margin:0;padding:17px 20px 20px;border:0;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;flex:none;background:#fff;min-height:60px}
 #p79HomeImportStatus[data-tone=error]{color:#b42332;background:#fff4f1}
 #p79HomeImportStatus[data-tone=success]{color:#146c45;background:#edfcf3}
+#p79HomeImportStatus[data-tone=pending]{color:#1d4ed8;background:#eff6ff}
 /* The authenticated original importer must stay alive for Excel parsing,
    cloud preflight, and its native confirmation dialog. Do not display
    the entire administration SPA as a second page inside this dialog. */
