@@ -173,7 +173,7 @@ function refresh(){
  if(isManager&&!canRun)message('這裡是全系統歷史備份入口；僅最高管理員可以操作。請以最高管理員身分登入後執行。');
  if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
-function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());refresh();}
+function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());show();}
 g.Port79AllBackup={start,refresh,show,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
