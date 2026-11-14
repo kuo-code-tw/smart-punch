@@ -421,6 +421,18 @@ function persist(){
  try{g.localStorage.setItem(storageKey,JSON.stringify(data));return true}
  catch(err){message('資料已載入目前畫面，但無法保存在此瀏覽器：'+String(err.message||err),'error');return false}
 }
+async function confirmHomeYardOverwrite(messageText){
+ // Use the same parent confirmation panel as Gate and Vessel on homepage imports.
+ // Fail closed if the embedded confirmation service is unavailable.
+ if(g.parent!==g&&new URLSearchParams(g.location.search).get('homeImport')==='1'){
+  try{
+   if(typeof g.parent.Port79HomeDropImport?.confirmImport!=='function')
+    throw Error('共用匯入確認視窗未就緒');
+   return await g.parent.Port79HomeDropImport.confirmImport(messageText,g);
+  }catch(error){throw Error('無法核對覆蓋確認，原資料未改動：'+String(error?.message||error));}
+ }
+ return g.confirm(messageText);
+}
 async function importFile(file){
  if(!file)return;
  if(!accountId)return message('請先以有碼頭管理權限的帳號登入，無法使用此匯入','error');
@@ -434,7 +446,7 @@ async function importFile(file){
   const book=g.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false,cellHTML:false});
   const imported=parseBook(book),existing=new Map(rows.map(r=>[r.date,r]));
   const changed=imported.filter(r=>existing.has(r.date)&&Object.keys(FIELD_ROWS).some(k=>existing.get(r.date)[k]!==r[k]));
-  if(changed.length&&!g.confirm('這份報表有 '+changed.length+' 個已儲存日期的數字不同。確認以新 Excel 的原始資料覆蓋這些日期？\n（其他日期會保留，不會累加。）')){
+  if(changed.length&&!(await confirmHomeYardOverwrite('這份報表有 '+changed.length+' 個已儲存日期的數字不同。確認以新 Excel 的原始資料覆蓋這些日期？\n（其他日期會保留，不會累加。）'))){
     message('已取消覆蓋，原資料保持不變');return;
   }
   imported.forEach(r=>existing.set(r.date,r));
