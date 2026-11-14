@@ -88,3 +88,29 @@
 @media(max-width:850px){#systems #p79AllBackupResults{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:620px){#systems #p79AllBackupResults{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:420px){#systems #p79AllBackupResults{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Keep backup directly under the History Database card inside its own grid cell. */
+#systems #p79HistoryBackupStack.p79-history-backup-stack{
+ display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;width:100%;
+}
+#systems #p79HistoryBackupStack[hidden]{display:none!important}
+#systems #p79HistoryBackupStack #cardHistory{
+ width:100%;max-width:none;box-sizing:border-box;flex:none;
+}
+#systems #p79HistoryBackupStack #p79AllBackupPanel.p79-all-backup{
+ display:flex;flex-direction:column;align-items:stretch;gap:6px;
+ width:100%;min-width:0;max-width:100%;margin:0;padding:0;border:0;background:transparent;
+}
+#systems #p79HistoryBackupStack #p79AllBackupButton{
+ box-sizing:border-box;width:100%;min-width:0;min-height:36px;height:36px;
+ margin:0;padding:7px 12px;text-align:center;font-size:13px;
+}
+#systems #p79HistoryBackupStack #p79AllBackupFeedback{
+ box-sizing:border-box;width:100%;min-width:0;max-width:100%;margin-top:0;
+}
+#systems #p79HistoryBackupStack #p79AllBackupResults{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,115px),1fr))!important;
+}
+@media(max-width:650px){
+ #systems #p79HistoryBackupStack #p79AllBackupButton{width:100%}
+}
