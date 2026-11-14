@@ -128,6 +128,6 @@ function refresh(){
  if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
 function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());refresh();}
-g.Port79AllBackup={start,refresh,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
+g.Port79AllBackup={start,refresh,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
