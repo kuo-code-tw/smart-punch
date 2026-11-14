@@ -39,27 +39,43 @@ function render(){
  list.replaceChildren();
  for(const item of batch.items){
   const kind=item.result?'done':item.error?'error':item.running?'running':'pending';
+  const title=item.type==='yardFile'?'儲量原檔':item.label;
   const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.running?'備份及讀回核對中…':'等待備份';
-  const title=item.type==='yardFile'?'儲量Excel原檔':item.label;
-  const detail=item.type==='yardFile'?(String(item.original?.name||'Excel原檔')+' · '+summary):summary;
-  const li=d.createElement('li');li.className='p79-backup-row p79-backup-'+kind;li.title=title+'：'+detail;
-  const indicator=d.createElement('span');indicator.className='p79-backup-indicator';indicator.textContent=kind==='done'?'✓':kind==='error'?'!':kind==='running'?'…':'·';indicator.setAttribute('aria-hidden','true');
-  const name=d.createElement('strong');name.className='p79-backup-name';name.textContent=title;
-  const state=d.createElement('span');state.className='p79-backup-summary';state.textContent=detail;state.title=detail;
-  const actions=d.createElement('span');actions.className='p79-backup-actions';
+  const detail=(item.type==='yardFile'?(item.original?.name||'Excel原檔')+' · ':'')+summary;
+  const li=d.createElement('li');
+  li.className='p79-backup-light p79-backup-'+kind;
+  const tip=title+'：'+detail+(item.result?'；點擊開啟歷史資料':item.error?'；點擊單獨重試':'');
+  li.title=tip;
+  const control=d.createElement(item.result?'a':item.error?'button':'span');
+  control.className='p79-backup-light-control';
+  control.title=tip;
+  control.setAttribute('aria-label',tip);
+  const lamp=d.createElement('span');
+  lamp.className='p79-backup-lamp';
+  lamp.setAttribute('aria-hidden','true');
+  const label=d.createElement('span');
+  label.className='p79-backup-light-label';
+  label.textContent=title;
+  control.append(lamp,label);
   if(item.result){
-   const a=d.createElement('a');a.href=item.result.backupUrl;a.target='_blank';a.rel='noopener';a.className='p79-backup-history';a.textContent='歷史資料';a.setAttribute('aria-label','開啟'+title+'歷史資料');actions.append(a);
+   control.href=item.result.backupUrl;
+   control.target='_blank';
+   control.rel='noopener';
   }else if(item.error){
-   const retry=d.createElement('button');retry.type='button';retry.className='p79-backup-retry';retry.textContent='重試';retry.disabled=busy;retry.title='只重試「'+title+'」';retry.setAttribute('aria-label','重試'+title);retry.addEventListener('click',()=>start(item.id));actions.append(retry);
-  }else{
-   const placeholder=d.createElement('span');placeholder.className='p79-backup-action-placeholder';placeholder.textContent='—';placeholder.setAttribute('aria-hidden','true');actions.append(placeholder);
+   control.type='button';
+   control.disabled=busy;
+   control.addEventListener('click',()=>start(item.id));
   }
-  li.append(indicator,name,state,actions);list.append(li);
+  li.append(control);
+  list.append(li);
  }
- const done=batch.items.filter(i=>i.result).length,failed=batch.items.some(i=>i.error),progress=$('p79AllBackupProgress');
+ const done=batch.items.filter(i=>i.result).length;
+ const failed=batch.items.some(i=>i.error);
+ const progress=$('p79AllBackupProgress');
  if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
- message(done===batch.items.length?'全部分類已備份並核對完成。':busy?'備份進度 '+done+'/'+batch.items.length+'；完成的項目會保留。':failed?'已完成 '+done+'/'+batch.items.length+'；可單項重試或按「重試未完成項目」。':'尚未取得全部分類的完成確認。');
- const btn=$('p79AllBackupButton');if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
+ message(done===batch.items.length?'完成 '+done+'/'+batch.items.length:busy?'備份 '+done+'/'+batch.items.length:failed?'完成 '+done+'/'+batch.items.length+' · 可重試':'待核對 '+done+'/'+batch.items.length);
+ const btn=$('p79AllBackupButton');
+ if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
 async function start(onlyId=null){
  if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
