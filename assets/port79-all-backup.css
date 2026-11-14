@@ -89,28 +89,32 @@
 @media(max-width:620px){#systems #p79AllBackupResults{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:420px){#systems #p79AllBackupResults{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
-/* Keep backup directly under the History Database card inside its own grid cell. */
-#systems #p79HistoryBackupStack.p79-history-backup-stack{
- display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;width:100%;
+
+/* Compact backup lights are visibly located above the Vessel Operations overview. */
+#systems #p79AllBackupPanel.p79-all-backup{
+ display:flex;flex-direction:column;align-items:stretch;gap:8px;
+ box-sizing:border-box;width:100%;max-width:none;margin:0 0 12px;padding:11px 13px;
+ background:var(--card,#fff);border:1px solid var(--border,#dbe5f1);
+ border-radius:13px;box-shadow:0 2px 12px rgba(18,48,93,.05);
+ scroll-margin-top:80px;
 }
-#systems #p79HistoryBackupStack[hidden]{display:none!important}
-#systems #p79HistoryBackupStack #cardHistory{
- width:100%;max-width:none;box-sizing:border-box;flex:none;
+#systems #p79AllBackupPanel[hidden]{display:none!important}
+#systems #p79AllBackupPanel .p79-all-backup-top{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
 }
-#systems #p79HistoryBackupStack #p79AllBackupPanel.p79-all-backup{
- display:flex;flex-direction:column;align-items:stretch;gap:6px;
- width:100%;min-width:0;max-width:100%;margin:0;padding:0;border:0;background:transparent;
+#systems #p79AllBackupPanel .p79-all-backup-top strong{font-size:15px;line-height:1.5;color:var(--text,#173050)}
+#systems #p79AllBackupPanel #p79AllBackupButton{
+ margin:0;min-width:118px;width:auto;min-height:34px;height:34px;
+ padding:6px 13px;border-radius:8px;font-size:12px;font-weight:750;
 }
-#systems #p79HistoryBackupStack #p79AllBackupButton{
- box-sizing:border-box;width:100%;min-width:0;min-height:36px;height:36px;
- margin:0;padding:7px 12px;text-align:center;font-size:13px;
+#systems #p79AllBackupPanel #p79AllBackupFeedback{
+ display:flex;flex-direction:column;align-items:stretch;gap:7px;
+ width:100%;max-width:100%;min-width:0;margin:0;
+ padding:0;border:0;border-radius:0;box-shadow:none;background:transparent;
 }
-#systems #p79HistoryBackupStack #p79AllBackupFeedback{
- box-sizing:border-box;width:100%;min-width:0;max-width:100%;margin-top:0;
-}
-#systems #p79HistoryBackupStack #p79AllBackupResults{
- grid-template-columns:repeat(auto-fit,minmax(min(100%,115px),1fr))!important;
-}
-@media(max-width:650px){
- #systems #p79HistoryBackupStack #p79AllBackupButton{width:100%}
-}
+#systems #p79AllBackupPanel #p79AllBackupFeedback[hidden]{display:none!important}
+#systems #p79AllBackupPanel #p79AllBackupResults{grid-template-columns:repeat(7,minmax(0,1fr));width:100%;min-width:0}
+@media(max-width:1299px){#systems #p79AllBackupPanel #p79AllBackupResults{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:850px){#systems #p79AllBackupPanel #p79AllBackupResults{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:620px){#systems #p79AllBackupPanel #p79AllBackupResults{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:420px){#systems #p79AllBackupPanel #p79AllBackupResults{grid-template-columns:repeat(2,minmax(0,1fr))}}
