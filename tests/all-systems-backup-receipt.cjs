@@ -1,0 +1,17 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
+const code=fs.readFileSync('backend/all-systems-backup-receipt.gs','utf8');
+const props=new Map();let authorized=true,trashed=false,writes=0,fail=false;
+const c={Date,JSON,Object,String,Error,getSpreadsheet_:()=>({}),p79HistoryBackupSession_:()=>{if(!authorized)throw Error('permission denied');},p79AllBackupGroups_:()=>[{type:'attendance'}],p79HistoryBackupCapabilities_:()=>({ok:true,allSystemsBackupVersion:1}),PropertiesService:{getScriptProperties:()=>({getProperty:k=>props.get(k)||null,setProperty:(k,v)=>props.set(k,v)})},DriveApp:{getFileById:()=>({isTrashed:()=>trashed})},p79HistoryBackupMonth_:d=>{writes++;if(fail)throw Error('readback failed');return {ok:true,verified:true,sourceUnchanged:true,type:d.type,requestId:d.requestId,backupId:'fixture-backup',backupUrl:'https://docs.google.com/spreadsheets/d/fixture-backup/edit'};}};
+vm.createContext(c);vm.runInContext(code,c);
+const d={backupMode:'all-systems-v1',type:'attendance',requestId:'fixture-request-one',token:'fixture'};
+const first=c.p79HistoryBackupRequest_(d);a.equal(first.verified,true);let r=c.p79HistoryBackupReceipt_(d);a.equal(r.state,'complete');a.equal(r.receipt.requestId,d.requestId);a.equal(writes,1,'status must never create another backup');
+a.equal(c.p79HistoryBackupReceipt_({...d,requestId:'fixture-other-request'}).state,'pending','old success is not confirmation for another request');
+trashed=true;a.throws(()=>c.p79HistoryBackupReceipt_(d),/垃圾桶/);trashed=false;
+authorized=false;a.throws(()=>c.p79HistoryBackupReceipt_(d),/permission/);a.throws(()=>c.p79HistoryBackupRequest_(d),/permission/);a.equal(writes,1);authorized=true;
+a.throws(()=>c.p79HistoryBackupReceipt_({...d,type:'arbitrary-source'}),/分類/);a.throws(()=>c.p79HistoryBackupReceipt_({...d,requestId:'bad'}),/編號/);
+fail=true;const broken={...d,requestId:'fixture-failed-request'};a.throws(()=>c.p79HistoryBackupRequest_(broken),/readback/);a.equal(c.p79HistoryBackupReceipt_(broken).state,'failed');
+props.set('P79_ALL_BACKUP_BUSY_attendance',JSON.stringify({requestId:broken.requestId,at:Date.now()}));a.equal(c.p79HistoryBackupReceipt_(broken).state,'running','concurrent owner still running takes priority over busy failure');props.delete('P79_ALL_BACKUP_BUSY_attendance');
+props.set('P79_ALL_BACKUP_LAST_attendance',JSON.stringify(first));a.equal(c.p79HistoryBackupReceipt_(d).state,'complete','V114 exact-request receipt can be recovered after upgrade');
+a.equal(c.p79HistoryBackupCapabilitiesWithReceipt_({}).backupReceiptLookupVersion,1);
+console.log('PASS authenticated exact-request recovery, no duplicate writes, failed/running states, deleted file guard and V114 transition');

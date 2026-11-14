@@ -16,10 +16,23 @@ function same(c){try{const s=session();return allowed(s)&&s.empId===c.actor&&tok
 function message(text){const n=$('p79AllBackupStatus');if(n)n.textContent=text;}
 function link(value){const u=new URL(value);if(u.protocol!=='https:'||!['docs.google.com','drive.google.com'].includes(u.hostname)||!/^\/(spreadsheets\/d|file\/d)\/[A-Za-z0-9_-]+(?:\/|$)/.test(u.pathname))throw Error('備份回傳的檔案連結無法核對');return u.href;}
 async function request(c,payload,get){
- if(!same(c))throw Error('登入身分已變更，已停止備份');controller=new AbortController();const abort=controller,timer=g.setTimeout(()=>abort.abort(),180000);
- try{let url=c.endpoint,options={cache:'no-store',redirect:'follow',signal:abort.signal};if(get){const u=new URL(url);u.searchParams.set('action','historyBackupCapabilities');u.searchParams.set('gcToken',c.token);u.searchParams.set('_',Date.now());url=u.href;}else options={...options,method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action:'historyBackupMonth',backupMode:'all-systems-v1',gcToken:c.token,token:c.token})};
- const res=await g.fetch(url,options);let data;try{data=await res.json();}catch(_){throw Error('雲端沒有回傳備份結果，請檢查正式服務版本');}if(!same(c))throw Error('登入身分已變更，未套用備份結果');if(!res.ok||data?.ok!==true)throw Error(String(data?.error||'雲端備份未完成'));return data;
- }catch(e){if(e.name==='AbortError')throw Error('連線逾時，尚未取得完成確認；重試會先核對先前結果');throw e;}finally{g.clearTimeout(timer);if(controller===abort)controller=null;}
+ if(!same(c))throw Error('登入身分已變更，已停止備份');controller=new AbortController();const abort=controller,timer=g.setTimeout(()=>abort.abort(),get?30000:180000);
+ try{let url=c.endpoint,options={cache:'no-store',redirect:'follow',signal:abort.signal};if(get){const u=new URL(url);u.searchParams.set('action',payload?.action||'historyBackupCapabilities');for(const key of ['type','requestId'])if(payload?.[key])u.searchParams.set(key,payload[key]);u.searchParams.set('gcToken',c.token);u.searchParams.set('_',Date.now());url=u.href;}else options={...options,method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action:'historyBackupMonth',backupMode:'all-systems-v1',gcToken:c.token,token:c.token})};
+ const res=await g.fetch(url,options);let data;try{data=await res.json();}catch(_){throw Error('雲端回應中斷，正在核對備份回條');}if(!same(c))throw Error('登入身分已變更，未套用備份結果');if(!res.ok||data?.ok!==true)throw Object.assign(Error(String(data?.error||'雲端備份未完成')),{serverError:data?.ok===false});return data;
+ }catch(e){if(e.name==='AbortError')throw Object.assign(Error('連線逾時，正在核對備份回條'),{receiptCheck:true});if(!e.serverError)e.receiptCheck=true;throw e;}finally{g.clearTimeout(timer);if(controller===abort)controller=null;}
+}
+async function recoverReceipt(c,item){
+ const deadline=Date.now()+7*60*1000;
+ while(same(c)&&Date.now()<deadline){
+  let status;
+  try{status=await request(c,{action:'historyBackupReceipt',type:item.type,requestId:item.id},true);}catch(e){if(e.serverError||!same(c))throw e;}
+  if(status?.state==='complete')return status.receipt;
+  if(status?.state==='failed')throw Error(status.error||'雲端備份未完成');
+  message(item.label+'：正在讀回雲端完成確認…');
+  await new Promise(resolve=>g.setTimeout(resolve,3000));
+ }
+ if(!same(c))throw Error('登入身分已變更，已停止核對');
+ throw Error('暫時無法取得雲端確認，請重試此分類；已完成的備份會自動沿用');
 }
 async function digest(bytes){const hash=await g.crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');}
 async function yardSnapshot(actor){
@@ -100,7 +113,7 @@ function render(){
 async function start(onlyId=null){
  if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
  try{
-  const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');
+  const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');c.receiptLookup=caps.backupReceiptLookupVersion===1;
   const yard=await yardSnapshot(c.actor),fingerprint=await digest(new TextEncoder().encode(JSON.stringify(yard))),originals=(await records()).filter(r=>r.actor===c.actor&&!r.receipt);
   if(!same(c))throw Error('登入身分已變更，已停止備份');
   if(!batch||batch.actor!==c.actor||batch.endpoint!==c.endpoint||batch.fingerprint!==fingerprint){
@@ -110,7 +123,7 @@ async function start(onlyId=null){
   if(onlyId&&!batch.items.some(item=>item.id===onlyId&&!item.result))throw Error('此分類不在待重試清單，請重新執行備份');
   for(const item of batch.items){if(item.result||(onlyId&&item.id!==onlyId))continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
    try{const payload={type:item.type,requestId:item.id};if(item.type==='yard')payload.yard=yard;if(item.original)payload.original={name:item.original.name,hash:item.original.hash,base64:base64(item.original.bytes)};
-    const result=await request(c,payload,false);if(result.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
+    let result;try{result=await request(c,payload,false);}catch(e){if(!c.receiptLookup||!e.receiptCheck||!same(c))throw e;result=await recoverReceipt(c,item);}if(result?.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
     if(item.original){item.original.receipt={backupId:result.backupId,backupUrl:result.backupUrl};await put(item.original);}
     if(item.type==='yard'&&yard&&same(c)){try{g.localStorage.setItem('p79_yard_backup_receipt_v1_'+encodeURIComponent(c.actor),JSON.stringify({fingerprint,backupUrl:result.backupUrl,backupAt:result.backupAt,updatedAt:yard.updatedAt}));}catch(_){}}
    }catch(e){if(!same(c))throw e;item.error=String(e.message||e).slice(0,240);}finally{item.running=false;}render();
