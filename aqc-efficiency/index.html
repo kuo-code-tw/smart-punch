@@ -11632,6 +11632,19 @@ let excelLiveHideTimer=null;
 
 function updateExcelImportLiveStatus(patch={}){
   excelLiveState={...excelLiveState,...patch};
+  // Progress-only notice to the same-origin homepage shell; this never
+  // claims cloud commit success or bypasses an import approval.
+  if(window.parent!==window&&new URLSearchParams(location.search).get('homeImport')==='1'){
+   try{
+    window.parent.postMessage({
+     type:'p79-vessel-import-progress',
+     fileName:String(excelLiveState.fileName||''),
+     stage:String(excelLiveState.stage||'核對中'),
+     pct:Math.max(0,Math.min(100,Number(excelLiveState.pct)||0)),
+     state:String(excelLiveState.state||'working')
+    },location.origin);
+   }catch(error){console.warn('首頁匯入進度通知未送出',error);}
+  }
   const wrap=document.getElementById('excelLiveProgress');
   const card=document.getElementById('excelLiveProgressCard');
   const icon=document.getElementById('excelLiveIcon');
