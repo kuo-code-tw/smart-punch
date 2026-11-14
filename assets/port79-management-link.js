@@ -259,7 +259,7 @@ applySnapshot:async snapshot=>{p79CanonicalOrgOptions=null;p79ApplyHrEmployeesPa
 if(g.P79ManagementPageBridge)return;
 const context=g.P79ManagementContext,api=g.P79ManagementSync,factory=g.P79ManagementAdapterFactory;
 if(!context||!api||!factory)return;
-let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0,lastFocusCheck=0;
+let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,successTimer=null,attempts=0,bar=null,pendingState=null,viewRevision=0,lastFocusCheck=0,hiddenAt=0,lastFailedGeneration=-1;
 const activeReads=new Set();
 // Attendance retains its dedicated refresh owner. Work-hours may refresh a confirmed
 // selected-month snapshot only when the adapter verifies no form or local write is pending.
@@ -267,7 +267,10 @@ const manualOnly=context.system==='attendance';
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
 function roleAllowed(){if(g.P79ManagementTestMode!==true&&g.P79ManagementOptimizationMode!==true)return false;try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
- const el=document.activeElement;if(el&&el.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
+ const el=document.activeElement;
+ // A focused query filter is not an unsaved edit: do not lock cloud refresh indefinitely.
+ const readOnlyFilter=el?.closest?.('#adminContentOvertime .p79-overtime-compact-filters');
+ if(el&&!readOnlyFilter&&el.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
  return [...document.querySelectorAll('dialog[open],[role="dialog"],.modal')].some(el=>el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');
 }
 function editing(){try{return context.hasPendingChanges()!==false||openForm()}catch(_){return true;}}
@@ -289,7 +292,7 @@ function ensureBar(){
  if(bar)return bar;bar=document.createElement('div');bar.id='p79ManagementSyncBar';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');
  bar.style.cssText='display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 16px;background:#eff6ff;color:#1e3a8a;border-bottom:1px solid #93c5fd;font:700 13px system-ui;flex-wrap:wrap';
  const label=document.createElement('span');label.dataset.label='1';bar.appendChild(label);
- if(!manualOnly){const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize();bar.appendChild(button);}
+ if(!manualOnly){const button=document.createElement('button');button.type='button';button.textContent='更新相關資料';button.style.cssText='padding:6px 12px;border:1px solid #60a5fa;border-radius:8px;background:white;color:#1d4ed8;font:inherit';button.onclick=()=>void synchronize(true);bar.appendChild(button);}
  const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
 }
 function scheduleReadIdleResume(){
@@ -297,17 +300,37 @@ function scheduleReadIdleResume(){
  clearTimeout(timer);timer=setTimeout(()=>{timer=null;if(stopped||suspended||document.visibilityState!=='visible')return;if(context.isReadBusy?.()===true)scheduleReadIdleResume();else resume();},1000);
 }
 function notify(state){
- pendingState=state;if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
- const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';if(!manualOnly)b.querySelector('button').disabled=false;return;}
+ pendingState=state;clearTimeout(successTimer);successTimer=null;
+ if(stopped||suspended||!roleAllowed()||!context.canRead()){if(bar)bar.style.display='none';return;}
+ const b=ensureBar();b.style.display='flex';const names=state.pending.map(t=>topicNames[t]||t).join('、');if(!state.pending.length){
+  b.dataset.confirmed=String(Date.now());b.querySelector('[data-label]').textContent='跨系統更新已讀回核對';
+  if(!manualOnly)b.querySelector('button').disabled=false;
+  // Completed reads must not occupy the page permanently.
+  successTimer=setTimeout(()=>{successTimer=null;if(!stopped&&!suspended&&!pendingState?.pending.length&&bar)bar.style.display='none';},3500);
+  return;
+ }
  b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():manualOnly?'｜請按上方「重新整理」核對':'｜準備同步');
  if(manualOnly)return;
  b.querySelector('button').disabled=state.running;
- if(state.pending.length&&!state.running&&!editing()&&document.visibilityState==='visible'){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}else if(state.pending.length&&!state.running)scheduleReadIdleResume();
+ if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration&&!editing()&&document.visibilityState==='visible'){
+  clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);
+ }else if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration)scheduleReadIdleResume();
 }
-async function synchronize(){
- clearTimeout(timer);timer=null;if(stopped||suspended||!binding||!roleAllowed()||document.visibilityState!=='visible')return;if(editing()){scheduleReadIdleResume();return;}
+async function synchronize(manual=false){
+ clearTimeout(timer);timer=null;
+ if(stopped||suspended||!binding||!roleAllowed()||document.visibilityState!=='visible')return;
+ // A failed generation is not another automatic request. Only a new confirmed
+ // mutation event or a deliberate click is allowed to retry that generation.
+ if(!manual&&binding.engine.status().generation===lastFailedGeneration)return;
+ if(editing()){if(!manual)scheduleReadIdleResume();return;}
  const result=await binding.engine.synchronize();
- if(!stopped&&!suspended&&result.ok!==true&&bar){clearTimeout(timer);timer=null;bar.querySelector('[data-label]').textContent=result.reason==='editing'?editingMessage():'跨系統更新尚未確認'+(result.errorType?'（'+result.errorType+'）':'')+'｜保留目前資料，可按更新重試';}
+ if(stopped||suspended)return;
+ if(result.ok!==true){
+  lastFailedGeneration=binding.engine.status().generation;
+  clearTimeout(timer);timer=null;
+  if(bar){bar.querySelector('[data-label]').textContent=result.reason==='editing'?editingMessage():
+   '跨系統更新未完成'+(result.errorType?'（'+result.errorType+'）':'')+'；已停止自動重試，請按「更新相關資料」重試';}
+ }else{lastFailedGeneration=-1;}
 }
 function boot(){
  if(stopped||suspended||binding||!roleAllowed())return;
@@ -318,17 +341,29 @@ function boot(){
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.8';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
 const resume=(event)=>{if(stopped||suspended)return;
-// Browser broadcasts cannot reach a different device. Revalidate on return to
-// these management pages, bounded to once per 30 seconds and deferred during edits.
-if(binding&&['leave','schedule','workhours'].includes(context.system)&&document.visibilityState==='visible'&&
-   ['focus','visibilitychange'].includes(event?.type)&&Date.now()-lastFocusCheck>=30000){
- lastFocusCheck=Date.now();
- binding.engine.receive({v:1,id:context.system+'-return-'+lastFocusCheck,at:lastFocusCheck,topics:['leave','cover','schedule','overtime']});
-}
-if(manualOnly){if(!binding)boot();return;}if(binding&&pendingState?.pending.length&&editing()){if(bar)bar.querySelector('[data-label]').textContent=editingMessage();scheduleReadIdleResume();return;}if(!binding)boot();else if(pendingState?.pending.length&&!editing()){clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);}};
+ // Normal clicks/focus events must never invent a cross-system mutation.
+ // A real return from a long-hidden tab may check remote-device changes once.
+ if(event?.type==='visibilitychange'&&document.visibilityState==='hidden'){hiddenAt=Date.now();return;}
+ if(binding&&['leave','schedule','workhours'].includes(context.system)&&
+    event?.type==='visibilitychange'&&document.visibilityState==='visible'&&hiddenAt>0&&
+    Date.now()-hiddenAt>=120000&&Date.now()-lastFocusCheck>=300000){
+  lastFocusCheck=Date.now();
+  binding.engine.receive({v:1,id:context.system+'-return-'+lastFocusCheck,at:lastFocusCheck,topics:['leave','cover','schedule','overtime']});
+ }
+ if(event?.type==='visibilitychange'&&document.visibilityState==='visible')hiddenAt=0;
+ if(manualOnly){if(!binding)boot();return;}
+ if(binding&&pendingState?.pending.length&&editing()){
+  if(bar)bar.querySelector('[data-label]').textContent=editingMessage();
+  if(binding.engine.status().generation!==lastFailedGeneration)scheduleReadIdleResume();return;
+ }
+ if(!binding)boot();
+ else if(pendingState?.pending.length&&!editing()&&binding.engine.status().generation!==lastFailedGeneration){
+  clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);
+ }
+};
 const changed=()=>{viewRevision++;};document.addEventListener('input',changed,true);document.addEventListener('change',changed,true);document.addEventListener('focusout',resume);document.addEventListener('visibilitychange',resume);g.addEventListener('focus',resume);
 function pagehide(event){
- suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);timer=null;bootTimer=null;
+ suspended=true;viewRevision++;clearTimeout(timer);clearTimeout(bootTimer);clearTimeout(successTimer);timer=null;bootTimer=null;successTimer=null;
  activeReads.forEach(ctl=>ctl.abort());activeReads.clear();
  if(event.persisted)return;
  stopped=true;binding?.dispose();g.P79ManagementPageBridge?.adapter?.dispose();
