@@ -423,6 +423,7 @@ function persist(){
 }
 async function importFile(file){
  if(!file)return;
+ if(!accountId)return message('請先以有碼頭管理權限的帳號登入，無法使用此匯入','error');
  if(importBusy)return message('Excel 正在匯入與核對中，請完成本次匯入後再試。','info');
  if(!/\.xlsx?$/i.test(file.name))return message('僅支援 .xlsx / .xls 堆場報表','error');
  if(file.size>12*1024*1024)return message('檔案超過 12 MB，請先檢查檔案內容','error');
@@ -444,7 +445,7 @@ async function importFile(file){
    let originalSaved=false;
    try{if(g.Port79AllBackup?.rememberYardImport){await g.Port79AllBackup.rememberYardImport(file);originalSaved=true;}}
    catch(error){message('每日資料已匯入，但Excel原檔未保存：'+String(error.message||error)+'。請保留原檔並重新匯入。','error');return;}
-   message('Excel 核對通過：已匯入 '+imported.length+' 天（'+imported[0].date+' 至 '+imported[imported.length-1].date+'）。資料已存此瀏覽器'+(originalSaved?'，原始Excel也已保存':'')+'；請至首頁按「全部系統備份到歷史資料庫」完成雲端備份。','success');
+   message('Excel 核對通過：已匯入 '+imported.length+' 天（'+imported[0].date+' 至 '+imported[imported.length-1].date+'）。資料已存此瀏覽器'+(originalSaved?'，原始Excel也已保存':'')+'；如需另外備份歷史版本，請回首頁按「備份資料庫」（雲端功能須另行驗證）。','success');
   }
  }catch(err){message('匯入失敗：'+String(err.message||err),'error')}
  finally{importBusy=false;if($('yardFile'))$('yardFile').value='';}
@@ -724,6 +725,6 @@ function init(){
  $('yardMonth').addEventListener('change',e=>{const m=e.target.value,days=rows.filter(r=>r.date.startsWith(m));selectedDate=days.length?days[days.length-1].date:'';render();});
  d.querySelectorAll('[data-yard-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.yardView)));
 }
-g.P79YardDashboard={parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,containerCounts,containerBreakdown,compareAllowedCounts,allowedCountValue,allowedTeuValue,allowedSizeLimit,setAllowedCounts,clearAllowedCounts,historyTable,capacityValue,effectiveRecord,setCapacityOverride};
+g.P79YardDashboard={importFile,parseDate,validateRecord,parseBook,fieldRows:FIELD_ROWS,donutGradient,alertNotices,trendAxisMax,trendSvg,containerCounts,containerBreakdown,compareAllowedCounts,allowedCountValue,allowedTeuValue,allowedSizeLimit,setAllowedCounts,clearAllowedCounts,historyTable,capacityValue,effectiveRecord,setCapacityOverride};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
