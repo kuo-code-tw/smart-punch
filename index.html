@@ -675,7 +675,17 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       </section>
       <dialog id="p79HomeImportDialog" aria-label="首頁資料匯入">
         <div class="p79-import-modal-head"><h2 id="p79HomeImportTitle">資料匯入</h2><button id="p79HomeImportClose" type="button">關閉</button></div>
+        <div id="p79HomeImportFile" aria-label="目前匯入檔案"></div>
+        <div id="p79HomeImportProgress" role="progressbar" aria-label="匯入處理進度" aria-valuetext="等待匯入"><span id="p79HomeImportProgressBar"></span></div>
         <p id="p79HomeImportStatus" role="status" aria-live="polite"></p>
+        <section id="p79HomeImportReview" aria-label="匯入前資料確認" hidden>
+          <strong id="p79HomeImportReviewTitle">匯入前核對</strong>
+          <pre id="p79HomeImportReviewText"></pre>
+          <div class="p79-home-import-review-buttons">
+            <button type="button" id="p79HomeImportReviewNo">取消匯入</button>
+            <button type="button" id="p79HomeImportReviewYes">確認匯入</button>
+          </div>
+        </section>
         <iframe id="p79HomeImportFrame" title="原系統背景匯入核對服務" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin" hidden></iframe>
       </dialog>
       <div class="p79-modern-home-preserve"><span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班維持現行介面與流程</strong><small>本次只調整管理畫面外觀。登入、刷卡、權限、資料連結及雲端資料均保持原狀。</small></div></div>
