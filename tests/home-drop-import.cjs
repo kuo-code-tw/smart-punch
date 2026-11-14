@@ -29,6 +29,7 @@ function fakeElement(){
  const listeners={};
  return {
   listeners,dataset:{},textContent:'',hidden:false,value:'',open:false,
+  classList:{add(){},remove(){}},contains(){return false;},
   addEventListener(name,fn){listeners[name]=fn;},
   showModal(){this.open=true;},close(){this.open=false;},
   querySelector(){return null;}
