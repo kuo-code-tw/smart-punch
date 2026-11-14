@@ -676,6 +676,20 @@ html.dark #efficiencyMainTabs [data-tab="gate"].active {background:#14532d!impor
 <link rel="stylesheet" href="../assets/port79-personnel-dispatch.css?v=20261111-auto-balance-v4">
 <link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
 <script src="../assets/port79-org-context.js?v=20261112-remove-scope-ui-v3"></script>
+<script>
+if(new URLSearchParams(location.search).get('homeImport')==='1')document.documentElement.setAttribute('data-p79-home-vessel-import','1');
+</script>
+<style id="p79-home-vessel-embed-ui">
+html[data-p79-home-vessel-import="1"] body{background:#f8fbff!important}
+html[data-p79-home-vessel-import="1"] #efficiencyHeader{position:relative!important;top:0!important}
+html[data-p79-home-vessel-import="1"] #efficiencyHeaderInner{display:none!important}
+html[data-p79-home-vessel-import="1"] #efficiencyPageMain{display:none!important}
+html[data-p79-home-vessel-import="1"] #excelDropZone{margin:12px 10px!important}
+html[data-p79-home-vessel-import="1"] #excelLiveProgress{display:block!important}
+html[data-p79-home-vessel-import="1"] #excelLiveProgress.hidden{display:none!important}
+html[data-p79-home-vessel-import="1"] #p79WorkspaceSidebar,
+html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important}
+</style>
 </head>
 <!-- v2026.09.30.8.7：Bundle 同文字但不同作業時段不得去重；結構化扣除數優先。 -->
 <!-- v2026.09.28.7.36：七大系統日期篩選統一為單一日期範圍控制。 -->
@@ -11834,6 +11848,22 @@ async function importExcelFiles(fileList){
   }
 }
 
+
+// Homepage drop zone calls the ORIGINAL importer in this authenticated frame.
+// Success counts are parser results, not a claim that cloud read-back succeeded.
+window.P79VesselHomeImport={
+ importFiles:async function(files){
+  if(!Array.isArray(files)&&!(files&&typeof files.length==='number'))
+    throw Error('沒有可匯入的船舶 Excel');
+  await importExcelFiles(files);
+  return {
+   processed:excelQueueStats.processed,
+   success:excelQueueStats.success,
+   failed:excelQueueStats.failed,
+   cloudStatus:String(document.getElementById('cloudState')?.textContent||'')
+  };
+ }
+};
 
 // v2026.09.28.7.46：同 WORKING NO. 子作業採嚴格隔離；父作業只有在核對數學完全改善/吻合時才引用子作業做人員總量核對。
 // 同時修正相同來源 5260149-1 被重匯成 -2/-3 的問題。
