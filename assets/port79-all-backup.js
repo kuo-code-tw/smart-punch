@@ -33,19 +33,46 @@ async function put(record){const conn=await db();try{await new Promise((resolve,
 async function rememberYardImport(file){const s=session();if(!s?.empId||s.punchOnly)throw Error('登入身分未驗證，未保存Excel原檔');const actor=s.empId,bytes=await file.arrayBuffer(),hash=await digest(bytes);if(session()?.empId!==actor)throw Error('登入身分已變更，未保存Excel原檔');const existing=(await records()).find(r=>r.id===actor+'|'+hash);if(existing)return;await put({id:actor+'|'+hash,actor,name:file.name,bytes,hash,importedAt:new Date().toISOString(),receipt:null});}
 function base64(bytes){const u=new Uint8Array(bytes);let s='';for(let i=0;i<u.length;i+=16384)s+=String.fromCharCode(...u.subarray(i,i+16384));return g.btoa(s);}
 function render(){
- if(!batch)return;const list=$('p79AllBackupResults');if(!list)return;list.replaceChildren();for(const item of batch.items){const li=d.createElement('li'),name=d.createElement('strong'),state=d.createElement('span');name.textContent=item.label+'：';state.textContent=item.result?(item.result.unchanged?'無異動，已核對既有備份':`已備份 ${Number(item.result.rows||0).toLocaleString('zh-TW')} 筆`):item.error?'未完成：'+item.error:item.running?'備份及讀回核對中…':'等待備份';li.append(name,state);if(item.result){const a=d.createElement('a');a.href=item.result.backupUrl;a.target='_blank';a.rel='noopener';a.textContent='開啟歷史資料';li.append(a);}list.append(li);}
- const done=batch.items.filter(i=>i.result).length,failed=batch.items.some(i=>i.error),progress=$('p79AllBackupProgress');if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
- message(done===batch.items.length?'全部分類已備份並核對完成。':busy?`備份進度 ${done}/${batch.items.length}；完成的項目會保留。`:failed?`已完成 ${done}/${batch.items.length}；按「重試未完成項目」繼續。`:'尚未取得全部分類的完成確認。');
+ if(!batch)return;
+ const list=$('p79AllBackupResults');
+ if(!list)return;
+ list.replaceChildren();
+ for(const item of batch.items){
+  const kind=item.result?'done':item.error?'error':item.running?'running':'pending';
+  const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.running?'備份及讀回核對中…':'等待備份';
+  const title=item.type==='yardFile'?'儲量Excel原檔':item.label;
+  const detail=item.type==='yardFile'?(String(item.original?.name||'Excel原檔')+' · '+summary):summary;
+  const li=d.createElement('li');li.className='p79-backup-row p79-backup-'+kind;li.title=title+'：'+detail;
+  const indicator=d.createElement('span');indicator.className='p79-backup-indicator';indicator.textContent=kind==='done'?'✓':kind==='error'?'!':kind==='running'?'…':'·';indicator.setAttribute('aria-hidden','true');
+  const name=d.createElement('strong');name.className='p79-backup-name';name.textContent=title;
+  const state=d.createElement('span');state.className='p79-backup-summary';state.textContent=detail;state.title=detail;
+  const actions=d.createElement('span');actions.className='p79-backup-actions';
+  if(item.result){
+   const a=d.createElement('a');a.href=item.result.backupUrl;a.target='_blank';a.rel='noopener';a.className='p79-backup-history';a.textContent='歷史資料';a.setAttribute('aria-label','開啟'+title+'歷史資料');actions.append(a);
+  }else if(item.error){
+   const retry=d.createElement('button');retry.type='button';retry.className='p79-backup-retry';retry.textContent='重試';retry.disabled=busy;retry.title='只重試「'+title+'」';retry.setAttribute('aria-label','重試'+title);retry.addEventListener('click',()=>start(item.id));actions.append(retry);
+  }else{
+   const placeholder=d.createElement('span');placeholder.className='p79-backup-action-placeholder';placeholder.textContent='—';placeholder.setAttribute('aria-hidden','true');actions.append(placeholder);
+  }
+  li.append(indicator,name,state,actions);list.append(li);
+ }
+ const done=batch.items.filter(i=>i.result).length,failed=batch.items.some(i=>i.error),progress=$('p79AllBackupProgress');
+ if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
+ message(done===batch.items.length?'全部分類已備份並核對完成。':busy?'備份進度 '+done+'/'+batch.items.length+'；完成的項目會保留。':failed?'已完成 '+done+'/'+batch.items.length+'；可單項重試或按「重試未完成項目」。':'尚未取得全部分類的完成確認。');
  const btn=$('p79AllBackupButton');if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
-async function start(){
+async function start(onlyId=null){
  if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
  try{
   const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');
   const yard=await yardSnapshot(c.actor),fingerprint=await digest(new TextEncoder().encode(JSON.stringify(yard))),originals=(await records()).filter(r=>r.actor===c.actor&&!r.receipt);
   if(!same(c))throw Error('登入身分已變更，已停止備份');
-  if(!batch||batch.actor!==c.actor||batch.endpoint!==c.endpoint||batch.fingerprint!==fingerprint)batch={actor:c.actor,endpoint:c.endpoint,fingerprint,items:[...originals.map(r=>({type:'yardFile',label:'儲量Excel原檔：'+r.name,id:g.crypto.randomUUID(),original:r})),...TYPES.map(([type,label])=>({type,label,id:g.crypto.randomUUID()}))]};
-  for(const item of batch.items){if(item.result)continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
+  if(!batch||batch.actor!==c.actor||batch.endpoint!==c.endpoint||batch.fingerprint!==fingerprint){
+   if(onlyId)throw Error('備份資料來源已變更，請使用「備份資料庫」重新核對清單');
+   batch={actor:c.actor,endpoint:c.endpoint,fingerprint,items:[...originals.map(r=>({type:'yardFile',label:'儲量Excel原檔：'+r.name,id:g.crypto.randomUUID(),original:r})),...TYPES.map(([type,label])=>({type,label,id:g.crypto.randomUUID()}))]};
+  }
+  if(onlyId&&!batch.items.some(item=>item.id===onlyId&&!item.result))throw Error('此分類不在待重試清單，請重新執行備份');
+  for(const item of batch.items){if(item.result||(onlyId&&item.id!==onlyId))continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
    try{const payload={type:item.type,requestId:item.id};if(item.type==='yard')payload.yard=yard;if(item.original)payload.original={name:item.original.name,hash:item.original.hash,base64:base64(item.original.bytes)};
     const result=await request(c,payload,false);if(result.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
     if(item.original){item.original.receipt={backupId:result.backupId,backupUrl:result.backupUrl};await put(item.original);}
@@ -64,7 +91,7 @@ function refresh(){
  if(isManager&&!canRun)message('這裡是全系統歷史備份入口；僅最高管理員可以操作。請以最高管理員身分登入後執行。');
  if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
-function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',start);refresh();}
+function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());refresh();}
 g.Port79AllBackup={start,refresh,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
