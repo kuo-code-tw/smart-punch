@@ -296,7 +296,7 @@ function ensureBar(){
  const header=document.getElementById('p79SevenTop');if(header)header.after(bar);else document.body.prepend(bar);return bar;
 }
 function scheduleReadIdleResume(){
- if(stopped||suspended||!pendingState?.pending.length||document.visibilityState!=='visible'||context.isReadBusy?.()!==true)return;
+ if(stopped||suspended||!pendingState?.pending.length||pendingState.generation===lastFailedGeneration||document.visibilityState!=='visible'||context.isReadBusy?.()!==true)return;
  clearTimeout(timer);timer=setTimeout(()=>{timer=null;if(stopped||suspended||document.visibilityState!=='visible')return;if(context.isReadBusy?.()===true)scheduleReadIdleResume();else resume();},1000);
 }
 function notify(state){
@@ -337,7 +337,7 @@ function boot(){
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:topics=>context.readFresh(readFresh,topics)});
  const backend=new URL(context.gas(),location.href);
- binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!manualOnly&&!editing()});
+ binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!manualOnly&&!editing()&&binding?.engine.status().generation!==lastFailedGeneration});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.8';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
 const resume=(event)=>{if(stopped||suspended)return;
