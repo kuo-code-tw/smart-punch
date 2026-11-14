@@ -70,7 +70,27 @@ function render(){
   list.append(li);
  }
  const done=batch.items.filter(i=>i.result).length;
- const failed=batch.items.some(i=>i.error);
+ const failedItems=batch.items.filter(i=>i.error);
+ const failed=failedItems.length>0;
+ // Keep a compact, readable failure reason in the UI; a red light alone is not diagnostic.
+ const feedback=$('p79AllBackupFeedback');
+ let errors=$('p79AllBackupErrors');
+ if(!errors&&feedback){
+  errors=d.createElement('details');errors.id='p79AllBackupErrors';
+  errors.append(d.createElement('summary'),d.createElement('ul'));
+  feedback.append(errors);
+ }
+ if(errors){
+  errors.hidden=!failed;
+  if(failed){
+   const causes=new Map();
+   for(const item of failedItems)causes.set(item.error,(causes.get(item.error)||0)+1);
+   const [reason,count]=[...causes.entries()].sort((a,b)=>b[1]-a[1])[0];
+   errors.querySelector('summary').textContent='備份失敗 '+failedItems.length+' 項：'+String(reason||'原因未明').slice(0,130)+(count===failedItems.length?'':'（'+count+' 項相同；點此查看全部）');
+   const list=errors.querySelector('ul');list.replaceChildren();
+   for(const item of failedItems){const li=d.createElement('li');li.textContent=item.label+'：'+item.error;list.append(li);}
+  }
+ }
  const progress=$('p79AllBackupProgress');
  if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
  message(done===batch.items.length?'完成 '+done+'/'+batch.items.length:busy?'備份 '+done+'/'+batch.items.length:failed?'完成 '+done+'/'+batch.items.length+' · 可重試':'待核對 '+done+'/'+batch.items.length);
