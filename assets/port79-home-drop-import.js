@@ -197,7 +197,7 @@ function start(kind,list){
    });
   }catch(error){if(id===sequence)finish('匯入頁面載入失敗：'+String(error?.message||error),'error');}
  };
- frame.src=specs[kind].url+'&homeDropVersion=20261114-v1';
+ frame.src=specs[kind].url+'&homeDropVersion=20261114-unified-review-v4';
 }
 root.querySelectorAll('[data-p79-drop-kind]').forEach(function(zone){
  var kind=zone.dataset.p79DropKind;
