@@ -12,16 +12,29 @@
 .p79-home-drop-zone strong{font-size:13px;font-weight:800;color:#183d60;white-space:nowrap}
 .p79-home-drop-zone small{display:none}
 .p79-home-drop-zone input{display:none!important}
-#p79HomeImportDialog{width:min(1140px,calc(100vw - 24px));height:min(88vh,940px);max-width:1140px;max-height:940px;padding:0;border:0;border-radius:16px;background:#fff;color:#183c5b;box-shadow:0 20px 75px #101f3d55}
+#p79HomeImportDialog{width:min(580px,calc(100vw - 24px));height:auto;max-width:580px;max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:16px;background:#fff;color:#183c5b;box-shadow:0 20px 75px #101f3d55;overflow:hidden}
 #p79HomeImportDialog::backdrop{background:rgba(10,28,51,.56)}
 #p79HomeImportDialog[open]{display:flex;flex-direction:column}
-#p79HomeImportDialog .p79-import-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;background:#edf5ff;border-bottom:1px solid #d5e5f5;flex:none}
+#p79HomeImportDialog .p79-import-modal-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;background:#edf5ff;border-bottom:1px solid #d5e5f5;flex:none}
 #p79HomeImportTitle{margin:0;font-size:17px;font-weight:850}
 #p79HomeImportClose{min-width:62px;min-height:36px;border-radius:8px;background:#fff;border:1px solid #bfd3e6;color:#244b70;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-#p79HomeImportStatus{margin:0;padding:11px 17px;border-bottom:1px solid #e1eaf5;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;flex:none}
+#p79HomeImportStatus{position:relative;z-index:1;margin:0;padding:17px 20px 20px;border:0;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;flex:none;background:#fff;min-height:60px}
 #p79HomeImportStatus[data-tone=error]{color:#b42332;background:#fff4f1}
 #p79HomeImportStatus[data-tone=success]{color:#146c45;background:#edfcf3}
-#p79HomeImportFrame{display:block;min-height:0;flex:1 1 auto;width:100%;height:70vh;border:0;background:#f7fbff}
-@media(max-width:700px){#p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}#p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}#p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#p79HomeImportDialog{height:94vh;width:calc(100vw - 10px)}.p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}.p79-home-drop-zone strong{font-size:11px}.p79-home-drop-zone .p79-drop-icon{font-size:15px}}
+/* The authenticated original importer must stay alive for Excel parsing,
+   cloud preflight, and its native confirmation dialog. Do not display
+   the entire administration SPA as a second page inside this dialog. */
+#p79HomeImportFrame{
+ display:block;position:absolute;inset:0;z-index:0;
+ width:100%;height:100%;min-height:0;max-height:none;flex:none;
+ border:0;background:transparent;opacity:0;pointer-events:none;
+}
+#p79HomeImportStatus[data-tone=info]::before{
+ content:'◌';display:inline-block;color:#2563eb;font-weight:900;margin-right:7px;
+ animation:p79HomeImportSpin .9s linear infinite;
+}
+@keyframes p79HomeImportSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#p79HomeImportStatus[data-tone=info]::before{animation:none}}
+@media(max-width:700px){#p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}#p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}#p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#p79HomeImportDialog{height:auto;width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}.p79-home-drop-zone strong{font-size:11px}.p79-home-drop-zone .p79-drop-icon{font-size:15px}}
 html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
 html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
