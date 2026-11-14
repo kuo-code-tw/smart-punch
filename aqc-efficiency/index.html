@@ -12027,6 +12027,29 @@ function applyResolvedWorkingNo(summary, imported, resolved){
   });
 }
 
+async function p79HomeConfirmExcelImport(messageText){
+ // Embed-only: require explicit approval from the same-origin homepage dialog.
+ // Normal vessel management keeps its existing native confirmation.
+ if(window.parent!==window&&new URLSearchParams(location.search).get('homeImport')==='1'){
+  try{
+   if(typeof window.parent.Port79HomeDropImport?.confirmImport!=='function')
+    throw Error('共用匯入確認視窗未就緒');
+   return await window.parent.Port79HomeDropImport.confirmImport(messageText,window);
+  }catch(error){
+   console.warn('首頁船舶匯入確認失敗，安全取消匯入',error);
+   return false;
+  }
+ }
+ return confirm(messageText);
+}
+function p79HomeExcelImportWarning(messageText){
+ if(window.parent!==window&&new URLSearchParams(location.search).get('homeImport')==='1'){
+  try{
+   if(window.parent.Port79HomeDropImport?.reportImportIssue?.(messageText,window))return;
+  }catch(error){console.warn('首頁匯入錯誤訊息回報失敗',error);}
+ }
+ alert(messageText);
+}
 async function importExcel(file) {
   await window.p79EnsureXlsx();if(!requireSuperAdminAccess())return;
  if(!file)return;
@@ -12078,7 +12101,7 @@ async function importExcel(file) {
       console.error('Bundle 完整性檢查失敗',bundleAudit);
       const reason='Bundle 核對不一致：'+bundleAudit.errors.join('；');
       lastExcelImportResult={ok:false,file:String(file?.name||''),reason,records:imported.length,workingNo:String(summary?.workingNo||'')};
-      alert(
+      p79HomeExcelImportWarning(
         '匯入停止：Bundle 核對不一致\n\n'+
         bundleAudit.errors.join('\n')+
         '\n\n系統沒有寫入這份錯誤資料。'
@@ -12117,7 +12140,7 @@ async function importExcel(file) {
       `AQC：${summary.aqcs.length} 台｜人員作業明細：${imported.length} 筆\n\n`+
       `確定匯入？`;
     setExcelImportStage('等待確認匯入',62);
-    if(!confirm(msg)){
+    if(!(await p79HomeConfirmExcelImport(msg))){
       lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'使用者取消匯入',records:imported.length,workingNo:String(summary?.workingNo||'')};
       return;
     }
@@ -12346,7 +12369,7 @@ async function importExcel(file) {
     setExcelImportStage('解析 GC司機效率明細',45);
     imported=parseGcDriverEfficiencyWorkbook(book,workDate,vesselLabel);
     if(!imported.length){lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'沒有讀到 AQC 人員明細',records:0,workingNo:''};return toast('沒有讀到可匯入的 AQC 人員明細，請確認人資主檔的部門/單位含 AQC');}
-    if(!confirm(`讀到 ${imported.length} 筆船舶效率明細，確定匯入？`))return;
+    if(!(await p79HomeConfirmExcelImport(`讀到 ${imported.length} 筆船舶效率明細，確定匯入？`)))return;
     records.push(...imported);
     lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'GC司機效率明細已解析',records:imported.length,workingNo:''};
     [...new Set(imported.map(r=>r.name))].forEach(name=>{
@@ -12373,7 +12396,7 @@ async function importExcel(file) {
     book.SheetNames.forEach(sn=>{if(['GC-個人效率表','AQC-個人效率表','AQC效率櫃數'].includes(sn))return;const rows=XLSX.utils.sheet_to_json(book.Sheets[sn],{header:1,raw:true,defval:''});rows.slice(5).forEach(row=>{if(!String(row[0]||'').trim())return;const dm=String(row[2]||'').match(/(\d{1,2})[\/-](\d{1,2})/);if(!dm)return;imported.push({id:uid('IMP'),empId:`NAME:${sn}`,name:sn,groupId:'',number:String(row[0]||''),vessel:String(row[1]||''),workDate:`${year}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`,shift:String(row[3]||''),startTime:gcExcelTime(row[4]),endTime:gcExcelTime(row[5]),deduct1:num(row[6]),deduct2:num(row[7]),deduct3:num(row[8]),deduct4:num(row[9]),containers:num(row[10]),hatches:num(row[11]),note:String(row[17]||''),source:'excel-import'})})});
   }
   if(!imported.length){lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'沒有讀到可匯入的效率明細',records:0,workingNo:''};return toast('沒有讀到可匯入的效率明細');}
-  if(!confirm(`讀到 ${imported.length} 筆作業紀錄，確定匯入？`))return;
+  if(!(await p79HomeConfirmExcelImport(`讀到 ${imported.length} 筆作業紀錄，確定匯入？`)))return;
   records.push(...imported);lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'效率明細已解析',records:imported.length,workingNo:''};
   setExcelImportStage('寫入本機資料',75);
   saveLocal();toast(`已匯入 ${imported.length} 筆`);
