@@ -39,3 +39,54 @@
 @media(max-width:700px){#p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}#p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}#p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#p79HomeImportDialog{height:auto;width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}.p79-home-drop-zone strong{font-size:11px}.p79-home-drop-zone .p79-drop-icon{font-size:15px}}
 html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
 html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
+
+/* Unified three-way homepage import detail and explicit review UI - 2026-11-14 */
+#p79HomeImportFile{
+ position:relative;z-index:1;margin:0;padding:13px 18px 5px;
+ font-size:13px;font-weight:750;color:#274361;
+ white-space:normal;overflow-wrap:anywhere;background:#fff;
+}
+#p79HomeImportFile:empty{display:none}
+#p79HomeImportProgress{
+ position:relative;z-index:1;box-sizing:border-box;margin:8px 18px 0;
+ height:6px;overflow:hidden;border-radius:999px;background:#e5edf6;
+}
+#p79HomeImportProgressBar{
+ display:block;height:100%;width:38%;border-radius:999px;
+ background:linear-gradient(90deg,#bfdbfe,#2563eb,#bfdbfe);
+ background-size:200% 100%;animation:p79HomeImportProgress 1.3s linear infinite;
+ transition:width .25s ease;
+}
+#p79HomeImportProgress[data-tone=success] #p79HomeImportProgressBar{background:#16a34a;animation:none}
+#p79HomeImportProgress[data-tone=error] #p79HomeImportProgressBar{background:#dc2626;animation:none;min-width:2px}
+#p79HomeImportProgress[data-tone=pending] #p79HomeImportProgressBar{background:#d97706;animation:none}
+@keyframes p79HomeImportProgress{to{background-position:-200% 0}}
+#p79HomeImportReview{
+ position:relative;z-index:1;box-sizing:border-box;margin:0 16px 18px;padding:12px;
+ background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;
+ color:#1e3a5f;
+}
+#p79HomeImportReview[hidden]{display:none!important}
+#p79HomeImportReviewTitle{display:block;font-weight:850;font-size:13px;margin:0 0 7px}
+#p79HomeImportReviewText{
+ display:block;box-sizing:border-box;max-height:min(32vh,245px);overflow:auto;
+ margin:0;padding:10px;background:white;border:1px solid #dbe6f3;border-radius:7px;
+ white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 system-ui,sans-serif;color:#334155;
+}
+#p79HomeImportReview .p79-home-import-review-buttons{
+ display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:11px;
+}
+#p79HomeImportReview .p79-home-import-review-buttons button{
+ min-width:94px;min-height:34px;padding:7px 13px;font-size:12px;font-weight:750;line-height:1.2;
+ font-family:inherit;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;
+ background:white;color:#334155;
+}
+#p79HomeImportReviewYes{background:#126db8!important;color:#fff!important;border-color:#126db8!important}
+#p79HomeImportReview .p79-home-import-review-buttons button:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+@media(max-width:700px){
+ #p79HomeImportFile{padding:10px 12px 4px;font-size:12px}
+ #p79HomeImportProgress{margin:7px 12px 0}
+ #p79HomeImportReview{margin:0 10px 12px;padding:9px}
+ #p79HomeImportReviewText{max-height:30vh}
+}
+@media(prefers-reduced-motion:reduce){#p79HomeImportProgressBar{animation:none}}
