@@ -16,7 +16,7 @@ const d=document,home=!d.body.dataset.p79System;
 const paths={attendance:'attendance/',schedule:'schedule/',leave:'leave/',hr:'hr/',workhours:'work-hours/',efficiency:'aqc-efficiency/',history:'history-data/'};
 const meta={home:['首頁','整合人力、考勤、排班與船舶作業，讓每一天的管理更順暢。'],attendance:['考勤管理','查詢出勤紀錄、核對異常與補卡，掌握每日出勤狀況。'],schedule:['排班管理','依月份、單位與組別查看班表，安排班別與人力。'],leave:['請假管理','請假申請、審核與可休天數，集中管理。'],hr:['人資管理','維護員工主檔、組織資料與系統權限。'],workhours:['工時與加班管理','查詢出勤統計、核對申報加班與月結工時。'],efficiency:['碼頭系統管理','船舶作業明細、人員效率與月報輸出，集中查詢。'],history:['歷史資料庫','依月份查詢考勤、排班與船舶歷史資料。']};
 const order=['attendance','schedule','efficiency','hr','workhours','leave','history'];
-const icons={home:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',attendance:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',schedule:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/>',leave:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5"/>',hr:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>',workhours:'<path d="M4 20V11h3v9m4 0V5h3v15m4 0V2h3v18"/>',efficiency:'<path d="m3 13 9-3 9 3-3 6H6zm4-2V6h10v5M10 6V3h4v3M2 22q3-3 5 0 3-3 5 0 3-3 5 0 3-3 5 0"/>',history:'<path d="M3 5h18v5H3zm2 5v11h14V10m-10 4h6"/>',search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>',arrow:'<path d="m9 5 7 7-7 7"/>'};
+const icons={home:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',attendance:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',schedule:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/>',leave:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5"/>',hr:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>',workhours:'<path d="M4 20V11h3v9m4 0V5h3v15m4 0V2h3v18"/>',efficiency:'<path d="m3 13 9-3 9 3-3 6H6zm4-2V6h10v5M10 6V3h4v3M2 22q3-3 5 0 3-3 5 0 3-3 5 0 3-3 5 0"/>',history:'<path d="M3 5h18v5H3zm2 5v11h14V10m-10 4h6"/>',backup:'<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M8 2h8m-7 11 3 3 4-6"/>',search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>',arrow:'<path d="m9 5 7 7-7 7"/>'};
 const icon=k=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[k]||icons.leave)+'</svg>';
 const logo='<svg class="p79-port-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="27" r="24" fill="#dcefff"/><path d="M8 31 32 21l24 10-10 14H18z" fill="#1689ef"/><path d="M24 23V12h16v11M30 12V5" fill="none" stroke="#fff" stroke-width="5"/><path d="M2 49q12-9 28 0t32-2M5 57q12-7 27 0t27-2" fill="none" stroke="#197be1" stroke-width="4"/></svg>';
 let shell,bar,frame=0,navObserver,homePermissionSignature="";
@@ -51,6 +51,7 @@ function decorateNav(){
  const links=[...nav.querySelectorAll('a')];
  const rank=a=>{
   if(a.dataset.p79WorkspaceHome)return -1;
+  if(a.dataset.p79BackupNav==='1')return order.length;
   const key=order.find(k=>(a.getAttribute('href')||'').includes(paths[k]));
   return key?order.indexOf(key):order.length;
  };
@@ -62,6 +63,7 @@ function decorateNav(){
   a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
   a.dataset.p79Decorated='1';
  });
+ appendBackupNav(nav);
 }
 function homeNavAllowed(key,source){
  const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
@@ -69,6 +71,31 @@ function homeNavAllowed(key,source){
  if(role==='superadmin'&&!s.punchOnly)return true;
  if(role==='employee'||s.punchOnly)return false;
  return ['view','manage'].includes(String(s.systemPermissions?.[key]||'').toLowerCase());
+}
+function openBackupFromSidebar(event){
+ if(!home)return; // Other management pages navigate back to the homepage backup panel.
+ event.preventDefault();
+ window.Port79AllBackup?.refresh?.();
+ const panel=d.getElementById('p79AllBackupPanel');
+ if(!panel||panel.hidden)return;
+ try{history.replaceState(history.state,'',location.pathname+location.search+'#p79AllBackupPanel');}catch(_){}
+ panel.scrollIntoView({behavior:'smooth',block:'start'});
+ panel.setAttribute('tabindex','-1');
+ try{panel.focus({preventScroll:true});}catch(_){}
+}
+function appendBackupNav(nav){
+ if(!nav||nav.querySelector('[data-p79-backup-nav="1"]'))return;
+ const s=account(),role=String(s.adminRole||s.role||'').toLowerCase();
+ if(s.punchOnly||!['admin','superadmin'].includes(role))return;
+ const link=d.createElement('a');
+ link.href=homeTarget()+'#p79AllBackupPanel';
+ link.dataset.p79BackupNav='1';
+ link.dataset.p79Decorated='1';
+ link.setAttribute('aria-label','系統備份');
+ link.innerHTML=icon('backup')+'<span>系統備份</span><span class="p79-nav-arrow">›</span>';
+ if(home)link.addEventListener('click',openBackupFromSidebar);
+ const historyEntry=[...nav.querySelectorAll('a')].find(a=>(a.getAttribute('href')||'').includes(paths.history));
+ if(historyEntry)historyEntry.after(link);else nav.append(link);
 }
 function buildHomeNav(){
  const nav=d.createElement('nav');nav.id='p79SevenNav';nav.setAttribute('aria-label','系統模組');
@@ -87,6 +114,7 @@ function buildHomeNav(){
   });
   nav.append(a);
  });
+ appendBackupNav(nav);
  return nav;
 }
 function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.createElement('aside'):d.getElementById('p79SevenTop');if(!shell)return false;
