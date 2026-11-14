@@ -1358,7 +1358,7 @@
    async function refreshOfficialLeaveCandidates(){
     const date=String(dateInput.value||''),epoch=++leaveCandidateEpoch;
     const source=el.querySelector('#p79OtLeaveSource');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
      if(source)source.textContent='先選擇加班日期，再核對該日的請假人員。';
      if(!prefill.leaveHandoffId&&!editingOriginal)forSelect.innerHTML='<option value="">請先選擇日期</option>';
      return;
@@ -1426,7 +1426,7 @@
      return;
     }
     const date=String(dateInput.value||''),empId=String(empSelect.value||'');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!empId){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId){
      rosterHint.textContent='選擇人員及日期後，自動核對正式班別；排班不等於加班時數。';
      return;
     }
