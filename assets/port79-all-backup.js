@@ -110,6 +110,39 @@ function render(){
  const btn=$('p79AllBackupButton');
  if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
+// Sidebar navigation is a view action, not a request to create backup files.
+// Display all 13 cards immediately as pending; real red/green receipts are only
+// provided by the authenticated backup operation.
+function show(){
+ const panel=$('p79AllBackupPanel'),feedback=$('p79AllBackupFeedback');
+ refresh();
+ if(!panel||panel.hidden||!feedback)return false;
+ feedback.hidden=false;
+ const list=$('p79AllBackupResults');
+ if(batch){render();}
+ else if(list&&!list.children.length){
+  const fresh=d.createDocumentFragment();
+  for(const [type,label] of TYPES){
+   const item=d.createElement('li');
+   item.className='p79-backup-light p79-backup-pending';
+   item.title=label+'：尚未執行備份';
+   const control=d.createElement('span');
+   control.className='p79-backup-light-control';
+   control.setAttribute('aria-label',label+'：尚未執行備份');
+   const lamp=d.createElement('span');
+   lamp.className='p79-backup-lamp';
+   lamp.setAttribute('aria-hidden','true');
+   const name=d.createElement('span');
+   name.className='p79-backup-light-label';name.textContent=label;
+   control.append(lamp,name);item.append(control);fresh.append(item);
+  }
+  list.replaceChildren(fresh);
+  const progress=$('p79AllBackupProgress');
+  if(progress){progress.value=0;progress.max=TYPES.length;progress.hidden=false;}
+  message('尚未開始備份 · 0/'+TYPES.length+'（灰燈為待備份）');
+ }
+ return true;
+}
 async function start(onlyId=null){
  if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
  try{
@@ -141,6 +174,6 @@ function refresh(){
  if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
 function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());refresh();}
-g.Port79AllBackup={start,refresh,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
+g.Port79AllBackup={start,refresh,show,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
