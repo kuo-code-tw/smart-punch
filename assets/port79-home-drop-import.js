@@ -10,6 +10,10 @@ var root=d.getElementById('p79HomeDropImport');
 var dialog=d.getElementById('p79HomeImportDialog');
 if(!root||!dialog)return;
 var frame=d.getElementById('p79HomeImportFrame');
+// Keep the same-origin importer running, but never expose its whole application
+// as a nested management page. The parent dialog only shows safe status text.
+frame?.setAttribute('aria-hidden','true');
+if(frame)frame.tabIndex=-1;
 var label=d.getElementById('p79HomeImportTitle');
 var status=d.getElementById('p79HomeImportStatus');
 var close=d.getElementById('p79HomeImportClose');
@@ -99,8 +103,12 @@ async function deliver(kind,files,id){
   if(typeof child.P79VesselHomeImport?.importFiles!=='function')throw Error('船舶匯入服務沒有正常載入');
   var result=await child.P79VesselHomeImport.importFiles(files);
   if(id!==sequence)return;
-  var summary='已處理 '+Number(result?.processed||0)+' 個檔案，完成解析 '+Number(result?.success||0)+' 個，失敗 '+Number(result?.failed||0)+' 個。雲端同步狀態請核對下方船舶匯入畫面。';
-  finish(summary,result?.failed?'error':'success');
+  var processed=Number(result?.processed||0),parsed=Number(result?.success||0),failed=Number(result?.failed||0);
+  var summary='已處理 '+processed+' 個檔案｜完成解析 '+parsed+' 個｜未完成 '+failed+' 個。';
+  var cloud=String(result?.cloudStatus||'').trim();
+  if(cloud)summary+=' 船舶系統雲端狀態：'+cloud+'。';
+  summary+=' 完成解析不等於雲端已儲存，請到碼頭系統管理核對正式資料。';
+  finish(summary,failed||!processed||parsed!==processed?'error':'pending');
  }
 }
 function start(kind,list){
@@ -119,6 +127,9 @@ function start(kind,list){
  label.textContent=specs[kind].name+' · 匯入';
  notify('已接收 '+files.length+' 個檔案，正在啟動原系統核對流程…');
  if(!dialog.open)dialog.showModal();
+ // The iframe is intentionally alive but visually transparent and non-interactive.
+ // Do not use display:none: the original Excel importer may need its DOM and
+ // native import-confirmation prompts to complete normally.
  frame.hidden=false;
  frame.onload=function(){
   if(id!==sequence)return;
