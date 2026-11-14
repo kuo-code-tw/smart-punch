@@ -17,6 +17,14 @@ if(frame)frame.tabIndex=-1;
 var label=d.getElementById('p79HomeImportTitle');
 var status=d.getElementById('p79HomeImportStatus');
 var close=d.getElementById('p79HomeImportClose');
+var fileLabel=d.getElementById('p79HomeImportFile');
+var progress=d.getElementById('p79HomeImportProgress');
+var progressBar=d.getElementById('p79HomeImportProgressBar');
+var review=d.getElementById('p79HomeImportReview');
+var reviewText=d.getElementById('p79HomeImportReviewText');
+var reviewYes=d.getElementById('p79HomeImportReviewYes');
+var reviewNo=d.getElementById('p79HomeImportReviewNo');
+var resolveReview=null;
 var specs={
  gate:{name:'Gate 進出站',url:'./gate-import/?embed=1&homeImport=1',ext:/\.(xlsx|xls|csv)$/i,maxFiles:1,maxBytes:10*1024*1024},
  yard:{name:'Yard 儲量',url:'./yard-dashboard/?embed=1&homeImport=1',ext:/\.(xlsx|xls)$/i,maxFiles:1,maxBytes:12*1024*1024},
@@ -36,14 +44,53 @@ function canUse(){
  return !!s&&!s.punchOnly&&role==='superadmin'&&!!token;
 }
 function refresh(){root.hidden=!canUse();}
+function setProgress(tone,pct){
+ if(!progress)return;
+ const state=tone||'info';
+ progress.dataset.tone=state;
+ progress.setAttribute('aria-valuetext',state==='success'?'已完成':state==='error'?'匯入未完成':state==='pending'?'等待雲端核對':'匯入核對中');
+ if(progressBar){
+  const n=Number(pct);
+  progressBar.style.width=Number.isFinite(n)&&n>=0?Math.max(0,Math.min(100,n))+'%':'38%';
+ }
+}
 function notify(value,tone){
  status.textContent=String(value||'');
  status.dataset.tone=tone||'info';
+ if(tone!=='info')setProgress(tone,tone==='error'?0:100);
 }
 function finish(value,tone){
  working=false;
  notify(value,tone);
 }
+function settleReview(accepted){
+ const resolve=resolveReview;
+ if(!resolve)return;
+ resolveReview=null;
+ if(review)review.hidden=true;
+ resolve(accepted===true);
+}
+function confirmImport(message,requester){
+ // This is an explicit human approval. Another tab or untrusted frame
+ // cannot approve or take over the active upload confirmation.
+ if(!working||!dialog.open||requester!==frame.contentWindow||resolveReview)
+  return Promise.resolve(false);
+ if(!review||!reviewText||!reviewYes||!reviewNo)return Promise.resolve(false);
+ reviewText.textContent=String(message||'');
+ review.hidden=false;
+ notify('請核對下方內容，再決定是否匯入。','pending');
+ return new Promise(resolve=>{
+  resolveReview=resolve;
+  reviewYes.focus();
+ });
+}
+function reportImportIssue(message,requester){
+ if(requester!==frame.contentWindow||!working)return false;
+ notify(String(message||'匯入核對未通過'),'error');
+ return true;
+}
+reviewYes?.addEventListener('click',()=>{settleReview(true);if(working)notify('已確認，正在繼續匯入與核對…','info');});
+reviewNo?.addEventListener('click',()=>{settleReview(false);if(working)notify('已取消這次確認，原資料保留。','pending');});
 function guardFiles(kind,fileList){
  var spec=specs[kind];
  if(!spec)throw Error('未知匯入類型');
@@ -118,11 +165,16 @@ function start(kind,list){
  try{files=guardFiles(kind,list);}catch(e){
   var spec=specs[kind];label.textContent=spec?.name||'匯入資料';
   if(!dialog.open)dialog.showModal();
+  if(fileLabel)fileLabel.textContent=Array.from(list||[]).map(f=>f?.name||'').join('、');
   notify(String(e.message||e),'error');
   return;
  }
  active=kind;working=true;
  var id=++sequence;
+ if(resolveReview)settleReview(false);
+ if(review)review.hidden=true;
+ if(fileLabel)fileLabel.textContent=files.map(f=>f.name).join('、');
+ setProgress('info');
  if(watcher){watcher.disconnect();watcher=null;}
  label.textContent=specs[kind].name+' · 匯入';
  notify('已接收 '+files.length+' 個檔案，正在啟動原系統核對流程…');
@@ -184,13 +236,18 @@ w.addEventListener('message',function(event){
  }
 });
 function dismiss(){
- if(working&& !w.confirm('這次匯入可能仍在進行，關閉視窗不一定會停止雲端操作。確定關閉？'))return;
+ if(resolveReview){
+  settleReview(false);
+  notify('已取消匯入確認，原資料保留。','pending');
+  return;
+ }
+ if(working&&!w.confirm('匯入可能仍在進行。關閉視窗不一定會停止正在執行的雲端操作，確定關閉？'))return;
  dialog.close();
 }
 close.addEventListener('click',dismiss);
 dialog.addEventListener('cancel',function(event){
  if(working){event.preventDefault();dismiss();}
 });
-w.Port79HomeDropImport={refresh:refresh,canUse:canUse};
+w.Port79HomeDropImport={refresh:refresh,canUse:canUse,confirmImport:confirmImport,reportImportIssue:reportImportIssue};
 refresh();
 })(window);
