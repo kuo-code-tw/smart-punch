@@ -11851,12 +11851,17 @@ async function importExcelFiles(fileList){
 
 // Homepage drop zone calls the ORIGINAL importer in this authenticated frame.
 // Success counts are parser results, not a claim that cloud read-back succeeded.
+let p79VesselHomeImportInitialized=false;
 window.P79VesselHomeImport={
  importFiles:async function(files){
   if(!Array.isArray(files)&&!(files&&typeof files.length==='number'))
     throw Error('沒有可匯入的船舶 Excel');
-  if(!p79EfficiencyAuthReady||!canManageEfficiency())
-    throw Error('船舶系統尚未完成最高管理員身分核對，未執行匯入');
+  // The embedded page must finish SSO and local initialization before any
+  // cloud read. The full vessel cloud read is then performed explicitly.
+  for(let step=0;step<120&&!p79VesselHomeImportInitialized;step++)
+   await new Promise(resolve=>setTimeout(resolve,250));
+  if(!p79VesselHomeImportInitialized||!p79EfficiencyAuthReady||!canManageEfficiency())
+   throw Error('船舶系統尚未完成最高管理員身分核對，未執行匯入');
   // The ordinary vessel page hydrates cloud data asynchronously after the
   // iframe load event. Do not import into an incomplete master list.
   for(let step=0;step<120&&port79ShipAutoSyncBusy;step++)
@@ -15469,6 +15474,14 @@ async function initGcPage(){
   restorePersonalAuditCache(true);
   restoreDualAuditWorkingCache();
   renderEfficiencyTabFast('dashboard');
+
+  // Homepage embedded importer waits for an explicit full cloud-read preflight.
+  // Do not start ordinary page's background auto-sync concurrently with its upload.
+  if(new URLSearchParams(location.search).get('homeImport')==='1'){
+    p79VesselHomeImportInitialized=true;
+    cloudStatus('首頁匯入：待核對正式雲端船舶資料',false);
+    return;
+  }
 
   // 啟動後立即從 GAS 找回完整船舶主檔 / 作業明細。
   // 不論本機 localStorage 是否因換版本、換路徑而空掉，都能自動恢復。
