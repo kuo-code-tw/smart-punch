@@ -1232,6 +1232,10 @@
    const roles=[...new Set(sortedPeople.map(roleOf))].sort((a,b)=>stroke.compare(a,b));
    roleSelect.innerHTML='<option value="">全部職稱</option>'+roles.map(role=>'<option value="'+esc(role)+'">'+esc(role)+'</option>').join('');
    forSelect.innerHTML='<option value="">正式請假名單核對中…</option>';
+   if(prefill.forEmpId){
+    const linked=sorted().find(person=>String(person.empId).trim().toUpperCase()===String(prefill.forEmpId).trim().toUpperCase());
+    if(linked){forSelect.innerHTML+='<option value="'+esc(linked.empId)+'">'+esc(linked.name+'（'+linked.empId+'）｜原申報關聯待核對')+'</option>';forSelect.value=linked.empId;}
+   }
    el.querySelector('.p79-report-grid').insertAdjacentHTML('afterend','<p id="p79OtLeaveSource" role="status" style="margin:5px 0;font-size:12px;color:#475569">核對當日已核准請假人員中…</p>');
    function refreshPairPeople(){
     const rule=selectedRow(),target=people.find(e=>String(e.empId)===String(forSelect.value)),previous=empSelect.value;
@@ -1535,6 +1539,10 @@
      const originalLeaveDate=String(prefill.coverDate||dateInput.value);
      if(approvedDates.includes(originalLeaveDate))leaveDateSelect.value=originalLeaveDate;
      leaveDateSelect.disabled=true;
+     return;
+    }
+    if(approvedDates.includes(dateInput.value)){
+     leaveDateSelect.value=dateInput.value;
      return;
     }
     if(approvedDates.length===1){
