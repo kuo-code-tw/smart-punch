@@ -18,7 +18,7 @@ var specs={
  yard:{name:'Yard 儲量',url:'./yard-dashboard/?embed=1&homeImport=1',ext:/\.(xlsx|xls)$/i,maxFiles:1,maxBytes:12*1024*1024},
  vessel:{name:'船舶作業',url:'./aqc-efficiency/?homeImport=1',ext:/\.(xlsx|xls)$/i,maxFiles:30,maxBytes:30*1024*1024}
 };
-var active='',working=false,sequence=0,watcher=null;
+var active='',working=false,sequence=0,dispatched=0,watcher=null;
 var $=id=>d.getElementById(id);
 function session(){
  try{return JSON.parse(w.sessionStorage.getItem('port79_user_session')||'null');}catch(e){return null;}
@@ -124,6 +124,10 @@ function start(kind,list){
   if(id!==sequence)return;
   try{
    if(frame.contentWindow?.location?.origin!==w.location.origin)return;
+   var part=kind==='gate'?'/gate-import/':kind==='yard'?'/yard-dashboard/':'/aqc-efficiency/';
+   if(!String(frame.contentWindow?.location?.pathname||'').includes(part))return;
+   if(dispatched===id)return;
+   dispatched=id;
    notify('正在核對 '+files.map(function(x){return x.name;}).join('、')+' …');
    Promise.resolve(deliver(kind,files,id)).catch(function(error){
     if(id===sequence)finish('匯入無法完成：'+String(error?.message||error),'error');
