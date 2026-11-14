@@ -57,7 +57,7 @@ function setProgress(tone,pct){
 function notify(value,tone){
  status.textContent=String(value||'');
  status.dataset.tone=tone||'info';
- if(tone!=='info')setProgress(tone,tone==='error'?0:100);
+ if(tone==='info')setProgress('info');else setProgress(tone,tone==='error'?0:tone==='pending'?62:100);
 }
 function finish(value,tone){
  working=false;
@@ -229,7 +229,16 @@ d.addEventListener('drop',function(event){
  if(!root.hidden&&Array.from(event.dataTransfer?.types||[]).includes('Files'))event.preventDefault();
 });
 w.addEventListener('message',function(event){
- if(event.origin!==w.location.origin||event.source!==frame.contentWindow||active!=='gate')return;
+ if(event.origin!==w.location.origin||event.source!==frame.contentWindow)return;
+ if(active==='vessel'&&working&&event.data?.type==='p79-vessel-import-progress'){
+  var pct=Number(event.data.pct);
+  var stage=String(event.data.stage||'核對中').slice(0,240);
+  var name=String(event.data.fileName||'').slice(0,140);
+  if(!review||review.hidden)notify((name&&name!=='—'?name+'｜':'')+stage,'info');
+  setProgress('info',Number.isFinite(pct)?pct:0);
+  return;
+ }
+ if(active!=='gate')return;
  if(event.data?.type==='p79-gate-data-updated'){
   finish('Gate 進出站資料已由正式雲端確認寫入。','success');
   try{w.P79GateStatsHome?.refresh?.();}catch(e){}
