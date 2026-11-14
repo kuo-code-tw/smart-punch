@@ -22,6 +22,8 @@
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261113-v117-one-button">
+<link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261114-v1">
+<script defer src="assets/port79-home-drop-import.js?v=20261114-v1"></script>
 <script defer src="assets/port79-all-backup.js?v=20261113-v117-one-button"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
@@ -654,6 +656,28 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
           <ul id="p79AllBackupResults" aria-label="備份結果"></ul>
         </div>
       </section>
+      <section id="p79HomeDropImport" hidden aria-label="首頁拖曳匯入">
+        <h2>拖曳匯入資料</h2>
+        <div id="p79HomeDropGrid">
+          <div class="p79-home-drop-zone" data-p79-drop-kind="gate" role="button" tabindex="0" aria-label="拖曳或選擇 Gate 進出站報表">
+            <span class="p79-drop-icon" aria-hidden="true">🚛</span><strong>Gate 進出站</strong><small>拖曳 Excel／CSV 或點此選檔</small>
+            <input type="file" accept=".xlsx,.xls,.csv" aria-label="Gate 匯入檔案">
+          </div>
+          <div class="p79-home-drop-zone" data-p79-drop-kind="yard" role="button" tabindex="0" aria-label="拖曳或選擇 Yard 儲量報表">
+            <span class="p79-drop-icon" aria-hidden="true">▥</span><strong>Yard 儲量</strong><small>拖曳 Excel 或點此選檔</small>
+            <input type="file" accept=".xlsx,.xls" aria-label="Yard 匯入檔案">
+          </div>
+          <div class="p79-home-drop-zone" data-p79-drop-kind="vessel" role="button" tabindex="0" aria-label="拖曳或選擇船舶作業報表，可多檔">
+            <span class="p79-drop-icon" aria-hidden="true">🚢</span><strong>船舶作業</strong><small>拖曳 Excel（可多檔）或點此選檔</small>
+            <input type="file" accept=".xlsx,.xls" multiple aria-label="船舶作業匯入檔案">
+          </div>
+        </div>
+      </section>
+      <dialog id="p79HomeImportDialog" aria-label="首頁資料匯入">
+        <div class="p79-import-modal-head"><h2 id="p79HomeImportTitle">資料匯入</h2><button id="p79HomeImportClose" type="button">關閉</button></div>
+        <p id="p79HomeImportStatus" role="status" aria-live="polite"></p>
+        <iframe id="p79HomeImportFrame" title="原系統匯入核對與儲存" referrerpolicy="same-origin" hidden></iframe>
+      </dialog>
       <div class="p79-modern-home-preserve"><span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班維持現行介面與流程</strong><small>本次只調整管理畫面外觀。登入、刷卡、權限、資料連結及雲端資料均保持原狀。</small></div></div>
       <div class="note">所有系統的人員資料與權限統一由「人資管理系統」維護；歷史月份集中由「歷史資料中心」查詢，避免平常切換系統重複下載大量舊資料。</div>
 
@@ -1239,6 +1263,7 @@ function clearSession(){
   // 登出後完整重置登入身分判斷狀態，避免第二次登入時密碼欄維持 disabled。
   currentSession=null;
   window.Port79AllBackup?.refresh();
+  window.Port79HomeDropImport?.refresh();
   loginBusy=false;
   passwordTouched=false;
 
@@ -1317,6 +1342,7 @@ function showSession(session){
   $('loginBox').style.display='none';
   $('systems').classList.add('show');
   window.Port79AllBackup?.refresh();
+  window.Port79HomeDropImport?.refresh();
 
   SYSTEM_KEYS.forEach(k=>{
     const btn=$('card'+k.charAt(0).toUpperCase()+k.slice(1));
