@@ -52,7 +52,7 @@ source.forEach((values,i)=>{matrix[i+1][2]=values[0];matrix[i+1][3]=values[1];ma
 matrix[14][0]='本日進站卡車數';matrix[14][2]=263;matrix[14][3]=981;
 const book={SheetNames:['KHHGate'],Sheets:{KHHGate:{}}};
 const win={document:doc,XLSX:{read:()=>book,utils:{sheet_to_json:()=>matrix}},sessionStorage:{getItem:()=>null},setTimeout(){}};
-el('gateFile').files=[{name:'gate.xlsx',size:1200,arrayBuffer:async()=>new ArrayBuffer(8)}];
+el('gateFile').files=[{name:'gate.xlsx',size:1200,arrayBuffer:async()=>Uint8Array.from([0x50,0x4b,0x03,0x04]).buffer}];
 vm.runInNewContext(importer,{window:win,URL});
 (async()=>{
  await el('gateFile').listeners.change();
