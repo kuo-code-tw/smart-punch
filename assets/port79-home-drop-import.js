@@ -180,7 +180,7 @@ async function loadOriginal(kind){
    }catch(err){finish(err)}
   };
   frame.onerror=()=>finish(Error('原系統載入失敗'));
-  frame.src=url+'&homeDropVersion=20261115-auto-dispatch-v1';
+  frame.src=url+'&homeDropVersion=20261115-confirmed-auto-close-v1';
  });
 }
 async function runKind(kind,files){
@@ -207,7 +207,8 @@ async function runKind(kind,files){
   const total=Number(result?.processed)||0,ok=Number(result?.success)||0,failed=Number(result?.failed)||0;
   if(!total||failed||ok!==total)
    throw Error(lastVesselError||('船舶原系統未完成：解析成功 '+ok+'/'+Math.max(total,files.length)+'；請核對檔案工作表與人員明細'));
-  return {message:'船舶｜原系統解析成功 '+ok+'/'+total+'；雲端寫入仍須由原系統核對',tone:'pending'};
+  if(result?.cloudConfirmed===true)return {message:'船舶｜雲端寫入與讀回確認成功 '+ok+'/'+total+' 份',tone:'success'};
+  return {message:'船舶｜解析 '+ok+'/'+total+' 份；'+String(result?.cloudIssue||'尚未取得雲端資料讀回確認')+'。請先核對後再處理',tone:'pending'};
  }
  throw Error('未知匯入目標');
 }
@@ -252,6 +253,13 @@ async function start(input){
   const summary=resultLog.map(r=>r.message).join('\n');
   display((failures.length?'匯入未全部完成：\n':uncertain?'已完成原系統處理：\n':'匯入完成：\n')+summary,
     failures.length?'error':uncertain?'pending':'success',100);
+  if(!failures.length&&!uncertain&&id===taskId){
+   if(typeof w.CustomEvent==='function'&&typeof w.dispatchEvent==='function'){
+    try{w.dispatchEvent(new w.CustomEvent('p79-home-import-complete',{detail:{kinds:resultLog.map(r=>r.kind)}}));}
+    catch(error){console.warn('匯入已成功，但首頁更新通知失敗',error);}
+   }
+   if(modal.open)modal.close();
+  }
  }catch(err){
   display('已停止：'+String(err?.message||err),'error',100);
  }finally{busy=false;settle(false);}

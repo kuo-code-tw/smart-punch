@@ -11631,7 +11631,7 @@ let excelDragDepth=0;
 let excelBatchImporting=false;
 let excelImportQueue=[];
 let excelCurrentImportKey='';
-let excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
+let excelQueueStats={success:0,failed:0,processed:0,totalQueued:0,importedJobs:[]};
 let lastExcelImportResult={ok:false,file:'',reason:'尚未匯入',records:0,workingNo:''};
 let excelLiveState={fileName:'',stage:'',current:0,total:0,waiting:0,pct:0,state:'idle'};
 let excelLiveHideTimer=null;
@@ -11801,7 +11801,7 @@ async function importExcelFiles(fileList){
   // v7.42：正在匯入時不再阻擋第二批檔案，改成加入等待佇列。
   // 實際寫入仍採單檔依序處理，避免 lastExcelImportResult / records / 雲端同步互相覆蓋。
   if(!excelBatchImporting){
-    excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
+    excelQueueStats={success:0,failed:0,processed:0,totalQueued:0,importedJobs:[]};
   }
   const q=queueExcelFiles(incoming);
   if(!q.added){
@@ -11830,6 +11830,13 @@ async function importExcelFiles(fileList){
         lastExcelImportResult={ok:false,file:file.name,reason:'尚未完成驗證',records:0,workingNo:''};
         await importExcel(file);
         if(lastExcelImportResult?.ok){
+          if(lastExcelImportResult.workingNo){
+           excelQueueStats.importedJobs.push({
+            workingNo:String(lastExcelImportResult.workingNo).trim(),
+            recordIds:Array.isArray(lastExcelImportResult.recordIds)?lastExcelImportResult.recordIds.slice():[],
+            recordCount:Number(lastExcelImportResult.records)||0
+           });
+          }
           excelQueueStats.success++;
           updateExcelImportLiveStatus({stage:`✅ 此檔完成${lastExcelImportResult?.workingNo?`｜NO. ${lastExcelImportResult.workingNo}`:''}`,pct:100,state:'done',waiting:excelImportQueue.length});
         }else{
@@ -11893,11 +11900,41 @@ window.P79VesselHomeImport={
   cloudStatus('首頁匯入｜正在核對最新船舶主檔...',false);
   const ready=await restoreVesselDataFromCloud(false,true);
   if(!ready)throw Error('尚未取得正式雲端完整船舶主檔，已安全停止匯入');
+  const requested=Array.from(files);
   await importExcelFiles(files);
+  // Parsing alone is not successful import: require empty durable outbox and
+  // authoritative readback of every ship master and imported record ID.
+  let cloudConfirmed=false,cloudIssue='';
+  const jobs=excelQueueStats.importedJobs||[];
+  if(excelQueueStats.processed!==requested.length||
+    excelQueueStats.success!==requested.length||
+    excelQueueStats.failed!==0||jobs.length!==requested.length||
+    jobs.some(job=>!job.workingNo||!job.recordCount||
+      job.recordIds.length!==job.recordCount||job.recordIds.some(id=>!id))){
+   cloudIssue='有船舶報表或人員明細尚未完成匯入';
+  }else if(readQueue().length){
+   cloudIssue='資料已保留於本機，仍有待補傳船舶資料';
+  }else{
+   try{
+    cloudStatus('首頁匯入｜正在讀回雲端船舶主檔與人員明細...',false);
+    const verified=await p79ReadFullVesselData('gcGetData',{});
+    const masters=Array.isArray(verified?.shipMasters)?verified.shipMasters:[];
+    const recordIds=new Set((Array.isArray(verified?.records)?verified.records:[])
+     .map(row=>String(row?.id||'').trim()).filter(Boolean));
+    cloudConfirmed=jobs.every(job=>
+     masters.some(m=>String(m?.workingNo||'').trim()===job.workingNo)&&
+     job.recordIds.every(id=>recordIds.has(id)));
+    if(!cloudConfirmed)cloudIssue='雲端讀回主檔或人員明細尚未全部吻合；請先核對，避免重複匯入';
+    else cloudStatus('首頁匯入｜船舶主檔與人員明細已從雲端確認',true);
+   }catch(error){
+    cloudIssue='雲端讀回未完成：'+String(error?.message||error).slice(0,150);
+   }
+  }
   return {
    processed:excelQueueStats.processed,
    success:excelQueueStats.success,
    failed:excelQueueStats.failed,
+   cloudConfirmed,cloudIssue,
    cloudStatus:String(document.getElementById('cloudState')?.textContent||'')
   };
  }
@@ -12219,7 +12256,7 @@ async function importExcel(file) {
       });
     }
     records.push(...imported);
-    lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'船舶主檔與人員明細已解析',records:imported.length,workingNo:String(summary?.workingNo||'')};
+    lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'船舶主檔與人員明細已解析',records:imported.length,recordIds:imported.map(r=>String(r?.id||'').trim()),workingNo:String(summary?.workingNo||'')};
 
     // 船舶摘要獨立保存，避免 GAS 後端只保留舊欄位時 NO./GPH/VPH 被同步掉。
     const master={

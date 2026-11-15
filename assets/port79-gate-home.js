@@ -239,6 +239,9 @@ function switchTab(which){
   // Keep the default operations tab without requesting Gate data in the background.
   render();
  }
+ g.addEventListener?.('p79-home-import-complete',event=>{
+  if(event?.detail?.kinds?.includes('gate')&&active==='gate')void loadPeriod();
+ });
  g.P79GateStatsHome={setYearRows,normalize,rangeFor,aggregateFor:function(rows,yr,selectedMode,selectedAnchor){
   var anchor=String(selectedAnchor||yr+'-01-01');
   if(/^\d{4}-\d{2}$/.test(anchor))anchor+='-01';
