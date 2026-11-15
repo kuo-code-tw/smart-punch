@@ -88,17 +88,32 @@ function validateRecord(r){
  // not additive lines in the official daily container totals.
  return r;
 }
+function yardSheetRows(sheet){
+ // Source report categories refer to absolute A1 positions, even when the
+ // workbook has a cropped used-range starting in a later row or column.
+ const utils=g.XLSX.utils;
+ const options={header:1,raw:true,defval:null,blankrows:true};
+ if(sheet?.['!ref']&&typeof utils.decode_range==='function'&&typeof utils.encode_range==='function'){
+  const range=utils.decode_range(sheet['!ref']);
+  range.s.r=0;range.s.c=0;
+  options.range=utils.encode_range(range);
+ }
+ return utils.sheet_to_json(sheet,options);
+}
 function parseBook(book){
  const candidate=book.SheetNames.map(name=>({name,sheet:book.Sheets[name]})).find(({sheet})=>{
   if(!sheet)return false;
-  const a=g.XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null,blankrows:true});
+  const a=yardSheetRows(sheet);
   return String(a[1]?.[0]||'').includes('重櫃') &&
     String(a[2]?.[0]||'').includes('進口櫃') &&
     String(a[28]?.[0]||'').includes('空櫃') &&
     String(a[76]?.[0]||'').includes('Long-Stay');
  });
- if(!candidate)throw Error('找不到符合 yard.xlsx 格式的堆場工作表（需包含重櫃、空櫃與 Long-Stay 欄位）');
- const matrix=g.XLSX.utils.sheet_to_json(candidate.sheet,{header:1,raw:true,defval:null,blankrows:true});
+ if(!candidate){
+  const tabNames=(book.SheetNames||[]).slice(0,5).join('、')||'沒有工作表';
+  throw Error('找不到 Yard 堆場分類表：需有重櫃(A2)、進口櫃(A3)、空櫃(A29)、Long-Stay(A77)。實際工作表：'+tabNames+'；未變更原資料');
+ }
+ const matrix=yardSheetRows(candidate.sheet);
  const rawDates=matrix[0]||[],result=[],seen=new Set();
  for(let c=2;c<rawDates.length;c++){
   const v=rawDates[c];if(v===null||v===undefined||String(v).trim()==='')continue;
