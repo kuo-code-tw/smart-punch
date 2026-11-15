@@ -12081,15 +12081,15 @@ async function importExcel(file) {
   for(const required of ['WORKING SHEET','WORKING REPORT']){
     if(book.Sheets[required])continue;
     const original=book.SheetNames.find(title=>
-      String(title).trim().replace(/\\s+/g,' ').toUpperCase()===required);
+      String(title).trim().replace(/\s+/g,' ').toUpperCase()===required);
     if(original&&book.Sheets[original]){
       book.Sheets[required]=book.Sheets[original];
       if(!book.SheetNames.includes(required))book.SheetNames.push(required);
     }
   }
   const vesselBook=book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT');
-  const likelyVesselBook=book.SheetNames.some(title=>/WORKING\\s+(?:SHEET|REPORT)/i.test(String(title)))||
-    /(?:TALLY|WORKING[\\s_-]*SHEET)/i.test(String(file.name||''));
+  const likelyVesselBook=book.SheetNames.some(title=>/WORKING\s+(?:SHEET|REPORT)/i.test(String(title)))||
+    /(?:TALLY|WORKING[\s_-]*SHEET)/i.test(String(file.name||''));
   if(likelyVesselBook&&!vesselBook){
     throw Error('船舶工作表格式不完整：需要 WORKING SHEET 與 WORKING REPORT 兩張工作表；實際只有「'+
       book.SheetNames.slice(0,8).join('、')+'」。尚未寫入此檔資料。');
