@@ -1,51 +1,266 @@
-/* PORT79 homepage import navigation.
- * Home only opens the existing authenticated management system.
- * It does not parse, upload, save, or host any Excel importer.
+/* PORT79 homepage automatic Excel routing.
+ * Classify workbook signatures only; original Gate/Yard/Vessel pages own all
+ * validation, approval, data mutation and persistence. No duplicate importer.
  */
 (function(w){
 'use strict';
-const d=w.document;
-const root=d?.getElementById('p79HomeDropImport');
+const d=w.document,root=d.getElementById('p79HomeDropImport');
 if(!root)return;
+const $=id=>d.getElementById(id);
+const modal=$('p79HomeImportDialog'),frame=$('p79HomeImportFrame'),picker=$('p79HomeImportInput');
+const title=$('p79HomeImportTitle'),fileLabel=$('p79HomeImportFile');
+const status=$('p79HomeImportStatus'),bar=$('p79HomeImportProgressBar'),progress=$('p79HomeImportProgress');
+const review=$('p79HomeImportReview'),reviewText=$('p79HomeImportReviewText');
+const yes=$('p79HomeImportReviewYes'),no=$('p79HomeImportReviewNo'),close=$('p79HomeImportClose');
+const names={gate:'Gate 進出站',yard:'Yard 儲量',vessel:'船舶作業'};
+const targets={
+ gate:'./gate-import/?embed=1&homeImport=1',
+ yard:'./yard-dashboard/?embed=1&homeImport=1',
+ vessel:'./aqc-efficiency/?homeImport=1'
+};
+let busy=false,taskId=0,approval=null,lastVesselError='',resultLog=[];
 function canUse(){
- let s;
- try{s=JSON.parse(w.sessionStorage.getItem('port79_user_session')||'null');}catch(_){return false;}
+ let s=null;try{s=JSON.parse(w.sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
  const role=String(s?.adminRole||s?.role||'').toLowerCase();
  const token=String(w.sessionStorage.getItem('port79_user_token')||
-   w.sessionStorage.getItem('port79_admin_token')||
-   w.sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
+  w.sessionStorage.getItem('port79_admin_token')||
+  w.sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
  return !!s&&!s.punchOnly&&role==='superadmin'&&!!token;
 }
 function refresh(){root.hidden=!canUse();}
-function navigate(kind){
- if(!canUse())return;
- // Vessel and Yard already have the homepage's permission-aware navigation.
- // Reuse that exact route/SSO flow; no separate homepage importer.
- if(kind==='vessel'&&typeof w.launchSystem==='function'){
-  w.launchSystem('efficiency');return;
+function pct(n,tone){
+ const p=Math.max(0,Math.min(100,Math.round(Number(n)||0)));
+ if(bar)bar.style.width=p+'%';
+ if(progress){
+  progress.dataset.tone=tone||'info';
+  progress.setAttribute('aria-valuenow',String(p));
+  progress.setAttribute('aria-valuetext',p+'%（工作階段進度，非雲端寫入百分比）');
  }
- if(kind==='yard'&&typeof w.launchSystem==='function'){
-  w.launchSystem('yard');return;
- }
- const path=kind==='gate'?'./gate-import/':
-   kind==='yard'?'./yard-dashboard/':
-   kind==='vessel'?'./aqc-efficiency/':null;
- if(!path)return;
- if(typeof w.p79NavigateWhileBackingUp==='function')
-  w.p79NavigateWhileBackingUp(path);
- else w.location.assign(path);
 }
-root.querySelectorAll('[data-p79-drop-kind]').forEach(zone=>{
- const kind=zone.dataset.p79DropKind;
- zone.addEventListener('click',()=>navigate(kind));
- zone.addEventListener('keydown',e=>{
-  if(e.key==='Enter'||e.key===' '){e.preventDefault();navigate(kind);}
+function display(message,tone,percent){
+ if(status){status.textContent=String(message||'');status.dataset.tone=tone||'info';}
+ if(percent!==undefined)pct(percent,tone);
+}
+function normalize(v){return String(v??'').replace(/\s+/g,'').trim().toUpperCase()}
+function getCell(sheet,address){
+ const cell=sheet?.[address];
+ return String(cell?.v??cell?.w??'').trim();
+}
+async function identify(file){
+ const name=String(file?.name||'');
+ if(!/\.(xlsx|xls|csv)$/i.test(name))throw Error(name+'：僅支援 xlsx、xls、csv');
+ if(file.size>30*1024*1024)throw Error(name+'：單檔超過 30 MB 上限');
+ if(!file.arrayBuffer)throw Error(name+'：瀏覽器無法讀取檔案');
+ if(/\.csv$/i.test(name)){
+  if(!/(gate|進出站|交空櫃|交重櫃)/i.test(name))throw Error(name+'：無法辨識 CSV 來源；Gate CSV 請包含 Gate 或進出站識別名稱');
+  if(file.size>10*1024*1024)throw Error(name+'：Gate 單檔不可超過 10 MB');
+  return {file,kind:'gate',evidence:'Gate CSV'};
+ }
+ if(!w.XLSX?.read)throw Error('Excel 辨識元件尚未載入；請確認網路連線');
+ const bytes=await file.arrayBuffer();
+ const book=w.XLSX.read(bytes,{type:'array',cellDates:false,cellHTML:false,sheetRows:90});
+ const sheets=(book.SheetNames||[]).map(n=>String(n||''));
+ const canon=sheets.map(normalize);
+ const has=n=>canon.includes(n);
+ const vessel=has('WORKINGSHEET')&&has('WORKINGREPORT');
+ const yard=sheets.some(n=>{
+  const sh=book.Sheets[n];
+  return getCell(sh,'A2').includes('重櫃')&&getCell(sh,'A3').includes('進口櫃')&&
+   getCell(sh,'A29').includes('空櫃')&&/LONG[- ]?STAY/i.test(getCell(sh,'A77'));
  });
- // Never accept the file on the homepage. Prevent the browser from opening a
- // dropped Excel as a page; users choose their file in the real import screen.
- zone.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='none';});
- zone.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();navigate(kind);});
+ const gate=sheets.some(n=>{
+  const sh=book.Sheets[n];
+  return normalize(getCell(sh,'B2'))==='交空櫃'&&
+   normalize(getCell(sh,'B3'))==='交重櫃'&&
+   normalize(getCell(sh,'B7'))==='領空櫃'&&
+   getCell(sh,'A15').includes('本日進站卡車數');
+ });
+ const signs=[vessel&&'vessel',yard&&'yard',gate&&'gate'].filter(Boolean);
+ if(signs.length>1)throw Error(name+'：同時符合多種報表特徵，為避免匯錯資料庫已停止');
+ if(signs.length===1)return {file,kind:signs[0],evidence:'工作表內容確認'};
+ // Original importers still perform strict verification. A recognizable source
+ // filename may be routed to them, but never silently accepted as valid data.
+ const hinted=[
+  /(?:^|[\s_.-])GATE(?:[\s_.-]|$)|進出站/i.test(name)?'gate':null,
+  /(?:^|[\s_.-])YARD(?:[\s_.-]|$)|堆場|儲量/i.test(name)?'yard':null,
+  /TALLY|WORKING[\s_-]*SHEET|船舶作業|WAN\s*HAI|XINDE/i.test(name)||
+   has('WORKINGSHEET')||has('WORKINGREPORT')?'vessel':null
+ ].filter(Boolean);
+ if(hinted.length!==1)throw Error(name+'：無法辨識是 Yard、Gate 或船舶報表；已停止，沒有寫入資料');
+ return {file,kind:hinted[0],evidence:'依檔名／工作表名稱分流，仍須原系統驗證格式'};
+}
+function settle(ok){
+ if(!approval)return;
+ const resolve=approval;approval=null;
+ if(review)review.hidden=true;
+ resolve(ok===true);
+}
+function confirmImport(message,source){
+ if(!busy||!modal.open||source!==frame.contentWindow||approval||!review||!reviewText)return Promise.resolve(false);
+ reviewText.textContent=String(message||'');
+ review.hidden=false;
+ display('請確認原系統的資料覆蓋／匯入內容','pending');
+ return new Promise(resolve=>{approval=resolve;yes?.focus();});
+}
+function reportImportIssue(message,source){
+ if(!busy||source!==frame.contentWindow)return false;
+ lastVesselError=String(message||'匯入核對失敗').slice(0,500);
+ display(lastVesselError,'error');
+ return true;
+}
+yes?.addEventListener('click',()=>{settle(true);display('已確認，交由原系統完成匯入…','info');});
+no?.addEventListener('click',()=>{settle(false);display('已取消本次匯入，原資料保留','pending');});
+function updateGateStatus(){
+ const el=frame.contentDocument?.getElementById('gateMessage');
+ return {message:String(el?.textContent||'').trim(),kind:el?.dataset?.kind||''};
+}
+function waitGateResult(){
+ return new Promise((resolve,reject)=>{
+  const el=frame.contentDocument?.getElementById('gateMessage');
+  if(!el){reject(Error('Gate 原系統的狀態區無法讀取'));return;}
+  let finished=false;
+  const observer=new MutationObserver(check);
+  const timer=setTimeout(()=>done(Error('Gate 雲端確認逾時：無法確定是否已寫入，請先在原系統核對後再決定是否重匯')),120000);
+  function done(err,text){
+   if(finished)return;finished=true;
+   observer.disconnect();clearTimeout(timer);
+   if(err)reject(err);else resolve(text);
+  }
+  function check(){
+   const state=updateGateStatus();
+   if(/已寫入正式資料庫/.test(state.message)){done(null,state.message);return;}
+   if(state.kind==='error'){done(Error(state.message||'Gate 核對失敗'));return;}
+   if(state.message)display('Gate｜'+state.message,'info',72);
+  }
+  observer.observe(el,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:['data-kind']});
+  check();
+ });
+}
+async function loadOriginal(kind){
+ const url=targets[kind];if(!url)throw Error('不支援的匯入類型');
+ return new Promise((resolve,reject)=>{
+  let settled=false;
+  const timer=setTimeout(()=>finish(Error(names[kind]+' 原系統載入逾時')),45000);
+  function finish(err){
+   if(settled)return;settled=true;clearTimeout(timer);frame.onload=null;frame.onerror=null;
+   if(err)reject(err);else resolve();
+  }
+  frame.onload=()=>{
+   try{
+    if(frame.contentWindow?.location?.origin!==w.location.origin)
+     throw Error('匯入頁面來源不符，已停止');
+    const path=frame.contentWindow.location.pathname||'';
+    if(!path.includes(kind==='vessel'?'/aqc-efficiency/':kind==='yard'?'/yard-dashboard/':'/gate-import/'))
+     throw Error('載入的原系統不是指定匯入頁');
+    finish();
+   }catch(err){finish(err)}
+  };
+  frame.onerror=()=>finish(Error('原系統載入失敗'));
+  frame.src=url+'&homeDropVersion=20261115-auto-dispatch-v1';
+ });
+}
+async function runKind(kind,files){
+ const child=frame.contentWindow;
+ if(!child||child.location.origin!==w.location.origin)throw Error('來源驗證未通過');
+ if(kind==='gate'){
+  if(typeof child.P79GateImport?.chooseFile!=='function')throw Error('Gate 原匯入程式尚未載入');
+  const done=waitGateResult();
+  await child.P79GateImport.chooseFile(files[0]);
+  return {message:await done,tone:'success'};
+ }
+ if(kind==='yard'){
+  if(typeof child.P79YardDashboard?.importFile!=='function')throw Error('Yard 原匯入程式尚未載入');
+  await child.P79YardDashboard.importFile(files[0]);
+  const el=frame.contentDocument?.getElementById('yardStatus');
+  const text=String(el?.textContent||'').trim();
+  if(el?.dataset?.tone!=='success')throw Error(text||'Yard 原系統匯入未完成');
+  return {message:'Yard｜'+(text||'原系統已儲存'),tone:'success'};
+ }
+ if(kind==='vessel'){
+  if(typeof child.P79VesselHomeImport?.importFiles!=='function')throw Error('船舶原匯入程式尚未載入');
+  lastVesselError='';
+  const result=await child.P79VesselHomeImport.importFiles(files);
+  const total=Number(result?.processed)||0,ok=Number(result?.success)||0,failed=Number(result?.failed)||0;
+  if(!total||failed||ok!==total)
+   throw Error(lastVesselError||('船舶原系統未完成：解析成功 '+ok+'/'+Math.max(total,files.length)+'；請核對檔案工作表與人員明細'));
+  return {message:'船舶｜原系統解析成功 '+ok+'/'+total+'；雲端寫入仍須由原系統核對',tone:'pending'};
+ }
+ throw Error('未知匯入目標');
+}
+async function start(input){
+ if(!canUse())return;
+ if(busy){display('前一批還在匯入，請先完成這一批','error');return;}
+ const files=Array.from(input||[]);
+ if(!files.length)return;
+ if(files.length>32){modal.showModal();display('單次最多 32 個檔案：Gate 1、Yard 1、船舶 30','error',0);return;}
+ busy=true;taskId++;const id=taskId;resultLog=[];lastVesselError='';
+ if(review)review.hidden=true;
+ if(fileLabel)fileLabel.textContent=files.map(f=>f.name).join('、');
+ if(title)title.textContent='自動辨識 · 原系統匯入';
+ if(!modal.open)modal.showModal();
+ display('正在辨識 '+files.length+' 份 Excel 的來源…','info',5);
+ try{
+  const detected=[];
+  for(let i=0;i<files.length;i++){
+   if(!canUse()||id!==taskId)throw Error('登入狀態已變更，已停止');
+   detected.push(await identify(files[i]));
+   display('已辨識 '+(i+1)+'/'+files.length+'：'+names[detected[i].kind],'info',5+15*(i+1)/files.length);
+  }
+  const grouped={gate:[],yard:[],vessel:[]};
+  for(const item of detected)grouped[item.kind].push(item.file);
+  if(grouped.gate.length>1||grouped.yard.length>1||grouped.vessel.length>30)
+   throw Error('同一批次 Gate／Yard 各限 1 份、船舶最多 30 份；為避免重複覆蓋已停止');
+  const groups=['gate','yard','vessel'].filter(k=>grouped[k].length);
+  for(let i=0;i<groups.length;i++){
+   const kind=groups[i],list=grouped[kind];
+   display('已分流至 '+names[kind]+'，正在啟動原系統…','info',20+65*i/groups.length);
+   await loadOriginal(kind);
+   display(names[kind]+' 原系統已載入，正在核對與匯入 '+list.length+' 份檔案…','info',25+65*i/groups.length);
+   try{
+    const outcome=await runKind(kind,list);
+    resultLog.push({kind,tone:outcome.tone,message:outcome.message});
+   }catch(err){
+    resultLog.push({kind,tone:'error',message:names[kind]+'：'+String(err?.message||err)});
+   }
+   display('已處理 '+(i+1)+'/'+groups.length+' 個原系統','info',20+65*(i+1)/groups.length);
+  }
+  const failures=resultLog.filter(r=>r.tone==='error'),uncertain=resultLog.some(r=>r.tone==='pending');
+  const summary=resultLog.map(r=>r.message).join('\n');
+  display((failures.length?'匯入未全部完成：\n':uncertain?'已完成原系統處理：\n':'匯入完成：\n')+summary,
+    failures.length?'error':uncertain?'pending':'success',100);
+ }catch(err){
+  display('已停止：'+String(err?.message||err),'error',100);
+ }finally{busy=false;settle(false);}
+}
+function choose(){if(!canUse()||busy)return;picker?.click();}
+root.querySelectorAll('[data-p79-drop-kind]').forEach(zone=>{
+ zone.addEventListener('click',choose);
+ zone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
+ zone.addEventListener('dragover',e=>{if(!canUse())return;e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';});
+ zone.addEventListener('drop',e=>{if(!canUse())return;e.preventDefault();e.stopPropagation();void start(e.dataTransfer?.files);});
 });
-w.Port79HomeDropImport={refresh,canUse};
+picker?.addEventListener('change',()=>{if(picker.files?.length)void start(picker.files);picker.value='';});
+d.addEventListener('dragover',e=>{
+ if(canUse()&&!root.hidden&&Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';}
+});
+d.addEventListener('drop',e=>{
+ if(canUse()&&!root.hidden&&e.dataTransfer?.files?.length){e.preventDefault();void start(e.dataTransfer.files);}
+});
+w.addEventListener('message',e=>{
+ if(!busy||e.origin!==w.location.origin||e.source!==frame.contentWindow)return;
+ if(e.data?.type==='p79-vessel-import-progress'){
+  const st=String(e.data.stage||'').slice(0,450);
+  if(e.data.state==='error'&&st)lastVesselError=st;
+  if(!approval&&(!review||review.hidden)&&st)display('船舶｜'+st,'info');
+ }
+});
+function dismiss(){
+ if(approval){settle(false);return;}
+ if(busy){display('原系統仍在匯入，請完成後再關閉，避免中斷資料寫入','pending');return;}
+ if(modal.open)modal.close();
+}
+close?.addEventListener('click',dismiss);
+modal?.addEventListener('cancel',e=>{if(busy){e.preventDefault();dismiss();}});
+w.Port79HomeDropImport={refresh,canUse,confirmImport,reportImportIssue,start};
 refresh();
 })(window);
