@@ -9,6 +9,7 @@ on:
       - 'assets/port79-gate-home.js'
       - 'assets/port79-home-dashboard.js'
       - 'tests/home-drop-import.cjs'
+      - 'tests/home-vessel-confirmed-close.cjs'
       - '.github/workflows/home-import-auto-close.yml'
   push:
     branches: [main]
@@ -40,6 +41,7 @@ jobs:
       - name: Verify Gate, Yard, Vessel confirmed auto-close and failure safety
         run: |
           node tests/home-drop-import.cjs
+          node tests/home-vessel-confirmed-close.cjs
           node tests/gate-drag-drop-import.cjs
           node tests/yard-dashboard-module.cjs
           node tests/vessel-save-queue.cjs
