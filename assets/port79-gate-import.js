@@ -38,14 +38,30 @@ function day(v){
  if(!Number.isFinite(dt.getTime())||dt.toISOString().slice(0,10)!==iso)throw Error('日期不存在 '+iso);
  return iso;
 }
+// Preserve absolute Excel row/column coordinates even when the worksheet !ref
+// begins at B2, C1, etc.  Gate signatures are defined in physical A1 positions.
+function gateSheetRows(sheet){
+ var utils=g.XLSX.utils;
+ var options={header:1,defval:'',raw:false,blankrows:true};
+ if(sheet['!ref']&&typeof utils.decode_range==='function'&&typeof utils.encode_range==='function'){
+  var bounds=utils.decode_range(sheet['!ref']);
+  bounds.s.r=0;bounds.s.c=0;
+  options.range=utils.encode_range(bounds);
+ }
+ return utils.sheet_to_json(sheet,options);
+}
 function findGateMatrix(name){
  var sheet=book.Sheets[name];
  if(!sheet)throw Error('找不到選擇的工作表');
- var data=g.XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,blankrows:true});
+ var data=gateSheetRows(sheet);
  var label=(r,c)=>text(data[r]?.[c]).replace(/\s+/g,'');
  for(var pair of [[1,1,'交空櫃'],[2,1,'交重櫃'],[3,1,'交空櫃'],[4,1,'交重櫃'],
   [6,1,'領空櫃'],[7,1,'領重櫃'],[8,1,'領空櫃'],[9,1,'領重櫃']]){
-  if(label(pair[0],pair[1])!==pair[2])throw Error('工作表「'+name+'」的分類列與 Gate 報表不符；第 '+(pair[0]+1)+' 列應為「'+pair[2]+'」');
+  var found=label(pair[0],pair[1]);
+  if(found!==pair[2]){
+   var cell='B'+(pair[0]+1);
+   throw Error('工作表「'+name+'」不是預期的 Gate 分類表格；'+cell+' 應為「'+pair[2]+'」，實際讀到「'+(found||'空白')+'」。請核對分類列或改選正確工作表');
+  }
  }
  if(!label(14,0).includes('本日進站卡車數'))throw Error('找不到第15列「本日進站卡車數」');
  var results=[],seen=new Set();skippedDates=[];
@@ -182,7 +198,7 @@ async function chooseFile(droppedFile){
    $('gateSheet').appendChild(option);
   });
   var first=book.SheetNames.find(name=>{
-   try{return text(g.XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,defval:'',raw:false})?.[1]?.[1]).includes('交空櫃')}
+   try{return text(gateSheetRows(book.Sheets[name])?.[1]?.[1]).replace(/\s+/g,'')==='交空櫃'}
    catch(_){return false}
   })||book.SheetNames[0];
   $('gateSheet').value=first;
