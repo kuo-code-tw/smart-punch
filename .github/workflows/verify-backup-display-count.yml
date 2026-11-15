@@ -1,0 +1,35 @@
+name: Verify backup display counts and receipt safety
+
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-all-backup.js'
+      - 'index.html'
+      - 'tests/all-systems-backup-client.cjs'
+      - '.github/workflows/verify-backup-display-count.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-all-backup.js'
+      - 'index.html'
+      - 'tests/all-systems-backup-client.cjs'
+      - '.github/workflows/verify-backup-display-count.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backup-count:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate backup script parses
+        run: node --check assets/port79-all-backup.js
+      - name: Test 11 visible and 2 hidden backups with verified receipts
+        run: |
+          node tests/all-systems-backup-client.cjs
+          node tests/all-systems-backup-receipt.cjs
+          node tests/history-backup-all.cjs
