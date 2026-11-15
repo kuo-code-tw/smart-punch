@@ -62,6 +62,9 @@ function notify(value,tone){
 function finish(value,tone){
  working=false;
  notify(value,tone);
+ // The operation has ended even if its validation failed. Keep the bar full
+ // in red for a completed failed attempt rather than resetting to 0%.
+ setProgress(tone,100);
 }
 function settleReview(accepted){
  const resolve=resolveReview;
@@ -151,11 +154,18 @@ async function deliver(kind,files,id){
   var result=await child.P79VesselHomeImport.importFiles(files);
   if(id!==sequence)return;
   var processed=Number(result?.processed||0),parsed=Number(result?.success||0),failed=Number(result?.failed||0);
-  var summary='已處理 '+processed+' 個檔案｜完成解析 '+parsed+' 個｜未完成 '+failed+' 個。';
-  var cloud=String(result?.cloudStatus||'').trim();
-  if(cloud)summary+=' 船舶系統雲端狀態：'+cloud+'。';
-  summary+=' 完成解析不等於雲端已儲存，請到碼頭系統管理核對正式資料。';
-  finish(summary,failed||!processed||parsed!==processed?'error':'pending');
+  var failures=Array.isArray(result?.errors)?result.errors:[];
+  if(failed||!processed||parsed!==processed){
+   var details=failures.slice(0,3).map(function(item){
+    return String(item?.reason||'原因未明').slice(0,260);
+   }).filter(Boolean);
+   var reason=details.join('；')||'原系統沒有回傳失敗原因，請在碼頭系統管理查看該檔匯入紀錄';
+   if(failures.length>3)reason+='（另有 '+(failures.length-3)+' 個錯誤）';
+   finish('匯入未完成 '+parsed+'/'+Math.max(processed,files.length)+'｜原因：'+reason,'error');
+   return;
+  }
+  // Parsing is not proof of a successful authoritative cloud write.
+  finish('解析完成 '+parsed+'/'+processed+'｜請到碼頭系統管理核對雲端儲存結果','pending');
  }
 }
 function start(kind,list){
