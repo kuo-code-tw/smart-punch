@@ -47,6 +47,27 @@ const parsed=api.parseBook({SheetNames:['Yard'],Sheets:{Yard:mockSheet}});
 assert.equal(parsed.length,1);assert.equal(parsed[0].heavyTotal,490);
 assert.equal(parsed[0].longTotal,60);
 assert.throws(()=>{matrix[19][2]=999;api.parseBook({SheetNames:['Yard'],Sheets:{Yard:mockSheet}}) },/不一致/);
+matrix[19][2]=r.heavyTotal;
+// A cropped Excel used range must not shift source row 77 or its numeric
+// detail columns. The parser requests the physical A1-anchored range.
+const utils=window.XLSX.utils;
+const originalSheetToJson=utils.sheet_to_json;
+mockSheet['!ref']='B2:D77';
+utils.decode_range=()=>({s:{r:1,c:1},e:{r:76,c:3}});
+utils.encode_range=range=>{
+ assert.equal(range.s.r,0);
+ assert.equal(range.s.c,0);
+ return 'A1:D77';
+};
+utils.sheet_to_json=(sheet,options)=>{
+ assert.equal(options.range,'A1:D77');
+ return sheet.matrix;
+};
+const anchored=api.parseBook({SheetNames:['Yard'],Sheets:{Yard:mockSheet}});
+assert.equal(anchored.length,1,'cropped used range still parses the physical date and category rows');
+assert.equal(anchored[0].longTotal,60);
+delete mockSheet['!ref'];
+utils.sheet_to_json=originalSheetToJson;
 // Zero-stock dates must not create an invalid conic gradient or a NaN share.
 assert.equal(api.donutGradient([{label:'進口',value:0}],0),'#e1ebfa');
 assert.match(api.donutGradient([{label:'進口',value:0},{label:'出口',value:7}],7),/#ff861c 0\.0000% 100\.0000%/,'second category must retain its legend color');
@@ -66,16 +87,16 @@ const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:
 assert.match(trend,/>TEU<\/text>/);
 assert.doesNotMatch(trend,/>3,000<\/text>/,'small inventory cannot be flattened by a fixed 3,000 TEU axis');
 assert.match(html,/當日櫃別明細/,'historical selector must not label all dates as today');
-assert.match(html,/yard-dashboard\.js\?v=20261113-home-size-cards-v1/,'new dashboard script must invalidate old cache');
+assert.match(html,/yard-dashboard\.js\?v=20261115-yard-a1-guard-v3/,'updated workbook parser must invalidate old cache');
 assert.match(page,/20261113-yard-home-size-cards-v1/,'embedded iframe must invalidate old page cache');
 // Consistent product naming and center alignment across all history tables.
-assert.match(html,/<title>碼頭儲位管理｜/);
-assert.match(html,/<h1>碼頭儲位管理<\/h1>/);
-assert.match(html,/aria-label="碼頭儲位管理分頁"/);
+assert.match(html,/<title>碼頭儲量管理｜/);
+assert.match(html,/<h1>碼頭儲量管理<\/h1>/);
+assert.match(html,/aria-label="碼頭儲量管理分頁"/);
 assert.doesNotMatch(html,/堆場儲位管理/);
-assert.match(page,/data-tab="yard"[^>]*>▥ 碼頭儲位管理/);
-assert.match(page,/aria-label="碼頭儲位管理"/);
-assert.match(page,/title="碼頭儲位管理：/);
+assert.match(page,/data-tab="yard"[^>]*>▥ 碼頭儲量管理/);
+assert.match(page,/aria-label="碼頭儲量管理"/);
+assert.match(page,/title="碼頭儲量管理：/);
 assert.doesNotMatch(page,/堆場儲位管理/);
 assert.match(css,/\.yard-history-table th\{[^}]*text-align:center;[^}]*\}/,'history headings align center');
 assert.match(css,/\.yard-history-table td\{[^}]*text-align:center;[^}]*\}/,'historical values and dates align center');
