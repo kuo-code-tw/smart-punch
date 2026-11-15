@@ -71,7 +71,9 @@ function render(){
  const list=$('p79AllBackupResults');
  if(!list)return;
  list.replaceChildren();
- for(const item of batch.items.filter(showCard)){
+ const visibleItems=batch.items.filter(showCard);
+ const otherItems=batch.items.filter(item=>!showCard(item));
+ for(const item of visibleItems){
   const kind=item.result?'done':item.error?'error':item.running?'running':'pending';
   const title=item.type==='yardFile'?'儲量原檔':item.label;
   const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.waiting?'等待資料儲存，自動繼續中…':item.running?'備份及讀回核對中…':'等待備份';
@@ -103,7 +105,9 @@ function render(){
   li.append(control);
   list.append(li);
  }
- const done=batch.items.filter(i=>i.result).length;
+ const visibleDone=visibleItems.filter(i=>i.result).length;
+ const otherDone=otherItems.filter(i=>i.result).length;
+ const allDone=batch.items.every(i=>i.result);
  const failedItems=batch.items.filter(i=>i.error);
  const failed=failedItems.length>0;
  // Keep a compact, readable failure reason in the UI; a red light alone is not diagnostic.
@@ -126,8 +130,14 @@ function render(){
   }
  }
  const progress=$('p79AllBackupProgress');
- if(progress){progress.max=batch.items.length;progress.value=done;progress.hidden=false;}
- message(done===batch.items.length?'完成 '+done+'/'+batch.items.length:busy?'備份 '+done+'/'+batch.items.length:failed?'完成 '+done+'/'+batch.items.length+' · 可重試':'待核對 '+done+'/'+batch.items.length);
+ if(progress){progress.max=visibleItems.length;progress.value=visibleDone;progress.hidden=false;}
+ const otherLabel=otherItems.length
+  ?' · 其他備份 '+otherDone+'/'+otherItems.length+'（船期、系統稽核'+
+   (otherItems.some(i=>i.type==='yardFile')?'、儲量 Excel 原檔':'')+'）':'';
+ message((allDone?'全部備份完成':busy?'備份進行中':failed?'有備份未完成':'待核對')+
+  ' · '+visibleDone+'/'+visibleItems.length+otherLabel+
+  (failed?' · 可重試':''));
+
  const btn=$('p79AllBackupButton');
  if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
@@ -159,8 +169,9 @@ function show(){
   }
   list.replaceChildren(fresh);
   const progress=$('p79AllBackupProgress');
-  if(progress){progress.value=0;progress.max=TYPES.length;progress.hidden=false;}
-  message('尚未開始備份 · 0/'+TYPES.length+'（灰燈為待備份）');
+  if(progress){progress.value=0;progress.max=HOME_TYPES.length;progress.hidden=false;}
+  message('尚未開始備份 · 0/'+HOME_TYPES.length+
+   '（另有 '+(TYPES.length-HOME_TYPES.length)+' 項其他備份：船期、系統稽核；灰燈為待備份）');
  }
  return true;
 }
