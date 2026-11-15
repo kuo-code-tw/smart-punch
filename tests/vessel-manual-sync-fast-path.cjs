@@ -47,6 +47,7 @@ async function run(options={}){
     cloudStatus:()=>{},setEfficiencySaveState:()=>{c.efficiencyHasUnsavedChanges=false;},
     toast:msg=>calls.toasts.push(msg)
   };
+  c.p79WaitStrictVesselReadback=()=>c.restoreVesselDataFromCloud(false,true);
   vm.createContext(c);vm.runInContext(source,c);
   await c.manualCloudSync();
   return {calls,queue,elements,c};

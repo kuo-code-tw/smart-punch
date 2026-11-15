@@ -8035,6 +8035,7 @@ async function gcLogout(){
   location.href='../?v=20260927.7.13';
 }
 
+let p79VesselReadbackJob=null,p79EfficiencyReadbackGeneration=0;
 let p79EfficiencyManualSyncActive=false,p79EfficiencyReadbackRequired=false,p79EfficiencySyncPreflightRemote=null,p79EfficiencySyncTrace=[],p79EfficiencySyncCurrentStage='尚未開始';
 function p79EfficiencySyncStep(stage,info=''){
  p79EfficiencySyncCurrentStage=stage;
@@ -8108,7 +8109,7 @@ async function apiGet(action,params={}){
 // Retry only read-only synchronization-lock and transient transport failures, within one total budget.
 async function p79ReadFullVesselData(action,params={}){
   const requests=p79ReadFullVesselData.requests||(p79ReadFullVesselData.requests=new Map());
-  const key=JSON.stringify([typeof gcToken==='undefined'?'':String(gcToken),action,Object.entries(params||{}).sort(([a],[b])=>a.localeCompare(b))]);
+  const key=JSON.stringify([typeof gcToken==='undefined'?'':String(gcToken),typeof p79EfficiencyReadbackGeneration==='undefined'?0:p79EfficiencyReadbackGeneration,action,Object.entries(params||{}).sort(([a],[b])=>a.localeCompare(b))]);
   if(requests.has(key))return requests.get(key);
   // Share only a currently running read, never cache across subsequent writes.
   const task=(async()=>{
@@ -9102,6 +9103,7 @@ async function p79VerifyTimedOutEfficiencyWrite(action,payload,readSnapshot=null
 let gcQueueFlushPromise=null;
 async function postCloud(action,payload){
   if(!requireSuperAdminAccess())return {ok:false};
+  if(typeof p79EfficiencyReadbackGeneration!=='undefined')p79EfficiencyReadbackGeneration++;
   // 先保存獨立快照；後續編輯不能改到正在上傳或等待補傳的內容。
   const snapshot=JSON.parse(JSON.stringify(payload||{}));
   await ensureGcQueueReady();
@@ -9133,6 +9135,7 @@ async function flushQueue(){
   await ensureGcQueueReady();
   if(gcQueueFlushPromise)return gcQueueFlushPromise;
   if(!readQueue().length)return {ok:true};
+  if(typeof p79EfficiencyReadbackGeneration!=='undefined')p79EfficiencyReadbackGeneration++;
   if(cloudBusy)return {ok:false,pendingCloudSync:readQueue().length>0,error:'其他雲端作業進行中，尚未開始上傳'};
   if(!requireSuperAdminAccess())return {ok:false,pendingCloudSync:readQueue().length>0,error:'目前帳號沒有船舶資料寫入權限，待同步修改已保留'};
   cloudBusy=true;
@@ -9404,6 +9407,7 @@ async function restoreVesselFromHistoryFallback(){
 async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=false){
   if(!requireEfficiencyAccess())return false;
 
+  const readToken=gcToken;
   const read=requireCloudSuccess?(action,params)=>p79ReadFullVesselData(action,params):apiGet;
   try{
     cloudStatus('正在找回船舶資料...',false);
@@ -9413,6 +9417,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
 
     let scope=requireCloudSuccess?{}:efficiencyCloudScopeParams();
     let d=await read('gcGetData',scope);
+    if(gcToken!==readToken)throw Error('登入身分已變更，未套用船舶讀回資料');
 
     let cloudMasters=Array.isArray(d?.shipMasters)?d.shipMasters.map(sanitizeShipMasterMetrics):[];
     let cloudRecords=Array.isArray(d?.records)?d.records:[];
@@ -9672,6 +9677,36 @@ async function syncFromCloud(force=false){
  catch(e){cloudStatus('雲端暫時不可用',false)}
  finally{cloudBusy=false}
 }
+async function p79WaitStrictVesselReadback(){
+  const token=gcToken,generation=p79EfficiencyReadbackGeneration;
+  let job=p79VesselReadbackJob;
+  if(!job||job.token!==token||job.generation!==generation){
+    job={token,generation,detached:false,promise:null};
+    job.promise=restoreVesselDataFromCloud(false,true);
+    p79VesselReadbackJob=job;
+    job.promise.then(result=>{
+      if(!job.detached||result===false||gcToken!==token||p79EfficiencyReadbackGeneration!==generation||readQueue().length)return;
+      p79SetEfficiencySyncLight('success');
+      setEfficiencySaveState(false,'本機與雲端資料已完成同步');
+      cloudStatus('背景讀回已完成｜船舶資料已同步');
+    },error=>{
+      if(!job.detached||gcToken!==token||p79EfficiencyReadbackGeneration!==generation)return;
+      p79SetEfficiencySyncLight('pending','雲端確認延遲｜本機資料已保留');
+      console.warn('背景船舶讀回未完成',error);
+    }).finally(()=>{if(p79VesselReadbackJob===job)p79VesselReadbackJob=null;});
+  }
+  let timer;
+  try{
+    return await Promise.race([job.promise,new Promise((resolve,reject)=>{
+      timer=setTimeout(()=>{
+        job.detached=true;
+        const error=Error('雲端確認超過15秒，已轉背景讀回；本機資料可繼續查看，請勿重複匯入');
+        error.vesselReadPending=true;
+        reject(error);
+      },15000);
+    })]);
+  }finally{clearTimeout(timer);}
+}
 async function manualCloudSync(){
   if(!requireEfficiencyAccess()||p79EfficiencyManualSyncActive||globalThis.P79FullRefreshRunning===true)return;
   const btn=document.getElementById('efficiencyCloudSyncBtn');
@@ -9721,7 +9756,7 @@ async function manualCloudSync(){
     if(readbackPending()||efficiencyHasUnsavedChanges)revisionConfirmed=false;
     if(!revisionConfirmed){
       p79EfficiencySyncStep('讀回完整船舶資料，確認同步結果');
-      const pulled=await restoreVesselDataFromCloud(false,true);
+      const pulled=await p79WaitStrictVesselReadback();
       if(pulled===false)throw Error('船舶雲端讀取未完成，尚未確認同步');
     }
     if(readQueue().length)throw Error('同步期間有新修改等待補傳');
