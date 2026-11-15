@@ -178,12 +178,13 @@ function show(){
 async function start(onlyId=null){
  if(busy||!allowed(session()))return;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=false;let c;try{c={actor:session().empId,token:token(),endpoint:endpoint()};}catch(e){message(e.message);return;}busy=true;const btn=$('p79AllBackupButton');if(btn)btn.disabled=true;message('正在核對備份服務與各分類資料來源…');
  try{
-  const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');c.receiptLookup=caps.backupReceiptLookupVersion===1;
+  const destination=(!onlyId&&!batch&&g.Port79BackupExcel)?await g.Port79BackupExcel.prepare():batch?.excelDestination;
+  const caps=await request(c,null,true);if(caps.allSystemsBackupVersion!==1||!Array.isArray(caps.groups)||TYPES.some(([t])=>!caps.groups.some(x=>x.type===t)))throw Error('正式雲端尚未啟用全部系統備份，沒有執行任何備份');c.receiptLookup=caps.backupReceiptLookupVersion===1;if(g.Port79BackupExcel&&caps.excelBackupVersion!==1)throw Error('正式雲端尚未啟用Excel雙端備份，未開始備份');
   const yard=await yardSnapshot(c.actor),fingerprint=await digest(new TextEncoder().encode(JSON.stringify(yard))),originals=(await records()).filter(r=>r.actor===c.actor&&!r.receipt);
   if(!same(c))throw Error('登入身分已變更，已停止備份');
   if(!batch||batch.actor!==c.actor||batch.endpoint!==c.endpoint||batch.fingerprint!==fingerprint){
    if(onlyId)throw Error('備份資料來源已變更，請使用「備份資料庫」重新核對清單');
-   batch={actor:c.actor,endpoint:c.endpoint,fingerprint,items:[...originals.map(r=>({type:'yardFile',label:'儲量Excel原檔：'+r.name,id:g.crypto.randomUUID(),original:r})),...TYPES.map(([type,label])=>({type,label,id:g.crypto.randomUUID()}))]};
+   batch={actor:c.actor,endpoint:c.endpoint,fingerprint,excelDestination:destination,items:[...originals.map(r=>({type:'yardFile',label:'儲量Excel原檔：'+r.name,id:g.crypto.randomUUID(),original:r})),...TYPES.map(([type,label])=>({type,label,id:g.crypto.randomUUID()}))]};
   }
   if(onlyId&&!batch.items.some(item=>item.id===onlyId&&!item.result))throw Error('此分類不在待重試清單，請重新執行備份');
   for(const item of batch.items){if(item.result||(onlyId&&item.id!==onlyId))continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
@@ -193,19 +194,20 @@ async function start(onlyId=null){
     if(item.type==='yard'&&yard&&same(c)){try{g.localStorage.setItem('p79_yard_backup_receipt_v1_'+encodeURIComponent(c.actor),JSON.stringify({fingerprint,backupUrl:result.backupUrl,backupAt:result.backupAt,updatedAt:yard.updatedAt}));}catch(_){}}
    }catch(e){if(!same(c))throw e;item.error=String(e.message||e).slice(0,240);}finally{item.running=false;}render();
   }
+  if(batch.items.every(i=>i.result)&&g.Port79BackupExcel&&!batch.excelComplete)await g.Port79BackupExcel.run(batch,{...c,same:()=>same(c)});
  }catch(e){if(!c||same(c))message(String(e.message||e).slice(0,240));}
- finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result))batch=null;}else refresh();}
+ finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result)&&(!g.Port79BackupExcel||batch.excelComplete))batch=null;}else refresh();}
 }
 function refresh(){
  const s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
- const isManager=!!s&&!s.punchOnly&&['admin','superadmin'].includes(role)&&!!token();
+ const isManager=allowed(s);
  const canRun=allowed(s),panel=$('p79AllBackupPanel'),button=$('p79AllBackupButton');
  if(panel)panel.hidden=!isManager;
  if(button){button.disabled=!canRun||busy;button.title=canRun?'執行前會先核對雲端是否支援全部分類':'僅最高管理員可以執行全系統備份';}
  if(isManager&&!canRun)message('這裡是全系統歷史備份入口；僅最高管理員可以操作。請以最高管理員身分登入後執行。');
- if(!canRun){if(controller)controller.abort();batch=null;const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
+ if(!canRun){if(controller)controller.abort();batch=null;const list=$('p79AllBackupResults');if(list)list.replaceChildren();message('');const excel=$('p79BackupExcelStatus');if(excel)excel.textContent='';const feedback=$('p79AllBackupFeedback');if(feedback)feedback.hidden=true;}
 }
 function init(){const b=$('p79AllBackupButton');if(b)b.addEventListener('click',()=>start());show();}
-g.Port79AllBackup={start,refresh,show,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot};
+g.Port79AllBackup={start,refresh,show,isBusy:()=>busy,rememberYardImport,types:TYPES.map(([type,label])=>({type,label})),yardSnapshot,getLocalOriginals:async()=>allowed(session())?(await records()).filter(r=>r.actor===session()?.empId):[]};
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);

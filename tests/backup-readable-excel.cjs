@@ -1,0 +1,38 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),crypto=require('crypto');
+const frontend=fs.readFileSync('assets/port79-backup-excel.js','utf8'),backend=fs.readFileSync('backend/backup-readable-excel.gs','utf8');
+new vm.Script(frontend);new vm.Script(backend);
+function setup(){
+ const nodes=new Map(),files=new Map(),calls=[],written=[];let actor='A',role='superadmin',captured;
+ const element=()=>({textContent:'',setAttribute(){},append(){},click(){},remove(){}});
+ const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
+ const data=new Map([['gc_records_v1',JSON.stringify([{empId:'A',name:'測試',password:'secret',token:'never-export',schedule:{'2026-11-01':'早'}}])]]);
+ const workbook={utils:{book_new:()=>({sheets:[]}),aoa_to_sheet:rows=>({rows}),book_append_sheet:(b,s,n)=>b.sheets.push({name:n,...s})},write:b=>{captured=b;return Uint8Array.from([80,75,3,4]).buffer;}};
+ class Zip{file(name,value){files.set(name,value);return this;}async generateAsync(){return new Blob(['fixture']);}}
+ const bytes=Buffer.from([80,75,3,4]),digest=crypto.createHash('sha256').update(bytes).digest('hex');
+ const w={document:{getElementById:get,createElement:element,body:element()},XLSX:workbook,JSZip:Zip,crypto:crypto.webcrypto,sessionStorage:{getItem:k=>k==='port79_user_session'?JSON.stringify({empId:actor,adminRole:role}):null},localStorage:{getItem:k=>data.get(k)||null},Port79AllBackup:{getLocalOriginals:async()=>[{actor:'B',name:'禁止外洩.xlsx',bytes},{actor:'A',name:'儲量.xlsx',hash:'fixture',bytes}]},Port79DataCache:{viewerKey:()=> 'A@superadmin',all:async()=>[{key:'A@superadmin|system',kind:'system',system:'attendance',data:{rows:[{name:'本人資料'}]}},{key:'B@superadmin|system',kind:'system',data:{rows:[{name:'其他帳號'}]}}]},showSaveFilePicker:async()=>({createWritable:async()=>({write:async b=>written.push(b),close:async()=>written.push('closed')})}),setTimeout,clearTimeout,btoa:s=>Buffer.from(s,'binary').toString('base64'),atob:s=>Buffer.from(s,'base64').toString('binary'),fetch:async(url,opts)=>{const p=JSON.parse(opts.body);calls.push(p);if(p.phase==='local')return {ok:true,json:async()=>({ok:true,verified:true,hash:p.hash})};if(p.phase==='list')return {ok:true,json:async()=>({ok:true,total:2})};if(p.phase==='complete')return {ok:true,json:async()=>({ok:true,verified:true,files:2,backupAt:'2026-11-15T10:00:00Z'})};return {ok:true,json:async()=>({ok:true,verified:true,index:p.index,backupId:p.backupId,file:{name:'歷史資料_第'+p.index+'份.xlsx',hash:digest,base64:bytes.toString('base64')}})};}};
+ vm.runInNewContext(frontend,{window:w,URL,AbortController,Uint8Array,Intl,Date,console});
+ return {w,calls,files,nodes,written,setRole:v=>role=v,setActor:v=>actor=v,captured:()=>captured};
+}
+(async()=>{
+ const x=setup(),api=x.w.Port79BackupExcel;
+ const data=await api.localData({actor:'A',endpoint:'https://example.invalid/exec',same:()=>true});
+ assert(!JSON.stringify(data).includes('其他帳號'));assert(!JSON.stringify(data).includes('never-export'));assert(!JSON.stringify(data).includes('secret'));
+ api.workbook({...data,長文:[{內容:'甲'.repeat(40000)}]});const book=x.captured();assert(book.sheets.some(s=>s.name.includes('長文字明細')),'long cells preserve full data in readable segments');assert(JSON.stringify(book).includes('工號'));assert(!JSON.stringify(book).includes('secret'));
+ const batch={excelDestination:await api.prepare(),items:[{type:'vessel',result:{verified:true,backupId:'backup'}}]};
+ await api.run(batch,{actor:'A',endpoint:'https://example.invalid/exec',token:'fixture',same:()=>true});
+ assert(batch.excelComplete);assert.equal(x.calls.filter(p=>p.phase==='local').length,1);assert.equal(x.calls.filter(p=>p.index!==undefined).length,2,'all inherited snapshot files are downloaded');
+ assert(x.files.has('雲端資料/船舶/歷史資料_第0份.xlsx'));assert(x.files.has('電腦端資料/本機資料.xlsx'));assert(![...x.files.keys()].some(k=>k.includes('禁止外洩')));assert(x.files.has('備份說明/備份範圍.xlsx'));assert.equal(x.written.at(-1),'closed');
+ for(const role of ['admin','employee']){x.setRole(role);await assert.rejects(api.prepare(),/超級管理員/);}
+ let touches=0;const c={p79HistoryBackupSession_:()=>{throw Error('denied');},getSpreadsheet_:()=>({}),p79ExcelContext_:()=>touches++};vm.createContext(c);vm.runInContext(backend,c);
+ for(const phase of ['list','complete','local','export'])assert.throws(()=>c.p79BackupReadableExcel_({phase}),/denied/);assert.equal(touches,0,'no source metadata before superadmin authorization');
+ assert.throws(()=>c.p79ExcelFolder_('English'),/中文/);
+ const claims=new Map();let core=0,lockOwned=false;
+ Object.assign(c,{p79ExcelExisting_:()=>null,PropertiesService:{getScriptProperties:()=>({getProperty:k=>claims.get(k)||null,setProperty:(k,v)=>claims.set(k,v),deleteProperty:k=>claims.delete(k)})},LockService:{getScriptLock:()=>({tryLock:()=>{lockOwned=true;return true;},releaseLock:()=>{lockOwned=false;}})},Utilities:{getUuid:()=> 'owner'},p79ExcelExportSourceCore_:()=>{assert.equal(lockOwned,false,'network export must not hold global lock');core++;return {ok:true};}});
+ claims.set('P79_EXCEL_BUSY_source',JSON.stringify({owner:'other',at:Date.now()}));assert.throws(()=>c.p79ExcelExportSource_({ids:['source']},0),/正在產生/);assert.equal(core,0,'another computer cannot duplicate an active export');
+ claims.clear();assert(c.p79ExcelExportSource_({ids:['source']},0).ok);assert.equal(core,1);assert.equal(claims.size,0,'finished claim always released');
+ c.p79ExcelExportSourceCore_=()=>{throw Error('export failed');};assert.throws(()=>c.p79ExcelExportSource_({ids:['source']},0),/export failed/);assert.equal(claims.size,0,'failed claim released for retry');
+ 
+ assert(!backend.includes('setTrashed(')&&!backend.includes('addViewer(')&&!backend.includes('addEditor('),'new backups never delete history or broaden sharing');
+ console.log('PASS superadmin-only dual Excel: account isolation, secret redaction, readable long cells, all snapshot references, Chinese folders, verified bytes and real save completion');
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -3,7 +3,7 @@
  * One bounded receipt slot per category; no token or business rows are stored here.
  */
 function p79HistoryBackupCapabilitiesWithReceipt_(params) {
-  return Object.assign({},p79HistoryBackupCapabilities_(params),{backupReceiptLookupVersion:1});
+  return Object.assign({},p79HistoryBackupCapabilities_(params),{backupReceiptLookupVersion:1,excelBackupVersion:1});
 }
 function p79BackupReceiptType_(value) {
   var type=String(value||'');

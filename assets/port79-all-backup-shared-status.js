@@ -40,7 +40,7 @@
     order.forEach((type,i)=>{
       const receipt=byType.get(type),li=list.children[i];
       if(!li || !receipt || receipt.verified!==true)return;
-      const time=localTime(receipt.backupAt);
+      const time=localTime(receipt.excelBackupAt||receipt.backupAt);
       if(!time)return;
       const control=li.querySelector('.p79-backup-light-control');
       if(!control)return;
@@ -56,19 +56,19 @@
         li.classList.remove('p79-backup-pending');
         li.classList.add('p79-backup-done');
       }
-      const url=safeLink(receipt.backupUrl);
+      const url=safeLink(receipt.excelBackupUrl||receipt.backupUrl);
       if(url && control.tagName!=='A' && control.tagName!=='BUTTON') {
         const a=d.createElement('a');
         a.className=control.className;
         a.append(...Array.from(control.childNodes));
         control.replaceWith(a);
         a.href=url;a.target='_blank';a.rel='noopener';
-      }else if(url && control.tagName==='A' && !control.href){control.href=url;control.target='_blank';control.rel='noopener';}
+      }else if(url && control.tagName==='A' && control.href!==url){control.href=url;control.target='_blank';control.rel='noopener';}
       li.title='上次雲端備份完成：'+time+'（所有電腦共用）';
     });
     const done=order.filter(type=>byType.get(type)?.verified===true).length;
     const other=excluded.filter(type=>byType.get(type)?.verified===true).length;
-    const allTimes=data.groups.filter(x=>x.verified&&x.backupAt).map(x=>({raw:x.backupAt,time:localTime(x.backupAt)})).sort((a,b)=>a.raw.localeCompare(b.raw));
+    const allTimes=data.groups.filter(x=>x.verified&&x.backupAt).map(x=>({raw:x.excelBackupAt||x.backupAt,time:localTime(x.excelBackupAt||x.backupAt)})).sort((a,b)=>a.raw.localeCompare(b.raw));
     const latest=allTimes.length?allTimes[allTimes.length-1].time:'尚無紀錄';
     if(status && (/尚未開始備份|待核對|雲端備份紀錄/.test(status.textContent||''))){
       status.textContent='雲端備份紀錄 · '+done+'/'+order.length+' 類已備份（另有 '+other+'/'+excluded.length+' 項其他備份） · 最近完成 '+latest+'（台灣時間；所有電腦共用）';
@@ -122,5 +122,5 @@
     load(false);
   }
   if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',init,{once:true});else init();
-  g.Port79SharedBackupStatus={refresh:()=>load(true),get:()=>last.status};
+  g.Port79SharedBackupStatus={refresh:()=>load(true),get:()=>{const who=current();return who&&who.key===last.identity?last.status:null;}};
 })(window);

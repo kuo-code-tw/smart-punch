@@ -32,6 +32,7 @@ function p79AllBackupStatus_(params){
       if(!inRoot)return item;
       var at=String(receipt.backupAt);
       if(!/^\d{8}-\d{6}$/.test(at)&&!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(at))return item;
+      var excel=JSON.parse(props.getProperty('P79_EXCEL_LAST_'+group.type)||'null');if(excel&&excel.verified&&excel.backupId===receipt.backupId&&excel.fileId){try{var xfile=DriveApp.getFileById(excel.fileId);if(!xfile.isTrashed()){item.excelBackupAt=excel.backupAt;item.excelBackupUrl=xfile.getUrl();}}catch(ignore){}}
       item.verified=true;item.backupAt=at;item.backupId=file.getId();item.backupUrl=file.getUrl();
       item.rows=Math.max(0,Number(receipt.rows)||0);item.unchanged=!!receipt.unchanged;
     }catch(error){item.message='備份檔案暫時無法核對';}
