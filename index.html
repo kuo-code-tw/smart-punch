@@ -22,8 +22,9 @@
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-backup-above-vessel-v3">
-<link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261115-original-import-nav-v6">
-<script defer src="assets/port79-home-drop-import.js?v=20261115-original-import-nav-v6"></script>
+<link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261115-auto-dispatch-v1">
+<script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script defer src="assets/port79-home-drop-import.js?v=20261115-auto-dispatch-v1"></script>
 <script defer src="assets/port79-all-backup.js?v=20261114-backup-lock-wait-v7"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
@@ -436,19 +437,20 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         </div>
         <div class="p79-modern-home-ship" aria-hidden="true">🚢<small>人性化 · 科技化 · 更好操作</small></div>
       </section>
-      <section id="p79HomeDropImport" hidden aria-label="前往原系統匯入">
-        <h2>前往匯入</h2>
+      <section id="p79HomeDropImport" hidden aria-label="自動辨識 Excel 並使用原系統匯入">
+        <h2>Excel 自動匯入</h2>
         <div id="p79HomeDropGrid">
-          <div class="p79-home-drop-zone" data-p79-drop-kind="gate" role="button" tabindex="0" aria-label="前往 Gate 進出站原系統匯入檔案" title="進入 Gate 原系統選擇 Excel">
+          <div class="p79-home-drop-zone" data-p79-drop-kind="gate" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識並匯入 Gate Yard 或船舶" title="拖入 Excel 自動辨識類型">
             <span class="p79-drop-icon" aria-hidden="true">🚛</span><strong>Gate 進出站</strong>
           </div>
-          <div class="p79-home-drop-zone" data-p79-drop-kind="yard" role="button" tabindex="0" aria-label="前往 Yard 儲量原系統匯入檔案" title="進入 Yard 原系統選擇 Excel">
+          <div class="p79-home-drop-zone" data-p79-drop-kind="yard" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識類型後匯入" title="拖入 Excel 自動辨識類型">
             <span class="p79-drop-icon" aria-hidden="true">▥</span><strong>Yard 儲量</strong>
           </div>
-          <div class="p79-home-drop-zone" data-p79-drop-kind="vessel" role="button" tabindex="0" aria-label="前往船舶作業原系統匯入檔案" title="進入船舶作業原系統選擇 Excel">
+          <div class="p79-home-drop-zone" data-p79-drop-kind="vessel" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識類型後匯入" title="拖入 Excel 自動辨識類型">
             <span class="p79-drop-icon" aria-hidden="true">🚢</span><strong>船舶作業</strong>
           </div>
         </div>
+        <input id="p79HomeImportInput" type="file" accept=".xlsx,.xls,.csv" multiple hidden aria-label="選擇自動辨識匯入的 Excel 檔案">
       </section>
       <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-label="系統備份狀態">
         <div class="p79-all-backup-top"><strong>系統備份</strong><button type="button" id="p79AllBackupButton">備份資料庫</button></div>
@@ -670,6 +672,26 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         <button id="cardHr" class="system-card hr" type="button" onclick="launchSystem('hr')"><span class="icon">👥</span><span class="name">人資管理系統</span><span class="desc">唯一人員主檔、部門職稱、特休、裝置綁定與五大系統權限</span><span class="badge"></span></button>
         <button id="cardHistory" class="system-card history" type="button" onclick="p79NavigateWhileBackingUp('./history-data/')"><span class="icon">🗄️</span><span class="name">歷史資料庫／歷史資料中心</span><span class="desc">考勤、排班、船舶歷史月份集中查詢；連結原有 Google Drive 資料，不重建、不搬移</span><span class="badge">歷史</span></button>
       </div>
+      <dialog id="p79HomeImportDialog" aria-label="自動辨識匯入進度">
+        <div class="p79-import-modal-head">
+          <h2 id="p79HomeImportTitle">Excel 自動辨識匯入</h2>
+          <button type="button" id="p79HomeImportClose">關閉</button>
+        </div>
+        <div id="p79HomeImportFile" aria-label="匯入檔案名稱"></div>
+        <div id="p79HomeImportProgress" role="progressbar" aria-label="匯入工作階段進度" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+          <span id="p79HomeImportProgressBar"></span>
+        </div>
+        <p id="p79HomeImportStatus" role="status" aria-live="polite">準備辨識 Excel 格式</p>
+        <section id="p79HomeImportReview" hidden aria-label="原系統匯入前確認">
+          <strong>原系統資料核對</strong>
+          <pre id="p79HomeImportReviewText"></pre>
+          <div class="p79-home-import-review-buttons">
+            <button type="button" id="p79HomeImportReviewNo">取消匯入</button>
+            <button type="button" id="p79HomeImportReviewYes">確認匯入</button>
+          </div>
+        </section>
+        <iframe id="p79HomeImportFrame" title="原系統匯入執行頁面" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
+      </dialog>
       <div class="p79-modern-home-preserve"><span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班維持現行介面與流程</strong><small>本次只調整管理畫面外觀。登入、刷卡、權限、資料連結及雲端資料均保持原狀。</small></div></div>
       <div class="note">所有系統的人員資料與權限統一由「人資管理系統」維護；歷史月份集中由「歷史資料中心」查詢，避免平常切換系統重複下載大量舊資料。</div>
 
