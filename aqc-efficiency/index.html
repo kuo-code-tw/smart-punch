@@ -7853,6 +7853,7 @@ function requireEfficiencyAccess(){
   return role==='admin' && level!=='none' && !!loadGcSession();
 }
 function canManageEfficiency(){
+  if(p79EfficiencyLocalPreview&&!p79EfficiencyAuthReady)return false;
   const s=getHomeAdminSession();
   const role=String(s?.adminRole||sessionStorage.getItem('aqc_admin_role')||'').toLowerCase();
   if(role==='superadmin')return !!loadGcSession();
@@ -7933,6 +7934,7 @@ async function verifyGcSsoToken(token){
       data.efficiencyAccessLevel=access;
       p79EfficiencyRecentlyVerifiedToken=token;
       p79EfficiencyRecentlyVerifiedAt=Date.now();
+      try{sessionStorage.setItem('p79_efficiency_verified_preview',JSON.stringify({token,empId:String(data.empId||getHomeAdminSession()?.empId||'').trim().toUpperCase(),at:Date.now()}));}catch(_){}
       return data;
     }catch(e){
       lastError=e;
@@ -7994,7 +7996,7 @@ function loadGcSession(){
 
 function clearGcSession(){
   gcToken='';
-  [GC_SESSION_TOKEN_KEY,GC_LEGACY_TOKEN_KEY,'port79_admin_token','port79_sso_verified'].forEach(k=>sessionStorage.removeItem(k));
+  [GC_SESSION_TOKEN_KEY,GC_LEGACY_TOKEN_KEY,'port79_admin_token','port79_sso_verified','p79_efficiency_verified_preview'].forEach(k=>sessionStorage.removeItem(k));
   localStorage.removeItem(GC_SESSION_TOKEN_KEY);
   localStorage.removeItem(GC_LEGACY_TOKEN_KEY);
 }
@@ -15470,6 +15472,35 @@ function startShipFullAutoSync(){
   });
 }
 
+let p79EfficiencyLocalPreview=false;
+function p79CanPreviewEfficiencyLocal(){
+  if(new URLSearchParams(location.search).get('homeImport')==='1')return false;
+  try{
+    const receipt=JSON.parse(sessionStorage.getItem('p79_efficiency_verified_preview')||'null');
+    const admin=getHomeAdminSession();
+    const home=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
+    const owner=String(admin?.empId||'').trim().toUpperCase();
+    const homeOwner=String(home?.empId||'').trim().toUpperCase();
+    const age=Date.now()-Number(receipt?.at);
+    return !!owner&&(!homeOwner||homeOwner===owner)&&receipt?.empId===owner&&
+      receipt.token===currentPort79SsoToken()&&age>=0&&age<30*60*1000&&
+      efficiencyPermissionFromData(admin)!=='none';
+  }catch(_){return false;}
+}
+function p79ShowVerifiedLocalPreview(){
+  if(!p79CanPreviewEfficiencyLocal())return false;
+  loadGcSession();
+  efficiencyAccessLevel=efficiencyPermissionFromData(getHomeAdminSession());
+  loadLocal();
+  if(!hasLocalVesselData())return false;
+  p79EfficiencyLocalPreview=true;
+  updateLatestVesselSummaryFromMasters();
+  renderVesselSummary();
+  invalidateWorkloadIndex();
+  renderEfficiencyTabFast('dashboard');
+  cloudStatus('先顯示本機資料｜背景核對雲端登入與最新資料，核對完成前暫停修改',false);
+  return true;
+}
 let p79EfficiencyAuthRetryTimer=null;
 let p79EfficiencyAuthReady=false;
 let p79EfficiencyAuthRecoveryBusy=false;
@@ -15533,13 +15564,17 @@ async function initGcPage(){
       showGcAccessDenied('管理員登入狀態已失效或權限驗證未通過。請返回首頁重新登入。');
     }else{
       p79EfficiencyAuthReady=false;
-      showGcAccessDenied('雲端驗證暫時無法完成，登入資訊已保留，系統會自動重試。也可按「重新驗證登入」，不需要登出。',true);
+      if(p79EfficiencyLocalPreview){
+        cloudStatus('目前顯示本機資料｜雲端驗證暫忙，背景自動重試，不需要登出；核對完成前暫停修改',false);
+      }else showGcAccessDenied('雲端驗證暫時無法完成，登入資訊已保留，系統會自動重試。也可按「重新驗證登入」，不需要登出。',true);
       p79QueueEfficiencyAuthRecovery();
     }
     return;
   }
 
   loadLocal();
+  // Paint the existing computer data before waiting for IndexedDB or cloud refresh.
+  renderEfficiencyTabFast('dashboard');
   try{
     const row=await window.Port79DataCache?.getDisplaySnapshot?.('efficiency',{month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')});
     const d=row?.data;
@@ -15629,7 +15664,9 @@ function applyEfficiencyAccessUi(){
 }
 
 document.addEventListener('DOMContentLoaded',async()=>{
-  // 先接收首頁的一次登入憑證；成功後本頁不再要求第二次登入。
+  // Only a same-account, same-token verified receipt permits local read-only preview.
+  // Cloud verification still gates edits, uploads and all first-time access.
+  p79ShowVerifiedLocalPreview();
   await consumePort79SsoHandoff();
   loadGcSession();
   const s=getHomeAdminSession();
