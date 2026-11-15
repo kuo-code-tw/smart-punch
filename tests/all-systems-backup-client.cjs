@@ -2,13 +2,14 @@
 const fs=require('fs'),vm=require('vm'),a=require('assert/strict'),crypto=require('crypto');
 const code=fs.readFileSync('assets/port79-all-backup.js','utf8');
 function setup(options={}){
- const store=new Map([['port79_user_session',JSON.stringify({empId:'FIXTURE',adminRole:'superadmin',systemPermissions:{history:'manage'}})],['port79_user_token','fixture-token'],['port79_gas_url','https://script.google.com/macros/s/fixture/exec']]);const local=new Map(),nodes=new Map(),requests=[];let fail=options.fail,hold=null,excelRuns=0;const attempts=new Map();
+ const store=new Map([['port79_user_session',JSON.stringify({empId:'FIXTURE',adminRole:'superadmin',systemPermissions:{history:'manage'}})],['port79_user_token','fixture-token'],['port79_gas_url','https://script.google.com/macros/s/fixture/exec']]);const local=options.local||new Map(),nodes=new Map(),requests=[];let fail=options.fail,hold=null,excelRuns=0;const attempts=new Map();
  const node=(tag='')=>({tag,setAttribute(){},querySelector(t){let found=this.children.find(x=>x.tag===t);if(!found){found=node(t);this.children.push(found);}return found;},hidden:false,disabled:false,textContent:'',children:[],append(...v){this.children.push(...v.flatMap(x=>x.tag==='fragment'?x.children:[x]));},appendChild(v){this.children.push(v);},replaceChildren(...v){this.children=[];this.append(...v);},addEventListener(){}});
  const window={document:{readyState:'loading',addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},createElement:node,createDocumentFragment:()=>node('fragment')},sessionStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},localStorage:{getItem:k=>local.get(k)||null,setItem:(k,v)=>local.set(k,v)},crypto:{subtle:crypto.webcrypto.subtle,randomUUID:crypto.randomUUID},setTimeout:(fn,ms)=>options.busy&&ms<=15000?(Promise.resolve().then(()=>{if(options.changeDuringWait)store.set('port79_user_token','changed-during-wait');fn();}),0):setTimeout(fn,ms),clearTimeout,btoa:s=>Buffer.from(s,'binary').toString('base64'),fetch:async(url,init)=>{
   const u=new URL(url);const payload=init.body?JSON.parse(init.body):{action:u.searchParams.get('action'),type:u.searchParams.get('type'),requestId:u.searchParams.get('requestId')};requests.push(payload);if(hold)await hold;
+  if(payload.action==='historyBackupReceipt'&&options.lookupPendingType===payload.type)return {ok:true,json:async()=>({ok:true,state:'pending'})};
   if(payload.action==='historyBackupReceipt')return {ok:true,json:async()=>({ok:true,state:'complete',receipt:{ok:true,verified:true,sourceUnchanged:true,type:payload.type,requestId:options.wrongReceipt?'different-request':payload.requestId,backupId:'fixture-file',backupUrl:'https://docs.google.com/spreadsheets/d/fixture-file/edit',rows:2}})};
   if(init.body&&options.recover)throw new TypeError('Failed to fetch');
-  if(!init.body)return {ok:true,json:async()=>({ok:true,allSystemsBackupVersion:options.old?undefined:1,backupReceiptLookupVersion:options.recover?1:undefined,groups:window.Port79AllBackup.types,excelBackupVersion:options.excel&&!options.noExcelService?1:undefined})};
+  if(!init.body)return {ok:true,json:async()=>({ok:true,allSystemsBackupVersion:options.old?undefined:1,backupReceiptLookupVersion:options.recover||options.lookup?1:undefined,groups:window.Port79AllBackup.types,excelBackupVersion:options.excel&&!options.noExcelService?1:undefined})};
   if(init.body&&options.busy&&['efficiency','vessel','sailing','routes'].includes(payload.type)){const n=(attempts.get(payload.type)||0)+1;attempts.set(payload.type,n);if(n<=(options.permanentBusy?100:2))return {ok:true,json:async()=>({ok:false,error:'其他資料正在儲存，請重試此分類'})};}
   if(payload.type===fail)return {ok:true,json:async()=>({ok:false,error:'測試分類未完成'})};
   return {ok:true,json:async()=>({ok:true,verified:!options.unverified,sourceUnchanged:true,type:payload.type,requestId:payload.requestId,backupId:'fixture-file',backupUrl:options.badLink?'https://untrusted.invalid/leak':'https://docs.google.com/spreadsheets/d/fixture-file/edit',rows:2})};
@@ -54,5 +55,22 @@ function setup(options={}){
  t=setup({excel:true});await t.window.Port79AllBackup.start();a.equal(t.excelRuns(),1,'one button creates Excel only after all cloud receipts');a.equal(t.requests.length,14);
  t=setup({excel:true,fail:'leave'});await t.window.Port79AllBackup.start();a.equal(t.excelRuns(),0,'incomplete cloud backup cannot be reported as complete Excel');
  t=setup({excel:true,noExcelService:true});await t.window.Port79AllBackup.start();a.equal(t.requests.length,1,'missing server Excel capability blocks writes before starting');
+ const savedProgress=new Map();
+ t=setup({fail:'leave',local:savedProgress});await t.window.Port79AllBackup.start();
+ const originalIds=new Map(t.requests.filter(r=>r.requestId).map(r=>[r.type,r.requestId]));
+ a.equal(savedProgress.size,1,'incomplete progress survives page lifetime');
+ a(![...savedProgress.values()].join('').includes('fixture-token'),'checkpoint never stores authentication token');
+ const resumed=setup({local:savedProgress,lookup:true,lookupPendingType:'leave'});await resumed.window.Port79AllBackup.start();
+ a.equal(resumed.requests.filter(r=>r.action==='historyBackupMonth').length,1,'reload does not repeat twelve confirmed writes');
+ a.equal(resumed.requests.find(r=>r.action==='historyBackupMonth').requestId,originalIds.get('leave'),'remaining category retains its original request ID');
+ a.equal(resumed.requests.filter(r=>r.action==='historyBackupReceipt').length,13,'all saved categories are revalidated by the authenticated server');
+ a([...savedProgress.values()].every(v=>v===''),'successful completed batch clears checkpoint');
+ const navCode=homepage.slice(homepage.indexOf('function p79NavigateWhileBackingUp('),homepage.indexOf('function launchSystem('));
+ let navClick,opened=0,stopped=false;
+ const loc={href:'https://fixture.invalid/',origin:'https://fixture.invalid',pathname:'/',search:''};
+ const navWindow={Port79AllBackup:{isBusy:()=>true},open:()=>{opened++;return {};},addEventListener(){}};
+ vm.runInNewContext(navCode,{window:navWindow,location:loc,URL,document:{addEventListener:(kind,fn)=>{if(kind==='click')navClick=fn;}},alert:()=>{throw Error('unexpected popup refusal');}});
+ const event={button:0,target:{closest:()=>({href:'https://fixture.invalid/schedule/',target:'',hasAttribute:()=>false})},preventDefault(){this.defaultPrevented=true;},stopImmediatePropagation(){stopped=true;}};
+ navClick(event);a.equal(opened,1);a(stopped,'capture stops the sidebar second navigation handler');a.equal(loc.href,'https://fixture.invalid/','backup owner page remains alive while other system opens');
  console.log('PASS all-system client: all categories, old-backend guard, verified-only success, retry only failed with stable IDs, double-click/account guards, safe links and account-scoped yard data');
 })().catch(e=>{console.error(e);process.exit(1);});

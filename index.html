@@ -27,7 +27,7 @@
 <script defer src="assets/port79-home-drop-import.js?v=20261115-confirmed-auto-close-v1"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script defer src="assets/port79-backup-excel.js?v=20261115-dual-excel-v120"></script>
-<script defer src="assets/port79-all-backup.js?v=20261115-excel-superadmin-v120"></script>
+<script defer src="assets/port79-all-backup.js?v=20261115-resume-navigation-v121"></script>
 <script defer src="assets/port79-all-backup-shared-status.js?v=20261115-dual-excel-status-v120"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
@@ -1733,6 +1733,7 @@ document.addEventListener('click',function(event){
  if(target.origin!==location.origin)return;
  if(target.pathname===location.pathname&&target.search===location.search&&target.hash)return;
  event.preventDefault();
+ event.stopImmediatePropagation();
  p79NavigateWhileBackingUp(target.href);
 },true);
 window.addEventListener('beforeunload',function(event){
