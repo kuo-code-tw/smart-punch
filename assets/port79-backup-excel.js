@@ -2,6 +2,21 @@
 (function(g){
 'use strict';
 const d=g.document;
+let readyDownload=null;
+function clearDownload(){if(readyDownload)g.URL.revokeObjectURL(readyDownload.url);readyDownload=null;const b=d.getElementById('p79BackupDownload');if(b)b.hidden=true;}
+function refreshDownload(){if(readyDownload&&(!allowed()||!readyDownload.same()))clearDownload();}
+function offerDownload(blob,c){
+ clearDownload();const name='79號碼頭完整備份_'+stamp()+'.zip',url=g.URL.createObjectURL(blob);readyDownload={url,name,same:c.same};
+ let b=d.getElementById('p79BackupDownload');if(!b){b=d.createElement('button');b.id='p79BackupDownload';b.type='button';b.textContent='下載';b.style.marginInlineStart='8px';d.getElementById('p79AllBackupButton')?.insertAdjacentElement('afterend',b);b.addEventListener('click',()=>{refreshDownload();if(!readyDownload)return;const a=d.createElement('a');a.href=readyDownload.url;a.download=readyDownload.name;d.body.append(a);a.click();a.remove();state('雲端Excel：已保存｜電腦端：已開始下載 '+readyDownload.name+'，請以瀏覽器下載完成為準；可再次按「下載」。');});}
+ b.hidden=false;b.title=name;
+}
+async function validateArchive(blob){
+ if(!blob||blob.size<22)throw Error('壓縮檔尚未完整產生，未提供下載');
+ const data=await blob.arrayBuffer(),head=new Uint8Array(data,0,4);if(head[0]!==80||head[1]!==75||head[2]!==3||head[3]!==4)throw Error('壓縮檔格式錯誤，未提供下載');
+ const check=await g.JSZip.loadAsync(data,{checkCRC32:true}),files=Object.values(check.files).filter(f=>!f.dir);
+ if(!files.length||!files.some(f=>f.name==='電腦端資料/本機資料.xlsx')||!files.some(f=>f.name==='備份說明/備份範圍.xlsx'))throw Error('壓縮檔內容不完整，未提供下載');
+ return check;
+}
 const labels={personnel:'人資',attendance:'出勤',schedule:'排班',leave:'請假',overtime:'加班',workhours:'工時',efficiency:'作業效率',vessel:'船舶',sailing:'船期',audit:'系統稽核',gate:'碼頭進出站',routes:'碼頭航線',yard:'碼頭儲量'};
 const columns={empId:'工號',name:'姓名',date:'日期',month:'月份',year:'年度',records:'明細',shipMasters:'船舶主檔',employees:'人員',schedules:'班表',schedule:'排班',assignments:'人員分組',groups:'組別',workDate:'作業日期',workingNo:'作業編號',vessel:'船名',shift:'班別',startTime:'開始時間',endTime:'結束時間',containers:'櫃量',hours:'時數',rows:'資料列',data:'資料',fileName:'檔名',updatedAt:'更新時間',savedAt:'保存時間',systemEmployees:'系統人員'};
 function allowed(){try{const s=JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');return !!s&&!s.punchOnly&&String(s.adminRole||s.role).toLowerCase()==='superadmin';}catch(_){return false;}}
@@ -16,8 +31,7 @@ async function prepare(){
  if(!allowed())throw Error('僅超級管理員可查看及執行備份');
  if(!g.XLSX||!g.JSZip)throw Error('Excel備份元件尚未載入，請稍後再試');
  state('正在準備本次雲端與電腦端Excel備份…');
- // Ask the browser for a destination while the original click still has activation.
- if(g.showSaveFilePicker){try{return {handle:await g.showSaveFilePicker({suggestedName:'79號碼頭完整備份_'+stamp()+'.zip',types:[{description:'中文分類Excel備份',accept:{'application/zip':['.zip']}}]})};}catch(error){if(error.name==='AbortError')throw error;}}
+ // Do not create an empty destination file before a long cloud backup finishes.
  return {handle:null};
 }
 async function callOnce(c,payload){
@@ -106,13 +120,14 @@ async function run(batch,c){
   }
   stateData.cloud=true;
   zip.file('備份說明/備份範圍.xlsx',workbook({備份清單:Object.entries(stateData.completed).map(([type,r])=>({分類:labels[type],Excel份數:r.files,雲端成功時間:r.backupAt})),說明:[{資料:'電腦端資料僅涵蓋目前瀏覽器可讀取的資料；其他電腦未上傳的資料，必須在該電腦執行備份。'}]}));
-  const blob=await zip.generateAsync({type:'blob',compression:'STORE'});if(!c.same())throw Error('登入已變更，未下載備份');
-  const destination=batch.excelDestination;
+  const blob=await zip.generateAsync({type:'blob',compression:'STORE',mimeType:'application/zip'});if(!c.same())throw Error('登入已變更，未提供備份下載');
+  state('雲端Excel：已保存｜正在檢查壓縮檔完整性…');
+  await validateArchive(blob);if(!c.same())throw Error('登入已變更，未提供備份下載');
+  offerDownload(blob,c);
   const completedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
-  if(destination?.handle){const writer=await destination.handle.createWritable();try{await writer.write(blob);await writer.close();}catch(e){try{await writer.abort();}catch(_){}throw e;}state('雲端Excel：全部保存完成｜電腦端：備份檔已寫入所選位置（中文資料夾分類）｜'+completedAt+'（台灣時間）');}
-  else{const url=g.URL.createObjectURL(blob),a=d.createElement('a');a.href=url;a.download='79號碼頭完整備份_'+stamp()+'.zip';d.body.append(a);a.click();a.remove();g.setTimeout(()=>g.URL.revokeObjectURL(url),60000);state('雲端Excel：全部保存完成｜電腦端：已開始下載，請確認瀏覽器下載完成；不代表其他電腦已保存｜'+completedAt+'（台灣時間）');}
+  state('雲端Excel：全部保存完成｜壓縮檔完整性檢查通過｜請按旁邊「下載」儲存到電腦；目前尚未下載｜'+completedAt+'（台灣時間）。重新整理或關閉本頁前請先下載。');
   batch.excelComplete=true;g.Port79SharedBackupStatus?.refresh?.();
  }catch(e){state((stateData.cloud?'雲端Excel：已保存':'雲端Excel：尚未全部完成')+'｜電腦端：尚未完成；'+String(e.message||e)+'。已完成項目保留，可按原按鈕繼續。');throw e;}
 }
-g.Port79BackupExcel={prepare,run,workbook,clean,allowed,localData};
+g.Port79BackupExcel={prepare,run,workbook,clean,allowed,localData,validateArchive,refreshDownload,clearDownload};
 })(window);

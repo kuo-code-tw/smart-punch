@@ -221,6 +221,7 @@ async function start(onlyId=null){
  finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result)&&(!g.Port79BackupExcel||batch.excelComplete)){clearCheckpoint(c);batch=null;}}else refresh();}
 }
 function refresh(){
+ g.Port79BackupExcel?.refreshDownload?.();
  const s=session(),role=String(s?.adminRole||s?.role||'').toLowerCase();
  const isManager=allowed(s);
  const canRun=allowed(s),panel=$('p79AllBackupPanel'),button=$('p79AllBackupButton');
