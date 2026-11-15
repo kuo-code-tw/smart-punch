@@ -24,7 +24,7 @@ assert.match(html,/id="yardReeferCount"/);
 assert.match(html,/id="yardReeferTeuSummary"/);
 assert.match(html,/20 呎櫃＝1 TEU，40／45 呎櫃＝2 TEU/);
 assert.doesNotMatch(html,/id="yardManualHeavyCap"|id="yardManualEmptyCap"/,'TEU override inputs must not be shown as box count controls');
-assert.match(html,/yard-dashboard\.js\?v=20261113-home-size-cards-v1/);
+assert.match(html,/yard-dashboard\.js\?v=20261115-yard-a1-guard-v3/);
 assert.match(html,/yard-dashboard\.css\?v=20261113-home-size-cards-v1/);
 assert.match(parent,/20261113-yard-home-size-cards-v1/);
 assert.match(css,/\.yard-allowed-summary/);
