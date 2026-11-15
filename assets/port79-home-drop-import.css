@@ -27,3 +27,84 @@
 }
 html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
 html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
+
+/* Auto-routing dialog: short and readable. Native importers run inside the
+   invisible same-origin iframe; the iframe never stretches this dialog. */
+#p79HomeImportDialog{
+ position:relative;box-sizing:border-box;
+ width:min(470px,calc(100vw - 24px));max-width:470px;
+ height:fit-content;max-height:min(310px,calc(100dvh - 24px));
+ padding:0;margin:auto;border:0;border-radius:14px;
+ background:#fff;color:#173c65;box-shadow:0 18px 65px #10233d5c;
+ overflow:hidden;
+}
+#p79HomeImportDialog[open]{display:flex;flex-direction:column;align-items:stretch}
+#p79HomeImportDialog::backdrop{background:rgba(10,25,45,.54)}
+#p79HomeImportDialog .p79-import-modal-head{
+ z-index:1;flex:none;display:flex;align-items:center;justify-content:space-between;
+ gap:10px;padding:9px 13px;background:#edf5ff;border-bottom:1px solid #d7e4f2;
+}
+#p79HomeImportTitle{font-size:14px;line-height:1.5;margin:0;font-weight:800}
+#p79HomeImportClose{
+ min-height:30px;padding:5px 10px;border:1px solid #bdd4e6;
+ border-radius:8px;background:#fff;color:#244b70;cursor:pointer;font-size:12px;
+}
+#p79HomeImportFile{
+ position:relative;z-index:1;flex:none;
+ overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ margin:0;padding:9px 13px 5px;font-size:12px;font-weight:650;
+}
+#p79HomeImportProgress{
+ position:relative;z-index:1;flex:none;margin:7px 13px 4px;
+ height:7px;min-height:7px;border-radius:99px;overflow:hidden;background:#e5eefa;
+}
+#p79HomeImportProgressBar{
+ display:block;height:100%;width:0%;background:#2563eb;
+ border-radius:99px;transition:width .2s ease;
+}
+#p79HomeImportProgress[data-tone=error] #p79HomeImportProgressBar{background:#dc2626}
+#p79HomeImportProgress[data-tone=success] #p79HomeImportProgressBar{background:#16a34a}
+#p79HomeImportProgress[data-tone=pending] #p79HomeImportProgressBar{background:#d97706}
+#p79HomeImportStatus{
+ position:relative;z-index:1;flex:0 1 auto;box-sizing:border-box;
+ min-height:32px;max-height:120px;overflow-y:auto;
+ margin:0;padding:7px 13px 12px;
+ white-space:pre-wrap;overflow-wrap:anywhere;
+ font-size:12px;line-height:1.5;color:#294565;
+}
+#p79HomeImportStatus[data-tone=error]{color:#a32230;background:#fff5f4}
+#p79HomeImportStatus[data-tone=pending]{color:#8a5511;background:#fffaf0}
+#p79HomeImportStatus[data-tone=success]{color:#12643d;background:#effbf3}
+#p79HomeImportReview{
+ position:relative;z-index:1;flex:0 1 auto;min-height:0;overflow:auto;
+ margin:0 13px 12px;padding:10px;
+ border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;
+}
+#p79HomeImportReview[hidden]{display:none!important}
+#p79HomeImportReview strong{font-size:12px}
+#p79HomeImportReviewText{
+ max-height:180px;overflow:auto;padding:8px;margin:5px 0 8px;
+ border:1px solid #dbe6f3;border-radius:5px;background:#fff;
+ white-space:pre-wrap;overflow-wrap:anywhere;
+ font:12px/1.5 system-ui,sans-serif;color:#294565;
+}
+#p79HomeImportReview .p79-home-import-review-buttons{display:flex;justify-content:flex-end;gap:8px}
+#p79HomeImportReview .p79-home-import-review-buttons button{
+ min-height:30px;padding:5px 10px;border-radius:7px;border:1px solid #bfd3e6;
+ background:#fff;color:#23466a;cursor:pointer;font-size:12px;
+}
+#p79HomeImportReviewYes{background:#126db8!important;color:#fff!important}
+#p79HomeImportDialog:has(#p79HomeImportReview:not([hidden])){
+ max-height:min(560px,calc(100dvh - 24px));
+}
+#p79HomeImportFrame{
+ display:block!important;position:absolute!important;top:0;left:0;
+ width:1px!important;height:1px!important;min-width:0;min-height:0;
+ opacity:0!important;pointer-events:none!important;border:0!important;
+ z-index:0;overflow:hidden;
+}
+#p79HomeImportInput[hidden]{display:none!important}
+#p79HomeDropImport .p79-home-drop-zone.p79-import-over{
+ border-color:#2563eb;background:#dbeafe;box-shadow:0 0 0 2px #93c5fd;
+}
+@media(max-width:700px){#p79HomeImportDialog{width:calc(100vw - 18px)}}
