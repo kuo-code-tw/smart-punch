@@ -60,7 +60,8 @@ function findGateMatrix(name){
   var found=label(pair[0],pair[1]);
   if(found!==pair[2]){
    var cell='B'+(pair[0]+1);
-   throw Error('工作表「'+name+'」不是預期的 Gate 分類表格；'+cell+' 應為「'+pair[2]+'」，實際讀到「'+(found||'空白')+'」。請核對分類列或改選正確工作表');
+   var safe=found&&found.length<=24&&!/[\\x00-\\x1f\\ufffd]/i.test(found)&&/^[\\p{L}\\p{N}\\s_.()\\/-]+$/u.test(found)?'「'+found+'」':'無法辨識的字元或空白';
+   throw Error('工作表「'+name+'」不符合 Gate 原報表；'+cell+' 應為「'+pair[2]+'」，實際讀到 '+safe+'。未寫入任何資料，請核對報表格式');
   }
  }
  if(!label(14,0).includes('本日進站卡車數'))throw Error('找不到第15列「本日進站卡車數」');
@@ -191,6 +192,13 @@ async function chooseFile(droppedFile){
   message('正在讀取並核對 '+sourceFile.name+' …');
   var bytes=await sourceFile.arrayBuffer();
   if(selection!==selectionId)return;
+  if(/\.xlsx$/i.test(sourceFile.name)){
+   var sig=new Uint8Array(bytes,0,Math.min(bytes.byteLength,8));
+   var zip=sig[0]===0x50&&sig[1]===0x4b&&(
+    (sig[2]===3&&sig[3]===4)||(sig[2]===5&&sig[3]===6)||(sig[2]===7&&sig[3]===8));
+   var ole=[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1].every((n,i)=>sig[i]===n);
+   if(!zip&&!ole)throw Error('檔案內容不是有效 Excel 活頁簿；雖然名為 .xlsx，檔案實際不是 ZIP/Excel 格式。請使用真正的 Excel 原始檔');
+  }
   book=g.XLSX.read(bytes,{type:'array',cellHTML:false,cellDates:false});
   if(!book.SheetNames?.length)throw Error('Excel 不含工作表');
   book.SheetNames.forEach(function(name){
