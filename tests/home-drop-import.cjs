@@ -14,7 +14,7 @@ assert.match(html,/id="p79HomeImportProgressBar"/);
 assert.match(html,/id="p79HomeImportReviewYes"/);
 assert.match(html,/id="p79HomeImportInput"/);
 assert.match(css,/#p79HomeImportProgressBar/);
-assert.match(html,/port79-home-drop-import.js\?v=20261115-auto-dispatch-v1/);
+assert.match(html,/port79-home-drop-import.js\?v=20261115-gate-content-guard-v2/);
 assert(!js.includes('launchSystem('),'no homepage redirect');
 assert(!js.includes('gcSyncAll'),'cloud storage remains with the original importers');
 assert(!js.includes('gateStatsImport'),'no second Gate import implementation');
@@ -66,7 +66,8 @@ books[3]={
  }}
 };
 books[4]={SheetNames:['Notes'],Sheets:{Notes:{}}};
-const XLSX={read:buf=>books[new Uint8Array(buf)[0]]};
+books[5]={SheetNames:['Sheet1'],Sheets:{Sheet1:{B2:{v:'¥-ølbEóæ}ol'}}}};
+const XLSX={read:buf=>books[new Uint8Array(buf)[4]]};
 const session=new Map([
  ['port79_user_session',JSON.stringify({adminRole:'superadmin'})],
  ['port79_user_token','TEST']
@@ -113,7 +114,7 @@ Object.defineProperty(frame,'src',{
  }
 });
 vm.runInNewContext(js,{window:host,MutationObserver:MockObserver,setTimeout,clearTimeout,URL,console},{timeout:5000});
-function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Array.from([marker]).buffer};}
+function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Array.from([0x50,0x4b,3,4,marker]).buffer};}
 (async()=>{
  await host.Port79HomeDropImport.start([file('yard.xlsx',1)]);
  assert.deepEqual(calls,[['vessel','yard.xlsx']],'contents, not filename, choose original vessel');
@@ -130,7 +131,17 @@ function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Arra
  await host.Port79HomeDropImport.start([file('random.xlsx',4)]);
  assert.equal(calls.length,0,'unrecognized workbook must not enter any database');
  assert.equal(status.dataset.tone,'error');
- assert.match(status.textContent,/無法辨識/);
+ assert.match(status.textContent,/Excel 內容不符合/);
+ calls.length=0;
+ await host.Port79HomeDropImport.start([file('gate.xlsx',5)]);
+ assert.equal(calls.length,0,'filename-only Gate workbook must be rejected');
+ assert.match(status.textContent,/B2/);
+ assert.doesNotMatch(status.textContent,/ølbEóæ/,'garbled cell values should not be shown');
+ calls.length=0;
+ const corrupt={name:'gate.xlsx',size:500,arrayBuffer:async()=>Uint8Array.from([0x1f,0x8b,0x08,0x00,0xaa]).buffer};
+ await host.Port79HomeDropImport.start([corrupt]);
+ assert.equal(calls.length,0,'misnamed binary file must not be dispatched to Gate');
+ assert.match(status.textContent,/不是正常 Excel 活頁簿/);
  session.set('port79_user_session',JSON.stringify({adminRole:'employee'}));
  host.Port79HomeDropImport.refresh();
  assert.equal(root.hidden,true);
