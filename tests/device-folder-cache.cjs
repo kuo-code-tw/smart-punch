@@ -24,6 +24,43 @@ const row=(version=1,key='A@admin|system|hr')=>({key,kind:'system',system:'hr',s
 let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+name)}
 (async()=>{
  await test('existing snapshots mirror into folder; browser clear recovers exact data',async()=>{const x=setup();await x.api.put(row());await x.api.connectFolder();await x.api.clear();assert.equal((await x.api.get(row().key)).data.version,1);assert.equal(x.folder.dirs.size,1)});
+
+ await test('disk cache filenames directly describe all seven systems in Chinese',async()=>{
+  const x=setup();await x.api.connectFolder();
+  const labels={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
+  for(const [sys] of Object.entries(labels))await x.api.put({...row(),key:'A@admin|system|'+sys,system:sys});
+  await x.api.flushFolder();
+  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1'),names=[...dir.files.keys()];
+  assert.equal(names.length,7,'seven system keys create seven Chinese JSON files');
+  for(const label of Object.values(labels))assert(names.some(n=>n.startsWith(label+'_完整快取_帳號A@admin_')&&n.endsWith('.json')),label+' has a visible Chinese file name');
+  await x.api.clear();
+  for(const [sys] of Object.entries(labels))assert(await x.api.get('A@admin|system|'+sys),'Chinese named cache restores '+sys);
+ });
+ await test('legacy hash filenames restore and new writes use Chinese names without deleting old files',async()=>{
+  const x=setup(),data=row(11),dir=await x.folder.getDirectoryHandle('port79-snapshots-v1',{create:true});
+  const digest=Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(data.key))).toString('hex')+'.json';
+  dir.files.set(digest,JSON.stringify({format:'port79-cache',version:1,row:data}));
+  await x.api.connectFolder();
+  assert.equal((await x.api.get(data.key)).data.version,11,'old hash remains readable');
+  assert(dir.files.has(digest),'original hash cache must never be deleted');
+  assert([...dir.files.keys()].some(n=>n.startsWith('人資_完整快取_帳號A@admin_')),'a new disk write uses descriptive Chinese');
+ });
+ await test('newest valid legacy snapshot wins over a stale Chinese copy',async()=>{
+  const x=setup();await x.api.connectFolder();await x.api.put(row(2));await x.api.flushFolder();
+  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1'),newer=row(20);
+  const digest=Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(newer.key))).toString('hex')+'.json';
+  dir.files.set(digest,JSON.stringify({format:'port79-cache',version:1,row:newer}));
+  await x.api.clear();
+  assert.equal((await x.api.get(newer.key)).data.version,20,'read picks latest matching record, never stale cache');
+ });
+ await test('monthly API cache files start with category and month, retaining key isolation',async()=>{
+  const x=setup();await x.api.connectFolder();
+  const key='A@admin|api|https://script.google.com/macros/s/fixture/exec?action=getAttendanceMonthData&month=2026-11';
+  await x.api.put({...row(),key,kind:'api',system:'attendance'});await x.api.flushFolder();
+  const dir=await x.folder.getDirectoryHandle('port79-snapshots-v1');
+  assert([...dir.files.keys()].some(n=>n.startsWith('考勤_月份資料_月份2026-11_帳號A@admin_')),'API snapshots must be human-readable');
+  await x.api.clear();assert(await x.api.get(key),'API cache can restore from its new Chinese filename');
+ });
  await test('cleared Chrome storage can reconnect existing folder in a new session',async()=>{const a=setup();await a.api.connectFolder();await a.api.put(row(2));await a.api.flushFolder();const b=setup({folder:a.folder});await b.api.connectFolder();assert.equal((await b.api.get(row().key)).data.version,2)});
  await test('persisted handle reconnects silently when permission remains granted',async()=>{const a=setup();await a.api.connectFolder();await a.api.put(row(3));await a.api.flushFolder();const b=setup({folder:a.folder,stores:a.stores});await b.api.clear();assert.equal((await b.api.get(row().key)).data.version,3)});
  await test('revoked permission falls back safely and does not prompt automatically',async()=>{const x=setup();await x.api.connectFolder();await x.api.put(row());await x.api.flushFolder();await x.api.clear();x.folder.setPermission('prompt');assert.equal(await x.api.get(row().key),null);assert((await x.api.deviceStatus()).folder.includes('重新授權'));await assert.rejects(x.api.reconnectFolder())});
