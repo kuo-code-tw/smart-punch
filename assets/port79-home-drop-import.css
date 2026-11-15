@@ -1,7 +1,7 @@
 /* Compact homepage drag-and-drop imports, no alternate parser or save route. */
 /* Compact single-row import strip at the top of the authenticated homepage. */
 #p79HomeDropImport{display:flex;align-items:center;gap:12px;min-height:66px;margin:0 0 12px;padding:9px 13px;border:1px solid #dce8f5;border-radius:12px;background:var(--panel,#fff);box-shadow:none}
-#p79HomeDropImport[hidden],#p79HomeImportFrame[hidden]{display:none!important}
+#p79HomeDropImport[hidden]{display:none!important}
 #p79HomeDropImport>h2{flex:none;white-space:nowrap;font-size:13px;font-weight:800;margin:0;color:var(--text,#173c65)}
 #p79HomeDropGrid{display:grid;flex:1 1 auto;min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .p79-home-drop-zone{position:relative;display:flex;flex-direction:row;justify-content:center;align-items:center;gap:8px;min-height:46px;padding:7px 10px;border:1.5px dashed #98bcdf;border-radius:9px;background:#f2f8ff;text-align:center;cursor:pointer;outline:0;transition:background .15s,border-color .15s}
@@ -12,152 +12,18 @@
 .p79-home-drop-zone strong{font-size:13px;font-weight:800;color:#183d60;white-space:nowrap}
 .p79-home-drop-zone small{display:none}
 .p79-home-drop-zone input{display:none!important}
-#p79HomeImportDialog{width:min(580px,calc(100vw - 24px));height:auto;max-width:580px;max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:16px;background:#fff;color:#183c5b;box-shadow:0 20px 75px #101f3d55;overflow:hidden}
-#p79HomeImportDialog::backdrop{background:rgba(10,28,51,.56)}
-#p79HomeImportDialog[open]{display:flex;flex-direction:column}
-#p79HomeImportDialog .p79-import-modal-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;background:#edf5ff;border-bottom:1px solid #d5e5f5;flex:none}
-#p79HomeImportTitle{margin:0;font-size:17px;font-weight:850}
-#p79HomeImportClose{min-width:62px;min-height:36px;border-radius:8px;background:#fff;border:1px solid #bfd3e6;color:#244b70;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-#p79HomeImportStatus{position:relative;z-index:1;margin:0;padding:17px 20px 20px;border:0;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;flex:none;background:#fff;min-height:60px}
-#p79HomeImportStatus[data-tone=error]{color:#b42332;background:#fff4f1}
-#p79HomeImportStatus[data-tone=success]{color:#146c45;background:#edfcf3}
-#p79HomeImportStatus[data-tone=pending]{color:#1d4ed8;background:#eff6ff}
-/* The authenticated original importer must stay alive for Excel parsing,
-   cloud preflight, and its native confirmation dialog. Do not display
-   the entire administration SPA as a second page inside this dialog. */
-#p79HomeImportFrame{
- display:block;position:absolute;inset:0;z-index:0;
- width:100%;height:100%;min-height:0;max-height:none;flex:none;
- border:0;background:transparent;opacity:0;pointer-events:none;
+/* Navigation-only homepage import entries; all actual Excel processing stays
+   inside each original management system, not this homepage. */
+#p79HomeDropImport .p79-home-drop-zone{font:inherit;cursor:pointer;user-select:none}
+#p79HomeDropImport .p79-home-drop-zone:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+#p79HomeDropImport .p79-home-drop-zone:hover{border-color:#126db8;background:#e1f1ff}
+@media(max-width:700px){
+ #p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}
+ #p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}
+ #p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}
+ .p79-home-drop-zone strong{font-size:11px}
+ .p79-home-drop-zone .p79-drop-icon{font-size:15px}
 }
-#p79HomeImportStatus[data-tone=info]::before{
- content:'◌';display:inline-block;color:#2563eb;font-weight:900;margin-right:7px;
- animation:p79HomeImportSpin .9s linear infinite;
-}
-@keyframes p79HomeImportSpin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){#p79HomeImportStatus[data-tone=info]::before{animation:none}}
-@media(max-width:700px){#p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}#p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}#p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#p79HomeImportDialog{height:auto;width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}.p79-home-drop-zone strong{font-size:11px}.p79-home-drop-zone .p79-drop-icon{font-size:15px}}
 html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
 html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
-
-/* Unified three-way homepage import detail and explicit review UI - 2026-11-14 */
-#p79HomeImportFile{
- position:relative;z-index:1;margin:0;padding:13px 18px 5px;
- font-size:13px;font-weight:750;color:#274361;
- white-space:normal;overflow-wrap:anywhere;background:#fff;
-}
-#p79HomeImportFile:empty{display:none}
-#p79HomeImportProgress{
- position:relative;z-index:1;box-sizing:border-box;margin:8px 18px 0;
- height:6px;overflow:hidden;border-radius:999px;background:#e5edf6;
-}
-#p79HomeImportProgressBar{
- display:block;height:100%;width:38%;border-radius:999px;
- background:linear-gradient(90deg,#bfdbfe,#2563eb,#bfdbfe);
- background-size:200% 100%;animation:p79HomeImportProgress 1.3s linear infinite;
- transition:width .25s ease;
-}
-#p79HomeImportProgress[data-tone=success] #p79HomeImportProgressBar{background:#16a34a;animation:none}
-#p79HomeImportProgress[data-tone=error] #p79HomeImportProgressBar{background:#dc2626;animation:none;min-width:2px}
-#p79HomeImportProgress[data-tone=pending] #p79HomeImportProgressBar{background:#d97706;animation:none}
-@keyframes p79HomeImportProgress{to{background-position:-200% 0}}
-#p79HomeImportReview{
- position:relative;z-index:1;box-sizing:border-box;margin:0 16px 18px;padding:12px;
- background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;
- color:#1e3a5f;
-}
-#p79HomeImportReview[hidden]{display:none!important}
-#p79HomeImportReviewTitle{display:block;font-weight:850;font-size:13px;margin:0 0 7px}
-#p79HomeImportReviewText{
- display:block;box-sizing:border-box;max-height:min(32vh,245px);overflow:auto;
- margin:0;padding:10px;background:white;border:1px solid #dbe6f3;border-radius:7px;
- white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 system-ui,sans-serif;color:#334155;
-}
-#p79HomeImportReview .p79-home-import-review-buttons{
- display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:11px;
-}
-#p79HomeImportReview .p79-home-import-review-buttons button{
- min-width:94px;min-height:34px;padding:7px 13px;font-size:12px;font-weight:750;line-height:1.2;
- font-family:inherit;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;
- background:white;color:#334155;
-}
-#p79HomeImportReviewYes{background:#126db8!important;color:#fff!important;border-color:#126db8!important}
-#p79HomeImportReview .p79-home-import-review-buttons button:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
-@media(max-width:700px){
- #p79HomeImportFile{padding:10px 12px 4px;font-size:12px}
- #p79HomeImportProgress{margin:7px 12px 0}
- #p79HomeImportReview{margin:0 10px 12px;padding:9px}
- #p79HomeImportReviewText{max-height:30vh}
-}
-@media(prefers-reduced-motion:reduce){#p79HomeImportProgressBar{animation:none}}
-
-/* 2026-11-15: true compact import modal with an always-visible progress bar.
-   The embedded management iframe remains operational but does not size the dialog. */
-#p79HomeImportDialog{
- box-sizing:border-box!important;
- width:min(460px,calc(100vw - 24px))!important;
- max-width:460px!important;
- min-height:0!important;
- height:fit-content!important;
- max-height:min(270px,calc(100dvh - 26px))!important;
- margin:auto!important;
- overflow:hidden!important;
-}
-#p79HomeImportDialog[open]{
- display:flex!important;
- flex-direction:column!important;
- align-items:stretch!important;
- justify-content:flex-start!important;
-}
-#p79HomeImportDialog .p79-import-modal-head{
- box-sizing:border-box!important;
- flex:0 0 auto!important;
- min-height:42px!important;
- padding:7px 13px!important;
-}
-#p79HomeImportTitle{font-size:14px!important;line-height:1.35!important}
-#p79HomeImportClose{min-width:54px!important;min-height:30px!important;padding:4px 10px!important;font-size:12px!important}
-#p79HomeImportFile{
- box-sizing:border-box!important;
- flex:0 0 auto!important;
- min-height:0!important;
- margin:0!important;
- padding:9px 13px 3px!important;
- overflow:hidden!important;
- text-overflow:ellipsis!important;
- white-space:nowrap!important;
- font-size:12px!important;
-}
-#p79HomeImportProgress{
- box-sizing:border-box!important;
- flex:0 0 auto!important;
- min-height:7px!important;
- height:7px!important;
- margin:7px 13px 5px!important;
- overflow:hidden!important;
-}
-#p79HomeImportStatus{
- box-sizing:border-box!important;
- flex:0 1 auto!important;
- min-height:0!important;
- max-height:110px!important;
- overflow-y:auto!important;
- margin:0!important;
- padding:7px 13px 12px!important;
- font-size:12px!important;
- line-height:1.5!important;
- white-space:pre-wrap!important;
-}
-#p79HomeImportDialog:has(#p79HomeImportReview:not([hidden])){
- max-height:min(520px,calc(100dvh - 26px))!important;
-}
-#p79HomeImportReview{
- box-sizing:border-box!important;
- flex:0 1 auto!important;
- min-height:0!important;
- margin:0 13px 13px!important;
- overflow:auto!important;
-}
-@media(max-width:700px){
- #p79HomeImportDialog{width:calc(100vw - 18px)!important}
-}
