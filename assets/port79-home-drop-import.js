@@ -250,7 +250,7 @@ w.addEventListener('message',e=>{
  if(!busy||e.origin!==w.location.origin||e.source!==frame.contentWindow)return;
  if(e.data?.type==='p79-vessel-import-progress'){
   const st=String(e.data.stage||'').slice(0,450);
-  if(e.data.state==='error'&&st)lastVesselError=st;
+  if(e.data.state==='error'&&st&&(!lastVesselError||/^❌|失敗：|核對不一致|讀取失敗/i.test(st)))lastVesselError=st;
   if(!approval&&(!review||review.hidden)&&st)display('船舶｜'+st,'info');
  }
 });
