@@ -12076,7 +12076,25 @@ async function importExcel(file) {
   const buf=await file.arrayBuffer();
   setExcelImportStage('解析 試算表 工作表',15);
   const book=XLSX.read(buf,{type:'array',cellDates:true});
-  if(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')){
+  // Accept harmless worksheet-title casing and surrounding spaces, while
+  // still requiring both original verified data sources for vessel imports.
+  for(const required of ['WORKING SHEET','WORKING REPORT']){
+    if(book.Sheets[required])continue;
+    const original=book.SheetNames.find(title=>
+      String(title).trim().replace(/\\s+/g,' ').toUpperCase()===required);
+    if(original&&book.Sheets[original]){
+      book.Sheets[required]=book.Sheets[original];
+      if(!book.SheetNames.includes(required))book.SheetNames.push(required);
+    }
+  }
+  const vesselBook=book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT');
+  const likelyVesselBook=book.SheetNames.some(title=>/WORKING\\s+(?:SHEET|REPORT)/i.test(String(title)))||
+    /(?:TALLY|WORKING[\\s_-]*SHEET)/i.test(String(file.name||''));
+  if(likelyVesselBook&&!vesselBook){
+    throw Error('船舶工作表格式不完整：需要 WORKING SHEET 與 WORKING REPORT 兩張工作表；實際只有「'+
+      book.SheetNames.slice(0,8).join('、')+'」。尚未寫入此檔資料。');
+  }
+  if(vesselBook){
     setExcelImportStage('解析 WORKING SHEET 船舶主檔',25);
     const summary=parseWorkingSheetSummary(book);
     setExcelImportStage('讀取 GPH / VPH 與船舶統計',32);
