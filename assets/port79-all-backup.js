@@ -6,7 +6,7 @@
 const TYPES=[['personnel','人資'],['attendance','出勤'],['schedule','排班'],['leave','請假'],['overtime','加班'],['workhours','工時'],['efficiency','作業效率'],['vessel','船舶'],['sailing','船期'],['audit','系統稽核'],['gate','碼頭進出站'],['routes','碼頭航線'],['yard','碼頭儲量']];
 // These categories remain in the backup batch, but have no homepage status card.
 const HOME_TYPES=TYPES.filter(([type])=>!['sailing','audit'].includes(type));
-function showCard(item){return !['sailing','audit'].includes(item.type);}
+function showCard(item){return !['sailing','audit','yardFile'].includes(item.type);}
 let busy=false,batch=null,controller=null;
 const d=g.document,$=id=>d.getElementById(id);
 function session(){try{return JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');}catch(_){return null;}}
