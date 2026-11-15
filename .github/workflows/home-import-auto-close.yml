@@ -1,0 +1,47 @@
+name: Verify homepage import success-close and cloud safety
+
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-home-drop-import.js'
+      - 'aqc-efficiency/index.html'
+      - 'index.html'
+      - 'assets/port79-gate-home.js'
+      - 'assets/port79-home-dashboard.js'
+      - 'tests/home-drop-import.cjs'
+      - 'tests/home-vessel-confirmed-close.cjs'
+      - '.github/workflows/home-import-auto-close.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-home-drop-import.js'
+      - 'aqc-efficiency/index.html'
+      - 'index.html'
+      - 'assets/port79-gate-home.js'
+      - 'assets/port79-home-dashboard.js'
+      - 'tests/home-drop-import.cjs'
+      - '.github/workflows/home-import-auto-close.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-home-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check importer JavaScript syntax
+        run: |
+          node --check assets/port79-home-drop-import.js
+          node --check assets/port79-gate-home.js
+          node --check assets/port79-home-dashboard.js
+      - name: Verify Gate, Yard, Vessel confirmed auto-close and failure safety
+        run: |
+          node tests/home-drop-import.cjs
+          node tests/home-vessel-confirmed-close.cjs
+          node tests/gate-drag-drop-import.cjs
+          node tests/yard-dashboard-module.cjs
+          node tests/vessel-save-queue.cjs

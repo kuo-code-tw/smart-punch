@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-backup-above-vessel-v3">
 <link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261115-auto-dispatch-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="assets/port79-home-drop-import.js?v=20261115-gate-content-guard-v2"></script>
+<script defer src="assets/port79-home-drop-import.js?v=20261115-confirmed-auto-close-v1"></script>
 <script defer src="assets/port79-all-backup.js?v=20261115-backup-home-cards-v8"></script>
 <script src="./assets/port79-vessel-name-directory.js?v=20261110-all-vessels-v1"></script>
 <style>
@@ -1703,6 +1703,10 @@ function renderHomeYardSummary(session){
   note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
+window.addEventListener('p79-home-import-complete',event=>{
+ if(event?.detail?.kinds?.includes('yard')&&currentSession&&canViewHomeYard(currentSession))
+  renderHomeYardSummary(currentSession);
+});
 window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
 /* A backup batch currently runs on this page. Preserve its page lifetime when a
  * manager opens another system; server-owned background jobs are still required
@@ -2056,7 +2060,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-schedule-punch-restore.js?v=20261111-home-rest-proof-v1"></script>
 <script src="./assets/port79-schedule-rest-evidence.js?v=20261111-home-rest-proof-v1"></script>
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
-<script src="./assets/port79-home-dashboard.js?v=20261030-single-monthly-v2"></script>
+<script src="./assets/port79-home-dashboard.js?v=20261115-import-refresh-v1"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
@@ -2067,7 +2071,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-reference-dashboard.js?v=20261111-overtime-no-false-empty-v1&donut=20261112-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&precision=20261113-converted-two-decimals-v1"></script>
 <script src="./assets/port79-google-sheet-schedule.js?v=20261110-all-vessels-v1"></script>
 <script src="./assets/port79-efficiency-week-month-pager.js?v=20261108-source-freshness-v1"></script>
-<script src="./assets/port79-gate-home.js?v=20261111-admin-phone-no-gate-v2"></script>
+<script src="./assets/port79-gate-home.js?v=20261115-import-refresh-v1"></script>
 <script src="./assets/port79-current-shift.js?v=20261030-inline-current-v1"></script>
 <!-- PORT79 2026-11-03: 管理員手機首頁只顯示萬海網站船期與目前班別人員；桌面版、員工登入與原資料讀取不變。 -->
 <style id="p79-admin-phone-two-panels-20261103">

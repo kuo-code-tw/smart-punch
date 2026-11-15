@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 const script=fs.readFileSync('assets/port79-gate-home.js','utf8');
 new vm.Script(script);
-assert(html.includes('port79-gate-home.js?v=20261111-admin-phone-no-gate-v2'),
+assert(html.includes('port79-gate-home.js?v=20261115-import-refresh-v1'),
  'mobile fix must load a fresh JS version');
 assert(html.includes('id="p79-mobile-gate-quantities-20261107"'),
  'mobile Gate six-tile layout is present');
