@@ -72,5 +72,12 @@ function setup(options={}){
  vm.runInNewContext(navCode,{window:navWindow,location:loc,URL,document:{addEventListener:(kind,fn)=>{if(kind==='click')navClick=fn;}},alert:()=>{throw Error('unexpected popup refusal');}});
  const event={button:0,target:{closest:()=>({href:'https://fixture.invalid/schedule/',target:'',hasAttribute:()=>false})},preventDefault(){this.defaultPrevented=true;},stopImmediatePropagation(){stopped=true;}};
  navClick(event);a.equal(opened,1);a(stopped,'capture stops the sidebar second navigation handler');a.equal(loc.href,'https://fixture.invalid/','backup owner page remains alive while other system opens');
+ const idleCode=fs.readFileSync('assets/port79-session-timeout.js','utf8');
+ const clocks=idleCode.slice(idleCode.indexOf('function sharedActivityKey()'),idleCode.indexOf('function observeLogin()'));
+ const activityStore=new Map();let now=100000;
+ function clock(identity){const tabStore=new Map();return vm.runInNewContext(clocks+';({timestamp,setTimestamp})',{fingerprint:()=>identity,ACTIVITY_KEY:'activity',Date:{now:()=>now},sessionStorage:{getItem:k=>tabStore.get(k),setItem:(k,v)=>tabStore.set(k,v)},localStorage:{getItem:k=>activityStore.get(k),setItem:(k,v)=>activityStore.set(k,v)}});}
+ const ownerClock=clock('same-login'),otherClock=clock('same-login'),strangerClock=clock('other-login');
+ ownerClock.setTimestamp(now);now+=120000;otherClock.setTimestamp(now);a.equal(ownerClock.timestamp(),now,'activity in other system keeps backup tab same-session clock current');a.equal(strangerClock.timestamp(),0,'another identity cannot renew this session');
+ now+=301000;a(now-ownerClock.timestamp()>=300000,'all tabs still expire after five minutes with no real activity');
  console.log('PASS all-system client: all categories, old-backend guard, verified-only success, retry only failed with stable IDs, double-click/account guards, safe links and account-scoped yard data');
 })().catch(e=>{console.error(e);process.exit(1);});

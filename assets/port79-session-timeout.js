@@ -46,8 +46,17 @@ function fingerprint(){
  for(let i=0;i<identity.length;i++){hash^=identity.charCodeAt(i);hash=Math.imul(hash,16777619);}
  return (hash>>>0).toString(36)+':'+String(s?.empId||'');
 }
-function timestamp(){try{return Number(sessionStorage.getItem(ACTIVITY_KEY)||0);}catch(e){return 0;}}
-function setTimestamp(t){try{sessionStorage.setItem(ACTIVITY_KEY,String(t));}catch(e){}}
+// Same-login tabs share real user activity. Background jobs never renew this clock.
+function sharedActivityKey(){const id=fingerprint();return id?ACTIVITY_KEY+'_'+id:'';}
+function timestamp(){
+ let last=0;try{last=Number(sessionStorage.getItem(ACTIVITY_KEY)||0);}catch(e){}
+ try{const key=sharedActivityKey(),shared=key?Number(localStorage.getItem(key)||0):0;if(Number.isFinite(shared)&&shared<=Date.now())last=Math.max(last,shared);}catch(e){}
+ return last;
+}
+function setTimestamp(t){
+ try{sessionStorage.setItem(ACTIVITY_KEY,String(t));}catch(e){}
+ try{const key=sharedActivityKey();if(key)localStorage.setItem(key,String(t));}catch(e){}
+}
 function observeLogin(){
  const next=fingerprint();
  if(!next){observedFingerprint='';return false;}
