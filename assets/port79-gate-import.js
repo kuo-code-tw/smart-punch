@@ -19,10 +19,14 @@ function message(text,kind){
 }
 function text(v){return String(v??'').trim();}
 function amount(raw,label){
- var s=text(raw).replace(/,/g,'');
- if(!/^\d+$/.test(s))throw Error(label+' 不是有效非負整數：'+String(raw));
+ // Excel caches often store whole counts as 166.0. Use the numeric cell value
+ // instead of rejecting a harmless display format such as "166.00".
+ var s=typeof raw==='number'?raw:text(raw).replace(/,/g,'');
+ if(typeof s==='string'&&!/^\d+(?:\.0+)?$/.test(s))
+  throw Error(label+' 不是有效非負整數：'+String(raw));
  var n=Number(s);
- if(!Number.isSafeInteger(n)||n>1000000)throw Error(label+' 數值超出範圍');
+ if(!Number.isSafeInteger(n)||n<0||n>1000000)
+  throw Error(label+' 數值超出有效整數範圍：'+String(raw));
  return n;
 }
 function day(v){
@@ -42,7 +46,7 @@ function day(v){
 // begins at B2, C1, etc.  Gate signatures are defined in physical A1 positions.
 function gateSheetRows(sheet){
  var utils=g.XLSX.utils;
- var options={header:1,defval:'',raw:false,blankrows:true};
+ var options={header:1,defval:'',raw:true,blankrows:true};
  if(sheet['!ref']&&typeof utils.decode_range==='function'&&typeof utils.encode_range==='function'){
   var bounds=utils.decode_range(sheet['!ref']);
   bounds.s.r=0;bounds.s.c=0;
@@ -60,7 +64,7 @@ function findGateMatrix(name){
   var found=label(pair[0],pair[1]);
   if(found!==pair[2]){
    var cell='B'+(pair[0]+1);
-   var safe=found&&found.length<=24&&!/[\\x00-\\x1f\\ufffd]/i.test(found)&&/^[\\p{L}\\p{N}\\s_.()\\/-]+$/u.test(found)?'「'+found+'」':'無法辨識的字元或空白';
+   var safe=found&&found.length<=24&&!/[\x00-\x1f\ufffd]/.test(found)&&/^[\p{L}\p{N}\s_.()/-]+$/u.test(found)?'「'+found+'」':'無法辨識的字元或空白';
    throw Error('工作表「'+name+'」不符合 Gate 原報表；'+cell+' 應為「'+pair[2]+'」，實際讀到 '+safe+'。未寫入任何資料，請核對報表格式');
   }
  }
