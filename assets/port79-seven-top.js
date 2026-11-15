@@ -83,6 +83,7 @@ window.p79LogoutToSevenSystemHome=function(){
  location.replace('../?logout=1&t='+Date.now());
 };
 function p79IsReturnHome(el){
+ if(el.dataset?.p79PreserveSession==='1')return false;
  const label=String(el.textContent||'').replace(/\s+/g,'').trim();
  return /返回首頁|回首頁|登出系統/.test(label) ||
         (el.dataset?.action==='home') ||

@@ -706,7 +706,8 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
     <div id="gcAccessDeniedIcon" class="text-4xl mb-3">🔒</div>
     <h2 id="gcAccessDeniedTitle" class="text-xl font-black text-slate-900">沒有權限進入效率系統</h2>
     <p id="gcAccessDeniedText" class="mt-3 text-sm leading-6 text-slate-500">請回首頁登入具有「效率系統」權限的管理員帳號。</p>
-    <a href="../?v=20260927.7.13" class="mt-5 inline-block rounded-xl bg-indigo-600 px-5 py-3 font-black text-white no-underline">返回首頁</a>
+    <button id="gcAuthRetry" type="button" onclick="p79RetryEfficiencyAuth()" hidden class="mt-5 rounded-xl bg-indigo-600 px-5 py-3 font-black text-white">重新驗證登入</button>
+    <a data-p79-preserve-session="1" href="../?v=20260927.7.13" class="mt-5 inline-block rounded-xl bg-indigo-600 px-5 py-3 font-black text-white no-underline">返回首頁</a>
   </div>
 </div>
 <header id="efficiencyHeader" class="sticky top-0 z-30 bg-slate-900 text-white shadow-lg">
@@ -7892,6 +7893,7 @@ function clearPort79SsoHash(){try{history.replaceState(null,'',location.pathname
 function currentPort79SsoToken(){
   return String(
     readPort79SsoTokenFromHash() ||
+    sessionStorage.getItem('port79_user_token') ||
     sessionStorage.getItem(GC_SESSION_TOKEN_KEY) ||
     sessionStorage.getItem('port79_admin_token') ||
     sessionStorage.getItem(GC_LEGACY_TOKEN_KEY) || ''
@@ -7924,7 +7926,8 @@ async function verifyGcSsoToken(token){
       const access=efficiencyPermissionFromData(data);
       if(!data?.ok || !['admin','superadmin'].includes(role) || access==='none'){
         const authError=new Error(data?.error||'此帳號沒有「效率系統」權限');
-        authError.ssoAuthRejected=true;
+        // Service/lock failures must never erase an otherwise valid login.
+        authError.ssoAuthRejected=data?.ok===true || /登入驗證已逾時|登入驗證資料失效|找不到此員工帳號|沒有管理員權限|帳號.*停用|token.*(invalid|expired)|未授權/i.test(String(data?.error||''));
         throw authError;
       }
       data.efficiencyAccessLevel=access;
@@ -7974,6 +7977,7 @@ async function consumePort79SsoHandoff(){
 function loadGcSession(){
   // 優先使用正式版 token；相容首頁舊 key
   gcToken=String(
+    sessionStorage.getItem('port79_user_token') ||
     sessionStorage.getItem(GC_SESSION_TOKEN_KEY) ||
     sessionStorage.getItem('port79_admin_token') ||
     sessionStorage.getItem(GC_LEGACY_TOKEN_KEY) ||
@@ -8008,6 +8012,8 @@ function showGcAccessDenied(message,transient=false){
   if(text)text.textContent=message||"請先回 79號碼頭智慧管理系統，以超級管理員登入。";
   if(heading)heading.textContent=transient?'雲端登入驗證暫時中斷':'沒有權限進入效率系統';
   if(icon)icon.textContent=transient?'⏳':'🔒';
+  const retry=document.getElementById('gcAuthRetry');
+  if(retry)retry.hidden=!transient;
   if(box){box.dataset.transient=transient?'1':'0';box.classList.remove("hidden");box.classList.add("flex")}
 }
 
@@ -15429,6 +15435,26 @@ function startShipFullAutoSync(){
 
 let p79EfficiencyAuthRetryTimer=null;
 let p79EfficiencyAuthReady=false;
+let p79EfficiencyAuthRecoveryBusy=false;
+async function p79RetryEfficiencyAuth(){
+  if(p79EfficiencyAuthRecoveryBusy||p79EfficiencyAuthReady)return;
+  p79EfficiencyAuthRecoveryBusy=true;
+  const retry=document.getElementById('gcAuthRetry');
+  if(retry)retry.disabled=true;
+  if(p79EfficiencyAuthRetryTimer!==null){clearTimeout(p79EfficiencyAuthRetryTimer);p79EfficiencyAuthRetryTimer=null;}
+  try{
+    loadGcSession();
+    await initGcPage();
+    if(p79EfficiencyAuthReady)applyEfficiencyAccessUi();
+  }catch(error){
+    console.warn('碼頭系統重新驗證失敗',error);
+    p79QueueEfficiencyAuthRecovery();
+  }finally{
+    p79EfficiencyAuthRecoveryBusy=false;
+    if(retry)retry.disabled=false;
+  }
+}
+window.addEventListener('online',()=>{if(document.getElementById('gcAccessDenied')?.dataset.transient==='1')void p79RetryEfficiencyAuth();});
 function p79QueueEfficiencyAuthRecovery(){
   if(p79EfficiencyAuthRetryTimer!==null||p79EfficiencyAuthReady)return;
   p79EfficiencyAuthRetryTimer=setTimeout(async()=>{
@@ -15437,13 +15463,7 @@ function p79QueueEfficiencyAuthRecovery(){
       p79QueueEfficiencyAuthRecovery();
       return;
     }
-    try{
-      await initGcPage();
-      if(p79EfficiencyAuthReady)applyEfficiencyAccessUi();
-    }catch(error){
-      console.warn('效率系統恢復登入驗證失敗',error);
-      p79QueueEfficiencyAuthRecovery();
-    }
+    await p79RetryEfficiencyAuth();
   },7000);
 }
 async function initGcPage(){
@@ -15476,7 +15496,7 @@ async function initGcPage(){
       showGcAccessDenied('管理員登入狀態已失效或權限驗證未通過。請返回首頁重新登入。');
     }else{
       p79EfficiencyAuthReady=false;
-      showGcAccessDenied('目前無法連線驗證登入狀態，已保留登入資訊並自動重試；恢復後會自動進入系統。',true);
+      showGcAccessDenied('雲端驗證暫時無法完成，登入資訊已保留，系統會自動重試。也可按「重新驗證登入」，不需要登出。',true);
       p79QueueEfficiencyAuthRecovery();
     }
     return;
@@ -15982,7 +16002,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 </script>
 <script src="../assets/port79-aqc-schedule-groups.js?v=20261026-group-identity-v2"></script>
 <script src="../assets/port79-vessel-monthly-report.js?v=20261102-operation-count-hide-zeros-v1"></script>
-<script src="../assets/port79-seven-top.js?v=20261109-working-sheet-service&org=20261112-unit-source-v2&menu=20261113-terminal-system-v1"></script>
+<script src="../assets/port79-seven-top.js?v=20261109-working-sheet-service&org=20261112-unit-source-v2&menu=20261115-auth-recovery-v2"></script>
 
 <!-- p79-efficiency-wide-history-fallback-20261007: 船舶作業明細滿版寬度 + 年份選單防空白 -->
 <style id="p79-efficiency-wide-history-fallback-20261007-style">
