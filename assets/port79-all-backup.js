@@ -4,6 +4,9 @@
 (function(g){
 'use strict';
 const TYPES=[['personnel','人資'],['attendance','出勤'],['schedule','排班'],['leave','請假'],['overtime','加班'],['workhours','工時'],['efficiency','作業效率'],['vessel','船舶'],['sailing','船期'],['audit','系統稽核'],['gate','碼頭進出站'],['routes','碼頭航線'],['yard','碼頭儲量']];
+// These categories remain in the backup batch, but have no homepage status card.
+const HOME_TYPES=TYPES.filter(([type])=>!['sailing','audit'].includes(type));
+function showCard(item){return !['sailing','audit'].includes(item.type);}
 let busy=false,batch=null,controller=null;
 const d=g.document,$=id=>d.getElementById(id);
 function session(){try{return JSON.parse(g.sessionStorage.getItem('port79_user_session')||'null');}catch(_){return null;}}
@@ -68,7 +71,7 @@ function render(){
  const list=$('p79AllBackupResults');
  if(!list)return;
  list.replaceChildren();
- for(const item of batch.items){
+ for(const item of batch.items.filter(showCard)){
   const kind=item.result?'done':item.error?'error':item.running?'running':'pending';
   const title=item.type==='yardFile'?'儲量原檔':item.label;
   const summary=item.result?(item.result.unchanged?'無異動，已核對既有備份':'已備份 '+Number(item.result.rows||0).toLocaleString('zh-TW')+' 筆'):item.error?'未完成：'+item.error:item.waiting?'等待資料儲存，自動繼續中…':item.running?'備份及讀回核對中…':'等待備份';
@@ -129,7 +132,7 @@ function render(){
  if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':failed?'重試未完成項目':'備份資料庫';}
 }
 // Sidebar navigation is a view action, not a request to create backup files.
-// Display all 13 cards immediately as pending; real red/green receipts are only
+// Display homepage cards immediately as pending; real red/green receipts are only
 // provided by the authenticated backup operation.
 function show(){
  const panel=$('p79AllBackupPanel'),feedback=$('p79AllBackupFeedback');
@@ -140,7 +143,7 @@ function show(){
  if(batch){render();}
  else if(list&&!list.children.length){
   const fresh=d.createDocumentFragment();
-  for(const [type,label] of TYPES){
+  for(const [type,label] of HOME_TYPES){
    const item=d.createElement('li');
    item.className='p79-backup-light p79-backup-pending';
    item.title=label+'：尚未執行備份';
