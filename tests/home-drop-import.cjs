@@ -14,7 +14,7 @@ assert.match(html,/id="p79HomeImportProgressBar"/);
 assert.match(html,/id="p79HomeImportReviewYes"/);
 assert.match(html,/id="p79HomeImportInput"/);
 assert.match(css,/#p79HomeImportProgressBar/);
-assert.match(html,/port79-home-drop-import.js\?v=20261115-gate-content-guard-v2/);
+assert.match(html,/port79-home-drop-import.js\?v=20261115-confirmed-auto-close-v1/);
 assert(!js.includes('launchSystem('),'no homepage redirect');
 assert(!js.includes('gcSyncAll'),'cloud storage remains with the original importers');
 assert(!js.includes('gateStatsImport'),'no second Gate import implementation');
@@ -80,7 +80,7 @@ class MockObserver{
  constructor(fn){this.fn=fn;MockObserver.current=this;}
  observe(){}disconnect(){if(MockObserver.current===this)MockObserver.current=null}
 }
-let onloadTrigger=0;
+let onloadTrigger=0,vesselVerified=false,gateFails=false,yardFails=false;
 Object.defineProperty(frame,'src',{
  configurable:true,
  get(){return this._src;},
@@ -93,7 +93,7 @@ Object.defineProperty(frame,'src',{
    frame.contentDocument={getElementById:id=>id==='gateMessage'?msg:null};
    frame.contentWindow.P79GateImport={chooseFile:async file=>{
     calls.push(['gate',file.name]);
-    msg.textContent='已寫入正式資料庫：新增 1 天';msg.dataset.kind='success';
+    msg.textContent=gateFails?'Gate 雲端寫入失敗':'已寫入正式資料庫：新增 1 天';msg.dataset.kind=gateFails?'error':'success';
     MockObserver.current?.fn();
    }};
   }else if(path.includes('/yard-dashboard/')){
@@ -101,13 +101,13 @@ Object.defineProperty(frame,'src',{
    frame.contentDocument={getElementById:id=>id==='yardStatus'?msg:null};
    frame.contentWindow.P79YardDashboard={importFile:async file=>{
     calls.push(['yard',file.name]);
-    msg.textContent='已儲存於此瀏覽器';msg.dataset.tone='success';
+    msg.textContent=yardFails?'Yard 資料儲存失敗':'已儲存於此瀏覽器';msg.dataset.tone=yardFails?'error':'success';
    }};
   }else if(path.includes('/aqc-efficiency/')){
    frame.contentDocument={getElementById:()=>null};
    frame.contentWindow.P79VesselHomeImport={importFiles:async files=>{
     calls.push(['vessel',files.map(f=>f.name).join(',')]);
-    return {processed:files.length,success:files.length,failed:0};
+    return {processed:files.length,success:files.length,failed:0,cloudConfirmed:vesselVerified,cloudIssue:vesselVerified?'':'雲端資料尚未讀回'};
    }};
   }
   queueMicrotask(()=>{onloadTrigger++;frame.onload?.();});
@@ -119,14 +119,32 @@ function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Arra
  await host.Port79HomeDropImport.start([file('yard.xlsx',1)]);
  assert.deepEqual(calls,[['vessel','yard.xlsx']],'contents, not filename, choose original vessel');
  assert.equal(status.dataset.tone,'pending','vessel parser result never fakes cloud confirmation');
+ assert.equal(modal.open,true,'unverified vessel keeps window');
+ vesselVerified=true;
  calls.length=0;
  await host.Port79HomeDropImport.start([
   file('tally.xlsx',1),file('yard.xlsx',2),file('gate.xlsx',3)
  ]);
  assert.deepEqual(calls,[['gate','gate.xlsx'],['yard','yard.xlsx'],['vessel','tally.xlsx']]);
  assert.equal(bar.style.width,'100%');
- assert.equal(modal.open,true);
+ assert.equal(modal.open,false,'mixed batch closes only once all are confirmed');
  assert.equal(onloadTrigger,4);
+ calls.length=0;
+ await host.Port79HomeDropImport.start([file('gate.xlsx',3)]);
+ assert.equal(modal.open,false,'confirmed Gate closes');
+ await host.Port79HomeDropImport.start([file('yard.xlsx',2)]);
+ assert.equal(modal.open,false,'persisted Yard closes');
+ await host.Port79HomeDropImport.start([file('ship.xlsx',1)]);
+ assert.equal(modal.open,false,'readback-confirmed vessel closes');
+ gateFails=true;await host.Port79HomeDropImport.start([file('gate.xlsx',3)]);
+ assert.equal(modal.open,true,'failed Gate remains open');
+ assert.equal(status.dataset.tone,'error');gateFails=false;
+ yardFails=true;await host.Port79HomeDropImport.start([file('yard.xlsx',2)]);
+ assert.equal(modal.open,true,'failed Yard remains open');
+ assert.equal(status.dataset.tone,'error');yardFails=false;
+ vesselVerified=false;await host.Port79HomeDropImport.start([file('ship.xlsx',1)]);
+ assert.equal(modal.open,true,'cloud-unverified vessel remains open');
+ assert.equal(status.dataset.tone,'pending');vesselVerified=true;
  calls.length=0;
  await host.Port79HomeDropImport.start([file('random.xlsx',4)]);
  assert.equal(calls.length,0,'unrecognized workbook must not enter any database');
