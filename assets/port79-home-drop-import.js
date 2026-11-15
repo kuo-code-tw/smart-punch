@@ -58,6 +58,15 @@ async function identify(file){
  }
  if(!w.XLSX?.read)throw Error('Excel 辨識元件尚未載入；請確認網路連線');
  const bytes=await file.arrayBuffer();
+ // SheetJS can interpret arbitrary bytes as text/CSV even when a file is
+ // incorrectly named .xlsx. Check the container before trusting cell values.
+ if(/\.xlsx$/i.test(name)){
+  const head=new Uint8Array(bytes,0,Math.min(8,bytes.byteLength));
+  const zip=head[0]===0x50&&head[1]===0x4b&&
+   ((head[2]===3&&head[3]===4)||(head[2]===5&&head[3]===6)||(head[2]===7&&head[3]===8));
+  const ole=[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1].every((n,i)=>head[i]===n);
+  if(!zip&&!ole)throw Error(name+'：檔案內容不是正常 Excel 活頁簿（副檔名為 .xlsx，但內容不是 ZIP/Excel 格式）。未匯入任何資料，請重新取得原始 Excel 檔案');
+ }
  const book=w.XLSX.read(bytes,{type:'array',cellDates:false,cellHTML:false,sheetRows:90});
  const sheets=(book.SheetNames||[]).map(n=>String(n||''));
  const canon=sheets.map(normalize);
@@ -78,16 +87,31 @@ async function identify(file){
  const signs=[vessel&&'vessel',yard&&'yard',gate&&'gate'].filter(Boolean);
  if(signs.length>1)throw Error(name+'：同時符合多種報表特徵，為避免匯錯資料庫已停止');
  if(signs.length===1)return {file,kind:signs[0],evidence:'工作表內容確認'};
- // Original importers still perform strict verification. A recognizable source
- // filename may be routed to them, but never silently accepted as valid data.
- const hinted=[
-  /(?:^|[\s_.-])GATE(?:[\s_.-]|$)|進出站/i.test(name)?'gate':null,
-  /(?:^|[\s_.-])YARD(?:[\s_.-]|$)|堆場|儲量/i.test(name)?'yard':null,
-  /TALLY|WORKING[\s_-]*SHEET|船舶作業|WAN\s*HAI|XINDE/i.test(name)||
-   has('WORKINGSHEET')||has('WORKINGREPORT')?'vessel':null
- ].filter(Boolean);
- if(hinted.length!==1)throw Error(name+'：無法辨識是 Yard、Gate 或船舶報表；已停止，沒有寫入資料');
- return {file,kind:hinted[0],evidence:'依檔名／工作表名稱分流，仍須原系統驗證格式'};
+ // Never treat a filename as proof of a Gate/Yard workbook. A mislabeled
+ // binary file was previously routed to Gate, where B2 appeared as garbage.
+ const gateHint=/(?:^|[\s_.-])GATE(?:[\s_.-]|$)|進出站/i.test(name);
+ const yardHint=/(?:^|[\s_.-])YARD(?:[\s_.-]|$)|堆場|儲量/i.test(name);
+ const vesselHint=/TALLY|WORKING[\s_-]*SHEET|船舶作業|WAN\s*HAI|XINDE/i.test(name)||
+  has('WORKINGSHEET')||has('WORKINGREPORT');
+ const gateLabels=[['B2','交空櫃'],['B3','交重櫃'],['B4','交空櫃'],['B5','交重櫃'],
+  ['B7','領空櫃'],['B8','領重櫃'],['B9','領空櫃'],['B10','領重櫃']];
+ if(gateHint){
+  const shName=sheets[0]||'（沒有工作表）',sh=book.Sheets[shName];
+  const wrong=gateLabels.find(([addr,expected])=>normalize(getCell(sh,addr))!==expected);
+  if(wrong){
+   const [addr,expected]=wrong;
+   const got=getCell(sh,addr);
+   const printable=got&&got.length<=20&&!/[\x00-\x1F\uFFFD]/.test(got)
+    &&/^[\p{L}\p{N}\s_.()\/-]+$/u.test(got);
+   throw Error(name+'：不是可辨識的 Gate 標準報表。工作表「'+shName+'」'+addr+
+    ' 應是「'+expected+'」，目前是'+(printable?'「'+got+'」':'異常或空白文字')+
+    '；未匯入任何資料。請核對檔案內容');
+  }
+  throw Error(name+'：Gate 分類列部分符合，但其餘必要欄位不完整；為避免寫入錯誤資料已停止');
+ }
+ if(yardHint)throw Error(name+'：沒有找到符合「重櫃、進口櫃、空櫃、Long-Stay」分類的 Yard 工作表；未匯入任何資料');
+ if(vesselHint)throw Error(name+'：船舶報表需要 WORKING SHEET 和 WORKING REPORT 兩張工作表；實際為「'+sheets.slice(0,6).join('、')+'」。未匯入任何資料');
+ throw Error(name+'：Excel 內容不符合 Yard、Gate 或船舶報表特徵；不依檔名猜測，未匯入任何資料');
 }
 function settle(ok){
  if(!approval)return;
