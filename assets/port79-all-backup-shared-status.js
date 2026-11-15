@@ -51,6 +51,7 @@
         control.append(stamp);
       }
       stamp.textContent='上次 '+time;
+      li.classList.add('p79-backup-has-history');
       if(!li.classList.contains('p79-backup-error')&&!li.classList.contains('p79-backup-running')){
         li.classList.remove('p79-backup-pending');
         li.classList.add('p79-backup-done');
@@ -108,6 +109,7 @@
     try{await promise;}finally{if(last.pending===promise)last.pending=null;}
   }
   function init() {
+    if(!d.getElementById('p79BackupSharedStyle')){const style=d.createElement('style');style.id='p79BackupSharedStyle';style.textContent="#systems #p79AllBackupResults li.p79-backup-has-history{height:54px!important;min-height:54px!important;max-height:54px!important;}\n#systems #p79AllBackupResults li.p79-backup-has-history .p79-backup-light-control{height:54px!important;min-height:54px!important;max-height:54px!important;display:flex!important;align-content:center;flex-wrap:wrap;column-gap:7px;row-gap:0;}\n#systems #p79AllBackupResults li.p79-backup-has-history .p79-backup-light-label{max-width:calc(100% - 25px);}\n#systems #p79AllBackupResults .p79-backup-history-time{display:block;flex:0 0 100%;color:var(--muted,#64748b);font-size:10px;line-height:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}";d.head.append(style);}
     const list=d.getElementById('p79AllBackupResults');
     if(list && g.MutationObserver){
       observer=new MutationObserver(()=>{if(last.status)g.queueMicrotask(apply);});
