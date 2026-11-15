@@ -11626,7 +11626,6 @@ let excelBatchImporting=false;
 let excelImportQueue=[];
 let excelCurrentImportKey='';
 let excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
-let excelQueueFailures=[];
 let lastExcelImportResult={ok:false,file:'',reason:'尚未匯入',records:0,workingNo:''};
 let excelLiveState={fileName:'',stage:'',current:0,total:0,waiting:0,pct:0,state:'idle'};
 let excelLiveHideTimer=null;
@@ -11797,7 +11796,6 @@ async function importExcelFiles(fileList){
   // 實際寫入仍採單檔依序處理，避免 lastExcelImportResult / records / 雲端同步互相覆蓋。
   if(!excelBatchImporting){
     excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
-    excelQueueFailures=[];
   }
   const q=queueExcelFiles(incoming);
   if(!q.added){
@@ -11831,7 +11829,6 @@ async function importExcelFiles(fileList){
         }else{
           excelQueueStats.failed++;
           const reason=lastExcelImportResult?.reason||'未寫入人員作業明細';
-          excelQueueFailures.push({file:String(file.name||''),reason:String(reason)});
           updateExcelImportLiveStatus({stage:`❌ ${reason}`,pct:100,state:'error',waiting:excelImportQueue.length});
           toast(`❌ ${file.name} 未完整匯入：${reason}`);
         }
@@ -11839,7 +11836,6 @@ async function importExcelFiles(fileList){
         console.error('批次匯入失敗',file.name,err);
         excelQueueStats.failed++;
         lastExcelImportResult={ok:false,file:file.name,reason:String(err?.message||err),records:0,workingNo:''};
-        excelQueueFailures.push({file:String(file.name||''),reason:String(err?.message||err)});
         updateExcelImportLiveStatus({stage:`❌ 匯入失敗：${err?.message||err}`,pct:100,state:'error',waiting:excelImportQueue.length});
         toast(`${file.name} 匯入失敗：${err?.message||err}`);
       }finally{
@@ -11896,7 +11892,6 @@ window.P79VesselHomeImport={
    processed:excelQueueStats.processed,
    success:excelQueueStats.success,
    failed:excelQueueStats.failed,
-   errors:excelQueueFailures.map(item=>({file:item.file,reason:item.reason})),
    cloudStatus:String(document.getElementById('cloudState')?.textContent||'')
   };
  }
@@ -12076,25 +12071,7 @@ async function importExcel(file) {
   const buf=await file.arrayBuffer();
   setExcelImportStage('解析 試算表 工作表',15);
   const book=XLSX.read(buf,{type:'array',cellDates:true});
-  // Accept harmless worksheet-title casing and surrounding spaces, while
-  // still requiring both original verified data sources for vessel imports.
-  for(const required of ['WORKING SHEET','WORKING REPORT']){
-    if(book.Sheets[required])continue;
-    const original=book.SheetNames.find(title=>
-      String(title).trim().replace(/\s+/g,' ').toUpperCase()===required);
-    if(original&&book.Sheets[original]){
-      book.Sheets[required]=book.Sheets[original];
-      if(!book.SheetNames.includes(required))book.SheetNames.push(required);
-    }
-  }
-  const vesselBook=book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT');
-  const likelyVesselBook=book.SheetNames.some(title=>/WORKING\s+(?:SHEET|REPORT)/i.test(String(title)))||
-    /(?:TALLY|WORKING[\s_-]*SHEET)/i.test(String(file.name||''));
-  if(likelyVesselBook&&!vesselBook){
-    throw Error('船舶工作表格式不完整：需要 WORKING SHEET 與 WORKING REPORT 兩張工作表；實際只有「'+
-      book.SheetNames.slice(0,8).join('、')+'」。尚未寫入此檔資料。');
-  }
-  if(vesselBook){
+  if(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')){
     setExcelImportStage('解析 WORKING SHEET 船舶主檔',25);
     const summary=parseWorkingSheetSummary(book);
     setExcelImportStage('讀取 GPH / VPH 與船舶統計',32);
