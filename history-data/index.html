@@ -17,6 +17,8 @@
 
 .progressbox{display:none;padding:12px 16px;border-bottom:1px solid var(--line);background:#f8fafc;text-align:center}
 .progressbox.show{display:block}.progressline{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:7px;font-size:12px;font-weight:800;color:#334155}.progressbar{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden;box-shadow:inset 0 1px 2px rgba(15,23,42,.08)}.progressfill{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,#0ea5e9,#2563eb,#7c3aed);transition:width .35s ease}.progressdetail{margin-top:6px;font-size:11px;color:#64748b}.num{font-variant-numeric:tabular-nums}
+#historyDrivePanel[hidden],#historyDriveOpen[hidden]{display:none!important}
+#historyDrivePanel{gap:10px;flex-wrap:wrap}#historyDrivePanel small{flex-basis:100%;color:var(--muted,#64748b)}
 </style>
 <style>
 .history-excel-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:1600px;margin:12px auto;padding:0 14px}
@@ -69,6 +71,15 @@ body[data-p79-system="history"] .picker .p79-umnav-label{
 <input type="file" id="historyExcelFile" accept=".xlsx,.xls" hidden>
 <span id="historyExcelMessage" aria-live="polite">先讀取月份，再匯出或比對</span>
 </div>
+<section id="historyDrivePanel" class="history-excel-bar" hidden aria-label="Google雲端硬碟年月備份下載">
+<strong>Google 雲端硬碟年月備份</strong>
+<label>備份年份 <input id="historyDriveYear" type="number" min="2000" max="2099" step="1" aria-label="備份年份" style="width:100px"></label>
+<label>備份月份 <select id="historyDriveMonth" aria-label="備份月份"><option value="">整年度</option><option value="01">01月</option><option value="02">02月</option><option value="03">03月</option><option value="04">04月</option><option value="05">05月</option><option value="06">06月</option><option value="07">07月</option><option value="08">08月</option><option value="09">09月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select></label>
+<button id="historyDriveFind" type="button">查詢雲端備份</button>
+<a id="historyDriveOpen" hidden target="_blank" rel="noopener">開啟雲端備份下載</a>
+<span id="historyDriveStatus" role="status"></span>
+<small>依備份建立年月分類；檔案可能包含新舊資料。上方「歷史資料月份」與原有匯出功能仍依資料所屬月份查詢。</small>
+</section>
 <div id="historyImportPreview" class="history-import-preview" hidden></div>
 <div class="tabs"><button class="tab active" data-type="attendance"><strong>🕒 考勤歷史</strong><small>依月份讀取完整考勤紀錄</small></button><button class="tab" data-type="schedule"><strong>📅 排班歷史</strong><small>依月份查看人員班表</small></button><button class="tab" data-type="vessel"><strong>🚢 船舶歷史</strong><small>依月份讀取船舶主檔與作業明細</small></button></div>
 <section class="panel"><div class="panelhead"><div><strong id="panelTitle">考勤歷史</strong><div id="status" class="status">選擇月份後按「讀取月份」</div></div><div class="stats" id="stats"></div></div><div id="progressBox" class="progressbox"><div class="progressline"><span id="progressText">準備讀取…</span><span id="progressPct" class="num">0%</span></div><div class="progressbar"><div id="progressFill" class="progressfill"></div></div><div id="progressDetail" class="progressdetail">等待開始</div></div><div class="tablewrap" id="result"><div class="empty">尚未讀取資料</div></div></section>
@@ -203,6 +214,7 @@ function session(){
 function perms(){const s=session(),r=String(s?.adminRole||s?.role||'').toLowerCase(),p=s?.systemPermissions||{},f=s?.finePermissions?.history||{};if(r==='superadmin')return{level:'manage',attendance:true,schedule:true,vessel:true};const level=String(p.history||'none');return{level,attendance:!!f['attendance.view'],schedule:!!f['schedule.view'],vessel:!!f['vessel.view']}}
 function token(){return String(sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_token')||sessionStorage.getItem('port79_user_token')||'').trim()}
 function gas(){return String(sessionStorage.getItem('port79_gas_url')||GAS_DEFAULT).trim()}
+window.Port79HistoryDriveContext={session,token,gas};
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(v){if(v==null)return '';if(typeof v==='object')return JSON.stringify(v);return String(v)}
 async function api(action,params={},options={}){const u=new URL(gas()),tk=token();u.searchParams.set('action',action);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,String(v)));if(tk){u.searchParams.set('token',tk);u.searchParams.set('gcToken',tk)}u.searchParams.set('_',Date.now());return window.P79HistoryRead.read(u.toString(),{forceCloud:options.forceCloud===true})}
@@ -342,5 +354,6 @@ C.mountMonth({inputId:'month'});
 </script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1&menu=20261112-clean-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3"></script>
+<script defer src="../assets/port79-history-drive.js?v=20261116-drive-year-month-v1"></script>
 </body></html>
 
