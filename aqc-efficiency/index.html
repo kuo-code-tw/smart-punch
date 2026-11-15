@@ -11626,6 +11626,7 @@ let excelBatchImporting=false;
 let excelImportQueue=[];
 let excelCurrentImportKey='';
 let excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
+let excelQueueFailures=[];
 let lastExcelImportResult={ok:false,file:'',reason:'尚未匯入',records:0,workingNo:''};
 let excelLiveState={fileName:'',stage:'',current:0,total:0,waiting:0,pct:0,state:'idle'};
 let excelLiveHideTimer=null;
@@ -11796,6 +11797,7 @@ async function importExcelFiles(fileList){
   // 實際寫入仍採單檔依序處理，避免 lastExcelImportResult / records / 雲端同步互相覆蓋。
   if(!excelBatchImporting){
     excelQueueStats={success:0,failed:0,processed:0,totalQueued:0};
+    excelQueueFailures=[];
   }
   const q=queueExcelFiles(incoming);
   if(!q.added){
@@ -11829,6 +11831,7 @@ async function importExcelFiles(fileList){
         }else{
           excelQueueStats.failed++;
           const reason=lastExcelImportResult?.reason||'未寫入人員作業明細';
+          excelQueueFailures.push({file:String(file.name||''),reason:String(reason)});
           updateExcelImportLiveStatus({stage:`❌ ${reason}`,pct:100,state:'error',waiting:excelImportQueue.length});
           toast(`❌ ${file.name} 未完整匯入：${reason}`);
         }
@@ -11836,6 +11839,7 @@ async function importExcelFiles(fileList){
         console.error('批次匯入失敗',file.name,err);
         excelQueueStats.failed++;
         lastExcelImportResult={ok:false,file:file.name,reason:String(err?.message||err),records:0,workingNo:''};
+        excelQueueFailures.push({file:String(file.name||''),reason:String(err?.message||err)});
         updateExcelImportLiveStatus({stage:`❌ 匯入失敗：${err?.message||err}`,pct:100,state:'error',waiting:excelImportQueue.length});
         toast(`${file.name} 匯入失敗：${err?.message||err}`);
       }finally{
@@ -11892,6 +11896,7 @@ window.P79VesselHomeImport={
    processed:excelQueueStats.processed,
    success:excelQueueStats.success,
    failed:excelQueueStats.failed,
+   errors:excelQueueFailures.map(item=>({file:item.file,reason:item.reason})),
    cloudStatus:String(document.getElementById('cloudState')?.textContent||'')
   };
  }
