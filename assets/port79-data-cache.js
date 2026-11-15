@@ -175,9 +175,52 @@ async function allowedFolder(){
  }catch(_){folderMessage='資料夾暫時無法存取，請重新選擇'}
  return null;
 }
-async function folderFilename(key){
+// Keep the old SHA-256 name only for reading legacy files; new disk writes are
+// immediately saved under descriptive Chinese names (no conversion or extra copy).
+async function legacyFolderFilename(key){
  const hash=await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(key));
  return Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('')+'.json';
+}
+const FOLDER_API_NAMES={
+ getAttendanceCoreData:['考勤','考勤核心'],getAttendanceMonthData:['考勤','月份資料'],
+ getAttendanceMonths:['考勤','月份清單'],getAttendanceEmployeeMaster:['人資','考勤員工主檔'],
+ getAttendanceMainDirect:['考勤','原始紀錄'],getLeaveData:['請假','請假紀錄'],
+ getScheduleDataSecure:['排班','正式班表'],getScheduleData:['排班','班表資料'],
+ getData:['共用資料','資料讀取'],gcGetData:['效率','工作報告'],
+ getHistoricalDataCatalog:['歷史資料','月份目錄'],historyGetMonthData:['歷史資料','月份內容'],
+ hrGetEmployees:['人資','員工資料'],getEmployeeSnapshot:['人資','員工快照']
+};
+const FOLDER_HISTORY_TYPES={attendance:'考勤',schedule:'排班',vessel:'船舶',sailing:'船期',routes:'碼頭航線',gate:'碼頭進出站',yard:'碼頭儲量'};
+function folderSafePart(value,limit=48){
+ const s=String(value??'').trim().replace(/[\\/:*?"<>|\\u0000-\\u001f]/g,'－').replace(/\s+/g,'_').replace(/\.+$/,'').slice(0,limit);
+ return s||'未命名';
+}
+async function folderFilename(key){
+ const parts=String(key).split('|'),viewer=folderSafePart(parts.shift(),40),kind=parts.shift();
+ let category='系統資料',detail='快取';
+ if(kind==='system'){
+  const sys=parts.shift();category=SYSTEM_LABELS[sys]||'系統資料';
+  const extra=parts.map(p=>p==='export'?'原始匯出':/^\d{4}-\d{2}$/.test(p)?'月份'+p:folderSafePart(p,24));
+  detail=extra.length?extra.join('_'):'完整快取';
+ }else if(kind==='api'){
+  try{
+   const url=new URL(parts.join('|')),action=url.searchParams.get('action')||'';
+   const names=FOLDER_API_NAMES[action]||['系統資料','雲端讀取'];
+   category=names[0];detail=names[1];
+   const type=url.searchParams.get('type');
+   if(action==='historyGetMonthData'&&type&&FOLDER_HISTORY_TYPES[type])category=FOLDER_HISTORY_TYPES[type];
+   const descriptors=[];
+   for(const param of ['month','year','type','scope','includeEmployees']){
+    const value=url.searchParams.get(param);
+    if(value!==null&&value!=='')descriptors.push(({month:'月份',year:'年份',type:'分類',scope:'範圍',includeEmployees:'包含員工'})[param]+folderSafePart(value,24));
+   }
+   if(descriptors.length)detail+='_'+descriptors.join('_');
+  }catch(_){detail='雲端讀取'}
+ }
+ // Short stable suffix prevents distinct accounts/queries with similar readable
+ // labels from overwriting each other; it is not used as the visible category.
+ const unique=(await legacyFolderFilename(key)).slice(0,12);
+ return folderSafePart(category,20)+'_'+folderSafePart(detail,100)+'_帳號'+viewer+'_'+unique+'.json';
 }
 async function snapshotDirectory(handle,create=false){return handle.getDirectoryHandle('port79-snapshots-v1',{create})}
 function currentViewerRow(row){return !!token()&&row?.key?.startsWith(viewerKey()+'|')&&['api','system'].includes(row.kind)&&row.data&&Number.isFinite(row.savedAt)}
@@ -279,21 +322,26 @@ function writeFolderSnapshot(row){
   if(!currentViewerRow(row))return false;
   const handle=await allowedFolder();if(!handle)return false;writeHandle=handle;
   const dir=await snapshotDirectory(handle,true),name=await folderFilename(row.key);
+  const legacyName=await legacyFolderFilename(row.key);
   const payload=JSON.stringify(row.data);
   // An unchanged cloud result may have a newer download timestamp. Never write it again
   // just to refresh that timestamp. Folder status time must mean a real disk commit.
   const prior=folderKnownPayload.get(row.key);
   if(prior?.handle===handle&&prior.data===payload){prior.savedAt=Math.max(prior.savedAt,Number(row.savedAt)||0);return true;}
-  try{
-   const old=JSON.parse(await(await(await dir.getFileHandle(name)).getFile()).text());
-   if(old?.row?.key===row.key){
+  // A newer legacy snapshot must not be replaced by stale browser data.
+  // Only the new Chinese file is eligible for deduplication; the old hash file
+  // remains unchanged and is used as a read fallback.
+  for(const existingName of [name,legacyName]){
+   try{
+    const old=JSON.parse(await(await(await dir.getFileHandle(existingName)).getFile()).text());
+    if(old?.format!=='port79-cache'||old.version!==1||old.row?.key!==row.key)continue;
     if(Number(old.row.savedAt)>Number(row.savedAt))return true;
-    if(old.row.kind===row.kind&&old.row.system===row.system&&JSON.stringify(old.row.data)===payload){
+    if(existingName===name&&old.row.kind===row.kind&&old.row.system===row.system&&JSON.stringify(old.row.data)===payload){
      folderKnownPayload.set(row.key,{handle,data:payload,savedAt:Math.max(Number(old.row.savedAt||0),Number(row.savedAt||0))});
      return true;
     }
-   }
-  }catch(_){}
+   }catch(_){}
+  }
   const file=await dir.getFileHandle(name,{create:true}),writer=await file.createWritable();
   try{await writer.write(JSON.stringify({format:'port79-cache',version:1,row}));await writer.close()}
   catch(error){try{await writer.abort()}catch(_){}throw error}
@@ -314,10 +362,20 @@ async function readFolderSnapshot(key,options={}){
  if(!token()||!key.startsWith(viewerKey()+'|'))return null;
  try{
   const handle=await allowedFolder();if(!handle)return null;
-  const dir=await snapshotDirectory(handle),file=await(await dir.getFileHandle(await folderFilename(key))).getFile();
-  if(file.size>64*1024*1024)return null;
-  const doc=JSON.parse(await file.text()),row=doc?.row;
-  if(doc.format!=='port79-cache'||doc.version!==1||row?.key!==key||!currentViewerRow(row)||row.savedAt>Date.now()+60000)return null;
+  const dir=await snapshotDirectory(handle);
+  let row=null;
+  // Prefer the freshest valid cache, including legacy SHA-256 files that
+  // existed before Chinese names were introduced. Never enumerate other accounts.
+  for(const name of [await folderFilename(key),await legacyFolderFilename(key)]){
+   try{
+    const file=await(await dir.getFileHandle(name)).getFile();
+    if(file.size>64*1024*1024)continue;
+    const doc=JSON.parse(await file.text()),candidate=doc?.row;
+    if(doc.format!=='port79-cache'||doc.version!==1||candidate?.key!==key||!currentViewerRow(candidate)||candidate.savedAt>Date.now()+60000)continue;
+    if(!row||Number(candidate.savedAt)>Number(row.savedAt))row=candidate;
+   }catch(_){}
+  }
+  if(!row)return null;
   if(options.expectedViewer&&options.expectedViewer!==viewerKey()||options.expectedToken&&options.expectedToken!==token())return null;
   if(options.hydrate!==false)await putLocal(row).catch(()=>{});return row;
  }catch(_){return null}
