@@ -45,7 +45,7 @@ function boot(){
  const selectors='[role="status"],[role="alert"],#status,.status,.error';
  const technical=/Failed to fetch|NetworkError|Load failed|AbortError|TimeoutError|timed? ?out|Unexpected token|Unexpected end of JSON|JSON Parse error|Session expired|Invalid token|Unauthorized|Permission denied|Access denied|Forbidden|HTTP\s*[45]\d\d|Cannot read properties|is not defined|is not a function/i;
  function translate(node){
-  if(node.nodeType===3){if(node.parentElement?.closest(selectors)&&technical.test(node.nodeValue||'')){const next=error(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}return;}
+  if(node.nodeType===3){if(node.parentElement?.closest('[data-p79-raw-error]'))return;if(node.parentElement?.closest(selectors)&&technical.test(node.nodeValue||'')){const next=error(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}return;}
   if(node.nodeType!==1)return;
   const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let child;while((child=walker.nextNode()))translate(child);
  }

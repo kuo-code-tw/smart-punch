@@ -3,8 +3,8 @@
 'use strict';
 const d=g.document;
 let readyDownload=null;
-function clearDownload(){if(readyDownload)g.URL.revokeObjectURL(readyDownload.url);readyDownload=null;const b=d.getElementById('p79BackupDownload');if(b)b.hidden=true;}
-function refreshDownload(){if(readyDownload&&(!allowed()||!readyDownload.same()))clearDownload();}
+function clearDownload(){if(readyDownload)g.URL.revokeObjectURL(readyDownload.url);readyDownload=null;const b=d.getElementById('p79BackupDownload');if(b)b.hidden=true;const diagnostic=d.getElementById('p79BackupErrorDetails');if(diagnostic)diagnostic.hidden=true;}
+function refreshDownload(){if(!allowed()||(readyDownload&&!readyDownload.same()))clearDownload();}
 function offerDownload(blob,c){
  clearDownload();const name='79號碼頭完整備份_'+stamp()+'.zip',url=g.URL.createObjectURL(blob);readyDownload={url,name,same:c.same};
  let b=d.getElementById('p79BackupDownload');if(!b){b=d.createElement('button');b.id='p79BackupDownload';b.type='button';b.textContent='下載';b.style.marginInlineStart='8px';d.getElementById('p79AllBackupButton')?.insertAdjacentElement('afterend',b);b.addEventListener('click',()=>{refreshDownload();if(!readyDownload)return;const a=d.createElement('a');a.href=readyDownload.url;a.download=readyDownload.name;d.body.append(a);a.click();a.remove();state('雲端Excel：已保存｜電腦端：已開始下載 '+readyDownload.name+'，請以瀏覽器下載完成為準；可再次按「下載」。');});}
@@ -34,13 +34,22 @@ async function prepare(){
  // Do not create an empty destination file before a long cloud backup finishes.
  return {handle:null};
 }
+function errorScope(payload){const category=payload.phase==='local'?'電腦端資料':labels[payload.type]||'備份資料';const steps={local:'上傳本機Excel雲端副本',list:'讀取雲端Excel來源清單',complete:'核對雲端Excel完成結果'};return category+'｜'+(steps[payload.phase]||'雲端匯出及下載Excel')+(Number.isInteger(payload.index)?'｜第'+(payload.index+1)+(payload._total?'/'+payload._total:'')+'份檔案':'');}
+function rawError(error){return String(error?.message||error).replace(/([?&](?:gcToken|token|key|access_token)=)[^&\s]+/gi,'$1[已隱藏]').replace(/Bearer\s+[^\s]+/gi,'Bearer [已隱藏]').slice(0,1400);}
+function diagnose(payload,error,attempt){
+ const at=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',dateStyle:'short',timeStyle:'medium'}).format(new Date());
+ const scope=errorScope(payload),raw=rawError(error);let details=d.getElementById('p79BackupErrorDetails');
+ if(!details){details=d.createElement('details');details.id='p79BackupErrorDetails';details.setAttribute('data-p79-raw-error','true');const title=d.createElement('summary');title.textContent='備份錯誤明細（分類、步驟及原始回應）';details.append(title);d.getElementById('p79AllBackupFeedback')?.append(details);}
+ details.hidden=false;let pre=details.querySelector('pre');if(!pre){pre=d.createElement('pre');pre.style.whiteSpace='pre-wrap';details.append(pre);}pre.textContent='時間：'+at+'（台灣時間）\n位置：'+scope+'\n狀態：'+(attempt?'準備自動重試 '+attempt+'/5':'已停止，尚未確認完成')+'\n錯誤類型：'+String(error.name||'Error')+(error.httpStatus?'\nHTTP：'+error.httpStatus:'')+'\n原始錯誤：'+raw;
+ error.backupScope=scope;return scope+'｜'+raw;
+}
 async function callOnce(c,payload){
  if(!c.same())throw Error('登入已變更，已停止Excel備份');
  const ctrl=new AbortController(),timer=g.setTimeout(()=>ctrl.abort(),180000);
  try{
   const r=await g.fetch(c.endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action:'historyBackupExcel',gcToken:c.token}),signal:ctrl.signal,redirect:'follow',cache:'no-store'});
-  let result;try{result=await r.json();}catch(e){throw Object.assign(Error('雲端回應未完整傳回，將重新核對相同Excel'),{transient:true});}if(!c.same())throw Error('登入已變更，未套用備份結果');
-  if(!r.ok||result.ok!==true)throw Object.assign(Error(String(result.error||'Excel備份未完成')),{serverRejected:result.ok===false,transient:[408,429,500,502,503,504].includes(r.status)});
+  let result;try{result=await r.json();}catch(e){throw Object.assign(Error('雲端回應未完整傳回，將重新核對相同Excel'),{transient:true,httpStatus:r.status});}if(!c.same())throw Error('登入已變更，未套用備份結果');
+  if(!r.ok||result.ok!==true)throw Object.assign(Error(String(result.error||'Excel備份未完成')),{httpStatus:r.status,serverRejected:result.ok===false,transient:[408,429,500,502,503,504].includes(r.status)});
   return result;
  }finally{g.clearTimeout(timer);}
 }
@@ -48,12 +57,14 @@ function transient(error){
  if(error.serverRejected&&!error.transient)return /Excel正在產生|Excel備份正在準備|備份資料夾正在準備/.test(error.message);
  return !!error.transient||['AbortError','TimeoutError','TypeError'].includes(error.name)||/Failed to fetch|NetworkError|Load failed|網路連線失敗|連線逾時|網路連線中斷|回應未完整傳回/i.test(error.message);
 }
-async function call(c,payload){
+async function call(c,payload,total){
+ const scopePayload={...payload,_total:total};
  const delays=[3000,5000,10000,20000,30000];
  for(let attempt=0;;attempt++){
   try{return await callOnce(c,payload);}catch(error){
-   if(!c.same()||!allowed()||!transient(error)||attempt>=delays.length)throw error;
-   state('雲端暫時無法確認，'+delays[attempt]/1000+'秒後自動重試（'+(attempt+1)+'/'+delays.length+'）；已完成項目保留，核對同一份Excel，不會從頭備份…');
+   if(!c.same()||!allowed())throw error;
+   const retry=transient(error)&&attempt<delays.length,detail=diagnose(scopePayload,error,retry?attempt+1:0);if(!retry)throw error;
+   state(errorScope(scopePayload)+'｜原始錯誤：'+rawError(error)+'｜雲端暫時無法確認，'+delays[attempt]/1000+'秒後自動重試（'+(attempt+1)+'/'+delays.length+'）；已完成項目保留，核對同一份Excel，不會從頭備份…');
    await new Promise(resolve=>g.setTimeout(resolve,delays[attempt]));
    if(!c.same()||!allowed())throw Error('登入已變更，已停止Excel備份');
   }
@@ -119,7 +130,7 @@ async function run(batch,c){
    if(!Number.isInteger(list.total)||list.total<1||list.total>1000)throw Error('Excel來源清單不完整');
    for(let i=0;i<list.total;i++){
     const key=item.type+'|'+id+'|'+i;if(downloaded[key])continue;
-    const r=await call(c,{type:item.type,backupId:id,index:i});
+    const r=await call(c,{type:item.type,backupId:id,index:i},list.total);
     if(!r.verified||r.backupId!==id||r.index!==i||!r.file||!/^[^\\/:*?"<>|]+\.xlsx$/.test(r.file.name))throw Error('Excel檔案回條不完整');
     const b=bytes(r.file.base64);if(await hash(b)!==r.file.hash)throw Error('Excel下載內容校驗不符');
     zip.file('雲端資料/'+label+'/'+r.file.name,b);downloaded[key]=true;
@@ -131,11 +142,11 @@ async function run(batch,c){
   const blob=await zip.generateAsync({type:'blob',compression:'STORE',mimeType:'application/zip'});if(!c.same())throw Error('登入已變更，未提供備份下載');
   state('雲端Excel：已保存｜正在檢查壓縮檔完整性…');
   await validateArchive(blob);if(!c.same())throw Error('登入已變更，未提供備份下載');
-  offerDownload(blob,c);
+  offerDownload(blob,c);const diagnostic=d.getElementById('p79BackupErrorDetails');if(diagnostic)diagnostic.hidden=true;
   const completedAt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
   state('雲端Excel：全部保存完成｜壓縮檔完整性檢查通過｜請按旁邊「下載」儲存到電腦；目前尚未下載｜'+completedAt+'（台灣時間）。重新整理或關閉本頁前請先下載。');
   batch.excelComplete=true;g.Port79SharedBackupStatus?.refresh?.();
- }catch(e){state((stateData.cloud?'雲端Excel：已保存':'雲端Excel：尚未全部完成')+'｜電腦端：尚未完成；'+String(e.message||e)+'。已完成項目保留，可按原按鈕繼續。');throw e;}
+ }catch(e){state((stateData.cloud?'雲端Excel：已保存':'雲端Excel：尚未全部完成')+'｜電腦端：尚未完成；'+(e.backupScope?e.backupScope+'｜':'')+rawError(e)+'。已完成項目保留，可按原按鈕繼續。');throw e;}
 }
 g.Port79BackupExcel={prepare,run,workbook,clean,allowed,localData,validateArchive,refreshDownload,clearDownload};
 })(window);
