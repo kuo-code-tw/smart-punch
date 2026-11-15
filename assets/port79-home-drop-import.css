@@ -90,3 +90,74 @@ html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
  #p79HomeImportReviewText{max-height:30vh}
 }
 @media(prefers-reduced-motion:reduce){#p79HomeImportProgressBar{animation:none}}
+
+/* 2026-11-15: true compact import modal with an always-visible progress bar.
+   The embedded management iframe remains operational but does not size the dialog. */
+#p79HomeImportDialog{
+ box-sizing:border-box!important;
+ width:min(460px,calc(100vw - 24px))!important;
+ max-width:460px!important;
+ min-height:0!important;
+ height:fit-content!important;
+ max-height:min(270px,calc(100dvh - 26px))!important;
+ margin:auto!important;
+ overflow:hidden!important;
+}
+#p79HomeImportDialog[open]{
+ display:flex!important;
+ flex-direction:column!important;
+ align-items:stretch!important;
+ justify-content:flex-start!important;
+}
+#p79HomeImportDialog .p79-import-modal-head{
+ box-sizing:border-box!important;
+ flex:0 0 auto!important;
+ min-height:42px!important;
+ padding:7px 13px!important;
+}
+#p79HomeImportTitle{font-size:14px!important;line-height:1.35!important}
+#p79HomeImportClose{min-width:54px!important;min-height:30px!important;padding:4px 10px!important;font-size:12px!important}
+#p79HomeImportFile{
+ box-sizing:border-box!important;
+ flex:0 0 auto!important;
+ min-height:0!important;
+ margin:0!important;
+ padding:9px 13px 3px!important;
+ overflow:hidden!important;
+ text-overflow:ellipsis!important;
+ white-space:nowrap!important;
+ font-size:12px!important;
+}
+#p79HomeImportProgress{
+ box-sizing:border-box!important;
+ flex:0 0 auto!important;
+ min-height:7px!important;
+ height:7px!important;
+ margin:7px 13px 5px!important;
+ overflow:hidden!important;
+}
+#p79HomeImportStatus{
+ box-sizing:border-box!important;
+ flex:0 1 auto!important;
+ min-height:0!important;
+ max-height:110px!important;
+ overflow-y:auto!important;
+ margin:0!important;
+ padding:7px 13px 12px!important;
+ font-size:12px!important;
+ line-height:1.5!important;
+ white-space:pre-wrap!important;
+}
+#p79HomeImportDialog:has(#p79HomeImportReview:not([hidden])){
+ max-height:min(520px,calc(100dvh - 26px))!important;
+}
+#p79HomeImportReview{
+ box-sizing:border-box!important;
+ flex:0 1 auto!important;
+ min-height:0!important;
+ margin:0 13px 13px!important;
+ overflow:auto!important;
+}
+@media(max-width:700px){
+ #p79HomeImportDialog{width:calc(100vw - 18px)!important}
+}
