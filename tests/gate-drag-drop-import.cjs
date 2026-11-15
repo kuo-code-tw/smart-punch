@@ -10,7 +10,7 @@ const backend=fs.readFileSync(path.join(base,'backend/gate-stats-daily-import.gs
 new vm.Script(js);
 assert(html.includes('id="gateDropZone"'), 'drop target available above official Gate metrics');
 assert(html.indexOf('id="gateDropZone"')>html.indexOf('<h2>匯入／更新 Gate Excel</h2>')&&html.indexOf('id="gateDropZone"')<html.indexOf('id="gateFile"'),'drop zone is preserved inside collapsible Excel importer, rather than obsolete Gate cards');
-assert(html.includes('gate-absolute-cells-v1'),'import JS cache is refreshed');
+assert(html.includes('gate-format-guard-v2'),'import JS cache is refreshed');
 assert(backend.includes('index.get(date)'),'back end continues date upsert instead of addition');
 class Element{
  constructor(id){this.id=id;this.children=[];this.listeners={};this.dataset={};this.attrs={};
@@ -69,7 +69,7 @@ const win={
  }
 };
 vm.runInNewContext(js,{window:win,URL,URLSearchParams,console},{timeout:4000});
-const file={name:'gate.xlsx',size:1400,arrayBuffer:async()=>new ArrayBuffer(4)};
+const file={name:'gate.xlsx',size:1400,arrayBuffer:async()=>Uint8Array.from([0x50,0x4b,3,4]).buffer};
 function drop(files=[file]){
  const ev={dataTransfer:{types:['Files'],files},preventDefault(){this.prevented=true;},
   stopPropagation(){this.stopped=true;}};
