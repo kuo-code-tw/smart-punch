@@ -16,7 +16,7 @@ assert(html.indexOf('id="systems"')<html.indexOf('id="p79HomeDropImport"'),'drop
 assert(html.indexOf('class="p79-modern-home-intro"')<html.indexOf('id="p79HomeDropImport"'),'drop bar follows the homepage introduction, not the very top');
 assert(html.indexOf('id="p79HomeDropImport"')<html.indexOf('id="p79Dashboard"'),'drop bar is immediately before Ship Operations Overview');
 assert(html.indexOf('id="p79HomeDropImport"')<html.indexOf('id="cardHistory"'),'drop bar precedes navigation cards');
-assert.equal((html.slice(html.indexOf('id="p79HomeDropImport"'),html.indexOf('id="p79Dashboard"')).match(/<\/section>/g)||[]).length,1,'only drop section is between the intro and ship dashboard');
+assert(html.indexOf('id="p79HomeDropImport"')<html.indexOf('id="p79AllBackupPanel"')&&html.indexOf('id="p79AllBackupPanel"')<html.indexOf('id="p79Dashboard"'),'drop bar then visible backup status remain before ship dashboard');
 assert.match(html,/<h2>拖曳匯入<\/h2>/,'compact title');
 assert(!html.includes('拖曳 Excel 或點此選檔'),'long subtitles removed from small drop zones');
 assert.match(html,/port79-home-drop-import.js\?v=/);
@@ -34,9 +34,10 @@ assert(!source.includes('gateStatsImport'), 'homepage must not copy private Gate
 function fakeElement(){
  const listeners={};
  return {
-  listeners,dataset:{},textContent:'',hidden:false,value:'',open:false,
+  listeners,dataset:{},textContent:'',hidden:false,value:'',open:false,style:{},attributes:{},
   classList:{add(){},remove(){}},contains(){return false;},
   addEventListener(name,fn){listeners[name]=fn;},
+  setAttribute(name,value){this.attributes[name]=String(value);},
   showModal(){this.open=true;},close(){this.open=false;},
   querySelector(){return null;}
  };
@@ -49,11 +50,12 @@ for(const kind of names){
  zone.querySelector=q=>q==='input[type=file]'?input:null;
  zones[kind]=zone;
 }
-const root=fakeElement(),dialog=fakeElement(),frame=fakeElement(),title=fakeElement(),status=fakeElement(),close=fakeElement();
+const root=fakeElement(),dialog=fakeElement(),frame=fakeElement(),title=fakeElement(),status=fakeElement(),close=fakeElement(),progress=fakeElement(),progressBar=fakeElement();
 root.querySelectorAll=()=>Object.values(zones);
 const elements={
  p79HomeDropImport:root,p79HomeImportDialog:dialog,p79HomeImportFrame:frame,
- p79HomeImportTitle:title,p79HomeImportStatus:status,p79HomeImportClose:close
+ p79HomeImportTitle:title,p79HomeImportStatus:status,p79HomeImportClose:close,
+ p79HomeImportProgress:progress,p79HomeImportProgressBar:progressBar
 };
 const document={
  getElementById:id=>elements[id]||null,
@@ -127,8 +129,20 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
  assert.match(frame.src,/aqc-efficiency\/\?homeImport=1/);
  frame.onload();await flush();
  assert.equal(seen.length,2);
- assert.match(status.textContent,/已處理 2 個檔案/);
- assert.match(status.textContent,/雲端同步狀態/);
+ assert.match(status.textContent,/解析完成 2\/2/);
+ assert.match(status.textContent,/核對雲端儲存結果/);
+ assert.equal(progressBar.style.width,'100%','completed parse shows full progress');
+
+ // The original vessel parser's per-file error must reach the parent dialog.
+ frame.contentWindow={
+  location:{origin:host.location.origin,pathname:'/smart-punch/aqc-efficiency/'},
+  P79VesselHomeImport:{importFiles:async()=>({processed:1,success:0,failed:1,errors:[{file:'tally.xlsx',reason:'WORKING REPORT 沒有讀到人員作業明細'}],cloudStatus:'雲端主檔 106、明細 1708'})}
+ };
+ drag('vessel',[file('tally.xlsx')]);frame.onload();await flush();
+ assert.equal(status.dataset.tone,'error','failed parse is not reported as cloud success');
+ assert.match(status.textContent,/WORKING REPORT 沒有讀到人員作業明細/);
+ assert.doesNotMatch(status.textContent,/雲端主檔 106/,'cloud restore is not the file import result');
+ assert.equal(progressBar.style.width,'100%','completed failed attempt keeps full red progress bar');
 
  token.set('port79_user_session',JSON.stringify({adminRole:'employee'}));
  host.Port79HomeDropImport.refresh();
