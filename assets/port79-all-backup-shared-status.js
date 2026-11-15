@@ -26,10 +26,10 @@
   function localTime(stamp) {
     const s=String(stamp||'');
     const m=/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)$/.exec(s);
-    if(m)return m[1]+'/'+m[2]+'/'+m[3]+' '+m[4]+':'+m[5];
+    if(m)return m[1]+'/'+m[2]+'/'+m[3]+' '+m[4]+':'+m[5]+':'+m[6];
     const date=new Date(s);
     if(isNaN(date.getTime()))return '';
-    return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+    return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date);
   }
   function apply() {
     const who=current(), data=last.status;
