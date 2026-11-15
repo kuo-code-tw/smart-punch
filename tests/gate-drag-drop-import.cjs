@@ -10,7 +10,7 @@ const backend=fs.readFileSync(path.join(base,'backend/gate-stats-daily-import.gs
 new vm.Script(js);
 assert(html.includes('id="gateDropZone"'), 'drop target available above official Gate metrics');
 assert(html.indexOf('id="gateDropZone"')>html.indexOf('<h2>匯入／更新 Gate Excel</h2>')&&html.indexOf('id="gateDropZone"')<html.indexOf('id="gateFile"'),'drop zone is preserved inside collapsible Excel importer, rather than obsolete Gate cards');
-assert(html.includes('gate-raw-values-v3'),'import JS cache is refreshed');
+assert(html.includes('gate-cross-realm-v4'),'import JS cache is refreshed');
 assert(backend.includes('index.get(date)'),'back end continues date upsert instead of addition');
 class Element{
  constructor(id){this.id=id;this.children=[];this.listeners={};this.dataset={};this.attrs={};
@@ -49,7 +49,7 @@ const storage={
 };
 const win={
  document:doc,setTimeout:fn=>{closeTimers.push(fn);},sessionStorage:{getItem:k=>storage[k]||null},
- XLSX:{read:()=>book,utils:{sheet_to_json:()=>valid?matrix:[[1]]}},
+ XLSX:{read:bytes=>{assert(ArrayBuffer.isView(bytes),'cross-frame file must become a local byte view before SheetJS');return book},utils:{sheet_to_json:()=>valid?matrix:[[1]]}},
  P79GateLive:{refresh:async date=>{refreshes++;refreshDate=date;}},
  fetch:async (url,options)=>{
   calls.push({url:String(url),options});

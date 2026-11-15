@@ -87,7 +87,7 @@ const trend=api.trendSvg([{date:'2026-11-12',heavyTotal:50,emptyTotal:20},{date:
 assert.match(trend,/>TEU<\/text>/);
 assert.doesNotMatch(trend,/>3,000<\/text>/,'small inventory cannot be flattened by a fixed 3,000 TEU axis');
 assert.match(html,/當日櫃別明細/,'historical selector must not label all dates as today');
-assert.match(html,/yard-dashboard\.js\?v=20261115-yard-a1-guard-v3/,'updated workbook parser must invalidate old cache');
+assert.match(html,/yard-dashboard\.js\?v=20261115-yard-cross-realm-v4/,'updated workbook parser must invalidate old cache');
 assert.match(page,/20261113-yard-home-size-cards-v1/,'embedded iframe must invalidate old page cache');
 // Consistent product naming and center alignment across all history tables.
 assert.match(html,/<title>碼頭儲量管理｜/);

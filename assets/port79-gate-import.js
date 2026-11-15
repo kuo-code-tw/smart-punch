@@ -203,7 +203,9 @@ async function chooseFile(droppedFile){
    var ole=[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1].every((n,i)=>sig[i]===n);
    if(!zip&&!ole)throw Error('檔案內容不是有效 Excel 活頁簿；雖然名為 .xlsx，檔案實際不是 ZIP/Excel 格式。請使用真正的 Excel 原始檔');
   }
-  book=g.XLSX.read(bytes,{type:'array',cellHTML:false,cellDates:false});
+  // Files passed by the homepage retain its ArrayBuffer realm. SheetJS
+  // must receive a byte view created inside this importing page.
+  book=g.XLSX.read(new Uint8Array(bytes),{type:'array',cellHTML:false,cellDates:false});
   if(!book.SheetNames?.length)throw Error('Excel 不含工作表');
   book.SheetNames.forEach(function(name){
    var option=d.createElement('option');option.value=name;option.textContent=name;

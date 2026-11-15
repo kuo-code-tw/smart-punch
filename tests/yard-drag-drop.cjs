@@ -40,7 +40,7 @@ function createBrowser(authorized=true){
   XLSX:{
    SSF:{parse_date_code:()=>null},
    utils:{sheet_to_json:sheet=>sheet.matrix},
-   read:()=>{readCount++;return {SheetNames:['Yard'],Sheets:{Yard:{matrix}}};}
+   read:bytes=>{assert(ArrayBuffer.isView(bytes),'homepage buffers must become a local byte view before SheetJS');readCount++;return {SheetNames:['Yard'],Sheets:{Yard:{matrix}}};}
   },
   confirm:()=>{confirmCount++;return allowOverwrite;},
   addEventListener:on,
@@ -80,7 +80,7 @@ const flush=async()=>{for(let n=0;n<6;n++)await new Promise(done=>setTimeout(don
 (async()=>{
  assert.match(html,/yardDropOverlay/,'drop feedback overlay available');
  assert.match(html,/yardDropHint/,'visible drop instruction available');
- assert.match(html,/yard-dashboard\.js\?v=20261115-yard-a1-guard-v3/,'script cache revision');
+ assert.match(html,/yard-dashboard\.js\?v=20261115-yard-cross-realm-v4/,'script cache revision');
  assert.match(html,/yard-dashboard\.css\?v=20261113-home-size-cards-v1/,'style cache revision');
  assert.match(css,/yard-drop-overlay\[hidden\]\{display:none!important\}/,'hidden overlay does not block page');
  assert.match(parent,/20261113-yard-home-size-cards-v1/,'embedded iframe refreshes cached Yard page');

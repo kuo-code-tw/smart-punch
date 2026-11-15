@@ -458,7 +458,8 @@ async function importFile(file){
  importBusy=true;
  message('正在核對 Excel 的每日櫃數、TEU、容量及使用率…');
  try{
-  const book=g.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false,cellHTML:false});
+  // Normalize homepage-owned buffers in this iframe before SheetJS reads them.
+  const book=g.XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false,cellHTML:false});
   const imported=parseBook(book),existing=new Map(rows.map(r=>[r.date,r]));
   const changed=imported.filter(r=>existing.has(r.date)&&Object.keys(FIELD_ROWS).some(k=>existing.get(r.date)[k]!==r[k]));
   if(changed.length&&!(await confirmHomeYardOverwrite('這份報表有 '+changed.length+' 個已儲存日期的數字不同。確認以新 Excel 的原始資料覆蓋這些日期？\n（其他日期會保留，不會累加。）'))){

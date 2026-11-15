@@ -5223,7 +5223,7 @@ async function importWorkingSheetDriverAudit(file){
   dualAuditWorkingReference=null;try{localStorage.removeItem(DUAL_AUDIT_WORKING_CACHE_KEY);}catch(_){}renderWorkingSheetDriverAudit();
   const state=document.getElementById('workingSheetDriverFileState');if(state)state.textContent='正在解析 WORKING SHEET 與 WORKING REPORT…';
   try{
-    await window.p79EnsureXlsx();const buf=await file.arrayBuffer(),book=XLSX.read(buf,{type:'array',cellDates:true});
+    await window.p79EnsureXlsx();const buf=await file.arrayBuffer(),book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
     if(version!==workingSheetDriverImportVersion)return;
     if(!book.Sheets['WORKING SHEET']||!book.Sheets['WORKING REPORT'])throw Error('檔案需同時包含 WORKING SHEET 與 WORKING REPORT 分頁');
     const summary=parseWorkingSheetSummary(book);if(!summary)throw Error('無法讀取 WORKING SHEET');
@@ -5599,7 +5599,7 @@ async function importDualWorkingExcel(file) {
   if(state){state.className='rounded-xl border bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700';state.textContent='② 正在解析 WORKING SHEET / WORKING REPORT...'}
   try{
     const buf=await file.arrayBuffer();
-    const book=XLSX.read(buf,{type:'array',cellDates:true});
+    const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
     const summary=parseWorkingSheetSummary(book);
     if(!summary)throw new Error('找不到 WORKING SHEET 船舶資料');
     Object.assign(summary,parseWorkingReportProductivity(book,summary));
@@ -6657,7 +6657,7 @@ async function comparePersonalEfficiencyExcel(file) {
     }
 
     const buf=await file.arrayBuffer();
-    const book=XLSX.read(buf,{type:'array',cellDates:true});
+    const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
     personalAuditReference=parsePersonalEfficiencyWorkbook(book,file.name||'個人效率表.xlsx');
 
     if(!personalAuditReference.month){
@@ -12070,7 +12070,7 @@ async function importExcel(file) {
   setExcelImportStage('讀取 試算表 檔案',8);
   const buf=await file.arrayBuffer();
   setExcelImportStage('解析 試算表 工作表',15);
-  const book=XLSX.read(buf,{type:'array',cellDates:true});
+  const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
   if(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')){
     setExcelImportStage('解析 WORKING SHEET 船舶主檔',25);
     const summary=parseWorkingSheetSummary(book);
