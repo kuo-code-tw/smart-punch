@@ -192,7 +192,9 @@ const FOLDER_API_NAMES={
 };
 const FOLDER_HISTORY_TYPES={attendance:'考勤',schedule:'排班',vessel:'船舶',sailing:'船期',routes:'碼頭航線',gate:'碼頭進出站',yard:'碼頭儲量'};
 function folderSafePart(value,limit=48){
- const s=String(value??'').trim().replace(/[\\/:*?"<>|\\u0000-\\u001f]/g,'－').replace(/\s+/g,'_').replace(/\.+$/,'').slice(0,limit);
+ const invalid='/:*?"<>|'+String.fromCharCode(92);
+ const raw=String(value??'').trim();
+ const s=Array.from(raw,ch=>ch.charCodeAt(0)<32||invalid.includes(ch)?'－':ch).join('').replace(/\s+/g,'_').replace(/\.+$/,'').slice(0,limit);
  return s||'未命名';
 }
 async function folderFilename(key){
