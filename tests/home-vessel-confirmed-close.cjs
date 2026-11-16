@@ -6,7 +6,10 @@ const html=fs.readFileSync('aqc-efficiency/index.html','utf8');
 const begin=html.indexOf('async function p79HomeDrainVesselQueue(){');
 const end=html.indexOf('\n};',begin);
 assert(begin>0&&end>begin,'original embedded vessel importer is available');
-const snippet=html.slice(begin,end+3);
+const importer=html.indexOf('window.P79VesselHomeImport={',begin);
+const init=html.indexOf('let p79VesselHomeImportInitialized=false;',begin);
+assert(init>begin&&importer>init,'fixture uses an explicitly ready importer without redeclaring startup state');
+const snippet=html.slice(begin,init)+html.slice(importer,end+3);
 new vm.Script(snippet);
 function fixture({jobs,masters,records,pending=false,recoverPending=false,initialPending=false,readError='',processed,success,failed}={}){
   jobs=jobs||[{workingNo:'SHIP-1',recordCount:2,recordIds:['ROW-1','ROW-2']}];
