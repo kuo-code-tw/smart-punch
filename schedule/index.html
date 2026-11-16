@@ -7762,7 +7762,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // A temporary unread attendance source must not hide an existing
       // roster/coverage assignment. Only real missing punches block it.
       const coverageShift=noPunchRest||unworkedOvertime||punchPending?'':p79CoverageShift(emp.id,dayStr);
-      const displayShift=coverageShift||(noNationalQuota&&shiftVal==='國'?'休':shiftVal);
+      // Historical raw 國 in a month with zero national-holiday quota is an
+      // ordinary eligible off-day, not permanently a 休 day. The shared
+      // allocator may have already consumed it as a missing 例 (e.g. 2026-11-14).
+      // Match that verified automatic category in the visible day cell AND
+      // quota summary, but never override formal reports, approval or locks.
+      const reclassifiedLegacyNational=noNationalQuota&&shiftVal==='國'&&
+        !hasOfficialOvertimeReport&&!originalMeta.restAllocationLocked&&
+        !originalMeta.restCategoryLocked&&
+        dayMeta?.restAllocationSource==='auto-v1'&&
+        ['例','休'].includes(dayMeta.restCategory)?dayMeta.restCategory:'休';
+      const displayShift=coverageShift||(noNationalQuota&&shiftVal==='國'
+        ?reclassifiedLegacyNational:shiftVal);
       const substituteLabel=ownApprovedLeave||noPunchRest||unworkedOvertime?'':p79SubstituteShiftLabel(emp.id,dayStr,dayMeta);
       const approvedLeaveCode=ownApprovedLeave?p79ScheduleLeaveExportCode(scheduleLeaveTypeText(ownApprovedLeave)):'';
       const specialCandidate=p79ScheduleSpecialNoPunchCode(emp.id,dayStr,rosterShift,ownApprovedLeave,
