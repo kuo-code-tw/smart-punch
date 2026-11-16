@@ -436,7 +436,7 @@ const p79LeaveReads=new Map();
 function p79LeaveIsTransientReadFailure(error){
  const raw=String(error?.error||error?.message||error||'');
  if(p79LeaveAuthError(raw))return false;
- return error?.retryable===true||/ReadError|雲端回應逾時|timeout|timed out|Failed to fetch|NetworkError|network request failed|Load failed|signal is aborted|abort without reason|HTTP 5\\d\\d|網路連線失敗|目前正在處理其他資料/i.test(raw);
+ return error?.retryable===true||/ReadError|雲端回應逾時|timeout|timed out|Failed to fetch|NetworkError|network request failed|Load failed|signal is aborted|abort without reason|HTTP 5\d\d|網路連線失敗|目前正在處理其他資料/i.test(raw);
 }
 async function p79ReadOfficialLeaveWithRetry(token,{fresh=false,deadlineMs=50000,onRetry=null}={}){
  const deadline=Date.now()+Math.max(2500,deadlineMs);
