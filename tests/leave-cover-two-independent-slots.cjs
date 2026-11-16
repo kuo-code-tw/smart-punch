@@ -26,15 +26,23 @@ assert.equal(selects.length,2,'two independent worker selectors visible in two-p
 assert.equal(selects[0][1],'0');assert.equal(selects[1][1],'1');
 for(const [,slot,options] of selects.map(x=>[x[0],x[1],x[0]])){
  assert(options.includes('方乃慶')&&options.includes('第二位員工'),'each slot shows unfiltered eligible same-department workers');
- assert(options.includes('其他職稱員工'),'slots are not confined to optional job filter');
+ assert(!options.includes('其他職稱員工'),'default direct dropdown shows only the leave worker job title');
+ assert(options.includes('已請假同仁')&&options.includes(' disabled'),'unavailable same-title workers remain visible with reason');
  assert(!options.includes('外部單位員工'),'other department must not appear');
- assert(options.includes('已請假同仁')&&options.includes(' disabled'),'unavailable people remain disabled with reason');
 }
 assert(selects[1][0].includes('disabled'),'second slot is visible but waits for first selection');
 const afterFirst=picker.render({...params,selected:['A']});
 const second=afterFirst.match(/<select data-smart-action="slot" data-smart-slot="1"[^>]*>[\s\S]*?<\/select>/)?.[0]||'';
 assert(second&&!second.match(/^<select[^>]* disabled/),'second slot enabled after first choice');
-assert(second.includes('第二位員工'),'second candidate available even though name filter selects A');
+assert(second.includes('第二位員工'),'second same-title candidate available even though advanced name filter selects A');
+assert(html.includes('data-smart-action="slot-job" data-smart-slot="0"'),'first worker has a visible job filter');
+assert(html.includes('data-smart-action="slot-job" data-smart-slot="1"'),'second worker has a separate visible job filter');
+assert(html.includes('<option value="F/L" selected>F/L</option>'),'target title is selected by default');
+const mixed=picker.render({...params,slotJobs:['F/L','AQC']});
+const secondMixed=mixed.match(/<select data-smart-action="slot" data-smart-slot="1"[^>]*>[\s\S]*?<\/select>/)?.[0]||'';
+assert(secondMixed.includes('其他職稱員工'),'second worker may use another job title');
+assert(!secondMixed.includes('方乃慶'),'different slot title filters are independent');
+
 assert(second.includes('已選為另一位'),'first worker cannot be selected as second');
 const done=picker.render({...params,selected:['A','B']});
 assert(done.includes('已勾選 2 / 2 位'),'two distinct workers complete required selection');
@@ -59,7 +67,7 @@ assert(approved.includes("action.kind==='slot'")&&fresh.includes("action.kind===
 assert(approved.includes("entry.mode==='two'&&ids.length!==2"),'approved two-person saves still reject missing second worker');
 assert(fresh.includes("ids.length!==(row.secondVisible?2:1)"),'new-leave saves still reject missing second worker');
 for(const filename of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js']){
- assert(leave.includes(filename+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1'),'deployed page cache busts '+filename);
+ assert(leave.includes(filename+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1'),'deployed page cache busts '+filename);
 }
 for(const x of [js,approved,fresh])new vm.Script(x);
 console.log('PASS two separate leave-cover selectors; filters no longer hide second choice; duplicate/unavailable workers blocked; both workflows integrated');
