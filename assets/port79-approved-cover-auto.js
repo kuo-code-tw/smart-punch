@@ -58,6 +58,22 @@
      if(action.kind==='mode'){
        row.mode=action.value==='two'?'two':'one';
        if(row.mode==='one')row.second='';
+     }else if(action.kind==='slot'){
+       if(row.mode!=='two'||![0,1].includes(action.slot))return;
+       const id=String(action.id||''),options=picker.candidates(smartOptions(row));
+       if(id&&!options.some(x=>x.id===id&&!x.disabled)){
+        el('p79LeaveCoverAutoStatus').textContent='此人員已有請假、代班或班別衝突，請重新選擇。';renderSmart();return;
+       }
+       if(action.slot===1&&!row.first){
+        el('p79LeaveCoverAutoStatus').textContent='請先選擇第一位代班人員。';renderSmart();return;
+       }
+       if(id&&id===(action.slot===0?row.second:row.first)){
+        el('p79LeaveCoverAutoStatus').textContent='兩位代班人員不能是同一人。';renderSmart();return;
+       }
+       if(action.slot===0){
+        row.first=id;
+        if(!row.first){row.first=row.second||'';row.second='';}
+       }else row.second=id;
      }else if(action.kind==='recommend'){
        const ids=picker.recommend(smartOptions(row),row.mode);
        if(!ids.length){el('p79LeaveCoverAutoStatus').textContent='當天沒有已核對的排休候選人，請依班次及休息條件人工選擇。';return;}
