@@ -427,16 +427,6 @@ html[data-p79-schedule-page="daily"] #p79RestAuditLiveStatus{display:none!import
  padding:10px;background:#fffefa;border:1px solid #f1e2c5;
  border-radius:7px;font:12px/1.7 system-ui,'Noto Sans TC',sans-serif;
 }
-/* Show genuine additional off-days without disguising them as
-   unfilled statutory quotas or altering any saved shift. */
-html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] td.p79-rest-over-quota{
- background:#fff1f2!important;color:#9f1239!important;
-}
-html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] td .p79-rest-overquota-note{
- display:block;margin-top:2px;font:900 9px/1.2 system-ui,'Noto Sans TC',sans-serif;
- color:#b91c1c;white-space:nowrap;letter-spacing:0;
-}
-
 /* Keep real interaction priority, edit locks, scrolling and browser sizes safe. */
 @media(max-width:1540px){
  #p79ReferenceKpis{gap:8px}
