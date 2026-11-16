@@ -26,19 +26,12 @@ assert.equal(linked.actualNormalShift,'早','UI shows actual cloud roster shift'
 assert.equal(linked.expectedNormalShift,'中');
 assert.equal(linked.expectedSplitRule.overtimeStart,'24');
 assert.equal(linked.expectedSplitRule.overtimeEnd,'04');
-const button=source.match(/el\.querySelector\('#p79OtOwnShiftReport'\)\.onclick=\(\)=>\{([\s\S]*?)\n    \};/);
-assert(button,'linked leave dialog offers an independent own-shift filing action');
-const openCalls=[],prefill={date,workDate:date,empId:'WORKER',forEmpId:'LEAVER',coverDate:date,overtimeDate:date,leaveHandoffId:'L-14'};
-vm.runInNewContext('(function(){'+button[1]+'})()',{
- prefill,selectedRow:()=>valid,openReport:input=>openCalls.push(input),String
-});
-assert.equal(openCalls.length,1,'button only opens one new form and never writes');
-assert.equal(openCalls[0].independentOvertime,true);
-assert.equal(openCalls[0].date,date);
-assert.equal(openCalls[0].empId,'WORKER');
-assert.equal(openCalls[0].code,'延16-20');
-assert(!openCalls[0].leaveHandoffId&&!openCalls[0].forEmpId,'source leave link not used for actual-shift overtime');
-assert.match(openCalls[0].note,/原請假代班預排另行核對/);
+// The person selects 延16-20 and presses the SAME save button.
+assert(!source.includes('p79OtOwnShiftReport'),'no separate action is needed to submit the chosen period');
+assert(!source.includes('href="../schedule/"'),'no roster-adjustment detour in the overtime form');
+assert(api.chosenMatchesLeaveSplit(valid,linked.expectedSplitRule)===false);
+const linkedPeriod=['延','延16-04',4,6.02,'16','24','24','04','after','平日延時加班'];
+assert(api.chosenMatchesLeaveSplit(linkedPeriod,linked.expectedSplitRule)===true);
 const begin=source.indexOf('   let submissionBusy=false;'),finish=source.indexOf('\n   };',begin);
 assert(begin>=0&&finish>begin);
 const handler=source.slice(begin,finish)+'\n   };';
@@ -48,19 +41,19 @@ async function submit({officialShift='早',selected=valid}={}){
  let writes=0,validated=0,resultDraft=null;
  const ctx={Error,Promise,Date,Math,Number,String,Boolean,Object,JSON,
   console:{warn(){}},crypto:{randomUUID:()=> 'UNIQUE-INDEPENDENT'},
-  el,editingOriginal:false,prefill:{date,empId:'WORKER',independentOvertime:true},
+  el,editingOriginal:false,prefill:{date,empId:'WORKER',workDate:date,coverDate:date,overtimeDate:date,forEmpId:'LEAVER',leaveHandoffId:'L-14',workdayShiftMismatch:true,expectedSplitRule:linked.expectedSplitRule},
   dateInput:node('#p79OtDate'),empSelect:node('#p79OtEmp'),kind:node('#p79OtKind'),select:node('#p79OtCode'),forSelect:node('#p79OtForEmp'),
   selectedRow:()=>selected,verifyPlannedReviewSelection:()=>{},
   prepareSaveValidation:async request=>{validated++;assert.equal(request.leaveHandoffId,'');assert.equal(request.overtimeDate,date);
    return{cloud:{revision:'rev',schedules:[{empId:'WORKER',schedule:{[date]:officialShift,__meta:{}}}]},
     rules:{rows:[selected],config:{}}};},
-  independentShiftOvertimeIssue:api.independentShiftOvertimeIssue,
+  independentShiftOvertimeIssue:api.independentShiftOvertimeIssue,chosenMatchesLeaveSplit:api.chosenMatchesLeaveSplit,
   ruleType:()=> '平日延時加班',activeReportRows:rows=>rows,
   typeOptions:()=>[{name:'平日延時加班'}],specialTypes:[],
   report:row=>({category:row[0],code:row[1],declaredHours:row[2],convertedHours:row[3],
    normalStart:row[4],normalEnd:row[5],overtimeStart:row[6],overtimeEnd:row[7],position:row[8],typeName:row[9]}),
   validateLeaveLinkedOvertimeDate:()=>{},ruleAttendanceIssue:()=>null,
-  reportPair:(cat,emp,forEmp)=>{assert.equal(forEmp,'');return{forEmpId:'',forName:''};},
+  reportPair:(cat,emp,forEmp)=>{throw Error('Independently filed period must not call reportPair');},
   people:[{empId:'WORKER'}],approvedDates:[],
   auth:()=>({url:'test'}),sessionStorage:{getItem:()=>null,setItem:(key,value)=>{resultDraft=JSON.parse(value)},removeItem:()=>{}},KEY:'independent-overtime',
   awaitOvertimeSaveConfirmation:task=>task,verifySavedReport:(draft,resp)=>assert.equal(draft.id,resp.id),
@@ -68,7 +61,7 @@ async function submit({officialShift='早',selected=valid}={}){
   global:{p79OvertimeContext:{saveReport:async draft=>{writes++;assert.equal(draft.leaveHandoffId,'');assert.equal(draft.forEmpId,'');assert.equal(draft.overtimeDate,date);
    return{ok:true,directOvertimeSaved:true,id:draft.id,report:{id:draft.id,overtimeDate:date}};}},dispatchEvent:()=>{}}
  };
- node('#p79OtDate').value=date;node('#p79OtEmp').value='WORKER';node('#p79OtForEmp').value='';
+ node('#p79OtDate').value=date;node('#p79OtEmp').value='WORKER';node('#p79OtForEmp').value='LEAVER';
  node('#p79OtNote').value='依本人正式班別延時加班';node('#p79OtKind').value='平日延時加班';node('#p79OtCode').value='0';
  vm.createContext(ctx);vm.runInContext(handler,ctx);
  await node('#p79OtStage').onclick();
@@ -79,6 +72,8 @@ async function submit({officialShift='早',selected=valid}={}){
  assert.equal(result.writes,1,'valid 08–16 + 16–20 can be saved once independently');
  assert.equal(result.validated,1,'fresh official roster preflight required');
  assert.equal(result.resultDraft?.rule.code,'延16-20');
+ assert.equal(result.resultDraft?.leaveHandoffId,'');
+ assert.equal(result.resultDraft?.forEmpId,'');
  assert.equal(result.el.open,false);
  result=await submit({officialShift:'中'});
  assert.equal(result.writes,0,'mismatched current roster cannot POST');
@@ -87,10 +82,10 @@ async function submit({officialShift='早',selected=valid}={}){
  result=await submit({selected:other});
  assert.equal(result.writes,0,'24–04 is not an extension from an early shift');
  assert.match(result.status,/08-16/);
- assert(source.includes("forSelect.value='';forSelect.disabled=true;"),'independent mode clears leave person');
- assert(source.includes("leaveHandoffId:prefill.independentOvertime?'':"),'no leave handoff in preflight');
+ assert(source.includes('const pair=independentFiling?{forEmpId:'),'automatic branch clears original leave person even though shown in the modal');
+ assert(source.includes("leaveHandoffId:independentFiling?'':"),'no leave handoff in preflight for unrelated chosen period');
  assert(source.includes("leaveHandoffId:validationRequest.leaveHandoffId"),'draft cannot reattach prior leave');
- assert(source.includes('調整正式班表')&&source.includes('href="../schedule/"'),'roster editing is separately explicit');
+ assert(source.includes('chosenMatchesLeaveSplit(chosen,expected)'),'system automatically separates original cover from chosen actual period');
  assert(leave.includes('if(previous?.id&&String(previous.id)!==String(draft.id))'),'host refuses overwriting another same-day report');
  assert(leave.includes('P79Overtime.ruleAttendanceIssue'),'host validates actual punches and selected time');
  new vm.Script(source);
