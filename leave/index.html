@@ -1966,7 +1966,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v2&recovery=20261113-r3&saveguard=20261116a&ownshift=20261116b&selected=20261116c"></script>
+<script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v2&recovery=20261113-r3&saveguard=20261116a&ownshift=20261116b&selected=20261116c&next=20261116d"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -2227,8 +2227,20 @@ function p79LaunchLeaveOvertimeAfterSave(){
  });
  return true;
 }
-async function p79OpenLeaveOvertimeHandoff(){
+async function p79OpenLeaveOvertimeHandoff(autoContinue=false){
  if(p79LeaveHandoffBusy)return;
+ const queued=p79GetLeaveHandoff();
+ if(autoContinue===true){
+  // A standalone filing is not proof that its planned leave cover was done.
+  // Skip deferred workers only during automatic sequential filing.
+  if(!queued?.entries?.some(e=>e.deferredAfterOwnOvertime!==true)){
+   p79UpdateLeaveHandoffBanner();return;
+  }
+ }else if(queued?.entries?.some(e=>e.deferredAfterOwnOvertime===true)){
+  // Manual "集中核對加班" revisits any still-unfulfilled original cover.
+  sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify({...queued,
+   entries:queued.entries.map(({deferredAfterOwnOvertime,...e})=>e)}));
+ }
  p79LeaveHandoffBusy=true;
  const loading=P79Overtime.showReportLoading();
  try{
@@ -2236,6 +2248,9 @@ async function p79OpenLeaveOvertimeHandoff(){
   const h=await p79ReconcileLeaveHandoff();
   if(!loading.isConnected)return;
   if(!h?.entries?.length){loading.close();setStatus('✅ 已安排或已申報的代班資料已核對，不再重複提醒','success');return;}
+  if(autoContinue===true&&h.entries[0]?.deferredAfterOwnOvertime===true){
+   loading.close();p79UpdateLeaveHandoffBanner();return;
+  }
   const e=h.entries[0],token=leaveRequestToken(),cached=p79LeaveHandoffContext;
   const canUse=cached&&String(cached.leaveId)===String(e.leaveId||h.id)&&
    cached.month===e.date.slice(0,7)&&cached.date===e.date&&

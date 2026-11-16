@@ -35,10 +35,19 @@ assert(api.chosenMatchesLeaveSplit(linkedPeriod,linked.expectedSplitRule)===true
 const begin=source.indexOf('   let submissionBusy=false;'),finish=source.indexOf('\n   };',begin);
 assert(begin>=0&&finish>begin);
 const handler=source.slice(begin,finish)+'\n   };';
+const nextStart=source.indexOf(' function advanceLeaveHandoff(draft,sourcePrefill={})');
+const nextEnd=source.indexOf(' // Match the currently selected overtime TYPE',nextStart);
+assert(nextStart>=0&&nextEnd>nextStart,'production queue handoff helper exists');
+const nextHelper=source.slice(nextStart,nextEnd);
 async function submit({officialShift='早',selected=valid}={}){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',disabled:false});return nodes.get(id);};
  const el={isConnected:true,open:true,querySelector:node};
  let writes=0,validated=0,resultDraft=null;
+ const queueKey='port79_leave_overtime_handoff_v1';
+ const storage=new Map([[queueKey,JSON.stringify({id:'L-14',createdAt:Date.now(),pendingReports:true,
+  entries:[{leaveId:'L-14',date,empId:'WORKER',forEmpId:'LEAVER',code:'延16-04'},
+           {leaveId:'L-14',date:'2026-11-15',empId:'SECOND',forEmpId:'LEAVER',code:'延04-16'}]})]]);
+ const jumps=[];
  const ctx={Error,Promise,Date,Math,Number,String,Boolean,Object,JSON,
   console:{warn(){}},crypto:{randomUUID:()=> 'UNIQUE-INDEPENDENT'},
   el,editingOriginal:false,prefill:{date,empId:'WORKER',workDate:date,coverDate:date,overtimeDate:date,forEmpId:'LEAVER',leaveHandoffId:'L-14',workdayShiftMismatch:true,expectedSplitRule:linked.expectedSplitRule},
@@ -55,17 +64,31 @@ async function submit({officialShift='早',selected=valid}={}){
   validateLeaveLinkedOvertimeDate:()=>{},ruleAttendanceIssue:()=>null,
   reportPair:(cat,emp,forEmp)=>{throw Error('Independently filed period must not call reportPair');},
   people:[{empId:'WORKER'}],approvedDates:[],
-  auth:()=>({url:'test'}),sessionStorage:{getItem:()=>null,setItem:(key,value)=>{resultDraft=JSON.parse(value)},removeItem:()=>{}},KEY:'independent-overtime',
+  auth:()=>({url:'test'}),sessionStorage:{
+    getItem:key=>storage.get(key)||null,
+    setItem:(key,value)=>{storage.set(key,value);if(key==='independent-overtime')resultDraft=JSON.parse(value);},
+    removeItem:key=>storage.delete(key)
+   },KEY:'independent-overtime',
   awaitOvertimeSaveConfirmation:task=>task,verifySavedReport:(draft,resp)=>assert.equal(draft.id,resp.id),
   closeConfirmedReportDialog:node=>{node.isConnected=false;node.open=false},
   global:{p79OvertimeContext:{saveReport:async draft=>{writes++;assert.equal(draft.leaveHandoffId,'');assert.equal(draft.forEmpId,'');assert.equal(draft.overtimeDate,date);
-   return{ok:true,directOvertimeSaved:true,id:draft.id,report:{id:draft.id,overtimeDate:date}};}},dispatchEvent:()=>{}}
+   return{ok:true,directOvertimeSaved:true,id:draft.id,report:{id:draft.id,overtimeDate:date}};}},dispatchEvent:()=>{},
+    p79OpenLeaveOvertimeHandoff:async autoContinue=>{
+      assert.equal(el.open,false,'first confirmed filing closes before the second form opens');
+      assert.equal(autoContinue,true,'next person opens in automatic continuation mode');
+      jumps.push(autoContinue);
+      const entries=JSON.parse(storage.get(queueKey)).entries;
+      assert.equal(entries[0].empId,'SECOND','next open targets the second assigned worker');
+      assert.equal(entries[1].empId,'WORKER','first original approved cover remains queued for later review');
+      assert.equal(entries[1].deferredAfterOwnOvertime,true,'independent extension is not false completion');
+    }}
  };
  node('#p79OtDate').value=date;node('#p79OtEmp').value='WORKER';node('#p79OtForEmp').value='LEAVER';
  node('#p79OtNote').value='依本人正式班別延時加班';node('#p79OtKind').value='平日延時加班';node('#p79OtCode').value='0';
- vm.createContext(ctx);vm.runInContext(handler,ctx);
+ vm.createContext(ctx);vm.runInContext(nextHelper+'\n'+handler,ctx);
  await node('#p79OtStage').onclick();
- return {writes,validated,resultDraft,status:node('#p79OtStatus').textContent,el};
+ return {writes,validated,resultDraft,status:node('#p79OtStatus').textContent,el,jumps,
+   handoff:JSON.parse(storage.get(queueKey)||'null')};
 }
 (async()=>{
  let result=await submit();
@@ -75,7 +98,11 @@ async function submit({officialShift='早',selected=valid}={}){
  assert.equal(result.resultDraft?.leaveHandoffId,'');
  assert.equal(result.resultDraft?.forEmpId,'');
  assert.equal(result.el.open,false);
+ assert.deepEqual(result.jumps,[true],'confirmed first employee filing must launch second automatically');
+ assert.equal(result.handoff.entries.length,2,'independent filing keeps original approved cover pending');
+ assert.equal(result.handoff.entries[0].empId,'SECOND');
  result=await submit({officialShift:'中'});
+ assert.equal(result.jumps.length,0,'failed save must never advance to the second worker');
  assert.equal(result.writes,0,'mismatched current roster cannot POST');
  assert.equal(result.validated,1);
  assert.match(result.status,/正式班表為「中」班/);

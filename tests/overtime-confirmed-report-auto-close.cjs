@@ -47,7 +47,7 @@ function setup({save='success',throwsEvent=false,handoff=false,cleanupThrows=fal
     save==='unverified'?{...ack,directOvertimeSaved:false}:ack;
   }},
   dispatchEvent(){events++;if(throwsEvent)throw Error('after-save list refresh failed')},
-  p79OpenLeaveOvertimeHandoff:async()=>{followups++;throw Error('followup navigation interrupted')}
+  p79OpenLeaveOvertimeHandoff:async autoContinue=>{assert.equal(autoContinue,true,'handoff must auto-continue');followups++;throw Error('followup navigation interrupted')}
  };
  const ctx={console,el,global,sessionStorage,CustomEvent:class{constructor(type,opts){this.type=type;this.detail=opts.detail}},
   Promise,Error,Date,JSON,Math,Number,String,Boolean,Object,crypto:{randomUUID:()=>id},
@@ -71,7 +71,7 @@ function setup({save='success',throwsEvent=false,handoff=false,cleanupThrows=fal
    if(result?.report?.id!==draft.id||result.report.code!==draft.rule.code)
     throw Error('雲端資料不符');
   },
-  advanceLeaveHandoff:()=>({remaining:true}),
+  advanceLeaveHandoff:(draft,original)=>{assert.equal(original,prefill,'use source leave link to determine next worker');return {remaining:true,nextAuto:true}},
   closeConfirmedReportDialog:null,awaitOvertimeSaveConfirmation:null
  };
  ctx.dateInput.value=date;ctx.empSelect.value=empId;ctx.forSelect.value='';

@@ -1151,16 +1151,40 @@
   if(!target||String(forEmpId)===String(empId))throw Error('請選擇另一位有效的請假人員');
   return {forEmpId:String(target.empId),forName:String(target.name||'')};
  }
- function advanceLeaveHandoff(draft){
-  if(!draft.leaveHandoffId)return null;
-  const key='port79_leave_overtime_handoff_v1',handoff=JSON.parse(sessionStorage.getItem(key)||'null');
+ // Confirmed independent overtime is NOT proof the original night-cover
+ // split was worked. Keep that cover pending for later review, but defer it
+ // for this filing round so the next assigned worker opens automatically.
+ function advanceLeaveHandoff(draft,sourcePrefill={}){
+  const leaveId=String(sourcePrefill.leaveHandoffId||draft.leaveHandoffId||'');
+  if(!leaveId)return null;
+  const key='port79_leave_overtime_handoff_v1';
+  const handoff=JSON.parse(sessionStorage.getItem(key)||'null');
   if(!handoff||!Array.isArray(handoff.entries))return null;
-  // 每天每位代班員工各有請假關聯 ID，不能只與佇列第一筆比對。
-  const index=handoff.entries.findIndex(e=>String(e.leaveId||handoff.id)===String(draft.leaveHandoffId)&&String(e.empId)===String(draft.empId)&&e.date===draft.date&&String(e.forEmpId||'')===String(draft.forEmpId||''));
+  const sourceDate=String(sourcePrefill.workDate||sourcePrefill.date||draft.date||'');
+  const sourceForEmp=String(sourcePrefill.forEmpId||draft.forEmpId||'');
+  const index=handoff.entries.findIndex(e=>
+   String(e.leaveId||handoff.id)===leaveId&&
+   String(e.empId)===String(draft.empId)&&
+   String(e.date)===sourceDate&&
+   String(e.forEmpId||'')===sourceForEmp);
   if(index<0)return null;
-  handoff.entries.splice(index,1);
-  if(handoff.entries.length)sessionStorage.setItem(key,JSON.stringify(handoff));else sessionStorage.removeItem(key);
-  return {remaining:handoff.entries.length};
+  const [entry]=handoff.entries.splice(index,1);
+  const independent=String(draft.leaveHandoffId||'')!==leaveId||
+   String(draft.forEmpId||'')!==sourceForEmp;
+  if(independent){
+   // This is only a per-round UI deferral; the original leave-cover entry
+   // stays stored and cannot be marked completed by unrelated overtime.
+   handoff.entries.push({...entry,deferredAfterOwnOvertime:true});
+   handoff.entries=[
+    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime!==true),
+    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime===true)
+   ];
+  }
+  if(handoff.entries.length)sessionStorage.setItem(key,JSON.stringify(handoff));
+  else sessionStorage.removeItem(key);
+  return {remaining:handoff.entries.length,
+   nextAuto:handoff.entries.some(e=>e.deferredAfterOwnOvertime!==true),
+   independent};
  }
  // Match the currently selected overtime TYPE to complete official punches.
  // Never substitute the first period (often 08-16) for a 24-08 employee.
@@ -1979,14 +2003,23 @@
        // listener or leave-handoff navigation can throw, block or reopen UI.
        completed=true;
        try{sessionStorage.removeItem(KEY);}catch(error){console.warn('已儲存申報；暫存清理未完成',error);}
+       // Advance BEFORE broadcast: the saved-event listener starts an
+       // asynchronous cloud reconciliation. Otherwise it can race the queue
+       // mutation and re-open the first worker instead of the second.
+       let progress=null;
+       if(prefill.leaveHandoffId){
+        try{progress=advanceLeaveHandoff(draft,prefill);}
+        catch(error){console.warn('加班已儲存，但代班佇列更新失敗；保留待核對清單',error);}
+       }
        closeConfirmedReportDialog(el);
        try{global.dispatchEvent?.(new CustomEvent('p79-overtime-report-saved',{detail:{draft,result}}));}
        catch(error){console.warn('申報已儲存；畫面通知未完成',error);}
-       if(draft.leaveHandoffId&&typeof global.p79OpenLeaveOvertimeHandoff==='function'){
-        try{
-         const progress=advanceLeaveHandoff(draft);
-         if(progress?.remaining)await global.p79OpenLeaveOvertimeHandoff();
-        }catch(error){console.warn('申報已儲存；接續代班申報需重新開啟',error);}
+       if(progress?.nextAuto&&typeof global.p79OpenLeaveOvertimeHandoff==='function'){
+        try{await global.p79OpenLeaveOvertimeHandoff(true);}
+        catch(error){
+         console.warn('申報已儲存；下一位代班加班視窗未能開啟',error);
+         try{global.p79LeaveHandoffOpenError?.(error);}catch(ignore){}
+        }
        }
 
       }finally{button.disabled=completed}

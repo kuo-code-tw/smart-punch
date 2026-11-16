@@ -11,6 +11,7 @@ on:
       - 'tests/overtime-leave-handoff-dual-date-form.cjs'
       - 'tests/overtime-leave-handoff-save-guard.cjs'
       - 'tests/overtime-independent-worker-shift-from-leave-cover.cjs'
+      - 'tests/overtime-two-person-handoff-queue.cjs'
       - 'tests/leave-handoff-independent-overtime-queue.cjs'
       - '.github/workflows/night-leave-cover-workday.yml'
   push:
@@ -25,6 +26,7 @@ on:
       - 'tests/overtime-leave-handoff-dual-date-form.cjs'
       - 'tests/overtime-leave-handoff-save-guard.cjs'
       - 'tests/overtime-independent-worker-shift-from-leave-cover.cjs'
+      - 'tests/overtime-two-person-handoff-queue.cjs'
       - 'tests/leave-handoff-independent-overtime-queue.cjs'
       - '.github/workflows/night-leave-cover-workday.yml'
 permissions:
@@ -44,6 +46,7 @@ jobs:
           node tests/overtime-leave-handoff-dual-date-form.cjs
           node tests/overtime-leave-handoff-save-guard.cjs
           node tests/overtime-independent-worker-shift-from-leave-cover.cjs
+          node tests/overtime-two-person-handoff-queue.cjs
           node tests/leave-handoff-independent-overtime-queue.cjs
           node tests/leave-handoff-dedupe.cjs
           node tests/overtime-extension-cross-midnight-workdate.cjs
