@@ -125,6 +125,7 @@
     return '<div class="p79-smart-cover-preview-row"><span>'+esc(p.person.name||id)+'</span><strong>'+esc(period(target,date,rosters,mode,i))+'</strong><small>加班待核對</small></div>';
   }).join('');
   const alert=!official?'尚未讀到完整正式班表，請人工核對；不會盲目自動勾選。':
+    mode==='two'&&qualified<2?'目前同部門僅有 '+qualified+' 位初步可選人員，尚無法完成兩人代班；請核對排班、請假與候選人。':
     qualified===0?'當日沒有通過初步條件的代班人員；請核對班表與請假。':
     '優先推薦依排休與同職稱排序；儲存前仍核對請假、代班衝突與休息條件。';
   return '<div class="p79-smart-cover-picker" data-smart-date="'+esc(date)+'" data-smart-scope="'+esc(scope)+'">'+
