@@ -7997,7 +7997,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // Numbers only: actual allocated days / still available days.
         const invalidNote=invalidNationalCount?
           ' title="'+scheduleEscapeHtml('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。')+'"':'';
-        return '<td data-rest-category="'+category+'"'+invalidNote+' class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+'"><span>'+count+'/'+rest+'</span></td>';
+        // A separate excess rest-day marker distinguishes the REAL roster's
+        // extra off-days from missing automatic 例/休/國 quota. Never hide the
+        // real count or silently convert an extra 休 to a fabricated workday.
+        const extraNote=extra&&!invalidNationalCount?
+          ' title="'+scheduleEscapeHtml(category+'實際顯示'+count+'天；本月額度'+limit+
+          '天，額外'+extra+'天。請核對原排班、正式考勤及已核准請假；未自動修改來源。')+'"':'';
+        const extraBadge=extra&&!invalidNationalCount?
+          '<small class="p79-rest-overquota-note" aria-label="額外'+extra+'天">超'+extra+'</small>':'';
+        return '<td data-rest-category="'+category+'"'+(invalidNote||extraNote)+
+          ' class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+
+          (extraBadge?' p79-rest-over-quota':'')+'"><span>'+count+'/'+rest+'</span>'+extraBadge+'</td>';
       }).join('');
       const days=[...typhoonSet].sort().map(date=>date.slice(-2)).join('、')||'無';
       const typhoonCell=special.typhoon?'<td data-rest-category="颱" class="p79-rest-count-compact p79-rest-typhoon text-center font-bold border-r text-xs" title="'+
