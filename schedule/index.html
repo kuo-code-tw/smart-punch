@@ -8137,6 +8137,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
     // It never changes saved roster, approved leave, attendance or overtime.
     let p79RestAuditRunId=0,p79RestAuditTimer=null;
     function p79QueueLiveRestQuotaAudit(){
+      // Detailed cross-unit personnel findings require the existing management
+      // permission; read-only viewers keep their original scoped schedule.
+      if(typeof canManageSchedule==='function'&&!canManageSchedule())return;
       if(document.documentElement?.dataset?.p79SchedulePage!=='month')return;
       const target=document.getElementById('p79RestAuditLiveStatus');
       if(!target)return;
@@ -8157,7 +8160,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const totals={checked:0,complete:0,needsUpdate:0,unresolved:0,blocked:0};
         const findings=[];
         const error=()=>{
-          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month)return;
+          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month||
+             document.documentElement?.dataset?.p79SchedulePage!=='month')return;
           const problems=totals.needsUpdate+totals.blocked;
           target.classList.toggle('p79-audit-attention',problems>0);
           const sourceLabel=typeof p79ScheduleHasOfficialData==='function'&&p79ScheduleHasOfficialData()?'正式班表':'本機暫存班表';
@@ -8184,7 +8188,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         };
         let index=0;
         const step=()=>{
-          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month)return;
+          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month||
+             document.documentElement?.dataset?.p79SchedulePage!=='month')return;
           try{
             const sample=p79RestQuotaAuditSnapshot(month,people.slice(index,index+4));
             for(const key of Object.keys(totals))totals[key]+=sample.totals[key]||0;
