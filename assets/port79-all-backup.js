@@ -64,6 +64,7 @@ async function backupWithRetry(c,item,payload){
     item.waiting=false;
     continue;
    }
+   if(e.serverError&&e.message==='備份檔已寫入但完成紀錄尚未取得，請稍後重試')e.receiptCheck=true;
    if(!c.receiptLookup||!e.receiptCheck||!same(c))throw e;
    return await recoverReceipt(c,item);
   }
@@ -218,7 +219,9 @@ async function start(onlyId=null){
   }
   if(batch.items.every(i=>i.result)&&g.Port79BackupExcel&&!batch.excelComplete)await g.Port79BackupExcel.run(batch,{...c,same:()=>same(c)});
  }catch(e){if(!c||same(c))message(String(e.message||e).slice(0,240));}
- finally{busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result)&&(!g.Port79BackupExcel||batch.excelComplete)){clearCheckpoint(c);batch=null;}}else refresh();}
+ finally{
+  if(c&&same(c)&&batch&&batch.items.some(i=>!i.result)){const excel=$('p79BackupExcelStatus');if(excel)excel.textContent='雲端分類備份尚未全部核對完成；電腦端Excel尚未產生。已完成項目保留，可重試未完成項目。';}
+  busy=false;if(c&&same(c)){render();if(btn){btn.disabled=false;if(!batch)btn.textContent='備份資料庫';}if(batch?.items.every(i=>i.result)&&(!g.Port79BackupExcel||batch.excelComplete)){clearCheckpoint(c);batch=null;}}else refresh();}
 }
 function refresh(){
  g.Port79BackupExcel?.refreshDownload?.();
