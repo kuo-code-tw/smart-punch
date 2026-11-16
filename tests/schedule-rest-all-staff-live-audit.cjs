@@ -69,15 +69,14 @@ assertSame(f.p79RestQuota(month).counts,{例:5,休:4,國:0});
 // Current browser schedule must audit all loaded employees, in small idle
 // batches, after month render, and provide individual details without
 // adding a write or requiring a new manual action.
-assert(html.includes('id="p79RestAuditLiveStatus"'));
-assert(html.includes('p79QueueLiveRestQuotaAudit();'));
-assert(html.includes('function p79QueueLiveRestQuotaAudit(){'));
-assert(html.includes('p79RestQuotaAuditSnapshot(month,people.slice(index,index+4))'));
+assert(!html.includes('id="p79RestAuditLiveStatus"'),'unwanted yellow audit banner removed');
+assert(!html.includes('p79QueueLiveRestQuotaAudit();'),'no automatic audit banner render');
+assert(html.includes('function p79RestQuotaAuditSnapshot('),'read-only diagnostic remains available');
 assert(html.includes("emp.group!=='不輪班'"),'fixed non-rotators are exempt from no-roster warnings');
 assert(html.includes('result.conflicts||[]'));
 assert(html.includes("pre.textContent=findings.join"));
-assert(css.includes('.p79-audit-attention'));
-assert(html.includes('function p79ApplyAutomaticRestMetadata()'));
+assert(!css.includes('.p79-audit-attention'),'old banner CSS removed');
+assert(html.includes('function p79ApplyAutomaticRestMetadata(planned=null)'));
 assert(html.includes('Re-enable automatic quota metadata persistence ONLY as part of an'),'verified saves may persist auto 例休國');
 assert(html.includes('!scheduleEditLockState.mine'),'auto-write requires a valid editor lock');
 for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
