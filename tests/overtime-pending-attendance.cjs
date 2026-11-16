@@ -20,7 +20,7 @@ assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({planned:true,overtimeReport:{
 assert.equal(ctx.p79WorkOvertimeIsUnconfirmedPlan({planned:false,overtimeReport:{id:'x',planned:false}}),false,'confirmed cloud report is eligible');
 assert(hours.includes('const allOvertimeRows=p79OvertimeMainLedgerRows(formalRows,plannedRows)'),'main table includes independently labeled saved plans');
 assert(hours.includes('const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'completed hour totals exclude unconfirmed plans');
-assert(hours.includes("row.planned&&!row.clockIn?'待出勤'"));assert(hours.includes("row.clockIn?'尚未下班':'待出勤'"));
+assert(hours.includes("savedPlan&&!row.clockIn?'待出勤'"));assert(hours.includes("row.clockIn?'尚未下班':'待出勤'"));
 const app={};app.window=app;vm.runInNewContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),app);vm.runInNewContext(fs.readFileSync('assets/port79-overtime-monthly-matrix.js','utf8'),app);
 const snap={schedules:[{empId:'AP1',schedule:{'2026-10-01':'例','2026-10-02':'休','2026-10-03':'國',__meta:{}}}]};
 assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('休16-24'),'休');assert.equal(app.P79OvertimeMonthlyMatrix.leaveCode('國08-16'),'國');
