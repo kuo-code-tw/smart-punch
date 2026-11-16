@@ -526,6 +526,9 @@ html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79S
 html.p79-leave-reference-admin #tabLeaveBalances{
  min-width:236px!important;
 }
+html.p79-leave-reference-admin:not(.p79-leave-balance-only) #adminBalancePanel{
+ display:none!important;
+}
 html.p79-leave-reference-admin.p79-leave-balance-only #adminMode{
  display:block!important;
 }
