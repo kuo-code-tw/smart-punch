@@ -1942,6 +1942,8 @@
      // instead of performing a second GET after the Save spinner appears.
      const validation=await prepareSaveValidation(validationRequest,true);
      // Older GAS stores only the punch/work date. Never silently credit 04-08 to 11/08.
+     if(prefill.sameDayCover&&validation.cloud?.capabilities?.sameDayCoverFourHourV1!==true)
+      throw Error('正式 GAS 尚未部署同日兩位各 4 小時代班申報驗證；保留申報資料，禁止寫入錯誤日期或時段。');
      if(validationRequest.overtimeDate!==date&&validation.cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
       throw Error('正式 GAS 尚未支援跨日加班歸屬日 '+validationRequest.overtimeDate+'（出勤日 '+date+'）；保留代班安排，禁止錯日送出申報。');
      if(selectionKey()!==selection)throw Error('核對期間申報內容已變更，請確認內容後再次儲存');
