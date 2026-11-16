@@ -562,7 +562,7 @@
   if(!Array.isArray(rule)||rule[0]!=='延'||!['before','after'].includes(rule[8]))
    return '依本人正式班別申報只能選「平日延時加班」，其他類型須另行申報。';
   if(hour(rule[4])%1440!==hour(normal[0])%1440||hour(rule[5])%1440!==hour(normal[1])%1440)
-   return '正式班表為「'+name+'」班（'+normal.join('-')+'），目前選擇的正常班時間不一致；請選符合原班別的加班時段，或先至排班管理正式調整班別。';
+   return '正式班表為「'+name+'」班（'+normal.join('-')+'），目前選擇的正常班時間不一致；請選擇符合本人正式班別的加班時段。';
   return '';
  }
  function dialog(title,content,id='p79OvertimeDialog'){
