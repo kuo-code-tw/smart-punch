@@ -431,12 +431,44 @@ function leaveRequestToken(){
 let p79LeaveCloudDataReady=false;
 let p79LeaveLoadGeneration=0;
 const p79LeaveReads=new Map();
-// Share only active, equivalent reads. A post-write verification always gets a fresh request.
+// ReadError / transient transport faults are safe to retry ONLY for GET reads.
+// No retry here can create, approve, modify or delete a leave record.
+function p79LeaveIsTransientReadFailure(error){
+ const raw=String(error?.error||error?.message||error||'');
+ if(p79LeaveAuthError(raw))return false;
+ return error?.retryable===true||/ReadError|雲端回應逾時|timeout|timed out|Failed to fetch|NetworkError|network request failed|Load failed|signal is aborted|abort without reason|HTTP 5\\d\\d|網路連線失敗|目前正在處理其他資料/i.test(raw);
+}
+async function p79ReadOfficialLeaveWithRetry(token,{fresh=false,deadlineMs=50000,onRetry=null}={}){
+ const deadline=Date.now()+Math.max(2500,deadlineMs);
+ let previous=null;
+ for(let attempt=0;attempt<3;attempt++){
+  const remaining=deadline-Date.now();
+  if(remaining<2500)break;
+  try{
+   const d=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now(),
+    {cache:'no-store',redirect:'follow'},Math.min(fresh?18000:14000,remaining-1000));
+   if(d?.ok===true||!p79LeaveIsTransientReadFailure(d))return d;
+   previous=Error(String(d.error||'ReadError'));
+  }catch(error){
+   if(!p79LeaveIsTransientReadFailure(error))throw error;
+   previous=error;
+  }
+  if(attempt===2)break;
+  const delay=650*(attempt+1);
+  if(Date.now()+delay+2500>=deadline)break;
+  if(typeof onRetry==='function')onRetry(attempt+1);
+  await new Promise(resolve=>setTimeout(resolve,delay));
+ }
+ const reason=String(previous?.message||previous||'ReadError');
+ throw Error('請假雲端讀取暫時未完成（'+(/ReadError/i.test(reason)?'ReadError':'連線不穩')+
+  '），目前沒有確認最新資料；請確認連線後再操作，系統不會重複送出請假');
+}
+// Share only active, equivalent reads; a post-write read is never shared.
 function p79StartLeaveRead(token,requireFresh=false){
  if(requireFresh)p79LeaveReads.clear();
  const key=GAS_URL+'|'+String(token)+'|'+requireFresh;
  if(!requireFresh&&p79LeaveReads.has(key))return p79LeaveReads.get(key);
- const read=jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(token)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},requireFresh?22000:18000)
+ const read=p79ReadOfficialLeaveWithRetry(token,{fresh:requireFresh,deadlineMs:requireFresh?46000:38500})
   .then(data=>({data}),error=>({error}));
  if(!requireFresh){p79LeaveReads.set(key,read);void read.then(()=>{if(p79LeaveReads.get(key)===read)p79LeaveReads.delete(key);});}
  return read;
@@ -518,7 +550,7 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null,entryR
   const displayedLabel=displayedMonth?displayedMonth.slice(0,4)+'年'+Number(displayedMonth.slice(5,7))+'月':'全部月份';
   const displayedLeaveCount=leaveRecords.filter(l=>p79LeaveMatchesMonth(l,displayedMonth)).length;
   setStatus(adminSession?('☁️ 雲端同步完成｜人員 '+employees.length+'｜'+displayedLabel+'請假 '+displayedLeaveCount+' 筆'):'☁️ 員工請假申請模式已就緒','');return true;
- }catch(e){last=e;}
+ }catch(e){last=e;p79LeaveCloudDataReady=false;}
  // A failed update keeps the display; cached rows never count as confirmed readback.
  if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
  if(requireFresh){cloudFinished=true;throw last||new Error('無法讀回最新雲端資料，尚未確認匯入成功');}
@@ -526,7 +558,8 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null,entryR
  if(!canApply()){if(requireFresh)throw new Error('登入或資料來源已變更，尚未確認最新雲端資料');return false;}
  cloudFinished=true;
  if(adminSession&&employees.length){
-  setStatus('☁️ 雲端同步未完成｜保留目前顯示資料，請稍後重新整理','warn');return false;
+  const reason=/ReadError/i.test(String(last?.message||last||''))?'（ReadError）':'';
+  setStatus('☁️ 請假雲端同步未完成'+reason+'｜目前顯示上次資料，不能當作已儲存確認；儲存前會重新核對正式雲端。','warn');return false;
  }
  // No full-data preview is available. Try the lightweight roster once, without a retry chain.
  if(adminSession){
@@ -1156,21 +1189,20 @@ async function p79CleanupDeletedLeaveCovers(){
  try{const result=await postCloud({action:'cleanupOrphanLeaveCovers'});setStatus('✅ 已清除 '+Number(result.removedCoverAssignments||0)+' 筆已刪請假的代班殘留','success');await loadCloud();renderAdmin();}catch(error){setStatus('清除未確認：'+String(error.message||error),'error');}
 }
 async function p79ReadCurrentLeaveCoverState(){
- // This preflight is read-only. Busy replies can be retried without replaying a write.
- const deadline=Date.now()+90000;
- for(let attempt=0;;attempt++){
-  const remaining=deadline-Date.now();
-  if(remaining<3000)throw Error('雲端資料核對仍忙碌，原內容已保留，尚未送出請假');
-  const fresh=await jsonFetch(GAS_URL+'?action=getLeaveData&token='+encodeURIComponent(leaveRequestToken())+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},Math.min(22000,remaining));
-  if(fresh?.ok===true&&Array.isArray(fresh.leaveRecords)&&Array.isArray(fresh.leaveCoverAssignments))return fresh;
-  if(fresh?.ok===false&&fresh.retryable===true&&attempt<5){
-   const delay=Math.min(6000,1500*(attempt+1));
-   if(Date.now()+delay+3000>=deadline)throw Error(fresh.error||'雲端資料核對仍忙碌');
-   if(typeof adminCreateLeaveBusy!=='undefined'&&adminCreateLeaveBusy)$('adminCreateLeaveMessage').textContent='正在等待正式資料核對（自動重試 '+(attempt+1)+'/5）…';
-   await new Promise(resolve=>setTimeout(resolve,delay));continue;
+ // No read failure may fall back to cached/preview rows for a leave save.
+ // This is read-only, so retrying an explicit ReadError/timeout is safe.
+ const fresh=await p79ReadOfficialLeaveWithRetry(leaveRequestToken(),{
+  fresh:true,deadlineMs:52000,
+  onRetry:n=>{
+   if(typeof adminCreateLeaveBusy!=='undefined'&&adminCreateLeaveBusy){
+    const status=$('adminCreateLeaveMessage');
+    if(status)status.textContent='請假雲端讀取暫時中斷，系統正在自動重新核對 '+n+'/2；尚未寫入請假…';
+   }
   }
-  throw Error(fresh?.error||'無法確認雲端代班安排，請稍後重試');
- }
+ });
+ if(fresh?.ok!==true||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))
+  throw Error(fresh?.error||'正式請假或代班資料未完整讀回；尚未送出請假，不能使用上次顯示資料儲存');
+ return fresh;
 }
 
 function leaveBalanceNumber(v){
