@@ -10,6 +10,7 @@ on:
       - 'assets/port79-leave-daily-simple.js'
       - 'tests/leave-cover-two-independent-slots.cjs'
       - 'tests/leave-cover-short-form.cjs'
+      - 'tests/leave-cover-worker-job-first.cjs'
       - 'tests/leave-cover-auto-suggest.cjs'
       - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
@@ -22,6 +23,7 @@ on:
       - 'assets/port79-leave-daily-simple.js'
       - 'tests/leave-cover-two-independent-slots.cjs'
       - 'tests/leave-cover-short-form.cjs'
+      - 'tests/leave-cover-worker-job-first.cjs'
       - 'tests/leave-cover-auto-suggest.cjs'
       - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
@@ -41,6 +43,7 @@ jobs:
           node tests/leave-approved-cover-roster.cjs
           node tests/leave-cover-two-independent-slots.cjs
           node tests/leave-cover-short-form.cjs
+          node tests/leave-cover-worker-job-first.cjs
           node tests/leave-cover-job-name-filter.cjs
           node tests/leave-handoff-dedupe.cjs
           node tests/leave-admin-month-filter.cjs

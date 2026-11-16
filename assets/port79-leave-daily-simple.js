@@ -75,7 +75,7 @@ function legacyRedraw(){
 let smartDay='',smartMonthKey='',smartSerial=0,smartRosters=null,smartLeaves=[],smartCovers=[],smartLoadStatus='';
 function smartOptions(date,row,target,people){
  return {date,people,target,selected:[row.first,row.second].filter(Boolean),mode:row.secondVisible?'two':'one',
-  jobFilter:row.filterJob||'',nameFilter:row.filterName||'',advancedOpen:row.advancedOpen===true,
+  jobFilter:row.filterJob||'',nameFilter:row.filterName||'',advancedOpen:row.advancedOpen===true,slotJobs:row.slotJobs||[],
   rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,excludeLeaveId:row.id||'',scope:'new'};
 }
 function refreshSmartRosters(){
@@ -182,6 +182,17 @@ function redraw(){
   if(action.kind==='mode'){
    entry.secondVisible=action.value==='two';
    if(!entry.secondVisible){entry.second='';entry.secondOvertimeType='';}
+  }else if(action.kind==='slot-job'){
+   if(![0,1].includes(action.slot)||action.slot===1&&!entry.secondVisible)return;
+   const newJob=String(action.value||''),priorId=action.slot===0?entry.first:entry.second;
+   const options=picker.candidates(smartOptions(date,entry,target,people));
+   const previous=options.find(x=>x.id===priorId);
+   entry.slotJobs=Array.isArray(entry.slotJobs)?[...entry.slotJobs]:[];
+   entry.slotJobs[action.slot]=newJob;
+   if(previous&&newJob&&picker.personJob(previous.person)!==newJob){
+    if(action.slot===0){entry.first='';entry.second='';entry.firstOvertimeType='';entry.secondOvertimeType='';}
+    else{entry.second='';entry.secondOvertimeType='';}
+   }
   }else if(action.kind==='slot'){
    if(![0,1].includes(action.slot)||action.slot===1&&!entry.secondVisible)return;
    const id=String(action.id||''),available=picker.candidates(smartOptions(date,entry,target,people));
@@ -204,10 +215,12 @@ function redraw(){
    const ids=picker.recommend(smartOptions(date,entry,p,people),entry.secondVisible?'two':'one');
    if(!ids.length){$id('adminCreateLeaveMessage').textContent='當日沒有已核對的排休候選人，請人工選擇。';return;}
    entry.first=ids[0]||'';entry.second=ids[1]||'';
+   entry.slotJobs=[]; // Auto-picked workers may use different job titles.
    entry.firstOvertimeType='';entry.secondOvertimeType='';
   }else if(action.kind==='pick'){
    const available=picker.candidates(smartOptions(date,entry,target,people));
    if(!available.some(x=>x.id===action.id&&!x.disabled))return;
+   entry.slotJobs=[]; // Advanced list may have mixed job titles.
    if(!action.checked){
     if(entry.first===action.id){entry.first=entry.second||'';entry.second='';}
     else if(entry.second===action.id)entry.second='';

@@ -24,7 +24,7 @@
  }
  function smartOptions(entry){
    return {people:state.people,target:state.target,date:entry.date,selected:[entry.first,entry.second].filter(Boolean),
-     mode:entry.mode||'one',jobFilter:entry.filterJob||'',nameFilter:entry.filterName||'',advancedOpen:entry.advancedOpen===true,rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
+     mode:entry.mode||'one',jobFilter:entry.filterJob||'',nameFilter:entry.filterName||'',advancedOpen:entry.advancedOpen===true,slotJobs:entry.slotJobs||[],rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
  }
  function renderSmart(){
    const host=el('p79LeaveCoverDailyRows'),picker=global.P79SmartCoverPicker;
@@ -59,6 +59,18 @@
      if(action.kind==='mode'){
        row.mode=action.value==='two'?'two':'one';
        if(row.mode==='one')row.second='';
+     }else if(action.kind==='slot-job'){
+       if(![0,1].includes(action.slot)||action.slot===1&&row.mode!=='two')return;
+       const newJob=String(action.value||'');
+       const oldId=action.slot===0?row.first:row.second;
+       const options=picker.candidates(smartOptions(row));
+       const previous=options.find(x=>x.id===oldId);
+       row.slotJobs=Array.isArray(row.slotJobs)?[...row.slotJobs]:[];
+       row.slotJobs[action.slot]=newJob;
+       if(previous&&newJob&&picker.personJob(previous.person)!==newJob){
+         if(action.slot===0){row.first='';row.second='';}
+         else row.second='';
+       }
      }else if(action.kind==='slot'){
        if(![0,1].includes(action.slot)||action.slot===1&&row.mode!=='two')return;
        const id=String(action.id||''),options=picker.candidates(smartOptions(row));
@@ -79,9 +91,11 @@
        const ids=picker.recommend(smartOptions(row),row.mode);
        if(!ids.length){el('p79LeaveCoverAutoStatus').textContent='當天沒有已核對的排休候選人，請依班次及休息條件人工選擇。';return;}
        row.first=ids[0]||'';row.second=row.mode==='two'?(ids[1]||''):'';
+       row.slotJobs=[]; // Recommended workers may have different job titles.
      }else if(action.kind==='pick'){
        const options=picker.candidates(smartOptions(row));
        if(!options.some(x=>x.id===action.id&&!x.disabled))return;
+       row.slotJobs=[]; // Advanced multi-select may choose mixed titles.
        if(!action.checked){if(row.first===action.id){row.first=row.second||'';row.second='';}else if(row.second===action.id)row.second='';}
        else if(row.first===action.id||row.second===action.id)return;
        else if(!row.first)row.first=action.id;
