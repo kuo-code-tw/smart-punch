@@ -52,9 +52,11 @@ function init(){
  const statusBanner=create('div','p79-leave-cloud-unverified-banner');
  statusBanner.id='p79LeaveCloudUnverified';
  statusBanner.setAttribute('role','status');
- statusBanner.textContent='請假雲端紀錄尚未同步；此時的零筆不是正式資料已清空。請使用既有的「重新整理」重新讀取正式雲端，資料未核實前不進行新增或審核。';
+ statusBanner.textContent='正式請假紀錄尚未完成雲端核對。若顯示零筆或上次快取，均不是已確認的最新資料；請使用原本的「重新整理」重讀正式雲端。';
  statusBanner.hidden=true;
- document.getElementById('adminLeaveSummary')?.insertAdjacentElement('afterend',statusBanner);
+ // Outside the review card so the warning remains visible on the annual
+ // balance tab as well, while never covering or altering the original rows.
+ tabs?.insertAdjacentElement('afterend',statusBanner);
  const stats=create('section','p79-leave-visual-stats');
  stats.id='p79LeaveVisualStats';
  stats.setAttribute('aria-label','請假狀態統計');
@@ -177,17 +179,21 @@ function init(){
      queued=false;
      const active=!admin.classList.contains('hidden');
      document.documentElement.classList.toggle('p79-leave-reference-admin',active);
-     if(!active)return;
+     if(!active){
+       statusBanner.hidden=true;
+       document.documentElement.classList.remove('p79-leave-cloud-unverified');
+       return;
+     }
      updatePeople();updateQuota();
      const rs=records().filter(permitted),m=month();
      // A failed getLeaveData with HR-only fallback must never paint a
      // false "0 records" business conclusion. This is display-only.
      const cloudReady=typeof p79LeaveCloudDataReady!=='undefined'&&p79LeaveCloudDataReady===true;
-     const unverified=!cloudReady&&rs.length===0;
+     const unverified=!cloudReady;
      document.documentElement.classList.toggle('p79-leave-cloud-unverified',unverified);
      statusBanner.hidden=!unverified;
      const officialSummary=document.getElementById('adminLeaveSummary');
-     if(unverified){
+     if(unverified&&rs.length===0){
        // The original controller's zero-row fallback is NOT an official
        // getLeaveData result. Replace ONLY these UI text nodes with an
        // explicit unknown state; never touch leaveRecords or cloud storage.
