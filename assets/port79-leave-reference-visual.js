@@ -11,6 +11,50 @@ function init(){
  heading.id='p79LeaveVisualHeading';
  heading.innerHTML='<div class="p79-leave-visual-heading-title"><span aria-hidden="true">♧</span><strong>請假管理</strong><small>請假申請・審核・紀錄查詢</small></div><div class="p79-leave-visual-heading-right">依原有權限與正式資料顯示</div>';
  main.insertBefore(heading,main.firstElementChild);
+ const tabs=document.getElementById('leaveStickyTabs');
+ const adminTab=document.getElementById('tabAdmin');
+ const employeeTab=document.getElementById('tabEmployee');
+ const balancePanel=document.getElementById('adminBalancePanel');
+ if(tabs&&adminTab&&balancePanel){
+   // A third presentation tab reuses the actual existing annual-balance
+   // table. No table, leave record or quota is copied or recomputed.
+   const balanceTab=create('button','tab hidden');
+   balanceTab.id='tabLeaveBalances';
+   balanceTab.type='button';
+   balanceTab.textContent='🏖️ 員工年假剩餘天數';
+   balanceTab.setAttribute('aria-controls','adminBalancePanel');
+   tabs.insertBefore(balanceTab,adminTab.nextSibling);
+   const closeBalance=()=>{
+     document.documentElement.classList.remove('p79-leave-balance-only');
+     balanceTab.classList.remove('active');
+   };
+   const syncBalancePermission=()=>{
+     const unavailable=adminTab.classList.contains('hidden')||admin.classList.contains('hidden');
+     balanceTab.classList.toggle('hidden',adminTab.classList.contains('hidden'));
+     if(unavailable)closeBalance();
+   };
+   balanceTab.addEventListener('click',()=>{
+     if(adminTab.classList.contains('hidden'))return;
+     if(typeof switchMode==='function')switchMode('admin');
+     if(admin.classList.contains('hidden'))return;
+     document.documentElement.classList.add('p79-leave-balance-only');
+     adminTab.classList.remove('active');
+     balanceTab.classList.add('active');
+     balancePanel.open=true;
+     if(typeof renderAdminBalances==='function')renderAdminBalances();
+   });
+   adminTab.addEventListener('click',closeBalance);
+   employeeTab?.addEventListener('click',closeBalance);
+   const permissionWatcher=new MutationObserver(syncBalancePermission);
+   permissionWatcher.observe(adminTab,{attributes:true,attributeFilter:['class']});
+   syncBalancePermission();
+ }
+ const statusBanner=create('div','p79-leave-cloud-unverified-banner');
+ statusBanner.id='p79LeaveCloudUnverified';
+ statusBanner.setAttribute('role','status');
+ statusBanner.textContent='請假雲端紀錄尚未同步；此時的零筆不是正式資料已清空。請使用既有的「重新整理」重新讀取正式雲端，資料未核實前不進行新增或審核。';
+ statusBanner.hidden=true;
+ document.getElementById('adminLeaveSummary')?.insertAdjacentElement('afterend',statusBanner);
  const stats=create('section','p79-leave-visual-stats');
  stats.id='p79LeaveVisualStats';
  stats.setAttribute('aria-label','請假狀態統計');
@@ -77,7 +121,11 @@ function init(){
    showDays('p79LeaveVisualRemain',info?.effectiveRemaining??null);
    document.getElementById('p79LeaveVisualQuotaNote').textContent=!e?'選取人員可查看原有年假額度。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
  }
- function updateStats(rs,m){
+ function updateStats(rs,m,unverified=false){
+   if(unverified){
+     stats.querySelectorAll('[data-leave-visual-stat]').forEach(node=>{node.textContent='—';});
+     return;
+   }
    const matching=rs.filter(x=>overlaps(x,m));
    const count=s=>rs.filter(x=>String(x.status||'待審核').trim()===s).length;
    const values={pending:count('待審核'),approved:count('已核准'),rejected:count('已駁回'),month:matching.length,
@@ -118,7 +166,13 @@ function init(){
      if(!active)return;
      updatePeople();updateQuota();
      const rs=records().filter(permitted),m=month();
-     updateStats(rs,m);updateCalendar(rs,m);
+     // A failed getLeaveData with HR-only fallback must never paint a
+     // false "0 records" business conclusion. This is display-only.
+     const cloudReady=typeof p79LeaveCloudDataReady!=='undefined'&&p79LeaveCloudDataReady===true;
+     const unverified=!cloudReady&&rs.length===0;
+     document.documentElement.classList.toggle('p79-leave-cloud-unverified',unverified);
+     statusBanner.hidden=!unverified;
+     updateStats(rs,m,unverified);updateCalendar(rs,m);
    });
  }
  personSelect.addEventListener('change',updateQuota);
@@ -126,6 +180,8 @@ function init(){
  const observer=new MutationObserver(refresh);
  observer.observe(admin,{attributes:true,attributeFilter:['class']});
  observer.observe(document.getElementById('adminLeaveBody'),{childList:true});
+ const readStatus=document.getElementById('globalStatus');
+ if(readStatus)observer.observe(readStatus,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
  window.addEventListener('pageshow',refresh);
  refresh();
 }
