@@ -78,7 +78,7 @@
   if(shift.startsWith('中'))return index===0?'16:00–20:00':'20:00–24:00';
   return index===0?'次日 00:00–04:00':'次日 04:00–08:00';
  }
- function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',jobFilter='',nameFilter=''}={}){
+ function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',jobFilter='',nameFilter='',advancedOpen=false}={}){
   const options=candidates({people,target,date,rosters,leaves,covers,excludeLeaveId});
   const wanted=mode==='two'?2:1;
   const valid=selected.filter(id=>options.some(x=>x.id===str(id)&&!x.disabled)).slice(0,wanted);
@@ -99,8 +99,8 @@
   // In two-person mode the two physical assignments are independent. The
   // optional job/name filters narrow the checkbox list only; they must never
   // hide the second person's choices or force a second slot to one candidate.
-  const slotHtml=mode==='two'?'<div class="p79-smart-cover-slots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:10px 0">'+
-   [0,1].map(slot=>{
+  const slotHtml='<div class="p79-smart-cover-slots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:4px 0">'+
+   (mode==='two'?[0,1]:[0]).map(slot=>{
     const id=valid[slot]||'',other=valid[1-slot]||'',firstRequired=slot===1&&!valid[0];
     const optionsHtml=options.map(x=>{
      const unavailable=x.disabled||x.id===other;
@@ -109,13 +109,13 @@
       '｜'+(x.shift||'班表待核')+(x.id===other?'｜已選為另一位':x.disabled?'｜'+x.note:''))+'</option>';
     }).join('');
     return '<label class="p79-smart-cover-filter-label" style="display:flex;flex-direction:column;gap:5px">'+
-     '<strong>'+(slot===0?'第一位代班':'第二位代班')+'（'+esc(period(target,date,rosters,'two',slot))+'，4H）</strong>'+
-     '<select data-smart-action="slot" data-smart-slot="'+slot+'" aria-label="'+(slot===0?'第一位代班人員':'第二位代班人員')+'"'+
+     '<strong>'+(mode==='one'?'代班人員（8 小時）':slot===0?'第一位代班（4 小時）':'第二位代班（4 小時）')+'</strong>'+
+     '<span class="p79-smart-cover-slot-period">'+esc(period(target,date,rosters,mode,slot))+'</span>'+
+     '<select data-smart-action="slot" data-smart-slot="'+slot+'" aria-label="'+(mode==='one'?'代班人員':slot===0?'第一位代班人員':'第二位代班人員')+'"'+
      (firstRequired?' disabled':'')+' style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px">'+
      '<option value="">'+(firstRequired?'請先選第一位':'請選擇'+(slot===0?'第一':'第二')+'位代班人員')+'</option>'+
      optionsHtml+'</select></label>';
-   }).join('')+'</div>'+
-   '<p class="p79-smart-cover-hint">兩個代班欄位獨立選人；下方職稱／姓名僅篩選勾選名單，不限制第二位人選。已請假、重複代班及同班衝突者不可選。</p>':'';
+   }).join('')+'</div>';
   const rows=matched.map(x=>'<label class="p79-smart-cover-person'+(valid.includes(x.id)?' selected':'')+(x.disabled?' excluded':'')+'">'+
    '<input type="checkbox" data-smart-action="pick" data-smart-id="'+esc(x.id)+'"'+(valid.includes(x.id)?' checked':'')+(x.disabled?' disabled':'')+'>'+
    '<span class="p79-smart-cover-person-content"><strong>'+esc(x.person.name||x.id)+'</strong><small>'+esc(personJob(x.person))+'｜'+esc(x.shift||'班表待核')+'</small><small>'+esc(x.note)+'</small></span>'+
@@ -128,18 +128,28 @@
     mode==='two'&&qualified<2?'目前同部門僅有 '+qualified+' 位初步可選人員，尚無法完成兩人代班；請核對排班、請假與候選人。':
     qualified===0?'當日沒有通過初步條件的代班人員；請核對班表與請假。':
     '優先推薦依排休與同職稱排序；儲存前仍核對請假、代班衝突與休息條件。';
+  const countText='已勾選 '+valid.length+' / '+wanted+' 位｜顯示 '+matched.length+' 位候選人'+
+   ((jobFilter||nameFilter)?'（篩選不影響已勾選人員）':'');
+  const totalText='合計 '+(valid.length*(mode==='two'?4:8))+' / 8 小時';
+  const quickStatus=valid.length===wanted?
+   '✓ 已選好 '+wanted+' 位，預排 '+(mode==='two'?'各 4':'8')+' 小時（加班另核對）':
+   '請選擇 '+wanted+' 位代班人員（已選 '+valid.length+' 位）';
   return '<div class="p79-smart-cover-picker" data-smart-date="'+esc(date)+'" data-smart-scope="'+esc(scope)+'">'+
-    '<div class="p79-smart-cover-toolbar"><span class="p79-smart-cover-caption">代班方式</span>'+
-    '<div class="p79-smart-cover-modes"><button type="button" data-smart-action="mode" data-smart-value="one" aria-pressed="'+(mode==='one')+'">1 人 8H</button>'+
-    '<button type="button" data-smart-action="mode" data-smart-value="two" aria-pressed="'+(mode==='two')+'">2 人各 4H</button></div>'+
-    '<button type="button" class="p79-smart-cover-recommend" data-smart-action="recommend"'+(!official?' disabled':'')+'>✦ 排休優先推薦</button></div>'+
-    slotHtml+filterHtml+
-    '<div class="p79-smart-cover-summary">已勾選 '+valid.length+' / '+wanted+' 位｜顯示 '+matched.length+' 位候選人'+
-    ((jobFilter||nameFilter)?'（篩選不影響已勾選人員）':'')+'</div>'+
-    '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">目前篩選沒有符合的候選人，請調整職稱或姓名</p>')+'</div>'+
-    '<div class="p79-smart-cover-preview"><strong>指派預覽</strong>'+(preview||'<p class="p79-smart-cover-hint">請勾選人員</p>')+
-    '<div class="p79-smart-cover-total">合計 '+(valid.length*(mode==='two'?4:8))+' / 8 小時</div></div>'+
-    '<p class="p79-smart-cover-hint">'+esc(alert)+'</p></div>';
+   '<div class="p79-smart-cover-toolbar"><span class="p79-smart-cover-caption">代班方式</span>'+
+   '<div class="p79-smart-cover-modes"><button type="button" data-smart-action="mode" data-smart-value="one" aria-pressed="'+(mode==='one')+'">1 人 8H</button>'+
+   '<button type="button" data-smart-action="mode" data-smart-value="two" aria-pressed="'+(mode==='two')+'">2 人各 4H</button></div>'+
+   '<button type="button" class="p79-smart-cover-recommend" data-smart-action="recommend"'+(!official?' disabled':'')+'>✦ 自動推薦</button></div>'+
+   slotHtml+
+   '<div class="p79-smart-cover-quick-status" aria-live="polite">'+esc(quickStatus)+'</div>'+
+   ((qualified<wanted)?'<p class="p79-smart-cover-hint">'+esc(alert)+'</p>':'')+
+   '<details class="p79-smart-cover-advanced" data-smart-action="advanced"'+(advancedOpen?' open':'')+'>'+
+   '<summary>進階篩選／查看全部候選人（選填）</summary>'+
+   '<div class="p79-smart-cover-advanced-body">'+filterHtml+
+   '<div class="p79-smart-cover-summary">'+countText+'</div>'+
+   '<div class="p79-smart-cover-list">'+(rows||'<p class="p79-smart-cover-hint">目前篩選沒有符合的候選人，請調整職稱或姓名</p>')+'</div>'+
+   '<div class="p79-smart-cover-preview"><strong>指派預覽</strong>'+(preview||'<p class="p79-smart-cover-hint">請勾選人員</p>')+
+   '<div class="p79-smart-cover-total">'+totalText+'</div></div>'+
+   '<p class="p79-smart-cover-hint">'+esc(alert)+'</p></div></details></div>';
  }
  function bind(root,onAction){
   if(!root||typeof root.querySelectorAll!=='function')return;
@@ -147,6 +157,7 @@
    const act=node.dataset.smartAction;
    if(act==='pick')node.onchange=()=>onAction({kind:'pick',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',id:node.dataset.smartId,checked:!!node.checked});
    else if(act==='slot')node.onchange=()=>onAction({kind:'slot',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',slot:Number(node.dataset.smartSlot),id:node.value});
+   else if(act==='advanced')node.ontoggle=()=>onAction({kind:'advanced',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:!!node.open});
    else if(act==='filter-job'||act==='filter-name')node.onchange=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.value});
    else node.onclick=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.dataset.smartValue||''});
   });
