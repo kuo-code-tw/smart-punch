@@ -523,11 +523,13 @@
     throw Error('加班歸屬日應為 '+split.overtimeDate+'，不能依畫面日期自行變更');
    const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
     .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
+   const expectedSplitRule={normalStart:split.normalStart,normalEnd:split.normalEnd,
+    overtimeStart:split.overtimeStart,overtimeEnd:split.overtimeEnd,declaredHours:split.declaredHours};
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
-    workdayShiftMismatch:true,expectedNormalShift:split.normalShift,
+    workdayShiftMismatch:true,expectedNormalShift:split.normalShift,expectedSplitRule,
     overtimeDate:split.overtimeDate,workDate:split.workDate,
     periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；出勤日 '+split.workDate+'，加班歸屬 '+split.overtimeDate+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
-   return {code:split.code,requirePeriodSelection:false,overtimeDate:split.overtimeDate,workDate:split.workDate,
+   return {code:split.code,requirePeriodSelection:false,expectedSplitRule,overtimeDate:split.overtimeDate,workDate:split.workDate,
     periodHint:'原請假日 '+leaveDate+'；實際出勤日 '+date+'；加班歸屬日 '+split.overtimeDate+'；正常班 '+split.normalStart+'-'+split.normalEnd+
      '；平日延時加班 '+split.overtimeStart+'-'+split.overtimeEnd+'（不含正常班）'};
   }
@@ -1390,6 +1392,20 @@
      return;
     }
     if(leaveVerified&&leaveVerifiedDate===date)return;
+    // The signed-in leave workflow already reconciles an explicit handoff
+    // against GAS before opening this dialog. Its optional list decoration
+    // must not issue a second 16-second month read and fail with AbortError.
+    // The Save button still rereads authoritative leave, roster and punches.
+    if(prefill.leaveHandoffId){
+     const approvedDate=String(prefill.coverDate||prefill.overtimeDate||date);
+     const found=approvedLeaveDateChoices(leaveRecords,prefill.forEmpId||'').includes(approvedDate);
+     if(source)source.textContent=(found?
+      '已核對 '+approvedDate+' 的已核准請假及原代班關聯。':
+      '原請假／代班安排已由正式流程帶入（目前名單未完整讀入）。')+
+      '正式儲存時會再次核對雲端，尚未建立加班申報。';
+     leaveVerified=found;leaveVerifiedDate=found?date:'';
+     return;
+    }
     const before=String(forSelect.value||prefill.forEmpId||'');
     if(source)source.textContent='正在核對 '+date+' 的正式已核准請假名單…';
     try{
@@ -1434,7 +1450,10 @@
      leaveVerified=false;leaveVerifiedDate='';
      if(!prefill.leaveHandoffId&&!editingOriginal)
       forSelect.innerHTML='<option value="">請假資料尚未核對，請稍後重試</option>';
-     if(source)source.textContent='請假名單讀取失敗：'+String(error?.message||error)+'；請勿建立未確認的代班關聯。';
+     const interrupted=error?.name==='AbortError'||/signal is aborted|aborted without reason|timed? out|逾時/i.test(String(error?.message||''));
+     if(source)source.textContent=interrupted?
+      '請假名單雲端讀取逾時；尚未送出加班，原選擇已保留。請重新核對正式請假名單。':
+      '請假名單讀取失敗：'+String(error?.message||error)+'；尚未核對前不可建立新代班關聯。';
     }
    }
    async function refreshOfficialRosterHint(){
@@ -1810,7 +1829,21 @@
       throw Error('已核對原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
        '，但代班人員 '+String(prefill.workDate||prefill.date)+
        ' 的正式班表不是預期的 '+String(prefill.expectedNormalShift||'')+
-       '班；請核對班表或代班安排，不可使用另一時段代替原預排04-08。');
+       '班；請核對班表或代班安排，不可改選不相符的加班時段。');
+     // A two-worker split cover must not silently accept an unrelated
+     // extension (e.g. 延20-24/normal24-08 for a 16-24 + 24-04 slot).
+     const expected=prefill.leaveHandoffId?prefill.expectedSplitRule:null;
+     if(expected){
+      const sameHour=(a,b)=>Number.isFinite(hour(a))&&Number.isFinite(hour(b))&&hour(a)%1440===hour(b)%1440;
+      if(chosen[0]!=='延'||Number(chosen[2])!==Number(expected.declaredHours)||
+         !sameHour(chosen[4],expected.normalStart)||!sameHour(chosen[5],expected.normalEnd)||
+         !sameHour(chosen[6],expected.overtimeStart)||!sameHour(chosen[7],expected.overtimeEnd))
+       throw Error('原請假日 '+String(prefill.coverDate||prefill.overtimeDate||prefill.date)+
+        ' 的雙人代班預排為正常班 '+expected.normalStart+'-'+expected.normalEnd+
+        '、加班 '+expected.overtimeStart+'-'+expected.overtimeEnd+
+        '（4小時）。目前選擇的 '+String(chosen[1]||'')+
+        ' 時段不符，不能替代申報；請核對代班安排與正式加班時段設定。');
+     }
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
      const selection=selectionKey();
@@ -1872,8 +1905,23 @@
       try{
        // The up-to-date rule was checked above. Do not block confirmed
        // posting on a redundant network read with another timeout.
-       const result=await awaitOvertimeSaveConfirmation(
-        global.p79OvertimeContext.saveReport(draft));
+       // Retry only an authoritative, no-write edit-lock refusal. Never
+       // replay a timeout or unknown POST result; preserve the original ID.
+       let result;
+       for(let attempt=0;attempt<3;attempt++){
+        try{
+         result=await awaitOvertimeSaveConfirmation(global.p79OvertimeContext.saveReport(draft));
+         break;
+        }catch(error){
+         const message=String(error?.message||'');
+         if(message!=='班表正在編輯，請待儲存完成後再申報')throw error;
+         if(attempt===2)throw Error('排班編輯鎖仍被占用，尚未寫入加班；原申報內容已保留。排班完成後可繼續申報，不必重新填寫。');
+         if(!el.isConnected||selectionKey()!==selection)
+          throw Error('申報視窗已關閉或內容已更動，停止自動重試；原申報內容已保留。');
+         el.querySelector('#p79OtStatus').textContent='排班正在編輯，未寫入加班；已保留原申報並自動重新核對 '+(attempt+1)+'/2…';
+         await new Promise(resolve=>setTimeout(resolve,1400*(attempt+1)));
+        }
+       }
        verifySavedReport(draft,result);
        if(draft.overtimeDate!==draft.date&&String(result?.report?.overtimeDate||'')!==draft.overtimeDate)
         throw Error('雲端未確認加班歸屬日 '+draft.overtimeDate+'；保留待核對，不可當作已申報。');
