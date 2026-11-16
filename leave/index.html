@@ -1985,6 +1985,8 @@ async function p79SaveWorkOvertimeDraft(draft){
  const prepared=P79Overtime.takeSaveContext?.(draft);
  const cloud=prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
  const overtimeDate=String(draft.overtimeDate||draft.date);
+  if(draft.coverPeriodMode==='same-day'&&cloud?.capabilities?.sameDayCoverFourHourV1!==true)
+   throw Error('正式 GAS 尚未部署同日兩位各4小時代班驗證；保留申報資料，不送出錯誤日期或時段。');
  // Older GAS stores the punch/work date only; refuse to claim the following
  // morning's extension is credited on the previous night before backend support.
  if(overtimeDate!==String(draft.date)&&cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
@@ -2009,6 +2011,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,
   date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,
   forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,
+   coverPeriodMode:draft.coverPeriodMode||'',
   expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,
   attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
