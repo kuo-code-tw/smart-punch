@@ -78,7 +78,7 @@
   if(shift.startsWith('中'))return index===0?'16:00–20:00':'20:00–24:00';
   return index===0?'次日 00:00–04:00':'次日 04:00–08:00';
  }
- function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',jobFilter='',nameFilter='',advancedOpen=false}={}){
+ function render({people=[],target=null,date='',selected=[],mode='one',rosters=null,leaves=[],covers=[],excludeLeaveId='',scope='',jobFilter='',nameFilter='',advancedOpen=false,slotJobs=[]}={}){
   const options=candidates({people,target,date,rosters,leaves,covers,excludeLeaveId});
   const wanted=mode==='two'?2:1;
   const valid=selected.filter(id=>options.some(x=>x.id===str(id)&&!x.disabled)).slice(0,wanted);
@@ -99,22 +99,43 @@
   // In two-person mode the two physical assignments are independent. The
   // optional job/name filters narrow the checkbox list only; they must never
   // hide the second person's choices or force a second slot to one candidate.
+  // In each 4-hour position choose the job title BEFORE the worker's name.
+  // Default to the leave applicant's role for quick selection, yet permit
+  // different positions to use different roles and an explicit "all" choice.
+  // Advanced checkbox filters remain completely independent.
   const slotHtml='<div class="p79-smart-cover-slots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:4px 0">'+
    (mode==='two'?[0,1]:[0]).map(slot=>{
     const id=valid[slot]||'',other=valid[1-slot]||'',firstRequired=slot===1&&!valid[0];
-    const optionsHtml=options.map(x=>{
+    const person=options.find(x=>x.id===id);
+    const applicantJob=personJob(target);
+    const defaultJob=person?personJob(person.person):(jobs.includes(applicantJob)?applicantJob:'');
+    const chosenJob=Array.isArray(slotJobs)&&typeof slotJobs[slot]==='string'?slotJobs[slot]:defaultJob;
+    const slotOptions=options.filter(x=>!chosenJob||personJob(x.person)===chosenJob);
+    const eligibleCount=slotOptions.filter(x=>!x.disabled&&x.id!==other).length;
+    const slotLabel=mode==='one'?'代班人員（8 小時）':slot===0?'第一位代班（4 小時）':'第二位代班（4 小時）';
+    const jobOptions='<option value=""'+(chosenJob===''?' selected':'')+'>全部職稱</option>'+
+     jobs.map(job=>'<option value="'+esc(job)+'"'+(chosenJob===job?' selected':'')+'>'+
+      esc(job)+'</option>').join('');
+    const optionsHtml=slotOptions.map(x=>{
      const unavailable=x.disabled||x.id===other;
      return '<option value="'+esc(x.id)+'"'+(x.id===id?' selected':'')+
-      (unavailable?' disabled':'')+'>'+esc(str(x.person.name||x.id)+'（'+x.id+'）｜'+personJob(x.person)+
+      (unavailable?' disabled':'')+'>'+esc(str(x.person.name||x.id)+'（'+x.id+'）'+
+      (chosenJob?'':'｜'+personJob(x.person))+
       '｜'+(x.shift||'班表待核')+(x.id===other?'｜已選為另一位':x.disabled?'｜'+x.note:''))+'</option>';
     }).join('');
-    return '<label class="p79-smart-cover-filter-label" style="display:flex;flex-direction:column;gap:5px">'+
-     '<strong>'+(mode==='one'?'代班人員（8 小時）':slot===0?'第一位代班（4 小時）':'第二位代班（4 小時）')+'</strong>'+
+    return '<div class="p79-smart-cover-slot">'+
+     '<strong>'+slotLabel+'</strong>'+
      '<span class="p79-smart-cover-slot-period">'+esc(period(target,date,rosters,mode,slot))+'</span>'+
-     '<select data-smart-action="slot" data-smart-slot="'+slot+'" aria-label="'+(mode==='one'?'代班人員':slot===0?'第一位代班人員':'第二位代班人員')+'"'+
-     (firstRequired?' disabled':'')+' style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px">'+
-     '<option value="">'+(firstRequired?'請先選第一位':'請選擇'+(slot===0?'第一':'第二')+'位代班人員')+'</option>'+
-     optionsHtml+'</select></label>';
+     '<div class="p79-smart-cover-slot-fields">'+
+     '<label class="p79-smart-cover-filter-label">職稱'+
+     '<select data-smart-action="slot-job" data-smart-slot="'+slot+'" aria-label="'+slotLabel+'職稱">'+jobOptions+'</select></label>'+
+     '<label class="p79-smart-cover-filter-label">姓名'+
+     '<select data-smart-action="slot" data-smart-slot="'+slot+'" aria-label="'+slotLabel+'姓名"'+
+     (firstRequired?' disabled':'')+'>'+
+     '<option value="">'+(firstRequired?'請先選第一位':'請選擇人員')+'</option>'+
+     optionsHtml+'</select></label></div>'+
+     '<small class="p79-smart-cover-slot-count">'+(eligibleCount?'本職稱可選 '+eligibleCount+' 位':'本職稱沒有可選人員，請更換職稱')+'</small>'+
+     '</div>';
    }).join('')+'</div>';
   const rows=matched.map(x=>'<label class="p79-smart-cover-person'+(valid.includes(x.id)?' selected':'')+(x.disabled?' excluded':'')+'">'+
    '<input type="checkbox" data-smart-action="pick" data-smart-id="'+esc(x.id)+'"'+(valid.includes(x.id)?' checked':'')+(x.disabled?' disabled':'')+'>'+
@@ -157,6 +178,7 @@
    const act=node.dataset.smartAction;
    if(act==='pick')node.onchange=()=>onAction({kind:'pick',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',id:node.dataset.smartId,checked:!!node.checked});
    else if(act==='slot')node.onchange=()=>onAction({kind:'slot',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',slot:Number(node.dataset.smartSlot),id:node.value});
+   else if(act==='slot-job')node.onchange=()=>onAction({kind:'slot-job',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',slot:Number(node.dataset.smartSlot),value:node.value});
    else if(act==='advanced')node.ontoggle=()=>onAction({kind:'advanced',date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:!!node.open});
    else if(act==='filter-job'||act==='filter-name')node.onchange=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.value});
    else node.onclick=()=>onAction({kind:act,date:node.closest('.p79-smart-cover-picker')?.dataset.smartDate||'',value:node.dataset.smartValue||''});
