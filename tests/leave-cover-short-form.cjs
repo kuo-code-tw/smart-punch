@@ -1,0 +1,47 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const code=fs.readFileSync('assets/port79-smart-cover-picker.js','utf8');
+const create=fs.readFileSync('assets/port79-leave-daily-simple.js','utf8');
+const approved=fs.readFileSync('assets/port79-approved-cover-auto.js','utf8');
+const page=fs.readFileSync('leave/index.html','utf8');
+const win={};vm.runInNewContext(code,{window:win,Map,Set,Date});
+const picker=win.P79SmartCoverPicker,date='2026-11-14';
+const staff=(empId,name,shift='休',dept='第二事業處')=>({empId,name,jobTitle:'F/L',dept,employmentStatus:'active'});
+const people=[staff('L','請假者','晚'),staff('A','第一人','中'),staff('B','第二人','早'),
+ staff('C','已請假人','休'),staff('D','其他部門','休','別部門')];
+const rosters=new Map(people.map(p=>[p.empId,{[date]:p.name==='請假者'?'晚':p.name==='第一人'?'中':'休'}]));
+const params={people,target:people[0],date,rosters,leaves:[{empId:'C',startDate:date,endDate:date,status:'已核准'}],mode:'two',jobFilter:'F/L',nameFilter:'A'};
+const two=picker.render(params);
+const slots=two.match(/<select data-smart-action="slot" data-smart-slot="[01]"[\s\S]*?<\/select>/g)||[];
+assert.equal(slots.length,2,'two 4-hour positions are directly visible');
+assert(!two.includes('data-smart-action="advanced" open'),'advanced filters do not expand by default');
+assert(two.includes('進階篩選／查看全部候選人（選填）'),'filters accessible for advanced use');
+assert(two.includes('第一位代班（4 小時）')&&two.includes('第二位代班（4 小時）'));
+assert(slots.every(x=>x.includes('第二人')),'both slots bypass one-name advanced filter');
+assert(slots.some(x=>x.includes('已請假人')&&x.includes('disabled')),'leave conflict is still blocked');
+assert(two.includes('請選擇 2 位代班人員（已選 0 位）'));
+const chosen=picker.render({...params,selected:['A','B']});
+assert(chosen.includes('✓ 已選好 2 位，預排各 4 小時（加班另核對）'));
+assert(chosen.includes('合計 8 / 8 小時'),'existing detailed preview retained');
+const one=picker.render({...params,mode:'one',selected:['A']});
+assert.equal((one.match(/data-smart-action="slot" data-smart-slot="/g)||[]).length,1);
+assert(one.includes('代班人員（8 小時）'));
+assert(one.includes('✓ 已選好 1 位，預排 8 小時（加班另核對）'));
+const open=picker.render({...params,advancedOpen:true});
+assert(open.includes('data-smart-action="advanced" open'),'advanced open state persists');
+const switches=[],tag={dataset:{smartAction:'advanced'},open:true,closest:()=>({dataset:{smartDate:date}})};
+picker.bind({querySelectorAll:()=>[tag]},v=>switches.push(v));tag.ontoggle();
+assert.deepEqual(JSON.parse(JSON.stringify(switches)),[{kind:'advanced',date,value:true}]);
+assert(create.includes('const daysHtml=list.length===1'), 'single-day form omits duplicate day tab');
+assert(create.includes("const override=(list.length===1&&!row.applicantOverride?'':"),'single-day form omits repeated applicant');
+assert(create.includes('p79-smart-cover-advanced-overtime'),'overtime options are still available but collapsed');
+assert(create.includes("action.kind==='advanced'")&&approved.includes("action.kind==='advanced'"),'both source flows preserve details state');
+assert(create.includes("action.slot===1&&!entry.secondVisible"),'one-person source can use direct slot 0');
+assert(approved.includes("action.slot===1&&row.mode!=='two'"),'approved source can use direct slot 0');
+assert(page.includes('p79-leave-short-form-v1'),'compact CSS is shipped');
+for(const name of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js'])
+ assert(page.includes(name+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1'),name+' must bust old browser cache');
+for(const js of [code,create,approved])new vm.Script(js);
+for(const match of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
+ if(!/\bsrc=|application\/json|importmap/.test(match[1])&&match[2].trim())new vm.Script(match[2]);
+console.log('PASS compact leave form: one/two direct selectors, no duplicate one-day labels, advanced optional, eligibility and save validation retained');
