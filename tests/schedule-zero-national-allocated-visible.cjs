@@ -79,8 +79,8 @@ assert.deepEqual(clone(Object.fromEntries(Object.entries(r.visible).map(([k,v])=
  {例:5,休:5,國:0},'5例 and 4休 quotas filled; genuine extra off-day retained');
 assert.deepEqual(clone(r.counter),{例:'5/0',休:'5/0',國:'0/0'},'left counters equal the actual dates');
 assert.equal(r.visible.休.length-4,1,'extra saved 休 is not silently removed to force 5/4');
-assert.match(r.cellsHtml,/超1/,'the extra 休 is explicitly flagged rather than silently hidden');
-assert.match(r.cellsHtml,/額外1天/,'manager can inspect the actual extra rest in the tooltip');
+assert.doesNotMatch(r.cellsHtml,/超1|p79-rest-overquota-note|p79-rest-over-quota/,'quota columns remain a single compact row');
+assert.equal((r.cellsHtml.match(/data-rest-category=/g)||[]).length,3,'quota columns are unchanged');
 for(const n of [27,28,29])assert.equal(r.scope.p79ScheduleExportDay(r.emp,day(n),r.view),'待排班',
  'leave-deletion pending dates are preserved, not fabricated as off days');
 assert.equal(original[day(14)],'國','source unchanged after display');
