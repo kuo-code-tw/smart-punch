@@ -178,6 +178,23 @@ function redraw(){
   if(action.kind==='mode'){
    entry.secondVisible=action.value==='two';
    if(!entry.secondVisible){entry.second='';entry.secondOvertimeType='';}
+  }else if(action.kind==='slot'){
+   if(!entry.secondVisible||![0,1].includes(action.slot))return;
+   const id=String(action.id||''),available=picker.candidates(smartOptions(date,entry,target,people));
+   if(id&&!available.some(x=>x.id===id&&!x.disabled)){
+    $id('adminCreateLeaveMessage').textContent='此人員已有請假、代班或班別衝突，請重新選擇。';redraw();return;
+   }
+   if(action.slot===1&&!entry.first){
+    $id('adminCreateLeaveMessage').textContent='請先選擇第一位代班人員。';redraw();return;
+   }
+   if(id&&id===(action.slot===0?entry.second:entry.first)){
+    $id('adminCreateLeaveMessage').textContent='兩位代班人員不能是同一人。';redraw();return;
+   }
+   if(action.slot===0){
+    entry.first=id;
+    if(!entry.first){entry.first=entry.second||'';entry.second='';}
+   }else entry.second=id;
+   entry.firstOvertimeType='';entry.secondOvertimeType='';
   }else if(action.kind==='recommend'){
    const p=people.find(x=>String(x.empId)===String(entry.applicantOverride?entry.applicant:$id('adminCreateLeaveEmployee')?.value||''));
    const ids=picker.recommend(smartOptions(date,entry,p,people),entry.secondVisible?'two':'one');
