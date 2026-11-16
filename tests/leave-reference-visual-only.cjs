@@ -64,11 +64,14 @@ assert(css.includes('html.p79-leave-reference-admin.p79-leave-balance-only #admi
 assert(css.includes('html.p79-leave-reference-admin:not(.p79-leave-balance-only) #adminBalancePanel'),
  'original annual table appears ONLY in the new tab, not twice');
 assert(html.includes('port79-leave-reference-visual.css?v=20261116-reference-tab-stroke-v2'));
-assert(html.includes('port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v2'));
+assert(html.includes('port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v3'));
 assert(css.includes('html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop.p79-workspace-sidebar'),
  'reference-blue sidebar must style the actual shared workspace sidebar');
 assert(visual.includes('p79LeaveCloudUnverified'),'failed official reads must never be presented as zero records');
 assert(visual.includes('p79LeaveCloudDataReady'),'cloud read verification uses existing source flag');
+assert(visual.includes('const unverified=!cloudReady;'),'unverified cloud cache stays marked even with stale rows');
+assert(visual.includes("tabs?.insertAdjacentElement('afterend',statusBanner)"),
+ 'cloud warning remains visible in annual balance tab');
 assert(visual.includes('筆數待確認'));
 // The personnel dropdown shows actual job title + name, ordered by stroke.
 assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"));
