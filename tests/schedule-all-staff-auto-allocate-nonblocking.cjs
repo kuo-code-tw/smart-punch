@@ -21,17 +21,21 @@ const people=Array.from({length:86},(_,i)=>({
  name:i===16?'黃柏源':'測試員'+(i+1),
  group:['A組','B組','C組','D組','不分組','不輪班'][i%6]
 }));
+// Real browser updateDailyShift('例') persists raw 休 with manual metadata.
+const chosenExamples=[1,3,5,7,9,11,13],chosenRests=[15,17,19];
 const original=()=>{
  const row=Object.fromEntries(Array.from({length:30},(_,i)=>[d(i+1),'中']));
- for(const n of [1,3,5,7,9,11,13])row[d(n)]='例';
- for(const n of [15,17,19])row[d(n)]='休';
+ for(const n of [...chosenExamples,...chosenRests])row[d(n)]='休';
  return row;
 };
 const roster=Object.fromEntries(people.map(p=>[p.id,original()]));
-const meta=Object.fromEntries(people.map(p=>[p.id,{}]));
-for(const id of ['E84','E85','E86'])roster[id]={}; // no monthly roster
-meta.E17[d(1)]={manualRosterShift:'例',restAllocationSource:'manual',
- restCategory:'例',restCategoryLocked:true,note:'locked manual'};
+const meta=Object.fromEntries(people.map(p=>[p.id,Object.fromEntries([
+ ...chosenExamples.map(n=>[d(n),{manualRosterShift:'例',restCategory:'例',
+  restAllocationSource:'manual'}]),
+ ...chosenRests.map(n=>[d(n),{manualRosterShift:'休'}])
+])]));
+for(const id of ['E84','E85','E86']){roster[id]={};meta[id]={};} // no monthly roster
+meta.E17[d(1)]={...meta.E17[d(1)],restCategoryLocked:true,note:'locked manual'};
 meta.E18[d(3)]={overtimeReport:{id:'CLOUD-18',category:'例',
  code:'例08-16'},note:'formal original'};
 const unchanged=JSON.stringify(roster);
@@ -63,10 +67,12 @@ const classes=Object.values(meta.E17).reduce((acc,v)=>{
  if(['例','休','國'].includes(v.restCategory))acc[v.restCategory]++;
  return acc;
 },{例:0,休:0,國:0});
-assert.equal(classes.例,5,'7 legacy 例 get rebalanced across all qualified staff');
-assert.equal(classes.休,5,'3 old 休 + movable excess 例 result in 5 true off days');
+assert.equal(classes.例,5,'7 actual manually selected 例 rebalanced to 5 valid 例');
+assert.equal(classes.休,5,'3 manual 休 + 2 surplus manual 例 become 5 actual rest days');
 assert.equal(meta.E17[d(1)].restCategory,'例','manual lock protected');
 assert.equal(meta.E17[d(1)].note,'locked manual');
+assert(['auto-v1','auto-excess-v1'].includes(meta.E17[d(3)].restAllocationSource),
+ 'nonlocked manually selected 例 is eligible for auto quota reconciliation');
 assert.equal(meta.E18[d(3)].overtimeReport.id,'CLOUD-18','cloud overtime untouched');
 assert.deepEqual(meta.E84,{});
 assert.deepEqual(meta.E85,{});
