@@ -75,10 +75,10 @@ function init(){
   const companyOpt=document.createElement('option');companyOpt.textContent='全部公司';companyOpt.value='';
   company.append(companyOpt);company.disabled=true;company.title='目前公司範圍依登入權限';
   const unit=make('select','p79-pixel-header-filter');
-  const job=make('select','p79-pixel-header-filter');
+  const group=make('select','p79-pixel-header-filter');
+  group.id='p79PixelGroup';
   for(const [source,target,fallback] of [
-   [document.getElementById('filterDept'),unit,'全部單位'],
-   [document.getElementById('filterJob'),job,'全部職稱']
+   [document.getElementById('filterDept'),unit,'全部單位']
   ]){
     const original=source;
     function sync(){
@@ -105,10 +105,31 @@ function init(){
     // Original options can repopulate after a cloud read.
     if(original)new MutationObserver(sync).observe(original,{childList:true,subtree:true});
   }
+  const employeeGroup=e=>String(e?.group||e?.groupName||e?.team||e?.teamName||'').trim();
+  function updateGroups(){
+   const prior=group.value;
+   const groups=[...new Set((typeof employees!=='undefined'&&Array.isArray(employees)?employees:[])
+     .map(employeeGroup).filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke').compare);
+   const signature=groups.join('|');
+   if(group.dataset.sourceSignature===signature)return;
+   group.dataset.sourceSignature=signature;
+   group.replaceChildren();
+   const all=make('option','','全部組別');all.value='';group.append(all);
+   for(const name of groups){const option=make('option','',name);option.value=name;group.append(option);}
+   if(groups.includes(prior))group.value=prior;
+  }
+  updateGroups();
   const bell=make('span','p79-pixel-header-bell','♧');
   bell.setAttribute('aria-hidden','true');
-  const account=make('span','p79-pixel-header-user','79號碼頭');
-  headingRight.append(company,unit,job,bell,account);
+  const account=make('span','p79-pixel-header-user','登入人員');
+  const userName=document.querySelector('.p79-user-name');
+  function updateAccount(){
+   const name=userName?.textContent?.trim();
+   account.textContent=name||'登入人員';
+  }
+  updateAccount();
+  if(userName)new MutationObserver(updateAccount).observe(userName,{childList:true,characterData:true,subtree:true});
+  headingRight.append(company,unit,group,bell,account);
  }
 
  // Reuse every live original button and select. Moves are structural only,
@@ -159,7 +180,16 @@ function init(){
   if(!active())return;
   const all=[...body.querySelectorAll(':scope > tr')];
   const keyword=search.value.trim().toLocaleLowerCase('zh-TW');
-  const matches=all.filter(tr=>!keyword||tr.textContent.toLocaleLowerCase('zh-TW').includes(keyword));
+  const chosenGroup=document.getElementById('p79PixelGroup')?.value||'';
+  const rendered=typeof p79LeaveComparisonRows!=='undefined'&&Array.isArray(p79LeaveComparisonRows)?
+   p79LeaveComparisonRows:[];
+  const matches=all.filter((tr,i)=>{
+   if(keyword&&!tr.textContent.toLocaleLowerCase('zh-TW').includes(keyword))return false;
+   if(!chosenGroup)return true;
+   const record=rendered[i],emp=typeof employees!=='undefined'&&Array.isArray(employees)?
+     employees.find(e=>String(e.empId||'').toUpperCase()===String(record?.empId||'').toUpperCase()):null;
+   return !!emp&&String(emp.group||emp.groupName||emp.team||emp.teamName||'').trim()===chosenGroup;
+  });
   const maxPage=Math.max(1,Math.ceil(matches.length/pageSize));
   currentPage=Math.min(currentPage,maxPage);
   const keep=new Set(matches.slice((currentPage-1)*pageSize,currentPage*pageSize));
@@ -181,8 +211,9 @@ function init(){
  function queueTableUpdate(reset=false){
   if(reset)currentPage=1;
   if(queued)return;queued=true;
-  Promise.resolve().then(()=>{queued=false;updateTable()});
+  Promise.resolve().then(()=>{queued=false;updateGroups();updateTable()});
  }
+ document.getElementById('p79PixelGroup')?.addEventListener('change',()=>queueTableUpdate(true));
  search.addEventListener('input',()=>queueTableUpdate(true));
  searchButton.addEventListener('click',()=>queueTableUpdate(true));
  for(const id of ['filterMonth','filterDept','filterJob','filterStatus']){
@@ -241,7 +272,8 @@ function init(){
        (kind==='personal'?/事假/.test(l.leaveType):kind==='sick'?/病假|傷病/.test(l.leaveType):
         kind==='marriage'?/婚假/.test(l.leaveType):/喪假/.test(l.leaveType)));
       const days=approved.reduce((sum,l)=>sum+(Number(l.days??l.hours??0)||0),0);
-      used.textContent=emp?value(days):'—';
+      const cloudConfirmed=typeof p79LeaveCloudDataReady!=='undefined'&&p79LeaveCloudDataReady===true;
+      used.textContent=emp&&cloudConfirmed?value(days):'—';
     }
     tr.append(typ,entitled,used,remaining);quotaBody.append(tr);
    }
