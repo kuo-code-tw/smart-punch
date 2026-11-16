@@ -7788,7 +7788,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         !hasOfficialOvertimeReport&&!actualShift&&!ownApprovedLeave
       )?dayMeta.restCategory:'';
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
-        autoRestLabel||displayShift;
+        autoRestLabel||(shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
       const overtimeLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
         (punchPending&&!hasOfficialOvertimeReport)?'':substituteLabel;
       const proof=ctx.attendanceEvidence?.nightSplitRestConfirmed?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
