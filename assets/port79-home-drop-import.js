@@ -1,6 +1,6 @@
 /* PORT79 homepage automatic Excel routing.
  * Classify workbook signatures only; original Gate/Yard/Vessel pages own all
- * validation, approval, data mutation and persistence. No duplicate importer.
+ * validation, authorized automatic import, data mutation and persistence. No duplicate importer.
  */
 (function(w){
 'use strict';
@@ -120,11 +120,11 @@ function settle(ok){
  resolve(ok===true);
 }
 function confirmImport(message,source){
- if(!busy||!modal.open||source!==frame.contentWindow||approval||!review||!reviewText)return Promise.resolve(false);
- reviewText.textContent=String(message||'');
- review.hidden=false;
- display('請確認原系統的資料覆蓋／匯入內容','pending');
- return new Promise(resolve=>{approval=resolve;yes?.focus();});
+ if(!busy||!modal.open||!canUse()||source!==frame.contentWindow||approval)return Promise.resolve(false);
+ if(reviewText)reviewText.textContent=String(message||'');
+ if(review)review.hidden=true;
+ display('原系統核對完成，正在自動匯入…','info');
+ return Promise.resolve(true);
 }
 function reportImportIssue(message,source){
  if(!busy||source!==frame.contentWindow)return false;
@@ -180,7 +180,7 @@ async function loadOriginal(kind){
    }catch(err){finish(err)}
   };
   frame.onerror=()=>finish(Error('原系統載入失敗'));
-  frame.src=url+'&homeDropVersion=20261115-confirmed-auto-close-v1';
+  frame.src=url+'&homeDropVersion=20261116-auto-import-v2';
  });
 }
 async function runKind(kind,files){

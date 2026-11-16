@@ -14,7 +14,7 @@ assert.match(html,/id="p79HomeImportProgressBar"/);
 assert.match(html,/id="p79HomeImportReviewYes"/);
 assert.match(html,/id="p79HomeImportInput"/);
 assert.match(css,/#p79HomeImportProgressBar/);
-assert.match(html,/port79-home-drop-import.js\?v=20261115-confirmed-auto-close-v1/);
+assert.match(html,/port79-home-drop-import.js\?v=20261116-auto-import-v2/);
 assert(!js.includes('launchSystem('),'no homepage redirect');
 assert(!js.includes('gcSyncAll'),'cloud storage remains with the original importers');
 assert(!js.includes('gateStatsImport'),'no second Gate import implementation');
@@ -106,6 +106,9 @@ Object.defineProperty(frame,'src',{
   }else if(path.includes('/aqc-efficiency/')){
    frame.contentDocument={getElementById:()=>null};
    frame.contentWindow.P79VesselHomeImport={importFiles:async files=>{
+    assert.equal(await host.Port79HomeDropImport.confirmImport('匯入前檢查',frame.contentWindow),true,'validated workbook imports without another question');
+    assert.equal(review.hidden,true,'manual approval controls stay hidden');
+    assert.equal(await host.Port79HomeDropImport.confirmImport('untrusted',{}),false,'unrelated frame cannot auto-approve');
     calls.push(['vessel',files.map(f=>f.name).join(',')]);
     return {processed:files.length,success:files.length,failed:0,cloudConfirmed:vesselVerified,cloudIssue:vesselVerified?'':'雲端資料尚未讀回'};
    }};
@@ -160,11 +163,16 @@ function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Arra
  await host.Port79HomeDropImport.start([corrupt]);
  assert.equal(calls.length,0,'misnamed binary file must not be dispatched to Gate');
  assert.match(status.textContent,/不是正常 Excel 活頁簿/);
+ assert.equal(await host.Port79HomeDropImport.confirmImport('idle',frame.contentWindow),false,'inactive import cannot auto-approve');
  session.set('port79_user_session',JSON.stringify({adminRole:'employee'}));
  host.Port79HomeDropImport.refresh();
  assert.equal(root.hidden,true);
  const n=calls.length;
  zones.vessel.listeners.click();
  assert.equal(calls.length,n,'regular employee cannot trigger uploads');
+ const vesselHtml=fs.readFileSync('aqc-efficiency/index.html','utf8'),at=vesselHtml.indexOf('async function p79HomeConfirmExcelImport('),end=vesselHtml.indexOf('\n}',at)+2;
+ const nativeWindow={};nativeWindow.parent=nativeWindow;let permitted=true,asked=0;
+ const nativeContext={window:nativeWindow,location:{search:''},URLSearchParams,console,requireSuperAdminAccess:()=>permitted,confirm:()=>{asked++;throw Error('native confirmation is forbidden');}};vm.createContext(nativeContext);vm.runInContext(vesselHtml.slice(at,end),nativeContext);
+ assert.equal(await nativeContext.p79HomeConfirmExcelImport('valid report'),true);assert.equal(asked,0,'native file selection imports without prompting');permitted=false;assert.equal(await nativeContext.p79HomeConfirmExcelImport('unauthorized'),false,'direct import retains authorization checks');
  console.log('PASS: detect vessel/yard/gate by workbook contents, delegate to originals, avoid guessed cloud success, reject unknown');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -12151,19 +12151,19 @@ function applyResolvedWorkingNo(summary, imported, resolved){
 }
 
 async function p79HomeConfirmExcelImport(messageText){
- // Embed-only: require explicit approval from the same-origin homepage dialog.
- // Normal vessel management keeps its existing native confirmation.
+ // A user-selected valid workbook is authorized for direct import.
+ // Homepage imports still require the active authenticated same-origin frame.
  if(window.parent!==window&&new URLSearchParams(location.search).get('homeImport')==='1'){
   try{
    if(typeof window.parent.Port79HomeDropImport?.confirmImport!=='function')
-    throw Error('共用匯入確認視窗未就緒');
+    throw Error('首頁自動匯入授權未就緒');
    return await window.parent.Port79HomeDropImport.confirmImport(messageText,window);
   }catch(error){
-   console.warn('首頁船舶匯入確認失敗，安全取消匯入',error);
+   console.warn('首頁船舶自動匯入授權失效，已停止匯入',error);
    return false;
   }
  }
- return confirm(messageText);
+ return requireSuperAdminAccess()===true;
 }
 function p79HomeExcelImportWarning(messageText){
  if(window.parent!==window&&new URLSearchParams(location.search).get('homeImport')==='1'){
@@ -12261,10 +12261,10 @@ async function importExcel(file) {
       `欄位驗證：${audit.reportColumnCheck==='OK'?'✅ 通過':'⚠ '+(audit.reportColumnCheck||'未檢查')}\n`+
       (audit.reportColumns?`WORKING REPORT：時間 ${audit.reportColumns.time}｜姓名 ${audit.reportColumns.name}｜DISC ${audit.reportColumns.disc}｜LOAD ${audit.reportColumns.load}｜H/C ${audit.reportColumns.hatches}｜GPH ${audit.reportColumns.gph}｜Remark ${audit.reportColumns.remark}\n`:'')+
       `AQC：${summary.aqcs.length} 台｜人員作業明細：${imported.length} 筆\n\n`+
-      `確定匯入？`;
-    setExcelImportStage('等待確認匯入',62);
+      `核對完成後自動匯入`;
+    setExcelImportStage('核對完成，自動匯入',62);
     if(!(await p79HomeConfirmExcelImport(msg))){
-      lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'使用者取消匯入',records:imported.length,workingNo:String(summary?.workingNo||'')};
+      lastExcelImportResult={ok:false,file:String(file?.name||''),reason:'匯入授權已變更或匯入流程已關閉',records:imported.length,workingNo:String(summary?.workingNo||'')};
       return;
     }
     // v2026.09.27.7.15：再次匯入時只取代「同一 WORKING NO.」或已由船舶主檔
