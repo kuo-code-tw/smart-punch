@@ -7,8 +7,8 @@ const js=fs.readFileSync('assets/port79-leave-exact-reference.js','utf8');
 const css=fs.readFileSync('assets/port79-leave-exact-reference.css','utf8');
 new vm.Script(js,{filename:'leave-exact-reference.js'});
 assert.equal((css.match(/{/g)||[]).length,(css.match(/}/g)||[]).length);
-assert.match(html,/port79-leave-exact-reference\.js\?v=20261116-reference-match-v1/);
-assert.match(html,/port79-leave-exact-reference\.css\?v=20261116-reference-match-v1/);
+assert.match(html,/port79-leave-exact-reference\.js\?v=20261116-reference-match-v2/);
+assert.match(html,/port79-leave-exact-reference\.css\?v=20261116-reference-match-v2/);
 const assetOrder=html.indexOf('port79-leave-exact-reference.css');
 assert(assetOrder>html.indexOf('port79-management-workspace.css'),'reference rules run after shared workspace');
 assert(assetOrder>html.indexOf('port79-leave-reference-visual.css'),'new rules override the older partial design');
@@ -56,5 +56,7 @@ assert(js.includes("const employeeTab=document.getElementById('tabEmployee')"),
 assert(js.includes("balanceTab.textContent='員工年假剩餘天數'"),
  'requested third annual balance tab retained');
 assert(js.includes("const closeHistory=()=>"),'history tab can return to original approval view');
+assert(js.includes("document.documentElement.classList.remove('p79-leave-balance-only');"),
+ 'history tab exits annual-balance-only mode, retaining the original records table');
 assert(js.includes('tr.hidden=!keep.has(tr)'), 'pagination only toggles row visibility');
 console.log('PASS leave reference visual: header/nav/KPIs/records/quotas/calendar aligned, original operations and cloud data retained');
