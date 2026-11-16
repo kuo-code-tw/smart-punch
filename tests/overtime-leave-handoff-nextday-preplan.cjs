@@ -25,7 +25,7 @@ assert.equal(g.P79Overtime.resolveLeaveCoverReport({...future,leaveCoverAssignme
 assert.equal(g.P79Overtime.normalizeLeaveCoverHandoffEntry(origin,{id:'L1'},mapped).date,tomorrow,
  'already-corrected handoff remains stable');
 
-const begin=leave.indexOf('function p79LeaveHandoffEntryState(');
+const begin=leave.indexOf('function p79LeaveHandoffMatchesOvertime(');
 const end=leave.indexOf('function p79UpdateLeaveHandoffBanner()',begin);
 assert(begin>0&&end>begin,'actual handoff reconciler must exist');
 const code=leave.slice(begin,end);
@@ -72,7 +72,7 @@ async function run(initial,original=origin){
  assert.deepEqual(again.calls,[tomorrow,day],'reverify original approval even for shifted queue');
  const duplicate=JSON.parse(JSON.stringify(origin));
  duplicate.schedules.find(r=>r.empId==='EARLY').schedule.__meta={
-  [day]:{overtimeReport:{id:'WRONG-DAY-ID',category:'延',overtimeStart:'04',overtimeEnd:'08'}}
+  [day]:{overtimeReport:{id:'WRONG-DAY-ID',category:'延',code:'延04-16',leaveId:'L1',overtimeStart:'04',overtimeEnd:'08'}}
  };
  const existing=await run(legacy,duplicate);
  assert.equal(existing.result.entries[0].date,tomorrow);
