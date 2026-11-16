@@ -61,6 +61,10 @@ assert(visual.includes("renderAdminBalances()"),'annual tab uses the original qu
 assert(!visual.includes("adminBalanceBody.innerHTML="),'visual must not replace annual-balance source rows');
 assert(css.includes('html.p79-leave-reference-admin.p79-leave-balance-only #adminMode>div.card'),
  'new annual tab hides just the original records card, not data');
+assert(css.includes('html.p79-leave-reference-admin:not(.p79-leave-balance-only) #adminBalancePanel'),
+ 'original annual table appears ONLY in the new tab, not twice');
+assert(html.includes('port79-leave-reference-visual.css?v=20261116-reference-tab-stroke-v2'));
+assert(html.includes('port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v2'));
 assert(css.includes('html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop.p79-workspace-sidebar'),
  'reference-blue sidebar must style the actual shared workspace sidebar');
 assert(visual.includes('p79LeaveCloudUnverified'),'failed official reads must never be presented as zero records');
