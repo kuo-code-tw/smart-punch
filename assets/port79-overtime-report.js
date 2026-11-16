@@ -1873,32 +1873,21 @@
      if(prefill.leaveHandoffId&&date!==String(prefill.workDate||prefill.date))
       throw Error('原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
        '，實際出勤日 '+String(prefill.workDate||prefill.date)+'；不能把上班日期改成請假日。');
-     if(prefill.leaveHandoffId&&prefill.workdayShiftMismatch===true)
-      throw Error('已核對原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
-       '，但代班人員 '+String(prefill.workDate||prefill.date)+
-       ' 的正式班表不是預期的 '+String(prefill.expectedNormalShift||'')+
-       '班；請核對班表或代班安排，不可改選不相符的加班時段。');
-     // A two-worker split cover must not silently accept an unrelated
-     // extension (e.g. 延20-24/normal24-08 for a 16-24 + 24-04 slot).
+     // Save the selected period. A period differing from the approved
+     // cover split becomes a separate filing, without completing that cover.
      const expected=prefill.leaveHandoffId?prefill.expectedSplitRule:null;
-     if(expected){
-      const sameHour=(a,b)=>Number.isFinite(hour(a))&&Number.isFinite(hour(b))&&hour(a)%1440===hour(b)%1440;
-      if(chosen[0]!=='延'||Number(chosen[2])!==Number(expected.declaredHours)||
-         !sameHour(chosen[4],expected.normalStart)||!sameHour(chosen[5],expected.normalEnd)||
-         !sameHour(chosen[6],expected.overtimeStart)||!sameHour(chosen[7],expected.overtimeEnd))
-       throw Error('原請假日 '+String(prefill.coverDate||prefill.overtimeDate||prefill.date)+
-        ' 的雙人代班預排為正常班 '+expected.normalStart+'-'+expected.normalEnd+
-        '、加班 '+expected.overtimeStart+'-'+expected.overtimeEnd+
-        '（4小時）。目前選擇的 '+String(chosen[1]||'')+
-        ' 時段不符，不能替代申報；請核對代班安排與正式加班時段設定。');
-     }
+     const independentFiling=prefill.independentOvertime===true||
+      !!(prefill.leaveHandoffId&&(prefill.workdayShiftMismatch===true||
+       expected&&!chosenMatchesLeaveSplit(chosen,expected)));
+     if(independentFiling&&chosen[0]==='代')
+      throw Error('代班類型必須符合請假代班關聯；請選擇實際延時或休假日加班的時段。');
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow(),!!prefill.independentOvertime]);
      const selection=selectionKey();
      const validationRequest={empId,date,
-      overtimeDate:prefill.independentOvertime?date:(prefill.overtimeDate||date),
-      coverDate:prefill.independentOvertime?date:(prefill.coverDate||date),
-      leaveHandoffId:prefill.independentOvertime?'':(prefill.leaveHandoffId||'')};
+      overtimeDate:independentFiling?date:(prefill.overtimeDate||date),
+      coverDate:independentFiling?date:(prefill.coverDate||date),
+      leaveHandoffId:independentFiling?'':(prefill.leaveHandoffId||'')};
      // Always read the current official rule table during preflight, including
      // original planned-review edits. Reuse this already verified snapshot
      // instead of performing a second GET after the Save spinner appears.
@@ -1919,14 +1908,14 @@
        throw Error('所選加班類型或時段已從雲端刪除、停用或換算已更新，請重新讀取雲端選項後核對。');
      }
      const selectedCategoryNow=chosen?.[0];
-     if(prefill.independentOvertime===true){
+     if(independentFiling&&chosen[0]==='延'){
       const ownRoster=validation.cloud.schedules.find(row=>
        String(row.empId).trim().toUpperCase()===String(empId).trim().toUpperCase())?.schedule||{};
       const shiftIssue=independentShiftOvertimeIssue(ownRoster[date],chosen);
       if(shiftIssue)throw Error(shiftIssue);
-      if(String(forSelect.value||'')!==''||validationRequest.leaveHandoffId)
-       throw Error('本人延時加班不得關聯原請假代班；請重新開啟申報。');
      }
+     if(independentFiling&&validationRequest.leaveHandoffId)
+      throw Error('本人加班不能錯誤關聯原請假單。');
      if(!editingOriginal&&['休','例','國','延'].includes(selectedCategoryNow)){
       const officialRoster=validation.cloud.schedules.find(row=>String(row.empId).trim().toUpperCase()===String(empId).trim().toUpperCase())?.schedule||{};
       const officialMeta=officialRoster.__meta?.[date]||{};
@@ -1942,7 +1931,7 @@
      const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&chosen?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
-     if(!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
+     if(!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
       date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
       prefill.leaveHandoffId?String(prefill.coverDate||prefill.overtimeDate||''):'');
      if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
@@ -1950,10 +1939,10 @@
      if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
      if(editingExisting&&!(prefill.attendance?.end>prefill.attendance?.start))throw Error('原申報需完成上下班打卡才能確認修改時段；目前只顯示暫估');
      const selectedCategory=chosen[0];
-     const pair=editingOriginal&&!['代','延'].includes(selectedCategory)
+     const pair=independentFiling?{forEmpId:'',forName:''}:editingOriginal&&!['代','延'].includes(selectedCategory)
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
-     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
+     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value||(independentFiling&&prefill.leaveHandoffId?'本人加班（非代班）':''),createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
      try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}
