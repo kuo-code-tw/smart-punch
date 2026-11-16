@@ -1672,6 +1672,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
     <div class="p79-ref-kpi p79-ref-kpi-leave"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-bed"></i></div><div><span>休假人數</span><strong id="p79RefLeaveCount">—</strong><small>依正式班表及核准請假</small></div></div>
     <div class="p79-ref-kpi p79-ref-kpi-cover"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-right-left"></i></div><div><span>加班／代班</span><strong id="p79RefCoverCount">—</strong><small>依今日班表附加紀錄</small></div></div>
   </div>
+  <div id="p79RestAuditLiveStatus" class="p79-rest-audit-live" role="status" aria-live="polite" hidden></div>
 </section>
   <!-- 1~3. 固定頂部控制區：操作列 / 說明 / 頁籤 -->
   <div id="schedule-control-shell" class="sticky top-0 z-50 no-print border-b border-slate-200 dark:border-slate-700">
@@ -7017,6 +7018,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(Math.abs(window.scrollY-savedPageY)>2)window.scrollTo({top:savedPageY,behavior:'instant'});
       applyScheduleAccessUi();
       p79ScheduleLastRenderError='';
+      p79QueueLiveRestQuotaAudit();
     }
 
     let p79ManualScheduleSaveBusy=false;
@@ -8114,20 +8116,98 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const mismatch=['例','休','國'].filter(kind=>hidden[kind]!==after[kind]);
           const extra=Object.entries(result.quota).filter(([kind,n])=>after[kind]>n)
             .map(([kind,n])=>kind+'超額'+(after[kind]-n)+'天');
+          const conflicts=(result.conflicts||[]).map(c=>c.date.slice(-2)+'日 '+c.category+'：'+c.reason);
           const refreshed=['例','休','國'].some(kind=>before[kind]!==after[kind]);
-          if(refreshed||mismatch.length||extra.length||missing.length)totals.needsUpdate++;
+          if(refreshed||mismatch.length||extra.length||missing.length||conflicts.length)totals.needsUpdate++;
           if(missing.length)totals.unresolved++;
-          if(refreshed||missing.length||mismatch.length||extra.length)findings.push(emp.name+'：'+
+          if(refreshed||missing.length||mismatch.length||extra.length||conflicts.length)findings.push(emp.name+'：'+
             '目前 '+['例','休','國'].map(c=>c+before[c]+'天('+((current[c]||[]).map(d=>d.slice(-2)).join('、')||'無')+')').join('／')+
             ' → 重新配對預覽 '+['例','休','國'].map(c=>c+after[c]).join('／')+
             (mismatch.length?'｜配對註記與實際畫面不符：'+mismatch.join('、'):'')+
             (missing.length?'｜'+missing.join('、')+'（未自動建立加班）':'')+
-            (extra.length?'｜'+extra.join('、')+'（須人工確認，不會刪改班別）':''));
+            (extra.length?'｜'+extra.join('、')+'（須核對額外休假日，不會刪改班別）':'')+
+            (conflicts.length?'｜既有班表衝突：'+conflicts.join('、'):'') );
           else totals.complete++;
         }catch(error){totals.blocked++;findings.push(emp.name+'：無法安全配對－'+String(error.message||error));}
       }
       return {totals,findings};
     }
+    // Entire loaded company, not just the visible department/group. This
+    // diagnostic is read-only and automatically scans after cloud/month redraw.
+    // It never changes saved roster, approved leave, attendance or overtime.
+    let p79RestAuditRunId=0,p79RestAuditTimer=null;
+    function p79QueueLiveRestQuotaAudit(){
+      // Detailed cross-unit personnel findings require the existing management
+      // permission; read-only viewers keep their original scoped schedule.
+      if(typeof canManageSchedule==='function'&&!canManageSchedule())return;
+      if(document.documentElement?.dataset?.p79SchedulePage!=='month')return;
+      const target=document.getElementById('p79RestAuditLiveStatus');
+      if(!target)return;
+      const run=++p79RestAuditRunId;
+      clearTimeout(p79RestAuditTimer);
+      target.hidden=false;
+      target.textContent='正在自動核對本月全員例／休／國，並讀取實際日期格…';
+      p79RestAuditTimer=setTimeout(()=>{
+        const month=document.getElementById('month-picker')?.value;
+        if(run!==p79RestAuditRunId||!month||currentScheduleMonthKey()!==month)return;
+        const people=(employees||[]).filter(emp=>{
+          const rows=monthlyScheduleData[emp.id]||{};
+          // Fixed nonrotating staff are not falsely reported as missing 5/4.
+          return Object.keys(rows).some(date=>date.startsWith(month+'-'))||
+            emp.group!=='不輪班';
+        });
+        const exempt=(employees||[]).length-people.length;
+        const totals={checked:0,complete:0,needsUpdate:0,unresolved:0,blocked:0};
+        const findings=[];
+        const error=()=>{
+          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month||
+             document.documentElement?.dataset?.p79SchedulePage!=='month')return;
+          const problems=totals.needsUpdate+totals.blocked;
+          target.classList.toggle('p79-audit-attention',problems>0);
+          const sourceLabel=typeof p79ScheduleHasOfficialData==='function'&&p79ScheduleHasOfficialData()?'正式班表':'本機暫存班表';
+          const title=month+' '+sourceLabel+'全員核對：'+totals.checked+'人已掃描，'+totals.complete+
+            '人符合，'+totals.needsUpdate+'人需核對，'+totals.unresolved+
+            '人配額不足，'+totals.blocked+'人資料未齊'+
+            (exempt?'，'+exempt+'人免排班':'');
+          target.textContent='';
+          const heading=document.createElement('div');
+          heading.className='p79-audit-heading';
+          heading.textContent=title;target.appendChild(heading);
+          const description=document.createElement('small');
+          description.textContent='自動讀取目前已載入資料與顯示日期格。考勤、請假及加班需取得雲端確認；額外休假或申報不會強制改成 5／4，原班表未變更。';
+          target.appendChild(description);
+          if(findings.length){
+            const details=document.createElement('details');
+            details.className='p79-audit-details';
+            const summary=document.createElement('summary');
+            summary.textContent='逐人差異與日期（'+findings.length+'筆）';
+            const pre=document.createElement('pre');
+            pre.textContent=findings.join('\n');
+            details.append(summary,pre);target.append(details);
+          }
+        };
+        let index=0;
+        const step=()=>{
+          if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month||
+             document.documentElement?.dataset?.p79SchedulePage!=='month')return;
+          try{
+            const sample=p79RestQuotaAuditSnapshot(month,people.slice(index,index+4));
+            for(const key of Object.keys(totals))totals[key]+=sample.totals[key]||0;
+            findings.push(...sample.findings);
+            index+=4;
+            if(index<people.length){
+              if(typeof requestIdleCallback==='function')requestIdleCallback(step,{timeout:1800});
+              else setTimeout(step,50);
+            }else error();
+          }catch(e){
+            target.textContent='全員例休國核對暫時無法完成：'+String(e?.message||e);
+            target.classList.add('p79-audit-attention');
+          }
+        };
+        step();
+      },700);
+    }
+
     function p79AuditAllRestQuota() {
       const month=document.getElementById('month-picker')?.value||currentScheduleMonthKey();
       try {
