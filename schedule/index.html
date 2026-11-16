@@ -27,7 +27,7 @@
 <!-- PORT79 2026-10-04 SCHEDULE-COLOR-RESTORE：恢復原班別顏色＋放大字體/格子＋交錯列辨識。 -->
 <!-- PORT79 2026-10-04 TOP-LAYOUT-FINAL：系統名左／七大置中／功能選單右／狀態列下方。 -->
 
-<script src="../assets/port79-rest-allocation.js?v=20261109-zero-national-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
+<script src="../assets/port79-rest-allocation.js?v=20261116-all-staff-pair-v3&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1&noWork=20261106"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261105-night-split-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
@@ -1672,7 +1672,6 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
     <div class="p79-ref-kpi p79-ref-kpi-leave"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-bed"></i></div><div><span>休假人數</span><strong id="p79RefLeaveCount">—</strong><small>依正式班表及核准請假</small></div></div>
     <div class="p79-ref-kpi p79-ref-kpi-cover"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-right-left"></i></div><div><span>加班／代班</span><strong id="p79RefCoverCount">—</strong><small>依今日班表附加紀錄</small></div></div>
   </div>
-  <div id="p79RestAuditLiveStatus" class="p79-rest-audit-live" role="status" aria-live="polite" hidden></div>
 </section>
   <!-- 1~3. 固定頂部控制區：操作列 / 說明 / 頁籤 -->
   <div id="schedule-control-shell" class="sticky top-0 z-50 no-print border-b border-slate-200 dark:border-slate-700">
@@ -7018,7 +7017,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(Math.abs(window.scrollY-savedPageY)>2)window.scrollTo({top:savedPageY,behavior:'instant'});
       applyScheduleAccessUi();
       p79ScheduleLastRenderError='';
-      p79QueueLiveRestQuotaAudit();
     }
 
     let p79ManualScheduleSaveBusy=false;
@@ -7782,8 +7780,15 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // 只改顯示，不覆寫原始排班、加班申報、代班及人工鎖定資料。
       const typhoonScheduledRest=ctx.typhoonDays.has(dayStr)&&['休','例','國'].includes(String(rosterShift).trim())&&!ownApprovedLeave&&!actualShift&&!hasOfficialOvertimeReport;
       const specialNoPunch=specialCandidate;
+      const autoRestLabel=(
+        ['休','例','國'].includes(shiftVal)&&
+        ['auto-v1','auto-excess-v1'].includes(dayMeta?.restAllocationSource)&&
+        ['例','休','國'].includes(dayMeta?.restCategory)&&
+        !originalMeta.restCategoryLocked&&!originalMeta.restAllocationLocked&&
+        !hasOfficialOvertimeReport&&!actualShift&&!ownApprovedLeave
+      )?dayMeta.restCategory:'';
       const shownShift=typhoonScheduledRest?'颱':specialNoPunch||approvedLeaveCode||
-        (shiftVal==='休'&&dayMeta?.restCategory?dayMeta.restCategory:displayShift);
+        autoRestLabel||displayShift;
       const overtimeLabel=typhoonScheduledRest||specialNoPunch||noPunchRest||
         (punchPending&&!hasOfficialOvertimeReport)?'':substituteLabel;
       const proof=ctx.attendanceEvidence?.nightSplitRestConfirmed?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
@@ -8089,7 +8094,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       catch(error){return existing;}
     }
 
-    function p79ApplyAutomaticRestMetadata() {
+    function p79ApplyAutomaticRestMetadata(planned=null) {
       // Re-enable automatic quota metadata persistence ONLY as part of an
       // authorized, already-requested save against the verified cloud month.
       // Never run a stand-alone background month overwrite, or remove the
@@ -8102,9 +8107,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
         'restQuotaOvertime','restAllocationSource','restPreferredCategory','restSegmentSource'];
       let changed=false;
       for(const emp of employees){
+        if(planned&&!planned.has(emp.id))continue;
         const prior=monthlyScheduleMeta[emp.id]||{};
         let plan;
-        try{plan=p79RestAutomaticPlan(emp,month,prior);}
+        try{plan=planned?planned.get(emp.id):p79RestAutomaticPlan(emp,month,prior);}
         catch(error){
           console.warn('自動例休國：班表或來源尚未齊全，略過 '+emp.id,String(error?.message||error));
           continue;
@@ -8275,46 +8281,41 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79AutoAllocateRest() {
       if(!requireScheduleEditLock())return;
       const month=document.getElementById('month-picker').value;
-      // This action explicitly applies to all employees, not the visible role tab.
-      const selected=employees.slice();
-      const results=[],errors=[];
-      for(const emp of selected) {
+      if(month==='2026-10'){
+        showScheduleNotice('2026年10月原始排班仍在安全保護中，不允許整月自動覆寫。','error',7000);
+        return;
+      }
+      // Always inspect the full loaded company, regardless of the selected tab,
+      // unit or group. A missing or incomplete month skips ONLY that person.
+      const plans=new Map(),skipped=[],conflicts=[];
+      for(const emp of employees){
         const schedule=monthlyScheduleData[emp.id]||{};
         const monthDays=Object.keys(schedule).filter(d=>d.startsWith(month+'-'));
-        if(monthDays.length&&monthDays.every(d=>['離','離職'].includes(schedule[d])))continue;
-        if(!monthDays.length){errors.push(emp.name+'：本月沒有班表，不能當作已完成配對');continue;}
-        try {
-          results.push({emp,result:p79RestAutomaticPlan(emp,month)});
-        } catch(error) {errors.push(emp.name+'：'+error.message);}
+        if(!monthDays.length||monthDays.every(d=>['離','離職'].includes(schedule[d]))) {
+          skipped.push(emp.id);continue;
+        }
+        try{
+          const result=p79RestAutomaticPlan(emp,month);
+          plans.set(emp.id,result);
+          if(result.unresolved?.length||result.conflicts?.length)conflicts.push(emp.id);
+        }catch(error){
+          // Do not let an unrostered person block valid employees, and do not
+          // insert fabricated rest dates into an incomplete roster.
+          skipped.push(emp.id);
+          console.warn('全員例休國配對略過未完成班表 '+emp.id,String(error?.message||error));
+        }
       }
-      if(errors.length){alert('全員配對未執行：\n'+errors.join('\n'));return;}
-      const changed=results.filter(({emp,result})=>JSON.stringify(result.meta)!==
-        JSON.stringify(monthlyScheduleMeta[emp.id]||{}));
-      // A successful plan is not proof that a hidden 例 is visible. Verify the
-      // same individual day-cell classifier that the full-staff audit uses.
-      const quota=p79RestQuota(month).counts,shortages=[];
-      for(const {emp,result} of results){
-        try {
-          const visible=p79VisibleRestDayAudit(emp,month,result.meta);
-          const typhoon=new Set(p79TyphoonDates().filter(d=>d.startsWith(month+'-')));
-          const counts=Object.fromEntries(['例','休','國'].map(kind=>
-            [kind,visible[kind].filter(d=>!typhoon.has(d)).length]));
-          const missing=['例','休','國'].filter(kind=>counts[kind]<result.quota[kind])
-            .map(kind=>kind+' '+counts[kind]+'/'+result.quota[kind]);
-          if(missing.length)shortages.push(emp.name+'：'+missing.join('、')+
-            '（已優先補例再補休，剩餘可調整的休假日不足或受正式加班、人工鎖定限制）');
-        }catch(error){shortages.push(emp.name+'：無法核對實際班格 '+String(error.message||error));}
-      }
-      if(changed.length){
-        changed.forEach(({emp,result})=>monthlyScheduleMeta[emp.id]=result.meta);
-        p79MarkScheduleLocalMutation();
-        queueScheduleCloudSave();
-        buildRoleTabsAndRender();
-      }
-      alert(month+' 已重新核對 '+results.length+' 人；實際調整 '+changed.length+' 人。\n'+
-        '配對優先順序：例 → 休 → 國；颱風日固定顯示「颱」，不補例／休／國，也不動正式加班、核准請假及代班。\n'+
-        (shortages.length?'仍不足（請按全員檢查查看日期）：\n'+shortages.join('\n')+'\n':'全部可配日期已按優先順序處理。\n')+
-        (changed.length?'修改已排入雲端儲存，請確認儲存狀態。':'資料沒有變化，未重複寫入雲端。'));
+      // The same protected merger is used for automatic saves and the button:
+      // formal reports, approved leaves, manual locks and cloud shift codes
+      // remain untouched. Only safe classification metadata is persisted.
+      const changed=p79ApplyAutomaticRestMetadata(plans);
+      if(changed)queueScheduleCloudSave();
+      buildRoleTabsAndRender();
+      const summary=month+' 全公司例／休／國配對：'+plans.size+'人已處理，'+
+        skipped.length+'人因無完整班表略過'+
+        (conflicts.length?'，'+conflicts.length+'人仍有鎖定／額度衝突待核對':'')+
+        (changed?'；變更已排入正式雲端儲存，請以儲存狀態確認。':'；沒有需要儲存的新分類。');
+      showScheduleNotice(summary,conflicts.length?'info':'success',9000);
     }
 
     function autoScheduleCurrentTab() {
@@ -9835,4 +9836,4 @@ body[data-p79-system="schedule"] #schedule-cloud-sync-btn{display:inline-flex!im
 </style>
 
 <link rel="stylesheet" href="../assets/port79-schedule-compact-toolbar.css?v=20261024-1">
-<link rel="stylesheet" href="../assets/port79-schedule-reference-design.css?v=20261116-rest-compact-v2">
+<link rel="stylesheet" href="../assets/port79-schedule-reference-design.css?v=20261116-no-audit-banner-v3">
