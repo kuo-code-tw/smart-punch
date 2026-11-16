@@ -72,4 +72,42 @@ assert.deepEqual(plain(ctx.p79RestQuota(month).counts),{例:5,休:4,國:0},'Nove
  assert.deepEqual(count(result.meta),{例:5,休:4,國:0});
  assert.equal(result.meta[day(1)].manualRosterShift,'休');
 }
-console.log('PASS AQC 例休 auto refill, stable reload, explicit manual 例, locks, formal overtime and zero 國 quota');
+// Verify the real monthly roster cell classifier, not only the allocator:
+// the existing renderer already calls automatic metadata at render time,
+// so the user sees 例/休 automatically without clicking 全員自動配對.
+{
+ const html=fs.readFileSync('schedule/index.html','utf8');
+ const extract=name=>{
+  const start=html.indexOf('    function '+name+'('),end=html.indexOf('\n    }',start);
+  assert(start>=0&&end>start,'missing live display function '+name);
+  return html.slice(start,end+6);
+ };
+ const state={window:null,Date,Set,Map,JSON,Math,Array,String,Number,Object,
+  p79RestQuota:ctx.p79RestQuota,p79EmployeeDateEligible:()=>true,
+  monthlyScheduleData:{E1:clone(roster)},monthlyScheduleMeta:{E1:manualRest()},
+  approvedLeaveForEmployee:()=>null,p79ScheduleHasVerifiedPunch:()=>false,
+  p79ScheduleNoPunchRest:()=>false,p79LeaveCoverOnDay:()=>[],
+  p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=>'',p79ScheduleSpecialNoPunchCode:()=>'',p79ScheduleLeaveExportCode:()=>'',scheduleLeaveTypeText:()=> '',
+  p79ConfirmedOvertimeReport:()=>false,scheduleTaipeiTodayKey:()=>day(1)
+ };
+ state.window=state;state.P79RestAttendance={state:()=> 'unknown'};
+ vm.createContext(state);
+ for(const name of ['p79VisibleRestKind','p79ScheduleDisplayDay'])
+  vm.runInContext(extract(name),state);
+ const plan=ctx.p79AllocateRestMonth(roster,manualRest(),month);
+ const evidence={complete:false,actualShifts:{},actualWorkedMinutes:{}};
+ const view={automaticRestMeta:plan.meta,restBalance:{ledger:[]},
+  attendanceEvidence:evidence,attendanceSnapshot:{attendanceEvidence:evidence},
+  typhoonDays:new Set(),electionDays:new Set(),typhoonToday:day(1)};
+ const visible={例:[],休:[],國:[]};
+ for(let n=1;n<=30;n++){
+  const result=state.p79ScheduleDisplayDay({id:'E1'},day(n),view);
+  if(result.visibleRestKind)visible[result.visibleRestKind].push(day(n));
+ }
+ assert.deepEqual(plain(Object.fromEntries(Object.entries(visible).map(([key,value])=>[key,value.length]))),
+  {例:5,休:4,國:0},'actual month grid automatically displays 5 例 and 4 休 without a button click');
+ assert.equal(state.monthlyScheduleData.E1[day(1)],'休','grid uses new category without rewriting the original shift');
+ assert(html.includes('const automaticRestMeta = p79AutomaticRestMetadata(emp.id, yearMonth);'),
+  'live roster calculates classifications automatically during render');
+}
+console.log('PASS AQC 例休 auto refill, visible monthly grid, reload stability, manual locks, formal overtime and zero 國 quota');
