@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'schedule/index.html'
+      - 'tests/schedule-two-pages.cjs'
       - 'tests/schedule-lock-manual-only.cjs'
       - '.github/workflows/schedule-manual-edit-lock.yml'
 permissions:
@@ -17,3 +18,5 @@ jobs:
           node-version: '22'
       - run: node tests/schedule-lock-manual-only.cjs
       - run: node tests/schedule-edit-lock-lane.cjs
+      - run: node tests/schedule-two-pages.cjs
+      - run: node tests/schedule-live-month-scope.cjs
