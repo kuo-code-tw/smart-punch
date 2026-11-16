@@ -1,0 +1,163 @@
+/* PORT79 two-line monthly schedule controls, visual-only.
+ * Existing month/edit buttons, live editor banner, role tabs, filters,
+ * official holiday link, state labels, listeners and Cloud writes untouched.
+ * The source nodes are reparented by port79-schedule-two-line-toolbar.js.
+ */
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar{
+ display:flex!important;flex-direction:column!important;
+ gap:3px!important;align-items:stretch!important;
+ padding:0!important;margin-bottom:5px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar>div[data-p79-compact-vacated="true"]{
+ display:none!important;margin:0!important;padding:0!important;min-height:0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar{
+ display:grid!important;
+ grid-template-columns:max-content minmax(0,1fr)!important;
+ grid-template-rows:minmax(0,1fr)!important;
+ column-gap:7px!important;row-gap:0!important;
+ align-items:center!important;width:100%!important;
+ min-height:42px!important;max-height:48px!important;
+ padding:4px 8px!important;margin:0!important;
+ border-radius:9px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-month{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ flex-wrap:nowrap!important;white-space:nowrap!important;gap:3px!important;
+ grid-column:1!important;grid-row:1!important;
+ max-width:none!important;min-width:0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-actions{
+ display:flex!important;flex-wrap:nowrap!important;align-items:center!important;
+ justify-content:flex-start!important;gap:4px!important;
+ grid-column:2!important;grid-row:1!important;min-width:0!important;
+ width:100%!important;overflow-x:auto!important;overflow-y:hidden!important;
+ scrollbar-width:thin;scrollbar-color:#aec7e8 transparent;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-actions>*{
+ flex:0 0 auto!important;white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-month button,
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-actions>button,
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar :is(.p79-quick-more,.p79-quick-legend)>summary{
+ min-height:31px!important;height:31px!important;
+ padding:4px 7px!important;font-size:11px!important;line-height:20px!important;
+ border-radius:7px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79QuickMonthHost #scheduleRangeControl{
+ min-height:31px!important;height:31px!important;padding:1px 5px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79QuickMonthHost #month-picker{
+ min-height:26px!important;font-size:12px!important;min-width:116px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow{
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(250px,auto)!important;
+ grid-template-rows:34px!important;align-items:center!important;
+ column-gap:7px!important;width:100%!important;min-width:0!important;
+ min-height:38px!important;max-height:42px!important;
+ padding:3px 8px!important;margin:0!important;
+ border:1px solid #c7dcf5!important;border-radius:9px!important;
+ background:rgba(255,255,255,.97)!important;
+ box-shadow:0 2px 8px #11457a0c!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactFilter{
+ grid-column:1!important;grid-row:1!important;min-width:0!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ scrollbar-width:thin;scrollbar-color:#aec7e8 transparent;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactFilter #main-role-tabs-container{
+ display:flex!important;align-items:center!important;flex-wrap:nowrap!important;
+ justify-content:flex-start!important;gap:4px!important;
+ min-height:32px!important;width:max-content!important;min-width:100%!important;
+ padding:0!important;margin:0!important;border:0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactFilter #main-role-tabs-container button{
+ flex:0 0 auto!important;white-space:nowrap!important;
+ min-height:29px!important;height:29px!important;padding:3px 8px!important;
+ font-size:11px!important;line-height:20px!important;border-radius:7px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus{
+ grid-column:2!important;grid-row:1!important;
+ display:flex!important;align-items:center!important;justify-content:flex-end!important;
+ gap:5px!important;white-space:nowrap!important;min-width:0!important;
+ height:32px!important;max-width:min(48vw,660px)!important;
+ overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin;
+ scrollbar-color:#aec7e8 transparent;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #p79ReferenceEditorHost{
+ display:flex!important;flex-wrap:nowrap!important;align-items:center!important;
+ gap:4px!important;min-width:0!important;max-width:none!important;
+ margin:0!important;height:30px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleEditLockStatus{
+ flex:0 0 auto!important;min-height:27px!important;height:27px!important;
+ padding:3px 6px!important;font-size:10px!important;line-height:18px!important;
+ white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleActiveEditorBanner{
+ display:flex!important;flex:0 0 auto!important;align-items:center!important;
+ width:auto!important;min-width:0!important;max-width:none!important;
+ min-height:27px!important;height:27px!important;
+ margin:0!important;padding:2px 4px!important;white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleActiveEditorBanner :is(.schedule-editor-main,.schedule-editor-actions){
+ display:flex!important;align-items:center!important;gap:3px!important;
+ flex:0 0 auto!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleActiveEditorBanner .schedule-editor-sub{
+ display:none!important; /* descriptive second sentence only; primary editor status/action remain */
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleActiveEditorBanner .schedule-editor-title{
+ font-size:10px!important;line-height:18px!important;white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #scheduleActiveEditorBanner button{
+ min-height:25px!important;padding:3px 6px!important;font-size:10px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #schedule-legend-row{
+ flex:0 0 auto!important;display:flex!important;align-items:center!important;
+ width:auto!important;min-height:27px!important;
+ margin:0!important;padding:0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #overall-summary-badge{
+ max-width:150px!important;overflow:hidden!important;text-overflow:ellipsis!important;
+ white-space:nowrap!important;padding:3px 6px!important;font-size:10px!important;
+ line-height:18px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus #p79ScheduleDataSource{
+ display:block!important;flex:0 1 175px!important;
+ max-width:175px!important;min-width:70px!important;
+ white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+ margin:0!important;padding:0!important;
+ font-size:10px!important;line-height:20px!important;
+}
+/* The quick-bar dropdowns still open over the roster, not clipped by the
+   horizontal scrolling action strip: panels are fixed-viewport overlays. */
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar{
+ overflow:visible!important;
+}
+html[data-theme="dark"] body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow,
+html.dark body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow{
+ background:#152943!important;border-color:#3e5674!important;
+}
+@media(max-width:1150px){
+ html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow{
+   grid-template-columns:minmax(0,1fr) minmax(180px,auto)!important;
+ }
+ html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus{
+   max-width:36vw!important;
+ }
+}
+@media(max-width:700px){
+ html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar{
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  padding:4px!important;gap:3px!important;
+ }
+ html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow{
+  grid-template-columns:minmax(0,1fr) minmax(140px,auto)!important;
+  padding:3px 4px!important;gap:3px!important;
+ }
+ html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactStatus{max-width:36vw!important}
+}
+@media print{
+ #p79ScheduleCompactSecondRow{display:none!important}
+}
