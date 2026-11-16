@@ -1,0 +1,446 @@
+/* PORT79 leave-management visual skin, 2026-11-16.
+   The original employee/admin forms, selectors, buttons and underlying data
+   are intact. Only the admin appearance and read-only widgets are styled. */
+html.p79-leave-reference-admin{
+ --p79-leave-ink:#13284f;
+ --p79-leave-blue:#0965e7;
+ --p79-leave-line:#d7e3f3;
+ --p79-leave-surface:#ffffff;
+ --p79-leave-canvas:#f4f7fc;
+}
+html.p79-leave-reference-admin body[data-p79-system="leave"]{
+ padding-left:204px!important;
+ background:linear-gradient(130deg,#f5f9ff 0%,#f7f9fc 48%,#edf4fd 100%)!important;
+ min-height:100vh;
+ color:var(--p79-leave-ink)!important;
+}
+html.p79-leave-reference-admin #p79SevenTop{
+ position:fixed!important;left:0!important;top:0!important;
+ display:flex!important;flex-direction:column!important;
+ width:204px!important;height:100vh!important;max-height:100vh!important;
+ min-height:0!important;z-index:11000!important;
+ border-right:1px solid #2c4264!important;border-bottom:0!important;
+ background:linear-gradient(160deg,#183962 0%,#102746 55%,#162e52 100%)!important;
+ box-shadow:4px 0 16px rgba(21,45,80,.12)!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .top-row{
+ min-height:0!important;display:flex!important;flex-direction:column!important;
+ align-items:stretch!important;justify-content:flex-start!important;
+ gap:16px!important;padding:17px 10px 10px!important;flex:1 1 auto!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .brand{
+ padding:0 7px 17px!important;gap:9px!important;
+ border-bottom:1px solid rgba(215,229,247,.14)!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .logo{
+ width:35px!important;height:35px!important;min-width:35px!important;
+ border-radius:9px!important;font-size:18px!important;
+ background:#1266e8!important;box-shadow:none!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .brand-name{
+ font-size:16px!important;line-height:1.3!important;
+ color:#f6f9ff!important;font-weight:900!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .brand-sub{display:none!important}
+html.p79-leave-reference-admin #p79SevenNav{
+ width:100%!important;display:flex!important;flex:0 1 auto!important;
+ flex-direction:column!important;align-items:stretch!important;
+ justify-content:flex-start!important;gap:5px!important;
+ padding:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+ max-height:calc(100vh - 190px)!important;
+ border:0!important;border-radius:0!important;background:transparent!important;
+}
+html.p79-leave-reference-admin #p79SevenNav a{
+ min-height:48px!important;padding:12px 14px!important;
+ justify-content:flex-start!important;display:flex!important;
+ width:100%!important;flex:0 0 auto!important;border-radius:10px!important;
+ color:#dce9ff!important;white-space:normal!important;
+ font-size:14px!important;line-height:1.35!important;box-shadow:none!important;
+}
+html.p79-leave-reference-admin #p79SevenNav a:hover{background:#284a78!important}
+html.p79-leave-reference-admin #p79SevenNav a.active{
+ background:linear-gradient(90deg,#0965e7,#1873fc)!important;
+ color:#fff!important;box-shadow:0 4px 12px rgba(4,33,83,.18)!important;
+}
+html.p79-leave-reference-admin #p79SevenTop .action{
+ width:100%!important;margin-top:auto!important;
+ display:flex!important;justify-content:stretch!important;
+}
+html.p79-leave-reference-admin #p79SevenMenuWrap{width:100%!important}
+html.p79-leave-reference-admin #p79SevenMenuButton{
+ width:100%!important;min-height:39px!important;
+ padding:9px 10px!important;background:#23496f!important;
+ border-color:#3c6288!important;color:#fff!important;
+}
+html.p79-leave-reference-admin #p79SevenMenuWrap :is(.p79-seven-standard-menu,.p79-seven-default-menu,.p79v103-menu){
+ left:185px!important;right:auto!important;bottom:12px!important;top:auto!important;
+ max-width:min(290px,calc(100vw - 195px))!important;
+}
+html.p79-leave-reference-admin #p79SevenStatus{
+ min-height:0!important;max-height:70px!important;
+ overflow-y:auto!important;display:flex!important;
+ flex-wrap:wrap!important;justify-content:flex-start!important;
+ gap:2px!important;padding:8px!important;
+ background:rgba(5,22,44,.24)!important;
+}
+html.p79-leave-reference-admin #p79SevenStatus .cloud-title{
+ font-size:10px!important;padding:0 3px!important;color:#c9defa!important;
+}
+html.p79-leave-reference-admin #p79SevenStatus .sys{
+ font-size:9px!important;padding:2px 5px!important;border-radius:5px!important;
+}
+html.p79-leave-reference-admin body[data-p79-system="leave"]>main{
+ width:100%!important;max-width:none!important;margin:0!important;
+ padding:0 17px 28px!important;min-width:0!important;
+}
+html.p79-leave-reference-admin #p79LeaveVisualHeading{
+ min-height:70px;display:flex;align-items:center;justify-content:space-between;
+ margin:0 -17px 14px;padding:13px 23px;
+ border-bottom:1px solid #dbe5f4;background:#fff;
+ box-shadow:0 2px 12px rgba(27,58,96,.035);
+}
+.p79-leave-visual-heading{display:none}
+html.p79-leave-reference-admin .p79-leave-visual-heading-title{
+ display:flex;align-items:center;gap:11px;min-width:0;
+}
+html.p79-leave-reference-admin .p79-leave-visual-heading-title>span{
+ display:inline-grid;place-items:center;color:#1367ea;font-size:29px;
+ width:35px;height:39px;
+}
+html.p79-leave-reference-admin .p79-leave-visual-heading-title strong{
+ font-size:27px;letter-spacing:.015em;font-weight:950;color:#0e2856;
+ white-space:nowrap;
+}
+html.p79-leave-reference-admin .p79-leave-visual-heading-title small{
+ color:#8a9bad;font-size:12px;font-weight:700;white-space:nowrap;
+ border-left:1px solid #e4eaf3;padding-left:12px;
+}
+html.p79-leave-reference-admin .p79-leave-visual-heading-right{
+ font-size:12px;color:#64748b;font-weight:750;
+ background:#f7faff;border:1px solid #e1ebf7;border-radius:8px;
+ padding:9px 12px;
+}
+html.p79-leave-reference-admin #globalStatus{
+ border-radius:9px!important;background:#eaf3ff!important;
+ border:1px solid #cbdff9!important;color:#1d4e87!important;
+ margin-bottom:11px!important;padding:8px 12px!important;
+}
+html.p79-leave-reference-admin #globalStatus:empty{display:none!important}
+html.p79-leave-reference-admin #leaveStickyTabs{
+ display:flex!important;position:relative!important;top:auto!important;
+ width:100%!important;max-width:100%!important;
+ padding:0!important;gap:10px!important;margin:0 0 14px!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;backdrop-filter:none!important;
+}
+html.p79-leave-reference-admin #leaveStickyTabs .tab{
+ flex:0 0 auto!important;min-width:190px!important;
+ min-height:46px!important;padding:11px 22px!important;
+ background:#fff!important;color:#19325a!important;
+ border:1px solid #dce6f4!important;border-radius:10px!important;
+ box-shadow:0 2px 5px rgba(40,68,110,.04)!important;
+ font-size:14px!important;font-weight:850!important;
+}
+html.p79-leave-reference-admin #leaveStickyTabs .tab.active{
+ background:linear-gradient(110deg,#0964e6,#117af8)!important;
+ border-color:#0861e2!important;color:#fff!important;
+ box-shadow:0 5px 12px rgba(21,97,228,.16)!important;
+}
+html.p79-leave-reference-admin #adminMode{
+ display:grid!important;grid-template-columns:minmax(0,1fr) 354px!important;
+ gap:15px!important;align-items:start!important;min-width:0!important;
+}
+html.p79-leave-reference-admin #adminMode.hidden{display:none!important}
+.p79-leave-visual-stats,.p79-leave-visual-side{display:none}
+html.p79-leave-reference-admin #p79LeaveVisualStats{
+ grid-column:1/-1;grid-row:1;
+ display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:12px;width:100%;min-width:0;margin:0 0 1px;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat{
+ min-height:95px;display:flex;align-items:center;gap:12px;
+ padding:15px 15px;background:#fff;
+ border:1px solid #dce7f5;border-radius:13px;
+ box-shadow:0 4px 14px rgba(31,65,118,.05);
+ min-width:0;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat-icon{
+ width:47px;height:47px;border-radius:13px;display:grid;place-items:center;
+ flex:0 0 47px;font-size:25px;font-weight:800;
+ background:#e9f2ff;color:#146cef;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat-info{min-width:0;display:block}
+html.p79-leave-reference-admin .p79-leave-visual-stat-title{
+ display:block;color:#17315e;font-size:14px;font-weight:900;white-space:nowrap;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat-amount{
+ display:flex;align-items:baseline;gap:5px;color:#15346a;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat-amount strong{
+ font-size:28px;line-height:1.35;font-weight:950;
+}
+html.p79-leave-reference-admin .p79-leave-visual-stat-amount span{font-size:13px;font-weight:800}
+html.p79-leave-reference-admin .p79-leave-visual-stat-approved .p79-leave-visual-stat-icon{background:#ddfae8;color:#0c9951}
+html.p79-leave-reference-admin .p79-leave-visual-stat-approved .p79-leave-visual-stat-amount{color:#087b40}
+html.p79-leave-reference-admin .p79-leave-visual-stat-rejected .p79-leave-visual-stat-icon{background:#ffe8e8;color:#e01829}
+html.p79-leave-reference-admin .p79-leave-visual-stat-rejected .p79-leave-visual-stat-amount{color:#b91c1c}
+html.p79-leave-reference-admin .p79-leave-visual-stat-month .p79-leave-visual-stat-icon{background:#efe8ff;color:#7858ea}
+html.p79-leave-reference-admin .p79-leave-visual-stat-days .p79-leave-visual-stat-icon{background:#fff1df;color:#e99a25}
+html.p79-leave-reference-admin .p79-leave-visual-stat-days .p79-leave-visual-stat-amount{color:#aa620e}
+html.p79-leave-reference-admin #adminMode > div.card{
+ grid-column:1;grid-row:2;margin:0!important;
+ padding:15px!important;min-width:0!important;
+ border:1px solid #dbe6f4!important;
+ border-radius:12px!important;background:#fff!important;
+ box-shadow:0 4px 15px rgba(21,63,116,.045)!important;
+}
+html.p79-leave-reference-admin #adminMode > div.card > div:first-child{
+ display:flex!important;justify-content:space-between!important;align-items:center!important;
+ border-bottom:1px solid #e9eff7!important;padding-bottom:10px!important;
+ gap:12px!important;
+}
+html.p79-leave-reference-admin #adminMode > div.card h2{
+ color:#15315c!important;font-size:19px!important;
+ font-weight:900!important;margin:0 0 4px!important;
+}
+html.p79-leave-reference-admin #adminMode > div.card .actions{
+ justify-content:flex-start!important;align-items:center!important;gap:7px!important;
+}
+html.p79-leave-reference-admin #adminMode .btn{
+ border-radius:8px!important;min-height:37px!important;
+ padding:8px 12px!important;font-weight:850!important;
+}
+html.p79-leave-reference-admin #adminMode .btn-pri{
+ background:#0969ed!important;color:#fff!important;
+ box-shadow:0 2px 6px rgba(20,94,220,.12)!important;
+}
+html.p79-leave-reference-admin #adminMode .btn-sec{
+ background:#f7faff!important;color:#203f70!important;
+ border:1px solid #d6e3f3!important;box-shadow:none!important;
+}
+html.p79-leave-reference-admin body[data-p79-system="leave"] #adminMode>div.card>.toolbar{
+ display:grid!important;grid-template-columns:repeat(4,minmax(125px,1fr))!important;
+ align-items:end!important;gap:10px!important;
+ padding:13px!important;margin:12px 0 10px!important;
+ border-radius:10px!important;border:1px solid #dce6f5!important;
+ background:#f8fbff!important;box-shadow:none!important;
+}
+html.p79-leave-reference-admin #adminMode .toolbar .field{min-width:0!important;margin:0!important}
+html.p79-leave-reference-admin #adminMode .toolbar label{margin-bottom:5px!important;font-size:12px!important;color:#425c80!important}
+html.p79-leave-reference-admin #adminMode .toolbar select{
+ min-height:41px!important;border:1px solid #ccdbee!important;
+ border-radius:8px!important;background:#fff!important;
+ color:#243b5c!important;font-weight:700!important;font-size:13px!important;
+}
+html.p79-leave-reference-admin #adminLeaveSummary{
+ margin:5px 0 10px!important;color:#637d9e!important;
+ font-size:12px!important;font-weight:750!important;
+}
+html.p79-leave-reference-admin #p79CleanupDeletedLeaveButton{
+ background:#f7faff!important;color:#526b8e!important;
+ border:1px solid #d9e5f2!important;font-size:12px!important;
+}
+html.p79-leave-reference-admin #adminMode .table-wrap{
+ overflow-x:auto!important;max-width:100%!important;
+ border:1px solid #dfe7f2!important;border-radius:10px!important;
+ background:#fff!important;box-shadow:none!important;
+}
+html.p79-leave-reference-admin #adminMode .leave-admin-table{
+ min-width:1130px!important;width:100%!important;
+ border-collapse:separate!important;border-spacing:0!important;
+ font-size:12.5px!important;
+}
+html.p79-leave-reference-admin #adminMode .leave-admin-table th{
+ background:#eaf1fa!important;color:#213d66!important;
+ font-size:12px!important;font-weight:900!important;
+ padding:13px 10px!important;line-height:1.35!important;
+ white-space:nowrap!important;border-bottom:1px solid #dce7f3!important;
+}
+html.p79-leave-reference-admin #adminMode .leave-admin-table td{
+ padding:10px 9px!important;color:#263d5d!important;
+ font-size:12px!important;line-height:1.45!important;
+ border-bottom:1px solid #edf1f7!important;
+ vertical-align:middle!important;
+}
+html.p79-leave-reference-admin #adminMode .leave-admin-table tbody tr:nth-child(even) td{background:#f8fbff!important}
+html.p79-leave-reference-admin #adminMode .leave-admin-table tbody tr:hover td{background:#edf5ff!important}
+html.p79-leave-reference-admin #adminMode .leave-admin-table .actions{flex-wrap:wrap!important;gap:4px!important}
+html.p79-leave-reference-admin #adminMode .leave-admin-table .actions button{
+ min-height:29px!important;padding:6px 8px!important;
+ font-size:11px!important;border-radius:6px!important;
+}
+html.p79-leave-reference-admin #adminMode .badge{
+ border-radius:7px!important;padding:5px 9px!important;
+ font-size:11px!important;font-weight:900!important;
+}
+html.p79-leave-reference-admin #adminMode .p79-leave-type{
+ min-width:66px!important;padding:5px 9px!important;border-radius:7px!important;
+ font-size:11px!important;font-weight:850!important;
+}
+html.p79-leave-reference-admin #adminMode .p79-leave-type-personal{background:#e4f0ff!important;border-color:#b6d8ff!important;color:#1755a0!important}
+html.p79-leave-reference-admin #adminMode .p79-leave-type-sick{background:#fce7f1!important;border-color:#fac0db!important;color:#b31d5b!important}
+html.p79-leave-reference-admin #adminMode .p79-leave-type-marriage{background:#f0e6ff!important;border-color:#cfb5ff!important;color:#6737b5!important}
+html.p79-leave-reference-admin #p79LeaveVisualSide{
+ display:flex!important;flex-direction:column!important;gap:14px!important;
+ grid-column:2;grid-row:2;min-width:0;
+}
+html.p79-leave-reference-admin .p79-leave-visual-panel{
+ background:#fff;border:1px solid #dce6f4;
+ border-radius:13px;padding:15px 13px;
+ box-shadow:0 4px 15px rgba(21,63,116,.05);
+}
+html.p79-leave-reference-admin .p79-leave-visual-panel-head{
+ display:flex;justify-content:space-between;align-items:center;gap:8px;
+ margin-bottom:13px;padding-bottom:9px;border-bottom:1px solid #edf1f7;
+}
+html.p79-leave-reference-admin .p79-leave-visual-panel-head strong{
+ color:#103165;font-size:17px;font-weight:950;white-space:nowrap;
+}
+html.p79-leave-reference-admin .p79-leave-visual-panel-head small{
+ color:#788eab;font-size:11px;font-weight:750;
+}
+html.p79-leave-reference-admin .p79-leave-visual-person-label{margin:0 0 5px!important;font-weight:750!important;color:#405c81!important}
+html.p79-leave-reference-admin #p79LeaveVisualPerson{
+ width:100%;min-height:38px!important;
+ padding:8px 10px!important;border-radius:8px!important;
+ border:1px solid #d5e0ef!important;background:#fafdff!important;
+ color:#1f3c65!important;font-size:12.5px!important;
+}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;
+ margin-top:14px;
+}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid>div{
+ min-width:0;border-radius:9px;padding:12px 4px;
+ background:#f1f7ff;border:1px solid #e1ebfa;text-align:center;
+}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid>div:nth-child(1){background:#eaf8f0;border-color:#dbf4e5}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid>div:nth-child(3){background:#ecfbf0;border-color:#d7f3df}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid small{
+ display:block;color:#627c9c;font-size:10px;font-weight:800;white-space:nowrap;
+}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid strong{
+ display:block;margin-top:5px;color:#0f4279;font-size:16px;font-weight:950;
+ white-space:nowrap;
+}
+html.p79-leave-reference-admin .p79-leave-visual-quota-grid>div:nth-child(3) strong{color:#118244}
+html.p79-leave-reference-admin #p79LeaveVisualQuotaNote{
+ margin:10px 0 0;font-size:11px;line-height:1.5;color:#7185a1;
+}
+html.p79-leave-reference-admin .p79-leave-visual-weekdays,
+html.p79-leave-reference-admin .p79-leave-visual-calendar-grid{
+ display:grid;grid-template-columns:repeat(7,minmax(0,1fr));width:100%;
+}
+html.p79-leave-reference-admin .p79-leave-visual-weekdays{
+ padding:9px 0;border-radius:8px 8px 0 0;
+ background:#ecf2fa;color:#455d7e;
+}
+html.p79-leave-reference-admin .p79-leave-visual-weekdays span{
+ text-align:center;font-size:11px;font-weight:800;
+}
+html.p79-leave-reference-admin .p79-leave-visual-weekdays span:first-child{color:#d43847}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-grid{
+ border:1px solid #edf1f8;border-top:0;
+ border-radius:0 0 8px 8px;overflow:hidden;
+}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-day,
+html.p79-leave-reference-admin .p79-leave-visual-calendar-empty{
+ min-width:0;min-height:38px;display:flex;flex-direction:column;
+ align-items:center;justify-content:center;gap:3px;
+ border-bottom:1px solid #f0f3f9;border-right:1px solid #f0f3f9;
+ background:#fff;
+}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-day strong{font-weight:850;color:#273b5b;font-size:12px}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-day.sunday strong{color:#de4050}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-day.has-leave{background:#f9faff}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-dots{display:flex;gap:3px;align-items:center;justify-content:center}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-dots i,
+html.p79-leave-reference-admin .p79-leave-visual-calendar-legend i{
+ width:7px;height:7px;display:inline-block;border-radius:50%;background:#9aa8bd;
+}
+html.p79-leave-reference-admin i.annual{background:#41c878!important}
+html.p79-leave-reference-admin i.personal{background:#3386f7!important}
+html.p79-leave-reference-admin i.sick{background:#ed66aa!important}
+html.p79-leave-reference-admin i.other{background:#9765ec!important}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-legend{
+ display:flex;justify-content:space-between;gap:4px;flex-wrap:wrap;margin-top:13px;
+ color:#516b8c;font-size:10px;font-weight:800;
+}
+html.p79-leave-reference-admin .p79-leave-visual-calendar-legend span{display:inline-flex;align-items:center;gap:4px}
+html.p79-leave-reference-admin #adminBalancePanel{
+ grid-column:1/-1;grid-row:3;width:100%;
+ border:1px solid #dce6f4!important;border-radius:12px!important;
+ background:#fff!important;box-shadow:0 3px 11px rgba(21,63,116,.045)!important;
+}
+html.p79-leave-reference-admin #adminBalancePanel>summary{
+ font-size:16px!important;color:#1a3b68!important;font-weight:900!important;
+}
+@media(max-width:1450px){
+ html.p79-leave-reference-admin #p79LeaveVisualStats{gap:8px;grid-template-columns:repeat(5,minmax(0,1fr))}
+ html.p79-leave-reference-admin .p79-leave-visual-stat{padding:12px 9px;gap:7px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-icon{flex-basis:35px;width:35px;height:35px;font-size:20px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-title{font-size:12px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-amount strong{font-size:23px}
+ html.p79-leave-reference-admin #adminMode{grid-template-columns:minmax(0,1fr) 300px!important}
+}
+@media(max-width:1120px){
+ html.p79-leave-reference-admin #adminMode{grid-template-columns:minmax(0,1fr)!important}
+ html.p79-leave-reference-admin #adminMode > div.card{grid-column:1;grid-row:2}
+ html.p79-leave-reference-admin #p79LeaveVisualSide{
+  grid-column:1;grid-row:3;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;
+ }
+ html.p79-leave-reference-admin #adminBalancePanel{grid-column:1;grid-row:4}
+ html.p79-leave-reference-admin #p79LeaveVisualStats{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:850px){
+ html.p79-leave-reference-admin body[data-p79-system="leave"]{padding-left:0!important}
+ html.p79-leave-reference-admin #p79SevenTop{
+  position:sticky!important;left:auto!important;top:0!important;
+  width:100%!important;height:auto!important;max-height:none!important;
+  min-height:0!important;border-right:0!important;border-bottom:1px solid #35517c!important;
+ }
+ html.p79-leave-reference-admin #p79SevenTop .top-row{
+  display:flex!important;flex-direction:row!important;
+  align-items:center!important;gap:8px!important;padding:7px!important;flex-wrap:wrap!important;
+ }
+ html.p79-leave-reference-admin #p79SevenTop .brand{padding:0 6px!important;border:0!important;flex:0 0 auto!important}
+ html.p79-leave-reference-admin #p79SevenTop .brand-name{font-size:14px!important}
+ html.p79-leave-reference-admin #p79SevenNav{
+  order:3;flex:1 0 100%!important;display:flex!important;flex-direction:row!important;
+  overflow-x:auto!important;overflow-y:hidden!important;max-height:none!important;
+  align-items:center!important;gap:3px!important;width:100%!important;
+ }
+ html.p79-leave-reference-admin #p79SevenNav a{
+  width:auto!important;min-height:34px!important;white-space:nowrap!important;
+  padding:7px 10px!important;font-size:11px!important;
+ }
+ html.p79-leave-reference-admin #p79SevenTop .action{margin:0 0 0 auto!important;width:auto!important}
+ html.p79-leave-reference-admin #p79SevenMenuButton{min-height:34px!important;width:auto!important}
+ html.p79-leave-reference-admin #p79SevenStatus{display:none!important}
+ html.p79-leave-reference-admin #p79SevenMenuWrap :is(.p79-seven-standard-menu,.p79-seven-default-menu,.p79v103-menu){
+  top:calc(100% + 8px)!important;left:auto!important;right:0!important;bottom:auto!important;
+ }
+ html.p79-leave-reference-admin #p79LeaveVisualStats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ html.p79-leave-reference-admin .p79-leave-visual-heading-right{display:none}
+ html.p79-leave-reference-admin .p79-leave-visual-heading-title small{display:none}
+ html.p79-leave-reference-admin #p79LeaveVisualSide{grid-template-columns:minmax(0,1fr)}
+ html.p79-leave-reference-admin body[data-p79-system="leave"] #adminMode>div.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:560px){
+ html.p79-leave-reference-admin body[data-p79-system="leave"]>main{padding:0 9px 22px!important}
+ html.p79-leave-reference-admin #p79LeaveVisualHeading{margin:0 -9px 10px;padding:10px 13px;min-height:58px}
+ html.p79-leave-reference-admin .p79-leave-visual-heading-title strong{font-size:21px}
+ html.p79-leave-reference-admin #leaveStickyTabs{overflow-x:auto!important}
+ html.p79-leave-reference-admin #leaveStickyTabs .tab{min-width:145px!important;min-height:39px!important;padding:8px 11px!important;font-size:12px!important}
+ html.p79-leave-reference-admin #p79LeaveVisualStats{gap:7px;grid-template-columns:repeat(2,minmax(0,1fr))}
+ html.p79-leave-reference-admin .p79-leave-visual-stat{min-height:75px;padding:9px;gap:7px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-title{font-size:11px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-amount strong{font-size:22px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat-icon{width:32px;height:32px;flex-basis:32px;font-size:19px}
+ html.p79-leave-reference-admin .p79-leave-visual-stat:last-child{grid-column:1/-1}
+ html.p79-leave-reference-admin #adminMode > div.card{padding:10px!important}
+ html.p79-leave-reference-admin body[data-p79-system="leave"] #adminMode>div.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}
+ html.p79-leave-reference-admin #adminMode > div.card > div:first-child{align-items:flex-start!important}
+}
+/* The visual skin does not alter the employee application page, including
+   its original simple mode, hidden elements, application form and permissions. */
