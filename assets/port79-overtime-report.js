@@ -1243,6 +1243,15 @@
    const dateInput=el.querySelector('#p79OtDate'),leaveDateSelect=el.querySelector('#p79OtLeaveDates'),leaveDateWrap=el.querySelector('#p79OtLeaveDatesWrap');
    // Leave day is the accounting date. The actual workDate is independently
    // fixed for official roster and IN/OUT verification; no wrong-day filing.
+   if(prefill.independentOvertime===true){
+    const fixedDate=String(prefill.date||'');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(fixedDate)){
+     dateInput.value=fixedDate;dateInput.min=fixedDate;dateInput.max=fixedDate;
+     dateInput.readOnly=true;
+    }
+    const dateLabel=dateInput.closest?.('label');
+    if(dateLabel?.firstChild?.nodeType===3)dateLabel.firstChild.textContent='本人實際出勤日';
+   }
    if(prefill.leaveHandoffId){
     const workDate=String(prefill.workDate||prefill.date||'');
     const leaveDate=String(prefill.coverDate||prefill.overtimeDate||workDate);
@@ -1407,6 +1416,13 @@
     // against GAS before opening this dialog. Its optional list decoration
     // must not issue a second 16-second month read and fail with AbortError.
     // The Save button still rereads authoritative leave, roster and punches.
+    if(prefill.independentOvertime===true){
+     forSelect.innerHTML='<option value="">不關聯原請假單（本人延時加班）</option>';
+     forSelect.value='';forSelect.disabled=true;
+     if(source)source.textContent='目前依本人正式班別申報加班，原請假代班安排仍待核對；不會當成已完成代班。';
+     leaveVerified=true;leaveVerifiedDate=date;
+     return;
+    }
     if(prefill.leaveHandoffId){
      const approvedDate=String(prefill.coverDate||prefill.overtimeDate||date);
      const found=approvedLeaveDateChoices(leaveRecords,prefill.forEmpId||'').includes(approvedDate);
@@ -1572,7 +1588,7 @@
     select.value=previous!==''&&choices.some(item=>String(item.index)===previous)?previous:'';
     preview();
    };
-   function preview(){const r=selectedRow();const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=['代','延'].includes(r?.[0])?'flex':'none';if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型，請先按「＋新增／管理加班類型與時段」新增類型及時段':!kind.value?'請先選擇加班類型':rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'此加班類型尚未建立出勤時段，請先到加班選項管理新增');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
+   function preview(){const r=selectedRow();const originalLocked=!!(prefill.lockOriginal&&prefill.savedReport&&prefill.reportId);for(const field of [kind,select,el.querySelector('#p79OtPreview')])field.setAttribute?.('data-ot-category',r?.[0]||'');refreshPairPeople();forSelect.disabled=originalLocked||!!prefill.leaveHandoffId||!!prefill.independentOvertime||!['代','延'].includes(r?.[0]);empSelect.disabled=!!prefill.leaveHandoffId&&r?.[0]==='代'&&!(prefill.allowedEmpIds?.length>1);if(empSelect.disabled)empSelect.value=String(prefill.empId||'');el.querySelector('#p79OtForWrap').style.display=prefill.independentOvertime?'none':['代','延'].includes(r?.[0])?'flex':'none';if(prefill.independentOvertime)forSelect.value='';else if(prefill.leaveHandoffId||originalLocked)forSelect.value=String(prefill.forEmpId||'');else if(!['代','延'].includes(r?.[0]))forSelect.value='';el.querySelector('#p79OtPreview').textContent=r&&matches(r)?'出勤時段 '+displayPeriodCode(r)+(r[0]==='延'?'｜正常班 '+r[4]+'-'+r[5]:'')+'｜申報 '+r[2]+' 小時｜換算 '+(r[3]===''?'未設定':r[3]+' 小時'):(!typeOptions(dialogRuleConfig(),rows).length?'雲端尚未新增加班類型，請先按「＋新增／管理加班類型與時段」新增類型及時段':!kind.value?'請先選擇加班類型':rows.some(matches)?'尚未選定出勤時段，請核對班表或實際打卡':'此加班類型尚未建立出勤時段，請先到加班選項管理新增');if(r?.[0]==='代'){const worker=people.find(e=>String(e.empId)===String(empSelect.value)),target=people.find(e=>String(e.empId)===String(forSelect.value));el.querySelector('#p79OtPreview').textContent+='｜代班：'+(worker?.name||'未選擇')+'｜請假：'+(target?.name||'未選擇');}}
    const refreshTypes=()=>{const previous=kind.value,options=typeOptions(dialogRuleConfig(),rows);kind.innerHTML=(options.length?'':'<option value="">尚未新增任何加班類型</option>')+options.map(x=>'<option data-ot-category="'+x.category+'" value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');if(options.some(x=>x.name===previous))kind.value=previous;refresh();};
    function syncApprovedLeaveDate(){
     const forId=String(forSelect.value||'');
