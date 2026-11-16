@@ -38,12 +38,26 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // as statutory rest categories. Reserve those existing labels BEFORE
   // placing any new automatic 例/休/國, or a 5例4休 roster becomes 6例3休.
   // A plain 休 remains flexible, and 0-quota 國 is never reserved.
+  // A legacy bare 例 is movable only when it has no explicit manual category,
+  // formal declaration, substitution or edit lock. Keep the cloud shift as-is:
+  // only this month's effective statutory label changes.
+  const movableExample=date=>{
+    const item=result[date]||{};
+    return String(schedule[date]||'').trim()==='例'&&
+      !excluded.has(date)&&!typhoonProtected.has(date)&&!quotaExempt.has(date)&&
+      !item.restCategoryLocked&&!item.restAllocationLocked&&
+      item.restAllocationSource!=='manual'&&
+      String(item.manualRosterShift||'').trim()!=='例'&&
+      !item.restQuotaOvertime&&!item.overtime&&!item.overtimeReport&&
+      !item.overtimeReports?.length&&!item.forEmpId&&item.type!=='substitute';
+  };
   const fixedRosterRest=date=>{
     const value=String(schedule[date]||'').trim();
     const category=/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
-    return category==='休'&&value==='休'||category==='國'&&noNationalQuota?'':category;
+    return category==='休'&&value==='休'||category==='國'&&noNationalQuota||
+      category==='例'&&movableExample(date)?'':category;
   };
-  const isRestCandidate=date=>schedule[date]==='休'||
+  const isRestCandidate=date=>schedule[date]==='休'||movableExample(date)||
     (noNationalQuota&&schedule[date]==='國')||
     (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
   // Partial-night rest proof comes only from the official dual-source attendance audit.
@@ -72,7 +86,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   }
   // Remove only fields owned by this allocator; preserve manual overtime and substitutions.
   for(const date of dates) {
-    const item=result[date];if(!item||!['auto-v1','roster'].includes(item.restAllocationSource))continue;
+    const item=result[date];if(!item||!['auto-v1','auto-excess-v1','roster'].includes(item.restAllocationSource))continue;
     for(const field of ['restCategory','restSourceDate','restHolidayName','restQuotaOvertime','restAllocationSource'])delete item[field];
     if(!Object.keys(item).length)delete result[date];
   }
@@ -145,7 +159,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[],conflicts=[];
   const available=dates.filter(date=>
     isRestCandidate(date)&&!substitutionDates.has(date)&&!excluded.has(date)&&
-    (!result[date]?.restCategory||flexible.has(date))&&
+    (!result[date]?.restCategory||flexible.has(date)||movableExample(date))&&
     !result[date]?.restAllocationLocked&&!result[date]?.restCategoryLocked&&
     (!result[date]?.overtime||nightSplit(date))&&
     (!result[date]?.overtimeReport||nightSplit(date))&&
@@ -187,7 +201,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       continue;
     }
     const fixedCategory=fixedRosterRest(date);
-    const reservedCategory=fixedCategory||item.restCategory;
+    const reservedCategory=fixedCategory||(movableExample(date)?'':item.restCategory);
     if(!reservedCategory||item.restAllocationSource==='auto-v1'&&!fixedCategory||
        flexible.has(date)&&!fixedCategory||excluded.has(date)||
        item.restQuotaOvertime||!(isRestCandidate(date)||fixedCategory))continue;
@@ -233,16 +247,33 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     pool.sort((a,b)=>{
       const pref=date=>result[date]?.restPreferredCategory==='休'||
         result[date]?.restAllocationSource==='manual'&&result[date]?.restCategory==='休';
-      // Keep original manual 休 as 休 whenever possible. If 例/國
-      // cannot otherwise be filled, those 休 cells are still convertible.
-      const x=(slot.category==='休'?!pref(a):!!pref(a))?1:0;
-      const y=(slot.category==='休'?!pref(b):!!pref(b))?1:0;
+      // Fill the 例 quota from existing movable 例 first. Reassign only
+      // remaining unprotected 例 to missing 休, never the reverse.
+      const rank=date=>slot.category==='例'
+        ?(movableExample(date)?0:pref(date)?2:1)
+        :slot.category==='休'
+          ?(pref(date)||String(schedule[date]).trim()==='休'?0:movableExample(date)?1:2)
+          :0;
+      const x=rank(a),y=rank(b);
       return Number(nightSplit(b))-Number(nightSplit(a))||x-y||
         Math.abs(Number(a.slice(8))-Number(slot.sourceDate.slice(8)))-
         Math.abs(Number(b.slice(8))-Number(slot.sourceDate.slice(8)))||a.localeCompare(b);
     });
     if(pool.length)assign(pool[0],slot);
     else remaining.push(slot);
+  }
+  // More saved 例 days than monthly 例 slots remain genuine off-days.
+  // Mark the editable excess as ordinary 休 rather than invent a work shift
+  // or count the same legacy 例 beyond its quota. Totals may truthfully
+  // exceed the 休 quota; the UI never adds a second-row "超休" marker.
+  for(const date of available){
+    if(used.has(date)||!movableExample(date))continue;
+    const prior=result[date]||{},clean={...prior};
+    for(const field of ['restCategory','restSourceDate','restHolidayName',
+      'restQuotaOvertime','restAllocationSource','restPreferredCategory'])delete clean[field];
+    result[date]={...clean,restCategory:'休',restSourceDate:'',
+      restHolidayName:'',restQuotaOvertime:false,restAllocationSource:'auto-excess-v1'};
+    used.add(date);
   }
   // 未被休假日分配覆蓋的額度只能列為「尚未安排」。
   // 不可在工作日自動建立 restQuotaOvertime；只有明確申報／人工安排才有加班。
