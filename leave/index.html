@@ -1091,12 +1091,12 @@ async function p79BuildLeaveCoverWorkdayEntries(leaveId,leaveEmpId,assignments){
    if(!leaveShift)throw Error('找不到 '+coverDate+' 請假員工的原班別；代班安排已儲存，申報日期需人工核對');
   }
   for(const [index,empId] of ids.entries()){
-   const plan=window.P79LeaveCoverSuggest?.coverWorkday?.(coverDate,leaveShift,mode,index);
+   const plan=window.P79LeaveCoverSuggest?.coverWorkday?.(coverDate,leaveShift,mode,index,'same-day');
    const emp=employees.find(e=>norm(e.empId)===norm(empId));
    entries.push({empId,name:emp?.name||empId,date:plan?.workDate||coverDate,
     workDate:plan?.workDate||coverDate,overtimeDate:plan?.overtimeDate||plan?.workDate||coverDate,
     coverDate,coverShift:leaveShift,forEmpId:String(leaveEmpId),
-    ...(plan?{code:plan.code,preferredType:'平日延時加班'}:{})});
+    ...(plan?{code:plan.code,periodMode:plan.periodMode,expectedOvertimeStart:plan.overtimeStart,expectedOvertimeEnd:plan.overtimeEnd}:{})});
   }
  }
  return entries;
@@ -1653,8 +1653,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261116-sameday-4h-stroke-v1"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261116-sameday-4h-stroke-v1"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -1715,7 +1715,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
 
-<script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
+<script src="../assets/port79-leave-cover-suggest.js?v=20261116-sameday-4h-v1"></script>
 <script>
 let p79CreateDailyPlan=new Map();
 function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
@@ -1966,7 +1966,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v2&recovery=20261113-r3&saveguard=20261116a&ownshift=20261116b&selected=20261116c&next=20261116d"></script>
+<script src="../assets/port79-overtime-report.js?v=20261116-sameday-4h-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -2277,7 +2277,7 @@ async function p79OpenLeaveOvertimeHandoff(autoContinue=false){
   const entryType=String(e.preferredType||'').trim();
   const selectedCategories={休息日加班:'休',平日延時加班:'延',國定假日加班:'國',例假加班:'例'};
   const entryCategory=selectedCategories[entryType]||'';
-  const requestedType=entryCategory?[entryCategory,entryType]:perPersonType;
+  const requestedType=period.sameDayCover?null:entryCategory?[entryCategory,entryType]:perPersonType;
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;
