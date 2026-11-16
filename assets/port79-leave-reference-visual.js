@@ -100,14 +100,28 @@ function init(){
    return !!start&&start<=last&&end>=m+'-01';
  };
  const color=t=>/特休|年假/.test(String(t||''))?'annual':/事假/.test(String(t||''))?'personal':/病假|傷病/.test(String(t||''))?'sick':'other';
+ // The dropdown is only a read-only view of the existing HR roster.
+ // Sort the NAME by Traditional-Chinese stroke count (not phonetic, insertion
+ // order or employee number); display the actual job title beside the name.
+ const leaveStrokeCollator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true,sensitivity:'variant'});
+ const personTitle=x=>String(x?.jobTitle||x?.deptDetail||x?.position||'未設定職稱').trim();
+ const personName=x=>String(x?.name||x?.empName||x?.empId||'').trim();
  function updatePeople(){
-   const shown=people().filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&permitted(x));
-   const sig=shown.map(x=>x.empId+'|'+x.name).join(';');
+   const shown=people()
+    .filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&permitted(x))
+    .slice().sort((a,b)=>leaveStrokeCollator.compare(personName(a),personName(b))||
+      leaveStrokeCollator.compare(personTitle(a),personTitle(b))||
+      String(a.empId).localeCompare(String(b.empId),'zh-TW',{numeric:true}));
+   const sig=shown.map(x=>x.empId+'|'+personName(x)+'|'+personTitle(x)).join(';');
    if(sig===personSelect.dataset.sourceSignature)return;
    const previous=personSelect.value;personSelect.dataset.sourceSignature=sig;
    personSelect.replaceChildren();
-   const choose=document.createElement('option');choose.value='';choose.textContent='請選擇人員';personSelect.append(choose);
-   shown.forEach(x=>{const opt=document.createElement('option');opt.value=String(x.empId);opt.textContent=String(x.name||x.empId)+'（'+x.empId+'）';personSelect.append(opt);});
+   const choose=document.createElement('option');choose.value='';choose.textContent='請選擇人員（姓名依繁體中文筆畫排序）';personSelect.append(choose);
+   shown.forEach(x=>{
+     const opt=document.createElement('option');opt.value=String(x.empId);
+     opt.textContent=personTitle(x)+'｜'+personName(x)+'（'+x.empId+'）';
+     personSelect.append(opt);
+   });
    if(shown.some(x=>String(x.empId)===previous))personSelect.value=previous;
  }
  const showDays=(id,n)=>{
