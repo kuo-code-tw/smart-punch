@@ -38,16 +38,23 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // as statutory rest categories. Reserve those existing labels BEFORE
   // placing any new automatic 例/休/國, or a 5例4休 roster becomes 6例3休.
   // A plain 休 remains flexible, and 0-quota 國 is never reserved.
-  // A legacy bare 例 is movable only when it has no explicit manual category,
-  // formal declaration, substitution or edit lock. Keep the cloud shift as-is:
-  // only this month's effective statutory label changes.
+  // User-picked 例 is stored as raw 休 plus
+  // {manualRosterShift:'例', restCategory:'例', source:'manual'}.
+  // Previous versions incorrectly treated all those entries as immutable.
+  // A choice is NOT a lock: only explicit locks, formal reports, leave/cover
+  // and verified work protect it from reconciling a monthly 例 surplus.
+  const isSavedExample=date=>{
+    const value=String(schedule[date]||'').trim(),item=result[date]||{};
+    return /^(例)(?=$|[0-9])/.test(value)||
+      value==='休'&&(String(item.manualRosterShift||'').trim()==='例'||
+        item.restAllocationSource==='manual'&&item.restCategory==='例');
+  };
+  let hasExampleSurplus=false;
   const movableExample=date=>{
-    const item=result[date]||{};
-    return String(schedule[date]||'').trim()==='例'&&
+    const item=result[date]||{},value=String(schedule[date]||'').trim();
+    return hasExampleSurplus&&isSavedExample(date)&&['例','休'].includes(value)&&
       !excluded.has(date)&&!typhoonProtected.has(date)&&!quotaExempt.has(date)&&
       !item.restCategoryLocked&&!item.restAllocationLocked&&
-      item.restAllocationSource!=='manual'&&
-      String(item.manualRosterShift||'').trim()!=='例'&&
       !item.restQuotaOvertime&&!item.overtime&&!item.overtimeReport&&
       !item.overtimeReports?.length&&!item.forEmpId&&item.type!=='substitute';
   };
@@ -72,6 +79,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const dates=allDates.filter(d=>(!employmentStart||d>=employmentStart)&&(!employmentEnd||d<employmentEnd));
   quota.slots=quota.slots.filter(s=>(!employmentStart||s.sourceDate>=employmentStart)&&(!employmentEnd||s.sourceDate<employmentEnd));
   quota.counts=quota.slots.reduce((a,s)=>(a[s.category]++,a),{'例':0,'休':0,'國':0});
+  hasExampleSurplus=dates.filter(date=>isSavedExample(date)&&
+    !excluded.has(date)&&!typhoonProtected.has(date)&&!quotaExempt.has(date)).length>quota.counts.例;
   if(dates.some(d=>!schedule[d]))throw new Error('本月有未排班日期，請補齊班表後再配對');
   // Clear stale unapproved national classifications on the calculation copy.
   // Never rewrite the saved roster or a locked/confirmed report.
@@ -154,7 +163,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
        (!nightSplit(date)&&(item.overtime||item.overtimeReport||item.overtimeReports?.length||
        item.forEmpId||item.type==='substitute')))continue;
     if(item.restCategory==='休'||item.restPreferredCategory==='休'||
-       item.restCategory==='國'&&nationalBlocked.has(date))flexible.add(date);
+       item.restCategory==='國'&&nationalBlocked.has(date)||
+       movableExample(date))flexible.add(date);
   }
   const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[],conflicts=[];
   const available=dates.filter(date=>
@@ -171,7 +181,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     // 例/國, work shifts, confirmed overtime, or locked records.
     (!result[date]?.manualRosterShift||
       String(result[date].manualRosterShift).trim()==='休'&&
-        String(schedule[date]||'').trim()==='休'||nightSplit(date))&&
+        String(schedule[date]||'').trim()==='休'||movableExample(date)||nightSplit(date))&&
     !result[date]?.restQuotaOvertime);
   // Only a non-revoked formal report can consume an unworked rest quota
   // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
@@ -252,7 +262,8 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       const rank=date=>slot.category==='例'
         ?(movableExample(date)?0:pref(date)?2:1)
         :slot.category==='休'
-          ?(pref(date)||String(schedule[date]).trim()==='休'?0:movableExample(date)?1:2)
+          ?(movableExample(date)?2:pref(date)||
+            String(schedule[date]).trim()==='休'?0:1)
           :0;
       const x=rank(a),y=rank(b);
       return Number(nightSplit(b))-Number(nightSplit(a))||x-y||
