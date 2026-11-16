@@ -132,7 +132,7 @@
    ((jobFilter||nameFilter)?'（篩選不影響已勾選人員）':'');
   const totalText='合計 '+(valid.length*(mode==='two'?4:8))+' / 8 小時';
   const quickStatus=valid.length===wanted?
-   '✓ 已選好 '+wanted+' 位，預排 '+(mode==='two'?'各 4':'8')+' 小時（加班另核對）':
+   '✓ 已選好 '+wanted+' 位，預排'+(mode==='two'?'每人 4':' 8')+' 小時（加班另核對）':
    '請選擇 '+wanted+' 位代班人員（已選 '+valid.length+' 位）';
   return '<div class="p79-smart-cover-picker" data-smart-date="'+esc(date)+'" data-smart-scope="'+esc(scope)+'">'+
    '<div class="p79-smart-cover-toolbar"><span class="p79-smart-cover-caption">代班方式</span>'+
