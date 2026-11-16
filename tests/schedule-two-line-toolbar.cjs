@@ -36,6 +36,14 @@ class Node{
  }
  append(...nodes){nodes.forEach(n=>this.appendChild(n));}
  setAttribute(k,v){this.attributes[k]=v;}
+ querySelector(selector){
+  if(selector!=='.p79-quick-actions')throw Error('unexpected query '+selector);
+  return this.children.find(x=>x.id==='original-actions')||null;
+ }
+ querySelectorAll(selector){
+  if(selector!==':scope > details')throw Error('unexpected query '+selector);
+  return this.children.filter(x=>x.tagName==='DETAILS');
+ }
  closest(selector){
   if(selector!=='#schedule-control-shell > div')throw Error('unexpected selector '+selector);
   let x=this;
@@ -60,10 +68,12 @@ const shell=make('schedule-control-shell'),
  legendWrap=make('legacy-legend-wrap'),legend=make('schedule-legend-row'),
  badge=make('overall-summary-badge'),tabsWrap=make('legacy-tabs-wrap'),
  roles=make('main-role-tabs-container'),month=make('p79QuickMonthHost'),
- actions=make('original-actions');
+ actions=make('original-actions'),more=make('original-more','DETAILS'),
+ legendMenu=make('original-legend','DETAILS');
 shell.append(header);shell.append(quick);shell.append(editor);
 shell.append(legendWrap);shell.append(tabsWrap);
 quick.append(month);quick.append(actions);quick.append(source);
+actions.append(more);actions.append(legendMenu);
 editor.append(lock);editor.append(banner);
 legendWrap.append(legend);legend.append(badge);
 tabsWrap.append(roles);
@@ -92,6 +102,10 @@ assert.equal(lock.parentElement,editor,'lock status remains in its original host
 assert.equal(banner.parentElement,editor,'real edit-lock actions remain with editor host');
 assert.equal(month.parentElement,quick,'real month input stays live');
 assert.equal(actions.parentElement,quick,'real action controls stay live');
+const dropdowns=quick.children.find(x=>x.id==='p79ScheduleCompactDropdowns');
+assert(dropdowns,'dropdowns remain outside the scroll-clipped action strip');
+assert.equal(more.parentElement,dropdowns,'original More menu and handlers preserved');
+assert.equal(legendMenu.parentElement,dropdowns,'original Legend remains openable');
 assert.equal(legendWrap.attributes['data-p79-compact-vacated'],'true');
 assert.equal(tabsWrap.attributes['data-p79-compact-vacated'],'true');
 for(const [id,originalNode] of Object.entries(original))assert.equal(nodes.get(id),originalNode,'no replacement of original '+id);
