@@ -21,11 +21,12 @@ if(!window.p79LegacyFlushCloudOutbox&&typeof window.flushCloudOutbox==='function
   window.p79LegacyFlushCloudOutbox=window.flushCloudOutbox;
 }
 // 刪除失敗不應每 15 秒重新佔用 GAS；保留資料並採漸進退避（5分鐘至1小時）。
-function p79AttendanceRetryDelay(payload, attempts) {
+function p79AttendanceRetryDelay(payload, attempts, error=null) {
   if(String(payload?.action||'')==='deleteRecord'){
     return Math.min(3600000, Math.max(300000, 300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4))));
   }
   if (['updateRecord','editRecord'].includes(String(payload?.action||''))) {
+    if(p79TransientAttendanceError(error))return Math.min(60000,15000*Math.pow(2,Math.min(Math.max(0,attempts-1),2)));
     return Math.min(3600000,300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4)));
   }
   if(['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(String(payload?.action||''))) {
@@ -785,7 +786,7 @@ async function drain(force=false){
         cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
         cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
-        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts,err);
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
         currentOpText=cur.paused?'已暫停，等待核對':'等待重試';
@@ -865,7 +866,7 @@ async function drainFast(force=true, concurrency=4){
       cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
       cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
-        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts,err);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
       return {ok:false,item,error:err,retryable:true};
     }
@@ -1311,7 +1312,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
         current.attempts=Number(current.attempts||0)+1;
         current.lastError=reason;current.lastFailureRetryable=err?.retryable!==false;current.state='pending';
         current.paused=p79PauseAttendanceWrite(payload,err,current.attempts);
-        current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(payload,current.attempts);
+        current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(payload,current.attempts,err);
         saveQueue(readQueue().map(x=>x.key===current.key&&samePayload(x.payload,payload)?current:x));
       }
       currentOpText=current?.paused?'已暫停，等待核對':'等待自動重試';
@@ -1406,6 +1407,15 @@ function p79ResumeTransientAttendanceEdits(){
   }
   if(changed)saveQueue(q);
 }
+function p79ShortenTransientEditRetryWait(){
+  const q=readQueue(),now=Date.now();let changed=false;
+  for(const item of q){
+    if(item?.paused||item?.state==='syncing'||!['updateRecord','editRecord'].includes(String(item?.payload?.action||'')))continue;
+    if(item.lastFailureRetryable===false||!p79TransientAttendanceError(item.lastError))continue;
+    if(Number(item.nextRetryAt||0)>now+30000){item.nextRetryAt=now+30000;changed=true;}
+  }
+  if(changed)saveQueue(q);
+}
 function p79ShortenOldPunchRetryWait(){
   // 只修正舊版留下的過長 nextRetryAt；保留所有 payload/ID/attempts，不重送 paused 項目。
   const q=readQueue(), now=Date.now();
@@ -1420,6 +1430,7 @@ function p79ShortenOldPunchRetryWait(){
 document.addEventListener('DOMContentLoaded',()=>{
   p79PruneVerifiedDeletedRecordRetries20261010();
   p79ResumeTransientAttendanceEdits();
+  p79ShortenTransientEditRetryWait();
   p79ShortenOldPunchRetryWait();
   updateUi();
   startDelta();
@@ -1428,7 +1439,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 },{once:true});
 window.addEventListener('online',()=>{drain(true);pollDelta(true)});
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden){drain(false);pollDelta(true)}
+  if(!document.hidden){p79ShortenTransientEditRetryWait();drain(false);pollDelta(true)}
 });
 setInterval(()=>{if(!writing&&readQueue().some(x=>!x.paused))drain(false)},5000);
 

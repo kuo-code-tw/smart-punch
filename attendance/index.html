@@ -24444,7 +24444,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-transient-recovery-v1"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2"></script>
 
 
 
@@ -25178,6 +25178,9 @@ function show(autoReview=true){
    const attempts=entry?.attempts??entry?.retries??0;
    const rawState=String(entry?.state||'pending').toLowerCase();
    const state=entry?.paused?'已暫停，等待人工核對':({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
+   const retryAt=Number(entry?.nextRetryAt||0);
+   const retryText=!entry?.paused&&rawState!=='syncing'&&Number.isFinite(retryAt)&&retryAt>0&&retryAt<Number.MAX_SAFE_INTEGER
+     ? (retryAt>Date.now()?'下次重試：'+new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(retryAt))+'（台灣時間）':'已到重試時間，等待同步程序處理') : '';
    const rawError=String(entry?.lastError||entry?.error||'');
    let error='尚無錯誤資訊';
    if(rawError){
@@ -25187,7 +25190,7 @@ function show(autoReview=true){
    }
    const recordId=String(p.id??p.record?.id??entry?.recordId??'').trim();
    if(key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))shownDrafts.set(entry.key,JSON.parse(JSON.stringify(p)));
-   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(names[action]||action)+(recordId?' <small style="color:#64748b">（紀錄ID '+safe(recordId)+'）</small>':'')+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+'</td><td>'+safe(error)+'</td><td>'+((key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))?'<button type="button" data-review-key="'+safe(encodeURIComponent(entry.key))+'">核對並處理</button><button type="button" data-withdraw-key="'+safe(encodeURIComponent(entry.key))+'">撤回修改</button>':'—')+'</td></tr>';
+   html+='<tr><td>'+String(i+1)+'</td><td>'+safe(names[action]||action)+(recordId?' <small style="color:#64748b">（紀錄ID '+safe(recordId)+'）</small>':'')+'</td><td>'+safe(attempts)+'</td><td>'+safe(state)+(retryText?'<br><small>'+safe(retryText)+'</small>':'')+'</td><td>'+safe(error)+'</td><td>'+((key==='port79_attendance_v5_outbox'&&entry.paused&&['updateRecord','editRecord'].includes(action))?'<button type="button" data-review-key="'+safe(encodeURIComponent(entry.key))+'">核對並處理</button><button type="button" data-withdraw-key="'+safe(encodeURIComponent(entry.key))+'">撤回修改</button>':'—')+'</td></tr>';
   });
   html+='</tbody></table>';
  }
