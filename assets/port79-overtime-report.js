@@ -1561,7 +1561,7 @@
     }
     if(!forId)return;
     if(prefill.leaveHandoffId){
-     dateInput.value=prefill.date||'';
+     dateInput.value=String(prefill.workDate||prefill.date||'');
      const originalLeaveDate=String(prefill.coverDate||dateInput.value);
      if(approvedDates.includes(originalLeaveDate))leaveDateSelect.value=originalLeaveDate;
      leaveDateSelect.disabled=true;
