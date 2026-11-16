@@ -9641,7 +9641,10 @@ async function p79SelectSchedulePage(next,{updateUrl=true}={}){
   // Hidden tables measure zero width: rerender only after the page is visible
   // so the original sticky name column and horizontal scroll remain aligned.
   requestAnimationFrame(()=>{
-   if(typeof renderRoleScheduleView==='function')renderRoleScheduleView();
+   // The reference month page opens the full personnel grid by default,
+   // while preserving any unit selection explicitly made by the user.
+   if(typeof activeRoleTab!=='undefined'&&!activeRoleTab&&typeof switchRoleTab==='function')switchRoleTab('ALL');
+   else if(typeof renderRoleScheduleView==='function')renderRoleScheduleView();
    window.dispatchEvent(new Event('resize'));
   });
  }
@@ -9662,6 +9665,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  if(typeof todayScheduleExpanded!=='undefined'&&page==='daily')todayScheduleExpanded=true;
  p79ScheduleRefreshPageNav();
  if(page==='daily'&&typeof renderTodaySchedulePanel==='function')renderTodaySchedulePanel();
+ if(page==='month'&&typeof activeRoleTab!=='undefined'&&!activeRoleTab&&typeof switchRoleTab==='function')switchRoleTab('ALL');
 });
 </script>
 
