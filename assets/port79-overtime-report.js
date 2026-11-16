@@ -524,6 +524,7 @@
    const ownShift=[own[date],own.__meta?.[date]?.reportOriginalShift,own.__meta?.[date]?.overtimeOriginalShift]
     .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
+    workdayShiftMismatch:true,expectedNormalShift:split.normalShift,
     overtimeDate:split.overtimeDate,workDate:split.workDate,
     periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；出勤日 '+split.workDate+'，加班歸屬 '+split.overtimeDate+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
    return {code:split.code,requirePeriodSelection:false,overtimeDate:split.overtimeDate,workDate:split.workDate,
@@ -1108,9 +1109,15 @@
   }
   return [...dates].sort();
  }
- function validateLeaveLinkedOvertimeDate(date,forEmpId,allowedDates,handoffDate=''){
+ function validateLeaveLinkedOvertimeDate(date,forEmpId,allowedDates,handoffDate='',coverDate=''){
   if(handoffDate){
-   if(date!==handoffDate)throw Error('請假代班申報日期不可變更；原請假／代班日期是 '+handoffDate+'，請重新從請假紀錄開啟。');
+   // A two-person night cover credits the original approved leave date, while
+   // roster and punch checks must use the worker's actual (possibly next) day.
+   if(date!==handoffDate)throw Error('代班實際出勤日應為 '+handoffDate+
+    '；原請假／加班歸屬日為 '+(coverDate||handoffDate)+
+    '。兩者不可混用，請重新從請假紀錄開啟。');
+   if(coverDate&&allowedDates.length&&!allowedDates.includes(coverDate))
+    throw Error('請假人員的核准請假日期不包含 '+coverDate+'；請回請假紀錄重新核對，不可改成代班出勤日。');
    return;
   }
   if(!forEmpId)return;
@@ -1221,6 +1228,25 @@
     if(prefill.manualPlan===true&&prefill.pickDateExplicitly===true)el.querySelector('#p79OtDate').value='';
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
    const dateInput=el.querySelector('#p79OtDate'),leaveDateSelect=el.querySelector('#p79OtLeaveDates'),leaveDateWrap=el.querySelector('#p79OtLeaveDatesWrap');
+   // Leave day is the accounting date. The actual workDate is independently
+   // fixed for official roster and IN/OUT verification; no wrong-day filing.
+   if(prefill.leaveHandoffId){
+    const workDate=String(prefill.workDate||prefill.date||'');
+    const leaveDate=String(prefill.coverDate||prefill.overtimeDate||workDate);
+    const creditDate=String(prefill.overtimeDate||leaveDate);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(workDate)){
+     dateInput.value=workDate;dateInput.min=workDate;dateInput.max=workDate;
+     dateInput.readOnly=true;
+     dateInput.title='實際出勤日期 '+workDate+' 已固定；加班歸屬日依原請假日計算';
+    }
+    const dateLabel=dateInput.closest?.('label');
+    if(dateLabel?.firstChild?.nodeType===3)dateLabel.firstChild.textContent='實際出勤日期';
+    dateLabel?.insertAdjacentHTML?.('beforeend',
+     '<span class="block text-xs font-bold text-blue-800" style="margin-top:5px">'+
+     '請假日 '+esc(leaveDate.replaceAll('-','/'))+
+     '｜加班歸屬日 '+esc(creditDate.replaceAll('-','/'))+
+     (creditDate!==workDate?'（實際出勤為隔日）':'')+'</span>');
+   }
    let leaveRecords=global.p79OvertimeContext?.approvedLeaves?.()||[];
    let leaveCandidateEpoch=0,leaveVerifiedDate='',leaveVerified=false;
    let approvedDates=[];
@@ -1597,7 +1623,13 @@
    forSelect.onchange=()=>{syncApprovedLeaveDate();preview();void refreshOfficialRosterHint();};
    leaveDateSelect.onchange=()=>{if(prefill.leaveHandoffId)return;dateInput.value=leaveDateSelect.value;refresh();void refreshOfficialRosterHint();};
    empSelect.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterEmployee='';refresh();suggestBySelectedRole();leaveVerified=false;void refreshOfficialLeaveCandidates();void refreshOfficialRosterHint();};
-   dateInput.onchange=()=>{manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();leaveVerified=false;void refreshOfficialLeaveCandidates();void refreshOfficialRosterHint();};
+   dateInput.onchange=()=>{if(prefill.leaveHandoffId){
+     dateInput.value=String(prefill.workDate||prefill.date||'');
+     el.querySelector('#p79OtStatus').textContent='請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
+      '；實際出勤日 '+String(prefill.workDate||prefill.date)+' 固定，不能改成請假日期。';
+     return;
+    }
+    manuallySelectedType=false;manuallySelectedPeriod=false;lastOfficialShift='';lastRosterDate='';if(forSelect.value&&approvedDates.length)leaveDateSelect.value=approvedDates.includes(dateInput.value)?dateInput.value:'';refresh();leaveVerified=false;void refreshOfficialLeaveCandidates();void refreshOfficialRosterHint();};
    refreshTypes();el.querySelector('#p79OtStatus').textContent=typeOptions(dialogRuleConfig(),rows).length?'請選擇員工、日期與出勤時段。':'雲端目前沒有可用的加班類型。請按下方「＋新增／管理加班類型與時段」，先新增類型，再設定出勤時段。';
    if(prefill.empId||prefill.forEmpId){
     el.querySelector('#p79OtDate').value=prefill.date||el.querySelector('#p79OtDate').value;
@@ -1771,6 +1803,14 @@
     try{const chosen=selectedRow();if(!chosen)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
+     if(prefill.leaveHandoffId&&date!==String(prefill.workDate||prefill.date))
+      throw Error('原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
+       '，實際出勤日 '+String(prefill.workDate||prefill.date)+'；不能把上班日期改成請假日。');
+     if(prefill.leaveHandoffId&&prefill.workdayShiftMismatch===true)
+      throw Error('已核對原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
+       '，但代班人員 '+String(prefill.workDate||prefill.date)+
+       ' 的正式班表不是預期的 '+String(prefill.expectedNormalShift||'')+
+       '班；請核對班表或代班安排，不可使用另一時段代替原預排04-08。');
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
      const selection=selectionKey();
@@ -1811,7 +1851,9 @@
      const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&chosen?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
-     if(!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?prefill.date:'');
+     if(!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
+      date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
+      prefill.leaveHandoffId?String(prefill.coverDate||prefill.overtimeDate||''):'');
      if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
      if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
