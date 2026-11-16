@@ -31,7 +31,8 @@ assert(html.includes('王明安（W1）')&&html.includes('王明安（W2）'),'d
 html=picker.render({...params,jobFilter:'指揮手'});
 assert(html.includes('<strong>王明安</strong>'),'job filter displays matching candidates');
 assert(!html.includes('<strong>陳建華</strong>'),'wrong-title worker hidden from candidate list');
-assert(!html.includes('郭正宏（W4）'),'name dropdown narrows to selected job title');
+const nameSelect=html.match(/<select data-smart-action="filter-name"[^>]*>[\s\S]*?<\/select>/)?.[0]||'';
+assert(!nameSelect.includes('郭正宏（W4）'),'name dropdown narrows to selected job title, independent worker slots remain unfiltered');
 assert(html.includes('已勾選 2 / 2 位'),'hidden selected worker remains counted');
 assert(html.includes('陳建華</span>'),'hidden selected worker remains in preview');
 assert.deepEqual(Array.from(picker.recommend({...params,jobFilter:'指揮手'},'two')).sort(),['W1','W2'],'recommendation honors job filter');
