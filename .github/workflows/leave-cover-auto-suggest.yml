@@ -11,6 +11,7 @@ on:
       - 'tests/leave-cover-two-independent-slots.cjs'
       - 'tests/leave-cover-short-form.cjs'
       - 'tests/leave-cover-worker-job-first.cjs'
+      - 'tests/leave-readerror-safe-recovery.cjs'
       - 'tests/leave-cover-auto-suggest.cjs'
       - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
@@ -24,6 +25,7 @@ on:
       - 'tests/leave-cover-two-independent-slots.cjs'
       - 'tests/leave-cover-short-form.cjs'
       - 'tests/leave-cover-worker-job-first.cjs'
+      - 'tests/leave-readerror-safe-recovery.cjs'
       - 'tests/leave-cover-auto-suggest.cjs'
       - 'tests/leave-approved-cover-roster.cjs'
       - '.github/workflows/leave-cover-auto-suggest.yml'
@@ -48,6 +50,7 @@ jobs:
           node tests/leave-handoff-dedupe.cjs
           node tests/leave-admin-month-filter.cjs
           node tests/leave-entry-fast-loading.cjs
+          node tests/leave-readerror-safe-recovery.cjs
           node tests/leave-admin-sso-readonly.cjs
           node tests/leave-employee-session.cjs
           node tests/leave-employee-dates.cjs

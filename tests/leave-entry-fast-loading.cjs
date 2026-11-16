@@ -8,11 +8,11 @@ function setup({admin=true,cache=null}={}){
  const calls=[],statuses=[],renders=[];let token='manager-token';
  const data={ok:true,employees:[{empId:'E1'}],leaveRecords:[{id:'OLD',startDate:'2026-09-01'},{id:'CROSS',startDate:'2026-10-31',endDate:'2026-11-02'}],leaveCoverAssignments:[],leaveCoverCancellations:[]};
  const nodes={filterMonth:{value:'2026-11'},employeeLeaveReauth:{hidden:true}};
- const c={Promise,Map,Date,Error,URL,encodeURIComponent,console:{warn(){}},GAS_URL:'https://script.google.com/macros/s/test/exec',adminSession:admin?{}:null,adminToken:token,employees:[],leaveRecords:[],currentEmployee:null,p79LeaveCloudDataReady:false,p79LeaveLoadGeneration:0,p79LeaveReads:new Map(),
+ const c={Promise,Map,Date,Error,URL,encodeURIComponent,setTimeout:fn=>{queueMicrotask(fn);return 0},clearTimeout:()=>{},console:{warn(){}},GAS_URL:'https://script.google.com/macros/s/test/exec',adminSession:admin?{}:null,adminToken:token,employees:[],leaveRecords:[],currentEmployee:null,p79LeaveCloudDataReady:false,p79LeaveLoadGeneration:0,p79LeaveReads:new Map(),
  window:{Port79DataCache:{getDisplaySnapshot:async()=>cache}},storedToken:()=>token,leaveRequestToken:()=>token,p79LeaveEmployeeEntry:()=>false,
  $:id=>nodes[id],setStatus:m=>statuses.push(m),populateDepartments(){},renderAll(){renders.push(c.leaveRecords.map(l=>l.id))},p79ShowPendingLeavePrompt(){},p79ReconcileLeaveHandoff:async()=>{},p79LeaveMatchesMonth:()=>true,p79LeaveAuthError:m=>/auth/.test(m),p79EmployeeLeaveReauth(){c.reauth=true},p79RenewEmployeeLeaveSession:async()=>false,
  jsonFetch:(url,options,timeout)=>{const d=deferred();calls.push({url,options,timeout,...d});return d.promise;}};
- vm.createContext(c);for(const name of ['p79StartLeaveRead','p79PrepareLeaveEntryRead','p79HydrateLeaveComputerCache','loadCloud','postCloud'])vm.runInContext(fn(name),c);
+ vm.createContext(c);for(const name of ['p79LeaveIsTransientReadFailure','p79ReadOfficialLeaveWithRetry','p79StartLeaveRead','p79PrepareLeaveEntryRead','p79HydrateLeaveComputerCache','loadCloud','postCloud'])vm.runInContext(fn(name),c);
  return{c,calls,statuses,renders,data,setToken:v=>token=v};
 }
 (async()=>{
@@ -32,14 +32,19 @@ function setup({admin=true,cache=null}={}){
  // Cache appears while the network is pending; cloud replaces it. No extra fetch for overlapping refreshes.
  x=setup({cache:{data:{ok:true,employees:[{empId:'E1'}],leaveRecords:[{id:'CACHE'}]}}});
  const first=x.c.loadCloud();await tick();assert.equal(x.renders[0][0],'CACHE');
- const second=x.c.loadCloud();assert.equal(x.calls.length,1);assert.equal(x.calls[0].timeout,18000);
+ const second=x.c.loadCloud();assert.equal(x.calls.length,1);assert.equal(x.calls[0].timeout,14000);
  x.calls[0].resolve(x.data);assert.equal(await first,false);assert.equal(await second,true);assert.equal(x.renders.at(-1)[0],'OLD');
- // Timeout ends one ordinary read, preserves rows, and never claims fresh confirmation.
+ // A transient timeout retries only GET up to three times, then keeps old rows visibly unconfirmed.
  x=setup({cache:{data:{ok:true,employees:[{empId:'E1'}],leaveRecords:[{id:'CACHE'}]}}});
- const failed=x.c.loadCloud();await tick();x.calls[0].reject(Error('timeout'));
- assert.equal(await failed,false);assert.equal(x.calls.length,1);assert.equal(x.c.leaveRecords[0].id,'CACHE');assert(x.statuses.at(-1).includes('未完成'));
+ const failed=x.c.loadCloud();await tick();
+ for(let attempt=0;attempt<3;attempt++){
+  assert.equal(x.calls.length,attempt+1);
+  x.calls[attempt].reject(Error('timeout'));await tick();
+ }
+ assert.equal(await failed,false);assert.equal(x.calls.length,3);
+ assert.equal(x.c.leaveRecords[0].id,'CACHE');assert(x.statuses.at(-1).includes('未完成'));
  // A fresh post-write read bypasses an older active read and rejects failure even with rows present.
- x=setup();const old=x.c.loadCloud();const fresh=x.c.loadCloud(false,true);assert.equal(x.calls.length,2);assert.equal(x.calls[1].timeout,22000);
+ x=setup();const old=x.c.loadCloud();const fresh=x.c.loadCloud(false,true);assert.equal(x.calls.length,2);assert.equal(x.calls[1].timeout,18000);
  x.calls[1].reject(Error('readback failed'));await assert.rejects(fresh,/readback failed/);x.calls[0].resolve(x.data);assert.equal(await old,false);assert.equal(x.renders.length,0);
  x=setup();const staleFresh=x.c.loadCloud(false,true);x.setToken('other-account');x.calls[0].resolve(x.data);await assert.rejects(staleFresh,/尚未確認/);
  // An approval/submission invalidates pre-write reads, including normal refreshes that follow it.
