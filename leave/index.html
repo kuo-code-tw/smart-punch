@@ -1621,8 +1621,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -2347,8 +2347,34 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 .p79-smart-cover-overtime select{width:100%;min-height:35px;border-radius:8px;border:1px solid #cbd5e1;background:var(--card,#fff);padding:5px}
 @media(max-width:600px){#p79LeaveCoverModal .cover-card{padding:12px} .p79-smart-cover-toolbar{align-items:stretch}.p79-smart-cover-recommend{margin-left:0!important}.p79-smart-cover-day{padding:7px}.p79-smart-cover-person{padding:10px!important}}
 </style>
+<style id="p79-leave-short-form-v1">
+/* Basic flow: leave person and dates are above, then just 1 or 2 worker slots. */
+#adminCreateLeaveDialog .p79-smart-cover-day{
+ padding:2px 0!important;border:0!important;margin-top:4px!important;gap:6px!important
+}
+#adminCreateLeaveDialog .p79-smart-cover-picker,
+#p79LeaveCoverModal .p79-smart-cover-picker{gap:8px;margin:4px 0!important}
+.p79-smart-cover-slots .p79-smart-cover-filter-label{align-content:start}
+.p79-smart-cover-slot-period{font-size:12px;color:#64748b;font-weight:600;line-height:1.4}
+.p79-smart-cover-quick-status{
+ padding:9px 11px;border:1px solid #d1e5dd;border-radius:9px;
+ background:#f0fdf4;color:#166534;font-size:13px;font-weight:700
+}
+.p79-smart-cover-advanced,.p79-smart-cover-advanced-overtime{
+ border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;padding:8px 10px
+}
+.p79-smart-cover-advanced summary,.p79-smart-cover-advanced-overtime summary{
+ cursor:pointer;color:#475569;font-size:12px;font-weight:700;list-style:revert
+}
+.p79-smart-cover-advanced-body{padding-top:12px}
+.p79-smart-cover-advanced-overtime .p79-smart-cover-overtime{margin-top:8px}
+@media(max-width:540px){
+ .p79-smart-cover-slots{grid-template-columns:minmax(0,1fr)!important}
+ .p79-smart-cover-toolbar{gap:6px!important}
+}
+</style>
 
-<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
 <script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
 </body>
 </html>
