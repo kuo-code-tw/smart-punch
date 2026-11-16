@@ -76,8 +76,17 @@
  // but its 04-08 overtime is ACCOUNTED to the previous leave/night workday.
  // Normal early-shift attendance still belongs to the actual next day.
  // Keep independent workDate (punch matching) and overtimeDate (overtime ledger).
- function coverWorkday(leaveDate,leaveShift,mode,workerIndex){
+ function coverWorkday(leaveDate,leaveShift,mode,workerIndex,periodMode='legacy'){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(leaveDate||''))||mode!=='two'||![0,1].includes(workerIndex))return null;
+  // New leave-cover filings use the actual approved leave day for both workers.
+  // Historical cross-day plans retain their original dates and identifiers.
+  if(periodMode==='same-day'){
+   const first=workerIndex===0;
+   return {workDate:leaveDate,overtimeDate:leaveDate,leaveDate,
+    overtimeStart:first?'16':'20',overtimeEnd:first?'20':'24',
+    period:first?'16-20':'20-24',code:'',category:'代',declaredHours:4,
+    sameDayCover:true,periodMode:'same-day'};
+  }
   let p;
   if(shiftName(leaveShift)==='晚'){
    p=workerIndex===0?
@@ -91,10 +100,11 @@
   const overtimeDate=shiftName(leaveShift)==='晚'&&workerIndex===1?leaveDate:p.workDate;
   return {...p,leaveDate,overtimeDate,category:'延',declaredHours:4};
  }
- function suggest({people=[],rosters=new Map(),leaves=[],covers=[],leaveEmpId,date}={}){
+ function suggest({people=[],rosters=new Map(),leaves=[],covers=[],leaveEmpId,date,periodMode='legacy'}={}){
   const target=people.find(e=>norm(e.empId)===norm(leaveEmpId)),schedule=rosters.get(norm(leaveEmpId));
   if(!target||!schedule||!/\d{4}-\d{2}-\d{2}/.test(String(date||'')))return {reason:'請先確認請假人員、日期與正式班表',slots:[]};
   const leaveShift=shiftName(schedule[date]);
+  if(periodMode==='same-day')return {leaveShift,slots:[],reason:'兩位代班加班分別為當日 16–20、20–24；候選人請依當日班表及休息條件選擇，不使用舊跨日延班推薦'};
   if(!['晚','早'].includes(leaveShift))return {reason:leaveShift?'目前僅對早班／大夜班請假自動推薦兩位支援；其他班別仍可手動安排':'請假當日班別未能確認，暫不自動指定',slots:[],leaveShift};
   const d=midnight(date),prev=addDays(date,-1),next=addDays(date,1);
   const scenarios=leaveShift==='晚'?

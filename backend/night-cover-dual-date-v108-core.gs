@@ -94,7 +94,9 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  const value={...old,overtimeDate:accounting.overtimeDate,type:rule[0]==='代'?'substitute':'overtime',overtime:true,overtimeType:isRest?'rest':'extended',overtimeOriginalShift:isRest?'休':original,reportOriginalShift:original,overtimeAssignedShift:assigned,overtimeStart:canonical(rule[6]),overtimeEnd:canonical(rule[7]),overtimeReport:report,note:String(request.note||''),forEmpId:rule[0]==='代'||request.leaveHandoffId?request.forEmpId||'':''};
  delete value.overtimeExcluded;delete value.overtimeDeletedAt;
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
- schedule[date]=assigned;meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
+ // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
+ if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;
+ meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
  return {rows:next,duplicate:false,report};
 }
 
@@ -175,7 +177,7 @@ function p79GetOvertimeReportContext_(p){
  const coverDate=p79DateOnly_(p.coverDate||date),coverMonth=coverDate.slice(0,7);
  if(/^\d{4}-\d{2}-\d{2}$/.test(coverDate)&&coverMonth!==month)(readScheduleMonthOnly_(ss,coverMonth)||[]).filter(function(r){return allowed.has(normalizeEmpId_(r.empId));}).forEach(function(r){var existing=schedules.find(function(x){return normalizeEmpId_(x.empId)===normalizeEmpId_(r.empId);});if(existing){existing.schedule=Object.assign({},r.schedule||{},existing.schedule||{},{__meta:Object.assign({},r.schedule&&r.schedule.__meta||{},existing.schedule&&existing.schedule.__meta||{})});}else schedules.push(r);});
  const config=getSystemConfig_(),options={overtimeConversionRowsV1:config.overtimeConversionRowsV1,overtimeReportTypesV1:config.overtimeReportTypesV1};
- return {ok:true,action:'getOvertimeReportContext',empId:empId,date:date,month:month,records:records,config:options,schedules:schedules,capabilities:{nightCoverOvertimeAccountingV1:true},report:(schedules.find(function(r){return normalizeEmpId_(r.empId)===empId;})||{}).schedule?.__meta?.[date]?.overtimeReport||null,leaveCoverAssignments:covers,revision:[getScheduleSyncRevision_(),getLeaveSyncRevision_(),getEmployeeAuthRevision_(),month].join(':'),apiVersion:API_VERSION};
+ return {ok:true,action:'getOvertimeReportContext',empId:empId,date:date,month:month,records:records,config:options,schedules:schedules,capabilities:{nightCoverOvertimeAccountingV1:true,sameDayCoverFourHourV1:true},report:(schedules.find(function(r){return normalizeEmpId_(r.empId)===empId;})||{}).schedule?.__meta?.[date]?.overtimeReport||null,leaveCoverAssignments:covers,revision:[getScheduleSyncRevision_(),getLeaveSyncRevision_(),getEmployeeAuthRevision_(),month].join(':'),apiVersion:API_VERSION};
 }
 
 function p79DirectCoverDateV107_(request,old){return String(request.coverDate||old&&old.overtimeReport&&old.overtimeReport.coverDate||request.date||'');}
@@ -187,6 +189,19 @@ function p79DirectCoverCheckV107_(rows,request,rule,cover,leaves,coverDate){
  if(!valid(coverDate))throw Error('原請假日期無效');
  var leave=(leaves||[]).find(function(l){return String(l.id)===String(request.leaveHandoffId)&&String(l.empId).toUpperCase()===String(request.forEmpId).toUpperCase()&&l.status==='已核准'&&coverDate>=String(l.startDate||l.startTime).slice(0,10).replace(/\//g,'-')&&coverDate<=String(l.endDate||l.endTime||l.startDate||l.startTime).slice(0,10).replace(/\//g,'-');});
  if(!cover||!leave)throw Error('對應請假或代班安排已變更，未生成加班');
+ // New two-person leave cover is two explicit same-day four-hour periods.
+ // Keep the old adjacent-day rule for previously created historical reports.
+ if(request.coverPeriodMode==='same-day'){
+  if(cover.mode!=='two'||date!==coverDate)throw Error('兩位代班加班必須歸在原請假日 '+coverDate);
+  var workerIndex=(cover.workerIds||[]).findIndex(function(id){return String(id).toUpperCase()===String(request.empId).toUpperCase();});
+  if(workerIndex<0||workerIndex>1)throw Error('代班人員不在正式安排中');
+  var expectedStart=workerIndex===0?'16':'20',expectedEnd=workerIndex===0?'20':'24';
+  if(!['代','延'].includes(String(rule[0]))||Number(rule[2])!==4||
+     p79DirectMinute_(rule[6])!==p79DirectMinute_(expectedStart)||
+     p79DirectMinute_(rule[7])!==p79DirectMinute_(expectedEnd))
+   throw Error('原請假日 '+coverDate+' 的代班加班只能申報 '+expectedStart+':00–'+expectedEnd+':00（4 小時）');
+  return;
+ }
  if(date===coverDate&&rule[0]!=='延')return;
  if(cover.mode!=='two'){if(date!==coverDate)throw Error('此代班模式不支援跨日工作日期');return;}
  var target=rows.find(function(r){return String(r.empId).toUpperCase()===String(request.forEmpId).toUpperCase()&&p79DirectCoverShiftV107_(r,coverDate);});

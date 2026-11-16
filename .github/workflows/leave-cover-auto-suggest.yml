@@ -9,6 +9,7 @@ on:
       - 'assets/port79-smart-cover-picker.js'
       - 'assets/port79-leave-daily-simple.js'
       - 'tests/leave-cover-two-independent-slots.cjs'
+      - 'tests/leave-cover-sameday-four-hour-stroke.cjs'
       - 'tests/leave-cover-short-form.cjs'
       - 'tests/leave-cover-worker-job-first.cjs'
       - 'tests/leave-readerror-safe-recovery.cjs'
@@ -23,6 +24,7 @@ on:
       - 'assets/port79-smart-cover-picker.js'
       - 'assets/port79-leave-daily-simple.js'
       - 'tests/leave-cover-two-independent-slots.cjs'
+      - 'tests/leave-cover-sameday-four-hour-stroke.cjs'
       - 'tests/leave-cover-short-form.cjs'
       - 'tests/leave-cover-worker-job-first.cjs'
       - 'tests/leave-readerror-safe-recovery.cjs'
@@ -42,6 +44,7 @@ jobs:
       - name: Test automatic cover candidate rest and no auto persistence
         run: |
           node tests/leave-cover-auto-suggest.cjs
+          node tests/leave-cover-sameday-four-hour-stroke.cjs
           node tests/leave-approved-cover-roster.cjs
           node tests/leave-cover-two-independent-slots.cjs
           node tests/leave-cover-short-form.cjs

@@ -1079,25 +1079,16 @@ async function p79BuildLeaveCoverWorkdayEntries(leaveId,leaveEmpId,assignments){
  for(const item of assignments){
   const coverDate=String(item.date||''),ids=(item.workerIds||[]).map(String),mode=item.mode||'one';
   if(!/^\d{4}-\d{2}-\d{2}$/.test(coverDate)||!ids.length)throw Error('代班日期或人員無效');
-  let leaveShift='';
-  if(mode==='two'){
-   const cloud=await jsonFetch(GAS_URL+'?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+
-    '&empId='+encodeURIComponent(ids[0])+'&date='+encodeURIComponent(coverDate)+
-    '&leaveHandoffId='+encodeURIComponent(leaveId)+'&t='+Date.now(),{cache:'no-store',redirect:'follow'},45000);
-   if(!cloud?.ok||!Array.isArray(cloud.schedules))throw Error('無法核對請假當天的正式班別，沒有推算隔日加班');
-   const target=cloud.schedules.find(r=>norm(r.empId)===norm(leaveEmpId))?.schedule;
-   const meta=target?.__meta?.[coverDate]||{};
-   leaveShift=[target?.[coverDate],meta.leaveOriginalShift,meta.reportOriginalShift,meta.overtimeOriginalShift]
-    .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
-   if(!leaveShift)throw Error('找不到 '+coverDate+' 請假員工的原班別；代班安排已儲存，申報日期需人工核對');
-  }
+  // Every newly prepared two-person cover uses the approved leave day.
+  // Final submission still verifies official leave, candidate and punches.
+  const leaveShift='';
   for(const [index,empId] of ids.entries()){
-   const plan=window.P79LeaveCoverSuggest?.coverWorkday?.(coverDate,leaveShift,mode,index);
+   const plan=window.P79LeaveCoverSuggest?.coverWorkday?.(coverDate,leaveShift,mode,index,'same-day');
    const emp=employees.find(e=>norm(e.empId)===norm(empId));
    entries.push({empId,name:emp?.name||empId,date:plan?.workDate||coverDate,
     workDate:plan?.workDate||coverDate,overtimeDate:plan?.overtimeDate||plan?.workDate||coverDate,
     coverDate,coverShift:leaveShift,forEmpId:String(leaveEmpId),
-    ...(plan?{code:plan.code,preferredType:'平日延時加班'}:{})});
+    ...(plan?{code:plan.code,periodMode:plan.periodMode,expectedOvertimeStart:plan.overtimeStart,expectedOvertimeEnd:plan.overtimeEnd}:{})});
   }
  }
  return entries;
@@ -1654,8 +1645,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261116-sameday-4h-stroke-v1"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261116-sameday-4h-stroke-v1"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -1716,7 +1707,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
 
-<script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
+<script src="../assets/port79-leave-cover-suggest.js?v=20261116-sameday-4h-v1"></script>
 <script>
 let p79CreateDailyPlan=new Map();
 function p79DailyCreateDates(){const a=$('adminCreateLeaveStart').value,b=$('adminCreateLeaveEnd').value,out=[];if(!a||!b||a>b)return out;for(let day=new Date(a+'T12:00:00Z'),last=new Date(b+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1)){out.push(day.toISOString().slice(0,10));if(out.length>62)return [];}return out;}
@@ -1751,7 +1742,7 @@ function leavePersonJob(e){return String(e.jobTitle||e.deptDetail||'').trim()||'
 function leaveCreatePeople(){return leavePeopleStrokeOrder(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)));}
 function leavePersonOption(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name+'（'+e.empId+'）｜'+leavePersonJob(e))+'</option>';}
 function leaveFillJobFilter(select,people){
- const previous=select.value,titles=[...new Set(people.map(leavePersonJob))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+ const previous=select.value,titles=[...new Set(people.map(leavePersonJob))].sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
  select.innerHTML='<option value="">全部職稱</option>'+titles.map(title=>'<option value="'+esc(title)+'">'+esc(title)+'</option>').join('');
  if(titles.includes(previous))select.value=previous;
 }
@@ -1814,7 +1805,7 @@ async function p79SuggestCreateLeaveCover(){
   const uniq=(items,key)=>[...new Map(items.map(x=>[key(x),x])).values()];
   const records=uniq([...leaveRecords,...payloads.flatMap(x=>x.leaveRecords||[])],x=>String(x.id||x.empId+'|'+x.startDate+'|'+x.endDate));
   const covers=uniq([...(window.p79LeaveCoverAssignments||[]),...payloads.flatMap(x=>x.leaveCoverAssignments||[])],x=>String(x.id||x.leaveId+'|'+x.startDate+'|'+x.endDate+'|'+(x.workerIds||[]).join(',')));
-  const recommendation=window.P79LeaveCoverSuggest.suggest({people:employees,rosters,leaves:records,covers,leaveEmpId:selected,date});
+  const recommendation=window.P79LeaveCoverSuggest.suggest({people:employees,rosters,leaves:records,covers,leaveEmpId:selected,date,periodMode:'same-day'});
   if(request!==p79CreateCoverSuggestRequest||p79CreateCoverManual||!$('adminCreateLeaveDialog').open||
      $('adminCreateLeaveEmployee').value!==selected||$('adminCreateLeaveStart').value!==date||$('adminCreateLeaveEnd').value!==date)return;
   if(!recommendation.first||!recommendation.second){notice.textContent=recommendation.reason||'暫無符合條件的兩人代班組合，請人工核對。';return;}
@@ -1967,7 +1958,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v2&recovery=20261113-r3&saveguard=20261116a&ownshift=20261116b&selected=20261116c&next=20261116d"></script>
+<script src="../assets/port79-overtime-report.js?v=20261116-sameday-4h-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -1995,6 +1986,8 @@ async function p79SaveWorkOvertimeDraft(draft){
  const prepared=P79Overtime.takeSaveContext?.(draft);
  const cloud=prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
  const overtimeDate=String(draft.overtimeDate||draft.date);
+  if(draft.coverPeriodMode==='same-day'&&cloud?.capabilities?.sameDayCoverFourHourV1!==true)
+   throw Error('正式 GAS 尚未部署同日兩位各4小時代班驗證；保留申報資料，不送出錯誤日期或時段。');
  // Older GAS stores the punch/work date only; refuse to claim the following
  // morning's extension is credited on the previous night before backend support.
  if(overtimeDate!==String(draft.date)&&cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
@@ -2019,6 +2012,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,
   date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,
   forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,
+   coverPeriodMode:draft.coverPeriodMode||'',
   expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,
   attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
@@ -2278,7 +2272,7 @@ async function p79OpenLeaveOvertimeHandoff(autoContinue=false){
   const entryType=String(e.preferredType||'').trim();
   const selectedCategories={休息日加班:'休',平日延時加班:'延',國定假日加班:'國',例假加班:'例'};
   const entryCategory=selectedCategories[entryType]||'';
-  const requestedType=entryCategory?[entryCategory,entryType]:perPersonType;
+  const requestedType=period.sameDayCover?null:entryCategory?[entryCategory,entryType]:perPersonType;
   const verifiedOvertimeRules=data.config&&Array.isArray(data.config[P79Overtime.CONFIG])&&Array.isArray(data.config.overtimeReportTypesV1)?
    {config:data.config,rows:data.config[P79Overtime.CONFIG],token,url:GAS_URL,
     checkedAt:p79LeaveHandoffContext.at}:null;

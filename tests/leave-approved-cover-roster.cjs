@@ -38,10 +38,10 @@ async function run(){
  const markup=el('p79LeaveCoverDailyRows').innerHTML;
  assert(markup.includes('2026-11-27')&&markup.includes('2026-11-28')&&markup.includes('2026-11-29'),'all three dates rendered');
  assert(markup.includes('中班甲')&&markup.includes('早班乙'),'actual people named in drop-down options');
- const assignments=Array.from(api.collect());
- assert.equal(assignments.length,3);
- for(const a of assignments){assert.equal(a.mode,'two');assert.deepEqual(Array.from(a.workerIds),['MID','EARLY']);}
- assert(el('p79LeaveCoverAutoStatus').textContent.includes('3 天'),'explains multi-day roster result');
+ // Both workers have official shifts which do not prove the NEW 16-20 / 20-24
+ // overtime assignments. Do not blindly copy the old 24-04 / 04-08 recommendation.
+ assert.throws(()=>api.collect(),/2026-11-27/,'unsafe legacy cross-day recommendation must not auto-assign same-day overtime');
+ assert(el('p79LeaveCoverAutoStatus').textContent.includes('3 天'),'explains three day roster read without silently creating overtime');
  api.close();
  assert.equal(el('p79LeaveCoverDailyRows').hidden,true);
  await api.open({leave,people,leaves:[leave,{empId:'EARLY',startDate:'2026-11-28',endDate:'2026-11-28',status:'已核准'}],covers:[],fetchMonth});
@@ -58,6 +58,6 @@ async function run(){
  assert(html.includes('port79-approved-cover-auto.js?v='),'approved leave module loaded');
  for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
   if(!/\bsrc=|application\/json|importmap/.test(match[1]))new vm.Script(match[2]);
- console.log('PASS approved 3-day leave: official numbered-day roster, name recommendations, daily 4h split, date-specific restrictions, no overwrites, parse-safe page');
+ console.log('PASS approved 3-day leave: official numbered-day roster, unsafe legacy recommendations not reused, date-specific restrictions, no overwrites, parse-safe page');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});

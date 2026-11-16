@@ -18,7 +18,8 @@
   return state.people.filter(p=>key(p.dept)===key(state.target.dept)&&key(p.empId)!==key(state.target.empId)&&p.empId&&!['resigned','離職','terminated','inactive','leave','loa','留停'].includes(String(p.employmentStatus||'active').toLowerCase()));
  }
  function optionList(state,selected,exclude,required){
-  const candidates=eligible(state).filter(p=>key(p.empId)!==key(exclude));
+  const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
+  const candidates=eligible(state).filter(p=>key(p.empId)!==key(exclude)).sort((a,b)=>stroke.compare(String(a.name||a.empId),String(b.name||b.empId))||String(a.empId).localeCompare(String(b.empId)));
   const placeholder=required?'請選擇代班人員':'不選第二位（單人代班 8 小時）';
   return '<option value="">'+placeholder+'</option>'+candidates.map(p=>'<option value="'+escaped(p.empId)+'"'+(key(p.empId)===key(selected)?' selected':'')+'>'+escaped(p.name||p.empId)+'｜'+escaped(job(p))+'</option>').join('');
  }
@@ -167,7 +168,7 @@
    state.leaves=allLeaves;state.covers=allCovers;
    if(seq!==serial||!state||state.id!==id||state.manual||el('p79LeaveCoverModal')?.hidden)return;
    if(allCovers.some(c=>String(c.leaveId)===id)){status.textContent='雲端發現已有代班安排，已保留原紀錄；請先重新整理。';state=null;return;}
-   const entries=dates.map(date=>{const suggestion=helper.suggest({people,rosters:roster,leaves:allLeaves,covers:allCovers,leaveEmpId:target.empId,date});
+   const entries=dates.map(date=>{const suggestion=helper.suggest({people,rosters:roster,leaves:allLeaves,covers:allCovers,leaveEmpId:target.empId,date,periodMode:'same-day'});
     return {date,recommendation:suggestion,first:suggestion.first?.empId||'',second:suggestion.second?.empId||'',mode:suggestion.first&&suggestion.second?'two':'one'};
    });
    state.entries=entries;
