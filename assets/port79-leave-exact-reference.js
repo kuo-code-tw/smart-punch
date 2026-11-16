@@ -69,6 +69,7 @@ function init(){
  // Match the screenshot header using safe view filters; the original
  // department/job controls remain in the real records toolbar below.
  const headingRight=heading.querySelector('.p79-leave-visual-heading-right');
+ let updateGroups=()=>{};
  if(headingRight){
   headingRight.textContent='';
   const company=make('select','p79-pixel-header-filter');
@@ -106,7 +107,7 @@ function init(){
     if(original)new MutationObserver(sync).observe(original,{childList:true,subtree:true});
   }
   const employeeGroup=e=>String(e?.group||e?.groupName||e?.team||e?.teamName||'').trim();
-  function updateGroups(){
+  updateGroups=function(){
    const prior=group.value;
    const groups=[...new Set((typeof employees!=='undefined'&&Array.isArray(employees)?employees:[])
      .map(employeeGroup).filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke').compare);
