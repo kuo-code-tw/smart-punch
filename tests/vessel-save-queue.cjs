@@ -17,6 +17,8 @@ function setup(){
     document:{getElementById:id=>id==='efficiencySaveBtn'?btn:null},saveLocal(){},forceFullSystemConsistencyRefresh(){},
     restoreVesselDataFromCloud:async()=>{},getGasUrl:()=> 'https://test.invalid/isolated',gcToken:'test-token',
     apiPost:async(action,payload)=>{requests.push({action,payload:plain(payload)});return{ok:true,revision:1}}};
+  // The manual-sync path delegates strict readback through the shared helper.
+  c.p79WaitStrictVesselReadback=()=>c.restoreVesselDataFromCloud(false,true);
   vm.createContext(c);vm.runInContext('let gcQueueFlushPromise=null;',c);
   for(const name of ['setEfficiencySaveState','postCloud','postCloudConfirmed','flushQueue','saveEfficiencyChangesToCloud','manualCloudSync'])vm.runInContext(fn(name),c);
   return{c,btn,statuses,messages,requests,revisions,queue:()=>plain(queue),states};
