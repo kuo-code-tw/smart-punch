@@ -10,7 +10,9 @@
  const kind=v=>str(v).replace(/\s+/g,'');
  const personUnit=p=>str(p?.unit||p?.unitName)||'未設定單位';
  const personJob=p=>str(p?.jobTitle||p?.deptDetail||p?.role)||'未設定職稱';
- const orderedOptions=list=>[...new Set(list)].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
+ const stroke=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true});
+ const orderedOptions=list=>[...new Set(list)].sort(stroke.compare);
+ const byNameStroke=(a,b)=>stroke.compare(str(a.person?.name||a.id),str(b.person?.name||b.id))||str(a.id).localeCompare(str(b.id));
  // Filters only change list visibility, never eligibility or saved worker ids.
  function visible(options,{jobFilter='',nameFilter=''}={}){
   // Filters restrict the visible list, not who can legally be assigned.
@@ -69,6 +71,7 @@
  }
  function period(target,date,rosters,mode,index){
   const shift=rosterLabel(rosters,target?.empId,date);
+  if(mode==='two')return index===0?'16:00–20:00':'20:00–24:00';
   const base=/^(早|早班)$/.test(shift)?'08:00–16:00':
     /^(中|中班)$/.test(shift)?'16:00–24:00':
     /^(晚|晚班)$/.test(shift)?'次日 00:00–08:00':'';
@@ -86,8 +89,8 @@
   const qualified=options.filter(x=>!x.disabled).length;
   const jobs=orderedOptions(options.map(x=>personJob(x.person)));
   const byJob=jobFilter?options.filter(x=>personJob(x.person)===jobFilter):options;
-  const names=[...byJob].sort((a,b)=>str(a.person.name||a.id).localeCompare(str(b.person.name||b.id),'zh-Hant')||a.id.localeCompare(b.id));
-  const matched=visible(options,{jobFilter,nameFilter});
+  const names=[...byJob].sort(byNameStroke);
+  const matched=visible(options,{jobFilter,nameFilter}).sort(byNameStroke);
   const jobChoices=jobs.map(value=>'<option value="'+esc(value)+'"'+(jobFilter===value?' selected':'')+'>'+esc(value)+'</option>').join('');
   const nameChoices=names.map(x=>'<option value="'+esc(x.id)+'"'+(norm(nameFilter)===norm(x.id)?' selected':'')+'>'+
    esc(str(x.person.name||x.id)+'（'+x.id+'）')+'</option>').join('');
@@ -110,9 +113,9 @@
     const applicantJob=personJob(target);
     const defaultJob=person?personJob(person.person):(jobs.includes(applicantJob)?applicantJob:'');
     const chosenJob=Array.isArray(slotJobs)&&typeof slotJobs[slot]==='string'?slotJobs[slot]:defaultJob;
-    const slotOptions=options.filter(x=>!chosenJob||personJob(x.person)===chosenJob);
+    const slotOptions=options.filter(x=>!chosenJob||personJob(x.person)===chosenJob).sort(byNameStroke);
     const eligibleCount=slotOptions.filter(x=>!x.disabled&&x.id!==other).length;
-    const slotLabel=mode==='one'?'代班人員（8 小時）':slot===0?'第一位代班（4 小時）':'第二位代班（4 小時）';
+    const slotLabel=mode==='one'?'代班人員（8 小時）':slot===0?'第一位代班（早班加班 4 小時）':'第二位代班（晚班加班 4 小時）';
     const jobOptions='<option value=""'+(chosenJob===''?' selected':'')+'>全部職稱</option>'+
      jobs.map(job=>'<option value="'+esc(job)+'"'+(chosenJob===job?' selected':'')+'>'+
       esc(job)+'</option>').join('');
