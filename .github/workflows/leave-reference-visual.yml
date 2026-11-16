@@ -1,0 +1,30 @@
+name: Leave page visual-only safety check
+on:
+  pull_request:
+    paths:
+      - 'leave/index.html'
+      - 'assets/port79-leave-reference-visual.css'
+      - 'assets/port79-leave-reference-visual.js'
+      - 'tests/leave-reference-visual-only.cjs'
+      - '.github/workflows/leave-reference-visual.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'leave/index.html'
+      - 'assets/port79-leave-reference-visual.css'
+      - 'assets/port79-leave-reference-visual.js'
+      - 'tests/leave-reference-visual-only.cjs'
+      - '.github/workflows/leave-reference-visual.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/leave-reference-visual-only.cjs
+      - run: node tests/leave-admin-month-filter.cjs
+      - run: node tests/leave-cover-short-form.cjs
