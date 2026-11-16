@@ -12264,9 +12264,31 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         let p79AttendanceEditDeleteReady = false;
         let p79WorkhoursEditConflict=null;
         const p79WorkhoursEditWarmups=new Map();
+        function p79WaitWorkhoursEditSync(record){
+            const token=currentPort79SsoToken(),generation=p79AttendanceEditOpenGeneration;
+            return new Promise((resolve,reject)=>{
+                let interval,timer,done=false;
+                const finish=error=>{if(done)return;done=true;clearInterval(interval);clearTimeout(timer);window.removeEventListener('p79-attendance-outbox-updated',check);error?reject(error):resolve();};
+                const check=()=>{
+                    if(currentPort79SsoToken()!==token||generation!==p79AttendanceEditOpenGeneration)return finish(Error('修改視窗或登入身分已變更，已停止核對'));
+                    const queue=window.p79V5QueueInfoForId?.(record.id);
+                    if(!queue||queue.paused)return finish();
+                };
+                window.addEventListener('p79-attendance-outbox-updated',check);
+                interval=setInterval(check,250);
+                timer=setTimeout(()=>finish(Error('這筆考勤同步尚未完成，輸入已保留；請查看考勤同步錯誤後重新核對')),45000);
+                // Join the existing writer; never enqueue the correction before its previous write settles.
+                Promise.resolve().then(()=>window.p79V5Drain(false)).catch(()=>{});
+                check();
+            });
+        }
         function p79PrepareWorkhoursEdit(record,consume=false){
             const queue=window.p79V5QueueInfoForId?.(record.id);
-            if(queue&&!queue.paused)return Promise.reject(Error('這筆考勤尚在同步，請等同步完成後再修改'));
+            if(queue&&!queue.paused){
+                if(!consume||typeof window.p79V5Drain!=='function')return Promise.reject(Error('這筆考勤尚在同步，請等同步完成後再修改'));
+                p79SetAttendanceEditCloudState(false,'此筆考勤正在同步；可先修改時間，完成後會自動核對並開放儲存。');
+                return p79WaitWorkhoursEditSync(record).then(()=>p79PrepareWorkhoursEdit(record,true));
+            }
             const token=typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'';
             const key=JSON.stringify([token,record.id,record.empId,record.attNo,record.timeStr,record.status,record.note]);
             const now=Date.now();
@@ -13350,6 +13372,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             const bundle=await window.P79WorkhoursCache.load(month,{force,
                                 onPreview:b=>{if(current())window.P79WorkhoursCacheContext.applyBundle(b,state);},
                                 onRoster:b=>{if(current())window.P79WorkhoursCacheContext.applyRoster(b,state);},
+                                onAttendance:b=>{if(current())window.P79WorkhoursCacheContext.applyBundle(b,state);},
                                 onInvalidate:()=>{if(current())window.P79WorkhoursCacheContext.invalidatePreview(month);}
                             });
                             if(current())window.P79WorkhoursCacheContext.applyBundle(bundle,state);
@@ -17532,7 +17555,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 
-<script src="../assets/port79-workhours-cache.js?v=20261113-local-first-shared-v1"></script>
+<script src="../assets/port79-workhours-cache.js?v=20261116-attendance-preview-v1"></script>
 <script>
 // One read service for main table, monthly report and amendment/accounting views.
 window.P79WorkhoursCacheContext={

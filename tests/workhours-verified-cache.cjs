@@ -19,6 +19,17 @@ function setup(disk=new Map()){
 let passed=0;async function test(name,fn){await fn();passed++;console.log('PASS '+name)}
 (async()=>{
 await test('cold load stores a complete versioned bundle, shared by concurrent consumers',async()=>{const t=setup(),[a,b]=await Promise.all([t.api.load(month),t.api.load(month)]);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,1);assert.equal(t.calls.filter(c=>c.action==='getAttendanceMonthRaw').length,t.api.monthsFor(month).length);assert.equal(t.calls.filter(c=>c.action==='getOvertimeReportCacheMeta').length,2);assert.equal(t.disk.size,1);a.roster.schedules[0].empId='mutated';assert.notEqual(b.roster.schedules[0].empId,'mutated');});
+await test('fresh attendance displays before slow config without confirming accounting or saving cache',async()=>{
+ const t=setup(),gate=t.hold('getOvertimeConfig'),previews=[];
+ const p=t.api.load(month,{onAttendance:b=>previews.push(b)});
+ await new Promise(r=>setTimeout(r,10));
+ assert.equal(previews.length,1);assert.equal(previews[0].preview,true);
+ assert.equal(Object.keys(previews[0].raw).length,t.api.monthsFor(month).length);
+ assert.equal(t.disk.size,0);assert.equal(previews[0].config,undefined);
+ const late=[];const joined=t.api.load(month,{force:true,onAttendance:b=>late.push(b)});
+ assert.equal(late.length,1);assert.equal(late[0].preview,true);
+ gate.resolve();const b=await p;await joined;assert.equal(b.preview,false);assert.equal(t.disk.size,1);
+});
 await test('fresh-page disk hit uses one version check and zero full data downloads',async()=>{const t=setup();await t.api.load(month);const n=setup(t.disk),preview=[];const b=await n.api.load(month,{onPreview:x=>preview.push(x)});assert.equal(n.calls.length,1);assert.equal(n.calls[0].action,'getOvertimeReportCacheMeta');assert.equal(b.source,'本機有效快取');assert.equal(preview[0].preview,true);});
 await test('main-table then accounting/status reuse the same verified month without redownload',async()=>{const t=setup();await t.api.load(month);const n=t.calls.length;const a=await t.api.load(month),b=await t.api.load(month);assert.equal(t.calls.length,n);assert.equal(a.version,b.version);assert.equal(a.preview,false);});
 await test('changed cloud version reloads full data and replaces obsolete records',async()=>{const t=setup();const a=await t.api.load(month);t.change();const b=await t.api.load(month,{force:true});assert.notEqual(a.version,b.version);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,2);assert.equal(b.raw[month].revision,'R1x');});

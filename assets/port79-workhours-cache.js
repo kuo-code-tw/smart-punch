@@ -7,14 +7,15 @@ const flights=new Map(),metaFlights=new Map(),metaMemo=new Map(),memory=new Map(
 // table opened while startup is already checking the same month.
 const observers=new Map();
 function observe(k,options){
- let entry=observers.get(k);if(!entry){entry={listeners:new Set(),preview:null,roster:null,invalidated:null};observers.set(k,entry);}
+ let entry=observers.get(k);if(!entry){entry={listeners:new Set(),preview:null,roster:null,attendance:null,invalidated:null};observers.set(k,entry);}
  entry.listeners.add(options);
  if(entry.preview&&options.force!==true)deliver(options.onPreview,entry.preview);
  if(entry.invalidated)deliver(options.onInvalidate,entry.invalidated);
  if(entry.roster)deliver(options.onRoster,entry.roster);
+ if(entry.attendance)deliver(options.onAttendance,entry.attendance);
 }
 function deliver(callback,value){try{if(callback)callback(copy(value));}catch(_){}}
-function publish(k,type,value){const entry=observers.get(k);if(!entry)return;if(type==='onPreview')entry.preview=value;if(type==='onRoster')entry.roster=value;if(type==='onInvalidate'){entry.preview=null;entry.roster=null;entry.invalidated=value;}for(const options of entry.listeners){if(type==='onPreview'&&options.force===true)continue;deliver(options[type],value);}}
+function publish(k,type,value){const entry=observers.get(k);if(!entry)return;if(type==='onPreview')entry.preview=value;if(type==='onRoster')entry.roster=value;if(type==='onAttendance')entry.attendance=value;if(type==='onInvalidate'){entry.preview=null;entry.roster=null;entry.attendance=null;entry.invalidated=value;}for(const options of entry.listeners){if(type==='onPreview'&&options.force===true)continue;deliver(options[type],value);}}
 let generation=0,startupFlight=null;
 const copy=x=>JSON.parse(JSON.stringify(x));
 function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3)memory.delete(memory.keys().next().value);}
@@ -83,9 +84,11 @@ function load(month,options={}){
     const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
     batches.push(...group);assert(s);
    }
-   const config=await request(s,'getOvertimeConfig',month);assert(s);
    const raw=Object.fromEntries(months.map((m,i)=>[m,batches[i]]));
    if(Array.isArray(roster.employees))Object.values(raw).forEach(d=>{if(Array.isArray(d.records)&&context().scopeRecords){d.records=context().scopeRecords(d.records,roster.employees);d.recordCount=d.records.length;delete d.missingNameSamples;}});
+   if(!months.every(m=>raw[m]?.ok===true&&raw[m].month===m&&Array.isArray(raw[m].records)))throw Error('跨月考勤尚未讀齊');
+   publish(k,'onAttendance',{month,roster,raw,preview:true,source:'雲端考勤已讀取，背景核對版本中'});
+   const config=await request(s,'getOvertimeConfig',month);assert(s);
    const b={schema:1,month,viewer:s.viewer,url:s.url,version:before.version,roster,raw,config,meta:before};
    if(!valid(b,month,s))throw Error('完整班表或跨月考勤尚未讀齊，未覆蓋原快取');
    const after=await meta(s,month,true);assert(s);
@@ -110,7 +113,7 @@ function startup(){
   // month or a write source. The versioned bundle supplies authoritative data.
   let finished=false;
   void Promise.resolve((g.Port79DataCache?.getDisplaySnapshot||g.Port79DataCache?.getSystemSnapshot)?.('workhours',{timeoutMs:10000})).then(row=>{assert(s);if(!finished&&row?.data?.fullDatabase)context().applyFull?.(row.data);}).catch(()=>{});
-  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onRoster:b=>context().applyRoster?.(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
+  try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onRoster:b=>context().applyRoster?.(b),onAttendance:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
  })().finally(()=>{if(startupFlight===flight)startupFlight=null;});return flight.promise;
 }
 g.P79WorkhoursCache={load,startup,invalidate,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
