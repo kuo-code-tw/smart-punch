@@ -61,7 +61,7 @@ assert(approvedSource.includes("row.filterName=action.value"),'approved leave st
 assert(dailySource.includes("nameFilter:row.filterName"),'new leave restores saved name');
 assert(approvedSource.includes("nameFilter:entry.filterName"),'approved leave restores saved name');
 assert(page.includes('p79-smart-cover-job-name-filter-v3'),'filters styled in both windows');
-assert(page.includes('smart-cover-picker.js?v=20261106-job-name-filter-v3'),'JS cache version updated');
+assert(page.includes('smart-cover-picker.js?v=20261116-sameday-4h-stroke-v1'),'JS cache version updated');
 const attack=person('X','<script>danger()</script>','<img src=x>');
 html=picker.render({...params,people:[...people,attack]});
 assert(!html.includes('<script>danger()</script>')&&!html.includes('<img src=x>'),'names and titles escaped');
