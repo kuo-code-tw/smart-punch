@@ -35,7 +35,7 @@ assert.equal(get.day({id:'E1'},'2026-10-30',ctx).visibleCode,'晚','October thir
 assert.equal(original.E1['2026-10-01'],'早');
 assert.equal(original.E1['2026-10-30'],'晚');
 assert(html.includes('function p79QueueScheduleNoPunchReconcile(yearMonth){\n      // EMERGENCY HOLD'),'background autosave hold is mandatory');
-assert(html.includes('function p79ApplyAutomaticRestMetadata() {\n      // Re-enable automatic quota metadata persistence ONLY as part of an'),'automatic allocation only on authorized save');
+assert(html.includes('function p79ApplyAutomaticRestMetadata(planned=null) {\n      // Re-enable automatic quota metadata persistence ONLY as part of an'),'automatic allocation only on authorized save');
 assert(html.includes('!scheduleEditLockState.mine'),'auto allocation blocked without edit lock');
 assert(html.includes('before.restCategoryLocked||before.restAllocationLocked'),'manual rest locks protected');
 assert(html.includes("if(yearMonth==='2026-10'){"),'October full-month save guard is mandatory');
