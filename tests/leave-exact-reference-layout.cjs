@@ -8,7 +8,7 @@ const css=fs.readFileSync('assets/port79-leave-exact-reference.css','utf8');
 new vm.Script(js,{filename:'leave-exact-reference.js'});
 assert.equal((css.match(/{/g)||[]).length,(css.match(/}/g)||[]).length);
 assert.match(html,/port79-leave-exact-reference\.js\?v=20261116-reference-match-v3/);
-assert.match(html,/port79-leave-exact-reference\.css\?v=20261116-reference-match-v3/);
+assert.match(html,/port79-leave-exact-reference\.css\?v=20261116-reference-match-v4/);
 const assetOrder=html.indexOf('port79-leave-exact-reference.css');
 assert(assetOrder>html.indexOf('port79-management-workspace.css'),'reference rules run after shared workspace');
 assert(assetOrder>html.indexOf('port79-leave-reference-visual.css'),'new rules override the older partial design');
@@ -33,6 +33,8 @@ for(const bad of [
  /adminBalanceBody\.innerHTML\s*=/
 ])assert(!bad.test(js),'new overlay cannot change business data: '+bad);
 assert(css.includes('Final specificity guard'),'final rules outrank original common workspace');
+assert(css.includes('body.p79-workspace[data-p79-system="leave"] > header'),
+ 'single reference header replaces duplicate legacy management header');
 assert(css.includes('html.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"]'),
  'all brand/sidebar changes must be isolated to the leave manager');
 assert(css.includes('grid-template-columns:minmax(0,1fr) 342px'),
