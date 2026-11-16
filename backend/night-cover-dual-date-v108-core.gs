@@ -94,7 +94,9 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  const value={...old,overtimeDate:accounting.overtimeDate,type:rule[0]==='代'?'substitute':'overtime',overtime:true,overtimeType:isRest?'rest':'extended',overtimeOriginalShift:isRest?'休':original,reportOriginalShift:original,overtimeAssignedShift:assigned,overtimeStart:canonical(rule[6]),overtimeEnd:canonical(rule[7]),overtimeReport:report,note:String(request.note||''),forEmpId:rule[0]==='代'||request.leaveHandoffId?request.forEmpId||'':''};
  delete value.overtimeExcluded;delete value.overtimeDeletedAt;
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
- schedule[date]=assigned;meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
+ // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
+ if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;
+ meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
  return {rows:next,duplicate:false,report};
 }
 
