@@ -50,7 +50,7 @@ assert(!html.includes('跨日歸入上班日期。'),'old misleading all-cross-d
 assert(html.includes('p79WorkOvertimeLedgerMonth(row) === monthEl.value'),'filter must use confirmed credit month');
 assert(html.includes('p79WorkOvertimeLedgerMonth(row) === month)'),'daily ledger month must use confirmed credit month');
 assert(html.includes('上班日期／加班歸屬'),'show distinct actual and credit dates');
-for(const script of html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/g)){
- if(!/\\bsrc=|application\\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
+for(const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
+ if(!/\bsrc=|application\/json|importmap/.test(script[1])&&script[2].trim())new vm.Script(script[2]);
 }
 console.log('PASS staff-wide overtime date display, Nov/Dec official credit, unreported mismatch, saved plans and previous-day proper reports');
