@@ -1804,7 +1804,7 @@ async function p79SuggestCreateLeaveCover(){
   const uniq=(items,key)=>[...new Map(items.map(x=>[key(x),x])).values()];
   const records=uniq([...leaveRecords,...payloads.flatMap(x=>x.leaveRecords||[])],x=>String(x.id||x.empId+'|'+x.startDate+'|'+x.endDate));
   const covers=uniq([...(window.p79LeaveCoverAssignments||[]),...payloads.flatMap(x=>x.leaveCoverAssignments||[])],x=>String(x.id||x.leaveId+'|'+x.startDate+'|'+x.endDate+'|'+(x.workerIds||[]).join(',')));
-  const recommendation=window.P79LeaveCoverSuggest.suggest({people:employees,rosters,leaves:records,covers,leaveEmpId:selected,date});
+  const recommendation=window.P79LeaveCoverSuggest.suggest({people:employees,rosters,leaves:records,covers,leaveEmpId:selected,date,periodMode:'same-day'});
   if(request!==p79CreateCoverSuggestRequest||p79CreateCoverManual||!$('adminCreateLeaveDialog').open||
      $('adminCreateLeaveEmployee').value!==selected||$('adminCreateLeaveStart').value!==date||$('adminCreateLeaveEnd').value!==date)return;
   if(!recommendation.first||!recommendation.second){notice.textContent=recommendation.reason||'暫無符合條件的兩人代班組合，請人工核對。';return;}
