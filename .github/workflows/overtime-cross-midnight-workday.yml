@@ -6,6 +6,7 @@ on:
       - 'work-hours/index.html'
       - 'tests/overtime-extension-cross-midnight-workdate.cjs'
       - '.github/workflows/overtime-cross-midnight-workday.yml'
+      - 'tests/workhours-cross-day-credit-all-staff.cjs'
   push:
     branches: [main]
     paths:
@@ -28,3 +29,4 @@ jobs:
           node tests/overtime-extension-cross-midnight-workdate.cjs
           node tests/overtime-clockout-policy.cjs
           node tests/attendance-overtime-official-pair.cjs
+          node tests/workhours-cross-day-credit-all-staff.cjs
