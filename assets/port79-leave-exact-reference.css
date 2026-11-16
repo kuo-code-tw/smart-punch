@@ -556,3 +556,90 @@ html.p79-leave-pixel-admin #port79CalendarModeBox{display:none!important}
  html.p79-leave-pixel-admin #p79PixelFilterBar,
  html.p79-leave-pixel-admin #p79PixelPages{display:none!important}
 }
+
+
+/* Final specificity guard: original global/partial design styles often use
+   html + body[data-system] + ID with !important. The image-matched layout
+   must win without changing any shared stylesheet or other system. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"]{
+ padding-top:0!important;padding-left:204px!important;
+ background:linear-gradient(140deg,#f7faff,#edf5ff)!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] > main{
+ width:100%!important;max-width:none!important;margin:0!important;padding:0 16px 28px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading{
+ height:68px!important;min-height:68px!important;max-height:68px!important;
+ margin:0 -16px!important;padding:0 22px!important;border-radius:0!important;
+ background:#fff!important;border-bottom:1px solid #d9e5f5!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs{
+ display:flex!important;position:relative!important;top:auto!important;
+ width:calc(100% + 32px)!important;min-height:76px!important;
+ margin:0 -16px 14px!important;padding:12px 16px!important;
+ background:#fff!important;border-radius:0!important;gap:12px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs .tab{
+ flex:0 0 auto!important;min-width:168px!important;
+ min-height:47px!important;height:47px!important;
+ padding:11px 23px!important;font-size:15px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode{
+ display:grid!important;grid-template-columns:minmax(0,1fr) 342px!important;
+ grid-template-rows:auto minmax(0,1fr)!important;
+ column-gap:16px!important;row-gap:13px!important;align-items:start!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode>.card{
+ display:flex!important;grid-column:1!important;grid-row:2!important;
+ flex-direction:column!important;padding:0!important;margin:0!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;min-width:0!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualStats{
+ display:grid!important;grid-column:1!important;grid-row:1!important;
+ grid-template-columns:repeat(5,minmax(0,1fr))!important;
+ gap:12px!important;margin:0!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{
+ display:flex!important;grid-column:2!important;grid-row:1 / span 2!important;
+ flex-direction:column!important;gap:13px!important;width:100%!important;min-width:0!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79PixelFilterBar{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ flex-wrap:nowrap!important;min-height:64px!important;padding:10px 0!important;
+ margin:0!important;background:transparent!important;border-top:1px solid #dce7f7!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body.p79-workspace[data-p79-system="leave"] #adminMode{
+ display:block!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body.p79-workspace[data-p79-system="leave"] #adminMode>.card,
+html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualStats,
+html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{
+ display:none!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body.p79-workspace[data-p79-system="leave"] #adminBalancePanel{
+ display:block!important;width:100%!important;max-width:none!important;
+}
+@media(max-width:1480px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode{
+  grid-template-columns:minmax(0,1fr) 310px!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualStats{gap:6px!important}
+}
+@media(max-width:1180px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{
+  grid-column:1!important;grid-row:3!important;display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:900px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"]{
+  padding-left:0!important;padding-top:64px!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{
+  display:grid!important;grid-template-columns:1fr!important;
+ }
+}
