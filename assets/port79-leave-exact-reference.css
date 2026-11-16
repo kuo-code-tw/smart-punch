@@ -120,6 +120,9 @@ html.p79-leave-pixel-admin #globalStatus{
 }
 html.p79-leave-pixel-admin #globalStatus.hidden,
 html.p79-leave-pixel-admin #globalStatus:empty{display:none!important}
+html.p79-leave-pixel-admin:not(.p79-leave-cloud-unverified) #globalStatus.status.info{
+ display:none!important; /* verified routine info must not add another row */
+}
 html.p79-leave-pixel-admin #leaveStickyTabs{
  display:flex!important;align-items:center!important;justify-content:flex-start!important;
  position:relative!important;top:auto!important;
