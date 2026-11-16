@@ -141,7 +141,13 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     (!result[date]?.overtimeReport||nightSplit(date))&&
     (!result[date]?.overtimeReports?.length||nightSplit(date))&&
     (!result[date]?.forEmpId||nightSplit(date))&&
-    (!result[date]?.manualRosterShift||nightSplit(date))&&
+    // A manually selected/imported "休" is a genuine off-day. The manual
+    // roster shift must stay untouched, but the monthly 例/休 accounting may
+    // assign a missing 例 quota to it. Never reclassify explicitly selected
+    // 例/國, work shifts, confirmed overtime, or locked records.
+    (!result[date]?.manualRosterShift||
+      String(result[date].manualRosterShift).trim()==='休'&&
+        String(schedule[date]||'').trim()==='休'||nightSplit(date))&&
     !result[date]?.restQuotaOvertime);
   // Only a non-revoked formal report can consume an unworked rest quota
   // for a working shift. Historical overtime/restQuotaOvertime flags are not proof.
