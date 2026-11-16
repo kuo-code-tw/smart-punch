@@ -1,0 +1,260 @@
+/*
+ * PORT79 approved compact schedule layout, 2026-11-16.
+ * Visual-only overlay: existing monthly roster, daily attendance,
+ * employee/role filters, edit lock, persistence, exports and router remain intact.
+ * No data, handlers or schedule calculations are added or replaced here.
+ */
+html body.p79-workspace[data-p79-system="schedule"]{
+  background:linear-gradient(165deg,#ecf5ff 0%,#f7fbff 48%,#e6f1ff 100%)!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleRefHero{
+  padding:8px 12px 0!important;
+}
+#p79ScheduleRefHero .p79-ref-hero-head{
+  display:grid!important;
+  grid-template-columns:auto minmax(350px,1fr) auto!important;
+  align-items:center!important;
+  gap:7px!important;
+  margin:0 0 7px!important;
+  min-height:0!important;
+}
+#p79ScheduleRefHero .p79-ref-hero-name{
+  min-width:0!important;
+  flex:unset!important;
+  gap:7px!important;
+}
+#p79ScheduleRefHero .p79-ref-hero-heading h1{
+  font-size:19px!important;
+  white-space:nowrap!important;
+}
+#p79ScheduleRefHero .p79-ref-hero-heading i{font-size:20px!important}
+#p79ScheduleRefHero .p79-ref-hero-sub{
+  font-size:11px!important;
+  line-height:1.25!important;
+  max-width:205px;
+}
+#p79ScheduleRefHero #p79ScheduleViewNav{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(145px,1fr))!important;
+  align-items:stretch!important;
+  padding:3px!important;
+  gap:4px!important;
+  min-width:0!important;
+  width:100%!important;
+  background:#fff!important;
+  border:1px solid #c2d9f3!important;
+  border-radius:11px!important;
+  box-shadow:0 2px 7px #143e7718!important;
+}
+#p79ScheduleRefHero #p79ScheduleViewNav .p79-page-link{
+  display:flex!important;
+  min-height:41px!important;
+  padding:7px 12px!important;
+  border:1px solid #b8d5f6!important;
+  border-radius:8px!important;
+  background:linear-gradient(180deg,#fff,#f2f8ff)!important;
+  color:#113b78!important;
+  font-size:14px!important;
+  font-weight:900!important;
+  text-align:center!important;
+  box-shadow:none!important;
+  white-space:nowrap!important;
+}
+#p79ScheduleRefHero #p79ScheduleViewNav .p79-page-link i{
+  font-size:17px!important;
+  color:inherit!important;
+}
+#p79ScheduleRefHero #p79ScheduleViewNav .p79-page-link[aria-current="page"]{
+  background:linear-gradient(130deg,#168bfc,#0060dd)!important;
+  border-color:#0875e7!important;
+  color:white!important;
+  box-shadow:0 3px 9px #0874d333!important;
+}
+#p79ScheduleRefHero #p79SchedulePageNotice{
+  grid-column:1/-1;
+  min-height:0!important;
+  margin:0!important;
+}
+#p79RefAdvancedToggle{
+  min-height:42px!important;
+  padding:7px 13px!important;
+  font-size:13px!important;
+  white-space:nowrap!important;
+  border-color:#b9d5f3!important;
+  background:linear-gradient(180deg,#fff,#f2f8ff)!important;
+  color:#17447e!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell{
+  width:calc(100% - 24px)!important;
+  margin:0 12px 6px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell #p79ScheduleQuickBar{
+  grid-template-columns:minmax(290px,1fr) minmax(0,auto)!important;
+  gap:5px 12px!important;
+  padding:7px 11px!important;
+  border-radius:11px!important;
+  border:1px solid #c7dcf5!important;
+  box-shadow:0 3px 12px #11457a13!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar .p79-quick-month{
+  gap:5px!important;
+  flex-wrap:wrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar .p79-quick-actions{
+  gap:5px!important;
+  flex-wrap:wrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar button,
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar :is(.p79-quick-more,.p79-quick-legend)>summary{
+  min-height:37px!important;
+  padding:6px 9px!important;
+  font-size:12px!important;
+  line-height:21px!important;
+  border:1px solid #b8d3f2!important;
+  border-radius:9px!important;
+  background:linear-gradient(180deg,#fff,#f3f8ff)!important;
+  color:#153d75!important;
+  font-weight:850!important;
+  box-shadow:0 1px 5px #15529d10!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar button.primary{
+  background:linear-gradient(125deg,#138ffc,#0764dc)!important;
+  color:#fff!important;
+  border-color:#137cdf!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar #p79PullOfficialHolidays{
+  background:linear-gradient(120deg,#05b4dc,#0678be)!important;
+  color:#fff!important;
+  border-color:#148ebf!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79QuickMonthHost #scheduleRangeControl{
+  min-height:37px!important;
+  height:37px!important;
+  margin:0!important;
+  padding:2px 5px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79QuickMonthHost #month-picker{
+  font-size:14px!important;
+  font-weight:900!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar #p79ScheduleDataSource{
+  padding:0!important;
+  margin:0!important;
+  grid-column:1/-1!important;
+  min-height:0!important;
+  line-height:15px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ReferenceEditorHost{
+  min-height:0!important;
+  gap:6px!important;
+  margin:2px 0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #p79ReferenceEditorHost #scheduleEditLockStatus{
+  min-height:28px!important;
+  padding:3px 9px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-legend-row{
+  padding:3px 0!important;
+  margin:0!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #main-role-tabs-container{
+  gap:5px!important;
+  min-height:0!important;
+  padding:3px 0!important;
+  flex-wrap:wrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #main-role-tabs-container button{
+  min-height:37px!important;
+  padding:6px 12px!important;
+  font-size:13px!important;
+  line-height:20px!important;
+  border-radius:9px!important;
+  border:1px solid #b9d5f6!important;
+  box-shadow:0 2px 6px #153e6d16!important;
+  white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #main-role-tabs-container button[aria-pressed="true"]{
+  border-color:#0877e1!important;
+  background:linear-gradient(120deg,#168ef9,#0565d3)!important;
+  color:#fff!important;
+}
+#p79ReferenceKpis{
+  grid-template-columns:1.2fr repeat(4,minmax(0,1fr))!important;
+  gap:7px!important;
+  margin:0 0 7px!important;
+}
+#p79ReferenceKpis .p79-ref-kpi{
+  min-height:81px!important;
+  padding:9px 11px!important;
+  gap:9px!important;
+  border-radius:12px!important;
+  box-shadow:0 3px 9px #104f8b15!important;
+}
+#p79ReferenceKpis .p79-ref-kpi-icon{
+  width:43px!important;height:43px!important;
+  font-size:21px!important;
+  border-radius:10px!important;
+}
+#p79ReferenceKpis .p79-ref-kpi>div:last-child span{font-size:13px!important}
+#p79ReferenceKpis .p79-ref-kpi strong{font-size:26px!important;line-height:1.1!important}
+#p79ReferenceKpis .p79-ref-kpi small{font-size:10px!important}
+html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel{
+  width:calc(100% - 24px)!important;
+  margin:2px 12px 12px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel .today-schedule-card{
+  padding:10px!important;border-radius:12px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel #todayScheduleCounts{
+  gap:5px!important;margin-top:7px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel #todayScheduleCounts>div{
+  min-height:56px!important;padding:7px 10px!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel #todayScheduleDetail{
+  margin-top:9px!important;gap:7px!important;
+}
+html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] #app-main-container{
+  padding-top:3px!important;padding-left:12px!important;padding-right:12px!important;
+}
+/* Preserve original edit locks, dropdowns, warnings, roster scrolling and dark theme. */
+html.dark #p79ScheduleRefHero #p79ScheduleViewNav,
+html.dark body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell #p79ScheduleQuickBar{
+  background:#12243d!important;border-color:#3e5674!important;
+}
+html.dark #p79ScheduleRefHero #p79ScheduleViewNav .p79-page-link:not([aria-current="page"]){
+  background:#1d3657!important;color:#e5f0ff!important;border-color:#4b6685!important;
+}
+@media(max-width:1400px){
+  #p79ScheduleRefHero .p79-ref-hero-head{grid-template-columns:1fr auto!important}
+  #p79ScheduleRefHero .p79-ref-hero-name{grid-column:1}
+  #p79ScheduleRefHero #p79ScheduleViewNav{grid-column:1/-1!important;grid-row:2!important}
+  #p79RefAdvancedToggle{grid-column:2;grid-row:1}
+  html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell #p79ScheduleQuickBar{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar .p79-quick-actions{
+    grid-column:1!important;grid-row:2!important;justify-content:flex-start!important;
+  }
+  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar #p79ScheduleDataSource{
+    grid-row:3!important;
+  }
+}
+@media(max-width:900px){
+  #p79ReferenceKpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleRefHero{padding:7px 8px 0!important}
+  html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell,
+  html body.p79-workspace[data-p79-system="schedule"] #todaySchedulePanel{
+    width:calc(100% - 16px)!important;margin-left:8px!important;margin-right:8px!important;
+  }
+}
+@media(max-width:530px){
+  #p79ScheduleRefHero .p79-ref-hero-head{grid-template-columns:minmax(0,1fr) auto!important}
+  #p79ScheduleRefHero #p79ScheduleViewNav{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #p79ScheduleRefHero #p79ScheduleViewNav .p79-page-link{padding:7px 4px!important;font-size:12px!important;gap:4px!important}
+  #p79ReferenceKpis .p79-ref-kpi-icon{width:34px!important;height:34px!important;font-size:17px!important}
+  #p79ReferenceKpis .p79-ref-kpi strong{font-size:21px!important}
+}
+@media print{
+  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleViewNav{display:none!important}
+}
