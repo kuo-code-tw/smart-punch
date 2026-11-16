@@ -69,7 +69,10 @@ legendWrap.append(legend);legend.append(badge);
 tabsWrap.append(roles);
 const original=Object.fromEntries([...nodes.entries()].map(([id,x])=>[id,x]));
 const doc={readyState:'complete',
- getElementById:id=>nodes.get(id)||null,
+ getElementById:id=>{
+  const walk=n=>n.id===id?n:n.children.map(walk).find(Boolean)||null;
+  return walk(shell);
+ },
  createElement:tag=>new Node('',tag.toUpperCase()),
  addEventListener(){throw Error('DOMContentLoaded already passed');}
 };
