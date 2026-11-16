@@ -1535,6 +1535,114 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 @media(max-width:600px){#p79ScheduleQuickBar{padding:8px!important}#p79ScheduleQuickBar .p79-quick-actions>button{font-size:11px!important;padding:5px 8px!important}#p79ScheduleQuickBar .p79-quick-legend>div{right:auto!important;left:0!important}}
 </style><link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
 <script src="../assets/port79-org-context.js?v=20261112-remove-scope-ui-v3"></script>
+<style id="p79-schedule-two-page-design-v1">
+/* Two URLs, one live scheduler: only presentation changes. Do not duplicate
+   schedule state, IndexedDB, cloud save, attendance or editor-lock handlers. */
+#p79ScheduleViewNav{
+ display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:12px 20px;margin:0;background:linear-gradient(110deg,#f0f8ff,#e6f1ff);
+ border-top:1px solid #dce9fb;border-bottom:1px solid #cbdcf5;
+}
+#p79ScheduleViewNav .p79-page-link{
+ display:inline-flex;align-items:center;justify-content:center;gap:10px;
+ min-height:46px;padding:9px 18px;border-radius:13px;border:1px solid #b5d0f0;
+ background:white;color:#154376;box-shadow:0 2px 9px #133b6920;
+ font-size:15px;font-weight:900;text-decoration:none;transition:background .12s ease;
+}
+#p79ScheduleViewNav .p79-page-link:hover{background:#eaf4ff}
+#p79ScheduleViewNav .p79-page-link[aria-current="page"]{
+ background:linear-gradient(125deg,#097fe0,#0751a7);
+ color:white;border-color:#0751a7;box-shadow:0 4px 14px #0b66c947;
+}
+#p79SchedulePageNotice{color:#9a3412;font-size:12px;font-weight:800}
+html[data-p79-schedule-page="daily"] #app-main-container,
+html[data-p79-schedule-page="daily"] #p79ScheduleQuickBar,
+html[data-p79-schedule-page="daily"] #schedule-rule-toolbar,
+html[data-p79-schedule-page="daily"] #schedule-legend-row,
+html[data-p79-schedule-page="daily"] #main-role-tabs-container,
+html[data-p79-schedule-page="daily"] #scheduleActiveEditorBanner{
+ display:none!important;
+}
+html[data-p79-schedule-page="month"] #todaySchedulePanel{display:none!important}
+#todaySchedulePanel{width:100%;max-width:1920px;margin:16px auto 28px;padding:0 20px;box-sizing:border-box}
+#todaySchedulePanel .p79-daily-heading{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+ margin-bottom:14px;padding:17px 22px;border:1px solid #d6e5f5;border-radius:17px;
+ background:linear-gradient(120deg,#fff,#eef6ff);box-shadow:0 6px 18px #0b315018;
+}
+#todaySchedulePanel .p79-daily-heading h2{font-size:22px;font-weight:950;color:#10345e}
+#todaySchedulePanel .p79-daily-heading p{color:#496680;font-size:13px;margin:3px 0 0}
+#todaySchedulePanel .today-schedule-card{
+ border:1px solid #d9e7f5!important;border-radius:18px!important;
+ background:white!important;box-shadow:0 9px 26px #123e6515!important;
+ padding:18px!important;
+}
+#todaySchedulePanel .today-panel-title{font-size:19px!important;color:#14345a!important}
+#todayScheduleCounts{gap:12px!important;margin-top:14px!important}
+#todayScheduleCounts>div{
+ padding:14px 16px!important;min-height:96px;display:flex;flex-direction:column;
+ justify-content:center;border-radius:15px!important;
+ box-shadow:0 5px 15px #173e6b16;border:1px solid #c5d9f2!important;
+}
+#todayScheduleCounts>div:nth-child(1){background:linear-gradient(125deg,#0c83e7,#0750a5)!important;color:#fff!important}
+#todayScheduleCounts>div:nth-child(2){background:linear-gradient(135deg,#effdf3,#d4fae4)!important;color:#046b40!important}
+#todayScheduleCounts>div:nth-child(3){background:linear-gradient(135deg,#fff9e6,#fff0bb)!important;color:#9e5100!important}
+#todayScheduleCounts>div:nth-child(4){background:linear-gradient(135deg,#f9efff,#e9d9ff)!important;color:#6b21a8!important}
+#todayScheduleCounts>div:nth-child(5){background:linear-gradient(135deg,#fff0f5,#ffe2ed)!important;color:#b21b57!important}
+#todayScheduleCounts>div:nth-child(6){background:linear-gradient(135deg,#f0f9ff,#ddf3fe)!important;color:#0369a1!important}
+#todayScheduleCounts .today-count-label{font-size:13px!important;color:inherit!important}
+#todayScheduleCounts .today-count-value{font-size:27px!important;line-height:1.35!important;color:inherit!important}
+#todayScheduleDetail{gap:10px!important;margin-top:15px!important;align-items:start}
+#todayScheduleDetail .today-shift-block{
+ background:#fff;border:1px solid #d9e5f3;border-radius:15px;padding:12px;
+ box-shadow:0 4px 13px #123e6514;overflow:hidden;
+}
+#todayScheduleDetail .today-shift-title{
+ font-size:16px!important;font-weight:900!important;padding:9px 12px;
+ margin:-12px -12px 12px!important;border-radius:14px 14px 0 0;
+ background:linear-gradient(120deg,#e6f2ff,#f8fbff);
+}
+#todayScheduleDetail .today-shift-block:nth-child(1) .today-shift-title{background:linear-gradient(110deg,#0da77a,#27c99b);color:#fff!important}
+#todayScheduleDetail .today-shift-block:nth-child(2) .today-shift-title{background:linear-gradient(110deg,#e9a400,#ffcb43);color:#663b00!important}
+#todayScheduleDetail .today-shift-block:nth-child(3) .today-shift-title{background:linear-gradient(110deg,#7550d5,#a47cf4);color:#fff!important}
+#todayScheduleDetail .today-shift-block:nth-child(4) .today-shift-title{background:linear-gradient(110deg,#db518d,#fa8db2);color:#fff!important}
+#todayScheduleDetail .today-person-row{border-radius:8px!important}
+#p79DailyMonthMismatchNotice:not([hidden]){
+ padding:13px 16px;margin:12px 0;border-radius:12px;
+ background:#fffbeb;color:#92400e;border:1px solid #f9d66c;font-weight:700
+}
+#p79DailyMonthMismatchNotice button{
+ border-radius:8px;background:#155cb2;color:white;padding:7px 12px;
+ font-weight:800;margin-left:8px;
+}
+html[data-p79-schedule-page="month"] #app-main-container{padding-top:14px!important}
+html[data-p79-schedule-page="month"] .p79-roster-action-heading{
+ border:1px solid #d3e1f3!important;border-radius:14px 14px 0 0!important;
+ background:linear-gradient(110deg,#f8fbff,#e7f3ff)!important;
+}
+html[data-p79-schedule-page="month"] #app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="早"]{background:#d8f7e5!important}
+html[data-p79-schedule-page="month"] #app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="中"]{background:#fff3ca!important}
+html[data-p79-schedule-page="month"] #app-main-container .p79-month-schedule-table .p79-day-cell[data-display-shift="晚"]{background:#dbeafe!important}
+html[data-p79-schedule-page="month"] #app-main-container .p79-month-schedule-table .p79-day-cell:is([data-display-shift="休"],[data-display-shift="例"],[data-display-shift="國"]){background:#ffe3ec!important}
+html[data-p79-schedule-page="month"] #app-main-container .p79-month-schedule-table .p79-day-cell .p79-shift-select{
+ border-radius:7px!important;font-weight:900!important;
+}
+html.dark #p79ScheduleViewNav{background:#132a46;border-color:#334b68}
+html.dark #todaySchedulePanel .p79-daily-heading,html.dark #todaySchedulePanel .today-schedule-card,
+html.dark #todayScheduleDetail .today-shift-block{background:#13243c!important;color:#f8fafc!important;border-color:#334b68!important}
+html.dark #todaySchedulePanel .p79-daily-heading h2,html.dark #todaySchedulePanel .today-panel-title{color:#f8fafc!important}
+@media(max-width:720px){
+ #p79ScheduleViewNav{padding:8px;gap:7px}
+ #p79ScheduleViewNav .p79-page-link{flex:1 1 135px;font-size:13px;min-height:42px;padding:8px}
+ #todaySchedulePanel{padding:0 8px}
+ #todaySchedulePanel .p79-daily-heading h2{font-size:18px}
+}
+@media print{#p79ScheduleViewNav{display:none!important}}
+</style>
+<script id="p79-schedule-two-page-initializer">
+/* Prevent the wrong large panel flashing before the scheduler initializes. */
+document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.search).get('view')==='month'?'month':'daily';
+</script>
 </head>
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
@@ -1674,6 +1782,17 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
       <span id="p79QuickMonthStatus" hidden aria-hidden="true"></span>
       <div id="p79ScheduleDataSource" role="status" aria-live="polite" style="flex-basis:100%" class="text-xs text-slate-600 dark:text-slate-300 py-1"></div>
     </section>
+
+    <!-- Two independent navigation pages that share the existing scheduler instance. -->
+    <nav id="p79ScheduleViewNav" aria-label="排班管理兩個頁面">
+      <a id="p79DailyPageLink" class="p79-page-link" href="?view=daily" aria-current="page" onclick="return p79GoScheduleView(event,'daily')">
+        <i class="fa-solid fa-chart-column" aria-hidden="true"></i> 每日排班總覽
+      </a>
+      <a id="p79MonthlyPageLink" class="p79-page-link" href="?view=month" onclick="return p79GoScheduleView(event,'month')">
+        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 月排班編輯
+      </a>
+      <span id="p79SchedulePageNotice" role="status" aria-live="polite"></span>
+    </nav>
     <!-- 圖片二：說明與全部職稱頁籤固定在上方，不會隨班表往下捲走 -->
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
       <div id="schedule-legend-row" class="max-w-[1920px] mx-auto bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
@@ -1690,6 +1809,12 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 
   <!-- v7.39：登入首頁直接顯示今日排班出勤人員 -->
   <section id="todaySchedulePanel" class="no-print">
+    <div class="p79-daily-heading">
+      <div><h2><i class="fa-solid fa-clipboard-list"></i> 每日排班總覽</h2>
+      <p>直接查看今日早班、中班、晚班、休假及加班／代班，考勤狀態依原系統核對</p></div>
+      <a href="?view=month" onclick="return p79GoScheduleView(event,'month')" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white no-underline">查看月排班表 →</a>
+    </div>
+    <div id="p79DailyMonthMismatchNotice" hidden>目前月份不是本月，今日人員名單尚未載入。<button type="button" onclick="p79QuickScheduleMonth(0)">載入本月班表</button></div>
     <div class="today-schedule-card p-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="p79-today-heading-inline">
@@ -9420,6 +9545,83 @@ window.p79ShowCombinedShiftInfo=function(button){
 #app-main-container .p79-month-schedule-table .p79-rest-election{background:#eef2ff!important;color:#4338ca!important;font-weight:900!important}
 </style>
 <script>window.Port79OrgContext.configure({system:'schedule',people:()=>employeeMasterBase.length?employeeMasterBase:employees,render:()=>{renderRoleScheduleView();renderEmployeeManagementView();}});</script>
+<script id="p79-schedule-two-page-controller">
+/* Router changes only visibility and URL; no second schedule store or write path. */
+function p79SchedulePageValue(value){return value==='month'?'month':'daily';}
+function p79ScheduleSetPageUrl(page,replace=false){
+ const u=new URL(location.href);
+ u.searchParams.set('view',page);
+ history[replace?'replaceState':'pushState']({p79SchedulePage:page},'',u.pathname+u.search+u.hash);
+}
+function p79ScheduleRefreshPageNav(){
+ const page=p79SchedulePageValue(document.documentElement.dataset.p79SchedulePage);
+ for(const [id,name] of [['p79DailyPageLink','daily'],['p79MonthlyPageLink','month']]){
+  const link=document.getElementById(id);if(!link)continue;
+  if(name===page)link.setAttribute('aria-current','page');
+  else link.removeAttribute('aria-current');
+ }
+}
+async function p79SelectSchedulePage(next,{updateUrl=true}={}){
+ next=p79SchedulePageValue(next);
+ const current=p79SchedulePageValue(document.documentElement.dataset.p79SchedulePage);
+ const note=document.getElementById('p79SchedulePageNotice');
+ if(next===current){
+  if(updateUrl)p79ScheduleSetPageUrl(next,true);
+  p79ScheduleRefreshPageNav();
+  return true;
+ }
+ // Do not hide unsaved monthly edits. Existing write/lock and receipt guards
+ // remain responsible for deciding when switching is safe.
+ if(current==='month' && typeof flushSchedulePendingWrites==='function' &&
+   (typeof port79ScheduleDirty!=='undefined'&&port79ScheduleDirty ||
+    typeof scheduleSaveTimer!=='undefined'&&scheduleSaveTimer ||
+    typeof personnelSaveTimer!=='undefined'&&personnelSaveTimer ||
+    typeof port79ScheduleWriteInFlight!=='undefined'&&port79ScheduleWriteInFlight)){
+  if(note)note.textContent='正在確認尚未儲存的排班…';
+  try{
+   const ok=await flushSchedulePendingWrites();
+   if(!ok)throw Error('排班尚未儲存成功，請先確認儲存狀態');
+  }catch(error){
+   if(note)note.textContent=String(error?.message||error);
+   if(!updateUrl)p79ScheduleSetPageUrl(current,true);
+   return false;
+  }
+ }
+ if(note)note.textContent='';
+ document.documentElement.dataset.p79SchedulePage=next;
+ if(updateUrl)p79ScheduleSetPageUrl(next);
+ p79ScheduleRefreshPageNav();
+ if(next==='daily'){
+  if(typeof todayScheduleExpanded!=='undefined')todayScheduleExpanded=true;
+  if(typeof renderTodaySchedulePanel==='function')renderTodaySchedulePanel();
+ }else{
+  // Hidden tables measure zero width: rerender only after the page is visible
+  // so the original sticky name column and horizontal scroll remain aligned.
+  requestAnimationFrame(()=>{
+   if(typeof renderRoleScheduleView==='function')renderRoleScheduleView();
+   window.dispatchEvent(new Event('resize'));
+  });
+ }
+ return true;
+}
+function p79GoScheduleView(event,page){
+ if(event)event.preventDefault();
+ void p79SelectSchedulePage(page);
+ return false;
+}
+window.addEventListener('popstate',()=>{
+ const page=p79SchedulePageValue(new URLSearchParams(location.search).get('view'));
+ void p79SelectSchedulePage(page,{updateUrl:false});
+});
+document.addEventListener('DOMContentLoaded',()=>{
+ const page=p79SchedulePageValue(new URLSearchParams(location.search).get('view'));
+ document.documentElement.dataset.p79SchedulePage=page;
+ if(typeof todayScheduleExpanded!=='undefined'&&page==='daily')todayScheduleExpanded=true;
+ p79ScheduleRefreshPageNav();
+ if(page==='daily'&&typeof renderTodaySchedulePanel==='function')renderTodaySchedulePanel();
+});
+</script>
+
 </body>
 </html>
 
