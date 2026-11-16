@@ -6,6 +6,7 @@ on:
       - 'assets/port79-schedule-two-line-toolbar.js'
       - 'assets/port79-schedule-two-line-toolbar.css'
       - 'tests/schedule-two-line-toolbar.cjs'
+      - 'tests/schedule-toolbar-readability.cjs'
       - '.github/workflows/schedule-two-line-toolbar.yml'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'assets/port79-schedule-two-line-toolbar.js'
       - 'assets/port79-schedule-two-line-toolbar.css'
       - 'tests/schedule-two-line-toolbar.cjs'
+      - 'tests/schedule-toolbar-readability.cjs'
       - '.github/workflows/schedule-two-line-toolbar.yml'
 permissions:
   contents: read
@@ -26,5 +28,6 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/schedule-two-line-toolbar.cjs
+      - run: node tests/schedule-toolbar-readability.cjs
       - run: node tests/schedule-two-pages.cjs
       - run: node tests/leave-reference-visual-only.cjs
