@@ -1621,8 +1621,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -2373,8 +2373,18 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
  .p79-smart-cover-toolbar{gap:6px!important}
 }
 </style>
+<style id="p79-cover-worker-job-first-v1">
+/* The primary flow places each worker's title directly beside their name. */
+.p79-smart-cover-slot{display:grid;gap:5px;min-width:0}
+.p79-smart-cover-slot strong{font-size:13px;color:#24354d}
+.p79-smart-cover-slot-fields{display:grid;grid-template-columns:minmax(105px,.9fr) minmax(140px,1.15fr);gap:9px;align-items:end}
+.p79-smart-cover-slot-fields label{min-width:0}
+.p79-smart-cover-slot-fields select{width:100%;min-width:0}
+.p79-smart-cover-slot-count{font-size:11px;color:#64748b;line-height:1.35}
+@media(max-width:420px){.p79-smart-cover-slot-fields{grid-template-columns:minmax(0,1fr)}}
+</style>
 
-<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
 <script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
 </body>
 </html>
