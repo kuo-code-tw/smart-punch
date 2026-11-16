@@ -444,3 +444,154 @@ html.p79-leave-reference-admin #adminBalancePanel>summary{
 }
 /* The visual skin does not alter the employee application page, including
    its original simple mode, hidden elements, application form and permissions. */
+
+
+/* Reference-design final layer. The shared PORT79 workspace is loaded after
+   older page styles, and moves its REAL nav nodes into a separate sidebar.
+   Target those mounted nodes instead of the obsolete .top-row.
+   Never replace any link, menu, permission, button, account, or data source. */
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"]{
+ --p79-w-width:204px!important;
+ --p79-w-bg:#f3f7fd!important;
+ padding-left:var(--p79-w-width)!important;
+ background:linear-gradient(140deg,#f3f8ff,#f8faff 65%,#edf4fd)!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop.p79-workspace-sidebar{
+ width:var(--p79-w-width)!important;
+ background:linear-gradient(165deg,#183c68 0%,#112b4f 55%,#0c2445 100%)!important;
+ border-right:1px solid #244670!important;
+ color:#f4f9ff!important;
+ box-shadow:3px 0 18px rgba(14,43,79,.13)!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-workspace-brand{
+ min-height:90px!important;padding:15px 12px!important;gap:8px!important;
+ border-bottom:1px solid rgba(207,229,254,.14)!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-workspace-brand strong{
+ font-size:21px!important;letter-spacing:-.03em!important;
+ color:#fff!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-workspace-brand small{
+ color:#b9d3f6!important;font-size:10px!important;letter-spacing:3px!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-workspace-brand .p79-port-mark{
+ width:43px!important;height:43px!important;flex:0 0 43px!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav{
+ margin:12px 9px 0!important;padding:0!important;gap:5px!important;
+ overflow-y:auto!important;overflow-x:hidden!important;
+ background:transparent!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav a{
+ color:#d9eaff!important;background:transparent!important;
+ min-height:45px!important;padding:11px 12px!important;
+ border-radius:9px!important;font-size:13px!important;font-weight:800!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav a svg{
+ color:#b2d1f5!important;width:19px!important;height:19px!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav a:hover{
+ background:#294d7d!important;color:#fff!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav a.active{
+ background:linear-gradient(100deg,#1069e9,#2784ff)!important;
+ color:#fff!important;box-shadow:0 5px 13px rgba(0,24,63,.22)!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenNav a.active svg{color:#fff!important}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-sidebar-footer{
+ color:#c4dcff!important;border-color:rgba(196,220,255,.14)!important;
+ background:rgba(9,28,57,.15)!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-sidebar-footer strong{
+ color:#eaf3ff!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-sidebar-footer small{color:#b7cde7!important}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79WorkspaceTopbar{
+ left:var(--p79-w-width)!important;
+ background:#edf4ff!important;border-bottom:1px solid #e0e9f7!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79WorkspaceStatus{
+ background:#e8eff9!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading{
+ background:#fff!important;border-color:#dfe7f4!important;
+}
+html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop .p79-sidebar-footer .p79-sidebar-harbor{
+ opacity:.48!important;
+}
+
+/* Annual balance is a REAL third tab beside the two original mode tabs:
+   its contents are the original adminBalancePanel and adminBalanceBody.
+   Hidden only on this tab are the other admin presentation cards. */
+html.p79-leave-reference-admin #tabLeaveBalances{
+ min-width:236px!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminMode{
+ display:block!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #p79LeaveVisualStats,
+html.p79-leave-reference-admin.p79-leave-balance-only #p79LeaveVisualSide,
+html.p79-leave-reference-admin.p79-leave-balance-only #adminMode>div.card{
+ display:none!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel{
+ display:block!important;
+ width:100%!important;margin:0!important;
+ padding:18px!important;
+ max-width:100%!important;
+ border-radius:12px!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel>summary{
+ padding:5px 0 12px!important;
+ font-size:19px!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel .table-wrap{
+ width:100%!important;
+ overflow-x:auto!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel table{
+ width:100%!important;min-width:860px!important;
+ border-collapse:collapse!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel th{
+ background:#eaf2fc!important;
+ padding:13px 10px!important;
+}
+html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel td{
+ padding:12px 10px!important;
+}
+
+/* Never interpret an HR-only fall-back as zero official leave requests. */
+#p79LeaveCloudUnverified[hidden]{display:none!important}
+html.p79-leave-reference-admin #p79LeaveCloudUnverified:not([hidden]){
+ display:block!important;
+ background:#fff7e8!important;
+ border:1px solid #f8d79a!important;
+ color:#89551c!important;
+ border-radius:9px!important;
+ padding:11px 13px!important;
+ font-size:12.5px!important;
+ font-weight:750!important;
+ margin:0 0 13px!important;
+}
+html.p79-leave-reference-admin.p79-leave-cloud-unverified #adminLeaveSummary{
+ color:#a56522!important;
+ font-weight:800!important;
+}
+
+/* Preserve the existing employee leave request page and its bare layout. */
+@media(max-width:900px){
+ html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"]{
+  padding-left:0!important;
+ }
+ html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop.p79-workspace-sidebar{
+  width:min(285px,84vw)!important;
+ }
+ html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79WorkspaceTopbar{
+  left:0!important;
+ }
+}
+@media(max-width:560px){
+ html.p79-leave-reference-admin #tabLeaveBalances{min-width:180px!important}
+ html.p79-leave-reference-admin.p79-leave-balance-only #adminBalancePanel{padding:12px!important}
+}
