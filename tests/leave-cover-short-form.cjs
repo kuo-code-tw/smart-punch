@@ -16,7 +16,7 @@ const slots=two.match(/<select data-smart-action="slot" data-smart-slot="[01]"[\
 assert.equal(slots.length,2,'two 4-hour positions are directly visible');
 assert(!two.includes('data-smart-action="advanced" open'),'advanced filters do not expand by default');
 assert(two.includes('進階篩選／查看全部候選人（選填）'),'filters accessible for advanced use');
-assert(two.includes('第一位代班（4 小時）')&&two.includes('第二位代班（4 小時）'));
+assert(two.includes('第一位代班（早班加班 4 小時）')&&two.includes('第二位代班（晚班加班 4 小時）'));
 assert(slots.every(x=>x.includes('第二人')),'both slots bypass one-name advanced filter while using the target job');
 assert(two.includes('data-smart-action="slot-job" data-smart-slot="0"')&&two.includes('data-smart-action="slot-job" data-smart-slot="1"'),'both direct selects have their own title dropdown');
 assert(two.includes('<option value="F/L" selected>F/L</option>'),'the leave employee job auto-populates both slots');
@@ -42,7 +42,7 @@ assert(create.includes("action.slot===1&&!entry.secondVisible"),'one-person sour
 assert(approved.includes("action.slot===1&&row.mode!=='two'"),'approved source can use direct slot 0');
 assert(page.includes('p79-leave-short-form-v1'),'compact CSS is shipped');
 for(const name of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js'])
- assert(page.includes(name+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1'),name+' must bust old browser cache');
+ assert(page.includes(name+'?v='+(name==='port79-leave-daily-simple.js'?'20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1':'20261116-sameday-4h-stroke-v1')),name+' must bust old browser cache');
 for(const js of [code,create,approved])new vm.Script(js);
 for(const match of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
  if(!/\bsrc=|application\/json|importmap/.test(match[1])&&match[2].trim())new vm.Script(match[2]);
