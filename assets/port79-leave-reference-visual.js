@@ -186,6 +186,21 @@ function init(){
      const unverified=!cloudReady&&rs.length===0;
      document.documentElement.classList.toggle('p79-leave-cloud-unverified',unverified);
      statusBanner.hidden=!unverified;
+     const officialSummary=document.getElementById('adminLeaveSummary');
+     if(unverified){
+       // The original controller's zero-row fallback is NOT an official
+       // getLeaveData result. Replace ONLY these UI text nodes with an
+       // explicit unknown state; never touch leaveRecords or cloud storage.
+       if(officialSummary){
+         const warning='請假正式雲端紀錄尚未同步｜筆數待確認（目前不是 0 筆的正式核對結果）';
+         if(officialSummary.textContent!==warning)officialSummary.textContent=warning;
+       }
+       const emptyRow=document.querySelector('#adminLeaveBody td[colspan="9"]');
+       if(emptyRow){
+         const message='正式請假紀錄讀取未完成，請按原本的「重新整理」讀取；目前尚無法確認請假筆數。';
+         if(emptyRow.textContent!==message)emptyRow.textContent=message;
+       }
+     }
      updateStats(rs,m,unverified);updateCalendar(rs,m);
    });
  }
