@@ -67,7 +67,7 @@ assert(approved.includes("action.kind==='slot'")&&fresh.includes("action.kind===
 assert(approved.includes("entry.mode==='two'&&ids.length!==2"),'approved two-person saves still reject missing second worker');
 assert(fresh.includes("ids.length!==(row.secondVisible?2:1)"),'new-leave saves still reject missing second worker');
 for(const filename of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js']){
- assert(leave.includes(filename+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1'),'deployed page cache busts '+filename);
+ assert(leave.includes(filename+'?v='+(filename==='port79-leave-daily-simple.js'?'20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1':'20261116-sameday-4h-stroke-v1')),'deployed page cache busts '+filename);
 }
 for(const x of [js,approved,fresh])new vm.Script(x);
 console.log('PASS two separate leave-cover selectors; filters no longer hide second choice; duplicate/unavailable workers blocked; both workflows integrated');
