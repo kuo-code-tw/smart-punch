@@ -1621,8 +1621,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <p style="margin-top:10px;font-size:12px">僅可安排同部門、未核准請假的人員；選擇「排休代班」會由雲端確認請假日期均為排休。</p>
 <div class="cover-actions"><button type="button" onclick="p79CloseLeaveCover()">取消</button><button type="button" id="p79LeaveCoverSave" onclick="p79SaveLeaveCover()">儲存並同步排班</button></div>
 </div></div>
-<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3"></script>
-<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3"></script>
+<script src="../assets/port79-smart-cover-picker.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
+<script src="../assets/port79-approved-cover-auto.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
 
 <style id="p79-leave-create-layout-v91">
 #adminCreateLeaveDialog [hidden]{display:none!important}
@@ -2348,7 +2348,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 @media(max-width:600px){#p79LeaveCoverModal .cover-card{padding:12px} .p79-smart-cover-toolbar{align-items:stretch}.p79-smart-cover-recommend{margin-left:0!important}.p79-smart-cover-day{padding:7px}.p79-smart-cover-person{padding:10px!important}}
 </style>
 
-<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116"></script>
 <script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
 </body>
 </html>
