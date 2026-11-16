@@ -42,6 +42,10 @@ function init(){
  if(employeeTab)employeeTab.textContent='員工請假';
  recordsTab.addEventListener('click',()=>{
   if(adminTab?.classList.contains('hidden'))return;
+  // The existing annual tab is controlled by its own CSS state. Clear it
+  // before opening the read-only history view, otherwise the records card
+  // stays hidden even though the admin page is active.
+  document.documentElement.classList.remove('p79-leave-balance-only');
   if(typeof switchMode==='function')switchMode('admin');
   queryView=true;
   document.documentElement.classList.add('p79-pixel-history-view');
