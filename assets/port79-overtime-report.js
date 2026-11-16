@@ -526,7 +526,7 @@
    const expectedSplitRule={normalStart:split.normalStart,normalEnd:split.normalEnd,
     overtimeStart:split.overtimeStart,overtimeEnd:split.overtimeEnd,declaredHours:split.declaredHours};
    if(ownShift!==split.normalShift)return {code:'',requirePeriodSelection:true,
-    workdayShiftMismatch:true,expectedNormalShift:split.normalShift,expectedSplitRule,
+    workdayShiftMismatch:true,actualNormalShift:ownShift,expectedNormalShift:split.normalShift,expectedSplitRule,
     overtimeDate:split.overtimeDate,workDate:split.workDate,
     periodHint:'預排候選：正常班 '+split.normalStart+'-'+split.normalEnd+'，加班 '+split.overtimeStart+'-'+split.overtimeEnd+'；出勤日 '+split.workDate+'，加班歸屬 '+split.overtimeDate+'；雲端尚未確認此人 '+date+' 的 '+split.normalShift+'班，請核對後才能儲存。'};
    return {code:split.code,requirePeriodSelection:false,expectedSplitRule,overtimeDate:split.overtimeDate,workDate:split.workDate,
@@ -546,6 +546,17 @@
    }else times=halves[name][cover.workerIds.findIndex(id=>key(id)===key(entry.empId))===1?1:0];
   }
   return {code:'',requirePeriodSelection:true,periodHint:times?'請假班為'+name+'班 '+ranges[name].join('-')+'；本筆代班時段 '+times.join('-')+'，請選擇符合的已設定規則。':''};
+ }
+ // An employee's actual-shift extension is NOT proof of the original split
+ // leave-cover overtime. Check it independently against the cloud roster.
+ function independentShiftOvertimeIssue(shift,rule){
+  const name=String(shift||''),normal={早:['08','16'],中:['16','24'],晚:['24','08']}[name];
+  if(!normal)return '正式班表為「'+(name||'未排班')+'」，無法依本人班別申報平日延時加班；請先核對排班。';
+  if(!Array.isArray(rule)||rule[0]!=='延'||!['before','after'].includes(rule[8]))
+   return '依本人正式班別申報只能選「平日延時加班」，其他類型須另行申報。';
+  if(hour(rule[4])%1440!==hour(normal[0])%1440||hour(rule[5])%1440!==hour(normal[1])%1440)
+   return '正式班表為「'+name+'」班（'+normal.join('-')+'），目前選擇的正常班時間不一致；請選符合原班別的加班時段，或先至排班管理正式調整班別。';
+  return '';
  }
  function dialog(title,content,id='p79OvertimeDialog'){
   const previous=document.getElementById(id);previous?.p79Cleanup?.();previous?.remove();
@@ -1949,7 +1960,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
