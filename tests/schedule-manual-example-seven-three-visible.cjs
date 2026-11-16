@@ -24,7 +24,7 @@ for(const n of rests){
 const original=JSON.stringify({roster,meta}),emp={id:'AP1080060',name:'黃柏源',group:'D組'};
 assert.deepEqual(p79RestQuota(month).counts,{例:5,休:4,國:0});
 assert.equal(Object.values(meta).filter(x=>x.restCategory==='例').length,7,
- 'fixture matches screenshot's seven manually selected 例 dates');
+ 'fixture matches seven manually selected 例 dates from the screenshot');
 const plan=p79AllocateRestMonth(roster,meta,month),again=p79AllocateRestMonth(roster,plan.meta,month);
 const total=(m,k)=>Object.values(m).filter(x=>x.restCategory===k).length;
 assert.equal(total(plan.meta,'例'),5,'surplus manual 例 is moved out of 例 quota');
