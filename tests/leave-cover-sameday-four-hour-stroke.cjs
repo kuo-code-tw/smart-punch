@@ -70,6 +70,7 @@ const firstRule=['代','代16-20',4,4,'','','16','20','full','代班加班'];
 const secondRule=['代','代20-24',4,4,'','','20','24','full','代班加班'];
 assert.doesNotThrow(()=>backend.p79DirectCoverCheckV107_(cloud.schedules,firstReq,firstRule,cover,leaveRecords,date));
 assert.doesNotThrow(()=>backend.p79DirectCoverCheckV107_(cloud.schedules,secondReq,secondRule,cover,leaveRecords,date));
+assert(fs.readFileSync('backend/night-cover-dual-date-v108-core.gs','utf8').includes("if(request.coverPeriodMode!=='same-day')schedule[date]=assigned"),'new same-day overtime must not change the official roster shift');
 assert.throws(()=>backend.p79DirectCoverCheckV107_(cloud.schedules,firstReq,secondRule,cover,leaveRecords,date),/16:00–20:00/);
 assert.throws(()=>backend.p79DirectCoverCheckV107_(cloud.schedules,{...secondReq,date:'2026-11-15'},secondRule,cover,leaveRecords,date),/2026-11-14/);
 
