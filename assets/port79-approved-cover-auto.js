@@ -168,7 +168,7 @@
    state.leaves=allLeaves;state.covers=allCovers;
    if(seq!==serial||!state||state.id!==id||state.manual||el('p79LeaveCoverModal')?.hidden)return;
    if(allCovers.some(c=>String(c.leaveId)===id)){status.textContent='雲端發現已有代班安排，已保留原紀錄；請先重新整理。';state=null;return;}
-   const entries=dates.map(date=>{const suggestion=helper.suggest({people,rosters:roster,leaves:allLeaves,covers:allCovers,leaveEmpId:target.empId,date});
+   const entries=dates.map(date=>{const suggestion=helper.suggest({people,rosters:roster,leaves:allLeaves,covers:allCovers,leaveEmpId:target.empId,date,periodMode:'same-day'});
     return {date,recommendation:suggestion,first:suggestion.first?.empId||'',second:suggestion.second?.empId||'',mode:suggestion.first&&suggestion.second?'two':'one'};
    });
    state.entries=entries;
