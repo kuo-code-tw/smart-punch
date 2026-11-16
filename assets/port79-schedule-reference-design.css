@@ -404,29 +404,7 @@ html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedul
  width:49px!important;min-width:49px!important;max-width:49px!important;padding-left:3px!important;padding-right:3px!important;
 }
 
-/* Read-only company-wide quota audit. Visible by default on the month page,
-   computed in idle batches to avoid freezing the schedule grid. */
-html[data-p79-schedule-page="daily"] #p79RestAuditLiveStatus{display:none!important}
-#p79RestAuditLiveStatus[hidden]{display:none!important}
-#p79RestAuditLiveStatus{
- display:block;margin:1px 0 13px;padding:9px 13px;border-radius:11px;
- background:#ecfdf5;border:1px solid #99dfc4;color:#075f49;
- font-size:12px;font-weight:750;line-height:1.6;
-}
-#p79RestAuditLiveStatus.p79-audit-attention{
- background:#fffaeb;border-color:#f6d78e;color:#7c490c;
-}
-#p79RestAuditLiveStatus .p79-audit-heading{font-weight:950}
-#p79RestAuditLiveStatus small{display:block;font-size:11px;font-weight:600}
-#p79RestAuditLiveStatus .p79-audit-details{margin:7px 0 0}
-#p79RestAuditLiveStatus .p79-audit-details summary{
- font-size:12px;cursor:pointer;font-weight:900;text-decoration:underline;
-}
-#p79RestAuditLiveStatus .p79-audit-details pre{
- white-space:pre-wrap;max-height:200px;overflow:auto;margin:8px 0 0;
- padding:10px;background:#fffefa;border:1px solid #f1e2c5;
- border-radius:7px;font:12px/1.7 system-ui,'Noto Sans TC',sans-serif;
-}
+/* The company-wide audit banner was removed: the roster must not gain height. */
 /* Keep real interaction priority, edit locks, scrolling and browser sizes safe. */
 @media(max-width:1540px){
  #p79ReferenceKpis{gap:8px}
