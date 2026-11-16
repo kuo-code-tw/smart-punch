@@ -393,6 +393,17 @@ html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedul
  margin:0 8px 8px!important;border-radius:0 0 9px 9px!important;background:#dceafb!important;
 }
 
+/* Fit approximately twenty dates at 1680px, like the approved monthly image. */
+html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] #app-main-container .p79-month-schedule-table :is(.p79-day-head,.p79-day-cell){
+ width:49px!important;min-width:49px!important;max-width:49px!important;
+}
+html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] #app-main-container .p79-month-schedule-table :is(.p79-person-header,.p79-person-cell){
+ width:166px!important;min-width:166px!important;max-width:166px!important;
+}
+html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedule"] #app-main-container .p79-month-schedule-table :is(.p79-rest-example,.p79-rest-break,.p79-rest-national,.p79-rest-election){
+ width:49px!important;min-width:49px!important;max-width:49px!important;padding-left:3px!important;padding-right:3px!important;
+}
+
 /* Keep real interaction priority, edit locks, scrolling and browser sizes safe. */
 @media(max-width:1540px){
  #p79ReferenceKpis{gap:8px}
