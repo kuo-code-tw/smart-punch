@@ -20,9 +20,15 @@ assertSame(f.p79RestQuota(month).counts,{例:5,休:4,國:0});
  for(const n of [1,5,13])roster[d(n)]='例';
  const extra=[2,3,10,16,23,30];
  for(const n of extra)roster[d(n)]='休';
- const meta=Object.fromEntries([3,10,16,23,30].map(n=>[d(n),{
-  manualRosterShift:'例',restCategory:'例',restAllocationSource:'manual'
- }]));
+ const meta=Object.fromEntries([
+  ...[1,5,13].map(n=>[d(n),{
+   manualRosterShift:'例',restCategory:'例',restAllocationSource:'manual',
+   restCategoryLocked:true
+  }]),
+  ...[3,10,16,23,30].map(n=>[d(n),{
+   manualRosterShift:'例',restCategory:'例',restAllocationSource:'manual'
+  }])
+ ]);
  const before=JSON.stringify({roster,meta});
  const plan=f.p79AllocateRestMonth(roster,meta,month);
  assert(plan.conflicts.length>=3,'existing over-quota dates are flagged, not thrown');
