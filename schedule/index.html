@@ -8160,7 +8160,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
           if(run!==p79RestAuditRunId||currentScheduleMonthKey()!==month)return;
           const problems=totals.needsUpdate+totals.blocked;
           target.classList.toggle('p79-audit-attention',problems>0);
-          const title=month+' 全員核對：'+totals.checked+'人已掃描，'+totals.complete+
+          const sourceLabel=typeof p79ScheduleHasOfficialData==='function'&&p79ScheduleHasOfficialData()?'正式班表':'本機暫存班表';
+          const title=month+' '+sourceLabel+'全員核對：'+totals.checked+'人已掃描，'+totals.complete+
             '人符合，'+totals.needsUpdate+'人需核對，'+totals.unresolved+
             '人配額不足，'+totals.blocked+'人資料未齊'+
             (exempt?'，'+exempt+'人免排班':'');
@@ -8169,7 +8170,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           heading.className='p79-audit-heading';
           heading.textContent=title;target.appendChild(heading);
           const description=document.createElement('small');
-          description.textContent='自動讀取現有資料與顯示日期格；含額外休假或正式申報者不會被強制改成 5／4，原班表未變更。';
+          description.textContent='自動讀取目前已載入資料與顯示日期格。考勤、請假及加班需取得雲端確認；額外休假或申報不會強制改成 5／4，原班表未變更。';
           target.appendChild(description);
           if(findings.length){
             const details=document.createElement('details');
