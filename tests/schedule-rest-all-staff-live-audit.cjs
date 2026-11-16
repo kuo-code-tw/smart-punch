@@ -13,8 +13,8 @@ const schedule=()=>Object.fromEntries(Array.from({length:30},(_,i)=>
 assertSame(f.p79RestQuota(month).counts,{例:5,休:4,國:0});
 
 // Real-world AQC D rotation shape: three visible bare 例 plus five explicit
-// manual 例 stored in the off-day metadata. This was previously an exception
-// that silently aborted the entire employee's auto-audit.
+// locked manual 例 stored in the off-day metadata. These explicit locks
+// must remain conflicts rather than being silently reallocated.
 {
  const roster=schedule();
  for(const n of [1,5,13])roster[d(n)]='例';
@@ -26,7 +26,8 @@ assertSame(f.p79RestQuota(month).counts,{例:5,休:4,國:0});
    restCategoryLocked:true
   }]),
   ...[3,10,16,23,30].map(n=>[d(n),{
-   manualRosterShift:'例',restCategory:'例',restAllocationSource:'manual'
+   manualRosterShift:'例',restCategory:'例',restAllocationSource:'manual',
+   restCategoryLocked:true
   }])
  ]);
  const before=JSON.stringify({roster,meta});
@@ -34,7 +35,7 @@ assertSame(f.p79RestQuota(month).counts,{例:5,休:4,國:0});
  assert(plan.conflicts.length>=3,'existing over-quota dates are flagged, not thrown');
  assert(plan.conflicts.every(x=>x.reason==='既有例休國超過配額'));
  assert.equal(JSON.stringify({roster,meta}),before,'original roster/manual meta not overwritten');
- for(const n of [3,10,16,23,30])assert.equal(plan.meta[d(n)].restCategory,'例','existing manual labels remain');
+ for(const n of [3,10,16,23,30])assert.equal(plan.meta[d(n)].restCategory,'例','explicitly locked manual labels remain');
  const reload=f.p79AllocateRestMonth(roster,plan.meta,month);
  assert(reload.conflicts.length>=3,'conflicts survive rerun instead of disappearing');
 }
