@@ -21,7 +21,7 @@ assert(slots.every(x=>x.includes('第二人')),'both slots bypass one-name advan
 assert(slots.some(x=>x.includes('已請假人')&&x.includes('disabled')),'leave conflict is still blocked');
 assert(two.includes('請選擇 2 位代班人員（已選 0 位）'));
 const chosen=picker.render({...params,selected:['A','B']});
-assert(chosen.includes('✓ 已選好 2 位，預排各 4 小時（加班另核對）'));
+assert(chosen.includes('✓ 已選好 2 位，預排每人 4 小時（加班另核對）'));
 assert(chosen.includes('合計 8 / 8 小時'),'existing detailed preview retained');
 const one=picker.render({...params,mode:'one',selected:['A']});
 assert.equal((one.match(/data-smart-action="slot" data-smart-slot="/g)||[]).length,1);
