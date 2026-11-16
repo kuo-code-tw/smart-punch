@@ -2075,6 +2075,22 @@ function p79DiscardLeaveHandoff(leaveId){
  }
  p79UpdateLeaveHandoffBanner();
 }
+// Never let an unrelated same-day extension close the original approved
+// leave-cover split. A matching employee/leave source AND expected split period
+// are required; historical meta.forEmpId remains readable for old records.
+function p79LeaveHandoffMatchesOvertime(h,e,meta){
+ const report=meta?.overtimeReport;
+ if(!report||!String(report.id||'').trim()||meta?.overtimeExcluded===true)return false;
+ const norm=v=>String(v||'').trim().toUpperCase();
+ const leaveId=String(e?.leaveId||h?.id||'').trim();
+ const linkedLeave=String(report.leaveHandoffId||report.leaveId||meta.leaveId||'').trim();
+ const linkedPerson=norm(report.forEmpId||meta.forEmpId);
+ if(linkedLeave&&linkedLeave!==leaveId||linkedPerson&&linkedPerson!==norm(e?.forEmpId))return false;
+ if(!linkedLeave&&!linkedPerson)return false;
+ const expected=String(e?.code||'').trim(),actual=String(report.code||'').trim();
+ if(expected&&expected!==actual)return false;
+ return true;
+}
 function p79LeaveHandoffEntryState(h,e,cloud,active){
  if(!Array.isArray(cloud?.leaveCoverAssignments)||!Array.isArray(cloud?.schedules))throw Error('雲端未提供完整代班與排班資料，暫不變更待核對清單');
  const norm=v=>String(v||'').trim().toUpperCase(),date=String(e?.date||''),coverDate=String(e?.coverDate||date);
@@ -2083,16 +2099,17 @@ function p79LeaveHandoffEntryState(h,e,cloud,active){
  if(!validCover)return 'cancelled';
  const row=cloud.schedules.find(r=>norm(r.empId)===norm(e.empId));
  if(!row)return 'unverified';
- const report=(row.schedule||{}).__meta?.[date]?.overtimeReport;
+ const meta=(row.schedule||{}).__meta?.[date]||{},report=meta.overtimeReport;
  if(coverDate!==date){
-  const wrong=(row.schedule||{}).__meta?.[coverDate]?.overtimeReport;
-  if(wrong?.id&&wrong.category==='延'&&
+  const wrongMeta=(row.schedule||{}).__meta?.[coverDate]||{},wrong=wrongMeta.overtimeReport;
+  if(p79LeaveHandoffMatchesOvertime(h,e,wrongMeta)&&wrong.category==='延'&&
      (String(wrong.overtimeStart||'')==='04'&&String(wrong.overtimeEnd||'')==='08'||/04-(?:08|16)$/.test(String(wrong.code||'')))&&
      !(e.readonlyWrongDate===true&&String(e.originalReportId||'')===String(wrong.id)))
    return 'wrong-workdate';
  }
- if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
-  // Report on physical date alone is not proof of previous-night credit.
+ if(p79LeaveHandoffMatchesOvertime(h,e,meta)){
+  // A report on the work date is not sufficient if its credit belongs to
+  // another date. The original source leave must also have the right period.
   if(String(e.overtimeDate||date)!==date&&String(report.overtimeDate||'')!==String(e.overtimeDate))return 'wrong-workdate';
   return 'reported';
  }
