@@ -28,7 +28,7 @@ function fixture(report=null,covers=true,rows=true){
  let t=fixture();t.put();await t.context.p79ReconcileLeaveHandoff();
  assert.equal(t.read(),null,'already assigned substitute must not reappear on revisit');
  assert.equal(t.banner.hidden,true);
- t=fixture({id:'SAVED',category:'代',code:'代08-16'});t.put();t.context.p79ActivateLeaveHandoff();await t.context.p79ReconcileLeaveHandoff();
+ t=fixture({id:'SAVED',category:'代',code:'代08-16',leaveId:'LEAVE'});t.put();t.context.p79ActivateLeaveHandoff();await t.context.p79ReconcileLeaveHandoff();
  assert.equal(t.read(),null,'filed overtime must not reappear even during fresh handoff');
  t=fixture();t.put();t.context.p79ActivateLeaveHandoff();await t.context.p79ReconcileLeaveHandoff();
  assert.equal(t.read().entries.length,1,'newly assigned and not filed is allowed to continue once');
@@ -59,7 +59,7 @@ function fixture(report=null,covers=true,rows=true){
  assert.equal(t.read().entries.length,2,'unverified later entries must remain queued');
  // Once the first filing is saved, the later error must preserve the whole queue.
  const firstData=await fetchFirst();
- firstData.schedules[0].schedule.__meta['2026-10-20']={overtimeReport:{id:'SAVED'}};
+ firstData.schedules[0].schedule.__meta['2026-10-20']={overtimeReport:{id:'SAVED',leaveId:'LEAVE'}};
  await assert.rejects(t.context.p79ReconcileLeaveHandoff(),/later month offline/);
  assert.equal(t.read().entries.length,2,'partial reconciliation cannot drop entries on error');
  // A same-month second date must receive its own scoped punch/leave context.
@@ -69,7 +69,7 @@ function fixture(report=null,covers=true,rows=true){
  t.context.jsonFetch=async url=>{
   urls.push(url);const date=url.includes('2026-10-28')?'2026-10-28':'2026-10-20';
   return {ok:true,date,config:{},leaveCoverAssignments:[{leaveId:'LEAVE',leaveEmpId:'LEAVER',workerIds:['WORKER'],startDate:'2026-10-20',endDate:'2026-10-28'}],
-   schedules:[{empId:'WORKER',schedule:{__meta:{'2026-10-20':{overtimeReport:{id:'SAVED'}}}}}]};
+   schedules:[{empId:'WORKER',schedule:{__meta:{'2026-10-20':{overtimeReport:{id:'SAVED',leaveId:'LEAVE'}}}}}]};
  };
  t.context.P79Overtime.resolveLeaveCoverReport=(data,h,e)=>{assert.equal(data.date,e.date,'do not relabel a different day context as current');return {};};
  await t.context.p79OpenLeaveOvertimeHandoff();
