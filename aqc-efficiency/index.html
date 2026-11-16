@@ -11914,6 +11914,21 @@ async function importExcelFiles(fileList){
 
 // Homepage drop zone calls the ORIGINAL importer in this authenticated frame.
 // Success counts are parser results, not a claim that cloud read-back succeeded.
+// A cloud write may finish after the first network timeout. Resume only through
+// flushQueue(), which verifies uncertain writes before it ever retries them.
+async function p79HomeDrainVesselQueue(){
+ const waits=[1500,3500,7000];
+ for(let attempt=0;attempt<=waits.length;attempt++){
+  if(!readQueue().length)return true;
+  cloudStatus('首頁匯入｜正在自動核對與接續待同步船舶資料（'+(attempt+1)+'/'+(waits.length+1)+'）',false);
+  try{await flushQueue();}catch(error){
+   console.warn('船舶自動接續未完成，保留待同步資料',error);
+  }
+  if(!readQueue().length)return true;
+  if(attempt<waits.length)await new Promise(resolve=>setTimeout(resolve,waits[attempt]));
+ }
+ return false;
+}
 let p79VesselHomeImportInitialized=false;
 window.P79VesselHomeImport={
  importFiles:async function(files){
@@ -11932,8 +11947,8 @@ window.P79VesselHomeImport={
   if(port79ShipAutoSyncBusy||p79EfficiencyManualSyncActive)
    throw Error('雲端船舶資料仍在同步，請完成後重新拖入檔案');
   await ensureGcQueueReady();
-  if(readQueue().length)
-   throw Error('本機已有尚未確認同步的船舶資料，請先處理，避免覆蓋');
+  if(readQueue().length && !await p79HomeDrainVesselQueue())
+   throw Error('前次船舶資料仍在雲端核對中，已保留待同步資料；為避免重複匯入已停止本次上傳');
   cloudStatus('首頁匯入｜正在核對最新船舶主檔...',false);
   const ready=await restoreVesselDataFromCloud(false,true);
   if(!ready)throw Error('尚未取得正式雲端完整船舶主檔，已安全停止匯入');
@@ -11949,10 +11964,14 @@ window.P79VesselHomeImport={
     jobs.some(job=>!job.workingNo||!job.recordCount||
       job.recordIds.length!==job.recordCount||job.recordIds.some(id=>!id))){
    cloudIssue='有船舶報表或人員明細尚未完成匯入';
-  }else if(readQueue().length){
-   cloudIssue='資料已保留於本機，仍有待補傳船舶資料';
   }else{
-   try{
+   // One Excel may finish parsing before the server confirms its write.
+   // Do not make the user re-import: safely drain the durable queue first.
+   // Uncertain writes remain protected by flushQueue's strict readback guard.
+   const drained=await p79HomeDrainVesselQueue();
+   if(!drained){
+    cloudIssue='資料已保留於本機；自動補傳尚未取得雲端確認，原始紀錄不會重複上傳';
+   }else try{
     cloudStatus('首頁匯入｜正在讀回雲端船舶主檔與人員明細...',false);
     const verified=await p79ReadFullVesselData('gcGetData',{});
     const masters=Array.isArray(verified?.shipMasters)?verified.shipMasters:[];
