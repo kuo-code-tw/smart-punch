@@ -499,12 +499,12 @@
    target.__meta?.[leaveDate]?.reportOriginalShift,entry.coverShift]
    .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
   const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
-  const plan=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
+  const plan=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex,entry.periodMode==='same-day'?'same-day':'legacy');
   if(!plan)return {...entry,coverDate:leaveDate};
   if(entry.date!==leaveDate&&entry.date!==plan.workDate)
    throw Error('原請假日期與代班工作日期不符，不能猜測或重複建立加班');
   return {...entry,date:plan.workDate,workDate:plan.workDate, overtimeDate:plan.overtimeDate,
-   coverDate:leaveDate,coverShift:originalShift,code:plan.code,preferredType:'平日延時加班'};
+   coverDate:leaveDate,coverShift:originalShift,code:plan.code,periodMode:plan.periodMode||'legacy',preferredType:plan.sameDayCover?'':'平日延時加班'};
  }
  function resolveLeaveCoverReport(data,handoff,entry){
   const key=v=>String(v||'').trim().toUpperCase(),date=entry.date;
@@ -516,8 +516,16 @@
    target.__meta?.[leaveDate]?.reportOriginalShift,entry.coverShift]
    .map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v))||'';
   const workerIndex=(cover.workerIds||[]).findIndex(id=>key(id)===key(entry.empId));
-  const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex);
+  const split=global.P79LeaveCoverSuggest?.coverWorkday?.(leaveDate,originalShift,cover.mode,workerIndex,entry.periodMode==='same-day'?'same-day':'legacy');
   if(split){
+   if(split.sameDayCover){
+    if(date!==leaveDate||entry.overtimeDate&&entry.overtimeDate!==leaveDate)
+     throw Error('兩位代班加班都必須申報於原請假日 '+leaveDate+'，不可帶入隔日');
+    return {code:'',category:'代',sameDayCover:true,periodMode:'same-day',requirePeriodSelection:true,
+     expectedSplitRule:{overtimeStart:split.overtimeStart,overtimeEnd:split.overtimeEnd,declaredHours:4,sameDayCover:true},
+     overtimeDate:leaveDate,workDate:leaveDate,
+     periodHint:'代班加班 '+split.overtimeStart+':00–'+split.overtimeEnd+':00（4 小時）；申報日期 '+leaveDate+'。僅可選擇雲端已設定、時段一致的加班選項。'};
+   }
    if(date!==split.workDate)throw Error('本筆實際出勤日期應為 '+split.workDate+'（原請假日 '+leaveDate+'）；請重新核對代班預排，尚未正式申報');
    if(entry.overtimeDate&&entry.overtimeDate!==split.overtimeDate)
     throw Error('加班歸屬日應為 '+split.overtimeDate+'，不能依畫面日期自行變更');
@@ -550,8 +558,11 @@
  // An employee's actual-shift extension is NOT proof of the original split
  // leave-cover overtime. Check it independently against the cloud roster.
  function chosenMatchesLeaveSplit(rule,expected){
-  if(!expected||!Array.isArray(rule)||rule[0]!=='延')return false;
+  if(!expected||!Array.isArray(rule))return false;
   const eq=(a,b)=>Number.isFinite(hour(a))&&Number.isFinite(hour(b))&&hour(a)%1440===hour(b)%1440;
+  if(expected.sameDayCover)return ['代','延'].includes(rule[0])&&Number(rule[2])===4&&
+   eq(rule[6],expected.overtimeStart)&&eq(rule[7],expected.overtimeEnd);
+  if(rule[0]!=='延')return false;
   return Number(rule[2])===Number(expected.declaredHours)&&
    eq(rule[4],expected.normalStart)&&eq(rule[5],expected.normalEnd)&&
    eq(rule[6],expected.overtimeStart)&&eq(rule[7],expected.overtimeEnd);
@@ -1731,6 +1742,17 @@
     else{select.selectedIndex=-1;select.value='';preview();el.querySelector('#p79OtStatus').textContent='已帶入「'+requested+'」，請選擇本位人員的出勤時段。';}
    }
    applyPreferredType();
+   // Select only an active uniquely matching cloud rule; never invent overtime codes.
+   if(prefill.sameDayCover&&prefill.expectedSplitRule){
+    const wanted=prefill.expectedSplitRule;
+    const candidates=rows.map((r,i)=>({r,i})).filter(({r})=>
+     chosenMatchesLeaveSplit(r,wanted)&&typeOptions(dialogRuleConfig(),rows).some(x=>x.name===ruleType(r)));
+    const byCover=candidates.filter(x=>x.r[0]==='代');
+    const matches=byCover.length===1?byCover:candidates;
+    if(matches.length===1){kind.value=ruleType(matches[0].r);refresh();select.value=String(matches[0].i);preview();}
+    else{select.value='';select.selectedIndex=-1;preview();
+     el.querySelector('#p79OtStatus').textContent=matches.length?'有多個符合的加班時段，請核對選擇。':'雲端沒有 '+wanted.overtimeStart+'–'+wanted.overtimeEnd+' 的有效 4 小時加班選項；不會寫入錯誤時段。';}
+   }
    // Show the intended four-hour period even before the next day's first IN.
    // It is a plan only, never verified actual overtime or punch evidence.
    if(prefill.leaveHandoffId&&prefill.periodHint){
@@ -1905,13 +1927,16 @@
        expected&&!chosenMatchesLeaveSplit(chosen,expected)));
      if(independentFiling&&chosen[0]==='代')
       throw Error('代班類型必須符合請假代班關聯；請選擇實際延時或休假日加班的時段。');
+     if(prefill.sameDayCover&&expected&&!chosenMatchesLeaveSplit(chosen,expected))
+      throw Error('這位代班人員的加班時段固定為 '+expected.overtimeStart+'–'+expected.overtimeEnd+'（同日 4 小時）；目前選擇不符，未送出申報。');
      verifyPlannedReviewSelection(chosen);
      const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow(),!!prefill.independentOvertime]);
      const selection=selectionKey();
      const validationRequest={empId,date,
       overtimeDate:independentFiling?date:(prefill.overtimeDate||date),
       coverDate:independentFiling?date:(prefill.coverDate||date),
-      leaveHandoffId:independentFiling?'':(prefill.leaveHandoffId||'')};
+      leaveHandoffId:independentFiling?'':(prefill.leaveHandoffId||''),
+      ...(prefill.sameDayCover&&!independentFiling?{coverPeriodMode:'same-day'}:{})};
      // Always read the current official rule table during preflight, including
      // original planned-review edits. Reuse this already verified snapshot
      // instead of performing a second GET after the Save spinner appears.
