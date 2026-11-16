@@ -52,4 +52,49 @@ assert(css.split('{').length===css.split('}').length,'CSS brace balance');
 assert(/num\.dataset\.leaveVisualStat=key/.test(visual),'metrics reflect actual data, not static screenshot numbers');
 assert(visual.includes("leaveBalanceInfo(e)"),'quota uses existing read-only calculation');
 assert(visual.includes("const rs=records().filter(permitted)"),'admin visuals respect current org scope');
+
+// New view-only third tab must reuse the actual original annual-balance table.
+assert(visual.includes("balanceTab.id='tabLeaveBalances'"));
+assert(visual.includes("tabs.insertBefore(balanceTab,adminTab.nextSibling)"));
+assert(visual.includes("balancePanel.open=true"),'annual tab opens the real original balance panel');
+assert(visual.includes("renderAdminBalances()"),'annual tab uses the original quota calculation');
+assert(!visual.includes("adminBalanceBody.innerHTML="),'visual must not replace annual-balance source rows');
+assert(css.includes('html.p79-leave-reference-admin.p79-leave-balance-only #adminMode>div.card'),
+ 'new annual tab hides just the original records card, not data');
+assert(css.includes('html.p79-leave-reference-admin body.p79-workspace[data-p79-system="leave"] #p79SevenTop.p79-workspace-sidebar'),
+ 'reference-blue sidebar must style the actual shared workspace sidebar');
+assert(visual.includes('p79LeaveCloudUnverified'),'failed official reads must never be presented as zero records');
+assert(visual.includes('p79LeaveCloudDataReady'),'cloud read verification uses existing source flag');
+assert(visual.includes('筆數待確認'));
+// The personnel dropdown shows actual job title + name, ordered by stroke.
+assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"));
+assert(visual.includes("personTitle(x)+'｜'+personName(x)") );
+assert(visual.includes("sort((a,b)=>leaveStrokeCollator.compare(personName(a),personName(b))"));
+const sourceBegin=visual.indexOf(' const leaveStrokeCollator=');
+const sourceEnd=visual.indexOf(' const showDays=',sourceBegin);
+assert(sourceBegin>0&&sourceEnd>sourceBegin,'isolate production dropdown implementation');
+const nameSource=visual.slice(sourceBegin,sourceEnd);
+const people=[
+ {empId:'E3',name:'黃柏源',jobTitle:'技術員'},
+ {empId:'E1',name:'王子明',jobTitle:'領班'},
+ {empId:'E2',name:'林小華',deptDetail:'操作員'}
+];
+const before=JSON.stringify(people);
+const select={
+ value:'',dataset:{},children:[],
+ replaceChildren(){this.children=[]},
+ append(child){this.children.push(child);}
+};
+const documentMock={createElement:tag=>({tag,value:'',textContent:''})};
+const getChoices=Function('people','permitted','document','personSelect',
+ nameSource+'\nupdatePeople();return personSelect.children.map(x=>({value:x.value,label:x.textContent}));');
+const options=getChoices(()=>people,()=>true,documentMock,select);
+assert.deepEqual(options.map(x=>x.value),['','E1','E2','E3'],
+ 'names use traditional stroke order: 王, 林, 黃');
+assert.equal(options[1].label,'領班｜王子明（E1）');
+assert.equal(options[2].label,'操作員｜林小華（E2）');
+assert.equal(options[3].label,'技術員｜黃柏源（E3）');
+assert.equal(JSON.stringify(people),before,'dropdown must never mutate HR employee records');
+console.log('PASS annual-balance adjacent tab, blue workspace reference layout, official cloud unknown state, stroke-sorted job-title/name selector');
+
 console.log('PASS leave reference page: only admin visual skin and read-only KPI/calendar; existing application, review, balance, cover, auth and cloud functions preserved');
