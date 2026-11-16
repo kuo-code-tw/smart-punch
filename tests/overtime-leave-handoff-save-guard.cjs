@@ -29,7 +29,7 @@ async function simulate({code='延16-04',mode='success'}={}){
   crypto:{randomUUID:()=> 'SAME-ID'},setTimeout:callback=>{callback();return 0;},clearTimeout:()=>{},
   el,editingOriginal:false,prefill:{leaveHandoffId:'L1',date:day,workDate:day,coverDate:day,overtimeDate:day,empId:'FIRST',forEmpId:'LEAVER',expectedSplitRule:split.expectedSplitRule},
   dateInput:node('#p79OtDate'),empSelect:node('#p79OtEmp'),kind:node('#p79OtKind'),select:node('#p79OtCode'),forSelect:node('#p79OtForEmp'),
-  selectedRow:()=>chosen,verifyPlannedReviewSelection:()=>{},approvedDates:[day],people:[{empId:'FIRST'},{empId:'LEAVER'}],
+  selectedRow:()=>chosen,chosenMatchesLeaveSplit:api.chosenMatchesLeaveSplit,independentShiftOvertimeIssue:api.independentShiftOvertimeIssue,verifyPlannedReviewSelection:()=>{},approvedDates:[day],people:[{empId:'FIRST'},{empId:'LEAVER'}],
   prepareSaveValidation:async()=>{validationCalls++;return{cloud:{revision:'rev1',capabilities:{nightCoverOvertimeAccountingV1:true},schedules:[{empId:'FIRST',schedule:{[day]:'中',__meta:{}}}]},rules:{rows:[chosen],config:{}}}},
   activeReportRows:rows=>rows,typeOptions:()=>[{name:'平日延時加班'}],specialTypes:[],
   ruleType:()=> '平日延時加班',hour:value=>{const h=String(value).split(':');return Number(h[0])*60+Number(h[1]||0);},
@@ -52,8 +52,8 @@ async function simulate({code='延16-04',mode='success'}={}){
 }
 (async()=>{
  let t=await simulate({code:'延20-24'});
- assert.equal(t.postCalls,0);assert.equal(t.validationCalls,0,'wrong extension is blocked before any GET/POST');
- assert.match(t.status,/正常班 16-24、加班 24-04/);
+ assert.equal(t.postCalls,0);assert.equal(t.validationCalls,1,'a different selected period must undergo fresh official roster checks');
+ assert.match(t.status,/正式班表為「中」班/);
  t=await simulate({mode:'lock-then-ok'});
  assert.equal(t.postCalls,3,'only explicit no-write GAS edit lock triggers bounded retry');
  assert.deepEqual(t.posts,['SAME-ID','SAME-ID','SAME-ID'],'all safe retries preserve the idempotent report identity');
