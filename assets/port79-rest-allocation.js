@@ -142,7 +142,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     if(item.restCategory==='休'||item.restPreferredCategory==='休'||
        item.restCategory==='國'&&nationalBlocked.has(date))flexible.add(date);
   }
-  const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[];
+  const used=new Set(),slots=quota.slots.map(s=>({...s})),remaining=[],conflicts=[];
   const available=dates.filter(date=>
     isRestCandidate(date)&&!substitutionDates.has(date)&&!excluded.has(date)&&
     (!result[date]?.restCategory||flexible.has(date))&&
@@ -194,9 +194,21 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
     // The visible original code is authoritative for a fixed date. A stale
     // non-formal restCategory must not reserve a different quota in parallel.
     const sourceDate=fixedCategory&&fixedCategory!==item.restCategory?'':item.restSourceDate;
-    const index=slots.findIndex(s=>s.category===reservedCategory&&
+    let index=slots.findIndex(s=>s.category===reservedCategory&&
       (!sourceDate||s.sourceDate===sourceDate));
-    if(index<0)throw new Error('既有「'+reservedCategory+'」超過本月額度或來源日期不符：'+date);
+    if(index<0){
+      // A wrong old source-date does not invalidate the entire employee's
+      // monthly calculation. Reserve one category slot and flag its origin.
+      index=slots.findIndex(s=>s.category===reservedCategory);
+      if(index>=0)conflicts.push({date,category:reservedCategory,reason:'來源日期不符',sourceDate:sourceDate||''});
+    }
+    if(index<0){
+      // Preserve explicit manual/imported leave. Do NOT overwrite it to force
+      // 5/4, and do NOT silently discard the rest of this employee's audit.
+      conflicts.push({date,category:reservedCategory,reason:'既有例休國超過配額',sourceDate:sourceDate||''});
+      used.add(date);
+      continue;
+    }
     slots.splice(index,1);used.add(date);
   }
   const assign=(date,slot)=>{
@@ -237,7 +249,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const unresolved=remaining.slice();
   const assigned=dates.filter(d=>!typhoonProtected.has(d)&&!quotaExempt.has(d)).map(d=>result[d]).filter(x=>x?.restCategory);
   return {meta:result,quota:quota.counts,off:assigned.filter(x=>!x.restQuotaOvertime).length,
-    overtime:assigned.filter(x=>x.restQuotaOvertime).length,unresolved};
+    overtime:assigned.filter(x=>x.restQuotaOvertime).length,unresolved,conflicts};
 }
 
 function p79RestActualOvertimeMinutes(totalMinutes,meta) {
