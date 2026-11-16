@@ -40,7 +40,10 @@ const done=picker.render({...params,selected:['A','B']});
 assert(done.includes('已勾選 2 / 2 位'),'two distinct workers complete required selection');
 assert(done.includes('合計 8 / 8 小時'),'each four-hour slot contributes four hours');
 const singles=picker.render({...params,mode:'one'});
-assert(!singles.includes('data-smart-action="slot"'),'single worker mode retains original checkbox flow');
+assert.equal([...singles.matchAll(/data-smart-action="slot" data-smart-slot=/g)].length,1,'one-person mode uses one direct worker dropdown');
+assert(singles.includes('代班人員（8 小時）'),'one-person mode has a single eight-hour worker field');
+assert(singles.includes('<details class="p79-smart-cover-advanced"')&&!singles.includes('<details class="p79-smart-cover-advanced" data-smart-action="advanced" open>'),'advanced filters default collapsed');
+assert(picker.render({...params,advancedOpen:true}).includes('data-smart-action="advanced" open'),'optional details can remain expanded across rerenders');
 const events=[],makeNode=(n,id)=>({
  dataset:{smartAction:'slot',smartSlot:String(n)},value:id,
  closest:()=>({dataset:{smartDate:date}})
@@ -56,7 +59,7 @@ assert(approved.includes("action.kind==='slot'")&&fresh.includes("action.kind===
 assert(approved.includes("entry.mode==='two'&&ids.length!==2"),'approved two-person saves still reject missing second worker');
 assert(fresh.includes("ids.length!==(row.secondVisible?2:1)"),'new-leave saves still reject missing second worker');
 for(const filename of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js']){
- assert(leave.includes(filename+'?v=20261106-job-name-filter-v3-two-slots-20261116'),'deployed page cache busts '+filename);
+ assert(leave.includes(filename+'?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1'),'deployed page cache busts '+filename);
 }
 for(const x of [js,approved,fresh])new vm.Script(x);
 console.log('PASS two separate leave-cover selectors; filters no longer hide second choice; duplicate/unavailable workers blocked; both workflows integrated');

@@ -75,7 +75,7 @@ function legacyRedraw(){
 let smartDay='',smartMonthKey='',smartSerial=0,smartRosters=null,smartLeaves=[],smartCovers=[],smartLoadStatus='';
 function smartOptions(date,row,target,people){
  return {date,people,target,selected:[row.first,row.second].filter(Boolean),mode:row.secondVisible?'two':'one',
-  jobFilter:row.filterJob||'',nameFilter:row.filterName||'',
+  jobFilter:row.filterJob||'',nameFilter:row.filterName||'',advancedOpen:row.advancedOpen===true,
   rosters:smartRosters,leaves:smartLeaves,covers:smartCovers,excludeLeaveId:row.id||'',scope:'new'};
 }
 function refreshSmartRosters(){
@@ -136,22 +136,25 @@ function redraw(){
  if(!options.some(x=>x.id===row.first&&!x.disabled)){row.first='';row.firstOvertimeType='';}
  if(!options.some(x=>x.id===row.second&&!x.disabled)||row.second===row.first){row.second='';row.secondOvertimeType='';}
  if(!row.secondVisible){row.second='';row.secondOvertimeType='';}
- const daysHtml='<div class="p79-smart-cover-days" role="group" aria-label="選擇每日代班">'+list.map(date=>{
+ const daysHtml=list.length===1?'':'<div class="p79-smart-cover-days" role="group" aria-label="選擇每日代班">'+list.map(date=>{
   const r=rows.get(date);
   return '<button type="button" data-new-day="'+safe(date)+'" aria-pressed="'+(date===smartDay)+'">'+safe(date.slice(5))+'｜'+(r.first&&(!r.secondVisible||r.second)?'已選':'待選')+'</button>';
  }).join('')+'</div>';
  const basePerson=people.find(p=>String(p.empId)===String($id('adminCreateLeaveEmployee')?.value||''));
  const applicantMeta=target?'｜職稱：'+safe(picker.personJob(target)):'';
- const override='<div class="p79-smart-cover-applicant"><strong>請假人員：'+safe(target?.name||'請先選擇請假人員')+'</strong><small>'+applicantMeta+'</small>'+
-  '<button type="button" data-applicant-toggle="'+safe(smartDay)+'">'+(row.applicantOverride?'↩ 使用上方請假人員':'本日不同請假人員')+'</button></div>'+
+ const override=(list.length===1&&!row.applicantOverride?'':'<div class="p79-smart-cover-applicant"><strong>請假人員：'+safe(target?.name||'請先選擇請假人員')+'</strong><small>'+applicantMeta+'</small>'+
+  '<button type="button" data-applicant-toggle="'+safe(smartDay)+'">'+(row.applicantOverride?'↩ 使用上方請假人員':'本日不同請假人員')+'</button></div>')+
   (row.applicantOverride?'<div class="p79-smart-cover-override"><label>本日請假人員</label><select data-smart-applicant="'+safe(smartDay)+'"><option value="">請選擇本日請假人員</option>'+
    people.map(p=>'<option value="'+safe(p.empId)+'"'+(row.applicant===String(p.empId)?' selected':'')+'>'+safe(p.name||p.empId)+'｜'+safe(leavePersonJob(p))+'</option>').join('')+'</select></div>':'');
  const personOvertime=(key,id)=>id?'<div class="p79-smart-cover-overtime"><strong>'+safe(people.find(p=>String(p.empId)===String(id))?.name||id)+'｜加班類型（申報前待核對）</strong>'+
    overtimeTypeField(smartDay,row,key)+'</div>':'';
+ const overtimeOptions=personOvertime('first',row.first)+personOvertime('second',row.second);
  root.innerHTML=daysHtml+'<div class="p79-smart-cover-day">'+override+
   picker.render(smartOptions(smartDay,row,target,people))+
-  '<p class="p79-smart-cover-hint">'+safe(smartLoadStatus||'先核對正式班表；代班不得直接視為已出勤或已申報加班。')+'</p>'+
-  personOvertime('first',row.first)+personOvertime('second',row.second)+'</div>';
+  (smartLoadStatus&&/未完成|無法|失敗|尚未/.test(smartLoadStatus)?
+   '<p class="p79-smart-cover-hint">'+safe(smartLoadStatus)+'</p>':'')+
+  (overtimeOptions?'<details class="p79-smart-cover-advanced-overtime"><summary>加班類型選項（選填）</summary>'+
+   overtimeOptions+'</details>':'')+'</div>';
  root.querySelectorAll('[data-new-day]').forEach(el=>el.onclick=()=>{smartDay=el.dataset.newDay;redraw();});
  root.querySelectorAll('[data-applicant-toggle]').forEach(el=>el.onclick=()=>{
   row.applicantOverride=!row.applicantOverride;
@@ -166,6 +169,7 @@ function redraw(){
  picker.bind(root,action=>{
   const entry=rows.get(action.date),date=action.date;
   if(!entry)return;
+  if(action.kind==='advanced'){entry.advancedOpen=action.value===true;return;}
   if(action.kind==='filter-job'){
    entry.filterJob=action.value;entry.filterName='';
    redraw();return;
@@ -179,7 +183,7 @@ function redraw(){
    entry.secondVisible=action.value==='two';
    if(!entry.secondVisible){entry.second='';entry.secondOvertimeType='';}
   }else if(action.kind==='slot'){
-   if(!entry.secondVisible||![0,1].includes(action.slot))return;
+   if(![0,1].includes(action.slot)||action.slot===1&&!entry.secondVisible)return;
    const id=String(action.id||''),available=picker.candidates(smartOptions(date,entry,target,people));
    if(id&&!available.some(x=>x.id===id&&!x.disabled)){
     $id('adminCreateLeaveMessage').textContent='此人員已有請假、代班或班別衝突，請重新選擇。';redraw();return;

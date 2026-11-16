@@ -24,7 +24,7 @@
  }
  function smartOptions(entry){
    return {people:state.people,target:state.target,date:entry.date,selected:[entry.first,entry.second].filter(Boolean),
-     mode:entry.mode||'one',jobFilter:entry.filterJob||'',nameFilter:entry.filterName||'',rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
+     mode:entry.mode||'one',jobFilter:entry.filterJob||'',nameFilter:entry.filterName||'',advancedOpen:entry.advancedOpen===true,rosters:state.rosters||null,leaves:state.leaves||[],covers:state.covers||[],excludeLeaveId:state.id,scope:'approved'};
  }
  function renderSmart(){
    const host=el('p79LeaveCoverDailyRows'),picker=global.P79SmartCoverPicker;
@@ -46,6 +46,7 @@
    host.querySelectorAll('[data-approved-day]').forEach(node=>node.onclick=()=>{state.activeDate=node.dataset.approvedDay;renderSmart();});
    picker.bind(host,action=>{
      const row=state.entries.find(e=>e.date===action.date);if(!row)return;
+     if(action.kind==='advanced'){row.advancedOpen=action.value===true;return;}
      if(action.kind==='filter-job'){
        row.filterJob=action.value;row.filterName='';
        renderSmart();return;
@@ -59,7 +60,7 @@
        row.mode=action.value==='two'?'two':'one';
        if(row.mode==='one')row.second='';
      }else if(action.kind==='slot'){
-       if(row.mode!=='two'||![0,1].includes(action.slot))return;
+       if(![0,1].includes(action.slot)||action.slot===1&&row.mode!=='two')return;
        const id=String(action.id||''),options=picker.candidates(smartOptions(row));
        if(id&&!options.some(x=>x.id===id&&!x.disabled)){
         el('p79LeaveCoverAutoStatus').textContent='此人員已有請假、代班或班別衝突，請重新選擇。';renderSmart();return;
