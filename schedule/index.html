@@ -1648,6 +1648,31 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
 <!-- v2026.09.28.8.0：七大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col" data-p79-system="schedule">
 
+<section id="p79ScheduleRefHero" class="no-print" aria-label="排班管理儀表板">
+  <div class="p79-ref-hero-head">
+    <div class="p79-ref-hero-name">
+      <div class="p79-ref-hero-heading"><i class="fa-solid fa-calendar-days"></i><h1>排班管理</h1></div>
+      <div class="p79-ref-hero-sub">人員排班・出勤・請假與支援調度 <span class="p79-ref-month-only">› 月排班編輯</span></div>
+    </div>
+    <nav id="p79ScheduleViewNav" aria-label="排班管理兩個頁面">
+      <a id="p79DailyPageLink" class="p79-page-link" href="?view=daily" aria-current="page" onclick="return p79GoScheduleView(event,'daily')">
+        <i class="fa-solid fa-chart-column" aria-hidden="true"></i> 每日排班總覽
+      </a>
+      <a id="p79MonthlyPageLink" class="p79-page-link" href="?view=month" onclick="return p79GoScheduleView(event,'month')">
+        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 月排班編輯
+      </a>
+      <span id="p79SchedulePageNotice" role="status" aria-live="polite"></span>
+    </nav>
+    <button type="button" id="p79RefAdvancedToggle" aria-expanded="false" onclick="p79ToggleReferenceAdminTools()" title="原有排班管理工具、連線診斷、匯入匯出與輪班規則"><i class="fa-solid fa-gear"></i> 進階工具</button>
+  </div>
+  <div id="p79ReferenceKpis" aria-label="今日排班與考勤統計">
+    <div class="p79-ref-kpi p79-ref-kpi-total"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-users"></i></div><div><span>本日排班總人數</span><strong id="p79RefAllCount">—</strong><small>依正式班表核算</small></div></div>
+    <div class="p79-ref-kpi p79-ref-kpi-attended"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-calendar-check"></i></div><div><span>已簽到人數</span><strong id="p79RefPresentCount">—</strong><small id="p79RefPresentNote">等待正式考勤同步</small></div></div>
+    <div class="p79-ref-kpi p79-ref-kpi-pending"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div><span>未出勤中人數</span><strong id="p79RefAbsentCount">—</strong><small>含已簽退，非缺勤認定</small></div></div>
+    <div class="p79-ref-kpi p79-ref-kpi-leave"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-bed"></i></div><div><span>休假人數</span><strong id="p79RefLeaveCount">—</strong><small>依正式班表及核准請假</small></div></div>
+    <div class="p79-ref-kpi p79-ref-kpi-cover"><div class="p79-ref-kpi-icon"><i class="fa-solid fa-right-left"></i></div><div><span>加班／代班</span><strong id="p79RefCoverCount">—</strong><small>依今日班表附加紀錄</small></div></div>
+  </div>
+</section>
   <!-- 1~3. 固定頂部控制區：操作列 / 說明 / 頁籤 -->
   <div id="schedule-control-shell" class="sticky top-0 z-50 no-print border-b border-slate-200 dark:border-slate-700">
     <header class="bg-white/95 dark:bg-slate-900/95 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-700">
@@ -1785,15 +1810,8 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
     </section>
 
     <!-- Two independent navigation pages that share the existing scheduler instance. -->
-    <nav id="p79ScheduleViewNav" aria-label="排班管理兩個頁面">
-      <a id="p79DailyPageLink" class="p79-page-link" href="?view=daily" aria-current="page" onclick="return p79GoScheduleView(event,'daily')">
-        <i class="fa-solid fa-chart-column" aria-hidden="true"></i> 每日排班總覽
-      </a>
-      <a id="p79MonthlyPageLink" class="p79-page-link" href="?view=month" onclick="return p79GoScheduleView(event,'month')">
-        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 月排班編輯
-      </a>
-      <span id="p79SchedulePageNotice" role="status" aria-live="polite"></span>
-    </nav>
+
+    <div id="p79ReferenceEditorHost" aria-label="排班編輯狀態"></div>
     <!-- 圖片二：說明與全部職稱頁籤固定在上方，不會隨班表往下捲走 -->
     <div class="bg-slate-50/95 dark:bg-slate-950/95 px-4 sm:px-6 pt-2 pb-1">
       <div id="schedule-legend-row" class="max-w-[1920px] mx-auto bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
@@ -3493,6 +3511,17 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       [...groups.早,...groups.中,...groups.晚,...groups.其他].forEach(x=>scheduledWorking.set(x.emp.id,x));
       const totalScheduled=scheduledWorking.size;
       const leaveCount=groups.休假.length;
+      // All headline numbers reflect the actual current roster and verified live attendance.
+      const currentAttendance=p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000;
+      const checkedIn=[...scheduledWorking.values()].filter(x=>isScheduleEmployeeClockedIn(x.emp.id)).length;
+      const allIncluded=new Set([...scheduledWorking.keys(),...groups.休假.map(x=>x.emp.id)]);
+      const kpi=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value);};
+      kpi('p79RefAllCount',allIncluded.size+' 人');
+      kpi('p79RefPresentCount',currentAttendance?checkedIn+' 人':'待核對');
+      kpi('p79RefAbsentCount',currentAttendance?Math.max(0,totalScheduled-checkedIn)+' 人':'待核對');
+      kpi('p79RefLeaveCount',leaveCount+' 人');
+      kpi('p79RefCoverCount',groups.加班代班.length+' 人');
+      kpi('p79RefPresentNote',currentAttendance?'目前出勤中（未簽退）':'等待正式考勤同步');
 
       summaryEl.textContent='';
       if(dateEl)dateEl.textContent='';
@@ -3562,8 +3591,12 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         block('休假',groups.休假,'text-rose-700','fa-umbrella-beach')
       ];
       if(groups.其他.length)blocks.push(block('其他排班',groups.其他,'text-indigo-700','fa-user-clock'));
-      if(groups.加班代班.length)blocks.push(block('加班／代班',groups.加班代班,'text-sky-700','fa-user-plus'));
-
+      // Keep the reference's fifth colored column even with no overtime/coverage.
+      blocks.push(groups.加班代班.length
+        ?block('加班／代班',groups.加班代班,'text-sky-700','fa-right-left')
+        :'<div class="today-shift-block p79-ref-no-cover"><div class="today-shift-title text-sky-700"><span><i class="fa-solid fa-right-left mr-1"></i>加班／代班</span><span>0 人</span></div>'+
+         '<div class="p79-ref-empty-cover"><i class="fa-regular fa-calendar-check"></i><b>今日無加班／代班安排</b><p>需要調整時，請到月排班表選擇日期與人員。</p>'+
+         '<button type="button" onclick="p79GoScheduleView(event,\'month\')">＋ 新增加班／代班</button></div></div>');
       detailEl.innerHTML=blocks.join('');
       detailEl.classList.toggle('hidden',!todayScheduleExpanded);
     }
@@ -9632,6 +9665,19 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+<script id="p79-schedule-reference-design-controller">
+function p79ToggleReferenceAdminTools(){
+ const active=document.body.classList.toggle('p79-ref-tools-expanded');
+ const btn=document.getElementById('p79RefAdvancedToggle');
+ if(btn)btn.setAttribute('aria-expanded',String(active));
+}
+document.addEventListener('DOMContentLoaded',()=>{
+ const host=document.getElementById('p79ReferenceEditorHost');
+ const lock=document.getElementById('scheduleEditLockStatus');
+ const banner=document.getElementById('scheduleActiveEditorBanner');
+ if(host){if(lock)host.appendChild(lock);if(banner)host.appendChild(banner);}
+});
+</script>
 </body>
 </html>
 
