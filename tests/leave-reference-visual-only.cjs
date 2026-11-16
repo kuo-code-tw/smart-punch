@@ -49,7 +49,7 @@ assert(!css.includes('#submitLeaveBtn'),'original employee submission controls n
 assert(!css.includes('#adminCreateLeaveDialog'),'original dialog fields not restyled');
 assert(!css.includes('#p79LeaveCoverModal'),'original cover modal is untouched');
 assert(css.split('{').length===css.split('}').length,'CSS brace balance');
-assert(/data\.leaveVisualStat=key/.test(visual),'metrics reflect actual data, not static screenshot numbers');
+assert(/num\.dataset\.leaveVisualStat=key/.test(visual),'metrics reflect actual data, not static screenshot numbers');
 assert(visual.includes("leaveBalanceInfo(e)"),'quota uses existing read-only calculation');
 assert(visual.includes("const rs=records().filter(permitted)"),'admin visuals respect current org scope');
 console.log('PASS leave reference page: only admin visual skin and read-only KPI/calendar; existing application, review, balance, cover, auth and cloud functions preserved');
