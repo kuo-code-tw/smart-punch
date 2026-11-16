@@ -19,3 +19,4 @@ jobs:
       - run: node tests/schedule-lock-manual-only.cjs
       - run: node tests/schedule-edit-lock-lane.cjs
       - run: node tests/schedule-two-pages.cjs
+      - run: node tests/schedule-live-month-scope.cjs
