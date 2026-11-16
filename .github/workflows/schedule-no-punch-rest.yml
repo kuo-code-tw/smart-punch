@@ -19,7 +19,6 @@ on:
       - 'tests/schedule-zero-national-allocated-visible.cjs'
       - 'tests/schedule-auto-rest-persist-safe.cjs'
       - 'tests/schedule-all-staff-auto-allocate-nonblocking.cjs'
-      - 'tests/schedule-all-staff-auto-allocate-nonblocking.cjs'
       - 'assets/port79-monthly-rest-overtime.js'
       - '.github/workflows/schedule-no-punch-rest.yml'
   push:
@@ -31,6 +30,8 @@ on:
       - 'tests/schedule-zero-national-allocated-visible.cjs'
       - 'tests/schedule-auto-rest-persist-safe.cjs'
       - 'tests/schedule-emergency-no-mass-rest.cjs'
+      - 'tests/schedule-all-staff-auto-allocate-nonblocking.cjs'
+      - 'tests/schedule-rest-all-staff-live-audit.cjs'
       - '.github/workflows/schedule-no-punch-rest.yml'
 permissions:
   contents: read
