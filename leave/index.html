@@ -2153,8 +2153,8 @@ async function p79ReconcileLeaveHandoff(){
    if(String(corrected.coverDate||corrected.date)!==String(corrected.date)){
     const oldEmployee=(original.schedules||[]).find(row=>
      String(row.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase());
-    const oldReport=oldEmployee?.schedule?.__meta?.[corrected.coverDate]?.overtimeReport;
-    if(oldReport?.id&&oldReport.category==='延'&&
+    const oldMeta=oldEmployee?.schedule?.__meta?.[corrected.coverDate]||{},oldReport=oldMeta.overtimeReport;
+    if(p79LeaveHandoffMatchesOvertime({...h,id:e.leaveId||h.id},corrected,oldMeta)&&oldReport.category==='延'&&
        (String(oldReport.overtimeStart||'')==='04'&&String(oldReport.overtimeEnd||'')==='08'||/04-(?:08|16)$/.test(String(oldReport.code||''))))
      wrongDateReportId=String(oldReport.id);
    }
