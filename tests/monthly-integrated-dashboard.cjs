@@ -10,7 +10,7 @@ test('UI uses the selected month, top vessel / bottom attendance and existing hi
   'p79DashAttendancePeople','p79DashPunchRecords','p79DashPersonDays','p79DashPunchIns','p79DashPeopleRanking']){
   assert(home.includes('id="'+id+'"'),'missing '+id);
  }
- assert(home.includes("onclick=\"location.href='./history-data/'\""),'history database nav');
+ assert(home.includes("onclick=\"p79NavigateWhileBackingUp('./history-data/')\""),'history database nav');
  assert(home.includes('id="punchLoginBtn"'),'punch button intact');
  assert(home.includes('id="manageLoginBtn"'),'manage button intact');
  assert(home.includes("onclick=\"launchSystem('attendance')\""),'original attendance route');

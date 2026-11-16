@@ -368,6 +368,7 @@ if(typeof module==='object'&&module.exports)module.exports=api;
 root.P79MonthlyDashboard=api;
 if(!root.document)return;
 let overtimeDisplayMode='actual',lastOvertimeData=null;
+let vesselRefreshEpoch=0;
 let loadedKey='',loading=false,sessionStamp='',pendingReviewItems=null,pendingReviewMonth='',pendingReviewDialog=null,pendingReviewSelection=-1,lastPendingReadAt=0,pendingReviewRefreshing=false,pendingReviewError='',pendingReviewVerifiedAt='';
 function session(){try{return JSON.parse(root.sessionStorage.getItem('port79_user_session')||'null')}catch(_){return null}}
 function permissions(){
@@ -673,7 +674,7 @@ async function request(kind,ym,token,forceCloud){
  const url=new URL(base);url.searchParams.set('action','historyGetMonthData');url.searchParams.set('type',kind);url.searchParams.set('month',ym);
  url.searchParams.set('token',token);url.searchParams.set('gcToken',token);
  if(!root.P79HistoryRead?.read)throw Error('歷史資料唯讀模組尚未載入');
- return root.P79HistoryRead.read(url.toString(),{forceCloud:forceCloud===true}).then(data=>{
+ return root.P79HistoryRead.read(url.toString(),{forceCloud:forceCloud===true||(kind==='vessel'&&ym===taipeiDay().slice(0,7))}).then(data=>{
   if(data.month&&String(data.month)!==ym)throw Error('雲端回傳月份與選取月份不同，已拒絕顯示');
   return data;
  });
@@ -841,8 +842,24 @@ async function renderVerifiedHomePunch(attendance,schedule,ym,leaveData,token){
      root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
  root.P79HomeEarlyPunchAlert?.render(attendance,schedule,ym,{leaveData,restEvidence});
 }
+async function refreshImportedVessels(){
+ const s=session(),p=permissions();if(!s||!p.vessel||!$('systems')?.classList.contains('show'))return;
+ const ym=checkMonth(),token=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'',account=String(s.empId||'');if(!token)return;
+ const epoch=++vesselRefreshEpoch;
+ const valid=()=>epoch===vesselRefreshEpoch&&month()===ym&&String(session()?.empId||'')===account&&permissions().vessel&&$('systems')?.classList.contains('show')&&(root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')===token;
+ statusText('p79DashShipSource','正在讀取匯入後的最新船舶資料…');
+ try{
+  const data=await request('vessel',ym,token,true);if(!valid())return;
+  if(!Array.isArray(data.shipMasters)||!Array.isArray(data.records))throw Error('船舶資料尚未完整讀回');
+  const report=analyzeVessels(data),range=weeklyWindow(ym);
+  if(!range.future&&range.start.slice(0,7)!==ym){try{const previous=await request('vessel',range.start.slice(0,7),token,true);report.weekVessels=[...analyzeVessels(previous).vessels,...report.vessels];}catch(error){report.weekError='跨月船舶資料尚未讀齊';}}
+  if(!valid())return;showVessels(report);statusText('p79DashShipSource','已讀取最新雲端船舶資料｜依所選月份與實際完工時間排序');
+ }catch(error){if(valid())statusText('p79DashShipSource','最新船舶更新未完成，保留上次顯示：'+String(error.message||error));}
+}
+function onHomeVesselImportComplete(event){if(event?.detail?.kinds?.includes('vessel'))void refreshImportedVessels();}
 async function load(forceCloud=false){
  if(loading)return;
+ const vesselEpochAtStart=vesselRefreshEpoch;
  const s=session(),p=permissions();if(!s||(!p.vessel&&!p.attendance))return;
  const ym=checkMonth(),token=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
  if(!token){statusText('p79DashMessage','沒有管理員登入權杖，請重新登入');return}
@@ -858,6 +875,7 @@ async function load(forceCloud=false){
    try{
     const data=kind==='schedule'?(scheduleSnapshot||await requestHomeOvertimeSchedule(ym,token,forceCloud)):await request(kind,ym,token,kind==='attendance'?true:forceCloud);
     if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions()[kind])return;
+    if(kind==='vessel'&&vesselEpochAtStart!==vesselRefreshEpoch)continue;
     if(kind==='vessel'&&Array.isArray(data.shipMasters)){
      const report=analyzeVessels(data),range=weeklyWindow(ym);
      if(!range.future&&range.start.slice(0,7)!==ym){
@@ -865,7 +883,7 @@ async function load(forceCloud=false){
       catch(error){report.weekError='跨月船舶資料尚未讀齊，請重新讀取';failures.push(report.weekError);}
       if(month()!==ym||!$('systems')?.classList.contains('show')||!permissions().vessel)return;
      }
-     render(report);
+     if(vesselEpochAtStart===vesselRefreshEpoch)render(report);
     }
     else if(kind==='attendance'&&Array.isArray(data.records)){
       if(p.schedule&&!scheduleSnapshot){
@@ -885,7 +903,7 @@ async function load(forceCloud=false){
       root.P79ReferenceDashboard?.setGroupRoster(data,ym);
     }
     else throw Error('該月份資料結構不完整');
-   }catch(error){const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message});renderHomeOvertimeList(null);} }
+   }catch(error){if(kind==='vessel'&&vesselEpochAtStart!==vesselRefreshEpoch)continue;const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message});renderHomeOvertimeList(null);} }
   }
   try{
    const data=await requestApprovedLeave(token);
@@ -932,6 +950,8 @@ function init(){
   const restEvidence=await verifiedHomeRestEvidence(schedule,ym,token);
   return {attendance,schedule,leaveData,restEvidence,month:ym};
  });
+ root.addEventListener?.('p79-home-import-complete',onHomeVesselImportComplete);
+ root.addEventListener?.('pageshow',event=>{if(event.persisted)void refreshImportedVessels();});
  ensurePendingReview();
  statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());
  selector?.addEventListener('change',()=>{loadedKey='';reset();statusText('p79DashMessage','正在準備所選月份資料…');statusText('p79DashMonthLabel',selectedMonthTitle());statusText('p79DashMonthLabel2',selectedMonthTitle());showWhenAdmin()});
