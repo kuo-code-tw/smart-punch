@@ -3382,12 +3382,12 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
     }
     function applyScheduleAttendanceMonthScope() {
       const visible=scheduleCanShowLiveAttendance(),panel=document.getElementById('todaySchedulePanel');
-      const dailyPage=document.documentElement.dataset.p79SchedulePage==='daily';
+      const dailyPage=document.documentElement?.dataset?.p79SchedulePage==='daily';
       // The daily page must show an explanatory notice, not a blank page, when
       // the month picker currently points to a different month.
       if(panel){
         panel.hidden=!visible&&!dailyPage;
-        const card=panel.querySelector('.today-schedule-card');
+        const card=panel.querySelector?.('.today-schedule-card');
         if(card)card.hidden=!visible;
       }
       const notice=document.getElementById('p79DailyMonthMismatchNotice');
