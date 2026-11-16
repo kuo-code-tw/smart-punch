@@ -78,7 +78,8 @@ assert(html.includes('result.conflicts||[]'));
 assert(html.includes("pre.textContent=findings.join"));
 assert(css.includes('.p79-audit-attention'));
 assert(html.includes('function p79ApplyAutomaticRestMetadata()'));
-assert(html.includes('EMERGENCY HOLD: no implicit quota allocation during saves'));
+assert(html.includes('Re-enable automatic quota metadata persistence ONLY as part of an'),'verified saves may persist auto 例休國');
+assert(html.includes('!scheduleEditLockState.mine'),'auto-write requires a valid editor lock');
 for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
  if(/\bsrc=|application\/json|importmap/.test(match[1]))continue;
  new vm.Script(match[2]);
