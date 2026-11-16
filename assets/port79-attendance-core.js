@@ -666,10 +666,16 @@ async function send(payload,timeout=25000){
   }
 }
 
+function p79TransientAttendanceError(error){
+  if(error?.retryable===false)return false;
+  const message=String(error?.message||error||'');
+  if(/CONFLICT|STALE_RECORD|原時間|原始時間|身分|權限|登入|已被|已由|已刪除|找不到|不存在|缺少/i.test(message))return false;
+  return /雲端目前正在處理其他資料|Failed to fetch|NetworkError|network request failed|Load failed|雲端.*忙碌|讀取逾時|寫入逾時/i.test(message)||error?.name==='AbortError';
+}
 function p79PauseAttendanceWrite(payload,error,attempts){
   const edit=['updateRecord','editRecord'].includes(String(payload?.action||''));
   const conflict=/原時間不符|原始時間不符|已由其他分頁修改|已被其他.*修改|TIME_CONFLICT|STALE_RECORD/i.test(String(error?.message||error||''));
-  return edit && (conflict || error?.retryable===false || attempts>=3);
+  return edit && (conflict || error?.retryable===false || (attempts>=3&&!p79TransientAttendanceError(error)));
 }
 function p79PunchUploadPriority(item){
   const action=String(item?.payload?.action||'');
@@ -777,6 +783,7 @@ async function drain(force=false){
         cur.attempts=attempts;
         cur.state='pending';
         cur.lastError=String(err?.message||err||'失敗');
+        cur.lastFailureRetryable=err?.retryable!==false;
         cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
@@ -856,6 +863,7 @@ async function drainFast(force=true, concurrency=4){
       cur.attempts=attempts;
       cur.state='pending';
       cur.lastError=String(err?.message||err||'失敗');
+        cur.lastFailureRetryable=err?.retryable!==false;
       cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
@@ -882,6 +890,9 @@ async function drainFast(force=true, concurrency=4){
         const action=String(item?.payload?.action||'');
         const rid=payloadRecordId(item?.payload);
         const bulk=action==='syncRecords'||action==='repairAttendanceRecords';
+        // Administrative edits share the GAS write lock; parallel edits only compete with each other.
+        const edit=['updateRecord','editRecord'].includes(action);
+        if(group.length&&(edit||group.some(x=>['updateRecord','editRecord'].includes(String(x.payload?.action||'')))))break;
 
         if(bulk){
           if(group.length===0){
@@ -1298,7 +1309,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       // 直送前已持久化；失敗時不能用舊 payload 覆蓋使用者後續修改。
       if(current){
         current.attempts=Number(current.attempts||0)+1;
-        current.lastError=reason;current.state='pending';
+        current.lastError=reason;current.lastFailureRetryable=err?.retryable!==false;current.state='pending';
         current.paused=p79PauseAttendanceWrite(payload,err,current.attempts);
         current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(payload,current.attempts);
         saveQueue(readQueue().map(x=>x.key===current.key&&samePayload(x.payload,payload)?current:x));
@@ -1383,6 +1394,18 @@ function p79PruneVerifiedDeletedRecordRetries20261010(){
 }
 window.p79PruneVerifiedDeletedRecordRetries20261010=p79PruneVerifiedDeletedRecordRetries20261010;
 
+function p79ResumeTransientAttendanceEdits(){
+  const q=readQueue();let changed=false;
+  for(const item of q){
+    if(!item?.paused||!['updateRecord','editRecord'].includes(String(item.payload?.action||'')))continue;
+    // Only known transport/lock failures. Unknown, withdrawn and conflict drafts stay paused.
+    if(item.lastFailureRetryable===false||!p79TransientAttendanceError(item.lastError))continue;
+    if(!/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}/.test(String(item.payload.originalTimeStr||'')))continue;
+    item.paused=false;item.state='pending';item.nextRetryAt=Date.now()+1500;
+    item.autoResumedTransientAt=Date.now();changed=true;
+  }
+  if(changed)saveQueue(q);
+}
 function p79ShortenOldPunchRetryWait(){
   // 只修正舊版留下的過長 nextRetryAt；保留所有 payload/ID/attempts，不重送 paused 項目。
   const q=readQueue(), now=Date.now();
@@ -1396,6 +1419,7 @@ function p79ShortenOldPunchRetryWait(){
 }
 document.addEventListener('DOMContentLoaded',()=>{
   p79PruneVerifiedDeletedRecordRetries20261010();
+  p79ResumeTransientAttendanceEdits();
   p79ShortenOldPunchRetryWait();
   updateUi();
   startDelta();
