@@ -13,7 +13,7 @@ html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-
 }
 html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar{
  display:grid!important;
- grid-template-columns:max-content minmax(0,1fr)!important;
+ grid-template-columns:max-content minmax(0,1fr) max-content!important;
  grid-template-rows:minmax(0,1fr)!important;
  column-gap:7px!important;row-gap:0!important;
  align-items:center!important;width:100%!important;
@@ -36,6 +36,21 @@ html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-
 }
 html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-actions>*{
  flex:0 0 auto!important;white-space:nowrap!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleCompactDropdowns{
+ grid-column:3!important;grid-row:1!important;
+ display:flex!important;align-items:center!important;justify-content:flex-end!important;
+ gap:4px!important;flex-wrap:nowrap!important;white-space:nowrap!important;
+ min-width:0!important;position:relative!important;
+ overflow:visible!important;z-index:15!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleCompactDropdowns>details{
+ position:relative!important;flex:0 0 auto!important;
+}
+html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleCompactDropdowns>details>div{
+ position:absolute!important;z-index:110!important;
+ top:calc(100% + 3px)!important;right:0!important;
+ max-height:min(65vh,500px)!important;overflow-y:auto!important;
 }
 html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-month button,
 html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar .p79-quick-actions>button,
@@ -149,7 +164,7 @@ html.dark body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSeco
 }
 @media(max-width:700px){
  html body.p79-workspace[data-p79-system="schedule"] #schedule-control-shell.p79-two-line-toolbar #p79ScheduleQuickBar{
-  grid-template-columns:max-content minmax(0,1fr)!important;
+  grid-template-columns:max-content minmax(0,1fr) max-content!important;
   padding:4px!important;gap:3px!important;
  }
  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleCompactSecondRow{
