@@ -1878,6 +1878,9 @@
     try{const chosen=selectedRow();if(!chosen)throw Error('請先選擇正確出勤時段；若沒有符合的選項，請新增加班規則');
      const date=el.querySelector('#p79OtDate').value,empId=el.querySelector('#p79OtEmp').value;
      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!empId)throw Error('請選擇員工與日期');
+     if(prefill.independentOvertime===true&&
+        (date!==String(prefill.date||'')||empId!==String(prefill.empId||'')))
+      throw Error('本人班別延時申報不可更換原選員工或日期，請重新開啟申報。');
      if(prefill.leaveHandoffId&&date!==String(prefill.workDate||prefill.date))
       throw Error('原請假／加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date)+
        '，實際出勤日 '+String(prefill.workDate||prefill.date)+'；不能把上班日期改成請假日。');
@@ -1901,10 +1904,12 @@
         ' 時段不符，不能替代申報；請核對代班安排與正式加班時段設定。');
      }
      verifyPlannedReviewSelection(chosen);
-     const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow()]);
+     const selectionKey=()=>JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value,el.querySelector('#p79OtNote').value,selectedRow(),!!prefill.independentOvertime]);
      const selection=selectionKey();
-     const validationRequest={empId,date,overtimeDate:prefill.overtimeDate||date,
-      coverDate:prefill.coverDate||date,leaveHandoffId:prefill.leaveHandoffId||''};
+     const validationRequest={empId,date,
+      overtimeDate:prefill.independentOvertime?date:(prefill.overtimeDate||date),
+      coverDate:prefill.independentOvertime?date:(prefill.coverDate||date),
+      leaveHandoffId:prefill.independentOvertime?'':(prefill.leaveHandoffId||'')};
      // Always read the current official rule table during preflight, including
      // original planned-review edits. Reuse this already verified snapshot
      // instead of performing a second GET after the Save spinner appears.
@@ -1925,6 +1930,14 @@
        throw Error('所選加班類型或時段已從雲端刪除、停用或換算已更新，請重新讀取雲端選項後核對。');
      }
      const selectedCategoryNow=chosen?.[0];
+     if(prefill.independentOvertime===true){
+      const ownRoster=validation.cloud.schedules.find(row=>
+       String(row.empId).trim().toUpperCase()===String(empId).trim().toUpperCase())?.schedule||{};
+      const shiftIssue=independentShiftOvertimeIssue(ownRoster[date],chosen);
+      if(shiftIssue)throw Error(shiftIssue);
+      if(String(forSelect.value||'')!==''||validationRequest.leaveHandoffId)
+       throw Error('本人延時加班不得關聯原請假代班；請重新開啟申報。');
+     }
      if(!editingOriginal&&['休','例','國','延'].includes(selectedCategoryNow)){
       const officialRoster=validation.cloud.schedules.find(row=>String(row.empId).trim().toUpperCase()===String(empId).trim().toUpperCase())?.schedule||{};
       const officialMeta=officialRoster.__meta?.[date]||{};
@@ -1951,7 +1964,7 @@
      const pair=editingOriginal&&!['代','延'].includes(selectedCategory)
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
-     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:prefill.leaveHandoffId||''});
+     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
      try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
      }catch(ignore){}
