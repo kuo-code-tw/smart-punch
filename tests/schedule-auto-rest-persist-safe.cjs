@@ -8,7 +8,7 @@ const html=fs.readFileSync('schedule/index.html','utf8');
 const allocation=fs.readFileSync('assets/port79-rest-allocation.js','utf8');
 const {p79AllocateRestMonth}=Function(allocation+
  ';return {p79AllocateRestMonth};')();
-const begin=html.indexOf('    function p79ApplyAutomaticRestMetadata() {');
+const begin=html.indexOf('    function p79ApplyAutomaticRestMetadata(planned=null) {');
 const end=html.indexOf('\n    }',begin);
 assert(begin>=0&&end>begin,'automatic save classifier exists');
 const isolated=html.slice(begin,end+6);
