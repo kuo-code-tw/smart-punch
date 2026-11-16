@@ -3513,12 +3513,15 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       const leaveCount=groups.休假.length;
       // All headline numbers reflect the actual current roster and verified live attendance.
       const currentAttendance=p79ScheduleAttendanceHasSynced&&!p79ScheduleAttendanceAuthExpired&&Date.now()-p79ScheduleAttendanceLastSyncedAt<=45000;
-      const checkedIn=[...scheduledWorking.values()].filter(x=>isScheduleEmployeeClockedIn(x.emp.id)).length;
-      const allIncluded=new Set([...scheduledWorking.keys(),...groups.休假.map(x=>x.emp.id)]);
+      // Main KPI compares the same roster-eligible headcount against active
+      // punches; the lower "班表人員" card is specifically working shifts.
+      const eligibleStaff=(employees||[]).filter(e=>scheduleEmployeeEligibleForMonth(e,dateKey.slice(0,7))&&p79EmployeeDateEligible(e,dateKey));
+      const allIncluded=new Set(eligibleStaff.map(e=>String(e.id||'')));
+      const checkedIn=eligibleStaff.filter(e=>isScheduleEmployeeClockedIn(e.id)).length;
       const kpi=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value);};
       kpi('p79RefAllCount',allIncluded.size+' 人');
       kpi('p79RefPresentCount',currentAttendance?checkedIn+' 人':'待核對');
-      kpi('p79RefAbsentCount',currentAttendance?Math.max(0,totalScheduled-checkedIn)+' 人':'待核對');
+      kpi('p79RefAbsentCount',currentAttendance?Math.max(0,allIncluded.size-checkedIn)+' 人':'待核對');
       kpi('p79RefLeaveCount',leaveCount+' 人');
       kpi('p79RefCoverCount',groups.加班代班.length+' 人');
       kpi('p79RefPresentNote',currentAttendance?'目前出勤中（未簽退）':'等待正式考勤同步');
