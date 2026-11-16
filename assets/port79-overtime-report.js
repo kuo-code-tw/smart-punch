@@ -1905,8 +1905,23 @@
       try{
        // The up-to-date rule was checked above. Do not block confirmed
        // posting on a redundant network read with another timeout.
-       const result=await awaitOvertimeSaveConfirmation(
-        global.p79OvertimeContext.saveReport(draft));
+       // Retry only an authoritative, no-write edit-lock refusal. Never
+       // replay a timeout or unknown POST result; preserve the original ID.
+       let result;
+       for(let attempt=0;attempt<3;attempt++){
+        try{
+         result=await awaitOvertimeSaveConfirmation(global.p79OvertimeContext.saveReport(draft));
+         break;
+        }catch(error){
+         const message=String(error?.message||'');
+         if(message!=='班表正在編輯，請待儲存完成後再申報')throw error;
+         if(attempt===2)throw Error('排班編輯鎖仍被占用，尚未寫入加班；原申報內容已保留。排班完成後可繼續申報，不必重新填寫。');
+         if(!el.isConnected||selectionKey()!==selection)
+          throw Error('申報視窗已關閉或內容已更動，停止自動重試；原申報內容已保留。');
+         el.querySelector('#p79OtStatus').textContent='排班正在編輯，未寫入加班；已保留原申報並自動重新核對 '+(attempt+1)+'/2…';
+         await new Promise(resolve=>setTimeout(resolve,1400*(attempt+1)));
+        }
+       }
        verifySavedReport(draft,result);
        if(draft.overtimeDate!==draft.date&&String(result?.report?.overtimeDate||'')!==draft.overtimeDate)
         throw Error('雲端未確認加班歸屬日 '+draft.overtimeDate+'；保留待核對，不可當作已申報。');
