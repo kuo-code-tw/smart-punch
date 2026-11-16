@@ -14,6 +14,7 @@ on:
       - 'assets/port79-schedule-rest-evidence.js'
       - 'assets/port79-rest-allocation.js'
       - 'tests/schedule-manual-rest-auto-refill.cjs'
+      - 'tests/schedule-timed-rest-quota-visible.cjs'
       - 'assets/port79-monthly-rest-overtime.js'
       - '.github/workflows/schedule-no-punch-rest.yml'
 permissions:
@@ -29,6 +30,7 @@ jobs:
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
       - run: node tests/schedule-manual-rest-auto-refill.cjs
+      - run: node tests/schedule-timed-rest-quota-visible.cjs
       - run: node tests/schedule-pre08-extension-regular-shift.cjs
       - run: node tests/schedule-short-punch-date-display.cjs
       - run: node tests/schedule-overtime-accounting-date.cjs

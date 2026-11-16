@@ -34,6 +34,15 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   const noNationalQuota=!quota.slots.some(slot=>slot.category==='國');
   // A saved bare 國 in a zero-national month was an off-day classification,
   // not proof that the employee worked. Reclassify in this calculation copy.
+  // The calendar also displays timed codes (例08-16 / 休16-24 / 國08-16)
+  // as statutory rest categories. Reserve those existing labels BEFORE
+  // placing any new automatic 例/休/國, or a 5例4休 roster becomes 6例3休.
+  // A plain 休 remains flexible, and 0-quota 國 is never reserved.
+  const fixedRosterRest=date=>{
+    const value=String(schedule[date]||'').trim();
+    const category=/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
+    return category==='休'&&value==='休'||category==='國'&&noNationalQuota?'':category;
+  };
   const isRestCandidate=date=>schedule[date]==='休'||
     (noNationalQuota&&schedule[date]==='國')||
     (observedOff.has(date)&&['早','中','晚'].includes(String(schedule[date]||'').trim()));
@@ -113,13 +122,14 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
   // own quota before allocating flexible 休 days, including imported cells
   // without metadata. Otherwise the grid and monthly ledger count different days.
   for(const date of dates){
-    const category=String(schedule[date]||'').trim(),item=result[date]||{};
-    if(!['例','國'].includes(category)||category==='國'&&noNationalQuota||
-       excluded.has(date)||typhoonProtected.has(date)||
+    const category=fixedRosterRest(date),item=result[date]||{};
+    if(!category||excluded.has(date)||typhoonProtected.has(date)||
        category==='國'&&nationalBlocked.has(date)||item.restCategory||
        item.restAllocationLocked||item.restCategoryLocked||item.restQuotaOvertime||
        item.overtime||item.overtimeReport||item.overtimeReports?.length||
-       item.forEmpId||item.type==='substitute'||item.manualRosterShift)continue;
+       item.forEmpId||item.type==='substitute')continue;
+    // manualRosterShift records where the shift came from; matching timed
+    // holiday labels still consume their category. This is calculation-only.
     result[date]={...item,restCategory:category,restAllocationSource:'roster'};
   }
   const flexible=new Set();
@@ -176,11 +186,17 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       used.add(date);
       continue;
     }
-    if(!item.restCategory||item.restAllocationSource==='auto-v1'||flexible.has(date)||
-       excluded.has(date)||item.restQuotaOvertime||!(isRestCandidate(date)||['例','國'].includes(String(schedule[date]||'').trim())))continue;
-    const index=slots.findIndex(s=>s.category===item.restCategory&&
-      (!item.restSourceDate||s.sourceDate===item.restSourceDate));
-    if(index<0)throw new Error('手動「'+item.restCategory+'」超過本月額度或來源日期不符：'+date);
+    const fixedCategory=fixedRosterRest(date);
+    const reservedCategory=fixedCategory||item.restCategory;
+    if(!reservedCategory||item.restAllocationSource==='auto-v1'&&!fixedCategory||
+       flexible.has(date)&&!fixedCategory||excluded.has(date)||
+       item.restQuotaOvertime||!(isRestCandidate(date)||fixedCategory))continue;
+    // The visible original code is authoritative for a fixed date. A stale
+    // non-formal restCategory must not reserve a different quota in parallel.
+    const sourceDate=fixedCategory&&fixedCategory!==item.restCategory?'':item.restSourceDate;
+    const index=slots.findIndex(s=>s.category===reservedCategory&&
+      (!sourceDate||s.sourceDate===sourceDate));
+    if(index<0)throw new Error('既有「'+reservedCategory+'」超過本月額度或來源日期不符：'+date);
     slots.splice(index,1);used.add(date);
   }
   const assign=(date,slot)=>{
