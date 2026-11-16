@@ -7,6 +7,7 @@ on:
       - 'leave/index.html'
       - 'work-hours/index.html'
       - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - 'tests/leave-cover-sameday-four-hour-stroke.cjs'
       - 'tests/overtime-leave-handoff-nextday-preplan.cjs'
       - 'tests/overtime-leave-handoff-dual-date-form.cjs'
       - 'tests/overtime-leave-handoff-save-guard.cjs'
@@ -22,6 +23,7 @@ on:
       - 'leave/index.html'
       - 'work-hours/index.html'
       - 'tests/overtime-night-leave-cover-individual-workday.cjs'
+      - 'tests/leave-cover-sameday-four-hour-stroke.cjs'
       - 'tests/overtime-leave-handoff-nextday-preplan.cjs'
       - 'tests/overtime-leave-handoff-dual-date-form.cjs'
       - 'tests/overtime-leave-handoff-save-guard.cjs'
@@ -42,6 +44,7 @@ jobs:
       - name: Check original leave date, each cover workday, and full-punch confirmation
         run: |
           node tests/overtime-night-leave-cover-individual-workday.cjs
+          node tests/leave-cover-sameday-four-hour-stroke.cjs
           node tests/overtime-leave-handoff-nextday-preplan.cjs
           node tests/overtime-leave-handoff-dual-date-form.cjs
           node tests/overtime-leave-handoff-save-guard.cjs
