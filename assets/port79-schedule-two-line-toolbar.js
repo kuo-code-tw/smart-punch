@@ -22,6 +22,16 @@
    status.id='p79ScheduleCompactStatus';
    const previousParents=[roles.closest('#schedule-control-shell > div'),
      legend.closest('#schedule-control-shell > div')];
+   // Keep the actual More/Legend dropdowns OUTSIDE the horizontally
+   // scrollable action strip, so their popups are never clipped.
+   const popups=document.createElement('div');
+   popups.id='p79ScheduleCompactDropdowns';
+   const actions=quick.querySelector('.p79-quick-actions');
+   if(actions){
+     for(const details of [...actions.querySelectorAll(':scope > details')])
+       popups.appendChild(details);
+     if(popups.children.length)quick.appendChild(popups);
+   }
    // Append moves existing live DOM nodes. Their event handlers and closures,
    // including save/refresh, edit-lock and status observers are preserved.
    filter.appendChild(roles);
