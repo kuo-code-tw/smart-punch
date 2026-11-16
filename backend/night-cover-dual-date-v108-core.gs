@@ -187,6 +187,19 @@ function p79DirectCoverCheckV107_(rows,request,rule,cover,leaves,coverDate){
  if(!valid(coverDate))throw Error('原請假日期無效');
  var leave=(leaves||[]).find(function(l){return String(l.id)===String(request.leaveHandoffId)&&String(l.empId).toUpperCase()===String(request.forEmpId).toUpperCase()&&l.status==='已核准'&&coverDate>=String(l.startDate||l.startTime).slice(0,10).replace(/\//g,'-')&&coverDate<=String(l.endDate||l.endTime||l.startDate||l.startTime).slice(0,10).replace(/\//g,'-');});
  if(!cover||!leave)throw Error('對應請假或代班安排已變更，未生成加班');
+ // New two-person leave cover is two explicit same-day four-hour periods.
+ // Keep the old adjacent-day rule for previously created historical reports.
+ if(request.coverPeriodMode==='same-day'){
+  if(cover.mode!=='two'||date!==coverDate)throw Error('兩位代班加班必須歸在原請假日 '+coverDate);
+  var workerIndex=(cover.workerIds||[]).findIndex(function(id){return String(id).toUpperCase()===String(request.empId).toUpperCase();});
+  if(workerIndex<0||workerIndex>1)throw Error('代班人員不在正式安排中');
+  var expectedStart=workerIndex===0?'16':'20',expectedEnd=workerIndex===0?'20':'24';
+  if(!['代','延'].includes(String(rule[0]))||Number(rule[2])!==4||
+     p79DirectMinute_(rule[6])!==p79DirectMinute_(expectedStart)||
+     p79DirectMinute_(rule[7])!==p79DirectMinute_(expectedEnd))
+   throw Error('原請假日 '+coverDate+' 的代班加班只能申報 '+expectedStart+':00–'+expectedEnd+':00（4 小時）');
+  return;
+ }
  if(date===coverDate&&rule[0]!=='延')return;
  if(cover.mode!=='two'){if(date!==coverDate)throw Error('此代班模式不支援跨日工作日期');return;}
  var target=rows.find(function(r){return String(r.empId).toUpperCase()===String(request.forEmpId).toUpperCase()&&p79DirectCoverShiftV107_(r,coverDate);});
