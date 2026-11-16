@@ -727,6 +727,7 @@ html.dark #todayScheduleLeaveSummary .today-leave-title{color:#fdba74}
   padding-left:8px!important;
   padding-right:8px!important;
 }
+#todaySchedulePanel .today-schedule-card[hidden]{display:none!important}
 #todaySchedulePanel .today-schedule-card{
   padding:7px!important;
   border-radius:10px!important;
@@ -3381,7 +3382,16 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
     }
     function applyScheduleAttendanceMonthScope() {
       const visible=scheduleCanShowLiveAttendance(),panel=document.getElementById('todaySchedulePanel');
-      if(panel)panel.hidden=!visible;
+      const dailyPage=document.documentElement.dataset.p79SchedulePage==='daily';
+      // The daily page must show an explanatory notice, not a blank page, when
+      // the month picker currently points to a different month.
+      if(panel){
+        panel.hidden=!visible&&!dailyPage;
+        const card=panel.querySelector('.today-schedule-card');
+        if(card)card.hidden=!visible;
+      }
+      const notice=document.getElementById('p79DailyMonthMismatchNotice');
+      if(notice)notice.hidden=visible;
       if(!visible)document.querySelectorAll('.today-attendance-active,.p79-person-checkin').forEach(el=>el.remove());
       return visible;
     }
