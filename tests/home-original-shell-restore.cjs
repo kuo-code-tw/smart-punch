@@ -15,6 +15,8 @@ assert(!js.includes("shell.style.setProperty('background'"),'do not override lig
 assert.match(js,/className='sys '\+\(permitted\?'is-available':'is-unavailable'\)/,'permission-aware lamp class is required');
 assert.match(js,/className='p79-status-light'/,'status light element is required');
 assert(!js.includes("a.style.opacity='0.55'"),'do not fade disabled menu links to unreadable opacity');
+assert(!js.includes("available.textContent=permitted?'可使用':'不可使用'"),'homepage must not replace live activity with fixed green availability');
+assert.match(html,/port79-home-cloud-status\\.js\\?v=20261117-live-cloud-v1/,'live home cloud poller must be loaded');
 assert(!js.includes("intro.innerHTML="),'homepage script must not overwrite native title');
 assert(!js.includes("card.querySelector('.name').textContent="),'native system names stay unchanged');
 assert(!js.includes("card.querySelector('.icon').innerHTML="),'native system icons stay unchanged');
@@ -47,23 +49,52 @@ function fn(name){
 const links=[];
 const list={children:[],replaceChildren(){this.children=[]},append(x){this.children.push(x);}};
 const menu={open:true,querySelector:()=>list};
-const statuses={children:[],replaceChildren(){this.children=[]},append(x){this.children.push(x);}};
+function element(tag='span'){
+ const n={tag,className:'',textContent:'',dataset:{},style:{display:''},attrs:{},children:[],
+  setAttribute(k,v){this.attrs[k]=v;},append(...items){this.children.push(...items);},
+  prepend(...items){this.children.unshift(...items);},
+  querySelector(selector){
+   if(selector==='.cloud-title')return this.children.find(c=>c.className==='cloud-title')||null;
+   if(selector==='.p79-sys-state')return this.children.find(c=>c.className==='p79-sys-state')||null;
+   const m=selector.match(/^\\[data-sys="([^"]+)"\\]$/);
+   return m?this.children.find(c=>c.dataset.sys===m[1])||null:null;
+  }
+ };
+ n.classList={toggle(k,enabled){
+  const a=new Set(n.className.split(/\\s+/).filter(Boolean));
+  if(enabled)a.add(k);else a.delete(k);
+  n.className=[...a].join(' ');
+ },contains(k){return n.className.split(/\\s+/).includes(k)}};
+ return n;
+}
+const statuses=element('div');
 const ids=['cardAttendance','cardSchedule','cardHr'];
-const sources=Object.fromEntries(ids.map((id,i)=>[id,{hidden:false,disabled:false,style:{display:''},querySelector(){return{textContent:['考勤系統','排班系統','人資管理系統'][i]}},click(){links.push(id)}}]));
+const sources=Object.fromEntries(ids.map((id,i)=>[id,{
+ hidden:false,disabled:false,style:{display:''},
+ querySelector(){return{textContent:['考勤系統','排班系統','人資管理系統'][i]}},
+ click(){links.push(id)}
+}]));
 const ctx={home:true,order:['attendance','schedule','hr'],meta:{attendance:['考勤管理'],schedule:['排班管理'],hr:['人資管理']},
- d:{getElementById(id){return id==='p79HomeFunctionMenu'?menu:id==='p79SevenStatus'?statuses:sources[id]||null;},createElement(){return{className:'',textContent:'',children:[],attrs:{},setAttribute(k,v){this.attrs[k]=v},append(...x){this.children.push(...x)}}}},
+ d:{getElementById(id){return id==='p79HomeFunctionMenu'?menu:id==='p79SevenStatus'?statuses:sources[id]||null;},createElement:tag=>element(tag)},
  homeNavAllowed:key=>key!=='hr',
  icon:key=>key,
  button:(name,cssName,markup,callback)=>({name,cssName,markup,click:callback})};
 const f=new Function('ctx','with(ctx){'+fn('syncHomeFunctionMenu')+';return syncHomeFunctionMenu}')(ctx);
 f();
-assert.deepEqual(list.children.map(x=>x.name),['考勤系統','排班系統'],'show original permitted system names, not modified labels');
-assert.equal(statuses.children.length,3,'show seven-system status entries including disabled ones');
-assert.equal(statuses.children[0].className,'sys is-available');
-assert.equal(statuses.children[0].children[0].className,'p79-status-light');
-assert.equal(statuses.children[0].children[2].textContent,'可使用');
-assert.equal(statuses.children[2].className,'sys is-unavailable');
-assert.equal(statuses.children[2].children[2].textContent,'不可使用');
+assert.deepEqual(list.children.map(x=>x.name),['考勤系統','排班系統'],'show original permitted system names');
+assert.equal(statuses.children.length,8,'cloud heading and all seven system chips remain visible');
+const attendance=statuses.querySelector('[data-sys="attendance"]');
+const schedule=statuses.querySelector('[data-sys="schedule"]');
+const hr=statuses.querySelector('[data-sys="hr"]');
+assert(attendance.classList.contains('is-available'));
+assert.equal(attendance.querySelector('.p79-sys-state').textContent,'狀態準備中…');
+assert.equal(attendance.children[2].className,'p79-status-light');
+assert(hr.classList.contains('is-unavailable'));
+assert.equal(hr.querySelector('.p79-sys-state').textContent,'無權限');
+attendance.querySelector('.p79-sys-state').textContent='寫入中';
+f();
+assert.strictEqual(statuses.querySelector('[data-sys="attendance"]'),attendance,'status node must not be replaced when permissions are synchronized');
+assert.equal(attendance.querySelector('.p79-sys-state').textContent,'寫入中','ongoing real cloud status must not reset to availability');
 // Execute the actual hamburger handler with a mock DOM; verify it never navigates.
 const toggleBegin=js.indexOf("const toggle=button('切換系統導覽'");
 const toggleEnd=js.indexOf('bar.append(toggle);',toggleBegin)+'bar.append(toggle);'.length;
